@@ -386,24 +386,49 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
    - **THE TIE HALF CANNOT LIVE INSIDE `riscv_crash_pred`** (found in
      phase C1, and it corrects the earlier "both halves are in hand at a
      completion" reading). The completion is the only mover of the tie,
-     and its channel to the crash side is `crash_inv`, whose body is the
+     and its channel to the crash side is `crash_inv`, whose body was the
      OPAQUE `iProp` field `riscv_crash_pred`: opening `crashN` yields
      that proposition, not its innards, so a half parked inside `P_fs`
      is unreachable to the mechanical update — and at `Pc := True` it
      does not exist at all, which makes the conjunct unmaintainable.
-     The fix is to **index the crash predicate by the block view**:
-     `riscv_crash_pred : (Z -> list (bv 8)) -> iProp Σ` with
-     `crash_inv := inv crashN (∃ P, ghost_var γtie (1/2) P ∗
-     riscv_crash_pred P)`. The half is then a SIBLING of the client's
-     predicate — allocatable at the trivial `Pc`, mechanically movable
-     by the completion (ghost_var is timeless, so the `∃P` strips), and
-     still exactly the tie `P_fs` needs, because the record's `fr_P` IS
-     the index. The permit correspondingly becomes
-     `∀ P P', ⌜write-relation P P'⌝ -∗ ▷ riscv_crash_pred P ==∗
-     ▷ riscv_crash_pred P' ∗ Q`, which keeps the identity permit free
-     for reads AND for any caller at a trivial `Pc` — the property that
-     lets the log's call sites stay unchanged until their real fupds
-     land. Full cost inventory: `../projects/fs-log.md`, phase C2.
+     **LANDED FIX (phase C2a): index the crash predicate by the DISK
+     IMAGE.** `riscv_crash_pred : (Z -> bv 8) -> iProp Σ` with
+     `crash_inv := inv crashN (∃ dk, disk_tie dk ∗ riscv_crash_pred dk)`,
+     and `state_interp`'s new FIXED conjunct `fs_tie_interp g :=
+     disk_tie (v_disk (dvirtio (gdev g)))`. The half is a SIBLING of the
+     client's predicate — allocatable at the trivial `Pc`, mechanically
+     movable by the completion (`ghost_var` is timeless, so the `∃dk`
+     strips inside the existing `crashN` opening), and exactly the tie
+     `P_fs` needs, because `P_fs` becomes a PREDICATE ON `dk` and owns no
+     tie ghost at all.
+   - **THE INDEX IS THE RAW BYTE FUNCTION, NOT THE BLOCK MAP.** Two
+     reasons, both load-bearing: `state_interp` lives below every FS
+     constant (BSIZE, the fs range), and — decisively — the completion
+     would otherwise owe a SECTOR-EVENNESS fact (`vs_sector_off` is
+     `sector * 512`, and only the driver knows its sectors are even).
+     At the raw index the completion's obligation is literally
+     `VirtioModel.disk_write`, and the block view (`FsCrash.fs_blocks`,
+     with `fs_blocks_write_eq`/`_ne` as its teeth) is a pure re-indexing
+     the FS layer applies on top.
+   - **A WRITE'S PERMIT IS NOT FREE, AND THAT IS THE HONEST CONTENT.**
+     The permit is indexed by the request's own write identity —
+     `disk_write_permit (w : disk_wr) Q := ∀ dk, ▷ Pc dk ==∗
+     ▷ Pc (wr_apply w dk) ∗ Q` with `disk_wr := option (Z * list (bv 8))`
+     (`None` = a read). `wr_apply None` is the identity ON THE NOSE, so a
+     READ's permit stays provable for an ARBITRARY `Pc` and the whole
+     read stack (bread and above) is untouched. A WRITE moves the index,
+     so no `Pc`-generic proof exists: an earlier claim that the trivial
+     write permit survives the reshape was WRONG. Until the real fupds
+     land, the three WAL write kinds carry the PURE, DELETABLE premise
+     `crash_pred_indifferent` (`∀ dk dk', ⊢ Pc dk -∗ Pc dk'`), which
+     `Pc := fun _ => True` satisfies.
+   - **THE PERMIT'S INDEX IS PINNED TO THE REQUEST BY THE SLOT.** The
+     permit-channel token gains the `disk_wr` as part of its ghost-map
+     value, and `VirtioProto.slot_pend_res` holds it AT `vs_wr sl` —
+     the slot's own write identity (`VirtioQueue.vs_wr`, with
+     `vslot_post_wr` as the completion's discharge). So nothing in
+     PermInv knows anything about virtio, and nothing in virtio knows
+     anything about the crash predicate.
    - Consequence for adequacy: `HPc : ⊢ Pc` cannot survive — a crash
      predicate that OWNS ghosts is never provable from nothing. The
      interface becomes "the client builds `Pc` from the ghosts adequacy

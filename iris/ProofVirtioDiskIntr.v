@@ -1173,7 +1173,7 @@ Section VtDevRam.
       phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero -∗
       (* the SPENT crash permit's token rides WITH the payoff, on its way
          from the completed slot to [DiskInv.parked_res] (PermInv.v) *)
-      (perm_done (dn_perm γd) (vs_perm sl) ∗
+      (perm_done (dn_perm γd) (vs_perm sl) (vs_wr sl) ∗
        ∃ bs : list (bv 8),
          ⌜length bs = vs_len sl⌝ ∗
          ⌜bs = vs_data sl⌝ ∗
@@ -1208,7 +1208,7 @@ Section VtDevRam.
                          disk_pub γd np ∗ disk_done_lb γd (S p) ∗
                          phys_map pin ∗
                          phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
-                         (perm_done (dn_perm γd) (vs_perm sl) ∗
+                         (perm_done (dn_perm γd) (vs_perm sl) (vs_wr sl) ∗
                           ∃ bs : list (bv 8),
                             ⌜length bs = vs_len sl⌝ ∗
                             ⌜bs = vs_data sl⌝ ∗
@@ -1869,7 +1869,7 @@ Section VtBody.
     (phys_map pin ∗
      phys_pointsto (vr_status (vs_req sl)) (DfracOwn 1) byte_zero ∗
      (* the SPENT crash permit's token, on its way to [DiskInv.parked_res] *)
-     perm_done (dn_perm γd) (vs_perm sl) ∗
+     perm_done (dn_perm γd) (vs_perm sl) (vs_wr sl) ∗
      (∃ bs : list (bv 8),
         ⌜length bs = vs_len sl⌝ ∗
         ⌜bs = vs_data sl⌝ ∗

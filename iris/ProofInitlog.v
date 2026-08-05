@@ -302,7 +302,7 @@ Section ProofInitlog.
                             pidv dq dqs m K eb C b.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
-    intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1.
+    intros pcE pj ret_tgt c_name c_cpu HK Hind Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1.
     destruct Hgeom as [Hcovok Hlogsub].
     subst eb.
     unfold K_initlog in HK.
@@ -1082,7 +1082,7 @@ Section ProofInitlog.
               cov logstart dev true 0%nat ([] : list (mword 32))
               (fun _ : nat => ([] : list (bv 8))) L D pidv dq
               C2 (K - 6)%nat true C b
-              HKit Hgeomok Hj Hgl eq_refl
+              HKit Hind Hgeomok Hj Hgl eq_refl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
@@ -1185,7 +1185,7 @@ Section ProofInitlog.
     iApply (WriteHead.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
               D2 (K - 6)%nat true C b
-              HKwh Hgeomok Hj Hgl eq_refl Hshape0
+              HKwh Hind Hgeomok Hj Hgl eq_refl Hshape0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [-]").

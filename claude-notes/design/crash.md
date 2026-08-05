@@ -219,30 +219,39 @@ GHOST mirror deliberately is not.
   image ghost is per-era and re-minted, and `P_fs`'s own state has to be
   fixed-layer or re-derivable, which is what recovery is for.
   - **A FIELD OF TYPE `iProp Σ` IS OPAQUE TO EVERY OPENER, and that
-    decides what may be parked inside it.** `crash_inv`'s body is the
-    field itself, so the disk thread's completion — the one opener —
-    gets the proposition, never its innards. Anything the MACHINE layer
+    decides what may be parked inside it.** `crash_inv`'s body used to be
+    the field itself, so the disk thread's completion — the one opener —
+    got the proposition, never its innards. Anything the MACHINE layer
     has to move at a completion (the FS tie's other half: a
     `ghost_var` ½ mirroring `v_disk`) therefore cannot be a conjunct of
     the client's `Pc`; it has to be a SIBLING of it in the invariant
-    body, which means indexing the field by the value being tied:
-    `riscv_crash_pred : (Z -> list (bv 8)) -> iProp Σ`. Found in
-    fs-log stage 4 phase C1; the reshape (and why it also keeps the
-    identity permit free) is written up in `design/fs-log.md`'s
-    stage-4 item 3 and `projects/fs-log.md`'s phase C2.
+    body, which means indexing the field by the value being tied. That
+    is now the shape (fs-log stage 4 phase C2a):
+    `riscv_crash_pred : (Z -> bv 8) -> iProp Σ` and
+    `crash_inv := inv crashN (∃ dk, disk_tie dk ∗ riscv_crash_pred dk)`,
+    against `state_interp`'s new FIXED conjunct `fs_tie_interp`. The
+    corollary for adequacy is that `HPc : ⊢ Pc` becomes
+    `⊢ |==> Pc (v_disk …)` — a crash predicate that OWNS ghosts is never
+    provable from nothing — and that a WRITE's permit is no longer free
+    (`design/fs-log.md`, stage-4 item 3).
   - **The stranded-fragment question is CLOSED by the per-era map**: a
     sleeper's `disk_bytes` fragments sit in the per-era `disk_inv`, so a
     crash abandons them together with the auth that remembers their keys.
     Nothing is lost, because the next boot's map is brand new.
 - `v_disk` changes in exactly ONE place (the device thread's DMA
   completion of an OUT slot, `vslot_post`), so that step carries the only
-  crash obligation in the whole kernel: `wp_disk_loop` opens `crash_inv`
-  and `disk_inv` together (disjoint namespaces) at that instant and spends
-  a WRITE PERMIT — `disk_write_permit := (▷ riscv_crash_pred ==∗ ▷
-  riscv_crash_pred)`, handed to it by `virtio_proto_step` — to
-  re-establish `P_fs`. A BASIC update suffices, with no mask annotation:
-  a serialized writer (xv6's log) needs nothing conditional. Disk reads
-  cost nothing (the identity permit).
+  crash obligation in the whole kernel: `wp_disk_loop` opens `crash_inv`,
+  `permN` and `disk_inv` together (disjoint namespaces) at that instant,
+  does the MECHANICAL update of the FS tie's two halves (it is the only
+  holder of both), and spends a WRITE PERMIT —
+  `disk_write_permit (w : disk_wr) Q := ∀ dk, ▷ riscv_crash_pred dk ==∗
+  ▷ riscv_crash_pred (wr_apply w dk) ∗ Q`, transported by `PermInv` and
+  INDEXED by the completing slot's own write identity (`VirtioQueue.vs_wr`,
+  pinned to the request by `VirtioProto.slot_pend_res`) — to re-establish
+  `P_fs`. A BASIC update suffices, with no mask annotation: a serialized
+  writer (xv6's log) needs nothing conditional. Disk reads cost nothing
+  (`w = None`, and `wr_apply None` is the identity ON THE NOSE, which is
+  what keeps every read caller's statement unchanged).
   - **Where the permit comes FROM is still open.** The intended source is
     the enqueuer (`virtio_disk_rw`'s caller), per the recorded vs_data
     rule, but the `vslot` cannot hold it: `disk_inv_body` must be

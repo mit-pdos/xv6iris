@@ -572,6 +572,42 @@ Proof.
     symmetry. apply lookup_ge_None_2. lia.
 Qed.
 
+(* A byte outside the written range reads through. *)
+Lemma disk_write_out (dk : Z -> bv 8) (off : Z) (bs : list (bv 8)) (a : Z) :
+  a < off \/ off + Z.of_nat (length bs) <= a ->
+  disk_write dk off bs a = dk a.
+Proof.
+  intros [Hlt|Hge]; unfold disk_write.
+  - rewrite (proj2 (Z.leb_gt off a)); [reflexivity|lia].
+  - destruct (off <=? a) eqn:Hle; [|reflexivity].
+    rewrite (lookup_ge_None_2 bs (Z.to_nat (a - off))); [reflexivity|].
+    apply Z.leb_le in Hle. lia.
+Qed.
+
+(* -- THE WRITE IDENTITY of one completed request (claude-notes/design/    *)
+(*    fs-log.md stage 4 phase C2a).                                         *)
+(*                                                                          *)
+(* The crash predicate is INDEXED by the disk image, so the write permit a  *)
+(* client deposits must say WHICH image the completion will move it to.     *)
+(* [disk_wr] is exactly that, as pure data the request slot can carry:      *)
+(* [None] for a request that moves no disk byte (a READ), [Some (off, bs)]  *)
+(* for one that writes [bs] at [off].  Keeping it an OPTION rather than a   *)
+(* degenerate write is what keeps a READ's permit FREE -- [wr_apply None]   *)
+(* is the identity ON THE NOSE, so [▷ Pc dk ==∗ ▷ Pc (wr_apply None dk)]    *)
+(* is provable for an ARBITRARY crash predicate and every read caller's     *)
+(* statement is unchanged.  (A [Some (0, [])] encoding would need funext to *)
+(* be the identity, and then reads would not be free.)                      *)
+Definition disk_wr : Type := option (Z * list (bv 8)).
+
+Definition wr_apply (w : disk_wr) (dk : Z -> bv 8) : Z -> bv 8 :=
+  match w with
+  | None => dk
+  | Some ob => disk_write dk ob.1 ob.2
+  end.
+
+Lemma wr_apply_none (dk : Z -> bv 8) : wr_apply None dk = dk.
+Proof. reflexivity. Qed.
+
 (* ---------------------------------------------------------------------- *)
 (* 4. The memory VIEW: what the device sees when it masters the bus.       *)
 (*                                                                        *)

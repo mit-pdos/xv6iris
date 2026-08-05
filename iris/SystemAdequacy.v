@@ -182,13 +182,18 @@ Theorem xv6_power_adequacy Σ
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
-  (* [Pc := True]: the crash predicate is the client's durability property,
-     and instantiating it is the FS layer's job (claude-notes/design/crash.md).
-     At [True] the crash invariant is allocated once into the fixed layer and
-     opened by nothing but the disk thread's completion permit -- so the
-     theorem says "never stuck", with the durability slot left open. *)
-  apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g (True : iProp Σ)
-           (bi.True_intro _) Hgen0 Hpow).
+  (* [Pc := fun _ => True]: the crash predicate is the client's durability
+     property, and instantiating it is the FS layer's job
+     (claude-notes/design/crash.md).  It is now INDEXED by the disk image
+     (phase C2a), and at the constant-[True] instance the index costs nothing:
+     the crash invariant is allocated once into the fixed layer -- carrying
+     the FS tie's other half beside the predicate -- and opened by nothing but
+     the disk thread's completion, which finds the index move free.  So the
+     theorem still says exactly "never stuck", with the durability slot left
+     open. *)
+  apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
+           (fun _ : Z -> bv 8 => True%I)
+           ltac:(iModIntro; done) Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS

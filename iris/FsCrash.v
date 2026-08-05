@@ -22,16 +22,16 @@
 (* MONO-LIST of committed [D]s whose persistent lower bounds are the       *)
 (* durability receipts [sys_sync] will hand out.                          *)
 (*                                                                        *)
-(* WHAT IS DELIBERATELY *NOT* IN HERE (phases C2/D):                       *)
-(*  - the [state_interp] side of the tie, and the DMA completion's         *)
-(*    mechanical update of both halves.  See the note above [fs_tie_state] *)
-(*    below: at [Pc := True] the completion provably cannot maintain a     *)
-(*    half-[ghost_var] conjunct, because the other half would have to live *)
-(*    inside [riscv_crash_pred], which is opaque to the completion.  The   *)
-(*    resolution (index [riscv_crash_pred] by the block view, so the tie   *)
-(*    half becomes a SIBLING conjunct of [crash_inv]'s body) is a seam     *)
-(*    reshape of PermInv/VirtioProto and is recorded in                    *)
-(*    claude-notes/projects/fs-log.md.                                     *)
+(* THE TIE IS NOW THE MACHINE LAYER'S (phase C2a, LANDED).                 *)
+(* [RiscvPtsto.riscv_crash_pred] is INDEXED by the disk image and           *)
+(* [crash_inv]'s body is [∃ dk, disk_tie dk ∗ riscv_crash_pred dk], so the  *)
+(* tie's two halves are [state_interp]'s conjunct and the invariant's own   *)
+(* sibling -- the DMA completion holds both and moves them mechanically.    *)
+(* [P_fs] therefore does NOT own a tie half: it is a PREDICATE ON [dk],     *)
+(* and the machine layer guarantees that [dk] is the real disk.  The block  *)
+(* view [fs_blocks dk] is where the FS's own vocabulary starts.            *)
+(*                                                                          *)
+(* WHAT IS DELIBERATELY *NOT* IN HERE (phases C2b/D):                       *)
 (*  - the generation SWAP protocol (the checked-out arm's era binding) --  *)
 (*    the arm exists here, the protocol is phase D's.                      *)
 (*  - the per-call-site permit fupds (each WAL write kind re-establishing  *)
@@ -239,9 +239,10 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Record fs_rec := MkFsRec {
-  (* the PHYSICAL disk, as blocks: tied to the machine's own [v_disk] *)
-  fr_P : Z -> list (bv 8);
-  (* the DURABLE home map: what recovery produces from [fr_P] right now *)
+  (* the DURABLE home map: what recovery produces from the PHYSICAL disk
+     right now.  The physical disk itself is no longer a field: it is the
+     crash predicate's INDEX (phase C2a), which the machine layer's tie pins
+     to the real [v_disk]. *)
   fr_D : gmap Z (list (bv 8));
   (* the committed HISTORY, oldest first; [fr_D] is its last element.  The
      mono-list's persistent lower bounds over this are the durability
@@ -249,12 +250,13 @@ Record fs_rec := MkFsRec {
   fr_hist : list (gmap Z (list (bv 8)));
 }.
 
-Definition fs_rec_wf (r : fs_rec) (cov : gset Z) (logstart : Z) : Prop :=
-  fs_recovery (fr_P r) (fr_D r) cov logstart /\
+Definition fs_rec_wf (r : fs_rec) (P : Z -> list (bv 8))
+    (cov : gset Z) (logstart : Z) : Prop :=
+  fs_recovery P (fr_D r) cov logstart /\
   last (fr_hist r) = Some (fr_D r).
 
-Lemma fs_rec_wf_hist_ne r cov logstart :
-  fs_rec_wf r cov logstart -> fr_hist r <> [].
+Lemma fs_rec_wf_hist_ne r P cov logstart :
+  fs_rec_wf r P cov logstart -> fr_hist r <> [].
 Proof. intros [_ Hlast] Hnil. rewrite Hnil in Hlast. discriminate. Qed.
 
 (* ====================================================================== *)
@@ -267,30 +269,27 @@ Proof. intros [_ Hlast] Hnil. rewrite Hnil in Hlast. discriminate. Qed.
 Notation fs_histO := (leibnizO (gmap Z (list (bv 8)))).
 Notation fs_histR := (mono_listR fs_histO).
 
-(* THE TIE's value type is the TOTAL block view (see [fs_blocks] above), so
-   the class is [ghost_varG Σ (Z -> list (bv 8))] -- a type no other ghost
-   in the tree uses, hence no instance ambiguity.  The FS BOOT TOKEN reuses
-   [WpLock.lock_tok_excl] rather than minting a second [ghost_varG Σ bool]
+(* The TIE needs no class here at all any more: it is the MACHINE layer's
+   ([RiscvPtsto.riscv_fstie_name], over the raw disk image), and [P_fs] is a
+   predicate on that image rather than an owner of a half.  The FS BOOT TOKEN
+   reuses [WpLock.lock_tok_excl] rather than minting a [ghost_varG Σ bool]
    (which WOULD be ambiguous against [riscvF_parkGS]). *)
 Class fsCrashG (Σ : gFunctors) := FsCrashG {
-  fscrash_tieG :: ghost_varG Σ (Z -> list (bv 8));
   fscrash_histG :: inG Σ fs_histR;
 }.
 
-Definition fsCrashΣ : gFunctors :=
-  #[ ghost_varΣ (Z -> list (bv 8)); GFunctor fs_histR ].
+Definition fsCrashΣ : gFunctors := #[ GFunctor fs_histR ].
 
 Global Instance subG_fsCrashΣ Σ : subG fsCrashΣ Σ -> fsCrashG Σ.
 Proof. solve_inG. Qed.
 
-(* The gname record [P_fs] is parameterized by.  The TIE's gname is here
-   rather than taken from the fixed layer on purpose: [riscv_crash_pred] is
-   a FIELD of [riscvFixedGS] and [P_fs] is what will instantiate it, so
-   [P_fs] must not itself mention that record -- it would be circular.
-   Adequacy allocates these, passes them to [P_fs], and (when the
-   [state_interp] conjunct lands) stores [fcn_tie] in the fixed layer. *)
+(* The gname record [P_fs] is parameterized by.  It stays a PARAMETER rather
+   than being read off the fixed layer, because [riscv_crash_pred] is a FIELD
+   of [riscvFixedGS] and [P_fs] is what instantiates it -- naming the record
+   inside itself would be circular.  Adequacy's obligation is discharged at
+   [Pc := fun dk => ∃ γs, P_fs γs … dk], whose existential is exactly
+   [P_fs_alloc]'s. *)
 Record fs_crash_names := MkFsCrashNames {
-  fcn_tie  : gname;   (* the 1/2-1/2 tie against [state_interp]'s disk view *)
   fcn_hist : gname;   (* the committed history, a mono-list *)
 }.
 
@@ -368,19 +367,6 @@ Section fs_crash.
   (* 2c. the tie's CLIENT-SIDE half and the receipts                       *)
   (* -------------------------------------------------------------------- *)
 
-  (* THE MACHINE-SIDE HALF of the tie: [state_interp]'s conjunct, at the
-     block view of the machine's own [v_disk].  It is stated here (rather
-     than in RiscvPtsto.v) because in this phase it has no home in
-     [state_interp] yet -- see the file header, and
-     claude-notes/projects/fs-log.md.  Every lemma below that consumes it
-     is exactly what the completion arm will consume once it does. *)
-  Definition fs_tie_state (γs : fs_crash_names)
-      (P : Z -> list (bv 8)) : iProp Σ :=
-    ghost_var (fcn_tie γs) (1/2) P.
-
-  Global Instance fs_tie_state_timeless γs P : Timeless (fs_tie_state γs P).
-  Proof. rewrite /fs_tie_state. apply _. Qed.
-
   (* A DURABILITY RECEIPT: persistent evidence that [D] was, at some point,
      the committed state.  (The lower bound records the whole prefix, so a
      receipt also pins everything committed before it -- which is what makes
@@ -406,43 +392,42 @@ Section fs_crash.
     (emp ∨ ∃ γg : gname, fs_boot_tok γg)%I.
 
   (* THE CRASH PREDICATE, i.e. the intended value of
-     [RiscvPtsto.riscv_crash_pred] (the adequacy [Pc] parameter).  Read it
-     as: there is a pure record [r] such that
-       - the machine's disk IS [fr_P r] (the tie's other half is the
-         [state_interp] conjunct [fs_tie_state]),
+     [RiscvPtsto.riscv_crash_pred] (the adequacy [Pc] parameter).  It is a
+     PREDICATE ON THE DISK IMAGE [dk], and the machine layer's tie
+     ([RiscvPtsto.disk_tie], whose other half is [state_interp]'s fixed
+     conjunct) is what guarantees that [dk] is the REAL disk -- so nothing
+     here has to own a ghost about it.  Read it as: there is a pure record
+     [r] such that
        - the committed history is [fr_hist r] (its lower bounds are the
          receipts already handed out), and
-       - [r] is WELL FORMED: recovery of the physical disk is the last
-         committed state.
-     Everything a client ever learns at a crash comes out of the third
-     conjunct; the first is what makes it a statement about the REAL disk
+       - [r] is WELL FORMED AT [dk]: recovery of the physical disk's block
+         view is the last committed state.
+     Everything a client ever learns at a crash comes out of the second
+     conjunct; the index is what makes it a statement about the REAL disk
      rather than about a ghost. *)
   Definition P_fs (γs : fs_crash_names) (cov : gset Z) (logstart : Z)
-      : iProp Σ :=
+      (dk : Z -> bv 8) : iProp Σ :=
     (∃ r : fs_rec,
-       ghost_var (fcn_tie γs) (1/2) (fr_P r) ∗
        fs_hist_auth (fcn_hist γs) (fr_hist r) ∗
-       ⌜fs_rec_wf r cov logstart⌝ ∗
+       ⌜fs_rec_wf r (fs_blocks dk) cov logstart⌝ ∗
        fs_arm)%I.
 
   (* -------------------------------------------------------------------- *)
-  (* 3a. what [P_fs] SAYS, against the machine-side tie                     *)
+  (* 3a. what [P_fs] SAYS                                                   *)
   (* -------------------------------------------------------------------- *)
 
-  (* THE HEADLINE.  With the [state_interp] half in hand -- i.e. knowing
-     that the real disk's block view is [P] -- the crash predicate says the
-     real disk recovers to the last committed state.  This is the fact a
-     crash-time client (recovery, sys_sync) consumes, and the reason the tie
-     exists at all: without it [P_fs] would be a statement about a ghost. *)
-  Lemma P_fs_recovers γs cov logstart (P : Z -> list (bv 8)) :
-    P_fs γs cov logstart -∗ fs_tie_state γs P -∗
+  (* THE HEADLINE.  At the disk image the machine layer's tie pins, the crash
+     predicate says the REAL disk recovers to the last committed state.  This
+     is the fact a crash-time client (recovery, sys_sync) consumes. *)
+  Lemma P_fs_recovers γs cov logstart dk :
+    P_fs γs cov logstart dk -∗
       ⌜exists (D : gmap Z (list (bv 8)))
               (h : list (gmap Z (list (bv 8)))),
-         fs_recovery P D cov logstart /\ h <> [] /\ last h = Some D⌝.
+         fs_recovery (fs_blocks dk) D cov logstart /\
+         h <> [] /\ last h = Some D⌝.
   Proof.
-    rewrite /P_fs /fs_tie_state.
-    iIntros "Hp Ht". iDestruct "Hp" as (r) "(Htie & _ & %Hwf & _)".
-    iDestruct (ghost_var_agree with "Htie Ht") as %<-.
+    rewrite /P_fs.
+    iIntros "Hp". iDestruct "Hp" as (r) "(_ & %Hwf & _)".
     iPureIntro. exists (fr_D r), (fr_hist r).
     destruct Hwf as [Hrec Hlast].
     split_and!; [exact Hrec | | exact Hlast].
@@ -450,12 +435,13 @@ Section fs_crash.
   Qed.
 
   (* a receipt is honest: what it names really was committed *)
-  Lemma P_fs_receipt_committed γs cov logstart D :
-    P_fs γs cov logstart -∗ fs_receipt γs D -∗
-      ⌜exists r : fs_rec, fs_rec_wf r cov logstart /\ D ∈ fr_hist r⌝.
+  Lemma P_fs_receipt_committed γs cov logstart dk D :
+    P_fs γs cov logstart dk -∗ fs_receipt γs D -∗
+      ⌜exists r : fs_rec,
+         fs_rec_wf r (fs_blocks dk) cov logstart /\ D ∈ fr_hist r⌝.
   Proof.
     rewrite /P_fs /fs_receipt.
-    iIntros "Hp Hr". iDestruct "Hp" as (r) "(_ & Hauth & %Hwf & _)".
+    iIntros "Hp Hr". iDestruct "Hp" as (r) "(Hauth & %Hwf & _)".
     iDestruct "Hr" as (l) "Hlb".
     iDestruct (fs_hist_valid with "Hauth Hlb") as %[k Hk].
     iPureIntro. exists r. split; [exact Hwf|].
@@ -467,50 +453,43 @@ Section fs_crash.
   (* 3b. ALLOCATION -- mkfs's obligation, discharged                        *)
   (* -------------------------------------------------------------------- *)
 
-  (* [P_fs] holds INITIALLY, from nothing but the pure fact that the
-     pristine disk recovers to [D0].  The two outputs are what adequacy
-     keeps: the machine-side tie half (destined for [state_interp]) and the
-     initial durability receipt.
-
-     This is the C1 form of the adequacy hypothesis [HPc : ⊢ Pc].  Note the
-     shape difference and why it is forced: [Pc] can no longer be provable
-     from NOTHING once it owns ghosts, so the adequacy interface must move
-     from "⊢ Pc" to "the client builds Pc from the ghosts adequacy
-     allocates" -- which is exactly this lemma's [|==> ∃ γs, …]. *)
-  Lemma P_fs_alloc (P0 : Z -> list (bv 8)) (D0 : gmap Z (list (bv 8)))
+  (* [P_fs] holds INITIALLY, from nothing but the pure fact that the pristine
+     disk recovers to [D0].  This IS the shape of adequacy's [HPc] premise
+     ([RiscvAdequacy.riscv_system_adequacy]): a build-from-nothing entailment
+     UNDER AN UPDATE, because a crash predicate that owns ghosts is never
+     provable from nothing.  The client instantiates
+     [Pc := fun dk => ∃ γs, P_fs γs cov logstart dk] and discharges the
+     obligation with this lemma. *)
+  Lemma P_fs_alloc (dk0 : Z -> bv 8) (D0 : gmap Z (list (bv 8)))
       (cov : gset Z) (logstart : Z) :
-    fs_recovery P0 D0 cov logstart ->
+    fs_recovery (fs_blocks dk0) D0 cov logstart ->
     ⊢ |==> ∃ γs : fs_crash_names,
-        P_fs γs cov logstart ∗ fs_tie_state γs P0 ∗ fs_receipt γs D0.
+        P_fs γs cov logstart dk0 ∗ fs_receipt γs D0.
   Proof.
     intros Hrec.
-    iMod (ghost_var_alloc P0) as (γt) "Ht".
-    iEval (rewrite -Qp.half_half) in "Ht".
-    iDestruct (ghost_var_split with "Ht") as "[HtA HtB]".
     iMod (fs_hist_alloc [D0]) as (γh) "[Hauth #Hlb]".
-    iModIntro. iExists (MkFsCrashNames γt γh).
-    iSplitR "HtB"; [| iSplitL "HtB" ].
-    - rewrite /P_fs. iExists (MkFsRec P0 D0 [D0]).
-      iFrame "HtA Hauth".
+    iModIntro. iExists (MkFsCrashNames γh).
+    iSplitL "Hauth".
+    - rewrite /P_fs. iExists (MkFsRec D0 [D0]).
+      iFrame "Hauth".
       iSplitR.
       { iPureIntro. rewrite /fs_rec_wf /=. split; [exact Hrec | reflexivity]. }
       rewrite /fs_arm. by iLeft.
-    - rewrite /fs_tie_state /=. iExact "HtB".
     - rewrite /fs_receipt /=. iExists []. iExact "Hlb".
   Qed.
 
   (* The mkfs corollary: a freshly formatted disk has an EMPTY on-disk log,
      so its committed state is just its home blocks and no recovery
      hypothesis has to be assumed at all. *)
-  Lemma P_fs_alloc_clean (P0 : Z -> list (bv 8))
-      (cov : gset Z) (logstart : Z) :
-    hdr_n (P0 (log_hdr_bno logstart)) = 0 ->
+  Lemma P_fs_alloc_clean (dk0 : Z -> bv 8) (cov : gset Z) (logstart : Z) :
+    hdr_n (fs_blocks dk0 (log_hdr_bno logstart)) = 0 ->
     ⊢ |==> ∃ γs : fs_crash_names,
-        P_fs γs cov logstart ∗ fs_tie_state γs P0 ∗
-        fs_receipt γs (fs_restrict P0 (fs_home_set cov logstart)).
+        P_fs γs cov logstart dk0 ∗
+        fs_receipt γs (fs_restrict (fs_blocks dk0)
+                         (fs_home_set cov logstart)).
   Proof.
     intros Hn. iApply P_fs_alloc.
-    by apply (fs_recovery_clean P0 _ cov logstart Hn).
+    by apply (fs_recovery_clean (fs_blocks dk0) _ cov logstart Hn).
   Qed.
 
 End fs_crash.

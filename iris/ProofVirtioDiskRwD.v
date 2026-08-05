@@ -1369,6 +1369,37 @@ Proof.
   cbn [rw_slot vs_req vr_sector]. rewrite Ho. reflexivity.
 Qed.
 
+(* THE PUBLISHED SLOT'S CRASH-PERMIT INDEX (phase C2a): what this request
+   does to the disk image, in the vocabulary of the CALLER's arguments.
+   Independent of the head index and of the buffer address, which is exactly
+   what lets the permit be deposited BEFORE the descriptor chain is chosen. *)
+Definition vdrwd_wr (wr : SailStdpp.Values.mword 64) (sec_off : Z)
+    (bs_buf : list (bv 8)) : disk_wr :=
+  if vdrwd_out wr then Some (sec_off, bs_buf) else None.
+
+Lemma vdrwd_slot_is_out (kq : nat * positive) (b : Arch.pa) (h : nat)
+    (wr sector : SailStdpp.Values.mword 64) (bs : list (bv 8)) :
+  vs_is_out (vdrwd_slot kq b h wr sector bs) = vdrwd_out wr.
+Proof.
+  unfold vs_is_out, vdrwd_out, vdrwd_slot. cbn [rw_slot vs_req vr_type].
+  reflexivity.
+Qed.
+
+Lemma vdrwd_slot_wr (kq : nat * positive) (b : Arch.pa) (h : nat)
+    (wr sector : SailStdpp.Values.mword 64)
+    (bs_buf bs_disk : list (bv 8)) (sec_off : Z) :
+  (bv_unsigned sector * 512)%Z = sec_off ->
+  vs_wr (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk))
+  = vdrwd_wr wr sec_off bs_buf.
+Proof.
+  intro Hoff. unfold vs_wr, vdrwd_wr.
+  rewrite vdrwd_slot_is_out.
+  destruct (vdrwd_out wr) eqn:Ho; [|reflexivity].
+  rewrite (vdrwd_slot_off kq b h wr sector _ (bv_unsigned sector) eq_refl) Hoff.
+  unfold vs_data, vdrwd_slot. cbn [rw_slot].
+  unfold vdrwd_sldata. rewrite Ho. reflexivity.
+Qed.
+
 (* ===================================================================== *)
 (* §6  P4 -- +0x162 .. +0x186, the ring write and THE PUBLISH.            *)
 (* ===================================================================== *)
@@ -1422,7 +1453,7 @@ Section VdrwdP4.
        spent into the published slot here (PermInv.v).  It is the TIMELESS
        skeleton of the client's view shift: the shift itself is in
        [perm_inv], keyed by [kq], and the DMA completion runs it. *)
-    perm_pend (dn_perm γd) kq -∗
+    perm_pend (dn_perm γd) kq (vdrwd_wr wr sec_off bs_buf) -∗
     ( ∀ (M1 : regfile) pin,
         ⌜(forall r : mword 5, is_cs_idx r = true -> M1 !!! Regidx r = M !!! Regidx r)
          /\ M1 !!! Regidx Ra1 = M !!! Regidx Ra1⌝ -∗
@@ -1724,7 +1755,9 @@ Section VdrwdP4.
                        (vdrwd_sldata wr bs_buf bs_disk)
                        (bv_unsigned sector) eq_refl) Hoff.
             iExact "Hdisk".
-          * (* [vs_perm (vdrwd_slot kq …) = kq] by conversion *)
+          * (* [vs_perm (vdrwd_slot kq …) = kq] by conversion; the permit's
+               INDEX has to be rewritten to the slot's own [vs_wr]. *)
+            rewrite (vdrwd_slot_wr kq b h wr sector bs_buf bs_disk sec_off Hoff).
             iExact "Hpend". }
     iIntros "Hcg Hpc Hpub Hrcpt".
     assert (Hp182 : add_vec_int (mword_of_int (VRW + 0x17e) : mword 64) 4

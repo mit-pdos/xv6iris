@@ -111,6 +111,10 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      the preserved disk content.  [DiskImg.v] owns the class, so the era auth
      and [DiskPtsto]'s fragments share the instance. *)
   riscv_pre_diskGS :: diskImgG Σ;
+  (* the FS TIE (claude-notes/design/fs-log.md stage 4 phase C2a): the
+     [ghost_var] over the whole disk image whose halves are [state_interp]'s
+     fixed conjunct and [crash_inv]'s body. *)
+  riscv_pre_fstieGS :: ghost_varG Σ (Z -> bv 8);
 }.
 
 Definition riscvΣ : gFunctors :=
@@ -128,7 +132,8 @@ Definition riscvΣ : gFunctors :=
      ghost_varΣ bool;
      mono_natΣ;
      ghost_mapΣ nat riscvEraGS;
-     diskImgΣ ].
+     diskImgΣ;
+     ghost_varΣ (Z -> bv 8) ].
 
 Global Instance subG_riscvGpreS {Σ} : subG riscvΣ Σ -> riscvGpreS Σ.
 Proof. solve_inG. Qed.
@@ -340,7 +345,7 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        [disk_bytes] fragments and whatever abstract-state ghosts the FS
        keeps); nothing between here and the disk thread's DMA completion --
        the only place it is opened -- ever names it. *)
-    (Pc : iProp Σ)
+    (Pc : (Z -> bv 8) -> iProp Σ)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
     (* the SINGLE-GENERATION form (crash.md): the machine is already booted
        and running generation 0 -- the power thread is not in this pool, so
@@ -348,13 +353,17 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        adequacy (pool = [PowerLoop]) supersedes this at milestone M6. *)
     (Hpow : g.(gpow) = true) (Hgen0 : g.(ggen) = 0%nat)
     (Hgid : gen_id = 0%nat)
-    (* the crash predicate must hold BEFORE anything runs -- mkfs's
-       obligation.  Stated as an entailment from nothing because the
-       fixed-layer ghosts it could speak about are allocated inside this
-       proof; minting the client's initial [disk_bytes] over the pristine
-       image (so that [Pc] can be about the disk at all) lands with the FS
-       instantiation. *)
-    (HPc : ⊢ Pc) :
+    (* THE CRASH PREDICATE MUST HOLD BEFORE ANYTHING RUNS -- mkfs's
+       obligation -- AT THE INITIAL DISK IMAGE.  A BUILD-FROM-NOTHING
+       ENTAILMENT UNDER AN UPDATE, not a plain one: once [Pc] owns ghosts (a
+       committed-history mono-list, the FS names) it is no longer provable
+       from nothing, and it cannot receive gnames allocated here either --
+       the field must be a fixed function.  The shape a real client uses is
+       therefore [Pc := fun dk => ∃ names, P_fs names … dk], whose
+       obligation is exactly [FsCrash.P_fs_alloc].  The TIE's own half is NOT
+       part of [Pc]: it is a sibling conjunct of [crash_inv]'s body,
+       allocated and installed here. *)
+    (HPc : ⊢ |==> Pc (v_disk (g.(gdev).(dvirtio)))) :
   (forall HR : riscvGS Σ,
      ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D c,
@@ -465,16 +474,30 @@ Proof.
   iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γdisk) "Hdiskauth".
   set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark γdisk).
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
-  (* the crash-spanning invariant, over the client's [Pc].  Allocated at the
-     FIXED layer, so it outlives every era; both power arms leave it closed. *)
-  iMod (inv_alloc crashN ⊤ Pc with "[]") as "#Hcinv"; [ iNext; iApply HPc |].
+  (* THE FS TIE, minted at the machine's own disk image and split: one half
+     goes into [state_interp]'s fixed conjunct below, the other into
+     [crash_inv]'s body beside the client's predicate.  FIXED-layer, so both
+     survive every power cycle -- which is what makes the crash predicate a
+     statement about the REAL disk rather than about a ghost. *)
+  iMod (ghost_var_alloc (v_disk (g.(gdev).(dvirtio)))) as (γtie) "Htie".
+  iEval (rewrite -Qp.half_half) in "Htie".
+  iDestruct (ghost_var_split with "Htie") as "[HtieS HtieC]".
+  (* the crash-spanning invariant, over the client's [Pc] AND the tie's other
+     half.  Allocated at the FIXED layer, so it outlives every era; both
+     power arms leave it closed. *)
+  iMod (HPc) as "HPc0".
+  iMod (inv_alloc crashN ⊤
+          (∃ dk : Z -> bv 8,
+             ghost_var γtie (1/2)%Qp dk ∗ Pc dk)%I with "[HtieC HPc0]")
+    as "#Hcinv".
+  { iNext. iExists (v_disk (g.(gdev).(dvirtio))). iFrame "HtieC HPc0". }
   assert (Hemp0 : (∅ : gmap nat riscvEraGS) !! 0%nat = None)
     by apply lookup_empty.
   iMod (ghost_map_insert 0%nat E0 Hemp0 with "HRauth") as "[HRauth HRelem]".
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
-                  _ Pc)
+                  _ _ γtie Pc)
                E0).
   (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
      layer's boot client has the same raw inputs at a fresh era and reuses
@@ -520,10 +543,11 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ (@riscv_fixedGS Σ HR))).
   cbv zeta beta.
-  iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth Hdiskauth".
+  iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth Hdiskauth HtieS".
   { (* the initial state interpretation: generation 0, power on, the one
        registered era, its image map empty *)
-    rewrite /power_interp. iFrame "Hgenauth Hstartauth".
+    rewrite /power_interp /fs_tie_interp /disk_tie.
+    iFrame "Hgenauth Hstartauth HtieS".
     iExists {[ 0%nat := E0 ]}. iFrame "HRauth".
     iSplitR.
     { iPureIntro. rewrite dom_singleton_L /start_count Hpow Hgen0 /=.
@@ -608,13 +632,15 @@ Corollary riscv_device_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId} (g
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof.
-  (* a device-only machine has no durability property to keep: [Pc := True],
-     whose invariant is allocated and then never opened by anything but the
-     completion arm's (identity) permit. *)
+  (* a device-only machine has no durability property to keep:
+     [Pc := fun _ => True], INDEX AND ALL -- the crash predicate ignores the
+     disk image, so its invariant is allocated and then never opened by
+     anything but the completion arm, which finds the index move free. *)
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0
-           (True : iProp Σ) Hram
-           Hpow Hgen0 Hgid (bi.True_intro _)).
+           (fun _ : Z -> bv 8 => True%I) Hram
+           Hpow Hgen0 Hgid).
+  { iModIntro. done. }
   intros HR.
   iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
             #Hcinv & #Hcert)".
@@ -760,7 +786,7 @@ Section power.
     iIntros "#Hcinv".
     iLöb as "IH".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & Htie & HR)".
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
     destruct (g.(gpow)) eqn:Hpw.
     - (* PowerOff: bump the generation, drop the power *)
@@ -783,12 +809,15 @@ Section power.
       iMod "Hback" as "_". iModIntro.
       rewrite /start_count Hpw /= in Hdom.
       iEval (rewrite /start_count Hpw /=) in "Hsauth".
-      iSplitL "Hgauth Hsauth HRauth".
+      iSplitL "Hgauth Hsauth HRauth Htie".
       { rewrite /state_interp /=.
         unfold power_interp, start_count.
         cbn [ggen gpow gregs gmem gdev].
         replace (S (g.(ggen)) + 0)%nat with (g.(ggen) + 1)%nat by lia.
-        iFrame "Hgauth Hsauth".
+        (* the FS tie is FRAMED: a power loss touches no disk byte, so the
+           machine-side half is already at the right image.  This is exactly
+           why the tie is a FIXED conjunct and not part of [era_interp]. *)
+        iFrame "Hgauth Hsauth Htie".
         (* the era is dropped WHOLE, its image map with it: nothing is owed
            (the map's only reader was this era's own disk thread, and every
            fragment of it dies in this era's invariants).  The next PowerOn
@@ -880,12 +909,19 @@ Section power.
         iExact "Hstartlb". }
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
-      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth".
+      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth Htie".
       { rewrite /state_interp /=.
         unfold power_interp, start_count.
         cbn [ggen gpow gregs gmem gdev].
         rewrite Hgen2 Hpow2.
-        iFrame "Hgauth Hsauth".
+        (* the FS tie is FRAMED across the boot too: [boot_shape] resets the
+           device but KEEPS [v_disk] ([VirtioModel.virtio_reset]), so the
+           machine-side half is still at the right image. *)
+        assert (Hdk2 : v_disk (dvirtio (gdev g)) = v_disk (dvirtio (gdev g2)))
+          by (rewrite Hvirt2; reflexivity).
+        iEval (rewrite /fs_tie_interp /disk_tie Hdk2) in "Htie".
+        rewrite /fs_tie_interp /disk_tie.
+        iFrame "Hgauth Hsauth Htie".
         iExists (<[g.(ggen) := HE]> R). iFrame "HRauth".
         iSplitR.
         { iPureIntro.
@@ -923,7 +959,8 @@ Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        which is what makes a durability property span power cycles.  Taken
        before [Hboot] so the [crash_inv] inside [power_boot_res] is this
        one. *)
-    (Pc : iProp Σ) (HPc : ⊢ Pc)
+    (Pc : (Z -> bv 8) -> iProp Σ)
+    (HPc : ⊢ |==> Pc (v_disk (g.(gdev).(dvirtio))))
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* the client boots ANY era over ANY machine of the reset shape; what it
        is told about that machine is [RiscvLang.boot_facts] (RAM total and
@@ -955,12 +992,23 @@ Proof.
   iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgauth _]".
   iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hsauth _]".
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
-  iMod (inv_alloc crashN ⊤ Pc with "[]") as "#Hcinv"; [ iNext; iApply HPc |].
+  (* THE FS TIE, at the powered-off machine's own disk image: one half into
+     [state_interp]'s fixed conjunct, one into [crash_inv]'s body.  Both
+     survive every power cycle, which is the point. *)
+  iMod (ghost_var_alloc (v_disk (g.(gdev).(dvirtio)))) as (γtie) "Htie".
+  iEval (rewrite -Qp.half_half) in "Htie".
+  iDestruct (ghost_var_split with "Htie") as "[HtieS HtieC]".
+  iMod (HPc) as "HPc0".
+  iMod (inv_alloc crashN ⊤
+          (∃ dk : Z -> bv 8,
+             ghost_var γtie (1/2)%Qp dk ∗ Pc dk)%I with "[HtieC HPc0]")
+    as "#Hcinv".
+  { iNext. iExists (v_disk (g.(gdev).(dvirtio))). iFrame "HtieC HPc0". }
   (* no disk image map is allocated here: the machine starts POWERED OFF, so
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
   set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-              _ Pc).
+              _ _ γtie Pc).
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -969,10 +1017,12 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ F)).
   cbv zeta beta.
-  iSplitL "Hgauth Hsauth HRauth".
+  iSplitL "Hgauth Hsauth HRauth HtieS".
   { (* the initial state interpretation: OFF, nothing ever started, no era
-       and hence no image map *)
-    rewrite /power_interp. iFrame "Hgauth Hsauth".
+       and hence no image map -- but the FS tie IS there: it is fixed-layer,
+       so it exists even with the power off. *)
+    rewrite /power_interp /fs_tie_interp /disk_tie.
+    iFrame "Hgauth Hsauth HtieS".
     iExists ∅. iFrame "HRauth".
     iSplitR.
     { iPureIntro. rewrite dom_empty_L /start_count Hpow /=.

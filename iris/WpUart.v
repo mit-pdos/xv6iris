@@ -909,7 +909,7 @@ Section DevLoops.
        over because a DMA completion is the one step that moves [v_disk]): the
        latch and stutter arms FRAME it, and the completion arm passes it
        through [virtio_proto_step] (claude-notes/design/crash.md). *)
-    iIntros (gr m d) "(Hgr & Hmem & Hdev & Hdur)".
+    iIntros (gr m d) "(Hgr & Hmem & Hdev & Hdur & Htie)".
     (* THE PERMIT INVARIANT IS OPENED IN THE FIRST (⊤ -> ∅) LEG, before the
        arm is even known.  It has to be: [perm_inv_body] is NOT timeless (it
        holds the clients' view shifts), so the only [▷]-stripping opportunity
@@ -941,7 +941,10 @@ Section DevLoops.
       (* the protocol step is an ACCESSOR over the permit channel: it hands
          out the completing request's PENDING token and owes the SPENT one *)
       iMod (virtio_proto_step γd vs m mv vnew w Hview Hdisk
-              with "Hmem Hdur Hlease") as (kq) "[Hpend Hback]".
+              with "Hmem Hdur Hlease") as (kq wr) "(%Hwr & Hpend & Hback)".
+      (* the post-write image, in the form the tie's two halves must move to *)
+      assert (Hpost : wr_apply wr (v_disk (dvirtio d)) = v_disk vnew)
+        by (rewrite Hv Hwr; reflexivity).
       (* THE COMMIT INSTANT -- the linearization point of every disk write in
          the system.  The durable image has just changed, so the crash
          predicate is re-established HERE, by running the client's own view
@@ -950,10 +953,25 @@ Section DevLoops.
          stripped: it is arbitrary, hence not timeless, and the permit's type
          takes it under the later.  This is the only opening of [crashN] in
          the tree. *)
-      iInv "Hcinv" as "HP" "Hcclose".
-      iMod (perm_consume_kq (dn_perm γd) kq with "Hpbody Hpend HP")
-        as "(Hpbody & Hdone & HP)".
-      iMod ("Hcclose" with "HP") as "_".
+      iInv "Hcinv" as "HPbody" "Hcclose".
+      (* The body's TIE HALF is timeless (a [ghost_var]), so it strips out
+         from under the invariant's later while the client's predicate stays
+         under it -- which is exactly what the permit's type wants. *)
+      iDestruct "HPbody" as (dk) "[>Htie2 HP]".
+      iDestruct (disk_tie_agree with "Htie Htie2") as %<-.
+      (* THE CLIENT'S VIEW SHIFT, at the image the machine is moving FROM;
+         it lands the crash predicate at [wr_apply wr] of it. *)
+      iMod (perm_consume_kq (dn_perm γd) kq wr (v_disk (dvirtio d))
+              with "Hpbody Hpend HP") as "(Hpbody & Hdone & HP)".
+      (* THE MECHANICAL TIE UPDATE: both halves, together, to the image the
+         device just produced.  It is the completion's own job -- the client
+         cannot do it (it holds neither half) and nobody else in the machine
+         ever holds both. *)
+      iMod (disk_tie_update _ _ (v_disk vnew) with "Htie Htie2")
+        as "[Htie Htie2]".
+      iEval (rewrite Hpost) in "HP".
+      iMod ("Hcclose" with "[Htie2 HP]") as "_".
+      { iNext. iExists (v_disk vnew). iFrame "Htie2 HP". }
       iDestruct ("Hback" with "Hdone") as "(Hmem' & Hdur' & Hlease')".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.
@@ -964,6 +982,7 @@ Section DevLoops.
       iEval (rewrite Himg) in "Hdauth'".
       iSplitL "Hdauth'".
       { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
+      iFrame "Htie".
       iApply "IH".
     - (* The queue the driver published is MALFORMED, so the device may write
          anything anywhere.  This case is REFUTED, not handled: the lease's
@@ -997,11 +1016,14 @@ Section DevLoops.
       iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
       iSplitL "Hdauth".
       { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+      (* a latch moves only the PLIC: the FS tie is FRAMED *)
+      iFrame "Htie".
       iApply "IH".
     - (* the totality stutter (RiscvLang §3c) *)
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev".
-      iSplitL "Hdur"; [iExact "Hdur"|]. iApply "IH".
+      iSplitL "Hdur"; [iExact "Hdur"|].
+      iFrame "Htie". iApply "IH".
   Qed.
 
   (* ------------------------------------------------------------------ *)

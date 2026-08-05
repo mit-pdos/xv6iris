@@ -1152,7 +1152,12 @@ Section VirtioProto.
        ⌜length bs = vs_len sl⌝ ∗
        ⌜vs_is_out sl = false -> bs = vs_data sl⌝ ∗
        disk_bytes γ (vs_sector_off sl) bs ∗
-       perm_pend (dn_perm γ) (vs_perm sl))%I.
+       (* THE PERMIT'S INDEX IS PINNED TO THE REQUEST (phase C2a): the token
+          rides here AT [vs_wr sl], the slot's own write identity, which is
+          what lets the DMA completion discharge the reshaped permit's
+          obligation ([VirtioQueue.vslot_post_wr]) without the permit
+          channel knowing anything about the virtio protocol. *)
+       perm_pend (dn_perm γ) (vs_perm sl) (vs_wr sl))%I.
 
   Definition slot_done_res (γ : disk_names) (c : virtio_cfg)
       (dma : gmap Arch.pa (bv 8)) (p : nat) (sl : vslot) : iProp Σ :=
@@ -1173,7 +1178,7 @@ Section VirtioProto.
        (* the SPENT permit's token: the completion moved the cell to [false]
           and parked the receipt in [PermInv]; this is what the woken
           publisher presents to collect it. *)
-       perm_done (dn_perm γ) (vs_perm sl))%I.
+       perm_done (dn_perm γ) (vs_perm sl) (vs_wr sl))%I.
 
   (* the completion record mentions only three windows of the lease, so it
      rides through any change to the lease that leaves those bytes alone *)
@@ -1565,9 +1570,13 @@ Section VirtioProto.
     virtio_req_step v mv = Some (v', w) ->
     gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
     virtio_proto γ v ==∗
-      ∃ kq : nat * gname,
-        perm_pend (dn_perm γ) kq ∗
-        (perm_done (dn_perm γ) kq -∗
+      ∃ (kq : nat * gname) (wr : disk_wr),
+        (* THE WRITE IDENTITY the completion needs to spend the permit: what
+           this request did to the disk image, as pure data.  [None] for a
+           read, so a read's completion moves no index at all. *)
+        ⌜v_disk v' = wr_apply wr (v_disk v)⌝ ∗
+        perm_pend (dn_perm γ) kq wr ∗
+        (perm_done (dn_perm γ) kq wr -∗
            gen_heap_interp (w ∪ m) ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
            virtio_proto γ v').
   Proof.
@@ -1701,7 +1710,9 @@ Section VirtioProto.
           * apply elem_of_union_r. exact Hc. }
     (* rebuild, AS THE ACCESSOR: the completing slot's pending token goes
        out, and the caller owes the spent one back at the same key. *)
-    iModIntro. iExists (vs_perm sl). iFrame "Hpend0". iIntros "Hdone0".
+    iModIntro. iExists (vs_perm sl), (vs_wr sl).
+    iSplitR; [iPureIntro; apply vslot_post_wr|].
+    iFrame "Hpend0". iIntros "Hdone0".
     iFrame "Hm".
     iSplitL "Hauth".
     { iExists dmap'. iFrame "Hauth". iPureIntro. exact Hdv'. }
@@ -2094,7 +2105,7 @@ Section VirtioProto.
        (* the SPENT crash permit's token: the completion already ran the
           client's view shift and parked the receipt in [PermInv]; this is
           what the woken publisher presents to collect it. *)
-       perm_done (dn_perm γ) (vs_perm sl) ∗
+       perm_done (dn_perm γ) (vs_perm sl) (vs_wr sl) ∗
        (∃ bs : list (bv 8),
           ⌜length bs = vs_len sl⌝ ∗
           ⌜bs = vs_data sl⌝ ∗

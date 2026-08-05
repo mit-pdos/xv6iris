@@ -609,6 +609,23 @@ Definition vslot_post (v : virtio_state) (sl : vslot) : virtio_state :=
                then disk_write (v_disk v) (vs_sector_off sl) (vs_data sl)
                else v_disk v).
 
+(* THE SLOT'S WRITE IDENTITY (claude-notes/design/fs-log.md stage 4 phase
+   C2a): what this request does to the disk image, as the pure
+   [VirtioModel.disk_wr] datum a crash permit is indexed by.  Derived from
+   the slot, so nothing has to be recorded twice -- the tie between the
+   permit's index and the request is [VirtioProto.slot_pend_res] holding the
+   pending token AT [vs_wr sl], and [vslot_post_wr] below is what lets the
+   DMA completion discharge the permit's obligation. *)
+Definition vs_wr (sl : vslot) : disk_wr :=
+  if vs_is_out sl then Some (vs_sector_off sl, vs_data sl) else None.
+
+Lemma vslot_post_wr (v : virtio_state) (sl : vslot) :
+  v_disk (vslot_post v sl) = wr_apply (vs_wr sl) (v_disk v).
+Proof.
+  unfold vslot_post, vs_wr, wr_apply. cbn [v_disk].
+  destruct (vs_is_out sl); reflexivity.
+Qed.
+
 Definition vslot_writes (c : virtio_cfg) (ui : bv 16) (dk : Z -> bv 8)
     (sl : vslot) : gmap Arch.pa (bv 8) :=
   let r := vs_req sl in

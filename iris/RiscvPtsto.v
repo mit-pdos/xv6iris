@@ -11,6 +11,10 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.
 Require Export DiskImg.  (* [diskImgG]/[disk_img_auth]: the disk image map *)
+(* [disk_write]/[disk_wr]/[wr_apply]: the disk image and the pure write
+   identity a crash permit is indexed by.  Safe to import here -- DiskImg.v
+   already does, and this file re-exports it. *)
+Require Import VirtioModel.
 Require Import PtreeType.   (* [ptree]: the carrier of the shared kernel table's ghost *)
 Local Open Scope Z_scope.
 
@@ -250,13 +254,40 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      same instance, and RiscvPtsto sits BELOW DiskPtsto, so neither file can
      take the class from the other. *)
   riscvF_diskGS :: diskImgG Σ;
+  (* THE FS TIE (claude-notes/design/fs-log.md stage 4 phase C2a): a
+     [ghost_var] over the WHOLE disk image function, split 1/2 - 1/2 between
+     [state_interp]'s fixed conjunct ([fs_tie_interp] below, always at the
+     machine's own [v_disk]) and [crash_inv]'s body.  FIXED-layer, because it
+     is what must survive a power cycle -- the disk does, so its mirror must
+     too, unlike the per-era image map above.
+
+     THE VALUE IS THE RAW BYTE FUNCTION, not a block map.  Every FS constant
+     (BSIZE, the fs range) lives above [SystemAdequacy], and the block view is
+     a pure re-indexing the FS layer applies on top ([FsCrash.fs_blocks]); the
+     completion's own obligation is then exactly [VirtioModel.disk_write],
+     with no sector-alignment side condition anywhere in the device stack.
+
+     The [ghost_varG Σ (Z -> bv 8)] instance is unique in a [riscvGS]
+     context (no other ghost in the tree carries that type), so there is no
+     resolution ambiguity. *)
+  riscvF_fstieGS :: ghost_varG Σ (Z -> bv 8);
+  riscv_fstie_name : gname;
   (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
-     durability invariant over the disk image -- an ARBITRARY iProp, sealed
-     into [crash_inv] below.  A plain iProp field is legal here (only the ERA
-     record has to be Σ-free, because it is a [ghost_map] VALUE), and it is
-     what keeps [P_fs] out of every [dev_inv]-adjacent signature: no proof
-     between here and the device thread ever names it. *)
-  riscv_crash_pred : iProp Σ;
+     durability invariant over the disk image, sealed into [crash_inv] below.
+
+     INDEXED BY THE DISK IMAGE (phase C2a).  It used to be a bare [iProp Σ],
+     and that shape cannot carry the tie: a field of type [iProp Σ] is OPAQUE
+     to every opener, so a [ghost_var] half parked INSIDE the client's
+     predicate is unreachable to the DMA completion -- which is the only
+     mover of the tie -- and at a trivial [Pc] it does not exist at all.
+     Indexing the field instead puts the tie half BESIDE the client's
+     predicate in [crash_inv]'s body, where the completion can move it
+     mechanically, while the index is exactly what a real [P_fs] needs to
+     talk about the real disk.
+
+     Still an ARBITRARY predicate, and still nothing between here and the
+     device thread names it. *)
+  riscv_crash_pred : (Z -> bv 8) -> iProp Σ;
 }.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
@@ -360,7 +391,33 @@ Definition gen_cert `{!riscvGS Σ} `{GEN : GenId} : iProp Σ :=
 
 Definition crashN : namespace := nroot .@ "crash".
 
-Definition crash_inv `{!riscvFixedGS Σ} : iProp Σ := inv crashN riscv_crash_pred.
+(* ONE HALF of the FS tie, at a given disk image.  [state_interp] holds the
+   other half at the machine's own [v_disk] ([fs_tie_interp] below), so the
+   two together say that the crash predicate is about THIS disk.  Both halves
+   are in hand exactly at the DMA completion: [wp_disk_step] hands over
+   [state_interp]'s, and opening [crashN] yields the body's. *)
+Definition disk_tie `{!riscvFixedGS Σ} (dk : Z -> bv 8) : iProp Σ :=
+  ghost_var riscv_fstie_name (1/2) dk.
+
+Global Instance disk_tie_timeless `{!riscvFixedGS Σ} dk : Timeless (disk_tie dk).
+Proof. rewrite /disk_tie. apply _. Qed.
+
+(* the two halves always agree, and only a holder of BOTH can move them --
+   which is exactly the DMA completion, and nobody else in the machine. *)
+Lemma disk_tie_agree `{!riscvFixedGS Σ} (dk dk' : Z -> bv 8) :
+  disk_tie dk -∗ disk_tie dk' -∗ ⌜dk = dk'⌝.
+Proof. rewrite /disk_tie. iApply ghost_var_agree. Qed.
+
+Lemma disk_tie_update `{!riscvFixedGS Σ} (dk dk' dk'' : Z -> bv 8) :
+  disk_tie dk -∗ disk_tie dk' ==∗ disk_tie dk'' ∗ disk_tie dk''.
+Proof. rewrite /disk_tie. iApply ghost_var_update_halves. Qed.
+
+(* THE CRASH INVARIANT.  The tie half is a SIBLING of the client's predicate,
+   not a conjunct of it: the completion must move it mechanically and cannot
+   look inside an opaque [iProp] field.  The existential is what makes the
+   body allocatable at ANY client predicate, including the trivial one. *)
+Definition crash_inv `{!riscvFixedGS Σ} : iProp Σ :=
+  inv crashN (∃ dk : Z -> bv 8, disk_tie dk ∗ riscv_crash_pred dk).
 
 Global Instance crash_inv_persistent `{!riscvFixedGS Σ} : Persistent crash_inv.
 Proof. rewrite /crash_inv. apply _. Qed.
@@ -382,17 +439,45 @@ Proof. rewrite /crash_inv. apply _. Qed.
    "if the disk still looks like X" guard, no mask annotation (a basic update
    goes through at whatever mask [wp_disk_loop] holds while [crashN],
    [PermInv.permN] and [diskN] are all open). *)
-Definition disk_write_permit `{!riscvFixedGS Σ} (Q : iProp Σ) : iProp Σ :=
-  (▷ riscv_crash_pred ==∗ ▷ riscv_crash_pred ∗ Q)%I.
+Definition disk_write_permit `{!riscvFixedGS Σ} (w : disk_wr) (Q : iProp Σ)
+    : iProp Σ :=
+  (∀ dk : Z -> bv 8,
+     ▷ riscv_crash_pred dk ==∗ ▷ riscv_crash_pred (wr_apply w dk) ∗ Q)%I.
 
-(* The identity permit, at the trivial receipt: a write that promises nothing
-   about durability is exactly a write whose permit is the identity and whose
-   receipt is [True].  Every enqueuer that has no crash obligation of its own
-   deposits THIS, so a caller that does not care about durability keeps its
-   statement (see [SpecVirtioDiskRw]'s trivial instantiation). *)
-Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} : ⊢ disk_write_permit True.
+(* THE IDENTITY PERMIT, and why it is still free.  A request that moves no
+   disk byte carries [w = None], and [wr_apply None] is the identity ON THE
+   NOSE, so the two occurrences of the crash predicate are syntactically the
+   same and the permit is provable for an ARBITRARY client predicate.  Every
+   READ deposits this, which is what keeps the whole read stack (bread and
+   everything above it) textually unchanged by the C2a reshape. *)
+Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} :
+  ⊢ disk_write_permit None True.
 Proof.
-  rewrite /disk_write_permit. iIntros "HP". iModIntro. iFrame "HP".
+  rewrite /disk_write_permit. iIntros (dk) "HP". iModIntro.
+  rewrite wr_apply_none. iFrame "HP".
+Qed.
+
+(* A REAL WRITE'S PERMIT IS NOT FREE, and that is the honest content of the
+   reshape: the completion moves the crash predicate's index, so somebody has
+   to say what the predicate does under that move.  A system that promises
+   NOTHING about durability -- [Pc := fun _ => True], which is what both
+   adequacy theorems still instantiate -- satisfies the pure side condition
+   below, and then even a write's permit costs nothing.
+
+   This is the PHASE C2a BRIDGE: the three WAL write kinds
+   (write_head / install_trans / end_op, plus initlog which calls two of
+   them) carry [crash_pred_indifferent] as a pure premise until their real
+   fupds land in C2b, at which point the premise is DELETED rather than
+   discharged.  It is deliberately a [Prop] and not a resource, so nothing
+   has to be threaded through any wand chain. *)
+Definition crash_pred_indifferent `{!riscvFixedGS Σ} : Prop :=
+  forall dk dk' : Z -> bv 8, ⊢ (riscv_crash_pred dk -∗ riscv_crash_pred dk')%I.
+
+Lemma disk_write_permit_indifferent `{!riscvFixedGS Σ} (w : disk_wr) :
+  crash_pred_indifferent -> ⊢ disk_write_permit w True.
+Proof.
+  intros Hind. rewrite /disk_write_permit. iIntros (dk) "HP". iModIntro.
+  iSplitL "HP"; [| done]. iNext. iApply (Hind dk (wr_apply w dk) with "HP").
 Qed.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
@@ -1149,8 +1234,19 @@ Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp 
    dev_interp_at E g.(gdev) ∗
    disk_dur_interp E g)%I.
 
+(* THE FS TIE's MACHINE SIDE: [state_interp]'s half, always at the machine's
+   own disk image.  A FIXED conjunct, NOT part of [era_interp]: the disk (and
+   hence its mirror) is the one thing a power cycle preserves, so the tie must
+   survive PowerOff -- both power arms simply FRAME it ([boot_shape] preserves
+   [v_disk]).  Of the whole machine only the DMA completion moves [v_disk], so
+   only [RiscvExec.wp_disk_step] hands this conjunct to its callback; the hart,
+   UART and PLIC rules frame it through their own [v_disk]-preservation
+   lemmas. *)
+Definition fs_tie_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
+  disk_tie (v_disk (dvirtio (gdev g))).
+
 Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
-  (gen_auth g.(ggen) ∗ start_auth (start_count g) ∗
+  (gen_auth g.(ggen) ∗ start_auth (start_count g) ∗ fs_tie_interp g ∗
    (∃ R : gmap nat riscvEraGS,
       ghost_map_auth riscv_registry_name 1 R ∗
       ⌜dom R = set_seq 0 (start_count g)⌝ ∗

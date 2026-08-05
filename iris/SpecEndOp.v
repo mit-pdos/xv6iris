@@ -106,6 +106,16 @@ Definition wp_end_op_sconf_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_end_op <= K)%nat ->
+  (* PHASE C2a BRIDGE (claude-notes/design/fs-log.md stage 4; DELETED in
+     C2b, not discharged).  The crash predicate is INDEXED by the disk image,
+     so this function's interior [bwrite] can no longer mint a free identity
+     permit: a write MOVES the index.  Until this WAL write kind's real
+     durability fupd lands, the contract carries the pure side condition that
+     the system promises nothing about durability -- which is exactly what
+     [Pc := fun _ => True] satisfies, and what both adequacy theorems still
+     instantiate.  It is a [Prop], so it threads as an ordinary premise and
+     costs no wand-chain plumbing. *)
+  crash_pred_indifferent ->
   (* the covered range's block-number bounds (bread's 2^31 arithmetic
      premise, and 0 is never a client block) and the fact that the log's own
      storage is covered -- the commit path breads the header and every log

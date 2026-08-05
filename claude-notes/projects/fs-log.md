@@ -234,57 +234,75 @@ preserve v_disk: the record-P does not move, so the power arms frame it.
       **three** call sites, not four — ProofInitlog calls write_head and
       install_trans, never bwrite — and each is a one-line-class edit
       (`True%I` + `disk_write_permit_trivial`), specs unchanged.
-- [ ] **C2 — THE BLOCKER, and the reshape it forces (found in C1).**
-      `state_interp`'s half of the tie **cannot be added while
-      `Pc := True`**, and the reason is structural, not a proof
-      difficulty: a `ghost_var γtie (1/2) …` conjunct can only be moved
-      by someone holding BOTH halves, the mover is the DMA completion,
-      and the completion's only channel to the crash side is
-      `riscv_crash_pred` — an OPAQUE `iProp Σ` field it cannot
-      destructure. So the other half has nowhere to live. (Every
-      alternative home fails too: an era invariant dies at PowerOff and
-      the fixed half could never be re-paired at the next boot; the boot
-      client cannot hold it because it is not the thread that completes;
-      and a lone half at fraction 1 in `state_interp` is a placeholder
-      that C2 would have to undo.)
-      **The resolution — INDEX THE CRASH PREDICATE BY THE BLOCK VIEW.**
-      Retype `riscv_crash_pred : (Z -> list (bv 8)) -> iProp Σ` and make
-      the tie half a SIBLING conjunct of the invariant body:
-      ```
-      crash_inv := inv crashN
-        (∃ P, ghost_var riscv_fstie_name (1/2) P ∗ riscv_crash_pred P)
-      ```
-      Then (i) the body is allocatable at `Pc := fun _ => True` from the
-      split half, so nothing has to be all-or-nothing; (ii) the
-      completion opens `crashN`, agrees the two halves (ghost_var is
-      timeless, so the `∃P` strips), updates BOTH mechanically to
-      `fs_blocks (v_disk d')` — the mechanical update stays with the
-      completion, as designed — and only then runs the client fupd; and
-      (iii) `disk_write_permit_trivial` stays provable for a WRITE at the
-      trivial `Pc`, which is what keeps the three log call sites and
-      `SpecVirtioDiskRw`'s read path free. The permit becomes
-      `∀ P P', ⌜wrel P P'⌝ -∗ ▷ riscv_crash_pred P ==∗
-       ▷ riscv_crash_pred P' ∗ Q`; `wrel` is the write identity, which
-      the completion must now export from `VirtioProto.virtio_proto_step`
-      (the completing slot's recorded request — the `vs_data` precedent),
-      and `PermInv.perm_slot`/`perm_consume`/`perm_consume_kq` re-type
-      alongside. Cost: RiscvPtsto (2 new fixed fields — the class
-      `ghost_varG Σ (Z -> list (bv 8))` and `riscv_fstie_name` — plus
-      `power_interp`'s 4th FIXED conjunct, `crash_inv`, the permit),
-      RiscvExec's four base rules (M5a conjunct surgery; the hart/uart
-      arms frame the conjunct through `run_v_disk`/`uart_step_v_disk`,
-      plic through nothing, and `wp_disk_step` hands it to the callback),
-      WpUart's completion arm, RiscvAdequacy (`riscvGpreS`/`riscvΣ`, the
-      two `RiscvFixedGS` constructor applications, the ghost_var
-      allocation at both theorems, and the two power arms' framing), and
-      the `HPc : ⊢ Pc` interface — which must become "the client builds
-      Pc from the ghosts adequacy allocated" (`P_fs_alloc`'s shape),
-      because a `Pc` that owns ghosts is never provable from nothing.
-- [ ] **C2 (cont.) — the four WAL write kinds' fupds** at the three
-      bwrite call sites (log-fill / commit(n,W) / install / clear), each
-      re-establishing `fs_rec_wf` at the new P from its own local
-      knowledge, and `SystemAdequacy` finally passing `P_fs` as `Pc`.
-      Checkpoint.
+- [x] **C2a — the seam reshape (LANDED).** `state_interp` gained the FS
+      tie, and the crash predicate is indexed by the disk image. File by
+      file:
+      - `VirtioModel.v`: `disk_write_out`; `disk_wr := option (Z * list
+        (bv 8))`, `wr_apply`, `wr_apply_none`.
+      - `VirtioQueue.v`: `vs_wr sl` (the slot's write identity) and
+        `vslot_post_wr : v_disk (vslot_post v sl) = wr_apply (vs_wr sl)
+        (v_disk v)` — the completion's discharge, by `destruct`.
+      - `RiscvPtsto.v`: two new FIXED fields (`riscvF_fstieGS ::
+        ghost_varG Σ (Z -> bv 8)`, `riscv_fstie_name`); `riscv_crash_pred
+        : (Z -> bv 8) -> iProp Σ`; `disk_tie` + `disk_tie_agree` /
+        `disk_tie_update`; `crash_inv := inv crashN (∃ dk, disk_tie dk ∗
+        riscv_crash_pred dk)`; `fs_tie_interp g := disk_tie (v_disk
+        (dvirtio (gdev g)))` as `power_interp`'s THIRD (fixed) conjunct;
+        `disk_write_permit (w : disk_wr) Q`; `disk_write_permit_trivial`
+        (the `None` instance, still free); `crash_pred_indifferent` +
+        `disk_write_permit_indifferent` (the C2b bridge).
+      - `RiscvExec.v`: the four base rules destructure the new conjunct;
+        hart/uart frame it through a SYMMETRIC restatement of their
+        `v_disk`-preservation lemma stated BEFORE the `destruct` that
+        substitutes the post-state away (`Hvd2`, then `iEval (rewrite
+        /fs_tie_interp Hvd2) in "Htie"`); plic frames it as is;
+        `wp_disk_step` hands it to the callback and demands it back at
+        `d'`.
+      - `PermInv.v`: the token's ghost-map value is `(bool * gname *
+        disk_wr)`; `perm_slot`/`perm_tok`/`perm_pend`/`perm_done` and all
+        six lemmas carry `w`; `perm_consume` takes the pre-image `dk` and
+        lands the predicate at `wr_apply w dk`.
+      - `VirtioProto.v`: `slot_pend_res`/`slot_done_res` hold the token AT
+        `vs_wr sl`; `virtio_proto_step` exports `(kq, wr)` plus
+        `⌜v_disk v' = wr_apply wr (v_disk v)⌝`.
+      - `WpUart.v` (`wp_disk_loop`): the completion strips the body's
+        timeless tie half out from under the invariant's later, agrees it
+        with `state_interp`'s, runs the client fupd at the OLD image, then
+        `disk_tie_update`s BOTH halves to `v_disk vnew` and re-closes.
+      - `DiskInv.v` (`rw_slot_wr`), `ProofVirtioDiskRwD.v` (`vdrwd_wr`,
+        `vdrwd_slot_is_out`, `vdrwd_slot_wr`), `ProofVirtioDiskRwDSeam.v`,
+        `ProofVirtioDiskRwF.v` (the deposit at the spec's index, converted
+        to the slot's by `vdrwf_out_iff`), `ProofVirtioDiskIntr.v`.
+      - `SpecVirtioDiskRw.v` / `SpecBwrite.v`: the permit premise gains the
+        index — `if wr then Some (1024 * uint bno, bs_buf) else None` and
+        `Some (1024 * uint bno, bs)` respectively. **Read callers are
+        textually unchanged** (ProofBread still passes
+        `disk_write_permit_trivial`).
+      - `RiscvAdequacy.v` / `SystemAdequacy.v`: `riscvGpreS`/`riscvΣ` gain
+        the `ghost_varG Σ (Z -> bv 8)`; both `RiscvFixedGS` applications
+        gain two fields; both theorems allocate the tie at the initial
+        `v_disk` and split it; both power arms FRAME it (PowerOff at the
+        same state, PowerOn through `virtio_reset`'s disk preservation);
+        `HPc : ⊢ Pc` became `HPc : ⊢ |==> Pc (v_disk …)`; both clients
+        instantiate `Pc := fun _ => True`.
+      - `FsCrash.v`: `P_fs γs cov logstart dk` is now a PREDICATE ON THE
+        IMAGE and owns no tie ghost; `fr_P` left the record (the index IS
+        the disk); `fs_rec_wf` takes the block view; `P_fs_alloc` /
+        `P_fs_alloc_clean` re-derived in adequacy's `⊢ |==> Pc dk0` shape;
+        `P_fs_recovers` no longer needs a tie argument.
+- [ ] **C2b — the three real call-site fupds, and `P_fs` as `Pc`.**
+      The bridge premise `crash_pred_indifferent` currently rides
+      `SpecWriteHead` / `SpecInstallTrans` / `SpecEndOp` / `SpecInitlog`
+      (and the block lemmas inside their proofs). Each of the WAL write
+      kinds — log-fill / commit(n,W) / install / clear — replaces it with
+      a real `disk_write_permit (Some (1024 * bno, bs)) Q` proved from its
+      own local knowledge, re-establishing `fs_rec_wf` at
+      `fs_blocks (disk_write dk (1024*bno) bs)` via
+      `FsCrash.fs_blocks_write_eq`/`_ne`. Then `SystemAdequacy` passes
+      `Pc := fun dk => ∃ γs, P_fs γs cov logstart dk`, discharged by
+      `P_fs_alloc`. Note the log Link files are NOT in the linked cone of
+      `xv6_power_adequacy`, so the bridge premise is never discharged
+      anywhere today and both Print Assumptions baselines are unmoved.
 
 ### Phase D — recovery + sys_sync
 

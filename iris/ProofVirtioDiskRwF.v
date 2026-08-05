@@ -821,7 +821,7 @@ Section VdrwfP6.
        to execute before it reaches its continuation, which is why the
        postcondition below is a single [▷ Q]. *)
     iApply fupd_wp.
-    iMod (perm_collect (dn_perm γd) kq.1 kq.2 Q ⊤ ltac:(solve_ndisj)
+    iMod (perm_collect (dn_perm γd) kq.1 kq.2 _ Q ⊤ ltac:(solve_ndisj)
             with "Hqinv Hrcpt Hperm") as "HQ".
     iModIntro.
     assert (Hdcb : dc_buf (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin) = b) by reflexivity.
@@ -1798,9 +1798,18 @@ Section ProofVirtioDiskRwF.
        because a deposit only ADDS under the invariant's later. *)
     iDestruct (dev_inv_perm with "Hdinv") as "#Hqinv".
     iApply fupd_wp.
-    iMod (perm_deposit_kq (dn_perm γd) Q ⊤ ltac:(solve_ndisj)
+    iMod (perm_deposit_kq (dn_perm γd) _ Q ⊤ ltac:(solve_ndisj)
             with "Hqinv Hperm") as (kq) "[Hpend #Hrcpt]".
     iModIntro.
+    (* the permit's INDEX, restated in the pin layer's vocabulary: the spec
+       states it as "this call's own block", the publish needs it as the
+       published slot's [vs_wr]. *)
+    assert (Hpermidx :
+      (if negb (eq_vec (m !!! Regidx Ra1) (zero_reg : SailStdpp.Values.mword 64))
+       then Some ((1024 * uint bno)%Z, bs_buf) else None)
+      = vdrwd_wr (m !!! Regidx Ra1) (1024 * uint bno)%Z bs_buf).
+    { unfold vdrwd_wr. rewrite (vdrwf_out_iff (m !!! Regidx Ra1)). reflexivity. }
+    iEval (rewrite Hpermidx) in "Hpend".
     assert (Hsecval : (bv_unsigned (vdrw_sector_raw bno) * 512)%Z
                       = (1024 * uint bno)%Z).
     { rewrite (vdrwd_sector_raw_val bno Hbnolt). apply vdrwf_sec512. }

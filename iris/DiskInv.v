@@ -350,7 +350,7 @@ Section DiskInv.
           receipt against its own saved proposition.  An existential key here
           would come back opaque and no receipt could ever be collected (the
           [vs_data] rule, one layer up). *)
-       perm_done (dn_perm γ) (vs_perm (dc_slot v)) ∗
+       perm_done (dn_perm γ) (vs_perm (dc_slot v)) (vs_wr (dc_slot v)) ∗
        (if vs_is_out (dc_slot v) then emp
         else phys_list (vr_buf (vs_req (dc_slot v))) bs))%I.
 
@@ -959,6 +959,15 @@ Definition rw_slot (hd : nat) (ty : bv 32) (sec : bv 64) (buf sts : Arch.pa)
     (bs : list (bv 8)) (kq : nat * positive) : vslot :=
   VSlot (VioReq (Z_to_bv 16 (Z.of_nat hd)) ty sec buf (Z_to_bv 32 1024) sts)
         bs kq.
+
+(* THE PUBLISHED SLOT'S WRITE IDENTITY (phase C2a), by conversion: what the
+   crash permit deposited with this request has to be indexed by. *)
+Lemma rw_slot_wr (hd : nat) (ty : bv 32) (sec : bv 64) (buf sts : Arch.pa)
+    (bs : list (bv 8)) (kq : nat * positive) :
+  vs_wr (rw_slot hd ty sec buf sts bs kq)
+  = (if bv_unsigned ty =? virtio_blk_t_out
+     then Some (bv_unsigned sec * 512, bs) else None).
+Proof. reflexivity. Qed.
 
 Lemma bv16_small (k : nat) : (k < 8)%nat -> bv_unsigned (Z_to_bv 16 (Z.of_nat k)) = Z.of_nat k.
 Proof.

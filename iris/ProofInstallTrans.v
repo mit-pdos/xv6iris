@@ -1202,6 +1202,8 @@ Section InstallTransBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_install_trans <= K)%nat ->
+    (* the phase-C2a bridge, threaded from the whole-function contract *)
+    crash_pred_indifferent ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
@@ -1244,7 +1246,7 @@ Section InstallTransBlocks.
     it_cont (CID0 := CID0) Φ j bn γfs logstart n W Lw L D pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hgeom Hj Hgl Heb Hshape Hnd Hwok HLw.
+    intros HK Hind Hgeom Hj Hgl Heb Hshape Hnd Hwok HLw.
     destruct Hshape as [HnW Hn30].
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH]; intros CID0 t M Ht Hfuel Hregs.
@@ -1764,11 +1766,8 @@ Section InstallTransBlocks.
               ltac:(exact (it_lt_lit _ Hwrange)) ltac:(reflexivity) Hj Hgl Hk2 HB7a0 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                     Hdev Hgeo Hdlock Hhold [] [-]").
-    (* THE TRIVIAL CRASH PERMIT (claude-notes/design/fs-log.md stage 4 item 3):
-       this WAL write kind's real durability view shift lands in phase C2;
-       for now it deposits the identity permit at the trivial receipt, so
-       this function's own spec is unchanged. *)
-    { iApply disk_write_permit_trivial. }
+    (* THE PHASE-C2a BRIDGE PERMIT (see ProofWriteHead) *)
+    { iApply (disk_write_permit_indifferent _ Hind). }
     iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
     assert (Hpca6 : ret_pc (B7 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0xa6)).
     { rewrite HB7ra. apply bv_eq; vm_compute; reflexivity. }
@@ -2159,7 +2158,7 @@ Section ProofInstallTrans.
                                   pidv dq m K eb C b.
   Proof.
     cbv beta delta [wp_install_trans_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hj Hgl Heb Hstage Ha0 Hshape Hnd Hwok HLw.
+    intros pcE pj ret_tgt HK Hind Hgeom Hj Hgl Heb Hstage Ha0 Hshape Hnd Hwok HLw.
     destruct Hshape as [HnW Hn30].
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlfz Hppid #Hprocs #Hscheds Hoctx Hpark".
     iIntros "#Hdev #Hgeo #Hdlock Hncell Hblks HauthL HauthD Hents Hslots Hcont".
@@ -2726,7 +2725,7 @@ Section ProofInstallTrans.
       { done. }
       iApply (it_loop n Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart dev
                 n W Lw L D pidv dq m K eb C
-                HK Hgeom Hj Hgl Heb (conj HnW Hn30) Hnd Hwok HLw
+                HK Hind Hgeom Hj Hgl Heb (conj HnW Hn30) Hnd Hwok HLw
                 CIDq12 0%nat Q11 Hnp (it_fuel0 n) HQ11regs
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds Hoctx Hpark
                       Hdev Hgeo Hdlock Hframe Hncell Hblks HauthL HauthD Hdone Hents

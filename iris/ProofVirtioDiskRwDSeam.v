@@ -177,8 +177,10 @@ Section ProofVirtioDiskRwDSeam.
     disk_geom γd pd pav pu -∗
     ([∗ list] k ↦ x ∈ bs_buf, pa_add (b_data b) k ↦ₘ x) -∗
     disk_block γd (uint bno) bs_disk -∗
-    (* the crash permit's token, on its way into the published slot *)
-    perm_pend (dn_perm γd) kq -∗
+    (* the crash permit's token, on its way into the published slot, AT THIS
+       REQUEST'S WRITE IDENTITY (phase C2a): [1024 * bno] is the byte offset
+       the sector arithmetic lands on. *)
+    perm_pend (dn_perm γd) kq (vdrwd_wr wr (1024 * uint bno)%Z bs_buf) -∗
     vdrw_p4_exit CID γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno)
                  bs_buf bs_disk m0 kq -∗
     vdrw_p3_exit_x CID γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno) m0.

@@ -39,9 +39,10 @@
 (*    is exactly what a saved proposition costs.                             *)
 (* ====================================================================== *)
 From Stdlib Require Import ZArith.
-From stdpp Require Import gmap.
+From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import ghost_map invariants saved_prop.
+Require Import VirtioModel.   (* [disk_wr]/[wr_apply]: the write identity *)
 Require Import RiscvPtsto.
 
 (* The channel's typing.  Two pieces: the saved propositions that pin each
@@ -51,11 +52,11 @@ Require Import RiscvPtsto.
    nothing here has to know anything about the virtio protocol. *)
 Class permG (Σ : gFunctors) := PermG {
   permG_saved :: savedPropG Σ;
-  permG_map :: ghost_mapG Σ nat (bool * gname);
+  permG_map :: ghost_mapG Σ nat (bool * gname * disk_wr);
 }.
 
 Definition permΣ : gFunctors :=
-  #[ savedPropΣ ; ghost_mapΣ nat (bool * gname) ].
+  #[ savedPropΣ ; ghost_mapΣ nat (bool * gname * disk_wr) ].
 
 Global Instance subG_permΣ Σ : subG permΣ Σ -> permG Σ.
 Proof. solve_inG. Qed.
@@ -69,15 +70,15 @@ Section perm.
      by the saved proposition at [γq], of which the enqueuer keeps a
      persistent copy ([perm_receipt]) -- that is what lets it recognize its
      own [Q] among everybody else's at collection time. *)
-  Definition perm_slot (b : bool) (γq : gname) : iProp Σ :=
+  Definition perm_slot (b : bool) (γq : gname) (w : disk_wr) : iProp Σ :=
     (∃ Q : iProp Σ,
        saved_prop_own γq DfracDiscarded Q ∗
-       if b then disk_write_permit Q else Q)%I.
+       if b then disk_write_permit w Q else Q)%I.
 
   Definition perm_inv_body (γP : gname) : iProp Σ :=
-    (∃ m : gmap nat (bool * gname),
+    (∃ m : gmap nat (bool * gname * disk_wr),
        ghost_map_auth γP 1 m ∗
-       [∗ map] k ↦ x ∈ m, perm_slot x.1 x.2)%I.
+       [∗ map] k ↦ x ∈ m, perm_slot x.1.1 x.1.2 x.2)%I.
 
   (* Disjoint from [crashN] (= [nroot .@ "crash"]) and from every
      [devN]-derived namespace, so the completion can hold all three open. *)
@@ -93,10 +94,11 @@ Section perm.
      [disk_inv] with no [▷] cost at all, which is the whole point of the
      split.  Holding it against the invariant's auth PINS the cell's state,
      which is how the completion knows the permit is still unspent. *)
-  Definition perm_tok (γP : gname) (k : nat) (b : bool) (γq : gname) : iProp Σ :=
-    (k ↪[γP] (b, γq))%I.
+  Definition perm_tok (γP : gname) (k : nat) (b : bool) (γq : gname)
+      (w : disk_wr) : iProp Σ :=
+    (k ↪[γP] (b, γq, w))%I.
 
-  Global Instance perm_tok_timeless γP k b γq : Timeless (perm_tok γP k b γq).
+  Global Instance perm_tok_timeless γP k b γq w : Timeless (perm_tok γP k b γq w).
   Proof. rewrite /perm_tok. apply _. Qed.
 
   (* the enqueuer's persistent handle on its own receipt *)
@@ -107,8 +109,8 @@ Section perm.
   Proof. rewrite /perm_receipt. apply _. Qed.
 
   (* two tokens for the same key cannot both exist: the element is exclusive *)
-  Lemma perm_tok_excl γP k b1 b2 γq1 γq2 :
-    perm_tok γP k b1 γq1 -∗ perm_tok γP k b2 γq2 -∗ False.
+  Lemma perm_tok_excl γP k b1 b2 γq1 γq2 w1 w2 :
+    perm_tok γP k b1 γq1 w1 -∗ perm_tok γP k b2 γq2 w2 -∗ False.
   Proof.
     rewrite /perm_tok. iIntros "H1 H2".
     iDestruct (ghost_map_elem_ne with "H1 H2") as %Hne. done.
@@ -122,7 +124,8 @@ Section perm.
      flight at power-on, so the map is empty and no permit is owed. *)
   Lemma perm_ghost_alloc : ⊢ |==> ∃ γP : gname, perm_inv_body γP.
   Proof.
-    iMod (ghost_map_alloc (∅ : gmap nat (bool * gname))) as (γP) "[Hauth _]".
+    iMod (ghost_map_alloc (∅ : gmap nat (bool * gname * disk_wr)))
+      as (γP) "[Hauth _]".
     iModIntro. iExists γP. rewrite /perm_inv_body.
     iExists ∅. iFrame "Hauth". by rewrite big_sepM_empty.
   Qed.
@@ -140,10 +143,10 @@ Section perm.
      is the only thing that knows which keys are taken), which is why the
      caller receives it rather than supplying it -- and why nothing in this
      file has to know that the caller's requests are queue positions. *)
-  Lemma perm_deposit (γP : gname) (Q : iProp Σ) (E : coPset) :
+  Lemma perm_deposit (γP : gname) (w : disk_wr) (Q : iProp Σ) (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv γP -∗ disk_write_permit Q ={E}=∗
-      ∃ (k : nat) (γq : gname), perm_tok γP k true γq ∗ perm_receipt γq Q.
+    perm_inv γP -∗ disk_write_permit w Q ={E}=∗
+      ∃ (k : nat) (γq : gname), perm_tok γP k true γq w ∗ perm_receipt γq Q.
   Proof.
     iIntros (HE) "#Hinv Hperm".
     iMod (saved_prop_alloc Q DfracDiscarded) as (γq) "#Hsp"; [done|].
@@ -157,11 +160,12 @@ Section perm.
     set (k := fresh (dom m)).
     assert (Hk : m !! k = None).
     { apply not_elem_of_dom. apply is_fresh. }
-    iMod (ghost_map_insert k (true, γq) Hk with "Hauth") as "[Hauth Htok]".
+    iMod (ghost_map_insert k (true, γq, w) Hk with "Hauth") as "[Hauth Htok]".
     iMod ("Hclose" with "[Hauth Hents Hperm]") as "_".
-    { iNext. rewrite /perm_inv_body. iExists (<[k := (true, γq)]> m).
+    { iNext. rewrite /perm_inv_body. iExists (<[k := (true, γq, w)]> m).
       iFrame "Hauth".
-      rewrite (big_sepM_insert (fun k x => perm_slot x.1 x.2) m k (true, γq) Hk).
+      rewrite (big_sepM_insert (fun k x => perm_slot x.1.1 x.1.2 x.2) m k
+                 (true, γq, w) Hk).
       iSplitR "Hents"; [| iExact "Hents"].
       rewrite /perm_slot /=. iExists Q. iFrame "Hsp Hperm". }
     iModIntro. iExists k, γq. iFrame "Htok Hsp".
@@ -181,25 +185,30 @@ Section perm.
      The token in hand is what refutes the done arm: the element is
      exclusive and the auth pins its value, so [b = true] and the permit is
      provably unspent. *)
-  Lemma perm_consume (γP : gname) (k : nat) (γq : gname) :
-    perm_inv_body γP -∗ perm_tok γP k true γq -∗ ▷ riscv_crash_pred ==∗
-      perm_inv_body γP ∗ perm_tok γP k false γq ∗ ▷ riscv_crash_pred.
+  Lemma perm_consume (γP : gname) (k : nat) (γq : gname) (w : disk_wr)
+      (dk : Z -> bv 8) :
+    perm_inv_body γP -∗ perm_tok γP k true γq w -∗ ▷ riscv_crash_pred dk ==∗
+      perm_inv_body γP ∗ perm_tok γP k false γq w ∗
+      ▷ riscv_crash_pred (wr_apply w dk).
   Proof.
     iIntros "Hbody Htok HP". rewrite {1}/perm_inv_body.
     iDestruct "Hbody" as (m) "[Hauth Hents]".
     rewrite /perm_tok.
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
-    iDestruct (big_sepM_delete (fun k x => perm_slot x.1 x.2) m k (true, γq) Hk
-                 with "Hents") as "[Hent Hents]".
+    iDestruct (big_sepM_delete (fun k x => perm_slot x.1.1 x.1.2 x.2) m k
+                 (true, γq, w) Hk with "Hents") as "[Hent Hents]".
     rewrite /perm_slot /=.
     iDestruct "Hent" as (Q) "[#Hsp Hpm]".
-    (* THE CLIENT'S VIEW SHIFT RUNS HERE *)
-    iMod ("Hpm" with "HP") as "[HP HQ]".
-    iMod (ghost_map_update (false, γq) with "Hauth Htok") as "[Hauth Htok]".
+    (* THE CLIENT'S VIEW SHIFT RUNS HERE, at the image the completion is
+       moving the machine FROM.  The index move is the whole content of the
+       reshaped permit: [w] is this request's write identity, pinned to the
+       slot by [VirtioProto.slot_pend_res]. *)
+    iMod ("Hpm" $! dk with "HP") as "[HP HQ]".
+    iMod (ghost_map_update (false, γq, w) with "Hauth Htok") as "[Hauth Htok]".
     iModIntro. iFrame "Htok HP". rewrite /perm_inv_body.
-    iExists (<[k := (false, γq)]> m). iFrame "Hauth".
-    rewrite (big_sepM_insert_delete (fun k x => perm_slot x.1 x.2)
-               m k (false, γq)).
+    iExists (<[k := (false, γq, w)]> m). iFrame "Hauth".
+    rewrite (big_sepM_insert_delete (fun k x => perm_slot x.1.1 x.1.2 x.2)
+               m k (false, γq, w)).
     iSplitR "Hents"; [| iExact "Hents"].
     rewrite /perm_slot /=. iExists Q. iFrame "Hsp HQ".
   Qed.
@@ -213,20 +222,22 @@ Section perm.
      [virtio_proto_step], and runs ONE lemma either way.  (The recorded
      gotcha, verbatim: the caller does not know the direction -- the
      completing slot is chosen inside the protocol lemma.) *)
-  Definition perm_pend (γP : gname) (kq : nat * gname) : iProp Σ :=
-    perm_tok γP kq.1 true kq.2.
+  Definition perm_pend (γP : gname) (kq : nat * gname) (w : disk_wr)
+      : iProp Σ := perm_tok γP kq.1 true kq.2 w.
 
-  Definition perm_done (γP : gname) (kq : nat * gname) : iProp Σ :=
-    perm_tok γP kq.1 false kq.2.
+  Definition perm_done (γP : gname) (kq : nat * gname) (w : disk_wr)
+      : iProp Σ := perm_tok γP kq.1 false kq.2 w.
 
-  Global Instance perm_pend_timeless γP kq : Timeless (perm_pend γP kq).
+  Global Instance perm_pend_timeless γP kq w : Timeless (perm_pend γP kq w).
   Proof. rewrite /perm_pend. apply _. Qed.
-  Global Instance perm_done_timeless γP kq : Timeless (perm_done γP kq).
+  Global Instance perm_done_timeless γP kq w : Timeless (perm_done γP kq w).
   Proof. rewrite /perm_done. apply _. Qed.
 
-  Lemma perm_consume_kq (γP : gname) (kq : nat * gname) :
-    perm_inv_body γP -∗ perm_pend γP kq -∗ ▷ riscv_crash_pred ==∗
-      perm_inv_body γP ∗ perm_done γP kq ∗ ▷ riscv_crash_pred.
+  Lemma perm_consume_kq (γP : gname) (kq : nat * gname) (w : disk_wr)
+      (dk : Z -> bv 8) :
+    perm_inv_body γP -∗ perm_pend γP kq w -∗ ▷ riscv_crash_pred dk ==∗
+      perm_inv_body γP ∗ perm_done γP kq w ∗
+      ▷ riscv_crash_pred (wr_apply w dk).
   Proof.
     iIntros "Hbody Hpend HP". rewrite /perm_pend /perm_done.
     iMod (perm_consume with "Hbody Hpend HP") as "(Hbody & Htok & HP)".
@@ -235,13 +246,13 @@ Section perm.
 
   (* the pair form of the deposit: what an enqueuer calls, returning exactly
      the [vs_perm] it must publish in its slot *)
-  Lemma perm_deposit_kq (γP : gname) (Q : iProp Σ) (E : coPset) :
+  Lemma perm_deposit_kq (γP : gname) (w : disk_wr) (Q : iProp Σ) (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv γP -∗ disk_write_permit Q ={E}=∗
-      ∃ kq : nat * gname, perm_pend γP kq ∗ perm_receipt kq.2 Q.
+    perm_inv γP -∗ disk_write_permit w Q ={E}=∗
+      ∃ kq : nat * gname, perm_pend γP kq w ∗ perm_receipt kq.2 Q.
   Proof.
     iIntros (HE) "#Hinv Hperm".
-    iMod (perm_deposit γP Q E HE with "Hinv Hperm") as (k γq) "[Htok #Hrc]".
+    iMod (perm_deposit γP w Q E HE with "Hinv Hperm") as (k γq) "[Htok #Hrc]".
     iModIntro. iExists (k, γq). rewrite /perm_pend /=. iFrame "Htok Hrc".
   Qed.
 
@@ -251,15 +262,16 @@ Section perm.
 
   (* Over the stripped body (a caller with a program step to spare): ONE
      later, and it is the saved-prop agreement's, not the invariant's. *)
-  Lemma perm_collect_body (γP : gname) (k : nat) (γq : gname) (Q : iProp Σ) :
-    perm_inv_body γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq ==∗
+  Lemma perm_collect_body (γP : gname) (k : nat) (γq : gname) (w : disk_wr)
+      (Q : iProp Σ) :
+    perm_inv_body γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq w ==∗
       perm_inv_body γP ∗ ▷ Q.
   Proof.
     iIntros "Hbody #Hrc Htok". rewrite {1}/perm_inv_body /perm_tok /perm_receipt.
     iDestruct "Hbody" as (m) "[Hauth Hents]".
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
-    iDestruct (big_sepM_delete (fun k x => perm_slot x.1 x.2) m k (false, γq) Hk
-                 with "Hents") as "[Hent Hents]".
+    iDestruct (big_sepM_delete (fun k x => perm_slot x.1.1 x.1.2 x.2) m k
+                 (false, γq, w) Hk with "Hents") as "[Hent Hents]".
     rewrite /perm_slot /=.
     iDestruct "Hent" as (Q') "[#Hsp HQ]".
     iDestruct (saved_prop_agree γq DfracDiscarded DfracDiscarded Q' Q
@@ -273,10 +285,10 @@ Section perm.
   (* Over the invariant, in a plain fupd (no program step): TWO laters --
      the invariant's own, and the agreement's.  A caller with a step to
      spare should use [perm_collect_body] instead. *)
-  Lemma perm_collect (γP : gname) (k : nat) (γq : gname) (Q : iProp Σ)
-      (E : coPset) :
+  Lemma perm_collect (γP : gname) (k : nat) (γq : gname) (w : disk_wr)
+      (Q : iProp Σ) (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq ={E}=∗ ▷ ▷ Q.
+    perm_inv γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq w ={E}=∗ ▷ ▷ Q.
   Proof.
     iIntros (HE) "#Hinv #Hrc Htok".
     iInv "Hinv" as "Hbody" "Hclose".
@@ -286,8 +298,8 @@ Section perm.
     iMod "Hauth".
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
     iEval (rewrite big_sepM_later) in "Hents".
-    iDestruct (big_sepM_delete (fun k x => ▷ perm_slot x.1 x.2)%I
-                 m k (false, γq) Hk with "Hents") as "[Hent Hents]".
+    iDestruct (big_sepM_delete (fun k x => ▷ perm_slot x.1.1 x.1.2 x.2)%I
+                 m k (false, γq, w) Hk with "Hents") as "[Hent Hents]".
     iMod (ghost_map_delete with "Hauth Htok") as "Hauth".
     iEval (rewrite -big_sepM_later) in "Hents".
     iMod ("Hclose" with "[Hauth Hents]") as "_".
@@ -302,8 +314,9 @@ Section perm.
 
   (* the pair form of the collection: what a woken enqueuer calls, over the
      [vs_perm] its own claim pinned *)
-  Lemma perm_collect_kq (γP : gname) (kq : nat * gname) (Q : iProp Σ) :
-    perm_inv_body γP -∗ perm_receipt kq.2 Q -∗ perm_done γP kq ==∗
+  Lemma perm_collect_kq (γP : gname) (kq : nat * gname) (w : disk_wr)
+      (Q : iProp Σ) :
+    perm_inv_body γP -∗ perm_receipt kq.2 Q -∗ perm_done γP kq w ==∗
       perm_inv_body γP ∗ ▷ Q.
   Proof.
     iIntros "Hbody #Hrc Htok". rewrite /perm_done.

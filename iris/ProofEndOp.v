@@ -877,6 +877,8 @@ Section EndOpBlocks.
       (j : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
     (K_end_op <= K)%nat ->
+    (* the phase-C2a bridge, threaded from the whole-function contract *)
+    crash_pred_indifferent ->
     eo_regsE m M ->
     sie_cap_gpr M (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b -∗
@@ -890,7 +892,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C b -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hregs.
+    intros HK Hind Hregs.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc Hoctx Hpark Hppid Hframe Hjunk Hcont".
     rewrite /eo_frame4 /eo_frameJ.
@@ -1118,6 +1120,8 @@ Section EndOpBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_end_op <= K)%nat ->
+    (* the phase-C2a bridge, threaded from the whole-function contract *)
+    crash_pred_indifferent ->
     eb = true ->
     eo_regsE m M ->
     sie_cap_gpr M (K - 8)%nat eb (proc_addr j) -∗
@@ -1136,7 +1140,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Heb Hregs.
+    intros HK Hind Heb Hregs.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hlctx #Hprocs Hoctx Hpark Hppid
               Hframe Hjunk Hbatch Hcont".
@@ -1520,7 +1524,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (eo_cont_shift (CIDa := CIDb1) (CIDb := CIDc2) Φ j pidv dq m K eb C eb
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (eo_epi (CID0 := CIDc2) Φ j pidv dq m mr K eb C eb HK Hregs2
+    iApply (eo_epi (CID0 := CIDc2) Φ j pidv dq m mr K eb C eb HK Hind Hregs2
               with "Hcg Hcnt Htext Hpc Hoctx Hpark Hppid Hframe Hjunk Hcont").
   Qed.
 
@@ -1587,6 +1591,8 @@ Section EndOpBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_end_op <= K)%nat ->
+    (* the phase-C2a bridge, threaded from the whole-function contract *)
+    crash_pred_indifferent ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
@@ -1617,7 +1623,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hgeom Hj Hgl Heb Hshape Hnd Hwok HLw Hregs.
+    intros HK Hind Hgeom Hj Hgl Heb Hshape Hnd Hwok HLw Hregs.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hppid #Hprocs #Hscheds
@@ -1660,7 +1666,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (WH.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev n W L pidv dq A1 (K - 8)%nat eb C eb
-              (eo_Kwh K HK) Hgeom Hj Hgl Heb (conj HnW Hn30)
+              (eo_Kwh K HK) Hind Hgeom Hj Hgl Heb (conj HnW Hn30)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1").
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid
@@ -1755,7 +1761,7 @@ Section EndOpBlocks.
     iApply (IT.wp_install_trans_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev false n W Lw (<[log_hdr_bno logstart := bs1]> L) D
               pidv dq A3 (K - 8)%nat eb C eb
-              (eo_Kit K HK) Hgeom Hj Hgl Heb (or_introl eq_refl) HA3a0
+              (eo_Kit K HK) Hind Hgeom Hj Hgl Heb (or_introl eq_refl) HA3a0
               (conj HnW Hn30) Hnd Hwok HLw'
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2").
@@ -1852,7 +1858,7 @@ Section EndOpBlocks.
     iApply (WH.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat [] (<[log_hdr_bno logstart := bs1]> L) pidv dq
               A5 (K - 8)%nat eb C eb
-              (eo_Kwh K HK) Hgeom Hj Hgl Heb Hshape0
+              (eo_Kwh K HK) Hind Hgeom Hj Hgl Heb Hshape0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3").
     { by iApply big_sepL_nil. }
@@ -2022,7 +2028,7 @@ Section EndOpBlocks.
       iSplitL "Hg16"; [iExact "Hg16"|].
       iSplitL "Hg8"; [iExact "Hg8"|]. iExact "Hg0". }
     iApply (eo_tail (CID0 := CIDa10) Φ γs j γl bn γ γfs cov logstart dev pidv dq
-              m B3 K eb C HK Heb HB3regsE
+              m B3 K eb C HK Hind Heb HB3regsE
               with "Hcg Hcnt Htext Hpc Hpanic Hlctx Hprocs Hoctx Hpark Hppid
                     Hframe Hjunk2 Hbatch Hcont").
   Qed.
@@ -2050,6 +2056,8 @@ Section EndOpBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (fuel : nat) :
     (K_end_op <= K)%nat ->
+    (* the phase-C2a bridge, threaded from the whole-function contract *)
+    crash_pred_indifferent ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
@@ -2088,7 +2096,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hgeom Hj Hgl Heb Hshape Hnd Hwok.
+    intros HK Hind Hgeom Hj Hgl Heb Hshape Hnd Hwok.
     destruct Hshape as [HnW Hn30].
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH];
@@ -2815,11 +2823,8 @@ Section EndOpBlocks.
               ltac:(reflexivity) Hj Hgl Hk1 HH2a0 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                     Hdevi Hdgeom Hdlock Hhold []").
-    (* THE TRIVIAL CRASH PERMIT (claude-notes/design/fs-log.md stage 4 item 3):
-       this WAL write kind's real durability view shift lands in phase C2;
-       for now it deposits the identity permit at the trivial receipt, so
-       this function's own spec is unchanged. *)
-    { iApply disk_write_permit_trivial. }
+    (* THE PHASE-C2a BRIDGE PERMIT (see ProofWriteHead) *)
+    { iApply (disk_write_permit_indifferent _ Hind). }
     iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
     assert (Hpcec : ret_pc (H2 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0xec)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3217,7 +3222,7 @@ Section EndOpBlocks.
       iEval (rewrite Htn) in "Hopen".
       iApply (eo_commit (CID0 := CIDa25) Φ γs j γl γu γd γk pd pav pu bn γ γfs
                 cov logstart dev n W Lw' (<[uint bnol := bs2]> L) D pidv dq m J3 K eb C
-                HK (conj Hcovok Hlogsub) Hj Hgl Heb (conj HnW Hn30) Hnd Hwok
+                HK Hind (conj Hcovok Hlogsub) Hj Hgl Heb (conj HnW Hn30) Hnd Hwok
                 ltac:(intros i v Hv; apply (HLw' i v);
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
                 HJ3regs
@@ -3237,6 +3242,8 @@ Section EndOpBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_end_op <= K)%nat ->
+    (* the phase-C2a bridge, threaded from the whole-function contract *)
+    crash_pred_indifferent ->
     eb = true ->
     eo_regsE m M ->
     sie_cap_gpr M (K - 8)%nat false (proc_addr j) -∗
@@ -3257,7 +3264,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Heb Hregs.
+    intros HK Hind Heb Hregs.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hpay Htok HRres #Htext Hpc #Hpanic #Hlctx #Hprocs
               Hoctx Hpark Hppid Hframe Hjunk Hcont".
@@ -3437,7 +3444,7 @@ Section EndOpBlocks.
         rewrite (callee_saved_lookup Hrel c Hcs). exact (HG3thr c Hcs N2 N8 N9 N18). }
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDc1) Φ j pidv dq m K eb C eb
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (eo_epi (CID0 := CIDc1) Φ j pidv dq m mr K eb C eb HK Hregs2
+    iApply (eo_epi (CID0 := CIDc1) Φ j pidv dq m mr K eb C eb HK Hind Hregs2
               with "Hcg Hcnt Htext Hpc Hoctx Hpark Hppid Hframe Hjunk Hcont").
   Qed.
 
@@ -3465,7 +3472,7 @@ Section ProofEndOp.
                            cov logstart dev u pidv dq m K eb C b.
   Proof.
     cbv beta zeta delta [wp_end_op_sconf_body].
-    intros HK Hgeom Hj Hgl Heb.
+    intros HK Hind Hgeom Hj Hgl Heb.
     subst eb.
     pose proof Hgeom as [Hcovok Hlogsub].
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hppid #Hprocs #Hscheds
@@ -4167,7 +4174,7 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iDestruct (eo_open_to_batch with "Hopen") as "Hbatch".
         iApply (eo_tail (CID0 := CIDs2) Φ γs j γl bn γ γfs cov logstart dev pidv dq
-                  m V1 K true C HK eq_refl HV1regsE
+                  m V1 K true C HK Hind eq_refl HV1regsE
                   with "Hcg Hcnt Htext Hpc Hpanic Hlctx Hprocs Hoctx Hpark Hppid
                         Hframe Hjunk Hbatch Hcont").
       + (* n > 0: save s3/s4/s5, set up the cursors, and run the copy loop *)
@@ -4342,7 +4349,7 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply (eo_loop Φ γs j γl γu γd γk pd pav pu bn γ γfs cov logstart dev
                   nl W D pidv dq m K true C nl
-                  HK Hgeom Hj Hgl eq_refl (conj HnW Hn30) Hnd Hwok
+                  HK Hind Hgeom Hj Hgl eq_refl (conj HnW Hn30) Hnd Hwok
                   CIDs9 0%nat Y4 L (fun _ => []) ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HY4regs HY4s2 HY4s4 HY4s5
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hppid Hprocs Hscheds
@@ -4380,7 +4387,7 @@ Section ProofEndOp.
       iEval (rewrite Htgt26) in "Hpc".
       clear Htgt26.
       iApply (eo_fast (CID0 := CIDq) Φ γs j γl bn γ γfs cov logstart dev pidv dq
-                m T4 K true C HK eq_refl HT4regsE
+                m T4 K true C HK Hind eq_refl HT4regsE
                 with "Hcg Hcnt Hpay Htok HRres Htext Hpc Hpanic Hlctx Hprocs
                       Hoctx Hpark Hppid Hframe Hjunk Hcont").
   Qed.

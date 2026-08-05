@@ -135,12 +135,16 @@ Definition wp_virtio_disk_rw_sconf_body
      driver deposits it in the permit channel at the publish, and the DMA
      COMPLETION -- the instant this request's bytes reach the durable image
      -- runs it.  [Q] is the caller's RECEIPT, and it comes back below.
-     Permits are UNIFORM: a READ deposits [disk_write_permit_trivial]
-     ([Q := True]), which is honest (no disk byte moved) and is what keeps
-     the completion direction-agnostic.  A caller with no durability
+     THE PERMIT IS INDEXED BY THIS REQUEST'S WRITE (phase C2a): a READ moves
+     no disk byte, so its index is [None] and [disk_write_permit_trivial]
+     still proves it for an ARBITRARY crash predicate -- every read caller is
+     unchanged.  A WRITE's index is the block this call is about
+     ([1024 * bno], BSIZE bytes), which is what lets the caller's fupd be
+     about its OWN block and what the DMA completion discharges from the
+     published slot ([VirtioQueue.vs_wr]).  A caller with no durability
      obligation instantiates the pair trivially and its statement is
      unchanged in meaning. *)
-  disk_write_permit Q -∗
+  disk_write_permit (if wr then Some (1024 * uint bno, bs_buf)%Z else None) Q -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗

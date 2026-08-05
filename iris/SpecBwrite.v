@@ -123,11 +123,17 @@ Definition wp_bwrite_sconf_body
      channel at the publish; the DMA COMPLETION -- the instant these bytes
      reach the durable image -- runs it, and [Q] is the caller's RECEIPT.
      Placed adjacent to the handle, exactly where rw places its own (after
-     the buffer/[disk_block] pair it is about).  A caller with no durability
-     obligation instantiates [Q := True] with
-     [RiscvPtsto.disk_write_permit_trivial]; that is what all four of log.c's
-     call sites do in this phase, and their specs are unchanged. *)
-  disk_write_permit Q -∗
+     the buffer/[disk_block] pair it is about).
+
+     THE PERMIT IS INDEXED BY THIS CALL'S OWN WRITE (phase C2a): bwrite
+     always writes, and it writes [bs] at block [bno] -- bytes
+     [1024 * bno ..].  A caller with no durability obligation instantiates
+     [Q := True] with [RiscvPtsto.disk_write_permit_indifferent], whose pure
+     side condition [crash_pred_indifferent] the three log.c call sites carry
+     as a deliberately DELETABLE premise until their real fupds land (phase
+     C2b).  A WRITE's permit is NOT free the way a READ's is, and that is the
+     honest content of the indexed crash predicate. *)
+  disk_write_permit (Some (1024 * uint bno, bs)%Z) Q -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
