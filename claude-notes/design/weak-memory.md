@@ -341,10 +341,21 @@ auth over each hart's `wstate`, and the per-byte history auth replacing
 today's flat `gen_heap_interp` (per-byte map of timestamp → value, derived
 from log + image; `dq`-governed like today).
 
-**Surface layer**: `vProp := monPred (View, ⊑) (iProp Σ)` where
-`View := gmap Arch.pa nat` (per-byte observation floors; a hart's logical
-view is `λ a. w_vrNew ⊔ w_coh(a)`-shaped). Iris 4.4's monPred + proofmode
-support is battle-tested (iRC11/gpfsl track modern Iris). The pieces:
+**Surface layer**: `vProp := monPred (View, ⊑) (iProp Σ)`. DECIDED
+(pre-M2, from the M0/M1a shapes): `View := nat * gmap Z nat` — a SCALAR
+floor plus a sparse per-byte map, denoting `flr V a = V.1 ⊔ (V.2 !! a)`,
+ordered pointwise on `flr`, joined componentwise (`⊔` on the scalar,
+union-with-max on the map), bottom `(0, ∅)`. Why the pair: a hart's
+semantic read floor for byte a is `w_vrNew ⊔ coh(a)` — a scalar joined
+with a finite map, which a bare `gmap` cannot represent (infinite
+support) and a bare scalar cannot either (per-byte points-to floors).
+The hart's logical index at a program point is `(w_vrNew, w_coh)`; a
+points-to needs only a singleton-map view; and a release deposits the
+SCALAR view `(t_rel, ∅)` — the timestamp of the releasing store bounds
+every component of the releaser's floor because timestamps below the
+log's length bound all views, which is what keeps lock-transfer
+statements tiny. Iris 4.4's monPred + proofmode support is battle-tested
+(iRC11/gpfsl track modern Iris). The pieces:
 
 - `⊒V` — duplicable, persistent "I have observed V"; anti-monotone; joins.
 - `objective P` + `@V P` (view-at) + the split axiom

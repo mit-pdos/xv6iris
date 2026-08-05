@@ -194,8 +194,8 @@ the Iris proof already pays for — no separate whole-kernel analysis):
 
 - Oracle granularity: per-MemRead per-byte timestamp list vs one global
   choice sequence; what shape keeps leaf statements smallest.
-- View index: full `gmap Arch.pa nat` vs (scalar vrNew + sparse coh deltas);
-  monPred index must be a join-semilattice either way.
+- [x] View index: DECIDED `View := nat * gmap Z nat` (scalar ⊔ sparse,
+  pointwise floor order) — see design doc Decision 5. Validate at M2.
 - Forward-bank view: store-time `w_vwNew` vs 0 (both sound; pick the one
   that never surfaces in leaf statements).
 - Whether `wp_dead`/corpse arms and the power thread need any view plumbing
