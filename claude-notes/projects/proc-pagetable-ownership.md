@@ -300,6 +300,35 @@ than the "two wands into a Core" sketch recorded earlier in this file
 two Module Types" advice is about `allocproc`, whose tails call `freeproc`,
 not `uvmfree`. It does not transfer here. That was my own error, corrected.)
 
+**ATTEMPTED AND BACKED OUT (2026-08-05), with what was learned.** The
+epilogue factoring above was written and the `iAssert` statement type-checks
+(after adding `InstrBytes`/`PtTree`/`KvmSpec` to the file's imports — the
+proof had never named `pc_is`, `ptree_own` or `kalloc_env` in a *statement*
+before, only in hypotheses, so none of the three was imported). Two things
+blocked it, both about `ppt_thr mm mr2` at the success exit:
+
+- **The staged walk-back does not survive abstraction over `c`.** The
+  original `callee_saved mm E5` proof works because its `match goal` sees a
+  CONCRETE register index per conjunct (`Regidx (mword_of_int ?k)`); with a
+  symbolic `c` the `rewrite (callee_saved_lookup Hcs1 c Hc)` fails with
+  *"the LHS `mr1 !!! Regidx c` does not match any subterm"* — the preceding
+  `repeat rewrite upd_ne` over the `set`-bound `N*` tower does not stop
+  where the staged version assumes.
+- A `repeat first [...]` peel loop (reflexivity / the three
+  `callee_saved_lookup`s / `HJp_ne` / `upd_ne` / `progress unfold`) gets
+  further but leaves goals open. Note `HJp_ne` wants
+  `Regidx c <> Regidx Rtp` while `is_cs_idx_true_neq Rtp c` delivers the
+  SYMMETRIC `Regidx Rtp <> Regidx c` — that needs `not_eq_sym`.
+
+**So the next attempt should establish `ppt_thr` differently**: not by
+peeling `mr2` back to `mm` in one tactic, but by proving it incrementally
+alongside the existing chain — one `ppt_thr mm <map>` fact after each callee
+boundary, each proved from the previous by a single `callee_saved_lookup`
+plus that stage's own peel, exactly the way `ProofProcFreepagetable.v`
+threads `pf_thr` through its three calls (where it works, because each step
+is short and the intermediate maps are named). That file is the model, not
+this one's existing tail.
+
 The `Some nb` arithmetic currently inlined at `Hav1`/`Hav2`/`Hav3`
 (`ProofProcPagetable.v:312`, `:450`, `:583`) disappears when `on` goes
 generic — the rewrites become no-ops on a symbolic `avail_sub` — so step 2
