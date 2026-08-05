@@ -180,8 +180,8 @@ Definition set_vcfg (v : virtio_state) (c : virtio_cfg) : virtio_state :=
    exists only for offsets somebody minted, exactly as [mem_view] relates
    the byte memory to its ghost map.  The predicate lives HERE, in the
    iris-free model, rather than with the points-to it serves
-   ([DiskPtsto.v]): the auth it ties is DURABLE and rides in
-   [RiscvPtsto.power_interp], which is below the driver protocol. *)
+   ([DiskPtsto.v]): the auth it ties rides in [RiscvPtsto.era_interp],
+   which is below the driver protocol. *)
 Definition disk_view (dmap : gmap Z (bv 8)) (dk : Z -> bv 8) : Prop :=
   forall (o : Z) (b : bv 8), dmap !! o = Some b -> dk o = b.
 

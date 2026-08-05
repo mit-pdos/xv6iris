@@ -105,11 +105,10 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
   riscv_pre_genGS :: mono_natG Σ;
   (* the generation REGISTRY (crash/power layer): gen -> era record *)
   riscv_pre_registryGS :: ghost_mapG Σ nat riscvEraGS;
-  (* the DURABLE DISK IMAGE (crash/power layer): the one ghost that spans
-     power cycles.  Capacity only -- the theorems below allocate it EMPTY
-     (nothing minted yet) and pin it into the fixed layer.  [DiskImg.v] owns
-     the class, so the fixed-layer auth and [DiskPtsto]'s fragments share the
-     instance. *)
+  (* the DISK IMAGE map (crash/power layer): capacity only -- the NAME is
+     per-era ([riscvEraGS.era_disk_name]), minted afresh at every PowerOn at
+     the preserved disk content.  [DiskImg.v] owns the class, so the era auth
+     and [DiskPtsto]'s fragments share the instance. *)
   riscv_pre_diskGS :: diskImgG Σ;
 }.
 
@@ -457,13 +456,14 @@ Proof.
   iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
   iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgenauth #Hbornlb]".
   iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hstartauth #Hstartlb]".
-  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark).
-  iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
-  (* the durable disk image, EMPTY: no fragment has been minted, and
-     [disk_view ∅ _] holds vacuously (crash.md).  Minting the client's initial
-     [disk_bytes] over the mkfs image is [DiskPtsto.disk_bytes_mint] against
-     this auth, and lands with the crash invariant. *)
+  (* THE ERA's disk image, EMPTY: this single-generation theorem hands its
+     client no disk fragments (its bundle has no disk conjunct), and
+     [disk_view ∅ _] holds vacuously.  The BOOT MINT -- a full-range image
+     allocated at the disk's content -- is the POWER thread's
+     ([wp_power_loop] below, through [power_boot_res]). *)
   iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γdisk) "Hdiskauth".
+  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark γdisk).
+  iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
   (* the crash-spanning invariant, over the client's [Pc].  Allocated at the
      FIXED layer, so it outlives every era; both power arms leave it closed. *)
   iMod (inv_alloc crashN ⊤ Pc with "[]") as "#Hcinv"; [ iNext; iApply HPc |].
@@ -473,7 +473,7 @@ Proof.
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
-                  _ γdisk Pc)
+                  _ Pc)
                E0).
   (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
      layer's boot client has the same raw inputs at a fresh era and reuses
@@ -521,11 +521,8 @@ Proof.
   cbv zeta beta.
   iSplitL "Hauths Hh HuA HpA HvA Hgenauth Hstartauth HRauth Hdiskauth".
   { (* the initial state interpretation: generation 0, power on, the one
-       registered era, the empty durable image *)
-    rewrite /power_interp /disk_dur_interp /disk_img_auth. iFrame "Hgenauth Hstartauth".
-    iSplitR "Hdiskauth"; last first.
-    { iExists ∅. iFrame "Hdiskauth". iPureIntro.
-      intros o b Hl. rewrite lookup_empty in Hl. discriminate. }
+       registered era, its image map empty *)
+    rewrite /power_interp. iFrame "Hgenauth Hstartauth".
     iExists {[ 0%nat := E0 ]}. iFrame "HRauth".
     iSplitR.
     { iPureIntro. rewrite dom_singleton_L /start_count Hpow Hgen0 /=.
@@ -533,10 +530,18 @@ Proof.
     rewrite Hpow. iExists E0.
     iSplitR.
     { iPureIntro. rewrite Hgen0. by rewrite lookup_singleton. }
-    rewrite /era_interp. iSplitL "Hauths".
+    rewrite /era_interp /disk_dur_interp /disk_img_auth. iSplitL "Hauths".
     { rewrite /gregs_interp_at. iApply big_sepL_enum_to_set. iExact "Hauths". }
-    iFrame "Hh". iSplitL "HuA"; [iExact "HuA"|].
-    iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
+    iFrame "Hh".
+    (* the device fabric, then the era's (empty) image map.  NEST the splits:
+       [dev_interp_at] is ONE conjunct of [era_interp], so a flat
+       [iSplitL "HuA"] would split the fabric from the image (crash.md's
+       power_interp-conjunct trap, one layer in). *)
+    iSplitL "HuA HpA HvA".
+    { iSplitL "HuA"; [iExact "HuA"|].
+      iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
+    iExists ∅. iFrame "Hdiskauth". iPureIntro.
+    intros o b Hl. rewrite lookup_empty in Hl. discriminate. }
   iSplitL "Hwps Hwpu Hwpd Hwpp".
   { (* the WPs of the initial threads: the harts, then the three devices *)
     rewrite big_sepL2_replicate_r; [|done].
@@ -689,7 +694,7 @@ Section power.
      RAM shape; the recipe is [riscv_system_adequacy]'s Htext/Hdata
      blocks). *)
   Definition power_boot_res (HE : riscvEraGS) (gen : nat)
-      (D : CPU -> gset register) (nproc : nat) (g' : gstate) : iProp Σ :=
+      (D : CPU -> gset register) (nproc ndisk : nat) (g' : gstate) : iProp Σ :=
     (([∗ list] c ∈ enum CPU, [∗ set] r ∈ D c,
         ghost_map_elem (era_reg_name HE c) r (DfracOwn 1)
           (existT r (register_lookup r (g'.(gregs) c)))) ∗
@@ -716,6 +721,15 @@ Section power.
      ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
      ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
      ghost_var (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
+     (* THE BOOT MINT (claude-notes/design/fs-log.md, stage 4): this era's
+        disk image map, allocated by the PowerOn arm at the disk's PRESERVED
+        content, handed out WHOLE -- the full byte fragments over
+        [[0, ndisk)].  Every boot gets them, the first one included; the
+        previous era's fragments are abandoned with its invariants and are
+        never missed, which is exactly what lets a client layer (bio's pool,
+        the log's block views) hold image fragments and still boot twice. *)
+     disk_img_bytes (era_disk_name HE) 0
+       (disk_read (v_disk (g'.(gdev).(dvirtio))) 0 ndisk) ∗
      (* the crash-spanning invariant: FIXED-layer, so every boot gets the
         SAME one -- which is the whole point (the durability property is what
         survives the power cycle).  The boot client threads it to
@@ -723,7 +737,7 @@ Section power.
      crash_inv ∗
      gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
 
-  Lemma wp_power_loop (D : CPU -> gset register) (nproc : nat)
+  Lemma wp_power_loop (D : CPU -> gset register) (nproc ndisk : nat)
       (Φ : mval -> iProp Σ)
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
@@ -732,7 +746,7 @@ Section power.
          the new machine to the dead one. *)
       (Hboot : forall (HE : riscvEraGS) (gen : nat) (g' : gstate),
          boot_facts g' ->
-         ⊢ power_boot_res HE gen D nproc g' ={⊤}=∗
+         ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
                WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
             WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
@@ -743,7 +757,7 @@ Section power.
     iIntros "#Hcinv".
     iLöb as "IH".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR & Hdur)".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
     destruct (g.(gpow)) eqn:Hpw.
     - (* PowerOff: bump the generation, drop the power *)
@@ -766,16 +780,17 @@ Section power.
       iMod "Hback" as "_". iModIntro.
       rewrite /start_count Hpw /= in Hdom.
       iEval (rewrite /start_count Hpw /=) in "Hsauth".
-      iSplitL "Hgauth Hsauth HRauth Hdur".
+      iSplitL "Hgauth Hsauth HRauth".
       { rewrite /state_interp /=.
-        unfold power_interp, disk_dur_interp, disk_img_auth, start_count.
+        unfold power_interp, start_count.
         cbn [ggen gpow gregs gmem gdev].
         replace (S (g.(ggen)) + 0)%nat with (g.(ggen) + 1)%nat by lia.
         iFrame "Hgauth Hsauth".
-        (* the durable image is FRAMED: PowerOff touches no device state *)
-        iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
-        iSplitR "Hdauth"; last first.
-        { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+        (* the era is dropped WHOLE, its image map with it: nothing is owed
+           (the map's only reader was this era's own disk thread, and every
+           fragment of it dies in this era's invariants).  The next PowerOn
+           mints a fresh map at the disk content the machine still has --
+           which is what makes the ghost side of the image re-creatable. *)
         iExists R. iFrame "HRauth". iPureIntro.
         split; [exact Hdom|exact I]. }
       iSplitL; [|done]. iApply "IH".
@@ -825,7 +840,14 @@ Section power.
       iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU)
               (NoDup_enum CPU)) as (γsie) "Hsie".
       iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γpark).
+      (* THE BOOT MINT: a BRAND-NEW image map at the disk content the reset
+         machine still carries ([boot_shape] preserves [v_disk]), together
+         with its full fragments over [[0, ndisk)] -- which go to the boot
+         client below.  Nothing here refers to the previous era's map: it was
+         dropped at PowerOff, fragments and all. *)
+      iMod (disk_img_alloc (v_disk (g2.(gdev).(dvirtio))) ndisk)
+        as (γdisk) "[Hdauth Hdfrags]".
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γpark γdisk).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -841,10 +863,11 @@ Section power.
       (* run the client's boot entailment over the fresh era *)
       iMod "Hback" as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf with
-              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF]")
+              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF
+                Hdfrags]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
-        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF".
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF Hdfrags".
         iFrame "Helems".
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
@@ -854,18 +877,12 @@ Section power.
         iExact "Hstartlb". }
       iModIntro.
       rewrite /start_count Hpw /= Nat.add_0_r in Hdom.
-      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdur".
+      iSplitL "Hgauth Hsauth HRauth Hauths Hh HuA HpA HvA Hdauth".
       { rewrite /state_interp /=.
-        unfold power_interp, disk_dur_interp, disk_img_auth, start_count.
+        unfold power_interp, start_count.
         cbn [ggen gpow gregs gmem gdev].
         rewrite Hgen2 Hpow2.
         iFrame "Hgauth Hsauth".
-        (* the durable image RIDES THROUGH the reset: [virtio_reset] keeps
-           [v_disk], which is the whole point of the fixed-layer conjunct *)
-        iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
-        iSplitR "Hdauth"; last first.
-        { iExists dmap. iFrame "Hdauth". iPureIntro.
-          rewrite Hvirt2. exact Hdview. }
         iExists (<[g.(ggen) := HE]> R). iFrame "HRauth".
         iSplitR.
         { iPureIntro.
@@ -873,11 +890,15 @@ Section power.
         iExists HE.
         iSplitR.
         { iPureIntro. by rewrite lookup_insert. }
-        rewrite /era_interp. iSplitL "Hauths".
+        rewrite /era_interp /disk_dur_interp. iSplitL "Hauths".
         { rewrite /gregs_interp_at. iApply big_sepL_enum_to_set.
           iExact "Hauths". }
-        iFrame "Hh". iSplitL "HuA"; [iExact "HuA"|].
-        iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
+        iFrame "Hh".
+        iSplitL "HuA HpA HvA".
+        { iSplitL "HuA"; [iExact "HuA"|].
+          iSplitL "HpA"; [iExact "HpA"|iExact "HvA"]. }
+        (* the fresh era's image auth, at the reset machine's own disk *)
+        iExact "Hdauth". }
       iSplitR; [iApply "IH"|].
       (* the fork obligations: the new generation's whole complement *)
       rewrite /power_fork big_sepL_app big_sepL_fmap /=.
@@ -893,7 +914,7 @@ End power.
    configuration reachable under any schedule of power-cycles, hart steps
    and device steps is reducible. *)
 Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
-    (D : CPU -> gset register) (nproc : nat) (g : gstate)
+    (D : CPU -> gset register) (nproc ndisk : nat) (g : gstate)
     (* the crash predicate (see [riscv_system_adequacy]): allocated ONCE, into
        the fixed layer, so the SAME [crash_inv] is handed to every boot --
        which is what makes a durability property span power cycles.  Taken
@@ -908,7 +929,7 @@ Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
     (Hboot : forall (F : riscvFixedGS Σ) (HE : riscvEraGS) (gen : nat)
                     (g' : gstate),
        boot_facts g' ->
-       ⊢ power_boot_res HE gen D nproc g' ={⊤}=∗
+       ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
              WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
           WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
@@ -931,10 +952,12 @@ Proof.
   iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgauth _]".
   iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hsauth _]".
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
-  iMod (ghost_map_alloc_empty (K := Z) (V := bv 8)) as (γdisk) "Hdiskauth".
   iMod (inv_alloc crashN ⊤ Pc with "[]") as "#Hcinv"; [ iNext; iApply HPc |].
+  (* no disk image map is allocated here: the machine starts POWERED OFF, so
+     there is no era, hence no image conjunct in [state_interp].  The first
+     boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
   set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-              _ γdisk Pc).
+              _ Pc).
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>
@@ -943,13 +966,10 @@ Proof.
     (fun _ : mval => True%I),
     (@state_interp_mono HasLc riscv_lang Σ (@riscv_irisGS Σ F)).
   cbv zeta beta.
-  iSplitL "Hgauth Hsauth HRauth Hdiskauth".
-  { (* the initial state interpretation: OFF, nothing ever started, the
-       durable image empty (no fragment minted yet) *)
-    rewrite /power_interp /disk_dur_interp /disk_img_auth. iFrame "Hgauth Hsauth".
-    iSplitR "Hdiskauth"; last first.
-    { iExists ∅. iFrame "Hdiskauth". iPureIntro.
-      intros o b Hl. rewrite lookup_empty in Hl. discriminate. }
+  iSplitL "Hgauth Hsauth HRauth".
+  { (* the initial state interpretation: OFF, nothing ever started, no era
+       and hence no image map *)
+    rewrite /power_interp. iFrame "Hgauth Hsauth".
     iExists ∅. iFrame "HRauth".
     iSplitR.
     { iPureIntro. rewrite dom_empty_L /start_count Hpow /=.
@@ -957,7 +977,7 @@ Proof.
     rewrite Hpow. done. }
   iSplitL.
   { cbn. iSplitL; [|done].
-    iApply (@wp_power_loop Σ F _ D nproc (fun _ => True%I) (Hboot F)
+    iApply (@wp_power_loop Σ F _ D nproc ndisk (fun _ => True%I) (Hboot F)
               with "Hcinv"). }
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".

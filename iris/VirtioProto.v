@@ -1194,12 +1194,11 @@ Section VirtioProto.
 
   (* -- THE protocol invariant (rides in dev_inv_body) ------------------- *)
 
-  (* THE IMAGE AUTH IS NOT HERE (claude-notes/design/crash.md).  This
-     invariant rides in the PER-ERA [disk_inv], and an Iris invariant is never
-     deallocated, so anything linear parked here is stranded at a power cycle.
-     The disk image survives a crash, hence its auth+tie
-     (⌜disk_view dmap (v_disk v)⌝) lives in the FIXED
-     [RiscvPtsto.disk_dur_interp] instead, and the two lemmas that move it --
+  (* THE IMAGE AUTH IS NOT HERE (claude-notes/design/crash.md).  The auth+tie
+     (⌜disk_view dmap (v_disk v)⌝) lives in [state_interp]'s era conjunct
+     [RiscvPtsto.disk_dur_interp] instead -- it must be in the hand of
+     whoever is stepping the machine, since it is pinned to the state's own
+     [v_disk] -- and the two lemmas that move it --
      the live flip's predecessor [virtio_proto_intro_gen] (which no longer
      needs it at all) and the DMA completion [virtio_proto_step] (which takes
      it as an explicit premise and returns it updated) -- speak about it
@@ -1266,22 +1265,21 @@ Section VirtioProto.
      this is where the gnames are chosen; discarding them (as this lemma used
      to) left main() with no way to assemble [disk_res] for its [newlock].
 
-     ERA-FRESH, EXCEPT THE IMAGE: [dn_img] is CONSTRUCTED as the fixed-layer
-     [riscv_disk_name] rather than allocated (claude-notes/design/crash.md),
-     so a reboot's protocol ghosts are new while every [disk_bytes γ …]
-     fragment a previous generation minted still speaks about the same map.
-     There is no sound mint rule at an ARBITRARY time -- a caller cannot know
-     the range has not already been minted, and nothing exposes the image map
-     -- so the initial mint is [DiskPtsto.disk_bytes_mint] applied, at
-     allocation time, to the still-empty durable auth. *)
+     ERA-FRESH THROUGHOUT, AND THE IMAGE IS CONSTRUCTED, NOT ALLOCATED:
+     [dn_img] is the AMBIENT ERA's image gname [disk_img_name], whose map the
+     POWER THREAD minted at this boot, at the preserved disk content, handing
+     the full fragments to the boot client ([RiscvAdequacy.power_boot_res];
+     claude-notes/design/fs-log.md, stage 4).  Allocating a second map here
+     would be unusable -- the auth [state_interp] holds, hence the one
+     [virtio_proto_step] updates, is the era's. *)
   Lemma disk_ghosts_alloc (v : virtio_state) :
     virtio_live (v_cfg v) = false ->
     v_seen v = zero16 -> v_used_idx v = zero16 ->
     ⊢ |==> ∃ γ : disk_names,
-        (* the image name IS the durable one: this is what lets the device
-           thread identify the auth [state_interp] hands it with the fragments
-           this invariant holds ([virtio_proto_step]). *)
-        ⌜dn_img γ = riscv_disk_name⌝ ∗
+        (* the image name IS the era's: this is what lets the device thread
+           identify the auth [state_interp] hands it with the fragments this
+           invariant holds ([virtio_proto_step]). *)
+        ⌜dn_img γ = disk_img_name⌝ ∗
         virtio_proto γ v ∗ disk_cfg_is γ (DfracOwn (1/2)) (v_cfg v) ∗
         ghost_map_auth (dn_claim γ) 1 (∅ : gmap nat dclaim) ∗
         disk_done_lb γ 0%nat.
@@ -1294,10 +1292,10 @@ Section VirtioProto.
     iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "Hclaim".
     iMod (disk_cfg_alloc (v_cfg v)) as (gcfg) "Hcfg".
     iDestruct (disk_cfg_is_split
-                 (DiskNames riscv_disk_name gslot gnc gnp gclaim gcfg)
+                 (DiskNames disk_img_name gslot gnc gnp gclaim gcfg)
                  (v_cfg v) with "[Hcfg]") as "[Hcfg1 Hcfg2]".
     { rewrite /disk_cfg_is. cbn [dn_cfg]. iExact "Hcfg". }
-    iModIntro. iExists (DiskNames riscv_disk_name gslot gnc gnp gclaim gcfg).
+    iModIntro. iExists (DiskNames disk_img_name gslot gnc gnp gclaim gcfg).
     iSplitR; [iPureIntro; reflexivity|].
     iFrame "Hcfg2".
     rewrite /disk_done_lb. cbn [dn_nc dn_claim].
@@ -1529,11 +1527,11 @@ Section VirtioProto.
   Qed.
 
   (* THE DMA COMPLETION -- the one step in the whole machine that moves
-     [v_disk], and hence the one place the DURABLE image auth
+     [v_disk], and hence the one place the era's image auth
      ([RiscvPtsto.disk_dur_interp], handed over by [RiscvExec.wp_disk_step])
      is updated.  It travels as an explicit premise+return rather than inside
-     [virtio_proto]: the invariant this lemma runs under is per-ERA and a
-     crash must not strand the image (claude-notes/design/crash.md).
+     [virtio_proto]: the auth is pinned to the machine's own [v_disk], so it
+     belongs to whoever is stepping the machine (claude-notes/design/crash.md).
 
      It also HANDS BACK a crash WRITE PERMIT
      ([RiscvPtsto.disk_write_permit]), so that the caller can spend it on

@@ -3,8 +3,8 @@
 (*                                                                         *)
 (* The virtio disk's image is a total function [v_disk : Z -> bv 8].  The  *)
 (* driver-facing resource for it is a byte-granularity ghost map: the      *)
-(* AUTH rides in [RiscvPtsto.power_interp]'s DURABLE conjunct (it is the   *)
-(* one ghost that spans power cycles -- claude-notes/design/crash.md),     *)
+(* AUTH rides in [RiscvPtsto.era_interp]'s image conjunct, at the ERA's    *)
+(* image gname (claude-notes/design/fs-log.md, stage 4),                   *)
 (* tied to the image by [VirtioModel.disk_view] -- the exact analogue of   *)
 (* [mem_view]: a fragment exists only for offsets somebody minted, and the *)
 (* model's disk stays                                                      *)
@@ -13,11 +13,12 @@
 (*                                                                         *)
 (* This file also owns the OTHER driver-protocol ghosts, so a single       *)
 (* [disk_names] record travels through [dev_inv] (mirroring [uart_names]): *)
-(*   dn_img  -- the disk image map above.  ALWAYS [riscv_disk_name] (the   *)
-(*              fixed-layer gname): the image outlives an era, so unlike   *)
-(*              the four ghosts below it is not re-allocated at a boot;    *)
-(*              it stays a FIELD so every client statement                 *)
-(*              ([disk_bytes γ …]) keeps its spelling;                     *)
+(*   dn_img  -- the disk image map above.  ALWAYS [disk_img_name] (the     *)
+(*              AMBIENT ERA's image gname): the map is minted by the power *)
+(*              thread at boot, before this record exists, so [dn_img] is  *)
+(*              CONSTRUCTED at it rather than allocated.  It stays a FIELD *)
+(*              so every client statement ([disk_bytes γ …]) keeps its     *)
+(*              spelling;                                                  *)
 (*   dn_slot -- ghost_map nat vslot: the auth covers every in-flight       *)
 (*              request; the FRAGMENT for position [p] is the publisher's  *)
 (*              RECEIPT, and presenting it is what licenses the reclaim;   *)
@@ -77,9 +78,9 @@ Record dclaim := DClaim {
 (* ---------------------------------------------------------------------- *)
 
 (* NB: the disk IMAGE map is deliberately NOT here -- it is [DiskImg.diskImgG],
-   below both this file and RiscvPtsto.v, because the durable auth rides in the
-   fixed layer's [state_interp] while the fragments below are elements of the
-   same map (claude-notes/design/crash.md). *)
+   below both this file and RiscvPtsto.v, because the era auth rides in
+   [state_interp] while the fragments below are elements of the same map, and
+   the CLASS typing both is fixed-layer (claude-notes/design/crash.md). *)
 Class diskGhostG (Σ : gFunctors) := DiskGhostG {
   (* a receipt records the slot AND the pin map deposited at publish *)
   disk_slot_inG :: ghost_mapG Σ nat (vslot * gmap Arch.pa (bv 8));
@@ -117,26 +118,12 @@ Record disk_names := DiskNames {
 (* ---------------------------------------------------------------------- *)
 
 (* [disk_view] itself lives in [VirtioModel.v]: the auth it ties is the
-   DURABLE one in [RiscvPtsto.power_interp] (claude-notes/design/crash.md),
+   ERA one in [RiscvPtsto.era_interp] (claude-notes/design/crash.md),
    which is below this file, so the predicate has to be stated in the
-   iris-free model. *)
-
-(* peeling the first byte off a disk range read *)
-Lemma disk_read_cons (dk : Z -> bv 8) (o : Z) (n : nat) :
-  disk_read dk o (S n) = dk o :: disk_read dk (o + 1) n.
-Proof.
-  assert (Htail : (fun j : nat => dk (o + Z.of_nat j)) <$> seq 1 n
-                  = (fun j : nat => dk (o + 1 + Z.of_nat j)) <$> seq 0 n).
-  { apply list_eq. intro i. rewrite !list_lookup_fmap.
-    destruct (decide (i < n)%nat) as [Hi|Hi].
-    - rewrite (lookup_seq_lt 1 n i Hi) (lookup_seq_lt 0 n i Hi).
-      cbn [fmap option_fmap option_map]. do 2 f_equal. lia.
-    - rewrite (lookup_seq_ge 1 n i); [| lia].
-      rewrite (lookup_seq_ge 0 n i); [| lia]. reflexivity. }
-  unfold disk_read. cbn [seq]. rewrite fmap_cons.
-  assert (Hz : o + Z.of_nat 0%nat = o) by lia. rewrite Hz.
-  f_equal. exact Htail.
-Qed.
+   iris-free model.  [disk_read_cons] and the whole byte-level points-to
+   algebra likewise live in [DiskImg.v], at a bare gname: the power thread
+   mints an era's fragments before any [disk_names] record exists.  The
+   [disk_names]-keyed forms below are those, verbatim, at [dn_img γ]. *)
 
 Section DiskPtsto.
   Context `{!diskGhostG Σ, !diskImgG Σ}.
@@ -239,36 +226,34 @@ Section DiskPtsto.
   Qed.
 
   (* -- the disk points-to ----------------------------------------------- *)
+  (*                                                                        *)
+  (* Every form below is [DiskImg]'s gname-keyed one at [dn_img γ] -- the    *)
+  (* era's image gname, constructed (not allocated) by                       *)
+  (* [VirtioProto.disk_ghosts_alloc].  Restated here rather than aliased so  *)
+  (* that no client statement changes and no implicit argument moves.        *)
 
   Definition disk_byte (γ : disk_names) (o : Z) (b : bv 8) : iProp Σ :=
-    o ↪[dn_img γ] b.
+    disk_img_byte (dn_img γ) o b.
 
   Definition disk_bytes (γ : disk_names) (o : Z) (bs : list (bv 8)) : iProp Σ :=
-    ([∗ list] j ↦ b ∈ bs, disk_byte γ (o + Z.of_nat j) b)%I.
+    disk_img_bytes (dn_img γ) o bs.
 
   (* the block form [virtio_disk_rw]'s spec moves: xv6's BSIZE = 1024 *)
   Definition disk_block (γ : disk_names) (bno : Z) (bs : list (bv 8)) : iProp Σ :=
     (⌜length bs = 1024%nat⌝ ∗ disk_bytes γ (1024 * bno) bs)%I.
 
   Global Instance disk_byte_timeless γ o b : Timeless (disk_byte γ o b).
-  Proof. apply _. Qed.
+  Proof. rewrite /disk_byte. apply _. Qed.
   Global Instance disk_bytes_timeless γ o bs : Timeless (disk_bytes γ o bs).
-  Proof. apply _. Qed.
+  Proof. rewrite /disk_bytes. apply _. Qed.
   Global Instance disk_block_timeless γ bno bs : Timeless (disk_block γ bno bs).
-  Proof. apply _. Qed.
+  Proof. rewrite /disk_block /disk_bytes. apply _. Qed.
 
   (* -- structural peeling ----------------------------------------------- *)
 
   Lemma disk_bytes_cons (γ : disk_names) (o : Z) (b : bv 8) (bs : list (bv 8)) :
     disk_bytes γ o (b :: bs) ⊣⊢ disk_byte γ o b ∗ disk_bytes γ (o + 1) bs.
-  Proof.
-    rewrite /disk_bytes big_sepL_cons. cbv beta.
-    assert (Hz : o + Z.of_nat 0%nat = o) by lia. rewrite Hz.
-    apply bi.sep_proper; [reflexivity|].
-    apply big_sepL_proper. intros k y _.
-    assert (Hs : o + Z.of_nat (S k) = o + 1 + Z.of_nat k) by lia.
-    rewrite Hs. reflexivity.
-  Qed.
+  Proof. exact (disk_img_bytes_cons (dn_img γ) o b bs). Qed.
 
   (* -- agreement: fragments read the image ------------------------------ *)
 
@@ -277,28 +262,7 @@ Section DiskPtsto.
     disk_view dmap dk ->
     ghost_map_auth (dn_img γ) 1 dmap -∗ disk_bytes γ o bs -∗
     ⌜disk_read dk o (length bs) = bs⌝.
-  Proof.
-    iIntros (Hview) "Hauth Hbs".
-    iAssert (⌜forall (j : nat) (b : bv 8),
-               bs !! j = Some b -> dmap !! (o + Z.of_nat j)%Z = Some b⌝)%I
-      as %Hlook.
-    { iIntros (j b Hj).
-      iDestruct (big_sepL_lookup _ _ j b Hj with "Hbs") as "Hb".
-      by iDestruct (ghost_map_lookup with "Hauth Hb") as %?. }
-    iPureIntro.
-    unfold disk_read. apply list_eq. intro i.
-    rewrite list_lookup_fmap.
-    destruct (decide (i < length bs)%nat) as [Hlt|Hge].
-    - rewrite (lookup_seq_lt 0 (length bs) i Hlt).
-      cbn [fmap option_fmap option_map]. cbv beta.
-      destruct (lookup_lt_is_Some_2 bs i Hlt) as [b Hb].
-      rewrite Hb. f_equal.
-      replace (0 + i)%nat with i by lia.
-      apply Hview, Hlook, Hb.
-    - rewrite (lookup_seq_ge 0 (length bs) i); [|lia].
-      cbn [fmap option_fmap option_map].
-      symmetry. apply lookup_ge_None_2. lia.
-  Qed.
+  Proof. exact (disk_img_bytes_read (dn_img γ) dmap dk o bs). Qed.
 
   (* -- update: an OUT completion rewrites a range ----------------------- *)
 
@@ -316,41 +280,7 @@ Section DiskPtsto.
       ⌜forall x : Z,
          (forall j : nat, (j < length bs')%nat -> (x ≠ o + Z.of_nat j)%Z) ->
          dmap' !! x = dmap !! x⌝.
-  Proof.
-    revert o bs dmap.
-    induction bs' as [|b' bs'' IH]; intros o bs dmap Hlen.
-    - iIntros "Hauth Hbs". iModIntro. iExists dmap. iFrame "Hauth".
-      rewrite /disk_bytes big_sepL_nil.
-      iSplitR; [done|]. iPureIntro. split.
-      + intros j b Hj. rewrite lookup_nil in Hj. discriminate.
-      + intros x _. reflexivity.
-    - destruct bs as [|b bs]; [ discriminate | ].
-      iIntros "Hauth Hbs".
-      rewrite disk_bytes_cons. iDestruct "Hbs" as "[Hb Hbs]".
-      iMod (ghost_map_update b' with "Hauth Hb") as "[Hauth Hb]".
-      assert (Hlen' : length bs'' = length bs) by (cbn in Hlen; lia).
-      iMod (IH (o + 1) bs (<[o := b']> dmap) Hlen' with "Hauth Hbs")
-        as (dmap') "(Hauth & Hbs & %Ha & %Hc)".
-      iModIntro. iExists dmap'. iFrame "Hauth".
-      iSplitL "Hb Hbs".
-      { rewrite disk_bytes_cons. iFrame "Hb Hbs". }
-      iPureIntro. split.
-      + intros j b0 Hj. destruct j as [|j].
-        * cbn in Hj. injection Hj as <-.
-          assert (Hz : o + Z.of_nat 0%nat = o) by lia. rewrite Hz.
-          rewrite (Hc o); [ apply lookup_insert | ].
-          intros k Hk Heq. lia.
-        * cbn in Hj.
-          assert (Hs : o + Z.of_nat (S j) = o + 1 + Z.of_nat j) by lia.
-          rewrite Hs. exact (Ha j b0 Hj).
-      + intros x Hx.
-        rewrite (Hc x).
-        * apply lookup_insert_ne. intro Heq.
-          assert (Hne : x ≠ o + Z.of_nat 0%nat) by (apply Hx; cbn; lia). lia.
-        * intros k Hk.
-          assert (Hs : o + 1 + Z.of_nat k = o + Z.of_nat (S k)) by lia.
-          rewrite Hs. apply Hx. cbn. lia.
-  Qed.
+  Proof. exact (disk_img_bytes_update_gen (dn_img γ) dmap o bs bs'). Qed.
 
   Lemma disk_bytes_update (γ : disk_names) (dmap : gmap Z (bv 8))
       (o : Z) (bs bs' : list (bv 8)) :
@@ -360,31 +290,7 @@ Section DiskPtsto.
       ghost_map_auth (dn_img γ) 1 dmap' ∗ disk_bytes γ o bs' ∗
       ⌜forall dk : Z -> bv 8,
          disk_view dmap dk -> disk_view dmap' (disk_write dk o bs')⌝.
-  Proof.
-    iIntros (Hlen) "Hauth Hbs".
-    iMod (disk_bytes_update_gen γ dmap o bs bs' Hlen with "Hauth Hbs")
-      as (dmap') "(Hauth & Hbs & %Ha & %Hc)".
-    iModIntro. iExists dmap'. iFrame "Hauth Hbs". iPureIntro.
-    intros dk Hview x b Hx. unfold disk_write.
-    destruct (o <=? x) eqn:Hle.
-    - apply Z.leb_le in Hle.
-      destruct (bs' !! Z.to_nat (x - o)) as [b0|] eqn:Hb0.
-      + assert (Hd : dmap' !! (o + Z.of_nat (Z.to_nat (x - o))) = Some b0)
-          by exact (Ha _ _ Hb0).
-        assert (Hxo : o + Z.of_nat (Z.to_nat (x - o)) = x) by lia.
-        rewrite Hxo in Hd. rewrite Hd in Hx. injection Hx as <-. reflexivity.
-      + assert (Hout : forall j : nat, (j < length bs')%nat -> x ≠ o + Z.of_nat j).
-        { intros j Hj Heq.
-          assert (Hjj : Z.to_nat (x - o) = j) by lia.
-          rewrite Hjj in Hb0.
-          destruct (lookup_lt_is_Some_2 bs' j Hj) as [bb Hbb].
-          rewrite Hbb in Hb0. discriminate. }
-        rewrite (Hc x Hout) in Hx. exact (Hview x b Hx).
-    - apply Z.leb_gt in Hle.
-      assert (Hout : forall j : nat, (j < length bs')%nat -> x ≠ o + Z.of_nat j)
-        by (intros j _; lia).
-      rewrite (Hc x Hout) in Hx. exact (Hview x b Hx).
-  Qed.
+  Proof. exact (disk_img_bytes_update (dn_img γ) dmap o bs bs'). Qed.
 
   (* -- minting: fragments for untouched offsets ------------------------- *)
 
@@ -397,32 +303,6 @@ Section DiskPtsto.
       ghost_map_auth (dn_img γ) 1 dmap' ∗
       disk_bytes γ o (disk_read dk o n) ∗
       ⌜disk_view dmap' dk⌝.
-  Proof.
-    revert o dmap. induction n as [|n IH]; intros o dmap Hview Hfresh.
-    - iIntros "Hauth". iModIntro. iExists dmap. iFrame "Hauth".
-      iSplitR; [| iPureIntro; exact Hview ].
-      assert (Hnil : disk_read dk o 0%nat = []) by reflexivity.
-      rewrite Hnil /disk_bytes big_sepL_nil. done.
-    - iIntros "Hauth".
-      iMod (ghost_map_insert o (dk o) with "Hauth") as "[Hauth Hb]".
-      { pose proof (Hfresh 0%nat ltac:(lia)) as Hf.
-        assert (Ho : o + Z.of_nat 0%nat = o) by lia. rewrite Ho in Hf. exact Hf. }
-      assert (Hview' : disk_view (<[o := dk o]> dmap) dk).
-      { intros x b Hx. destruct (decide (x = o)) as [->|Hne].
-        - rewrite lookup_insert in Hx. by injection Hx as <-.
-        - rewrite lookup_insert_ne in Hx; [| exact (fun e => Hne (eq_sym e)) ].
-          exact (Hview x b Hx). }
-      assert (Hfresh' : forall j : nat, (j < n)%nat ->
-                <[o := dk o]> dmap !! (o + 1 + Z.of_nat j) = None).
-      { intros j Hj. rewrite lookup_insert_ne; [| lia ].
-        pose proof (Hfresh (S j) ltac:(lia)) as Hf.
-        assert (Hs : o + Z.of_nat (S j) = o + 1 + Z.of_nat j) by lia.
-        rewrite Hs in Hf. exact Hf. }
-      iMod (IH (o + 1) (<[o := dk o]> dmap) Hview' Hfresh' with "Hauth")
-        as (dmap') "(Hauth & Hbs & %Hv)".
-      iModIntro. iExists dmap'. iFrame "Hauth".
-      iSplitL; [| iPureIntro; exact Hv ].
-      rewrite disk_read_cons disk_bytes_cons. iFrame "Hb Hbs".
-  Qed.
+  Proof. exact (disk_img_bytes_mint (dn_img γ) dmap dk o n). Qed.
 
 End DiskPtsto.

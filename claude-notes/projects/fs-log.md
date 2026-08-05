@@ -150,18 +150,75 @@ pool's index is `(LOGBLOCKS − n) + 2` and only the n++ re-establishes it.
       dead; delayed lock seal with the ∀R wand; word4_pointsto_persist →
       log_frozen; assembles log_batch 0 / log_res inline).
 
-## Stage 4 — the crash instantiation (DO NOT START until the two forks in
-## the design doc's stage-4 section are settled)
+## Stage 4 — the crash instantiation (design PINNED with the user —
+## see design/fs-log.md's stage-4 architecture; both forks resolved:
+## per-era client disk ghosts + logatom permits via M5b option (a))
 
-- [ ] Settle fork 1 (permit identity/currying; the M5b timelessness
-      blocker) and fork 2 (era-boundary hand-off of the FS ghosts; note
-      the recorded option (b) auth-side forgetting does not typecheck —
-      ghost_map_delete needs the elems).
-- [ ] `P_fs` definition; adequacy client passes it as Pc; the mkfs-image
-      mint threaded into the boot bundle.
-- [ ] bwrite gains the permit premise; write_head's commit permit does
-      D := L|W; install/write_log permits are recovery-neutral.
-- [ ] recover_from_log / install_trans(recovering=1) against the crash
-      receipt; initlog's clean-image precondition replaced by the real
-      one.
-- [ ] sys_sync spec + proof (durability receipt).
+Phased; each phase ends with a green full build and a checkpoint push.
+
+### Phase A — per-era client disk ghosts (revises M5's fragment story)
+
+REFINED before launch: an auth-only fixed γdur cannot track writes
+in-logic (an auth update must be frame-preserving against POSSIBLE
+fragments — "none were ever minted" is not a usable fact), so the fixed
+gname RETIRES outright and the state_interp disk conjunct itself goes
+era-keyed. The P_fs tie (Phase B) survives PowerOn because crashes
+preserve v_disk: the record-P does not move, so the power arms frame it.
+
+- [ ] `riscvEraGS` gains the era disk-image gname (Σ-free data);
+      state_interp's durable-disk conjunct moves under the `gpow` live
+      branch at the ERA's gname; the four base rules' splits adjust.
+- [ ] PowerOn allocates the era image auth AT the preserved v_disk
+      content and hands the FULL fragments out through
+      `power_boot_res` — THE BOOT MINT (every boot, first included; the
+      old "mkfs-image mint future work" dissolves into it). PowerOff
+      abandons the era auth with the era.
+- [ ] `riscv_disk_name` retired; `dn_img` stays a field
+      (client spellings unchanged); `disk_ghosts_alloc` takes the era
+      gname; the seam equations re-point; bio/log Spec/Proof files
+      textually untouched. lemma_diff + spec_vacuity + full build +
+      Print Assumptions on the system theorem; checkpoint.
+
+### Phase B — the permit-invariant seam + the state_interp tie
+
+- [ ] `perm_inv` (M5b option (a)): a non-timeless era invariant holding,
+      per in-flight write, pending(client fupd, saved-prop-identified)
+      ∨ done(Q); the timeless vslot stores only the saved-prop gname.
+      Deposit at the enqueue publish leaf (under ▷); consumption in
+      `wp_disk_step`'s first leg (the between-legs iNext strips);
+      post-wake Q collection with the slot receipt.
+- [ ] The fixed `ghost_var` tie between `P_fs`'s record-P and
+      `state_interp`'s disk conjunct (both fixed-layer; M5's
+      fourth-conjunct recipe for the base-rule churn). The completion's
+      MECHANICAL update P := P[o := bs] happens here, outside the
+      client fupd.
+- [ ] `virtio_proto_step`/`wp_disk_loop` reshaped: the completion opens
+      crashN + permN, does the mechanical P-update, applies the client
+      fupd (write identity as a pure premise), stores done(Q).
+      Checkpoint.
+
+### Phase C — P_fs + the logatom bwrite
+
+- [ ] `P_fs` (the real `Pc`): the generation-swappable escrow — at-rest
+      ∨ checked-out(era boot token) — over the record (P|fs-range, D,
+      the receipts mono-list) with ⌜recovery(P) = D⌝; the boot token in
+      the era boot bundle; adequacy passes P_fs and the mkfs-image
+      initial record.
+- [ ] bwrite's spec gains the logatom premise (the client fupd + Q
+      post); threading through write_head/install_trans/end_op/initlog
+      call sites — each of the four WAL write kinds is ONE call site's
+      fupd instantiation, nothing below the log layer changes shape.
+      Checkpoint.
+
+### Phase D — recovery + sys_sync
+
+- [ ] initlog's REAL spec (n > 0): the P_fs arm swap with the boot
+      token; recovery's writes as install/clear fupds; the stage-2
+      clean-image spec becomes the n = 0 corollary.
+- [ ] install_trans(recovering = true, n > 0) form (the printk arm
+      becomes live — needs the printk-general assumed contract).
+- [ ] sys_sync spec + proof (the mono-list receipt lower bound).
+- [ ] The ∀-era FS boot composition: every boot's bio_init/initlog runs
+      from the era mint + the P_fs swap; the whole-system statement
+      quantifies over power schedules. Checkpoint; move this file's
+      finished stages to completed/.

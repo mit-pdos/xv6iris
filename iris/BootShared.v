@@ -712,8 +712,8 @@ Section BootAlloc.
      form ([reg_pointsto_at], [kmap_auth], [uart_frag], [park_full], ...) IS
      that form at [riscv_eraGS] BY DELTA (RiscvPtsto §"the era's names"), so
      the unpacking is pure conversion and there is nothing to prove. *)
-  Lemma power_boot_res_unpack (g : gstate) :
-    power_boot_res riscv_eraGS gen_id boot_D NPROC g ⊢
+  Lemma power_boot_res_unpack (g : gstate) (ndisk : nat) :
+    power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g ⊢
       ([∗ list] c ∈ enum CPU, boot_reg_res (CID := c) (g.(gregs) c)) ∗
       boot_raw_bytes g ∗
       kmap_auth kmap_M0 ∗
@@ -725,6 +725,13 @@ Section BootAlloc.
       ([∗ list] j ∈ seq 0 NPROC, park_full j false) ∗
       uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
       virtio_frag (g.(gdev).(dvirtio)) ∗
+      (* the BOOT MINT: this era's whole disk image, in fragments
+         (claude-notes/design/fs-log.md, stage 4).  [disk_img_name] is the
+         ambient era's image gname -- the one [disk_ghosts_alloc] constructs
+         [dn_img] at, so these ARE [disk_bytes γv 0 …] once that record
+         exists. *)
+      disk_img_bytes disk_img_name 0
+        (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
       crash_inv ∗ gen_cert.
   Proof. iIntros "H". iExact "H". Qed.
 
@@ -805,11 +812,11 @@ Section BootAlloc.
   (* ------------------------------------------------------------------ *)
   (* THE COMPANION LEMMA.                                               *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_shared_alloc (g : gstate) (Φ : mval -> iProp Σ) :
+  Lemma boot_shared_alloc (g : gstate) (ndisk : nat) (Φ : mval -> iProp Σ) :
     boot_facts g ->
-    power_boot_res riscv_eraGS gen_id boot_D NPROC g
+    power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g
     ={⊤}=∗ ∃ (_ : fdslotG Σ) (γd : uart_names) (γv : disk_names),
-      ⌜dn_img γv = riscv_disk_name⌝ ∗
+      ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗ panic_wp_any ∗
       started_inv (main_deposit γd γv Φ) ∗
@@ -830,6 +837,11 @@ Section BootAlloc.
       ghost_map_auth (dn_claim γv) 1 (∅ : gmap nat dclaim) ∗
       disk_done_lb γv 0%nat ∗
       kpt_unset ∗ kmap_auth kmap_M0 ∗
+      (* THE BOOT MINT, restated at the disk names this lemma just allocated:
+         the whole image, in exclusive byte fragments.  Nothing consumes it
+         yet -- it is what the FS layer's block views will be carved out of
+         (claude-notes/design/fs-log.md, stage 4). *)
+      disk_bytes γv 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
       (∃ ps : list (mword 64),
          ⌜prun phystop_val s1entry_val ps⌝ ∗
          ⌜(K_kvmmake + 64 + 3 < length ps)%nat⌝ ∗
@@ -842,9 +854,9 @@ Section BootAlloc.
     destruct Hbf' as (Hpow & Hin & Hmemf & Hregsf & Hu0 & Hp0 & Hv0').
     destruct Hv0' as (v0 & Hv0).
     iIntros "H".
-    iDestruct (power_boot_res_unpack g with "H") as
+    iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hpark &
-        Huf & Hpf & Hvf & #Hcinv & #Hcert)".
+        Huf & Hpf & Hvf & Hdimg & #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [img_end] ---- *)
@@ -950,6 +962,10 @@ Section BootAlloc.
     iSplitR; [iExact "Hdone" |].
     iSplitL "Hkpt"; [iExact "Hkpt" |].
     iSplitL "Hkauth"; [iExact "Hkauth" |].
+    (* the boot mint, re-spelled at [γv]: [disk_bytes γv] IS
+       [disk_img_bytes (dn_img γv)], and [Himg] says that gname is the era's *)
+    iSplitL "Hdimg".
+    { rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
     iExact "Hpages".
   Qed.
 

@@ -10,7 +10,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang.
-Require Export DiskImg.  (* [diskImgG]/[disk_img_auth]: the DURABLE disk image *)
+Require Export DiskImg.  (* [diskImgG]/[disk_img_auth]: the disk image map *)
 Require Import PtreeType.   (* [ptree]: the carrier of the shared kernel table's ghost *)
 Local Open Scope Z_scope.
 
@@ -177,6 +177,26 @@ Record riscvEraGS := RiscvEraGS {
      every one of the ~50 files that mention [procs_inv].  The function is
      total; only indices below [NPROC] are ever owned. *)
   era_park_name : nat -> gname;
+  (* THE DISK IMAGE MAP (claude-notes/design/crash.md, design/fs-log.md
+     stage 4): a byte-granularity ghost map mirroring [v_disk], tied to the
+     state by [disk_dur_interp] below -- ONE conjunct of this era's
+     [era_interp], hence gone when the era is.
+
+     PER-ERA, deliberately.  The image itself survives a power cycle (it is
+     the one machine component that does), but its GHOST mirror must not:
+     client-visible fragments -- bio's pool/escrow, the log's block views --
+     park in era invariants, and a FIXED map could never re-mint them at the
+     next boot ([ghost_map] cannot re-create an existing key, and auth-side
+     forgetting needs the element, which is exactly what is stranded), so a
+     fixed map cannot boot twice once the FS layer holds fragments.  A fresh
+     map per era, allocated at the PRESERVED content and handed out WHOLE
+     ([RiscvAdequacy.power_boot_res]'s boot mint), has no such problem: the
+     dead era's fragments are abandoned with everything else it owned.
+
+     The class typing it stays FIXED-layer ([riscvF_diskGS], from DiskImg.v):
+     it is the unique source of the [ghost_mapG Σ Z (bv 8)] instance in a
+     [riscvGS] context, and a second one could not interact with it. *)
+  era_disk_name : gname;
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
@@ -221,20 +241,15 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      ambient era to the one [state_interp]'s existential holds. *)
   riscvF_registryGS :: ghost_mapG Σ nat riscvEraGS;
   riscv_registry_name : gname;
-  (* THE DURABLE DISK IMAGE (claude-notes/design/crash.md): a byte-granularity
-     ghost map mirroring [v_disk], tied to the state by [disk_dur_interp]
-     below.  FIXED-layer, because the image is the ONE machine component a
-     power cycle preserves -- anything linear parked in an era invariant is
-     stranded at a crash, so the auth cannot live in [virtio_proto] (which
-     rides in the per-era [disk_inv]).  The era's OTHER disk ghosts
-     (slots/counters/claims) stay era-fresh: in-flight requests SHOULD die
-     with the device reset.  [DiskPtsto.disk_names]'s [dn_img] field is
-     always this gname, so every client [disk_bytes γ …] is unchanged and
-     its fragments survive a boot.  The class comes from [DiskImg.v], BELOW
-     both this file and DiskPtsto.v, because the auth here and the driver's
-     fragments there must carry the same [ghost_mapG] instance. *)
+  (* THE DISK IMAGE's TYPING (claude-notes/design/crash.md): the class alone
+     -- the NAME is per-era ([riscvEraGS.era_disk_name] above), because a
+     fixed image map could not be re-minted after a crash.  This field is
+     the UNIQUE source of the [ghost_mapG Σ Z (bv 8)] instance in every
+     [riscvGS] context, which is the whole reason [DiskImg.v] exists: the
+     era auth here and the driver's fragments in DiskPtsto.v must carry the
+     same instance, and RiscvPtsto sits BELOW DiskPtsto, so neither file can
+     take the class from the other. *)
   riscvF_diskGS :: diskImgG Σ;
-  riscv_disk_name : gname;
   (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
      durability invariant over the disk image -- an ARBITRARY iProp, sealed
      into [crash_inv] below.  A plain iProp field is legal here (only the ERA
@@ -279,6 +294,11 @@ Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name riscv_eraGS.
 Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name riscv_eraGS.
 Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
 Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
+(* the AMBIENT era's disk-image gname: what [DiskPtsto.disk_names]'s [dn_img]
+   field is always constructed at ([VirtioProto.disk_ghosts_alloc]), and what
+   [RiscvExec.wp_disk_step] hands the disk thread.  The seam equation the
+   driver carries is [dn_img γd = disk_img_name]. *)
+Definition disk_img_name `{!riscvGS Σ} : gname := era_disk_name riscv_eraGS.
 
 (* The generation counter's three faces (claude-notes/design/crash.md).
    [gen_auth] rides in [state_interp] pinned to [gstate.(ggen)]; the lower
@@ -303,16 +323,17 @@ Definition start_auth `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
 Definition gen_started `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_start_name (S gen).
 
-(* THE DURABLE DISK TIE (claude-notes/design/crash.md): the fixed-layer image
-   auth, pinned to the state's own [v_disk].  It is a conjunct of
-   [power_interp] at BOTH power states, and both power arms FRAME it --
-   PowerOff touches no device state at all and PowerOn's [virtio_reset] keeps
-   [v_disk], which is exactly what makes the image (and hence every
-   [disk_bytes] fragment) crash-surviving.  Of the whole tree only the DISK
+(* THE DISK IMAGE TIE (claude-notes/design/crash.md, design/fs-log.md): era
+   [E]'s image auth, pinned to the state's own [v_disk].  It is a conjunct of
+   [era_interp] below, hence live exactly while the era is: PowerOff drops it
+   with the rest of the era (nothing is owed -- the auth had no reader left),
+   and PowerOn allocates the NEXT era's at the preserved content, handing the
+   full fragments to the boot client.  Of the whole tree only the DISK
    thread's DMA completion moves [v_disk], so only [wp_disk_step] hands this
-   conjunct over to its caller. *)
-Definition disk_dur_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
-  disk_img_auth riscv_disk_name (v_disk (dvirtio (gdev g))).
+   conjunct over to its caller; the other three lifting rules frame it. *)
+Definition disk_dur_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate)
+    : iProp Σ :=
+  disk_img_auth (era_disk_name E) (v_disk (dvirtio (gdev g))).
 
 (* the registry element: generation [gen] runs era [E].  Persistent. *)
 Definition era_registered `{!riscvFixedGS Σ} (gen : nat) (E : riscvEraGS) : iProp Σ :=
@@ -330,7 +351,7 @@ Definition gen_cert `{!riscvGS Σ} `{GEN : GenId} : iProp Σ :=
 (*                                                                          *)
 (* [crash_inv] is allocated ONCE, in adequacy, over the fixed layer's        *)
 (* [riscv_crash_pred], and it spans power cycles for free: neither power arm *)
-(* opens it (both FRAME [disk_dur_interp], and [virtio_reset] keeps          *)
+(* opens it (the real disk image is untouched -- [virtio_reset] keeps        *)
 (* [v_disk]), so the client's durability property holds at every reachable   *)
 (* state INCLUDING the instant after a power loss.  It is opened in exactly  *)
 (* one place in the whole tree -- the disk thread's DMA completion, the one  *)
@@ -1109,10 +1130,15 @@ Definition dev_interp_at `{!riscvFixedGS Σ} (E : riscvEraGS)
   (ghost_var (era_uart_name E) (1/2) d.(duart) ∗
    ghost_var (era_plic_name E) (1/2) d.(dplic) ∗
    ghost_var (era_virtio_name E) (1/2) d.(dvirtio))%I.
+(* the era's four conjuncts.  The DISK IMAGE rides here, in LAST position,
+   rather than beside the fixed conjuncts: it is per-era (see
+   [era_disk_name]), so when the power is off there is no disk conjunct at
+   all -- the era, and its image map, are gone. *)
 Definition era_interp `{!riscvFixedGS Σ} (E : riscvEraGS) (g : gstate) : iProp Σ :=
   (gregs_interp_at E g.(gregs) ∗
    gen_heap_interp (hG := era_memGS_of E) g.(gmem) ∗
-   dev_interp_at E g.(gdev))%I.
+   dev_interp_at E g.(gdev) ∗
+   disk_dur_interp E g)%I.
 
 Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
   (gen_auth g.(ggen) ∗ start_auth (start_count g) ∗
@@ -1120,8 +1146,7 @@ Definition power_interp `{!riscvFixedGS Σ} (g : gstate) : iProp Σ :=
       ghost_map_auth riscv_registry_name 1 R ∗
       ⌜dom R = set_seq 0 (start_count g)⌝ ∗
       (if g.(gpow) then (∃ E, ⌜R !! g.(ggen) = Some E⌝ ∗ era_interp E g)%I
-       else True%I)) ∗
-   disk_dur_interp g)%I.
+       else True%I)))%I.
 
 Global Program Instance riscv_irisGS `{!riscvFixedGS Σ} : irisGS riscv_lang Σ := {
   iris_invGS := riscvF_invGS;

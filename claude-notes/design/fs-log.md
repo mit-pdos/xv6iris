@@ -317,16 +317,36 @@ stranded). Fractional splits (a ½ standing in `P_fs`) merely leak ½ per
 crash. So the CURRENT stage-1–3 volatile design cannot boot twice; any
 resolution must make the stranded pieces RE-CREATABLE, i.e.:
 
-1. **Per-era client disk ghosts.** Each boot allocates a fresh era image
-   ghost (auth + full fs-range fragments, minted at the current disk
-   content); bio's `bv_gd` points at the ERA ghost; a crash abandons it
-   wholesale — nothing to reclaim, next boot mints fresh. The fixed
-   `γdur` becomes AUTH-ONLY, zero outstanding fragments ever (its
-   completion updates are then auth-alone, which is legal precisely
-   because nothing is outstanding). The boot mint needs one new base
-   seam: a boot-time view of "the era map equals the durable map"
-   (allocated where the γdur auth is accessible — the `power_boot_res` /
-   adequacy client bundle, the `disk_ghosts_alloc` precedent).
+1. **Per-era client disk ghosts — LANDED (Phase A).** Each boot allocates
+   a fresh era image ghost (auth + full fragments, minted at the current
+   disk content); bio's `bv_gd` points at the ERA ghost; a crash abandons
+   it wholesale — nothing to reclaim, next boot mints fresh. What landed
+   (see `design/crash.md`, "The disk image ghost"):
+   - `riscvEraGS.era_disk_name`; the typing class stays fixed-layer
+     (`riscvF_diskGS`, the unique instance source). The fixed
+     `riscv_disk_name` gname is GONE — there is no auth-only fixed map at
+     all, because nothing needs one: `state_interp` ties the ERA map to
+     the machine's own `v_disk`, and the REAL disk is what carries content
+     across the crash.
+   - `state_interp`'s image conjunct moved INSIDE the `gpow` live branch
+     (it is `era_interp`'s fourth conjunct, `disk_dur_interp E g`), so
+     when the power is off there is no image conjunct at all.
+   - `wp_power_loop`'s PowerOn arm is THE BOOT MINT: `DiskImg.disk_img_alloc`
+     allocates the fresh map at the preserved `v_disk`, and `power_boot_res`
+     hands the client `disk_img_bytes (era_disk_name HE) 0
+     (disk_read (v_disk (g'.(gdev).(dvirtio))) 0 ndisk)` — total exclusive
+     ownership of bytes `[0, ndisk)`, every boot including the first. The
+     range is a PARAMETER (`ndisk`, threaded like `nproc`);
+     `SystemAdequacy.XV6_DISK_BYTES = 2000 * 1024` is the xv6 value, so no
+     FS constant appears below that file. `BootShared.boot_shared_alloc`
+     re-exports the mint as `disk_bytes γv 0 (disk_read … 0 ndisk)`, which
+     is where the bio pool will take it from.
+   - The seam equation is now `dn_img γd = disk_img_name` (the ambient
+     era's gname); `disk_ghosts_alloc` still CONSTRUCTS `dn_img` at it and
+     exports the equation, `wp_disk_loop` still takes it as a premise, and
+     `virtio_proto_step` is unchanged in shape.
+   - The recorded "mkfs-image mint" future work dissolves into the boot
+     mint; `disk_bytes_mint` (at `disk_names`) has no caller left.
 2. **Permits are LOGICALLY-ATOMIC client view shifts, transported by
    M5b's option (a)** (decided with the user; an earlier tag-enumeration
    draft is recorded below as rejected). bwrite's crash-facing contract

@@ -117,9 +117,9 @@ per-milestone record):
 ## Generations in the logic
 
 - `riscvGS` splits into a FIXED layer (invGS, the `γgen` mono-nat, the
-  generation→era registry, the durable disk ghost `γdur`, `crash_inv`'s
+  generation→era registry, the disk-image ghost's CLASS, `crash_inv`'s
   ghosts) and an ERA layer (heap gname, register auths, device ghost-vars,
-  sie/strans/park/kpt names, …). PowerOn allocates a fresh era record, so
+  sie/strans/park/kpt names, the disk-image gname `era_disk_name`). PowerOn allocates a fresh era record, so
   every memory/register reference of a boot is independent of the previous
   boot's. The composite class keeps the name `riscvGS` and its field
   accessors, so mid-tree files are textually unchanged.
@@ -132,9 +132,11 @@ per-milestone record):
   a crashed machine's run state is gone).
 - `state_interp` = fixed conjuncts (mono-nat auth of `ggen`; the registry
   gen ↦ era with the pure shape `dom(registry) = [0, ggen) ∪ (if gpow
-  then {ggen} else ∅)`; the durable disk tie `∃ dmap, ghost_map_auth γdur
-  1 dmap ∗ ⌜disk_view dmap (v_disk g)⌝`) ∗ (when `gpow`: the current
-  era's interp triple).
+  then {ggen} else ∅)`) ∗ (when `gpow`: the current era's interp
+  QUADRUPLE — registers, heap, devices, and the era's disk-image tie
+  `disk_img_auth (era_disk_name E) (v_disk (dvirtio (gdev g)))`).  When the
+  power is off there is no image conjunct at all: the era, and its image
+  map, are gone.
 - **Base lifting rules are the only re-proved WP layer** (`wp_exec_step`
   tower roots + the three device lifting rules). Each reads `(ggen, gpow)`
   off `state_interp` and four-way splits against the caller's `gen`:
@@ -154,10 +156,13 @@ per-milestone record):
   ride INSIDE that era's `minstret_inv` (allocated per era at PowerOn,
   already threaded by every WP in the tree): zero statement churn.
 - `wp_power_loop`: Löb over the two arms. PowerOff: drop the era innards
-  of `state_interp`, bump the auth, re-establish the off form — the
-  durable conjunct is FRAMED (`v_disk` untouched). PowerOn:
+  of `state_interp` — INCLUDING the era's disk-image auth — bump the auth,
+  re-establish the off form. PowerOn:
   `gen_heap_init` over the reset memory, fresh register/device auths (the
-  virtio auth at the PRESERVED `v_disk`), allocate the era invariants,
+  virtio auth at the PRESERVED `v_disk`), a FRESH image map minted at that
+  preserved content whose full fragments go to the client
+  (`DiskImg.disk_img_alloc`; see the image section below),
+  allocate the era invariants,
   register the era, then discharge the fork obligations with the client's
   JOINT boot entailment — the same shape as the old adequacy hypothesis
   (`∀` era instance, `∀ g' ∈ boot_shape`, initial resources `={⊤}=∗` the
@@ -166,14 +171,36 @@ per-milestone record):
 - Adequacy shrinks to: allocate the fixed layer, hand the pool
   `wp_power_loop`. The era-0-vs-era-k distinction does not exist.
 
-## The crash-spanning disk invariant
+## The disk image ghost: PER-ERA, re-minted at every boot
 
-- **Nothing durable may be parked in an era invariant**: Iris invariants
-  are never deallocated, so a linear resource inside a dead era's
-  invariant is stranded forever. Hence the disk-image auth moves OUT of
-  `virtio_proto`/`disk_inv` into the fixed `state_interp` conjunct
-  (`γdur` tied to `v_disk g`); `disk_bytes` becomes a crash-surviving
-  resource. The era-level `virtio_proto` keeps the queue/slot/claim
+The disk itself is the one machine component a power cycle preserves; its
+GHOST mirror deliberately is not.
+
+- **Nothing linear may be parked in an era invariant and still be needed
+  after a crash**: Iris invariants are never deallocated, so a resource
+  inside a dead era's invariant is unreachable forever. The image auth
+  therefore cannot live in `virtio_proto`/`disk_inv` *and* be the thing
+  clients hold fragments of. It does not live in the FIXED layer either
+  (that was M5's shape, and it does not survive contact with the FS
+  layer): a fixed map's stranded fragments can never be re-minted —
+  `ghost_map` cannot re-create an existing key, and auth-side forgetting
+  needs the element, which is exactly what is stranded — so a system whose
+  bio/log layers hold image fragments could not boot twice.
+- **The shape: one image map PER ERA** (`riscvEraGS.era_disk_name`; the
+  typing class `diskImgG` stays fixed-layer, `riscvFixedGS.riscvF_diskGS`,
+  and is the UNIQUE source of that `ghost_mapG Σ Z (bv 8)` instance).
+  `state_interp`'s live branch holds `disk_img_auth (era_disk_name E)
+  (v_disk …)`; PowerOff drops it with the era (nothing is owed — the map's
+  only reader was that era's own disk thread); PowerOn allocates a FRESH
+  map at the disk's preserved content and hands the client its FULL
+  fragments (`DiskImg.disk_img_alloc`, delivered in `power_boot_res` as
+  `disk_img_bytes (era_disk_name HE) 0 (disk_read (v_disk …) 0 ndisk)`).
+  So every boot — the first one included — starts with total ownership of
+  a whole disk's worth of ghost bytes, and a crash abandons the previous
+  era's wholesale. `DiskPtsto.disk_names.dn_img` is CONSTRUCTED at the
+  ambient era's gname (`RiscvPtsto.disk_img_name`), so every client
+  spelling `disk_bytes γ …` / `disk_block γ …` is unchanged.
+- The era-level `virtio_proto` keeps the queue/slot/claim
   protocol — which SHOULD die at a crash: in-flight requests vanish with
   the device reset, and sleepers holding receipts are dead anyway.
 - `crash_inv := inv crashN riscv_crash_pred`, where `riscv_crash_pred` is
@@ -185,17 +212,16 @@ per-milestone record):
   `P_fs` out of every `dev_inv`-adjacent signature — nothing between
   RiscvPtsto and the disk thread names it. Allocated once, in adequacy,
   and handed to every boot (`power_boot_res`), so all generations share
-  it; it spans power cycles because neither power arm touches `v_disk` —
-  the power proofs FRAME the durable conjunct and never open the
-  invariant.
-  - **A sleeper's `disk_bytes` fragments are still era-parked**, and that
-    is a known open decision, not an oversight: a slot's fragments sit in
-    the per-era `disk_inv`, so a crash strands them while the durable auth
-    still remembers their keys (sound, but those offsets can never be
-    re-minted or re-claimed). The two candidate fixes — fractional/
-    agreement image entries so a slot holds a COPY, or auth-side key
-    forgetting in the power arm plus recovery re-minting — are recorded in
-    `../projects/crash.md`; the choice belongs with the log's crash proof.
+  it; it spans power cycles because neither power arm touches `v_disk` and
+  neither opens the invariant.  Note the asymmetry that makes the whole
+  design work: what spans a crash is the CRASH PREDICATE (an iProp over
+  whatever ghost state the client chooses), never the image map — the
+  image ghost is per-era and re-minted, and `P_fs`'s own state has to be
+  fixed-layer or re-derivable, which is what recovery is for.
+  - **The stranded-fragment question is CLOSED by the per-era map**: a
+    sleeper's `disk_bytes` fragments sit in the per-era `disk_inv`, so a
+    crash abandons them together with the auth that remembers their keys.
+    Nothing is lost, because the next boot's map is brand new.
 - `v_disk` changes in exactly ONE place (the device thread's DMA
   completion of an OUT slot, `vslot_post`), so that step carries the only
   crash obligation in the whole kernel: `wp_disk_loop` opens `crash_inv`

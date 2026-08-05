@@ -874,11 +874,11 @@ Section DevLoops.
   (*  for the latch arm.                                                 *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_disk_loop γd Φ :
-    (* the disk names are the CANONICAL ones: the image gname is the DURABLE
-       fixed-layer one, which is what identifies the auth [wp_disk_step] hands
-       over with the fragments [virtio_proto] holds.  [disk_ghosts_alloc]
-       exports this equation. *)
-    dn_img γd = riscv_disk_name ->
+    (* the disk names are the CANONICAL ones: the image gname is the AMBIENT
+       ERA's, which is what identifies the auth [wp_disk_step] hands over with
+       the fragments [virtio_proto] holds.  [disk_ghosts_alloc] exports this
+       equation. *)
+    dn_img γd = disk_img_name ->
     (* [crash_inv] is taken PERSISTENTLY and opened in exactly one arm: the
        DMA completion, where the durable image changes and the write permit
        deposited at enqueue re-establishes the crash predicate
@@ -891,7 +891,7 @@ Section DevLoops.
     iIntros "#Hcert #Hcinv #Hvinv #Hpinv".
     iLöb as "IH".
     iApply (wp_disk_step with "Hcert").
-    (* the fourth component is the DURABLE image auth ([wp_disk_step] hands it
+    (* the fourth component is the ERA's image auth ([wp_disk_step] hands it
        over because a DMA completion is the one step that moves [v_disk]): the
        latch and stutter arms FRAME it, and the completion arm passes it
        through [virtio_proto_step] (claude-notes/design/crash.md). *)
@@ -912,7 +912,7 @@ Section DevLoops.
       iDestruct (dev_interp_agree_virtio with "Hdev Hv") as %Hv.
       rewrite Hv in Hdisk.
       iMod (dev_interp_update_virtio _ vs vnew with "Hdev Hv") as "[Hdev' Hv']".
-      (* the auth [wp_disk_step] handed over is at the DURABLE gname; the
+      (* the auth [wp_disk_step] handed over is at the ERA's gname; the
          fragments this invariant holds are at [dn_img γd] -- the same map,
          by [Himg]. *)
       iEval (rewrite -Himg Hv) in "Hdur".

@@ -229,7 +229,7 @@ Section WPExec.
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR & Hdur)".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -254,9 +254,8 @@ Section WPExec.
         | discriminate Hc | discriminate Hc | discriminate Hc | discriminate Hc ].
       iIntros "_". iMod "Hback" as "_". iModIntro.
       iFrame "Hgauth Hsauth".
-      iSplitL "HRauth Hera Hdur".
-      { iSplitL "HRauth Hera"; [| iExact "Hdur"].
-        iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
       iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
     destruct (g.(gpow)) eqn:Hpw; last first.
@@ -269,7 +268,7 @@ Section WPExec.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
     iMod ("H" $! (MState (g.(gregs) cpu_id) g.(gmem) g.(gdev)) with "[Hri Hmem Hdev]")
@@ -305,15 +304,15 @@ Section WPExec.
       | destruct (Huniqf _ _ Hrun2) as [_ ->] ];
       iMod "Hk" as "[(Hri' & Hmem' & Hdev') HWP]";
       iDestruct ("Hclose" with "Hri'") as "Hgr'";
-      iIntros "_ !>"; rewrite /state_interp /power_interp /disk_dur_interp /disk_img_auth /=;
+      iIntros "_ !>"; rewrite /state_interp /power_interp /era_interp
+        /disk_dur_interp /disk_img_auth /=;
       iFrame "Hgauth Hsauth HWP";
-      (iSplitR "Hdauth";
-       [ iExists R; iFrame "HRauth";
-         (iSplitR; [iPureIntro; exact Hdom|]);
-         rewrite Hpw; iExists riscv_eraGS;
-         (iSplitR; [iPureIntro; exact HRE|]);
-         iFrame "Hgr' Hmem' Hdev'"
-       | iExists dmap; iFrame "Hdauth"; iPureIntro; exact Hdview2 ]).
+      iExists R; iFrame "HRauth";
+      (iSplitR; [iPureIntro; exact Hdom|]);
+      rewrite Hpw; iExists riscv_eraGS;
+      (iSplitR; [iPureIntro; exact HRE|]);
+      iFrame "Hgr' Hmem' Hdev'";
+      iExists dmap; iFrame "Hdauth"; iPureIntro; exact Hdview2.
   Qed.
 
 End WPExec.
@@ -343,7 +342,7 @@ Section WPDev.
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR & Hdur)".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -368,9 +367,8 @@ Section WPDev.
         | discriminate Hc | discriminate Hc | discriminate Hc ].
       iIntros "_". iMod "Hback" as "_". iModIntro.
       iFrame "Hgauth Hsauth".
-      iSplitL "HRauth Hera Hdur".
-      { iSplitL "HRauth Hera"; [| iExact "Hdur"].
-        iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
       iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
     destruct (g.(gpow)) eqn:Hpw; last first.
@@ -379,7 +377,7 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
@@ -402,39 +400,39 @@ Section WPDev.
     pose proof (uart_step_v_disk _ _ Hdstep) as Hvd.
     assert (Hdview2 : disk_view dmap (v_disk (dvirtio d')))
       by (rewrite Hvd; exact Hdview).
-    iIntros "_ !>". rewrite /state_interp /power_interp /disk_dur_interp /disk_img_auth /=.
+    iIntros "_ !>". rewrite /state_interp /power_interp /era_interp
+      /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth HWP".
-    iSplitR "Hdauth".
-    { iExists R. iFrame "HRauth".
-      iSplitR; [iPureIntro; exact Hdom|].
-      rewrite Hpw. iExists riscv_eraGS.
-      iSplitR; [iPureIntro; exact HRE|].
-      iFrame "Hgr' Hmem' Hdev'". }
+    iExists R. iFrame "HRauth".
+    iSplitR; [iPureIntro; exact Hdom|].
+    rewrite Hpw. iExists riscv_eraGS.
+    iSplitR; [iPureIntro; exact HRE|].
+    iFrame "Hgr' Hmem' Hdev'".
     iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview2.
   Qed.
 
-  (* THE ONE RULE THAT HANDS THE DURABLE CONJUNCT OVER (crash.md): a DMA
+  (* THE ONE RULE THAT HANDS THE IMAGE CONJUNCT OVER (crash.md): a DMA
      completion is the only step in the whole machine that moves [v_disk], so
-     the disk thread -- and nobody else -- receives the fixed-layer image auth
-     together with its tie to the device's image, and owes the same shape back
-     at the post-state's image.  Stated in the RAW ∃-form rather than as
+     the disk thread -- and nobody else -- receives the AMBIENT ERA's image
+     auth together with its tie to the device's image, and owes the same shape
+     back at the post-state's image.  Stated in the RAW ∃-form rather than as
      [disk_dur_interp], because the callback is per-[dev_state], not per
      [gstate] -- the two are the same resource
-     ([disk_dur_interp g = disk_img_auth riscv_disk_name
+     ([disk_dur_interp riscv_eraGS g = disk_img_auth disk_img_name
      (v_disk (dvirtio (gdev g)))]). *)
   Lemma wp_disk_step Φ :
     gen_cert -∗
     (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ∗
-       disk_img_auth riscv_disk_name (v_disk (dvirtio d)) ={⊤,∅}=∗
+       disk_img_auth disk_img_name (v_disk (dvirtio d)) ={⊤,∅}=∗
        ▷ (∀ d' m', ⌜disk_step d m d' m'⌝ ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m' ∗ dev_interp d' ∗
-            disk_img_auth riscv_disk_name (v_disk (dvirtio d')) ∗
+            disk_img_auth disk_img_name (v_disk (dvirtio d')) ∗
             WP (DiskLoop : expr riscv_lang) {{ Φ }})) -∗
     WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR & Hdur)".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -460,9 +458,8 @@ Section WPDev.
         | discriminate Hc | discriminate Hc ].
       iIntros "_". iMod "Hback" as "_". iModIntro.
       iFrame "Hgauth Hsauth".
-      iSplitL "HRauth Hera Hdur".
-      { iSplitL "HRauth Hera"; [| iExact "Hdur"].
-        iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
       iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
     destruct (g.(gpow)) eqn:Hpw; last first.
@@ -471,7 +468,7 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev)
             with "[$Hgr $Hmem $Hdev Hdauth]") as "Hk".
@@ -493,15 +490,15 @@ Section WPDev.
       | injection Hu as <-; exfalso; apply Hnl; split; congruence
       | discriminate Hc | discriminate Hc ].
     iMod ("Hk" $! d' m' with "[//]") as "(Hgr' & Hmem' & Hdev' & Hdur' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /power_interp /disk_dur_interp /disk_img_auth /=.
+    iIntros "_ !>". rewrite /state_interp /power_interp /era_interp
+      /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth HWP".
     iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdview']".
-    iSplitR "Hdauth'".
-    { iExists R. iFrame "HRauth".
-      iSplitR; [iPureIntro; exact Hdom|].
-      rewrite Hpw. iExists riscv_eraGS.
-      iSplitR; [iPureIntro; exact HRE|].
-      iFrame "Hgr' Hmem' Hdev'". }
+    iExists R. iFrame "HRauth".
+    iSplitR; [iPureIntro; exact Hdom|].
+    rewrite Hpw. iExists riscv_eraGS.
+    iSplitR; [iPureIntro; exact HRE|].
+    iFrame "Hgr' Hmem' Hdev'".
     iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdview'.
   Qed.
 
@@ -515,7 +512,7 @@ Section WPDev.
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
-    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR & Hdur)".
+    iIntros (g ns κ κs nt) "(Hgauth & Hsauth & HR)".
     iDestruct (mono_nat_lb_own_valid with "Hgauth Hborn") as %[_ Hbge].
     iDestruct (mono_nat_lb_own_valid with "Hsauth Hstarted") as %[_ Hsge].
     iDestruct "HR" as (R) "(HRauth & %Hdom & Hera)".
@@ -542,9 +539,8 @@ Section WPDev.
         | discriminate Hc ].
       iIntros "_". iMod "Hback" as "_". iModIntro.
       iFrame "Hgauth Hsauth".
-      iSplitL "HRauth Hera Hdur".
-      { iSplitL "HRauth Hera"; [| iExact "Hdur"].
-        iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
+      iSplitL "HRauth Hera".
+      { iExists R. iFrame "HRauth Hera". iPureIntro. exact Hdom. }
       iSplitL; [|done].
       iApply (wp_dead _ gen_id); [done|]. iExact "Hdead". }
     destruct (g.(gpow)) eqn:Hpw; last first.
@@ -553,7 +549,7 @@ Section WPDev.
     iDestruct (ghost_map_lookup with "HRauth Hrege") as %HRgen.
     assert (E = riscv_eraGS) as ->.
     { rewrite Heq in HRE. congruence. }
-    iDestruct "Hera" as "(Hgr & Hmem & Hdev)".
+    iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
     iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) with "[$Hgr $Hmem $Hdev]") as "Hk".
     iModIntro. iSplitR.
@@ -577,15 +573,15 @@ Section WPDev.
       | injection Hu as <-; exfalso; apply Hnl; split; congruence
       | discriminate Hc ].
     iMod ("Hk" $! gr' with "[//]") as "(Hgr' & Hmem' & Hdev' & HWP)".
-    iIntros "_ !>". rewrite /state_interp /power_interp /disk_dur_interp /disk_img_auth /=.
+    iIntros "_ !>". rewrite /state_interp /power_interp /era_interp
+      /disk_dur_interp /disk_img_auth /=.
     iFrame "Hgauth Hsauth HWP".
-    (* a PLIC step moves only registers: the durable conjunct is FRAMED *)
-    iSplitR "Hdauth".
-    { iExists R. iFrame "HRauth".
-      iSplitR; [iPureIntro; exact Hdom|].
-      rewrite Hpw. iExists riscv_eraGS.
-      iSplitR; [iPureIntro; exact HRE|].
-      iFrame "Hgr' Hmem' Hdev'". }
+    (* a PLIC step moves only registers: the image conjunct is FRAMED *)
+    iExists R. iFrame "HRauth".
+    iSplitR; [iPureIntro; exact Hdom|].
+    rewrite Hpw. iExists riscv_eraGS.
+    iSplitR; [iPureIntro; exact HRE|].
+    iFrame "Hgr' Hmem' Hdev'".
     iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview.
   Qed.
 

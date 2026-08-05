@@ -92,6 +92,15 @@ Proof. reflexivity. Qed.
 (* 2. ONE ERA'S BOOT: the entailment [riscv_power_adequacy] asks for.       *)
 (* ---------------------------------------------------------------------- *)
 
+(* THE BOOT MINT's RANGE: the whole xv6 file system image, FSSIZE = 2000
+   blocks of BSIZE = 1024 bytes (kernel/param.h, kernel/fs.h, mkfs/mkfs.c).
+   Every boot is handed exclusive byte fragments of the era's disk image over
+   [[0, XV6_DISK_BYTES)] ([RiscvAdequacy.power_boot_res]); the FS layer's
+   block views are carved out of them (claude-notes/design/fs-log.md).  The
+   base layer takes this as a PARAMETER -- no FS constant appears below this
+   file. *)
+Definition XV6_DISK_BYTES : nat := (2000 * 1024)%nat.
+
 Section SystemBoot.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ}.
   Context `{!fdslotGpreS Σ, !uartGhostG Σ, !diskGhostG Σ}.
@@ -99,7 +108,7 @@ Section SystemBoot.
 
   Lemma xv6_boot_era (g : gstate) :
     boot_facts g ->
-    power_boot_res riscv_eraGS gen_id boot_D NPROC g
+    power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
          WP (LoopE gen_id c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
@@ -108,11 +117,11 @@ Section SystemBoot.
       WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤ {{ _, True }}.
   Proof.
     intro Hbf. iIntros "Hres".
-    iMod (boot_shared_alloc g (fun _ => True%I) Hbf with "Hres")
+    iMod (boot_shared_alloc g XV6_DISK_BYTES (fun _ => True%I) Hbf with "Hres")
       as (Hfd γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Huart &
-        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hpages)".
+        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hpages)".
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
     iDestruct "Hcfg" as (c0) "[%Hlive Hcfg]".
@@ -176,7 +185,7 @@ Proof.
      At [True] the crash invariant is allocated once into the fixed layer and
      opened by nothing but the disk thread's completion permit -- so the
      theorem says "never stuck", with the durability slot left open. *)
-  apply (riscv_power_adequacy Σ boot_D NPROC g (True : iProp Σ)
+  apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g (True : iProp Σ)
            (bi.True_intro _) Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
