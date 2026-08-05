@@ -1767,6 +1767,19 @@ Lemma cdec_4605 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 12)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+(* c.li a3,0 -- proc_freepagetable +0x10/+0x20, proc_pagetable +0x66:
+   [do_free = 0] at every uvmunmap call that drops a FIXED leaf *)
+Lemma cdec_4681 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4681 : mword 16)) s
+  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 13)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* c.j -0x36 -- proc_pagetable +0x82, the second failure tail's join *)
+Lemma cdec_b7e9 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xb7e9 : mword 16)) s
+  = Some (C_J (mword_of_int 2021 : mword 11), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma cdec_4685 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x4685 : mword 16)) s
   = Some (C_LI (mword_of_int 1, Regidx (mword_of_int 13)), s).

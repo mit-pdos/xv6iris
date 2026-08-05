@@ -7,7 +7,8 @@
    jal mappages; bltz) and the shared epilogue at +0x4c.
 
    The catalog covers the SUCCESS path only (+0x00 .. +0x58): the two
-   error tails (+0x5a uvmfree, +0x66 uvmunmap/uvmfree) are unreachable
+   error tails (+0x5a uvmfree, +0x66 uvmunmap/uvmfree) are CATALOGUED (they
+   are reachable in the uncounted regime kfork needs; unreachable
    under the proof's page budget, so no instruction there is ever fetched.
 
    Same architecture as CodeKvmmake.v; JAL residues = (target-pc) mod 2^21. *)
@@ -148,5 +149,65 @@ Section ProcPagetableInstrs.
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x56)%Z (mword_of_int 0x6105 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x56) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)) cdec_6105 exec_execute_C_ADDI16SP. Qed.
   Lemma ppti_58 : PPT 0x58 true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).  (* ret *)
   Proof. mk_rvc (KernelSyms.proc_pagetable + 0x58)%Z (mword_of_int 0x8082 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x58) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
+
+  (* ---- the two FAILURE TAILS' own base words (the three call targets) ---- *)
+
+  (* 0x5e  jal uvmfree   (offset -0x69a) *)
+  Lemma pptdec_5e s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+    exec (ext_decode (mword_of_int 0x967ff0ef : mword 32)) s
+    = Some (JAL (mword_of_int 2095462 : mword 21, Regidx (mword_of_int 1)), s).
+  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+
+  (* 0x74  jal uvmunmap  (offset -0x884) *)
+  Lemma pptdec_74 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+    exec (ext_decode (mword_of_int 0xf7cff0ef : mword 32)) s
+    = Some (JAL (mword_of_int 2094972 : mword 21, Regidx (mword_of_int 1)), s).
+  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+
+  (* 0x7c  jal uvmfree   (offset -0x6b8) *)
+  Lemma pptdec_7c s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+    exec (ext_decode (mword_of_int 0x949ff0ef : mword 32)) s
+    = Some (JAL (mword_of_int 2095432 : mword 21, Regidx (mword_of_int 1)), s).
+  Proof. first [ decode_bridge_ms | intros Hbm Hcfg; destruct Hcfg as [[Hpriv _]|[Hpriv _]]; decode_any s Hpriv ]. Qed.
+
+  (* ---- the tails' [instr] facts.  Tail #1 (+0x5a .. +0x64) is the FIRST
+     mappages failure: uvmfree(pagetable, 0), return 0.  Tail #2 (+0x66 ..
+     +0x82) is the second: drop the trampoline it had just mapped, then
+     uvmfree, then return 0.  Both join the shared epilogue at +0x4c. ---- *)
+
+  Lemma ppti_5a : PPT 0x5a true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).  (* li a1,0   -- uvmfree(pagetable, 0) *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x5a)%Z (mword_of_int 0x4581 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x5a) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) cdec_4581 exec_execute_C_LI. Qed.
+  Lemma ppti_5c : PPT 0x5c true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).  (* mv a0,s1 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x5c)%Z (mword_of_int 0x8526 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x5c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) cdec_8526 exec_execute_C_MV. Qed.
+  Lemma ppti_5e : PPT 0x5e false (JAL (mword_of_int 2095462 : mword 21, Regidx (mword_of_int 1))).  (* jal uvmfree *)
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x5e)%Z (mword_of_int 0x967ff0ef : mword 32) (mword_of_int (KernelSyms.proc_pagetable + 0x5e) : mword 64) (JAL (mword_of_int 2095462 : mword 21, Regidx (mword_of_int 1))) pptdec_5e. Qed.
+  Lemma ppti_62 : PPT 0x62 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).  (* li s1,0   -- return 0 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x62)%Z (mword_of_int 0x4481 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x62) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) cdec_4481 exec_execute_C_LI. Qed.
+  Lemma ppti_64 : PPT 0x64 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0")), zreg)).  (* j +0x4c  -- the shared epilogue *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x64)%Z (mword_of_int 0xb7e5 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x64) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0")), zreg)) cdec_b7e5 exec_execute_C_J. Qed.
+  Lemma ppti_66 : PPT 0x66 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).  (* li a3,0   -- do_free = 0 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x66)%Z (mword_of_int 0x4681 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x66) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) cdec_4681 exec_execute_C_LI. Qed.
+  Lemma ppti_68 : PPT 0x68 true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).  (* li a2,1   -- npages = 1 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x68)%Z (mword_of_int 0x4605 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x68) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4605 exec_execute_C_LI. Qed.
+  Lemma ppti_6a : PPT 0x6a false (UTYPE (mword_of_int 16384 : mword 20, Regidx (mword_of_int 11), LUI)).  (* lui a1,0x4000  -- TRAMPOLINE *)
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x6a)%Z (mword_of_int 0x040005b7 : mword 32) (mword_of_int (KernelSyms.proc_pagetable + 0x6a) : mword 64) (UTYPE (mword_of_int 16384 : mword 20, Regidx (mword_of_int 11), LUI)) bdec_040005b7. Qed.
+  Lemma ppti_6e : PPT 0x6e true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).  (* addi a1,a1,-1 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x6e)%Z (mword_of_int 0x15fd : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x6e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) cdec_15fd exec_execute_C_ADDI. Qed.
+  Lemma ppti_70 : PPT 0x70 true (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)).  (* slli a1,a1,0xc *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x70)%Z (mword_of_int 0x05b2 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x70) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)) cdec_05b2 exec_execute_C_SLLI. Qed.
+  Lemma ppti_72 : PPT 0x72 true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).  (* mv a0,s1 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x72)%Z (mword_of_int 0x8526 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x72) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) cdec_8526 exec_execute_C_MV. Qed.
+  Lemma ppti_74 : PPT 0x74 false (JAL (mword_of_int 2094972 : mword 21, Regidx (mword_of_int 1))).  (* jal uvmunmap  -- drop the trampoline *)
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x74)%Z (mword_of_int 0xf7cff0ef : mword 32) (mword_of_int (KernelSyms.proc_pagetable + 0x74) : mword 64) (JAL (mword_of_int 2094972 : mword 21, Regidx (mword_of_int 1))) pptdec_74. Qed.
+  Lemma ppti_78 : PPT 0x78 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)).  (* li a1,0 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x78)%Z (mword_of_int 0x4581 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x78) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) cdec_4581 exec_execute_C_LI. Qed.
+  Lemma ppti_7a : PPT 0x7a true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).  (* mv a0,s1 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x7a)%Z (mword_of_int 0x8526 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x7a) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) cdec_8526 exec_execute_C_MV. Qed.
+  Lemma ppti_7c : PPT 0x7c false (JAL (mword_of_int 2095432 : mword 21, Regidx (mword_of_int 1))).  (* jal uvmfree *)
+  Proof. mk_base (KernelSyms.proc_pagetable + 0x7c)%Z (mword_of_int 0x949ff0ef : mword 32) (mword_of_int (KernelSyms.proc_pagetable + 0x7c) : mword 64) (JAL (mword_of_int 2095432 : mword 21, Regidx (mword_of_int 1))) pptdec_7c. Qed.
+  Lemma ppti_80 : PPT 0x80 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)).  (* li s1,0   -- return 0 *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x80)%Z (mword_of_int 0x4481 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x80) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 9), ADDI)) cdec_4481 exec_execute_C_LI. Qed.
+  Lemma ppti_82 : PPT 0x82 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2021 : mword 11) ('b"0")), zreg)).  (* j +0x4c *)
+  Proof. mk_rvc (KernelSyms.proc_pagetable + 0x82)%Z (mword_of_int 0xb7e9 : mword 16) (mword_of_int (KernelSyms.proc_pagetable + 0x82) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2021 : mword 11) ('b"0")), zreg)) cdec_b7e9 exec_execute_C_J. Qed.
 
 End ProcPagetableInstrs.

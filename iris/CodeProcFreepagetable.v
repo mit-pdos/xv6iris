@@ -10,10 +10,11 @@
    KernelBaseDecode; this function's own words are local, named
    [pfdc_<word>] (compressed) / [pfdb_<word>] (base).
 
-   TWENTY OF THE TWENTY-ONE compressed words are already in
-   KernelRvcDecode: this is the plainest function shape in the kernel -- a
-   32-byte four-slot frame, two saved argument registers, three calls, and
-   the mirror-image epilogue.  Only [c.li a3,0] is new.
+   ALL TWENTY-ONE compressed words are in KernelRvcDecode: this is the
+   plainest function shape in the kernel -- a 32-byte four-slot frame, two
+   saved argument registers, three calls, and the mirror-image epilogue.
+   ([c.li a3,0] was this function's only new one, and proc_pagetable's
+   second failure tail wanted it too, so it was promoted there.)
 
    Body (all instruction bytes read out of the tracked KernelInstrs.v, never
    kernel.asm; the C is kernel/proc.c's
@@ -76,11 +77,9 @@ Notation PF := KernelSyms.proc_freepagetable.
 
 (* ---- this function's own decode words ---- *)
 
-(* 0x10, 0x20  c.li a3,0  -- do_free = 0, the whole point of both calls *)
-Lemma pfdc_4681 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec (ext_decode_compressed (mword_of_int 0x4681 : mword 16)) s
-  = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 13)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+(* [cdec_4681] (c.li a3,0 -- do_free = 0, the whole point of both calls) is
+   shared: proc_pagetable's second failure tail sets it too.  See
+   KernelRvcDecode.v. *)
 
 (* [bdec_040005b7] / [bdec_020005b7] (the two [lui]s) are shared -- see
    KernelBaseDecode.v.  The second was promoted there from a private copy in
@@ -139,7 +138,7 @@ Section CodeProcFreepagetable.
   Proof. mk_rvc (PF + 0x0e)%Z (mword_of_int 0x892e : mword 16) (mword_of_int (PF + 0x0e) : mword 64) (RTYPE (Regidx (mword_of_int 11), zreg, Regidx (mword_of_int 18), ADD)) cdec_892e exec_execute_C_MV. Qed.
 
   Lemma pfi_10 : PFT 0x10 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).  (* c.li a3,0  -- do_free = 0 *)
-  Proof. mk_rvc (PF + 0x10)%Z (mword_of_int 0x4681 : mword 16) (mword_of_int (PF + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) pfdc_4681 exec_execute_C_LI. Qed.
+  Proof. mk_rvc (PF + 0x10)%Z (mword_of_int 0x4681 : mword 16) (mword_of_int (PF + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) cdec_4681 exec_execute_C_LI. Qed.
 
   Lemma pfi_12 : PFT 0x12 true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).  (* c.li a2,1  -- npages = 1 *)
   Proof. mk_rvc (PF + 0x12)%Z (mword_of_int 0x4605 : mword 16) (mword_of_int (PF + 0x12) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4605 exec_execute_C_LI. Qed.
@@ -157,7 +156,7 @@ Section CodeProcFreepagetable.
   Proof. mk_base (PF + 0x1c)%Z (mword_of_int 0xf50ff0ef : mword 32) (mword_of_int (PF + 0x1c) : mword 64) (JAL (mword_of_int 2094928 : mword 21, Regidx (mword_of_int 1))) pfdb_f50ff0ef. Qed.
 
   Lemma pfi_20 : PFT 0x20 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).  (* c.li a3,0  -- do_free = 0 *)
-  Proof. mk_rvc (PF + 0x20)%Z (mword_of_int 0x4681 : mword 16) (mword_of_int (PF + 0x20) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) pfdc_4681 exec_execute_C_LI. Qed.
+  Proof. mk_rvc (PF + 0x20)%Z (mword_of_int 0x4681 : mword 16) (mword_of_int (PF + 0x20) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)) cdec_4681 exec_execute_C_LI. Qed.
 
   Lemma pfi_22 : PFT 0x22 true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).  (* c.li a2,1  -- npages = 1 *)
   Proof. mk_rvc (PF + 0x22)%Z (mword_of_int 0x4605 : mword 16) (mword_of_int (PF + 0x22) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4605 exec_execute_C_LI. Qed.
