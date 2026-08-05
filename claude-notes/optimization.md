@@ -167,6 +167,154 @@ into `Qed`-sealed chunk lemmas of ~5–6 instructions), which is a design change
 not a tactic swap.  Do not go hunting for a hot statement there — it was looked
 for, twice, and there is not one.
 
+**Amended 2026-08-05 (see the next section): that verdict holds for the
+straight-line body, but it MISSED a 5 s-per-site outlier hiding in the block
+`iIntros`, because an `iIntros` of eighteen wands is exactly the sentence a
+reader skips.  The general lesson is the one already at the top of this file
+under "`done` / bare `cbn` / bare `reflexivity`": to find these, list every
+sentence ≥ 5 s from a `.timing` file — do not read the proof.**
+
+## `ProofEndOp` / `ProofPiperead` (2026-08-05): a `#`-intro can cost 5 s, and the rest is the proofmode
+
+Measured with isolated `coqc -async-proofs off -time-file` on a quiet machine.
+**Do the isolation first**: inside a `-j32` build these same two files read
+414 s / 350 s — a 3–4x inflation that also *reorders* the per-sentence ranking
+(the block `iIntros` below reads 41 s in-build and 5.4 s isolated, because a
+5 GB-heap process pays GC on every allocating tactic).
+
+| | before | after | |
+|---|---|---|---|
+| `ProofEndOp` (4255 lines, six `Qed`-sealed blocks) | 92.5 s / 1.83 GB | **~68 s / 1.72 GB** | −26 % |
+| `ProofPiperead` (2618 lines, ONE monolithic `Qed`) | 113.1 s / 2.74 GB | **~97 s / 2.50 GB** | −19 % |
+
+(Per-cent figures are ratios taken *inside one batch*, which is the only
+comparison that survives a shared machine — the absolute seconds above come
+from different batches and drift ±15 % with whatever else is running.  RSS does
+not drift, and it moved the same way, which is the corroboration.  Piperead's
+−19 % is −13 % from the tactic edits plus −6.5 % from the `is_pipe` seal.)
+
+**The command that answers "why":** `Set Ltac Profiling.` after the imports,
+`Show Ltac Profile.` at the end, and read the *local* (self) column — the total
+column just re-reports `iApply`.  Both files said the same thing:
+
+```
+                              ProofEndOp   ProofPiperead
+typeclasses eauto (self)         22.2 %         6.4 %   <- ONE tactic; see below
+iSpecializePat_go (self)         19.5 %        22.9 %  \
+notypeclasses refine (self)      13.6 %        21.3 %   |  the proofmode itself
+pm_reduce / pm_eval              14.1 %        14.4 %  /
+rewrite (ssr, self)               7.1 %        10.3 %
+```
+
+### The outlier: `iIntros "#Hdlock"` on an `is_lock` was 5.1 s
+
+`ProofEndOp`'s three block-entry `iIntros "Hcg Hcnt #Htext … #Hdlock …"` were
+its three most expensive sentences.  **Split the pattern one name per sentence**
+— that is the whole diagnostic — and it is `iIntros "#Hdlock"` **alone**, 5.11 s
+of 5.4 s, where `Hdlock : is_lock γk d_lock "virtio_disk" (disk_res …)`.
+`is_lock` had a `Persistent` instance but was **not** `Typeclasses Opaque`, so
+resolution unfolded the definition and descended through `lock_inv γ lk R` into
+`R` — and `disk_res` carries 4096-entry descriptor big-ops.  `Global Typeclasses
+Opaque is_lock` (WpLock.v) takes it to 0.14 s.  `is_pipe` (PipeInv.v) is a
+separate definition with the same hole: sealing it is another −6.5 % on
+`ProofPiperead` (104 s → 97 s).
+
+Two controls, so nobody repeats them: sealing the *resource* instead
+(`Typeclasses Opaque disk_res`) changes **nothing** (11.64 s vs 11.43 s), and
+dropping the `#` so the lock enters spatially wins the same 5 s as the seal —
+which is what proves the cost is the persistence search, not the hypothesis.
+
+The seal costs one `rewrite /is_lock` inside each of `is_lock_name` /
+`is_lock_inv` / `is_lock_intro` (and the `is_pipe` twins).  That is the point:
+with it, nothing else can `iDestruct` a lock apart, so the projection lemmas
+become the only interface.  **Look for this shape wherever a big-resource
+abstraction has a `Persistent`/`Timeless` instance but no `Typeclasses Opaque`.**
+Tree-wide the one line is worth far more than the two files it was found in:
+`ProofBread` −45 s CPU, `ProofMain` −45 s, `ProofWriteHead` −32 s, `SleepLock`
+−22 s, `ProofInstallTrans` −23 s, `ProofBrelse` −14 s.
+
+**The candidate list, and why it was NOT swept.**  98 `Definition`s in the tree
+carry a `Persistent`/`Timeless` instance with no `Typeclasses Opaque` (find them
+with: collect every `Typeclasses Opaque` name tree-wide, then grep
+`Instance … : (Persistent|Timeless) (X`).  The ones over a big resource are
+`bio_ctx`, `log_ctx`, `procs_inv`/`scheds_inv`, `dev_inv`/`disk_inv`/`uart_inv`,
+`is_sleeplock`, `is_ftable`, `is_kmem`, `is_txlock`, `is_tickslock`,
+`kalloc_avail`, `kpt_inv`, `intr_inv`.  Sealing each costs a `rewrite /X` in its
+projection lemmas and risks breaking any consumer that `iDestruct`s it, so seal
+one at a time with a measurement — **and measure BEFORE you seal**: the
+one-name-per-sentence `iIntros` split on `ProofEndOp` says every other `#`-intro
+in that file is already under 0.15 s (`#Hbio` 0.14 s, `#Htext`/`#Hprocs`/
+`#Hscheds`/`#Hlctx` below 0.1 s), i.e. the lock was the *only* one worth
+sealing there.  Cost tracks the size of the resource under the abstraction, not
+the number of sites.
+
+### Everything else is the proofmode, and it is diffuse
+
+After the seal there is no hot statement left in either file: `iApply` is
+0.07–0.20 s a call over ~210 calls, `Qed` is 13 s (EndOp, six blocks) / 16.8 s
+(Piperead, one monolith), and the remaining ~50 % is a flat tail of `iEval` /
+`iPoseProof` / `assert` / `rewrite` / `set`.  Four cheap edits that DID pay,
+each measured as a ratio **inside one batch** (never across batches):
+
+- **Drop the redundant `[-]` from a leaf `iApply`'s spec pattern** — 110 / 107
+  sites, **EndOp −13 %**, Piperead −2 %.  `iApply (wp_X … with "Hcg Hpc Hi [-]")`
+  and `… with "Hcg Hpc Hi")` leave the *same* goal, but `[-]` forces an explicit
+  `envs_split` of the whole spatial context at every instruction, while omitting
+  it lets `iApplyHyp` hand the residual context over untouched.  Safe exactly
+  when the omitted premise is the LAST one (which for these leaves — the
+  `wp_next` continuation — it always is).  Textual drop-in: `s/ \[-\]"/"/`.
+- **`set (Mk := <[Regidx …]> …)` → `pose`** (the rule already in this file, just
+  never applied here) — 72 sites, **EndOp −11 %**.  It bought ~0 in
+  `ProofPiperead`, and the reason is worth knowing: **`set (x := e)` with
+  parentheses is vanilla Coq's `set`, not ssr's `set x := e`**, so it does not
+  fail when it finds no occurrence — and every one of Piperead's 58 sites is
+  followed by a `change e with Fk` that does the real fold.  Those 64 `change`s
+  total under 0.5 s for the whole file; the `set`s they follow cost 4.3 s.
+- **`clear` a single-use `assert`ed fact right after its one `iEval`** — the
+  per-instruction pc-bump `Hpp*` and value `Hwv*` equations, 129 / 131 sites:
+  **Piperead −5 %**, EndOp ~0.
+- **Pose an `instr` fact immediately before the `iApply` that consumes it**,
+  not in a batch of 24 at the top of a block — **EndOp −2.7 %** (`eo_loop` posed
+  24 facts at L2082–2105 for uses spread to L3126; median gap 121 lines, max
+  993).  `ProofPiperead` already did this and measured 0.  **That pair is the
+  useful result: spatial-context LENGTH is not the driver** — 12 fewer entries
+  out of ~40 bought 2.7 % — so do NOT go bundling live resources into folded
+  definitions expecting a win from the entry count alone.  Gotcha when
+  automating the move: a fact used TWICE is used once per *arm* of a branch and
+  must stay put (`iSpecialize: "Hi100" not found` is what you get otherwise).
+
+### What did NOT work
+
+- `Local Strategy opaque [rget] / [tp_pin] / [rf_upd]` — the `ProofVirtioDiskInit`
+  2.2x seal.  **Neutral in both files** once the lock seal is in (EndOp 80.0 s
+  vs 79.7 s; Piperead 113.9 s vs 114.4 s).  Consistent with the existing rule:
+  it pays only where a 20+-link `pose` chain and a large Iris context both hold,
+  and these proofs keep the goal one insert deep.
+- Sealing `disk_res` — 0 %, see above.
+- **A `-j` build log is NOT evidence of a regression.**  The build after the
+  lock seal showed `ProofVirtioDiskRwF` +53 s and `PipeInv` +32 s CPU.  Both are
+  noise: `PipeInv` does not mention `is_lock` *at all*, and isolated A/B gives
+  `PipeInv` 45.6 s sealed vs 45.7 s transparent, `ProofVirtioDiskRwF` 80.5 s vs
+  85.3 s (sealed is faster).  This is the ±-in-both-directions effect the
+  measurement-discipline rule below warns about, at a magnitude that looks
+  convincing.
+
+### What is left, and what it would cost
+
+`ProofPiperead` is now ~97 s for ~100 instructions in one `Qed`, spread evenly
+(4–15 s per 200 lines, growing gently with chain depth) plus that 16.8 s `Qed`.
+In descending value, the remaining levers are:
+
+1. Chunking into `Qed`-sealed ~5–6-instruction lemmas — the documented remedy,
+   deliberately not done here.
+2. Give the S-mode leaves an explicit successor-pc parameter
+   (`add_vec_int pc n = pc' -> … pc_is pc'`), so the per-instruction
+   `assert (Hpp…)` + `iEval (rewrite Hpp) in "Hpc"` pair disappears: ~110
+   sentences and ~6 s per whole-function proof, times ~50 such proofs.  It is a
+   sweep over the whole `Wp*` leaf layer, so cost it before starting.
+3. Nothing else.  The profile is the Iris proofmode executing 100 instruction
+   steps, and no tactic swap changes that.
+
 ## Proof performance rules (apply proactively when writing new proofs)
 
 - **Never `set_solver`** (or `naive_solver`) inside a large Iris WP context — it rescans the whole hypothesis context: **100–190 s per call** (and **272 s per call** measured 2026-07-28 in `ProofVirtioDiskRwF.wp_vdrw_p6_seam`, on a goal as trivial as `h ∈ tri_set (h,m2,t)`). Instead:
@@ -242,6 +390,8 @@ for, twice, and there is not one.
 - **Strip only the GOAL's later with `iApply bi.later_intro`; reach for `iNext` only when a HYPOTHESIS's `▷` has to come off too.** `iNext` is `iModIntro` at `▷`, so it runs `MaybeIntoLaterN` over every hypothesis in both environments: its cost tracks the proof's CONTEXT, not the goal, and in a whole-function WP proof that is ~1.1 s per call — once per instruction whose leaf leaves a `▷` on the goal. `bi.later_intro : P ⊢ ▷ P` turns the goal `▷ Q` into `Q` and touches nothing else: ~0.06 s, a ~20× difference for the same effect. In practice the only steps that need the real `iNext` are the **Löb back edges**, where `IH` (and any `▷`-guarded exits bundle like `HEX`) must be stripped before it can be applied.
   - **The tell that a file has this backwards** is an `iNext` followed, a few lines later, by `iAssert (▷ X)%I with "[H]" as "H". { iNext. iExact "H". }` — that block is *repairing* a `▷` the `iNext` stripped and the proof still wanted, so BOTH tactics are the expensive one and the pair does no net work. `▷ sched_vc` (the scheduler valid-context every S-mode whole-function proof carries) is the usual victim; grep `{ iNext. iExact` to find them. Replacing the pair with a single `iApply bi.later_intro` — keeping a real `iNext` at the 1–3 back-edge sites per file — measured **ProofPiperead 144 s → 96 s (−33 %)**, **ProofPipewrite 97 s → 74 s (−24 %)**, and the same edit applies to `ProofSysPause`. The inner `{ iNext. iExact "H". }` alone is ALWAYS safe to swap (goal `▷ X`, hypothesis `X`); the outer one is not, so convert it and let the build tell you which sites are the back edges.
   - **A/B this one with `-async-proofs off`.** With the async `Qed` worker on, the two variants hide different amounts of kernel work where `-time-file` cannot see it, and the per-sentence sums ranked them BACKWARDS here (they made the slower variant look 3 % faster). With async off the same comparison, interleaved over three reps, was unambiguous in both files.
+- **Give every big-resource abstraction with a `Persistent`/`Timeless` instance a `Typeclasses Opaque` right next to it** — otherwise each `#`-intro/`iDestruct` re-derives the instance by unfolding and descending into the resource. Measured at **5.1 s for one `iIntros "#Hdlock"`** on `is_lock … (disk_res …)`; see the `ProofEndOp`/`ProofPiperead` section above for the diagnostic (split the `iIntros` one name per sentence) and the candidate list.
+- **Do not write `[-]` as the last element of a leaf `iApply`'s spec pattern.** `iApply (wp_X … with "Hcg Hpc Hi [-]")` and `… with "Hcg Hpc Hi")` leave the same goal, but `[-]` forces an explicit `envs_split` of the whole spatial context on every instruction. −13 % on `ProofEndOp` over 110 sites. Safe whenever the omitted premise is the last one, which for a `wp_next`-continuation leaf it always is.
 - **Never bare `iFrame` in a large Iris context — name the hypotheses.** `iFrame` searches the WHOLE spatial context for something to match each conjunct of the goal, so its cost scales with (context size × #conjuncts). Rebuilding `pipe_res` (9 separating conjuncts) with a bare `iFrame` in `ProofPipeclose`'s arm — a context holding the three join wands (`EPI`/`JOIN`/`TAILS`), ~20 `instr` facts and the frame cells — **did not terminate** (RSS climbing through 2.6 GB while `coqc -time` sat on that one sentence). `iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack"` — the same nine, by name — is instant. Diagnostic: `coqc -time` flushes per sentence as it goes, so a stalled build's *last printed* sentence is the one BEFORE the culprit; the culprit is the next one in the file.
 - **Never `vm_compute` a goal containing a symbolic `mword` variable** (a ∀-quantified pointer `p`/`head`/`spr`) or a concrete built-up `mstate` (a tower of `set_reg`/`update_subrange`) — it tries to normalize 64-bit modular arithmetic symbolically and does not terminate (looks like a multi-minute hang). Compute only the CLOSED offset (`replace (<offset> : mword 64) with (mword_of_int 0) by (apply bv_eq; vm_compute; reflexivity)`, then close `add_vec p 0 = p` with `avi0`/`kv_addv_zero`); or prove the pure fact against an ABSTRACT state and `apply` it. Diagnostic: two `coqc -time` runs dying at the exact same char = the next sentence hangs (not a wall-clock cap).
 - **A guard fixed by `change`/plain cast pushes a slow non-VM conversion to `Qed`** (minutes). Close it with `replace g with v by (vm_compute; reflexivity)` so the kernel gets a vm-cast instead. For CSR/extension dispatch guards use `csr_dispatch_eq` (ExecCommon.v) — a positive `cbv delta [eq_vec get_word … bool_decide] iota zeta beta; reflexivity` that decides only the guard primitives and leaves `currentlyEnabled`/`hartSupports` folded (~1.7 s → ~0.02 s). NEVER `cbv -[…]` (negative delta) to collapse a Sail dispatch guard — it unfolds a def with a huge normal form and OOMs the box (125 GB).

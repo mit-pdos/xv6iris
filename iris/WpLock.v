@@ -268,15 +268,30 @@ Section Lock.
   Global Instance is_lock_persistent γ lk s R : Persistent (is_lock γ lk s R).
   Proof. apply _. Qed.
 
+  (* PERFORMANCE, and it is a big one: WITHOUT this seal, every [iIntros "#Hlk"]
+     of an [is_lock] re-derives persistence by UNFOLDING the definition and
+     descending through [lock_inv γ lk R] into [R].  For a lock whose resource
+     is large (the virtio disk lock's [disk_res], with its 4096-entry
+     descriptor big-ops) that single [#]-intro measured **5.1 s** -- 22 % of
+     [ProofEndOp]'s whole [typeclasses eauto] budget, at three sites.  With the
+     constant sealed, resolution stops at [is_lock_persistent] above and the
+     cost disappears (ProofEndOp 92.5 s -> 78 s from this line alone).
+     Everything a consumer needs is lemma-driven ([is_lock_name] /
+     [is_lock_inv] / [is_lock_intro] below), so nothing needs the unfolding. *)
+  Global Typeclasses Opaque is_lock.
+
   (* the two projections + the introduction rule (the only interface the
      lock leaves and [newlock] need). *)
+  (* these three are the ONLY places that may look inside [is_lock] -- the
+     [Typeclasses Opaque] above means an [iDestruct]/[iFrame] elsewhere can no
+     longer take it apart, which is the point: it must come through here. *)
   Lemma is_lock_name γ lk s R : is_lock γ lk s R -∗ lock_name lk s.
-  Proof. iIntros "[$ _]". Qed.
+  Proof. rewrite /is_lock. iIntros "[$ _]". Qed.
   Lemma is_lock_inv γ lk s R : is_lock γ lk s R -∗ inv lockN (lock_inv γ lk R).
-  Proof. iIntros "[_ $]". Qed.
+  Proof. rewrite /is_lock. iIntros "[_ $]". Qed.
   Lemma is_lock_intro γ lk s R :
     lock_name lk s -∗ inv lockN (lock_inv γ lk R) -∗ is_lock γ lk s R.
-  Proof. iIntros "#Hn #Hi". by iFrame "Hn Hi". Qed.
+  Proof. rewrite /is_lock. iIntros "#Hn #Hi". by iFrame "Hn Hi". Qed.
 
   (* ---- THE OPENING INTERFACE ------------------------------------------
 
