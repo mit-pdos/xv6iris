@@ -47,7 +47,7 @@ Validate the operational design before anything depends on it.
   `mp_reader_fence_only_forbidden` (MP with no writer fence — RVWMO allows
   it, this machine does not). Plus one M0-local simplification: `load_post`
   ignores the forward bank and always uses `t` for `vpost`, so `w_fwd` is
-  written and never read. Wire it in at M1 or delete the field.
+  written and never read. DECIDED: wire it into the load rule at M1 (design doc, Decision 3).
 - **Instantiating addresses at `Arch.pa`** needs only `EqDecision` +
   `Countable` + "byte i of a message" arithmetic; the spike keeps addresses
   as `Z` under `Z.le`/`Z.sub` and as `gmap` keys only. Mind the
