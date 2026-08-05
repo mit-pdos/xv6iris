@@ -142,16 +142,6 @@ Definition wp_initlog_sconf_body
   let c_name := lock_name_field log_addr in
   let c_cpu := lock_cpu log_addr in
   (K_initlog <= K)%nat ->
-  (* PHASE C2a BRIDGE (claude-notes/design/fs-log.md stage 4; DELETED in
-     C2b, not discharged).  The crash predicate is INDEXED by the disk image,
-     so this function's interior [bwrite] can no longer mint a free identity
-     permit: a write MOVES the index.  Until this WAL write kind's real
-     durability fupd lands, the contract carries the pure side condition that
-     the system promises nothing about durability -- which is exactly what
-     [Pc := fun _ => True] satisfies, and what both adequacy theorems still
-     instantiate.  It is a [Prop], so it threads as an ordinary premise and
-     costs no wand-chain plumbing. *)
-  crash_pred_indifferent ->
   (* the covered range's block-number bounds + the log's own storage is
      covered: initlog breads the header and write_head breads it again *)
   log_geom_ok cov logstart ->

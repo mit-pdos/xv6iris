@@ -33,16 +33,16 @@
        authority updated at that one key.
      - one [bslot] for its bread, returned by its brelse.
 
-   WHAT THE POST SAYS ABOUT THE NEW HEADER, AND WHAT IT DELIBERATELY DOES
-   NOT.  The only fact stated about [bs'] is [hdr_n bs' = n] -- the header's
-   first little-endian 32-bit word, i.e. the [int n] field (LogInv.hdr_n).
-   That is exactly what initlog's clean-image path needs (it re-reads the
-   header it just wrote, and stage 2's precondition is that n = 0 there).
-   The FULL (n, W) on-disk encoding is deliberately NOT stated: it is stage
-   4's business -- crash recovery is the only consumer that has to decode
-   the block list, and stating it here would fix an encoding lemma nothing
-   in stages 1-3 can use.  Likewise, when n > 0 this bwrite is THE COMMIT
-   POINT (D := L over W); stages 1-3 record nothing about D.
+   WHAT THE POST SAYS ABOUT THE NEW HEADER.  Two facts, and the second one
+   is what makes the commit fupd possible: [hdr_n bs' = n] -- the header's
+   first little-endian 32-bit word, i.e. the [int n] field (LogInv.hdr_n) --
+   and the FULL on-disk encoding [hdr_dec bs' = (n, map uint W)]
+   (FsCrash.hdr_dec), i.e. that the copy loop really did lay W out as the
+   following little-endian words.  The first is what initlog's clean-image
+   path needs (it re-reads the header it just wrote, and its precondition is
+   that n = 0 there); the second is what identifies the durable state this
+   write commits to ([FsCrash.fs_commit_permit] decodes the header it is
+   handed), so when n > 0 this bwrite is THE COMMIT POINT (D := L over W).
 
    write_head sleeps (bread, bwrite, brelse), so it threads the full
    running-process bundle exactly as SpecBread.v does, plus the disk
@@ -73,6 +73,7 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BcacheInv BioInv.
 Require Import FsBlocks LogInv.
+Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -100,16 +101,6 @@ Definition wp_write_head_sconf_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_write_head <= K)%nat ->
-  (* PHASE C2a BRIDGE (claude-notes/design/fs-log.md stage 4; DELETED in
-     C2b, not discharged).  The crash predicate is INDEXED by the disk image,
-     so this function's interior [bwrite] can no longer mint a free identity
-     permit: a write MOVES the index.  Until this WAL write kind's real
-     durability fupd lands, the contract carries the pure side condition that
-     the system promises nothing about durability -- which is exactly what
-     [Pc := fun _ => True] satisfies, and what both adequacy theorems still
-     instantiate.  It is a [Prop], so it threads as an ordinary premise and
-     costs no wand-chain plumbing. *)
-  crash_pred_indifferent ->
   (* the covered range's block-number bounds + the log region is covered:
      write_head breads the header block [log_hdr_bno logstart] *)
   log_geom_ok cov logstart ->
@@ -151,11 +142,11 @@ Definition wp_write_head_sconf_body
      as a FAMILY over the bytes, given the one fact the assembly establishes
      about them.  At [n = 0] (initlog's clear, and the clear that ends a
      commit) [hdr_n bs' = 0] plus [FsCrash.hdr_dec_zero] pins the whole
-     decoding, which is all a clear's fupd needs; the COMMIT arm's fupd will
-     want the full [hdr_dec bs' = (n, map uint W)], and that is an ADDITIVE
-     strengthening of this premise's hypothesis when the encoding proof
-     lands. *)
+     decoding, which is all a clear's fupd needs
+     ([FsCrash.fs_clear_permit]); the COMMIT arm ([FsCrash.fs_commit_permit])
+     consumes the third hypothesis instead. *)
   (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+     ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
      disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bs' : list (bv 8)),
@@ -172,9 +163,10 @@ Definition wp_write_head_sconf_body
       (* the authority back, moved at exactly the header block's key *)
       ghost_map_auth (fs_L γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
       fsblock γfs (log_hdr_bno logstart) bs' -∗
-      (* the ONE fact stated about the new header image: its n field.
-         The full (n, W) encoding is stage 4's. *)
+      (* the two facts stated about the new header image: its n field, and
+         the full (n, W) encoding the copy loop laid down *)
       ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+      ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
       bslot bn -∗
       (* the permit's RECEIPT, back from the DMA completion *)
       ▷ Q -∗

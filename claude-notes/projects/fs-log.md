@@ -371,7 +371,7 @@ preserve v_disk: the record-P does not move, so the power arms frame it.
         in the home map).
       - `log_mirror_ok_out`: a write outside the log region leaves the
         mirror valid — what the install fupd re-establishes custody with.
-- [ ] **C2b/D1 stages 2-5 — BLOCKED, see below.**
+- [x] **C2b/D1 stages 2-5 — DONE, see below.**
 
 ### THE PERMIT'S ∀-GENERATION HOLE — FOUND, FIXED (D1 stage 1.5)
 
@@ -514,28 +514,69 @@ Two traps this stage cost, both silent:
   types that print identically except for the position of one binder; it has
   to sit exactly where the spec's own context puts it.
 
-### C2b/D1 stage 4 (remaining) — stage 5 is DONE
+### C2b/D1 stage 4 — DONE (the WAL durability fupds)
 
-4. The three real fupds at the WAL sites, currying the era mirror half +
-   `swap_lb` and running `fs_arm_acc`; `Q` for write_head's commit is the new
-   `fs_receipt`; delete `crash_pred_indifferent`. Shape, now that stage 3 has
-   walked the path: each site is `fs_swap_permit`'s sibling — open the seam,
-   strip the (timeless) record inside the `={∅}=∗`, run `fs_arm_acc` at
-   `(gen_id, riscv_eraGS)` instead of `fs_arm_swap`, move `fr_D` with the
-   matching pure transition (`fs_recovery_logfill` / `_commit` /
-   `_install` / `_clear_keeps`), and re-close. Two things are NOT yet in
-   place: `install_trans` needs a per-entry permit FAMILY threaded through its
-   fuel induction (its spec has none today), and the COMMIT arm needs
-   `write_head`'s post to state the FULL header encoding
-   (`hdr_dec bs' = (n, map uint W)`, an encoding proof over the copy loop) —
-   the permit family's hypothesis is already the right place to hang it.
-   Concretely, the encoding proof is a STRENGTHENING OF `wh_loop`'S
-   INVARIANT: it carries only the header's `n` field today
-   (`∀ jj < 4, f jj = nth_byte n jj`) and needs the copied entries as well
-   (`∀ i' < i, ∀ jj < 4, f (4 * S i' + jj) = nth_byte (W !!! i') jj`), which
-   the per-step `f' := bb_set f (4 * S i) w` maintains from the big-op's
-   `lh_block i ↦₄ w`; the exit then assembles `map uint W` with an
-   offset-parametric twin of `wh_take4`.
+`crash_pred_indifferent` and `disk_write_permit_indifferent` are GONE from
+the tree (grep gives zero occurrences outside two explanatory comments): every
+WAL write now proves a REAL fupd against `P_fs`. Three pieces landed.
+
+1. **write_head's ENCODING fact.** `wh_loop`'s invariant carries the copied
+   entries as well as the `n` field (`∀ i' < i, ∀ jj < 4,
+   f (4 * S i' + jj) = nth_byte (W !!! i') jj`), maintained per step off
+   `f' := bb_set f (4 * S i) w` by `bb_set_in`/`_out`. `wh_hdr_dec` assembles
+   `hdr_dec (f <$> seq 0 1024) = (n, map uint W)` from it, over three new
+   pure helpers (`wh_win4`, the offset-parametric `wh_take4_at`,
+   `wh_fmap_seq_ext` + `wh_map_uint_seq`). The fact lands BOTH in
+   `SpecWriteHead`'s post and as the permit family's third hypothesis
+   (`⌜length bs' = 1024⌝ -∗ ⌜hdr_n bs' = n⌝ -∗ ⌜hdr_dec bs' = (n, map uint W)⌝`).
+2. **install_trans's per-entry permits are a GENERATOR, not a big-op.** The
+   entries' fupds are SEQUENTIAL (each consumes the era-side resource the
+   previous returned), so `n` independent permits could never be supplied —
+   there is one mirror half, not `n` of them. `SpecInstallTrans` gained an
+   opaque `(R : iProp Σ)`, the persistent
+   `□ ∀ i w bs', ⌜W !! i = Some w⌝ -∗ ⌜length bs' = 1024⌝ -∗ ▷ R -∗
+   disk_write_permit gen_id (Some (1024 * uint w, bs')) R`, a `▷ R` premise
+   and a `▷ R` post; `it_loop` threads it through the fuel induction and
+   `it_cont`/`it_epi` grew the parameter. initlog's `n = 0` instance passes
+   `R := True` and a VACUOUS generator (`W !! i = Some w` at `W = []`).
+3. **The four fupds** (FsCrash's seam section, `fs_swap_permit`'s siblings):
+   `fs_logfill_permit`, `fs_commit_permit`, `fs_install_permit`,
+   `fs_clear_permit`. Each opens the seam, strips the timeless record inside
+   the `={∅}=∗`, runs `fs_arm_acc` at `(gen_id, riscv_eraGS)`, moves `fr_D`
+   with its pure transition and re-closes the arm at the post-write image.
+   The mirror half travels between them as `LogInv.log_mirror_at h` (the
+   ERA's half at a recorded HEADER picture; `log_mirror_clean` is its
+   `(0, [])` instance, so `log_batch` is textually unchanged):
+
+       logfill  : at (0,[]) -> at (0,[])            (header clean ⇒ recovery blind)
+       commit   : at h      -> at (n, W) ∗ receipt  (D := install(W) over the home map)
+       install  : ▷at (n,W) -> at (n,W)             (D unchanged)
+       clear    : at h      -> at (0,[])            (D := the home map, history extended)
+
+   Only `fs_install_permit` takes its mirror half under a `▷`, because the
+   install generator hands it back that way and there is no step in between.
+
+   **THE INSTALL FUPD NEEDS NO PICTURE OF THE HOME SIDE**, and that dropped a
+   whole tracking problem: `fs_recovery_install`'s `P' b = P (slot i)`
+   hypothesis was UNUSED in its own proof and has been deleted. Recovery
+   re-installs a logged block from its slot whatever the home write put
+   there — so the mirror only ever has to record the HEADER, and the log
+   slots' contents never have to be threaded through the copy loop.
+
+**THE ONE RESIDUAL, deliberate and recorded**: the CLEAR re-bases `fr_D`
+onto the current home content and EXTENDS the history (exactly as
+`fs_swap_permit` does) rather than PRESERVING `fr_D` via
+`fs_recovery_clear_keeps`. The preserving form needs "every logged home block
+already holds its slot's content", i.e. a picture of the HOME side of the
+physical disk, and the era's custody records only the log region. The recipe,
+if it is wanted: a third `log_mirror` field `lm_home : Z -> option (list (bv
+8))` (a partial shadow, `log_mirror_ok` demanding `lm_home b = Some bs -> P b
+= bs`), extended by the install fupd and read by the clear. It ripples through
+RiscvPtsto's record, `log_mirror_ok`/`mirror_of`, all five permits, the boot
+mint (BootShared/SystemAdequacy) and `fs_swap_permit`. Nothing in stage 4
+cashes the difference (a receipt handed out before the clear stays valid
+either way, since the history only grows), and `fs_recovery_clear_keeps`
+stays in FsCrash.v unused, waiting for it.
 5. **DONE — `xv6_fs_adequacy` (and `xv6_fs_adequacy_xv6Σ`) are proven**, with
    `xv6_power_adequacy` untouched and BOTH footprints identical (the recorded
    ten). `Pc`'s signature grew to `gname -> gname -> gname -> (Z -> bv 8) ->

@@ -607,29 +607,15 @@ Qed.
 
 (* A REAL WRITE'S PERMIT IS NOT FREE, and that is the honest content of the
    reshape: the completion moves the crash predicate's index, so somebody has
-   to say what the predicate does under that move.  A system that promises
-   NOTHING about durability -- [Pc := fun _ => True], which is what both
-   adequacy theorems still instantiate -- satisfies the pure side condition
-   below, and then even a write's permit costs nothing.
-
-   This is the PHASE C2a BRIDGE: the three WAL write kinds
-   (write_head / install_trans / end_op, plus initlog which calls two of
-   them) carry [crash_pred_indifferent] as a pure premise until their real
-   fupds land in C2b, at which point the premise is DELETED rather than
-   discharged.  It is deliberately a [Prop] and not a resource, so nothing
-   has to be threaded through any wand chain. *)
-Definition crash_pred_indifferent `{!riscvFixedGS Σ} : Prop :=
-  forall dk dk' : Z -> bv 8, ⊢ (riscv_crash_pred dk -∗ riscv_crash_pred dk')%I.
-
-Lemma disk_write_permit_indifferent `{!riscvFixedGS Σ} (gd : nat)
-    (w : disk_wr) :
-  crash_pred_indifferent -> ⊢ disk_write_permit gd w True.
-Proof.
-  intros Hind. rewrite /disk_write_permit.
-  iIntros (dk n) "Hs _ HP". iModIntro.
-  iSplitL "HP"; [| iFrame "Hs"].
-  iNext. iApply (Hind dk (wr_apply w dk) with "HP").
-Qed.
+   to say what the predicate does under that move.  There is therefore NO
+   [Pc]-generic write permit, and no bridge lemma either: the four WAL write
+   kinds each prove their own fupd against the FS's own crash predicate
+   ([FsCrash.fs_logfill_permit] / [_commit_permit] / [_install_permit] /
+   [_clear_permit], phase C2b/D1 stage 4).  The earlier placeholder premise
+   [crash_pred_indifferent], which said the system promises nothing about
+   durability, was DELETED when those landed rather than discharged: it is
+   FALSE at the real [P_fs], so keeping it would have made every WAL
+   contract vacuous. *)
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
    what every [r ↦ᵣ v] / [reg_interp] / [reg_valid] / [reg_update] silently talks

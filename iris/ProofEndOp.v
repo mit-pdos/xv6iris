@@ -116,6 +116,7 @@ Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecBread SpecBwrite SpecBrelse SpecMemmove.
 Require Import SpecWriteHead SpecInstallTrans.
+Require Import FsCrash.
 Require Import SpecEndOp.
 From Kernel Require KernelSyms.
 
@@ -388,6 +389,13 @@ Proof. lia. Qed.
 Lemma eo_lt_len (t n : nat) (W : list (mword 32)) :
   (t < n)%nat -> n = length W -> (t < length W)%nat.
 Proof. lia. Qed.
+Lemma eo_map_lookup (W : list (mword 32)) (i : nat) (w : mword 32) :
+  W !! i = Some w -> map uint W !! i = Some (uint w).
+Proof.
+  intro H. change (map uint W) with (uint <$> W).
+  rewrite list_lookup_fmap H. reflexivity.
+Qed.
+
 Lemma eo_lookup_elem (W : list (mword 32)) (t : nat) (w : mword 32) :
   W !! t = Some w -> w ∈ W.
 Proof. intro H. eapply elem_of_list_lookup_2. exact H. Qed.
@@ -589,7 +597,7 @@ Local Ltac eoidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (* ===================================================================== *)
 Section EndOpDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   (* end_op's own [wp_next] obligation, NAMED and anchored at an explicit
      hart (durable-notes: a whole-function post must not be spelled inline). *)
@@ -871,7 +879,7 @@ End EndOpDefs.
 (* ===================================================================== *)
 Section EndOpBlocks.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   (* ================================================================== *)
   (*  +0x92 .. +0x9c : the four-register epilogue and the return.        *)
@@ -884,8 +892,6 @@ Section EndOpBlocks.
       (j : nat) (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
     (K_end_op <= K)%nat ->
-    (* the phase-C2a bridge, threaded from the whole-function contract *)
-    crash_pred_indifferent ->
     eo_regsE m M ->
     sie_cap_gpr M (K - 8)%nat b (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C b -∗
@@ -899,7 +905,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C b -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hind Hregs.
+    intros HK Hregs.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc Hoctx Hpark Hppid Hframe Hjunk Hcont".
     rewrite /eo_frame4 /eo_frameJ.
@@ -1127,8 +1133,6 @@ Section EndOpBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_end_op <= K)%nat ->
-    (* the phase-C2a bridge, threaded from the whole-function contract *)
-    crash_pred_indifferent ->
     eb = true ->
     eo_regsE m M ->
     sie_cap_gpr M (K - 8)%nat eb (proc_addr j) -∗
@@ -1147,7 +1151,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hind Heb Hregs.
+    intros HK Heb Hregs.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hlctx #Hprocs Hoctx Hpark Hppid
               Hframe Hjunk Hbatch Hcont".
@@ -1531,7 +1535,7 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (eo_cont_shift (CIDa := CIDb1) (CIDb := CIDc2) Φ j pidv dq m K eb C eb
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (eo_epi (CID0 := CIDc2) Φ j pidv dq m mr K eb C eb HK Hind Hregs2
+    iApply (eo_epi (CID0 := CIDc2) Φ j pidv dq m mr K eb C eb HK Hregs2
               with "Hcg Hcnt Htext Hpc Hoctx Hpark Hppid Hframe Hjunk Hcont").
   Qed.
 
@@ -1598,8 +1602,6 @@ Section EndOpBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_end_op <= K)%nat ->
-    (* the phase-C2a bridge, threaded from the whole-function contract *)
-    crash_pred_indifferent ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
@@ -1616,6 +1618,10 @@ Section EndOpBlocks.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
+    (* the crash seam and the era certificate: what turns this block's
+       [bwrite]s into REAL durability fupds (FsCrash's four permits) *)
+    fs_crash_seam cov logstart -∗
+    era_registered gen_id riscv_eraGS -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
@@ -1631,11 +1637,13 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hind Hgeom Hj Hgl Heb Hshape Hnd Hwok HLw Hregs.
+    intros HK Hgeom Hj Hgl Heb Hshape Hnd Hwok HLw Hregs.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hppid #Hprocs #Hscheds
-              Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc Hopen Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs
+              #Hscheds Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
+              Hopen Hcont".
+    iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
     rewrite /eo_open.
     iDestruct "Hopen" as
@@ -1673,13 +1681,27 @@ Section EndOpBlocks.
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDa1) Φ j pidv dq m K eb C eb
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (WH.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
-              cov logstart dev n W L pidv dq A1 (K - 8)%nat eb C eb True%I
-              (eo_Kwh K HK) Hind Hgeom Hj Hgl Heb (conj HnW Hn30)
+              cov logstart dev n W L pidv dq A1 (K - 8)%nat eb C eb
+              (log_mirror_at (n, map uint W)
+               ∗ ∃ Dc : gmap Z (list (bv 8)), fs_receipt_any Dc)%I
+              (eo_Kwh K HK) Hgeom Hj Hgl Heb (conj HnW Hn30)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
-                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1 []").
-    { iIntros (bs' _ _). iApply (disk_write_permit_indifferent _ _ Hind). }
+                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1
+                    [Hmirc]").
+    (* THE COMMIT POINT's fupd (phase C2b/D1 stage 4).  The durable state
+       jumps to the log's contents over the home map -- computable from the
+       PRE-write image, so the fupd needs to know nothing about the disk --
+       and the mirror half comes back at the header picture the write just
+       laid down, which is what the install fupds below then read. *)
+    { iIntros (bs' Hlen' Hhn' Hdec').
+      iApply (fs_commit_permit cov logstart (0%nat, []) n (map uint W) bs'
+                ltac:(exact Hlen') ltac:(exact Hdec')
+                with "Hseam Hregc Hswlb Hmirc"). }
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                                  Hncell HW HauthL Hhdr %Hhdrn1 Hu1 _".
+                                  Hncell HW HauthL Hhdr %Hhdrn1 %Hhdec1 Hu1 HQ1".
+    (* the mirror half back (the receipt is dropped: nothing in this stage
+       consumes a durability receipt -- sys_sync is phase D's) *)
+    iDestruct "HQ1" as "[>Hmirc _]".
     assert (Hpc108 : ret_pc (A1 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0x108)).
     { rewrite HA1ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc108) in "Hpc".
@@ -1769,13 +1791,27 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (IT.wp_install_trans_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev false n W Lw (<[log_hdr_bno logstart := bs1]> L) D
-              pidv dq A3 (K - 8)%nat eb C eb
-              (eo_Kit K HK) Hind Hgeom Hj Hgl Heb (or_introl eq_refl) HA3a0
+              pidv dq A3 (K - 8)%nat eb C eb (log_mirror_at (n, map uint W))
+              (eo_Kit K HK) Hgeom Hj Hgl Heb (or_introl eq_refl) HA3a0
               (conj HnW Hn30) Hnd Hwok HLw'
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
-                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2").
+                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL HauthD Hent Hu2
+                    [] [Hmirc]").
+    (* THE INSTALL fupds, one per entry, out of one generator: each reads the
+       committed header picture out of the mirror half and hands it straight
+       back, because recovery re-installs a logged block from its slot no
+       matter what the home write put there. *)
+    { iModIntro. iIntros (i w bs') "%Hwi %Hlen'".
+      iApply (fs_install_permit cov logstart n (map uint W) i (uint w) bs'
+                ltac:(exact Hlen')
+                ltac:(by apply NoDup_ListNoDup)
+                ltac:(rewrite length_map; lia)
+                ltac:(exact (eo_map_lookup W i w Hwi))
+                ltac:(exact (proj2 (Hwok w (eo_lookup_elem W i w Hwi))))
+                with "Hseam Hregc Hswlb"). }
+    { iNext. iExact "Hmirc". }
     iIntros (CIDb2 Hsb2 mf2) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                              Hncell HW HauthL HauthD Hent Hu2".
+                              Hncell HW HauthL HauthD Hent Hu2 >Hmirc".
     assert (Hpc10e : ret_pc (A3 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0x10e)).
     { rewrite HA3ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc10e) in "Hpc".
@@ -1866,15 +1902,22 @@ Section EndOpBlocks.
       by (split; [reflexivity | unfold LOGBLOCKS; lia]).
     iApply (WH.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat [] (<[log_hdr_bno logstart := bs1]> L) pidv dq
-              A5 (K - 8)%nat eb C eb True%I
-              (eo_Kwh K HK) Hind Hgeom Hj Hgl Heb Hshape0
+              A5 (K - 8)%nat eb C eb log_mirror_clean
+              (eo_Kwh K HK) Hgeom Hj Hgl Heb Hshape0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
-                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3 []").
+                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3
+                    [Hmirc]").
     { by iApply big_sepL_nil. }
     { iExists bs1. iExact "Hhdr". }
-    { iIntros (bs' _ _). iApply (disk_write_permit_indifferent _ _ Hind). }
+    (* THE CLEAR's fupd: the on-disk log is emptied, so recovery becomes the
+       plain home restriction and the mirror goes back to its clean picture --
+       which is the form [log_batch] parks in the lock. *)
+    { iIntros (bs' Hlen' Hhn' Hdec').
+      iApply (fs_clear_permit cov logstart (n, map uint W) bs'
+                ltac:(exact Hlen') ltac:(rewrite Hhn'; reflexivity)
+                with "Hseam Hregc Hswlb Hmirc"). }
     iIntros (CIDb3 Hsb3 mf3 bs2) "%Hcs3 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                                  Hncell _ HauthL Hhdr %Hhdrn2 Hu3 _".
+                                  Hncell _ HauthL Hhdr %Hhdrn2 %Hhdec2 Hu3 >Hmirc".
     assert (Hpc11a : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0x11a)).
     { rewrite HA5ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc11a) in "Hpc".
@@ -2038,7 +2081,7 @@ Section EndOpBlocks.
       iSplitL "Hg16"; [iExact "Hg16"|].
       iSplitL "Hg8"; [iExact "Hg8"|]. iExact "Hg0". }
     iApply (eo_tail (CID0 := CIDa10) Φ γs j γl bn γ γfs cov logstart dev pidv dq
-              m B3 K eb C HK Hind Heb HB3regsE
+              m B3 K eb C HK Heb HB3regsE
               with "Hcg Hcnt Htext Hpc Hpanic Hlctx Hprocs Hoctx Hpark Hppid
                     Hframe Hjunk2 Hbatch Hcont").
   Qed.
@@ -2066,8 +2109,6 @@ Section EndOpBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (fuel : nat) :
     (K_end_op <= K)%nat ->
-    (* the phase-C2a bridge, threaded from the whole-function contract *)
-    crash_pred_indifferent ->
     log_geom_ok cov logstart ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
@@ -2092,6 +2133,10 @@ Section EndOpBlocks.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
+    (* the crash seam and the era certificate: what turns this block's
+       [bwrite]s into REAL durability fupds (FsCrash's four permits) *)
+    fs_crash_seam cov logstart -∗
+    era_registered gen_id riscv_eraGS -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
@@ -2107,15 +2152,17 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hind Hgeom Hj Hgl Heb Hshape Hnd Hwok.
+    intros HK Hgeom Hj Hgl Heb Hshape Hnd Hwok.
     destruct Hshape as [HnW Hn30].
     destruct Hgeom as [Hcovok Hlogsub].
     induction fuel as [|fuel IH];
       intros CID0 t M L Lw Ht Hfuel HLw Hregs HMs2 HMs4 HMs5;
       [ exfalso; exact (eo_fuel_absurd t n Ht Hfuel) |].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hppid #Hprocs #Hscheds
-              Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc Hopen Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hseam #Hregc Hppid #Hprocs
+              #Hscheds Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc
+              Hopen Hcont".
+    iPoseProof (log_ctx_swap with "Hlctx") as "#Hswlb".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
     iDestruct "Hlfz" as "[#Hdevc #Hstc]".
     rewrite /eo_open.
@@ -2828,15 +2875,22 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (BW.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k1 pidv dev bnol dq H2 (K - 8)%nat eb C
-              bs2 bsd1 eb True%I
+              bs2 bsd1 eb log_mirror_clean
               (eo_Kbwrite K HK)
               ltac:(rewrite Hubnol; exact (eo_lt_lit _ Hslotrange))
               ltac:(reflexivity) Hj Hgl Hk1 HH2a0 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
-                    Hdevi Hdgeom Hdlock Hhold []").
-    (* THE PHASE-C2a BRIDGE PERMIT (see ProofWriteHead) *)
-    { iApply (disk_write_permit_indifferent _ _ Hind). }
-    iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
+                    Hdevi Hdgeom Hdlock Hhold [Hmirc]").
+    (* THE LOG-FILL fupd (phase C2b/D1 stage 4): with the ON-DISK header
+       still clean -- which is what the mirror half in hand says, and what
+       makes the batch's [log_mirror_clean] the right thing to park in the
+       lock -- recovery does not look at the slots at all, so this write is
+       invisible to the durable state. *)
+    { rewrite Hubnol.
+      iApply (fs_logfill_permit cov logstart t bs2 Hlen2
+                ltac:(exact (eo_t_lt_lb t n Ht Hn30))
+                with "Hseam Hregc Hswlb Hmirc"). }
+    iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold >Hmirc".
     assert (Hpcec : ret_pc (H2 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0xec)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcec) in "Hpc".
@@ -3206,8 +3260,9 @@ Section EndOpBlocks.
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       iApply (IH CIDa25 (S t) J3 (<[uint bnol := bs2]> L) Lw' Hlt
                 (eo_fuel_step t n fuel Hfuel) HLw' HJ3regs HJ3s2 HJ3s4 HJ3s5
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hppid Hprocs Hscheds
-                      Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hopen Hcont").
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hseam Hregc Hppid Hprocs
+                      Hscheds Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                      Hopen Hcont").
     - (* the loop is done: S t = n, and the commit tail follows *)
       assert (Htn : S t = n) by lia.
       assert (Hcmp : zopz0zI_s (rget J3 Rs2) (rget J3 Ra5) = false).
@@ -3233,12 +3288,13 @@ Section EndOpBlocks.
       iEval (rewrite Htn) in "Hopen".
       iApply (eo_commit (CID0 := CIDa25) Φ γs j γl γu γd γk pd pav pu bn γ γfs
                 cov logstart dev n W Lw' (<[uint bnol := bs2]> L) D pidv dq m J3 K eb C
-                HK Hind (conj Hcovok Hlogsub) Hj Hgl Heb (conj HnW Hn30) Hnd Hwok
+                HK (conj Hcovok Hlogsub) Hj Hgl Heb (conj HnW Hn30) Hnd Hwok
                 ltac:(intros i v Hv; apply (HLw' i v);
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
                 HJ3regs
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hppid Hprocs Hscheds
-                      Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hopen Hcont").
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hseam Hregc Hppid Hprocs
+                      Hscheds Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                      Hopen Hcont").
   Qed.
 
 
@@ -3253,8 +3309,6 @@ Section EndOpBlocks.
       (pidv : mword 32) (dq : dfrac)
       (m M : regfile) (K : nat) (eb : bool) (C : iProp Σ) :
     (K_end_op <= K)%nat ->
-    (* the phase-C2a bridge, threaded from the whole-function contract *)
-    crash_pred_indifferent ->
     eb = true ->
     eo_regsE m M ->
     sie_cap_gpr M (K - 8)%nat false (proc_addr j) -∗
@@ -3275,7 +3329,7 @@ Section EndOpBlocks.
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hind Heb Hregs.
+    intros HK Heb Hregs.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt Hpay Htok HRres #Htext Hpc #Hpanic #Hlctx #Hprocs
               Hoctx Hpark Hppid Hframe Hjunk Hcont".
@@ -3455,7 +3509,7 @@ Section EndOpBlocks.
         rewrite (callee_saved_lookup Hrel c Hcs). exact (HG3thr c Hcs N2 N8 N9 N18). }
     iDestruct (eo_cont_shift (CIDa := CID0) (CIDb := CIDc1) Φ j pidv dq m K eb C eb
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iApply (eo_epi (CID0 := CIDc1) Φ j pidv dq m mr K eb C eb HK Hind Hregs2
+    iApply (eo_epi (CID0 := CIDc1) Φ j pidv dq m mr K eb C eb HK Hregs2
               with "Hcg Hcnt Htext Hpc Hoctx Hpark Hppid Hframe Hjunk Hcont").
   Qed.
 
@@ -3465,7 +3519,7 @@ End EndOpBlocks.
 
 Section ProofEndOp.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_end_op_sconf (Φ : mval -> iProp Σ)
@@ -3483,11 +3537,12 @@ Section ProofEndOp.
                            cov logstart dev u pidv dq m K eb C b.
   Proof.
     cbv beta zeta delta [wp_end_op_sconf_body].
-    intros HK Hind Hgeom Hj Hgl Heb.
+    intros HK Hgeom Hj Hgl Heb.
     subst eb.
     pose proof Hgeom as [Hcovok Hlogsub].
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hppid #Hprocs #Hscheds
-              Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hop Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hseam #Hcert Hppid #Hprocs
+              #Hscheds Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hop Hcont".
+    iDestruct "Hcert" as "(_ & _ & #Hregc)".
     iDestruct (cpu_own_forces_on with "Hcg Hcnt") as %Hbtrue. subst b.
     iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc & #Hswlb)".
     iAssert (log_ctx γ bn γfs cov logstart dev) as "#Hlctx".
@@ -4186,7 +4241,7 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iDestruct (eo_open_to_batch with "Hmirc Hopen") as "Hbatch".
         iApply (eo_tail (CID0 := CIDs2) Φ γs j γl bn γ γfs cov logstart dev pidv dq
-                  m V1 K true C HK Hind eq_refl HV1regsE
+                  m V1 K true C HK eq_refl HV1regsE
                   with "Hcg Hcnt Htext Hpc Hpanic Hlctx Hprocs Hoctx Hpark Hppid
                         Hframe Hjunk Hbatch Hcont").
       + (* n > 0: save s3/s4/s5, set up the cursors, and run the copy loop *)
@@ -4361,11 +4416,12 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply (eo_loop Φ γs j γl γu γd γk pd pav pu bn γ γfs cov logstart dev
                   nl W D pidv dq m K true C nl
-                  HK Hind Hgeom Hj Hgl eq_refl (conj HnW Hn30) Hnd Hwok
+                  HK Hgeom Hj Hgl eq_refl (conj HnW Hn30) Hnd Hwok
                   CIDs9 0%nat Y4 L (fun _ => []) ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HY4regs HY4s2 HY4s4 HY4s5
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hppid Hprocs Hscheds
-                        Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hopen Hcont").
+                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hseam Hregc Hppid Hprocs
+                        Hscheds Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc
+                        Hopen Hcont").
     - (* ---- THE FAST PATH: other operations are still open ---- *)
       assert (Hnz26 : neq_vec (rget T4 Rs2) (zero_reg : mword 64) = true).
       { rgne. rewrite HT4s2 (eo_neq0 (out - 1)%nat Hout3d).
@@ -4399,7 +4455,7 @@ Section ProofEndOp.
       iEval (rewrite Htgt26) in "Hpc".
       clear Htgt26.
       iApply (eo_fast (CID0 := CIDq) Φ γs j γl bn γ γfs cov logstart dev pidv dq
-                m T4 K true C HK Hind eq_refl HT4regsE
+                m T4 K true C HK eq_refl HT4regsE
                 with "Hcg Hcnt Hpay Htok HRres Htext Hpc Hpanic Hlctx Hprocs
                       Hoctx Hpark Hppid Hframe Hjunk Hcont").
   Qed.

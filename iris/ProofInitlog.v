@@ -303,7 +303,7 @@ Section ProofInitlog.
                             pidv dq dqs m K eb C b.
   Proof.
     cbv beta delta [wp_initlog_sconf_body].
-    intros pcE pj ret_tgt c_name c_cpu HK Hind Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1.
+    intros pcE pj ret_tgt c_name c_cpu HK Hgeom Hj Hgl Heb Hhdr0 Hma0 Hma1.
     destruct Hgeom as [Hcovok Hlogsub].
     subst eb.
     unfold K_initlog in HK.
@@ -1083,14 +1083,21 @@ Section ProofInitlog.
     iApply (InstallTrans.wp_install_trans_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev true 0%nat ([] : list (mword 32))
               (fun _ : nat => ([] : list (bv 8))) L D pidv dq
-              C2 (K - 6)%nat true C b
-              HKit Hind Hgeomok Hj Hgl eq_refl
+              C2 (K - 6)%nat true C b True%I
+              HKit Hgeomok Hj Hgl eq_refl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
-                    Hnil2 Hs2 [-]").
+                    Hnil2 Hs2 [] [] [-]").
+    (* THE EMPTY WRITE SET's per-entry permits: this call installs NOTHING
+       (the on-disk header is clean, which is initlog's precondition), so the
+       generator is vacuous -- there is no entry to look up -- and the
+       threaded resource is [True]. *)
+    { iModIntro. iIntros (i w bs') "%Hi _ _". rewrite lookup_nil in Hi.
+      discriminate. }
+    { done. }
     iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                             Hncell _ HLauth HDauth _ Hs2".
+                             Hncell _ HLauth HDauth _ Hs2 _".
     assert (Hpc68 : ret_pc (C2 !!! Regidx Rra : mword 64)
                     = mword_of_int (ILG + 0x68)).
     { rewrite HC2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1187,10 +1194,8 @@ Section ProofInitlog.
     iApply (WriteHead.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
               D2 (K - 6)%nat true C b
-              ((∃ M : log_mirror,
-                  ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = (0%nat, [])⌝) ∗
-               swap_lb (S gen_id))%I
-              HKwh Hind Hgeomok Hj Hgl eq_refl Hshape0
+              (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
+              HKwh Hgeomok Hj Hgl eq_refl Hshape0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirf] [-]").
@@ -1201,13 +1206,13 @@ Section ProofInitlog.
        post-write picture, splits it there, keeps one half in the arm and
        returns the other (with its clean header, read off the write itself)
        together with the swap receipt. *)
-    { iIntros (bs' Hlen' Hhn').
+    { iIntros (bs' Hlen' Hhn' Hdec').
       iDestruct "Hcert" as "(_ & Hstc & Hregc)".
       iApply (fs_swap_permit cov logstart bs' ltac:(exact Hlen')
                 ltac:(rewrite Hhn'; reflexivity)
                 with "Hseam Hregc Hstc Hmirf"). }
     iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                                 Hncell _ HLauth Hfsb %Hhn Hs1u HQ".
+                                 Hncell _ HLauth Hfsb %Hhn %Hhdec Hs1u HQ".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
                     = mword_of_int (ILG + 0x74)).
     { rewrite HD2ra. apply bv_eq; vm_compute; reflexivity. }

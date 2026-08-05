@@ -92,6 +92,7 @@ Require Import FsBlocks LogInv.
 Require Import CodeWriteHead.
 Require Import SpecPanic.
 Require Import SpecBread SpecBwrite SpecBrelse.
+Require Import FsCrash.
 Require Import SpecWriteHead.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -202,6 +203,99 @@ Proof.
     rewrite Hs. reflexivity. }
   rewrite Htk. apply (bb_word_bytes _ nn); [reflexivity|].
   intros j Hj. destruct j as [|[|[|[|j']]]]; cbn; try (apply Hf; lia). lia.
+Qed.
+
+(* ---- THE FULL HEADER ENCODING (phase C2b/D1 stage 4).  [wh_take4] above
+   reads the [int n] field out of the assembled window; the commit fupd needs
+   the WHOLE decoding, so the same argument is run at every 4-byte offset the
+   copy loop wrote.  All of it is over plain [nat]/[Z] lists, so no solver
+   ever sees a [bv]. ---- *)
+
+(* the 4-byte window at [o], as a literal list -- the offset-parametric twin
+   of the [take 4 (seq 0 1024)] step inside [wh_take4] *)
+Lemma wh_win4 (f : nat -> bv 8) (len o : nat) :
+  (o + 4 <= len)%nat ->
+  take 4 (drop o (f <$> seq 0 len))
+  = [f o; f (S o); f (S (S o)); f (S (S (S o)))].
+Proof.
+  intro Ho. rewrite -fmap_drop -fmap_take drop_seq take_seq.
+  replace (4 `min` (len - o))%nat with 4%nat by lia.
+  replace (0 + o)%nat with o by lia. reflexivity.
+Qed.
+
+(* [wh_take4] at an arbitrary aligned offset *)
+Lemma wh_take4_at (f : nat -> bv 8) (nn : SailStdpp.Values.mword 32) (o : nat) :
+  (o + 4 <= 1024)%nat ->
+  (forall j, (j < 4)%nat -> f (o + j)%nat = nth_byte nn j) ->
+  assemble_bytes (take 4 (drop o (f <$> seq 0 1024))) = bv_unsigned nn.
+Proof.
+  intros Ho Hf. rewrite (wh_win4 f 1024 o Ho).
+  apply (bb_word_bytes _ nn); [reflexivity|].
+  intros j Hj.
+  assert (H0 : f o = nth_byte nn 0%nat)
+    by (rewrite -(Hf 0%nat ltac:(lia)); f_equal; lia).
+  assert (H1 : f (S o) = nth_byte nn 1%nat)
+    by (rewrite -(Hf 1%nat ltac:(lia)); f_equal; lia).
+  assert (H2 : f (S (S o)) = nth_byte nn 2%nat)
+    by (rewrite -(Hf 2%nat ltac:(lia)); f_equal; lia).
+  assert (H3 : f (S (S (S o))) = nth_byte nn 3%nat)
+    by (rewrite -(Hf 3%nat ltac:(lia)); f_equal; lia).
+  destruct j as [|[|[|[|j']]]]; cbn; [exact H0|exact H1|exact H2|exact H3|lia].
+Qed.
+
+Lemma wh_uint32 (a : SailStdpp.Values.mword 32) : uint a = bv_unsigned a.
+Proof.
+  pose proof (bv_unsigned_in_range _ a) as Hr.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  rewrite Z2N.id; [ reflexivity | lia ].
+Qed.
+
+Lemma wh_fmap_seq_ext {A : Type} (g h : nat -> A) (n : nat) :
+  (forall i, (i < n)%nat -> g i = h i) -> g <$> seq 0 n = h <$> seq 0 n.
+Proof.
+  intro Hgh. apply list_eq. intro k. rewrite !list_lookup_fmap.
+  destruct (decide (k < n)%nat) as [Hk|Hk].
+  - rewrite (lookup_seq_lt 0 n k Hk) /=. by rewrite (Hgh k Hk).
+  - rewrite (lookup_seq_ge 0 n k ltac:(lia)) //.
+Qed.
+
+Lemma wh_map_uint_seq (W : list (SailStdpp.Values.mword 32)) :
+  map uint W = (fun i => uint (W !!! i)) <$> seq 0 (length W).
+Proof.
+  apply list_eq. intro k. rewrite list_lookup_fmap list_lookup_fmap.
+  destruct (decide (k < length W)%nat) as [Hk|Hk].
+  - rewrite (lookup_seq_lt 0 (length W) k Hk) /=.
+    destruct (lookup_lt_is_Some_2 W k Hk) as [w Hw].
+    rewrite Hw /= (list_lookup_total_alt W k) Hw //.
+  - rewrite (lookup_seq_ge 0 (length W) k ltac:(lia))
+            (lookup_ge_None_2 W k ltac:(lia)) //.
+Qed.
+
+(* THE POSTCONDITION'S ENCODING FACT: the window the copy loop assembled
+   decodes to exactly the in-memory header [(n, W)].  [Hf4] is the [n] field
+   ([wh_take4]'s hypothesis, unchanged) and [Henc] is the loop's strengthened
+   invariant: entry [i'] went to the word at byte offset [4 * S i']. *)
+Lemma wh_hdr_dec (f : nat -> bv 8) (n : nat) (W : list (SailStdpp.Values.mword 32)) :
+  n = length W -> (n <= LOGBLOCKS)%nat ->
+  (forall jj, (jj < 4)%nat ->
+     f jj = nth_byte (mword_of_int (Z.of_nat n) : SailStdpp.Values.mword 32) jj) ->
+  (forall i' jj, (i' < n)%nat -> (jj < 4)%nat ->
+     f (4 * S i' + jj)%nat = nth_byte (W !!! i') jj) ->
+  hdr_dec (f <$> seq 0 1024) = (n, map uint W).
+Proof.
+  intros HnW HnB Hf4 Henc.
+  assert (Hn : hdr_n (f <$> seq 0 1024) = Z.of_nat n).
+  { rewrite (wh_take4 f (mword_of_int (Z.of_nat n) : SailStdpp.Values.mword 32) Hf4).
+    apply moi32_small. unfold LOGBLOCKS in HnB.
+    change (2 ^ 32)%Z with 4294967296%Z. lia. }
+  rewrite /hdr_dec le_word_0 Hn Nat2Z.id. f_equal.
+  rewrite wh_map_uint_seq -HnW.
+  apply wh_fmap_seq_ext. intros i Hi.
+  rewrite /le_word.
+  rewrite (wh_take4_at f (W !!! i) (4 * S i)%nat
+             ltac:(clear -Hi HnB; unfold LOGBLOCKS in HnB; lia)
+             ltac:(intros jj Hjj; exact (Henc i jj Hi Hjj))).
+  symmetry. apply wh_uint32.
 Qed.
 
 (* ---- the small-literal register facts ---- *)
@@ -399,6 +493,7 @@ Section WriteHeadDefs.
         ghost_map_auth (fs_L γfs) 1 (<[log_hdr_bno logstart := bs']> L) -∗
         fsblock γfs (log_hdr_bno logstart) bs' -∗
         ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
         bslot bn -∗
         ▷ Q -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I.
@@ -446,16 +541,20 @@ Section WriteHeadBlocks.
       (f : nat -> bv 8)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) (Q : iProp Σ) :
     (K_write_head <= K)%nat ->
-    (* the phase-C2a bridge, threaded from the whole-function contract *)
-    crash_pred_indifferent ->
     (uint bno < 2147483648)%Z ->
     uint bno = logstart ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
+    n = length W ->
     (n <= LOGBLOCKS)%nat ->
     (k < NBUF)%nat ->
     (forall jj, (jj < 4)%nat ->
        f jj = nth_byte (mword_of_int (Z.of_nat n) : mword 32) jj) ->
+    (* THE COPY LOOP'S OTHER HALF: entry [i'] sits in the word at byte
+       offset [4 * S i'].  Together with the line above this is the whole
+       on-disk encoding ([wh_hdr_dec]). *)
+    (forall i' jj, (i' < n)%nat -> (jj < 4)%nat ->
+       f (4 * S i' + jj)%nat = nth_byte (W !!! i') jj) ->
     wh_regs m M ->
     M !!! Regidx Rs1 = bnode k ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
@@ -482,11 +581,12 @@ Section WriteHeadBlocks.
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+       ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
     wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hind Hbnolt Hbnou Hj Hgl HnB Hk Hf4 Hregs HMs1.
+    intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1.
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hoctx Hpark
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
@@ -562,6 +662,8 @@ Section WriteHeadBlocks.
       apply moi32_small.
       unfold LOGBLOCKS in HnB.
       change (2 ^ 32)%Z with 4294967296%Z. lia. }
+    assert (Hdec_early : hdr_dec (f <$> seq 0 1024) = (n, map uint W))
+      by exact (wh_hdr_dec f n W HnW HnB Hf4 Henc).
     iApply (BW.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat true C
               (f <$> seq 0 1024) bsd0 b Q
@@ -574,7 +676,8 @@ Section WriteHeadBlocks.
        [log_hdr_bno logstart], the bread/bwrite pair at [uint bno]. *)
     { rewrite Hbnou. iApply ("Hperm" $! (f <$> seq 0 1024)).
       { iPureIntro. rewrite length_fmap length_seq. reflexivity. }
-      iPureIntro. exact Hhn_early. }
+      { iPureIntro. exact Hhn_early. }
+      iPureIntro. exact Hdec_early. }
     iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold HQ".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (WH + 0x4c)).
     { rewrite HT2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -884,9 +987,10 @@ Section WriteHeadBlocks.
     rewrite /wh_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid
-                     Hncell HW HLauth Hfsb [%] Hslot HQ").
+                     Hncell HW HLauth Hfsb [%] [%] Hslot HQ").
     { unfold callee_saved. repeat split; assumption. }
     { exact Hhn. }
+    { exact Hdec_early. }
   Qed.
 
   (* ================================================================== *)
@@ -911,8 +1015,6 @@ Section WriteHeadBlocks.
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (fuel : nat)
       (Q : iProp Σ) :
     (K_write_head <= K)%nat ->
-    (* the phase-C2a bridge, threaded from the whole-function contract *)
-    crash_pred_indifferent ->
     (uint bno < 2147483648)%Z ->
     uint bno = logstart ->
     (j < NPROC)%nat ->
@@ -925,6 +1027,9 @@ Section WriteHeadBlocks.
     (n - i <= fuel)%nat ->
     (forall jj, (jj < 4)%nat ->
        f jj = nth_byte (mword_of_int (Z.of_nat n) : mword 32) jj) ->
+    (* the ENCODING invariant: every entry copied so far is in its word *)
+    (forall i' jj, (i' < i)%nat -> (jj < 4)%nat ->
+       f (4 * S i' + jj)%nat = nth_byte (W !!! i') jj) ->
     wh_regs m M ->
     M !!! Regidx Rs1 = bnode kk ->
     M !!! Regidx Ra4 = lh_block i ->
@@ -954,15 +1059,16 @@ Section WriteHeadBlocks.
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i0 ↦ w ∈ W, lh_block i0 ↦₄ w) -∗
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+       ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
     wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hind Hbnolt Hbnou Hj Hgl HnW HnB Hk.
+    intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk.
     (* CID0 is GENERALIZED: the loop body crosses [wp_next]s, so the hart the
        back-edge re-enters at is not the one the block was entered at. *)
     iInduction fuel as [|fuel] "IH" forall (CID0);
-      iIntros (i M f Hi Hfuel Hf4 Hregs HMs1 HMa4 HMa5 HMa2);
+      iIntros (i M f Hi Hfuel Hf4 Henc Hregs HMs1 HMa4 HMa5 HMa2);
       [ exfalso; lia |].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hoctx Hpark
@@ -1038,6 +1144,20 @@ Section WriteHeadBlocks.
              f' jj = nth_byte (mword_of_int (Z.of_nat n) : mword 32) jj).
     { intros jj Hjj. rewrite /f' (bb_set_out f (4 * S i)%nat w jj ltac:(left; lia)).
       apply Hf4. exact Hjj. }
+    (* the ENCODING invariant, one entry longer: the word just stored IS
+       entry [i], and every earlier one is outside the window written *)
+    assert (Hwt : W !!! i = w)
+      by (rewrite (list_lookup_total_alt W i) Hw; reflexivity).
+    assert (Henc' : forall i' jj, (i' < S i)%nat -> (jj < 4)%nat ->
+             f' (4 * S i' + jj)%nat = nth_byte (W !!! i') jj).
+    { intros i' jj Hi' Hjj. destruct (decide (i' = i)) as [->|Hne].
+      - rewrite /f' (bb_set_in f (4 * S i)%nat w (4 * S i + jj)%nat
+                       ltac:(lia) ltac:(lia)).
+        replace (4 * S i + jj - 4 * S i)%nat with jj by lia.
+        rewrite Hwt. reflexivity.
+      - rewrite /f' (bb_set_out f (4 * S i)%nat w (4 * S i' + jj)%nat
+                       ltac:(left; lia)).
+        exact (Henc i' jj ltac:(lia) Hjj). }
     iAssert (wh_hold bn (fs_view γfs γd dev cov) kk pidv dev bno f' bsd0)
       with "[Hslk Hpid Hvalid Hbdev Hbno Hbdsk Hby Hdisk]" as "Hhold".
     { rewrite /wh_hold. iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
@@ -1124,7 +1244,9 @@ Section WriteHeadBlocks.
                  with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID5) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K C b Q
-                HK Hind Hbnolt Hbnou Hj Hgl HnB Hk Hf4' HS3regs HS3s1
+                HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
+                ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
+                HS3regs HS3s1
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
@@ -1152,7 +1274,7 @@ Section WriteHeadBlocks.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-      iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' HS3regs HS3s1
+      iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' Henc' HS3regs HS3s1
                      HS3a4 HS3a5 HS3a2).
       iApply ("IH" with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds
                          Hoctx Hpark Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
@@ -1183,7 +1305,7 @@ Section ProofWriteHead.
                                cov logstart dev n W L pidv dq m K eb C b Q.
   Proof.
     cbv beta delta [wp_write_head_sconf_body].
-    intros pcE pj ret_tgt HK Hind Hgeom Hj Hgl Heb Hbatch.
+    intros pcE pj ret_tgt HK Hgeom Hj Hgl Heb Hbatch.
     destruct Hgeom as [Hcovok Hlogsub].
     destruct Hbatch as [HnW HnB].
     subst eb.
@@ -1604,7 +1726,9 @@ Section ProofWriteHead.
       iApply (wh_tail (CID0 := CID16) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev 0%nat W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 f1 m B2 K C b Q
-                HK Hind Hbnolt Huint Hj Hgl HnB HA Hf14 HB2regs HB2s1
+                HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
+                ltac:(intros i' jj Hi' Hjj; exfalso; lia)
+                HB2regs HB2s1
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
@@ -1763,8 +1887,10 @@ Section ProofWriteHead.
       iApply (wh_loop (CID0 := CID21) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 m K C b (S n') Q
-                HK Hind Hbnolt Huint Hj Hgl HnW HnB HA 0%nat B7 f1
-                ltac:(lia) ltac:(lia) Hf14 HB7regs HB7s1 HB7a4 HB7a5 HB7a2
+                HK Hbnolt Huint Hj Hgl HnW HnB HA 0%nat B7 f1
+                ltac:(lia) ltac:(lia) Hf14
+                ltac:(intros i' jj Hi' Hjj; exfalso; lia)
+                HB7regs HB7s1 HB7a4 HB7a5 HB7a2
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").

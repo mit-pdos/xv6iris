@@ -142,21 +142,11 @@ Definition wp_install_trans_sconf_body
     (L : gmap Z (list (bv 8))) (D : gmap Z bool)
     (pidv : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
+    (b : bool) (R : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.install_trans in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_install_trans <= K)%nat ->
-  (* PHASE C2a BRIDGE (claude-notes/design/fs-log.md stage 4; DELETED in
-     C2b, not discharged).  The crash predicate is INDEXED by the disk image,
-     so this function's interior [bwrite] can no longer mint a free identity
-     permit: a write MOVES the index.  Until this WAL write kind's real
-     durability fupd lands, the contract carries the pure side condition that
-     the system promises nothing about durability -- which is exactly what
-     [Pc := fun _ => True] satisfies, and what both adequacy theorems still
-     instantiate.  It is a [Prop], so it threads as an ordinary premise and
-     costs no wand-chain plumbing. *)
-  crash_pred_indifferent ->
   (* the covered range's block-number bounds + the log region is covered:
      install_trans breads log slot [tail] as well as the home block *)
   log_geom_ok cov logstart ->
@@ -216,6 +206,24 @@ Definition wp_install_trans_sconf_body
      (uint w) ↪[fs_dirty γfs]{#(1/2)} true) -∗
   (* two slot units: it holds lbuf and dbuf at the same time *)
   bslots bn 2 -∗
+  (* THE CRASH PERMITS for the home writes (phase C2b/D1 stage 4).  One per
+     entry -- but the entries' fupds are SEQUENTIAL, each consuming the
+     era-side resource the previous one returned (for the FS client that is
+     the log-region mirror half, which is what tells a fupd that the on-disk
+     header still names the block it is about to overwrite).  A big-op of
+     independent permits could therefore never be supplied: there is one
+     such resource, not [n] of them.  So the premise is a REUSABLE GENERATOR
+     over the one threaded resource [R], persistent and instantiated at each
+     entry in turn; [R] itself is opaque here, which keeps install_trans as
+     crash-agnostic as the rest of the log proofs.
+     ([FsCrash.fs_install_permit] is exactly this shape, at
+     [R := LogInv.log_mirror_at (n, map uint W)].  Its [▷] is what the
+     bwrite's own [▷ Q] postcondition hands back, and a client whose [R] is
+     timeless -- the mirror half is -- strips it inside the fupd.) *)
+  □ (∀ (i : nat) (w : SailStdpp.Values.mword 32) (bs' : list (bv 8)),
+       ⌜W !! i = Some w⌝ -∗ ⌜length bs' = 1024%nat⌝ -∗ ▷ R -∗
+       disk_write_permit gen_id (Some ((1024 * uint w)%Z, bs')) R) -∗
+  ▷ R -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -236,6 +244,8 @@ Definition wp_install_trans_sconf_body
       (* the two units back, PLUS one per entry: each bunpin frees the pin
          unit log_write's bpin absorbed.  See the header note. *)
       bslots bn (2 + length W) -∗
+      (* the threaded resource, back from the last entry's DMA completion *)
+      ▷ R -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -256,8 +266,8 @@ Module Type INSTALL_TRANS.
       (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
+      (b : bool) (R : iProp Σ),
       wp_install_trans_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
                                   cov logstart dev recovering n W Lw L D
-                                  pidv dq m K eb C b.
+                                  pidv dq m K eb C b R.
 End INSTALL_TRANS.

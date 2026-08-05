@@ -418,10 +418,11 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
      READ's permit stays provable for an ARBITRARY `Pc` and the whole
      read stack (bread and above) is untouched. A WRITE moves the index,
      so no `Pc`-generic proof exists: an earlier claim that the trivial
-     write permit survives the reshape was WRONG. Until the real fupds
-     land, the three WAL write kinds carry the PURE, DELETABLE premise
-     `crash_pred_indifferent` (`∀ dk dk', ⊢ Pc dk -∗ Pc dk'`), which
-     `Pc := fun _ => True` satisfies.
+     write permit survives the reshape was WRONG. Each of the four WAL
+     write kinds therefore proves its OWN fupd against `P_fs`
+     (`FsCrash.fs_logfill_permit` / `_commit_permit` / `_install_permit` /
+     `_clear_permit`); there is no bridge lemma and no `Pc`-generic write
+     permit in the tree.
    - **THE PERMIT'S INDEX IS PINNED TO THE REQUEST BY THE SLOT.** The
      permit-channel token gains the `disk_wr` as part of its ghost-map
      value, and `VirtioProto.slot_pend_res` holds it AT `vs_wr sl` —

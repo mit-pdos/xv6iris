@@ -248,9 +248,26 @@ Section LogInv.
   Definition log_mirror_full : iProp Σ :=
     (∃ M : log_mirror, ghost_var mirror_name 1 M)%I.
 
-  Definition log_mirror_clean : iProp Σ :=
+  (* THE ERA'S HALF AT A RECORDED HEADER PICTURE.  [h] is the ON-DISK
+     header's [FsCrash.hdr_dec] reading, and it is the ONLY field a WAL fupd
+     ever reads out of the mirror: the log-fill kind needs a CLEAN header,
+     the install kind needs the header to be the (n, W) the commit just
+     wrote (which is what tells it the block it is overwriting is a LOGGED
+     one, so recovery re-installs it anyway).  The slot contents are recorded
+     too ([RiscvPtsto.log_mirror]'s second field) but no fupd has to read
+     them -- [FsCrash.fs_recovery_install] does not depend on the value a
+     home write stores.
+     Kept ONE definition, indexed by [h], because the commit and clear kinds
+     move the picture: [log_mirror_clean] is its [(0, [])] instance and
+     [log_batch] therefore reads exactly as before. *)
+  Definition log_mirror_at (h : nat * list Z) : iProp Σ :=
     (∃ M : log_mirror,
-       ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = (0%nat, [])⌝)%I.
+       ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = h⌝)%I.
+
+  Global Instance log_mirror_at_timeless h : Timeless (log_mirror_at h).
+  Proof. rewrite /log_mirror_at. apply _. Qed.
+
+  Definition log_mirror_clean : iProp Σ := log_mirror_at (0%nat, []).
 
   (* ---------------------------------------------------------------- *)
   (*  The batch bundle (checked out wholesale by the committer)        *)
