@@ -1,8 +1,8 @@
 # Project: weak memory (RVWMO) — staged worklist
 
 Design: [`design/weak-memory.md`](../design/weak-memory.md) (PROPOSAL).
-Branch: `weak-memory`. M0 has landed (`iris/WeakMem.v`, `iris/WeakLitmus.v`);
-nothing else has.
+Branch: `weak-memory`. Landed: M0 (`iris/WeakMem.v`, `iris/WeakLitmus.v`)
+and M1a (`iris/WeakInterp.v` + fwd-bank wire-in). Next: M1b.
 
 ## M0 — model spike (no Iris)
 
@@ -10,16 +10,12 @@ Validate the operational design before anything depends on it.
 
 - [x] `WeakMem.v`: `wmsg`, `wstate`, the log (`gmem0` + `glog`), per-byte
       readability, the load/store/AMO/fence update functions. Pure stdpp.
-- [ ] Modified `run`/`exec` on a COPY (`WeakLang.v` scratch): MemRead/
-      MemWrite/Barrier arms consult `wstate` + log; `exec` takes the read
-      oracle χ; `exec_run` bridge per oracle. **Deferred to M1** — the spike
-      exercised the model through the toy hart language in `WeakLitmus.v`
-      instead of a Sail copy, so the oracle shape is still unvalidated.
+- [x] Modified `run`/`exec` on a COPY: done as M1a's `WeakInterp.v`.
 - [x] Litmus suite as executable lemmas (SB, MP±fences, CoRR, IRIW,
       MP+amoswap.aq; LB must be unobservable — documents the promise-free
       gap). Verdicts cross-checked against riscv.cat/herd expectations.
-- [ ] Spike report: does the oracle shape hold up? is the per-byte View
-      workable as a monPred index? Feed corrections back into the design.
+- [x] Spike report: fed back into the design (AMO side condition, fwd-bank
+      decision, gap-witness framing).
 
 ### What M0 established (read before M1)
 
@@ -56,12 +52,27 @@ Validate the operational design before anything depends on it.
 
 ## M1 — language + base logic (ALL in parallel files; existing tree untouched)
 
-- [ ] **M1a — the weak interpreter** (`WeakInterp.v`, + WeakMem fwd-bank
-      wire-in): `wmstate` (sregs + img/log/wstate + mdev), `wrun`
-      (relational; weak MemRead/MemWrite/Barrier arms, access-kind
-      dispatch: explicit weak / rmw latest-read / ifetch+ttw coherent),
-      `wexec` with the read oracle χ, `wexec_wrun` bridge. Z keys via
-      `uint` at the seam (design doc, Decision 2).
+- [x] **M1a — the weak interpreter** (`WeakInterp.v`, + WeakMem fwd-bank
+      wire-in): DONE. `wrun`/`wexec` with the `list (list nat)` oracle
+      (validated, unchanged), `wexec_wrun` per-oracle soundness (closed),
+      `wexec_det`, `wread_bytes_complete` (the per-read converse M1c
+      consumes; full completeness blocked only by `Interface.Choose`,
+      TODO comment names the `choice_free` fix). Access-kind reality:
+      kinds come from the aq/rl/reserved flags ALONE — plain `.aq` loads
+      are internal_error (acquire arrives only on exclusives, i.e.
+      amoswap.w.aq), AMOs use exclusive/conditional kinds (never
+      AV_atomic_rmw), fetch and walker emit plain reads (see design doc
+      Decision 6 — SC-walker assumption dropped). Byte j of an access is
+      at `uint pa + j` (`acc_addr`), wrap-freedom isolated in `pa_z_add`
+      for the M2 bridge. Image is a function `Z → option (bv 8)`; the
+      `gmap Arch.pa` img converts at the seam (`img_z`). Forwarding is
+      disabled for acquire loads (PARM read_view side condition), coh
+      still joins the raw timestamp — all 11 litmus verdicts unchanged,
+      plus `fwd_selfread_*` witnesses so the wire-in can't go vacuous.
+      Sanity: `wrun_v_disk`, `wrun_img`, `wrun_log_app` (append-only —
+      M1c's mono_list premise), SC-degeneracy `wread_all_seen`.
+      NOTE for M1b: `wm_tid` is stamped None inside `wrun` — make
+      wrun/wexec tid-parametric so the language layer stamps hart ids.
 - [ ] **M1b — the language** (`WeakLang.v`): `wgstate`, prim_step arms
       (hart via `wrun`, uart/disk/plic/power; disk reads coherent-latest
       as an interim until M5's device views), boot/crash reset of
