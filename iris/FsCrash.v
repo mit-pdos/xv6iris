@@ -950,6 +950,21 @@ Section fs_crash.
        ⌜fs_rec_wf r (fs_blocks dk) cov logstart⌝ ∗
        fs_arm γs logstart dk)%I.
 
+  (* THE CRASH PREDICATE AS ADEQUACY FIXES IT, at RAW gnames.  Adequacy
+     allocates the swap counter, the generation registry and the started
+     counter inside its own proof, so a client-chosen [Pc] can only name them
+     if they are PASSED to it -- which is what [HPc]'s three arguments are.
+     [γs] stays existential because the history gname is allocated under the
+     update, and the three seam equations are all any WAL fupd needs (they are
+     exactly what [fs_arm_acc] reads).  Stated HERE, in the section that must
+     stay [riscvFixedGS]-free, because this IS the value the fixed record's
+     [riscv_crash_pred] field is built from. *)
+  Definition P_fs_named (γsw γreg γst : gname) (cov : gset Z) (ls : Z)
+      (dk : Z -> bv 8) : iProp Σ :=
+    (∃ γs : fs_crash_names,
+       ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
+       P_fs γs cov ls dk)%I.
+
   (* -------------------------------------------------------------------- *)
   (* 3a. what [P_fs] SAYS                                                   *)
   (* -------------------------------------------------------------------- *)
@@ -1056,13 +1071,13 @@ Section fs_crash_seam.
      they are all a WAL fupd needs, since [fs_arm_acc] reads only
      [fcn_swap] / [fcn_reg] / [fcn_start]. *)
   Definition P_fs_any (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : iProp Σ :=
-    (∃ γs : fs_crash_names,
-       ⌜fcn_swap γs = riscv_swap_name /\ fcn_reg γs = riscv_registry_name /\
-        fcn_start γs = riscv_start_name⌝ ∗
-       P_fs γs cov ls dk)%I.
+    P_fs_named riscv_swap_name riscv_registry_name riscv_start_name cov ls dk.
 
   Global Instance P_fs_any_timeless cov ls dk : Timeless (P_fs_any cov ls dk).
-  Proof. rewrite /P_fs_any /P_fs /fs_arm /fs_custody /fs_hist_auth. apply _. Qed.
+  Proof.
+    rewrite /P_fs_any /P_fs_named /P_fs /fs_arm /fs_custody /fs_hist_auth.
+    apply _.
+  Qed.
 
   (* The client's persistent handle on "the crash predicate IS my [P_fs]".
      Adequacy discharges it by conversion when it instantiates [Pc]; every
@@ -1128,7 +1143,8 @@ Section fs_crash_seam.
     iDestruct ("Hseam" $! dk) as "[Hfwd _]".
     iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
       [iNext; by iApply "Hfwd"|].
-    iMod "HP". iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
     destruct Hseq as (Hsw & Hrg & Hstn).
     rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
     (* THE NEW DURABLE STATE, and the history extension *)
@@ -1153,7 +1169,7 @@ Section fs_crash_seam.
     iModIntro.
     iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
     iSplitL "Hhist Harm".
-    { iNext. iApply "Hbwd". rewrite /P_fs_any. iExists γs.
+    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
       iSplitR; [iPureIntro; done|].
       rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
       iFrame "Hhist". iSplitR; [| iExact "Harm"].

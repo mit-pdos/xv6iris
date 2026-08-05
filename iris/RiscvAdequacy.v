@@ -354,7 +354,7 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        parameter.  The seam equation the client gets back is that its own
        [fcn_swap] IS [riscv_swap_name] -- the same shape as
        [VirtioProto.disk_ghosts_alloc]'s [dn_img γ = disk_img_name]. *)
-    (Pc : gname -> (Z -> bv 8) -> iProp Σ)
+    (Pc : gname -> gname -> gname -> (Z -> bv 8) -> iProp Σ)
     (Hram : forall a b, g.(gmem) !! a = Some b -> addr_is_ram a)
     (* the SINGLE-GENERATION form (crash.md): the machine is already booted
        and running generation 0 -- the power thread is not in this pool, so
@@ -372,8 +372,9 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        obligation is exactly [FsCrash.P_fs_alloc].  The TIE's own half is NOT
        part of [Pc]: it is a sibling conjunct of [crash_inv]'s body,
        allocated and installed here. *)
-    (HPc : forall γsw : gname,
-       mono_nat_auth_own γsw 1 0%nat ⊢ |==> Pc γsw (v_disk (g.(gdev).(dvirtio)))) :
+    (HPc : forall γsw γreg γst : gname,
+       mono_nat_auth_own γsw 1 0%nat ⊢
+         |==> Pc γsw γreg γst (v_disk (g.(gdev).(dvirtio)))) :
   (forall HR : riscvGS Σ,
      ⊢ ([∗ set] c ∈ (fin_to_set CPU : gset CPU),
           [∗ set] r ∈ D c,
@@ -504,10 +505,11 @@ Proof.
   (* the crash-spanning invariant, over the client's [Pc] AND the tie's other
      half.  Allocated at the FIXED layer, so it outlives every era; both
      power arms leave it closed. *)
-  iMod (HPc γswap with "Hswap") as "HPc0".
+  iMod (HPc γswap γreg γstart with "Hswap") as "HPc0".
   iMod (inv_alloc crashN ⊤
           (∃ dk : Z -> bv 8,
-             ghost_var γtie (1/2)%Qp dk ∗ Pc γswap dk)%I with "[HtieC HPc0]")
+             ghost_var γtie (1/2)%Qp dk ∗ Pc γswap γreg γstart dk)%I
+          with "[HtieC HPc0]")
     as "#Hcinv".
   { iNext. iExists (v_disk (g.(gdev).(dvirtio))). iFrame "HtieC HPc0". }
   assert (Hemp0 : (∅ : gmap nat riscvEraGS) !! 0%nat = None)
@@ -516,7 +518,7 @@ Proof.
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
                (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
-                  _ _ γtie (Pc γswap) γswap)
+                  _ _ γtie (Pc γswap γreg γstart) γswap)
                E0).
   (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
      layer's boot client has the same raw inputs at a fresh era and reuses
@@ -657,9 +659,9 @@ Proof.
      anything but the completion arm, which finds the index move free. *)
   apply (riscv_system_adequacy Σ [] g
            (fun _ => {[ (sig_seip : register); (sig_meip : register) ]}) 0
-           (fun (_ : gname) (_ : Z -> bv 8) => True%I) Hram
+           (fun (_ _ _ : gname) (_ : Z -> bv 8) => True%I) Hram
            Hpow Hgen0 Hgid).
-  { iIntros (γsw) "_". iModIntro. done. }
+  { iIntros (γsw γreg γst) "_". iModIntro. done. }
   intros HR.
   iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
             #Hcinv & #Hcert)".
@@ -991,9 +993,10 @@ Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        which is what makes a durability property span power cycles.  Taken
        before [Hboot] so the [crash_inv] inside [power_boot_res] is this
        one. *)
-    (Pc : gname -> (Z -> bv 8) -> iProp Σ)
-    (HPc : forall γsw : gname,
-       mono_nat_auth_own γsw 1 0%nat ⊢ |==> Pc γsw (v_disk (g.(gdev).(dvirtio))))
+    (Pc : gname -> gname -> gname -> (Z -> bv 8) -> iProp Σ)
+    (HPc : forall γsw γreg γst : gname,
+       mono_nat_auth_own γsw 1 0%nat ⊢
+         |==> Pc γsw γreg γst (v_disk (g.(gdev).(dvirtio))))
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
     (* the client boots ANY era over ANY machine of the reset shape; what it
        is told about that machine is [RiscvLang.boot_facts] (RAM total and
@@ -1035,17 +1038,18 @@ Proof.
      the auth goes into the crash invariant beside the client's predicate --
      a fixed-layer invariant never dies, so it never strands. *)
   iMod (mono_nat_own_alloc 0%nat) as (γswap) "[Hswap _]".
-  iMod (HPc γswap with "Hswap") as "HPc0".
+  iMod (HPc γswap γreg γstart with "Hswap") as "HPc0".
   iMod (inv_alloc crashN ⊤
           (∃ dk : Z -> bv 8,
-             ghost_var γtie (1/2)%Qp dk ∗ Pc γswap dk)%I with "[HtieC HPc0]")
+             ghost_var γtie (1/2)%Qp dk ∗ Pc γswap γreg γstart dk)%I
+          with "[HtieC HPc0]")
     as "#Hcinv".
   { iNext. iExists (v_disk (g.(gdev).(dvirtio))). iFrame "HtieC HPc0". }
   (* no disk image map is allocated here: the machine starts POWERED OFF, so
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
   set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
-              _ _ γtie (Pc γswap) γswap).
+              _ _ γtie (Pc γswap γreg γstart) γswap).
   iModIntro.
   iExists
     (fun (g' : gstate) (_ : nat) (_ : list mobs) (_ : nat) =>

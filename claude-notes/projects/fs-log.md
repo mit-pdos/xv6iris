@@ -514,7 +514,7 @@ Two traps this stage cost, both silent:
   types that print identically except for the position of one binder; it has
   to sit exactly where the spec's own context puts it.
 
-### C2b/D1 stages 4-5 (remaining)
+### C2b/D1 stage 4 (remaining) — stage 5 is DONE
 
 4. The three real fupds at the WAL sites, currying the era mirror half +
    `swap_lb` and running `fs_arm_acc`; `Q` for write_head's commit is the new
@@ -529,13 +529,25 @@ Two traps this stage cost, both silent:
    `write_head`'s post to state the FULL header encoding
    (`hdr_dec bs' = (n, map uint W)`, an encoding proof over the copy loop) —
    the permit family's hypothesis is already the right place to hang it.
-5. `xv6_fs_adequacy` with the one initial-recovery hypothesis;
-   `xv6_power_adequacy` untouched. **`Pc`'s signature has to grow**: it is
-   `gname -> (Z -> bv 8) -> iProp Σ` today (only the swap gname is threaded),
-   but `P_fs_any`'s seam equations also name `riscv_registry_name` and
-   `riscv_start_name`, which `riscv_system_adequacy` allocates INSIDE its own
-   proof — so the client cannot mention them unless `HPc` passes them the way
-   it passes `γsw`.
+   Concretely, the encoding proof is a STRENGTHENING OF `wh_loop`'S
+   INVARIANT: it carries only the header's `n` field today
+   (`∀ jj < 4, f jj = nth_byte n jj`) and needs the copied entries as well
+   (`∀ i' < i, ∀ jj < 4, f (4 * S i' + jj) = nth_byte (W !!! i') jj`), which
+   the per-step `f' := bb_set f (4 * S i) w` maintains from the big-op's
+   `lh_block i ↦₄ w`; the exit then assembles `map uint W` with an
+   offset-parametric twin of `wh_take4`.
+5. **DONE — `xv6_fs_adequacy` (and `xv6_fs_adequacy_xv6Σ`) are proven**, with
+   `xv6_power_adequacy` untouched and BOTH footprints identical (the recorded
+   ten). `Pc`'s signature grew to `gname -> gname -> gname -> (Z -> bv 8) ->
+   iProp Σ` and `HPc` passes all three gnames — the registry and started
+   counters are allocated inside `riscv_system_adequacy`'s own proof, so a
+   client-chosen `Pc` can only name them if they are passed, exactly as `γsw`
+   already was. `FsCrash.P_fs_named γsw γreg γst cov ls dk` is that value
+   (stated in the `riscvFixedGS`-FREE section — it IS what the fixed record's
+   `riscv_crash_pred` field is built from), and `P_fs_any` is now its instance
+   at the record's own gnames. The theorem's ONE hypothesis is mkfs's:
+   `fs_recovery (fs_blocks (v_disk …)) D0 cov logstart`, discharged into the
+   record by `P_fs_alloc`. `xv6Σ` gained `fsCrashΣ`.
 
 ### Phase D — recovery + sys_sync
 
