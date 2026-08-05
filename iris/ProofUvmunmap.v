@@ -107,6 +107,15 @@ Definition uu_thr (mm m : regfile) : Prop :=
     c <> (mword_of_int 22 : mword 5) ->
     m !!! Regidx c = mm !!! Regidx c.
 
+(* s5 holds [do_free], and the [beq s5,zero] at +0x66 is the ONE place the
+   loop body branches on it: taken skips the PTE2PA/kfree block and lands
+   straight on the [sd zero,0(s1)] at +0x46, which is where the freeing arm
+   rejoins anyway.  So the whole [df] split is this predicate plus a
+   two-way [destruct] at that branch. *)
+Definition uu_s5 (df : bool) (m : regfile) : Prop :=
+  if df then m !!! Regidx (mword_of_int 21 : mword 5) <> (mword_of_int 0 : mword 64)
+        else m !!! Regidx (mword_of_int 21 : mword 5) = (mword_of_int 0 : mword 64).
+
 Definition uu_thr1 (mm m : regfile) : Prop :=
   forall c : mword 5, is_cs_idx c = true ->
     c <> csp_rs1 ->
@@ -416,24 +425,32 @@ Section ProofUvmunmap.
   (* ================================================================== *)
   Local Lemma uu_loop `{CID0 : CpuId} (γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
-      (um : gmap (mword 27) (mword 64)) (npages K : nat) (eb b : bool)
+      (um : gmap (mword 27) (mword 64)) (npages K : nat) (eb b df : bool)
       (p : mword 64) (C : iProp Σ) (va spr : mword 64) (ilvl : nat) :
     (22 <= K)%nat ->
     (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
-    (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z ->
+    (* the WIDE bound: the cursor stays inside the Sv39 user space and does
+       not wrap.  A fixed-leaf run ends AT the top of it. *)
+    (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z ->
     uptg_wf um ->
     fx_wf fx ->
+    (* which side of the leaf map every vpn of the run lives on.  This
+       REPLACES the old proof's derivation of [vpn < tf_vpn] from the range
+       premise: at [df = true] the caller derives it exactly that way, at
+       [df = false] it names the fixed leaf. *)
+    (forall k : nat, (k < npages)%nat -> uu_vpn_ok df (vpn_at (svpn_of va) k)) ->
     forall (rem done : nat) (m : regfile) (t : ptree)
            (m_ad : gmap (mword 27) (mword 64)),
     (1 <= rem)%nat -> (done + rem = npages)%nat ->
     pt_rep0 t m_ad ->
-    uptg_view fx (um_del_run um (svpn_of va) done) m_ad ->
+    uptg_view (uu_fx df fx (svpn_of va) done)
+              (uu_um df um (svpn_of va) done) m_ad ->
     pt_base t = uroot ->
     m !!! Regidx csp_rs1 = spr ->
     m !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done)) ->
     m !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages)) ->
     m !!! Regidx Rs4 = page_base uroot ->
-    m !!! Regidx Rs5 <> (mword_of_int 0 : mword 64) ->
+    uu_s5 df m ->
     m !!! Regidx Rs6 = (mword_of_int 4096 : mword 64) ->
     uu_thr mm m ->
     sie_cap_gpr m (K - 8) b p -∗
@@ -441,7 +458,7 @@ Section ProofUvmunmap.
     kernel_text -∗
     pc_is (mword_of_int (UU + 0x50) : mword 64) -∗
     ptree_own 2 (DfracOwn 1) t -∗
-    upt_pages_own (um_del_run um (svpn_of va) done) -∗
+    upt_pages_own (uu_um df um (svpn_of va) done) -∗
     kalloc_env γa None -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ mj : regfile,
@@ -450,11 +467,12 @@ Section ProofUvmunmap.
       sie_cap_gpr mj (K - 8) b p -∗
       cpu_own ilvl eb p C b -∗
       pc_is (mword_of_int (UU + 0x76) : mword 64) -∗
-      uptg fx uroot (um_del_run um (svpn_of va) npages) -∗
+      uptg (uu_fx df fx (svpn_of va) npages)
+           uroot (uu_um df um (svpn_of va) npages) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hilvl Hrange Hwf Hfx.
+    intros HK Hilvl Hrange Hwf Hfx Hside.
     intro rem.
     revert CID0.
     induction rem as [| rem' IH];
@@ -469,9 +487,9 @@ Section ProofUvmunmap.
     (* ---- the iteration's numeric facts ---- *)
     pose proof (bv_unsigned_in_range 64 va) as [Hva0 _].
     assert (Hdnp : (Z.of_nat done + 1 <= Z.of_nat npages)%Z) by lia.
-    destruct (z_run_iter (bv_unsigned va) (Z.of_nat done) (Z.of_nat npages)
+    destruct (z_run_iter_gen (bv_unsigned va) (Z.of_nat done) (Z.of_nat npages)
                 Hva0 (Nat2Z.is_nonneg done) Hdnp Hrange)
-      as (Hcnn & Hc38 & Hc64 & Hcvpn).
+      as (Hcnn & Hc38 & Hc64).
     assert (Hcuru : bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat done)))
                     = bv_unsigned va + 4096 * Z.of_nat done)
       by (apply pb_va_k_unsigned; exact Hc64).
@@ -485,15 +503,15 @@ Section ProofUvmunmap.
                  ltac:(rewrite uint_unsigned; rewrite Hcuru; exact Hc38)).
       rewrite uint_unsigned. rewrite Hcuru.
       rewrite Z.shiftr_div_pow2; [reflexivity | lia]. }
-    (* THE ONE THING THE LOOP NEEDS OF THE FIXED LEAVES: the vpn it is
-       about to clear is a USER vpn.  [BarePt.uptg_fixed_user_none] turns
-       this single inequality into "no fixed leaf lives here" at BOTH ends
-       of the [fx] axis, which is what makes the whole proof generic. *)
-    assert (Hvlt : (bv_unsigned (vpn_at (svpn_of va) done)
-                    < bv_unsigned tf_vpn)%Z).
-    { rewrite Hvpnu.
-      replace (bv_unsigned tf_vpn) with 67108862 by (vm_compute; reflexivity).
-      exact Hcvpn. }
+    (* THE ONE THING THE LOOP NEEDS OF THE FIXED LEAVES: which side of the
+       leaf map this vpn lives on.  It used to be DERIVED here, from the
+       range premise, and that is exactly what pinned uvmunmap to runs
+       strictly below the trapframe.  It is a hypothesis now
+       ([BarePt.uu_vpn_ok]); the user-run seals still derive it from the
+       range premise, and proc_freepagetable's two calls supply the other
+       side instead. *)
+    assert (Hvok : uu_vpn_ok df (vpn_at (svpn_of va) done))
+      by (apply Hside; lia).
     (* ---- the instruction facts ---- *)
     iPoseProof (uui_50 with "Htext") as "Hi50".
     iPoseProof (uui_52 with "Htext") as "Hi52".
@@ -519,17 +537,18 @@ Section ProofUvmunmap.
           /\ mt !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
           /\ mt !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages))
           /\ mt !!! Regidx Rs4 = page_base uroot
-          /\ mt !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)
+          /\ uu_s5 df mt
           /\ mt !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)
           /\ uu_thr mm mt
           /\ pt_rep0 t' m'
-          /\ uptg_view fx (um_del_run um (svpn_of va) (S done)) m'
+          /\ uptg_view (uu_fx df fx (svpn_of va) (S done))
+                       (uu_um df um (svpn_of va) (S done)) m'
           /\ pt_base t' = uroot ⌝ -∗
         sie_cap_gpr mt (K - 8) b p -∗
         cpu_own ilvl eb p C b -∗
         pc_is (mword_of_int (UU + 0x4a) : mword 64) -∗
         ptree_own 2 (DfracOwn 1) t' -∗
-        upt_pages_own (um_del_run um (svpn_of va) (S done)) -∗
+        upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[Hcont]" as "TAIL".
     { iIntros (CIDt Hst mt t' m').
       iIntros "(%Htsp & %Hts2 & %Hts3 & %Hts4 & %Hts5 & %Hts6 & %Htthr
@@ -552,8 +571,9 @@ Section ProofUvmunmap.
                       = add_vec va (mword_of_int (4096 * Z.of_nat npages))) by lkp.
       assert (HT1sp : T1 !!! Regidx csp_rs1 = spr) by lkp.
       assert (HT1s4 : T1 !!! Regidx Rs4 = page_base uroot) by lkp.
-      assert (HT1s5 : T1 !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
-      { rewrite /T1. rewrite upd_ne; [exact Hts5 | reg_neq]. }
+      assert (HT1s5 : uu_s5 df T1).
+      { rewrite /uu_s5 in Hts5 |- *. rewrite /T1.
+        destruct df; rewrite upd_ne; [exact Hts5 | reg_neq | exact Hts5 | reg_neq]. }
       assert (HT1s6 : T1 !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)) by lkp.
       assert (HT1thr : uu_thr mm T1).
       { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22. thr_peel. apply Htthr; assumption. }
@@ -575,8 +595,10 @@ Section ProofUvmunmap.
         iEval (rewrite Htgt76) in "Hpc".
         rewrite Hdn in Htview.
         iEval (rewrite Hdn) in "Hown".
-        iDestruct (uptg_rebuild fx uroot (um_del_run um (svpn_of va) npages)
-                     t' m' (uptg_wf_del_run um (svpn_of va) npages Hwf) Hfx
+        iDestruct (uptg_rebuild (uu_fx df fx (svpn_of va) npages) uroot
+                     (uu_um df um (svpn_of va) npages)
+                     t' m' (uu_um_wf df um (svpn_of va) npages Hwf)
+                     (uu_fx_wf df fx (svpn_of va) npages Hfx)
                      Htview Htrep Htbase with "Hptree Hown") as "Hpt".
         iDestruct (cpu_own_transport CIDt CIDv ilvl eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
@@ -589,11 +611,11 @@ Section ProofUvmunmap.
       assert (Hcmp : zopz0zKzJ_u (T1 !!! Regidx Rs2) (T1 !!! Regidx Rs3) = false).
       { rewrite HT1s2 HT1s3. apply bc_ltu.
         rewrite (pb_va_k_unsigned va (S done)
-                   ltac:(exact (proj1 (proj2 (proj2 (z_run_iter (bv_unsigned va)
+                   ltac:(exact (proj2 (proj2 (z_run_iter_gen (bv_unsigned va)
                             (Z.of_nat (S done)) (Z.of_nat npages) Hva0
-                            (Nat2Z.is_nonneg (S done)) ltac:(lia) Hrange))))) ).
+                            (Nat2Z.is_nonneg (S done)) ltac:(lia) Hrange)))) ).
         rewrite (pb_va_k_unsigned va npages
-                   ltac:(exact (z_run_end64 (bv_unsigned va) (Z.of_nat npages)
+                   ltac:(exact (z_run_end64_gen (bv_unsigned va) (Z.of_nat npages)
                            Hva0 (Nat2Z.is_nonneg npages) Hrange))).
         apply z_run_strict. lia. }
       iApply (wp_bgeu_fall_s_sconf Φ (mword_of_int (UU + 0x4c))
@@ -672,10 +694,7 @@ Section ProofUvmunmap.
     assert (HL4s3 : L4 !!! Regidx Rs3
                     = add_vec va (mword_of_int (4096 * Z.of_nat npages))) by lkp.
     assert (HL4s4 : L4 !!! Regidx Rs4 = page_base uroot) by lkp.
-    assert (HL4s5 : L4 !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
-    { rewrite /L4. rewrite upd_ne; [| reg_neq]. rewrite /L3. rewrite upd_ne; [| reg_neq].
-      rewrite /L2. rewrite upd_ne; [| reg_neq]. rewrite /L1. rewrite upd_ne; [| reg_neq].
-      exact Hs5. }
+    assert (HL4s5 : L4 !!! Regidx Rs5 = m !!! Regidx Rs5) by lkp.
     assert (HL4s6 : L4 !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)) by lkp.
     assert (HL4thr : uu_thr mm L4).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22. thr_peel. apply Hthr; assumption. }
@@ -707,7 +726,7 @@ Section ProofUvmunmap.
     assert (Hmws4 : mw !!! Regidx Rs4 = page_base uroot).
     { rewrite (callee_saved_lookup Hwcs Rs4 ltac:(vm_compute; reflexivity)).
       exact HL4s4. }
-    assert (Hmws5 : mw !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
+    assert (Hmws5 : mw !!! Regidx Rs5 = m !!! Regidx Rs5).
     { rewrite (callee_saved_lookup Hwcs Rs5 ltac:(vm_compute; reflexivity)).
       exact HL4s5. }
     assert (Hmws6 : mw !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)).
@@ -729,8 +748,9 @@ Section ProofUvmunmap.
     assert (HB1s3 : B1 !!! Regidx Rs3
                     = add_vec va (mword_of_int (4096 * Z.of_nat npages))) by lkp.
     assert (HB1s4 : B1 !!! Regidx Rs4 = page_base uroot) by lkp.
-    assert (HB1s5 : B1 !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
+    assert (HB1s5 : B1 !!! Regidx Rs5 = m !!! Regidx Rs5).
     { rewrite /B1. rewrite upd_ne; [exact Hmws5 | reg_neq]. }
+    assert (HB1s5' : uu_s5 df B1) by (rewrite /uu_s5 HB1s5; exact Hs5).
     assert (HB1s6 : B1 !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)) by lkp.
     assert (HB1thr : uu_thr mm B1).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22. thr_peel. apply Hmwthr; assumption. }
@@ -755,19 +775,14 @@ Section ProofUvmunmap.
                 with "Hcg Hpc Hi5c [-]").
       iNext. iIntros (CIDz Hsz) "Hcg Hpc".
       iEval (rewrite Htgt4a) in "Hpc".
-      assert (Hunone : um_del_run um (svpn_of va) done
-                       !! vpn_at (svpn_of va) done = None).
-      { exact (uptg_view_none fx (um_del_run um (svpn_of va) done) m_ad
-                 (vpn_at (svpn_of va) done) Hfx Hvlt Hview Hnone). }
-      assert (Hstep : um_del_run um (svpn_of va) (S done)
-                      = um_del_run um (svpn_of va) done).
-      { cbn [um_del_run]. apply delete_notin. exact Hunone. }
+      destruct (uu_step_absent df fx um m_ad (svpn_of va) done
+                  Hwf Hfx Hvok Hview Hnone) as (HstepF & Hstep).
       iDestruct (cpu_own_transport CID0 CIDz ilvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("TAIL" $! CIDz with "[%]"); [wp_next_chain|].
       iApply ("TAIL" $! B1 t m_ad with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; try assumption; try exact Hbase.
-        rewrite Hstep. exact Hview. }
+        rewrite HstepF Hstep. exact Hview. }
       { rewrite Hstep. iExact "Hown". } }
     (* ============ walk reached the L0 slot ============ *)
     iDestruct (ptree_own_level0_ro (DfracOwn 1) t (vpn_at (svpn_of va) done) p2 p1 w0 Hl0
@@ -837,9 +852,11 @@ Section ProofUvmunmap.
     assert (HB3s3 : B3 !!! Regidx Rs3
                     = add_vec va (mword_of_int (4096 * Z.of_nat npages))) by lkp.
     assert (HB3s4 : B3 !!! Regidx Rs4 = page_base uroot) by lkp.
-    assert (HB3s5 : B3 !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
+    assert (HB3s5 : B3 !!! Regidx Rs5 = m !!! Regidx Rs5).
     { rewrite /B3. rewrite upd_ne; [| reg_neq]. rewrite /B2. rewrite upd_ne; [| reg_neq].
       exact HB1s5. }
+    assert (HB3s5' : uu_s5 df B3)
+      by (rewrite /uu_s5 HB3s5; exact Hs5).
     assert (HB3s6 : B3 !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)) by lkp.
     assert (HB3thr : uu_thr mm B3).
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22. thr_peel. apply Hmwthr; assumption. }
@@ -861,19 +878,14 @@ Section ProofUvmunmap.
                 with "Hcg Hpc Hi64 [-]").
       iNext. iIntros (CIDz4 Hsz4) "Hcg Hpc".
       iEval (rewrite Htgt4a') in "Hpc".
-      assert (Hunone : um_del_run um (svpn_of va) done
-                       !! vpn_at (svpn_of va) done = None).
-      { exact (uptg_view_none fx (um_del_run um (svpn_of va) done) m_ad
-                 (vpn_at (svpn_of va) done) Hfx Hvlt Hview Hnone). }
-      assert (Hstep : um_del_run um (svpn_of va) (S done)
-                      = um_del_run um (svpn_of va) done).
-      { cbn [um_del_run]. apply delete_notin. exact Hunone. }
+      destruct (uu_step_absent df fx um m_ad (svpn_of va) done
+                  Hwf Hfx Hvok Hview Hnone) as (HstepF & Hstep).
       iDestruct (cpu_own_transport CID0 CIDz4 ilvl eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
       iSpecialize ("TAIL" $! CIDz4 with "[%]"); [wp_next_chain|].
       iApply ("TAIL" $! B3 t m_ad with "[%] Hcg Hcnt Hpc Hptree [Hown]").
       { split_and!; try assumption; try exact Hbase.
-        rewrite Hstep. exact Hview. }
+        rewrite HstepF Hstep. exact Hview. }
       { rewrite Hstep. iExact "Hown". } }
     (* ---- the vpn IS mapped: free its page and clear the leaf ---- *)
     assert (Hv0 : pte_valid w0).
@@ -897,9 +909,115 @@ Section ProofUvmunmap.
     assert (Hp66 : add_vec_int (mword_of_int (UU + 0x64) : mword 64) 2
                    = mword_of_int (UU + 0x66)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp66) in "Hpc".
+    (* ================================================================ *)
+    (*  THE +0x46 STORE, SHARED BY BOTH do_free ARMS.                    *)
+    (*  do_free != 0 falls through +0x6a..+0x72 (PTE2PA, then kfree) and  *)
+    (*  reaches the store by the [c.j] at +0x74; do_free == 0 takes the   *)
+    (*  [beq] at +0x66 straight to it.  Everything from the store on --   *)
+    (*  the tree update, the view move, the +0x4a join -- is identical,   *)
+    (*  which is why the whole [df] split is ONE [destruct] here.         *)
+    (* ================================================================ *)
+    iAssert (wp_next b p (fun (CIDs : CpuId) =>
+        ∀ ms : regfile,
+        ⌜ ms !!! Regidx csp_rs1 = spr
+          /\ ms !!! Regidx Rs1 = mw !!! Regidx Ra0
+          /\ ms !!! Regidx Rs2 = add_vec va (mword_of_int (4096 * Z.of_nat done))
+          /\ ms !!! Regidx Rs3 = add_vec va (mword_of_int (4096 * Z.of_nat npages))
+          /\ ms !!! Regidx Rs4 = page_base uroot
+          /\ uu_s5 df ms
+          /\ ms !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)
+          /\ uu_thr mm ms ⌝ -∗
+        sie_cap_gpr ms (K - 8) b p -∗
+        cpu_own ilvl eb p C b -∗
+        pc_is (mword_of_int (UU + 0x46) : mword 64) -∗
+        ptree_own 2 (DfracOwn 1) t -∗
+        upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
+        WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[TAIL]" as "STORE".
+    { iIntros (CIDs Hss ms).
+      iIntros "(%Hmksp & %Hss1 & %Hmks2 & %Hmks3 & %Hmks4 & %Hmks5 & %Hmks6 & %Hmkthr)
+               Hcg Hcnt Hpc Hptree Hown".
+      (* the instruction fact must be re-posed INSIDE: the outer
+         [iPoseProof]s are spatial and the [with "[TAIL]"] clause does not
+         carry them in (durable-notes). *)
+      iPoseProof (uui_46 with "Htext") as "Hi46s".
+      (* --- +0x46 sd zero,0(s1) : *pte = 0 --- *)
+      iDestruct (ptree_own_level0_upd (DfracOwn 1) t (vpn_at (svpn_of va) done) p2 p1 w0 Hl0
+                   with "Hptree") as "(_ & Hcell & Hupd)".
+      iDestruct (pt_slot_phys_to_mem (u_next_base p1) (vpn_idx 0 (vpn_at (svpn_of va) done))
+                   (DfracOwn 1) w0 with "Hcl0 Hcell") as "Hcell".
+      assert (Hzoff : forall X : mword 64,
+          add_vec X (sign_extend' 64 (mword_of_int 0 : mword 12)) = X).
+      { intro X.
+        replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
+          with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
+        apply kv_addv_zero. }
+      iApply (wp_sd_zero_s_sconf Φ (mword_of_int (UU + 0x46)) Rs1
+                (mword_of_int 0 : mword 12) ms (K - 8) w0 b
+                with "Hcg Hpc Hi46s [Hcell] [-]").
+      { iEval (rewrite Hzoff; rgne; rewrite Hss1 Ha0v). iExact "Hcell". }
+      iIntros (CIDk3 Hsk3) "Hcg Hpc Hcell".
+      iEval (rewrite Hzoff; rgne; rewrite Hss1 Ha0v) in "Hcell".
+      assert (Hzr : (zero_reg : mword 64) = mword_of_int 0)
+        by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hzr) in "Hcell".
+      iDestruct (pt_slot_mem_to_phys (u_next_base p1) (vpn_idx 0 (vpn_at (svpn_of va) done))
+                   (DfracOwn 1) (mword_of_int 0) with "Hcl0 Hcell") as "Hcell".
+      iDestruct ("Hupd" $! (mword_of_int 0) with "Hcell") as "Hptree".
+      assert (Hp4a : add_vec_int (mword_of_int (UU + 0x46) : mword 64) 4
+                     = mword_of_int (UU + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hp4a) in "Hpc".
+      (* --- the new tree / map / view / descriptor --- *)
+      assert (HrepS : pt_rep0 (ptree_set_leaf t (vpn_at (svpn_of va) done) (mword_of_int 0))
+                              (delete (vpn_at (svpn_of va) done) m_ad))
+        by (exact (pt_rep0_delete t m_ad (vpn_at (svpn_of va) done) p2 p1 w0 Hrep Hl0)).
+      assert (HbaseS : pt_base (ptree_set_leaf t (vpn_at (svpn_of va) done) (mword_of_int 0))
+                       = uroot)
+        by (rewrite ptree_set_leaf_base; exact Hbase).
+      assert (HviewS : uptg_view (uu_fx df fx (svpn_of va) (S done))
+                (uu_um df um (svpn_of va) (S done))
+                (delete (vpn_at (svpn_of va) done) m_ad)).
+      { exact (uu_step_delete df fx um m_ad (svpn_of va) done
+                 Hwf Hfx Hvok Hview). }
+      iDestruct (cpu_own_transport CIDs CIDk3 ilvl eb p C b ltac:(wp_next_chain)
+                   with "Hcnt") as "Hcnt".
+      iSpecialize ("TAIL" $! CIDk3 with "[%]"); [wp_next_chain|].
+      iApply ("TAIL" $! ms (ptree_set_leaf t (vpn_at (svpn_of va) done) (mword_of_int 0))
+                          (delete (vpn_at (svpn_of va) done) m_ad)
+                with "[%] Hcg Hcnt Hpc Hptree [Hown]").
+      { split_and!; assumption. }
+      { iExact "Hown". }
+    }
+    destruct df.
+    2:{ (* ============ do_free == 0: NOTHING is freed ============ *)
+      (* proc_freepagetable's two calls and proc_pagetable's second failure
+         tail land here.  The leaf being cleared is a FIXED one, whose page
+         is kernel text (trampoline) or belongs to [proc_priv] (trapframe),
+         so there is no [page_own] to hand kfree and no [upt_pages_own] to
+         shrink -- which is exactly why the branch skips the call. *)
+      assert (Hs5z : eq_vec (rget B3 Rs5) zero_reg = true).
+      { rgne. rewrite HB3s5. rewrite /uu_s5 in Hs5. rewrite Hs5.
+        exact bc_moi_iszero. }
+      iApply (wp_beqz_x0_taken_s_sconf Φ (mword_of_int (UU + 0x66))
+                (mword_of_int 8160 : mword 13) Rs5 B3 (K - 8) b
+                ltac:(vm_compute; discriminate) Hs5z
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi66 [-]").
+      iNext. iIntros (CIDz6 Hsz6) "Hcg Hpc".
+      assert (Htgt46' : add_vec (mword_of_int (UU + 0x66) : mword 64)
+                (sign_extend' 64 (mword_of_int 8160 : mword 13))
+              = mword_of_int (UU + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Htgt46') in "Hpc".
+      iDestruct (cpu_own_transport CID0 CIDz6 ilvl eb p C b ltac:(wp_next_chain)
+                   with "Hcnt") as "Hcnt".
+      iSpecialize ("STORE" $! CIDz6 with "[%]"); [wp_next_chain|].
+      iApply ("STORE" $! B3 with "[%] Hcg Hcnt Hpc Hptree [Hown]").
+      { split_and!; assumption. }
+      { iExact "Hown". } }
+    (* ============ do_free != 0: PTE2PA, kfree, then the store ========= *)
     (* --- +0x66 beq s5,zero : do_free != 0, so NOT taken --- *)
     assert (Hs5nz : eq_vec (rget B3 Rs5) zero_reg = false).
-    { rgne. apply eq_vec_false_iff. intro He. apply HB3s5.
+    { rgne. rewrite HB3s5. apply eq_vec_false_iff. intro He.
+      rewrite /uu_s5 in Hs5. apply Hs5.
       rewrite He. apply bv_eq; vm_compute; reflexivity. }
     iApply (wp_beqz_x0_fall_s_sconf Φ (mword_of_int (UU + 0x66))
               (mword_of_int 8160 : mword 13) Rs5 B3 (K - 8) b
@@ -949,7 +1067,7 @@ Section ProofUvmunmap.
     iEval (rewrite Hp70) in "Hpc".
     (* --- the page comes OUT of the invariant --- *)
     destruct (uptg_view_um fx (um_del_run um (svpn_of va) done) m_ad
-                (vpn_at (svpn_of va) done) w0 Hfx Hvlt Hview Hsome)
+                (vpn_at (svpn_of va) done) w0 Hfx Hvok Hview Hsome)
       as (wu & au & du & Humsome & Hw0ad).
     assert (Hppn : pte_ppn w0 = pte_ppn wu)
       by (rewrite Hw0ad; apply pte_ppn_set_ad).
@@ -984,7 +1102,7 @@ Section ProofUvmunmap.
     assert (HB6s3 : B6 !!! Regidx Rs3
                     = add_vec va (mword_of_int (4096 * Z.of_nat npages))) by lkp.
     assert (HB6s4 : B6 !!! Regidx Rs4 = page_base uroot) by lkp.
-    assert (HB6s5 : B6 !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
+    assert (HB6s5 : B6 !!! Regidx Rs5 = m !!! Regidx Rs5).
     { rewrite /B6. rewrite upd_ne; [| reg_neq]. rewrite /B5. rewrite upd_ne; [| reg_neq].
       rewrite /B4. rewrite upd_ne; [| reg_neq]. exact HB3s5. }
     assert (HB6s6 : B6 !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)) by lkp.
@@ -1019,9 +1137,10 @@ Section ProofUvmunmap.
     assert (Hmks4 : mk !!! Regidx Rs4 = page_base uroot).
     { rewrite (callee_saved_lookup Hkcs Rs4 ltac:(vm_compute; reflexivity)).
       exact HB6s4. }
-    assert (Hmks5 : mk !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
-    { rewrite (callee_saved_lookup Hkcs Rs5 ltac:(vm_compute; reflexivity)).
-      exact HB6s5. }
+    assert (Hmks5 : uu_s5 true mk).
+    { rewrite /uu_s5.
+      rewrite (callee_saved_lookup Hkcs Rs5 ltac:(vm_compute; reflexivity)).
+      rewrite HB6s5. rewrite /uu_s5 in Hs5. exact Hs5. }
     assert (Hmks6 : mk !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)).
     { rewrite (callee_saved_lookup Hkcs Rs6 ltac:(vm_compute; reflexivity)).
       exact HB6s6. }
@@ -1039,53 +1158,12 @@ Section ProofUvmunmap.
                  (concat_vec (mword_of_int 2025 : mword 11) ('b"0"))))
             = mword_of_int (UU + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt46) in "Hpc".
-    (* --- +0x46 sd zero,0(s1) : *pte = 0 --- *)
-    iDestruct (ptree_own_level0_upd (DfracOwn 1) t (vpn_at (svpn_of va) done) p2 p1 w0 Hl0
-                 with "Hptree") as "(_ & Hcell & Hupd)".
-    iDestruct (pt_slot_phys_to_mem (u_next_base p1) (vpn_idx 0 (vpn_at (svpn_of va) done))
-                 (DfracOwn 1) w0 with "Hcl0 Hcell") as "Hcell".
-    assert (Hzoff : forall X : mword 64,
-        add_vec X (sign_extend' 64 (mword_of_int 0 : mword 12)) = X).
-    { intro X.
-      replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
-        with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
-      apply kv_addv_zero. }
-    iApply (wp_sd_zero_s_sconf Φ (mword_of_int (UU + 0x46)) Rs1
-              (mword_of_int 0 : mword 12) mk (K - 8) w0 b
-              with "Hcg Hpc Hi46 [Hcell] [-]").
-    { iEval (rewrite Hzoff; rgne; rewrite Hmks1 Ha0v). iExact "Hcell". }
-    iIntros (CIDk3 Hsk3) "Hcg Hpc Hcell".
-    iEval (rewrite Hzoff; rgne; rewrite Hmks1 Ha0v) in "Hcell".
-    assert (Hzr : (zero_reg : mword 64) = mword_of_int 0)
-      by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hzr) in "Hcell".
-    iDestruct (pt_slot_mem_to_phys (u_next_base p1) (vpn_idx 0 (vpn_at (svpn_of va) done))
-                 (DfracOwn 1) (mword_of_int 0) with "Hcl0 Hcell") as "Hcell".
-    iDestruct ("Hupd" $! (mword_of_int 0) with "Hcell") as "Hptree".
-    assert (Hp4a : add_vec_int (mword_of_int (UU + 0x46) : mword 64) 4
-                   = mword_of_int (UU + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hp4a) in "Hpc".
-    (* --- the new tree / map / view / descriptor --- *)
-    assert (HrepS : pt_rep0 (ptree_set_leaf t (vpn_at (svpn_of va) done) (mword_of_int 0))
-                            (delete (vpn_at (svpn_of va) done) m_ad))
-      by (exact (pt_rep0_delete t m_ad (vpn_at (svpn_of va) done) p2 p1 w0 Hrep Hl0)).
-    assert (HbaseS : pt_base (ptree_set_leaf t (vpn_at (svpn_of va) done) (mword_of_int 0))
-                     = uroot)
-      by (rewrite ptree_set_leaf_base; exact Hbase).
-    assert (HviewS : uptg_view fx
-              (um_del_run um (svpn_of va) (S done))
-              (delete (vpn_at (svpn_of va) done) m_ad)).
-    { cbn [um_del_run].
-      exact (uptg_view_delete fx (um_del_run um (svpn_of va) done)
-               m_ad (vpn_at (svpn_of va) done) Hfx Hvlt Hview). }
-    iDestruct (cpu_own_transport CIDk1 CIDk3 ilvl eb p C b ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CIDk1 CIDk2 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iSpecialize ("TAIL" $! CIDk3 with "[%]"); [wp_next_chain|].
-    iApply ("TAIL" $! mk (ptree_set_leaf t (vpn_at (svpn_of va) done) (mword_of_int 0))
-                        (delete (vpn_at (svpn_of va) done) m_ad)
-              with "[%] Hcg Hcnt Hpc Hptree [Hown]").
+    iSpecialize ("STORE" $! CIDk2 with "[%]"); [wp_next_chain|].
+    iApply ("STORE" $! mk with "[%] Hcg Hcnt Hpc Hptree [Hown]").
     { split_and!; assumption. }
-    { cbn [um_del_run]. iExact "Hown". }
+    { iExact "Hown". }
   Qed.
 
   (* ================================================================== *)
@@ -1097,7 +1175,7 @@ Section ProofUvmunmap.
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (ilvl : nat) (b : bool) :
+      (C : iProp Σ) (ilvl : nat) (b df : bool) :
     let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
     let va := mm !!! Regidx (mword_of_int 11) in
     let vpn0 := svpn_of va in
@@ -1107,8 +1185,14 @@ Section ProofUvmunmap.
     mm !!! Regidx (mword_of_int 10) = page_base uroot ->
     subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
     mm !!! Regidx (mword_of_int 12) = (mword_of_int (Z.of_nat npages) : mword 64) ->
-    mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64) ->
-    (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
+    (* do_free, as the boolean the whole proof is indexed by *)
+    (if df then mm !!! Regidx (mword_of_int 13) <> (mword_of_int 0 : mword 64)
+           else mm !!! Regidx (mword_of_int 13) = (mword_of_int 0 : mword 64)) ->
+    (* the run stays inside the Sv39 user space and does not wrap.  This is
+       WIDER than [uvm_maxsz]: a fixed-leaf run ends AT the top of it. *)
+    (uint va + Z.of_nat npages * 4096 <= 2 ^ 38)%Z ->
+    (* ...and which side of the leaf map its vpns are on *)
+    (forall k : nat, (k < npages)%nat -> uu_vpn_ok df (vpn_at vpn0 k)) ->
     sie_cap_gpr mm K b p -∗
     cpu_own ilvl eb p C b -∗
     kernel_text -∗
@@ -1121,18 +1205,18 @@ Section ProofUvmunmap.
       cpu_own ilvl eb p C b -∗
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
-      uptg fx uroot (um_del_run um vpn0 npages) -∗
+      uptg (uu_fx df fx vpn0 npages) uroot (uu_um df um vpn0 npages) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange.
+    intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hside.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
     set (spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))).
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
     (* ---- the range premise, as plain [Z] ---- *)
-    assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
-    { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
-      change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
+    assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877906944)%Z).
+    { rewrite uint_unsigned in Hrange.
+      change (2 ^ 38)%Z with 274877906944%Z in Hrange. exact Hrange. }
     assert (Hva12 : bv_unsigned va mod 4096 = 0) by (apply aligned12_unsigned; exact Hval).
     pose proof (bv_unsigned_in_range 64 va) as [Hva0 _].
     iPoseProof (uui_00 with "Htext") as "Hi00".
@@ -1402,10 +1486,11 @@ Section ProofUvmunmap.
       rewrite /R7. rewrite upd_ne; [| reg_neq]. rewrite /R6. rewrite upd_ne; [| reg_neq].
       rewrite /R5. rewrite upd_ne; [| reg_neq]. rewrite /R4 upd_eq.
       rewrite add_vec_zero_l. lkp0. exact Hroot. }
-    assert (HR9s5 : R9 !!! Regidx Rs5 <> (mword_of_int 0 : mword 64)).
-    { rewrite /R9. rewrite upd_ne; [| reg_neq]. rewrite /R8. rewrite upd_ne; [| reg_neq].
-      rewrite /R7. rewrite upd_ne; [| reg_neq]. rewrite /R6 upd_eq.
-      rewrite add_vec_zero_l. lkp0. exact Hdf. }
+    assert (HR9s5 : uu_s5 df R9).
+    { rewrite /uu_s5. destruct df;
+        (rewrite /R9; rewrite upd_ne; [| reg_neq]; rewrite /R8; rewrite upd_ne; [| reg_neq];
+         rewrite /R7; rewrite upd_ne; [| reg_neq]; rewrite /R6 upd_eq;
+         rewrite add_vec_zero_l; lkp0; exact Hdf). }
     assert (HR9s6 : R9 !!! Regidx Rs6 = (mword_of_int 4096 : mword 64)) by lkp.
     assert (HR9thr1 : uu_thr1 mm R9).
     { intros c Hc H2 H8 H18 H19 H20 H21 H22. thr_peel. reflexivity. }
@@ -1413,7 +1498,7 @@ Section ProofUvmunmap.
     assert (Hends : bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat npages)))
                     = bv_unsigned va + 4096 * Z.of_nat npages).
     { apply pb_va_k_unsigned.
-      exact (z_run_end64 (bv_unsigned va) (Z.of_nat npages) Hva0
+      exact (z_run_end64_gen (bv_unsigned va) (Z.of_nat npages) Hva0
                (Nat2Z.is_nonneg npages) Hrz). }
     destruct (Nat.eq_dec npages 0) as [Hnp0 | Hnppos].
     { (* ============ npages == 0: nothing to do ============ *)
@@ -1438,7 +1523,8 @@ Section ProofUvmunmap.
       iSpecialize ("Hcont" $! CIDr2 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! mf with "Hcg Hcnt Hpc [%] [Hpt]").
       { exact Hcs. }
-      { rewrite Hnp0 um_del_run_0. iExact "Hpt". } }
+      { rewrite Hnp0. rewrite /uu_fx /uu_um.
+        destruct df; rewrite um_del_run_0; iExact "Hpt". } }
     (* ============ npages >= 1: run the loop ============ *)
     assert (Hcmp : zopz0zKzJ_u (R9 !!! Regidx Ra1) (R9 !!! Regidx Rs3) = false).
     { rewrite HR9a1 HR9s3. apply bc_ltu. rewrite Hends.
@@ -1487,12 +1573,14 @@ Section ProofUvmunmap.
     { intros c Hc H2 H8 H9 H18 H19 H20 H21 H22. apply HR9thr1; assumption. }
     iDestruct (cpu_own_transport CID CIDr5 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (uu_loop γa Φ mm fx uroot um npages K eb b p C va spr ilvl HK Hilvl Hrz Hwf Hfx
+    iApply (uu_loop γa Φ mm fx uroot um npages K eb b df p C va spr ilvl
+              HK Hilvl Hrz Hwf Hfx Hside
               npages 0%nat R9 t m_ad ltac:(lia) ltac:(lia) Hrep
-              ltac:(rewrite um_del_run_0; exact Hview) Hbase
+              ltac:(rewrite /uu_fx /uu_um; destruct df;
+                    rewrite um_del_run_0; exact Hview) Hbase
               HR9sp HR9s2' HR9s3 HR9s4 HR9s5 HR9s6 HR9thr
               with "Hcg Hcnt Htext Hpc Hptree [Hown] Henv [-]").
-    { cbn [um_del_run]. iExact "Hown". }
+    { rewrite /uu_um. destruct df; [cbn [um_del_run] |]; iExact "Hown". }
     iIntros (CIDr6 Hsr6 mj) "%Hjsp %Hjthr Hcg Hcnt Hpc Hpt".
     (* --- +0x76 c.ldsp s1,40(sp) --- *)
     iApply (wp_cldsp_s_sconf Φ (mword_of_int (UU + 0x76)) (mword_of_int 5 : mword 6) Rs1
@@ -1532,6 +1620,54 @@ End UvmunmapCore.
 (* THE SEALS.  One proof; each [Module Type] pins [fx] to one literal.   *)
 (* ===================================================================== *)
 
+(* The USER-run seals' side condition, derived from the range premise they
+   already carry: every vpn a run below the trapframe clears is a user vpn.
+   This derivation used to live INSIDE the loop body, which is precisely
+   what pinned uvmunmap to user runs; hoisting it here is what lets the
+   same loop clear a fixed leaf for a caller that can say so. *)
+(* the range relaxation, as a CLOSED [Z] fact.  Inline [lia] fails here with
+   "Cannot find witness": the seal's context is mword-laden and the zify hook
+   tries to decompose the bitvector terms (durable-notes). *)
+Lemma uu_range_wide_Z (a : Z) : (a <= 2 ^ 38 - 8192)%Z -> (a <= 2 ^ 38)%Z.
+Proof. lia. Qed.
+
+Lemma uu_range_wide (va : mword 64) (npages : nat) :
+  (uint va + Z.of_nat npages * 4096 <= uvm_maxsz)%Z ->
+  (uint va + Z.of_nat npages * 4096 <= 2 ^ 38)%Z.
+Proof. rewrite /uvm_maxsz. apply uu_range_wide_Z. Qed.
+
+(* [ProcPt.vpn_at_0], reproved here rather than importing ProcPt (the
+   CONSTRUCTION side) into a teardown proof. *)
+Lemma uu_vpn_at_0 (v : mword 27) : vpn_at v 0 = v.
+Proof. apply bv_eq. apply vpn_at_0_bv. Qed.
+
+Lemma uu_side_user (va : mword 64) (npages : nat) :
+  (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z ->
+  forall k : nat, (k < npages)%nat -> uu_vpn_ok true (vpn_at (svpn_of va) k).
+Proof.
+  intros Hrange k Hk. rewrite /uu_vpn_ok.
+  pose proof (bv_unsigned_in_range 64 va) as [Hva0 _].
+  assert (Hdnp : (Z.of_nat k + 1 <= Z.of_nat npages)%Z) by lia.
+  destruct (z_run_iter (bv_unsigned va) (Z.of_nat k) (Z.of_nat npages)
+              Hva0 (Nat2Z.is_nonneg k) Hdnp Hrange) as (Hcnn & Hc38 & Hc64 & Hcvpn).
+  assert (Hcuru : bv_unsigned (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+                  = bv_unsigned va + 4096 * Z.of_nat k)
+    by (apply pb_va_k_unsigned; exact Hc64).
+  assert (Hvpne : svpn_of (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+                  = vpn_at (svpn_of va) k)
+    by (apply svpn_of_run; exact Hc38).
+  assert (Hvpnu : bv_unsigned (vpn_at (svpn_of va) k)
+                  = (bv_unsigned va + 4096 * Z.of_nat k) / 4096).
+  { rewrite <- Hvpne.
+    rewrite (svpn_of_unsigned_lo (add_vec va (mword_of_int (4096 * Z.of_nat k)))
+               ltac:(rewrite uint_unsigned; rewrite Hcuru; exact Hc38)).
+    rewrite uint_unsigned. rewrite Hcuru.
+    rewrite Z.shiftr_div_pow2; [reflexivity | lia]. }
+  rewrite Hvpnu.
+  replace (bv_unsigned tf_vpn) with 67108862 by (vm_compute; reflexivity).
+  exact Hcvpn.
+Qed.
+
 Module UvmunmapProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE) : UVMUNMAP.
 
 Module Core := UvmunmapCore WalkNoalloc Kfree.
@@ -1553,11 +1689,15 @@ Section SealUvmunmap.
     cbv beta delta [wp_uvmunmap_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange.
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
+    { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
+      change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
     iDestruct (proc_pt_wf_get P with "Hpt") as %Hwf.
     destruct Hwf as (_ & Hacc & _ & _ & Htfv).
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
     iApply (Core.wp_uvmunmap_gen γa Φ mm (upt_fixed_both P.(ud_tfp)) P.(ud_root)
-              P.(ud_um) npages K eb p C ilvl b HK Hilvl Hroot Hval Hnpr Hdf Hrange
+              P.(ud_um) npages K eb p C ilvl b true HK Hilvl Hroot Hval Hnpr Hdf
+              (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz)
               with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
     iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
@@ -1593,9 +1733,13 @@ Section SealUvmunmapBare.
     cbv beta delta [wp_uvmunmap_bare_sconf_body].
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange.
     iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    assert (Hrz : (bv_unsigned va + Z.of_nat npages * 4096 <= 274877898752)%Z).
+    { unfold uvm_maxsz in Hrange. rewrite uint_unsigned in Hrange.
+      change (2 ^ 38 - 8192)%Z with 274877898752%Z in Hrange. exact Hrange. }
     iEval (rewrite /bare_pt) in "Hpt".
-    iApply (Core.wp_uvmunmap_gen γa Φ mm ∅ uroot um npages K eb p C ilvl b
-              HK Hilvl Hroot Hval Hnpr Hdf Hrange
+    iApply (Core.wp_uvmunmap_gen γa Φ mm ∅ uroot um npages K eb p C ilvl b true
+              HK Hilvl Hroot Hval Hnpr Hdf
+              (uu_range_wide va npages Hrange) (uu_side_user va npages Hrz)
               with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
     iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
     iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
@@ -1607,3 +1751,53 @@ Section SealUvmunmapBare.
 End SealUvmunmapBare.
 
 End UvmunmapBareProof.
+
+(* --------------------------------------------------------------------- *)
+(* THE THIRD SEAL: the fixed-leaf unmap.  Same code, same proof, [df] at  *)
+(* [false] -- so the [beq s5,zero] at +0x66 is TAKEN, the PTE2PA/kfree    *)
+(* block is skipped, and the deletion lands on [fx] instead of [um].      *)
+(* --------------------------------------------------------------------- *)
+
+Module UvmunmapFixedProof (WalkNoalloc : WALK_NOALLOC) (Kfree : KFREE)
+  : UVMUNMAP_FIXED.
+
+Module Core := UvmunmapCore WalkNoalloc Kfree.
+
+Section SealUvmunmapFixed.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma wp_uvmunmap_fixed_sconf
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
+      (um : gmap (mword 27) (mword 64)) (v : mword 27)
+      (K : nat) (eb : bool) (p : mword 64)
+      (C : iProp Σ) (ilvl : nat) (b : bool)
+    : wp_uvmunmap_fixed_sconf_body γa Φ mm fx uroot um v K eb p C ilvl b.
+  Proof.
+    cbv beta delta [wp_uvmunmap_fixed_sconf_body].
+    intros pcE va ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hv Hfixed Hrange.
+    iIntros "Hcg Hcnt #Htext Hpc Hpt Henv Hcont".
+    (* the run is ONE page, so the only vpn it clears is [svpn_of va] itself
+       ([vpn_at _ 0]), which the caller has named as a fixed leaf. *)
+    assert (Hside : forall k : nat, (k < 1)%nat ->
+                      uu_vpn_ok false (vpn_at (svpn_of va) k)).
+    { intros k Hk. assert (Hk0 : k = 0%nat) by lia. rewrite Hk0 uu_vpn_at_0.
+      rewrite /uu_vpn_ok Hv. exact Hfixed. }
+    iApply (Core.wp_uvmunmap_gen γa Φ mm fx uroot um 1%nat K eb p C ilvl b false
+              HK Hilvl Hroot Hval
+              ltac:(rewrite Hnpr; reflexivity) Hdf Hrange Hside
+              with "Hcg Hcnt Htext Hpc Hpt Henv [-]").
+    iIntros (CID1 Hs1 mr) "Hcg Hcnt Hpc %Hcs Hpt".
+    iSpecialize ("Hcont" $! CID1 with "[%]"); [wp_next_chain|].
+    iApply ("Hcont" $! mr with "Hcg Hcnt Hpc [%] [Hpt]").
+    { exact Hcs. }
+    (* [uu_fx false fx vpn0 1] is [delete (vpn_at vpn0 0) fx]; [uu_um false]
+       is [um] untouched. *)
+    rewrite /uu_fx /uu_um. cbn [um_del_run]. rewrite uu_vpn_at_0 Hv.
+    iExact "Hpt".
+  Qed.
+
+End SealUvmunmapFixed.
+
+End UvmunmapFixedProof.

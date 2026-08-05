@@ -65,6 +65,8 @@ Require Import CpuOwn.
 Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
+Require Import KptExecMap TrampPt.
+Require Import UptTree.
 Require Import ProcPtOwn.
 Require Import BarePt.
 From Kernel Require KernelSyms.
@@ -179,3 +181,88 @@ Module Type UVMUNMAP_BARE.
       (C : iProp Σ) (ilvl : nat) (b : bool),
       wp_uvmunmap_bare_sconf_body γa Φ mm uroot um npages K eb p C ilvl b.
 End UVMUNMAP_BARE.
+
+(* --------------------------------------------------------------------- *)
+(* THE FIXED-LEAF INSTANCE.  proc_freepagetable's two [do_free = 0] calls  *)
+(*                                                                        *)
+(*     uvmunmap(pagetable, TRAMPOLINE, 1, 0)                              *)
+(*     uvmunmap(pagetable, TRAPFRAME,  1, 0)                              *)
+(*                                                                        *)
+(* and proc_pagetable's second mappages failure tail, which unmaps the     *)
+(* trampoline it had just installed.  This is the ONE contract in the tree *)
+(* that takes a leaf OUT of the fixed set -- that turns a table which      *)
+(* still satisfies the user-page-table invariant into one that does not.   *)
+(* It is stated at [BarePt.uptg], never at [proc_pt], because [proc_pt] is *)
+(* precisely what it destroys; what survives is [uptg_wf], the "still      *)
+(* well-formed enough to be torn down" tier (BarePt.v's header).           *)
+(*                                                                        *)
+(* THE RANGE PREMISE IS GONE, NOT RELAXED.  [wp_uvmunmap_sconf]'s          *)
+(* [uint va + npages*4096 <= uvm_maxsz] exists to prove that no vpn the    *)
+(* loop clears is a fixed leaf.  This instance wants the exact opposite,   *)
+(* so it names the leaf instead ([v = tramp_vpn \/ v = tf_vpn]).  What     *)
+(* both need -- that the cursor does not wrap and stays inside the Sv39    *)
+(* user space -- is the [2 ^ 38] bound, which TRAMPOLINE meets exactly.    *)
+(*                                                                        *)
+(* NOTHING COMES BACK, AND THAT IS NOT AN OMISSION.  [do_free] is zero, so *)
+(* the loop skips kfree; and the pages the two fixed leaves name were      *)
+(* never owned here anyway -- the trampoline's is kernel text, the         *)
+(* trapframe's belongs to [ProcInv.proc_priv], which the caller still      *)
+(* holds separately.  So [um] and [upt_pages_own] are untouched and the    *)
+(* postcondition differs from the precondition in ONE map deletion.        *)
+(*                                                                        *)
+(* [npages] is pinned to 1: every caller passes 1, and a run of two would  *)
+(* have to say which leaves it spans.  Same machine code, same proof --    *)
+(* [ProofUvmunmap.UvmunmapCore] is generic in [do_free] and seals here.    *)
+(* --------------------------------------------------------------------- *)
+
+Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
+    (um : gmap (mword 27) (mword 64)) (v : mword 27)
+    (K : nat) (eb : bool) (p : mword 64)
+    (C : iProp Σ) (ilvl : nat) (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
+  let va := mm !!! Regidx (mword_of_int 11) in
+  let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
+  (* the 8-slot frame + the no-alloc walk's 8; kfree's 14 are not needed
+     here, but the budget is kept uniform with the other two instances *)
+  (22 <= K)%nat ->
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
+  mm !!! Regidx (mword_of_int 10) = page_base uroot ->
+  (* va is page-aligned: the panic arm is dead.  TRAMPOLINE and TRAPFRAME
+     are both page-aligned constants. *)
+  subrange_vec_dec va 11 0 = (zeros' 12 : mword 12) ->
+  mm !!! Regidx (mword_of_int 12) = (mword_of_int 1 : mword 64) ->
+  (* do_free == 0 *)
+  mm !!! Regidx (mword_of_int 13) = (mword_of_int 0 : mword 64) ->
+  (* the page cleared is a FIXED leaf -- the thing [UVMUNMAP] forbids *)
+  svpn_of va = v ->
+  (v = tramp_vpn \/ v = tf_vpn) ->
+  (* the cursor does not wrap; TRAMPOLINE = 2^38 - 4096 meets this exactly *)
+  (uint va + 4096 <= 2 ^ 38)%Z ->
+  sie_cap_gpr mm K b p -∗
+  cpu_own ilvl eb p C b -∗
+  kernel_text -∗
+  pc_is pcE -∗
+  uptg fx uroot um -∗
+  kalloc_env γa None -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+    sie_cap_gpr mr K b p -∗
+    cpu_own ilvl eb p C b -∗
+    pc_is ret_tgt -∗
+    ⌜callee_saved mm mr⌝ -∗
+    uptg (delete v fx) uroot um -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type UVMUNMAP_FIXED.
+  Parameter wp_uvmunmap_fixed_sconf :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
+      (um : gmap (mword 27) (mword 64)) (v : mword 27)
+      (K : nat) (eb : bool) (p : mword 64)
+      (C : iProp Σ) (ilvl : nat) (b : bool),
+      wp_uvmunmap_fixed_sconf_body γa Φ mm fx uroot um v K eb p C ilvl b.
+End UVMUNMAP_FIXED.

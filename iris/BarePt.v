@@ -639,6 +639,103 @@ Section BarePt.
       exact (Hsome u w' Hl).
   Qed.
 
+  (* ================================================================== *)
+  (* §4  THE STEP ALGEBRA uvmunmap's LOOP RUNS ON, indexed by [do_free]. *)
+  (*                                                                     *)
+  (*   [df = true]  (do_free != 0): a USER run.  Each iteration deletes  *)
+  (*     from [um] and hands the page to kfree; [fx] never moves.        *)
+  (*   [df = false] (do_free == 0): a FIXED-leaf run, which is           *)
+  (*     proc_freepagetable's two calls and proc_pagetable's second      *)
+  (*     failure tail.  Each iteration deletes from [fx] and frees       *)
+  (*     NOTHING; [um] and [upt_pages_own] never move.                   *)
+  (*                                                                     *)
+  (* The loop proof is written against these three, so its body is one   *)
+  (* [destruct df] at the [beq s5,zero] and nowhere else.                *)
+  (* ================================================================== *)
+
+  (* which side of the leaf map the run's vpns live on.  At [df = true]
+     this is the spec's range premise; at [df = false] the caller says
+     which fixed leaf it is unmapping. *)
+  Definition uu_vpn_ok (df : bool) (v : mword 27) : Prop :=
+    if df then (bv_unsigned v < bv_unsigned tf_vpn)%Z
+          else (v = tramp_vpn \/ v = tf_vpn).
+
+  Definition uu_fx (df : bool) (fx : gmap (mword 27) (mword 64))
+      (vpn0 : mword 27) (k : nat) : gmap (mword 27) (mword 64) :=
+    if df then fx else um_del_run fx vpn0 k.
+
+  Definition uu_um (df : bool) (um : gmap (mword 27) (mword 64))
+      (vpn0 : mword 27) (k : nat) : gmap (mword 27) (mword 64) :=
+    if df then um_del_run um vpn0 k else um.
+
+  Lemma fx_wf_del_run (fx : gmap (mword 27) (mword 64)) (vpn0 : mword 27)
+      (k : nat) :
+    fx_wf fx -> fx_wf (um_del_run fx vpn0 k).
+  Proof.
+    intros Hwf. induction k as [| k IH]; [exact Hwf |].
+    cbn [um_del_run]. exact (fx_wf_delete _ _ IH).
+  Qed.
+
+  Lemma uu_fx_wf (df : bool) (fx : gmap (mword 27) (mword 64))
+      (vpn0 : mword 27) (k : nat) :
+    fx_wf fx -> fx_wf (uu_fx df fx vpn0 k).
+  Proof.
+    intros Hwf. rewrite /uu_fx. destruct df; [exact Hwf |].
+    exact (fx_wf_del_run fx vpn0 k Hwf).
+  Qed.
+
+  Lemma uu_um_wf (df : bool) (um : gmap (mword 27) (mword 64))
+      (vpn0 : mword 27) (k : nat) :
+    uptg_wf um -> uptg_wf (uu_um df um vpn0 k).
+  Proof.
+    intros Hwf. rewrite /uu_um. destruct df; [| exact Hwf].
+    exact (uptg_wf_del_run um vpn0 k Hwf).
+  Qed.
+
+  (* THE CONTINUE ARMS.  Walk found no leaf, or the leaf word was invalid:
+     either way the vpn is absent from the whole leaf map, so the step is a
+     no-op on BOTH components and the [S k] invariant is the [k] one. *)
+  Lemma uu_step_absent (df : bool) (fx um m_ad : gmap (mword 27) (mword 64))
+      (vpn0 : mword 27) (k : nat) :
+    uptg_wf um -> fx_wf fx -> uu_vpn_ok df (vpn_at vpn0 k) ->
+    uptg_view (uu_fx df fx vpn0 k) (uu_um df um vpn0 k) m_ad ->
+    m_ad !! vpn_at vpn0 k = None ->
+    uu_fx df fx vpn0 (S k) = uu_fx df fx vpn0 k
+    /\ uu_um df um vpn0 (S k) = uu_um df um vpn0 k.
+  Proof.
+    intros Hwf Hfx Hok Hview Hnone. rewrite /uu_fx /uu_um in Hview |- *.
+    destruct df.
+    - split; [reflexivity |]. cbn [um_del_run]. apply delete_notin.
+      exact (uptg_view_none fx (um_del_run um vpn0 k) m_ad (vpn_at vpn0 k)
+               Hfx Hok Hview Hnone).
+    - split; [| reflexivity]. cbn [um_del_run]. apply delete_notin.
+      exact (uptg_view_fx_none (um_del_run fx vpn0 k) um m_ad (vpn_at vpn0 k)
+               (proj1 Hwf) Hok Hview Hnone).
+  Qed.
+
+  (* THE CLEARING ARM.  The leaf is there and the store zeroes it; the
+     deletion lands on whichever component [df] selects. *)
+  Lemma uu_step_delete (df : bool) (fx um m_ad : gmap (mword 27) (mword 64))
+      (vpn0 : mword 27) (k : nat) :
+    uptg_wf um -> fx_wf fx -> uu_vpn_ok df (vpn_at vpn0 k) ->
+    uptg_view (uu_fx df fx vpn0 k) (uu_um df um vpn0 k) m_ad ->
+    uptg_view (uu_fx df fx vpn0 (S k)) (uu_um df um vpn0 (S k))
+              (delete (vpn_at vpn0 k) m_ad).
+  Proof.
+    intros Hwf Hfx Hok Hview. rewrite /uu_fx /uu_um in Hview |- *.
+    destruct df; cbn [um_del_run].
+    - exact (uptg_view_delete fx (um_del_run um vpn0 k) m_ad (vpn_at vpn0 k)
+               Hfx Hok Hview).
+    - exact (uptg_view_delete_fixed (um_del_run fx vpn0 k) um m_ad
+               (vpn_at vpn0 k) (proj1 Hwf) Hok Hview).
+  Qed.
+
+  (* ...and on the clearing arm at [df = true] ONLY, the page comes out.
+     There is no [df = false] twin, by design: the trampoline's page is
+     kernel text and the trapframe's belongs to [proc_priv], so a fixed
+     leaf's page was never in [upt_pages_own] and nothing is handed back.
+     That is also why the [do_free == 0] arm never calls kfree. *)
+
   (* ---- what uvmfree hands freewalk: a bare table at the EMPTY user map
      owns nothing but its own nodes, and its tree is freewalk-safe. ---- *)
   Lemma bare_pt_empty_free (uroot : mword 44) :

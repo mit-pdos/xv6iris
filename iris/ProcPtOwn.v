@@ -1232,6 +1232,30 @@ Proof.
   apply Z.div_lt_upper_bound; lia.
 Qed.
 
+(* THE SAME CURSOR FACTS AT THE WIDER BOUND, minus the user-vpn one.  A
+   run that clears the FIXED leaves (proc_freepagetable's two do_free=0
+   unmaps, proc_pagetable's second failure tail) ends AT the top of the
+   Sv39 user space, not below the trapframe, so [z_run_iter]'s premise is
+   unavailable to it -- but the first three conclusions, which are all the
+   address arithmetic needs, survive at [<= 2^38].  Only the fourth
+   ([the cursor's vpn is a USER vpn]) is genuinely about staying below the
+   fixed leaves, and a fixed-leaf run gets its vpn fact from the caller
+   instead.  [z_run_iter] is this plus that fourth conjunct. *)
+Lemma z_run_iter_gen (v d np : Z) :
+  0 <= v -> 0 <= d -> d + 1 <= np -> v + np * 4096 <= 274877906944 ->
+  0 <= v + 4096 * d
+  /\ v + 4096 * d < 274877906944
+  /\ v + 4096 * d < 18446744073709551616.
+Proof.
+  intros H0 H1 H2 H3.
+  split; [lia |]. split; lia.
+Qed.
+
+Lemma z_run_end64_gen (v np : Z) :
+  0 <= v -> 0 <= np -> v + np * 4096 <= 274877906944 ->
+  v + 4096 * np < 18446744073709551616.
+Proof. intros; lia. Qed.
+
 (* the run's END pointer does not wrap either *)
 Lemma z_run_end64 (v np : Z) :
   0 <= v -> 0 <= np -> v + np * 4096 <= 274877898752 ->

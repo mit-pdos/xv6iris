@@ -413,6 +413,13 @@ Lemma bdec_040005b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (UTYPE (mword_of_int 16384 : mword 20, Regidx (mword_of_int 11), LUI), s).
 Proof. decode_bridge_ms. Qed.
 
+(* lui a1,0x2000 -- TRAPFRAME's high half; proc_pagetable +0x3a,
+   proc_freepagetable +0x24 *)
+Lemma bdec_020005b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x020005b7 : mword 32)) s
+  = Some (UTYPE (mword_of_int 8192 : mword 20, Regidx (mword_of_int 11), LUI), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma bdec_08e7a023 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x08e7a023 : mword 32)) s
   = Some (STORE (mword_of_int 128 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 15), 4), s).
