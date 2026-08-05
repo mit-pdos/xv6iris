@@ -551,11 +551,16 @@ Section WriteHeadBlocks.
       by (unfold K_bwrite, K_write_head in *; lia).
     iApply (BW.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat true C
-              (f <$> seq 0 1024) bsd0 b
+              (f <$> seq 0 1024) bsd0 b True%I
               HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
-                    Hdevi Hdgeom Hdlock Hhold [-]").
-    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold".
+                    Hdevi Hdgeom Hdlock Hhold [] [-]").
+    (* THE TRIVIAL CRASH PERMIT (claude-notes/design/fs-log.md stage 4 item 3):
+       this WAL write kind's real durability view shift lands in phase C2;
+       for now it deposits the identity permit at the trivial receipt, so
+       this function's own spec is unchanged. *)
+    { iApply disk_write_permit_trivial. }
+    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (WH + 0x4c)).
     { rewrite HT2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc4c) in "Hpc".

@@ -68,7 +68,8 @@ Definition wp_bwrite_sconf_body
     (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (bs bsd : list (bv 8)) (b : bool) :=
+    (bs bsd : list (bv 8)) (b : bool)
+    (Q : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bwrite in
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -115,6 +116,18 @@ Definition wp_bwrite_sconf_body
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   (* the held buffer, payload aside (its interior disk fragment included) *)
   bio_hold0 bn V k pidv dev bno bs bsd -∗
+  (* THE CRASH PERMIT (claude-notes/design/fs-log.md stage 4 item 3): bwrite
+     is a WRITE-THROUGH, so it is one of the WAL's write kinds and its
+     caller owes the durability view shift.  Threaded verbatim to
+     virtio_disk_rw (SpecVirtioDiskRw.v), which deposits it in the permit
+     channel at the publish; the DMA COMPLETION -- the instant these bytes
+     reach the durable image -- runs it, and [Q] is the caller's RECEIPT.
+     Placed adjacent to the handle, exactly where rw places its own (after
+     the buffer/[disk_block] pair it is about).  A caller with no durability
+     obligation instantiates [Q := True] with
+     [RiscvPtsto.disk_write_permit_trivial]; that is what all four of log.c's
+     call sites do in this phase, and their specs are unchanged. *)
+  disk_write_permit Q -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -126,6 +139,10 @@ Definition wp_bwrite_sconf_body
       p_pid pj ↦₄{dq} pidv -∗
       (* the write-through: the handle's disk value is now its bytes *)
       bio_hold0 bn V k pidv dev bno bs bs -∗
+      (* THE RECEIPT, under ONE later -- rw's own postcondition shape (the
+         permit invariant is not timeless, and the saved-proposition
+         agreement costs the other later, which rw's epilogue pays off). *)
+      ▷ Q -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -140,7 +157,8 @@ Module Type BWRITE.
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (bs bsd : list (bv 8)) (b : bool),
+      (bs bsd : list (bv 8)) (b : bool)
+      (Q : iProp Σ),
       wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb C bs bsd b.
+                           pidv dev bno dq m K eb C bs bsd b Q.
 End BWRITE.

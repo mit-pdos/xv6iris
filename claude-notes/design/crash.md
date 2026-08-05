@@ -218,6 +218,18 @@ GHOST mirror deliberately is not.
   whatever ghost state the client chooses), never the image map — the
   image ghost is per-era and re-minted, and `P_fs`'s own state has to be
   fixed-layer or re-derivable, which is what recovery is for.
+  - **A FIELD OF TYPE `iProp Σ` IS OPAQUE TO EVERY OPENER, and that
+    decides what may be parked inside it.** `crash_inv`'s body is the
+    field itself, so the disk thread's completion — the one opener —
+    gets the proposition, never its innards. Anything the MACHINE layer
+    has to move at a completion (the FS tie's other half: a
+    `ghost_var` ½ mirroring `v_disk`) therefore cannot be a conjunct of
+    the client's `Pc`; it has to be a SIBLING of it in the invariant
+    body, which means indexing the field by the value being tied:
+    `riscv_crash_pred : (Z -> list (bv 8)) -> iProp Σ`. Found in
+    fs-log stage 4 phase C1; the reshape (and why it also keeps the
+    identity permit free) is written up in `design/fs-log.md`'s
+    stage-4 item 3 and `projects/fs-log.md`'s phase C2.
   - **The stranded-fragment question is CLOSED by the per-era map**: a
     sleeper's `disk_bytes` fragments sit in the per-era `disk_inv`, so a
     crash abandons them together with the auth that remembers their keys.

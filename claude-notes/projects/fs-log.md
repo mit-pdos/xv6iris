@@ -199,15 +199,91 @@ preserve v_disk: the record-P does not move, so the power arms frame it.
 
 ### Phase C — P_fs + the logatom bwrite
 
-- [ ] `P_fs` (the real `Pc`): the generation-swappable escrow — at-rest
-      ∨ checked-out(era boot token) — over the record (P|fs-range, D,
-      the receipts mono-list) with ⌜recovery(P) = D⌝; the boot token in
-      the era boot bundle; adequacy passes P_fs and the mkfs-image
-      initial record.
-- [ ] bwrite's spec gains the logatom premise (the client fupd + Q
-      post); threading through write_head/install_trans/end_op/initlog
-      call sites — each of the four WAL write kinds is ONE call site's
-      fupd instantiation, nothing below the log layer changes shape.
+- [x] **C1a — `iris/FsCrash.v`, the pure layer + `P_fs`.** Landed. The
+      block view `fs_blocks : (Z -> bv 8) -> Z -> list (bv 8)` (block b =
+      the 1024 bytes at b*BSIZE) plus its two one-block-write framing
+      facts; the full header decode `hdr_dec : list (bv 8) -> nat * list Z`
+      (total, junk-tolerant) with the bridge `hdr_dec_n : Z.of_nat
+      (hdr_dec bs).1 = LogInv.hdr_n bs`; `fs_recovery P D cov logstart`
+      (home restriction `cov ∖ log_region_set logstart`, overlaid by the
+      decoded write set from the log slots) — a FUNCTION of P
+      (`fs_recovery_det`/`_total`) with the n = 0 corollary
+      `fs_recovery_clean`; the record `fs_rec` + `fs_rec_wf`; the ghosts
+      (`fsCrashG`: the tie `ghost_varG Σ (Z -> list (bv 8))` and the
+      committed-history mono-list — only the ALGEBRA-level
+      `iris.algebra.lib.mono_list` exists in this Iris, so the `own`
+      wrappers are spelled out here; the FS boot token reuses
+      `WpLock.lock_tok_excl` rather than minting a second
+      `ghost_varG Σ bool`, which would be ambiguous against
+      `riscvF_parkGS`); `P_fs`, `P_fs_recovers` (the headline: with the
+      machine-side tie half in hand, the REAL disk recovers to the last
+      committed state), `P_fs_receipt_committed`, and the allocation
+      lemmas `P_fs_alloc` / `P_fs_alloc_clean` (mkfs's obligation).
+      - **The block view is a TOTAL function, not a `gmap` over a range.**
+        The tie's other half is destined for `state_interp` in
+        RiscvPtsto.v, *below* every FS constant; a finite block map would
+        need the FS's disk size down there (violating this design's own
+        "no FS constant below SystemAdequacy") or a new fixed-layer
+        parameter. Only the genuinely finite things — `fr_D`, the history
+        — stay `gmap`.
+- [x] **C1b — bwrite's logatom threading.** Landed, exactly mirroring
+      rw's phase-B change: `SpecBwrite.wp_bwrite_sconf_body` gains a
+      trailing `(Q : iProp Σ)`, the premise `disk_write_permit Q` (placed
+      adjacent to the handle, where rw places its own) and the post
+      `▷ Q`; ProofBwrite passes both straight through to rw. There are
+      **three** call sites, not four — ProofInitlog calls write_head and
+      install_trans, never bwrite — and each is a one-line-class edit
+      (`True%I` + `disk_write_permit_trivial`), specs unchanged.
+- [ ] **C2 — THE BLOCKER, and the reshape it forces (found in C1).**
+      `state_interp`'s half of the tie **cannot be added while
+      `Pc := True`**, and the reason is structural, not a proof
+      difficulty: a `ghost_var γtie (1/2) …` conjunct can only be moved
+      by someone holding BOTH halves, the mover is the DMA completion,
+      and the completion's only channel to the crash side is
+      `riscv_crash_pred` — an OPAQUE `iProp Σ` field it cannot
+      destructure. So the other half has nowhere to live. (Every
+      alternative home fails too: an era invariant dies at PowerOff and
+      the fixed half could never be re-paired at the next boot; the boot
+      client cannot hold it because it is not the thread that completes;
+      and a lone half at fraction 1 in `state_interp` is a placeholder
+      that C2 would have to undo.)
+      **The resolution — INDEX THE CRASH PREDICATE BY THE BLOCK VIEW.**
+      Retype `riscv_crash_pred : (Z -> list (bv 8)) -> iProp Σ` and make
+      the tie half a SIBLING conjunct of the invariant body:
+      ```
+      crash_inv := inv crashN
+        (∃ P, ghost_var riscv_fstie_name (1/2) P ∗ riscv_crash_pred P)
+      ```
+      Then (i) the body is allocatable at `Pc := fun _ => True` from the
+      split half, so nothing has to be all-or-nothing; (ii) the
+      completion opens `crashN`, agrees the two halves (ghost_var is
+      timeless, so the `∃P` strips), updates BOTH mechanically to
+      `fs_blocks (v_disk d')` — the mechanical update stays with the
+      completion, as designed — and only then runs the client fupd; and
+      (iii) `disk_write_permit_trivial` stays provable for a WRITE at the
+      trivial `Pc`, which is what keeps the three log call sites and
+      `SpecVirtioDiskRw`'s read path free. The permit becomes
+      `∀ P P', ⌜wrel P P'⌝ -∗ ▷ riscv_crash_pred P ==∗
+       ▷ riscv_crash_pred P' ∗ Q`; `wrel` is the write identity, which
+      the completion must now export from `VirtioProto.virtio_proto_step`
+      (the completing slot's recorded request — the `vs_data` precedent),
+      and `PermInv.perm_slot`/`perm_consume`/`perm_consume_kq` re-type
+      alongside. Cost: RiscvPtsto (2 new fixed fields — the class
+      `ghost_varG Σ (Z -> list (bv 8))` and `riscv_fstie_name` — plus
+      `power_interp`'s 4th FIXED conjunct, `crash_inv`, the permit),
+      RiscvExec's four base rules (M5a conjunct surgery; the hart/uart
+      arms frame the conjunct through `run_v_disk`/`uart_step_v_disk`,
+      plic through nothing, and `wp_disk_step` hands it to the callback),
+      WpUart's completion arm, RiscvAdequacy (`riscvGpreS`/`riscvΣ`, the
+      two `RiscvFixedGS` constructor applications, the ghost_var
+      allocation at both theorems, and the two power arms' framing), and
+      the `HPc : ⊢ Pc` interface — which must become "the client builds
+      Pc from the ghosts adequacy allocated" (`P_fs_alloc`'s shape),
+      because a `Pc` that owns ghosts is never provable from nothing.
+- [ ] **C2 (cont.) — the four WAL write kinds' fupds** at the three
+      bwrite call sites (log-fill / commit(n,W) / install / clear), each
+      re-establishing `fs_rec_wf` at the new P from its own local
+      knowledge, and `SystemAdequacy` finally passing `P_fs` as `Pc`.
       Checkpoint.
 
 ### Phase D — recovery + sys_sync

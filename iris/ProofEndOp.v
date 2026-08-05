@@ -2809,13 +2809,18 @@ Section EndOpBlocks.
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     iApply (BW.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k1 pidv dev bnol dq H2 (K - 8)%nat eb C
-              bs2 bsd1 eb
+              bs2 bsd1 eb True%I
               (eo_Kbwrite K HK)
               ltac:(rewrite Hubnol; exact (eo_lt_lit _ Hslotrange))
               ltac:(reflexivity) Hj Hgl Hk1 HH2a0 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
-                    Hdevi Hdgeom Hdlock Hhold").
-    iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold".
+                    Hdevi Hdgeom Hdlock Hhold []").
+    (* THE TRIVIAL CRASH PERMIT (claude-notes/design/fs-log.md stage 4 item 3):
+       this WAL write kind's real durability view shift lands in phase C2;
+       for now it deposits the identity permit at the trivial receipt, so
+       this function's own spec is unchanged. *)
+    { iApply disk_write_permit_trivial. }
+    iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
     assert (Hpcec : ret_pc (H2 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0xec)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcec) in "Hpc".

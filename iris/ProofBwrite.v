@@ -133,8 +133,9 @@ Section ProofBwrite.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bs bsd : list (bv 8)) (b : bool)
+      (Q : iProp Σ)
     : wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
-                           pidv dev bno dq m K eb C bs bsd b.
+                           pidv dev bno dq m K eb C bs bsd b Q.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
     intros pcE pj ret_tgt HK Hbno HgdV Hj Hgl Hk Ha0 Heb.
@@ -142,7 +143,7 @@ Section ProofBwrite.
     subst eb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs #Hscheds Hoctx Hpark
-              Hdev Hgeom Hdlock Hlocked Hcont".
+              Hdev Hgeom Hdlock Hlocked Hperm Hcont".
     iEval (rewrite /bio_hold0) in "Hlocked".
     iDestruct "Hlocked" as
       "(%Hk2 & %Hcov & %Hdv & Hstok & Hpid & Hvalid & Hbdev & Hbuf & Hdisk)".
@@ -423,16 +424,11 @@ Section ProofBwrite.
     (* ================================================================== *)
     iApply (RW.wp_virtio_disk_rw_sconf Φ γs j γl γu γd γk pd pav pu D3
               (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bsd b
-              True%I
+              Q
               HKrw Hbno Hkdata Hj Hgl eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hscheds Hoctx Hpark Hdev Hgeom Hdlock [Hbuf] Hdisk [] [-]").
+              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hscheds Hoctx Hpark Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm [-]").
     { iEval (rewrite HD3a0). iExact "Hbuf". }
-    (* THE TRIVIAL CRASH PERMIT (claude-notes/design/fs-log.md stage 4):
-       bwrite's public contract does not change in this phase, so it deposits
-       the identity view shift at the trivial receipt.  The real permits get
-       threaded here when the log lands. *)
-    { iApply disk_write_permit_trivial. }
-    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdisk _".
+    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hoctx Hpark Hbuf Hdisk HQ".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hbuf".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".
@@ -613,7 +609,7 @@ Section ProofBwrite.
     iDestruct (cpu_own_transport CID14 CID19 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID19 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hlocked").
+    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hlocked HQ").
     unfold callee_saved. repeat split; assumption.
   Qed.
 

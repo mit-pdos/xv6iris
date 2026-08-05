@@ -380,11 +380,34 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
    era-bundle exclusive; a later generation swaps in ITS token using the
    recorded pure picture — abandonment, not revocation, exactly the
    crash-layer's own pattern). The tie between the record's P and the
-   REAL disk is a fixed-layer `ghost_var` ½/½ between `P_fs` and
-   `state_interp`'s disk conjunct — both fixed, nothing strands, and
-   both halves are in hand exactly at a completion (state_interp is held
-   by the lifting rule; `crashN` is opened by the permit seam). Adding
-   the state_interp conjunct follows M5's fourth-conjunct recipe.
+   REAL disk is a fixed-layer `ghost_var` ½/½ against `state_interp`'s
+   disk conjunct — both fixed, nothing strands. Adding the state_interp
+   conjunct follows M5's fourth-conjunct recipe.
+   - **THE TIE HALF CANNOT LIVE INSIDE `riscv_crash_pred`** (found in
+     phase C1, and it corrects the earlier "both halves are in hand at a
+     completion" reading). The completion is the only mover of the tie,
+     and its channel to the crash side is `crash_inv`, whose body is the
+     OPAQUE `iProp` field `riscv_crash_pred`: opening `crashN` yields
+     that proposition, not its innards, so a half parked inside `P_fs`
+     is unreachable to the mechanical update — and at `Pc := True` it
+     does not exist at all, which makes the conjunct unmaintainable.
+     The fix is to **index the crash predicate by the block view**:
+     `riscv_crash_pred : (Z -> list (bv 8)) -> iProp Σ` with
+     `crash_inv := inv crashN (∃ P, ghost_var γtie (1/2) P ∗
+     riscv_crash_pred P)`. The half is then a SIBLING of the client's
+     predicate — allocatable at the trivial `Pc`, mechanically movable
+     by the completion (ghost_var is timeless, so the `∃P` strips), and
+     still exactly the tie `P_fs` needs, because the record's `fr_P` IS
+     the index. The permit correspondingly becomes
+     `∀ P P', ⌜write-relation P P'⌝ -∗ ▷ riscv_crash_pred P ==∗
+     ▷ riscv_crash_pred P' ∗ Q`, which keeps the identity permit free
+     for reads AND for any caller at a trivial `Pc` — the property that
+     lets the log's call sites stay unchanged until their real fupds
+     land. Full cost inventory: `../projects/fs-log.md`, phase C2.
+   - Consequence for adequacy: `HPc : ⊢ Pc` cannot survive — a crash
+     predicate that OWNS ghosts is never provable from nothing. The
+     interface becomes "the client builds `Pc` from the ghosts adequacy
+     allocated", i.e. `FsCrash.P_fs_alloc`'s shape.
 4. **Recovery** = initlog's real spec: swap the `P_fs` arm with the
    era's boot token; the recovery writes are tagged install/clear
    transitions; the final record has the header cleared and D unchanged.

@@ -1759,12 +1759,17 @@ Section InstallTransBlocks.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iApply (Bwrite.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k2 pidv dev w dq B7 (K - 10)%nat eb C
-              (Lw t) bsd2 eb
+              (Lw t) bsd2 eb True%I
               (it_Kbwrite K HK)
               ltac:(exact (it_lt_lit _ Hwrange)) ltac:(reflexivity) Hj Hgl Hk2 HB7a0 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
-                    Hdev Hgeo Hdlock Hhold [-]").
-    iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold".
+                    Hdev Hgeo Hdlock Hhold [] [-]").
+    (* THE TRIVIAL CRASH PERMIT (claude-notes/design/fs-log.md stage 4 item 3):
+       this WAL write kind's real durability view shift lands in phase C2;
+       for now it deposits the identity permit at the trivial receipt, so
+       this function's own spec is unchanged. *)
+    { iApply disk_write_permit_trivial. }
+    iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
     assert (Hpca6 : ret_pc (B7 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0xa6)).
     { rewrite HB7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpca6) in "Hpc".
