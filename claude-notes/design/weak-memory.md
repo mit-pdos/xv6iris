@@ -121,6 +121,20 @@ PS1 as acyclic(sb ∪ rf ∪ sc)):
 
     promise-free machine  ≡  RVWMO ∧ acyclic(po ∪ rf) ∧ (po ∩ W×W) ⊆ gmo
 
+**This is NOT TSO.** A total store order is shared by both, but TSO
+additionally forces every load to return the newest write in that order
+(modulo own-store-buffer forwarding) — reads are coherent-latest, R→R is
+program-ordered. The promise-free machine keeps almost all of RVWMO's
+READ-side weakness: a load may return any write not superseded within the
+reader's view, and views advance only via fences/acquires/coherence. So
+unfenced MP stays weak (reader sees y=1 then stale x=0 — forbidden under
+TSO), R→R reordering is observable, and every reader-side fence and
+acquire obligation in the kernel remains load-bearing. Strict containment
+both ways: TSO ⊊ promise-free ⊊ RVWMO (witnesses: unfenced MP separates
+TSO from promise-free; LB separates promise-free from RVWMO). What the
+machine temporarily trivializes is only the WRITER-side (predecessor-W)
+fence obligations — exactly the M6 gap.
+
 **Is this an established model class, or an invention?** The *genre* is
 established; the RVWMO instance is ours to define. RC11 (Lahav et al., PLDI
 2017) is exactly this move at the C11 level — C11 strengthened with
@@ -162,6 +176,26 @@ release-fenced/lock-mediated programs, full-machine behaviors =
 promise-free behaviors; operational-level, no Iris; PS1's DRF-Promise /
 PS2's Thm 6.5 are the language-level precedent). Full promises-in-logic
 (SLR-style) stays on the shelf unless robustness fails.
+
+**The end-state theorem (what the plan is FOR).** The strengthened model is
+scaffolding, not the final claim. Final shape: [adequacy over the
+promise-free machine, M1–M5, Iris] ∘ [M6 robustness: every full-machine
+execution of THIS kernel is matched by a promise-free execution with the
+same observable states] ∘ [Promising-RISC-V ≡ axiomatic RVWMO, Pulte et
+al., Coq] = adequacy over real RVWMO, no strengthening in the statement.
+Robustness is a program property ("reordering is unobservable"), not
+"hardware doesn't reorder". Preferred M6 proof route: extract it from the
+Iris proof itself — the WP proof already shows every store is either to
+exclusively-owned bytes (`↦ₘ`) or at an enumerated fenced sync site, which
+is exactly the per-store side condition a simulation needs to delay each
+promise to its fulfilment point unobserved (precedent: PS1/PS2's DRF
+theorems; iGPS/iRC11 deriving NA-race-freedom from the logic). Fallback
+route: standalone Lahav–Margalit-style robustness analysis. Interim value
+if M6 is unfinished: the characterization lemma makes the assumption a
+clean axiomatic statement, and **Ztso hardware implements the strengthened
+model outright** (Ztso's implicit RCpc annotations put po∩W×W into ppo and
+forbid LB), so the interim theorem is already unconditional for the Ztso
+class and assumption-carrying only for weaker RVWMO implementations.
 
 **Polarity note.** Decision 3 (dropping dependency tracking) makes the
 model *weaker* than hardware — sound for adequacy, costs nothing. THIS
