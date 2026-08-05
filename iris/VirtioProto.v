@@ -1551,7 +1551,7 @@ Section VirtioProto.
     gen_heap_interp m -∗ disk_img_auth (dn_img γ) (v_disk v) -∗
     virtio_proto γ v ==∗
       gen_heap_interp (w ∪ m) ∗ disk_img_auth (dn_img γ) (v_disk v') ∗
-      disk_write_permit ∗ virtio_proto γ v'.
+      disk_write_permit True ∗ virtio_proto γ v'.
   Proof.
     iIntros (Hview Hstep) "Hm Hauth Hp".
     iDestruct "Hauth" as (dmap) "[Hauth %Hdv]".
@@ -1601,7 +1601,8 @@ Section VirtioProto.
        interface that matters and it is final -- when the log lands, only the
        source of this permit changes, not [wp_disk_loop] and not the
        [wp_disk_step] seam. *)
-    iAssert disk_write_permit as "Hperm"; [ iApply disk_write_permit_trivial |].
+    iAssert (disk_write_permit True) as "Hperm";
+      [ iApply disk_write_permit_trivial |].
     iAssert (|==> ∃ (dmap' : gmap Z (bv 8)) (bs' : list (bv 8)),
                ghost_map_auth (dn_img γ) 1 dmap' ∗
                disk_bytes γ (vs_sector_off sl) bs' ∗

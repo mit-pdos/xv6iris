@@ -365,26 +365,35 @@ Definition crash_inv `{!riscvFixedGS Σ} : iProp Σ := inv crashN riscv_crash_pr
 Global Instance crash_inv_persistent `{!riscvFixedGS Σ} : Persistent crash_inv.
 Proof. rewrite /crash_inv. apply _. Qed.
 
-(* THE WRITE PERMIT: what an enqueuer deposits in an OUT slot
-   ([VirtioProto.slot_pend_res]) and what the DMA completion spends to
-   re-establish the crash predicate AT THE INSTANT the on-disk image changes.
-   Deliberately a BARE later-to-later basic update: the interesting content is
-   the CLOSURE, not the type -- the future log's commit-flip wand curries its
-   own abstract-state ghosts (and the block it is about) into the permit at
-   enqueue time, and the completion instant is precisely when the on-disk
-   state changes, so that is when the wand must run.  A SERIALIZED writer --
-   which xv6's log is, one commit at a time under the log lock -- needs
-   nothing conditional here: no "if the disk still looks like X" guard, no
-   mask annotation (a basic update goes through at whatever mask
-   [wp_disk_loop] holds while [crashN] and [diskN] are both open). *)
-Definition disk_write_permit `{!riscvFixedGS Σ} : iProp Σ :=
-  (▷ riscv_crash_pred ==∗ ▷ riscv_crash_pred)%I.
+(* THE WRITE PERMIT: what an enqueuer deposits for an OUT request (through
+   the permit channel of [PermInv.v] -- NOT through the timeless slot, which
+   cannot hold an iProp) and what the DMA completion spends to re-establish
+   the crash predicate AT THE INSTANT the on-disk image changes.
 
-(* Until the log lands, every enqueuer deposits THIS: a write that promises
-   nothing about durability is exactly a write whose permit is the identity.
-   The hook is what will change without touching the driver's specs. *)
-Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} : ⊢ disk_write_permit.
-Proof. rewrite /disk_write_permit. iIntros "HP". by iModIntro. Qed.
+   THE LOGICALLY-ATOMIC SHAPE (claude-notes/design/fs-log.md, stage 4 item 2):
+   the permit is the CLIENT's view shift over the crash predicate, returning
+   the client's own RECEIPT [Q] -- "when my write lands, the durability
+   invariant still holds, and here is what I learn from that".  The caller
+   curries the write's identity and its own abstract-state ghosts into the
+   closure at enqueue time; the completion instant is precisely when the
+   on-disk state changes, so that is when the wand must run, and [Q] is what
+   comes back to the caller.  A SERIALIZED writer -- which xv6's log is, one
+   commit at a time under the log lock -- needs nothing conditional here: no
+   "if the disk still looks like X" guard, no mask annotation (a basic update
+   goes through at whatever mask [wp_disk_loop] holds while [crashN],
+   [PermInv.permN] and [diskN] are all open). *)
+Definition disk_write_permit `{!riscvFixedGS Σ} (Q : iProp Σ) : iProp Σ :=
+  (▷ riscv_crash_pred ==∗ ▷ riscv_crash_pred ∗ Q)%I.
+
+(* The identity permit, at the trivial receipt: a write that promises nothing
+   about durability is exactly a write whose permit is the identity and whose
+   receipt is [True].  Every enqueuer that has no crash obligation of its own
+   deposits THIS, so a caller that does not care about durability keeps its
+   statement (see [SpecVirtioDiskRw]'s trivial instantiation). *)
+Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} : ⊢ disk_write_permit True.
+Proof.
+  rewrite /disk_write_permit. iIntros "HP". iModIntro. iFrame "HP".
+Qed.
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
    what every [r ↦ᵣ v] / [reg_interp] / [reg_valid] / [reg_update] silently talks

@@ -923,7 +923,7 @@ Section DevLoops.
          deposited in the OUT slot (the identity, for a read or until the log
          lands).  This is the only opening of [crashN] in the tree. *)
       iInv "Hcinv" as "HP" "Hcclose".
-      iMod ("Hperm" with "HP") as "HP".
+      iMod ("Hperm" with "HP") as "[HP _]".
       iMod ("Hcclose" with "HP") as "_".
       iMod ("Hclose" with "[Hv' Hlease']") as "_".
       { iNext. iExists vnew. iFrame.

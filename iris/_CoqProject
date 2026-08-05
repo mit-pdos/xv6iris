@@ -19,6 +19,7 @@ HartTp.v
 WpNext.v
 PtreeType.v
 RiscvPtsto.v
+PermInv.v
 PageGeom.v
 KptExecMap.v
 RiscvExec.v
