@@ -243,6 +243,21 @@ per-lemma roll-up is the tool; two findings generalise:
     conjunct order; a wrong order is worse than none (one reordering
     experiment took a frame from 2.2 s to 3.8 s).
 
+- **In a `first [...]` alternation, put the CHEAP-FAILING branch first.**
+  The cost of a tactic that FAILS grows with the proof term, so an
+  alternation that leads with an expensive-to-fail branch pays that cost at
+  every use.  Measured on `ProofProcPagetable.v`'s callee-saved transport:
+  `first [ rewrite Hx2 in Hc; vm_compute in Hc; discriminate | exact (H2
+  Hx2) | ... ]` cost ~1.3 s per use in the prologue and ~10 s per use in the
+  epilogue -- 42 s over the function -- purely in the failures of the first
+  branch.  Swapping the four `exact`s (which fail instantly on a type
+  mismatch) to the front took every use to milliseconds.  Same total work,
+  same proof, one reordering.  The rule of thumb: `exact`/`assumption` fail
+  cheaply, `rewrite ... in H` and `congruence` do not.
+- **`congruence` is not free in a whole-function context.**  Seconds per
+  call once the context is a hundred hypotheses deep.  Where the
+  contradiction is known, pass the hypothesis in by name and `exact` it.
+
 Beware when measuring: this is a shared machine.  Wall AND user time swing
 30%+ with someone else's load, so A/B by re-running interleaved and taking
 the minimum, or align the two `-time` logs sentence-by-sentence and calibrate
