@@ -2,8 +2,9 @@
 
 Design: [`design/weak-memory.md`](../design/weak-memory.md) (PROPOSAL).
 Branch: `weak-memory`. Landed: M0 (`iris/WeakMem.v`, `iris/WeakLitmus.v`),
-M1a (`iris/WeakInterp.v` + fwd-bank wire-in), M1b (`iris/WeakLang.v`).
-Next: M1c.
+M1a (`iris/WeakInterp.v` + fwd-bank wire-in), M1b (`iris/WeakLang.v`),
+M1c (`iris/WeakGhost.v`, `iris/WeakExec.v`, `iris/WeakAdequacy.v`).
+Next: M2.
 
 ## M0 — model spike (no Iris)
 
@@ -99,10 +100,66 @@ Validate the operational design before anything depends on it.
       between implicit/explicit-P spellings (fully apply or pre-assert);
       `lia` dies with an mword in context (hoist to mword-free Local
       Lemmas); `Forall_singleton` mis-elaborates (use `Forall_inv`).
-- [ ] **M1c — base logic**: state interpretation (`mono_list` log auth,
-      per-hart `wstate` auth, per-byte latest-write auth), base points-to
-      + seen-assertions, `wp_exec_step` tower analog (oracle-∀ form),
-      adequacy skeleton over log-initial resources.
+- [x] **M1c — base logic** (`WeakGhost.v` 429 / `WeakExec.v` 358 /
+      `WeakAdequacy.v` 211 lines; 2.8 / 3.8 / 4.4 s): DONE.
+      `weakGS` = mono-list log + `ghost_map Z (nat * bv 8)` latest-write map
+      + a PER-HART `ghost_var wstate` family; registers and devices are
+      `riscvGS`'s, reused verbatim (its `gen_heap` and the whole crash
+      apparatus go unused). `weak_system_adequacy` is CLOSED at the baseline
+      5 platform axioms (no funext).
+      **SEAM FACTS for M2:**
+      (1) **The leaf-facing rule is `WeakExec.wp_wexec_step`**, whose
+      continuation is `∀ tick χ σ' χ', ⌜wexec (Some (fin_to_nat cpu_id))
+      (riscv_step tick) χ σ = Some (tt, σ', χ')⌝ ={∅,⊤}=∗ wmstate_interp σ'
+      ∗ WP Loop`, and whose premises are ONE reducibility witness
+      (`∃ χ σ0 χ', wexec … false … = Some …`) plus the pure bridge
+      obligation `wexec_covers` (below). It is derived from the PRIMITIVE
+      `wp_wrun_step`, whose continuation quantifies over `wrun` successors
+      and which has NO bridge premise — a leaf that cannot discharge
+      `wexec_covers` can always drop to it.
+      (2) **The `wrun`→`wexec` bridge is NOT a theorem, and this is
+      structural.** `wexec` rejects `Interface.Choose` (as `RiscvExec.exec`
+      does) while `wrun` branches over it, and — unlike the SC tree — the
+      caller's exec witness does NOT pin the path: a `wrun` may read a
+      different admissible value and descend into a different subtree, which
+      may contain a `Choose`. rv64d has 54 `undefined_bitvector` sites, each
+      a `Choose`, so this is not a technicality. What IS proven:
+      `WeakExec.wrun_wexec` — the bridge on the choice-free fragment
+      (`mchoice_free`, a recursive predicate on `M X`), axiom-free — plus
+      `wread_coh_ts` (a coherent read's timestamp is forced to `coh_ts`, the
+      `ak_coh` twin of `wread_all_seen`). So `wexec_covers` is a caller
+      obligation with a proven sufficient condition.
+      (3) **γlat updates happen in the CALLBACK**, not in the rule: the
+      continuation must re-establish `wmstate_interp σ'`, whose
+      `wlat_interp (wm_img σ') (wm_log σ')` conjunct is exactly the "every
+      element is still the latest write" obligation. `WeakGhost` supplies
+      the algebra for it: `latest_val` (= `WeakMem.latest` + the value),
+      `wlat_lookup` (auth+elem ⇒ the element IS the latest — what collapses
+      the ∀-oracle to one VALUE), `latest_val_app` / `wlat_agree_app`
+      (an element survives an append that does not write its byte),
+      `wlat_agree_insert`, `wlat_interp_acc`, and
+      `writes_in_app_new`/`not_writes_in_app_new` for the "which new message
+      wrote this byte" side.
+      (4) **`ghost_map CPU wstate` was REJECTED for a per-hart `ghost_var`
+      family**: a single map authority cannot be focused on one hart the way
+      `gregs_interp_acc` focuses one hart's registers (the rule would have to
+      expose the whole map to say the other cells did not move). The halves
+      pattern makes it one `big_sepS_delete` (`wws_interp_acc`), exactly like
+      `era_strans_name`/`era_sie_name`.
+      (5) **Single-era simplifications, all noted in the file headers**: the
+      state interp pins `⌜wgpow g = true ∧ wggen g = 0⌝` (`wgen_pin`) instead
+      of the generation/started/registry/FS-tie tower, the rules take
+      `gen_id = 0` as a premise (so no corpse arms — `wp_dead` has no
+      analogue yet), and the pool excludes `PowerLoopE`. The era indirection
+      slots in at `weak_state_interp`, in `RiscvPtsto.power_interp`'s shape.
+      The unused `riscvGS` gnames (heap/meta, kmap, kpt, strans, sie, park,
+      disk, gen, start, registry, fstie) get `1%positive` placeholders —
+      nothing owns anything at them.
+      (6) Also landed: the three DEVICE lifting rules (`wp_wuart_step` /
+      `wp_wdisk_step` / `wp_wplic_step`), each handing the caller the whole
+      `weak_state_interp` and taking it back at its arm's successor
+      (`wg_dev` / `wg_regs` / `wg_dma`), so the adequacy premises are not
+      vacuous. The disk's is where M5's log-append obligation lands.
 
 ## M2 — the vProp surface
 

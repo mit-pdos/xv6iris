@@ -746,3 +746,6 @@ WeakMem.v
 WeakLitmus.v
 WeakInterp.v
 WeakLang.v
+WeakGhost.v
+WeakExec.v
+WeakAdequacy.v
