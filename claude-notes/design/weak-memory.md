@@ -339,24 +339,29 @@ support is battle-tested (iRC11/gpfsl track modern Iris). The pieces:
   `mem_view` reads through the device's view (per-byte staleness allowed
   below it) instead of the flat map. DMA writes append to `glog` as the disk
   agent. The wild/stalled arms are unchanged.
-- **MMIO ordering is a declared platform assumption.** RISC-V FENCE has
-  separate device-I/O bits (PI/PO/SI/SO); accesses to the virtio-mmio window
-  (PMA IOMemory) are class I (reads) / O (writes), not R/W. So strictly,
-  xv6's `fence rw,rw` before the QUEUE_NOTIFY store orders nothing — the
-  RAM ring writes (class W) vs an MMIO store (class O) need `fence w,o`,
-  and the completion path's MMIO status read vs RAM used-ring reads need
-  `fence i,r` (this is exactly what Linux's riscv `writel`/`readl` emit:
-  `__io_bw() = fence w,o`, `__io_ar() = fence i,r`). QEMU and typical
-  interconnects order them anyway, which is why xv6 works. Decision for
-  now: model MMIO stores as waiting on `w_vwNew` (so `fence rw,rw` covers
-  the ring→notify edge) and record the assumption next to the platform
-  axioms. The strict alternative — classify MMIO by I/O fence bits — would
-  make xv6's driver unverifiable as-is and force a `fence w,o` patch to
-  virtio_disk.c + re-dump: arguably the RIGHT outcome (the verification
-  catching a real portability bug); decide at M5. Caveat discovered en
-  route: the generated Sail model's `barrier_kind` vocabulary
-  (`Barrier_RISCV_rw_rw` … `_tso`, `_i`) is MEMORY-only — check at M5 what
-  the model does with I/O fence bits before choosing the strict reading.
+- **MMIO ordering: model the architecture strictly; fix the driver, not the
+  model.** RISC-V FENCE has separate device-I/O bits (PI/PO/SI/SO);
+  accesses to the virtio-mmio window (PMA IOMemory) are class I (reads) /
+  O (writes), not R/W. So xv6's `fence rw,rw` before the QUEUE_NOTIFY
+  store does NOT order the RAM ring writes (class W) before the MMIO store
+  (class O) — that needs `fence w,o` — and the completion path's MMIO
+  status read vs RAM used-ring reads needs `fence i,r` (exactly what
+  Linux's riscv `writel`/`readl` emit: `__io_bw() = fence w,o`,
+  `__io_ar() = fence i,r`). xv6 works today only because QEMU and typical
+  interconnects order these edges anyway. DECIDED (2026-08): the model
+  classifies MMIO accesses by the I/O fence bits — no permissive
+  accommodation of the current driver — and **virtio_disk.c gets patched at
+  M5** to emit `fence w,o` / `fence i,r` at the MMIO seams (+ re-dump).
+  The verification catching this is the system working as intended.
+  Mechanically: the device-agent view advances only per the hart's
+  I/O-ordering state, so a missing `fence w,o` leaves the DMA `mem_view`
+  able to read the ring stale — which is what makes the driver proof fail
+  without the patch. Caveat to resolve early in M5: the generated Sail
+  model's `barrier_kind` vocabulary (`Barrier_RISCV_rw_rw` … `_tso`, `_i`)
+  is MEMORY-only, so check how the model decodes/executes FENCE words with
+  I/O bits set (they must not be dropped; if the Sail model normalizes them
+  away, the fence kinds need to be recovered at the `run` layer from the
+  instruction word, or the model config fixed).
 - **Instruction fetch (AK_ifetch)**: reads stay coherent-SC. Kernel text is
   immutable post-boot (single message per byte ⇒ no weakening exists to
   express); user text written by exec is covered by xv6's own

@@ -56,8 +56,16 @@ Validate the operational design before anything depends on it.
 
 ## M5 — devices
 
+- [ ] Check how the generated Sail model decodes/executes FENCE words with
+      I/O bits (barrier_kind is memory-only — see design doc); recover the
+      I/O bits at the `run` layer if the model drops them.
+- [ ] **Patch xv6 virtio_disk.c to emit the architecturally correct
+      fences** (`fence w,o` before QUEUE_NOTIFY, `fence i,r` after the
+      MMIO status read) + re-dump; the model classifies MMIO by the I/O
+      fence bits strictly, no accommodation of the old driver (decided
+      2026-08, design doc Decision 6).
 - [ ] Disk-agent view; notify-carries-view MMIO coupling; `DiskStepDma`
-      through the device view; virtio cone re-proof (the 4 fence sites).
+      through the device view; virtio cone re-proof (the fence sites).
 
 ## M6 — closing the LB gap (research)
 
