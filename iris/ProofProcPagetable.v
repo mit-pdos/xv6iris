@@ -125,6 +125,83 @@ Section ProofProcPagetable.
       | lazymatch goal with |- ?M !!! _ = _ => is_var M; progress unfold M end ].
   Ltac peel_reg := peel_reg_step; reflexivity.
 
+  (* Discharge an [upd_ne] side goal inside a callee-saved TRANSPORT peel,
+     where the register [c] is a VARIABLE constrained only by [is_cs_idx c =
+     true] and by the four disequalities [ppt_thr] carries.  Either the
+     written register is not callee-saved at all (then [Hc] refutes the
+     equation) or it is one of the four this function writes (then the
+     corresponding [c <> k] hypothesis does).  [vm_compute in
+     Hc] on a variable [c] does nothing (claude-notes/durable-notes.md), and a
+     bare [subst] is not an option either -- it would try to expand the
+     [set]-bound register maps and fail with "N8 is used in hypothesis ...".
+     So the index equation is pushed into [Hc] by [rewrite] instead.
+     [congruence] would also close the second case, but it costs seconds
+     apiece in this function's context; the four disequalities are passed in
+     by name instead, so each is one [exact].
+
+     ORDER MATTERS, AND NOT A LITTLE.  The four [exact]s must come FIRST.
+     With the [rewrite]/[vm_compute]/[discriminate] branch leading, each of
+     the four frame-register writes pays for that branch's FAILURE, and the
+     cost of the failure grows with the proof term: ~1.3s per write at the
+     prologue, ~10s per write in the epilogue -- 42s of the 46s this
+     threading added to the file.  Leading with the [exact]s (which fail on a
+     type mismatch, instantly) takes every peel in the function to
+     milliseconds. *)
+  Ltac thr_side Hc H2 H8 H9 H18 :=
+    let Hx := fresh "Hx" in
+    let Hx2 := fresh "Hx2" in
+    intros Hx; injection Hx as Hx2;
+    first [ exact (H2 Hx2) | exact (H8 Hx2) | exact (H9 Hx2) | exact (H18 Hx2)
+          | rewrite Hx2 in Hc; vm_compute in Hc; discriminate ].
+
+  (* [callee_saved mm m] minus the four frame registers proc_pagetable saves
+     and restores itself (sp, s0, s1, s2), stated uniformly in the index so
+     it can be THREADED: one [ppt_thr mm <map>] fact per callee boundary,
+     each proved from the previous by a single [callee_saved_lookup] plus
+     that stage's own short peel.  The alternative -- peeling [mr2] all the
+     way back to [mm] in one tactic, once per concrete callee-saved index --
+     does not survive factoring the epilogue out, because that peel walks
+     through the [set]-bound tower and only terminates where the concrete
+     index says it should. *)
+  Definition ppt_thr (mm m : regfile) : Prop :=
+    forall c : mword 5, is_cs_idx c = true ->
+      c <> csp_rs1 ->
+      c <> (mword_of_int 8 : mword 5) ->
+      c <> (mword_of_int 9 : mword 5) ->
+      c <> (mword_of_int 18 : mword 5) ->
+      m !!! Regidx c = mm !!! Regidx c.
+
+  (* One own-register write at a time.  Peeling the whole [set]-bound tower
+     with [rewrite /M9 … /M1; repeat (rewrite upd_ne; [| thr_side Hc])] does
+     NOT work: once every layer is unfolded, the WRITTEN VALUES contain
+     lookups of their own (e.g. [N5]'s value is [add_vec (N4 !!! Regidx 11)
+     …]), and [rewrite] picks the first match, which may be one of those --
+     leaving a side goal about two concrete indices that [thr_side] cannot
+     close.  Going one insert at a time keeps the redex unambiguous. *)
+  Lemma ppt_thr_ins (mm m : regfile) (k : mword 5) (v : mword 64) :
+    (forall c : mword 5, is_cs_idx c = true ->
+       c <> csp_rs1 ->
+       c <> (mword_of_int 8 : mword 5) ->
+       c <> (mword_of_int 9 : mword 5) ->
+       c <> (mword_of_int 18 : mword 5) -> Regidx c <> Regidx k) ->
+    ppt_thr mm m -> ppt_thr mm (<[Regidx k := v]> m).
+  Proof.
+    intros Hk H c Hc H2 H8 H9 H18.
+    rewrite upd_ne; [| exact (Hk c Hc H2 H8 H9 H18)]. apply H; assumption.
+  Qed.
+
+  Lemma ppt_thr_refl (mm : regfile) : ppt_thr mm mm.
+  Proof. intros c _ _ _ _ _. reflexivity. Qed.
+
+  (* unfold the head [set] variable, or peel one write; repeat *)
+  Ltac thr_peel :=
+    repeat first
+      [ lazymatch goal with
+        | |- ppt_thr _ ?M => is_var M; progress unfold M
+        end
+      | apply ppt_thr_ins;
+        [ intros c Hc H2 H8 H9 H18; thr_side Hc H2 H8 H9 H18 |] ].
+
   Lemma wp_proc_pagetable_sconf (γa : gname) (Φ : mval -> iProp Σ)
       (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool)
       (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
@@ -265,6 +342,8 @@ Section ProofProcPagetable.
     assert (HJ18 : J !!! Regidx (mword_of_int 18 : mword 5) = pp).
     { rewrite /J. rewrite upd_ne; [| reg_neq]. rewrite /W3 upd_eq.
       rewrite add_vec_zero_l. rewrite /W2 /W1. repeat (rewrite upd_ne; [| reg_neq]). reflexivity. }
+    assert (HJthr : ppt_thr mm J).
+    { thr_peel. apply ppt_thr_refl. }
     (* [J]'s own tp slot is whatever [mm]'s was -- uvmcreate's contract still
        wants the raw fact ⌜tp = cid_word⌝ (SpecRelease's shape, not
        SpecAcquire's), which nothing hands us any more.  Calling at
@@ -291,6 +370,13 @@ Section ProofProcPagetable.
        [rewrite] at an arbitrary literal register, not just [apply]/[exact]. *)
     assert (HJp_ne : forall r : mword 5, Regidx r <> Regidx Rtp -> Jp !!! Regidx r = J !!! Regidx r).
     { intros r Hr. rewrite /Jp. apply (rget_ne J r Hr). }
+    (* [tp_pin] touches slot 4 only, and tp is NOT callee-saved, so the
+       transport crosses the pin for free. *)
+    assert (HJpthr : ppt_thr mm Jp).
+    { intros c Hc H2 H8 H9 H18.
+      rewrite (HJp_ne c (not_eq_sym (is_cs_idx_true_neq Rtp c
+                 ltac:(vm_compute; reflexivity) Hc))).
+      apply HJthr; assumption. }
     (* the eight plain instructions above have each moved to a fresh hart,
        so uvmcreate wants [Hcnt] at CID8. *)
     iDestruct (cpu_own_transport CID CID8 lvl eb p C b ltac:(wp_next_chain)
@@ -317,6 +403,9 @@ Section ProofProcPagetable.
     { rewrite (callee_saved_lookup Hucs csp_rs1 ltac:(vm_compute; reflexivity)). exact HJpsp. }
     assert (Hmr018 : mr0 !!! Regidx (mword_of_int 18 : mword 5) = pp).
     { rewrite (callee_saved_lookup Hucs (mword_of_int 18) ltac:(vm_compute; reflexivity)). exact HJp18. }
+    assert (Hmr0thr : ppt_thr mm mr0).
+    { intros c Hc H2 H8 H9 H18.
+      rewrite (callee_saved_lookup Hucs c Hc). apply HJpthr; assumption. }
     (* +0x12 mv s1,a0 *)
     iApply (wp_cmv_s_sconf Φ (mword_of_int (PPT + 0x12)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
               mr0 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -421,6 +510,8 @@ Section ProofProcPagetable.
     assert (HM9s1 : M9 !!! Regidx (mword_of_int 9 : mword 5) = root0).
     { rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2. repeat (rewrite upd_ne; [| reg_neq]).
       rewrite /M1 upd_eq. rewrite add_vec_zero_l. reflexivity. }
+    assert (HM9thr : ppt_thr mm M9).
+    { thr_peel. exact Hmr0thr. }
     assert (Hsvpn1 : svpn_of (M9 !!! Regidx (mword_of_int 11 : mword 5)) = tramp_vpn)
       by (rewrite HM9a1; apply bv_eq; vm_compute; reflexivity).
     assert (Hppn1 : (autocast (T := mword) (subrange_vec_dec (M9 !!! Regidx (mword_of_int 13 : mword 5)) 55 12) : mword 44) = tramp_ppn)
@@ -470,6 +561,9 @@ Section ProofProcPagetable.
     { rewrite (callee_saved_lookup Hcs1 (mword_of_int 18) ltac:(vm_compute; reflexivity)). exact HM918. }
     assert (Hmr1s1 : mr1 !!! Regidx (mword_of_int 9 : mword 5) = root0).
     { rewrite (callee_saved_lookup Hcs1 (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HM9s1. }
+    assert (Hmr1thr : ppt_thr mm mr1).
+    { intros c Hc H2 H8 H9 H18.
+      rewrite (callee_saved_lookup Hcs1 c Hc). apply HM9thr; assumption. }
     (* ------- TRAPFRAME group (+0x32 .. +0x44) ------- *)
     (* +0x32 li a4,6 *)
     iApply (wp_cli_s_sconf Φ (mword_of_int (PPT + 0x32)) (mword_of_int 14 : mword 5) (mword_of_int 6 : mword 6) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 6 : mword 6))))
@@ -554,6 +648,8 @@ Section ProofProcPagetable.
       apply bv_eq; vm_compute; reflexivity. }
     assert (HN8s1 : N8 !!! Regidx (mword_of_int 9 : mword 5) = root0).
     { rewrite /N8 /N7 /N6 /N5 /N4 /N3 /N2 /N1. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr1s1. }
+    assert (HN8thr : ppt_thr mm N8).
+    { thr_peel. exact Hmr1thr. }
     assert (Hsvpn2 : svpn_of (N8 !!! Regidx (mword_of_int 11 : mword 5)) = tf_vpn)
       by (rewrite HN8a1; apply bv_eq; vm_compute; reflexivity).
     assert (Hppn2 : (autocast (T := mword) (subrange_vec_dec (N8 !!! Regidx (mword_of_int 13 : mword 5)) 55 12) : mword 44) = tfp)
@@ -608,6 +704,9 @@ Section ProofProcPagetable.
       rewrite /N8 /N7 /N6 /N5 /N4 /N3 /N2 /N1. repeat (rewrite upd_ne; [| reg_neq]). exact Hmr1sp. }
     assert (Hmr2s1 : mr2 !!! Regidx (mword_of_int 9 : mword 5) = root0).
     { rewrite (callee_saved_lookup Hcs2 (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact HN8s1. }
+    assert (Hmr2thr : ppt_thr mm mr2).
+    { intros c Hc H2 H8 H9 H18.
+      rewrite (callee_saved_lookup Hcs2 c Hc). apply HN8thr; assumption. }
     (* ---------------- epilogue ---------------- *)
     (* +0x4c mv a0,s1 *)
     iApply (wp_cmv_s_sconf Φ (mword_of_int (PPT + 0x4c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
@@ -715,23 +814,17 @@ Section ProofProcPagetable.
     { exact Hrepfin. }
     { rewrite Hnt. exact (ppt_nodes_le g1 g2 Hg1 Hg2). }
     { (* callee_saved mm E5 *)
+      (* the four frame registers are restored explicitly from the stack;
+         everything else callee-saved rides the threaded [ppt_thr]. *)
+      assert (HE5thr : ppt_thr mm E5).
+      { thr_peel. exact Hmr2thr. }
       unfold callee_saved.
       split. { rewrite /E5 upd_eq. rewrite HE4sp. unfold spr. apply frame_cancel_32. }
       split. { rewrite /E5 /E4 /E3. repeat (rewrite upd_ne; [| reg_neq]). rewrite /E2 upd_eq. reflexivity. }
       split. { rewrite /E5 /E4. repeat (rewrite upd_ne; [| reg_neq]). rewrite /E3 upd_eq. reflexivity. }
       split. { rewrite /E5. rewrite upd_ne; [| reg_neq]. rewrite /E4 upd_eq. reflexivity. }
       repeat split;
-        (rewrite /E5 /E4 /E3 /E2 /E1 /E0; repeat (rewrite upd_ne; [| reg_neq]);
-         match goal with
-         | |- _ !!! Regidx (mword_of_int ?k) = _ =>
-           rewrite (callee_saved_lookup Hcs2 (mword_of_int k) ltac:(vm_compute; reflexivity));
-           rewrite /N8 /N7 /N6 /N5 /N4 /N3 /N2 /N1; repeat (rewrite upd_ne; [| reg_neq]);
-           rewrite (callee_saved_lookup Hcs1 (mword_of_int k) ltac:(vm_compute; reflexivity));
-           rewrite /M9 /M8 /M7 /M6 /M5 /M4 /M3 /M2 /M1; repeat (rewrite upd_ne; [| reg_neq]);
-           rewrite (callee_saved_lookup Hucs (mword_of_int k) ltac:(vm_compute; reflexivity));
-           rewrite (HJp_ne (mword_of_int k) ltac:(vm_compute; discriminate));
-           rewrite /J /W3 /W2 /W1; repeat (rewrite upd_ne; [| reg_neq]); reflexivity
-         end). }
+        apply HE5thr; first [ vm_compute; reflexivity | vm_compute; discriminate ]. }
   Qed.
 
 End ProofProcPagetable.
