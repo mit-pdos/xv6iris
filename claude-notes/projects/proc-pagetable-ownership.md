@@ -212,6 +212,67 @@ Three things the function proof turned up, all reusable:
 `ProofUvmfree.v` was the template throughout — same 32-byte frame, same
 epilogue, same `stack_own` reassembly.
 
+### The construction-side bridges (BarePt §5), and the open question ANSWERED
+
+`proc_pagetable`'s two mappages failure tails hand back `ptree_own` + a
+`pt_rep0` map view; `uptg` wants `pt_frame (uptg_spec …)`. `BarePt` §5 is
+that converse, at the two shapes the tails actually hold:
+
+- `uptg_of_rep0_empty` — tail #1 (the FIRST mappages failed, so `k = 0` and
+  `pt_insert_run ∅ _ _ 0 = ∅`): the table maps nothing and already IS the
+  bare table uvmfree takes.
+- `uptg_of_rep0_tramp` — tail #2 (the SECOND failed, trampoline mapped,
+  trapframe never was): `uptg upt_fixed_tramp uroot ∅`, the state the old
+  `option` axis could not name.
+
+Both run at the empty user map, so `upt_pages_own ∅` is `emp` and nothing
+changes hands.
+
+**The risk I flagged before committing to this — whether mappages installs
+literally `pte_tramp` — is answered, and it is a NO that does not matter.**
+proc_pagetable passes perm = 10 (`li a4,10`, R|X), so mappages stores
+`mk_pte tramp_ppn (10 lor 1)` = flags **0xB**, while
+`pte_tramp = mk_pte tramp_ppn PTE_TRAMP` is flags **0x4B** — the canonical
+constant has the **A bit** set and the store leaves it clear. But
+`uptg_spec` asks only for an A/D VARIANT of each leaf, and
+
+```coq
+Lemma tramp_pte_ad :
+  mappages_pte tramp_ppn 10 0 = pte_set_ad pte_tramp 0 0.
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+```
+
+closes it (all terms are closed — `tramp_ppn` is a literal). **So `fx`'s
+values stay pinned at the seals and no contract had to be weakened.** This
+is the same A/D subtlety that made the first draft of uvmcopy's
+postcondition false (`completed/pt-teardown-copy.md`); check it whenever a
+construction-side map view has to meet a canonical leaf constant.
+
+### What is left for an uncounted `proc_pagetable`
+
+The remaining work is a RESTRUCTURE of `ProofProcPagetable.v`, and its shape
+is forced by one fact: **`SpecUvmfree` exists only at `kalloc_env γa None`**,
+so the tails are reachable only there and a single `on`-generic spec cannot
+be written (unlike allocproc, whose tails call freeproc, not uvmfree — that
+is why S7 step 5's "one spec with a third arm" advice applies there and NOT
+here). The recipe:
+
+1. `ProcPagetableCore` proves one lemma generic in `on` whose statement
+   takes the two failure arms as **premises** — wands over
+   `⌜avail_zero (avail_sub on g)⌝` plus the table the tail holds. This is
+   the fdalloc recipe (the continuation as a premise of the statement)
+   applied to a failure arm rather than a loop.
+2. `PROC_PAGETABLE` (counted, unchanged) instantiates both wands by
+   refutation — `ppt_nz1` / `ppt_nz2` are already there and already do
+   exactly this at `ProofProcPagetable.v:455` and `:589`.
+3. `PROC_PAGETABLE_UNCOUNTED` (new, at `on = None`) instantiates them with
+   the real tails, using the two bridges above → `UVMUNMAP_FIXED` (tail #2
+   only) → `UVMFREE`, and returns 0.
+
+The `Some nb` arithmetic currently inlined at `Hav2`/`Hav3` disappears when
+`on` goes generic (the rewrites become no-ops on a symbolic `avail_sub`),
+so step 1 should make the file shorter, not longer.
+
 ## Worklist
 
 **Step 1 — extract `PageOwn.v` out of `KallocInv.v`.** Move the page

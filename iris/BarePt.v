@@ -83,6 +83,7 @@ Require Import KMap.
 Require Import UptTree.
 Require Import UserPtTree.
 Require Import KallocInv.
+Require Import ProcPt.
 Require Import ProcPtOwn.
 Require Import PtFree.
 Local Open Scope Z_scope.
@@ -735,6 +736,88 @@ Section BarePt.
      kernel text and the trapframe's belongs to [proc_priv], so a fixed
      leaf's page was never in [upt_pages_own] and nothing is handed back.
      That is also why the [do_free == 0] arm never calls kfree. *)
+
+  (* ================================================================== *)
+  (* §5  THE CONSTRUCTION-SIDE BRIDGES: what proc_pagetable's two mappages *)
+  (*     FAILURE TAILS hold, in [uptg] terms.                              *)
+  (*                                                                       *)
+  (* mappages hands back [ptree_own] + a [pt_rep0] map view; [uptg] wants  *)
+  (* [pt_frame (uptg_spec ..)].  These are the converse of                 *)
+  (* [bare_pt_empty_free], and they are all the two tails need to reach    *)
+  (* uvmfree -- both run at the EMPTY user map, so [upt_pages_own ∅] is    *)
+  (* [emp] and nothing has to be handed over.                              *)
+  (* ================================================================== *)
+
+  Lemma uptg_wf_empty : uptg_wf ∅.
+  Proof.
+    split_and!;
+      [ exact upt_map_wf_empty | exact um_pages_valid_empty | exact um_inj_empty ].
+  Qed.
+
+  Lemma upt_pages_own_empty : ⊢ upt_pages_own (∅ : gmap (mword 27) (mword 64)).
+  Proof.
+    rewrite /upt_pages_own.
+    rewrite (_ : um_ppns ∅ = (∅ : gset (mword 44))); [| apply um_ppns_empty ].
+    rewrite big_sepS_empty. done.
+  Qed.
+
+  (* TAIL #1: the FIRST mappages failed, so the table maps nothing at all
+     and is already the bare table uvmfree takes. *)
+  Lemma uptg_of_rep0_empty (uroot : mword 44) (t : ptree) :
+    pt_rep0 t ∅ -> pt_base t = uroot ->
+    ptree_own 2 (DfracOwn 1) t ⊢ bare_pt uroot ∅.
+  Proof.
+    intros Hrep Hbase.
+    assert (Hview : uptg_view ∅ ∅ (∅ : gmap (mword 27) (mword 64))).
+    { rewrite /uptg_view. split.
+      - intros v. rewrite uptg_map_empty. split; intros _; apply lookup_empty.
+      - intros v w' Hl. rewrite lookup_empty in Hl. discriminate. }
+    iIntros "Ht". rewrite /bare_pt.
+    iPoseProof upt_pages_own_empty as "Hown".
+    iApply (uptg_rebuild ∅ uroot ∅ t ∅ uptg_wf_empty fx_wf_empty
+              Hview Hrep Hbase with "Ht Hown").
+  Qed.
+
+  (* TAIL #2: the SECOND mappages failed, so the trampoline leaf IS there
+     and the trapframe one never was -- the state the old [option] axis
+     could not name.
+     THE ONE THING TO CHECK, and it holds: mappages installs
+     [mk_pte tramp_ppn (10 lor 1)] (flags 0xB) while [pte_tramp] is flags
+     0x4B, i.e. the A bit is set in the canonical constant and clear in what
+     the store leaves.  [uptg_spec] asks only for an A/D VARIANT, and
+     [tramp_pte_ad] says the two agree at [a = d = 0] -- so no contract has
+     to be weakened to accept the table this tail holds. *)
+  Lemma tramp_pte_ad :
+    mappages_pte tramp_ppn 10 0
+    = pte_set_ad pte_tramp (mword_of_int 0 : mword 1) (mword_of_int 0 : mword 1).
+  Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+  Lemma uptg_of_rep0_tramp (uroot : mword 44) (t : ptree) :
+    pt_rep0 t (<[tramp_vpn := mappages_pte tramp_ppn 10 0]> ∅) ->
+    pt_base t = uroot ->
+    ptree_own 2 (DfracOwn 1) t ⊢ uptg upt_fixed_tramp uroot ∅.
+  Proof.
+    intros Hrep Hbase.
+    assert (Hview : uptg_view upt_fixed_tramp ∅
+                      (<[tramp_vpn := mappages_pte tramp_ppn 10 0]> ∅)).
+    { rewrite /uptg_view /uptg_map /upt_fixed_tramp right_id_L. split.
+      - intros v. destruct (decide (v = tramp_vpn)) as [-> | Hne].
+        + rewrite lookup_insert lookup_singleton.
+          split; intros H; discriminate.
+        + rewrite (lookup_insert_ne _ tramp_vpn v _ (not_eq_sym Hne)).
+          rewrite (lookup_singleton_ne tramp_vpn v pte_tramp (not_eq_sym Hne)).
+          split; intros _; [reflexivity | apply lookup_empty].
+      - intros v w' Hl. destruct (decide (v = tramp_vpn)) as [-> | Hne].
+        + rewrite lookup_insert in Hl.
+          exists pte_tramp, (mword_of_int 0 : mword 1), (mword_of_int 0 : mword 1).
+          split; [apply lookup_singleton |].
+          injection Hl as <-. exact tramp_pte_ad.
+        + rewrite (lookup_insert_ne _ tramp_vpn v _ (not_eq_sym Hne)) in Hl.
+          rewrite lookup_empty in Hl. discriminate. }
+    iIntros "Ht". iPoseProof upt_pages_own_empty as "Hown".
+    iApply (uptg_rebuild upt_fixed_tramp uroot ∅ t _ uptg_wf_empty fx_wf_tramp
+              Hview Hrep Hbase with "Ht Hown").
+  Qed.
 
   (* ---- what uvmfree hands freewalk: a bare table at the EMPTY user map
      owns nothing but its own nodes, and its tree is freewalk-safe. ---- *)
