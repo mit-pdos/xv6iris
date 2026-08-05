@@ -60,21 +60,49 @@ decode-dedup rule).
 - [x] `lemma_diff.py` + `spec_vacuity.py` CLEAN; `proof_coverage.py
       --check` rc=0; full build green (checkpoint commit).
 
-## Stage 2 — LogInv + the log.c specs
+## Stage 2 — LogInv + the log.c specs (COMPLETE)
 
-- [ ] `LogInv.v`: `log_res` / `log_batch` per the design; the ops/units
-      counting ghost (mirror FdSlots); `op_tok`; the cmt→out=0 tie;
-      lemmas: mint (begin_op's guard arithmetic), burn-unit-grow,
-      burn-unit-absorb, batch checkout/deposit.
-- [ ] Decode/Code files for log.c (initlog, begin_op, end_op, log_write,
-      and the static write_log/write_head/install_trans/read_head/
-      recover_from_log/commit — check which got inlined; gcc may have
-      folded commit into end_op etc. Look at KernelInstrs.v first).
-- [ ] Spec files: SpecBeginOp, SpecEndOp, SpecLogWrite, SpecInitlog
-      (clean-image precondition ⌜on-disk header n = 0⌝ for now).
-      Commit internals as Local contracts inside the proof, not public
-      specs (they are static and only end_op/initlog call them).
+- [x] `LogInv.v`: geometry (struct log @ KernelSyms.log: spinlock@0/24B,
+      start@24, outstanding@28, committing@32, dev@36, ncommit@40,
+      lh.n@44, lh.block[]@48); the LEDGER as a ghost map op-id →
+      remaining budget (a flat units counter is NOT inductive at end_op —
+      the per-op structure is what closes it), `log_op`, the three
+      transitions + guard arithmetic (`log_reserve_ok`) + `op_sum`
+      theory; `log_batch` (both FsBlocks auths = the freeze, the dirty
+      halves over cov recording W's membership, the log-region client
+      halves, the lh cells at (n, W), and THE SLOT POOL
+      `bslots bn ((LOGBLOCKS − n) + 2)` — one unit per free slot + the
+      committer's two in-flight breads; pool + n invariant is what makes
+      log_write's bslot refund UNCONDITIONAL and lets install's bunpins
+      deposit their freed units instead of end_op dropping them);
+      `log_res` (cmt=true → batch checked out, out = 0); `log_ctx`; and
+      `log_frozen` (the frozen dev/start cells alone — what write_head
+      and install_trans take, because initlog calls both BEFORE the lock
+      can be sealed); `hdr_n` (only the header's n field — the full
+      (n, W) encoding is deliberately stage 4).
+- [x] Code files (all six compile; structure headers carry frames,
+      offsets, loops, calls, panics): CodeWriteHead, CodeInstallTrans,
+      CodeInitlog, CodeBeginOp, CodeEndOp, CodeLogWrite. read_head +
+      recover_from_log inlined into initlog; write_log + commit into
+      end_op; initlog's "too big logheader" panic is compile-time dead
+      and ABSENT from the image. write_head/install_trans kept real
+      symbols → real Spec/Link treatment (not Local contracts).
+- [x] Spec files, all six, spec_vacuity/coverage clean; K values:
+      log_write 18, begin_op 26, write_head 44, install_trans 50,
+      initlog 56, end_op 58. Notables: log_write takes `bio_held` (bytes
+      already edited, pay still at bsl) + fsblock + log_op (S u) and
+      returns the re-indexed DIRTY `bio_locked` + fsblock at the new
+      bytes + log_op u + the unconditional bslot; install_trans takes
+      per-entry BOTH fsblock halves (home + log copy, same content — the
+      memmove content-preservation needs the copy's) + the dirty halves
+      at true, returns them at false, `recovering = false ∨ n = 0` for
+      stage 2; initlog is the clean-image form (`hdr_n = 0`) and stocks
+      the pool (pre `bslots bn 34`, post `bslots bn 2` + ∃γ log_ctx).
 - [ ] sys_sync: deferred to stage 4 (needs durability receipts).
+
+Note for ProofLogWrite (from the spec round): the append path must peel
+the refunded unit out of the batch's pool AT THE `lh.n++` store — the
+pool's index is `(LOGBLOCKS − n) + 2` and only the n++ re-establishes it.
 
 ## Stage 3 — the log.c proofs
 

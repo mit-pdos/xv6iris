@@ -134,14 +134,19 @@ Section FsBlocks.
   Qed.
 
   (* allocation, from an initial content map (the mkfs image's covered
-     range): both auths, the client halves, and the machinery-clean halves
-     -- the latter pair with the boot-side [disk_block]s to form
-     [bio_init]'s pool bundles. *)
+     range): both auths, and PER BLOCK all three client-side pieces -- the
+     fsblock client half, the machinery-clean payload (which pairs with
+     the boot-side [disk_block]s to form [bio_init]'s pool bundles), and
+     the LOG-SIDE dirty half (which stocks [log_batch]'s all-false
+     big-op).  All three, explicitly: an affine iFrame dropping one of
+     them compiles and strands initlog. *)
   Lemma fs_alloc (L0 : gmap Z (list (bv 8))) :
     ⊢ |==> ∃ γ : fs_names,
       ghost_map_auth (fs_L γ) 1 L0 ∗
       ghost_map_auth (fs_dirty γ) 1 ((fun _ => false) <$> L0) ∗
-      [∗ map] bno ↦ bs ∈ L0, fsblock γ bno bs ∗ fs_mclean γ bno bs.
+      [∗ map] bno ↦ bs ∈ L0,
+        fsblock γ bno bs ∗ fs_mclean γ bno bs ∗
+        (bno ↪[fs_dirty γ]{#(1/2)} false).
   Proof.
     iMod (ghost_map_alloc L0) as (γL) "[HaL HL]".
     iMod (ghost_map_alloc ((fun _ => false) <$> L0)) as (γD) "[HaD HD]".
