@@ -133,7 +133,7 @@ Definition wp_bwrite_sconf_body
      as a deliberately DELETABLE premise until their real fupds land (phase
      C2b).  A WRITE's permit is NOT free the way a READ's is, and that is the
      honest content of the indexed crash predicate. *)
-  disk_write_permit (Some (1024 * uint bno, bs)%Z) Q -∗
+  disk_write_permit gen_id (Some (1024 * uint bno, bs)%Z) Q -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗

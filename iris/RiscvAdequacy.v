@@ -673,7 +673,7 @@ Proof.
      the caller's half of the config tracker is discarded likewise, and so are
      the two vdisk_lock tokens ([dn_claim] at ∅ and [disk_done_lb _ 0]) that a
      boot chain would thread through virtio_disk_init into main's [newlock]. *)
-  iMod (disk_ghosts_alloc g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx)
+  iMod (disk_ghosts_alloc gen_id g.(gdev).(dvirtio) Hvlive Hvseen Hvuidx)
     as (γv) "(%Himg & Hproto & _ & _ & _ & Hpbody)".
   iMod (dev_inv_alloc _ γ γv
           with "[Huf Hpf Hvf Hacc Hout Htx Hdl Hproto] Hpbody") as "#Hinv".

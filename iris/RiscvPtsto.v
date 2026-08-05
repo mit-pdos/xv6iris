@@ -531,35 +531,55 @@ Proof. rewrite /crash_inv. apply _. Qed.
    "if the disk still looks like X" guard, no mask annotation (a basic update
    goes through at whatever mask [wp_disk_loop] holds while [crashN],
    [PermInv.permN] and [diskN] are all open). *)
-Definition disk_write_permit `{!riscvFixedGS Σ} (w : disk_wr) (Q : iProp Σ)
-    : iProp Σ :=
-  (∀ (dk : Z -> bv 8) (g : nat) (E : riscvEraGS) (n : nat),
-     era_registered g E -∗ start_auth n -∗ ⌜n = (g + 1)%nat⌝ -∗
+Definition disk_write_permit `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
+    (Q : iProp Σ) : iProp Σ :=
+  (∀ (dk : Z -> bv 8) (n : nat),
+     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
      ▷ riscv_crash_pred dk ==∗
        ▷ riscv_crash_pred (wr_apply w dk) ∗ start_auth n ∗ Q)%I.
 
-(* WHY THE PERMIT CARRIES THE AMBIENT ERA (phase C2b/D1).  A crash permit is
-   a STATELESS view shift: it runs at the DMA completion with only what its
-   author curried at enqueue.  But the facts a WAL write's fupd needs about
-   the PHYSICAL log region are chain facts -- established by the PREVIOUS
-   writes -- so they have to be read out of a mirror the ERA holds a half of,
-   and the crash predicate's own half of that mirror sits under an
+(* WHY THE PERMIT NAMES ITS AUTHOR'S GENERATION [gd] (phase C2b/D1).  A crash
+   permit is a STATELESS view shift: it runs at the DMA completion with only
+   what its author curried at enqueue.  But the facts a WAL write's fupd needs
+   about the PHYSICAL log region are chain facts -- established by the
+   PREVIOUS writes -- so they have to be read out of a mirror the ERA holds a
+   half of, and the crash predicate's own half of that mirror sits under an
    EXISTENTIAL (the mirror gname is per-era, because a fixed one could never
    be re-paired after a crash).  Matching the two halves therefore needs the
    fupd to know that the recorded custodian IS the ambient era.
 
-   The only thing that knows which generation is current is [state_interp],
-   and the DMA completion holds it -- so the completion THREADS IT IN, in the
-   same accessor style [VirtioProto.virtio_proto_step] uses for the image
-   auth: it supplies its own [(g, E)] and registry element, plus
-   [state_interp]'s started-generations auth with the live-era arithmetic
-   [n = g + 1], and takes the auth back.  Inside, the arm's [gen_started g'']
-   against that auth gives [g'' <= g] and the author's own [swap_lb g] gives
-   [g <= g''], so [g'' = g]; [era_registered] agreement at the shared key
-   then gives [E'' = E] and the mirror gname is identified.
+   THE AUTHOR'S OWN GENERATION IS THE ONLY WORKABLE INDEX, and an earlier
+   draft that quantified over the CONSUMER's generation instead
+   ([∀ g E, era_registered g E -∗ …]) is UNPROVABLE at every real call site:
+   everything a client can curry is at ITS [gen_id] -- [swap_lb (S gen_id)]
+   and the mirror half at [era_mirror_name riscv_eraGS] -- while the squeeze
+   would need both at the supplied [g].  The gap is exactly [g = gen_id], and
+   it has no source: the registry is a plain [ghost_map nat riscvEraGS] with
+   no injectivity (the base rules never need any -- [RiscvExec] identifies
+   [E = riscv_eraGS] only in the [ggen = gen_id] case and parks a stale thread
+   with [wp_dead]), and a [mono_nat] lower bound cannot be raised.  Nor MAY it
+   be derivable: a stale era's permit must fail, or the crash predicate is
+   unsound.
 
-   The IDENTITY permit ignores all four extra arguments, so a read's permit
-   is still free at an ARBITRARY crash predicate. *)
+   So the freshness certificate comes from the completion, against the
+   author's own [gd]: the completion threads in [state_interp]'s
+   started-generations auth with the live-era arithmetic [n = gd + 1] and
+   takes it back.  The client instantiates
+   [FsCrash.fs_arm_acc] at [(gen_id, riscv_eraGS)] and the squeeze closes:
+   its own [swap_lb (S gen_id)] gives [S gen_id <= c] from below, the arm's
+   [gen_started g''] against that auth gives [g'' <= gen_id] from above, so
+   [c = S gen_id] and [g'' = gen_id] -- and [era_registered] agreement AT THE
+   SHARED KEY then gives [E'' = riscv_eraGS].
+
+   WHAT MAKES THE CONSUMPTION SIDE WORK is era-locality, not per-request data:
+   [PermInv.perm_inv] is indexed by the SAME [gd], so every permit in an era's
+   channel is at that era's generation by construction, and [wp_disk_loop]
+   holds the channel at its own [gen_id].  A dead era's channel is simply
+   never opened again -- its device loop corpse-steps -- so its permits die
+   unconsumed, which is exactly the soundness story.
+
+   The IDENTITY permit ignores both remaining arguments, so a read's permit is
+   still free at an ARBITRARY crash predicate. *)
 
 (* THE IDENTITY PERMIT, and why it is still free.  A request that moves no
    disk byte carries [w = None], and [wr_apply None] is the identity ON THE
@@ -567,10 +587,10 @@ Definition disk_write_permit `{!riscvFixedGS Σ} (w : disk_wr) (Q : iProp Σ)
    same and the permit is provable for an ARBITRARY client predicate.  Every
    READ deposits this, which is what keeps the whole read stack (bread and
    everything above it) textually unchanged by the C2a reshape. *)
-Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} :
-  ⊢ disk_write_permit None True.
+Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} (gd : nat) :
+  ⊢ disk_write_permit gd None True.
 Proof.
-  rewrite /disk_write_permit. iIntros (dk g E n) "_ Hs _ HP". iModIntro.
+  rewrite /disk_write_permit. iIntros (dk n) "Hs _ HP". iModIntro.
   rewrite wr_apply_none. iFrame "HP Hs".
 Qed.
 
@@ -590,11 +610,12 @@ Qed.
 Definition crash_pred_indifferent `{!riscvFixedGS Σ} : Prop :=
   forall dk dk' : Z -> bv 8, ⊢ (riscv_crash_pred dk -∗ riscv_crash_pred dk')%I.
 
-Lemma disk_write_permit_indifferent `{!riscvFixedGS Σ} (w : disk_wr) :
-  crash_pred_indifferent -> ⊢ disk_write_permit w True.
+Lemma disk_write_permit_indifferent `{!riscvFixedGS Σ} (gd : nat)
+    (w : disk_wr) :
+  crash_pred_indifferent -> ⊢ disk_write_permit gd w True.
 Proof.
   intros Hind. rewrite /disk_write_permit.
-  iIntros (dk g E n) "_ Hs _ HP". iModIntro.
+  iIntros (dk n) "Hs _ HP". iModIntro.
   iSplitL "HP"; [| iFrame "Hs"].
   iNext. iApply (Hind dk (wr_apply w dk) with "HP").
 Qed.

@@ -1767,7 +1767,7 @@ Section InstallTransBlocks.
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                     Hdev Hgeo Hdlock Hhold [] [-]").
     (* THE PHASE-C2a BRIDGE PERMIT (see ProofWriteHead) *)
-    { iApply (disk_write_permit_indifferent _ Hind). }
+    { iApply (disk_write_permit_indifferent _ _ Hind). }
     iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
     assert (Hpca6 : ret_pc (B7 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0xa6)).
     { rewrite HB7ra. apply bv_eq; vm_compute; reflexivity. }

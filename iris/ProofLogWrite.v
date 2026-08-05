@@ -1955,7 +1955,7 @@ Section ProofLogWrite.
     iDestruct "Hbatch" as (nl) "(%Hsum & Hbatch)".
     rewrite /log_batch.
     iDestruct "Hbatch" as (W L D)
-      "(%Hlen & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool)".
+      "(%Hlen & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
     destruct Hlen as [HlenW HnlB].
     (* ---- the ledger spend: one budget unit, and nl <= 29 out of it ---- *)
     iMod (log_spend_step with "Hoauth Hop") as (i0) "(%Hi0 & Hoauth & Hop)".
@@ -2164,7 +2164,8 @@ Section ProofLogWrite.
     iAssert (lw_closeA γ bn γfs γd cov logstart dev k pidv bno bs bsd u nl W
              ∧ lw_closeB γ bn γfs γd cov logstart dev k pidv bno bs bsd u nl W)%I
       with "[Houtc Hcmtc Hncc Hoauth HLauth HDauth Hcovrest Hcovb Hhdr Hlogr Hpool
-             Hjtail HpL HpD Hextra Hslk Hpid Hvalid Hdevh Hbdisk Hbytes Hdisk Hfsb Hop]"
+             Hmirc Hjtail HpL HpD Hextra Hslk Hpid Hvalid Hdevh Hbdisk Hbytes Hdisk
+             Hfsb Hop]"
       as "Hcl".
     { iSplit.
       - (* ---------------- ABSORB ---------------- *)
@@ -2194,7 +2195,7 @@ Section ProofLogWrite.
           iSplitL "Hcovb Hcovrest".
           { rewrite (big_sepS_delete _ cov (uint bno) Hcovbno).
             iSplitL "Hcovb"; [iExact "Hcovb" | iExact "Hcovrest"]. }
-          iFrame "Hhdr Hlogr Hpool".
+          iFrame "Hhdr Hlogr Hpool Hmirc".
         + rewrite /lw_res. iFrame "Hop Hfsb Hslot".
           rewrite /bio_locked /bio_held.
           iSplitR; [iPureIntro; exact Hk2|].
@@ -2266,7 +2267,7 @@ Section ProofLogWrite.
             { apply elem_of_difference in Hx as [_ Hx].
               intro Hc. apply Hx. rewrite Hc. apply elem_of_singleton. reflexivity. }
             rewrite (lw_bd_snoc W bno x Hxne). done. }
-          iFrame "Hhdr Hlogr Hpool".
+          iFrame "Hhdr Hlogr Hpool Hmirc".
         + rewrite /lw_res. iFrame "Hop Hfsb Hslot".
           rewrite /bio_locked /bio_held.
           iSplitR; [iPureIntro; exact Hk2|].

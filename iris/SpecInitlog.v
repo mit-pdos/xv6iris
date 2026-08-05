@@ -169,6 +169,13 @@ Definition wp_initlog_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
+  (* THE ERA'S LOG-REGION MIRROR VARIABLE (phase C2b/D1 stage 2), whole: no
+     custody of the crash record has been taken yet, so both halves are the
+     era's, and [initlog] is what splits them -- one into [log_batch] (the
+     era's continuing half), one into [P_fs]'s checked-out arm when the swap
+     lands (stage 3).  It comes from the era boot bundle, minted at PowerOn
+     beside the disk image map. *)
+  log_mirror_full -∗
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
   procs_inv Φ γs -∗

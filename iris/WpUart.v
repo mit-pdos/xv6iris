@@ -713,6 +713,14 @@ Section DevLoops.
   Lemma disk_inv_alloc E γd : disk_inv_body γd ={E}=∗ disk_inv γd.
   Proof. iIntros "Hbody". rewrite /disk_inv. by iApply inv_alloc. Qed.
 
+  (* THE PERMIT CHANNEL IS ERA-LOCAL, so the bundle that carries it names the
+     era's generation -- and it names it as the AMBIENT [gen_id], not as an
+     explicit argument, so every client spec in the tree stays textually
+     unchanged (a [GenId] instance is in scope wherever [dev_inv] is, and it
+     is the same one for every thread of an era: they are all spawned at the
+     generation [power_boot_res] is handed out at).  The section's own [GEN]
+     is that instance -- [dev_inv] simply starts using it. *)
+
   (* The device invariant as a client-facing, duplicable proposition: the
      BUNDLE of the three per-device invariants.  Same name and same arguments
      as before the split, so every client spec in the tree is unchanged --
@@ -723,7 +731,7 @@ Section DevLoops.
      client threads [dev_inv] and borrows the fragment by opening the relevant
      half around the access. *)
   Definition dev_inv (γ : uart_names) (γd : disk_names) : iProp Σ :=
-    (uart_inv γ ∗ plic_inv ∗ disk_inv γd ∗ perm_inv (dn_perm γd))%I.
+    (uart_inv γ ∗ plic_inv ∗ disk_inv γd ∗ perm_inv gen_id (dn_perm γd))%I.
 
   Global Instance dev_inv_persistent γ γd : Persistent (dev_inv γ γd).
   Proof. rewrite /dev_inv. apply _. Qed.
@@ -742,7 +750,7 @@ Section DevLoops.
      no client spec statement changed when it landed: every driver proof that
      already threads [dev_inv] can open [permN] to deposit its permit at
      enqueue and to collect its receipt after the wake. *)
-  Lemma dev_inv_perm γ γd : dev_inv γ γd -∗ perm_inv (dn_perm γd).
+  Lemma dev_inv_perm γ γd : dev_inv γ γd -∗ perm_inv gen_id (dn_perm γd).
   Proof. iIntros "(_ & _ & _ & #H)". iExact "H". Qed.
 
   (* ... and the bundle allocation, at the EXISTING signature: the old
@@ -752,7 +760,7 @@ Section DevLoops.
      three timeless per-device invariants are carved out of), and
      [perm_inv_body] is deliberately NOT timeless. *)
   Lemma dev_inv_alloc E γ γd :
-    dev_inv_body γ γd -∗ perm_inv_body (dn_perm γd) ={E}=∗ dev_inv γ γd.
+    dev_inv_body γ γd -∗ perm_inv_body gen_id (dn_perm γd) ={E}=∗ dev_inv γ γd.
   Proof.
     iIntros "Hbody Hperm". rewrite /dev_inv_body.
     iDestruct "Hbody" as (u p v) "(Hu & Hp & Hv & Hg & Hproto & %Hpok & %Hvok)".
@@ -762,7 +770,7 @@ Section DevLoops.
     { iExists p. iFrame "Hp". iPureIntro. exact Hpok. }
     iMod (disk_inv_alloc E γd with "[Hv Hproto]") as "#Hdinv".
     { iExists v. iFrame "Hv Hproto". iPureIntro. exact Hvok. }
-    iMod (perm_inv_alloc E (dn_perm γd) with "Hperm") as "#Hqinv".
+    iMod (perm_inv_alloc E gen_id (dn_perm γd) with "Hperm") as "#Hqinv".
     iModIntro. rewrite /dev_inv. iFrame "Huinv Hpinv Hdinv Hqinv".
   Qed.
 
@@ -897,7 +905,7 @@ Section DevLoops.
        deposited at enqueue re-establishes the crash predicate
        (claude-notes/design/crash.md).  [crashN] is disjoint from [diskN] and
        [plicN], so the two openings compose. *)
-    gen_cert -∗ crash_inv -∗ perm_inv (dn_perm γd) -∗ disk_inv γd -∗
+    gen_cert -∗ crash_inv -∗ perm_inv gen_id (dn_perm γd) -∗ disk_inv γd -∗
     plic_inv -∗
     WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -961,15 +969,14 @@ Section DevLoops.
       iDestruct (disk_tie_agree with "Htie Htie2") as %<-.
       (* THE CLIENT'S VIEW SHIFT, at the image the machine is moving FROM;
          it lands the crash predicate at [wr_apply wr] of it. *)
-      (* THE AMBIENT ERA GOES IN WITH THE VIEW SHIFT (phase C2b/D1): the
-         thread's own generation and era record, its registry element, and
-         [state_interp]'s started-generations auth with the live-era
-         arithmetic.  That is what lets a client fupd identify the crash
-         record's recorded custodian as ITSELF. *)
-      iDestruct "Hcert" as "(_ & _ & Hrege)".
-      iMod (perm_consume_kq (dn_perm γd) kq wr (v_disk (dvirtio d))
-              gen_id riscv_eraGS n
-              with "Hpbody Hpend Hrege Hsa [//] HP")
+      (* THE LIVE-ERA ARITHMETIC GOES IN WITH THE VIEW SHIFT (phase C2b/D1):
+         [state_interp]'s started-generations auth at [n = gen_id + 1].  The
+         channel is held at THIS thread's [gen_id], so every permit in it was
+         authored by this era and its [⌜n = gd + 1⌝] is exactly the fact
+         [wp_disk_step] already handed us -- which is what lets a client fupd
+         identify the crash record's recorded custodian as ITSELF. *)
+      iMod (perm_consume_kq gen_id (dn_perm γd) kq wr (v_disk (dvirtio d)) n
+              with "Hpbody Hpend Hsa [//] HP")
         as "(Hpbody & Hdone & Hsa & HP)".
       (* THE MECHANICAL TIE UPDATE: both halves, together, to the image the
          device just produced.  It is the completion's own job -- the client

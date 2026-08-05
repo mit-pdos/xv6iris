@@ -677,15 +677,20 @@ Section EndOpDefs.
       ⌜n = length W /\ (n <= LOGBLOCKS)%nat⌝ ∗
       ⌜NoDup (map uint W)⌝ ∗
       ⌜forall w, w ∈ W -> uint w ∈ cov /\ ~ (uint w ∈ log_region_set logstart)⌝ ∗
+      (* the era's mirror half travels OUTSIDE [eo_open]: the commit moves the
+         on-disk header away from clean and back, so it cannot ride a bundle
+         that is held across [write_head] *)
+      log_mirror_clean ∗
       eo_open bn γfs cov logstart n W L D (fun _ => []) 0.
   Proof.
     rewrite /log_batch /eo_open.
     iIntros "H". iDestruct "H" as (W L D)
-      "(%Hlen & %Hnd & %Hwok & Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hlogr & Hpool)".
+      "(%Hlen & %Hnd & %Hwok & Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
     iExists W, L, D.
     iSplitR; [iPureIntro; exact Hlen|].
     iSplitR; [iPureIntro; exact Hnd|].
     iSplitR; [iPureIntro; exact Hwok|].
+    iSplitL "Hmirc"; [iExact "Hmirc"|].
     iSplitL "Hncell"; [iExact "Hncell"|].
     iSplitL "HW"; [iExact "HW"|].
     iSplitL "Hjunk"; [iExact "Hjunk"|].
@@ -701,11 +706,12 @@ Section EndOpDefs.
   Lemma eo_open_to_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
       (logstart : Z) (L : gmap Z (list (bv 8))) (D : gmap Z bool)
       (Lw : nat -> list (bv 8)) :
+    log_mirror_clean -∗
     eo_open bn γfs cov logstart 0 [] L D Lw 0 -∗
     log_batch bn γfs cov logstart 0.
   Proof.
     rewrite /log_batch /eo_open.
-    iIntros "(Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & _ & Hlogr & Hpool)".
+    iIntros "Hmirc (Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & _ & Hlogr & Hpool)".
     iExists [], L, D.
     iSplitR; [iPureIntro; split; [reflexivity | unfold LOGBLOCKS; lia]|].
     iSplitR; [iPureIntro; constructor|].
@@ -718,7 +724,8 @@ Section EndOpDefs.
     iSplitL "Hcov"; [iExact "Hcov"|].
     iSplitL "Hhdr"; [iExact "Hhdr"|].
     replace (LOGBLOCKS - 0)%nat with LOGBLOCKS in * by (unfold LOGBLOCKS; lia).
-    iSplitL "Hlogr"; [iExact "Hlogr"|]. iExact "Hpool".
+    iSplitL "Hlogr"; [iExact "Hlogr"|].
+    iSplitL "Hpool"; [iExact "Hpool"|]. iExact "Hmirc".
   Qed.
 
   (* ---- the payload's pieces, extracted / re-assembled without a case
@@ -1619,6 +1626,7 @@ Section EndOpBlocks.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     eo_frame4 m -∗
     eo_frameS m -∗
+    log_mirror_clean -∗
     eo_open bn γfs cov logstart n W L D Lw n -∗
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -1627,7 +1635,7 @@ Section EndOpBlocks.
     destruct Hshape as [HnW Hn30].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hppid #Hprocs #Hscheds
-              Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hframe HframeS Hopen Hcont".
+              Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc Hopen Hcont".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
     rewrite /eo_open.
     iDestruct "Hopen" as
@@ -1990,10 +1998,10 @@ Section EndOpBlocks.
       rewrite (bslots_op bn 1 (1 + length W)).
       iSplitL "Hu3"; [iExact "Hu3"|iExact "Hu2"]. }
     iAssert (log_batch bn γfs cov logstart 0)
-      with "[Hncell HauthL HauthD Hcov Hhdr Hjunk Hlogr Hpool]" as "Hbatch".
+      with "[Hncell HauthL HauthD Hcov Hhdr Hjunk Hlogr Hpool Hmirc]" as "Hbatch".
     { iApply (eo_open_to_batch bn γfs cov logstart
                 (<[log_hdr_bno logstart := bs2]> (<[log_hdr_bno logstart := bs1]> L))
-                (dirty_clear D (map uint W)) Lw).
+                (dirty_clear D (map uint W)) Lw with "Hmirc").
       rewrite /eo_open.
       iSplitL "Hncell"; [iExact "Hncell"|].
       iSplitR; [by iApply big_sepL_nil|].
@@ -2092,6 +2100,7 @@ Section EndOpBlocks.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     eo_frame4 m -∗
     eo_frameS m -∗
+    log_mirror_clean -∗
     eo_open bn γfs cov logstart n W L D Lw t -∗
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -2104,7 +2113,7 @@ Section EndOpBlocks.
       [ exfalso; exact (eo_fuel_absurd t n Ht Hfuel) |].
     pose proof Hregs as (Hsp & Hthr).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hppid #Hprocs #Hscheds
-              Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hframe HframeS Hopen Hcont".
+              Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hframe HframeS Hmirc Hopen Hcont".
     iPoseProof (log_ctx_frozen with "Hlctx") as "#Hlfz".
     iDestruct "Hlfz" as "[#Hdevc #Hstc]".
     rewrite /eo_open.
@@ -2824,7 +2833,7 @@ Section EndOpBlocks.
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
                     Hdevi Hdgeom Hdlock Hhold []").
     (* THE PHASE-C2a BRIDGE PERMIT (see ProofWriteHead) *)
-    { iApply (disk_write_permit_indifferent _ Hind). }
+    { iApply (disk_write_permit_indifferent _ _ Hind). }
     iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
     assert (Hpcec : ret_pc (H2 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0xec)).
     { rewrite HH2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -3196,7 +3205,7 @@ Section EndOpBlocks.
       iApply (IH CIDa25 (S t) J3 (<[uint bnol := bs2]> L) Lw' Hlt
                 (eo_fuel_step t n fuel Hfuel) HLw' HJ3regs HJ3s2 HJ3s4 HJ3s5
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hppid Hprocs Hscheds
-                      Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hopen Hcont").
+                      Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hopen Hcont").
     - (* the loop is done: S t = n, and the commit tail follows *)
       assert (Htn : S t = n) by lia.
       assert (Hcmp : zopz0zI_s (rget J3 Rs2) (rget J3 Ra5) = false).
@@ -3227,7 +3236,7 @@ Section EndOpBlocks.
                       [ apply lookup_lt_Some in Hv; lia | exact Hv ])
                 HJ3regs
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hppid Hprocs Hscheds
-                      Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hopen Hcont").
+                      Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hopen Hcont").
   Qed.
 
 
@@ -4108,7 +4117,8 @@ Section ProofEndOp.
       iDestruct (eo_cont_shift (CIDa := CIDq) (CIDb := CIDr) Φ j pidv dq m K true C true
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
       (* ---- the batch, opened for the commit body ---- *)
-      iDestruct (eo_open_of_batch with "Hbatch") as (W L D) "(%Hshape & %Hnd & %Hwok & Hopen)".
+      iDestruct (eo_open_of_batch with "Hbatch") as (W L D)
+        "(%Hshape & %Hnd & %Hwok & Hmirc & Hopen)".
       pose proof Hshape as [HnW Hn30].
       rewrite /eo_open.
       iDestruct "Hopen" as
@@ -4172,7 +4182,7 @@ Section ProofEndOp.
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iDestruct (eo_cont_shift (CIDa := CIDr) (CIDb := CIDs2) Φ j pidv dq m K true C true
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iDestruct (eo_open_to_batch with "Hopen") as "Hbatch".
+        iDestruct (eo_open_to_batch with "Hmirc Hopen") as "Hbatch".
         iApply (eo_tail (CID0 := CIDs2) Φ γs j γl bn γ γfs cov logstart dev pidv dq
                   m V1 K true C HK Hind eq_refl HV1regsE
                   with "Hcg Hcnt Htext Hpc Hpanic Hlctx Hprocs Hoctx Hpark Hppid
@@ -4353,7 +4363,7 @@ Section ProofEndOp.
                   CIDs9 0%nat Y4 L (fun _ => []) ltac:(lia) ltac:(lia)
                   ltac:(intros i v Hi Hv; lia) HY4regs HY4s2 HY4s4 HY4s5
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hppid Hprocs Hscheds
-                        Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hopen Hcont").
+                        Hoctx Hpark Hdevi Hdgeom Hdlock Hframe HframeS Hmirc Hopen Hcont").
     - (* ---- THE FAST PATH: other operations are still open ---- *)
       assert (Hnz26 : neq_vec (rget T4 Rs2) (zero_reg : mword 64) = true).
       { rgne. rewrite HT4s2 (eo_neq0 (out - 1)%nat Hout3d).

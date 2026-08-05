@@ -889,7 +889,7 @@ Section BootAlloc.
     assert (Hacceq : uart_acc (g.(gdev).(duart)) = u_out (g.(gdev).(duart)))
       by (rewrite Hu0; reflexivity).
     iEval (rewrite -Hacceq) in "Hlb".
-    iMod (disk_ghosts_alloc (g.(gdev).(dvirtio))
+    iMod (disk_ghosts_alloc gen_id (g.(gdev).(dvirtio))
             ltac:(rewrite Hv0; apply virtio_reset_not_live)
             ltac:(rewrite Hv0; apply virtio_reset_seen)
             ltac:(rewrite Hv0; apply virtio_reset_used_idx))

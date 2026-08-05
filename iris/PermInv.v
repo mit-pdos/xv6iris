@@ -70,23 +70,33 @@ Section perm.
      by the saved proposition at [γq], of which the enqueuer keeps a
      persistent copy ([perm_receipt]) -- that is what lets it recognize its
      own [Q] among everybody else's at collection time. *)
-  Definition perm_slot (b : bool) (γq : gname) (w : disk_wr) : iProp Σ :=
+  Definition perm_slot (gd : nat) (b : bool) (γq : gname) (w : disk_wr)
+      : iProp Σ :=
     (∃ Q : iProp Σ,
        saved_prop_own γq DfracDiscarded Q ∗
-       if b then disk_write_permit w Q else Q)%I.
+       if b then disk_write_permit gd w Q else Q)%I.
 
-  Definition perm_inv_body (γP : gname) : iProp Σ :=
+  (* THE CHANNEL IS ERA-LOCAL, AND [gd] IS WHAT SAYS SO.  Every permit an
+     era's clients deposit is authored by that era, so the invariant carries
+     the generation ONCE rather than per entry -- which is precisely what lets
+     the completion discharge the permit's [⌜n = gd + 1⌝] from the live-era
+     arithmetic [wp_disk_step] already hands it ([n = gen_id + 1], and the
+     disk loop holds the channel at its OWN [gen_id]).  A dead era's channel
+     is never opened again -- its device loop corpse-steps -- so its permits
+     die unconsumed. *)
+  Definition perm_inv_body (gd : nat) (γP : gname) : iProp Σ :=
     (∃ m : gmap nat (bool * gname * disk_wr),
        ghost_map_auth γP 1 m ∗
-       [∗ map] k ↦ x ∈ m, perm_slot x.1.1 x.1.2 x.2)%I.
+       [∗ map] k ↦ x ∈ m, perm_slot gd x.1.1 x.1.2 x.2)%I.
 
   (* Disjoint from [crashN] (= [nroot .@ "crash"]) and from every
      [devN]-derived namespace, so the completion can hold all three open. *)
   Definition permN : namespace := nroot .@ "permit".
 
-  Definition perm_inv (γP : gname) : iProp Σ := inv permN (perm_inv_body γP).
+  Definition perm_inv (gd : nat) (γP : gname) : iProp Σ :=
+    inv permN (perm_inv_body gd γP).
 
-  Global Instance perm_inv_persistent γP : Persistent (perm_inv γP).
+  Global Instance perm_inv_persistent gd γP : Persistent (perm_inv gd γP).
   Proof. rewrite /perm_inv. apply _. Qed.
 
   (* THE TIMELESS SKELETON: this is what a request slot stores.  It is a
@@ -122,7 +132,7 @@ Section perm.
 
   (* the empty channel, as the body an [inv_alloc] consumes.  Nothing is in
      flight at power-on, so the map is empty and no permit is owed. *)
-  Lemma perm_ghost_alloc : ⊢ |==> ∃ γP : gname, perm_inv_body γP.
+  Lemma perm_ghost_alloc (gd : nat) : ⊢ |==> ∃ γP : gname, perm_inv_body gd γP.
   Proof.
     iMod (ghost_map_alloc (∅ : gmap nat (bool * gname * disk_wr)))
       as (γP) "[Hauth _]".
@@ -130,7 +140,7 @@ Section perm.
     iExists ∅. iFrame "Hauth". by rewrite big_sepM_empty.
   Qed.
 
-  Lemma perm_inv_alloc E γP : perm_inv_body γP ={E}=∗ perm_inv γP.
+  Lemma perm_inv_alloc E gd γP : perm_inv_body gd γP ={E}=∗ perm_inv gd γP.
   Proof. iIntros "Hbody". rewrite /perm_inv. by iApply inv_alloc. Qed.
 
   (* ==================================================================== *)
@@ -143,9 +153,10 @@ Section perm.
      is the only thing that knows which keys are taken), which is why the
      caller receives it rather than supplying it -- and why nothing in this
      file has to know that the caller's requests are queue positions. *)
-  Lemma perm_deposit (γP : gname) (w : disk_wr) (Q : iProp Σ) (E : coPset) :
+  Lemma perm_deposit (gd : nat) (γP : gname) (w : disk_wr) (Q : iProp Σ)
+      (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv γP -∗ disk_write_permit w Q ={E}=∗
+    perm_inv gd γP -∗ disk_write_permit gd w Q ={E}=∗
       ∃ (k : nat) (γq : gname), perm_tok γP k true γq w ∗ perm_receipt γq Q.
   Proof.
     iIntros (HE) "#Hinv Hperm".
@@ -164,7 +175,7 @@ Section perm.
     iMod ("Hclose" with "[Hauth Hents Hperm]") as "_".
     { iNext. rewrite /perm_inv_body. iExists (<[k := (true, γq, w)]> m).
       iFrame "Hauth".
-      rewrite (big_sepM_insert (fun k x => perm_slot x.1.1 x.1.2 x.2) m k
+      rewrite (big_sepM_insert (fun k x => perm_slot gd x.1.1 x.1.2 x.2) m k
                  (true, γq, w) Hk).
       iSplitR "Hents"; [| iExact "Hents"].
       rewrite /perm_slot /=. iExists Q. iFrame "Hsp Hperm". }
@@ -185,19 +196,19 @@ Section perm.
      The token in hand is what refutes the done arm: the element is
      exclusive and the auth pins its value, so [b = true] and the permit is
      provably unspent. *)
-  Lemma perm_consume (γP : gname) (k : nat) (γq : gname) (w : disk_wr)
-      (dk : Z -> bv 8) (g : nat) (E : riscvEraGS) (n : nat) :
-    perm_inv_body γP -∗ perm_tok γP k true γq w -∗
-    era_registered g E -∗ start_auth n -∗ ⌜n = (g + 1)%nat⌝ -∗
+  Lemma perm_consume (gd : nat) (γP : gname) (k : nat) (γq : gname)
+      (w : disk_wr) (dk : Z -> bv 8) (n : nat) :
+    perm_inv_body gd γP -∗ perm_tok γP k true γq w -∗
+    start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
     ▷ riscv_crash_pred dk ==∗
-      perm_inv_body γP ∗ perm_tok γP k false γq w ∗ start_auth n ∗
+      perm_inv_body gd γP ∗ perm_tok γP k false γq w ∗ start_auth n ∗
       ▷ riscv_crash_pred (wr_apply w dk).
   Proof.
-    iIntros "Hbody Htok #Hera Hsa %Hn HP". rewrite {1}/perm_inv_body.
+    iIntros "Hbody Htok Hsa %Hn HP". rewrite {1}/perm_inv_body.
     iDestruct "Hbody" as (m) "[Hauth Hents]".
     rewrite /perm_tok.
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
-    iDestruct (big_sepM_delete (fun k x => perm_slot x.1.1 x.1.2 x.2) m k
+    iDestruct (big_sepM_delete (fun k x => perm_slot gd x.1.1 x.1.2 x.2) m k
                  (true, γq, w) Hk with "Hents") as "[Hent Hents]".
     rewrite /perm_slot /=.
     iDestruct "Hent" as (Q) "[#Hsp Hpm]".
@@ -205,11 +216,11 @@ Section perm.
        moving the machine FROM.  The index move is the whole content of the
        reshaped permit: [w] is this request's write identity, pinned to the
        slot by [VirtioProto.slot_pend_res]. *)
-    iMod ("Hpm" $! dk g E n with "Hera Hsa [//] HP") as "(HP & Hsa & HQ)".
+    iMod ("Hpm" $! dk n with "Hsa [//]  HP") as "(HP & Hsa & HQ)".
     iMod (ghost_map_update (false, γq, w) with "Hauth Htok") as "[Hauth Htok]".
     iModIntro. iFrame "Htok Hsa HP". rewrite /perm_inv_body.
     iExists (<[k := (false, γq, w)]> m). iFrame "Hauth".
-    rewrite (big_sepM_insert_delete (fun k x => perm_slot x.1.1 x.1.2 x.2)
+    rewrite (big_sepM_insert_delete (fun k x => perm_slot gd x.1.1 x.1.2 x.2)
                m k (false, γq, w)).
     iSplitR "Hents"; [| iExact "Hents"].
     rewrite /perm_slot /=. iExists Q. iFrame "Hsp HQ".
@@ -235,29 +246,30 @@ Section perm.
   Global Instance perm_done_timeless γP kq w : Timeless (perm_done γP kq w).
   Proof. rewrite /perm_done. apply _. Qed.
 
-  Lemma perm_consume_kq (γP : gname) (kq : nat * gname) (w : disk_wr)
-      (dk : Z -> bv 8) (g : nat) (E : riscvEraGS) (n : nat) :
-    perm_inv_body γP -∗ perm_pend γP kq w -∗
-    era_registered g E -∗ start_auth n -∗ ⌜n = (g + 1)%nat⌝ -∗
+  Lemma perm_consume_kq (gd : nat) (γP : gname) (kq : nat * gname)
+      (w : disk_wr) (dk : Z -> bv 8) (n : nat) :
+    perm_inv_body gd γP -∗ perm_pend γP kq w -∗
+    start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
     ▷ riscv_crash_pred dk ==∗
-      perm_inv_body γP ∗ perm_done γP kq w ∗ start_auth n ∗
+      perm_inv_body gd γP ∗ perm_done γP kq w ∗ start_auth n ∗
       ▷ riscv_crash_pred (wr_apply w dk).
   Proof.
-    iIntros "Hbody Hpend #Hera Hsa %Hn HP". rewrite /perm_pend /perm_done.
-    iMod (perm_consume with "Hbody Hpend Hera Hsa [//] HP")
+    iIntros "Hbody Hpend Hsa %Hn HP". rewrite /perm_pend /perm_done.
+    iMod (perm_consume with "Hbody Hpend Hsa [//] HP")
       as "(Hbody & Htok & Hsa & HP)".
     iModIntro. iFrame "Hbody Htok Hsa HP".
   Qed.
 
   (* the pair form of the deposit: what an enqueuer calls, returning exactly
      the [vs_perm] it must publish in its slot *)
-  Lemma perm_deposit_kq (γP : gname) (w : disk_wr) (Q : iProp Σ) (E : coPset) :
+  Lemma perm_deposit_kq (gd : nat) (γP : gname) (w : disk_wr) (Q : iProp Σ)
+      (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv γP -∗ disk_write_permit w Q ={E}=∗
+    perm_inv gd γP -∗ disk_write_permit gd w Q ={E}=∗
       ∃ kq : nat * gname, perm_pend γP kq w ∗ perm_receipt kq.2 Q.
   Proof.
     iIntros (HE) "#Hinv Hperm".
-    iMod (perm_deposit γP w Q E HE with "Hinv Hperm") as (k γq) "[Htok #Hrc]".
+    iMod (perm_deposit gd γP w Q E HE with "Hinv Hperm") as (k γq) "[Htok #Hrc]".
     iModIntro. iExists (k, γq). rewrite /perm_pend /=. iFrame "Htok Hrc".
   Qed.
 
@@ -267,15 +279,15 @@ Section perm.
 
   (* Over the stripped body (a caller with a program step to spare): ONE
      later, and it is the saved-prop agreement's, not the invariant's. *)
-  Lemma perm_collect_body (γP : gname) (k : nat) (γq : gname) (w : disk_wr)
-      (Q : iProp Σ) :
-    perm_inv_body γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq w ==∗
-      perm_inv_body γP ∗ ▷ Q.
+  Lemma perm_collect_body (gd : nat) (γP : gname) (k : nat) (γq : gname)
+      (w : disk_wr) (Q : iProp Σ) :
+    perm_inv_body gd γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq w ==∗
+      perm_inv_body gd γP ∗ ▷ Q.
   Proof.
     iIntros "Hbody #Hrc Htok". rewrite {1}/perm_inv_body /perm_tok /perm_receipt.
     iDestruct "Hbody" as (m) "[Hauth Hents]".
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
-    iDestruct (big_sepM_delete (fun k x => perm_slot x.1.1 x.1.2 x.2) m k
+    iDestruct (big_sepM_delete (fun k x => perm_slot gd x.1.1 x.1.2 x.2) m k
                  (false, γq, w) Hk with "Hents") as "[Hent Hents]".
     rewrite /perm_slot /=.
     iDestruct "Hent" as (Q') "[#Hsp HQ]".
@@ -290,10 +302,11 @@ Section perm.
   (* Over the invariant, in a plain fupd (no program step): TWO laters --
      the invariant's own, and the agreement's.  A caller with a step to
      spare should use [perm_collect_body] instead. *)
-  Lemma perm_collect (γP : gname) (k : nat) (γq : gname) (w : disk_wr)
-      (Q : iProp Σ) (E : coPset) :
+  Lemma perm_collect (gd : nat) (γP : gname) (k : nat) (γq : gname)
+      (w : disk_wr) (Q : iProp Σ) (E : coPset) :
     ↑permN ⊆ E ->
-    perm_inv γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq w ={E}=∗ ▷ ▷ Q.
+    perm_inv gd γP -∗ perm_receipt γq Q -∗ perm_tok γP k false γq w ={E}=∗
+      ▷ ▷ Q.
   Proof.
     iIntros (HE) "#Hinv #Hrc Htok".
     iInv "Hinv" as "Hbody" "Hclose".
@@ -303,7 +316,7 @@ Section perm.
     iMod "Hauth".
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
     iEval (rewrite big_sepM_later) in "Hents".
-    iDestruct (big_sepM_delete (fun k x => ▷ perm_slot x.1.1 x.1.2 x.2)%I
+    iDestruct (big_sepM_delete (fun k x => ▷ perm_slot gd x.1.1 x.1.2 x.2)%I
                  m k (false, γq, w) Hk with "Hents") as "[Hent Hents]".
     iMod (ghost_map_delete with "Hauth Htok") as "Hauth".
     iEval (rewrite -big_sepM_later) in "Hents".
@@ -319,10 +332,10 @@ Section perm.
 
   (* the pair form of the collection: what a woken enqueuer calls, over the
      [vs_perm] its own claim pinned *)
-  Lemma perm_collect_kq (γP : gname) (kq : nat * gname) (w : disk_wr)
-      (Q : iProp Σ) :
-    perm_inv_body γP -∗ perm_receipt kq.2 Q -∗ perm_done γP kq w ==∗
-      perm_inv_body γP ∗ ▷ Q.
+  Lemma perm_collect_kq (gd : nat) (γP : gname) (kq : nat * gname)
+      (w : disk_wr) (Q : iProp Σ) :
+    perm_inv_body gd γP -∗ perm_receipt kq.2 Q -∗ perm_done γP kq w ==∗
+      perm_inv_body gd γP ∗ ▷ Q.
   Proof.
     iIntros "Hbody #Hrc Htok". rewrite /perm_done.
     iApply (perm_collect_body with "Hbody Hrc Htok").

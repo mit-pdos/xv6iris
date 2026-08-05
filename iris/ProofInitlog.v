@@ -306,7 +306,7 @@ Section ProofInitlog.
     destruct Hgeom as [Hcovok Hlogsub].
     subst eb.
     unfold K_initlog in HK.
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hbio Hmirf Hppid #Hprocs #Hscheds
               Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hcont".
@@ -1397,8 +1397,24 @@ Section ProofInitlog.
               = false).
     { intro z. apply bool_decide_eq_false_2. apply not_elem_of_nil. }
     iApply fupd_wp.
+    (* ---- THE ERA'S MIRROR, SPLIT (phase C2b/D1 stage 2) ----
+       The era was handed the WHOLE variable at boot; the batch keeps one
+       half and the other is what [initlog]'s swap will hand to [P_fs]'s
+       checked-out arm (stage 3).  The value is set to a CLEAN header here,
+       which the clean-image precondition ([hdr_n bs_hdr = 0], and the header
+       block this function just wrote back unchanged) is exactly what
+       justifies -- the slot component is left as it was, because nothing
+       between commits ever reads it. *)
+    iDestruct "Hmirf" as (M0) "Hmirf".
+    iMod (ghost_var_update (MkLogMirror (0%nat, []) (lm_slots M0))
+            with "Hmirf") as "Hmirf".
+    iEval (rewrite -Qp.half_half) in "Hmirf".
+    iDestruct (ghost_var_split with "Hmirf") as "[Hmirc Hmirarm]".
+    iAssert (log_mirror_clean) with "[Hmirc]" as "Hmirc".
+    { rewrite /log_mirror_clean. iExists (MkLogMirror (0%nat, []) (lm_slots M0)).
+      iFrame "Hmirc". iPureIntro. reflexivity. }
     iAssert (log_batch bn γfs cov logstart 0%nat)
-      with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool]" as "Hbatch".
+      with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
     { rewrite /log_batch.
       iExists ([] : list (mword 32)), (<[log_hdr_bno logstart := bs']> L), D.
       iSplitR; [iPureIntro; split; [reflexivity | unfold LOGBLOCKS; lia]|].
@@ -1413,7 +1429,8 @@ Section ProofInitlog.
       { iApply (big_sepS_mono with "Hcovf"). intros z Hz. rewrite (Hbd z). done. }
       iSplitL "Hfsb"; [iExists bs'; iExact "Hfsb"|].
       iSplitL "Hslotsfs"; [iExact "Hslotsfs"|].
-      iExact "Hpool". }
+      iSplitL "Hpool"; [iExact "Hpool"|].
+      iExact "Hmirc". }
     iAssert (log_res (MkLogNames γlk γops) bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hbatch]" as "Hres".
     { rewrite /log_res.

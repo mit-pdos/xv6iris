@@ -1284,7 +1284,7 @@ Section VirtioProto.
      claude-notes/design/fs-log.md, stage 4).  Allocating a second map here
      would be unusable -- the auth [state_interp] holds, hence the one
      [virtio_proto_step] updates, is the era's. *)
-  Lemma disk_ghosts_alloc (v : virtio_state) :
+  Lemma disk_ghosts_alloc (gd : nat) (v : virtio_state) :
     virtio_live (v_cfg v) = false ->
     v_seen v = zero16 -> v_used_idx v = zero16 ->
     ⊢ |==> ∃ γ : disk_names,
@@ -1298,8 +1298,9 @@ Section VirtioProto.
         (* THE CRASH-PERMIT CHANNEL, empty: nothing is in flight at power-on,
            so no permit is owed.  Handed out as the BODY (not the invariant)
            because [WpUart.dev_inv_alloc] is what seals it, beside
-           [disk_inv]. *)
-        perm_inv_body (dn_perm γ).
+           [disk_inv].  [gd] is the ERA's generation: the channel only ever
+           holds permits its own era authored (PermInv.v). *)
+        perm_inv_body gd (dn_perm γ).
   Proof.
     intros Hlive Hsn Hui.
     iMod (ghost_map_alloc_empty (K:=nat)
@@ -1308,7 +1309,7 @@ Section VirtioProto.
     iMod (ghost_var_alloc 0%nat) as (gnp) "Hnp".
     iMod (ghost_map_alloc_empty (K:=nat) (V:=dclaim)) as (gclaim) "Hclaim".
     iMod (disk_cfg_alloc (v_cfg v)) as (gcfg) "Hcfg".
-    iMod (perm_ghost_alloc) as (gperm) "Hperm".
+    iMod (perm_ghost_alloc gd) as (gperm) "Hperm".
     iDestruct (disk_cfg_is_split
                  (DiskNames disk_img_name gslot gnc gnp gclaim gcfg gperm)
                  (v_cfg v) with "[Hcfg]") as "[Hcfg1 Hcfg2]".

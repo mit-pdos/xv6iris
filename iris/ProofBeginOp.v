@@ -358,14 +358,14 @@ Section BoProps.
        log_batch bn γfs cov logstart n).
   Proof.
     iIntros "H". rewrite /log_batch.
-    iDestruct "H" as (W L D) "(%Hlen & %Hnd & %Hcv & Hn & Hblk & Hjunk & HL & HD & Hdirty & Hhdr & Hsl & Hpool)".
+    iDestruct "H" as (W L D) "(%Hlen & %Hnd & %Hcv & Hn & Hblk & Hjunk & HL & HD & Hdirty & Hhdr & Hsl & Hpool & Hmirc)".
     iSplitR; [iPureIntro; exact (proj2 Hlen)|].
     iFrame "Hn". iIntros "Hn".
     iExists W, L, D.
     iSplitR; [iPureIntro; exact Hlen|].
     iSplitR; [iPureIntro; exact Hnd|].
     iSplitR; [iPureIntro; exact Hcv|].
-    iFrame "Hn Hblk Hjunk HL HD Hdirty Hhdr Hsl Hpool".
+    iFrame "Hn Hblk Hjunk HL HD Hdirty Hhdr Hsl Hpool Hmirc".
   Qed.
 
   (* The exit continuation, control at +0x58 (the store has already

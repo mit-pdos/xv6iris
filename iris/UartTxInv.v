@@ -56,6 +56,11 @@ Local Open Scope Z_scope.
 Section UartTxInv.
   Context `{!riscvGS Σ, !lockG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
+  (* [WpUart.dev_inv] carries the era-local permit channel at the ambient
+     generation (PermInv.v), so the two lemmas below that OPEN it are
+     [GenId]-indexed too.  Implicit, so no caller changes: every holder of
+     [dev_inv] has an instance in scope. *)
+  Context `{GEN : RiscvLang.GenId}.
 
   (* ---- geometry.  The lock's own two words ([locked] at +0, [cpu] at +16)
      belong to [lock_inv] (WpLock.v); nothing here names them. *)

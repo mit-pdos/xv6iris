@@ -561,7 +561,7 @@ Section WriteHeadBlocks.
        fupd lands in C2b; for now it deposits the identity view shift at the
        trivial receipt, which is sound exactly when the system promises
        nothing about durability -- the pure premise [Hind]. *)
-    { iApply (disk_write_permit_indifferent _ Hind). }
+    { iApply (disk_write_permit_indifferent _ _ Hind). }
     iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold _".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (WH + 0x4c)).
     { rewrite HT2ra. apply bv_eq; vm_compute; reflexivity. }

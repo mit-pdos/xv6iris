@@ -28,7 +28,7 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap frac.
-From iris.base_logic.lib Require Import ghost_map invariants.
+From iris.base_logic.lib Require Import ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
@@ -217,6 +217,37 @@ Section LogInv.
   Proof. apply _. Qed.
 
   (* ---------------------------------------------------------------- *)
+  (*  The ERA's half of the log-region MIRROR (phase C2b/D1 stage 2)    *)
+  (*                                                                    *)
+  (*  [RiscvPtsto.log_mirror] records what the LOG REGION of the         *)
+  (*  physical disk holds -- the header's decoding and the slots'        *)
+  (*  contents.  The crash record's checked-out arm holds one half       *)
+  (*  ([FsCrash.fs_custody]) and the ERA holds the other, and a WAL       *)
+  (*  write's fupd meets the two: that is the only way a STATELESS view   *)
+  (*  shift can know facts the PREVIOUS writes established ("the on-disk  *)
+  (*  header is clean", "the slots hold the logged values").             *)
+  (*                                                                     *)
+  (*  Which half lives where, and why the value is existential: the era's *)
+  (*  half rides [log_batch], so it is exactly as available as the batch  *)
+  (*  is -- in the lock between commits, checked out by the committer     *)
+  (*  during one.  The BETWEEN-COMMITS form carries the pure conjunct     *)
+  (*  [lm_hdr M = (0, [])]: with the batch in the lock the on-disk header *)
+  (*  is clean, which is what a log-fill fupd reads out of it, and the    *)
+  (*  final [write_head] of a commit (the CLEAR) is what re-establishes   *)
+  (*  it before the batch goes back.  Both forms keep [M] existential so  *)
+  (*  that no statement above this file grows a binder for it.            *)
+  (* ---------------------------------------------------------------- *)
+
+  (* the whole variable, as the era boot bundle mints it: no custody has
+     been taken yet, so both halves are the era's *)
+  Definition log_mirror_full : iProp Σ :=
+    (∃ M : log_mirror, ghost_var mirror_name 1 M)%I.
+
+  Definition log_mirror_clean : iProp Σ :=
+    (∃ M : log_mirror,
+       ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = (0%nat, [])⌝)%I.
+
+  (* ---------------------------------------------------------------- *)
   (*  The batch bundle (checked out wholesale by the committer)        *)
   (* ---------------------------------------------------------------- *)
 
@@ -260,7 +291,9 @@ Section LogInv.
           install_trans's bunpins deposit their freed units back instead
           of end_op dropping them: pool + n = LOGBLOCKS + 2 is
           inductive. *)
-       bslots bn ((LOGBLOCKS - n) + 2)%nat)%I.
+       bslots bn ((LOGBLOCKS - n) + 2)%nat ∗
+       (* THE ERA'S MIRROR HALF, at the between-commits picture *)
+       log_mirror_clean)%I.
 
   (* ---------------------------------------------------------------- *)
   (*  The lock's resource                                              *)

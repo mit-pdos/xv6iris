@@ -729,7 +729,7 @@ Section VdrwfP6.
        receipt from, and the persistent handle that says WHICH receipt is
        ours -- the claim pins [vs_perm] of our own slot, so the token the
        parked payoff carries is at exactly this [kq]. *)
-    perm_inv (dn_perm γd) -∗
+    perm_inv gen_id (dn_perm γd) -∗
     perm_receipt kq.2 Q -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -821,7 +821,7 @@ Section VdrwfP6.
        to execute before it reaches its continuation, which is why the
        postcondition below is a single [▷ Q]. *)
     iApply fupd_wp.
-    iMod (perm_collect (dn_perm γd) kq.1 kq.2 _ Q ⊤ ltac:(solve_ndisj)
+    iMod (perm_collect gen_id (dn_perm γd) kq.1 kq.2 _ Q ⊤ ltac:(solve_ndisj)
             with "Hqinv Hrcpt Hperm") as "HQ".
     iModIntro.
     assert (Hdcb : dc_buf (DClaim b (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) (h, m2, t) pin) = b) by reflexivity.
@@ -1798,7 +1798,7 @@ Section ProofVirtioDiskRwF.
        because a deposit only ADDS under the invariant's later. *)
     iDestruct (dev_inv_perm with "Hdinv") as "#Hqinv".
     iApply fupd_wp.
-    iMod (perm_deposit_kq (dn_perm γd) _ Q ⊤ ltac:(solve_ndisj)
+    iMod (perm_deposit_kq gen_id (dn_perm γd) _ Q ⊤ ltac:(solve_ndisj)
             with "Hqinv Hperm") as (kq) "[Hpend #Hrcpt]".
     iModIntro.
     (* the permit's INDEX, restated in the pin layer's vocabulary: the spec

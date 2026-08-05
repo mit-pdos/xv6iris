@@ -373,39 +373,23 @@ preserve v_disk: the record-P does not move, so the power arms frame it.
         mirror valid — what the install fupd re-establishes custody with.
 - [ ] **C2b/D1 stages 2-5 — BLOCKED, see below.**
 
-### THE PERMIT'S ∀-GENERATION HOLE (found doing D1 stage 4; BLOCKS 2-5)
+### THE PERMIT'S ∀-GENERATION HOLE — FOUND, FIXED (D1 stage 1.5)
 
-`fs_arm_acc`/`fs_arm_swap` are correct, but NO client can call them under
-the permit's CURRENT shape, so none of the three WAL fupds (nor initlog's
-swap) can be written. The permit is
-`∀ dk g E n, era_registered g E -∗ start_auth n -∗ ⌜n = g+1⌝ -∗ …`,
-i.e. the CONSUMER's generation is universally quantified, while everything
-the client can curry is at ITS OWN `gen_id`: `swap_lb (S gen_id)` and the
-mirror half at `era_mirror_name riscv_eraGS`. `fs_arm_acc` wants both at
-the supplied `(g, E)`. The gap is exactly `⌜g = gen_id⌝`, and it is NOT
-derivable:
+The shape that landed in C2b/D1/1 quantified the permit over the CONSUMER's
+generation (`∀ dk g E n, era_registered g E -∗ start_auth n -∗ ⌜n = g+1⌝ -∗ …`),
+and no client could call `fs_arm_acc` under it: everything a client can curry
+is at ITS `gen_id` (`swap_lb (S gen_id)`, the mirror half at
+`era_mirror_name riscv_eraGS`), while the lemma wants both at the supplied
+`g`. The gap is exactly `⌜g = gen_id⌝`, and it has no source — the registry is
+a plain `ghost_map nat riscvEraGS` with no injectivity (the base rules never
+need any: `RiscvExec` identifies `E = riscv_eraGS` only in the `ggen = gen_id`
+case and parks a stale thread with `wp_dead`), and a `mono_nat` lower bound
+cannot be raised. Nor MAY it be derivable: a stale era's permit must fail, or
+the crash predicate is unsound. Giving the client a FRACTION of `swap_auth`
+would supply the missing upper bound but would then require a dead era's
+cooperation to retire its arm — the one property the swap counter exists for.
 
-- `gen_started gen_id` against the supplied `start_auth (g+1)` gives only
-  `gen_id ≤ g`; the arm's own `gen_started g''` gives `g'' ≤ g`; the
-  client's `swap_lb (S gen_id)` gives `gen_id ≤ g''`. So
-  `gen_id ≤ g'' ≤ g` — the UPPER bound `g ≤ gen_id` is missing.
-- Nothing supplies it. The registry is a plain `ghost_map nat riscvEraGS`
-  with no injectivity (two keys may carry the same era record, and the
-  base rules never need injectivity — `RiscvExec` identifies
-  `E = riscv_eraGS` only in the `ggen = gen_id` case and parks a stale
-  thread with `wp_dead`). `mono_nat` lower bounds cannot be raised.
-  Making the client hold a FRACTION of `swap_auth` would supply the bound
-  (`mono_nat_auth_own` agreement) but then a fresh era could not retire
-  the dead era's arm unilaterally — which is the one property the counter
-  exists for.
-- And it MUST not be derivable: a stale era's permit must fail, or the
-  crash predicate is unsound. So the freshness certificate has to come
-  from the completion, and the completion has no idea which generation
-  authored the permit.
-
-**RECOMMENDED FIX (leaves FsCrash.v byte-identical — `fs_arm_acc` /
-`fs_arm_swap` are then instantiated at `(gen_id, riscv_eraGS)` exactly as
-written): index the permit by the DEPOSITING generation.**
+**THE FIX, LANDED: index the permit by its AUTHOR's generation.**
 
 ```
 disk_write_permit (gd : nat) (w : disk_wr) (Q : iProp Σ) :=
@@ -413,34 +397,62 @@ disk_write_permit (gd : nat) (w : disk_wr) (Q : iProp Σ) :=
     ▷ Pc dk ==∗ ▷ Pc (wr_apply w dk) ∗ start_auth n ∗ Q
 ```
 
-The `era_registered g E` premise DISAPPEARS (the client curries its own,
-out of `gen_cert`), and the squeeze closes: `swap_lb (S gen_id)` gives
-`S gen_id ≤ c`, `start_auth (gen_id+1)` against the arm's `gen_started g''`
-gives `g'' ≤ gen_id`, hence `c = S gen_id`, `g'' = gen_id`, and registry
-agreement AT THE SHARED KEY `gen_id` gives `E'' = riscv_eraGS`.
+`era_registered` leaves the type (the client curries its own, out of
+`gen_cert`), and `fs_arm_acc`/`fs_arm_swap` are then instantiated at
+`(gen_id, riscv_eraGS)` with **FsCrash.v byte-identical**: `swap_lb (S gen_id)`
+bounds the arm's counter from below, the threaded `start_auth (gen_id+1)`
+against the arm's `gen_started g''` bounds it from above, so `c = S gen_id`,
+`g'' = gen_id`, and registry agreement AT THE SHARED KEY gives
+`E'' = riscv_eraGS`.
 
-Consumption side: the completion must know `gd = gen_id`. Get it from the
-ERA-LOCALITY that already exists rather than from per-entry data —
-parameterize `PermInv.perm_inv`/`perm_inv_body`/`perm_ent` by `gd`, so
-every permit in the era's channel is at the era's generation by
-construction; `perm_deposit` then requires the client's permit at that
-`gd`, and `perm_consume`/`_kq` drop the `era_registered` premise and take
-`⌜n = gd+1⌝` (which `wp_disk_loop` already has in hand — it is the `[//]`
-it passes today). Files: `RiscvPtsto.v` (permit + trivial/indifferent),
-`PermInv.v`, `WpUart.v` (`dev_inv`/`dev_inv_alloc`/`wp_disk_loop` at
-`gen_id`), `ProofVirtioDiskRwF.v`, `SpecVirtioDiskRw.v`, `SpecBwrite.v`,
-and the boot site that allocates `dev_inv` for the new era (its generation
-is known there, and every era thread's `GenId` is instantiated to it).
-`RiscvExec.wp_disk_step` needs no change — it already threads
-`start_auth n` with `⌜n = gen_id+1⌝`; only the registry element it hands
-the callback becomes unused.
+What makes the CONSUMPTION side work is era-locality, not per-request data:
+`PermInv.perm_inv`/`perm_inv_body`/`perm_slot` are indexed by the same `gd`,
+so every permit in an era's channel is at that era's generation by
+construction, and `wp_disk_loop` holds the channel at its own `gen_id` — the
+`⌜n = gd+1⌝` it owes is exactly the live-era arithmetic `wp_disk_step` already
+hands it. A dead era's channel is never opened again (its device loop
+corpse-steps), so its permits die unconsumed.
 
-### C2b/D1 stages 2-5 (unchanged plan, to run after the fix)
-2. `LogInv.v`: the era-side mirror half in `log_res`/`log_batch` (the
-   batch form the committer checks out carries it; between commits
-   `log_res`'s arm), plus the era's `swap_lb (S g)` receipt —
-   `log_ctx` is the natural carrier (persistent, already threaded by
-   every log function).
+Files touched (RiscvExec untouched): `RiscvPtsto.v` (the permit + `_trivial` +
+`_indifferent`), `PermInv.v` (`gd` through the ten lemmas), `WpUart.v`
+(`dev_inv` now names the ambient `gen_id` — it is already inside a section
+with `GEN`, so **every client spec statement in the tree is textually
+unchanged**; `dev_inv_alloc`/`wp_disk_loop` follow), `VirtioProto.v`
+(`disk_ghosts_alloc` gains `gd`), `BootShared.v` + `RiscvAdequacy.v` (pass
+`gen_id` at the two alloc sites), `UartTxInv.v` (its two `dev_inv` lemmas gain
+the implicit `GEN`; the class must be written `RiscvLang.GenId` there — the
+short name is not in that file's scope and the backtick binder silently
+invents a `GenId : Type` variable instead), `ProofVirtioDiskRwF.v`,
+`SpecVirtioDiskRw.v`, `SpecBwrite.v` (permit premise at `gen_id`), and the
+three `disk_write_permit_indifferent _ _ Hind` call sites.
+
+### D1 STAGE 2 (the era-side mirror): what LANDED
+
+- `LogInv.v`: `log_mirror_full` (`∃ M, ghost_var mirror_name 1 M` — the whole
+  variable, as the era boot bundle mints it) and `log_mirror_clean`
+  (`∃ M, ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = (0, [])⌝` — the era's half
+  at the between-commits picture). `log_batch` gains `∗ log_mirror_clean` as
+  its last conjunct.
+  **KEEPING `M` EXISTENTIAL IS WHAT KEPT THE RIPPLE SMALL**: no statement
+  above `LogInv.v` grows a binder, so the twelve-file ripple is one name per
+  destruct pattern and one name per `iFrame`.
+- The mirror half travels OUTSIDE `ProofEndOp.eo_open`, threaded through
+  `eo_loop`/`eo_commit` as its own premise: a commit moves the on-disk header
+  away from clean and back, so the conjunct is false exactly while the
+  committer holds the batch open, and a bundle held across `write_head` could
+  not carry it.
+- `SpecInitlog.v` gains the premise `log_mirror_full` (no new binder, so the
+  `Module Type` is untouched); `ProofInitlog.v` sets the value to a clean
+  header, splits, keeps one half in `log_batch` and holds the other for the
+  swap (stage 3, where it goes to `P_fs`'s arm — until then it is dropped).
+- `log_ctx` does NOT grow: a client fupd never opens `crashN` (the completion
+  hands it `▷ Pc dk` directly), and the seam equations arrive with the `γs`
+  the fupd binds out of `Pc`'s own existential. The only thing `log_ctx` still
+  owes is the `swap_lb (S gen_id)` receipt, which cannot exist before the swap
+  that produces it — so it lands with stage 3.
+
+### C2b/D1 stages 3-5 (remaining)
+
 3. `initlog` (stage-2 clean form): the swap rides its final
    `write_head` fupd (`fs_arm_swap`), spending the era boot token; the
    mirror is `mirror_of` the post-write image, which is free inside the
