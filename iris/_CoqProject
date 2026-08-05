@@ -742,3 +742,15 @@ SpecSysDup.v
 ProofSysDup.v
 LinkArgfd.v
 LinkSysDup.v
+SpecSetkilled.v
+CodeSetkilled.v
+ProofSetkilled.v
+LinkSetkilled.v
+SpecKkill.v
+CodeKkill.v
+ProofKkill.v
+LinkKkill.v
+SpecSysKill.v
+CodeSysKill.v
+ProofSysKill.v
+LinkSysKill.v

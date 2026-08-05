@@ -194,6 +194,74 @@ the evidence for every offset. This file is only the worklist.
       with all four slots used (no gap); `p` parks in s1 across acquire and the
       value in s2 across release. `panic_wp` is threaded because the reworked
       `acquire` takes it.
+
+- [x] **`setkilled`, `kkill` and `sys_kill` PROVEN and LINKED** — with
+      `killed`, the whole `p->killed` cone. `SpecSetkilled` / `CodeSetkilled`
+      / `ProofSetkilled` / `LinkSetkilled` and `SpecKkill` / `CodeKkill` /
+      `ProofKkill` / `LinkKkill` over ACQUIRE + RELEASE; `SpecSysKill` /
+      `CodeSysKill` / `ProofSysKill` / `LinkSysKill` over ARGINT + KKILL.
+      **9 s / 23 s (1.1 GB) / 8 s**; all three axiom-clean (Sail primitives +
+      funext, nothing else), `proof_coverage` reads them `proven`. This is
+      the payoff for S1's FLAT invariant row: `kkill` writes `p->killed`,
+      reads `p->pid` and moves `p->state` on procs it does not own, and it
+      reaches every one of them at the TOP LEVEL of `proc_lock_res` — no
+      `proc_slots` guard is opened anywhere in the cone. What to reuse:
+
+      * **A `void` function whose whole effect is invisible.** `proc_pub`
+        quantifies `killed` existentially, so setkilled's postcondition is
+        EMPTY *and* the stored value never has to be computed — the
+        reassembly is `iExists _, xs, pid`. That is the right shape, not a
+        gap: the only reader is `killed()`, which any hart may call on any
+        proc, so no fraction of the cell can travel with the running thread
+        (`design/proc-struct.md`, discipline 1).
+      * **kkill IS wakeup's scan with a different test**, and it reuses
+        `SchedCtx.proc_lock_res_wakeup` verbatim for SLEEPING → RUNNABLE —
+        the lemma's comment always said it would. `ProofWakeup.v` is the
+        template to copy for any further proc[] walk: bounded fuel
+        induction, `wp_next b` loop invariant anchored at the lemma's own
+        `CID0`, and the acquire→release stretch at the literal `false`.
+      * **`kk_cs_rest`: ONE predicate for the callee-saved registers a
+        function neither saves nor uses** (here s4..s11), rather than
+        wakeup's eight explicit equalities. It composes through a call with
+        `callee_saved_lookup` and is cashed in at the epilogue for the eight
+        matching conjuncts of the final `callee_saved`. **The trap, and it
+        compiles-adjacent:** sp/s0/s1/s2/s3 all have `is_cs_idx = true`, so
+        the "insert at a non-callee-saved register" update lemma does NOT
+        apply to them — you need one update lemma per excluded index
+        (`kk_cs_rest_sp` / `_s0` / `_s1` / `_s2` / `_s3`, each one line,
+        `congruence` against the predicate's own premise). Getting it wrong
+        surfaces as a bare *"Unable to unify false with true"* far from the
+        cause.
+      * **Capture the frame in the EXIT continuation, don't thread it
+        through the loop.** kkill's scan never touches its own frame, so the
+        six saved cells and the caller's continuation are captured inside
+        the `iAssert`ed epilogue block, which is then handed to the loop as
+        its exit. wakeup threads a `wk_frame` through every iteration; there
+        is no need.
+      * **Build a shared block AFTER the case split that owns its
+        resources.** kkill's release-and-return-0 block at +0x4a has two
+        entries (both arms of the SLEEPING test) so it must be an
+        `iAssert` — but it consumes the exit continuation, which the
+        *no-match* path still needs for its own release and back edge. So
+        it is built inside the pid-match arm, not before the split.
+      * **`stack_own_slots` hands the cells at `pa_stk sp0 k`, and a slot
+        never passed to a leaf STAYS in that form.** Padding slots (kkill's
+        slot 0, setkilled's slot 0) must therefore be framed back with a
+        bare `iExact`, with no address rewrite — the rewrite every *used*
+        slot needs is exactly what breaks an unused one.
+      * `stk_fp_32` was the missing 32-byte member of `KernelRvcDecode`'s
+        `stk_fp_*` family (sys_kill's `addi s0,sp,32`); `cdec_d49c` /
+        `cexec_d49c` (`c.sw a5,40(s1)`, the `p->killed = 1` store) went into
+        `KernelRvcDecode` too, shared by setkilled and kkill.
+      * Stack budgets: setkilled `14 <= av`, kkill `16 <= av` (6 slots + 10
+        for acquire/release), sys_kill `22 <= av` (4 + argint's 18).
+      * **What the contracts deliberately do NOT say.** kkill returns 0 or
+        -1 and nothing relates that to the argument: `proc_pub` quantifies
+        every slot's pid and no resource in the tree ties a pid to a slot,
+        so a sharper postcondition would need a pid→slot ghost map that no
+        consumer wants. sys_kill hands the value straight to user space.
+        Same honesty as `killed`'s and sys_pause's return values.
+
 - [x] **S3b — `sys_pause` PROVEN and LINKED** (`CodeSysPause.v` /
       `ProofSysPause.v` / `LinkSysPause.v`, over ARGINT / ACQUIRE / RELEASE /
       MYPROC / KILLED / SLEEP; **42 s / 1.4 GB**, axiom-clean, `proof_coverage`

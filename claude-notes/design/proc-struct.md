@@ -54,17 +54,27 @@ held" group is *not* uniformly private.
 
 ### 1. Lock-protected and genuinely mutable — `state`, `chan`, `killed`, `xstate`
 
-Every core touches these on procs it does not own: `kill()` walks all 64 and
+Every core touches these on procs it does not own: `kkill()` walks all 64 and
 writes `killed`, `wakeup()` walks all 64 and compares `chan`, `scheduler()`
 walks all 64 and reads/writes `state`, `wait()` reads a child's `xstate`.
 Full ownership, always resident in the lock's resource. This is the group
 `proc_lock_res` already covers (`state`, `chan`); `killed` and `xstate` join
 it unchanged.
 
+**`killed` is quantified, and that is the design, not a gap.** `proc_pub`
+holds `p_killed pa ↦₄ kl` under an existential `kl`, so the invariant says
+nothing about the flag's value. The three consumers are all proven and all
+live with it: `killed()` returns a value its contract cannot constrain,
+`setkilled()` has an EMPTY postcondition (and never has to compute the value
+it stores), and `kkill()` reports only *whether it found a matching pid*.
+Making the write visible would mean giving the cell a fraction that travels
+with the running thread — the `pid` discipline below — and no consumer wants
+one, because `killed()` may be called on any proc by any hart.
+
 ### 2. Lock-protected but immutable-while-allocated — `pid`
 
 `allocproc` writes it once under the lock; after that nobody writes it. But it
-is read two ways: by *other* cores under `p->lock` (`kill()`'s scan, `wait()`'s
+is read two ways: by *other* cores under `p->lock` (`kkill()`'s scan, `wait()`'s
 `pp->pid`) and by the owning process with **no lock at all** (`sys_getpid`,
 `acquiresleep`/`holdingsleep` — `jal myproc; lw a5,48(a0)`).
 
@@ -72,7 +82,7 @@ This is precisely `design/file-table.md`'s discipline 2: a
 reference-counted read-share that becomes writable again when the last holder
 goes away. And exactly as there, no ghost algebra is needed — a **points-to
 fraction** gives agreement for free (`word4_pointsto_agree`). Half stays in the
-lock resource so `kill()` can always read it; half travels with the running
+lock resource so `kkill()` can always read it; half travels with the running
 process. `allocproc` reunites both halves in the `UNUSED` arm and so may write.
 
 ### 3. A different lock — `parent`
@@ -448,16 +458,16 @@ With this shape **no caller ever destructs more than one guard**:
 | caller | needs | guards touched |
 |---|---|---|
 | `wakeup` | `state`, `chan` | none |
-| `kill` | `state`, `killed`, `pid` | none |
+| `kkill` | `state`, `killed`, `pid` | none (PROVEN) |
 | `wait` | `xstate`, `pid`, child's pagetable/trapframe | `inv_dormant` only |
 | `scheduler` | `state`, the parked context | `needs_ctx` only |
 | `allocproc` | `state`, `pid`, the free block | `inv_dormant` only |
 | `sleep` / `yield` / `sched` | `state`, `chan`, own context | `needs_ctx` only |
 
-`kill` and `wakeup` — the two functions that walk procs they do not own — reach
+`kkill` and `wakeup` — the two functions that walk procs they do not own — reach
 everything they touch at the top level and never learn the state. And because
 the two `pid` halves are plain points-to fractions,
-`word4_pointsto_agree` tells `kill()` that the pid it reads under the lock is
+`word4_pointsto_agree` tells `kkill()` that the pid it reads under the lock is
 the pid the running thread believes it has. No ghost state.
 
 `procs_inv γ Φ γf γs` is unchanged in shape: 64 `is_lock`s over the new

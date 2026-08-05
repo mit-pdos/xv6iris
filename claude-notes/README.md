@@ -114,7 +114,8 @@ are working on that effort — the relevant `projects/` file.
   the design doc's two open forks). Nothing landed yet.
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
-  `argraw`/`argint`/`argaddr`, `argfd`, `killed`, `sys_getpid`, `sys_close`,
+  `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone
+  (`killed`/`setkilled`/`kkill`/`sys_kill`), `sys_getpid`, `sys_close`,
   `sys_pause`, `fetchaddr`, `fdalloc`) and what is next (the remaining
   syscalls, and `cwd_ref`). Keeps the measured account of why
   `argraw`'s six-arm proof cost 74 GB, sys_pause's path-dependent-frame

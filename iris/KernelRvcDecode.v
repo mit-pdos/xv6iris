@@ -607,6 +607,19 @@ Lemma cdec_cc9c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   = Some (C_SW (mword_of_int 6, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+(* 0xd49c  c.sw a5,40(s1)  -- the [p->killed = 1] store, shared by setkilled
+   and kkill.  [C_SW]'s first field is the word index, so 40 = 4 * 10. *)
+Lemma cdec_d49c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xd49c : mword 16)) s
+  = Some (C_SW (mword_of_int 10, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_d49c]'s AST in the shape a WP store leaf takes. *)
+Lemma cexec_d49c s :
+  exec (execute (C_SW (mword_of_int 10, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 40, Regidx (mword_of_int 15), Regidx (mword_of_int 9), 4)), s).
+Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
 (* 0xe0a2 -- shared by Mappages, ProcMapstacks *)
 Lemma cdec_e0a2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
     exec (ext_decode_compressed (mword_of_int 0xe0a2 : mword 16)) s
@@ -943,6 +956,9 @@ Lemma stk_pop_64 (X : mword 64) :
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 
 (* [addi s0,sp,<frame>] -- the frame-pointer set-up, back at the entry sp. *)
+Lemma stk_fp_32 (X : mword 64) :
+  add_vec (StackOwn.pa_stk X 4) (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))) = X.
+Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma stk_fp_48 (X : mword 64) :
   add_vec (StackOwn.pa_stk X 6) (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))) = X.
 Proof. apply stk_pop. apply bv_eq; vm_compute; reflexivity. Qed.
