@@ -175,7 +175,7 @@ Definition wp_allocproc_sconf_body
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* 4 slots for this frame, 36 for proc_pagetable's (the deepest callee) *)
-  (40 <= K)%nat ->
+  (44 <= K)%nat ->
   (* the proc lock is HELD across kalloc / proc_pagetable, so their own
      push_off sees [S lvl] and needs one more slot of headroom than usual *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->

@@ -192,17 +192,17 @@ Qed.
    [bv_unsigned]s, where [bitvector.tactics]' zify hook makes [lia] answer
    "Cannot find witness" (claude-notes/durable-notes.md).  Stated here, they
    are closed facts the call sites pass by name. *)
-Lemma ap_K4 (K : nat) : (40 <= K)%nat -> (4 <= K)%nat.
+Lemma ap_K4 (K : nat) : (44 <= K)%nat -> (4 <= K)%nat.
 Proof. lia. Qed.
-Lemma ap_K2 (K : nat) : (40 <= K)%nat -> (2 <= K - 4)%nat.
+Lemma ap_K2 (K : nat) : (44 <= K)%nat -> (2 <= K - 4)%nat.
 Proof. lia. Qed.
-Lemma ap_K10 (K : nat) : (40 <= K)%nat -> (10 <= K - 4)%nat.
+Lemma ap_K10 (K : nat) : (44 <= K)%nat -> (10 <= K - 4)%nat.
 Proof. lia. Qed.
-Lemma ap_K14 (K : nat) : (40 <= K)%nat -> (14 <= K - 4)%nat.
+Lemma ap_K14 (K : nat) : (44 <= K)%nat -> (14 <= K - 4)%nat.
 Proof. lia. Qed.
-Lemma ap_K36 (K : nat) : (40 <= K)%nat -> (36 <= K - 4)%nat.
+Lemma ap_K36 (K : nat) : (44 <= K)%nat -> (40 <= K - 4)%nat.
 Proof. lia. Qed.
-Lemma ap_Kback (K : nat) : (40 <= K)%nat -> ((K - 4) + 4)%nat = K.
+Lemma ap_Kback (K : nat) : (44 <= K)%nat -> ((K - 4) + 4)%nat = K.
 Proof. lia. Qed.
 Lemma ap_lvl1 (lvl : nat) : (Z.of_nat lvl + 2 < 2 ^ 31)%Z -> (Z.of_nat lvl + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.

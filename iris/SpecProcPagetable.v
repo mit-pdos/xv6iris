@@ -90,14 +90,18 @@ Definition ppt_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : Gen
    invariant [utlb_inv_pt] is built from.  Consumption is exactly the tree
    that was built ([avail_sub on (pt_nodes t)], [pt_nodes t <= 3]).
 
-   stack_own bound 36 = own 4-slot frame + mappages' 32 (uvmcreate needs 18). *)
+   stack_own bound 40 = own 4-slot frame + uvmfree's 36 (mappages needs 32,
+   uvmcreate 18).  uvmfree is what sets it, and uvmfree appears only in the
+   ERROR TAILS -- which the counted premise makes unreachable.  The bound is
+   charged anyway: a stack budget is a property of the code, not of the path
+   a particular caller proves it takes. *)
 Definition wp_proc_pagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (tf : mword 64) (dqtf : dfrac) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let pp := mm !!! Regidx (mword_of_int 10) in
   let tfp := (autocast (T := mword) (subrange_vec_dec tf 55 12) : mword 44) in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-  (36 <= K)%nat ->
+  (40 <= K)%nat ->
   (exists nb, on = Some nb /\ (K_proc_pagetable < nb)%nat) ->
   subrange_vec_dec tf 11 0 = (zeros' 12 : mword 12) ->
   (uint tf + 4096 < 2 ^ 56)%Z ->
