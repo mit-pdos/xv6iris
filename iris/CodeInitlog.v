@@ -139,8 +139,12 @@
    recorded:
      0x0001e917 -- also CodeVirtioDiskRw.v:rwb_0001e917
      0x00004597 -- also CodeIinit.v:iidb_00004597
-   Also duplicated WITHIN the six new log.c decode files (same argument --
-   these are the strongest promotion candidates):
+   PROMOTED by the log.c decode-word dedup sweep.  Each word below was
+   duplicated WITHIN the six log.c decode files and now lives once in
+   KernelRvcDecode.v (compressed) / KernelBaseDecode.v (base), together with
+   its leaf-shape expansion where that was duplicated too.  The local name is
+   kept here as a RESTATEMENT with its original statement, closed by [exact]
+   over the promoted lemma, so every consumer compiles untouched:
      0x00c05f63 (+ write_head), 0x060a (+ write_head, log_write),
      0x962a (+ write_head), 0x0791 (+ write_head),
      0x0711 (+ write_head, log_write), 0xfec79ce3 (+ write_head)
@@ -178,13 +182,13 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ildc_060a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x060a : mword 16)) s
   = Some (C_SLLI (mword_of_int 2, Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_060a s). Qed.
 
 (* 0x962a  add a2,a2,a0 *)
 Lemma ildc_962a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x962a : mword 16)) s
   = Some (C_ADD (Regidx (mword_of_int 12), Regidx (mword_of_int 10)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_962a s). Qed.
 
 (* 0x4ff4  lw a3,92(a5) *)
 Lemma ildc_4ff4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -202,13 +206,13 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ildc_0791 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x0791 : mword 16)) s
   = Some (C_ADDI (mword_of_int 4, Regidx (mword_of_int 15)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_0791 s). Qed.
 
 (* 0x0711  addi a4,a4,4 *)
 Lemma ildc_0711 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x0711 : mword 16)) s
   = Some (C_ADDI (mword_of_int 4, Regidx (mword_of_int 14)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_0711 s). Qed.
 
 (* ---- the leaf-form expansions of the compressed loads/stores: a literal
    [mword 12] displacement and plain [Regidx]es, the shape the WP
@@ -297,7 +301,7 @@ Proof. decode_bridge_ms. Qed.
 Lemma ildb_00c05f63 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00c05f63 : mword 32)) s
   = Some (BTYPE (mword_of_int 30 : mword 13, Regidx (mword_of_int 12), Regidx (mword_of_int 0), BGE), s).
-Proof. decode_bridge_ms. Qed.
+Proof. exact (KernelBaseDecode.bdec_00c05f63 s). Qed.
 
 (* 0x7aa70713  addi a4,a4,1962 # 80022348 <log+0x30> *)
 Lemma ildb_7aa70713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -309,7 +313,7 @@ Proof. decode_bridge_ms. Qed.
 Lemma ildb_fec79ce3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xfec79ce3 : mword 32)) s
   = Some (BTYPE (mword_of_int 8184 : mword 13, Regidx (mword_of_int 12), Regidx (mword_of_int 15), BNE), s).
-Proof. decode_bridge_ms. Qed.
+Proof. exact (KernelBaseDecode.bdec_fec79ce3 s). Qed.
 
 (* 0x888ff0ef  jal 80002c3e <brelse> *)
 Lemma ildb_888ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

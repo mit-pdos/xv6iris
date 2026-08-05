@@ -302,35 +302,88 @@ when the FS layer above wants it, each op's end_op can carry a composable
 "my delta preserves Pcontent" wand — xv6's ops are serializable under
 their inode/bitmap locks, so the batch composes them.
 
-Known open forks, discovered while designing (do not start stage 4 without
-settling these):
+### The stage-4 architecture (PROPOSED, to pin down before any code)
 
-1. **The permit needs the write's identity.** A bare `▷P_fs ==∗ ▷P_fs`
-   cannot update a shadow-of-P ghost per write. The enqueuer knows (o, bs)
-   at enqueue and can curry them into the permit it deposits, but the M5b
-   blocker stands: an iProp permit cannot ride the timeless `disk_inv`.
-   Candidates remain M5b's (a) second non-timeless permit invariant with a
-   timeless skeleton, or (b) `P_fs` closed under in-flight writes with a
-   pure pending-set. Also likely: the permit type widens so the completing
-   write's `disk_block` fragment passes THROUGH the permit (P_fs holding a
-   fraction of fs-range disk_blocks), which touches `virtio_proto_step`'s
-   hand-off type.
-2. **The era boundary strands the FS ghosts.** Bio's pool/escrow
-   `disk_block` fragments, log_res's γL/γdirty auths and halves — all die
-   with the era at a crash. Recovery in the next generation needs fresh
-   ones. The recorded option (b) "auth-side key forgetting"
-   (projects/crash.md, stranded-fragment decision) DOES NOT TYPECHECK as
-   stated: `ghost_map_delete` needs the elem, and the elems are exactly
-   what is stranded. Viable shapes: per-era FS ghosts (γL/γdirty freshly
-   allocated each boot — natural, they are volatile state) plus a
-   crash-SPANNING hand-off through `P_fs` itself, shaped as an escrow
-   whose checked-out arm RECORDS the pure picture (the vs_data rule) so
-   the next generation can re-check-out with its own one-shot boot token
-   and rebuild the volatile layer from recorded data + re-minted
-   fragments. The base `γdur` fragments need the same treatment (they are
-   fixed-layer; whether P_fs holds a standing fraction of them, or the FS
-   range is never minted at the base and P_fs tracks content in its own
-   shadow, is part of fork 1's resolution).
+The two forks recorded earlier are resolved by one load-bearing finding
+plus one dissolution; the whole shape follows.
+
+**The finding that forces everything: client-visible disk fragments
+cannot live at the fixed `γdur`.** Today bio's pool/escrow/handles hold
+FULL fs-range `disk_block` fragments of the fixed durable auth. At the
+first crash those strand in the dead era's invariants forever —
+`ghost_map` cannot re-mint an existing key, and "auth-side forgetting"
+does not typecheck (delete needs the elem, which is exactly what is
+stranded). Fractional splits (a ½ standing in `P_fs`) merely leak ½ per
+crash. So the CURRENT stage-1–3 volatile design cannot boot twice; any
+resolution must make the stranded pieces RE-CREATABLE, i.e.:
+
+1. **Per-era client disk ghosts.** Each boot allocates a fresh era image
+   ghost (auth + full fs-range fragments, minted at the current disk
+   content); bio's `bv_gd` points at the ERA ghost; a crash abandons it
+   wholesale — nothing to reclaim, next boot mints fresh. The fixed
+   `γdur` becomes AUTH-ONLY, zero outstanding fragments ever (its
+   completion updates are then auth-alone, which is legal precisely
+   because nothing is outstanding). The boot mint needs one new base
+   seam: a boot-time view of "the era map equals the durable map"
+   (allocated where the γdur auth is accessible — the `power_boot_res` /
+   adequacy client bundle, the `disk_ghosts_alloc` precedent).
+2. **Permits are LOGICALLY-ATOMIC client view shifts, transported by
+   M5b's option (a)** (decided with the user; an earlier tag-enumeration
+   draft is recorded below as rejected). bwrite's crash-facing contract
+   is the textbook logatom disk write: the CALLER supplies a fupd
+   `▷P_fs ==∗ ▷P_fs ∗ Q`, curried over its own ghosts, applied at the
+   DMA completion (the linearization point); `Q` is the caller's receipt
+   ("this transaction committed", durable fragments, the receipt
+   lower-bound) and returns to it after the write. The timeless-slot
+   blocker is solved exactly as M5b recorded: a SECOND, non-timeless era
+   invariant holds the in-flight permits — per pending write, either the
+   client's fupd identified by a saved proposition at a gname the
+   timeless slot stores (pure, so it rides `disk_inv` fine), or the
+   `done(Q)` arm after the completion consumed it. Deposit works under
+   the `▷` (`▷B ∗ P ⊢ ▷(B ∗ P)`); the completion strips via
+   `wp_disk_step`'s existing between-legs `iNext`; the enqueuer collects
+   `▷Q` post-wake where it has steps (and Q is usually timeless ghost
+   state anyway). The MECHANICAL disk-tracking update (the record's P
+   moving to P[o := bs]) stays with the completion itself — it has the
+   write's identity from the slot and the state_interp tie — so the
+   client fupd is stated against the FS-meaning part of the record with
+   the write identity as a premise. Consequences: the four WAL write
+   kinds (log-fill / commit(n,W) / install / clear) exist NOWHERE as a
+   type — they are four call sites in the log proofs, each proving its
+   own fupd with its own local knowledge; nothing FS-shaped appears
+   below the log layer; and the design does not lean on xv6's commit
+   serialization, so it would survive a concurrent-commit log.
+3. **`P_fs` is a generation-swappable escrow over a PURE record.**
+   Record = (P restricted to the fs range, D, the receipts list), with
+   `⌜recovery(P) = D⌝`-class conjuncts. Arms: at-rest, or checked out by
+   generation g — the arm holds g's one-shot FS BOOT TOKEN (a fresh
+   era-bundle exclusive; a later generation swaps in ITS token using the
+   recorded pure picture — abandonment, not revocation, exactly the
+   crash-layer's own pattern). The tie between the record's P and the
+   REAL disk is a fixed-layer `ghost_var` ½/½ between `P_fs` and
+   `state_interp`'s disk conjunct — both fixed, nothing strands, and
+   both halves are in hand exactly at a completion (state_interp is held
+   by the lifting rule; `crashN` is opened by the permit seam). Adding
+   the state_interp conjunct follows M5's fourth-conjunct recipe.
+4. **Recovery** = initlog's real spec: swap the `P_fs` arm with the
+   era's boot token; the recovery writes are tagged install/clear
+   transitions; the final record has the header cleared and D unchanged.
+   The stage-2 clean-image spec becomes the n = 0 corollary.
+5. **sys_sync** = a persistent receipt: the record carries a fixed
+   mono-list of committed D's; commit appends; sys_sync's post is a
+   lower-bound receipt that the caller's pre-call writes are durable.
+6. **FS-level consistency stays parametric** (the record carries raw
+   maps; `Pcontent D` and the per-op composable wands remain the future
+   fs.c layer's business), and the torn-write knob stays off
+   (request-atomic writes, crash.md's recorded modeling choice).
+
+Cost inventory (all contained): the era image ghost + boot mint seam
+(DiskPtsto/VirtioProto/boot bundle); the γdur auth-only sweep (rw's
+`disk_block` re-keyed to the era gname — one seam equation today, so
+mostly mechanical); the permit→tag reshape at `virtio_proto_step` /
+`wp_disk_loop`; the state_interp `ghost_var` conjunct; `P_fs` + the boot
+token; bwrite's spec gains the tag argument (threaded to rw); initlog's
+recovery spec/proof; sys_sync.
 
 ## Decision record (rejected shapes)
 
@@ -367,3 +420,11 @@ settling these):
   cannot predict absorption, a conditional resource poisons every caller
   proof, and always-consume matches the C code's own MAXOPBLOCKS
   worst-case accounting.
+- **Crash permits as PURE TRANSITION TAGS in the timeless slots**
+  (enumerating the WAL's four write kinds as data the completion
+  case-splits on): rejected in favour of the logatom permit above. It
+  worked around the timeless-slot blocker that option (a)'s permit
+  invariant already solves properly, it pushed an FS-shaped enumeration
+  deep into the device stack, and it leaned on xv6's commit
+  serialization for tag-freshness — three costs the client-fupd shape
+  simply doesn't have.

@@ -231,8 +231,12 @@
      0x64850513 -- also CodeBread.v:bddb_64850513
      0x0001ea97 -- also CodeVirtioDiskRw.v:rwb_0001ea97
      0x40000613 -- also CodeVirtioDiskRw.v:rwb_40000613
-   Also duplicated WITHIN the six new log.c decode files (same argument --
-   these are the strongest promotion candidates):
+   PROMOTED by the log.c decode-word dedup sweep.  Each word below was
+   duplicated WITHIN the six log.c decode files and now lives once in
+   KernelRvcDecode.v (compressed) / KernelBaseDecode.v (base), together with
+   its leaf-shape expansion where that was duplicated too.  The local name is
+   kept here as a RESTATEMENT with its original statement, closed by [exact]
+   over the promoted lemma, so every consumer compiles untouched:
      0x509c (+ begin_op), 0x018a2583 (+ install_trans),
      0x2585 (+ install_trans), 0x024a2503 (+ install_trans),
      0x000aa583 (+ install_trans), 0x0a91 (+ install_trans),
@@ -277,7 +281,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma eodc_509c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x509c : mword 16)) s
   = Some (C_LW (mword_of_int 8, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_509c s). Qed.
 
 (* 0xe3b1  bnez a5,80003cb2 <end_op+0x68> *)
 Lemma eodc_e3b1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -319,13 +323,13 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma eodc_2585 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x2585 : mword 16)) s
   = Some (C_ADDIW (mword_of_int 1, Regidx (mword_of_int 11)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_2585 s). Qed.
 
 (* 0x0a91  addi s5,s5,4 *)
 Lemma eodc_0a91 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x0a91 : mword 16)) s
   = Some (C_ADDI (mword_of_int 4, Regidx (mword_of_int 21)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_0a91 s). Qed.
 
 (* 0xb70d  j 80003c8c <end_op+0x42> *)
 Lemma eodc_b70d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -350,7 +354,7 @@ Proof. apply exec_execute_C_SW_leaf; first [ apply bv_eq; vm_compute; reflexivit
 Lemma eocx_509c s :
   exec (execute (C_LW (mword_of_int 8, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 32, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
-Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+Proof. exact (KernelRvcDecode.cexec_509c s). Qed.
 
 Lemma eocx_d09c s :
   exec (execute (C_SW (mword_of_int 8, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
@@ -512,7 +516,7 @@ Proof. decode_bridge_ms. Qed.
 Lemma eodb_018a2583 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x018a2583 : mword 32)) s
   = Some (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 11), false, 4), s).
-Proof. decode_bridge_ms. Qed.
+Proof. exact (KernelBaseDecode.bdec_018a2583 s). Qed.
 
 (* 0x012585bb  addw a1,a1,s2 *)
 Lemma eodb_012585bb s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -524,7 +528,7 @@ Proof. decode_bridge_ms. Qed.
 Lemma eodb_024a2503 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x024a2503 : mword 32)) s
   = Some (LOAD (mword_of_int 36 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 10), false, 4), s).
-Proof. decode_bridge_ms. Qed.
+Proof. exact (KernelBaseDecode.bdec_024a2503 s). Qed.
 
 (* 0xe2bfe0ef  jal 80002b36 <bread> *)
 Lemma eodb_e2bfe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -536,7 +540,7 @@ Proof. decode_bridge_ms. Qed.
 Lemma eodb_000aa583 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x000aa583 : mword 32)) s
   = Some (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 11), false, 4), s).
-Proof. decode_bridge_ms. Qed.
+Proof. exact (KernelBaseDecode.bdec_000aa583 s). Qed.
 
 (* 0xe1dfe0ef  jal 80002b36 <bread> *)
 Lemma eodb_e1dfe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -590,7 +594,7 @@ Proof. decode_bridge_ms. Qed.
 Lemma eodb_02ca2783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x02ca2783 : mword 32)) s
   = Some (LOAD (mword_of_int 44 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 15), false, 4), s).
-Proof. decode_bridge_ms. Qed.
+Proof. exact (KernelBaseDecode.bdec_02ca2783 s). Qed.
 
 (* 0xfaf94ae3  blt s2,a5,80003cfe <end_op+0xb4> *)
 Lemma eodb_faf94ae3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

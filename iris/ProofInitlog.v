@@ -82,6 +82,7 @@ Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
 Require Import WpSmodeIntr.
 Require Import ByteCursor.
+Require Import ByteBuf.
 Require Import PageFields.
 Require Import KstackArith.
 Require Import FdSlots.
@@ -120,19 +121,8 @@ Proof.
   intro H. rewrite /il_hdrw H. apply bv_eq; vm_compute; reflexivity.
 Qed.
 
-(* ---- the alignment of the buffer's first data word (ProofWriteHead's
-   [wh_align4] at q = 0) ---- *)
-Lemma il_align_z (x : Z) :
-  0 <= x -> x < 18446744073709551616 -> x `mod` 4 = 0 ->
-  Z.rem (bv_wrap 64 x) 4 = 0.
-Proof.
-  intros H0 H1 Hm.
-  unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64%Z.
-  change (2 ^ 64)%Z with 18446744073709551616%Z.
-  rewrite (Z.mod_small x); [| lia].
-  rewrite Z.rem_mod_nonneg; [ exact Hm | lia | lia ].
-Qed.
-
+(* ---- the alignment of the buffer's first data word: [bcache]'s geometry,
+   then [ByteBuf.bb_align_z] (ProofWriteHead's [wh_align4] at q = 0) ---- *)
 Lemma il_align_arith (kk : Z) :
   0 <= kk -> kk < 30 ->
   (2147582376 + 1112 * kk + 88) `mod` 4 = 0
@@ -160,7 +150,7 @@ Proof.
     as (Hm & Hlo & Hhi).
   replace (0x80018190 + 24 + 1112 * Z.of_nat k + Z.of_nat 88)
     with (2147582376 + 1112 * Z.of_nat k + 88) by lia.
-  apply il_align_z; assumption.
+  apply bb_align_z; assumption.
 Qed.
 
 (* ---- the sign-extended immediates initlog forms ---- *)
@@ -195,13 +185,6 @@ Lemma il_hdr_addr (a : SailStdpp.Values.mword 64) :
   add_vec a (mword_of_int 88 : SailStdpp.Values.mword 64) = b_data a.
 Proof. reflexivity. Qed.
 
-Lemma il_uint32 (a : SailStdpp.Values.mword 32) : uint a = bv_unsigned a.
-Proof.
-  pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
-  rewrite Z2N.id; [ reflexivity | lia ].
-Qed.
-
 (* ===================================================================== *)
 
 Module InitlogProof (Initlock : INITLOCK) (Bread : BREAD) (Brelse : BRELSE)
@@ -232,42 +215,13 @@ Section InitlogDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  (* ---- a 4-byte cell out of / into four consecutive byte points-tos ---- *)
-  Lemma il_word4_intro (a : Arch.pa) (w : SailStdpp.Values.mword 32)
-      (b0 b1 b2 b3 : bv 8) :
-    is_aligned_paddr (Physaddr a) 4 = true ->
-    nth_byte w 0%nat = b0 -> nth_byte w 1%nat = b1 ->
-    nth_byte w 2%nat = b2 -> nth_byte w 3%nat = b3 ->
-    pa_add a 0%nat ↦ₘ b0 -∗ pa_add a 1%nat ↦ₘ b1 -∗
-    pa_add a 2%nat ↦ₘ b2 -∗ pa_add a 3%nat ↦ₘ b3 -∗ a ↦₄ w.
-  Proof.
-    intros Hal E0 E1 E2 E3. subst b0 b1 b2 b3.
-    iIntros "H0 H1 H2 H3".
-    rewrite /word4_pointsto. iSplitR; [iPureIntro; exact Hal|].
-    change (seq 0 4) with [0%nat; 1%nat; 2%nat; 3%nat].
-    iSplitL "H0"; [iExact "H0"|]. iSplitL "H1"; [iExact "H1"|].
-    iSplitL "H2"; [iExact "H2"|]. iSplitL "H3"; [iExact "H3"|]. done.
-  Qed.
-
-  Lemma il_word4_elim (a : Arch.pa) (w : SailStdpp.Values.mword 32)
-      (b0 b1 b2 b3 : bv 8) :
-    nth_byte w 0%nat = b0 -> nth_byte w 1%nat = b1 ->
-    nth_byte w 2%nat = b2 -> nth_byte w 3%nat = b3 ->
-    a ↦₄ w -∗
-    pa_add a 0%nat ↦ₘ b0 ∗ pa_add a 1%nat ↦ₘ b1 ∗
-    pa_add a 2%nat ↦ₘ b2 ∗ pa_add a 3%nat ↦ₘ b3.
-  Proof.
-    intros E0 E1 E2 E3. subst b0 b1 b2 b3.
-    iIntros "H". iDestruct (word4_pointsto_bytes with "H") as "H".
-    change (seq 0 4) with [0%nat; 1%nat; 2%nat; 3%nat].
-    iDestruct "H" as "(H0 & H1 & H2 & H3 & _)".
-    iSplitL "H0"; [iExact "H0"|]. iSplitL "H1"; [iExact "H1"|].
-    iSplitL "H2"; [iExact "H2"|]. iExact "H3".
-  Qed.
-
   (* BORROW the block's first word out of its byte list, and give it back.
-     initlog never WRITES the buffer, so the give-back is at the same word
-     and the handle brelse gets is bread's, byte for byte. *)
+     The window vocabulary is ByteBuf's ([bb_bytes_of_list] to trade the
+     list for a named window, [bb_word4_acc] to borrow the aligned cell at
+     offset 0); all this lemma adds is that the word there IS [il_hdrw].
+     initlog never WRITES the buffer, so the give-back is at the same word,
+     and [ByteBuf.bb_set_mk] -- writing back what was read changes nothing --
+     is what says the handle brelse gets is bread's, byte for byte. *)
   Lemma il_hdr_acc (a : Arch.pa) (bs : list (bv 8)) :
     (4 <= length bs)%nat ->
     is_aligned_paddr (Physaddr a) 4 = true ->
@@ -275,39 +229,28 @@ Section InitlogDefs.
     a ↦₄ il_hdrw bs ∗
     (a ↦₄ il_hdrw bs -∗ ([∗ list] j ↦ x ∈ bs, pa_add a j ↦ₘ x)).
   Proof.
-    iIntros (Hlen Hal) "H".
-    destruct bs as [|b0 [|b1 [|b2 [|b3 rest]]]]; cbn [length] in Hlen;
-      try (exfalso; lia).
-    assert (E0 : nth_byte (il_hdrw (b0 :: b1 :: b2 :: b3 :: rest)) 0%nat = b0).
-    { rewrite /il_hdrw /hdr_n.
-      change (take 4 (b0 :: b1 :: b2 :: b3 :: rest)) with [b0; b1; b2; b3].
-      rewrite (nth_byte_assemble4 [b0; b1; b2; b3] 0%nat eq_refl ltac:(lia)).
+    intros Hlen Hal.
+    assert (Ha0 : pa_add a 0%nat = a) by apply RiscvExtras.pa_add_0.
+    assert (Hmk : bb_mk (fun j => bs !!! j) 0%nat = il_hdrw bs).
+    { rewrite /bb_mk /il_hdrw /hdr_n.
+      destruct bs as [|b0 [|b1 [|b2 [|b3 rest]]]]; cbn [length] in Hlen;
+        try (exfalso; lia).
       reflexivity. }
-    assert (E1 : nth_byte (il_hdrw (b0 :: b1 :: b2 :: b3 :: rest)) 1%nat = b1).
-    { rewrite /il_hdrw /hdr_n.
-      change (take 4 (b0 :: b1 :: b2 :: b3 :: rest)) with [b0; b1; b2; b3].
-      rewrite (nth_byte_assemble4 [b0; b1; b2; b3] 1%nat eq_refl ltac:(lia)).
-      reflexivity. }
-    assert (E2 : nth_byte (il_hdrw (b0 :: b1 :: b2 :: b3 :: rest)) 2%nat = b2).
-    { rewrite /il_hdrw /hdr_n.
-      change (take 4 (b0 :: b1 :: b2 :: b3 :: rest)) with [b0; b1; b2; b3].
-      rewrite (nth_byte_assemble4 [b0; b1; b2; b3] 2%nat eq_refl ltac:(lia)).
-      reflexivity. }
-    assert (E3 : nth_byte (il_hdrw (b0 :: b1 :: b2 :: b3 :: rest)) 3%nat = b3).
-    { rewrite /il_hdrw /hdr_n.
-      change (take 4 (b0 :: b1 :: b2 :: b3 :: rest)) with [b0; b1; b2; b3].
-      rewrite (nth_byte_assemble4 [b0; b1; b2; b3] 3%nat eq_refl ltac:(lia)).
-      reflexivity. }
-    iDestruct "H" as "(H0 & H1 & H2 & H3 & Hrest)".
-    iSplitL "H0 H1 H2 H3".
-    { iApply (il_word4_intro a _ b0 b1 b2 b3 Hal E0 E1 E2 E3
-                with "H0 H1 H2 H3"). }
-    { iIntros "Hc".
-      iDestruct (il_word4_elim a _ b0 b1 b2 b3 E0 E1 E2 E3 with "Hc")
-        as "(H0 & H1 & H2 & H3)".
-      iSplitL "H0"; [iExact "H0"|]. iSplitL "H1"; [iExact "H1"|].
-      iSplitL "H2"; [iExact "H2"|]. iSplitL "H3"; [iExact "H3"|].
-      iExact "Hrest". }
+    rewrite (bb_bytes_of_list a bs).
+    iIntros "Hw".
+    iDestruct (bb_word4_acc a (length bs) 0%nat (length bs - 4)%nat
+                 (fun j => bs !!! j) ltac:(lia)
+                 ltac:(rewrite Ha0; exact Hal) with "Hw") as "[Hc Hback]".
+    rewrite Ha0 Hmk.
+    iSplitL "Hc"; [iExact "Hc"|].
+    iIntros "Hc".
+    iDestruct ("Hback" $! (il_hdrw bs) with "Hc") as "Hw".
+    (* the opening rewrite already put the give-back's window in [bb_bytes]
+       form too, so only the unfolding is left here *)
+    rewrite /bb_bytes.
+    iApply (big_sepL_mono with "Hw"). intros i jj Hj.
+    apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+    rewrite -Hmk (bb_set_mk (fun j => bs !!! j) 0%nat i). reflexivity.
   Qed.
 
   (* an EMPTY indexed big-op is [emp]; naming it keeps the call sites free
@@ -373,7 +316,7 @@ Section ProofInitlog.
       apply elem_of_union_r. apply elem_of_singleton. reflexivity. }
     destruct (Hcovok logstart Hhdrcov) as [Hls0 Hls1].
     assert (Huint : uint (mword_of_int logstart : mword 32) = logstart).
-    { rewrite il_uint32. apply moi32_small.
+    { rewrite bb_uint32. apply moi32_small.
       change (2 ^ 32)%Z with 4294967296%Z.
       change (2 ^ 31)%Z with 2147483648%Z in Hls1. lia. }
     assert (Hbnolt : (uint (mword_of_int logstart : mword 32) < 2147483648)%Z).

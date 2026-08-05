@@ -171,8 +171,12 @@
    but promoting it would edit files outside this task, so it is only
    recorded:
      (none)
-   Also duplicated WITHIN the six new log.c decode files (same argument --
-   these are the strongest promotion candidates):
+   PROMOTED by the log.c decode-word dedup sweep.  Each word below was
+   duplicated WITHIN the six log.c decode files and now lives once in
+   KernelRvcDecode.v (compressed) / KernelBaseDecode.v (base), together with
+   its leaf-shape expansion where that was duplicated too.  The local name is
+   kept here as a RESTATEMENT with its original statement, closed by [exact]
+   over the promoted lemma, so every consumer compiles untouched:
      0x4314 (+ write_head), 0x0711 (+ write_head, initlog),
      0x060a (+ write_head, initlog)
                                                                           *)
@@ -215,19 +219,19 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma lwdc_4314 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x4314 : mword 16)) s
   = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 6), Cregidx (mword_of_int 5)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_4314 s). Qed.
 
 (* 0x0711  addi a4,a4,4 *)
 Lemma lwdc_0711 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x0711 : mword 16)) s
   = Some (C_ADDI (mword_of_int 4, Regidx (mword_of_int 14)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_0711 s). Qed.
 
 (* 0x060a  slli a2,a2,0x2 *)
 Lemma lwdc_060a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x060a : mword 16)) s
   = Some (C_SLLI (mword_of_int 2, Regidx (mword_of_int 12)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_060a s). Qed.
 
 (* 0x97b2  add a5,a5,a2 *)
 Lemma lwdc_97b2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -289,7 +293,7 @@ Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivit
 Lemma lwcx_4314 s :
   exec (execute (C_LW (mword_of_int 0, Cregidx (mword_of_int 6), Cregidx (mword_of_int 5)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 0, Regidx (mword_of_int 14), Regidx (mword_of_int 13), false, 4)), s).
-Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+Proof. exact (KernelRvcDecode.cexec_4314 s). Qed.
 
 Lemma lwcx_44d8 s :
   exec (execute (C_LW (mword_of_int 3, Cregidx (mword_of_int 1), Cregidx (mword_of_int 6)))) s

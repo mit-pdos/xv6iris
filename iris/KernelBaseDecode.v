@@ -534,3 +534,46 @@ Lemma bdec_f3dff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xf3dff0ef : mword 32)) s
   = Some (JAL (mword_of_int 2096956 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
+
+(* --------------------------------------------------------------------- *)
+(* Words the log.c sweep collapsed: each had a private copy in two of      *)
+(* CodeWriteHead / CodeInitlog / CodeInstallTrans / CodeEndOp before it    *)
+(* landed here.  The old per-function names survive there as restatements. *)
+(* --------------------------------------------------------------------- *)
+
+(* 0x00c05f63  blez a2,+0x1e  -- write_head, initlog: the [i < log.lh.n]
+   entry test of the log-header copy loop *)
+Lemma bdec_00c05f63 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00c05f63 : mword 32)) s
+  = Some (BTYPE (mword_of_int 30 : mword 13, Regidx (mword_of_int 12), Regidx (mword_of_int 0), BGE), s).
+Proof. decode_bridge_ms. Qed.
+
+(* 0xfec79ce3  bne a5,a2,-0x8 -- write_head, initlog: the copy loop's back edge *)
+Lemma bdec_fec79ce3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xfec79ce3 : mword 32)) s
+  = Some (BTYPE (mword_of_int 8184 : mword 13, Regidx (mword_of_int 12), Regidx (mword_of_int 15), BNE), s).
+Proof. decode_bridge_ms. Qed.
+
+(* 0x02ca2783  lw a5,44(s4)   -- install_trans, end_op: [log.lh.n] *)
+Lemma bdec_02ca2783 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x02ca2783 : mword 32)) s
+  = Some (LOAD (mword_of_int 44 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 15), false, 4), s).
+Proof. decode_bridge_ms. Qed.
+
+(* 0x018a2583  lw a1,24(s4)   -- install_trans, end_op: [log.start] *)
+Lemma bdec_018a2583 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x018a2583 : mword 32)) s
+  = Some (LOAD (mword_of_int 24 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 11), false, 4), s).
+Proof. decode_bridge_ms. Qed.
+
+(* 0x024a2503  lw a0,36(s4)   -- install_trans, end_op: [log.dev] *)
+Lemma bdec_024a2503 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x024a2503 : mword 32)) s
+  = Some (LOAD (mword_of_int 36 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 10), false, 4), s).
+Proof. decode_bridge_ms. Qed.
+
+(* 0x000aa583  lw a1,0(s5)    -- install_trans, end_op: [log.lh.block[tail]] *)
+Lemma bdec_000aa583 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x000aa583 : mword 32)) s
+  = Some (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 21), Regidx (mword_of_int 11), false, 4), s).
+Proof. decode_bridge_ms. Qed.

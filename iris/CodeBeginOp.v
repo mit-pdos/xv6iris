@@ -132,8 +132,12 @@
    recorded:
      0xa029 -- also CodePipealloc.v:padc_a029
      0x9fb9 -- also CodeProcinit.v:pidc_9fb9
-   Also duplicated WITHIN the six new log.c decode files (same argument --
-   these are the strongest promotion candidates):
+   PROMOTED by the log.c decode-word dedup sweep.  Each word below was
+   duplicated WITHIN the six log.c decode files and now lives once in
+   KernelRvcDecode.v (compressed) / KernelBaseDecode.v (base), together with
+   its leaf-shape expansion where that was duplicated too.  The local name is
+   kept here as a RESTATEMENT with its original statement, closed by [exact]
+   over the promoted lemma, so every consumer compiles untouched:
      0x509c (+ end_op)
                                                                           *)
 From Stdlib Require Import ZArith.
@@ -175,7 +179,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma bodc_509c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x509c : mword 16)) s
   = Some (C_LW (mword_of_int 8, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
-Proof. intro H. rvc_oneshot s H. Qed.
+Proof. exact (KernelRvcDecode.cdec_509c s). Qed.
 
 (* 0x4cd8  lw a4,28(s1) *)
 Lemma bodc_4cd8 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -214,7 +218,7 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma bocx_509c s :
   exec (execute (C_LW (mword_of_int 8, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
   = Some (ExecuteAs (LOAD (mword_of_int 32, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
-Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+Proof. exact (KernelRvcDecode.cexec_509c s). Qed.
 
 Lemma bocx_4cd8 s :
   exec (execute (C_LW (mword_of_int 7, Cregidx (mword_of_int 1), Cregidx (mword_of_int 6)))) s

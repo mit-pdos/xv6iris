@@ -2072,3 +2072,79 @@ Lemma cdec_bff1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1"
   exec (ext_decode_compressed (mword_of_int 0xbff1 : mword 16)) s
   = Some (C_J (mword_of_int 2030 : mword 11), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+(* ===================================================================== *)
+(*  Words the log.c sweep collapsed.  Each of these had two or three      *)
+(*  private copies among CodeWriteHead / CodeInitlog / CodeInstallTrans /  *)
+(*  CodeBeginOp / CodeEndOp / CodeLogWrite before it landed here; per the  *)
+(*  dedup discipline in claude-notes/durable-notes.md a word proved in     *)
+(*  two or more decode files belongs at this shared altitude.  The old     *)
+(*  per-function names survive there as restatements over these, so no     *)
+(*  consumer changed.                                                      *)
+(* ===================================================================== *)
+
+(* 0x060a  c.slli a2,a2,0x2  -- write_head, initlog, log_write: the
+   [i * sizeof(int)] scaling of a log-header index *)
+Lemma cdec_060a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x060a : mword 16)) s
+  = Some (C_SLLI (mword_of_int 2, Regidx (mword_of_int 12)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x962a  c.add a2,a2,a0    -- write_head, initlog: the copy loop's end
+   sentinel, [buf + 4*log.lh.n] *)
+Lemma cdec_962a s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x962a : mword 16)) s
+  = Some (C_ADD (Regidx (mword_of_int 12), Regidx (mword_of_int 10)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x4314  c.lw a3,0(a4)     -- write_head, log_write: the source cursor load *)
+Lemma cdec_4314 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4314 : mword 16)) s
+  = Some (C_LW (mword_of_int 0, Cregidx (mword_of_int 6), Cregidx (mword_of_int 5)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_4314]'s AST in the shape a WP load leaf takes: a literal [mword 12]
+   displacement and plain [Regidx]es. *)
+Lemma cexec_4314 s :
+  exec (execute (C_LW (mword_of_int 0, Cregidx (mword_of_int 6), Cregidx (mword_of_int 5)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 0, Regidx (mword_of_int 14), Regidx (mword_of_int 13), false, 4)), s).
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+(* 0x0711  c.addi a4,a4,4    -- write_head, initlog, log_write: bump the
+   [&log.lh.block[i]] cursor *)
+Lemma cdec_0711 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x0711 : mword 16)) s
+  = Some (C_ADDI (mword_of_int 4, Regidx (mword_of_int 14)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x0791  c.addi a5,a5,4    -- write_head, initlog: bump the buf cursor *)
+Lemma cdec_0791 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x0791 : mword 16)) s
+  = Some (C_ADDI (mword_of_int 4, Regidx (mword_of_int 15)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x509c  c.lw a5,32(s1)    -- begin_op, end_op: the [log.committing] read *)
+Lemma cdec_509c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x509c : mword 16)) s
+  = Some (C_LW (mword_of_int 8, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* [cdec_509c]'s AST in the shape a WP load leaf takes. *)
+Lemma cexec_509c s :
+  exec (execute (C_LW (mword_of_int 8, Cregidx (mword_of_int 1), Cregidx (mword_of_int 7)))) s
+  = Some (ExecuteAs (LOAD (mword_of_int 32, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)), s).
+Proof. apply exec_execute_C_LW_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
+(* 0x2585  c.addiw a1,a1,1   -- install_trans, end_op: the [tail++] of the
+   install_trans loop (end_op inlines the same increment) *)
+Lemma cdec_2585 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x2585 : mword 16)) s
+  = Some (C_ADDIW (mword_of_int 1, Regidx (mword_of_int 11)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+(* 0x0a91  c.addi s5,s5,4    -- install_trans, end_op: bump the
+   [&log.lh.block[tail]] cursor held in s5 *)
+Lemma cdec_0a91 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x0a91 : mword 16)) s
+  = Some (C_ADDI (mword_of_int 4, Regidx (mword_of_int 21)), s).
+Proof. intro H. rvc_oneshot s H. Qed.

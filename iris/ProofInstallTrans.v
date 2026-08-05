@@ -373,45 +373,6 @@ Proof. intros H1 H2. apply nil_length_inv. rewrite -H1. exact H2. Qed.
 
 
 
-(* ===================================================================== *)
-(*  ONE MISSING LEAF: the 4-byte [addw rd,rs1,rs2].  WpSconfAlu.v has     *)
-(*  the COMPRESSED two-operand [c.addw] (is_rvc = true, rd = rs1) and the *)
-(*  4-byte SUBW, but not this one; install_trans's [addw a1,a1,s3] at     *)
-(*  +0x74 is the base encoding.  Same shape as [wp_subw_s_sconf].         *)
-(* ===================================================================== *)
-Section ItLeaf.
-  Context `{!riscvGS Σ}.
-  Context `{!sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
-
-  Lemma wp_addw4_s_sconf (Φ : mval -> iProp Σ)
-      (pc : mword 64) (rd rs1 rs2 : mword 5) (m : regfile) (n : nat) (b : bool) :
-    let wval :=
-      sign_extend' 64 (add_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
-                               (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
-    uint rd <> 0 -> rd_ok rd ->
-    sie_cap_gpr m n b p -∗
-    pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
-      pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
-  Proof.
-    intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
-              (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))
-              wval m n b Hrd Hrdok _
-              with "Hcg Hpc Hinstr Hcont").
-    - intros s_pc Hnpc Hva Hvb.
-      rewrite (exec_execute_RTYPEW_ADDW_gpr rs2 rs1 rd s_pc).
-      replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
-      unfold gpr_addw_val, gpr_src. rewrite Hva Hvb. reflexivity.
-  Qed.
-
-End ItLeaf.
 
 (* the frame base: sp after [c.addi16sp sp,-80] *)
 Definition it_spr (m : regfile) : mword 64 :=

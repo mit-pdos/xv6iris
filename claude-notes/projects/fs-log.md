@@ -104,30 +104,26 @@ Note for ProofLogWrite (from the spec round): the append path must peel
 the refunded unit out of the batch's pool AT THE `lh.n++` store — the
 pool's index is `(LOGBLOCKS − n) + 2` and only the n++ re-establishes it.
 
-## Cleanup queue (post-stage-3; none blocks anything)
+## Cleanup queue (post-stage-3) — DONE except one residual
 
-- [ ] Promote the four missing WP leaves now proved locally TWICE or
-      needed broadly: `wp_addw4_s_sconf` (base 3-operand addw — Local in
-      BOTH ProofInstallTrans and ProofEndOp, the promotion trigger) to
-      WpSconfAlu.v; `wp_bgtz_{fall,taken}_s_sconf` (BLT with rs1 = x0 —
-      only the rs2 = x0 bltz twin exists) and `wp_blt_taken_s_sconf`
-      (the general two-register BLT taken arm; every loop back edge of
-      this shape needs it) to WpSconfBtype.v. All four route through
-      WpSconfBtype's Local exec lemmas by qualified name — copy-paste
-      promotions.
-- [ ] The byte↔word bridge vocabulary is now duplicated: ProofWriteHead's
-      `wh_align4`/`wh_word_acc`/byte-list bridges and ProofInitlog's
-      `il_*` near-copies. Promote to a shared home (ByteBuf.v or
-      InstrBytes.v) when a third consumer appears.
-- [ ] The decode-dedup sweep flagged by the log.c Code files: the words
-      duplicated WITHIN the six new files (0x060a, 0x0711, 0x0791,
-      0x962a, 0x4314, 0x00c05f63, 0xfec79ce3, 0x509c, 0x2585, 0x0a91,
-      0x000aa583, 0x018a2583, 0x024a2503, 0x02ca2783) and the
-      cross-file candidates listed in each Code header.
-- [ ] `wp_next_shift` (WpSconfVc) subsumes the bespoke `*_cont` +
-      `*_cont_shift` pairs — ProofWriteHead's could be retired the next
-      time that file is touched (ProofInitlog already uses the direct
-      form).
+- [x] The four WP leaves promoted: `wp_addw4_s_sconf` → WpSconfAlu.v;
+      `wp_bgtz_{fall,taken}_s_sconf` + `wp_blt_taken_s_sconf` →
+      WpSconfBtype.v; both Local sections retired.
+- [x] Byte↔word bridge vocabulary promoted to ByteBuf.v (the `bb_set`/
+      `bb_mk`/`bb_word4_acc`/`bb_bytes_*` block + `bb_set_mk`, the
+      borrowed-and-returned law); ProofWriteHead's and ProofInitlog's
+      copies retired; `wh_cont_shift` retired in favour of
+      `WpSconfVc.wp_next_shift` (the local `wh_cont` FOLD stays — it
+      keeps the block-lemma statements readable, and only the shift was
+      a duplicate).
+- [x] Decode dedup: 14 words + 2 leaf shapes promoted to
+      KernelRvcDecode/KernelBaseDecode with 34 zero-churn restatements
+      in the six Code files; statement diff vs HEAD = 0 mismatches.
+- [ ] RESIDUAL: the `il_s*`/`wh_s*` immediate facts and `il_l_*`/`wh_l_*`
+      struct-log address lemmas are still textually duplicated between
+      ProofWriteHead and ProofInitlog — they are LogInv/RiscvExtras
+      material, not byte-buffer algebra; promote when either file is
+      next touched.
 
 ## Stage 3 — the log.c proofs (COMPLETE: log.c 6/7 fns, 91.0% of bytes;
 ## only sys_sync remains, deferred to stage 4)

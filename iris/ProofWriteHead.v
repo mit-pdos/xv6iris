@@ -26,12 +26,12 @@
      clean payload's [bsd = bsl] tie can be re-established.
 
    * THE BYTES ARE CARRIED BY A NAMING FUNCTION.  [buf_own]'s byte list is
-     traded for [wh_bytes] -- the [seq]-indexed, function-named window
+     traded for [bb_bytes] -- the [seq]-indexed, function-named window
      ByteBuf.v's algebra works on -- for the duration of the stores, and
      materialised back into a list ([f <$> seq 0 1024]) at the tail.  A
-     4-byte store is [wh_word_acc]: borrow the aligned word cell at offset
+     4-byte store is [bb_word4_acc]: borrow the aligned word cell at offset
      [o], give it back holding [w], and the window's naming function
-     becomes [wh_set f o w].  The only fact the tail needs about the final
+     becomes [bb_set f o w].  The only fact the tail needs about the final
      function is that its first four bytes spell [log.lh.n] -- which is
      [hdr_n] (LogInv.v) and the whole of the postcondition's content
      claim.  Nothing is said about the block list; that encoding is stage
@@ -47,7 +47,8 @@
    HART-GENERIC PROTOCOL.  Every callee returns through [wp_next b pj
    (fun CID => ...)]; the loop lemma therefore carries its own [CID0]
    binder and the continuation is re-anchored at each crossing with
-   [wh_cont_shift]. *)
+   [WpSconfVc.wp_next_shift] -- [wh_cont] IS a [wp_next], so the generic
+   lemma applies to it directly. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -75,7 +76,7 @@ Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import WpLock.
 Require Import SleepLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
 Require Import WpSmodeIntr.
 Require Import ByteCursor.
 Require Import ByteBuf.
@@ -100,122 +101,15 @@ Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 (* ===================================================================== *)
-(*  The BYTE-WINDOW algebra a 4-byte store into a tracked byte list       *)
-(*  needs.  All of it is over plain [Z]/[nat], so no solver ever runs     *)
-(*  inside the WP context.                                               *)
+(*  write_head's own pure vocabulary.  The general byte<->word window      *)
+(*  algebra it runs on -- [bb_set] / [bb_mk] / [bb_bytes] / [bb_word4_acc] *)
+(*  and the [bb_align_z] / [bb_uint32] side conditions -- lives in         *)
+(*  ByteBuf.v; only what is specific to THIS function is below.  All of it *)
+(*  is over plain [Z]/[nat], so no solver ever runs inside the WP context. *)
 (* ===================================================================== *)
 
-(* the naming-function update a 4-byte store performs *)
-Definition wh_set (f : nat -> bv 8) (o : nat) (w : SailStdpp.Values.mword 32)
-  : nat -> bv 8 :=
-  fun j => if decide ((o <= j)%nat /\ (j < o + 4)%nat)
-           then nth_byte w (j - o)%nat else f j.
-
-Lemma wh_set_in (f : nat -> bv 8) (o : nat) (w : SailStdpp.Values.mword 32) (j : nat) :
-  (o <= j)%nat -> (j < o + 4)%nat -> wh_set f o w j = nth_byte w (j - o)%nat.
-Proof. intros H1 H2. rewrite /wh_set decide_True; [reflexivity | split; assumption]. Qed.
-
-Lemma wh_set_out (f : nat -> bv 8) (o : nat) (w : SailStdpp.Values.mword 32) (j : nat) :
-  ((j < o)%nat \/ (o + 4 <= j)%nat) -> wh_set f o w j = f j.
-Proof. intro H. rewrite /wh_set decide_False; [reflexivity | intros [A B]; lia]. Qed.
-
-(* the word four consecutive named bytes spell *)
-Definition wh_mk (f : nat -> bv 8) (o : nat) : SailStdpp.Values.mword 32 :=
-  Z_to_bv 32 (assemble_bytes
-                [f o; f (o + 1)%nat; f (o + 2)%nat; f (o + 3)%nat]).
-
-Lemma wh_mk_byte (f : nat -> bv 8) (o j : nat) : (j < 4)%nat ->
-  nth_byte (wh_mk f o) j = f (o + j)%nat.
-Proof.
-  intro Hj. rewrite /wh_mk.
-  rewrite (nth_byte_assemble4 [f o; f (o + 1)%nat; f (o + 2)%nat; f (o + 3)%nat]
-             j ltac:(reflexivity) Hj).
-  destruct j as [|[|[|[|j']]]]; cbn;
-    [ f_equal; lia | f_equal; lia | f_equal; lia | f_equal; lia | lia ].
-Qed.
-
-Lemma wh_assemble_len4 (bs : list (bv 8)) : length bs = 4%nat ->
-  bv_unsigned (Z_to_bv 32 (assemble_bytes bs) : SailStdpp.Values.mword 32)
-  = assemble_bytes bs.
-Proof.
-  intro Hlen. rewrite Z_to_bv_unsigned. apply bv_wrap_small.
-  pose proof (assemble_bytes_bound bs) as [Hlo Hhi].
-  rewrite Hlen in Hhi.
-  assert (Hb : (2 ^ (8 * Z.of_nat 4%nat))%Z = 4294967296%Z)
-    by (vm_compute; reflexivity).
-  rewrite Hb in Hhi.
-  assert (Hm : bv_modulus (MachineWord.Z_idx 32) = 4294967296%Z)
-    by (vm_compute; reflexivity).
-  rewrite Hm. lia.
-Qed.
-
-Lemma wh_word_bytes (bs : list (bv 8)) (w : SailStdpp.Values.mword 32) :
-  length bs = 4%nat ->
-  (forall j, (j < 4)%nat -> bs !!! j = nth_byte w j) ->
-  assemble_bytes bs = bv_unsigned w.
-Proof.
-  intros Hlen Hbs.
-  assert (Heq : (Z_to_bv 32 (assemble_bytes bs) : SailStdpp.Values.mword 32) = w).
-  { apply (bv_eq_of_bytes (n := 4)). intros j Hj.
-    assert (Hj4 : (j < 4)%nat) by lia.
-    rewrite (nth_byte_assemble4 bs j Hlen Hj4). apply Hbs. exact Hj4. }
-  transitivity (bv_unsigned (Z_to_bv 32 (assemble_bytes bs)
-                              : SailStdpp.Values.mword 32)).
-  - symmetry. apply (wh_assemble_len4 bs Hlen).
-  - rewrite Heq. reflexivity.
-Qed.
-
-Lemma wh_mk_set (f : nat -> bv 8) (o : nat) (w : SailStdpp.Values.mword 32) :
-  wh_mk (wh_set f o w) o = w.
-Proof.
-  rewrite /wh_mk.
-  rewrite (wh_set_in f o w o ltac:(lia) ltac:(lia)).
-  rewrite (wh_set_in f o w (o + 1)%nat ltac:(lia) ltac:(lia)).
-  rewrite (wh_set_in f o w (o + 2)%nat ltac:(lia) ltac:(lia)).
-  rewrite (wh_set_in f o w (o + 3)%nat ltac:(lia) ltac:(lia)).
-  replace (o - o)%nat with 0%nat by lia.
-  replace (o + 1 - o)%nat with 1%nat by lia.
-  replace (o + 2 - o)%nat with 2%nat by lia.
-  replace (o + 3 - o)%nat with 3%nat by lia.
-  apply (bv_eq_of_bytes (n := 4)). intros j Hj.
-  assert (Hj4 : (j < 4)%nat) by lia.
-  rewrite (nth_byte_assemble4 [nth_byte w 0%nat; nth_byte w 1%nat;
-                               nth_byte w 2%nat; nth_byte w 3%nat]
-             j ltac:(reflexivity) Hj4).
-  destruct j as [|[|[|[|j']]]]; cbn; try reflexivity. lia.
-Qed.
-
-(* ---- the list <-> naming-function bridge ---- *)
-Lemma wh_list_id (l : list (bv 8)) :
-  ((fun j => l !!! j) <$> seq 0 (length l)) = l.
-Proof.
-  apply list_eq. intros i. rewrite list_lookup_fmap.
-  destruct (decide (i < length l)%nat) as [Hi|Hi].
-  - assert (Hs : seq 0 (length l) !! i = Some i)
-      by (apply lookup_seq; split; [lia | exact Hi]).
-    rewrite Hs /=.
-    destruct (lookup_lt_is_Some_2 l i Hi) as [x Hx].
-    rewrite Hx. by rewrite (list_lookup_total_correct l i x Hx).
-  - assert (Hs : seq 0 (length l) !! i = None).
-    { apply lookup_ge_None. rewrite length_seq. lia. }
-    rewrite Hs /=. symmetry. apply lookup_ge_None. lia.
-Qed.
-
-Lemma wh_fmap_len (f : nat -> bv 8) (n : nat) : length (f <$> seq 0 n) = n.
-Proof. rewrite length_fmap length_seq. reflexivity. Qed.
-
-(* ---- the alignment of a word slot inside a buffer's data area ---- *)
-Lemma wh_align_z (x : Z) :
-  0 <= x -> x < 18446744073709551616 -> x `mod` 4 = 0 ->
-  Z.rem (bv_wrap 64 x) 4 = 0.
-Proof.
-  intros H0 H1 Hm.
-  unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64%Z.
-  change (2 ^ 64)%Z with 18446744073709551616%Z.
-  rewrite (Z.mod_small x); [| lia].
-  rewrite Z.rem_mod_nonneg; [ exact Hm | lia | lia ].
-Qed.
-
+(* ---- the alignment of a word slot inside a buffer's data area:
+   [bcache]'s geometry, then [ByteBuf.bb_align_z] ---- *)
 Lemma wh_align_arith (kk qq : Z) :
   0 <= kk -> kk < 30 -> 0 <= qq -> qq <= 255 ->
   (2147582376 + 1112 * kk + (88 + 4 * qq)) `mod` 4 = 0
@@ -243,17 +137,11 @@ Proof.
     as (Hm & Hlo & Hhi).
   replace (0x80018190 + 24 + 1112 * Z.of_nat k + Z.of_nat (88 + 4 * q))
     with (2147582376 + 1112 * Z.of_nat k + (88 + 4 * Z.of_nat q)) by lia.
-  apply wh_align_z; assumption.
+  apply bb_align_z; assumption.
 Qed.
 
-(* ---- pointer arithmetic the two cursors and the sentinel need ---- *)
-Lemma wh_pa_add0 (p : SailStdpp.Values.mword 64) : pa_add p 0%nat = p.
-Proof.
-  apply bv_eq. rewrite ByteCursor.pa_add_unsigned.
-  cbn [Z.of_nat]. rewrite Z.add_0_r.
-  apply bv_wrap_small. apply bv_unsigned_in_range.
-Qed.
-
+(* ---- pointer arithmetic the two cursors and the sentinel need ----
+   ([pa_add p 0 = p] is [RiscvExtras.pa_add_0]; do not restate it) *)
 Lemma wh_dst_addr (a : SailStdpp.Values.mword 64) (i : nat) :
   add_vec (pa_add a (4 * i)%nat) (mword_of_int 92 : SailStdpp.Values.mword 64)
   = pa_add (b_data a) (4 * S i)%nat.
@@ -312,7 +200,7 @@ Proof.
   { rewrite -fmap_take.
     assert (Hs : take 4 (seq 0 1024) = seq 0 4) by (vm_compute; reflexivity).
     rewrite Hs. reflexivity. }
-  rewrite Htk. apply (wh_word_bytes _ nn); [reflexivity|].
+  rewrite Htk. apply (bb_word_bytes _ nn); [reflexivity|].
   intros j Hj. destruct j as [|[|[|[|j']]]]; cbn; try (apply Hf; lia). lia.
 Qed.
 
@@ -343,13 +231,6 @@ Proof.
   rewrite Hz.
   rewrite (sint_moi_small b ltac:(change (2^63) with 9223372036854775808; lia)).
   reflexivity.
-Qed.
-
-Lemma wh_uint32 (a : SailStdpp.Values.mword 32) : uint a = bv_unsigned a.
-Proof.
-  pose proof (bv_unsigned_in_range _ a) as Hr.
-  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
-  rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
 (* ---- the three [struct log] cell addresses the code forms ---- *)
@@ -415,63 +296,6 @@ Section WriteHeadDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  (* the [seq]-indexed, function-named byte window a store edits *)
-  Definition wh_bytes (a : SailStdpp.Values.mword 64) (n : nat) (f : nat -> bv 8)
-    : iProp Σ :=
-    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j)%I.
-
-  Lemma wh_bytes_of_list (a : SailStdpp.Values.mword 64) (l : list (bv 8)) :
-    ([∗ list] j ↦ x ∈ l, pa_add a j ↦ₘ x)
-    ⊣⊢ wh_bytes a (length l) (fun j => l !!! j).
-  Proof.
-    rewrite /wh_bytes.
-    rewrite -{1}(wh_list_id l) big_sepL_fmap.
-    apply big_sepL_proper. intros i jj Hj.
-    apply lookup_seq in Hj as [-> _]. reflexivity.
-  Qed.
-
-  Lemma wh_bytes_to_list (a : SailStdpp.Values.mword 64) (n : nat) (f : nat -> bv 8) :
-    wh_bytes a n f ⊣⊢ ([∗ list] j ↦ x ∈ (f <$> seq 0 n), pa_add a j ↦ₘ x).
-  Proof.
-    rewrite /wh_bytes big_sepL_fmap.
-    apply big_sepL_proper. intros i jj Hj.
-    apply lookup_seq in Hj as [-> _]. reflexivity.
-  Qed.
-
-  (* borrow the aligned word at offset [o]; give it back holding [w] *)
-  Lemma wh_word_acc (a : SailStdpp.Values.mword 64) (n o r : nat) (f : nat -> bv 8) :
-    (o + 4 + r)%nat = n ->
-    is_aligned_paddr (Physaddr (pa_add a o)) 4 = true ->
-    wh_bytes a n f -∗
-    pa_add a o ↦₄ wh_mk f o ∗
-    (∀ w : SailStdpp.Values.mword 32,
-       pa_add a o ↦₄ w -∗ wh_bytes a n (wh_set f o w)).
-  Proof.
-    intros Hn Hal.
-    rewrite /wh_bytes (bb_split3 a o 4 r n f Hn).
-    iIntros "(Hpre & Hmid & Hsuf)".
-    iSplitL "Hmid".
-    { iApply (word4_pointsto_intro _ _ _ Hal).
-      iApply (big_sepL_mono with "Hmid"). intros i jj Hj.
-      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-      rewrite (wh_mk_byte f o i Hlt). reflexivity. }
-    iIntros (w) "Hw".
-    rewrite (bb_split3 a o 4 r n (wh_set f o w) Hn).
-    iDestruct (word4_pointsto_bytes with "Hw") as "Hw".
-    iSplitL "Hpre".
-    { iApply (big_sepL_mono with "Hpre"). intros i jj Hj.
-      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-      rewrite (wh_set_out f o w i ltac:(left; lia)). reflexivity. }
-    iSplitL "Hw".
-    { iApply (big_sepL_mono with "Hw"). intros i jj Hj.
-      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-      rewrite (wh_set_in f o w (o + i)%nat ltac:(lia) ltac:(lia)).
-      replace (o + i - o)%nat with i by lia. reflexivity. }
-    { iApply (big_sepL_mono with "Hsuf"). intros i jj Hj.
-      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
-      rewrite (wh_set_out f o w (o + (4 + i))%nat ltac:(right; lia)). reflexivity. }
-  Qed.
-
   (* ---------------------------------------------------------------- *)
   (*  the payload-less handle, with its bytes in window form            *)
   (* ---------------------------------------------------------------- *)
@@ -486,7 +310,7 @@ Section WriteHeadDefs.
      b_dev (bnode k) ↦₄{DfracOwn (1/2)} dev ∗
      b_blockno (bnode k) ↦₄{DfracOwn (1/2)} bno ∗
      b_disk (bnode k) ↦₄ (mword_of_int 0 : mword 32) ∗
-     wh_bytes (b_data (bnode k)) 1024 f ∗
+     bb_bytes (b_data (bnode k)) 1024 f ∗
      disk_block (bv_gd V) (uint bno) bsd)%I.
 
   Lemma wh_hold_of (bn : bio_names) (V : bio_view Σ) (k : nat)
@@ -496,8 +320,8 @@ Section WriteHeadDefs.
   Proof.
     rewrite /bio_hold0 /wh_hold /buf_own /bpa.
     iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & (Hb & Hd & %Hlen & Hby) & H6)".
-    iEval (rewrite (wh_bytes_of_list (b_data (bnode k)) bs) Hlen) in "Hby".
-    (* NEVER [iFrame] a goal mentioning [wh_bytes]: the framing search walks
+    iEval (rewrite (bb_bytes_of_list (b_data (bnode k)) bs) Hlen) in "Hby".
+    (* NEVER [iFrame] a goal mentioning [bb_bytes]: the framing search walks
        into the 1024-element [seq] big-op and does not come back. *)
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|].
@@ -513,14 +337,14 @@ Section WriteHeadDefs.
   Proof.
     rewrite /bio_hold0 /wh_hold /buf_own /bpa.
     iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & Hb & Hd & Hby & H6)".
-    iEval (rewrite wh_bytes_to_list) in "Hby".
+    iEval (rewrite bb_bytes_to_list) in "Hby".
     iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
     iSplitL "H1"; [iExact "H1"|]. iSplitL "H2"; [iExact "H2"|].
     iSplitL "H3"; [iExact "H3"|]. iSplitL "H4"; [iExact "H4"|].
     (* [buf_own] is one parenthesised group, so peel it off whole first *)
     iSplitR "H6"; [| iExact "H6"].
     iSplitL "Hb"; [iExact "Hb"|]. iSplitL "Hd"; [iExact "Hd"|].
-    iSplitR; [iPureIntro; apply wh_fmap_len|]. iExact "Hby".
+    iSplitR; [iPureIntro; apply bb_fmap_len|]. iExact "Hby".
   Qed.
 
   (* ---------------------------------------------------------------- *)
@@ -576,21 +400,6 @@ Section WriteHeadDefs.
         ⌜hdr_n bs' = Z.of_nat n⌝ -∗
         bslot bn -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I.
-
-  Lemma wh_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
-      (Φ : mval -> iProp Σ)
-      (γfs : fs_names) (bn : bio_names) (logstart : Z) (n : nat)
-      (W : list (mword 32)) (L : gmap Z (list (bv 8)))
-      (pidv : mword 32) (dq : dfrac) (j : nat)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool) :
-    (b = false \/ proc_addr j = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
-    wh_cont (CID0 := CIDa) Φ γfs bn logstart n W L pidv dq j m K eb C b -∗
-    wh_cont (CID0 := CIDb) Φ γfs bn logstart n W L pidv dq j m K eb C b.
-  Proof.
-    intros Hs. rewrite /wh_cont /wp_next.
-    iIntros "H" (CID2 Hs2). iApply "H". iPureIntro.
-    intro Hb. specialize (Hs2 Hb). specialize (Hs Hb). congruence.
-  Qed.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
   Definition wh_frame (m : regfile) : iProp Σ :=
@@ -736,8 +545,8 @@ Section WriteHeadBlocks.
     iDestruct (wh_hold_to with "Hhold") as "Hhold".
     iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wh_cont_shift (CIDa := CID0) (CIDb := CID2) Φ γfs bn logstart n W L
-                 pidv dq j m K true C b ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
+                 with "Hcont") as "Hcont".
     assert (HKbw : (K_bwrite <= K - 4)%nat)
       by (unfold K_bwrite, K_write_head in *; lia).
     iApply (BW.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
@@ -827,8 +636,8 @@ Section WriteHeadBlocks.
       rewrite /T4 upd_ne; [| regne]. exact (HT3thr c Hcs N2 N8 N9 N18). }
     iDestruct (cpu_own_transport CID3 CID5 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (wh_cont_shift (CIDa := CID2) (CIDb := CID5) Φ γfs bn logstart n W L
-                 pidv dq j m K true C b ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    iDestruct (wp_next_shift (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
+                 with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat)
       by (unfold K_brelse, K_write_head in *; lia).
     iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
@@ -1186,12 +995,12 @@ Section WriteHeadBlocks.
     rewrite /wh_hold.
     iDestruct "Hhold" as
       "(%HA & %HB & %HC & Hslk & Hpid & Hvalid & Hbdev & Hbno & Hbdsk & Hby & Hdisk)".
-    iDestruct (wh_word_acc (b_data (bnode kk)) 1024 (4 * S i)%nat
+    iDestruct (bb_word4_acc (b_data (bnode kk)) 1024 (4 * S i)%nat
                  (1016 - 4 * i)%nat f Hsum Hal with "Hby") as "[Hcell Hback2]".
     iEval (rewrite -Hdst) in "Hcell".
     iApply (wp_csw_s_sconf Φ (mword_of_int (WH + 0x3c)) Ra3 Ra5
               (mword_of_int 92 : mword 12) S1 (K - 4)%nat
-              (wh_mk f (4 * S i)%nat) b
+              (bb_mk f (4 * S i)%nat) b
               with "Hcg Hpc Hi3c Hcell [-]").
     iIntros (CID2 Hs2) "Hcg Hpc Hcell".
     iEval (rewrite Hdst) in "Hcell".
@@ -1199,10 +1008,10 @@ Section WriteHeadBlocks.
     { rgne. rewrite HS1a3. apply trunc32_sext64. }
     iEval (rewrite Hsv) in "Hcell".
     iDestruct ("Hback2" $! w with "Hcell") as "Hby".
-    set (f' := wh_set f (4 * S i)%nat w).
+    set (f' := bb_set f (4 * S i)%nat w).
     assert (Hf4' : forall jj, (jj < 4)%nat ->
              f' jj = nth_byte (mword_of_int (Z.of_nat n) : mword 32) jj).
-    { intros jj Hjj. rewrite /f' (wh_set_out f (4 * S i)%nat w jj ltac:(left; lia)).
+    { intros jj Hjj. rewrite /f' (bb_set_out f (4 * S i)%nat w jj ltac:(left; lia)).
       apply Hf4. exact Hjj. }
     iAssert (wh_hold bn (fs_view γfs γd dev cov) kk pidv dev bno f' bsd0)
       with "[Hslk Hpid Hvalid Hbdev Hbno Hbdsk Hby Hdisk]" as "Hhold".
@@ -1286,8 +1095,8 @@ Section WriteHeadBlocks.
       iEval (rewrite Hpp46) in "Hpc".
       iDestruct (cpu_own_transport CID0 CID5 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wh_cont_shift (CIDa := CID0) (CIDb := CID5) Φ γfs bn logstart n W L
-                   pidv dq j m K true C b ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
+                 with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID5) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K C b
                 HK Hbnolt Hbnou Hj Hgl HnB Hk Hf4' HS3regs HS3s1
@@ -1316,8 +1125,8 @@ Section WriteHeadBlocks.
       assert (Hf' : (n - S i <= fuel)%nat) by (clear -Hi Hfuel Hmore; lia).
       iDestruct (cpu_own_transport CID0 CID5 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iDestruct (wh_cont_shift (CIDa := CID0) (CIDb := CID5) Φ γfs bn logstart n W L
-                   pidv dq j m K true C b ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
+                 with "Hcont") as "Hcont".
       iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' HS3regs HS3s1
                      HS3a4 HS3a5 HS3a2).
       iApply ("IH" with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds
@@ -1364,7 +1173,7 @@ Section ProofWriteHead.
       apply elem_of_union_r. apply elem_of_singleton. reflexivity. }
     destruct (Hcovok logstart Hhdrcov) as [Hls0 Hls1].
     assert (Huint : uint (mword_of_int logstart : mword 32) = logstart).
-    { rewrite wh_uint32. apply moi32_small.
+    { rewrite bb_uint32. apply moi32_small.
       change (2 ^ 32)%Z with 4294967296%Z.
       change (2 ^ 31)%Z with 2147483648%Z in Hls1. lia. }
     assert (Hbnolt : (uint (mword_of_int logstart : mword 32) < 2147483648)%Z).
@@ -1607,8 +1416,8 @@ Section ProofWriteHead.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID11 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iDestruct (wh_cont_shift (CIDa := CID) (CIDb := CID11) Φ γfs bn logstart n W L
-                 pidv dq j m K true C b ltac:(wp_next_chain) with "Hcont") as "Hcont".
+    iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
+                 with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
@@ -1711,12 +1520,12 @@ Section ProofWriteHead.
     assert (Hal0 : is_aligned_paddr
                      (Physaddr (pa_add (b_data (bnode kk)) (4 * 0)%nat)) 4 = true)
       by (apply wh_align4; [exact HA | apply Nat.le_0_l]).
-    iDestruct (wh_word_acc (b_data (bnode kk)) 1024 (4 * 0)%nat 1020
+    iDestruct (bb_word4_acc (b_data (bnode kk)) 1024 (4 * 0)%nat 1020
                  (fun jj => bs0 !!! jj) Hsum0 Hal0 with "Hby") as "[Hcell Hback]".
     iEval (rewrite -Hhaddr) in "Hcell".
     iApply (wp_csw_s_sconf Φ (mword_of_int (WH + 0x26)) Ra2 Ra0
               (mword_of_int 88 : mword 12) B2 (K - 4)%nat
-              (wh_mk (fun jj => bs0 !!! jj) (4 * 0)%nat) b
+              (bb_mk (fun jj => bs0 !!! jj) (4 * 0)%nat) b
               with "Hcg Hpc Hi26 Hcell [-]").
     iIntros (CID15 Hs15) "Hcg Hpc Hcell".
     iEval (rewrite Hhaddr) in "Hcell".
@@ -1724,12 +1533,12 @@ Section ProofWriteHead.
     { rgne. rewrite HB2a2. apply trunc32_sext64. }
     iEval (rewrite Hsv0) in "Hcell".
     iDestruct ("Hback" $! (mword_of_int (Z.of_nat n) : mword 32) with "Hcell") as "Hby".
-    set (f1 := wh_set (fun jj => bs0 !!! jj) (4 * 0)%nat
+    set (f1 := bb_set (fun jj => bs0 !!! jj) (4 * 0)%nat
                  (mword_of_int (Z.of_nat n) : mword 32)).
     assert (Hf14 : forall jj, (jj < 4)%nat ->
              f1 jj = nth_byte (mword_of_int (Z.of_nat n) : mword 32) jj).
     { intros jj Hjj.
-      rewrite /f1 (wh_set_in (fun j0 => bs0 !!! j0) (4 * 0)%nat
+      rewrite /f1 (bb_set_in (fun j0 => bs0 !!! j0) (4 * 0)%nat
                      (mword_of_int (Z.of_nat n) : mword 32) jj ltac:(lia) ltac:(lia)).
       f_equal. lia. }
     iAssert (wh_hold bn (fs_view γfs γd dev cov) kk pidv dev
@@ -1765,9 +1574,8 @@ Section ProofWriteHead.
       iEval (rewrite Htgt46) in "Hpc".
       iDestruct (cpu_own_transport CID12 CID16 0 true pj C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iDestruct (wh_cont_shift (CIDa := CID11) (CIDb := CID16) Φ γfs bn logstart 0%nat
-                   W L pidv dq j m K true C b ltac:(wp_next_chain)
-                   with "Hcont") as "Hcont".
+      iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID16) ltac:(wp_next_chain)
+                 with "Hcont") as "Hcont".
       iApply (wh_tail (CID0 := CID16) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev 0%nat W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 f1 m B2 K C b
@@ -1845,7 +1653,7 @@ Section ProofWriteHead.
       assert (HB5a5 : B5 !!! Regidx Ra5 = pa_add (bnode kk) (4 * 0)%nat).
       { rewrite /B5 upd_eq. rgne. rewrite HB4a0.
         rewrite add_vec_zero_l. change (4 * 0)%nat with 0%nat.
-        symmetry. apply wh_pa_add0. }
+        symmetry. apply RiscvExtras.pa_add_0. }
       assert (HB5a2 : B5 !!! Regidx Ra2
                       = sign_extend' 64 (mword_of_int (Z.of_nat (S n')) : mword 32))
         by (rewrite /B5 upd_ne; [exact HB4a2 | vm_compute; discriminate]).
@@ -1925,9 +1733,8 @@ Section ProofWriteHead.
       iEval (rewrite Hpp3a) in "Hpc".
       iDestruct (cpu_own_transport CID12 CID21 0 true pj C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iDestruct (wh_cont_shift (CIDa := CID11) (CIDb := CID21) Φ γfs bn logstart
-                   (S n') W L pidv dq j m K true C b ltac:(wp_next_chain)
-                   with "Hcont") as "Hcont".
+      iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID21) ltac:(wp_next_chain)
+                 with "Hcont") as "Hcont".
       iApply (wh_loop (CID0 := CID21) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 m K C b (S n')

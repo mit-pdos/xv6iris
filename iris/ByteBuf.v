@@ -28,6 +28,13 @@
        of a buffer are named by two different functions and the caller's
        postcondition names the whole of it by one.
 
+   A buffer is also read and written a WORD at a time -- a C struct laid over
+   it ([struct logheader]'s [n] and [block[]]) is 4-byte fields, not bytes --
+   so the same window vocabulary has a 32-bit twin: [bb_mk] (the word four
+   consecutive named bytes spell), [bb_set] (the naming function a 4-byte
+   store leaves behind), and [bb_word4_acc], which borrows the aligned cell
+   at an offset out of a window and gives it back holding a new value.
+
    Nothing here mentions page tables, so it is reusable by copyinstr and by
    any future byte-range code. *)
 From Stdlib Require Import ZArith Lia List.
@@ -36,6 +43,7 @@ From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes RiscvPtsto.
 Require Import InstrBytes.
 Require Import KallocInv.
@@ -116,6 +124,157 @@ Lemma bb_cstr_upd (f : nat -> bv 8) (d : nat) :
 Proof.
   intro Hn. apply bb_cstr_intro; [| apply bb_upd_eq].
   intros j Hj. rewrite bb_upd_ne; [apply Hn; exact Hj | lia].
+Qed.
+
+(* ===================================================================== *)
+(* A FOUR-BYTE WORD inside a buffer, as a property of the naming function. *)
+(* ===================================================================== *)
+(* The byte-at-a-time vocabulary above has a word-at-a-time twin, and any
+   code that lays a C struct over a tracked byte window needs it: a 4-byte
+   store moves the window's naming function by [bb_set], and every reading
+   of a word OUT of the window -- including the one that says what a store
+   just left there -- is [bb_mk].  The two are mutually inverse
+   ([bb_mk_set] one way, [bb_set_mk] the other), which is what lets a proof
+   that borrowed a cell and put it back UNCHANGED recover the window it
+   started with.  All of it is over plain [nat]/[Z] and closed words, so no
+   solver ever runs inside a WP context. *)
+
+(* the naming-function update a 4-byte store performs *)
+Definition bb_set (f : nat -> bv 8) (o : nat) (w : mword 32) : nat -> bv 8 :=
+  fun j => if decide ((o <= j)%nat /\ (j < o + 4)%nat)
+           then nth_byte w (j - o)%nat else f j.
+
+Lemma bb_set_in (f : nat -> bv 8) (o : nat) (w : mword 32) (j : nat) :
+  (o <= j)%nat -> (j < o + 4)%nat -> bb_set f o w j = nth_byte w (j - o)%nat.
+Proof. intros H1 H2. rewrite /bb_set decide_True; [reflexivity | split; assumption]. Qed.
+
+Lemma bb_set_out (f : nat -> bv 8) (o : nat) (w : mword 32) (j : nat) :
+  ((j < o)%nat \/ (o + 4 <= j)%nat) -> bb_set f o w j = f j.
+Proof. intro H. rewrite /bb_set decide_False; [reflexivity | intros [A B]; lia]. Qed.
+
+(* the word four consecutive named bytes spell *)
+Definition bb_mk (f : nat -> bv 8) (o : nat) : mword 32 :=
+  Z_to_bv 32 (assemble_bytes
+                [f o; f (o + 1)%nat; f (o + 2)%nat; f (o + 3)%nat]).
+
+Lemma bb_mk_byte (f : nat -> bv 8) (o j : nat) : (j < 4)%nat ->
+  nth_byte (bb_mk f o) j = f (o + j)%nat.
+Proof.
+  intro Hj. rewrite /bb_mk.
+  rewrite (nth_byte_assemble_len 32
+             [f o; f (o + 1)%nat; f (o + 2)%nat; f (o + 3)%nat] j
+             ltac:(cbn; lia) ltac:(cbn; lia)).
+  destruct j as [|[|[|[|j']]]]; cbn;
+    [ f_equal; lia | f_equal; lia | f_equal; lia | f_equal; lia | lia ].
+Qed.
+
+Lemma bb_assemble_len4 (bs : list (bv 8)) : length bs = 4%nat ->
+  bv_unsigned (Z_to_bv 32 (assemble_bytes bs) : mword 32) = assemble_bytes bs.
+Proof.
+  intro Hlen. rewrite Z_to_bv_unsigned. apply bv_wrap_small.
+  pose proof (assemble_bytes_bound bs) as [Hlo Hhi].
+  rewrite Hlen in Hhi.
+  assert (Hb : (2 ^ (8 * Z.of_nat 4%nat))%Z = 4294967296%Z)
+    by (vm_compute; reflexivity).
+  rewrite Hb in Hhi.
+  assert (Hm : bv_modulus (MachineWord.Z_idx 32) = 4294967296%Z)
+    by (vm_compute; reflexivity).
+  rewrite Hm. lia.
+Qed.
+
+(* four bytes that ARE a word's bytes assemble to that word's value *)
+Lemma bb_word_bytes (bs : list (bv 8)) (w : mword 32) :
+  length bs = 4%nat ->
+  (forall j, (j < 4)%nat -> bs !!! j = nth_byte w j) ->
+  assemble_bytes bs = bv_unsigned w.
+Proof.
+  intros Hlen Hbs.
+  assert (Heq : (Z_to_bv 32 (assemble_bytes bs) : mword 32) = w).
+  { apply (bv_eq_of_bytes (n := 4)). intros j Hj.
+    assert (Hj4 : (j < 4)%nat) by lia.
+    rewrite (nth_byte_assemble_len 32 bs j
+               ltac:(rewrite Hlen; cbn; lia) ltac:(rewrite Hlen; lia)).
+    apply Hbs. exact Hj4. }
+  transitivity (bv_unsigned (Z_to_bv 32 (assemble_bytes bs) : mword 32)).
+  - symmetry. apply (bb_assemble_len4 bs Hlen).
+  - rewrite Heq. reflexivity.
+Qed.
+
+(* WRITE then READ: the cell holds what the store put there *)
+Lemma bb_mk_set (f : nat -> bv 8) (o : nat) (w : mword 32) :
+  bb_mk (bb_set f o w) o = w.
+Proof.
+  rewrite /bb_mk.
+  rewrite (bb_set_in f o w o ltac:(lia) ltac:(lia)).
+  rewrite (bb_set_in f o w (o + 1)%nat ltac:(lia) ltac:(lia)).
+  rewrite (bb_set_in f o w (o + 2)%nat ltac:(lia) ltac:(lia)).
+  rewrite (bb_set_in f o w (o + 3)%nat ltac:(lia) ltac:(lia)).
+  replace (o - o)%nat with 0%nat by lia.
+  replace (o + 1 - o)%nat with 1%nat by lia.
+  replace (o + 2 - o)%nat with 2%nat by lia.
+  replace (o + 3 - o)%nat with 3%nat by lia.
+  apply (bv_eq_of_bytes (n := 4)). intros j Hj.
+  assert (Hj4 : (j < 4)%nat) by lia.
+  rewrite (nth_byte_assemble_len 32
+             [nth_byte w 0%nat; nth_byte w 1%nat;
+              nth_byte w 2%nat; nth_byte w 3%nat]
+             j ltac:(cbn; lia) ltac:(cbn; lia)).
+  destruct j as [|[|[|[|j']]]]; cbn; try reflexivity. lia.
+Qed.
+
+(* READ then WRITE BACK: a cell given back unchanged leaves the window
+   pointwise as it was -- no index bound needed, so a caller that borrows
+   and returns is exactly where it started. *)
+Lemma bb_set_mk (f : nat -> bv 8) (o j : nat) : bb_set f o (bb_mk f o) j = f j.
+Proof.
+  rewrite /bb_set.
+  destruct (decide ((o <= j)%nat /\ (j < o + 4)%nat)) as [[H1 H2] | _];
+    [| reflexivity].
+  rewrite (bb_mk_byte f o (j - o)%nat ltac:(lia)). f_equal. lia.
+Qed.
+
+(* ---- the list <-> naming-function bridge ---- *)
+Lemma bb_list_id (l : list (bv 8)) :
+  ((fun j => l !!! j) <$> seq 0 (length l)) = l.
+Proof.
+  apply list_eq. intros i. rewrite list_lookup_fmap.
+  destruct (decide (i < length l)%nat) as [Hi|Hi].
+  - assert (Hs : seq 0 (length l) !! i = Some i)
+      by (apply lookup_seq; split; [lia | exact Hi]).
+    rewrite Hs /=.
+    destruct (lookup_lt_is_Some_2 l i Hi) as [x Hx].
+    rewrite Hx. by rewrite (list_lookup_total_correct l i x Hx).
+  - assert (Hs : seq 0 (length l) !! i = None).
+    { apply lookup_ge_None. rewrite length_seq. lia. }
+    rewrite Hs /=. symmetry. apply lookup_ge_None. lia.
+Qed.
+
+Lemma bb_fmap_len (f : nat -> bv 8) (n : nat) : length (f <$> seq 0 n) = n.
+Proof. rewrite length_fmap length_seq. reflexivity. Qed.
+
+(* ---- the two arithmetic side conditions a word window keeps asking for ---- *)
+(* 4-ALIGNMENT of an address once it has been reduced to a [Z] literal.  A
+   buffer-geometry lemma (write_head's and initlog's [*_align4]) does the
+   [pa_add]/[bnode] reduction itself and then lands here. *)
+Lemma bb_align_z (x : Z) :
+  0 <= x -> x < 18446744073709551616 -> x `mod` 4 = 0 ->
+  Z.rem (bv_wrap 64 x) 4 = 0.
+Proof.
+  intros H0 H1 Hm.
+  unfold bv_wrap, bv_modulus. change (Z.of_N 64) with 64%Z.
+  change (2 ^ 64)%Z with 18446744073709551616%Z.
+  rewrite (Z.mod_small x); [| lia].
+  rewrite Z.rem_mod_nonneg; [ exact Hm | lia | lia ].
+Qed.
+
+(* [uint] at width 32 -- the twin of [RiscvExtras.uint_unsigned], which is
+   stated at 64 only.  A word loaded out of a buffer is an [mword 32], and
+   every bound on it is stated with [bv_unsigned]. *)
+Lemma bb_uint32 (a : mword 32) : uint a = bv_unsigned a.
+Proof.
+  pose proof (bv_unsigned_in_range _ a) as Hr.
+  unfold uint, get_word, MachineWord.MachineWord.word_to_N.
+  rewrite Z2N.id; [ reflexivity | lia ].
 Qed.
 
 Section ByteBuf.
@@ -387,6 +546,77 @@ Section ByteBuf.
     { unfold bs.
       destruct i as [|[|[|[|[|[|[|[|i']]]]]]]]; try reflexivity. cbn in Hlt. lia. }
     rewrite Hbs. reflexivity.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* ONE 4-BYTE CELL of a buffer, borrowed and put back.                 *)
+  (* ------------------------------------------------------------------ *)
+  (* [bb_bytes] names the [seq]-indexed, function-named window itself, so a
+     resource that carries a byte LIST (a [buf_own]-style block) can be
+     traded for it once ([bb_bytes_of_list]) and materialised back at the
+     end ([bb_bytes_to_list]) instead of being re-indexed at every store.
+
+     [bb_word4_acc] is then the word-sized analogue of [bb_byte_acc]: the
+     window splits at [o] ([bb_split3]), the middle four bytes become a
+     [↦₄] cell holding [bb_mk f o], and the returning wand takes the new
+     value EXPLICITLY -- the naming function becomes [bb_set f o w], which
+     is what keeps the caller in control of the contents.  Reading is the
+     [w := bb_mk f o] instance ([bb_set_mk] then says the window is
+     unchanged), so this is one lemma and not two.  The alignment fact is a
+     premise rather than something derived: the four bytes do not carry it
+     and the caller's geometry lemma is where it belongs. *)
+  Definition bb_bytes (a : mword 64) (n : nat) (f : nat -> bv 8) : iProp Σ :=
+    ([∗ list] j ∈ seq 0 n, pa_add a j ↦ₘ f j)%I.
+
+  Lemma bb_bytes_of_list (a : mword 64) (l : list (bv 8)) :
+    ([∗ list] j ↦ x ∈ l, pa_add a j ↦ₘ x)
+    ⊣⊢ bb_bytes a (length l) (fun j => l !!! j).
+  Proof.
+    rewrite /bb_bytes.
+    rewrite -{1}(bb_list_id l) big_sepL_fmap.
+    apply big_sepL_proper. intros i jj Hj.
+    apply lookup_seq in Hj as [-> _]. reflexivity.
+  Qed.
+
+  Lemma bb_bytes_to_list (a : mword 64) (n : nat) (f : nat -> bv 8) :
+    bb_bytes a n f ⊣⊢ ([∗ list] j ↦ x ∈ (f <$> seq 0 n), pa_add a j ↦ₘ x).
+  Proof.
+    rewrite /bb_bytes big_sepL_fmap.
+    apply big_sepL_proper. intros i jj Hj.
+    apply lookup_seq in Hj as [-> _]. reflexivity.
+  Qed.
+
+  Lemma bb_word4_acc (a : mword 64) (n o r : nat) (f : nat -> bv 8) :
+    (o + 4 + r)%nat = n ->
+    is_aligned_paddr (Physaddr (pa_add a o)) 4 = true ->
+    bb_bytes a n f -∗
+    pa_add a o ↦₄ bb_mk f o ∗
+    (∀ w : mword 32,
+       pa_add a o ↦₄ w -∗ bb_bytes a n (bb_set f o w)).
+  Proof.
+    intros Hn Hal.
+    rewrite /bb_bytes (bb_split3 a o 4 r n f Hn).
+    iIntros "(Hpre & Hmid & Hsuf)".
+    iSplitL "Hmid".
+    { iApply (word4_pointsto_intro _ _ _ Hal).
+      iApply (big_sepL_mono with "Hmid"). intros i jj Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+      rewrite (bb_mk_byte f o i Hlt). reflexivity. }
+    iIntros (w) "Hw".
+    rewrite (bb_split3 a o 4 r n (bb_set f o w) Hn).
+    iDestruct (word4_pointsto_bytes with "Hw") as "Hw".
+    iSplitL "Hpre".
+    { iApply (big_sepL_mono with "Hpre"). intros i jj Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+      rewrite (bb_set_out f o w i ltac:(left; lia)). reflexivity. }
+    iSplitL "Hw".
+    { iApply (big_sepL_mono with "Hw"). intros i jj Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+      rewrite (bb_set_in f o w (o + i)%nat ltac:(lia) ltac:(lia)).
+      replace (o + i - o)%nat with i by lia. reflexivity. }
+    { iApply (big_sepL_mono with "Hsuf"). intros i jj Hj.
+      apply lookup_seq in Hj as [-> Hlt]. rewrite Nat.add_0_l.
+      rewrite (bb_set_out f o w (o + (4 + i))%nat ltac:(right; lia)). reflexivity. }
   Qed.
 
 End ByteBuf.
