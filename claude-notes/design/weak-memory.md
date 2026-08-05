@@ -414,14 +414,28 @@ support is battle-tested (iRC11/gpfsl track modern Iris). The pieces:
   I/O bits set (they must not be dropped; if the Sail model normalizes them
   away, the fence kinds need to be recovered at the `run` layer from the
   instruction word, or the model config fixed).
-- **Instruction fetch (AK_ifetch)**: reads stay coherent-SC. Kernel text is
-  immutable post-boot (single message per byte ⇒ no weakening exists to
-  express); user text written by exec is covered by xv6's own
-  coherent-icache assumption (it uses no `fence.i` — upstream shares this);
-  declared alongside the MMIO assumption.
-- **Page-table walks (AK_ttw) / sfence.vma**: outside RVWMO by the spec's
-  own statement. The walker keeps reading the coherent latest state;
-  the existing TLB model remains the (orthogonal) staleness axis. Declared.
+- **Instruction fetch and page-table walks are PLAIN WEAK LOADS — found at
+  M1a, superseding the planned coherent-read dispatch.** rv64d picks
+  read/write kinds from the (aq, rl, reserved/conditional) flags alone;
+  `AK_ifetch`/`AK_ttw` are never emitted — fetch (`fetch_bytes`) and the
+  walker (`read_pte`) are indistinguishable from `lw` at the interface
+  seam (the coherent arms exist in `WeakInterp` but are dead for rv64d).
+  This is FINE, and better than the old plan:
+  - Fetch: kernel text bytes have exactly one message (timestamp 0), so
+    every admissible weak read agrees and fetch stays deterministic — no
+    assumption needed for kernel text. USER text (written by exec) is
+    ordinary weakly-read memory, covered by the same lock/view discipline
+    as any data. What remains declared is only **no-icache**: real
+    hardware has incoherent icaches and xv6 issues no `fence.i` (a real
+    upstream gap); our model has no icache, hence is stronger than such
+    hardware on this one axis.
+  - Walks: a walk is a weak read at the hart's own views — SOUND (more
+    behaviors than an SC walker, in the safe direction) and arguably
+    faithful: same-hart PTE writes are seen via coherence, cross-hart
+    staleness composes with the existing TLB model (the orthogonal axis;
+    sfence.vma stays outside RVWMO by the spec's own statement). **The
+    planned SC-walker declared assumption is DROPPED** — walks need no
+    special arm at all. PTE A/D updates are plain stores to the log.
 - **UART/PLIC**: never touch RAM; unchanged.
 - **Crash/power**: a PowerOn resets `glog` to empty over the new `gmem0`
   (boot image) and zeroes every `wstate` — the generation machinery is
@@ -444,8 +458,9 @@ this tractable:
   cone + the started handoff), THEN sweep.
 - `tools/lemma_diff.py` + `spec_vacuity.py` after every ported batch; the
   final `Print Assumptions` diff must show: 5 platform axioms + funext + the
-  4 assumed kernel contracts + the NEW declared assumptions (LB-gap/M6,
-  MMIO-ordering, coherent-ifetch, SC-walker) and nothing else.
+  4 assumed kernel contracts + the NEW declared assumptions
+  (store-reordering gap/M6, MMIO-ordering, no-icache) and nothing else
+  (the SC-walker assumption was dropped at M1a — walks are weak reads).
 
 ## Validation
 

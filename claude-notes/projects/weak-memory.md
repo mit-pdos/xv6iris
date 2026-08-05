@@ -95,8 +95,8 @@ Validate the operational design before anything depends on it.
 - [ ] File-by-file port of the leaf libraries, then function proofs
       (subagents, batched; `lemma_diff.py`/`spec_vacuity.py` per batch).
 - [ ] Final `Print Assumptions` diff: baseline axioms + the four declared
-      weak-memory assumptions (LB-gap, MMIO-ordering, coherent-ifetch,
-      SC-walker) and nothing else.
+      weak-memory assumptions (store-reordering gap, MMIO-ordering,
+      no-icache) and nothing else (SC-walker dropped at M1a).
 
 ## M5 — devices
 
