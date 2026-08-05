@@ -84,6 +84,12 @@ are working on that effort — the relevant `projects/` file.
   guards), and `proc_priv`, the exclusive private bundle
   (`sz`/`pagetable`/`trapframe`/`ofile`/`cwd`) that rides alongside
   `cur_proc p` and carries a `FileInv.file_ref` per open fd.
+- **[`weak-memory.md`](design/weak-memory.md)** — PROPOSAL (nothing landed):
+  the RVWMO weak-memory model — the promise-free view machine (global write
+  log + per-hart views, Promising-RISC-V shape), the read-oracle `exec` seam,
+  the Cosmo-style vProp surface (objective invariants, `⊒V`/`@V`, SC-shaped
+  `↦ₘ`, fence modalities, view-transferring locks), the device/MMIO/fetch/
+  walker decisions, and the staged migration + LB-gap story.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture (swtch/contexts, proc locks/wakeup, loop shapes), whole-function
   WP specs (`callee_saved`/`stack_own`), spinlocks (`WpLock.v`), and the kernel
@@ -183,6 +189,10 @@ are working on that effort — the relevant `projects/` file.
   over user VAs), the interrupt-absorbing step engine with hart-switching
   continuations, the Umode leaf WPs, and the sync program's function proofs
   (start/main + the sync/exit ecall stubs).
+- **[`weak-memory.md`](projects/weak-memory.md)** — the weak-memory effort's
+  staged worklist (M0 model spike → base logic → vProp surface → vertical
+  slice → sweep → devices → the LB robustness theorem). Nothing landed;
+  design in [`design/weak-memory.md`](design/weak-memory.md).
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
   driver: uartwrite, uartintr and uartgetc, all proven (uart.c 4/4). The
   `tx_lock` invariant (`UartTxInv.v`) whose implication "`tx_busy == 0` ⟹
