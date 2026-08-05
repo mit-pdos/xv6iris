@@ -17,7 +17,6 @@ From Stdlib Require Import ZArith.
 From stdpp Require Import gmap finite bitvector.definitions.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import RiscvLang.
 Require Import RiscvExtras.
 Local Open Scope Z_scope.

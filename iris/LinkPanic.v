@@ -23,7 +23,6 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import RegFile.
 Require Import SpecPanic.
 
 Module Panic.

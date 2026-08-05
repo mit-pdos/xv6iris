@@ -56,8 +56,8 @@ From stdpp Require Import gmap bitvector.definitions.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import CommonWalk UserPtTree.
+Require Import RiscvPtsto.
+Require Import UserPtTree.
 Require Import WpDecodeBridge DecodeTotalU WpRvcBridge.
 Require Import UmodeMem UmodeAbi.
 From User Require SyncInstrs SyncSyms.

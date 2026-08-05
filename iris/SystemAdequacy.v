@@ -39,10 +39,9 @@ Require Import RiscvLang RiscvPtsto.
 Require Import SmodeCore.
 Require Import ProcGeom.
 Require Import WpLock KallocInv FileInv FdSlots.
-Require Import VirtioProto VirtioModel DiskPtsto.
-Require Import WpUart WireInv.
-Require Import SpecMain SpecMainSecondary.
-Require Import BootConfig PowerBoot.
+Require Import DiskPtsto.
+Require Import WpUart.
+Require Import BootConfig.
 Require Import BootChain BootShared.
 Require Import RiscvAdequacy.
 Local Open Scope Z_scope.

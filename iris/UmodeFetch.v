@@ -43,8 +43,6 @@ Require Import UserPtTree.
 Require Import UserBits.
 Require Import UserMem.
 Require Import UserFetch.
-Require Import UserMemPt.
-Require Import UserFetchPt.
 Require Import InstrBytes.
 Require Import UmodeMem.
 Require Import Riscv.rv64d_types Riscv.rv64d.

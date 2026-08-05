@@ -83,7 +83,6 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExtras.
 Require Import ByteCursor.   (* the add/sub/mword_of_int unsigned laws *)
-Require Import SmodePte.
 Require Import Pt4kWalk.
 Require Import CommonWalk.
 Require Import PtTree.

@@ -32,9 +32,8 @@ From iris.bi.lib Require Import fractional.
 Require Import SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras RiscvTryStep RiscvFetchExec MinstretInv.
-Require Import KptPt KMap InstrBytes RegFile WpGpr.
+Require Import RiscvLang RiscvPtsto RiscvExtras RiscvFetchExec MinstretInv.
+Require Import KMap InstrBytes RegFile WpGpr.
 Require Import MstatusFacts.
 (* [gsi64] is the general [get_slice_int] unsigned fact; its one home is
    PrintintArith.v (kept there with a minimal import set, because [lia] is

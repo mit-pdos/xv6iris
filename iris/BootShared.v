@@ -18,30 +18,28 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec MinstretInv.
-Require Import RegFile HartTp InstrBytes WpGpr.
-Require Import KMap KptPt SmodePte KptGhost.
+Require Import RiscvLang RiscvPtsto.
+Require Import HartTp.
+Require Import KMap KptPt KptGhost.
 Require Import StackOwn.
 Require Import KernelText KernelDataInv.
-Require Import SRegime SmodeCore.
+Require Import SmodeCore.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn SwtchCtx SchedCtx ProcInv.
+Require Import ProcGeom SwtchCtx SchedCtx.
 Require Import WpLock KallocInv FileInv FdSlots.
 Require Import WpEntryNew.
-Require Import VirtioProto VirtioModel VirtioQueue DiskPtsto DiskInv.
+Require Import VirtioProto VirtioModel VirtioQueue DiskPtsto.
 Require Import PlicPlan WpUart WireInv.
-Require Import SpecConsoleinit SpecProcinit SpecIinit SpecVirtioDiskInit.
-Require Import SpecFreerange KvmSpec BcacheInv SleepLock.
+Require Import SpecConsoleinit SpecIinit.
+Require Import SpecFreerange KvmSpec BcacheInv.
 Require Import StartedInv SpecPanic LinkPanic.
 Require Import SpecMain SpecMainSecondary.
-Require Import BootConfig BootBridge PowerBoot.
+Require Import BootConfig PowerBoot.
 Require Import BootCarve BootCarveMain.
 Require Import BootChain.
 Require Import RiscvAdequacy.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
-Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:

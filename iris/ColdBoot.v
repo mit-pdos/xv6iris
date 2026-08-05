@@ -127,7 +127,6 @@
 From stdpp Require Import gmap finite bitvector.definitions.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvModelBytes.
 Require Import RiscvLang.
 Require Import RiscvExec.
 Import Defs.

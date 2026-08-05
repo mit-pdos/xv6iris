@@ -85,7 +85,7 @@ Require Import SailStdpp.Base.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec MinstretInv.
 Require Import RegFile HartTp InstrBytes WpGpr.
-Require Import KMap KptPt SmodePte.
+Require Import KMap KptPt.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.
 Require Import WpGprCsrwA WpGprCsrwB WpGprCsrwC.

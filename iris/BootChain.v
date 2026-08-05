@@ -42,19 +42,19 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvModelBytes.
-Require Import RiscvLang RiscvPtsto RiscvFetchExec MinstretInv.
+Require Import RiscvLang RiscvPtsto MinstretInv.
 Require Import RegFile HartTp InstrBytes WpGpr.
-Require Import KMap KptPt SmodePte.
+Require Import KMap KptPt.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.
 Require Import KernelText KernelDataInv.
 Require Import WpEntryNew WpTimerinit WpStartNew.
-Require Import SRegime SmodeCore.
+Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
 Require Import BootConfig BootBridge PowerBoot.
-Require Import SpecEntry LinkEntry.
+Require Import LinkEntry.
 Require Import SpecMainSecondary LinkMainSecondary.
 Require Import StartedInv DevModel.
 Require Import WpUart DiskPtsto SpecPanic.
@@ -63,7 +63,6 @@ Require Import KptGhost VirtioProto VirtioModel SpecFreerange KvmSpec.
 Require Import LinkMain.
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
-Require Import RiscvExtras.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
