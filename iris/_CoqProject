@@ -560,6 +560,8 @@ ProofUvmunmap.v
 LinkUvmunmap.v
 LinkUvmunmapBare.v
 LinkUvmunmapFixed.v
+SpecProcFreepagetable.v
+CodeProcFreepagetable.v
 SpecUvmdealloc.v
 CodeUvmdealloc.v
 ProofUvmdealloc.v

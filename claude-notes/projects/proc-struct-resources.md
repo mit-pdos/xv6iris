@@ -627,8 +627,18 @@ the evidence for every offset. This file is only the worklist.
            `uptg_spec None uroot ∅ t'` from `pt_rep0 t' ∅` +
            `pt_base t' = uroot`.  A handful of lines.
 
-         - **BUT TAIL #2 DOES NOT COMPOSE, AND THIS IS THE REAL REMAINING
-           OBSTACLE.**  After the SECOND mappages fails, proc_pagetable
+         - **SUPERSEDED (2026-08-05): the range premise was not the real
+           obstacle, and the fix has LANDED.**  See
+           [`proc-pagetable-ownership.md`](proc-pagetable-ownership.md)
+           "The teardown axis".  `BarePt`'s `otf : option (mword 44)` could
+           not even NAME tail #2's table (trampoline mapped, trapframe never
+           was), so relaxing the range premise would not have helped.  The
+           axis is the fixed-leaf MAP now, `UvmunmapCore` is generic in
+           `do_free`, and `UVMUNMAP_FIXED` is the contract these two calls
+           want.  The analysis below is kept for the record.
+
+         - ~~**BUT TAIL #2 DOES NOT COMPOSE, AND THIS IS THE REAL REMAINING
+           OBSTACLE.**~~  After the SECOND mappages fails, proc_pagetable
            calls `uvmunmap(pagetable, TRAMPOLINE, 1, 0)` before uvmfree —
            and `SpecUvmunmap`'s range premise is
            `uint va + npages*4096 <= uvm_maxsz` with

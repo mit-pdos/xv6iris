@@ -104,6 +104,88 @@ Parked ⇄ installed differ in **exactly one conjunct** (`pt_frame` vs
 conversion is the existing satp-switch window (`TransPt.tlb_inv_pt2_enter` /
 `_exit`, already used by `wp_userret_entry_pt`).
 
+## The teardown axis: `otf` retired for a fixed-leaf MAP (2026-08-05)
+
+`BarePt.v`'s axis used to be `otf : option (mword 44)` — "both fixed leaves
+or neither". **That is one state short**, and it is what blocked
+`proc_freepagetable` and `proc_pagetable`'s second failure tail:
+
+- proc_freepagetable passes *through* "trampoline gone, trapframe still
+  there" (it unmaps them one at a time);
+- proc_pagetable's second tail *starts* in "trampoline mapped, trapframe
+  never was" — `if (mappages(.., TRAPFRAME, ..) < 0) { uvmunmap(pt, TRAMPOLINE, 1, 0); … }`.
+
+Neither is an `option`, so neither function could be *stated*. This is a
+sharper diagnosis than the one recorded earlier in
+[`proc-struct-resources.md`](proc-struct-resources.md) S7, which blamed only
+`SpecUvmunmap`'s range premise: relaxing that premise would not have helped,
+because the intermediate table had no name.
+
+**The axis is now the fixed-leaf map itself**, `fx : gmap (mword 27) (mword 64)`,
+with `uptg_map fx um := fx ∪ um` (`fx` wins) and `fx_wf fx` — every key is
+`tramp_vpn` or `tf_vpn` — carried *inside* `uptg` so consumers never thread
+it. `fx` is generic only inside `UvmunmapCore`; every `Module Type` pins it
+to one of three literals, so no contract leaves the leaves' *values* loose:
+
+| state | `fx` | predicate |
+|---|---|---|
+| live | `upt_fixed_both tfp` | `proc_pt P` (via `proc_pt_uptg`) |
+| mid-teardown | `upt_fixed_tramp` | — |
+| bare | `∅` | `bare_pt uroot um` |
+
+**Widening costs no resource bookkeeping**, and that is the fact that makes
+the whole thing cheap: `upt_pages_own` is a function of `um` ALONE. The
+trampoline's page is kernel text and the trapframe's belongs to
+`ProcInv.proc_priv`, so neither was ever owned here — which is also why
+dropping a fixed leaf hands nothing back, and why the two calls that drop
+them pass `do_free = 0`.
+
+### One proof, THREE seals
+
+`UvmunmapCore` is generic in `do_free` as well, and seals three ways:
+`UVMUNMAP` (live, user run), `UVMUNMAP_BARE` (bare, user run),
+`UVMUNMAP_FIXED` (any `fx`, one page, at a named fixed leaf). **The first
+two statements are byte-identical to what they were and no existing caller
+changed.** What the split actually cost, in case a similar one comes up:
+
+- **The `beq s5,zero` at +0x66 branches on `df` instead of being proved
+  not-taken.** Its taken target is +0x46 — the `sd zero,0(s1)` that the
+  *freeing* arm already rejoins after kfree — so the two arms meet at a join
+  point that existed. Everything downstream (tree update, view move, the
+  +0x4a tail) is proved once, in an `iAssert`ed `STORE` block parameterized
+  by the register map. **Look for this before assuming a `do_free`-style flag
+  needs two proofs: the compiler had already shared the tail.**
+- **The loop's `vpn < tf_vpn` fact stopped being *derived* and became a
+  hypothesis** (`uu_vpn_ok df`). That derivation, sitting inside the loop
+  body, *was* the thing pinning uvmunmap to user runs. It now lives in
+  `uu_side_user`, which the two user-run seals apply — so the tighter range
+  premise is still where it always was, just no longer load-bearing for
+  callers that do not need it.
+- **The range premise widened to `<= 2^38`** (`z_run_iter_gen`). Of
+  `z_run_iter`'s four conclusions, three are about the cursor not wrapping
+  and survive at the wider bound; only the fourth is the user-vpn claim.
+  TRAMPOLINE (`2^38 - 4096`) meets `<= 2^38` exactly.
+- **`BarePt` §4** is the step algebra: `uu_fx` / `uu_um` (which side a run
+  deletes from), `uu_step_absent` (both continue arms), `uu_step_delete`
+  (the clearing arm). There is deliberately no `df = false` twin of
+  `uptg_own_shrink` — see above.
+- Rs5 is never written in the loop body, so the fact chain carries it as an
+  *equality* to the loop-entry map and reads `uu_s5` off that. Making each
+  intermediate `uu_s5 df Bi` instead would have put an `if` under every
+  `rewrite upd_ne`.
+
+Gotchas paid for: `lia` inside an mword-laden seal fails with "Cannot find
+witness" (the zify hook) — the range relaxation had to become the closed
+`uu_range_wide_Z`; and an instruction fact re-`iPoseProof`ed inside an
+`iAssert` needs a *fresh name*, the outer one is still in scope at
+elaboration time.
+
+**Status.** Landed and green (`c3b495d`, `d66cff4`). `CodeProcFreepagetable.v`
+(30/30 instructions) and `SpecProcFreepagetable.v` are written and compile;
+`ProofProcFreepagetable.v` + `LinkProcFreepagetable.v` are the remaining
+step. `ProofUvmfree.v` (900 lines, a 2-call function with one branch) is the
+closest template — proc_freepagetable is 3 calls and no branch at all.
+
 ## Worklist
 
 **Step 1 — extract `PageOwn.v` out of `KallocInv.v`.** Move the page
