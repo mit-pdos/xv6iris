@@ -2,24 +2,28 @@
 (* ArchReset.v -- THE PROGRAM A POWER-ON RUNS, with the one platform hook   *)
 (* the interpreters cannot step lifted to a parameter.                      *)
 (*                                                                          *)
-(* [RiscvLang.boot_facts] states the per-hart register side of a power-on as *)
-(* "the model's own boot chain RAN, from some power-on register file", so    *)
-(* the chain has to be nameable BELOW the language file -- hence this file,  *)
-(* which requires nothing but the generated model.  [ColdBoot.v] runs the    *)
-(* same program from the closed [init_regstate] (the compiled evidence       *)
-(* layer) and [BootReset.v] runs it over an ARBITRARY power-on file.         *)
+(* [RiscvLang.boot_facts] states the per-hart register side of a power-on as  *)
+(* "this program RAN, from some power-on register file", so the program has   *)
+(* to be nameable BELOW the language file -- hence this file, which requires  *)
+(* nothing but the generated model.  [ColdBoot.v] runs it from the closed     *)
+(* [init_regstate] (the compiled evidence layer) and [BootReset.v] runs it    *)
+(* over an ARBITRARY power-on file.                                          *)
 (*                                                                          *)
-(* THE CHAIN, and it is the model's own ([rv64d]'s last three definitions):  *)
-(*   [sail_model_init]        the compiled register initializers            *)
-(*   the BOARD's two hooks    [set_pc_reset_address] (virt's reset vector,   *)
-(*                            0x80000000) and this hart's [mhartid]; the     *)
-(*                            model writes 0 for both and the platform is    *)
-(*                            what supplies them -- and they must be written *)
-(*                            HERE, before [init_model], because [reset_sys] *)
-(*                            reads pc_reset_address and                     *)
-(*                            [init_boot_requirements] reads mhartid         *)
-(*   [init_model ""]          the config-validity assert + [reset]           *)
-(*   [init_boot_requirements] the firmware step: a0 := mhartid, a1 := DTB    *)
+(* THE PROGRAM ([boot_prog], §2), in three parts:                            *)
+(*   [board_init hid pma]     OUR OWN initialization statement: the SHORT,    *)
+(*                            EXPLICIT list of writes the board guarantees,   *)
+(*                            and nothing more.  Its comment is the platform  *)
+(*                            assumption list -- read it.  They are written   *)
+(*                            FIRST because [reset_sys] reads pc_reset_address,*)
+(*                            [config_is_valid] reads pma_regions and         *)
+(*                            [init_boot_requirements] reads mhartid.         *)
+(*   [init_model ""]          the model's own entry point: the config-validity*)
+(*                            assert + the privileged spec's [reset]          *)
+(*   [init_boot_requirements] the firmware step: a0 := mhartid, a1 := DTB     *)
+(*                                                                          *)
+(* [sail_model_init] -- the model's compiled register initializers -- is      *)
+(* deliberately NOT in the program; see [board_init]'s comment for the        *)
+(* reason, which is the whole point of the file.                             *)
 (*                                                                          *)
 (* THE ONE PLATFORM HOOK THE INTERPRETERS CANNOT STEP.  [reset_sys] calls    *)
 (* [cancel_reservation], which rv64d declares as an *Axiom* (the LR/SC       *)
@@ -148,16 +152,96 @@ Definition plat_hook : M unit := returnm tt.
    [reset_regs]' PC pin and this write are definitionally the same value. *)
 Definition reset_vector : mword 64 := SailStdpp.Values.mword_of_int 0x80000000.
 
-(* the chain's PRE-[init_model] half: the compiled register initializers plus
-   the board's two writes.  Split out because the config assert lives at
-   exactly this state -- [config_is_valid] reads [pma_regions], which
-   [sail_model_init] has by then written and which [reset] never touches. *)
-Definition boot_pre (hid : mword 64) : M unit :=
-  sail_model_init tt >>
+(* ---------------------------------------------------------------------- *)
+(* THE BOARD'S WRITES -- AND THIS LIST *IS* THE PLATFORM ASSUMPTION LIST.   *)
+(*                                                                         *)
+(* THE POWER-ON MODEL IS: ARBITRARY GARBAGE IN EVERY REGISTER, plus these   *)
+(* explicit board-guaranteed writes, plus the privileged spec's own          *)
+(* [reset] (with its configuration validation).  Nothing else.              *)
+(*                                                                         *)
+(* WHY NOT [sail_model_init] (the decision, so it is not re-litigated -- it  *)
+(* has now been made twice).  Anchoring on the model's own initializers      *)
+(* would narrow the modeled power-on states to exactly THE SIMULATOR'S       *)
+(* boots: every register pinned to an ISA-unspecified simulator value.  Real *)
+(* hardware that powers up with garbage in a register the spec does not      *)
+(* reset would then fall OUTSIDE the theorem.  The chosen model is the       *)
+(* weaker, honest one -- garbage everywhere except a SHORT, EXPLICIT list of *)
+(* board obligations -- even though it makes the assumption list longer to   *)
+(* read, because each line of it is then a claim about the BOARD that a      *)
+(* reader can check against real hardware, instead of an invisible           *)
+(* consequence of running a simulator's init.                               *)
+(*                                                                         *)
+(* KEEP THE LIST MINIMAL: a register belongs here only if some consumed fact *)
+(* of [RiscvLang.reset_regs] does NOT follow from [init_model] over an OPEN  *)
+(* file.  Register by register, and each line is an obligation on the board: *)
+(*                                                                         *)
+(*  - pc_reset_address: [reset_sys] copies it into PC and nextPC, so this IS *)
+(*    the reset vector (virt's 0x80000000).  Nothing else pins PC.          *)
+(*  - mhartid: the hart index, which [init_boot_requirements] copies into a0 *)
+(*    and every per-hart carve keys off.  Irreducible: it IS the platform.   *)
+(*  - pma_regions: the physical-memory attributes.  Read by [config_is_valid] *)
+(*    (so the assert's discharge depends on it) and consumed as the tower's   *)
+(*    RAM/IO classification.  [reset] never touches it.                      *)
+(*  - mstatus: [reset_sys] clears only MIE and MPRV, so SXL/UXL = 2 (and the  *)
+(*    S-mode fields being clear) is a power-on claim, not a reset one.        *)
+(*  - misa: [reset_misa] writes one bit per [hartSupports] answer but NEVER   *)
+(*    MXL, so the board supplies MXL = 2 with no extension bits and the       *)
+(*    spec's reset derives the rest -- which is what keeps                    *)
+(*    [ColdBoot.cold_boot_misa]'s tie between the model's config and          *)
+(*    [RiscvFetchExec.MISA_C] a real check.                                   *)
+(*  - mseccfg / menvcfg: the two whole-value pins the user has chosen to keep *)
+(*    (claude-notes/projects/crash.md, "MSECCFG / MENVCFG PATCH SHARPENING"): *)
+(*    [reset_sys] clears three bits of mseccfg and never touches menvcfg,     *)
+(*    while the fast decode bridge consumes all 64 bits of both.  Spelled     *)
+(*    here as board writes, which is what they are.                          *)
+(*  - htif_tohost_base = None: no host interface.  [reset] never touches it.  *)
+(*  - mie / mideleg = 0: every interrupt disabled and nothing delegated at    *)
+(*    power-on.  Written by no line of the spec's reset.  Necessary and not   *)
+(*    obvious -- see [RiscvLang.boot_patch]'s comment for why a nonzero entry *)
+(*    mie makes the boot chain's S-mode bridge unprovable.                    *)
+(*                                                                         *)
+(* NOT HERE, on purpose -- every one of these is DERIVED by [init_model] over *)
+(* arbitrary garbage ([BootReset.exec_init_model]): PC, nextPC,               *)
+(* cur_privilege, hart_state, misa's extension bits, elp, mcause, the vector  *)
+(* CSRs, the stateen family, the TLB.  And pmpcfg is NOT here either: the     *)
+(* spec's [reset_pmp] establishes what [reset_regs] asks of it               *)
+(* ([pmp_all_off]); only the OPEN-file derivation of that is unfinished, so   *)
+(* it rides in [RiscvLang.boot_patch] instead of being claimed of the board.  *)
+(* ---------------------------------------------------------------------- *)
+(* THE BOARD'S WIRING: the two values only the platform can know.  The model's
+   own initializers write 0 for both, so these are the two writes that are NOT
+   redundant after [sail_model_init] -- see [ColdBoot.board_regs_after_sim]. *)
+Definition board_wired (hid : mword 64) : M unit :=
   set_pc_reset_address reset_vector >>
   write_reg mhartid hid.
 
-Definition boot_prog (hid : mword 64) : M unit :=
-  boot_pre hid >>
+(* THE BOARD'S POWER-ON REGISTER VALUES: the eight the privileged spec's [reset]
+   does not establish over garbage.  [pma] is a PARAMETER rather than the literal
+   table because the table lives in the language file ([RiscvLang.pma_boot], with
+   the account of its three regions), which is ABOVE this one: the board's
+   obligation is spelled here and the value it is instantiated at there.  Split from the wiring because these eight
+   are exactly the ones [ColdBoot.board_regs_after_sim] holds to the model's own
+   initializers -- running this after [sail_model_init] changes nothing, which is
+   the machine-checked statement that these constants are not a transcription. *)
+Definition board_regs (pma : list PMA_Region) : M unit :=
+  write_reg pma_regions pma >>
+  write_reg mstatus (SailStdpp.Values.mword_of_int 0xA00000000) >>
+  write_reg misa (SailStdpp.Values.mword_of_int 0x8000000000000000) >>
+  write_reg mseccfg (SailStdpp.Values.mword_of_int 0) >>
+  write_reg menvcfg (SailStdpp.Values.mword_of_int 0) >>
+  write_reg htif_tohost_base None >>
+  (* nothing enabled, nothing delegated *)
+  write_reg mie (SailStdpp.Values.mword_of_int 0) >>
+  write_reg mideleg (SailStdpp.Values.mword_of_int 0).
+
+Definition board_init (hid : mword 64) (pma : list PMA_Region) : M unit :=
+  board_wired hid >> board_regs pma.
+
+(* THE ANCHORED BOOT PROGRAM: the board's writes, then the privileged spec's
+   own entry point ([init_model] = the configuration assert + [reset]), then
+   the firmware step that hands a0/a1 to the kernel.  [RiscvLang.boot_facts]
+   states a power-on as a RUN of this, from an ARBITRARY register file. *)
+Definition boot_prog (hid : mword 64) (pma : list PMA_Region) : M unit :=
+  board_init hid pma >>
   init_model_at "" plat_hook >>
   init_boot_requirements tt.

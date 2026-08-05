@@ -430,8 +430,11 @@ Definition boot_w64 (z : Z) : SailStdpp.Values.mword 64 :=
 (* THE PLATFORM'S PMA TABLE -- THE MODEL'S OWN, three regions and the holes
    between them.  [sail_model_init] ends with one [write_reg pma_regions] of
    exactly this list (the values come from the memory map in
-   model-xv6iris/sail-config-rv64d.json), and [ColdBoot.cold_boot_pma] proves
-   it by RUNNING the model: the literal here is kernel-checked, so a config or
+   model-xv6iris/sail-config-rv64d.json).  It is the BOARD's table -- written by
+   [ArchReset.board_init], since the anchored boot program does not run the
+   model's initializers (see that file's header) -- and it is kernel-checked
+   against them anyway by [ColdBoot.board_regs_after_sim], which RUNS
+   [sail_model_init] and shows this write is a no-op after it.  So a config or
    model move that changes a base, a size or an attribute breaks the build
    rather than silently making this transcription a fiction (the discipline
    [RiscvFetchExec.MISA_C] / [ColdBoot.cold_boot_misa] follow).
@@ -684,28 +687,18 @@ Lemma reset_regs_mideleg (c : CPU) (rs : regstate) :
   reset_regs c rs -> register_lookup mideleg rs = boot_w64 0.
 Proof. intros (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & H). exact H. Qed.
 
-(* THE NAMED PLATFORM PATCH: what the model's own boot chain does NOT write, and
-   therefore the honest list of what a power-on is ASSUMED to leave behind.
-   Everything else in [reset_regs] is DERIVED from the chain, at an arbitrary
-   power-on register file ([BootReset.reset_regs_of_run]).
-   - mie / mideleg: no line of the chain touches them.  A hart powers up with
-     every interrupt disabled and nothing delegated.  Necessary and not obvious:
-     the S-mode side's [IntrDefs.sconf] wants every enabled interrupt delegated,
-     and start()'s [csrs sie] does not clear an M-mode enable it finds already
-     set while [legalize_mideleg] forces the matching delegation bit to 0 -- so
-     at a nonzero entry [mie] the boot chain's bridge is not provable at all.
-   - pmpcfg: the chain's [reset_pmp] DOES clear A and L in all 64 entries, and
-     that is what [reset_regs] asks for ([pmp_all_off]).  Deriving it over an
-     OPEN power-on file is a 64-way symbolic index resolution over a
-     [vec_update_dec] tower (claude-notes/projects/crash.md); until that lands
-     the value is written here, which is why [pmpcfg_boot] is still a name.
-   The two whole-value pins mseccfg = 0 and menvcfg = 0 are NOT in this list:
-   [sail_model_init] writes both ([legalize_mseccfg] / [legalize_menvcfg] of
-   zero), so the run establishes them. *)
+(* THE ONE POST-RUN PATCH LEFT, and it is a TEMPORARY proof debt, not a claim
+   about the board.  The privileged spec's [reset_pmp] really does clear A and L
+   in all 64 entries -- exactly what [reset_regs] asks for ([pmp_all_off]) -- but
+   the OPEN-file derivation of that is a 64-way symbolic index resolution over a
+   [vec_update_dec] tower (claude-notes/projects/crash.md); only the loop's FRAME
+   half is proved ([BootReset.exec_reset_pmp]).  Until the other half lands the
+   value is written here, which is why [pmpcfg_boot] is still a name.  Every
+   OTHER assumption about a power-on now lives where it belongs: as an explicit
+   write in [ArchReset.board_init], whose comment is the platform obligation
+   list. *)
 Definition boot_patch (rs : regstate) : regstate :=
-  register_set mie (boot_w64 0)
-    (register_set mideleg (boot_w64 0)
-      (register_set pmpcfg_n pmpcfg_boot rs)).
+  register_set pmpcfg_n pmpcfg_boot rs.
 
 (* WHAT A BOOTED MACHINE LOOKS LIKE, with no reference to the machine it
    replaces: this is the fact set the power thread hands the boot client
@@ -721,10 +714,17 @@ Definition boot_facts (g' : gstate) : Prop :=
   /\ (forall a : Z, (ram_lo <= a < ram_hi)%Z ->
         g'.(gmem) !! (SailStdpp.Values.mword_of_int a : Arch.pa)
         = Some (boot_byte a))
-  (* THE REGISTER SIDE, ANCHORED ON THE MODEL'S OWN BOOT CODE rather than on a
-     table of values: for each hart there are a power-on file [rs0] and a
-     landing file [rs1] such that the model's boot chain RAN from the one to the
-     other, and this hart's registers are [rs1] under the named platform patch.
+  (* THE REGISTER SIDE, ANCHORED ON A RUN rather than on a table of values: for
+     each hart there are a power-on file [rs0] and a landing file [rs1] such that
+     the boot program RAN from the one to the other, and this hart's registers
+     are [rs1] under the (one remaining) patch.  THE POWER-ON MODEL IS THEREFORE
+     "arbitrary garbage in every register, plus [ArchReset.board_init]'s short
+     list of explicit board-guaranteed writes, plus the privileged spec's own
+     [reset] with its configuration validation" -- deliberately NOT "whatever the
+     simulator's initializers leave behind", which would narrow the modeled
+     power-ons to the simulator's own and put real hardware with garbage in an
+     unreset register outside the theorem.  Read [ArchReset.board_init]'s comment
+     for the write list; it IS the platform assumption list.
      [rs0] is arbitrary garbage, which is the point: [BootReset.reset_regs_of_run]
      derives [reset_regs] -- the fifteen-way fact set every consumer still asks
      for by name -- from this clause for EVERY [rs0], and
@@ -733,7 +733,7 @@ Definition boot_facts (g' : gstate) : Prop :=
      VM).  Memory and the device fabric are pinned on both sides because the
      chain touches neither. *)
   /\ (forall c : CPU, exists rs0 rs1 : regstate,
-        run (ArchReset.boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))))
+        run (ArchReset.boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))) pma_boot)
             (MState rs0 ∅ dev0_state) tt (MState rs1 ∅ dev0_state)
         /\ g'.(gregs) c = boot_patch rs1)
   (* the devices are reset: FIFOs empty, no interrupt enabled or pending,

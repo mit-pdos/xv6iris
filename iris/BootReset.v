@@ -5,7 +5,7 @@
 (* and computes every value with the VM.  This file runs the SAME program    *)
 (* over an ARBITRARY power-on register file and derives the same facts        *)
 (* SYMBOLICALLY -- which is what makes [RiscvLang.boot_facts]' register       *)
-(* clause a statement about the model's own boot code rather than a table of  *)
+(* clause a statement about a RUN of the boot program rather than a table of   *)
 (* pinned values written over the dying generation's registers.               *)
 (*                                                                          *)
 (* WHY IT CANNOT BE COMPUTED (measured; claude-notes/projects/crash.md).      *)
@@ -47,17 +47,17 @@
 (* ABSTRACT, generic in the loop body -- and the body is taken FROM THE GOAL  *)
 (* rather than transcribed.                                                  *)
 (*                                                                          *)
-(* WHAT THE RUN DOES NOT ESTABLISH -- the residue, and it is the honest       *)
-(* named-platform-assumption list ([RiscvLang.boot_patch]):                   *)
-(*  - mie / mideleg: written by NO line of the chain.  A hart powers up with  *)
-(*    every interrupt disabled and nothing delegated; irreducible.            *)
-(*  - pmpcfg: the chain's [reset_pmp] DOES establish [pmp_all_off], but only  *)
-(*    the frame half of that loop is proved here (§3), so the value is still  *)
-(*    in the patch.  Retiring it is the 64-way symbolic index resolution      *)
-(*    recorded in claude-notes/projects/crash.md.                             *)
-(* Everything else -- PC, nextPC, cur_privilege, hart_state, mhartid,         *)
-(* mstatus, misa, mseccfg, menvcfg, htif_tohost_base, elp, pma_regions -- is  *)
-(* DERIVED here from the program, at an arbitrary power-on file.              *)
+(* THE POWER-ON MODEL: garbage in every register, plus                        *)
+(* [ArchReset.board_init]'s ten explicit board-guaranteed writes, plus the     *)
+(* privileged spec's own [reset] with its configuration validation.  That      *)
+(* file's header carries the write list and the reason the anchored program    *)
+(* deliberately does NOT run [sail_model_init].  What is left over after the   *)
+(* peel is ONE register: pmpcfg, whose [pmp_all_off] the spec's [reset_pmp]    *)
+(* does establish but whose open-file derivation is unfinished (§3 proves the  *)
+(* frame half only), so it rides in [RiscvLang.boot_patch] as proof debt.      *)
+(* Everything else in [reset_regs] -- PC, nextPC, cur_privilege, hart_state,   *)
+(* elp and misa's extension bits from the spec's reset; the board's nine other *)
+(* writes carried through -- is DERIVED here at an ARBITRARY power-on file.    *)
 (* ====================================================================== *)
 From stdpp Require Import gmap finite bitvector.definitions.
 Require Import SailStdpp.Base.
@@ -300,16 +300,15 @@ Ltac pstep :=
 Ltac peel := repeat pstep.
 
 (* ---------------------------------------------------------------------- *)
-(* 1. WHAT THE PRE-[init_model] HALF ESTABLISHES.                          *)
+(* 1. WHAT THE BOARD'S WRITES ESTABLISH.                                   *)
 (*                                                                         *)
-(*    [sail_model_init]'s initializers plus the board's two writes.  These   *)
-(*    are exactly the values the rest of the chain READS: mstatus and misa    *)
-(*    are RMW'd by [reset_sys], pc_reset_address is where PC/nextPC come      *)
-(*    from, mhartid is what [init_boot_requirements] copies into a0, and      *)
-(*    pma_regions is what the config assert inspects.                        *)
+(*    [ArchReset.board_init]'s ten writes and nothing else -- the power-on   *)
+(*    file is garbage everywhere else.  Read that file's header for why each  *)
+(*    write is there and why [sail_model_init] is NOT in the anchored         *)
+(*    program; this section is only the peel.                                *)
 (* ---------------------------------------------------------------------- *)
 
-Definition pre_ok (hid : mword 64) (rs : regstate) : Prop :=
+Definition board_ok (hid : mword 64) (rs : regstate) : Prop :=
   register_lookup misa rs = boot_w64 0x8000000000000000
   /\ register_lookup mstatus rs = boot_w64 0xA00000000
   /\ register_lookup mseccfg rs = boot_w64 0
@@ -317,13 +316,15 @@ Definition pre_ok (hid : mword 64) (rs : regstate) : Prop :=
   /\ register_lookup htif_tohost_base rs = None
   /\ register_lookup pma_regions rs = pma_boot
   /\ register_lookup pc_reset_address rs = boot_w64 0x80000000
-  /\ register_lookup mhartid rs = hid.
+  /\ register_lookup mhartid rs = hid
+  /\ register_lookup mie rs = boot_w64 0
+  /\ register_lookup mideleg rs = boot_w64 0.
 
-Lemma exec_boot_pre (hid : mword 64) (s0 : mstate) (rs : regstate) :
-  pfin s0 (pre_ok hid) (boot_pre hid) rs.
+Lemma exec_board_init (hid : mword 64) (s0 : mstate) (rs : regstate) :
+  pfin s0 (board_ok hid) (board_init hid pma_boot) rs.
 Proof.
-  unfold boot_pre, set_pc_reset_address. peel.
-  apply px_done. unfold pre_ok. split_and!; lkres;
+  unfold board_init, set_pc_reset_address. peel.
+  apply px_done. unfold board_ok. split_and!; lkres;
     first [ reflexivity | apply bv_eq; vm_compute; reflexivity ].
 Qed.
 
@@ -399,10 +400,12 @@ Qed.
 (* 4. [init_model]: THE ASSERT AND THE ARCHITECTURAL RESET.                *)
 (* ---------------------------------------------------------------------- *)
 
-(* [reset_regs] minus the two clauses no line of the chain writes (mie /
-   mideleg) and minus pmpcfg's predicate (§3 proves only the frame half of
-   [reset_pmp]'s loop) -- i.e. exactly what the model's own boot code
-   establishes at an ARBITRARY power-on register file. *)
+(* [reset_regs] minus ONLY pmpcfg's predicate (§3 proves just the frame half of
+   [reset_pmp]'s loop) -- i.e. everything the boot program establishes at an
+   ARBITRARY power-on register file: five values the privileged spec's own
+   [reset] writes (PC, nextPC, cur_privilege, hart_state, elp), misa's extension
+   bits from [reset_misa] over the board's MXL, and the board's own nine other
+   writes carried through a chain that does not touch them. *)
 Definition post_ok (hid : mword 64) (rs : regstate) : Prop :=
   register_lookup PC rs = boot_w64 0x80000000
   /\ register_lookup nextPC rs = boot_w64 0x80000000
@@ -415,13 +418,16 @@ Definition post_ok (hid : mword 64) (rs : regstate) : Prop :=
   /\ register_lookup menvcfg rs = boot_w64 0
   /\ register_lookup htif_tohost_base rs = None
   /\ register_lookup elp rs = landing_pad_bits_backwards NO_LP_EXPECTED
-  /\ register_lookup pma_regions rs = pma_boot.
+  /\ register_lookup pma_regions rs = pma_boot
+  /\ register_lookup mie rs = boot_w64 0
+  /\ register_lookup mideleg rs = boot_w64 0.
 
 Lemma exec_init_model (hid : mword 64) (s0 : mstate) (rs : regstate) :
-  pre_ok hid rs ->
+  board_ok hid rs ->
   pfin s0 (post_ok hid) (init_model_at "" plat_hook) rs.
 Proof.
-  intros (Hmisa & Hmstat & Hmsec & Hmenv & Hhtif & Hpma & Hpcr & Hmhid).
+  intros (Hmisa & Hmstat & Hmsec & Hmenv & Hhtif & Hpma & Hpcr & Hmhid
+          & Hmie & Hmdl).
   unfold init_model_at.
   refine (px_step _ _ _ true _ _ _ (exec_config_is_valid rs _ _ Hpma) _).
   unfold reset_at, plat_hook.
@@ -456,7 +462,11 @@ Proof.
     by (rewrite (Hfr htif_tohost_base ltac:(vm_compute; reflexivity)); lkres; reflexivity).
   assert (Hpma' : register_lookup pma_regions rsp = pma_boot)
     by (rewrite (Hfr pma_regions ltac:(vm_compute; reflexivity)); lkres; reflexivity).
-  clear Hfr Hmisa Hmstat Hmsec Hmenv Hhtif Hpma Hpcr Hmhid.
+  assert (Hmie' : register_lookup mie rsp = boot_w64 0)
+    by (rewrite (Hfr mie ltac:(vm_compute; reflexivity)); lkres; reflexivity).
+  assert (Hmdl' : register_lookup mideleg rsp = boot_w64 0)
+    by (rewrite (Hfr mideleg ltac:(vm_compute; reflexivity)); lkres; reflexivity).
+  clear Hfr Hmisa Hmstat Hmsec Hmenv Hhtif Hpma Hpcr Hmhid Hmie Hmdl.
   peel.
   apply px_done. unfold post_ok. split_and!; lkres;
     first [ reflexivity | apply bv_eq; vm_compute; reflexivity ].
@@ -470,18 +480,18 @@ Lemma exec_init_boot_requirements (hid : mword 64) (s0 : mstate) (rs : regstate)
   post_ok hid rs -> pfin s0 (post_ok hid) (init_boot_requirements tt) rs.
 Proof.
   intros (HPC & HnPC & Hpriv & Hhs & Hmhid & Hmstat & Hmisa & Hmsec & Hmenv
-          & Hhtif & Help & Hpma).
+          & Hhtif & Help & Hpma & Hmie & Hmdl).
   unfold init_boot_requirements. peel.
   apply px_done. unfold post_ok. split_and!; lkres; reflexivity.
 Qed.
 
 Lemma exec_boot_prog (hid : mword 64) (s0 : mstate) (rs : regstate) :
-  pfin s0 (post_ok hid) (boot_prog hid) rs.
+  pfin s0 (post_ok hid) (boot_prog hid pma_boot) rs.
 Proof.
   (* [>>] is LEFT-associative, so the program is [(A >> B) >> C]: one
      re-association and the three stages compose in order. *)
   unfold boot_prog. apply px_assoc. cbv beta.
-  destruct (exec_boot_pre hid s0 rs) as [rs1 H1 Hpre].
+  destruct (exec_board_init hid s0 rs) as [rs1 H1 Hpre].
   refine (px_step _ _ _ tt _ _ _ H1 _).
   destruct (exec_init_model hid s0 rs1 Hpre) as [rs2 H2 Hpost].
   refine (px_step _ _ _ tt _ _ _ H2 _).
@@ -499,7 +509,7 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Theorem reset_regs_of_run (c : CPU) (rs0 rs1 : regstate) :
-  run (boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))))
+  run (boot_prog (boot_w64 (Z.of_nat (fin_to_nat c))) pma_boot)
       (MState rs0 ∅ dev0_state) tt (MState rs1 ∅ dev0_state) ->
   reset_regs c (boot_patch rs1).
 Proof.
@@ -511,7 +521,7 @@ Proof.
   destruct (Huniq _ _ Hrun) as [_ Heq].
   injection Heq as Heq. subst rs1.
   destruct Hpost as (HPC & HnPC & Hpriv & Hhs & Hmhid & Hmstat & Hmisa & Hmsec
-                     & Hmenv & Hhtif & Help & Hpma).
+                     & Hmenv & Hhtif & Help & Hpma & Hmie & Hmdl).
   unfold reset_regs, boot_patch. split_and!; lkres;
     first [ reflexivity | exact pmp_all_off_pmpcfg_boot ].
 Qed.

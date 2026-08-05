@@ -42,9 +42,11 @@ No `wp_consoleintr_sconf`: the boot chain reaches consoleintr only through the
 assumed `kerneltrap`, so it is not in the cone.
 
 **THE COMPOSITION, in one line each** (every file in `_CoqProject`):
-`ArchReset` (the model's boot program, hook elided) → `ColdBoot` (that program
-run CLOSED, by the VM) + `BootReset` (the same program peeled over ARBITRARY
-power-on garbage — `boot_facts`' register anchor) →
+`ArchReset` (the board's explicit power-on writes + the spec's reset/init_model
+with the platform hook elided = the anchored boot program) → `ColdBoot` (that
+program run CLOSED, by the VM, + the board-vs-simulator constant check) +
+`BootReset` (the same program peeled over ARBITRARY power-on garbage —
+`boot_facts`' register anchor) →
 `BootCarve` + `BootCarveMain` (the image-carving library) → `BootConfig` (the
 register set and the config bundles) → `BootChain` (one hart's whole life,
 twice: `boot_hart_primary` / `boot_hart_secondary`) → `BootShared`
@@ -2170,19 +2172,21 @@ yet.
 - ~~pmpcfg patch retirement~~ — **DONE** (see "PMPCFG PATCH RETIREMENT" below):
   `reset_regs`' clause is `pmp_all_off (register_lookup pmpcfg_n rs)`, the
   predicate its consumers consume, and no longer a pinned 64-entry value.
-- ~~The mseccfg / menvcfg full-value pins~~ — **NO LONGER ASSUMPTIONS AT ALL**
-  (2026-08-05, a side effect of the ∀-garbage anchoring): `sail_model_init`
-  WRITES both (`legalize_mseccfg` / `legalize_menvcfg` of zero), and the anchor
-  program includes it, so the garbage-run peel DERIVES both values. The pins
-  stay in `reset_regs` verbatim (the user's decision: "keep the whole-value
-  pins" — nothing was weakened or deleted), and the decode bridge's whole-value
-  consumption recorded below is unchanged; what changed is that the *justification*
-  is now the model's own initializer rather than a stated platform assumption.
-  The measurement in "MSECCFG / MENVCFG PATCH SHARPENING" is kept as the record
-  of why a FIELD-WISE restatement is still not available.
+- The mseccfg / menvcfg full-value pins: **KEPT, and now spelled as what they
+  are** — two of `ArchReset.board_init`'s explicit board writes (the user's
+  standing decision, "keep the whole-value pins"). They are NOT derived: an
+  earlier draft anchored on `sail_model_init` (which writes both) and the user
+  rejected that anchor outright — see "THE POWER-ON MODEL, AND THE USER'S
+  RULING" below. `ColdBoot.board_regs_after_sim` holds both constants to the
+  model's own initializers, so they are checked without being assumed-away. The
+  measurement in "MSECCFG / MENVCFG PATCH SHARPENING" stays as the record of why
+  a FIELD-WISE restatement is still unavailable (the decode bridge consumes all
+  64 bits of both).
 - ~~The ∀-garbage anchoring of the register clause~~ — **DONE** (see "THE
-  ∀-GARBAGE ANCHOR" below): `boot_facts`' register clause is now "the model's own
-  boot chain RAN, from some power-on file, up to `boot_patch`", and
+  ∀-GARBAGE ANCHOR" below): `boot_facts`' register clause is now "the boot
+  program RAN, from some power-on file, up to `boot_patch`" — where the program
+  is the board's own short list of explicit writes followed by the privileged
+  spec's validated `reset`, deliberately NOT the simulator's initializers — and
   `BootReset.reset_regs_of_run` derives `reset_regs` from it for EVERY power-on
   file. One follow-on remains: **pmpcfg's 64-way `reset_pmp` derivation** — the
   loop's FRAME half is proved (`BootReset.exec_reset_pmp`), the per-entry
@@ -2193,11 +2197,14 @@ yet.
 `RiscvLang.pma_boot` is the three-region table `sail_model_init` really writes
 (boot ROM at 0x1000 IOMemory read-only; MMIO band at 0x2000000 IOMemory R/W;
 DRAM at `[ram_lo, ram_hi)` MainMemory R/W/X with `AMOCASQ` atomics and PTE
-access), `ColdBoot.cold_boot_pma` is the compiled tie that proves it by RUNNING
-the model, and `cold_regs_boot` applies **no `register_set` at all** — the PMA
-table joined misa in the run-derived column. `pma_model_table` /
-`pma_boot_not_model` / `pma_boot_attrs` are gone (one home per fact: the literal
-lives in RiscvLang, the check in ColdBoot).
+access). `pma_model_table` / `pma_boot_not_model` / `pma_boot_attrs` are gone
+(one home per fact: the literal lives in RiscvLang, the check in ColdBoot).
+**The table is a BOARD write now** (`ArchReset.board_init`, since the anchored
+program no longer runs the simulator's initializers — see "THE POWER-ON MODEL"
+below), which is what it always was physically: the platform's memory map. It is
+still kernel-checked against the model's own config, by
+`ColdBoot.board_regs_after_sim` rather than by `cold_boot_pma` — the check that
+used to cover the table alone now covers all eight of the board's value writes.
 
 What made the swap possible, and both parts are the durable lessons:
 
@@ -2403,29 +2410,74 @@ ties, and the program `boot_prog` — it had to move out of ColdBoot because
 `boot_facts` NAMES the program.  `BootReset.v` (new) is the peeling kit and the
 garbage-run theorem.  `ColdBoot.v` keeps the closed run.
 
-**THE NAMED PLATFORM ASSUMPTIONS — the minimal honest list**, i.e. what does NOT
-follow from the chain and is written by `RiscvLang.boot_patch`:
+**`RiscvLang.boot_patch` IS DOWN TO ONE REGISTER, and it is proof debt rather
+than an assumption:** `pmpcfg := pmpcfg_boot`. The spec's `reset_pmp` really does
+clear A and L in all 64 entries — exactly what `reset_regs` asks for
+(`pmp_all_off`) — but only the loop's FRAME half is proved over an open file; the
+per-entry half is the 64-way index resolution below. Every genuine platform
+assumption is now an explicit write in `board_init` instead (see the table
+below), which is where a reader looks for them.
 
-- **mie / mideleg = 0** — written by no line of the chain; they are a hart's
-  power-on state. Irreducible.
-- **pmpcfg = `pmpcfg_boot`** — NOT irreducible: `reset_pmp` really does clear A
-  and L in all 64 entries, which is exactly what `reset_regs` asks for
-  (`pmp_all_off`). Only the loop's FRAME half is proved here; the per-entry half
-  is the 64-way index resolution below. This is the one item left.
+**THE POWER-ON MODEL, AND THE USER'S RULING ON IT (2026-08-05, the SECOND time
+this was decided — do not re-litigate).** The anchored program is
 
-Everything else — PC, nextPC, cur_privilege, hart_state, mhartid, mstatus, misa,
-**mseccfg**, **menvcfg**, htif_tohost_base, elp, pma_regions — is now DERIVED at
-an arbitrary power-on file.  (mhartid and the reset vector are still the BOARD's
-two configuration writes, but they are now writes INSIDE the anchored program
-rather than a patch over its output: `ArchReset.boot_pre`.)
+```coq
+boot_prog hid pma := ArchReset.board_init hid pma >>   (* the board's writes *)
+                     init_model_at "" plat_hook >>     (* the spec's assert + reset *)
+                     init_boot_requirements tt         (* the firmware's a0/a1 *)
+```
 
-**WHY THE PROGRAM INCLUDES `sail_model_init`.** The anchor is the model's whole
-boot entry point, not `reset()` alone. That is the honest choice AND the cheap
-one: `reset()` alone leaves mstatus, misa's MXL, htif_tohost_base, menvcfg,
-mseccfg and pma_regions unwritten, so a reset-only anchor would have had to pin
-all six as whole-value platform assumptions — a strictly LONGER assumption list
-than the one above. `sail_model_init` IS the model's account of power-on, and it
-reads no register, so the peel takes it in ~40 steps.
+and `board_init` is OUR OWN short initialization statement, **not**
+`sail_model_init`. The first draft did include the model's initializers, and the
+user rejected it in these terms: including `sail_model_init` *"narrows the
+modeled power-on states to exactly the simulator's boots — every register pinned
+to ISA-unspecified simulator values — so real hardware powering on with garbage
+in a register the spec doesn't reset falls outside the theorem."* The standing
+choice is **the weaker, honest power-on model: garbage everywhere, except a
+SHORT, EXPLICIT list of board-guaranteed writes, followed by the spec's reset
+with its validation.** The list is longer to read than "run the simulator's
+init", and that is the point: every line of it is a claim about the BOARD that a
+reader can check against real hardware, instead of an invisible consequence of
+running a simulator.
+
+**THE PLATFORM ASSUMPTION LIST IS `ArchReset.board_init`'S WRITE LIST**, ten
+writes, and its comment carries the per-register justification:
+
+| write | why it cannot come from the spec's reset |
+| --- | --- |
+| `pc_reset_address := 0x80000000` | `reset_sys` copies it into PC/nextPC; nothing else pins PC |
+| `mhartid := hid` | the hart index; `init_boot_requirements` copies it into a0 |
+| `pma_regions := pma_boot` | read by `config_is_valid`; `reset` never touches it |
+| `mstatus := 0xA00000000` | `reset_sys` clears only MIE and MPRV |
+| `misa := 0x8000000000000000` | `reset_misa` never writes MXL (it writes the extension bits, which stay DERIVED — that is what keeps `cold_boot_misa`'s config tie a real check) |
+| `mseccfg := 0` | the user's kept whole-value pin; reset clears three bits |
+| `menvcfg := 0` | the user's kept whole-value pin; reset never touches it |
+| `htif_tohost_base := None` | no host interface; reset never touches it |
+| `mie := 0`, `mideleg := 0` | nothing enabled, nothing delegated at power-on |
+
+`board_init` is split into `board_wired` (the two the platform alone can know)
+and `board_regs` (the eight power-on VALUES), because the eight are held to
+something: **`ColdBoot.board_regs_after_sim`** runs `sail_model_init` and then
+`board_regs` on top and shows every register `board_regs` writes reads back
+UNCHANGED — the board's claimed power-on values ARE the model's, so the writes
+are a no-op after them. That is the user's own phrasing of the check ("running
+`sail_model_init` is equivalent to running `sail_model_init; board_init`"), and
+it is the ONLY remaining use of `sail_model_init` in the tree. It is a check, not
+part of the anchor; nothing above it depends on it. It replaces what
+`cold_boot_pma` used to do for the PMA table alone, and it covers all eight
+constants without transcribing a single one of them (the RHS is a lookup in the
+model's own post-init state, not a literal).
+State-level equality of the two runs was considered and is NOT the right
+statement: the redundant `register_set`s leave field FUNCTIONS that are pointwise
+equal but not convertible, so it needs funext AND a `register_beq` reflection
+lemma the generated model does not provide (the per-kind `beq`s are enumerations
+with ~100 constructors, so `destruct`-based reflection is not affordable). The
+per-register form needs neither.
+
+**NOT WRITTEN, on purpose** — all DERIVED by `init_model` over arbitrary
+garbage: PC, nextPC, cur_privilege, hart_state, misa's extension bits, elp,
+mcause, the vector CSRs, the stateen family, the TLB. If a register's consumed
+facts derive from the spec's reset, it must NOT be in `board_init`.
 
 **THE KIT (`BootReset.v` §0), and it is now the durable recipe** — lifted into
 durable-notes.md, "THE ESCAPE FROM AN OPEN REGISTER FILE IS A SYMBOLIC PEEL":
@@ -2440,15 +2492,22 @@ and starts evaluating the interpreter over the tower.
 
 | thing | cost |
 | --- | --- |
-| `BootReset.v` whole file (~135 register effects + the 64-way loop + the config assert) | **37.8 s / 0.96 GB** |
-| `exec_boot_pre` (sail_model_init + the board's two writes, ~45 effects) | 11.2 s |
+| `BootReset.v` whole file (the whole chain + the 64-way loop + the config assert) | **60.2 s / 0.77 GB** |
+| `exec_board_init` (the board's ten writes) | 0.06 s |
+| `exec_init_model` (the assert + the spec's whole `reset`, over garbage) | 8.7 s + 2.3 s + 2.4 s (peel, post-seam peel, the fact set) |
+| `ColdBoot.v` (the closed run + the board-vs-simulator check) | 12.2 s / 0.92 GB |
 | `exec_config_is_valid` at an OPEN file (3 pma_regions reads, 12 checks) | 7.7 s |
 | the same config probe at the CLOSED cold-boot state (ColdBoot) | 1.4 s |
 | one field of the reset applied to an open file, by EVALUATION (the old wall) | 100 s timeout at ~4 GB |
 
 So the per-field cost is not per-field at all: the peel produces every conjunct
 of `post_ok` in one pass, and the whole file is cheaper than ONE field's failed
-`vm_compute` used to be.
+`vm_compute` used to be.  **Dropping `sail_model_init` from the anchor made the
+peel dearer, not cheaper** (37.8 s → 60.2 s): its ~40 writes were the CHEAPEST
+part of the old chain (all closed values, no reads), and removing them leaves
+more registers garbage at the points where the spec's `reset` RMWs them, so more
+of the peel runs against unresolved reads.  Worth it — the price buys the weaker
+power-on model.
 
 **THE FOUR TRAPS THAT COST THE MOST TIME** (all four are now in durable-notes):
 

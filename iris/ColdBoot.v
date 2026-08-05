@@ -53,12 +53,14 @@
 (* disagree, ask which of the two is describing the machine you mean to verify     *)
 (* before assuming the constant is the thing to move.                             *)
 (*                                                                            *)
-(* THE PMA TABLE IS THE MODEL'S OWN NOW, AND THE PATCH IS GONE.                *)
-(* [sail_model_init] writes a THREE-region table (boot ROM, MMIO band, DRAM     *)
-(* bank), and [RiscvLang.pma_boot] IS that table: §3's [cold_boot_pma] proves,  *)
-(* by running the model, that it is what the register holds, so the table joins *)
-(* misa in the run-derived column and [cold_regs_boot] applies no               *)
-(* [register_set] at all.  Two things made the swap possible, both recorded in  *)
+(* THE PMA TABLE IS A BOARD WRITE, AND IT IS STILL KERNEL-CHECKED.              *)
+(* [RiscvLang.pma_boot] is the platform's three-region memory map (boot ROM,    *)
+(* MMIO band, DRAM bank) and [ArchReset.board_init] writes it, because the      *)
+(* anchored program no longer runs [sail_model_init] (ArchReset's header says    *)
+(* why).  §3's [cold_boot_pma] therefore only reads the closed run's value      *)
+(* back; what holds the table to the model's own CONFIG is §3b's                *)
+(* [board_regs_after_sim], which shows the board's eight value writes are a     *)
+(* no-op after the simulator's own initializers.  Two things made the swap possible, both recorded in  *)
 (* claude-notes/projects/crash.md: the tower's PMA obligation is stated PER     *)
 (* ADDRESS CLASS ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]), since the *)
 (* real table has HOLES; and the RAM class's atomic conjunct asks for what an   *)
@@ -149,7 +151,7 @@ Definition cold_s0 : mstate := MState init_regstate ∅ dev0_state.
    [cold_state] is built by [vm_compute] rather than written down, and
    [cold_boot_exec] is what makes that legitimate: it says this state IS what
    [exec] gets from the model's chain.  Two reasons it has to be done this way
-   and not by leaving [exec (ArchReset.boot_prog hid) cold_s0] in every statement:
+   and not by leaving [exec (ArchReset.boot_prog hid pma_boot) cold_s0] in every statement:
    - THE VM COSTS A SECOND, THE KERNEL COSTS GIGABYTES.  [vm_compute] runs the
      ~300-write chain in well under a second, but a plain [reflexivity] closes
      the goal with an [eq_refl] whose type the kernel then rechecks with its
@@ -169,12 +171,12 @@ Definition cold_s0 : mstate := MState init_regstate ∅ dev0_state.
    to redo the whole initializer chain. *)
 Definition pre_state (hid : mword 64) : mstate.
 Proof.
-  let x := eval vm_compute in (exec (ArchReset.boot_pre hid) cold_s0) in
+  let x := eval vm_compute in (exec (ArchReset.board_init hid pma_boot) cold_s0) in
   lazymatch x with Some (_, ?s) => exact s end.
 Defined.
 
-Lemma boot_pre_exec (hid : mword 64) :
-  exec (ArchReset.boot_pre hid) cold_s0 = Some (tt, pre_state hid).
+Lemma board_init_exec (hid : mword 64) :
+  exec (ArchReset.board_init hid pma_boot) cold_s0 = Some (tt, pre_state hid).
 Proof. vm_cast_no_check (eq_refl (Some (tt, pre_state hid))). Qed.
 
 (* THE CONFIG IS VALID -- the positive fact the [init_model] anchor rests on.
@@ -185,7 +187,7 @@ Proof. vm_cast_no_check (eq_refl (Some (true, pre_state hid))). Qed.
 
 Definition cold_state (hid : mword 64) : mstate.
 Proof.
-  let x := eval vm_compute in (exec (ArchReset.boot_prog hid) cold_s0) in
+  let x := eval vm_compute in (exec (ArchReset.boot_prog hid pma_boot) cold_s0) in
   lazymatch x with Some (_, ?s) => exact s end.
 Defined.
 
@@ -194,18 +196,18 @@ Definition cold_regs (hid : mword 64) : regstate := sregs (cold_state hid).
 (* THE TIE: [cold_state] is the model's own cold boot, run by the language's
    own interpreter.  Every fact below is therefore a fact about the model. *)
 Lemma cold_boot_exec (hid : mword 64) :
-  exec (ArchReset.boot_prog hid) cold_s0 = Some (tt, cold_state hid).
+  exec (ArchReset.boot_prog hid pma_boot) cold_s0 = Some (tt, cold_state hid).
 Proof. vm_cast_no_check (eq_refl (Some (tt, cold_state hid))). Qed.
 
 (* and hence the LANGUAGE's own relation holds of it, with the uniqueness that
    makes it the ONLY thing the chain can do: the model's cold boot is a [run] of
    the machine RiscvLang defines, not a separate semantics. *)
 Lemma cold_boot_run (hid : mword 64) :
-  run (ArchReset.boot_prog hid) cold_s0 tt (cold_state hid).
+  run (ArchReset.boot_prog hid pma_boot) cold_s0 tt (cold_state hid).
 Proof. exact (proj1 (exec_run_det _ _ _ _ (cold_boot_exec hid))). Qed.
 
 Lemma cold_boot_run_unique (hid : mword 64) (u : unit) (s : mstate) :
-  run (ArchReset.boot_prog hid) cold_s0 u s -> s = cold_state hid.
+  run (ArchReset.boot_prog hid pma_boot) cold_s0 u s -> s = cold_state hid.
 Proof. intro H. exact (proj2 (proj2 (exec_run_det _ _ _ _ (cold_boot_exec hid)) _ _ H)). Qed.
 
 (* the chain leaves RAM and the device fabric alone *)
@@ -229,28 +231,108 @@ Proof.
 Qed.
 
 Lemma cold_boot_run_shape (hid : mword 64) :
-  run (ArchReset.boot_prog hid) (MState init_regstate ∅ dev0_state) tt
+  run (ArchReset.boot_prog hid pma_boot) (MState init_regstate ∅ dev0_state) tt
       (MState (cold_regs hid) ∅ dev0_state).
 Proof. rewrite <- cold_state_shape. exact (cold_boot_run hid). Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 3. THE PMA TABLE IS THE MODEL'S OWN -- kernel-checked.                    *)
 (*                                                                         *)
-(*    [sail_model_init] ends with one [write_reg pma_regions [...]] of three *)
-(*    regions, and [RiscvLang.pma_boot] IS that list (the literal lives      *)
-(*    there, with the account of what the three regions are; the values come *)
-(*    from the memory map in model-xv6iris/sail-config-rv64d.json).  This is  *)
-(*    the check: a config or model move that changes a base, a size or an     *)
-(*    attribute breaks the build HERE rather than silently making the         *)
-(*    transcription a fiction -- the same discipline                          *)
+(*    [RiscvLang.pma_boot] is the platform's table (the literal lives there,  *)
+(*    with the account of its three regions; the values come from the memory  *)
+(*    map in model-xv6iris/sail-config-rv64d.json) and [ArchReset.board_init] *)
+(*    writes it, so this lemma reads the closed run's value back -- it is what *)
+(*    [reset_regs_cold_boot]'s table conjunct applies, by name, because a      *)
+(*    plain [reflexivity] would ask the kernel's LAZY conversion for the whole *)
+(*    chain again.  The CHECK that the table is not a transcription is §3b's   *)
+(*    [board_regs_after_sim] (a config or model move that changes a base, a    *)
+(*    size or an attribute breaks the build THERE) -- the same discipline      *)
 (*    [RiscvFetchExec.MISA_C] / [cold_boot_misa] follow.  [reset] does not     *)
-(*    touch [pma_regions], so this is equally the PRE-reset value: the         *)
-(*    platform's table, as the model configures it.                           *)
+(*    touch [pma_regions], so this is equally the PRE-reset value.            *)
 (* ---------------------------------------------------------------------- *)
 
 Lemma cold_boot_pma (hid : mword 64) :
   register_lookup pma_regions (cold_regs hid) = pma_boot.
 Proof. vm_cast_no_check (eq_refl pma_boot). Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 3b. THE BOARD'S WRITES ARE REDUNDANT AFTER THE SIMULATOR'S OWN INIT.     *)
+(*                                                                         *)
+(*    The anchored program deliberately does NOT run [sail_model_init]: that  *)
+(*    would narrow the modeled power-on states to the simulator's own boots   *)
+(*    (see ArchReset.v's header).  But then nothing would hold                *)
+(*    [ArchReset.board_regs]' eight constants to anything, and a config or     *)
+(*    model regeneration could quietly turn them into fiction -- exactly the   *)
+(*    silent rot [cold_boot_pma] used to prevent for the PMA table.           *)
+(*                                                                         *)
+(*    THIS is that check, and it is the only remaining use of                 *)
+(*    [sail_model_init]: run the model's own initializers, then run            *)
+(*    [board_regs] on top, and every register [board_regs] writes reads back   *)
+(*    UNCHANGED -- i.e. the board's claimed power-on values ARE the model's,   *)
+(*    so the writes are a no-op after them.  (No other register is touched at  *)
+(*    all: [board_regs] is eight [register_set]s and nothing else.)  The two   *)
+(*    writes of [board_wired] are deliberately NOT here -- the model writes 0  *)
+(*    for pc_reset_address and mhartid and the platform is what supplies them, *)
+(*    which is the whole reason they are board obligations.                    *)
+(*                                                                         *)
+(*    It is a CHECK, not part of the anchor: nothing above depends on it.     *)
+(* ---------------------------------------------------------------------- *)
+
+Definition sim_state : mstate.
+Proof.
+  let x := eval vm_compute in (exec (sail_model_init tt) cold_s0) in
+  lazymatch x with Some (_, ?s) => exact s end.
+Defined.
+
+Lemma sim_init_exec : exec (sail_model_init tt) cold_s0 = Some (tt, sim_state).
+Proof. vm_cast_no_check (eq_refl (Some (tt, sim_state))). Qed.
+
+(* [board_regs] run on top of the model's own initializers, computed once (the
+   [vm_cast_no_check] discipline of §2: the kernel rechecks with the VM too). *)
+Definition sim_board_state : mstate.
+Proof.
+  let x := eval vm_compute in (exec (ArchReset.board_regs pma_boot) sim_state) in
+  lazymatch x with Some (_, ?s) => exact s end.
+Defined.
+
+Lemma sim_board_exec :
+  exec (ArchReset.board_regs pma_boot) sim_state = Some (tt, sim_board_state).
+Proof. vm_cast_no_check (eq_refl (Some (tt, sim_board_state))). Qed.
+
+(* THE CHECK: every register [board_regs] writes reads back the value the
+   simulator's own initializers already left there -- so the eight board
+   constants are the model's, and running [board_regs] after [sail_model_init]
+   changes nothing.  Stated per register rather than as an equality of the two
+   post-STATES on purpose: the redundant [register_set]s leave field FUNCTIONS
+   that are pointwise equal but not convertible, so the state form would need
+   funext AND a [register_beq] reflection lemma the generated model does not
+   provide (its per-kind [beq]s are ~100-constructor enumerations, so
+   [destruct]-based reflection is not affordable).  No other register is touched
+   at all: [board_regs] is eight [register_set]s and nothing else. *)
+Lemma board_regs_after_sim :
+  register_lookup pma_regions (sregs sim_board_state)
+    = register_lookup pma_regions (sregs sim_state)
+  /\ register_lookup mstatus (sregs sim_board_state)
+    = register_lookup mstatus (sregs sim_state)
+  /\ register_lookup misa (sregs sim_board_state)
+    = register_lookup misa (sregs sim_state)
+  /\ register_lookup mseccfg (sregs sim_board_state)
+    = register_lookup mseccfg (sregs sim_state)
+  /\ register_lookup menvcfg (sregs sim_board_state)
+    = register_lookup menvcfg (sregs sim_state)
+  /\ register_lookup htif_tohost_base (sregs sim_board_state)
+    = register_lookup htif_tohost_base (sregs sim_state)
+  /\ register_lookup mie (sregs sim_board_state)
+    = register_lookup mie (sregs sim_state)
+  /\ register_lookup mideleg (sregs sim_board_state)
+    = register_lookup mideleg (sregs sim_state).
+Proof.
+  (* [reflexivity] settles the six the simulator writes EXPLICITLY; mie and
+     mideleg come from [init_regstate]'s [inhabitant], which is [zeros] rather
+     than [mword_of_int 0] -- equal bitvectors whose [bv_is_wf] proof terms are
+     not convertible, hence [bv_eq] (the durable-notes reflex). *)
+  split_and!; first [ reflexivity | apply bv_eq; vm_compute; reflexivity ].
+Qed.
 
 (* ---------------------------------------------------------------------- *)
 (* 4. THE THEOREM: [reset_regs] is what the model's cold boot produces.     *)

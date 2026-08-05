@@ -25,8 +25,8 @@ Local Open Scope Z_scope.
 (* ---------------------------------------------------------------------- *)
 (* 1. The reset REGISTER file.                                              *)
 (*                                                                          *)
-(*    [boot_facts]' register clause is "the model's own boot chain RAN, from  *)
-(*    SOME power-on file, up to [boot_patch]", so this construction's job is  *)
+(*    [boot_facts]' register clause is "the boot program RAN, from SOME       *)
+(*    power-on file, up to [boot_patch]", so this construction's job is       *)
 (*    to EXHIBIT one such run -- and [ColdBoot] has it: the chain from the    *)
 (*    model's own [init_regstate], computed with the VM.  So the reset        *)
 (*    register file no longer depends on the dying generation's registers at  *)
@@ -43,7 +43,7 @@ Definition boot_regs (c : CPU) : regstate := boot_patch (cold_regs (boot_hid c))
 (* THE WITNESS IS A REAL RUN: the model's boot chain, from [init_regstate] to
    the register file this construction hands over. *)
 Lemma boot_regs_run (c : CPU) :
-  run (ArchReset.boot_prog (boot_hid c))
+  run (ArchReset.boot_prog (boot_hid c) pma_boot)
       (MState init_regstate ∅ dev0_state) tt
       (MState (cold_regs (boot_hid c)) ∅ dev0_state).
 Proof. exact (cold_boot_run_shape (boot_hid c)). Qed.
