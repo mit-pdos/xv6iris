@@ -42,12 +42,16 @@ Local Notation rg2 := (2%nat).
 (** The era-initial image: both litmus bytes read as 0 at timestamp 0.  (The
     alternative — seeding explicit init messages into the log — would shift
     every timestamp by the number of init bytes and buy nothing.) *)
-Definition img0 : gmap Z (bv 8) := <[ax := b0]> {[ay := b0]}.
+Definition img0m : gmap Z (bv 8) := <[ax := b0]> {[ay := b0]}.
+(** [WeakMem.image] is a partial FUNCTION on [Z] (so that M1's interpreter can
+    read the tree's [gmap Arch.pa _] image through the address seam without a
+    [kmap]); the litmus image is still built as a two-entry map. *)
+Definition img0 : image := λ a, img0m !! a.
 
-Lemma img0_x : img0 !! ax = Some b0.
-Proof. rewrite /img0 lookup_insert //. Qed.
-Lemma img0_y : img0 !! ay = Some b0.
-Proof. rewrite /img0 lookup_insert_ne // lookup_singleton //. Qed.
+Lemma img0_x : img0 ax = Some b0.
+Proof. rewrite /img0 /img0m lookup_insert //. Qed.
+Lemma img0_y : img0 ay = Some b0.
+Proof. rewrite /img0 /img0m lookup_insert_ne // lookup_singleton //. Qed.
 
 (* ------------------------------------------------------------------ *)
 (** ** Single-byte messages *)
@@ -75,50 +79,10 @@ Lemma log_byte_2 img m0 m1 rest a :
   log_byte img (m0 :: m1 :: rest) 2 a = msg_byte m1 a.
 Proof. done. Qed.
 
-(* ------------------------------------------------------------------ *)
-(** ** Deciding [writes_in] by reflection
-
-    Every litmus side condition is "no message in this window writes this
-    byte", over a concrete log.  Reflect it so [vm_compute] discharges it. *)
-
-Definition msg_writesb (m : wmsg) (a : Z) : bool :=
-  match msg_byte m a with Some _ => true | None => false end.
-
-Definition writes_inb (log : list wmsg) (a : Z) (lo hi : nat) : bool :=
-  existsb (λ t, bool_decide (lo < t)%nat && bool_decide (t ≤ hi)%nat &&
-                match log !! (t - 1)%nat with
-                | Some m => msg_writesb m a
-                | None => false
-                end)
-          (seq 1 (length log)).
-
-Lemma writes_inb_spec log a lo hi :
-  writes_in log a lo hi ↔ writes_inb log a lo hi = true.
-Proof.
-  rewrite /writes_inb existsb_exists. split.
-  - intros (t & Hlo & Hhi & m & Hm & Hs).
-    pose proof (lookup_lt_Some _ _ _ Hm) as Hlt.
-    exists t. split.
-    + apply elem_of_list_In, elem_of_seq. lia.
-    + rewrite Hm /msg_writesb. destruct Hs as [v Hv]. rewrite Hv /=.
-      rewrite andb_true_r andb_true_iff.
-      split; by apply bool_decide_eq_true_2.
-  - intros (t & Ht & Hb). apply elem_of_list_In, elem_of_seq in Ht.
-    rewrite !andb_true_iff in Hb. destruct Hb as [[H1 H2] H3].
-    apply bool_decide_eq_true_1 in H1. apply bool_decide_eq_true_1 in H2.
-    destruct (log !! (t - 1)%nat) as [m|] eqn:Hm; [|done].
-    exists t. split_and!; [done|done|]. exists m. split; [done|].
-    rewrite /msg_writesb in H3. destruct (msg_byte m a) as [v|]; [|done].
-    by exists v.
-Qed.
-
-Lemma not_writes_in_compute log a lo hi :
-  writes_inb log a lo hi = false → ¬ writes_in log a lo hi.
-Proof. intros Hb Hw. apply writes_inb_spec in Hw. by rewrite Hw in Hb. Qed.
-
-Lemma writes_in_compute log a lo hi :
-  writes_inb log a lo hi = true → writes_in log a lo hi.
-Proof. apply writes_inb_spec. Qed.
+(** The reflection of [writes_in] every concrete side condition below goes
+    through ([msg_writesb] / [writes_inb] / [not_writes_in_compute] /
+    [writes_in_compute]) lives in [WeakMem.v] — the functional interpreter
+    [WeakInterp.wexec] checks read admissibility with the same procedure. *)
 
 (* ------------------------------------------------------------------ *)
 (** ** The hart-program language *)
@@ -141,7 +105,7 @@ Record hart := Hart {
 }.
 
 Record config := Cfg {
-  c_img   : gmap Z (bv 8);
+  c_img   : image;
   c_log   : list wmsg;
   c_harts : list hart;
 }.
@@ -187,14 +151,8 @@ Lemma amo_latest_unique img log a t t' :
   is_Some (log_byte img log t' a) → ¬ writes_in log a t' (length log) →
   t = t'.
 Proof.
-  intros Ht Hnt Ht' Hnt'.
-  destruct (decide (t < t')%nat) as [Hlt|?].
-  { exfalso. apply Hnt. apply (writes_in_log_byte img). exists t'.
-    split_and!; [lia| |done]. exact (log_byte_bounded _ _ _ _ Ht'). }
-  destruct (decide (t' < t)%nat) as [Hlt'|?].
-  { exfalso. apply Hnt'. apply (writes_in_log_byte img). exists t.
-    split_and!; [lia| |done]. exact (log_byte_bounded _ _ _ _ Ht). }
-  lia.
+  intros Ht Hnt Ht' Hnt'. exact (latest_unique img log a t t'
+    (conj Ht Hnt) (conj Ht' Hnt')).
 Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -398,12 +356,12 @@ Qed.
 
 (** Reading a concrete log at an arbitrary timestamp. *)
 Lemma log_byte_cases0 img a t v :
-  log_byte img [] t a = Some v → t = 0%nat ∧ img !! a = Some v.
+  log_byte img [] t a = Some v → t = 0%nat ∧ img a = Some v.
 Proof. destruct t as [|i]; simpl; [intros H; by split|done]. Qed.
 
 Lemma log_byte_cases1 img m a t v :
   log_byte img [m] t a = Some v →
-  (t = 0%nat ∧ img !! a = Some v) ∨ (t = 1%nat ∧ msg_byte m a = Some v).
+  (t = 0%nat ∧ img a = Some v) ∨ (t = 1%nat ∧ msg_byte m a = Some v).
 Proof.
   destruct t as [|[|i]]; simpl; [intros H; left; by split
                                 |intros H; right; by split|done].
@@ -411,7 +369,7 @@ Qed.
 
 Lemma log_byte_cases2 img m0 m1 a t v :
   log_byte img [m0; m1] t a = Some v →
-  (t = 0%nat ∧ img !! a = Some v) ∨ (t = 1%nat ∧ msg_byte m0 a = Some v)
+  (t = 0%nat ∧ img a = Some v) ∨ (t = 1%nat ∧ msg_byte m0 a = Some v)
   ∨ (t = 2%nat ∧ msg_byte m1 a = Some v).
 Proof.
   destruct t as [|[|[|i]]]; simpl;
@@ -420,9 +378,9 @@ Proof.
     |intros H; right; right; by split|done].
 Qed.
 
-Lemma img0_x_nb1 : img0 !! ax ≠ Some b1.
+Lemma img0_x_nb1 : img0 ax ≠ Some b1.
 Proof. rewrite img0_x. intros H. apply b0_ne_b1. congruence. Qed.
-Lemma img0_y_nb1 : img0 !! ay ≠ Some b1.
+Lemma img0_y_nb1 : img0 ay ≠ Some b1.
 Proof. rewrite img0_y. intros H. apply b0_ne_b1. congruence. Qed.
 
 (* ------------------------------------------------------------------ *)
@@ -497,13 +455,22 @@ Definition mpf_W (p : list instr) (log : list wmsg) : Prop :=
   (p = MPF_W2 ∧ log = [MX]) ∨ (p = [] ∧ log = [MX; MY]).
 
 (** The reader's phase carries the ordering it has accumulated: once it has
-    seen y = 1, the x-message is below its read floor. *)
+    seen y = 1, the x-message is below its read floor.
+
+    THE FORWARD-BANK CONJUNCT.  Since M1 wires [w_fwd] into the load view
+    ([WeakMem.fwd_view]), "the load's post-view covers the timestamp it read"
+    only holds for a NON-forwarded read.  A reader that never stores has an
+    empty bank, and neither [load_post] nor [fence_post] populates one, so the
+    conjunct is trivially inductive — and it is the honest statement of what
+    the ordering argument needs.  (The MP+acquire reader needs no such
+    conjunct: forwarding is disabled for acquire loads.) *)
 Definition mpf_R (p : list instr) (regs : gmap nat (bv 8)) (ws : wstate)
     (log : list wmsg) : Prop :=
-  (p = MPF_R0) ∨
-  (p = MPF_R1 ∧ (regs !! rg1 = Some b1 → writes_in log ax 0 (w_vrOld ws))) ∨
-  (p = MPF_R2 ∧ (regs !! rg1 = Some b1 → writes_in log ax 0 (w_vrNew ws))) ∨
-  (p = [] ∧ (regs !! rg1 = Some b1 → regs !! rg2 = Some b1)).
+  w_fwd ws = ∅ ∧
+  ((p = MPF_R0) ∨
+   (p = MPF_R1 ∧ (regs !! rg1 = Some b1 → writes_in log ax 0 (w_vrOld ws))) ∨
+   (p = MPF_R2 ∧ (regs !! rg1 = Some b1 → writes_in log ax 0 (w_vrNew ws))) ∨
+   (p = [] ∧ (regs !! rg1 = Some b1 → regs !! rg2 = Some b1))).
 
 Definition mpf_inv (c : config) : Prop :=
   c_img c = img0 ∧
@@ -517,7 +484,7 @@ Proof. rewrite /mp_logs. intros [[_ ->]|[[_ ->]|[[_ ->]|[_ ->]]]]; auto. Qed.
 Lemma mpf_R_app p regs ws log l :
   mpf_R p regs ws log → mpf_R p regs ws (log ++ l).
 Proof.
-  intros [->|[[-> H]|[[-> H]|[-> H]]]].
+  intros [Hf HR]. split; [exact Hf|]. destruct HR as [->|[[-> H]|[[-> H]|[-> H]]]].
   - by left.
   - right; left. split; [done|]. intros ?. by apply writes_in_app, H.
   - right; right; left. split; [done|]. intros ?. by apply writes_in_app, H.
@@ -551,6 +518,7 @@ Proof.
       * right; right; right. split; [reflexivity|]. rewrite Hlog Hl //.
       * rewrite Hlog. by apply mpf_R_app.
   - (* ---- the reader steps ---- *)
+    destruct HR as [Hfwd HR].
     destruct HR as [->|[[-> HRc]|[[-> HRc]|[-> HRc]]]]; simpl in Hst;
       [| | |done].
     + (* load r1 <- y *)
@@ -558,18 +526,20 @@ Proof.
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
-      * right; left. split; [reflexivity|]. rewrite lookup_insert.
+      * split; [rewrite load_post_fwd; exact Hfwd|].
+        right; left. split; [reflexivity|]. rewrite lookup_insert.
         intros Hv. assert (v = b1) as -> by congruence.
         rewrite Himg in Hlb.
         apply (mp_read_y_1 _ _ Hlogs) in Hlb as [-> Hw].
         rewrite Hlog. eapply writes_in_mono_hi; [|exact Hw].
-        apply load_post_vrOld.
+        apply load_post_vrOld_nofwd; exact Hfwd.
     + (* fence r,rw *)
       destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
-      * right; right; left. split; [reflexivity|]. intros Hv.
+      * split; [rewrite fence_post_fwd; exact Hfwd|].
+        right; right; left. split; [reflexivity|]. intros Hv.
         rewrite Hlog. eapply writes_in_mono_hi; [|by apply HRc].
         apply fence_post_vrNew_r.
     + (* load r2 <- x *)
@@ -577,7 +547,8 @@ Proof.
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
-      * right; right; right. split; [reflexivity|].
+      * split; [rewrite load_post_fwd; exact Hfwd|].
+        right; right; right. split; [reflexivity|].
         rewrite lookup_insert_ne // lookup_insert. intros Hv.
         assert (Hpre : writes_in (c_log c) ax 0 (load_vpre ws1 false)).
         { eapply writes_in_mono_hi; [|by apply HRc]. apply load_vpre_vrNew. }
@@ -592,7 +563,7 @@ Lemma mpf_inv0 : mpf_inv mpf_c0.
 Proof.
   split; [done|]. eexists _, _. split; [reflexivity|]. simpl. split.
   - by left.
-  - by left.
+  - split; [done|by left].
 Qed.
 
 (** MP + writer [fence rw,w] + reader [fence r,rw]: r1 = 1 ∧ r2 = 0 is
@@ -606,7 +577,7 @@ Proof.
   intros Hre Hh H1 H2.
   assert (Hinv : mpf_inv c).
   { eapply inv_reach; [apply mpf_inv0| |exact Hre]. intros. by eapply mpf_step. }
-  destruct Hinv as (_ & g0 & g1 & Hh' & _ & HR).
+  destruct Hinv as (_ & g0 & g1 & Hh' & _ & _ & HR).
   rewrite Hh in Hh'. simplify_eq/=.
   destruct HR as [Hc|[[Hc _]|[[Hc _]|[_ Himp]]]]; try discriminate.
   pose proof (Himp H1) as H3. apply b0_ne_b1. congruence.
@@ -768,30 +739,34 @@ Proof.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * right; right. split; [reflexivity|]. rewrite Hlog Hl //.
       * rewrite Hlog. by apply mpf_R_app.
-  - destruct HR as [->|[[-> HRc]|[[-> HRc]|[-> HRc]]]]; simpl in Hst;
+  - destruct HR as [Hfwd HR].
+    destruct HR as [->|[[-> HRc]|[[-> HRc]|[-> HRc]]]]; simpl in Hst;
       [| | |done].
     + destruct Hst as (t & v & Hlb & Hrd & Hlog & Hharts).
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
-      * right; left. split; [reflexivity|]. rewrite lookup_insert.
+      * split; [rewrite load_post_fwd; exact Hfwd|].
+        right; left. split; [reflexivity|]. rewrite lookup_insert.
         intros Hv. assert (v = b1) as -> by congruence.
         rewrite Himg in Hlb.
         apply (mp_read_y_1 _ _ Hlogs) in Hlb as [-> Hw].
         rewrite Hlog. eapply writes_in_mono_hi; [|exact Hw].
-        apply load_post_vrOld.
+        apply load_post_vrOld_nofwd; exact Hfwd.
     + destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
-      * right; right; left. split; [reflexivity|]. intros Hv.
+      * split; [rewrite fence_post_fwd; exact Hfwd|].
+        right; right; left. split; [reflexivity|]. intros Hv.
         rewrite Hlog. eapply writes_in_mono_hi; [|by apply HRc].
         apply fence_post_vrNew_r.
     + destruct Hst as (t & v & Hlb & Hrd & Hlog & Hharts).
       split; [rewrite Himg' //|]. eexists _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. split.
       * rewrite Hlog. exact HW.
-      * right; right; right. split; [reflexivity|].
+      * split; [rewrite load_post_fwd; exact Hfwd|].
+        right; right; right. split; [reflexivity|].
         rewrite lookup_insert_ne // lookup_insert. intros Hv.
         assert (Hpre : writes_in (c_log c) ax 0 (load_vpre ws1 false)).
         { eapply writes_in_mono_hi; [|by apply HRc]. apply load_vpre_vrNew. }
@@ -812,9 +787,9 @@ Proof.
   assert (Hinv : mpg_inv c).
   { eapply inv_reach; [|  |exact Hre].
     - split; [done|]. eexists _, _. split; [reflexivity|]. simpl.
-      split; by left.
+      split; [by left|split; [done|by left]].
     - intros. by eapply mpg_step. }
-  destruct Hinv as (_ & g0 & g1 & Hh' & _ & HR).
+  destruct Hinv as (_ & g0 & g1 & Hh' & _ & _ & HR).
   rewrite Hh in Hh'. simplify_eq/=.
   destruct HR as [Hc|[[Hc _]|[[Hc _]|[_ Himp]]]]; try discriminate.
   pose proof (Himp H1) as H3. apply b0_ne_b1. congruence.
@@ -1295,20 +1270,24 @@ Proof.
   split_and!; [lia|lia|by eexists].
 Qed.
 
-(** One reader: loads [a], fences rw,rw, loads [b]. *)
+(** One reader: loads [a], fences rw,rw, loads [b].  The [w_fwd] conjunct is
+    the forward-bank one — see [mpf_R]: a reader that never stores keeps an
+    empty bank, which is what makes its load's post-view cover the timestamp
+    it read. *)
 Definition iriw_R (a b : Z) (p : list instr) (regs : gmap nat (bv 8))
     (ws : wstate) (log : list wmsg) : Prop :=
-  (p = [ILoad rg1 a false; FENCE_RW_RW; ILoad rg2 b false]) ∨
-  (p = [FENCE_RW_RW; ILoad rg2 b false] ∧
-     (regs !! rg1 = Some b1 → writes_in log a 0 (w_vrOld ws))) ∨
-  (p = [ILoad rg2 b false] ∧
-     (regs !! rg1 = Some b1 → writes_in log a 0 (w_vrNew ws))) ∨
-  (p = [] ∧ (regs !! rg1 = Some b1 → regs !! rg2 = Some b0 → wfirst log a b)).
+  w_fwd ws = ∅ ∧
+  ((p = [ILoad rg1 a false; FENCE_RW_RW; ILoad rg2 b false]) ∨
+   (p = [FENCE_RW_RW; ILoad rg2 b false] ∧
+      (regs !! rg1 = Some b1 → writes_in log a 0 (w_vrOld ws))) ∨
+   (p = [ILoad rg2 b false] ∧
+      (regs !! rg1 = Some b1 → writes_in log a 0 (w_vrNew ws))) ∨
+   (p = [] ∧ (regs !! rg1 = Some b1 → regs !! rg2 = Some b0 → wfirst log a b))).
 
 Lemma iriw_R_app a b p regs ws log l :
   iriw_R a b p regs ws log → iriw_R a b p regs ws (log ++ l).
 Proof.
-  intros [->|[[-> H]|[[-> H]|[-> H]]]].
+  intros [Hf HR]. split; [exact Hf|]. destruct HR as [->|[[-> H]|[[-> H]|[-> H]]]].
   - by left.
   - right; left. split; [done|]. intros ?. by apply writes_in_app, H.
   - right; right; left. split; [done|]. intros ?. by apply writes_in_app, H.
@@ -1360,25 +1339,30 @@ Proof.
     + by apply iriw_R_app.
     + by apply iriw_R_app.
   - (* hart 2: loads x then y *)
+    destruct H2 as [Hfwd H2].
     destruct H2 as [->|[[-> Hc]|[[-> Hc]|[-> Hc]]]]; simpl in Hst; [| | |done].
     + destruct Hst as (t & v & Hlb & Hrd & Hlog & Hharts).
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. rewrite Hlog.
       split_and!; [exact Hcont|exact H0|exact H1| |exact H3].
+      split; [rewrite load_post_fwd; exact Hfwd|].
       right; left. split; [reflexivity|]. rewrite lookup_insert.
       intros Hv. assert (v = b1) as -> by congruence. rewrite Himg in Hlb.
-      eapply writes_in_mono_hi; [apply load_post_vrOld|].
+      eapply writes_in_mono_hi;
+        [apply load_post_vrOld_nofwd; exact Hfwd|].
       eapply writes_in_read_at; [exact Hlb|by eapply read_x_b1_ne0].
     + destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. rewrite Hlog.
       split_and!; [exact Hcont|exact H0|exact H1| |exact H3].
+      split; [rewrite fence_post_fwd; exact Hfwd|].
       right; right; left. split; [reflexivity|]. intros Hv.
       eapply writes_in_mono_hi; [apply fence_post_vrNew_r|by apply Hc].
     + destruct Hst as (t & v & Hlb & Hrd & Hlog & Hharts).
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. rewrite Hlog.
       split_and!; [exact Hcont|exact H0|exact H1| |exact H3].
+      split; [rewrite load_post_fwd; exact Hfwd|].
       right; right; right. split; [reflexivity|].
       rewrite lookup_insert_ne // lookup_insert. intros Hv1 Hv2.
       assert (v = b0) as -> by congruence. rewrite Himg in Hlb.
@@ -1390,25 +1374,30 @@ Proof.
         eapply writes_in_mono_hi; [apply load_vpre_vrNew|by apply Hc].
       * intros Hw. apply Hn. eapply writes_in_mono_hi; [|exact Hw]. lia.
   - (* hart 3: loads y then x *)
+    destruct H3 as [Hfwd H3].
     destruct H3 as [->|[[-> Hc]|[[-> Hc]|[-> Hc]]]]; simpl in Hst; [| | |done].
     + destruct Hst as (t & v & Hlb & Hrd & Hlog & Hharts).
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. rewrite Hlog.
       split_and!; [exact Hcont|exact H0|exact H1|exact H2|].
+      split; [rewrite load_post_fwd; exact Hfwd|].
       right; left. split; [reflexivity|]. rewrite lookup_insert.
       intros Hv. assert (v = b1) as -> by congruence. rewrite Himg in Hlb.
-      eapply writes_in_mono_hi; [apply load_post_vrOld|].
+      eapply writes_in_mono_hi;
+        [apply load_post_vrOld_nofwd; exact Hfwd|].
       eapply writes_in_read_at; [exact Hlb|by eapply read_y_b1_ne0].
     + destruct Hst as [Hlog Hharts].
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. rewrite Hlog.
       split_and!; [exact Hcont|exact H0|exact H1|exact H2|].
+      split; [rewrite fence_post_fwd; exact Hfwd|].
       right; right; left. split; [reflexivity|]. intros Hv.
       eapply writes_in_mono_hi; [apply fence_post_vrNew_r|by apply Hc].
     + destruct Hst as (t & v & Hlb & Hrd & Hlog & Hharts).
       split; [rewrite Himg' //|]. eexists _, _, _, _.
       split; [rewrite Hharts Hh /=; reflexivity|]. simpl. rewrite Hlog.
       split_and!; [exact Hcont|exact H0|exact H1|exact H2|].
+      split; [rewrite load_post_fwd; exact Hfwd|].
       right; right; right. split; [reflexivity|].
       rewrite lookup_insert_ne // lookup_insert. intros Hv1 Hv2.
       assert (v = b0) as -> by congruence. rewrite Himg in Hlb.
@@ -1431,10 +1420,12 @@ Proof.
   assert (Hinv : iriw_inv c).
   { eapply inv_reach; [|  |exact Hre].
     - split; [done|]. eexists _, _, _, _. split; [reflexivity|]. simpl.
-      split_and!; [by intros ? ?%elem_of_nil|by left|by left|by left|by left].
+      split_and!; [by intros ? ?%elem_of_nil|by left|by left
+                  |split; [done|by left]|split; [done|by left]].
     - intros. by eapply iriw_step. }
   destruct Hinv as (_ & g0 & g1 & g2 & g3 & Hh' & _ & _ & _ & H2 & H3).
   rewrite Hh in Hh'. simplify_eq/=.
+  destruct H2 as [_ H2]. destruct H3 as [_ H3].
   destruct H2 as [Hc|[[Hc _]|[[Hc _]|[_ Himp2]]]]; try discriminate.
   destruct H3 as [Hc|[[Hc _]|[[Hc _]|[_ Himp3]]]]; try discriminate.
   eapply wfirst_absurd; [by apply Himp2|by apply Himp3].
@@ -1489,3 +1480,38 @@ Proof.
     simpl. apply rtc_refl. }
   do 2 eexists. split; [reflexivity|]. rewrite lookup_insert //.
 Qed.
+
+(* ------------------------------------------------------------------ *)
+(** *** The FORWARD BANK, in action.
+
+    No litmus program above reads back its own store, so the M1 wire-in of
+    [w_fwd] into the load view ([WeakMem.fwd_view], design doc Decision 3) is
+    invisible to every verdict — which is exactly why it needs its own
+    witness here, or the wire-in could be vacuous and nobody would notice.
+
+    A hart that stores x = 1 and then loads x back reads its OWN message
+    (timestamp 1, which coherence pins), but its read view rises only to the
+    view the store banked — [w_vwNew] at store time, i.e. 0 for a hart that
+    has issued no fence.  Coherence still records the real timestamp. *)
+
+Local Notation FWD_WS := (store_post ws_init false ax 1).
+
+Lemma fwd_bank_after_store : w_fwd FWD_WS !! ax = Some (1%nat, 0%nat).
+Proof. rewrite /store_post /= lookup_insert //. Qed.
+
+(** The forwarded (relaxed) load: post-view 0, NOT the timestamp 1. *)
+Lemma fwd_selfread_relaxed :
+  w_vrOld (load_post FWD_WS false ax 1) = 0%nat.
+Proof. vm_compute. reflexivity. Qed.
+
+(** Coherence is unaffected — the read still cannot go back before its own
+    store (this is what keeps CoRR-style verdicts intact). *)
+Lemma fwd_selfread_coh : (1 ≤ coh (load_post FWD_WS false ax 1) ax)%nat.
+Proof. apply load_post_coh. Qed.
+
+(** An ACQUIRE load is never forwarded (Promising-ARM's [read_view] side
+    condition): its post-view is the timestamp, so the kernel's
+    [amoswap.w.aq] keeps its full ordering force even on its own lock word. *)
+Lemma fwd_selfread_acquire :
+  (1 ≤ w_vrOld (load_post FWD_WS true ax 1))%nat.
+Proof. vm_compute. lia. Qed.
