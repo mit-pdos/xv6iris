@@ -2471,7 +2471,19 @@ bitvector facts (`_get_Pmpcfg_ent_A (_update_Pmpcfg_ent_A x OFF) = OFF`,
 `pmpLocked (_update_Pmpcfg_ent_L y 0) = false`) — none of it `vm_compute`-able.
 The pointer is recorded in `ColdBoot.cold_boot_pmp_all_off`'s comment.
 
-### MSECCFG / MENVCFG PATCH SHARPENING — **MEASURED; BLOCKED ON THE DECODE BRIDGE**
+### MSECCFG / MENVCFG PATCH SHARPENING — **MEASURED; DECIDED: THE PINS STAY**
+
+**USER DECISION (2026-08-05): keep the whole-value pins.** Exit (2) (the
+Zicfilp config flip) was offered with the measurement below and declined:
+"let's keep the whole-value pins." So `mseccfg = 0` and `menvcfg = 0` are
+PERMANENT named platform assumptions — the supported hardware is not
+shrunk further, and no config regen happens for this. Consequence for the
+∀-garbage anchoring task: it does NOT try to derive or delete these two;
+they ride in `boot_patch`/`boot_facts` as explicit platform facts (the
+"not optional" note under menvcfg below is superseded — the third exit is
+"keep the pin as a stated assumption", and that is the chosen one). The
+field-wise decomposition below stays as documentation of which bits are
+architecturally justified vs. platform-assumed.
 
 The `mseccfg = 0` pin over-claims *architecturally*, and its honest decomposition
 is per-field (below). But it is NOT a spec-shape slip that can be fixed by
