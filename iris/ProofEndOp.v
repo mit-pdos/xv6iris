@@ -1677,7 +1677,7 @@ Section EndOpBlocks.
               (eo_Kwh K HK) Hind Hgeom Hj Hgl Heb (conj HnW Hn30)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlfz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell HW HauthL Hhdr Hu1 []").
-    { iIntros (bs' _). iApply (disk_write_permit_indifferent _ _ Hind). }
+    { iIntros (bs' _ _). iApply (disk_write_permit_indifferent _ _ Hind). }
     iIntros (CIDb1 Hsb1 mf1 bs1) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid
                                   Hncell HW HauthL Hhdr %Hhdrn1 Hu1 _".
     assert (Hpc108 : ret_pc (A1 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0x108)).
@@ -1872,7 +1872,7 @@ Section EndOpBlocks.
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell [] HauthL [Hhdr] Hu3 []").
     { by iApply big_sepL_nil. }
     { iExists bs1. iExact "Hhdr". }
-    { iIntros (bs' _). iApply (disk_write_permit_indifferent _ _ Hind). }
+    { iIntros (bs' _ _). iApply (disk_write_permit_indifferent _ _ Hind). }
     iIntros (CIDb3 Hsb3 mf3 bs2) "%Hcs3 Hcg Hcnt Hpc Hoctx Hpark Hppid
                                   Hncell _ HauthL Hhdr %Hhdrn2 Hu3 _".
     assert (Hpc11a : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (EO + 0x11a)).
@@ -3489,10 +3489,10 @@ Section ProofEndOp.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hppid #Hprocs #Hscheds
               Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hop Hcont".
     iDestruct (cpu_own_forces_on with "Hcg Hcnt") as %Hbtrue. subst b.
-    iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc)".
+    iDestruct "Hlctx" as "(#Hlock & #Hdevc & #Hstc & #Hswlb)".
     iAssert (log_ctx γ bn γfs cov logstart dev) as "#Hlctx".
     { rewrite /log_ctx. iSplitR; [iExact "Hlock"|]. iSplitR; [iExact "Hdevc"|].
-      iExact "Hstc". }
+      iSplitR; [iExact "Hstc" | iExact "Hswlb"]. }
     iAssert (eo_cont (CID0 := CID) Φ j pidv dq m K true C true)%I
       with "[Hcont]" as "Hcont"; [rewrite /eo_cont; iExact "Hcont"|].
     (* ===== PROLOGUE: the eight-slot frame ===== *)

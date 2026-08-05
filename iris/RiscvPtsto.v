@@ -535,8 +535,19 @@ Definition disk_write_permit `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
     (Q : iProp Σ) : iProp Σ :=
   (∀ (dk : Z -> bv 8) (n : nat),
      start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
-     ▷ riscv_crash_pred dk ==∗
+     ▷ riscv_crash_pred dk ={∅}=∗
        ▷ riscv_crash_pred (wr_apply w dk) ∗ start_auth n ∗ Q)%I.
+
+(* WHY A MASK-[∅] FUPD AND NOT A BASIC UPDATE.  A client whose crash
+   predicate is TIMELESS -- [FsCrash.P_fs_any] is, every conjunct of it is a
+   [ghost_map]/[mono_nat]/[own] over a discrete cmra -- has to STRIP the [▷]
+   this type hands it before it can update the record's ghosts, and a basic
+   update cannot do that: [◇] is not absorbed by [|==>] (there is no
+   [▷ |==> P ⊢ |==> ▷ P] in Iris either).  A fupd at ANY mask absorbs [◇], so
+   [∅] is the right choice: it is the weakest thing to PROVE (no invariant is
+   open inside it -- a crash permit never opens one, it is handed the
+   predicate directly), and the consumer runs it under whatever mask it holds
+   via [fupd_mask_subseteq].  Nothing else about the seam changes. *)
 
 (* WHY THE PERMIT NAMES ITS AUTHOR'S GENERATION [gd] (phase C2b/D1).  A crash
    permit is a STATELESS view shift: it runs at the DMA completion with only

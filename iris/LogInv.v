@@ -32,6 +32,7 @@ From iris.base_logic.lib Require Import ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
+Require Import RiscvLang.   (* [GenId]/[gen_id]: [log_ctx]'s swap receipt *)
 Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import DiskPtsto.
@@ -202,6 +203,10 @@ Qed.
 
 Section LogInv.
   Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !fsLogG Σ, !logG Σ}.
+  (* the ambient generation: [log_ctx] carries this era's SWAP RECEIPT, which
+     is what every WAL fupd curries to prove the crash record's arm is its
+     own ([FsCrash.fs_arm_acc]).  Implicit, so no spec statement changes. *)
+  Context `{GEN : GenId}.
 
   (* ---------------------------------------------------------------- *)
   (*  An active operation                                              *)
@@ -326,7 +331,14 @@ Section LogInv.
     (is_lock (ln_lk γ) log_addr "log"%string
        (log_res γ bn γfs cov logstart) ∗
      l_dev ↦₄□ dev ∗
-     l_start ↦₄□ (mword_of_int logstart : mword 32))%I.
+     l_start ↦₄□ (mword_of_int logstart : mword 32) ∗
+     (* THE ERA'S SWAP RECEIPT (phase C2b/D1 stage 3).  [initlog]'s swap
+        produced it and every later WAL fupd needs it: it is the LOWER bound
+        that, against the started-generations auth the DMA completion threads
+        in, pins the crash record's arm to THIS era ([FsCrash.fs_arm_acc]'s
+        squeeze).  Persistent, so it rides the context every log function
+        already threads. *)
+     swap_lb (S gen_id))%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
@@ -350,7 +362,11 @@ Section LogInv.
 
   Lemma log_ctx_frozen γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ log_frozen logstart dev.
-  Proof. rewrite /log_ctx /log_frozen. iIntros "(_ & $ & $)". Qed.
+  Proof. rewrite /log_ctx /log_frozen. iIntros "(_ & $ & $ & _)". Qed.
+
+  Lemma log_ctx_swap γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ swap_lb (S gen_id).
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & $)". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)

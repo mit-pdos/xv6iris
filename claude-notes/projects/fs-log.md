@@ -451,86 +451,91 @@ three `disk_write_permit_indifferent _ _ Hind` call sites.
   owes is the `swap_lb (S gen_id)` receipt, which cannot exist before the swap
   that produces it — so it lands with stage 3.
 
-### D1 STAGE 3 (initlog's swap): the INTERFACE landed, the fupd designed
+### D1 STAGE 3 (initlog's swap): COMPLETE
 
-What landed and is green:
+`initlog`'s final `write_head` now carries a REAL durability fupd: the era
+takes custody of the crash record at the image that write produces, and the
+mirror half + swap receipt come back through `Q`.
 
-- **`SpecWriteHead` carries a real permit.** A `(Q : iProp Σ)` binder (last),
-  the premise
-  `(∀ bs', ⌜hdr_n bs' = Z.of_nat n⌝ -∗ disk_write_permit gen_id (Some (1024 * log_hdr_bno logstart, bs')) Q)`,
-  and `▷ Q` in the continuation. **The permit has to be a FAMILY over the
-  header bytes**: the caller cannot know the image write_head will assemble
-  (the copy loop builds it from `n` and `W`), so it supplies a permit for
-  every image the assembly could produce, given what the assembly
-  establishes. At `n = 0` (initlog's clear, and the clear that ends a commit)
-  `hdr_n bs' = 0` plus `hdr_dec_zero` pins the WHOLE decoding, which is all a
-  clear's fupd needs; the COMMIT arm will want `hdr_dec bs' = (n, map uint W)`
-  — an ADDITIVE strengthening of this premise's hypothesis once the encoding
-  proof exists. `ProofWriteHead` threads it to its bwrite (`wh_cont`, both
-  block lemmas and the capstone gained `Q`); `Hbnou` is what reconciles the
-  contract's `log_hdr_bno logstart` with the bread/bwrite pair's `uint bno`.
-  Both callers (initlog, end_op ×2) currently pass `True` + the indifferent
-  permit, so `crash_pred_indifferent` stays until stage 4 deletes it.
-- **The boot mint.** `power_boot_res` gained
-  `ghost_var (era_mirror_name HE) 1 (MkLogMirror (0, []) (fun _ => []))`
-  (the `"Hmir"` PowerOn already allocated and dropped), threaded through
-  `power_boot_res_unpack` → `boot_shared_alloc`'s post → `SystemAdequacy`'s
-  destructuring, so the FS boot client can feed `initlog`'s
-  `log_mirror_full`.
+- **`SpecWriteHead` carries the permit as a FAMILY over the header bytes**
+  (`∀ bs', ⌜length bs' = 1024⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+  disk_write_permit gen_id (Some (1024 * log_hdr_bno logstart, bs')) Q`), plus
+  `▷ Q` in the continuation: the caller cannot know the image the copy loop
+  will assemble, so it supplies a permit for every image the assembly can
+  produce. At `n = 0` `hdr_n bs' = 0` + `hdr_dec_zero` pins the whole
+  decoding, which is all a CLEAR needs; the COMMIT arm's
+  `hdr_dec bs' = (n, map uint W)` is an additive strengthening of the same
+  hypothesis. `ProofWriteHead` instantiates it at its own buffer image and
+  discharges the two hypotheses (`length_fmap`/`length_seq`, and the `n`-field
+  fact it already proved); `Hbnou` reconciles `log_hdr_bno logstart` with the
+  bread/bwrite pair's `uint bno`.
+- **The boot mint**: `power_boot_res` → `power_boot_res_unpack` →
+  `boot_shared_alloc` → `SystemAdequacy` now carry
+  `ghost_var (era_mirror_name HE) 1 (MkLogMirror (0,[]) (fun _ => []))`.
+- **`FsCrash.fs_arm_swap` takes TWO images** (`fs_arm γs ls dk` in,
+  `fs_arm γs ls dk'` out); the proof is unchanged, the old statement is the
+  `dk = dk'` instance.
+- **`FsCrash`'s second section** (`Section fs_crash_seam`, over `riscvGS`):
+  `P_fs_any` (the `∃ γs` + the three seam equations — `γs` MUST be
+  existential, since adequacy's `HPc` allocates the history gname under the
+  update), its `Timeless` instance, `fs_crash_seam` (the persistent
+  identification of `riscv_crash_pred` with it), and **`fs_swap_permit`** —
+  the whole boot swap as one lemma. `P_fs`'s own section stays
+  `riscvFixedGS`-free: it is what instantiates `riscv_crash_pred`.
+- **`log_ctx` carries `swap_lb (S gen_id)`** (arguments unchanged, so only the
+  two construction sites moved), and `log_ctx_swap` projects it.
+  `SpecInitlog` gained `fs_crash_seam cov logstart`, `gen_cert` and
+  `!fsCrashG Σ`.
 
-The fupd itself is fully designed; four findings decide its shape, and the
-first two are load-bearing:
+**THE PERMIT HAD TO BECOME A FUPD, AND THAT IS A GENERAL FACT ABOUT THIS
+SEAM.** A crash permit hands the client `▷ Pc dk` and expects ghost updates on
+what is inside; a client whose predicate is TIMELESS (ours is — every conjunct
+is a `ghost_map`/`mono_nat`/`own` over a discrete cmra) must therefore strip
+that later, and **a basic update cannot do it**: `|==>` does not absorb `◇`,
+and Iris has no `▷ |==> P ⊢ |==> ▷ P` either (checked). So
+`disk_write_permit` is now `… ={∅}=∗ …`: mask `∅` is the weakest thing to
+prove (a crash permit never opens an invariant — it is handed the predicate
+directly), and the consumer runs it under whatever mask it holds via
+`fupd_mask_subseteq` (two lines in `wp_disk_loop`; `PermInv.perm_consume`/`_kq`
+carry the same mask). The alternative — demanding a timeless `riscv_crash_pred`
+so the completion could strip the later itself — would have frozen that choice
+into the machine layer forever.
 
-1. **THE BOOT SWAP MUST RE-BASE THE DURABLE STATE, and cannot preserve it.**
-   Every later WAL fupd learns the PRE-image's log region from the custody
-   arm's `log_mirror_ok M (fs_blocks dk) ls` — that is what the mirror is
-   for. The swap is the one fupd that has NO custody yet, so it cannot know
-   the on-disk header was clean, and `initlog`'s `⌜hdr_n bs_hdr = 0⌝` is
-   about the block it READ, which no curryable fact ties to the fupd's
-   universally quantified `dk`. So the swap sets
-   `fr_D := fs_restrict (fs_blocks dk) (fs_home_set cov ls)` and APPENDS it
-   to the history (`fs_hist_update`, a prefix extension — old receipts stay
-   valid). That is the honest reading anyway: at boot, after the clear, the
-   committed state IS what the disk recovers to.
-2. **`fs_arm_swap` needs a TWO-IMAGE generalization** — `fs_arm γs ls dk` in,
-   `fs_arm γs ls dk'` out. Retirement drops the old custody wholesale and the
-   only thing read out of the incoming arm is its counter plus
-   `fs_custody_started` (which does not mention `dk`), so the proof is
-   unchanged; the landed statement is the `dk = dk'` instance.
-3. **The seam goes in a SECOND section of `FsCrash.v`** — `P_fs_any cov ls dk`
-   (`∃ γs, ⌜the three seam equations⌝ ∗ P_fs γs cov ls dk`) and
-   `fs_crash_seam := □ ∀ dk, (riscv_crash_pred dk -∗ P_fs_any … dk) ∗
-   (P_fs_any … dk -∗ riscv_crash_pred dk)`, in a section that DOES take
-   `riscvGS`. `P_fs`'s own section must stay `riscvFixedGS`-free: it is what
-   instantiates `riscv_crash_pred`, so naming the record inside it is
-   circular. `P_fs_any` is timeless (every conjunct is), which is what lets
-   the fupd strip the permit's `▷` inside its `==∗`.
-4. **initlog must curry the WHOLE mirror variable into the closure**, not
-   split it beforehand: the swap sets the value to `mirror_of (fs_blocks dk')
-   ls` (free — `mirror_of_ok`), splits there, hands one half to the arm and
-   returns the other in `Q := log_mirror_clean ∗ swap_lb (S gen_id)`. Its
-   clean-header conjunct comes from the write itself:
-   `fs_blocks_write_eq` gives `fs_blocks dk' (log_hdr_bno ls) = bs'`, and
-   `hdr_dec_zero` turns `hdr_n bs' = 0` into `lm_hdr = (0, [])`.
-   **`fs_blocks_write_eq` needs `length bs' = BSIZE`**, so `SpecWriteHead`'s
-   permit family owes one more hypothesis — `⌜length bs' = 1024%nat⌝` — which
-   `ProofWriteHead` discharges by `length_fmap`/`length_seq`. Not yet added.
+Two traps this stage cost, both silent:
 
-Then `log_ctx` gains the `swap_lb (S gen_id)` receipt (its ARGUMENTS do not
-change, so only the two construction sites — ProofInitlog, ProofEndOp — move).
+- **`` `{GEN : GenId} `` / `` `{!fsCrashG Σ} `` INVENTS A VARIABLE when the
+  name is not in that file's scope** (`GenId : Type`, `fsCrashG : gFunctors →
+  Type` show up in the error's environment, and the real error surfaces as
+  "Could not find an instance" hundreds of lines later). Fix: `Require Import`
+  the defining file, or write the qualified name.
+- **Section-variable ORDER decides whether a `Module Type` signature matches.**
+  `!fsCrashG Σ` inserted mid-list in `ProofInitlog`'s `Context` produced
+  "Signature components for field wp_initlog_sconf do not match" with two
+  types that print identically except for the position of one binder; it has
+  to sit exactly where the spec's own context puts it.
 
-### C2b/D1 stages 3-5 (remaining)
+### C2b/D1 stages 4-5 (remaining)
 
-
-3. `initlog` (stage-2 clean form): the swap rides its final
-   `write_head` fupd (`fs_arm_swap`), spending the era boot token; the
-   mirror is `mirror_of` the post-write image, which is free inside the
-   fupd since `dk` is universally quantified there.
-4. The three real fupds at the WAL sites, currying the era mirror half
-   + `swap_lb` and running `fs_arm_acc`; `Q` for write_head's commit is
-   the new `fs_receipt`; delete `crash_pred_indifferent`.
-5. `xv6_fs_adequacy` passing `Pc := P_fs` with the one initial-recovery
-   hypothesis; `xv6_power_adequacy` untouched.
+4. The three real fupds at the WAL sites, currying the era mirror half +
+   `swap_lb` and running `fs_arm_acc`; `Q` for write_head's commit is the new
+   `fs_receipt`; delete `crash_pred_indifferent`. Shape, now that stage 3 has
+   walked the path: each site is `fs_swap_permit`'s sibling — open the seam,
+   strip the (timeless) record inside the `={∅}=∗`, run `fs_arm_acc` at
+   `(gen_id, riscv_eraGS)` instead of `fs_arm_swap`, move `fr_D` with the
+   matching pure transition (`fs_recovery_logfill` / `_commit` /
+   `_install` / `_clear_keeps`), and re-close. Two things are NOT yet in
+   place: `install_trans` needs a per-entry permit FAMILY threaded through its
+   fuel induction (its spec has none today), and the COMMIT arm needs
+   `write_head`'s post to state the FULL header encoding
+   (`hdr_dec bs' = (n, map uint W)`, an encoding proof over the copy loop) —
+   the permit family's hypothesis is already the right place to hang it.
+5. `xv6_fs_adequacy` with the one initial-recovery hypothesis;
+   `xv6_power_adequacy` untouched. **`Pc`'s signature has to grow**: it is
+   `gname -> (Z -> bv 8) -> iProp Σ` today (only the swap gname is threaded),
+   but `P_fs_any`'s seam equations also name `riscv_registry_name` and
+   `riscv_start_name`, which `riscv_system_adequacy` allocates INSIDE its own
+   proof — so the client cannot mention them unless `HPc` passes them the way
+   it passes `γsw`.
 
 ### Phase D — recovery + sys_sync
 

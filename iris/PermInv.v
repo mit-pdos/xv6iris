@@ -200,7 +200,7 @@ Section perm.
       (w : disk_wr) (dk : Z -> bv 8) (n : nat) :
     perm_inv_body gd γP -∗ perm_tok γP k true γq w -∗
     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
-    ▷ riscv_crash_pred dk ==∗
+    ▷ riscv_crash_pred dk ={∅}=∗
       perm_inv_body gd γP ∗ perm_tok γP k false γq w ∗ start_auth n ∗
       ▷ riscv_crash_pred (wr_apply w dk).
   Proof.
@@ -250,7 +250,7 @@ Section perm.
       (w : disk_wr) (dk : Z -> bv 8) (n : nat) :
     perm_inv_body gd γP -∗ perm_pend γP kq w -∗
     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
-    ▷ riscv_crash_pred dk ==∗
+    ▷ riscv_crash_pred dk ={∅}=∗
       perm_inv_body gd γP ∗ perm_done γP kq w ∗ start_auth n ∗
       ▷ riscv_crash_pred (wr_apply w dk).
   Proof.

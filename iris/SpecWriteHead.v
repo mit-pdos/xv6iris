@@ -155,7 +155,7 @@ Definition wp_write_head_sconf_body
      want the full [hdr_dec bs' = (n, map uint W)], and that is an ADDITIVE
      strengthening of this premise's hypothesis when the encoding proof
      lands. *)
-  (∀ bs' : list (bv 8), ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+  (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
      disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (bs' : list (bv 8)),

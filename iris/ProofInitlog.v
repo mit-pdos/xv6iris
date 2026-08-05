@@ -92,6 +92,7 @@ Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
+Require Import FsCrash.
 Require Import CodeInitlog.
 Require Import SpecPanic.
 Require Import SpecInitlock.
@@ -213,7 +214,7 @@ Local Ltac ilidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 
 Section InitlogDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   (* BORROW the block's first word out of its byte list, and give it back.
      The window vocabulary is ByteBuf's ([bb_bytes_of_list] to trade the
@@ -279,7 +280,7 @@ End InitlogDefs.
 
 Section ProofInitlog.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_initlog_sconf (Φ : mval -> iProp Σ)
@@ -306,7 +307,8 @@ Section ProofInitlog.
     destruct Hgeom as [Hcovok Hlogsub].
     subst eb.
     unfold K_initlog in HK.
-    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hbio Hmirf Hppid #Hprocs #Hscheds
+    iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hbio #Hseam #Hcert Hmirf
+              Hppid #Hprocs #Hscheds
               Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hcont".
@@ -1184,15 +1186,28 @@ Section ProofInitlog.
       as "Hnil3"; [iApply il_bigL_nil|].
     iApply (WriteHead.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
-              D2 (K - 6)%nat true C b True%I
+              D2 (K - 6)%nat true C b
+              ((∃ M : log_mirror,
+                  ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = (0%nat, [])⌝) ∗
+               swap_lb (S gen_id))%I
               HKwh Hind Hgeomok Hj Hgl eq_refl Hshape0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hscheds
                     Hoctx Hpark Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
-                    Hs1u [] [-]").
+                    Hs1u [Hmirf] [-]").
     { iExists bs_hdr. iExact "Hfsb". }
-    { iIntros (bs' _). iApply (disk_write_permit_indifferent _ _ Hind). }
+    (* THE SWAP, riding this write (phase C2b/D1 stage 3): the era takes
+       custody of the crash record at the image the write produces.  The
+       WHOLE mirror variable goes into the closure -- the swap sets it to the
+       post-write picture, splits it there, keeps one half in the arm and
+       returns the other (with its clean header, read off the write itself)
+       together with the swap receipt. *)
+    { iIntros (bs' Hlen' Hhn').
+      iDestruct "Hcert" as "(_ & Hstc & Hregc)".
+      iApply (fs_swap_permit cov logstart bs' ltac:(exact Hlen')
+                ltac:(rewrite Hhn'; reflexivity)
+                with "Hseam Hregc Hstc Hmirf"). }
     iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid
-                                 Hncell _ HLauth Hfsb %Hhn Hs1u _".
+                                 Hncell _ HLauth Hfsb %Hhn Hs1u HQ".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
                     = mword_of_int (ILG + 0x74)).
     { rewrite HD2ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1398,22 +1413,13 @@ Section ProofInitlog.
               = false).
     { intro z. apply bool_decide_eq_false_2. apply not_elem_of_nil. }
     iApply fupd_wp.
-    (* ---- THE ERA'S MIRROR, SPLIT (phase C2b/D1 stage 2) ----
-       The era was handed the WHOLE variable at boot; the batch keeps one
-       half and the other is what [initlog]'s swap will hand to [P_fs]'s
-       checked-out arm (stage 3).  The value is set to a CLEAN header here,
-       which the clean-image precondition ([hdr_n bs_hdr = 0], and the header
-       block this function just wrote back unchanged) is exactly what
-       justifies -- the slot component is left as it was, because nothing
-       between commits ever reads it. *)
-    iDestruct "Hmirf" as (M0) "Hmirf".
-    iMod (ghost_var_update (MkLogMirror (0%nat, []) (lm_slots M0))
-            with "Hmirf") as "Hmirf".
-    iEval (rewrite -Qp.half_half) in "Hmirf".
-    iDestruct (ghost_var_split with "Hmirf") as "[Hmirc Hmirarm]".
-    iAssert (log_mirror_clean) with "[Hmirc]" as "Hmirc".
-    { rewrite /log_mirror_clean. iExists (MkLogMirror (0%nat, []) (lm_slots M0)).
-      iFrame "Hmirc". iPureIntro. reflexivity. }
+    (* ---- THE SWAP'S RECEIPT, off the write's permit (stage 3) ----
+       Both halves are timeless, so the [▷] the permit channel puts on them
+       strips inside this update: the era's mirror half goes into the batch
+       and the swap lower bound into [log_ctx]. *)
+    iMod "HQ" as "[Hmirc #Hswlb]".
+    iAssert (log_mirror_clean) with "[Hmirc]" as "Hmirc";
+      [rewrite /log_mirror_clean; iExact "Hmirc"|].
     iAssert (log_batch bn γfs cov logstart 0%nat)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
     { rewrite /log_batch.
@@ -1452,7 +1458,8 @@ Section ProofInitlog.
     iAssert (∃ γ : log_names, log_ctx γ bn γfs cov logstart dev)%I as "#Hctx".
     { iExists (MkLogNames γlk γops). rewrite /log_ctx.
       iSplitR; [iExact "Hislk"|].
-      iSplitR; [iExact "Hdvp" | iExact "Hstp"]. }
+      iSplitR; [iExact "Hdvp"|].
+      iSplitR; [iExact "Hstp" | iExact "Hswlb"]. }
     iModIntro.
     (* the two units the caller gets back *)
     iAssert (bslots bn 2) with "[Hs1u Hs1v]" as "Hs2".

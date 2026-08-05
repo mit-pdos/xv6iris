@@ -101,6 +101,7 @@ Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BcacheInv BioInv.
 Require Import FsBlocks LogInv.
+Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -118,7 +119,7 @@ Definition log_name_str : Z := 0x800074f8.
 
 Definition wp_initlog_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -169,6 +170,15 @@ Definition wp_initlog_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
+  (* THE CRASH SEAM (phase C2b/D1 stage 3): the persistent identification of
+     the machine layer's crash predicate with THIS file system's [P_fs].  It
+     is what lets [initlog]'s final [write_head] carry a REAL durability fupd
+     -- the swap that takes custody of the crash record for this era.  The
+     boot client gets it from the adequacy instantiation. *)
+  fs_crash_seam cov logstart -∗
+  (* the era certificate: the swap installs custody AT [gen_id], and the
+     registry element + started lower bound are exactly what identifies it *)
+  gen_cert -∗
   (* THE ERA'S LOG-REGION MIRROR VARIABLE (phase C2b/D1 stage 2), whole: no
      custody of the crash record has been taken yet, so both halves are the
      era's, and [initlog] is what splits them -- one into [log_batch] (the
@@ -242,7 +252,7 @@ Definition wp_initlog_sconf_body
 Module Type INITLOG.
   Parameter wp_initlog_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)

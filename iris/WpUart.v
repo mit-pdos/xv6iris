@@ -975,9 +975,14 @@ Section DevLoops.
          authored by this era and its [⌜n = gd + 1⌝] is exactly the fact
          [wp_disk_step] already handed us -- which is what lets a client fupd
          identify the crash record's recorded custodian as ITSELF. *)
+      (* the permit is a mask-[∅] fupd (RiscvPtsto: a timeless client
+         predicate must be able to strip the [▷] this hands it), and we hold
+         three invariants open, so shrink the mask around it and restore. *)
+      iMod (fupd_mask_subseteq ∅) as "Hmclose"; [set_solver|].
       iMod (perm_consume_kq gen_id (dn_perm γd) kq wr (v_disk (dvirtio d)) n
               with "Hpbody Hpend Hsa [//] HP")
         as "(Hpbody & Hdone & Hsa & HP)".
+      iMod "Hmclose" as "_".
       (* THE MECHANICAL TIE UPDATE: both halves, together, to the image the
          device just produced.  It is the completion's own job -- the client
          cannot do it (it holds neither half) and nobody else in the machine

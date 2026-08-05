@@ -481,7 +481,7 @@ Section WriteHeadBlocks.
     fsblock γfs (log_hdr_bno logstart) bsh -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
-    (∀ bs' : list (bv 8), ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+    (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
     wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -573,6 +573,7 @@ Section WriteHeadBlocks.
        the block number agree: the contract states the write's index at
        [log_hdr_bno logstart], the bread/bwrite pair at [uint bno]. *)
     { rewrite Hbnou. iApply ("Hperm" $! (f <$> seq 0 1024)).
+      { iPureIntro. rewrite length_fmap length_seq. reflexivity. }
       iPureIntro. exact Hhn_early. }
     iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold HQ".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (WH + 0x4c)).
@@ -952,7 +953,7 @@ Section WriteHeadBlocks.
     fsblock γfs (log_hdr_bno logstart) bsh -∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
     ([∗ list] i0 ↦ w ∈ W, lh_block i0 ↦₄ w) -∗
-    (∀ bs' : list (bv 8), ⌜hdr_n bs' = Z.of_nat n⌝ -∗
+    (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
     wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
