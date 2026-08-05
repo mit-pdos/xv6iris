@@ -133,16 +133,44 @@ the Iris proof already pays for — no separate whole-kernel analysis):
       pins the promise: fulfilment po-after `fence rw,w` forces the
       timestamp above everything the fence covers). Adequacy exports the
       certificate fact alongside reducibility; Layer 1 consumes it.
-- [ ] Resolve early (shapes Layer 1): the PARM Coq machine-step
-      certification granularity — is all-threads-certified invariant, or
-      only the stepping thread checked? Decides whether doomed states
-      (unfulfillable promise ⇒ no certified step ⇒ stuck) are reachable,
-      which a reducibility adequacy must care about. Their Thm 6.3
-      (RISC-V deadlock freedom) suggests well-behaved; read the Coq, not
-      the paper. Also: the exact sufficient violation pattern (the
-      fenced case has an empty-predecessor-set wrinkle — a release-fenced
-      store with nothing to order CAN be promised, and must be shown to
-      commute harmlessly), and byte-granularity/mixed-size care.
+- [x] **RESOLVED (2026-08, read from snu-sf/promising-arm sources): the
+      PARM base machine has NO certification at all.** `Machine.step`
+      lifts `state_step ∪ promise_step` with promising unconditional;
+      doomed threads are trivially reachable and are pruned only EX POST —
+      "behavior" (`Machine.exec`) is a run whose FINAL state satisfies
+      `no_promise` (all promise sets ⊥). Both axiomatic-equivalence
+      directions and Thm 7.1 quantify over `Machine.exec` only. The
+      certified machine (`lcertify/Certify.v`) checks only the STEPPING
+      thread post-step; `certify` = the thread alone, from current
+      memory, reaches promises = ⊥ (its `write_step`s append but each
+      promise made in certification is fulfilled in the same step).
+      All-threads-certified is preserved only via `interference_certify`
+      (`certify` survives arbitrary memory extension), which exists ONLY
+      for RISC-V (`arch == riscv` hypothesis) — hence Thm 6.3 deadlock
+      freedom being RISC-V-only. Coq 8.15 + sflib + hahn, ~17k lines;
+      architecture is a parameter, not a separate RISC-V file.
+      CONSEQUENCES for us: (a) full-machine adequacy must be stated over
+      completable prefixes (prefixes extendable to a `no_promise`
+      completion) — doomed runs are model artifacts hardware never
+      exhibits, exactly what `Machine.exec` already prunes; (b) **their
+      Thm 7.1 (`promising_to_promising_pf`, PtoPF.v) is a reusable
+      Layer-1 skeleton**: every behavior = a promise PHASE from init,
+      then per-thread `state_step`s against FROZEN memory (`pf_exec`) —
+      so robustness reduces to "for our kernel, a nonempty front-loaded
+      promise set admits no `no_promise` completion beyond what the
+      empty phase admits", a statement over frozen-memory per-thread
+      runs, far more tractable than arbitrary interleavings.
+- [ ] OPEN TENSION to resolve when M6 starts: `interference_certify`
+      as paraphrased (certification survives ANY memory extension,
+      RISC-V) seems to contradict the CS-store scenario — a thread that
+      promised a critical-section store while the lock was free looks
+      uncertifiable after another hart's acquire lands (its cert-run AMO
+      must read the new lock=1 and spin). Read the lemma's exact side
+      conditions in CertifyProgressRiscV.v; the resolution determines
+      the robustness invariant. Also still open: the exact sufficient
+      violation pattern (the fenced empty-predecessor-set wrinkle — a
+      release-fenced store with nothing to order CAN be promised and
+      must commute harmlessly), and byte-granularity/mixed-size care.
 - [ ] Axiomatic characterization of the promise-free machine (the PS1
       Thm 5 analog): promise-free ≡ RVWMO ∧ acyclic(po ∪ rf) ∧
       (po ∩ W×W) ⊆ gmo. Pins exactly what the interim assumption says.
