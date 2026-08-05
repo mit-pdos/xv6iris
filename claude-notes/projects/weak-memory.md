@@ -1,8 +1,9 @@
 # Project: weak memory (RVWMO) — staged worklist
 
 Design: [`design/weak-memory.md`](../design/weak-memory.md) (PROPOSAL).
-Branch: `weak-memory`. Landed: M0 (`iris/WeakMem.v`, `iris/WeakLitmus.v`)
-and M1a (`iris/WeakInterp.v` + fwd-bank wire-in). Next: M1b.
+Branch: `weak-memory`. Landed: M0 (`iris/WeakMem.v`, `iris/WeakLitmus.v`),
+M1a (`iris/WeakInterp.v` + fwd-bank wire-in), M1b (`iris/WeakLang.v`).
+Next: M1c.
 
 ## M0 — model spike (no Iris)
 
@@ -73,10 +74,31 @@ Validate the operational design before anything depends on it.
       M1c's mono_list premise), SC-degeneracy `wread_all_seen`.
       NOTE for M1b: `wm_tid` is stamped None inside `wrun` — make
       wrun/wexec tid-parametric so the language layer stamps hart ids.
-- [ ] **M1b — the language** (`WeakLang.v`): `wgstate`, prim_step arms
-      (hart via `wrun`, uart/disk/plic/power; disk reads coherent-latest
-      as an interim until M5's device views), boot/crash reset of
-      log+views per generation, language mixin.
+- [x] **M1b — the language** (`WeakLang.v`, 778 lines): DONE. Reuses
+      RiscvLang's CPU/mexpr/device-relations/reset definitions wholesale
+      (no instance clash — both cones stay off SailStdpp.Base); the
+      interpreter is now tid-parametric and stamps hart ids on messages.
+      Disk arm: thin `wdisk_step d m d' w` exposing the WRITE MAP (the
+      reused relation only exposes `w ∪ m`, unrecoverable), proven
+      equivalent to `RiscvLang.disk_step` both ways; DMA appends
+      `wmsgs_of_map w`. `wflat` (coherent flat projection) characterized
+      against `latest`/`log_byte` under `wlog_wf` (needed: `z_pa` wraps,
+      keys don't round-trip without it). Boot anchor reused verbatim
+      (register-only program), so `reset_regs_of_run` and consumers
+      apply to a weak boot unchanged. Mixin's axiom footprint =
+      byte-identical to RiscvLang's (the 5 platform axioms).
+      **SEAM FACTS for M1c:** (1) log append-only holds for every arm
+      EXCEPT PowerOn (`wprim_step_log_app` carries that side condition;
+      `wprim_step_poweron_log` states the reset) — the mono_list log
+      auth is a PER-ERA resource, reallocated at reboot like the era
+      gen_heap in the fixed/era riscvGS split; (2) `ws_le` monotonicity
+      is per-hart and also broken by PowerOn (reset to `ws_init`);
+      (3) the five inversion lemmas are uniform, `whart_view`/
+      `whart_write` + peel lemmas are the destructing shape.
+      Gotchas recorded: conditional-`rewrite` side-goal ORDER flips
+      between implicit/explicit-P spellings (fully apply or pre-assert);
+      `lia` dies with an mword in context (hoist to mword-free Local
+      Lemmas); `Forall_singleton` mis-elaborates (use `Forall_inv`).
 - [ ] **M1c — base logic**: state interpretation (`mono_list` log auth,
       per-hart `wstate` auth, per-byte latest-write auth), base points-to
       + seen-assertions, `wp_exec_step` tower analog (oracle-∀ form),
