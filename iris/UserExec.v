@@ -170,7 +170,7 @@ Lemma lookup_set_mi (σ : mstate) (b : bool) (r : register) (v : type_of_registe
   register_beq r (R_bool minstret_increment) = false ->
   register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v.
 Proof.
-  intros Hv Hne. unfold set_reg; cbn [sregs].
+  intros Hv Hne. rewrite ?sregs_set_reg.
   rewrite irrelevant_register_set; [exact Hv | exact Hne].
 Qed.
 

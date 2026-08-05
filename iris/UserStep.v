@@ -302,7 +302,7 @@ Section StepWaitWake.
   Lemma exec_riscv_step_wait_wake : exec (riscv_step false) s = Some (tt, s_final).
   Proof using All.
     assert (Hhart_w : register_lookup hart_state s_w.(sregs) = HART_ACTIVE tt).
-    { unfold s_w, set_reg; cbn [sregs]. apply register_lookup_set. }
+    { unfold s_w; rewrite ?sregs_set_reg. apply register_lookup_set. }
     unfold riscv_step.
     rewrite (exec_bind_Some _ _ _ _ _
               (_ : exec (try_step 0 false) s = Some (false, s_final))).
@@ -336,7 +336,7 @@ Section StepWaitWake.
     replace (register_lookup minstret_increment
                (set_reg s_w PC (register_lookup nextPC s_w.(sregs))).(sregs))
       with b.
-    2:{ unfold s_w, s_a, set_reg; cbn [sregs].
+    2:{ unfold s_w, s_a; rewrite ?sregs_set_reg.
         repeat (first [ rewrite register_lookup_set
                       | rewrite irrelevant_register_set; [ | vm_compute; reflexivity ] ]).
         reflexivity. }
@@ -409,13 +409,13 @@ Section UserStepIris.
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
     set (s_a := set_reg σ (R_bool minstret_increment) b).
     assert (Lhs_a : register_lookup hart_state s_a.(sregs) = HART_WAITING (wr, ib)).
-    { unfold s_a, set_reg; cbn [sregs].
+    { unfold s_a; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
     assert (Lmip_a : register_lookup mip s_a.(sregs) = mip_v).
-    { unfold s_a, set_reg; cbn [sregs].
+    { unfold s_a; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Lmip | reflexivity]. }
     assert (Lmie_a : register_lookup mie s_a.(sregs) = mie_v).
-    { unfold s_a, set_reg; cbn [sregs].
+    { unfold s_a; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Lmie | reflexivity]. }
     destruct (neq_vec (and_vec mip_v mie_v) (zeros' 64)) eqn:Hwake;
       [ | destruct (valid_reservation tt) eqn:Hvr ].
@@ -427,13 +427,13 @@ Section UserStepIris.
       pose proof (exec_riscv_step_wait_wake σ wr ib b Hsi Lhs_a Hrhw) as Hstep.
       set (T0 := set_reg s_a hart_state (HART_ACTIVE tt)) in Hstep.
       assert (Hnpc0 : register_lookup nextPC T0.(sregs) = va').
-      { unfold T0, s_a, set_reg; cbn [sregs].
+      { unfold T0, s_a; rewrite ?sregs_set_reg.
         repeat (rewrite irrelevant_register_set; [ | reflexivity ]).
         exact Lnpc. }
       rewrite Hnpc0 in Hstep.
       set (T1 := set_reg T0 PC va') in Hstep.
       assert (Hmst1 : register_lookup minstret T1.(sregs) = mst).
-      { unfold T1, T0, s_a, set_reg; cbn [sregs].
+      { unfold T1, T0, s_a; rewrite ?sregs_set_reg.
         repeat (rewrite irrelevant_register_set; [ | reflexivity ]).
         exact Lmst. }
       rewrite Hmst1 in Hstep.
@@ -445,7 +445,7 @@ Section UserStepIris.
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
         iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst") as "[Hreg Hmst]".
         iModIntro.
-        unfold T1, T0, s_a, set_reg; cbn [sregs mem mdev].
+        unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
         iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
         iDestruct "Hcont" as "[_ Hwake']".
@@ -456,7 +456,7 @@ Section UserStepIris.
         iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
         iModIntro.
-        unfold T1, T0, s_a, set_reg; cbn [sregs mem mdev].
+        unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
         iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
         iDestruct "Hcont" as "[_ Hwake']".
@@ -470,7 +470,7 @@ Section UserStepIris.
       iModIntro. iExists s_a.
       iSplitR. { iPureIntro. exact Hstep. }
       iNext. iModIntro.
-      unfold s_a, set_reg; cbn [sregs mem mdev].
+      unfold s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
       iFrame "Hreg Hmd".
       iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
       iDestruct "Hcont" as "[Hstay _]".
@@ -484,13 +484,13 @@ Section UserStepIris.
       pose proof (exec_riscv_step_wait_wake σ wr ib b Hsi Lhs_a Hrhw) as Hstep.
       set (T0 := set_reg s_a hart_state (HART_ACTIVE tt)) in Hstep.
       assert (Hnpc0 : register_lookup nextPC T0.(sregs) = va').
-      { unfold T0, s_a, set_reg; cbn [sregs].
+      { unfold T0, s_a; rewrite ?sregs_set_reg.
         repeat (rewrite irrelevant_register_set; [ | reflexivity ]).
         exact Lnpc. }
       rewrite Hnpc0 in Hstep.
       set (T1 := set_reg T0 PC va') in Hstep.
       assert (Hmst1 : register_lookup minstret T1.(sregs) = mst).
-      { unfold T1, T0, s_a, set_reg; cbn [sregs].
+      { unfold T1, T0, s_a; rewrite ?sregs_set_reg.
         repeat (rewrite irrelevant_register_set; [ | reflexivity ]).
         exact Lmst. }
       rewrite Hmst1 in Hstep.
@@ -502,7 +502,7 @@ Section UserStepIris.
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
         iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst") as "[Hreg Hmst]".
         iModIntro.
-        unfold T1, T0, s_a, set_reg; cbn [sregs mem mdev].
+        unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
         iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
         iDestruct "Hcont" as "[_ Hwake']".
@@ -513,7 +513,7 @@ Section UserStepIris.
         iMod (reg_update _ hart_state _ (HART_ACTIVE tt) with "Hreg Hhs") as "[Hreg Hhs]".
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
         iModIntro.
-        unfold T1, T0, s_a, set_reg; cbn [sregs mem mdev].
+        unfold T1, T0, s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
         iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
         iDestruct "Hcont" as "[_ Hwake']".
@@ -750,7 +750,7 @@ Section StepEnterWait.
     (* Enter_Wait arm: not a nop -> (print-skip) >> write hart_state *)
     rewrite Hnop. cbn match.
     assert (Lw : register_lookup hart_state s_w.(sregs) = HART_WAITING (wr, ib)).
-    { unfold s_w, set_reg; cbn [sregs]. apply register_lookup_set. }
+    { unfold s_w; rewrite ?sregs_set_reg. apply register_lookup_set. }
     erewrite exec_bind_Some.
     2:{ erewrite exec_bind0_Some.
         2:{ erewrite exec_bind0_Some.

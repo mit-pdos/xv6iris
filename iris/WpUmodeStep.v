@@ -136,7 +136,7 @@ Section UvInterruptBranch.
               register_lookup r σ.(sregs) = v ->
               register_beq r (R_bool minstret_increment) = false ->
               register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v).
-    { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+    { intros r v Hv Hne. rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
     assert (Hdisp_a : exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
@@ -160,7 +160,7 @@ Section UvInterruptBranch.
                   (uc_tvd C) (T PC _ Lpc eq_refl) i eq_refl eq_refl) as Hhi.
     set (s_trap := set_reg _ nextPC (stvec_base (uc_stvec C))) in Hhi.
     assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
-    { unfold s_trap, set_reg; cbn [sregs].
+    { unfold s_trap; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
       exact Lhs0. }
     assert (Hstep : exec (riscv_step false) σ
@@ -168,7 +168,7 @@ Section UvInterruptBranch.
     { eapply exec_riscv_step_interrupt;
         [ exact Hsi | exact Lhs | exact Hha | exact Hhi | exact Lhs_trap ]. }
     assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
-    { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
+    { unfold s_trap; rewrite ?sregs_set_reg. apply register_lookup_set. }
     rewrite Lnpc_trap in Hstep.
     assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
                 = utrap_state (set_reg σ (R_bool minstret_increment) b)
@@ -313,7 +313,7 @@ Section UvStepEngine.
                   register_lookup r σ.(sregs) = v ->
                   register_beq r (R_bool minstret_increment) = false ->
                   register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v).
-        { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+        { intros r v Hv Hne. rewrite ?sregs_set_reg.
           rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
         rewrite (exec_dispatchInterrupt_U_reduce (set_reg σ (R_bool minstret_increment) b)
                    (uc_mip C) (uc_mie C) (uc_mideleg C) meip seip
@@ -400,9 +400,9 @@ Proof.
   intro Hd.
   assert (Hj : register_lookup nextPC (uv_jmp s jt).(sregs) = uv_next jt d).
   { destruct jt as [t | ]; [ | exact Hd ].
-    unfold uv_jmp, uv_next, set_reg; cbn [sregs]. apply register_lookup_set. }
+    unfold uv_jmp, uv_next; rewrite ?sregs_set_reg. apply register_lookup_set. }
   unfold uv_post. destruct wr as [[rd v] | ]; [ | exact Hj ].
-  unfold uv_wr, set_reg; cbn [sregs].
+  unfold uv_wr; rewrite ?sregs_set_reg.
   rewrite (irrelevant_register_set _ _ _ _ (regbeq_nextPC_gpr (uint rd))).
   exact Hj.
 Qed.
@@ -482,7 +482,7 @@ Lemma agree_u_set_nextPC (s : mstate) (v : mword 64) :
   agree_on D_u s dstateU -> agree_on D_u (set_reg s nextPC v) dstateU.
 Proof.
   intros Hag r Hr. rewrite <- (Hag r Hr).
-  unfold set_reg; cbn [sregs].
+  rewrite ?sregs_set_reg.
   apply irrelevant_register_set. exact (D_u_ne_nextPC r Hr).
 Qed.
 
@@ -608,7 +608,7 @@ Section UvStepAt.
       [ | iModIntro; iFrame ].
     iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
     iMod (reg_update _ nextPC _ t with "Hreg Hnpc") as "[Hreg Hnpc]".
-    iModIntro. unfold set_reg; cbn [sregs mem mdev]. iFrame.
+    iModIntro. rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame.
   Qed.
 
   Lemma uv_wr_ghost (s : mstate) (wr : option (mword 5 * mword 64)) (m : regfile) :
@@ -627,7 +627,7 @@ Section UvStepAt.
             with "Hreg Hpt") as "[Hreg Hpt]".
     iDestruct ("Hins" with "[Hpt]") as "Hgpr".
     { rewrite (gpr_pt_nz rd _ Hok). iExact "Hpt". }
-    iModIntro. unfold set_reg; cbn [sregs mem mdev]. iFrame.
+    iModIntro. rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame.
   Qed.
 
 End UvStepAt.
@@ -693,17 +693,17 @@ Section UvRetirePost.
       as "[Hreg Hnpc]".
     iDestruct (gpr_file_values m (set_reg sf nextPC (add_vec_int pc k))
                  with "[Hreg] Hgpr") as %Hvals.
-    { unfold set_reg; cbn [sregs]. iExact "Hreg". }
+    { rewrite ?sregs_set_reg. iExact "Hreg". }
     assert (Lnpc0 : register_lookup nextPC
               (set_reg sf nextPC (add_vec_int pc k)).(sregs) = add_vec_int pc k)
-      by (unfold set_reg; cbn [sregs]; apply register_lookup_set).
+      by (rewrite ?sregs_set_reg; apply register_lookup_set).
     assert (Lpc0 : register_lookup PC
               (set_reg sf nextPC (add_vec_int pc k)).(sregs) = pc).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Lpcf | vm_compute; reflexivity ]. }
     assert (Lpriv0 : register_lookup cur_privilege
               (set_reg sf nextPC (add_vec_int pc k)).(sregs) = User).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Lprivf | vm_compute; reflexivity ]. }
     pose proof (Hexec _ Lpc0 Lnpc0 Lpriv0
                   (agree_u_set_nextPC sf (add_vec_int pc k) Hagreef) Hvals) as Hex.
@@ -711,7 +711,7 @@ Section UvRetirePost.
     (* the execute's own writes, in the model's order *)
     iAssert (mstate_interp (set_reg sf nextPC (add_vec_int pc k)))
       with "[Hreg Hmem Hdev]" as "Hint".
-    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
+    { rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev". }
     iMod (uv_jmp_ghost (set_reg sf nextPC (add_vec_int pc k)) jt (add_vec_int pc k)
             with "Hint Hnpc") as "[Hint Hnpc]".
     iMod (uv_wr_ghost (uv_jmp (set_reg sf nextPC (add_vec_int pc k)) jt) wr m Hwrok
@@ -731,7 +731,7 @@ Section UvRetirePost.
     set (s_tick := set_reg (uv_post (set_reg sf nextPC (add_vec_int pc k)) jt wr)
                      PC (uv_next jt (add_vec_int pc k))) in *.
     assert (Lmst_t : register_lookup minstret s_tick.(sregs) = mst).
-    { unfold s_tick, set_reg; cbn [sregs].
+    { unfold s_tick; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Lmst_x | reflexivity ]. }
     rewrite Lmst_t in Hstep.
     iMod (reg_update _ PC _ (uv_next jt (add_vec_int pc k)) with "Hreg Hpc")
@@ -741,12 +741,12 @@ Section UvRetirePost.
         as "[Hreg Hmst]".
       iModIntro. iExists (set_reg s_tick minstret (add_vec_int mst 1)).
       iSplitR. { iPureIntro. exact Hstep. }
-      iNext. unfold s_tick, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev".
+      iNext. unfold s_tick; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev".
       iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
       iApply ("Hcont" with "HP Hhs Hpc Hnpc Hgpr").
     - iModIntro. iExists s_tick.
       iSplitR. { iPureIntro. exact Hstep. }
-      iNext. unfold s_tick, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev".
+      iNext. unfold s_tick; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev".
       iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
       iApply ("Hcont" with "HP Hhs Hpc Hnpc Hgpr").
   Qed.
@@ -842,7 +842,7 @@ Section UvRetireFunnel.
               register_lookup r sg.(sregs) = v ->
               register_beq r (R_bool minstret_increment) = false ->
               register_lookup r (set_reg sg (R_bool minstret_increment) b).(sregs) = v).
-    { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+    { intros r v Hv Hne. rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     pose proof (T hart_state _ Lhs eq_refl) as Hhart_a.
     pose proof (T PC _ Lpc eq_refl) as LpcA.
@@ -916,8 +916,8 @@ Section UvRetireFunnel.
                 HSXL HpmaA
                 with "[Hreg] [Hmem] Hutlb Humem")
           as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-        { unfold set_reg; cbn [sregs]. iExact "Hreg". }
-        { unfold set_reg; cbn [mem]. iExact "Hmem". }
+        { rewrite ?sregs_set_reg. iExact "Hreg". }
+        { rewrite ?mem_set_reg. iExact "Hmem". }
         destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
         iApply (uv_retire_post_fetch CID0 Φ
                   (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
@@ -930,7 +930,7 @@ Section UvRetireFunnel.
                         ltac:(rewrite Lmisaf; vm_compute; reflexivity)) Hred)
                   Hexec
                   with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-        unfold mstate_interp. rewrite Hmdev. unfold set_reg; cbn [mdev].
+        unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
         iFrame "Hreg Hmem Hdev".
       + (* 2 mod 4: one 2-byte read *)
         iMod (umode_fetch_rvc_2 pt M w_leaf pc h
@@ -940,8 +940,8 @@ Section UvRetireFunnel.
                 HSXL HpmaA
                 with "[Hreg] [Hmem] Hutlb Humem")
           as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-        { unfold set_reg; cbn [sregs]. iExact "Hreg". }
-        { unfold set_reg; cbn [mem]. iExact "Hmem". }
+        { rewrite ?sregs_set_reg. iExact "Hreg". }
+        { rewrite ?mem_set_reg. iExact "Hmem". }
         destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
         iApply (uv_retire_post_fetch CID0 Φ
                   (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
@@ -954,7 +954,7 @@ Section UvRetireFunnel.
                         ltac:(rewrite Lmisaf; vm_compute; reflexivity)) Hred)
                   Hexec
                   with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-        unfold mstate_interp. rewrite Hmdev. unfold set_reg; cbn [mdev].
+        unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
         iFrame "Hreg Hmem Hdev".
     - (* ================= BASE (4-byte) ================= *)
       destruct Hcode as (w & HnRVC & Hbytes & Hdecbase).
@@ -966,8 +966,8 @@ Section UvRetireFunnel.
                 HSXL HpmaA
                 with "[Hreg] [Hmem] Hutlb Humem")
           as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-        { unfold set_reg; cbn [sregs]. iExact "Hreg". }
-        { unfold set_reg; cbn [mem]. iExact "Hmem". }
+        { rewrite ?sregs_set_reg. iExact "Hreg". }
+        { rewrite ?mem_set_reg. iExact "Hmem". }
         destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
         iApply (uv_retire_post_fetch CID0 Φ
                   (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
@@ -977,7 +977,7 @@ Section UvRetireFunnel.
                      (Hdecbase sf Hagree) Helpf Hlpad Lpcf Hred)
                   Hexec
                   with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-        unfold mstate_interp. rewrite Hmdev. unfold set_reg; cbn [mdev].
+        unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
         iFrame "Hreg Hmem Hdev".
       + iMod (umode_fetch_base_2 pt M w_leaf pc w
                 (set_reg sg (R_bool minstret_increment) b)
@@ -986,8 +986,8 @@ Section UvRetireFunnel.
                 HSXL HpmaA
                 with "[Hreg] [Hmem] Hutlb Humem")
           as (sf) "(%Hfetch & %Hmdev & %Tr & Hreg & Hmem & Hutlb & Humem)".
-        { unfold set_reg; cbn [sregs]. iExact "Hreg". }
-        { unfold set_reg; cbn [mem]. iExact "Hmem". }
+        { rewrite ?sregs_set_reg. iExact "Hreg". }
+        { rewrite ?mem_set_reg. iExact "Hmem". }
         destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
         iApply (uv_retire_post_fetch CID0 Φ
                   (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
@@ -997,7 +997,7 @@ Section UvRetireFunnel.
                      (Hdecbase sf Hagree) Helpf Hlpad Lpcf Hred)
                   Hexec
                   with "[Hreg Hmem Hdev] [$Hutlb $Humem $Hcfg] Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-        unfold mstate_interp. rewrite Hmdev. unfold set_reg; cbn [mdev].
+        unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
         iFrame "Hreg Hmem Hdev".
   Qed.
 
@@ -1034,9 +1034,9 @@ Proof.
   apply (exec_hart_active_progress_base_gen User sa sf _ w (ECALL tt) pc _
            Hpriv Hdisp Hfetch Hdec Help eq_refl Lpc); [ | exact I ].
   apply exec_execute_ECALL_U.
-  - unfold set_reg; cbn [sregs].
+  - rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ].
-  - unfold set_reg; cbn [sregs].
+  - rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [ exact Lpc | vm_compute; reflexivity ].
 Qed.
 
@@ -1097,11 +1097,11 @@ Section UvEcallPost.
               register_lookup r sf.(sregs) = v ->
               register_beq r nextPC = false ->
               register_lookup r (set_reg sf nextPC (add_vec_int pc 4)).(sregs) = v).
-    { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+    { intros r v Hv Hne. rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hv | exact Hne ]. }
     iAssert (mstate_interp (set_reg sf nextPC (add_vec_int pc 4)))
       with "[Hreg Hmem Hdev]" as "Hint".
-    { unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
+    { rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev". }
     iDestruct "Hint" as "(Hreg & Hmem & Hdev)".
     assert (Hdel_x : bit_to_bool (access_vec_dec
               (register_lookup medeleg (set_reg sf nextPC (add_vec_int pc 4)).(sregs))
@@ -1131,7 +1131,7 @@ Section UvEcallPost.
                   = Some (tt, s_trap)).
     { rewrite (exec_bind_Some _ _ _ _ _ Heh). unfold s_trap. apply exec_set_next_pc. }
     assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
-    { unfold s_trap, s9x, set_reg; cbn [sregs].
+    { unfold s_trap, s9x; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
       exact Lhs_f. }
     assert (Hstep : exec (riscv_step false) sg
@@ -1140,7 +1140,7 @@ Section UvEcallPost.
         [ exact Hsi | exact Hhart_a | exact Hha | exact Hxh | exact Lhs_trap ]. }
     assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs)
                         = stvec_base (uc_stvec C)).
-    { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
+    { unfold s_trap; rewrite ?sregs_set_reg. apply register_lookup_set. }
     rewrite Lnpc_trap in Hstep.
     assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
                 = utrap_state (set_reg sf nextPC (add_vec_int pc 4))
@@ -1231,7 +1231,7 @@ Section UvEcall.
               register_lookup r sg.(sregs) = v ->
               register_beq r (R_bool minstret_increment) = false ->
               register_lookup r (set_reg sg (R_bool minstret_increment) b).(sregs) = v).
-    { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+    { intros r v Hv Hne. rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     pose proof (T hart_state _ Lhs eq_refl) as Hhart_a.
     pose proof (T PC _ Lpc eq_refl) as LpcA.
@@ -1295,8 +1295,8 @@ Section UvEcall.
               HSXL HpmaA
               with "[Hreg] [Hmem] Hutlb Humem")
         as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-      { unfold set_reg; cbn [sregs]. iExact "Hreg". }
-      { unfold set_reg; cbn [mem]. iExact "Hmem". }
+      { rewrite ?sregs_set_reg. iExact "Hreg". }
+      { rewrite ?mem_set_reg. iExact "Hmem". }
       destruct (Hsf sf Tr)
         as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lmsf & Lscf & Lstvecf & Lelpf & Lmedlf).
       iApply (uv_ecall_post_fetch CID0 C pt Ψ Φ sg sf b mst pc (zero_extend' 32 w)
@@ -1307,7 +1307,7 @@ Section UvEcall.
                    (Hdecbase sf Hagree) Helpf Lpcf Lprivf)
                 with "[Hreg Hmem Hdev] Hsys Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc
                       Hgpr Hutlb Humem Hcfg Hmst Hmi HPsi").
-      unfold mstate_interp. rewrite Hmdev. unfold set_reg; cbn [mdev].
+      unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev".
     - iMod (umode_fetch_base_2 pt M w_leaf pc w
               (set_reg sg (R_bool minstret_increment) b)
@@ -1316,8 +1316,8 @@ Section UvEcall.
               HSXL HpmaA
               with "[Hreg] [Hmem] Hutlb Humem")
         as (sf) "(%Hfetch & %Hmdev & %Tr & Hreg & Hmem & Hutlb & Humem)".
-      { unfold set_reg; cbn [sregs]. iExact "Hreg". }
-      { unfold set_reg; cbn [mem]. iExact "Hmem". }
+      { rewrite ?sregs_set_reg. iExact "Hreg". }
+      { rewrite ?mem_set_reg. iExact "Hmem". }
       destruct (Hsf sf Tr)
         as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lmsf & Lscf & Lstvecf & Lelpf & Lmedlf).
       iApply (uv_ecall_post_fetch CID0 C pt Ψ Φ sg sf b mst pc (zero_extend' 32 w)
@@ -1328,7 +1328,7 @@ Section UvEcall.
                    (Hdecbase sf Hagree) Helpf Lpcf Lprivf)
                 with "[Hreg Hmem Hdev] Hsys Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc
                       Hgpr Hutlb Humem Hcfg Hmst Hmi HPsi").
-      unfold mstate_interp. rewrite Hmdev. unfold set_reg; cbn [mdev].
+      unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev".
   Qed.
 

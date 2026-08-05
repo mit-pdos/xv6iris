@@ -103,7 +103,7 @@ Section RvcRet.
     { iPureIntro. rewrite Hpceq.
       change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc. exact Hexec_spc. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc nextPC (ret_pc (m !!! Regidx ra))).(sregs)

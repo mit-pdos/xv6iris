@@ -675,7 +675,7 @@ Section WpCsrwGprNewC.
                  ltac:(rewrite Lmisap; exact HmisaU)).
       rewrite Lmsp Lrs1u. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc mstatus (mstatus_legalized ms0 (m !!! Regidx rs1))).(sregs)
@@ -747,7 +747,7 @@ Section WpCsrwGprNewC.
       rewrite (exec_execute_csrw_pmpcfg0 rs1 s_pc Lprivp).
       rewrite Lrs1u pmpcfg0_final_set Lcfgp. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc pmpcfg_n (pmpcfg_written (m !!! Regidx rs1) pmpcfg0)).(sregs)

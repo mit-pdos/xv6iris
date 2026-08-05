@@ -146,7 +146,7 @@ Section UserClassify.
     iMod ("Hob" $! b Hpre with "[Hreg Hmd] Hgpr Hnpc Hupt Hcfg")
       as (st s_x g' va')
          "(%Hha & %Hout & %Hmi_x & %Lnpc_x & [Hreg Hmd] & Hgpr & Hnpc & Hupt & Hcfg)".
-    { unfold s_a, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmd". }
+    { unfold s_a; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmd". }
     (* [hart_state s_x = ACTIVE] is re-derived (not demanded of the obligation):
        the branch retains the hart_state fragment [Hhs] while lending only the
        reg-interp authority to the obligation, which therefore cannot write
@@ -169,7 +169,7 @@ Section UserClassify.
       destruct Hr as [-> | [(e & xv & pcx & -> & He) | [-> | (wr & -> & Hwr)]]].
       + (* RETIRE *)
         assert (Hmi_x' : register_lookup (R_bool minstret_increment) s_x.(sregs) = b).
-        { rewrite Hmi_x. unfold s_a, set_reg; cbn [sregs].
+        { rewrite Hmi_x. unfold s_a; rewrite ?sregs_set_reg.
           rewrite register_lookup_set. reflexivity. }
         pose proof (exec_riscv_step_hart_active σ s_x ib b
                       Hsi Hhart_a Hha Hhart_x Hmi_x') as Hstep.
@@ -177,7 +177,7 @@ Section UserClassify.
         set (s_tick := set_reg s_x PC va') in *.
         iDestruct (reg_valid_dq with "Hreg Hmst") as %Lmst_x.
         assert (Lmst_t : register_lookup minstret s_tick.(sregs) = mst).
-        { unfold s_tick, set_reg; cbn [sregs].
+        { unfold s_tick; rewrite ?sregs_set_reg.
           rewrite irrelevant_register_set; [exact Lmst_x | reflexivity]. }
         rewrite Lmst_t in Hstep.
         iMod (reg_update _ PC _ va' with "Hreg Hpc") as "[Hreg Hpc]".
@@ -186,7 +186,7 @@ Section UserClassify.
         * iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst") as "[Hreg Hmst]".
           iModIntro. iExists (set_reg s_tick minstret (add_vec_int mst 1)).
           iSplitR. { iPureIntro. exact Hstep. }
-          iNext. unfold s_tick, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmd".
+          iNext. unfold s_tick; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmd".
           iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
           iApply ("Hcont" with "[-]").
           iExists (HART_ACTIVE tt), ms_v, sc_v, stval_v, sepc_v, va', va', g'.
@@ -194,7 +194,7 @@ Section UserClassify.
           iPureIntro. split; [exact Hmsok | intros u _; reflexivity].
         * iModIntro. iExists s_tick.
           iSplitR. { iPureIntro. exact Hstep. }
-          iNext. unfold s_tick, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmd".
+          iNext. unfold s_tick; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmd".
           iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
           iApply ("Hcont" with "[-]").
           iExists (HART_ACTIVE tt), ms_v, sc_v, stval_v, sepc_v, va', va', g'.
@@ -216,7 +216,7 @@ Section UserClassify.
                       = Some (tt, s_trap)).
         { rewrite (exec_bind_Some _ _ _ _ _ Heh). unfold s_trap. apply exec_set_next_pc. }
         assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
-        { unfold s_trap, s9x, set_reg; cbn [sregs].
+        { unfold s_trap, s9x; rewrite ?sregs_set_reg.
           repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
           exact Hhart_x. }
         assert (Hstep : exec (riscv_step false) σ
@@ -224,7 +224,7 @@ Section UserClassify.
         { eapply exec_riscv_step_execute_trap;
             [ exact Hsi | exact Hhart_a | exact Hha | exact Hxh | exact Lhs_trap ]. }
         assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
-        { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
+        { unfold s_trap; rewrite ?sregs_set_reg. apply register_lookup_set. }
         rewrite Lnpc_trap in Hstep.
         assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
                     = utrap_state s_x (rv64d_types.Exception e)
@@ -248,7 +248,7 @@ Section UserClassify.
                       (E_Illegal_Instr tt) (zero_extend' 64 ib) eq_refl eq_refl Hdel_x) as Hhe.
         set (s_trap := set_reg _ nextPC (stvec_base (uc_stvec C))) in Hhe.
         assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
-        { unfold s_trap, set_reg; cbn [sregs].
+        { unfold s_trap; rewrite ?sregs_set_reg.
           repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
           exact Hhart_x. }
         assert (Hstep : exec (riscv_step false) σ
@@ -256,7 +256,7 @@ Section UserClassify.
         { eapply exec_riscv_step_execute_illegal;
             [ exact Hsi | exact Hhart_a | exact Hha | exact Hhe | exact Lhs_trap ]. }
         assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
-        { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
+        { unfold s_trap; rewrite ?sregs_set_reg. apply register_lookup_set. }
         rewrite Lnpc_trap in Hstep.
         assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
                     = utrap_state s_x (rv64d_types.Exception (E_Illegal_Instr tt))
@@ -279,7 +279,7 @@ Section UserClassify.
         iDestruct "Hcont" as "[Hcont _]".
         iModIntro. iExists _.
         iSplitR. { iPureIntro. exact Hstep. }
-        iNext. unfold set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmd".
+        iNext. rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmd".
         iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
         iApply ("Hcont" with "[-]").
         iExists (HART_WAITING (wr, ib)), ms_v, sc_v, stval_v, sepc_v, va, va', g'.
@@ -296,7 +296,7 @@ Section UserClassify.
                     e xv eq_refl eq_refl Hdel_x) as Hhe.
       set (s_trap := set_reg _ nextPC (stvec_base (uc_stvec C))) in Hhe.
       assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
-      { unfold s_trap, set_reg; cbn [sregs].
+      { unfold s_trap; rewrite ?sregs_set_reg.
         repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
         exact Hhart_x. }
       assert (Hstep : exec (riscv_step false) σ
@@ -304,7 +304,7 @@ Section UserClassify.
       { eapply exec_riscv_step_fetch_failure;
           [ exact Hsi | exact Hhart_a | exact Hha | exact Hhe | exact Lhs_trap ]. }
       assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
-      { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
+      { unfold s_trap; rewrite ?sregs_set_reg. apply register_lookup_set. }
       rewrite Lnpc_trap in Hstep.
       assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
                   = utrap_state s_x (rv64d_types.Exception e)

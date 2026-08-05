@@ -402,7 +402,7 @@ Section MinstretInv.
       iMod (reg_update _ mip _ p' with "Hreg Hp") as "[Hreg Hp]".
       iMod ("Hclose" with "[Hc Ht Hp]") as "_".
       { iNext. iExists c', t', p'. iFrame. }
-      iModIntro. cbn iota. rewrite /mstate_interp. unfold set_reg; cbn [sregs mem mdev].
+      iModIntro. cbn iota. rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev HWP".
     - iModIntro. cbn iota. iFrame "Hsi' HWP".
   Qed.
@@ -517,14 +517,14 @@ Section MinstretInv.
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
     iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) with "[Hreg Hmem]")
       as (retval s_exec) "(%Hha & Hpc & [Hreg Hmem] & Hcont)".
-    { rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     (* wrapper's post-step reads, off the still-owned counter cells *)
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_exec.
     iDestruct (reg_valid with "Hreg Hmi") as %Hmi_exec.
     assert (Hhart_a :
       register_lookup hart_state (set_reg σ (R_bool minstret_increment) b).(sregs)
         = HART_ACTIVE tt).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
     (* POST: tick PC and (if b) bump minstret UNDER the outer fupd, then apply the
        caller's continuation to obtain [HWP : ▷ WP Loop] -- BEFORE the [iNext]. *)
@@ -534,7 +534,7 @@ Section MinstretInv.
     assert (Hmst_tick :
       register_lookup minstret
         (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs) = mst).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Lmst_e | reflexivity]. }
     iDestruct ("Hcont" with "Hhs Hpc") as "HWP".
     destruct b.
@@ -546,7 +546,7 @@ Section MinstretInv.
                  Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
       iNext.  (* strips HWP's later in lock-step with the step's later *)
       iModIntro. rewrite /mstate_interp. cbn [sregs mem]. rewrite Hmst_tick.
-      unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists (add_vec_int mst 1), true. iFrame. }
       iExact "HWP".
@@ -555,7 +555,7 @@ Section MinstretInv.
         exact (exec_riscv_step_hart_active σ s_exec retval false
                  Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
       iNext.
-      iModIntro. rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iModIntro. rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists mst, false. iFrame. }
       iExact "HWP".

@@ -210,7 +210,7 @@ Section WpMulGpr.
       rewrite (exec_execute_MUL_gpr rs2 rs1 rd (set_reg σ nextPC (add_vec_int pc 4)) Hrd).
       rewrite Hmv. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     (* continuation: PC/nextPC are both pc+4; hand back mmode_config, pmpcfg,
        the reassembled [pc_is (pc+4)], and the updated file *)
     iIntros "Hmm' Hpmpc' Hpc'".
@@ -223,7 +223,7 @@ Section WpMulGpr.
                       (m !!! Regidx rs1) (m !!! Regidx rs2)
                       (mulop_mul.(mul_op_result_part))))).(sregs)
              = add_vec_int pc 4).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").

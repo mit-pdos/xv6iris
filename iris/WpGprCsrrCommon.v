@@ -157,7 +157,7 @@ Proof. apply (exec_check_CSR_result_read_p Machine csr s). Qed.
    so they carry into the execute state (set_reg σ nextPC (pc+4)) unchanged. *)
 Lemma misa_set_nextPC (s : mstate) (v : mword 64) :
   register_lookup misa (set_reg s nextPC v).(sregs) = register_lookup misa s.(sregs).
-Proof. unfold set_reg; cbn [sregs].
+Proof. rewrite ?sregs_set_reg.
   rewrite irrelevant_register_set; [ reflexivity | vm_compute; reflexivity ]. Qed.
 
 (* Shared Iris-level machinery for the csrr WPs (fractional reg points-to,

@@ -812,7 +812,7 @@ Section StepHartActive.
     replace (register_lookup minstret_increment
                (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs))
       with b.
-    2:{ unfold set_reg; cbn [sregs].
+    2:{ rewrite ?sregs_set_reg.
         rewrite irrelevant_register_set;
           [ (exact Hmi_exec || (symmetry; exact Hmi_exec)) | reflexivity ]. }
     unfold s_final, s_tick.

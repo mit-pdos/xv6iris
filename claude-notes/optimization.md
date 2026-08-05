@@ -1,5 +1,103 @@
 # Proof performance & build optimization
 
+## WHERE `Qed` TIME ACTUALLY GOES: proof-term TREE size, not typechecking
+
+Measured 2026-08-05 with `rocq compile -profile`, which breaks a `Qed` down by
+kernel phase.  On `UserClassify.active_step_branch` (a 10.9 s `Qed`):
+
+```
+10.884s Qed
+   1.896s close_proof
+   8.987s interp-delayed-qed
+       3.913s HConstr.of_constr            <- 36 %
+       2.715s Typeops.execute (+Conversion) <- 25 %  the only REAL typechecking
+       0.950s sort_and_universes_of_constr <-  9 %  (4 calls)
+```
+
+**Only a quarter of `Qed` is conversion.**  The rest — `HConstr.of_constr`
+(Rocq 9's sharing-aware pre-pass, `kernel/hConstr.ml`, unconditional in
+`Constant_typing.check_delayed`, no user flag), `close_proof`, and
+`sort_and_universes_of_constr` (a naive `Constr.fold`, `kernel/vars.ml:532`) —
+are all **linear in the proof term's TREE size**, i.e. they re-walk every
+occurrence of a shared subterm.  So the lever on `Qed` is *term size*, and the
+question to ask is never "what is the kernel converting?" but "how big is the
+tree?".
+
+**The diagnostic: `Set Debug "hconstr".`**  It prints, per `Qed`, `tree size`
+(the unfolded tree) and `bindings` (distinct subterms, i.e. the DAG).  A high
+**tree/bindings ratio is the tell** — the proof is small, its tree is not:
+
+| proof | tree | bindings | ratio |
+|---|---|---|---|
+| `WpUmodeStep.uv_interrupt_branch` | 15,255,420 | 3,045 | **5010x** |
+| `UserClassify.active_step_branch` | 24,508,005 | 11,511 | **2130x** |
+| `ProofUservec.wp_uservec_pt` | 39,174,545 | 53,702 | 729x |
+| `ProofPiperead.wp_piperead_sconf` | 34,808,397 | 149,033 | 234x |
+
+To localise the blow-up inside one lemma, bisect with an axiom stub —
+`Axiom cheat_ : forall (A : Type), A.` and replace one branch's tactics with
+`exact (cheat_ _).`  Unlike `Admitted` this still runs `Qed`, so each variant
+reports its own tree size.  That pinned 23.7M of `active_step_branch`'s 24.5M
+onto three of its five branches in one parallel batch.
+
+### The cause found this way: `unfold set_reg` is a 3^N tree bomb
+
+`set_reg s r v := MState (register_set r v s.(sregs)) s.(mem) s.(mdev)`
+mentions `s` **three times**, so `unfold set_reg` over an N-deep state chain
+writes out a `3^N` tree; `utrap_state` alone is a 12-deep chain (`3^12` = 531k)
+and every subsequent `rewrite` copies that into an `eq_ind_r` motive.  The
+goal after `cbn` is small, so nothing looks wrong — the cost is invisible to
+tactic profiling and lands entirely in `Qed`.
+
+**Peel with the projection lemmas in `RiscvLang.v`, never with `unfold`:**
+
+| old | new |
+|---|---|
+| `unfold X, set_reg; cbn [sregs]` | `unfold X; rewrite ?sregs_set_reg` |
+| `unfold set_reg; cbn [sregs mem mdev]` | `rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg` |
+
+They are **goal-identical** drop-ins (`mstate_interp s` is literally
+`reg_interp s.(sregs) * gen_heap_interp s.(mem) * dev_interp s.(mdev)`, so
+every site is pure projection peeling), so whatever tactic followed —
+`irrelevant_register_set`, `register_lookup_set`, `iFrame`, `iExact` — still
+applies.  `UserClassify` went **24,508,005 -> 1,062,390 tree nodes for the same
+11.3k-node DAG (23x), 23.4 s -> 8.7 s, 1832 MB -> 722 MB RSS** (isolated,
+min of two interleaved).
+
+**Swept tree-wide 2026-08-05: 437 sites over 53 files**, one clean rebuild,
+zero errors, `lemma_diff.py` clean.  Whole build **ΣCPU 10364 s -> 9728 s
+(−6.1 %)**, clean-build wall ~635 s -> 495 s, `Qed` 1546 s -> 1377 s.  Biggest
+per-file CPU wins: `WpUmodeStep` −63 %, `UserClassify` −61 %, `ProofVirtioDiskRwB`
+−42 %, `ProofVirtioDiskRwF` −27 %, `ProofVirtioDiskInit` −24 %, `ProofBread`
+−24 %, `ProofPiperead` −21 %, `ProofSysPipe` −19 %.  (`ProofScheduler` +20 s and
+`ProofPipealloc` +15 s in the same pair of builds are **untouched files** — pure
+`-j32` contention noise, the ±10 s-in-both-directions effect this file warns
+about below.  The one touched "regression", `ProofKvminithart` +7 s in-build, is
+18.20 s vs 18.00 s CPU isolated, i.e. unchanged.)
+
+**Four sites must keep the `unfold` spelling** — do not "finish the sweep" by
+converting them:
+
+- `WpGprCsrwA.set_reg_pmpcfg_n_overwrite` states an equation between **whole
+  states** (`set_reg (set_reg s r a) r b = set_reg s r b`), not between
+  projections, so `f_equal` needs the `MState` constructor exposed.  There is no
+  projection in the goal for the rewrites to fire on.
+- Three `{ unfold set_reg; cbn [sregs mem mdev]. rewrite Hmdevtr. ... }` sites
+  (`WpSmodePtLeaves`, `UserretPt`, `WpSmodePtMem`, `WpSconfLock`, `WpSconfMem`).
+  **ssr's `rewrite ?L` deltas through let-bound locals while matching**, so
+  after producing `mdev s_tr` it keeps going into `s_tr`'s body and yields
+  `mdev s_pc` — and the next line's `rewrite Hmdevtr` then fails with *"The LHS
+  of Hmdevtr (mdev s_tr) does not match any subterm of the goal"*.  `cbn [mdev]`
+  does not delta local definitions and so stops where the hypothesis wants.
+  **The general rule: do not put `rewrite ?<proj>_set_reg` immediately before a
+  `rewrite H` whose LHS is a projection of a `set`-bound state.**  Sites where
+  the `rewrite H` comes FIRST on the line are fine and were converted.
+
+The 282 remaining `unfold ... set_reg` sites are ones where the `unfold` and the
+`cbn` are on different lines, or where there is no `cbn` at all; they are
+un-swept, not deliberate.  Convert them the same way when touching those files,
+checking the two shapes above.
+
 ## Proof performance rules (apply proactively when writing new proofs)
 
 - **Never `set_solver`** (or `naive_solver`) inside a large Iris WP context — it rescans the whole hypothesis context: **100–190 s per call** (and **272 s per call** measured 2026-07-28 in `ProofVirtioDiskRwF.wp_vdrw_p6_seam`, on a goal as trivial as `h ∈ tri_set (h,m2,t)`). Instead:

@@ -438,7 +438,7 @@ Section UvRetirePostState.
     rewrite Lnpcx in Hstep.
     set (s_tick := set_reg s_x PC npc) in *.
     assert (Lmst_t : register_lookup minstret s_tick.(sregs) = mst).
-    { unfold s_tick, set_reg; cbn [sregs].
+    { unfold s_tick; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Lmst_x | reflexivity ]. }
     rewrite Lmst_t in Hstep.
     iMod (reg_update _ PC _ npc with "Hreg Hpc") as "[Hreg Hpc]".
@@ -447,12 +447,12 @@ Section UvRetirePostState.
         as "[Hreg Hmst]".
       iModIntro. iExists (set_reg s_tick minstret (add_vec_int mst 1)).
       iSplitR. { iPureIntro. exact Hstep. }
-      iNext. unfold s_tick, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev".
+      iNext. unfold s_tick; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev".
       iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
       iApply ("Hcont" with "HP Hhs Hpc Hnpc").
     - iModIntro. iExists s_tick.
       iSplitR. { iPureIntro. exact Hstep. }
-      iNext. unfold s_tick, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev".
+      iNext. unfold s_tick; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev".
       iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
       iApply ("Hcont" with "HP Hhs Hpc Hnpc").
   Qed.
@@ -529,16 +529,16 @@ Section WpUmodeStore.
       as "[Hreg Hnpc]".
     set (s_pc := set_reg sf nextPC (add_vec_int pc k)).
     iAssert (reg_interp s_pc.(sregs)) with "[Hreg]" as "Hreg".
-    { unfold s_pc, set_reg; cbn [sregs]. iExact "Hreg". }
+    { unfold s_pc; rewrite ?sregs_set_reg. iExact "Hreg". }
     iAssert (gen_heap_interp s_pc.(mem)) with "[Hmem]" as "Hmem".
-    { unfold s_pc, set_reg; cbn [mem]. iExact "Hmem". }
+    { unfold s_pc; rewrite ?mem_set_reg. iExact "Hmem". }
     iDestruct (gpr_file_values m s_pc with "Hreg Hgpr") as %Hvals.
     (* the pins, transported across the nextPC write *)
     assert (Tn : forall (r : register) (v : type_of_register r),
               register_lookup r sf.(sregs) = v ->
               register_beq r nextPC = false ->
               register_lookup r s_pc.(sregs) = v).
-    { intros r v Hv Hne. unfold s_pc, set_reg; cbn [sregs].
+    { intros r v Hv Hne. unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hv | exact Hne ]. }
     pose proof (agree_u_set_nextPC sf (add_vec_int pc k) Hagreef) as Hagree.
     pose proof (agree_u_priv s_pc Hagree) as Lprivp.
@@ -565,7 +565,7 @@ Section WpUmodeStore.
     assert (Lpcp : register_lookup PC s_pc.(sregs) = pc)
       by (apply (Tn PC _ Lpcf); vm_compute; reflexivity).
     assert (Lnpcp : register_lookup nextPC s_pc.(sregs) = add_vec_int pc k)
-      by (unfold s_pc, set_reg; cbn [sregs]; apply register_lookup_set).
+      by (unfold s_pc; rewrite ?sregs_set_reg; apply register_lookup_set).
     (* the translation mode, read off the invariant *)
     iDestruct (utlb_inv_pt_translationMode_U (ud_root pt) (ud_tfp pt) (ud_um pt)
                  s_pc HSXLp with "Hreg Hutlb") as "(%Htm & Hreg & Hutlb)".
@@ -614,7 +614,7 @@ Section WpUmodeStore.
               Hsi Hhart_a Lnpcx Hha
               with "[Hreg Hmem Hdev] [$HP $Hutlb $Humem $Hgpr] Hhs Hpc Hnpc Hmst Hmi [Hcont]").
     - unfold s_x, mstate_interp; cbn [sregs mem mdev].
-      rewrite Hmdev2. unfold s_pc, set_reg; cbn [mdev].
+      rewrite Hmdev2. unfold s_pc; rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev".
     - iNext. iIntros "(HP & Hutlb & Humem & Hgpr) Hhs Hpc Hnpc".
       iApply ("Hcont" with "HP Hutlb Humem Hhs Hpc Hnpc Hgpr").
@@ -694,7 +694,7 @@ Section WpUmodeStore.
               register_lookup r sg.(sregs) = v ->
               register_beq r (R_bool minstret_increment) = false ->
               register_lookup r (set_reg sg (R_bool minstret_increment) b).(sregs) = v).
-    { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+    { intros r v Hv Hne. rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     pose proof (T hart_state _ Lhs eq_refl) as Hhart_a.
     pose proof (T PC _ Lpc eq_refl) as LpcA.
@@ -773,8 +773,8 @@ Section WpUmodeStore.
               HSXL HpmaA
               with "[Hreg] [Hmem] Hutlb Humem")
         as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-      { unfold set_reg; cbn [sregs]. iExact "Hreg". }
-      { unfold set_reg; cbn [mem]. iExact "Hmem". }
+      { rewrite ?sregs_set_reg. iExact "Hreg". }
+      { rewrite ?mem_set_reg. iExact "Hmem". }
       destruct (Hsf sf Tr)
         as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
       iApply (uv_store_post_fetch CID0 Phi True%I sg sf b mst pc 2
@@ -799,7 +799,7 @@ Section WpUmodeStore.
                       ltac:(rewrite Lmisaf; vm_compute; reflexivity))
                    ltac:(intro s; apply exec_execute_C_SDSP))
                 with "[Hreg Hmem Hdev] [] Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-      + unfold mstate_interp. rewrite Hmdev. unfold set_reg; cbn [mdev].
+      + unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
         iFrame "Hreg Hmem Hdev".
       + done.
     - (* 2 mod 4: one 2-byte read *)
@@ -810,8 +810,8 @@ Section WpUmodeStore.
               HSXL HpmaA
               with "[Hreg] [Hmem] Hutlb Humem")
         as (sf) "(%Hfetch & %Hmdev & _ & %Tr & Hreg & Hmem & Hutlb & Humem)".
-      { unfold set_reg; cbn [sregs]. iExact "Hreg". }
-      { unfold set_reg; cbn [mem]. iExact "Hmem". }
+      { rewrite ?sregs_set_reg. iExact "Hreg". }
+      { rewrite ?mem_set_reg. iExact "Hmem". }
       destruct (Hsf sf Tr)
         as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
       iApply (uv_store_post_fetch CID0 Phi True%I sg sf b mst pc 2
@@ -836,7 +836,7 @@ Section WpUmodeStore.
                       ltac:(rewrite Lmisaf; vm_compute; reflexivity))
                    ltac:(intro s; apply exec_execute_C_SDSP))
                 with "[Hreg Hmem Hdev] [] Hutlb Humem Hhs Hpc Hnpc Hgpr Hmst Hmi Hk").
-      + unfold mstate_interp. rewrite Hmdev. unfold set_reg; cbn [mdev].
+      + unfold mstate_interp. rewrite Hmdev. rewrite ?mdev_set_reg.
         iFrame "Hreg Hmem Hdev".
       + done.
   Qed.

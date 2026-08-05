@@ -1630,9 +1630,9 @@ Section MemArmGlue.
     - right. exists bi. split; [exact Hex1 | exact Hex2].
     - exact Hok.
     - exact Hnex.
-    - rewrite Hmi. unfold set_reg; cbn [sregs].
+    - rewrite Hmi. rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity].
-    - rewrite Hnpc. unfold set_reg; cbn [sregs]. apply register_lookup_set.
+    - rewrite Hnpc. rewrite ?sregs_set_reg. apply register_lookup_set.
   Qed.
 
 End MemArmGlue.
@@ -1784,11 +1784,11 @@ Section MemReadTotal.
       iSplitR; [ iPureIntro; unfold s_x, nv; exact Hexec |].
       assert (Tr : forall r : register, register_beq r (R_bitvector_64 (gpr_of_Z (uint rd))) = false ->
                 register_lookup r s_x.(sregs) = register_lookup r sig'.(sregs)).
-      { intros r Hne. unfold s_x, set_reg; cbn [sregs]. apply irrelevant_register_set; exact Hne. }
+      { intros r Hne. unfold s_x; rewrite ?sregs_set_reg. apply irrelevant_register_set; exact Hne. }
       iSplitR. { iPureIntro. rewrite Tr; [| reg_ne]. exact Hmi. }
       iSplitR. { iPureIntro. rewrite Tr; [| reg_ne]. exact Hnpc. }
       unfold mstate_interp. iSplitL "Hreg Hgh Hdev".
-      { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
+      { unfold s_x; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
       iFrame "Hgpr". iFrame "Hutlb Hudata". iPureIntro; split; assumption.
     - iDestruct "HErr" as (sig' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
       assert (Hvread : exec (vmem_read (Regidx rs1) (sign_extend' 64 imm) k (Load Data) false false false) s = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), sig')).
@@ -1915,18 +1915,18 @@ Section MemArmsU.
       { intros r Hne. destruct Hsregs as [Heq | (tv & Heq)]; rewrite Heq;
           [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
       iSplitR.
-      { iPureIntro. unfold s_x, set_reg; cbn [sregs].
+      { iPureIntro. unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set (R_bool minstret_increment) (R_bitvector_64 (gpr_of_Z (uint rd)))).
         2:{ reg_ne. }
         apply Tr. vm_compute; reflexivity. }
       iSplitR.
-      { iPureIntro. unfold s_x, set_reg; cbn [sregs].
+      { iPureIntro. unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set nextPC (R_bitvector_64 (gpr_of_Z (uint rd)))).
         2:{ reg_ne. }
         apply Tr. vm_compute; reflexivity. }
       unfold mstate_interp.
       iSplitL "Hreg Hgh Hdev".
-      { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hgh".
+      { unfold s_x; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh".
         rewrite Hmdev. iFrame "Hdev". }
       iFrame "Hgpr". iFrame "Hutlb Hudata". iPureIntro; split; assumption.
     - iDestruct "HErr" as "(%Herr & Hreg & Hgh & Hutlb & Hudata)".
@@ -3294,9 +3294,9 @@ Section BaseMemArms.
     - left; exact Hexec.
     - exact Hok.
     - exact Hnex.
-    - rewrite Hmi. unfold set_reg; cbn [sregs].
+    - rewrite Hmi. rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity].
-    - rewrite Hnpc. unfold set_reg; cbn [sregs]. apply register_lookup_set.
+    - rewrite Hnpc. rewrite ?sregs_set_reg. apply register_lookup_set.
   Qed.
 
 End BaseMemArms.
@@ -4287,11 +4287,11 @@ Section LRExecEngine.
         iSplitR; [ iPureIntro; unfold s_x, nv; exact Hexec |].
         assert (Tr : forall r : register, register_beq r (R_bitvector_64 (gpr_of_Z (uint rd))) = false ->
                   register_lookup r s_x.(sregs) = register_lookup r sig'.(sregs)).
-        { intros r Hne. unfold s_x, set_reg; cbn [sregs]. apply irrelevant_register_set; exact Hne. }
+        { intros r Hne. unfold s_x; rewrite ?sregs_set_reg. apply irrelevant_register_set; exact Hne. }
         iSplitR. { iPureIntro. rewrite Tr; [| reg_ne]. exact Hmi. }
         iSplitR. { iPureIntro. rewrite Tr; [| reg_ne]. exact Hnpc. }
         unfold mstate_interp. iSplitL "Hreg Hgh Hdev".
-        { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
+        { unfold s_x; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
         iFrame "Hgpr". iFrame "Hutlb Hudata". iPureIntro; split; assumption.
     - iDestruct "HErr" as (sig' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
       assert (Hvread : exec (vmem_read (Regidx rs1) (zeros' 64) k (LoadReserved Data) aq (andb aq rl) true) s = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), sig')).
@@ -5116,11 +5116,11 @@ Section SCEngine.
         iSplitR; [ iPureIntro; unfold s_x, nv; exact Hexec |].
         assert (Tr : forall r : register, register_beq r (R_bitvector_64 (gpr_of_Z (uint rd))) = false ->
                   register_lookup r s_x.(sregs) = register_lookup r sig'.(sregs)).
-        { intros r Hne. unfold s_x, set_reg; cbn [sregs]. apply irrelevant_register_set; exact Hne. }
+        { intros r Hne. unfold s_x; rewrite ?sregs_set_reg. apply irrelevant_register_set; exact Hne. }
         iSplitR. { iPureIntro. rewrite Tr; [| reg_ne]. exact Hmi. }
         iSplitR. { iPureIntro. rewrite Tr; [| reg_ne]. exact Hnpc. }
         unfold mstate_interp. iSplitL "Hreg Hgh Hdev".
-        { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
+        { unfold s_x; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
         iFrame "Hgpr". iFrame "Hutlb Hudata". iPureIntro; split; assumption.
     - iDestruct "HErr" as (sig' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
       assert (Hvwrite : exec (vmem_write (Regidx rs1) (zeros' 64) k dat (StoreConditional Data) (andb aq rl) rl true) s = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), sig')).
@@ -5880,11 +5880,11 @@ Section AmoEngine.
           iSplitR; [iPureIntro; unfold s_x; exact Hexec |].
           assert (Tr2 : forall r : register, register_beq r (R_bitvector_64 (gpr_of_Z (uint rd))) = false ->
                     register_lookup r s_x.(sregs) = register_lookup r sig'.(sregs)).
-          { intros r Hne. unfold s_x, set_reg; cbn [sregs]. apply irrelevant_register_set; exact Hne. }
+          { intros r Hne. unfold s_x; rewrite ?sregs_set_reg. apply irrelevant_register_set; exact Hne. }
           iSplitR. { iPureIntro. rewrite Tr2; [| reg_ne]. apply Tr; vm_compute; reflexivity. }
           iSplitR. { iPureIntro. rewrite Tr2; [| reg_ne]. apply Tr; vm_compute; reflexivity. }
           iSplitL "Hreg Hgh Hdev".
-          { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
+          { unfold s_x; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
           iFrame "Hgpr". unfold user_pt_inv; iFrame "Hutlb Hudata". iPureIntro; split; assumption.
       + (* THE STORE ARM: all nine RMW ops, and AMOCAS on a matching comparand.
            The stored value is the model's own per-op [result'] -- the write
@@ -5943,11 +5943,11 @@ Section AmoEngine.
           iSplitR; [iPureIntro; unfold s_x; exact Hexec |].
           assert (Tr2 : forall r : register, register_beq r (R_bitvector_64 (gpr_of_Z (uint rd))) = false ->
                     register_lookup r s_x.(sregs) = register_lookup r s2.(sregs)).
-          { intros r Hne. unfold s_x, set_reg; cbn [sregs]. apply irrelevant_register_set; exact Hne. }
+          { intros r Hne. unfold s_x; rewrite ?sregs_set_reg. apply irrelevant_register_set; exact Hne. }
           iSplitR. { iPureIntro. rewrite Tr2; [| reg_ne]. unfold s2; cbn [sregs]. apply Tr; vm_compute; reflexivity. }
           iSplitR. { iPureIntro. rewrite Tr2; [| reg_ne]. unfold s2; cbn [sregs]. apply Tr; vm_compute; reflexivity. }
           iSplitL "Hreg Hgh Hdev".
-          { unfold s_x, s2, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
+          { unfold s_x, s2; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
           iFrame "Hgpr". unfold user_pt_inv; iFrame "Hutlb Hudata". iPureIntro; split; assumption.
     - (* fault -> translate-fault trap *)
       iDestruct (user_pt_amo_translate_fault op pt.(ud_root) pt.(ud_tfp) pt.(ud_um) va s
@@ -6493,7 +6493,7 @@ Section AmoEngine16.
       { intros r Hne1 Hne2 Hne3. unfold wpair_state.
         destruct (generic_neq (Regidx rd) zreg);
           [ destruct (Z.eqb (uint rd) 0); destruct (Z.eqb (uint (add_vec_int rd 1)) 0);
-            unfold set_reg; cbn [sregs];
+            rewrite ?sregs_set_reg;
             repeat (rewrite irrelevant_register_set; [| assumption]);
             rewrite Hsx; apply Tr; exact Hne1
           | rewrite Hsx; apply Tr; exact Hne1 ]. }
@@ -6519,7 +6519,7 @@ Section AmoEngine16.
           iSplitR. { iPureIntro. apply Hpres; [ vm_compute; reflexivity | reg_ne |
                      apply Z.eqb_eq in Hrd1; rewrite Hrd1; reg_ne ]. }
           iSplitL "Hreg Hgh Hdev".
-          { rewrite Hst. unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hgh".
+          { rewrite Hst. unfold s1; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh".
             rewrite Hsxd. iFrame "Hdev". }
           iFrame "Hgpr". unfold user_pt_inv; iFrame "Hutlb Hudata". iPureIntro; split; assumption.
         * (* rd+1 <> 0: both rd and rd+1 written *)
@@ -6540,7 +6540,7 @@ Section AmoEngine16.
           iSplitR. { iPureIntro. apply Hpres; [ vm_compute; reflexivity | reg_ne | reg_ne ]. }
           iSplitR. { iPureIntro. apply Hpres; [ vm_compute; reflexivity | reg_ne | reg_ne ]. }
           iSplitL "Hreg Hgh Hdev".
-          { rewrite Hst. unfold s1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hgh".
+          { rewrite Hst. unfold s1; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh".
             rewrite Hsxd. iFrame "Hdev". }
           iFrame "Hgpr". unfold user_pt_inv; iFrame "Hutlb Hudata". iPureIntro; split; assumption.
       + (* rd = 0: no gpr write, final state = sx *)

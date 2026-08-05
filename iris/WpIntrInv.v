@@ -151,7 +151,7 @@ Section WpIntrInv.
     iMod (reg_update _ (R_bool minstret_increment) _ b with "Hreg Hmi") as "[Hreg Hmi]".
     iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) with "[Hreg Hmem]")
       as "[Hret | Hintr]".
-    { rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     - (* ---- retire: verbatim wp_exec_step_hart_active_inv continuation ---- *)
       iDestruct "Hret" as (retval s_exec) "(%Hha & Hpc & [Hreg Hmem] & Hcont)".
       iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_exec.
@@ -159,7 +159,7 @@ Section WpIntrInv.
       assert (Hhart_a :
         register_lookup hart_state (set_reg σ (R_bool minstret_increment) b).(sregs)
           = HART_ACTIVE tt).
-      { unfold set_reg; cbn [sregs].
+      { rewrite ?sregs_set_reg.
         rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
       iDestruct (reg_valid with "Hreg Hmst") as %Lmst_e.
       iMod (reg_update _ PC _ (register_lookup nextPC s_exec.(sregs)) with "Hreg Hpc")
@@ -167,7 +167,7 @@ Section WpIntrInv.
       assert (Hmst_tick :
         register_lookup minstret
           (set_reg s_exec PC (register_lookup nextPC s_exec.(sregs))).(sregs) = mst).
-      { unfold set_reg; cbn [sregs].
+      { rewrite ?sregs_set_reg.
         rewrite irrelevant_register_set; [exact Lmst_e | reflexivity]. }
       iDestruct ("Hcont" with "Hhs Hpc") as "HWP".
       destruct b.
@@ -179,7 +179,7 @@ Section WpIntrInv.
                    Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
         iNext.
         iModIntro. rewrite /mstate_interp. cbn [sregs mem]. rewrite Hmst_tick.
-        unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+        rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
         iSplitL "Hmst Hmi".
         { iExists (add_vec_int mst 1), true. iFrame. }
         iExact "HWP".
@@ -188,7 +188,7 @@ Section WpIntrInv.
           exact (exec_riscv_step_hart_active σ s_exec retval false
                    Hsi Hhart_a Hha Hhart_exec Hmi_exec). }
         iNext.
-        iModIntro. rewrite /mstate_interp. unfold set_reg; cbn [sregs mem].
+        iModIntro. rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg.
         iFrame "Hreg Hmem".
         iSplitL "Hmst Hmi".
         { iExists mst, false. iFrame. }
@@ -199,7 +199,7 @@ Section WpIntrInv.
       assert (Hhart_a :
         register_lookup hart_state (set_reg σ (R_bool minstret_increment) b).(sregs)
           = HART_ACTIVE tt).
-      { unfold set_reg; cbn [sregs].
+      { rewrite ?sregs_set_reg.
         rewrite irrelevant_register_set; [exact Lhs | reflexivity]. }
       iModIntro. iExists _. iSplitR.
       { iPureIntro.
@@ -208,7 +208,7 @@ Section WpIntrInv.
       iNext.
       iMod (reg_update _ PC _ (register_lookup nextPC s_trap.(sregs)) with "Hreg Hpc")
         as "[Hreg Hpc]".
-      iModIntro. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+      iModIntro. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi".
       { iExists mst, b. iFrame. }
       iApply ("Hcont" with "Hhs Hpc").
@@ -336,7 +336,7 @@ Section WpIntrInv.
       rewrite LpcT.
       iSplitL "Hpcr"; [iExact "Hpcr" |].
       iSplitL "Hreg Hmem".
-      { unfold s_trap, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      { unfold s_trap; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
       iNext.
       iIntros "Hhs Hpcr".
       assert (LnT : register_lookup nextPC s_trap.(sregs) = stvec_base handler).

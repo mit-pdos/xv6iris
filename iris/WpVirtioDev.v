@@ -282,7 +282,7 @@ Proof.
   assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
     by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
   assert (Hdrd_virtio : dev_read s_tr.(mdev) a8 4 = Some (w, σ.(mdev))).
-  { rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+  { rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
     apply (dev_read_virtio σ.(mdev) a8 w Hrange).
     rewrite Hveq. exact Hrd_v. }
   pose (s_x := set_reg (MState s_tr.(sregs) s_tr.(mem) σ.(mdev))
@@ -317,10 +317,10 @@ Proof.
   iSplitR.
   { iPureIntro. rewrite Hpceq. change (if is_rvc then 2%Z else 4%Z) with (if is_rvc then 2 else 4). fold s_pc. exact Hload. }
   iSplitL "Hreg Hmem Hdev".
-  { unfold s_x, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
+  { unfold s_x; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev". }
   iIntros "Hhs' Hpc'".
   assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
-  { unfold s_x, set_reg; cbn [sregs]. tmig.
+  { unfold s_x; rewrite ?sregs_set_reg. tmig.
     rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
     unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
   iEval (rewrite Lnpc) in "Hpc'".
@@ -470,7 +470,7 @@ Proof.
   assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
     by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
   assert (Hwr_virtio : dev_write s_tr.(mdev) a8 4 storeword = Some (set_dvirtio σ.(mdev) vst')).
-  { rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+  { rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
     apply (dev_write_virtio σ.(mdev) a8 storeword vst' Hrange).
     rewrite Hveq. exact Hvw. }
   pose (d' := set_dvirtio σ.(mdev) vst').

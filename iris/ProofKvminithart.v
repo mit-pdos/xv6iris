@@ -153,7 +153,7 @@ Section KvminithartBody.
     iSplitR.
     { iPureIntro. rewrite Hpceq1. fold s_pc1. rewrite Hzreg. exact Hex1. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc1; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc". iNext.
     assert (Lnpc1 : register_lookup nextPC (set_reg s_pc1 tlb tlbz1).(sregs)
                     = mword_of_int (KVI + 0x0c)).
@@ -301,7 +301,7 @@ Section KvminithartBody.
     { iPureIntro. rewrite Hpceq2. fold s_pc2.
       rewrite Hzreg. exact Hex2. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc2, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc2; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc". iNext.
     assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp (kvi_satp_word root)).(sregs)
                     = mword_of_int (KVI + 0x20)).
@@ -357,7 +357,7 @@ Section KvminithartBody.
     iSplitR.
     { iPureIntro. rewrite Hpceq3. fold s_pc3. rewrite Hzreg. exact Hex3. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc3, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc3; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc". iNext.
     assert (Lnpc3 : register_lookup nextPC (set_reg s_pc3 tlb tlbz3).(sregs)
                     = mword_of_int (KVI + 0x24)).

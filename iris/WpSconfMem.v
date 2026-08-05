@@ -371,7 +371,7 @@ Section WpSconfMem.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hload. }
     iSplitL "Hreg Hmem Hdev".
     { unfold set_reg; cbn [sregs mem mdev].
-      rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+      rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
@@ -950,7 +950,7 @@ Section WpSconfMem.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hstore. }
     iSplitL "Hreg Hmem Hdev".
     { cbn [sregs mem mdev].
-      rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+      rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
@@ -1331,7 +1331,7 @@ Section WpSconfMem.
       change (if false then 2%Z else 4%Z) with 4%Z. fold s_pc. exact Hstore. }
     iSplitL "Hreg Hmem Hdev".
     { cbn [sregs mem mdev].
-      rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+      rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
@@ -1573,7 +1573,7 @@ Section WpSconfMem.
       change (if false then 2%Z else 4%Z) with 4%Z. fold s_pc. exact Hstore. }
     iSplitL "Hreg Hmem Hdev".
     { cbn [sregs mem mdev].
-      rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+      rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
@@ -1756,7 +1756,7 @@ Section WpSconfMem.
       change (if false then 2%Z else 4%Z) with 4%Z. fold s_pc. exact Hstore. }
     iSplitL "Hreg Hmem Hdev".
     { cbn [sregs mem mdev].
-      rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+      rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC

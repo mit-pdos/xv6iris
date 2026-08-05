@@ -253,7 +253,7 @@ Section WpSconfTimer.
       apply (exec_execute_csrr_time_gpr_S rd s_pc Hrd Lpriv_spc).
       rewrite Lmcen_spc. exact HTM. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg tv)).(sregs)
@@ -348,7 +348,7 @@ Section WpSconfTimer.
                  ltac:(rewrite Lmenv_spc Hmenvval; vm_compute; reflexivity)).
       rewrite Lstc_spc Lrs1. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))).(sregs)

@@ -237,7 +237,7 @@ Section StepWaitRetire.
   Proof using All.
     assert (Hmst_tick :
       register_lookup minstret (set_reg s_exec PC npc).(sregs) = mst).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hmst | reflexivity ]. }
     unfold riscv_step.
     rewrite (exec_bind_Some _ _ _ _ _
@@ -274,7 +274,7 @@ Section StepWaitRetire.
     change (get_config_rvfi tt) with false.
     replace (register_lookup minstret_increment (set_reg s_exec PC npc).(sregs))
       with b.
-    2:{ unfold set_reg; cbn [sregs].
+    2:{ rewrite ?sregs_set_reg.
         rewrite irrelevant_register_set;
           [ (exact Hmi_exec || (symmetry; exact Hmi_exec)) | reflexivity ]. }
     destruct b.
@@ -311,7 +311,7 @@ Proof.
   assert (Hhart_a : register_lookup hart_state
                       (set_reg s (R_bool minstret_increment) b).(sregs)
                     = HART_ACTIVE tt).
-  { unfold set_reg; cbn [sregs].
+  { rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [ exact Lhs | reflexivity ]. }
   exact (exec_riscv_step_enter_wait s s_exec retval b WAIT_WFI Hsi Hhart_a Hha eq_refl).
 Qed.
@@ -327,14 +327,14 @@ Proof.
   assert (Hhart_a : register_lookup hart_state
                       (set_reg s (R_bool minstret_increment) b).(sregs)
                     = HART_WAITING (WAIT_WFI, instbits)).
-  { unfold set_reg; cbn [sregs].
+  { rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [ exact Lhs | reflexivity ]. }
   assert (Hnw' : neq_vec (and_vec (register_lookup mip
                                     (set_reg s (R_bool minstret_increment) b).(sregs))
                                   (register_lookup mie
                                     (set_reg s (R_bool minstret_increment) b).(sregs)))
                          (zeros' 64) = false).
-  { unfold set_reg; cbn [sregs].
+  { rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [| reflexivity ].
     rewrite irrelevant_register_set; [| reflexivity ].
     exact Hnw. }
@@ -362,14 +362,14 @@ Proof.
   assert (Hhart_a : register_lookup hart_state
                       (set_reg s (R_bool minstret_increment) b).(sregs)
                     = HART_WAITING (WAIT_WFI, instbits)).
-  { unfold set_reg; cbn [sregs].
+  { rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [ exact Lhs | reflexivity ]. }
   assert (Hw' : neq_vec (and_vec (register_lookup mip
                                    (set_reg s (R_bool minstret_increment) b).(sregs))
                                  (register_lookup mie
                                    (set_reg s (R_bool minstret_increment) b).(sregs)))
                         (zeros' 64) = true).
-  { unfold set_reg; cbn [sregs].
+  { rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [| reflexivity ].
     rewrite irrelevant_register_set; [| reflexivity ].
     exact Hw. }
@@ -382,20 +382,20 @@ Proof.
   assert (Hmi_e : register_lookup (R_bool minstret_increment)
                     (set_reg (set_reg s (R_bool minstret_increment) b)
                        hart_state (HART_ACTIVE tt)).(sregs) = b).
-  { unfold set_reg; cbn [sregs].
+  { rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [| reflexivity ].
     apply register_lookup_set. }
   assert (Hnpc_e : register_lookup nextPC
                      (set_reg (set_reg s (R_bool minstret_increment) b)
                         hart_state (HART_ACTIVE tt)).(sregs) = npc).
-  { unfold set_reg; cbn [sregs].
+  { rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [| reflexivity ].
     rewrite irrelevant_register_set; [| reflexivity ].
     exact Lnpc. }
   assert (Hmst_e : register_lookup minstret
                      (set_reg (set_reg s (R_bool minstret_increment) b)
                         hart_state (HART_ACTIVE tt)).(sregs) = mst).
-  { unfold set_reg; cbn [sregs].
+  { rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [| reflexivity ].
     rewrite irrelevant_register_set; [| reflexivity ].
     exact Lmst. }
@@ -475,11 +475,11 @@ Section WpSmodeWfi.
       destruct b.
       + iMod (reg_update _ minstret _ (add_vec_int mst 1) with "Hreg Hmst")
           as "[Hreg Hmst]".
-        iModIntro. rewrite /mstate_interp. unfold set_reg; cbn [sregs mem].
+        iModIntro. rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg.
         iFrame "Hreg Hmem".
         iSplitL "Hmst Hmi". { iExists (add_vec_int mst 1), true. iFrame. }
         iExact "HWP".
-      + iModIntro. rewrite /mstate_interp. unfold set_reg; cbn [sregs mem].
+      + iModIntro. rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg.
         iFrame "Hreg Hmem".
         iSplitL "Hmst Hmi". { iExists mst, false. iFrame. }
         iExact "HWP".
@@ -489,7 +489,7 @@ Section WpSmodeWfi.
       iSplitR.
       { iPureIntro. exact (exec_riscv_step_wfi_stutter σ instbits b Hsi Lhs Hw). }
       iNext. iModIntro.
-      rewrite /mstate_interp. unfold set_reg; cbn [sregs mem].
+      rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg.
       iFrame "Hreg Hmem".
       iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
       iApply ("IH" with "Hhs Hpcr Hnpc HR Hcont").
@@ -560,7 +560,7 @@ Section WpSmodeWfi.
     iMod (reg_update _ (R_bool minstret_increment) _ mib with "Hreg Hmi") as "[Hreg Hmi]".
     iAssert (mstate_interp (set_reg σ (R_bool minstret_increment) mib))
       with "[Hreg Hmem]" as "Hsi".
-    { rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     set (σa := set_reg σ (R_bool minstret_increment) mib).
     (* the ENTER step goes through run_hart_active: dispatch must be None *)
     iDestruct (dispatchInterrupt_none_S_from_regs σa misa0 ms mie_v mdv0
@@ -607,7 +607,7 @@ Section WpSmodeWfi.
     (* the execute: at Supervisor, wfi enters the WAIT state *)
     assert (Hpriv_x : register_lookup cur_privilege
                         (set_reg σf nextPC (add_vec_int pc 4)).(sregs) = Supervisor).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpriv_f | reflexivity ]. }
     pose proof (exec_hart_active_progress_base_gen Supervisor σa σf
                   (set_reg σf nextPC (add_vec_int pc 4)) w (WFI tt) pc
@@ -626,7 +626,7 @@ Section WpSmodeWfi.
       exact (exec_riscv_step_wfi_enter σ (set_reg σf nextPC (add_vec_int pc 4))
                (zero_extend' 32 w) mib Hsi Lhs0 Hha). }
     iNext. iModIntro.
-    rewrite /mstate_interp. unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem".
+    rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem".
     iSplitL "Hmst Hmi". { iExists mst, mib. iFrame. }
     (* ---- and now the WAIT phase, with everything the client is owed
        riding through as [R] ---- *)

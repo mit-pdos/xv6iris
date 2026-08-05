@@ -76,14 +76,14 @@ Section WpLogicRTypeGpr.
       rewrite (exec_execute_RTYPE_OR_gpr rs2 rs1 rd (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))) Hrd).
       rewrite Hmv. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (or_vec (m !!! Regidx rs1) (m !!! Regidx rs2)))).(sregs)
              = add_vec_int pc (if is_rvc then 2 else 4)).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
@@ -150,14 +150,14 @@ Section WpLogicRTypeGpr.
       rewrite (exec_execute_RTYPE_AND_gpr rs2 rs1 rd (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4))) Hrd).
       rewrite Hmv. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (and_vec (m !!! Regidx rs1) (m !!! Regidx rs2)))).(sregs)
              = add_vec_int pc (if is_rvc then 2 else 4)).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").
@@ -231,14 +231,14 @@ Section WpLogicRTypeGpr.
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       rewrite Hmv. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int pc (if is_rvc then 2 else 4)))
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (add_vec (m !!! Regidx rs1) (m !!! Regidx rs2)))).(sregs)
              = add_vec_int pc (if is_rvc then 2 else 4)).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] [Hfmap]").

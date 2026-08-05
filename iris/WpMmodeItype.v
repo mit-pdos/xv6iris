@@ -79,7 +79,7 @@ Section WpAddiGpr.
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       rewrite Hav. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     (* continuation: PC/nextPC are both pc+4; hand back mmode_config, pmpcfg,
        the reassembled [pc_is (pc+4)], and the updated file *)
     iIntros "Hmm' Hpmpc' Hpc'".
@@ -89,7 +89,7 @@ Section WpAddiGpr.
                 (regval_into_reg (add_vec (m !!! Regidx rs1)
                    (sign_extend' 64 imm)))).(sregs)
              = add_vec_int pc (if is_rvc then 2 else 4)).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hgf").
@@ -152,7 +152,7 @@ Section WpLogicITypeGpr.
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       rewrite Hav. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg σ nextPC (add_vec_int pc 4))
@@ -160,7 +160,7 @@ Section WpLogicITypeGpr.
                 (regval_into_reg (or_vec (m !!! Regidx rs1)
                    (sign_extend' 64 imm)))).(sregs)
              = add_vec_int pc 4).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hgf").

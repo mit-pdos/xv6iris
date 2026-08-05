@@ -185,8 +185,8 @@ Section UserTotalU.
     iPureIntro. split; [exact Hdec|]. split; [exact Hlpad|].
     split; [left; exact Hexec|]. split; [exact Hok|]. split; [exact Hnex|].
     split.
-    { unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
-    unfold set_reg; cbn [sregs]. apply register_lookup_set.
+    { rewrite ?sregs_set_reg. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
+    rewrite ?sregs_set_reg. apply register_lookup_set.
   Qed.
 
   (* GLUE (a'): state-unchanged via ONE base ExecuteAs redirect (SINVAL_VMA
@@ -216,8 +216,8 @@ Section UserTotalU.
     split; [right; exists other; split; [exact Hex1|exact Hex2]|].
     split; [exact Hok|]. split; [exact Hnex|].
     split.
-    { unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
-    unfold set_reg; cbn [sregs]. apply register_lookup_set.
+    { rewrite ?sregs_set_reg. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
+    rewrite ?sregs_set_reg. apply register_lookup_set.
   Qed.
 
   Lemma u_result_ok_retire : u_result_ok RETIRE_SUCCESS.
@@ -261,12 +261,12 @@ Section UserTotalU.
       iExists i, RETIRE_SUCCESS, s_x, (<[Regidx ird := v]> g), (add_vec_int va 4).
       assert (LmiX : register_lookup (R_bool minstret_increment) s_x.(sregs)
                      = register_lookup (R_bool minstret_increment) sigma.(sregs)).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set (R_bool minstret_increment) (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
       assert (LnpcX : register_lookup nextPC s_x.(sregs) = add_vec_int va 4).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set nextPC (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         apply register_lookup_set. }
@@ -286,7 +286,7 @@ Section UserTotalU.
     register_lookup cur_privilege sigma_f.(sregs) = User ->
     register_lookup cur_privilege (set_reg sigma_f nextPC (add_vec_int va 4)).(sregs) = User.
   Proof.
-    intro H. unfold set_reg; cbn [sregs].
+    intro H. rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [exact H | vm_compute; reflexivity].
   Qed.
 
@@ -294,7 +294,7 @@ Section UserTotalU.
     register_lookup PC sigma_f.(sregs) = va ->
     register_lookup PC (set_reg sigma_f nextPC (add_vec_int va 4)).(sregs) = va.
   Proof.
-    intro H. unfold set_reg; cbn [sregs].
+    intro H. rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [exact H | vm_compute; reflexivity].
   Qed.
 
@@ -429,7 +429,7 @@ Section UserTotalU.
     register_lookup r sigma_f.(sregs) = v ->
     register_lookup r (set_reg sigma_f nextPC (add_vec_int va 4)).(sregs) = v.
   Proof.
-    intros Hne H. unfold set_reg; cbn [sregs].
+    intros Hne H. rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [exact H | exact Hne].
   Qed.
 
@@ -462,10 +462,10 @@ Section UserTotalU.
     iPureIntro. split; [exact Hdec|]. split; [exact Hlpad|].
     split; [left; exact Hexec|]. split; [exact u_result_ok_retire|].
     split.
-    { unfold s_x, set_reg; cbn [sregs].
+    { unfold s_x; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [| vm_compute; reflexivity].
       rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity]. }
-    unfold s_x, set_reg; cbn [sregs]. apply register_lookup_set.
+    unfold s_x; rewrite ?sregs_set_reg. apply register_lookup_set.
   Qed.
 
   (* jump + gpr write (JAL / JALR): s_x = gpr_write_state ird v (set_reg s0 nextPC tgt). *)
@@ -496,10 +496,10 @@ Section UserTotalU.
       iPureIntro. split; [exact Hdec|]. split; [exact Hlpad|].
       split; [left; exact Hexec|]. split; [exact u_result_ok_retire|].
       split.
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite irrelevant_register_set; [| vm_compute; reflexivity].
         rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity]. }
-      unfold s_x, set_reg; cbn [sregs]. apply register_lookup_set.
+      unfold s_x; rewrite ?sregs_set_reg. apply register_lookup_set.
     - (* rd <> 0: nextPC then gpr write *)
       assert (Hrdne : uint ird <> 0) by (apply Z.eqb_neq; exact Hrd0).
       iDestruct (gpr_file_acc g ird Hrdne with "Hgpr") as "[Hrd Hins]".
@@ -512,13 +512,13 @@ Section UserTotalU.
       iExists i, RETIRE_SUCCESS, s_x, (<[Regidx ird := v]> g), tgt.
       assert (LmiX : register_lookup (R_bool minstret_increment) s_x.(sregs)
                      = register_lookup (R_bool minstret_increment) sigma.(sregs)).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set (R_bool minstret_increment) (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         rewrite irrelevant_register_set; [| vm_compute; reflexivity].
         rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity]. }
       assert (LnpcX : register_lookup nextPC s_x.(sregs) = tgt).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set nextPC (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         apply register_lookup_set. }
@@ -601,8 +601,8 @@ Section UserTotalU.
     iPureIntro. split; [exact Hdecc|]. split; [exact Hzca|].
     split; [right; exists other; split; [exact Hex1|exact Hex2]|]. split; [exact Hok|]. split; [exact Hnex|].
     split.
-    { unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
-    unfold set_reg; cbn [sregs]. apply register_lookup_set.
+    { rewrite ?sregs_set_reg. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
+    rewrite ?sregs_set_reg. apply register_lookup_set.
   Qed.
 
   (* RVC single-gpr retire (compute expansions: C_LI/C_MV/C_ADD/... -> base). *)
@@ -631,8 +631,8 @@ Section UserTotalU.
       iPureIntro. split; [exact Hdecc|]. split; [exact Hzca|].
       split; [right; exists other; split; [exact Hex1|exact Hex2]|]. split; [exact u_result_ok_retire|].
       split.
-      { unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
-      unfold set_reg; cbn [sregs]. apply register_lookup_set.
+      { rewrite ?sregs_set_reg. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
+      rewrite ?sregs_set_reg. apply register_lookup_set.
     - (* rd <> 0 *)
       assert (Hrdne : uint ird <> 0) by (apply Z.eqb_neq; exact Hrd0).
       iDestruct (gpr_file_acc g ird Hrdne with "Hgpr") as "[Hrd Hins]".
@@ -645,12 +645,12 @@ Section UserTotalU.
       iExists instr, RETIRE_SUCCESS, s_x, (<[Regidx ird := v]> g), (add_vec_int va 2).
       assert (LmiX : register_lookup (R_bool minstret_increment) s_x.(sregs)
                      = register_lookup (R_bool minstret_increment) sigma.(sregs)).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set (R_bool minstret_increment) (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
       assert (LnpcX : register_lookup nextPC s_x.(sregs) = add_vec_int va 2).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set nextPC (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         apply register_lookup_set. }
@@ -692,10 +692,10 @@ Section UserTotalU.
       iPureIntro. split; [exact Hdecc|]. split; [exact Hzca|].
       split; [right; exists other; split; [exact Hex1|exact Hex2]|]. split; [exact u_result_ok_retire|].
       split.
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite irrelevant_register_set; [| vm_compute; reflexivity].
         rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity]. }
-      unfold s_x, set_reg; cbn [sregs]. apply register_lookup_set.
+      unfold s_x; rewrite ?sregs_set_reg. apply register_lookup_set.
     - (* rd <> 0 (C_JALR) *)
       assert (Hrdne : uint ird <> 0) by (apply Z.eqb_neq; exact Hrd0).
       iDestruct (gpr_file_acc g ird Hrdne with "Hgpr") as "[Hrd Hins]".
@@ -708,13 +708,13 @@ Section UserTotalU.
       iExists instr, RETIRE_SUCCESS, s_x, (<[Regidx ird := v]> g), tgt.
       assert (LmiX : register_lookup (R_bool minstret_increment) s_x.(sregs)
                      = register_lookup (R_bool minstret_increment) sigma.(sregs)).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set (R_bool minstret_increment) (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         rewrite irrelevant_register_set; [| vm_compute; reflexivity].
         rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity]. }
       assert (LnpcX : register_lookup nextPC s_x.(sregs) = tgt).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set nextPC (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         apply register_lookup_set. }
@@ -748,8 +748,8 @@ Section UserTotalU.
     iPureIntro. split; [exact Hdecc|]. split; [exact Hzca|].
     split; [left; exact Hexec|]. split; [exact Hok|]. split; [exact Hnex|].
     split.
-    { unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
-    unfold set_reg; cbn [sregs]. apply register_lookup_set.
+    { rewrite ?sregs_set_reg. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
+    rewrite ?sregs_set_reg. apply register_lookup_set.
   Qed.
 
   (* RVC DIRECT single-gpr retire (no ExecuteAs redirect): C_NOT / C_ZEXT_B
@@ -777,8 +777,8 @@ Section UserTotalU.
       iPureIntro. split; [exact Hdecc|]. split; [exact Hzca|].
       split; [left; exact Hexec|]. split; [exact u_result_ok_retire|].
       split.
-      { unfold set_reg; cbn [sregs]. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
-      unfold set_reg; cbn [sregs]. apply register_lookup_set.
+      { rewrite ?sregs_set_reg. rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
+      rewrite ?sregs_set_reg. apply register_lookup_set.
     - (* rd <> 0 *)
       assert (Hrdne : uint ird <> 0) by (apply Z.eqb_neq; exact Hrd0).
       iDestruct (gpr_file_acc g ird Hrdne with "Hgpr") as "[Hrd Hins]".
@@ -791,12 +791,12 @@ Section UserTotalU.
       iExists instr, RETIRE_SUCCESS, s_x, (<[Regidx ird := v]> g), (add_vec_int va 2).
       assert (LmiX : register_lookup (R_bool minstret_increment) s_x.(sregs)
                      = register_lookup (R_bool minstret_increment) sigma.(sregs)).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set (R_bool minstret_increment) (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         rewrite irrelevant_register_set; [exact Lmi|vm_compute; reflexivity]. }
       assert (LnpcX : register_lookup nextPC s_x.(sregs) = add_vec_int va 2).
-      { unfold s_x, set_reg; cbn [sregs].
+      { unfold s_x; rewrite ?sregs_set_reg.
         rewrite (irrelevant_register_set nextPC (R_bitvector_64 (gpr_of_Z (uint ird)))).
         2:{ reg_ne. }
         apply register_lookup_set. }
@@ -1125,7 +1125,7 @@ Section UserTotalU.
     register_lookup r sigma_f.(sregs) = v ->
     register_lookup r (set_reg sigma_f nextPC x).(sregs) = v.
   Proof.
-    intros Hne H. unfold set_reg; cbn [sregs].
+    intros Hne H. rewrite ?sregs_set_reg.
     rewrite irrelevant_register_set; [exact H | exact Hne].
   Qed.
 
@@ -1153,10 +1153,10 @@ Section UserTotalU.
     iPureIntro. split; [exact Hdecc|]. split; [exact Hzca|].
     split; [right; exists other; split; [exact Hex1|exact Hex2]|]. split; [exact u_result_ok_retire|].
     split.
-    { unfold s_x, set_reg; cbn [sregs].
+    { unfold s_x; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [| vm_compute; reflexivity].
       rewrite irrelevant_register_set; [exact Lmi | vm_compute; reflexivity]. }
-    unfold s_x, set_reg; cbn [sregs]. apply register_lookup_set.
+    unfold s_x; rewrite ?sregs_set_reg. apply register_lookup_set.
   Qed.
 
   (* RVC compute expansion (C_* -> base gpr-write), taking the base total in

@@ -88,7 +88,7 @@ Section UserStepFull.
               register_lookup r σ.(sregs) = v ->
               register_beq r (R_bool minstret_increment) = false ->
               register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v).
-    { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+    { intros r v Hv Hne. rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
     assert (Hdisp_a : exec (dispatchInterrupt User) (set_reg σ (R_bool minstret_increment) b)
@@ -112,7 +112,7 @@ Section UserStepFull.
                   (uc_tvd C) (T PC _ Lpc eq_refl) i eq_refl eq_refl) as Hhi.
     set (s_trap := set_reg _ nextPC (stvec_base (uc_stvec C))) in Hhi.
     assert (Lhs_trap : register_lookup hart_state s_trap.(sregs) = HART_ACTIVE tt).
-    { unfold s_trap, set_reg; cbn [sregs].
+    { unfold s_trap; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
       exact Lhs0. }
     (* the pure whole-step reduction (σ pre-increment; the lemma does the
@@ -124,7 +124,7 @@ Section UserStepFull.
     (* GHOST: build interp s_tick from interp σ, matching every write.
        s_tick = set_reg s_trap PC (nextPC s_trap); nextPC s_trap = stvec_base *)
     assert (Lnpc_trap : register_lookup nextPC s_trap.(sregs) = stvec_base (uc_stvec C)).
-    { unfold s_trap, set_reg; cbn [sregs]. apply register_lookup_set. }
+    { unfold s_trap; rewrite ?sregs_set_reg. apply register_lookup_set. }
     rewrite Lnpc_trap in Hstep.
     (* the delivered state is the shared [utrap_state] (UserTrap.v §6) *)
     assert (Hs' : set_reg s_trap PC (stvec_base (uc_stvec C))
@@ -273,7 +273,7 @@ Section UserStepFull.
                   register_lookup r σ.(sregs) = v ->
                   register_beq r (R_bool minstret_increment) = false ->
                   register_lookup r (set_reg σ (R_bool minstret_increment) b).(sregs) = v).
-        { intros r v Hv Hne. unfold set_reg; cbn [sregs].
+        { intros r v Hv Hne. rewrite ?sregs_set_reg.
           rewrite irrelevant_register_set; [exact Hv | exact Hne]. }
         rewrite (exec_dispatchInterrupt_U_reduce (set_reg σ (R_bool minstret_increment) b)
                    (uc_mip C) (uc_mie C) (uc_mideleg C) meip seip

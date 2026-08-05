@@ -162,10 +162,10 @@ Qed.
     iMod (reg_update _ nextPC _ (add_vec_int pc_spin 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc_spin 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc_spin).
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [exact Hpceq | vm_compute; reflexivity]. }
     assert (HzcaC : eq_vec (_get_Misa_C (register_lookup misa s_pc.(sregs))) ('b"1") = true).
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [rewrite Lmisa; exact HmisaC | vm_compute; reflexivity]. }
     assert (Halign_spc : eq_vec (access_vec_dec
               (add_vec (register_lookup PC s_pc.(sregs)) (sign_extend' 64 jimm_spin)) 0)
@@ -185,7 +185,7 @@ Qed.
     { iPureIntro. rewrite Hpceq.
       change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc. exact Hexec_spc. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     (* continuation: PC (from wp_instr) = nextPC of s_exec = pc_spin; close the
        loop with the Löb hypothesis (its later is stripped by [wp_instr]'s). *)
     iIntros "Hmm' Hpmpc' Hpc'".

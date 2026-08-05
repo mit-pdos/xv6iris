@@ -152,7 +152,7 @@ Section WpStoreGpr.
     iSplitR.
     { iPureIntro. rewrite Hpceq. exact Hexec_spc. }
     iSplitL "Hreg Hmem Hdev".
-    { unfold s_x, s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
+    { unfold s_x, s_pc; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
@@ -299,7 +299,7 @@ Section MmodeStoreTor.
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec_spc. }
     iSplitL "Hreg Hmem Hdev".
-    { unfold s_x, s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem Hdev". }
+    { unfold s_x, s_pc; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem Hdev". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc (if is_rvc then 2 else 4)).
     { unfold s_x, s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }

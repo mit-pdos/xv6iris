@@ -89,7 +89,7 @@ Proof.
         * rewrite Hex. rewrite set_reg_tlb_overwrite. reflexivity.
         * intros i Hi.
           rewrite (Hprop i Hi).
-          unfold set_reg; cbn [sregs]. rewrite register_lookup_set.
+          rewrite ?sregs_set_reg. rewrite register_lookup_set.
           rewrite (vec64_access_update _ from i None ltac:(lia)).
           destruct (Z.leb_spec from i) as [Hfi | Hfi];
             destruct (Z.leb_spec (from + 1) i) as [Hf1i | Hf1i];
@@ -118,7 +118,7 @@ Proof.
       assert (HLr : exec (Defs.bind0 L r) s = Some (tv, set_reg s tlb tv)) end.
     { rewrite (exec_bind0_Some _ _ _ _ _ Hex).
       rewrite (exec_read_reg tlb _).
-      unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity. }
+      rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ HLr).
     cbv beta. apply exec_returnM.
   - intros i Hi. rewrite (Hprop i Hi).

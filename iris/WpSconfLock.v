@@ -750,12 +750,12 @@ Section WpSconfLock.
     { iPureIntro. rewrite Hpceq.
       change (if false then 2%Z else 4%Z) with 4%Z. fold s_pc. exact Hexec. }
     iSplitL "Hreg Hmem Hdev".
-    { unfold s_x, set_reg; cbn [sregs mem mdev].
-      rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+    { unfold s_x; unfold set_reg; cbn [sregs mem mdev].
+      rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC s_x.(sregs) = add_vec_int pc 4).
-    { unfold s_x, set_reg; cbn [sregs]. tmig.
+    { unfold s_x; rewrite ?sregs_set_reg. tmig.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".

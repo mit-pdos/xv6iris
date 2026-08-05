@@ -132,7 +132,7 @@ Section WpSmodePtGprEngine.
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).(sregs)
@@ -1079,7 +1079,7 @@ Section WpSmodePtGprGamma.
       change (if true then 2%Z else 4%Z) with 2%Z. fold s_pc.
       exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hsm' Htlbinv' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).(sregs)

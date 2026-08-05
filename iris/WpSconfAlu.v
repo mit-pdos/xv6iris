@@ -801,7 +801,7 @@ Section WpSconfAlu.
     assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     assert (LpcS : register_lookup PC s_pc.(sregs) = pc).
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
     iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rsa) with "Hfile") as "[Hrac Hfba]".
     iDestruct (gpr_pt_value rsa (tp_pin m (Regidx rsa)) s_pc with "Hreg Hrac") as %Lva0.
@@ -820,7 +820,7 @@ Section WpSconfAlu.
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 LpcS Lva0 Lvb0). }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).(sregs)
@@ -929,7 +929,7 @@ Section WpSconfAlu.
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).(sregs)

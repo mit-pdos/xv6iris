@@ -886,7 +886,7 @@ Section WpUaluUsretPt.
     iSplitR.
     { iPureIntro. exact Hload. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint (mword_of_int 10 : mword 5))))
@@ -1043,10 +1043,10 @@ Section WpUaluUsretPt.
     iSplitR.
     { iPureIntro. rewrite Hpceq. exact HexecC. }
     iSplitL "Hreg Hmem".
-    { unfold sX, s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold sX, s_pc; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
     assert (Lnpc : register_lookup nextPC sX.(sregs) = ret_pc sepc0)
-      by (unfold sX, set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
+      by (unfold sX; rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc
                           Hutlb [$Hpc' $Hnpc] Hfile").

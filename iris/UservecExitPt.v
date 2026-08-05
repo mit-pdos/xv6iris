@@ -227,7 +227,7 @@ Section UservecExitPt.
     { iPureIntro. rewrite Hpceq1. rewrite Hva01. fold s_pc1.
       change ai_sfence with (SFENCE_VMA (zreg, zreg)). exact Hex1. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc1; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc1 : register_lookup nextPC (set_reg s_pc1 tlb tlbz1).(sregs) = uva 0x92).
     { unfold s_pc1; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
@@ -294,7 +294,7 @@ Section UservecExitPt.
     iSplitR.
     { iPureIntro. rewrite Hpceq2. rewrite Hva02. fold s_pc2. exact Hex2. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc2, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc2; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp ksatp).(sregs) = uva 0x96).
     { unfold s_pc2; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
@@ -345,7 +345,7 @@ Section UservecExitPt.
     { iPureIntro. rewrite Hpceq3. rewrite Hva03. fold s_pc3.
       change ai_sfence with (SFENCE_VMA (zreg, zreg)). exact Hex3. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc3, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc3; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc3 : register_lookup nextPC (set_reg s_pc3 tlb tlbz3).(sregs) = uva 0x9a).
     { unfold s_pc3; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
@@ -383,7 +383,7 @@ Section UservecExitPt.
     assert (Lmisa4p : register_lookup misa s_pc4.(sregs) = misa0)
       by (unfold s_pc4; tmig; exact Lmisa4).
     assert (Lnpc4v : register_lookup nextPC s_pc4.(sregs) = uva 0x9c)
-      by (unfold s_pc4, set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
+      by (unfold s_pc4; rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     assert (Hzic : exec (currentlyEnabled Ext_Zicfilp) s_pc4 = Some (false, s_pc4)).
     { apply uve_cE_zicfilp_false_S; [ exact Lpriv4p |].
       rewrite Lmenv4p Hmenvval0. vm_compute; reflexivity. }
@@ -430,7 +430,7 @@ Section UservecExitPt.
                ltac:(vm_compute; lia) Hrd1 Hzic Hzca).
       rewrite Htgt. unfold tgt. apply ret_pc_aligned. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc4, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc4; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc4 : register_lookup nextPC
               (set_reg (set_reg s_pc4 nextPC tgt)

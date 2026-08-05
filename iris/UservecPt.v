@@ -383,7 +383,7 @@ Section WpUsdPt.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hstore. }
     iSplitL "Hreg Hmem Hdev".
     { cbn [sregs mem mdev].
-      rewrite Hmdevtr. unfold s_pc, set_reg; cbn [mdev].
+      rewrite Hmdevtr. unfold s_pc; rewrite ?mdev_set_reg.
       iFrame "Hreg Hmem Hdev". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
@@ -638,7 +638,7 @@ Section WpUCsrPt.
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec0. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc sscratch (m !!! Regidx rs1 : mword 64)).(sregs)
@@ -752,7 +752,7 @@ Section WpUCsrPt.
     iSplitR.
     { iPureIntro. rewrite Hpceq. fold s_pc. exact Hexec0. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg sv)).(sregs)

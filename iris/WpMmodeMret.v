@@ -110,7 +110,7 @@ Section WpMretGpr.
     pose proof (fun HL => exec_execute_MRET s_pc newpriv false
                     LprivP HmuP HmcP HnpP Hnpm (Hxlpe _ HL)) as HexecC0.
     match type of HexecC0 with ?A -> _ => assert (HLmenv : A) end.
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [| vm_compute; reflexivity]).
       exact Lmenv. }
     specialize (HexecC0 HLmenv).
@@ -151,7 +151,7 @@ Section WpMretGpr.
     iSplitR.
     { iPureIntro. rewrite Hpceq. exact HexecC. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg (set_reg
@@ -161,7 +161,7 @@ Section WpMretGpr.
                elp (landing_pad_bits_backwards NO_LP_EXPECTED))
                nextPC (ret_pc mepc0)).(sregs)
              = ret_pc mepc0)
-      by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
+      by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hhs Hpriv Hms Hpmpc Hmenv [$Hpc' $Hnpc] Hfile Hmepc").
   Qed.

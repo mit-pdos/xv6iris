@@ -278,7 +278,7 @@ Section WpSconfCsr.
                Lpriv_spc Lms_spc
                ltac:(rewrite Lmisa_spc; exact HmisaS) Hrd). }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -498,7 +498,7 @@ Section WpSconfCsr.
                  ltac:(rewrite Lmisa_spc; exact HmisaU)
                  Himm2 Hrd). }
       iSplitL "Hreg Hmem".
-      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
       iIntros "Hhs' Hpc'".
       assert (Lnpc : register_lookup nextPC
                (set_reg (set_reg s_pc mstatus ms1)
@@ -553,7 +553,7 @@ Section WpSconfCsr.
                  ltac:(rewrite Lmisa_spc; exact HmisaU)
                  Himm2 Hrd Hcollapse). }
       iSplitL "Hreg Hmem".
-      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
       iIntros "Hhs' Hpc'".
       assert (Lnpc : register_lookup nextPC
                (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -731,7 +731,7 @@ Section WpSconfCsr.
                  ltac:(rewrite Lmisa_spc; exact HmisaU)
                  Himm2). }
       iSplitL "Hreg Hmem".
-      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
       iIntros "Hhs' Hpc'".
       assert (Lnpc : register_lookup nextPC
                (set_reg s_pc mstatus ms1).(sregs)
@@ -909,7 +909,7 @@ Section WpSconfCsr.
                ltac:(rewrite Lmisa_spc; exact HmisaU)
                Himm2). }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC (set_reg s_pc mstatus ms1).(sregs)
                    = add_vec_int pc 4).
@@ -1027,7 +1027,7 @@ Section WpSconfCsr.
                  ltac:(rewrite Lmisa_spc; exact HmisaU)
                  Himm2). }
       iSplitL "Hreg Hmem".
-      { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+      { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
       iIntros "Hhs' Hpc'".
       assert (Lnpc : register_lookup nextPC (set_reg s_pc mstatus ms1).(sregs)
                      = add_vec_int pc 4).
@@ -1119,7 +1119,7 @@ Section WpSconfCsr.
                ltac:(rewrite Lmisa_spc; exact HmisaS)).
       rewrite Lrs1. exact Hmode. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC (set_reg s_pc stvec wval).(sregs)
                    = add_vec_int pc 4).
@@ -1194,7 +1194,7 @@ Section WpSconfCsr.
       apply (exec_execute_csrr_scause_gpr_S rd s_pc Hrd Lpriv_spc).
       rewrite Lmisa_spc. exact HmisaS. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg sc)).(sregs)

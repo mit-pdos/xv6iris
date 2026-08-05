@@ -84,12 +84,12 @@ Section WpJalGpr.
     (* PC unchanged by the nextPC tick; still [pc] *)
     assert (Hpcv : register_lookup PC
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
     (* the link value: [register_lookup nextPC (set_reg σ nextPC (pc+4)) = pc+4] *)
     assert (Hlink : register_lookup nextPC
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = add_vec_int pc 4).
-    { unfold set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    { rewrite ?sregs_set_reg. rewrite register_lookup_set. reflexivity. }
     (* nextPC := target [add_vec pc (sign_extend' 64 imm)] (the JUMP) *)
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
             with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -116,7 +116,7 @@ Section WpJalGpr.
       - rewrite Hpcv. exact Hal0.
       - rewrite Hpcv. exact Hal1. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     (* continuation: PC (from wp_instr) is [register_lookup nextPC s_exec] = the
        target; own nextPC ↦ target too, giving [pc_is target]. *)
     iIntros "Hmm' Hpmpc' Hpc'".
@@ -126,7 +126,7 @@ Section WpJalGpr.
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (add_vec_int pc 4))).(sregs)
              = add_vec pc (sign_extend' 64 imm)).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfmap").

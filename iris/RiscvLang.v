@@ -77,6 +77,37 @@ Record mstate := MState {
 Definition set_reg (s : mstate) (r : register) (v : type_of_register r) : mstate :=
   MState (register_set r v s.(sregs)) s.(mem) s.(mdev).
 
+(* ---------------------------------------------------------------------- *)
+(* PEEL A STATE CHAIN WITH THESE, NEVER WITH [unfold set_reg; cbn [...]].  *)
+(*                                                                         *)
+(* [set_reg]'s body mentions [s] THREE times (once per field), so          *)
+(* [unfold set_reg] over an N-deep chain writes out a 3^N TREE -- the      *)
+(* result is a small DAG, but every kernel pass at [Qed] that walks the    *)
+(* term as a tree (HConstr.of_constr, sort_and_universes_of_constr) pays   *)
+(* the unfolded size.  [utrap_state] alone is a 12-deep chain (3^12 = 531k)*)
+(* and each subsequent [rewrite] copies that into an [eq_ind_r] motive.    *)
+(* Measured on [UserClassify.active_step_branch]: the [unfold] spelling    *)
+(* built a 24,508,005-node proof term for an 11,511-node DAG; the three    *)
+(* rewrites below build 1,062,390 nodes for the SAME proof (23x smaller),  *)
+(* taking the file from 23.4 s / 1832 MB to 8.7 s / 722 MB.                *)
+(*                                                                         *)
+(* They are goal-identical drop-ins: on the [sregs] projection             *)
+(* [rewrite ?sregs_set_reg] leaves exactly what [unfold set_reg;           *)
+(* cbn [sregs]] leaves, so whatever tactic followed still applies          *)
+(* ([irrelevant_register_set], [register_lookup_set], [iFrame], ...).      *)
+(* ---------------------------------------------------------------------- *)
+Lemma sregs_set_reg (s : mstate) (r : register) (v : type_of_register r) :
+  (set_reg s r v).(sregs) = register_set r v s.(sregs).
+Proof. reflexivity. Qed.
+
+Lemma mem_set_reg (s : mstate) (r : register) (v : type_of_register r) :
+  (set_reg s r v).(mem) = s.(mem).
+Proof. reflexivity. Qed.
+
+Lemma mdev_set_reg (s : mstate) (r : register) (v : type_of_register r) :
+  (set_reg s r v).(mdev) = s.(mdev).
+Proof. reflexivity. Qed.
+
 
 (* Byte address [a + j] (model's own mword arithmetic) and byte [j] of a value. *)
 

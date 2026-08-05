@@ -154,7 +154,7 @@ Section UTrapReduce.
     rewrite (exec_bind0_Some _ _ _ _ _ HZP).
     assert (HES1 : exec (currentlyEnabled Ext_S) s1e = Some (true, s1e)).
     { rewrite exec_currentlyEnabled_S. do 2 f_equal.
-      unfold s1e, s1, set_reg; cbn [sregs].
+      unfold s1e, s1; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
       exact HmisaS. }
     rewrite (exec_bind_Some _ _ _ _ _ HES1). cbn beta.
@@ -164,36 +164,36 @@ Section UTrapReduce.
     rewrite (exec_bind_Some _ _ _ _ _ HAE). cbn beta.
     (* scause chain *)
     assert (Hrd1 : exec (Defs.read_reg scause : M _) s1e = Some (sc_old, s1e)).
-    { rewrite (exec_read_reg scause s1e). unfold s1e, s1, set_reg; cbn [sregs].
+    { rewrite (exec_read_reg scause s1e). unfold s1e, s1; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
       rewrite Hsc. reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ Hrd1). cbn beta.
     rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg scause _ s1e)).
     assert (Hrd2 : exec (Defs.read_reg scause : M _) s2 = Some (c1, s2)).
-    { rewrite (exec_read_reg scause s2). unfold s2, set_reg; cbn [sregs].
+    { rewrite (exec_read_reg scause s2). unfold s2; rewrite ?sregs_set_reg.
       rewrite register_lookup_set. reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ Hrd2). cbn beta.
     rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg scause _ s2)).
     (* mstatus chain *)
     assert (Hrm1 : exec (Defs.read_reg mstatus : M _) s3 = Some (ms_e, s3)).
-    { rewrite (exec_read_reg mstatus s3). unfold s3, s2, s1e, set_reg; cbn [sregs].
+    { rewrite (exec_read_reg mstatus s3). unfold s3, s2, s1e; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
-      unfold s1, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+      unfold s1; rewrite ?sregs_set_reg. rewrite register_lookup_set. reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ Hrm1). cbn beta.
     rewrite (exec_bind_Some _ _ _ _ _ Hrm1). cbn beta.
     rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus _ s3)).
     assert (Hrm2 : exec (Defs.read_reg mstatus : M _) s4 = Some (ms_a, s4)).
-    { rewrite (exec_read_reg mstatus s4). unfold s4, set_reg; cbn [sregs].
+    { rewrite (exec_read_reg mstatus s4). unfold s4; rewrite ?sregs_set_reg.
       rewrite register_lookup_set. reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ Hrm2). cbn beta.
     rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg mstatus _ s4)).
     assert (Hrm3 : exec (Defs.read_reg mstatus : M _) s5 = Some (ms_b, s5)).
-    { rewrite (exec_read_reg mstatus s5). unfold s5, set_reg; cbn [sregs].
+    { rewrite (exec_read_reg mstatus s5). unfold s5; rewrite ?sregs_set_reg.
       rewrite register_lookup_set. reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ Hrm3). cbn beta.
     assert (Hrp : exec (Defs.read_reg cur_privilege : M _) s5 = Some (User, s5)).
     { rewrite (exec_read_reg cur_privilege s5).
-      unfold s5, s4, s3, s2, s1e, s1, set_reg; cbn [sregs].
+      unfold s5, s4, s3, s2, s1e, s1; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
       rewrite Hpriv. reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ Hrp). cbn beta. cbn match.
@@ -207,14 +207,14 @@ Section UTrapReduce.
     rewrite (exec_bind0_Some _ _ _ _ _ (exec_track_trap_S (trapCause_is_interrupt c) (trapCause_bits_forwards c) s9)).
     assert (Hrc : exec (Defs.read_reg scause : M _) s9 = Some (c2, s9)).
     { rewrite (exec_read_reg scause s9).
-      unfold s9, s8, s7, s6, s5, s4, set_reg; cbn [sregs].
+      unfold s9, s8, s7, s6, s5, s4; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
-      unfold s3, set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+      unfold s3; rewrite ?sregs_set_reg. rewrite register_lookup_set. reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ Hrc). cbn beta.
     unfold prepare_trap_vector.
     assert (Hrt : exec (Defs.read_reg stvec : M _) s9 = Some (stvec_v, s9)).
     { rewrite (exec_read_reg stvec s9).
-      unfold s9, s8, s7, s6, s5, s4, s3, s2, s1e, s1, set_reg; cbn [sregs].
+      unfold s9, s8, s7, s6, s5, s4, s3, s2, s1e, s1; rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
       rewrite Hstvec. reflexivity. }
     rewrite (exec_bind_Some _ _ _ _ _ Hrt). cbn beta.
@@ -544,7 +544,7 @@ Section UTrapGhost.
     iMod (reg_update _ mstatus _ ms_e with "Hreg Hms") as "[Hreg Hms]".
     iDestruct (reg_interp_set_same _ elp (landing_pad_bits_backwards NO_LP_EXPECTED)
                  with "Hreg") as "Hreg".
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       repeat (rewrite irrelevant_register_set; [ | vm_compute; reflexivity ]).
       rewrite Lelp Help0. reflexivity. }
     iMod (reg_update _ scause _
@@ -560,7 +560,7 @@ Section UTrapGhost.
     iMod (reg_update _ nextPC _ (stvec_base stvec_v) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iMod (reg_update _ PC _ (stvec_base stvec_v) with "Hreg Hpc") as "[Hreg Hpc]".
     iModIntro.
-    unfold utrap_state, set_reg; cbn [sregs mem mdev]. cbv zeta.
+    unfold utrap_state; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. cbv zeta.
     iFrame "Hreg Hmd Hms Hsc Hstval Hsepc Hpriv Hnpc Hpc".
   Qed.
 

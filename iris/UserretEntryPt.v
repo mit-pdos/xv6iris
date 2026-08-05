@@ -146,7 +146,7 @@ Section UserretEntryPt.
     { iPureIntro. rewrite Hpceq1. rewrite Hva01. fold s_pc1.
       change ai_sfence with (SFENCE_VMA (zreg, zreg)). exact Hex1. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc1, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc1; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc1 : register_lookup nextPC (set_reg s_pc1 tlb tlbz1).(sregs) = uva 0xa0).
     { unfold s_pc1; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
@@ -214,7 +214,7 @@ Section UserretEntryPt.
       change ai_csrw with (CSRReg (csr_satp, Regidx (mword_of_int 10 : mword 5), zreg, CSRRW)).
       exact Hex2. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc2, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc2; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp usatp).(sregs) = uva 0xa4).
     { unfold s_pc2; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
@@ -266,7 +266,7 @@ Section UserretEntryPt.
     { iPureIntro. rewrite Hpceq3. rewrite Hva03. fold s_pc3.
       change ai_sfence with (SFENCE_VMA (zreg, zreg)). exact Hex3. }
     iSplitL "Hreg Hmem".
-    { unfold s_pc3, set_reg; cbn [sregs mem mdev]. iFrame "Hreg Hmem". }
+    { unfold s_pc3; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
     assert (Lnpc3 : register_lookup nextPC (set_reg s_pc3 tlb tlbz3).(sregs) = uva 0xa8).
     { unfold s_pc3; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }

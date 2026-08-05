@@ -48,7 +48,7 @@ Section WpAuipcGpr.
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     assert (Hpcv : register_lookup PC
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
     (* write rd (rd <> 0, so its entry is the real register points-to) *)
     iDestruct (gpr_file_insert_acc m (Regidx rd)
@@ -69,7 +69,7 @@ Section WpAuipcGpr.
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       rewrite Hpcv. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     (* continuation: PC/nextPC are both pc+4; hand everything back *)
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
@@ -77,7 +77,7 @@ Section WpAuipcGpr.
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (add_vec pc (auipc_off imm)))).(sregs)
              = add_vec_int pc 4).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").
@@ -137,7 +137,7 @@ Section WpLuiGpr.
       replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
       reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     (* continuation: PC/nextPC are both pc+4; hand everything back *)
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
@@ -145,7 +145,7 @@ Section WpLuiGpr.
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (luival imm))).(sregs)
              = add_vec_int pc (if is_rvc then 2 else 4)).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iApply ("Hcont" with "Hmm' Hpmpc' [$Hpc' $Hnpc] Hfile").

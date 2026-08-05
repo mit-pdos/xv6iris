@@ -134,7 +134,7 @@ Section WpSconfCtl.
     { iPureIntro. rewrite Hpceq. fold s_pc.
       apply (exec_execute_FENCE_S menvcfg0 fm pred succ rs rd s_pc
                Lpriv_pc Lmenv_pc Hfiom). }
-    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
@@ -217,7 +217,7 @@ Section WpSconfCtl.
     { iPureIntro. rewrite Hpceq. fold s_pc.
       apply (exec_execute_FENCE_S menvcfg0 fm pred succ rs rd s_pc
                Lpriv_pc Lmenv_pc Hfiom). }
-    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
@@ -266,10 +266,10 @@ Section WpSconfCtl.
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
     assert (HzcaC : eq_vec (_get_Misa_C (register_lookup misa s_pc.(sregs))) ('b"1") = true).
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ rewrite Lmisa; exact HmisaC | vm_compute; reflexivity ]. }
     assert (Halign_spc : eq_vec (access_vec_dec
               (add_vec (register_lookup PC s_pc.(sregs)) (sign_extend' 64 jimm)) 0) ('b"0") = true).
@@ -284,10 +284,10 @@ Section WpSconfCtl.
       rewrite (exec_execute_JAL_zreg_zca jimm s_pc Halign_spc
                  (exec_currentlyEnabled_Zca s_pc HzcaC)).
       rewrite Hpcv. reflexivity. }
-    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
-      by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
+      by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert sconf with "[$Hhw $Hsc2]" as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
@@ -330,13 +330,13 @@ Section WpSconfCtl.
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     assert (Hpcv : register_lookup PC
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = pc).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
     assert (Hlink : register_lookup nextPC
              (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = add_vec_int pc 4).
-    { unfold set_reg; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    { rewrite ?sregs_set_reg. rewrite register_lookup_set. reflexivity. }
     assert (Lmisa1 : register_lookup misa (set_reg σ nextPC (add_vec_int pc 4)).(sregs) = misa0).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm))
             with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -362,7 +362,7 @@ Section WpSconfCtl.
                  (exec_currentlyEnabled_Zca (set_reg σ nextPC (add_vec_int pc 4)) ltac:(rewrite Lmisa1; exact HmisaC))).
       rewrite Hpcv. rewrite Hlink. reflexivity. }
     iSplitL "Hreg Hmem".
-    { unfold set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    { rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
              (set_reg (set_reg (set_reg σ nextPC (add_vec_int pc 4))
@@ -370,7 +370,7 @@ Section WpSconfCtl.
                 (R_bitvector_64 (gpr_of_Z (uint rd)))
                 (regval_into_reg (add_vec_int pc 4))).(sregs)
              = add_vec pc (sign_extend' 64 imm)).
-    { unfold set_reg; cbn [sregs].
+    { rewrite ?sregs_set_reg.
       tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
@@ -428,15 +428,15 @@ Section WpSconfCtl.
       replace (Z.eqb (uint ra) 0) with false in H by (symmetry; apply Z.eqb_neq; exact Hra).
       cbn match in H. exact H. }
     assert (Hpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor).
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Lpriv | vm_compute; reflexivity ]. }
     assert (Hmenv_spc : register_lookup menvcfg s_pc.(sregs) = menvcfg0).
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Lmenv | vm_compute; reflexivity ]. }
     assert (Hzic : exec (currentlyEnabled Ext_Zicfilp) s_pc = Some (false, s_pc)).
     { apply exec_cE_zicfilp_false_S; [ exact Hpriv_spc | rewrite Hmenv_spc; exact Hlpe ]. }
     assert (Hmisa_spc : register_lookup misa s_pc.(sregs) = misa0).
-    { unfold s_pc, set_reg; cbn [sregs].
+    { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Lmisa | vm_compute; reflexivity ]. }
     assert (Hzca : exec (currentlyEnabled Ext_Zca) s_pc = Some (true, s_pc)).
     { apply exec_currentlyEnabled_Zca. rewrite Hmisa_spc. exact HmisaC. }
@@ -456,10 +456,10 @@ Section WpSconfCtl.
       apply (exec_execute_JALR_ret_zca (zeros' 12) ra (zero_extend' 5 ('b"00") : mword 5) s_pc
                Hra ltac:(vm_compute; reflexivity) Hzic Hzca).
       rewrite Htgt. apply ret_pc_aligned. }
-    iSplitL "Hreg Hmem". { unfold s_pc, set_reg; cbn [sregs mem]. iFrame "Hreg Hmem". }
+    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC (set_reg s_pc nextPC tgt).(sregs) = tgt)
-      by (unfold set_reg; cbn [sregs]; rewrite register_lookup_set; reflexivity).
+      by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert sconf with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
