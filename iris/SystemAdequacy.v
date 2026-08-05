@@ -192,8 +192,8 @@ Proof.
      theorem still says exactly "never stuck", with the durability slot left
      open. *)
   apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
-           (fun _ : Z -> bv 8 => True%I)
-           ltac:(iModIntro; done) Hgen0 Hpow).
+           (fun (_ : gname) (_ : Z -> bv 8) => True%I)
+           ltac:(intros γsw; iIntros "_"; iModIntro; done) Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS

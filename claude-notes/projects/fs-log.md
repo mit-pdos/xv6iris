@@ -290,19 +290,67 @@ preserve v_disk: the record-P does not move, so the power arms frame it.
         the disk); `fs_rec_wf` takes the block view; `P_fs_alloc` /
         `P_fs_alloc_clean` re-derived in adequacy's `⊢ |==> Pc dk0` shape;
         `P_fs_recovers` no longer needs a tie argument.
-- [ ] **C2b — the three real call-site fupds, and `P_fs` as `Pc`.**
-      The bridge premise `crash_pred_indifferent` currently rides
-      `SpecWriteHead` / `SpecInstallTrans` / `SpecEndOp` / `SpecInitlog`
-      (and the block lemmas inside their proofs). Each of the WAL write
-      kinds — log-fill / commit(n,W) / install / clear — replaces it with
-      a real `disk_write_permit (Some (1024 * bno, bs)) Q` proved from its
-      own local knowledge, re-establishing `fs_rec_wf` at
-      `fs_blocks (disk_write dk (1024*bno) bs)` via
-      `FsCrash.fs_blocks_write_eq`/`_ne`. Then `SystemAdequacy` passes
-      `Pc := fun dk => ∃ γs, P_fs γs cov logstart dk`, discharged by
-      `P_fs_alloc`. Note the log Link files are NOT in the linked cone of
-      `xv6_power_adequacy`, so the bridge premise is never discharged
-      anywhere today and both Print Assumptions baselines are unmoved.
+- [x] **C2b/D1 stage 1 — THE SQUEEZE, LANDED AND PROVEN.** The blocker of
+      the previous round (a per-era mirror gname existentially quantified in
+      a fixed invariant cannot be matched from inside a stateless fupd; a
+      fixed one strands after a crash) is closed by threading the AMBIENT ERA
+      through the permit, and the identification is now a proved lemma.
+      - `RiscvPtsto.v`: `log_mirror` (the shape: `lm_hdr : nat * list Z`,
+        the ON-DISK header's `hdr_dec` reading, and `lm_slots : nat -> list
+        (bv 8)`, the slots' contents — READINGS, the lightest thing that
+        serves all three WAL kinds, and carrying no FS constant);
+        `riscvEraGS.era_mirror_name` (per-era, the `era_disk_name` pattern);
+        `riscvF_mirrorGS`; the FIXED `riscv_swap_name` + `swap_auth`/
+        `swap_lb` + `swap_lb_le` / `gen_started_le` / `swap_auth_update`.
+        The permit becomes
+        `disk_write_permit w Q := ∀ dk g E n, era_registered g E -∗
+        start_auth n -∗ ⌜n = g + 1⌝ -∗ ▷ Pc dk ==∗ ▷ Pc (wr_apply w dk) ∗
+        start_auth n ∗ Q`; `disk_write_permit_trivial` stays free (it ignores
+        all four).
+      - `RiscvExec.wp_disk_step`: hands the started-generations auth to the
+        callback with the live-era arithmetic `⌜n = gen_id + 1⌝`, and takes
+        it back — the same accessor style as the image auth.
+      - `PermInv`: `perm_consume`/`perm_consume_kq` thread `(g, E, n)`.
+      - `WpUart.wp_disk_loop`: supplies its own `gen_id`/`riscv_eraGS`, its
+        registry element out of `gen_cert`, and `state_interp`'s auth.
+      - `RiscvAdequacy`/`SystemAdequacy`: `Pc` is now
+        `gname -> (Z -> bv 8) -> iProp Σ` and `HPc` is
+        `∀ γsw, mono_nat_auth_own γsw 1 0 ⊢ |==> Pc γsw (v_disk …)` — the
+        swap AUTH is minted here and handed to the client, because a
+        fixed-layer invariant never dies so the auth never strands. Both
+        theorems still instantiate `Pc := fun _ _ => True`.
+      - `FsCrash.v`: `log_mirror_ok` / `mirror_of` / `mirror_of_ok`;
+        `fs_custody` and the counter-indexed `fs_arm`
+        (`∃ c, mono_nat_auth (fcn_swap) 1 c ∗ (⌜c = 0⌝ ∨ ∃ g'', ⌜c = S g''⌝ ∗
+        fs_custody … g'')`); **`fs_arm_swap`** (retire ANY arm — only the
+        upper bound is needed, which is why a fresh era can always swap —
+        then install this era's custody) and **`fs_arm_acc`** (the squeeze:
+        `swap_lb (S g)` gives `S g ≤ c` refuting at-rest AND `g ≤ g''`, the
+        threaded `start_auth (g+1)` against the arm's `gen_started g''` gives
+        `g'' ≤ g`, so `g'' = g`; `ghost_map_elem_agree` at the shared key
+        gives `E'' = E`; `ghost_var_agree` then meets the two mirror halves,
+        and the closing wand re-establishes the arm at the POST-write image).
+      - GOTCHA worth keeping: `P_fs` cannot mention `riscvFixedGS` (its
+        `riscv_crash_pred` field is what `P_fs` instantiates — circular), so
+        the registry/started/swap gnames are `fs_crash_names` PARAMETERS with
+        seam equations, and their CLASSES are bare Section constraints rather
+        than `fsCrashG` fields — two sibling class fields would be different
+        Σ slots whose resources cannot interact (DiskImg.v's recorded trap).
+- [ ] **C2b/D1 stages 2-5 — REMAINING.**
+      2. `LogInv.v`: the era-side mirror half in `log_res`/`log_batch` (the
+         batch form the committer checks out carries it; between commits
+         `log_res`'s arm), plus the era's `swap_lb (S g)` receipt —
+         `log_ctx` is the natural carrier (persistent, already threaded by
+         every log function).
+      3. `initlog` (stage-2 clean form): the swap rides its final
+         `write_head` fupd (`fs_arm_swap`), spending the era boot token; the
+         mirror is `mirror_of` the post-write image, which is free inside the
+         fupd since `dk` is universally quantified there.
+      4. The three real fupds at the WAL sites, currying the era mirror half
+         + `swap_lb` and running `fs_arm_acc`; `Q` for write_head's commit is
+         the new `fs_receipt`; delete `crash_pred_indifferent`.
+      5. `xv6_fs_adequacy` passing `Pc := P_fs` with the one initial-recovery
+         hypothesis; `xv6_power_adequacy` untouched.
 
 ### Phase D — recovery + sys_sync
 

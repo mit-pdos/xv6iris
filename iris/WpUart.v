@@ -909,7 +909,7 @@ Section DevLoops.
        over because a DMA completion is the one step that moves [v_disk]): the
        latch and stutter arms FRAME it, and the completion arm passes it
        through [virtio_proto_step] (claude-notes/design/crash.md). *)
-    iIntros (gr m d) "(Hgr & Hmem & Hdev & Hdur & Htie)".
+    iIntros (gr m d n Hn) "(Hgr & Hmem & Hdev & Hdur & Htie & Hsa)".
     (* THE PERMIT INVARIANT IS OPENED IN THE FIRST (⊤ -> ∅) LEG, before the
        arm is even known.  It has to be: [perm_inv_body] is NOT timeless (it
        holds the clients' view shifts), so the only [▷]-stripping opportunity
@@ -961,8 +961,16 @@ Section DevLoops.
       iDestruct (disk_tie_agree with "Htie Htie2") as %<-.
       (* THE CLIENT'S VIEW SHIFT, at the image the machine is moving FROM;
          it lands the crash predicate at [wr_apply wr] of it. *)
+      (* THE AMBIENT ERA GOES IN WITH THE VIEW SHIFT (phase C2b/D1): the
+         thread's own generation and era record, its registry element, and
+         [state_interp]'s started-generations auth with the live-era
+         arithmetic.  That is what lets a client fupd identify the crash
+         record's recorded custodian as ITSELF. *)
+      iDestruct "Hcert" as "(_ & _ & Hrege)".
       iMod (perm_consume_kq (dn_perm γd) kq wr (v_disk (dvirtio d))
-              with "Hpbody Hpend HP") as "(Hpbody & Hdone & HP)".
+              gen_id riscv_eraGS n
+              with "Hpbody Hpend Hrege Hsa [//] HP")
+        as "(Hpbody & Hdone & Hsa & HP)".
       (* THE MECHANICAL TIE UPDATE: both halves, together, to the image the
          device just produced.  It is the completion's own job -- the client
          cannot do it (it holds neither half) and nobody else in the machine
@@ -982,7 +990,7 @@ Section DevLoops.
       iEval (rewrite Himg) in "Hdauth'".
       iSplitL "Hdauth'".
       { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
-      iFrame "Htie".
+      iFrame "Htie Hsa".
       iApply "IH".
     - (* The queue the driver published is MALFORMED, so the device may write
          anything anywhere.  This case is REFUTED, not handled: the lease's
@@ -1017,13 +1025,13 @@ Section DevLoops.
       iSplitL "Hdauth".
       { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
       (* a latch moves only the PLIC: the FS tie is FRAMED *)
-      iFrame "Htie".
+      iFrame "Htie Hsa".
       iApply "IH".
     - (* the totality stutter (RiscvLang §3c) *)
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev".
       iSplitL "Hdur"; [iExact "Hdur"|].
-      iFrame "Htie". iApply "IH".
+      iFrame "Htie Hsa". iApply "IH".
   Qed.
 
   (* ------------------------------------------------------------------ *)

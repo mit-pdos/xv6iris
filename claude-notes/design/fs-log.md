@@ -436,6 +436,22 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
 4. **Recovery** = initlog's real spec: swap the `P_fs` arm with the
    era's boot token; the recovery writes are tagged install/clear
    transitions; the final record has the header cleared and D unchanged.
+   - **THE SWAP IS A PREREQUISITE FOR THE WRITE FUPDS, NOT A FOLLOW-ON**
+     (found in phase C2b). A crash permit is a STATELESS view shift: it
+     runs at the DMA completion, inside the disk thread, on whatever the
+     caller curried at enqueue. So every fact a WAL write's fupd needs
+     about the PHYSICAL log region — "the on-disk header is clean"
+     (write_log's slot fills), "the physical log slots hold the logged
+     values" (write_head's commit), "the on-disk header is the (n, W) I
+     just wrote" (install_trans's home writes) — has to be knowledge the
+     ERA holds continuously. It cannot live in `P_fs` as a ghost equation
+     against `γL`: `γL` is per-era and dies at a crash while `P_fs` is
+     fixed-layer. It cannot be re-derived at each `bwrite` either: bio
+     owns every covered block's `disk_block` (the log region is inside
+     `cov`), and the pool/escrow arms that DO tie physical to logical
+     (`pool_blk`'s shared `bs`, the clean arm's `⌜bsd = bs⌝`) are parked
+     under `bcache.lock`. The CHECKED-OUT arm is precisely the place for
+     that era-side custody, so recovery's swap has to land first.
    The stage-2 clean-image spec becomes the n = 0 corollary.
 5. **sys_sync** = a persistent receipt: the record carries a fixed
    mono-list of committed D's; commit appends; sys_sync's post is a

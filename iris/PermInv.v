@@ -186,12 +186,14 @@ Section perm.
      exclusive and the auth pins its value, so [b = true] and the permit is
      provably unspent. *)
   Lemma perm_consume (γP : gname) (k : nat) (γq : gname) (w : disk_wr)
-      (dk : Z -> bv 8) :
-    perm_inv_body γP -∗ perm_tok γP k true γq w -∗ ▷ riscv_crash_pred dk ==∗
-      perm_inv_body γP ∗ perm_tok γP k false γq w ∗
+      (dk : Z -> bv 8) (g : nat) (E : riscvEraGS) (n : nat) :
+    perm_inv_body γP -∗ perm_tok γP k true γq w -∗
+    era_registered g E -∗ start_auth n -∗ ⌜n = (g + 1)%nat⌝ -∗
+    ▷ riscv_crash_pred dk ==∗
+      perm_inv_body γP ∗ perm_tok γP k false γq w ∗ start_auth n ∗
       ▷ riscv_crash_pred (wr_apply w dk).
   Proof.
-    iIntros "Hbody Htok HP". rewrite {1}/perm_inv_body.
+    iIntros "Hbody Htok #Hera Hsa %Hn HP". rewrite {1}/perm_inv_body.
     iDestruct "Hbody" as (m) "[Hauth Hents]".
     rewrite /perm_tok.
     iDestruct (ghost_map_lookup with "Hauth Htok") as %Hk.
@@ -203,9 +205,9 @@ Section perm.
        moving the machine FROM.  The index move is the whole content of the
        reshaped permit: [w] is this request's write identity, pinned to the
        slot by [VirtioProto.slot_pend_res]. *)
-    iMod ("Hpm" $! dk with "HP") as "[HP HQ]".
+    iMod ("Hpm" $! dk g E n with "Hera Hsa [//] HP") as "(HP & Hsa & HQ)".
     iMod (ghost_map_update (false, γq, w) with "Hauth Htok") as "[Hauth Htok]".
-    iModIntro. iFrame "Htok HP". rewrite /perm_inv_body.
+    iModIntro. iFrame "Htok Hsa HP". rewrite /perm_inv_body.
     iExists (<[k := (false, γq, w)]> m). iFrame "Hauth".
     rewrite (big_sepM_insert_delete (fun k x => perm_slot x.1.1 x.1.2 x.2)
                m k (false, γq, w)).
@@ -234,14 +236,17 @@ Section perm.
   Proof. rewrite /perm_done. apply _. Qed.
 
   Lemma perm_consume_kq (γP : gname) (kq : nat * gname) (w : disk_wr)
-      (dk : Z -> bv 8) :
-    perm_inv_body γP -∗ perm_pend γP kq w -∗ ▷ riscv_crash_pred dk ==∗
-      perm_inv_body γP ∗ perm_done γP kq w ∗
+      (dk : Z -> bv 8) (g : nat) (E : riscvEraGS) (n : nat) :
+    perm_inv_body γP -∗ perm_pend γP kq w -∗
+    era_registered g E -∗ start_auth n -∗ ⌜n = (g + 1)%nat⌝ -∗
+    ▷ riscv_crash_pred dk ==∗
+      perm_inv_body γP ∗ perm_done γP kq w ∗ start_auth n ∗
       ▷ riscv_crash_pred (wr_apply w dk).
   Proof.
-    iIntros "Hbody Hpend HP". rewrite /perm_pend /perm_done.
-    iMod (perm_consume with "Hbody Hpend HP") as "(Hbody & Htok & HP)".
-    iModIntro. iFrame "Hbody Htok HP".
+    iIntros "Hbody Hpend #Hera Hsa %Hn HP". rewrite /perm_pend /perm_done.
+    iMod (perm_consume with "Hbody Hpend Hera Hsa [//] HP")
+      as "(Hbody & Htok & Hsa & HP)".
+    iModIntro. iFrame "Hbody Htok Hsa HP".
   Qed.
 
   (* the pair form of the deposit: what an enqueuer calls, returning exactly

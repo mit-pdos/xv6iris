@@ -433,13 +433,20 @@ Section WPDev.
      (v_disk (dvirtio (gdev g)))]). *)
   Lemma wp_disk_step Φ :
     gen_cert -∗
-    (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ∗
+    (* THE STARTED-GENERATIONS AUTH IS THREADED THROUGH TOO (phase C2b/D1),
+       in the same accessor style as the image auth: a DMA completion is the
+       one step whose client fupd has to know WHICH generation is current,
+       and [state_interp] is the only thing that does.  The pure [n = gen + 1]
+       is the live-era arithmetic ([start_count] at [gpow = true]); together
+       they let the crash-side arm's [gen_started] be bounded from above. *)
+    (∀ gr m d n, ⌜n = (gen_id + 1)%nat⌝ -∗
+       gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ∗
        disk_img_auth disk_img_name (v_disk (dvirtio d)) ∗
-       disk_tie (v_disk (dvirtio d)) ={⊤,∅}=∗
+       disk_tie (v_disk (dvirtio d)) ∗ start_auth n ={⊤,∅}=∗
        ▷ (∀ d' m', ⌜disk_step d m d' m'⌝ ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m' ∗ dev_interp d' ∗
             disk_img_auth disk_img_name (v_disk (dvirtio d')) ∗
-            disk_tie (v_disk (dvirtio d')) ∗
+            disk_tie (v_disk (dvirtio d')) ∗ start_auth n ∗
             WP (DiskLoop : expr riscv_lang) {{ Φ }})) -∗
     WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -483,9 +490,11 @@ Section WPDev.
     { rewrite Heq in HRE. congruence. }
     iDestruct "Hera" as "(Hgr & Hmem & Hdev & Hdur)".
     iDestruct "Hdur" as (dmap) "[Hdauth %Hdview]".
-    iMod ("H" $! g.(gregs) g.(gmem) g.(gdev)
-            with "[$Hgr $Hmem $Hdev Hdauth Htie]") as "Hk".
-    { iFrame "Htie". iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
+    iMod ("H" $! g.(gregs) g.(gmem) g.(gdev) (start_count g)
+            with "[] [$Hgr $Hmem $Hdev Hdauth Htie Hsauth]") as "Hk".
+    { iPureIntro. rewrite /start_count Hpw Heq. lia. }
+    { iFrame "Htie Hsauth". iExists dmap. iFrame "Hdauth". iPureIntro.
+      exact Hdview. }
     iModIntro. iSplitR.
     { iPureIntro. exists [], (DiskLoopE gen_id),
         (GState g.(gregs) g.(gmem) g.(gdev) g.(ggen) g.(gpow)), [].
@@ -503,10 +512,10 @@ Section WPDev.
       | injection Hu as <-; exfalso; apply Hnl; split; congruence
       | discriminate Hc | discriminate Hc ].
     iMod ("Hk" $! d' m' with "[//]")
-      as "(Hgr' & Hmem' & Hdev' & Hdur' & Htie' & HWP)".
+      as "(Hgr' & Hmem' & Hdev' & Hdur' & Htie' & Hsauth' & HWP)".
     iIntros "_ !>". rewrite /state_interp /power_interp /fs_tie_interp
       /era_interp /disk_dur_interp /disk_img_auth /=.
-    iFrame "Hgauth Hsauth Htie' HWP".
+    iFrame "Hgauth Hsauth' Htie' HWP".
     iDestruct "Hdur'" as (dmap') "[Hdauth' %Hdview']".
     iExists R. iFrame "HRauth".
     iSplitR; [iPureIntro; exact Hdom|].

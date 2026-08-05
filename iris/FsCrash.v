@@ -42,7 +42,7 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth.
 From iris.algebra.lib Require Import mono_list.
-From iris.base_logic.lib Require Import own ghost_var invariants.
+From iris.base_logic.lib Require Import own ghost_var ghost_map mono_nat invariants.
 Require Import RiscvModelBytes.
 Require Import VirtioModel.
 Require Import RiscvPtsto.
@@ -235,6 +235,32 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* 1c'. THE LOG-REGION MIRROR's MEANING (phase C2b/D1).                     *)
+(*                                                                          *)
+(* [RiscvPtsto.log_mirror] is the SHAPE; this is what makes a recorded       *)
+(* picture true of a disk.  It is the bridge the three WAL write kinds pass  *)
+(* to each other, and the reason it must exist at all is that a crash permit *)
+(* is a STATELESS view shift: no single [bwrite] can re-derive "the on-disk  *)
+(* header is clean" or "the log slots hold the logged values" -- those are   *)
+(* facts the PREVIOUS writes established.                                    *)
+(* ---------------------------------------------------------------------- *)
+
+Definition log_mirror_ok (M : log_mirror) (P : Z -> list (bv 8)) (ls : Z)
+    : Prop :=
+  lm_hdr M = hdr_dec (P (log_hdr_bno ls)) /\
+  forall i, (i < LOGBLOCKS)%nat -> lm_slots M i = P (log_slot_bno ls i).
+
+(* the mirror of a given disk, as a function -- what a swap installs and what
+   every WAL fupd re-establishes at the post-write image *)
+Definition mirror_of (P : Z -> list (bv 8)) (ls : Z) : log_mirror :=
+  MkLogMirror (hdr_dec (P (log_hdr_bno ls)))
+              (fun i => P (log_slot_bno ls i)).
+
+Lemma mirror_of_ok (P : Z -> list (bv 8)) (ls : Z) :
+  log_mirror_ok (mirror_of P ls) P ls.
+Proof. split; [reflexivity | intros i _; reflexivity]. Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 1d. The record the escrow is over, and its well-formedness.             *)
 (* ---------------------------------------------------------------------- *)
 
@@ -291,10 +317,31 @@ Proof. solve_inG. Qed.
    [P_fs_alloc]'s. *)
 Record fs_crash_names := MkFsCrashNames {
   fcn_hist : gname;   (* the committed history, a mono-list *)
+  (* THE SWAP COUNTER's gname (phase C2b/D1).  Adequacy allocates it and
+     hands the AUTH to the client, so it can only be a parameter here; the
+     seam equation the client carries is [fcn_swap γs = riscv_swap_name],
+     exactly like [VirtioProto]'s [dn_img γ = disk_img_name]. *)
+  fcn_swap : gname;
+  (* The GENERATION REGISTRY and the STARTED counter, likewise as parameters
+     with seam equations ([fcn_reg γs = riscv_registry_name],
+     [fcn_start γs = riscv_start_name]).  They cannot be read off
+     [riscvFixedGS] here: [riscv_crash_pred] is a FIELD of that record and
+     [P_fs] is what instantiates it, so naming the record inside [P_fs] would
+     be circular.  The CLASSES are taken as bare Section constraints below
+     rather than bundled into [fsCrashG], so that resolution picks the SAME
+     Σ slots the fixed record's own fields were built from -- two sibling
+     class fields would be different slots whose resources cannot interact
+     (the trap DiskImg.v's header records). *)
+  fcn_reg   : gname;
+  fcn_start : gname;
 }.
 
 Section fs_crash.
   Context `{!fsCrashG Σ, !lockG Σ}.
+  (* bare constraints, deliberately not [fsCrashG] fields -- see
+     [fs_crash_names] above *)
+  Context `{!ghost_mapG Σ nat riscvEraGS, !mono_natG Σ,
+            !ghost_varG Σ log_mirror}.
 
   (* -------------------------------------------------------------------- *)
   (* 2a. the committed-history mono-list                                   *)
@@ -382,14 +429,161 @@ Section fs_crash.
   (* 3. [P_fs] -- THE CRASH PREDICATE.                                     *)
   (* ==================================================================== *)
 
-  (* The generation arm (design/fs-log.md stage-4 item 3): the record is
-     either AT REST or CHECKED OUT by the era whose one-shot FS boot token
-     sits in it.  In C1 the swap protocol does not exist, so the at-rest arm
-     is [emp] and every allocation lands there; phase D gives the
-     checked-out arm its era binding (and the at-rest arm whatever the swap
-     needs to recognize a stale generation). *)
-  Definition fs_arm : iProp Σ :=
-    (emp ∨ ∃ γg : gname, fs_boot_tok γg)%I.
+  (* ==================================================================== *)
+  (* THE GENERATION ARM (phase C2b/D1): AT REST, or CHECKED OUT by an era.  *)
+  (*                                                                        *)
+  (* The counter [c] is the whole identification mechanism.  [c = 0] is at   *)
+  (* rest (no era has ever taken custody); [c = S g''] means generation      *)
+  (* [g''] holds custody, and the arm then carries that era's registry       *)
+  (* element, its started certificate, and HALF of its log-region mirror --  *)
+  (* the other half being era-side, in the log layer.                        *)
+  (*                                                                        *)
+  (* THE SQUEEZE.  A WAL write's fupd arrives with its own swap receipt      *)
+  (* [swap_lb (S g)] (so [S g <= c], which both refutes the at-rest arm and  *)
+  (* gives [g <= g'']) and, threaded in by the DMA completion, the           *)
+  (* started-generations auth at [g + 1] (so [S g'' <= g + 1], i.e.          *)
+  (* [g'' <= g]).  Hence [g'' = g]; [era_registered] agreement at the shared *)
+  (* key gives [E'' = E]; and the mirror gname is identified, so the two     *)
+  (* halves meet.  Retiring an arm needs NO identification -- only the       *)
+  (* upper bound -- which is why a fresh era can always swap.                *)
+  (* ==================================================================== *)
+
+  (* the registry element and the started certificate, at the PARAMETER
+     gnames.  Both persistent, as their fixed-layer twins are. *)
+  Definition fs_era_reg (γs : fs_crash_names) (g : nat) (E : riscvEraGS)
+      : iProp Σ := (g ↪[fcn_reg γs]□ E)%I.
+  Definition fs_started (γs : fs_crash_names) (g : nat) : iProp Σ :=
+    mono_nat_lb_own (fcn_start γs) (S g).
+
+  Global Instance fs_era_reg_persistent γs g E : Persistent (fs_era_reg γs g E).
+  Proof. rewrite /fs_era_reg. apply _. Qed.
+  Global Instance fs_started_persistent γs g : Persistent (fs_started γs g).
+  Proof. rewrite /fs_started. apply _. Qed.
+
+  Definition fs_custody (γs : fs_crash_names) (ls : Z) (dk : Z -> bv 8)
+      (g'' : nat) : iProp Σ :=
+    (∃ (E'' : riscvEraGS) (M : log_mirror),
+       fs_era_reg γs g'' E'' ∗ fs_started γs g'' ∗
+       ghost_var (era_mirror_name E'') (1/2) M ∗
+       ⌜log_mirror_ok M (fs_blocks dk) ls⌝)%I.
+
+  Definition fs_arm (γs : fs_crash_names) (ls : Z) (dk : Z -> bv 8)
+      : iProp Σ :=
+    (∃ c : nat,
+       mono_nat_auth_own (fcn_swap γs) 1 c ∗
+       (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs ls dk g''))%I.
+
+  (* the at-rest arm, as adequacy mints it *)
+  Lemma fs_arm_at_rest γs ls dk :
+    mono_nat_auth_own (fcn_swap γs) 1 0%nat ⊢ fs_arm γs ls dk.
+  Proof.
+    iIntros "Ha". rewrite /fs_arm. iExists 0%nat. iFrame "Ha". by iLeft.
+  Qed.
+
+  (* the upper bound RETIREMENT needs, and it is all it needs: whatever arm is
+     there, its generation is at most the ambient one.  No identification --
+     which is exactly why a fresh era can always swap, including after a
+     crash that stranded the previous era's mirror half. *)
+  Local Lemma fs_custody_started γs ls dk g'' :
+    fs_custody γs ls dk g'' -∗ fs_started γs g'' ∗ fs_custody γs ls dk g''.
+  Proof.
+    rewrite /fs_custody. iIntros "H".
+    iDestruct "H" as (E M) "(#Hr & #Hs & Hm & %Hok)".
+    iSplitR; [iExact "Hs"|].
+    iExists E, M. iFrame "Hr Hs Hm". iPureIntro. exact Hok.
+  Qed.
+
+  Local Lemma fs_arm_le γs ls dk (g n c : nat) :
+    n = (g + 1)%nat ->
+    mono_nat_auth_own (fcn_start γs) 1 n -∗
+    (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs ls dk g'') -∗
+    ⌜(c <= S g)%nat⌝ ∗ mono_nat_auth_own (fcn_start γs) 1 n ∗
+    (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs ls dk g'').
+  Proof.
+    intros ->. iIntros "Hsa Hd".
+    iDestruct "Hd" as "[%Hc0 | Hc]".
+    { iFrame "Hsa". iSplitR; [iPureIntro; lia|]. by iLeft. }
+    iDestruct "Hc" as (g'') "[%Hc Hcust]".
+    iDestruct (fs_custody_started with "Hcust") as "[#Hst Hcust]".
+    rewrite /fs_started.
+    iDestruct (mono_nat_lb_own_valid with "Hsa Hst") as %[_ Hle].
+    iFrame "Hsa". iSplitR; [iPureIntro; lia|].
+    iRight. iExists g''. iSplitR; [done|]. iExact "Hcust".
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE SWAP: retire whatever arm is there, install THIS era's custody.    *)
+  (* It rides a write fupd (initlog's final write_head), so it takes the    *)
+  (* started auth the completion threaded in and hands it straight back.    *)
+  (* ==================================================================== *)
+  Lemma fs_arm_swap (γs : fs_crash_names) (ls : Z) (dk : Z -> bv 8)
+      (g : nat) (E : riscvEraGS) (n : nat) (M : log_mirror) :
+    n = (g + 1)%nat ->
+    log_mirror_ok M (fs_blocks dk) ls ->
+    fs_era_reg γs g E -∗ fs_started γs g -∗
+    mono_nat_auth_own (fcn_start γs) 1 n -∗
+    ghost_var (era_mirror_name E) (1/2) M -∗
+    fs_arm γs ls dk ==∗
+      fs_arm γs ls dk ∗ mono_nat_auth_own (fcn_start γs) 1 n ∗
+      mono_nat_lb_own (fcn_swap γs) (S g).
+  Proof.
+    intros Hn Hok. iIntros "#Hreg #Hst Hsa Hmir Harm".
+    rewrite {1}/fs_arm. iDestruct "Harm" as (c) "[Hc Hrest]".
+    iDestruct (fs_arm_le γs ls dk g n c Hn with "Hsa Hrest")
+      as "(%Hle & Hsa & _)".
+    iMod (mono_nat_own_update (S g) with "Hc") as "[Hc #Hlb]"; [lia|].
+    iModIntro. iFrame "Hsa Hlb".
+    rewrite /fs_arm. iExists (S g). iFrame "Hc". iRight.
+    iExists g. iSplitR; [done|].
+    rewrite /fs_custody. iExists E, M. iFrame "Hreg Hst Hmir".
+    iPureIntro. exact Hok.
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE ACCESSOR every WAL write's fupd runs on: the SQUEEZE, then the     *)
+  (* mirror's two halves meet, then the arm re-closes at the POST-write     *)
+  (* image with the updated picture.                                       *)
+  (* ==================================================================== *)
+  Lemma fs_arm_acc (γs : fs_crash_names) (ls : Z) (dk : Z -> bv 8)
+      (g : nat) (E : riscvEraGS) (n : nat) (M0 : log_mirror) :
+    n = (g + 1)%nat ->
+    fs_era_reg γs g E -∗ mono_nat_lb_own (fcn_swap γs) (S g) -∗
+    mono_nat_auth_own (fcn_start γs) 1 n -∗
+    ghost_var (era_mirror_name E) (1/2) M0 -∗
+    fs_arm γs ls dk -∗
+      ⌜log_mirror_ok M0 (fs_blocks dk) ls⌝ ∗
+      mono_nat_auth_own (fcn_start γs) 1 n ∗
+      (∀ (dk' : Z -> bv 8) (M' : log_mirror),
+         ⌜log_mirror_ok M' (fs_blocks dk') ls⌝ ==∗
+           fs_arm γs ls dk' ∗ ghost_var (era_mirror_name E) (1/2) M').
+  Proof.
+    intros Hn. iIntros "#Hreg #Hswlb Hsa Hmir Harm".
+    rewrite {1}/fs_arm. iDestruct "Harm" as (c) "[Hc Hrest]".
+    (* ABOVE: the arm's generation is at most the ambient one *)
+    iDestruct (fs_arm_le γs ls dk g n c Hn with "Hsa Hrest")
+      as "(%Hup & Hsa & Hrest)".
+    (* BELOW: our own swap receipt says it is at least ours *)
+    iDestruct (mono_nat_lb_own_valid with "Hc Hswlb") as %[_ Hlow].
+    (* so the at-rest arm is refuted and the generations coincide *)
+    destruct c as [|c']; [exfalso; lia|].
+    iDestruct "Hrest" as "[%Hc0 | Hc2]"; [discriminate|].
+    iDestruct "Hc2" as (g'') "[%Hceq Hcust]".
+    assert (Hgg : g'' = g) by lia. subst g''.
+    rewrite /fs_custody. iDestruct "Hcust" as (E'' M) "(#Hreg2 & #Hst2 & Hmir2 & %Hok)".
+    (* the registry pins the era record, hence the mirror's gname *)
+    rewrite /fs_era_reg.
+    iDestruct (ghost_map_elem_agree with "Hreg Hreg2") as %<-.
+    iDestruct (ghost_var_agree with "Hmir Hmir2") as %<-.
+    iFrame "Hsa". iSplitR; [iPureIntro; exact Hok|].
+    iIntros (dk' M') "%Hok'".
+    iMod (ghost_var_update_halves M' with "Hmir Hmir2") as "[Hmir Hmir2]".
+    iModIntro. iFrame "Hmir".
+    assert (Hcg : c' = g) by lia. subst c'.
+    rewrite /fs_arm. iExists (S g). iFrame "Hc". iRight.
+    iExists g. iSplitR; [done|].
+    rewrite /fs_custody. iExists E, M'. iFrame "Hreg Hst2 Hmir2".
+    iPureIntro. exact Hok'.
+  Qed.
 
   (* THE CRASH PREDICATE, i.e. the intended value of
      [RiscvPtsto.riscv_crash_pred] (the adequacy [Pc] parameter).  It is a
@@ -410,7 +604,7 @@ Section fs_crash.
     (∃ r : fs_rec,
        fs_hist_auth (fcn_hist γs) (fr_hist r) ∗
        ⌜fs_rec_wf r (fs_blocks dk) cov logstart⌝ ∗
-       fs_arm)%I.
+       fs_arm γs logstart dk)%I.
 
   (* -------------------------------------------------------------------- *)
   (* 3a. what [P_fs] SAYS                                                   *)
@@ -460,33 +654,37 @@ Section fs_crash.
      provable from nothing.  The client instantiates
      [Pc := fun dk => ∃ γs, P_fs γs cov logstart dk] and discharges the
      obligation with this lemma. *)
-  Lemma P_fs_alloc (dk0 : Z -> bv 8) (D0 : gmap Z (list (bv 8)))
-      (cov : gset Z) (logstart : Z) :
+  Lemma P_fs_alloc (γsw γreg γst : gname) (dk0 : Z -> bv 8)
+      (D0 : gmap Z (list (bv 8))) (cov : gset Z) (logstart : Z) :
     fs_recovery (fs_blocks dk0) D0 cov logstart ->
-    ⊢ |==> ∃ γs : fs_crash_names,
-        P_fs γs cov logstart dk0 ∗ fs_receipt γs D0.
+    mono_nat_auth_own γsw 1 0%nat ⊢ |==> ∃ γs : fs_crash_names,
+      ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
+      P_fs γs cov logstart dk0 ∗ fs_receipt γs D0.
   Proof.
-    intros Hrec.
+    intros Hrec. iIntros "Hsw".
     iMod (fs_hist_alloc [D0]) as (γh) "[Hauth #Hlb]".
-    iModIntro. iExists (MkFsCrashNames γh).
-    iSplitL "Hauth".
+    iModIntro. iExists (MkFsCrashNames γh γsw γreg γst).
+    iSplitR; [iPureIntro; done|].
+    iSplitL "Hauth Hsw".
     - rewrite /P_fs. iExists (MkFsRec D0 [D0]).
       iFrame "Hauth".
       iSplitR.
       { iPureIntro. rewrite /fs_rec_wf /=. split; [exact Hrec | reflexivity]. }
-      rewrite /fs_arm. by iLeft.
+      iApply fs_arm_at_rest. iExact "Hsw".
     - rewrite /fs_receipt /=. iExists []. iExact "Hlb".
   Qed.
 
   (* The mkfs corollary: a freshly formatted disk has an EMPTY on-disk log,
      so its committed state is just its home blocks and no recovery
      hypothesis has to be assumed at all. *)
-  Lemma P_fs_alloc_clean (dk0 : Z -> bv 8) (cov : gset Z) (logstart : Z) :
+  Lemma P_fs_alloc_clean (γsw γreg γst : gname) (dk0 : Z -> bv 8)
+      (cov : gset Z) (logstart : Z) :
     hdr_n (fs_blocks dk0 (log_hdr_bno logstart)) = 0 ->
-    ⊢ |==> ∃ γs : fs_crash_names,
-        P_fs γs cov logstart dk0 ∗
-        fs_receipt γs (fs_restrict (fs_blocks dk0)
-                         (fs_home_set cov logstart)).
+    mono_nat_auth_own γsw 1 0%nat ⊢ |==> ∃ γs : fs_crash_names,
+      ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
+      P_fs γs cov logstart dk0 ∗
+      fs_receipt γs (fs_restrict (fs_blocks dk0)
+                       (fs_home_set cov logstart)).
   Proof.
     intros Hn. iApply P_fs_alloc.
     by apply (fs_recovery_clean (fs_blocks dk0) _ cov logstart Hn).
