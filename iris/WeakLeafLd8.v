@@ -535,139 +535,15 @@ End wP_eff_half.
 (* ====================================================================== *)
 (** ** 3. THE LEAF
 
-    ONE INTERFACE WART SHOWS UP HERE AND IT IS THE MAIN FINDING OF THIS FILE.
-    [WeakFunnel.wwp_cb] asks the leaf to hand back [wmstate_norg σ'], whose
-    [dev_interp (wm_dev σ')] conjunct needs [wm_dev σ' = wm_dev σ];
-    [WeakInstr.wstep_post] only says [wm_dev σ' = mdev t], and [dev_interp]
-    is an authoritative half that cannot be moved without its fragment.  So
-    the leaf has to learn what [t] IS — which means replaying the WHOLE step
-    a SECOND time, now at the FLAT state, even though [wP_eff_of_leaf_base]
-    has just replayed it at the confined one.  §3a is that replay.  It is
-    ~50 lines of pure duplication that belongs in the funnel (which knows [t]
-    outright): see the report at the end of the file.
-
-    §3a is nevertheless cheap to state, because every premise of it is a
-    premise §2d already has. *)
-
-(** *** 3a. The step at the FLAT state, and its device frame. *)
-
-Lemma exec_eff_step_all_ticks_dev (s t0 : mstate) (es : list weff) :
-  exec_eff (riscv_step false) s = Some (tt, t0, es) ->
-  forall tick : bool, exists t' : mstate,
-    exec_eff (riscv_step tick) s = Some (tt, t', es) /\ mdev t' = mdev t0.
-Proof.
-  intros H0 tick. destruct tick.
-  - destruct (exec_eff_tick_clock t0) as (c & ti & p & Htick).
-    eexists. split.
-    + exact (exec_eff_riscv_step_tick s t0 _ es H0 Htick).
-    + by rewrite !mdev_set_reg.
-  - exists t0. split; [exact H0 | reflexivity].
-Qed.
-
-Lemma exec_ld8_step_flat (σ : wmstate)
-    (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
-    (rs1 rd : mword 5) (imm : mword 12) (ea : Arch.pa) (v : bv 64)
-    (D : register -> bool) (dst : mstate) :
-  register_lookup PC (wm_regs σ) = pc ->
-  register_lookup cur_privilege (wm_regs σ) = Machine ->
-  pmp_all_off (register_lookup pmpcfg_n (wm_regs σ)) ->
-  pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
-  register_lookup htif_tohost_base (wm_regs σ) = None ->
-  register_lookup hart_state (wm_regs σ) = HART_ACTIVE tt ->
-  eq_vec (_get_Misa_S (register_lookup misa (wm_regs σ))) ('b"1") = true ->
-  eq_vec (_get_Mstatus_MIE (register_lookup mstatus (wm_regs σ))) ('b"1")
-    = false ->
-  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus (wm_regs σ))) ('b"1")
-    = false ->
-  pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg (wm_regs σ)))
-    = PMM_Disabled ->
-  eq_vec (register_lookup elp (wm_regs σ))
-         (landing_pad_bits_backwards LP_EXPECTED) = false ->
-  is_aligned_vaddr (Virtaddr pc) 4 = true ->
-  fetch_flat_ok (wflat_st σ) pc (F_Base w) ->
-  (forall r, D r = true ->
-     register_lookup r (wm_regs σ) = register_lookup r dst.(sregs)) ->
-  D (R_bool minstret_increment) = false ->
-  goodb0 D (ext_decode w) dst = true ->
-  exec (ext_decode w) dst
-    = Some (LOAD (imm, Regidx rs1, Regidx rd, false, 8), dst) ->
-  uint rd <> 0 ->
-  add_vec (if Z.eqb (uint rs1) 0 then zero_reg
-           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1)))
-                  (wm_regs σ))
-          (sign_extend' 64 imm) = ea ->
-  is_aligned_paddr (Physaddr ea) 8 = true ->
-  (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
-  (forall j : nat, (j < 8)%nat ->
-     wflat (wm_img σ) (wm_log σ) !! pa_add ea j = Some (nth_byte v j)) ->
-  forall tick : bool, exists t : mstate,
-    exec (riscv_step tick) (wflat_st σ) = Some (tt, t) /\ mdev t = wm_dev σ.
-Proof.
-  intros Lpc Lpriv Lpmp Lpma Lhtif Lhart LmisaS LmIE Lmprv Lpmm Lelp
-         Hal4 Hfok Hagree HDmi Hgood Hdec Hrd Hea Halea Hram8 Hbytes tick.
-  set (sf := wflat_st σ).
-  destruct (exec_eff_should_inc_minstret_Some
-              (register_lookup cur_privilege (sregs sf)) sf) as [b Hsi].
-  assert (Lpriv_a : register_lookup cur_privilege
-            (sregs (set_reg sf (R_bool minstret_increment) b)) = Machine)
-    by (rewrite (set_mi_lookup cur_privilege _ b eq_refl); exact Lpriv).
-  assert (Lpc_a : register_lookup PC
-            (sregs (set_reg sf (R_bool minstret_increment) b)) = pc)
-    by (rewrite (set_mi_lookup PC _ b eq_refl); exact Lpc).
-  assert (Lhart_a : register_lookup hart_state
-            (sregs (set_reg sf (R_bool minstret_increment) b))
-            = HART_ACTIVE tt)
-    by (rewrite (set_mi_lookup hart_state _ b eq_refl); exact Lhart).
-  assert (Lelp_a : eq_vec (register_lookup elp
-            (sregs (set_reg sf (R_bool minstret_increment) b)))
-            (landing_pad_bits_backwards LP_EXPECTED) = false)
-    by (rewrite (set_mi_lookup elp _ b eq_refl); exact Lelp).
-  assert (Hdisp : exec_eff (dispatchInterrupt Machine)
-            (set_reg sf (R_bool minstret_increment) b)
-            = Some (None, set_reg sf (R_bool minstret_increment) b, [])).
-  { apply exec_eff_dispatchInterrupt_machine_none.
-    - rewrite (set_mi_lookup misa _ b eq_refl). exact LmisaS.
-    - rewrite (set_mi_lookup mstatus _ b eq_refl). exact LmIE. }
-  assert (Hfetch : exec_eff (fetch tt)
-            (set_reg sf (R_bool minstret_increment) b)
-            = Some (F_Base w, set_reg sf (R_bool minstret_increment) b,
-                    [WEread wak_plain pc 4])).
-  { apply (exec_eff_fetch_flat_base4 _ pc w).
-    - rewrite (set_mi_lookup pmpcfg_n _ b eq_refl).
-      exact (pmp_all_off_allows_all _ Lpmp).
-    - rewrite (set_mi_lookup pma_regions _ b eq_refl). exact Lpma.
-    - exact Lpc_a.
-    - exact Lpriv_a.
-    - rewrite (set_mi_lookup htif_tohost_base _ b eq_refl). exact Lhtif.
-    - exact Hal4.
-    - exact (fetch_flat_ok_mem sf _ pc (F_Base w) (mem_set_reg _ _ _) Hfok). }
-  assert (Hdec_a : exec_eff (ext_decode w)
-            (set_reg sf (R_bool minstret_increment) b)
-            = Some (LOAD (imm, Regidx rs1, Regidx rd, false, 8),
-                    set_reg sf (R_bool minstret_increment) b, [])).
-  { refine (exec_eff_decode_bridge D (ext_decode w) dst _ _ _ Hgood Hdec).
-    intros r HDr.
-    assert (Hne : register_beq r (R_bool minstret_increment) = false).
-    { destruct (register_beq r (R_bool minstret_increment)) eqn:Hb;
-        [|reflexivity].
-      exfalso. rewrite (register_beq_eq _ _ Hb) in HDr.
-      by rewrite HDmi in HDr. }
-    rewrite (set_mi_lookup r _ b Hne). exact (Hagree r HDr). }
-  pose proof (exec_eff_ld8_at sf b pc rs1 rd imm ea v Hrd Lpriv Lmprv Lpmm
-                Lpmp Lpma Lhtif Hea Halea Hram8 Hbytes) as Hex.
-  pose proof (exec_eff_riscv_step_base sf _ w
-                (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pc b
-                [WEread wak_plain pc 4] [WEread wak_plain ea 8]
-                Hsi Lhart_a Lpriv_a Hdisp Hfetch Hdec_a Lelp_a eq_refl Lpc_a
-                Hex
-                (eq_trans (proj1 (ld8_sexec_facts sf b (add_vec_int pc 4) rd
-                                    (regval_into_reg v))) Lhart)
-                (proj1 (proj2 (ld8_sexec_facts sf b (add_vec_int pc 4) rd
-                                 (regval_into_reg v))))) as Hstep.
-  destruct (exec_eff_step_all_ticks_dev sf _ _ Hstep tick) as (t & Ht & Hdv).
-  exists t. split; [exact (exec_eff_exec _ _ _ _ _ Ht)|].
-  rewrite Hdv. destruct b; by rewrite !mdev_set_reg.
-Qed.
+    The device frame — [wmstate_norg σ']'s [dev_interp (wm_dev σ')] conjunct,
+    which needs [wm_dev σ' = wm_dev σ] while [WeakInstr.wstep_post] gives only
+    [wm_dev σ' = mdev t] — is handed over by the funnel as
+    [⌜mdev t = mdev s_exec⌝], and [ld8_sexec_facts] says the [execute]'s own
+    successor moved no device.  Two lines.  (Before that argument was added to
+    [WeakFunnel.wwp_cb] the leaf had to replay the entire [riscv_step] a
+    second time at the FLAT state and identify the two successors by
+    determinism of [exec] — 116 lines duplicating, premise for premise, what
+    [wP_eff_of_leaf_base] does at the confined state.) *)
 
 (** *** 3b. THE LEAF.
 
@@ -831,22 +707,14 @@ Section leaf.
                  ltac:(by rewrite Lms) ltac:(by rewrite Lsec)
                  ltac:(by rewrite Lelp) Hal4 HnotRVC Hrd Hea_σ Hram8
                  Hag_σ HDmi Hgood Hdec with "Hlat Hbs Hpt") as %HP.
-    (* ---- the flat facts: the text word and the data doubleword ---- *)
-    iDestruct (winstr_flat σ pc (F_Base w) Hwf with "Hlat Hbs") as %Hfok.
+    (* ---- the flat facts: the data doubleword ---- *)
     iDestruct (wwp_ld8 σ ea dqv v Hwf with "Hlat Hpt") as %[_ Hflat8].
     iDestruct (wpt8_align with "Hpt") as %Halea.
-    (* ---- the run, at the FLAT state: the SC [execute] fact AND the whole
-           step (whose successor's device state is [σ]'s) ---- *)
+    (* ---- the run, at the FLAT state: the SC [execute] fact ---- *)
     pose proof (exec_eff_ld8_at (wflat_st σ) b pc rs1 rd imm ea v Hrd Lpriv
                   ltac:(by rewrite Lms) ltac:(by rewrite Lsec)
                   ltac:(rewrite Lpmpc; exact Hpmp) ltac:(by rewrite Lpma) Lhtif Hea_σ Halea
                   Hram8 Hflat8) as Hexf.
-    pose proof (exec_ld8_step_flat σ pc w rs1 rd imm ea v D dst
-                  Lpc0 Lpriv ltac:(rewrite Lpmpc; exact Hpmp) ltac:(by rewrite Lpma) Lhtif
-                  Lhart ltac:(by rewrite Lmisa) ltac:(by rewrite Lms)
-                  ltac:(by rewrite Lms) ltac:(by rewrite Lsec)
-                  ltac:(by rewrite Lelp) Hal4 Hfok Hag_σ HDmi Hgood Hdec Hrd
-                  Hea_σ Halea Hram8 Hflat8) as Hflatstep.
     (* ---- the two register writes the [execute] performs ---- *)
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc")
       as "[Hreg Hnpc]".
@@ -861,11 +729,13 @@ Section leaf.
                      (regval_into_reg v)).
     iSplitR; [iPureIntro; exact (exec_eff_exec _ _ _ _ _ Hexf)|].
     iFrame "Hreg".
-    iNext. iIntros (tick σ' t) "%Hstep %Hpost %HQ Hmm' Hpmpc' Hpc'".
-    (* the device frame: determinism identifies the funnel's [t] with ours *)
+    iNext. iIntros (tick σ' t) "%Hstep %Hdevt0 %Hpost %HQ Hmm' Hpmpc' Hpc'".
+    (* the device frame: the funnel's successor moved no device past the
+       [execute]'s, and the [execute] moved none at all *)
     assert (Hdevt : mdev t = wm_dev σ).
-    { destruct (Hflatstep tick) as (t2 & Ht2 & Hdv).
-      assert (t = t2) as -> by congruence. exact Hdv. }
+    { rewrite Hdevt0 -(wflat_st_dev σ).
+      exact (proj1 (proj2 (proj2 (proj2 (ld8_sexec_facts (wflat_st σ) b
+                (add_vec_int pc 4) rd (regval_into_reg v)))))). }
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' & Hbnd').
     destruct HQ as (HQi & HQl & HQv).
     (* the hart's own view cell moves to [σ']'s *)
@@ -898,7 +768,7 @@ Section leaf.
 End leaf.
 
 (* ====================================================================== *)
-(** ** 4. WHAT THIS COST, AND THE ONE SEAM THAT SHOULD BE RESHAPED
+(** ** 4. WHAT THIS COST
 
     THE PRICE, in CODE lines (comments and the import block excluded);
     the SC leaf this is measured against, [WpMmodeLoad.wp_ld_gpr], is 128:
@@ -908,10 +778,9 @@ End leaf.
       §2b its three obligations .................................   40
       §2c the [execute] lemma at a generic [s0] .................   137
       §2d the [wP_eff] half .....................................  102
-      §3a the SECOND replay of the step, for the device frame ...  116
-      §3b the WP composition proper .............................  191
+      §3b the WP composition proper .............................  185
                                                                   ----
-                                                          total    648
+                                                          total    552
 
     §2a+§2b+§2d = 167 is the price the porting guide predicted (the window
     plus ONE re-instantiation of the leaf's own SC library lemma at the
@@ -921,35 +790,12 @@ End leaf.
     flat — are the same lemma applied twice; ~50 of it is work the SC leaf
     already does inline.
 
-    §3a IS NOT.  It exists only because [WeakFunnel.wwp_cb] asks the leaf to
-    return [wmstate_norg σ'], whose [dev_interp (wm_dev σ')] conjunct needs
-    [wm_dev σ' = wm_dev σ] — and [WeakInstr.wstep_post] gives only
-    [wm_dev σ' = mdev t], where [t] is the funnel's OWN successor, which the
-    funnel constructs by register writes and then forgets.  The leaf's only
-    way to learn [mdev t] is to replay the entire step a second time, at the
-    FLAT state, and identify the two successors by determinism of [exec].
-    That replay duplicates, premise for premise, what
-    [WeakFetchEff.wP_eff_of_leaf_base] has just done at the confined state,
-    and it will be duplicated ×50 by the sweep.
+    WHAT USED TO BE HERE AND IS NOT: a 116-line SECOND replay of the whole
+    [riscv_step] at the FLAT state, whose only purpose was to learn [mdev t]
+    for the device frame.  [WeakFunnel.wwp_cb] now hands that over
+    ([⌜mdev t = mdev s_exec⌝]); see the note there.
 
-    THE FIX, and it is small and belongs in [WeakFunnel]: split [dev_interp]
-    out of [wmstate_norg] the way [reg_interp] was already split out, and let
-    the funnel carry it — it holds [t] concretely and closes the obligation
-    with one [mdev_set_reg] chain.  (An equivalent, even cheaper fix: add
-    [⌜mdev t = wm_dev σ⌝] to [wwp_cb]'s post-step argument list.)  Either
-    deletes §3a from this file and from every leaf after it.
-
-    TWO SMALLER SEAMS, worth recording:
-
-    - [wwp_cb] hands the leaf [⌜register_lookup PC (wm_regs σ) = pc⌝] and
-      NOTHING else about [σ]'s registers, although the funnel has just read
-      the whole M-mode config tower off the bundle it was given.  So every
-      leaf re-splits [mmode_config] into halves and re-reads the same nine
-      registers through [reg_valid_dq].  Handing the callback the tower's
-      values (or simply [⌜cfg_ok (wflat_st σ)⌝] plus the four pins the decode
-      bridge needs) would delete ~25 lines per leaf.  It is also what forces
-      the [D]/[dst] agreement premise here to be quantified over the register
-      file instead of stated at [σ].
+    ONE SMALLER SEAM, worth recording:
 
     - [WeakFetchEff.wP_eff_of_leaf_base] takes the [execute]'s [exec_eff]
       fact at a state written out as [MState (wm_regs σ) (wmem_restrict σ W)

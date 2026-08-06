@@ -517,7 +517,22 @@ Section funnel.
           registers, and [wmstate_norg];
         - the continuation runs after the step, at a successor [σ'] described
           by [WeakInstr.wstep_post] over the SC successor [t], and gives back
-          the config bundle, the stepped PC, and the weak conjuncts at [σ']. *)
+          the config bundle, the stepped PC, and the weak conjuncts at [σ'].
+
+      THE DEVICE FRAME, [⌜mdev t = mdev s_exec⌝], IS HANDED OVER BECAUSE ONLY
+      THE FUNNEL KNOWS IT.  [wstep_post] says [wm_dev σ' = mdev t] and the
+      leaf must give back [dev_interp (wm_dev σ')] — an authoritative half it
+      cannot move without its fragment — so it needs to know what [mdev t] IS.
+      [t] is built by the funnel out of [s_exec] by REGISTER writes only (the
+      PC tick, the [minstret] bump, and on the tick branch [tick_clock]'s
+      three cells), so the fact is free here and unobtainable there: without
+      it a leaf has to replay the entire [riscv_step] a second time at the
+      flat state and identify the two successors by determinism of [exec]
+      (116 lines, ×50 over the sweep — the batch-2 interface defect).
+      It is stated against [mdev s_exec], not against [wm_dev σ]: the leaf
+      owns the [execute] fact, so it knows [mdev s_exec] outright (one line
+      for a RAM instruction, whose [execute] moves no device), and a future
+      MMIO leaf — whose [execute] DOES move [mdev] — can still use it. *)
   Definition wwp_cb Φ (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (i : instruction) (pmpcfg0 : type_of_register pmpcfg_n) (dq : dfrac)
       (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) : iProp Σ :=
@@ -536,6 +551,7 @@ Section funnel.
             reg_interp (sregs s_exec) ∗
             ▷ (∀ (tick : bool) (σ' : wmstate) (t : mstate),
                  ⌜exec (riscv_step tick) (wflat_st σ) = Some (tt, t)⌝ -∗
+                 ⌜mdev t = mdev s_exec⌝ -∗
                  ⌜wstep_post σ σ' t⌝ -∗
                  ⌜Q σ σ'⌝ -∗
                  mmode_config dq -∗
@@ -704,6 +720,7 @@ Section funnel.
     (* ---- the wrapper's own register writes: tick PC, maybe bump minstret ---- *)
     iAssert (|==> ∃ t0 : mstate,
                 ⌜exec (riscv_step false) (wflat_st σ) = Some (tt, t0)⌝ ∗
+                ⌜mdev t0 = mdev s_exec⌝ ∗
                 reg_interp (sregs t0) ∗ minstret_inv_body ∗
                 PC ↦ᵣ (register_lookup nextPC (sregs s_exec)))%I
       with "[Hreg Hmst Hmi Hpc]" as ">Hw".
@@ -716,10 +733,12 @@ Section funnel.
                              (register_lookup nextPC (sregs s_exec))))) 1)
                 with "Hreg Hmst") as "[Hreg Hmst]".
         iModIntro. iExists _. iSplitR; [iPureIntro; exact Hstep0|].
+        iSplitR; [iPureIntro; by rewrite !mdev_set_reg|].
         iFrame "Hreg Hpc". iExists _, true. iFrame.
       - iModIntro. iExists _. iSplitR; [iPureIntro; exact Hstep0|].
+        iSplitR; [iPureIntro; by rewrite !mdev_set_reg|].
         iFrame "Hreg Hpc". iExists _, false. iFrame. }
-    iDestruct "Hw" as (t0) "(%Hst0 & Hreg & Hbody & Hpc)".
+    iDestruct "Hw" as (t0) "(%Hst0 & %Hdev0 & Hreg & Hbody & Hpc)".
     destruct (exec_tick_clock t0) as (c' & ti' & p' & Htick).
     pose proof (exec_riscv_step_tick _ _ _ Hst0 Htick) as Hst1.
     (* ---- hand the two successors to [wp_winstr] ---- *)
@@ -735,6 +754,8 @@ Section funnel.
         set_reg (set_reg (set_reg t0 mcycle c') mtime ti') mip p' else t0)).
     iSpecialize ("Hcont" with "[%]");
       [destruct tick; [exact Hst1 | exact Hst0]|].
+    iSpecialize ("Hcont" with "[%]");
+      [destruct tick; [rewrite !mdev_set_reg; exact Hdev0 | exact Hdev0]|].
     iSpecialize ("Hcont" with "[%]"); [exact Hpost|].
     iSpecialize ("Hcont" with "[%]"); [exact HQ|].
     iSpecialize ("Hcont" with "[Hhs Hpriv Hmstatus]").
