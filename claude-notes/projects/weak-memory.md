@@ -10,7 +10,12 @@ M3a (`iris/WeakInstr.v`), M3b (`iris/WeakStore.v`, `iris/WeakCert.v`,
 `iris/WeakLock.v`, `iris/WeakStarted.v`), M3c (`iris/WeakAcquire.v`, the
 `wstep_cert` Q-type fix, `WeakCert`'s effect-trace certificates),
 M4-prep (`iris/WeakFunnel.v`, `iris/WeakEff.v`, `iris/WeakBranch.v`,
-`iris/WeakRacy.v`, `iris/WeakWord8.v`).
+`iris/WeakRacy.v`, `iris/WeakWord8.v`),
+the WIDTH GENERALIZATION (`WeakStore.winsw` & co., `WeakInstr`'s `_w`
+family — see the block below), and **M4 batch 0 PARTIAL**
+(`iris/WeakEffSkel.v`: `execR_eff` + its kit, the two `run_hart_active`
+progress mirrors, the step assembly; the FETCH and the `tick_clock` mirror
+are the two remaining pieces).
 **M3 and M4-prep are DONE.**  Next: M4 — read
 [`weak-memory-porting.md`](weak-memory-porting.md) first, then the M4-prep
 established-facts block below, whose closing section says exactly what the
@@ -1045,9 +1050,51 @@ all clean.  No `Admitted`/`admit`/new `Axiom`.
   yet produce a `wstep_ok_racy`, so `WeakRacy.wracy_cert` is a per-instruction
   premise the way `wstep_cert` was before `WeakCert`.
 
+### The WIDTH GENERALIZATION (landed after M4-prep; read before adding a width)
+
+M4-prep found three families that were the `n := 4` instances of width-generic
+statements ON THE NOSE.  They are now generalized, with the GENERIC statement
+primary and both widths as instances — measured call-site churn **ZERO** (every
+downstream `Weak*.v` compiled unchanged, including the ten `rewrite /wQ_store`-
+style sites, because a `Definition wQ_store … := wQ_store_w 4 …` is a delta
+step the same tactics see through).
+
+- **`WeakStore.winsw a T v n mm`** — the `n`-fold window insert, with
+  `winsw_lookup_in` / `_out` proved once by induction, and
+  `wlat_agree_store_w` (the store window's pure part at every width) over it.
+  `wins4 := winsw a T v 4` and `WeakWord8.wins8 := winsw a T v 8`; both
+  `wlat_agree_store4` / `_store8` are one `apply` each.
+- **`WeakInstr.wpt_byte_flat_pin` / `wlat_byte_flat_gen`** — the ONE-BYTE
+  flat/pinned bridges at an arbitrary access width.  Every N-fold bundle lemma
+  is N one-line applications of one of them (`wpt4_flat_pin` — new, the merged
+  pass — `wpt8_flat_pin`, `wlat4_flat_gen`, `wlat8_flat_gen`,
+  `wwp_amoswap_w_aq_inv`'s inner block).
+- **`WeakInstr`'s whole `P`/`V`/`Q` family** is now `wP_load_w` / `wP_mem_w` /
+  `wV_store_w` / `wV_amo_aq_w` / `wV_load_w` / `wQ_load_w` / `wQ_store_w` /
+  `wQ_amo_aq_w`, all taking `n : N`; the width-4 names are `_w 4` and
+  `WeakWord8`'s width-8 names are `_w 8`.  `WeakWord8.wP_load_w_4` & co. are
+  kept as `reflexivity` regression checks.
+
+**WHAT STAYS WIDTH-SPECIFIC, and why** (do not "fix" these):
+- the BUNDLES (`wlat4`/`wpt4` vs `wlat8`/`wpt8`).  They are deliberately N
+  explicit `∗`s, not a `big_sepL` or a fold, so that byte extraction is
+  `destruct j as [|[|…]]` with no `Φ` to elaborate.  A width-generic bundle
+  would have to be a fixpoint and would then NOT be convertible to either
+  instance (`emp ∗ …` and the associativity differ), so every proofmode
+  pattern in four files would churn — the exact opposite of a clean shape;
+- the ALIGNMENT conjunct (`is_aligned_paddr (Physaddr a) 4` vs `8`): it is the
+  model's own per-width access check, carried inside the bundle;
+- the store PRIMITIVES (`wlat4_store_prim` / `wlat8_store_prim`), which perform
+  N `ghost_map_update`s over the bundle's N explicit elements.
+- `wpt4_pinned` is deliberately NOT routed through the merged
+  `wpt4_flat_pin`: pinnedness needs no `wlog_wf`, and a leaf that owes only
+  the peel should not have to produce the log's well-formedness for it.
+  (`WeakWord8.wpt8_pinned` still carries the premise; harmless, unused.)
+
 ### WHAT M4 STILL OWES (the shared `exec_eff` skeleton)
 
-The one thing M4-prep did NOT build, and the only remaining model work:
+The one thing M4-prep did NOT build, and the only remaining model work
+(**items 1 and 2 are now DONE — see the batch-0 block below**):
 
 1. `execR_eff` — the early-return interpreter instrumented, plus its ~8
    rewriting lemmas (`execR_eff_bind`/`_bind0`/`_liftR`/`_returnR`/
@@ -1068,21 +1115,143 @@ The one thing M4-prep did NOT build, and the only remaining model work:
 Total ≈ 400–600 lines of shared skeleton plus ≈ 450 of per-shape mirrors, at
 the measured replay rate of ≈ 1.05× the SC script's lines.
 
+### What M4 BATCH 0 established (read before batch 1)
+
+`iris/WeakEffSkel.v`, **834 lines / 3.9 s**.  Items 1 and 2 of the list above
+are DONE; items 3 (the fetch) and 4 (the per-shape `execute` mirrors, = batch
+1) are not, and the block below is what was learned pricing them.
+
+- **`execR_eff` IS A SEPARATE FIXPOINT AND ITS KIT IS THE EXPENSIVE PART.**
+  `execR` (RiscvTryStep) differs from `exec` in one arm — `ExtraOutcome`, the
+  early return, which is a VALUE and carries the trace so far — so the
+  instrumented twin cannot be an instance of `exec_eff`.  Landed:
+  `execR_eff`, `execR_eff_execR` / `execR_execR_eff` / `execR_eff_None`,
+  `execR_eff_bind` / `_bind0` and their UNCONDITIONAL equations
+  `execR_eff_bind_eq` / `_bind0_eq`, `execR_eff_returnR`, `execR_eff_liftR`,
+  `exec_eff_catch_early_return`, and the six forward forms
+  (`_bind_cat` / `_bind_nil` / `_bind0_cat` / `_bind0_nil` / `_liftR_cat` /
+  `_liftR_seq`).  `_nil` is the drop-in replacement for
+  `execR_bind_Some` / `execR_bind0_Some` / `execR_liftR_seq`; `_cat` is for
+  the one sub-run per instruction that touches memory.
+- **THE REPLAY RATE IS NOT ONE NUMBER, and M4-prep's 1.05× is right only for
+  the SCRIPTS.**  Measured here:
+  - the two `run_hart_active` progress mirrors: **36 → 24 and 35 → 21 SC
+    lines (0.65×)** — a replayed script gets SHORTER, because the SC runs of
+    `cbn match` collapse into the trace-carrying equations;
+  - the `execR` interpreter + kit: **78 → ~300 SC lines (3.8×)** — a mirrored
+    INTERPRETER is much more expensive than a mirrored script, because the
+    trace turns each unconditional equation into a case analysis and each
+    rewriting lemma needs a `_cat` (trace-concatenating) and a `_nil`
+    (trace-free) form side by side.
+  **Rule for the rest of the sweep: price a mirrored SCRIPT at ~0.7× and a
+  mirrored INTERPRETER/DEFINITION at ~4×.**
+- **THE ASSEMBLY IS `exec_eff_riscv_step_base` / `_rvc`,** and it is the shape
+  a leaf meets: given the fetch's and the `execute`'s `exec_eff` facts (plus
+  the same register/config premises `WeakFunnel.wwp_instr` already collects),
+  the whole step's trace is `es_fetch ++ es_execute` and nothing else
+  contributes.  **So batch 1's per-shape deliverable is exactly "the
+  `execute`'s `exec_eff` fact", with no plumbing above it.**
+- **THE COMPLETENESS CHECK PASSED, WITH ONE HONEST RESIDUE.**
+  `wcert_load_via_skeleton` / `_store_` / `_amo_aq_` re-derive `WeakCert`'s
+  three certificates AT THE TRACE THE SKELETON PRODUCES — `es_f ++ es_x` at
+  `es_f := [fetch read]` and `es_x := [the data access(es)]` is the
+  certificates' own 2-/3-element list ON THE NOSE (`app` of singletons), so
+  the two halves meet with no adapter and no peeling.  **Verdict: batch 2 is
+  mechanical FOR THE TRACE JOIN and for the `Q` half; it is NOT yet
+  mechanical end-to-end, because `wP_eff` still needs the two model
+  reductions below.**
+- **EXACTLY TWO THINGS STAND BETWEEN THE ASSEMBLY AND `wP_eff`** (written up
+  in `WeakEffSkel.v` §6b):
+  1. **the FETCH's own `exec_eff` reduction.**  This is unavoidable and the
+     argument is worth keeping: `WeakEff`'s empty-memory detector does NOT
+     apply (the fetch reads the text, so it fails at `∅`), and a
+     domain-growth argument cannot exclude a value-preserving write to a byte
+     the confined map already has — M3c's finding, at the fetch.  It is a
+     syntactic replay of `exec_fetch_done` → `exec_fetch_bytes_4` →
+     `exec_mem_read_fetch` → `exec_checked_mem_read_ram` →
+     `exec_read_ram_plain_4` (≈ 110 SC lines for the 4-aligned `F_Base` path,
+     ≈ 75 mirrored at 0.7×), **plus** the register-only sub-lemmas that chain
+     names — `exec_translateAddr_identity` (14 SC lines) and its three
+     `returnM` twins, `exec_pmpCheck_machine_unlocked_ifetch4` (11, over the
+     much larger `exec_pmpCheck_machine_unlocked`),
+     `exec_pmaCheck_ram` (20), `exec_currentlyEnabled_Ziccif` +
+     `exec_hartSupports_Ziccif` (18), `within_clint_false` / `_sig_` /
+     `_htif_` (24), and `or_boolM`/`and_boolM` eff variants (≈ 20).
+     **Estimate: 250–350 lines for the 4-aligned `F_Base` arm alone**; the
+     three other arms of `WeakFunnel.exec_fetch_flat` (2-aligned `F_Base`,
+     `F_RVC` at 4 and at 2) roughly double it if all four are wanted, and
+     for M-mode kernel text only the 4-aligned `F_Base` and the two `F_RVC`
+     arms are actually reachable.
+  2. **the `tick_clock` mirror** (`exec_riscv_step_tick` over
+     `MinstretInv.exec_tick_clock`), which turns the assembly's
+     `riscv_step false` fact into the `∀ tick` shape `wstep_conf_eff` asks
+     for.  Register-only, so its trace is `[]`; ≈ 25 lines.
+- **WHY EVERY REGISTER-ONLY SUB-LEMMA HAS TO BE MIRRORED RATHER THAN
+  DETECTED — the zero-width residue, and it decides the whole shape.**  The
+  detector (`exec_eff_quiet_of_empty`) gives `quiet_trace`, which ADMITS
+  zero-width writes; `WeakEff.wcert_store_gen` / `_load_gen` / `_amo_aq_gen`
+  need `nowrite_trace`, because a zero-width write still APPENDS a
+  (byte-less) message and `wQ_store`'s `wm_log σ' = wm_log σ ++ [msg]` is
+  then false.  Weakening the certificates to "up to `qmsgs`" was considered
+  and REJECTED: the store's timestamp shifts by the length of the quiet
+  prefix, so `wQ_store` would have to name the timestamp existentially and
+  the change ripples through `WeakLock`/`WeakAcquire`/`WeakStarted`/
+  `WeakStore` — a strictly uglier spec for a residue the model never
+  exhibits.  **So: register-only sub-runs in a bind spine get a mirrored
+  lemma with an EMPTY trace; the detector is for whole `execute`s that touch
+  no memory at all (branch/jump/ALU), where `wQ_quiet` is the right `Q`
+  anyway.**  Record this before re-deriving it.
+- **A MIRROR FILE MUST IMPORT `iris.proofmode` EVEN WITH NO IRIS IN IT.**
+  Every SC script in this cone uses ssreflect's space-separated
+  `rewrite a b c` and `rewrite H /=`; without the import those are syntax
+  errors reported at the `/=` (a five-minute trap).  Two smaller ones:
+  stdpp's `by` does not parse inside `try (…; by tac)` in such a file (use
+  `; tac; reflexivity`), and `mword` must be spelled
+  `SailStdpp.Values.mword` (the durable notes' instance-leak rule).
+
 ## M4 — the sweep
 
 **Batches and their prices** (from M4-prep's measurements; the ORDER is
 [`weak-memory-porting.md`](weak-memory-porting.md) §5).
 
+**REVISED after batch 0 landed** (see the batch-0 block above for where the
+numbers come from; the prices below replace M4-prep's).
+
 | # | batch | size | note |
 |---|---|---|---|
-| 0 | the shared `exec_eff` skeleton (`execR_eff` + its rewriting lemmas, the two `run_hart_active` progress mirrors, the fetch) | ≈ 400–600 lines | the ONLY remaining model work; nothing downstream closes before it |
-| 1 | the memory `execute` mirrors, by SHAPE: LOAD/STORE at 1/2/4/8 + AMO | ≈ 9 × 40–60 lines | replay at the measured 1.05× |
-| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | 30–55 lines per load/ALU leaf, 60–90 per store/AMO leaf, ON TOP of the SC leaf | of which 20–40 is the certificate's window |
+| 0a | `execR_eff` + kit, the two `run_hart_active` progress mirrors, the step assembly, the certificate join | **DONE — 834 lines / 3.9 s** (`iris/WeakEffSkel.v`) | vs the 400–600 estimate for the whole of batch 0; the interpreter mirror is 3.8× its SC source, the script mirrors 0.65× |
+| 0b | the FETCH's `exec_eff` reduction + the `tick_clock` mirror | **250–350 lines** (4-aligned `F_Base` arm) + ≈ 25; ×2 if all four `exec_fetch_flat` arms are wanted | the last irreducible model work; nothing downstream closes before it |
+| 1 | the memory `execute` mirrors, by SHAPE | **≈ 6 shapes × 30–60 lines** (revised from 9 × 40–60) | see the shape enumeration below |
+| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | 30–55 lines per load/ALU leaf, 60–90 per store/AMO leaf, ON TOP of the SC leaf | of which 20–40 is the certificate's window; the trace join is now free (batch-0 block) |
 | 3 | `WpLock` clients | ≈ 0 | the interface is unchanged; `iris/WeakWord8.v` covers `cpu`/`name` |
 | 4 | the straight-line M-mode function proofs | batched by subagent | the config tower and every decode fact transfer verbatim |
 | 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | small, then a cone | the racy-load rule is landed; the escrow is not |
 | 6 | the sconf tier | **design first** | blocked on the page-table-walk items above |
 | 7 | the virtio cone | M5 | |
+
+### BATCH 1's SHAPES, ENUMERATED FROM THE ACTUAL SC LIBRARY
+
+M4-prep guessed "LOAD/STORE at 1/2/4/8 + AMO = 9 shapes".  Grepping the
+tree for what the M-mode side really has (`exec_execute_LOAD_*` /
+`_STORE_*` / `_AMO*`, excluding the `_S` / `_U` / `_walk_pt` cones, which
+belong to batch 6 and to the user cone) gives **fewer, and the batch-0
+assembly says each one's deliverable is now exactly its own `exec_eff`
+fact**:
+
+| shape | SC lemma (M-mode) | trace | note |
+|---|---|---|---|
+| LOAD 8 | `WpMmodeLeafBase.exec_execute_LOAD_8_gpr` (+ `_chk`) | `[WEread akl ea 8]` | `ld`; the `wwp_ld8` leaf of `WeakWord8` consumes it |
+| STORE 8 | `WpMmodeLeafBase.exec_execute_STORE_8_gpr` (+ `_chk`) | `[WEwrite akw ea 8 v]` | `sd` |
+| LOAD 4 | reached through `exec_execute_C_LW` / `_C_LDSP` → `ExecuteAs (LOAD … 4)`; the width-4 M-mode `LOAD` lemma does NOT exist yet and is part of this batch | `[WEread akl ea 4]` | `lw`, and the spinlock's spin re-read |
+| STORE 4 | ditto via `exec_execute_C_SW` / `_C_SDSP` | `[WEwrite akw ea 4 v]` | `sw`, the release and the `started` setter |
+| AMOSWAP 4 | only `WpAmo`'s S-flavoured chain and `WpSmodePtLock.exec_execute_AMOSWAP_4_gpr_S_walk_pt` exist; the M-mode one is part of this batch | `[WEread aka ea 4; WEwrite akw ea 4 v]` | THE lock instruction; note the two effects are adjacent, which is what `wcert_amo_aq_gen` assumes |
+| LOAD/STORE 1, 2 | `WpSmodePtMem.exec_execute_STORE_1_…` etc. only | | NOT reachable from M-mode kernel text today — defer to batch 6 rather than mirror speculatively |
+
+So batch 1 is **≈ 5 shapes (6 with a byte store), 30–60 lines each**, of which
+the memory-free prefix of each `execute` is free by the empty-memory detector
+and only the one `MemRead`/`MemWrite` arm is explicit.  Two of the five are
+NEW SC lemmas rather than mirrors (width-4 M-mode LOAD/STORE and the M-mode
+AMOSWAP), so those cost their SC lemma as well.
 
 Batches 0 and 1 are one agent each and must be serial; 2 and 4 parallelise
 freely (each file is independent through the funnel).  Batch 6 must NOT be

@@ -264,6 +264,48 @@ rule of thumb is short:
   invisible to `exec`, so the detector gives `quiet_trace` (which tolerates it)
   rather than `nowrite_trace` (which does not).  A syntactic bind-peel gives
   `nowrite` outright, since those arms are not in the program.
+  **This is what decides where the detector may be used** (batch 0): a
+  register-only sub-run INSIDE a bind spine must be mirrored to an empty
+  trace, because `WeakEff.wcert_store_gen` / `_load_gen` / `_amo_aq_gen` need
+  `nowrite_trace` and a zero-width write still appends a byte-less message
+  (which falsifies `wQ_store`'s `wm_log σ' = wm_log σ ++ [msg]`).  Weakening
+  the certificates to "up to `qmsgs`" was considered and rejected — the
+  store's timestamp shifts by the quiet prefix's length, so `wQ_store` would
+  have to name the timestamp existentially and the change ripples through
+  `WeakLock` / `WeakAcquire` / `WeakStarted` / `WeakStore`.  The detector is
+  for a WHOLE `execute` that touches no memory (branch / jump / ALU), where
+  `wQ_quiet` is the right `Q` anyway.
+
+---
+
+## 2f. THE STEP SKELETON (M4 batch 0): what a leaf's `wP_eff` is made of
+
+`iris/WeakEffSkel.v` is the `exec_eff` twin of the whole chain below
+`WeakEff.exec_eff_riscv_step_hart_active`.  Two things to know before writing
+a leaf:
+
+1. **THE WHOLE STEP'S TRACE IS `es_fetch ++ es_execute`.**
+   `WeakEffSkel.exec_eff_riscv_step_base` (and `_rvc`) takes the fetch's and
+   the `execute`'s `exec_eff` facts — plus exactly the register/config
+   premises `WeakFunnel.wwp_instr` already collects — and returns the step's.
+   Everything between them (the privilege read, `should_inc_minstret`, the
+   `minstret_increment` pre-write, the hart-active gate, the decode, the
+   landing-pad check, the `nextPC` write, the PC tick, the `minstret` bump) is
+   register-only and contributes nothing.  So **the only per-instruction
+   `exec_eff` fact a leaf owes is its own `execute`'s.**
+2. **THE JOIN WITH THE CERTIFICATE IS FREE.**
+   `WeakEffSkel.wcert_load_via_skeleton` / `_store_` / `_amo_aq_` are
+   `WeakCert`'s three certificates stated at `es_f ++ es_x`, and at
+   `es_f := [fetch read]` that IS their own 2-/3-element list on the nose
+   (`app` of singletons).  No adapter, no peeling.
+   `WeakEffSkel.wP_eff_of_window` turns a window plus the per-`tick` run fact
+   into `wP_eff` in one `apply`.
+
+**STILL MISSING, and it is shared, not per-leaf** (`WeakEffSkel.v` §6b): the
+fetch's own `exec_eff` reduction (a syntactic replay of `exec_fetch_done` and
+the chain under it — no semantic argument can replace it, see §4 note 9), and
+the `tick_clock` mirror that turns `riscv_step false` into the `∀ tick` shape.
+Until both land, a leaf can build the step's trace but not close `wP_eff`.
 
 ---
 
@@ -362,24 +404,44 @@ Every one of these type-checks and is wrong or vacuous.
    `Read_plain` for instruction fetch, so it is an ordinary weak read that
    raises views, and a `Q` proved against a trace without it is about a
    different machine.
-7. **`Print Assumptions` is the only real check on a functor/seal cone.**
+9. **`Print Assumptions` is the only real check on a functor/seal cone.**
    Expect the 5 rv64d platform axioms for anything mentioning `riscv_step`,
    and "Closed under the global context" for everything that does not — the
    whole vProp/view/bridge/certificate layer is axiom-free, so a NEW axiom in
    that layer is a regression, not a cost of doing business.
 
+10. **A MIRROR FILE MUST IMPORT `iris.proofmode` EVEN WITH NO IRIS IN IT.**
+   Every SC script in the `exec`/`execR` cone uses ssreflect's
+   space-separated `rewrite a b c` and `rewrite H /=`; without the import
+   those are *syntax errors reported at the `/=`*, which reads as a
+   nonsensical complaint about a line you did not change.  Two smaller ones
+   from the same batch: stdpp's `by` does not parse inside
+   `try (…; by tac)` in such a file (write `; tac; reflexivity`), and `mword`
+   must be spelled `SailStdpp.Values.mword` (the instance-leak rule in the
+   durable notes).
+11. **A domain-growth argument can never exclude a VALUE-PRESERVING write.**
+   This is why the fetch needs a syntactic `exec_eff` mirror and cannot be
+   detected: running it at the confined memory and observing
+   `mem t' = mem s` is consistent with a write that stored the same bytes,
+   and such a write would invalidate the `wkernel_text` elements.  Recorded
+   at M3c for the general case; it bites again at the fetch.
+
 ---
 
 ## 5. Order of the sweep (revised after M4-prep)
 
-0. **THE SHARED `exec_eff` SKELETON, and nothing else, first.**  `execR_eff`
-   plus its rewriting lemmas, the two `run_hart_active` progress mirrors, and
-   the fetch (`exec_eff_fetch_done` / `_fetch_bytes_4` / `_mem_read_fetch`).
-   ≈ 400–600 lines, ONE batch, and it is the only remaining model work: after
-   it, every non-memory part of a step is free (§2e) and every certificate's
-   `wP_eff` is within reach.  Nothing downstream can be closed before it.
-1. **The memory `execute` mirrors, by SHAPE not by call site**: LOAD/STORE at
-   widths 1/2/4/8 and the AMO, ≈ 9 shapes × 40–60 lines.  One batch.
+0a. **DONE** — `iris/WeakEffSkel.v` (834 lines / 3.9 s): `execR_eff` plus its
+   rewriting kit, the two `run_hart_active` progress mirrors, the step
+   assembly and the certificate join (§2f).
+0b. **THE FETCH's `exec_eff` reduction and the `tick_clock` mirror**, and
+   nothing else, next.  ≈ 250–350 lines for the 4-aligned `F_Base` arm plus
+   ≈ 25 for the tick; it is the last irreducible model work, and nothing
+   downstream can be closed before it.
+1. **The memory `execute` mirrors, by SHAPE not by call site.**  The shapes,
+   enumerated from the SC library rather than guessed, are in
+   [`weak-memory.md`](weak-memory.md)'s batch-1 table: ≈ 5 (LOAD/STORE at 4
+   and 8, AMOSWAP 4), 30–60 lines each, of which the width-4 M-mode LOAD /
+   STORE and the M-mode AMOSWAP need their SC lemma written too.  One batch.
 2. The M-mode leaf libraries through `WeakFunnel.wwp_instr` (§2d) —
    `WpMmodeLoad`, `WpMmodeStore`, the `WpMmodeLeaf*` family.  Their config
    tower and decode facts transfer as-is.
