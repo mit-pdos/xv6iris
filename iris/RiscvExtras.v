@@ -1357,6 +1357,22 @@ Proof.
   apply bv_eq. rewrite bv_zero_extend_unsigned. reflexivity. lia.
 Qed.
 
+Lemma subrange_full_64 (a : mword 64) : subrange_vec_dec a 63 0 = a.
+Proof.
+  apply bv_eq.
+  unfold subrange_vec_dec, Operators_mwords.subrange_vec_dec, get_word.
+  rewrite ?autocast_id.
+  unfold to_word_idx, to_word. rewrite ?MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
+  change (MachineWord.Z_idx (63 - 0 + 1)) with 64%N.
+  rewrite ?bv_extract_unsigned.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  unfold bv_wrap, bv_modulus.
+  change (Z.of_N (MachineWord.Z_idx 0)) with 0. change (Z.of_N 64) with 64.
+  rewrite Z.shiftr_0_r. apply Z.mod_small. exact Hr.
+Qed.
+
 Lemma subrange_full_44 (a : mword 44) : subrange_vec_dec a 43 0 = a.
 Proof.
   apply bv_eq.
@@ -1381,4 +1397,291 @@ Proof.
   unfold _update_Satp64_PPN, _get_Satp64_PPN.
   rewrite subrange_full_44. rewrite zero_extend'_id44.
   apply usvd_get_bottom_44.
+Qed.
+
+(* ====================================================================== *)
+(* THE VMEM LEVEL'S PAGE-BOUNDARY SPLIT.                                   *)
+(*                                                                         *)
+(* [vmem_read_addr]/[vmem_write_addr] no longer split on the MAG (that moved *)
+(* down into [checked_mem_read], see [pma_ok_aligned]); they split on a PAGE *)
+(* boundary, via [split_on_page_boundary].  A naturally aligned access never  *)
+(* crosses one, so the answer is always (width, 0) and the vmem level's      *)
+(* [do_split_access] is false.  Proving that is the one real bitvector fact   *)
+(* the bump needs: the page mask keeps only bits 63..12, and an 8-aligned     *)
+(* address leaves at least 7 bytes of room inside its page.                   *)
+(* ====================================================================== *)
+
+Lemma z_pagemask_val : 18446744073709547520 = Z.shiftl (Z.ones 52) 12.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma z_land_pagemask (x : Z) :
+  0 <= x -> x < 2 ^ 64 ->
+  Z.land x 18446744073709547520 = Z.shiftl (Z.shiftr x 12) 12.
+Proof.
+  intros Hx0 Hx1. assert (Hx : 0 <= x < 2 ^ 64) by lia. rewrite z_pagemask_val.
+  apply Z.bits_inj_iff'. intros n Hn.
+  rewrite Z.land_spec.
+  destruct (Z.lt_ge_cases n 12) as [Hlo|Hhi].
+  - assert (Hm : Z.testbit (Z.shiftl (Z.ones 52) 12) n = false)
+      by (apply Z.shiftl_spec_low; lia).
+    assert (Hs : Z.testbit (Z.shiftl (Z.shiftr x 12) 12) n = false)
+      by (apply Z.shiftl_spec_low; lia).
+    rewrite Hm. rewrite Hs. apply andb_false_r.
+  - assert (Hs : Z.testbit (Z.shiftl (Z.shiftr x 12) 12) n = Z.testbit x n).
+    { rewrite Z.shiftl_spec; [| lia]. rewrite Z.shiftr_spec; [| lia].
+      f_equal. lia. }
+    rewrite Hs.
+    destruct (Z.lt_ge_cases n 64) as [Hin|Hout].
+    + assert (Hm : Z.testbit (Z.shiftl (Z.ones 52) 12) n = true).
+      { rewrite Z.shiftl_spec; [| lia]. apply Z.ones_spec_low. lia. }
+      rewrite Hm. apply andb_true_r.
+    + assert (Hxb : Z.testbit x n = false).
+      { destruct (Z.eq_dec x 0) as [->|Hnz]; [ apply Z.bits_0 | ].
+        apply Z.bits_above_log2; [ lia | ].
+        assert (Hlg : Z.log2 x < 64) by (apply Z.log2_lt_pow2; lia). lia. }
+      rewrite Hxb. reflexivity.
+Qed.
+
+Lemma z_shiftr12_stable (u : Z) :
+  0 <= u -> u mod 8 = 0 -> Z.shiftr u 12 = Z.shiftr (u + 7) 12.
+Proof.
+  intros Hu H8.
+  assert (Hd : Z.shiftr u 12 = u / 4096) by (apply Z.shiftr_div_pow2; lia).
+  assert (Hd' : Z.shiftr (u + 7) 12 = (u + 7) / 4096) by (apply Z.shiftr_div_pow2; lia).
+  rewrite Hd. rewrite Hd'.
+  (* the page remainder inherits the 8-alignment (4096 = 8 * 512), so it is at
+     most 4088 and adding 7 cannot cross the page boundary *)
+  assert (Hm8 : (u mod 4096) mod 8 = 0).
+  { assert (Hz : u mod 4096 mod 8 = u mod 8)
+      by (apply Z.mod_mod_divide; exists 512; reflexivity).
+    rewrite Hz. exact H8. }
+  assert (Hlt : u mod 4096 < 4096) by (apply Z.mod_pos_bound; lia).
+  assert (Hge : 0 <= u mod 4096) by (apply Z.mod_pos_bound; lia).
+  assert (Hdv : (8 | u mod 4096)) by (apply Z.mod_divide; [ lia | exact Hm8 ]).
+  destruct Hdv as [k Hk].
+  assert (Hle : u mod 4096 <= 4088) by lia.
+  assert (Hsplit : u = 4096 * (u / 4096) + u mod 4096) by (apply Z.div_mod; lia).
+  assert (Hq : (4096 * (u / 4096) + (u mod 4096 + 7)) / 4096 = u / 4096).
+  { rewrite (Z.mul_comm 4096 (u / 4096)).
+    assert (Hda : ((u / 4096) * 4096 + (u mod 4096 + 7)) / 4096
+                  = u / 4096 + (u mod 4096 + 7) / 4096)
+      by (apply Z.div_add_l; lia).
+    rewrite Hda.
+    assert (Hs0 : (u mod 4096 + 7) / 4096 = 0) by (apply Z.div_small; lia).
+    rewrite Hs0. lia. }
+  assert (Heq : u + 7 = 4096 * (u / 4096) + (u mod 4096 + 7)) by lia.
+  rewrite Heq. rewrite Hq. reflexivity.
+Qed.
+
+(* the mask [split_on_page_boundary] builds at width 64: ones with the low 12
+   bits cleared *)
+Lemma page_mask64_val :
+  bv_unsigned (update_subrange_vec_dec ((ones 64) : bits 64) (pagesize_bits - 1) 0
+                 (zeros' (12 - 1 - (0 - 1))) : mword 64)
+  = 18446744073709547520.
+Proof. vm_compute. reflexivity. Qed.
+
+
+(* an 8-aligned value below 2^64 is at most 2^64 - 8, so +7 cannot wrap *)
+Lemma z_align8_room (u : Z) : 0 <= u -> u < 2 ^ 64 -> u mod 8 = 0 -> u + 7 < 2 ^ 64.
+Proof.
+  intros H0 H1 H8.
+  assert (Hdv : (8 | u)) by (apply Z.mod_divide; [ lia | exact H8 ]).
+  destruct Hdv as [k Hk].
+  assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  rewrite H64 in H1. rewrite H64. lia.
+Qed.
+
+Lemma z_align8_room_8 (u : Z) : 0 <= u -> u < 2 ^ 64 -> u mod 8 = 0 -> u + 8 <= 2 ^ 64.
+Proof.
+  intros H0 H1 H8.
+  assert (Hdv : (8 | u)) by (apply Z.mod_divide; [ lia | exact H8 ]).
+  destruct Hdv as [k Hk].
+  assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  rewrite H64 in H1. rewrite H64. lia.
+Qed.
+
+Lemma exec_split_on_page_boundary_aligned8 (a : mword 64) s :
+  is_aligned_vaddr (Virtaddr a) 8 = true ->
+  exec (split_on_page_boundary a 8) s = Some ((8, 0), s).
+Proof.
+  intro Halign.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  destruct Hr as [Hr0 Hr1].
+  (* the alignment, as a plain-Z fact about the address *)
+  assert (Hal : bv_unsigned a mod 8 = 0).
+  { unfold is_aligned_vaddr in Halign. apply Z.eqb_eq in Halign.
+    rewrite uint_unsigned in Halign.
+    assert (Hrm : Z.rem (bv_unsigned a) 8 = (bv_unsigned a) mod 8)
+      by (apply Z.rem_mod_nonneg; [ exact Hr0 | lia ]).
+    rewrite Hrm in Halign. exact Halign. }
+  (* an 8-aligned address is at most 2^64 - 8, so a + 7 does not wrap *)
+  assert (Hnw : bv_unsigned a + 7 < 2 ^ 64)
+    by (apply z_align8_room; [ exact Hr0 | exact Hr1 | exact Hal ]).
+  assert (Hsub : bv_unsigned (sub_vec_int (add_vec_int a 8) 1) = bv_unsigned a + 7).
+  { unfold sub_vec_int, add_vec_int.
+    rewrite sub_vec64_unsigned. rewrite add_vec64_unsigned.
+    rewrite !moi64_unsigned.
+    (* bv_wrap is idempotent through the add and the sub, so the whole thing is
+       one wrap of [a + 8 - 1]; that does not wrap, since an 8-aligned [a] leaves
+       room for +7. *)
+    assert (Hw8 : bv_wrap 64 8 = 8)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    assert (Hw1 : bv_wrap 64 1 = 1)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    rewrite Hw8. rewrite Hw1.
+    rewrite bv_wrap_sub_idemp_l.
+    assert (Hsimp : bv_unsigned a + 8 - 1 = bv_unsigned a + 7) by (clear; lia).
+    rewrite Hsimp.
+    apply bv_wrap_small. rewrite bv_modulus64.
+    assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
+    rewrite <- H64. split; [ clear - Hr0; lia | exact Hnw ]. }
+  unfold split_on_page_boundary.
+  assert (Hintra : eq_vec (and_vec a (update_subrange_vec_dec ((ones 64) : bits 64)
+                                        (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1)))))
+                          (and_vec (sub_vec_int (add_vec_int a 8) 1)
+                                   (update_subrange_vec_dec ((ones 64) : bits 64)
+                                      (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1))))) = true).
+  { apply eq_vec_true_iff. apply bv_eq.
+    rewrite !and_vec64_unsigned. rewrite page_mask64_val.
+    rewrite Hsub.
+    assert (Hnn : 0 <= bv_unsigned a + 7) by (clear - Hr0; lia).
+    rewrite (z_land_pagemask (bv_unsigned a) Hr0 Hr1).
+    rewrite (z_land_pagemask (bv_unsigned a + 7) Hnn Hnw).
+    rewrite <- (z_shiftr12_stable (bv_unsigned a) Hr0 Hal). reflexivity. }
+  rewrite Hintra. apply exec_returnm.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* The same, WIDTH-GENERIC.  The vmem level is proved once per width in    *)
+(* some files and generically in others, so both forms are wanted.  The    *)
+(* width premise is [w] in {1,2,4,8} -- what the model itself constrains   *)
+(* [vmem_read_addr]/[vmem_write_addr] to -- from which the two facts the    *)
+(* argument needs follow: [0 < w] and [w | 4096].                           *)
+(* ---------------------------------------------------------------------- *)
+
+Definition vmem_width (w : Z) : Prop := w = 1 \/ w = 2 \/ w = 4 \/ w = 8.
+
+Lemma vmem_width_pos (w : Z) : vmem_width w -> 0 < w.
+Proof. intros [-> | [-> | [-> | ->]]]; lia. Qed.
+
+Lemma vmem_width_page (w : Z) : vmem_width w -> (w | 4096).
+Proof.
+  intros [-> | [-> | [-> | ->]]].
+  - exists 4096; reflexivity.
+  - exists 2048; reflexivity.
+  - exists 1024; reflexivity.
+  - exists 512; reflexivity.
+Qed.
+
+Lemma vmem_width_le (w : Z) : vmem_width w -> w <= 8.
+Proof. intros [-> | [-> | [-> | ->]]]; lia. Qed.
+
+Lemma z_alignw_room (u w : Z) :
+  0 <= u -> u < 2 ^ 64 -> vmem_width w -> u mod w = 0 -> u + (w - 1) < 2 ^ 64.
+Proof.
+  intros H0 H1 Hw H8.
+  assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  rewrite H64 in H1. rewrite H64.
+  (* case on the width so that [u = k * w] is LINEAR (lia cannot multiply two
+     variables) *)
+  destruct Hw as [-> | [-> | [-> | ->]]].
+  - lia.
+  - assert (Hdv : (2 | u)) by (apply Z.mod_divide; [ lia | exact H8 ]).
+    destruct Hdv as [k Hk]. lia.
+  - assert (Hdv : (4 | u)) by (apply Z.mod_divide; [ lia | exact H8 ]).
+    destruct Hdv as [k Hk]. lia.
+  - assert (Hdv : (8 | u)) by (apply Z.mod_divide; [ lia | exact H8 ]).
+    destruct Hdv as [k Hk]. lia.
+Qed.
+
+Lemma z_shiftr12_stable_w (u w : Z) :
+  0 <= u -> vmem_width w -> u mod w = 0 ->
+  Z.shiftr u 12 = Z.shiftr (u + (w - 1)) 12.
+Proof.
+  intros Hu Hw H8.
+  assert (Hpos : 0 < w) by (apply vmem_width_pos; exact Hw).
+  assert (Hle : w <= 8) by (apply vmem_width_le; exact Hw).
+  assert (Hpg : (w | 4096)) by (apply vmem_width_page; exact Hw).
+  assert (Hd : Z.shiftr u 12 = u / 4096) by (apply Z.shiftr_div_pow2; lia).
+  assert (Hd' : Z.shiftr (u + (w - 1)) 12 = (u + (w - 1)) / 4096)
+    by (apply Z.shiftr_div_pow2; lia).
+  rewrite Hd. rewrite Hd'.
+  (* the page remainder inherits the w-alignment, so it is at most 4096 - w *)
+  assert (Hmw : (u mod 4096) mod w = 0).
+  { assert (Hz : u mod 4096 mod w = u mod w) by (apply Z.mod_mod_divide; exact Hpg).
+    rewrite Hz. exact H8. }
+  assert (Hlt : u mod 4096 < 4096) by (apply Z.mod_pos_bound; lia).
+  assert (Hge : 0 <= u mod 4096) by (apply Z.mod_pos_bound; lia).
+  assert (Hle' : u mod 4096 <= 4096 - w).
+  { destruct Hw as [-> | [-> | [-> | ->]]].
+    - lia.
+    - assert (Hdv : (2 | u mod 4096)) by (apply Z.mod_divide; [ lia | exact Hmw ]).
+      destruct Hdv as [k Hk]. lia.
+    - assert (Hdv : (4 | u mod 4096)) by (apply Z.mod_divide; [ lia | exact Hmw ]).
+      destruct Hdv as [k Hk]. lia.
+    - assert (Hdv : (8 | u mod 4096)) by (apply Z.mod_divide; [ lia | exact Hmw ]).
+      destruct Hdv as [k Hk]. lia. }
+  assert (Hsplit : u = 4096 * (u / 4096) + u mod 4096) by (apply Z.div_mod; lia).
+  assert (Hq : (4096 * (u / 4096) + (u mod 4096 + (w - 1))) / 4096 = u / 4096).
+  { rewrite (Z.mul_comm 4096 (u / 4096)).
+    assert (Hda : ((u / 4096) * 4096 + (u mod 4096 + (w - 1))) / 4096
+                  = u / 4096 + (u mod 4096 + (w - 1)) / 4096)
+      by (apply Z.div_add_l; lia).
+    rewrite Hda.
+    assert (Hs0 : (u mod 4096 + (w - 1)) / 4096 = 0) by (apply Z.div_small; lia).
+    rewrite Hs0. lia. }
+  assert (Heq : u + (w - 1) = 4096 * (u / 4096) + (u mod 4096 + (w - 1))) by lia.
+  rewrite Heq. rewrite Hq. reflexivity.
+Qed.
+
+Lemma exec_split_on_page_boundary_aligned (a : mword 64) (w : Z) s :
+  vmem_width w ->
+  is_aligned_vaddr (Virtaddr a) w = true ->
+  exec (split_on_page_boundary a w) s = Some ((w, 0), s).
+Proof.
+  intros Hw Halign.
+  assert (Hpos : 0 < w) by (apply vmem_width_pos; exact Hw).
+  assert (Hle : w <= 8) by (apply vmem_width_le; exact Hw).
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  destruct Hr as [Hr0 Hr1].
+  assert (Hal : bv_unsigned a mod w = 0).
+  { unfold is_aligned_vaddr in Halign. apply Z.eqb_eq in Halign.
+    rewrite uint_unsigned in Halign.
+    assert (Hrm : Z.rem (bv_unsigned a) w = (bv_unsigned a) mod w)
+      by (apply Z.rem_mod_nonneg; [ exact Hr0 | lia ]).
+    rewrite Hrm in Halign. exact Halign. }
+  assert (Hnw : bv_unsigned a + (w - 1) < 2 ^ 64)
+    by (apply z_alignw_room; assumption).
+  assert (Hsub : bv_unsigned (sub_vec_int (add_vec_int a w) 1) = bv_unsigned a + (w - 1)).
+  { unfold sub_vec_int, add_vec_int.
+    rewrite sub_vec64_unsigned. rewrite add_vec64_unsigned.
+    rewrite !moi64_unsigned.
+    assert (Hww : bv_wrap 64 w = w)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    assert (Hw1 : bv_wrap 64 1 = 1)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    rewrite Hww. rewrite Hw1.
+    rewrite bv_wrap_sub_idemp_l.
+    assert (Hsimp : bv_unsigned a + w - 1 = bv_unsigned a + (w - 1)) by (clear; lia).
+    rewrite Hsimp.
+    apply bv_wrap_small. rewrite bv_modulus64.
+    assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
+    rewrite <- H64. split; [ clear - Hr0 Hpos; lia | exact Hnw ]. }
+  unfold split_on_page_boundary.
+  assert (Hintra : eq_vec (and_vec a (update_subrange_vec_dec ((ones 64) : bits 64)
+                                        (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1)))))
+                          (and_vec (sub_vec_int (add_vec_int a w) 1)
+                                   (update_subrange_vec_dec ((ones 64) : bits 64)
+                                      (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1))))) = true).
+  { apply eq_vec_true_iff. apply bv_eq.
+    rewrite !and_vec64_unsigned. rewrite page_mask64_val.
+    rewrite Hsub.
+    assert (Hnn : 0 <= bv_unsigned a + (w - 1)) by (clear - Hr0 Hpos; lia).
+    rewrite (z_land_pagemask (bv_unsigned a) Hr0 Hr1).
+    rewrite (z_land_pagemask (bv_unsigned a + (w - 1)) Hnn Hnw).
+    rewrite <- (z_shiftr12_stable_w (bv_unsigned a) w Hr0 Hw Hal). reflexivity. }
+  rewrite Hintra. apply exec_returnm.
 Qed.

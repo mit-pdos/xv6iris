@@ -267,58 +267,72 @@ Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hdev : dev_addr pa = false.
 Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-(* PORT PENDING (claude-notes/projects/sail-model-bump.md): the vmem level no
-   longer splits with [split_misaligned] on the virtual address -- [vmem_read_addr]
-   is now a straight-line body that splits on PAGE boundaries
-   ([split_on_page_boundary]) and reads through [translate_and_read_value], and
-   [do_split_access] is false here because Machine-mode translation is Bare.  What
-   is missing is the intra-page fact: an 8-aligned address's 8 bytes lie in one
-   page, so [split_on_page_boundary] answers (8, 0) rather than taking the
-   boundary arm (whose [assert_exp'] would otherwise have to be discharged). *)
-Let data2 : mword (8*1*8) :=
-  update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v.
-
+(* [vmem_read_addr] is a straight-line body now: the vmem level splits on a PAGE
+   boundary rather than on the MAG (that moved down into [checked_mem_read]), and
+   an aligned in-page access takes neither split arm -- [do_split_access] is false
+   because Machine-mode translation is Bare, so [access_width] is the full width
+   and the two [translate_and_read_value] calls the split arms would make are
+   dead.  What survives is one [translate_and_read_value] and one full-width
+   [update_subrange_vec_dec] into the zero accumulator. *)
 Lemma exec_vmem_read_addr_8 :
   exec (vmem_read_addr (Virtaddr a) 8 (Load Data) false false false) s
-    = Some (Ok data2, s).
+    = Some (Ok v, s).
 Proof.
   unfold vmem_read_addr.
   rewrite exec_catch_early_return.
   rewrite Halign. cbn [Riscv.rv64d.not negb].
-  assert (Hinner : execR (returnR (result (mword (8 * 8)) ExecutionResult) tt >>
-                          liftR (split_misaligned (Virtaddr a) 8)) s = Some (inr (1, 8), s)).
-  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned (Virtaddr a) s Halign). reflexivity. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-  rewrite misaligned_order_1.
-  match goal with
-  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (data2, true, 0), s))
-  end.
-  { eapply execR_untilMT_1.
-    - (* measure *) reflexivity.
-    - (* body *)
-      cbn match.
-      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-      rewrite (execR_liftR_seq _ _ _ _ _
-        (exec_translateAddr_identity_load (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0*8)) s Hpriv Hmprv)).
-      cbn [bits_of_virtaddr]. cbn match.
-      match goal with
-      | |- execR (Defs.bind ?mrm ?post) s = _ =>
-        assert (Hmrm : execR mrm s = Some (inr data2, s))
-      end.
-      { rewrite (execR_liftR_seq _ _ _ _ _
-          (exec_mem_read_load PBMT_PMA pa region v (register_lookup mstatus s.(sregs)) s
-             Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes eq_refl Hmprv Hpriv)).
-        cbn match.
-        rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-        rewrite autocast_id. apply execR_returnR_fwd. }
-      rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
-      cbn. apply execR_returnR_fwd.
-    - (* cond *) apply execR_returnR_fwd. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hu).
-  cbn. rewrite autocast_id. reflexivity.
+  (* the page split: (8, 0), so nothing is split *)
+  (* the page split: an aligned in-page access is (8, 0), so nothing splits *)
+  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+  cbn [bits_of_virtaddr].
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_on_page_boundary_aligned8 a s Halign)).
+  cbn beta zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite Hpriv.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (exec_effectivePrivilege_load (register_lookup mstatus s.(sregs)) s Hmprv)).
+  cbn beta.
+  (* do_split_access = (translation not Bare) AND (next page bytes > 0): Machine
+     mode with MPRV = 0 translates Bare, so the left conjunct is already false *)
+  match goal with |- context[Defs.and_boolM ?A ?B] =>
+    assert (Hds : execR (Defs.and_boolM A B) s = Some (inr false, s)) end.
+  { unfold Defs.and_boolM.
+    match goal with |- context[Defs.bind (Defs.bind (Defs.liftR ?m) ?k1) _] =>
+      assert (Htm : execR (Defs.bind (Defs.liftR m) k1) s = Some (inr false, s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_M s)). cbn beta.
+      apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Htm). cbn match beta.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hds). cbn match beta zeta.
+  (* neither split arm runs, so the accumulator is still zeros *)
+  rewrite andb_false_r. cbn match beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (zeros' (8 * 8)) s)). cbn beta.
+  (* the single full-width access *)
+  assert (Htrv : exec (translate_and_read_value (Virtaddr a) 8 (Load Data) false false false) s
+                 = Some (Ok (Physaddr pa, v), s)).
+  { unfold translate_and_read_value.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_translateAddr_identity_load a s Hpriv Hmprv)).
+    cbn match beta.
+    (* the translated pa is [zero_extend' 64 a]; the section names it through the
+       (zero) split offset *)
+    assert (Hpa : zero_extend' 64 (bits_of_virtaddr (Virtaddr a)) = pa)
+      by (unfold pa; cbn [bits_of_virtaddr]; rewrite avi0_mul8; reflexivity).
+    rewrite Hpa.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_mem_read_load PBMT_PMA pa region v
+                  (register_lookup mstatus s.(sregs)) s
+                  Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes eq_refl Hmprv Hpriv)).
+    cbn match beta. apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Htrv). cbn match beta.
+  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+  cbn beta.
+  (* the accumulator was zeros and the access is full width, so the subrange
+     write is the value itself *)
+  rewrite autocast_id.
+  change (8 * 8 - 1) with 63. change (8 * 8) with 64.
+  rewrite usvd_zeros64.
+  cbn. reflexivity.
 Qed.
 End S.
 
