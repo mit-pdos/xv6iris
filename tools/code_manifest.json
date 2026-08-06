@@ -60,6 +60,12 @@
   2
  ],
  [
+  "CodeBmap.v",
+  "bmap",
+  "bmi_",
+  2
+ ],
+ [
   "CodeBpin.v",
   "bpin",
   "bpi_",
@@ -261,6 +267,12 @@
   "CodeIsmapped.v",
   "ismapped",
   "imi_",
+  2
+ ],
+ [
+  "CodeIupdate.v",
+  "iupdate",
+  "iui_",
   2
  ],
  [
@@ -717,6 +729,12 @@
   "CodeWriteHead.v",
   "write_head",
   "whi_",
+  2
+ ],
+ [
+  "CodeWritei.v",
+  "writei",
+  "wri_",
   2
  ],
  [
