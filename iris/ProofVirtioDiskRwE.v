@@ -61,7 +61,6 @@ Require Import VirtioModel DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
 Require Import WpVirtioDev.
 Require Import WpUart.
-Require Import PermInv.
 Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
 Require Import CodeVirtioDiskRw.

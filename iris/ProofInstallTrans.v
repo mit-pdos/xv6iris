@@ -87,9 +87,9 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr WpMmodeShiftiop.
+Require Import WpSmodeIntr.
 Require Import WpUart.
-Require Import ByteBuf ByteCursor.
+Require Import ByteCursor.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.

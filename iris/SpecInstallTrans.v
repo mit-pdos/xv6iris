@@ -116,7 +116,7 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

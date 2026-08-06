@@ -23,7 +23,7 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import RiscvModelBytes InstrBytes.
-Require Import StackOwn CalleeSaved KernelText KernelDataInv.
+Require Import StackOwn CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSmodeIntr.
 Require Import IntrDefs.
@@ -31,10 +31,7 @@ Require Import WpNext.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import FdSlots FileInv ProcInv.
-Require Import ProcPtOwn.
-Require Import SchedCtx.
-Require Import SpecPanic.
+Require Import FdSlots FileInv.
 Require Import SpecArgint SpecKkill.
 Require Import SpecSysKill.
 From Kernel Require KernelInstrs KernelSyms.

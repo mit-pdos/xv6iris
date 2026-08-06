@@ -65,7 +65,6 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
-Require Import StackOwn.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecArgfd SpecFdalloc.

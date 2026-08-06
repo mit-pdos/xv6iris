@@ -71,7 +71,7 @@ Require Import SchedCtx.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import DiskPtsto.
-Require Import BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease SpecSleep.

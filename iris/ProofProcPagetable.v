@@ -61,8 +61,9 @@ Require Import PtBuild KptExecMap TrampPt.
 Require Import PtreeType.
 (* the epilogue block STATES [pc_is] / [ptree_own] / [kalloc_env] (through
    [ppt_post]) rather than only receiving them, so these come in directly. *)
-Require Import InstrBytes KernelText.
-Require Import PtTree KvmSpec.
+Require Import InstrBytes.
+Require Import KvmSpec.
+Require Import PtreeType.
 Require Import ProcPt.
 Require Import CodeProcPagetable.
 Require Import BarePt.

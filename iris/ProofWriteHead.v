@@ -77,10 +77,8 @@ Require Import DiskPtsto DiskInv.
 Require Import WpLock.
 Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
-Require Import WpSmodeIntr.
 Require Import ByteCursor.
 Require Import ByteBuf.
-Require Import PageFields.
 Require Import KstackArith.
 Require Import FdSlots.
 Require Import ProcGeom.

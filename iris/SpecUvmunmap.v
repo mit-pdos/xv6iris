@@ -66,7 +66,6 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import KptExecMap TrampPt.
-Require Import UptTree.
 Require Import ProcPtOwn.
 Require Import BarePt.
 From Kernel Require KernelSyms.

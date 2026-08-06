@@ -65,7 +65,6 @@ Require Import SmodeCore.  (* sieG: the [ghost_varG Σ (mword 1)] for the strans
 Require Import KptGhost.   (* kpt_unset / kpt_ghost_alloc: the shared kernel table's one-shot agreement *)
 Require Import WireInv.
 Require Import PlicPlan DiskPtsto VirtioProto WpUart.
-Require Import PermInv.
 Require Import PowerBoot.   (* the canonical reset machine + [boot_shape_boot_gstate] *)
 
 (* ---------------------------------------------------------------------- *)

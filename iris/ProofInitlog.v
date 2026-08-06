@@ -64,8 +64,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import RiscvExtras.
-Require Import InstrBytes.
-Require Import KernelText KernelDataInv.
+Require Import KernelDataInv.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import WpAuipc.
@@ -73,28 +72,21 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
-Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
+Require Import BufOwn.
 Require Import WpLock.
-Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
 Require Import WpSmodeIntr.
 Require Import ByteCursor.
 Require Import ByteBuf.
-Require Import PageFields.
-Require Import KstackArith.
 Require Import FdSlots.
-Require Import ProcGeom.
-Require Import SwtchCtx.
-Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import CodeInitlog.
-Require Import SpecPanic.
 Require Import SpecInitlock.
 Require Import SpecBread SpecBrelse.
 Require Import SpecInstallTrans SpecWriteHead.

@@ -83,13 +83,12 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
+Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import RiscvExtras.
-Require Import InstrBytes ExecCommon.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import RegFile HartTp WpNext.
-Require Import WpGpr.
 Require Import WpAuipc.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
@@ -105,9 +104,9 @@ Require Import ProcGeom CodeMycpu.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr WpMmodeShiftiop.
+Require Import WpSmodeIntr.
 Require Import WpUart.
-Require Import ByteBuf ByteCursor.
+Require Import ByteCursor.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
