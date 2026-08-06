@@ -356,9 +356,32 @@ Landed at batch 0b/1. Five moves; nothing else about an instruction enters.
 5. **The WP.** `WeakFunnel.wwp_instr` with that `P` and the shape's `Q`, and
    §2b's four moves for the Iris half.
 
-**What is NOT free and is the whole per-leaf cost:** the window `W` and the
-second instantiation of the shape lemma at the restricted memory. Everything
-else above is an `apply` or an `exact`.
+**MEASURED, on the first complete leaf** (`iris/WeakLeafLd8.v`, the `ld`-class
+8-byte load — read it before writing your second one): **≈ 490 code lines,
+≈ 3.8× the SC leaf**, of which the window and its three obligations are 65
+(the 20–40 predicted, plus the membership lemmas) and **116 are a redundant
+second replay of the step** forced by the `wwp_cb` defect below. Steady-state
+once that is fixed: **≈ 375 / ≈ 2.9×**.
+
+**TWO SEAMS TO FIX BEFORE THE SWEEP SCALES ×50** (a better abstraction is
+always worth the rework — durable notes, the guiding principle):
+
+- **`wwp_cb` makes every leaf replay the step twice.** Its continuation owes
+  `wmstate_norg σ'`, whose `dev_interp (wm_dev σ')` needs
+  `wm_dev σ' = wm_dev σ`; `wstep_post` gives only `wm_dev σ' = mdev t`, and
+  the funnel constructs `t` and forgets it. **Add `⌜mdev t = wm_dev σ⌝` to
+  `wwp_cb`'s post-step arguments** (or split `dev_interp` out of
+  `wmstate_norg`, as `reg_interp` already is) and 116 lines vanish per leaf.
+- **`wwp_cb` hands out only `⌜register_lookup PC (wm_regs σ) = pc⌝`,** so each
+  leaf re-splits `mmode_config` and re-reads nine registers (~25 lines), and
+  the decode bridge's `agree_on D` premise has to be quantified over the
+  register file rather than stated at `σ`. Hand the callback
+  `⌜cfg_ok (wflat_st σ)⌝` plus the decode bridge's four pins instead.
+
+**TWO CONVENTIONS to follow from leaf one:** state the `execute` lemma over an
+ARBITRARY `s0 : mstate` (so confined and flat are the same lemma twice, and
+the `gmap Arch.pa` binder trap never arises), and define any `gset Arch.pa`
+window ABOVE the `SailStdpp.Base` import.
 
 ## 3. What needs thought: the racy sites, and only those
 
@@ -508,7 +531,7 @@ Every one of these type-checks and is wrong or vacuous.
    S-/U-flavoured AMO chains existed); those halves are 399–613 lines and
    replay the width-8 template essentially line for line.  Widths 1 and 2
    remain batch-6 territory: recorded, not built.
-2. The M-mode leaf libraries through `WeakFunnel.wwp_instr` (§2d) —
+2. The M-mode leaf libraries through `WeakFunnel.wwp_instr` (§2d, §2g; the FIRST one is landed, `iris/WeakLeafLd8.v` — read it) —
    `WpMmodeLoad`, `WpMmodeStore`, the `WpMmodeLeaf*` family.  Their config
    tower and decode facts transfer as-is.
 3. `WpLock` clients — nothing to do beyond the `iProp`→`vProp` altitude change

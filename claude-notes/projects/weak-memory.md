@@ -1399,6 +1399,58 @@ they unlock.
   them, exactly as the SC originals take the `exec` forms. Four agents built
   four files concurrently with no shared edit and no adapter at the seam.
 
+### THE BATCH-2 UNIT PRICE, MEASURED (read before batch 2)
+
+`iris/WeakLeafLd8.v` (967 lines / 43.7 s) is the FIRST COMPLETE WEAK LEAF —
+the `ld`-class 8-byte load, from the `↦w₈` resource to
+`WP (Loop) {{ Φ }}` — and it exists to produce this number.
+
+- **THE PRICE: ≈ 490 code lines, ≈ 3.8× the SC leaf** (`WpMmodeLoad.wp_ld_gpr`,
+  128 code lines), of which **116 lines are a redundant second replay of the
+  step forced by an interface defect** (below). Fix that and the steady-state
+  price is **≈ 375 lines / ≈ 2.9×**. Breakdown: the width-generic certificate
+  37 (paid once per FAMILY, not per leaf); the window and its three
+  obligations 65 — **exactly the porting guide's predicted 20–40 plus the
+  membership lemmas**; the `wP_eff` half 102; the `execute` lemma restated at
+  a generic state 137 (≈ 50 of which the SC leaf already does inline); the WP
+  composition proper 191.
+- **THE INTERFACE DEFECT, and it should be fixed before batch 2 scales ×50.**
+  `WeakFunnel.wwp_cb`'s continuation must hand back `wmstate_norg σ'`, whose
+  `dev_interp (wm_dev σ')` conjunct needs `wm_dev σ' = wm_dev σ`;
+  `WeakInstr.wstep_post` gives only `wm_dev σ' = mdev t`, and `dev_interp` is
+  an authoritative half that cannot be moved without its fragment. The funnel
+  CONSTRUCTS `t` by register writes and then forgets it, so the leaf's only
+  route is to re-derive the whole `riscv_step` at the FLAT state and identify
+  the two successors by determinism of `exec` — duplicating, premise for
+  premise, what `wP_eff_of_leaf_base` just did at the confined state.
+  **Fix: add `⌜mdev t = wm_dev σ⌝` to `wwp_cb`'s post-step argument list**
+  (or split `dev_interp` out of `wmstate_norg` the way `reg_interp` already
+  was, and let the funnel carry it). Either deletes the 116 lines from this
+  and every later leaf.
+- **THE SECOND, SMALLER SEAM: `wwp_cb` hands the leaf only
+  `⌜register_lookup PC (wm_regs σ) = pc⌝`,** although `wwp_instr` has just
+  read the whole M-mode tower off the bundle it was given. So every leaf
+  re-splits `mmode_config` and re-reads the same nine registers (≈ 25
+  lines/leaf) — and, worse, it is what forces the decode bridge's `agree_on D`
+  premise to be quantified over the register file rather than stated at `σ`,
+  because `σ` is not in scope at the leaf's altitude. Handing the callback
+  `⌜cfg_ok (wflat_st σ)⌝` plus the four pins the decode bridge needs would
+  delete it.
+- **TWO CONVENTIONS EVERY LATER LEAF SHOULD FOLLOW**, both established here:
+  - **state the leaf's `execute` lemma over an ARBITRARY `s0 : mstate`**, never
+    over `MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ)`. That makes the
+    confined and the flat instantiation literally the same lemma applied
+    twice, and it dodges the `gmap Arch.pa` binder-instance trap outright;
+  - **define any `gset Arch.pa` window ABOVE the `SailStdpp.Base` import**
+    (`Base` re-exports `#[export] Countable_mword`, so a `gset Arch.pa`
+    written after it elaborates against the wrong instance and
+    `wmem_restrict` rejects it, printing two identical-looking types).
+- **The certificate family is now width-generic.** `WeakLeafLd8.wcert_load_w`
+  is `WeakCert.wcert_load` over an arbitrary `n` — its script was generic ON
+  THE NOSE — with `wcert_load_w_4` as the subsumption check at the original's
+  exact statement. `wcert_store` / `wcert_amo_aq` are still width-4-only;
+  generalise them the same way when the first `sd`/`amoswap.d` leaf needs it.
+
 ## M4 — the sweep
 
 **Batches and their prices** (from M4-prep's measurements; the ORDER is
@@ -1412,7 +1464,7 @@ numbers come from; the prices below replace M4-prep's).
 | 0a | `execR_eff` + kit, the two `run_hart_active` progress mirrors, the step assembly, the certificate join | **DONE — 834 lines / 3.9 s** (`iris/WeakEffSkel.v`) | vs the 400–600 estimate for the whole of batch 0; the interpreter mirror is 3.8× its SC source, the script mirrors 0.65× |
 | 0b | the FETCH's `exec_eff` reduction + the `tick_clock` mirror + `wP_eff_of_leaf_base` | **DONE — 2272 lines / 13.1 s** (`WeakPmpEff.v` 358, `WeakTickEff.v` 397, `WeakFetchEff.v` 1112, `WeakFetchRvc.v` 405) | vs the 250–350 + 25 estimate; the gap is the TRANSITIVE cone (PMP, the interrupt gate, the clock) that the chain merely *names*. Both 4-aligned arms (`F_Base` and `F_RVC`); the 2-aligned ones are the remaining gap |
 | 1 | the memory `execute` mirrors, by SHAPE | **DONE — all five shapes, 4082 lines** (`WeakLeafEff8.v` 691, `WeakLeafEff8s.v` 698, `WeakLeafBase4.v` 1456, `WeakLeafAmo4.v` 1237) | vs the 30–60-lines-per-shape estimate: a shape is ≈ 800 lines, because the whole `vmem_read`/`vmem_write` cone below the `execute` must be mirrored too (same transitive-cone lesson as 0b). Three of the five needed their SC lemma written as well |
-| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | 30–55 lines per load/ALU leaf, 60–90 per store/AMO leaf, ON TOP of the SC leaf | of which 20–40 is the certificate's window; the trace join AND the decode fact are now free (batch-0b block) |
+| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | **MEASURED: ≈ 490 code lines / 3.8× the SC leaf** (`iris/WeakLeafLd8.v`, the `ld` leaf), falling to **≈ 375 / 2.9×** once the `wwp_cb` device-frame defect is fixed | vs the 30–55 estimate. The window IS 20–40 as predicted and the trace join and decode fact ARE free; what the estimate missed is the 116-line redundant step replay and the ~190-line WP composition. See the unit-price block above |
 | 3 | `WpLock` clients | ≈ 0 | the interface is unchanged; `iris/WeakWord8.v` covers `cpu`/`name` |
 | 4 | the straight-line M-mode function proofs | batched by subagent | the config tower and every decode fact transfer verbatim |
 | 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | small, then a cone | the racy-load rule is landed; the escrow is not |
