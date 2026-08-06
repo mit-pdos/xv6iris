@@ -27,6 +27,8 @@ Require Import SpecPushOff.
 Require Import CodeAcquire.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecAcquire.
+Require Import CodeAcquireAux.
+Require Import CodeMycpuAux.
 Import Defs.
 
 

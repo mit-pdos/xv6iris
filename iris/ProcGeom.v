@@ -31,6 +31,7 @@ Require Export HartTp.   (* cid_word_of / cid_word live here now; EXPORTED so th
 Require Import CodeMycpu.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import CodeMycpuAux.
 Local Open Scope Z_scope.
 
 

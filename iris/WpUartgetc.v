@@ -43,6 +43,7 @@ Require Import SpecUart.
 Require Import CodeUartPutcSync.
 Require Import WpSconfAlu WpSconfBtype.
 Require Import WpSconfUartAccess.
+Require Import CodeUartPutcSyncAux.
 Local Open Scope Z_scope.
 
 Module UartgetcProof (Uart : UART).

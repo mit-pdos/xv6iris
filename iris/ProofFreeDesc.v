@@ -53,6 +53,7 @@ Require Import VirtioModel DiskPtsto DiskInv.
 Require Import SpecWakeup.
 Require Import CodeFreeDesc.
 Require Import SpecFreeDesc.
+Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

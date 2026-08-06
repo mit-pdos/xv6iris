@@ -33,6 +33,7 @@ Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemset.
 Require Import KernelRvcDecode.
+Require Import CodeMemsetAux.
 Import Defs.
 
 Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.

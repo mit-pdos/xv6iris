@@ -23,6 +23,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CpuOwn.
 Require Import WpPushOffBridges.
 Require Import SpecPushOff.
+Require Import CodeMycpuAux.
+Require Import CodePopOffAux.
 Import Defs.
 
 

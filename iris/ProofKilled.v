@@ -38,6 +38,7 @@ Require Import SpecKilled.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeKilled.
+Require Import CodeKilledAux.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over the proc invariant otherwise
@@ -237,7 +238,6 @@ Section ProofKilled.
     { rewrite (callee_saved_lookup Hcs_acq kl_s1 ltac:(vm_compute; reflexivity)).
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HA2s1. }
     iPoseProof (kli_12 with "Htext") as "Hi12".
-    iEval (rewrite creg_c1; rewrite creg_c7) in "Hi12".
     assert (Haddr : add_vec (macq !!! Regidx kl_s1)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))))
                     = p_killed (proc_addr j))

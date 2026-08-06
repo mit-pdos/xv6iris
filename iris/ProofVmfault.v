@@ -399,7 +399,6 @@ Section ProofVmfault.
     { intros c Hc H2 H8 H18 H19.
       rewrite (callee_saved_lookup Hmpcs c Hc). apply HR5thr; assumption. }
     (* ---- +0x14 c.ld a5,72(a0) : the p->sz read ---- *)
-    iEval (rewrite cshape_653c) in "Hi14".
     assert (Hrgmfa0 : rget mf Ra0 = p) by (rgne; exact Hmpa0).
     iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.vmfault + 0x14)) Ra5 Ra0
               (mword_of_int 72 : mword 12) mf (K - 6)%nat szv b (dqm:=dqs)
@@ -1284,7 +1283,6 @@ Section ProofVmfault.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp62) in "Hpc".
       (* +0x62 c.ld a0,80(s1)   (a0 := p->pagetable) *)
-      iEval (rewrite cshape_68a8) in "Hi62".
       assert (HrgG4s1 : rget G4 Rs1 = p) by (rgne; exact HG4s1).
       iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.vmfault + 0x62)) Ra0 Rs1
                 (mword_of_int 80 : mword 12) G4 (K - 6)%nat

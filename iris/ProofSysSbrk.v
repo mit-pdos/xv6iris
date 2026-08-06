@@ -48,6 +48,7 @@ Require Import FdSlots FileInv ProcInv.
 Require Import CodeSysSbrk.
 Require Import SpecArgint SpecMyproc SpecGrowproc SpecSysSbrk.
 From Kernel Require KernelSyms.
+Require Import CodeSysSbrkAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
@@ -862,7 +863,6 @@ Section ProofSysSbrk.
     { rewrite <- uint_unsigned. rewrite <- uvm_maxsz_val. exact Hszmax. }
     iDestruct (proc_priv_addrspace with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
     (* ---- +0x22: c.ld s1,72(a0) -- s1 := p->sz, the value sbrk returns -- *)
-    iEval (rewrite ssshape_6524) in "Hi22".
     assert (Hszaddr : forall CID' : CpuId,
               add_vec (rget (CID := CID') D Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p).
     { intros CID'; rgne. rewrite HDa0; reflexivity. }
@@ -1344,7 +1344,6 @@ Section ProofSysSbrk.
         by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
       rewrite /E1 upd_ne; [| congruence]. apply HthrE; assumption. }
     (* ---- +0x50: c.ld a5,72(a0) -- re-read p->sz ---- *)
-    iEval (rewrite cshape_653c) in "Hi50".
     assert (Hszaddr2 : forall CID' : CpuId,
               add_vec (rget (CID := CID') E1 Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p).
     { intros CID'; rgne. rewrite HE1a0; reflexivity. }

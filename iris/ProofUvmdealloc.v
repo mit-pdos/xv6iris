@@ -694,7 +694,6 @@ Section ProofUvmdealloc.
     assert (HA7a1 : A7 !!! Regidx Ra1 = oldsz).
     { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_ne; [| reg_neq]. exact HA5a1. }
     (* +0x1c c.and a4,a4,a3 : a4 := PGROUNDUP(newsz) *)
-    iEval (rewrite udl_cr5 udl_cr6) in "Hi1c".
     iApply (wp_cand_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x1c)) Ra4 Ra3 A7 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
@@ -736,7 +735,6 @@ Section ProofUvmdealloc.
     assert (HA9a3 : A9 !!! Regidx Ra3 = (mword_of_int (-4096) : mword 64))
       by (rewrite /A9 upd_ne; [exact HA8a3 | reg_neq]).
     (* +0x20 c.and a5,a5,a3 : a5 := PGROUNDUP(oldsz) *)
-    iEval (rewrite udl_cr5 udl_cr7) in "Hi20".
     iApply (wp_cand_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x20)) Ra5 Ra3 A9 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
@@ -870,7 +868,6 @@ Section ProofUvmdealloc.
     iPoseProof (udi_3e with "Htext") as "Hi3e".
     iPoseProof (udi_42 with "Htext") as "Hi42".
     (* +0x32 c.sub a5,a5,a4 *)
-    iEval (rewrite udl_cr6 udl_cr7) in "Hi32".
     assert (Hsubv : sub_vec (rget A10 Ra5) (rget A10 Ra4)
                     = (mword_of_int (bv_unsigned (pgroundup oldsz)
                                      - bv_unsigned (pgroundup newsz)) : mword 64)).
@@ -898,7 +895,6 @@ Section ProofUvmdealloc.
                                      - bv_unsigned (pgroundup newsz)) : mword 64))
       by (rewrite /B1 upd_eq; reflexivity).
     (* +0x34 c.srli a5,a5,0xc : a5 := npages *)
-    iEval (rewrite udl_cr7) in "Hi34".
     iApply (wp_csrli_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x34)) (Cregidx (mword_of_int 7)) Ra5
               (mword_of_int 12 : mword 6) B1 (K - 4)%nat b
               udl_cr7 ltac:(vm_compute; discriminate) ltac:(rdok)

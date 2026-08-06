@@ -57,6 +57,7 @@ Require Import CodeScheduler.
 Require Import SpecAcquire SpecRelease SpecSwtch SpecScheduler.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
+Require Import CodeMycpuAux.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.

@@ -230,7 +230,6 @@ Section ProofArgint.
     { rewrite (callee_saved_lookup HcsMF (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
       rewrite /A3 upd_ne; [| vm_compute; discriminate]. exact HA2s1. }
     iPoseProof (ai_10 with "Htext") as "Hi10".
-    iEval (rewrite creg_c1; rewrite creg_c2) in "Hi10".
     assert (Haddr10 : add_vec (rget MF (mword_of_int 9 : mword 5))
                         (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = ip).
     { rgne. rewrite HMFs1. apply ai_sw_off. }

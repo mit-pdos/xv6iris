@@ -740,10 +740,6 @@ Section UwBodies.
     iPoseProof (uwi_6c with "Ht") as "#Hi6c".
     iPoseProof (uwi_6e with "Ht") as "#Hi6e".
     iPoseProof (uwi_70 with "Ht") as "#Hi70".
-    iEval (rewrite uw_cr1 uw_cr7) in "Hi56".
-    iEval (rewrite uw_cr1 uw_cr7) in "Hi6c".
-    iEval (rewrite uw_cr7) in "Hi58".
-    iEval (rewrite uw_cr7) in "Hi6e".
     assert (P50 : add_vec_int (mword_of_int (KernelSyms.uartwrite + 0x4e) : mword 64) 2 = mword_of_int (KernelSyms.uartwrite + 0x50)) by pcw.
     assert (P52 : add_vec_int (mword_of_int (KernelSyms.uartwrite + 0x50) : mword 64) 2 = mword_of_int (KernelSyms.uartwrite + 0x52)) by pcw.
     assert (P56 : ret_pc (add_vec_int (mword_of_int (KernelSyms.uartwrite + 0x52) : mword 64) 4) = mword_of_int (KernelSyms.uartwrite + 0x56)) by pcw.

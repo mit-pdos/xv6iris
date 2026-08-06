@@ -23,6 +23,7 @@ Require Import CodeFileinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFileinit.
+Require Import CodeFileinitAux.
 Local Open Scope Z_scope.
 Import Defs.
 

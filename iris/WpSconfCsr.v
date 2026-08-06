@@ -41,6 +41,7 @@ Require Import StackOwn.
 Require Import HartTp WpNext.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
+Require Import CodePopOffAux.
 Import Defs.
 
 (* helper copy (Local in WpSmodePtCtl.v) *)

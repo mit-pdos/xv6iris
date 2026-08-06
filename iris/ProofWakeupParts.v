@@ -29,6 +29,7 @@ Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import CodeWakeup.
 Require Import SpecWakeupParts.
 From Kernel Require KernelSyms.
+Require Import CodeWakeupAux.
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the

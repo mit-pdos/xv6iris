@@ -64,6 +64,7 @@ Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Require Import CodeTimerinit.
 
+Require Import CodeTimerinitAux.
 (* ===================================================================== *)
 (* Symbolic values of the run (functions of the entry state).             *)
 (* ===================================================================== *)

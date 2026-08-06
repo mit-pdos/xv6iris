@@ -93,6 +93,8 @@ Local Open Scope Z_scope.
 Require Import CodeStart.
 Require Import CodeTimerinit.
 
+Require Import CodeStartAux.
+Require Import CodeTimerinitAux.
 (* ===================================================================== *)
 (* Symbolic values of the run (functions of the entry state).  start()'s *)
 (* own 16-byte frame reuses timerinit's slot geometry: the frame base is  *)

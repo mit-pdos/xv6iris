@@ -66,6 +66,7 @@ Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyin
 Require Import CodePipewrite.
 Require Import SpecPipewrite.
 From Kernel Require KernelSyms.
+Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.

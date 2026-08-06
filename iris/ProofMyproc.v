@@ -32,6 +32,7 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import SpecPushOff.
 Require Import SpecMyproc.
+Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

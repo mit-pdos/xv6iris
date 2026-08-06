@@ -22,6 +22,8 @@ Require Import CodeWakeup.
 From Kernel Require KernelSyms.
 
 
+Require Import ProcGeom.
+Require Import CodeWakeupAux.
 (* myproc is PROVEN (SpecMyproc.v / ProofMyproc.v / LinkMyproc.v), and wakeup
    threads the [cur_proc] resource so it can use [wp_myproc_sconf] directly
    (SpecWakeup.v).  There is no myproc axiom. *)

@@ -54,6 +54,7 @@ Require Import SpecUartPutc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
+Require Import CodeUartPutcSyncAux.
 Local Open Scope Z_scope.
 
 Module UartPutcProof (Uart : UART) : UARTPUTC.

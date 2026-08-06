@@ -50,6 +50,7 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
+Require Import CodeMycpuAux.
 (* consoleintr's own frame plus its deepest callee (wakeup, 18). *)
 Definition consoleintr_stack : nat := 32%nat.
 

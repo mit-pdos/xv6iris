@@ -72,6 +72,7 @@ Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyou
 Require Import CodePiperead.
 Require Import SpecPiperead.
 From Kernel Require KernelSyms.
+Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
 Import Defs.

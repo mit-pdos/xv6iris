@@ -901,7 +901,6 @@ Section ProofCopyout.
           rewrite /W2. rewrite upd_ne; [| exact H6].
           rewrite /W1. rewrite upd_ne; [| exact H5].
           exact (Hmvget c Hc). }
-        iEval (rewrite zreg0) in "Hi4c".
         (* ---- +0x4c beqz s5 : done, or another page ---- *)
         destruct (Nat.eq_dec (rem - nn)%nat 0%nat) as [Hdone | Hmore].
         + (* len exhausted: -> +0x90, li a0,0, j +0x9a *)

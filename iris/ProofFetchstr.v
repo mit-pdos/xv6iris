@@ -668,7 +668,6 @@ Section ProofFetchstr.
     { rewrite /A3 upd_ne; [| reg_neq]. rewrite /A2 upd_ne; [| reg_neq].
       rewrite /A1 upd_ne; [exact HAa0 | reg_neq]. }
     (* ---- +0x1e: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
-    iEval (rewrite cshape_6928) in "Hi1e".
     assert (Hptaddr : add_vec (A3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                       = p_pagetable p)
       by (rewrite HA3a0; reflexivity).

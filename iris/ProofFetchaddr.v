@@ -558,7 +558,6 @@ Section ProofFetchaddr.
     iDestruct (proc_priv_sz_bound with "Hpriv") as %Hszb.
     iDestruct (proc_priv_copy with "Hpriv") as "(Hszc & Hptc & Hpt & Hpback)".
     (* ---- +0x14: c.ld a5,72(a0) -- a5 := p->sz ---- *)
-    iEval (rewrite cshape_653c) in "Hi14".
     assert (Hszaddr : add_vec (A !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p)
       by (rewrite HAa0; reflexivity).
     iEval (rewrite -Hszaddr) in "Hszc".
@@ -827,7 +826,6 @@ Section ProofFetchaddr.
         { rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_ne; [| reg_neq].
           rewrite /A3 upd_ne; [exact HA2a0 | reg_neq]. }
         (* ---- +0x28: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
-        iEval (rewrite cshape_6928) in "Hi28".
         assert (Hptaddr : add_vec (A5 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                           = p_pagetable p)
           by (rewrite HA5a0; reflexivity).

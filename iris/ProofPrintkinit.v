@@ -24,6 +24,7 @@ Require Import CodePrintkinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPrintkinit.
+Require Import CodePrintkinitAux.
 Local Open Scope Z_scope.
 Import Defs.
 

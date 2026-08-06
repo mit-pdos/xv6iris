@@ -55,6 +55,7 @@ Require Import CodeSleeplock.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
 From Kernel Require KernelSyms.
+Require Import CodeMycpuAux.
 Import Defs.
 Local Open Scope Z_scope.
 

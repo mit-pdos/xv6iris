@@ -26,6 +26,7 @@ Require Import ProcGeom.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
+Require Import CodeMycpuAux.
 Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in

@@ -45,6 +45,7 @@ From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import CodeEntry.
+Require Import CodeEntryAux.
 Local Open Scope Z_scope.
 
 (* Moved here from WpDecode.v via the late KernelBoot.v (this file is now their

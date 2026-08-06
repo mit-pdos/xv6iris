@@ -411,7 +411,6 @@ Section ProofSysUptime.
     iEval (rewrite Hpc30) in "Hpc".
     (* +0x30: c.srli a0,a0,0x20 *)
     iPoseProof (sui_30 with "Htext") as "Hi30".
-    iEval (rewrite creg_c2) in "Hi30".
     iApply (wp_csrli_s_sconf Φ (mword_of_int (KernelSyms.sys_uptime + 0x30)) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
               (mword_of_int 32 : mword 6) C0 (av - 4)%nat b
               creg_c2 ltac:(vm_compute; discriminate) ltac:(rdok)

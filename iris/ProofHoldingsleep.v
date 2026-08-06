@@ -31,6 +31,7 @@ Require Import SpecAcquire SpecRelease SpecMyproc.
 Require Import SpecHoldingsleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
+Require Import CodeWakeupAux.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -250,7 +251,6 @@ Section ProofHoldingsleep.
     iDestruct "Hcellex" as (v) "(Hslk & %Hvnz)".
     (* +0x18 c.lw a5,0(s1) : a5 := sext v *)
     iPoseProof (hsl_18 with "Htext") as "Hi18".
-    iEval (rewrite creg_c1; rewrite creg_c7) in "Hi18".
     assert (HAs1 : A !!! Regidx (mword_of_int 9 : mword 5) = slk).
     { rewrite (callee_saved_lookup HcsA (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)). exact HM5s1. }
     assert (Haddr18 : add_vec (A !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")))) = slk).
@@ -349,7 +349,6 @@ Section ProofHoldingsleep.
     iEval (rewrite Hpc3c) in "Hpc".
     (* +0x3c c.lw s1,48(a0) : s1 := sext pidv (myproc()->pid) *)
     iPoseProof (hsl_3c with "Htext") as "Hi3c".
-    iEval (rewrite creg_c2; rewrite creg_c1) in "Hi3c".
     assert (Haddr3c : add_vec (MP !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00")))) = p_pid p).
     { rewrite HMPa0. rewrite /p_pid.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)

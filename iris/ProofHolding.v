@@ -44,6 +44,8 @@ Require Import KernelRvcDecode CodeMycpu SpecMycpu.
 Require Import CodeHolding WpHoldingInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecHolding.
+Require Import CodeHoldingAux.
+Require Import CodeMycpuAux.
 Import Defs.
 
 

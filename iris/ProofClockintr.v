@@ -59,6 +59,7 @@ Require Import ProcGeom.
 Require Import CodeClockintr.
 Require Import SpecCpuid SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecClockintr.
+Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

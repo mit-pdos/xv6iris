@@ -190,7 +190,6 @@ Section ProofSysGetpid.
     iEval (rewrite Hpc0c) in "Hpc".
     (* ---- +0x0c: c.lw a0,48(a0) -- THE read: myproc()->pid ---- *)
     iDestruct (proc_priv_pid with "Hpriv") as "[Hpid Hpidback]".
-    iEval (rewrite creg_c2) in "Hi0c".
     assert (Haddr0c : add_vec (MF !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00")))) = p_pid p).
     { rewrite HMFa0. rewrite /p_pid.
       replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 12 : mword 5) ('b"00"))) : mword 64)

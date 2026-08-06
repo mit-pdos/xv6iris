@@ -758,7 +758,6 @@ Section ProofEitherCopyout.
       { rewrite /U3 upd_ne; [| reg_neq]. rewrite /U2 upd_ne; [| reg_neq].
         rewrite /U1 upd_ne; [exact HAa0 | reg_neq]. }
       (* ---- +0x24: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
-      iEval (rewrite cshape_6928) in "Hi24".
       assert (Hptaddr : add_vec (U3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                         = p_pagetable p)
         by (rewrite HU3a0; reflexivity).
@@ -1438,7 +1437,6 @@ Section ProofEitherCopyin.
       { rewrite /U3 upd_ne; [| reg_neq]. rewrite /U2 upd_ne; [| reg_neq].
         rewrite /U1 upd_ne; [exact HAa0 | reg_neq]. }
       (* ---- +0x24: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
-      iEval (rewrite cshape_6928) in "Hi24".
       assert (Hptaddr : add_vec (U3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                         = p_pagetable p)
         by (rewrite HU3a0; reflexivity).

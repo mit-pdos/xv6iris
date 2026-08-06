@@ -39,6 +39,7 @@ Require Import SpecSetkilled.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSetkilled.
+Require Import CodeSetkilledAux.
 Import Defs.
 Local Open Scope Z_scope.
 (* a failing tactic in a whole-function WP over the proc invariant otherwise

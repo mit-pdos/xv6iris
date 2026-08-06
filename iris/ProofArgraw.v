@@ -51,6 +51,7 @@ From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeArgraw.
+Require Import CodeArgrawAux.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -483,7 +484,6 @@ Section ProofArgraw.
     iPoseProof (ar_table_word 0%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
-    iEval (rewrite ar_cr1; rewrite ar_cr7) in "Hi22".
     assert (Hta : add_vec (M !!! Regidx ar_s1)
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 0%nat))
@@ -524,7 +524,6 @@ Section ProofArgraw.
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
     iPoseProof (ar_i_tf 0%nat Hk with "Htext") as "Hitf".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -546,7 +545,6 @@ Section ProofArgraw.
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word tfp ws (tf_arg_idx 0%nat) v Hws with "Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 0%nat Hk with "Htext") as "Hild".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 0%nat) : mword 5) ('b"000"))))
                     = a_tf_word tfp (tf_arg_idx 0%nat))
@@ -600,7 +598,6 @@ Section ProofArgraw.
     iPoseProof (ar_table_word 1%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
-    iEval (rewrite ar_cr1; rewrite ar_cr7) in "Hi22".
     assert (Hta : add_vec (M !!! Regidx ar_s1)
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 1%nat))
@@ -641,7 +638,6 @@ Section ProofArgraw.
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
     iPoseProof (ar_i_tf 1%nat Hk with "Htext") as "Hitf".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -663,7 +659,6 @@ Section ProofArgraw.
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word tfp ws (tf_arg_idx 1%nat) v Hws with "Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 1%nat Hk with "Htext") as "Hild".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 1%nat) : mword 5) ('b"000"))))
                     = a_tf_word tfp (tf_arg_idx 1%nat))
@@ -717,7 +712,6 @@ Section ProofArgraw.
     iPoseProof (ar_table_word 2%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
-    iEval (rewrite ar_cr1; rewrite ar_cr7) in "Hi22".
     assert (Hta : add_vec (M !!! Regidx ar_s1)
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 2%nat))
@@ -758,7 +752,6 @@ Section ProofArgraw.
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
     iPoseProof (ar_i_tf 2%nat Hk with "Htext") as "Hitf".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -780,7 +773,6 @@ Section ProofArgraw.
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word tfp ws (tf_arg_idx 2%nat) v Hws with "Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 2%nat Hk with "Htext") as "Hild".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 2%nat) : mword 5) ('b"000"))))
                     = a_tf_word tfp (tf_arg_idx 2%nat))
@@ -834,7 +826,6 @@ Section ProofArgraw.
     iPoseProof (ar_table_word 3%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
-    iEval (rewrite ar_cr1; rewrite ar_cr7) in "Hi22".
     assert (Hta : add_vec (M !!! Regidx ar_s1)
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 3%nat))
@@ -875,7 +866,6 @@ Section ProofArgraw.
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
     iPoseProof (ar_i_tf 3%nat Hk with "Htext") as "Hitf".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -897,7 +887,6 @@ Section ProofArgraw.
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word tfp ws (tf_arg_idx 3%nat) v Hws with "Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 3%nat Hk with "Htext") as "Hild".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 3%nat) : mword 5) ('b"000"))))
                     = a_tf_word tfp (tf_arg_idx 3%nat))
@@ -951,7 +940,6 @@ Section ProofArgraw.
     iPoseProof (ar_table_word 4%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
-    iEval (rewrite ar_cr1; rewrite ar_cr7) in "Hi22".
     assert (Hta : add_vec (M !!! Regidx ar_s1)
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 4%nat))
@@ -992,7 +980,6 @@ Section ProofArgraw.
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
     iPoseProof (ar_i_tf 4%nat Hk with "Htext") as "Hitf".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -1014,7 +1001,6 @@ Section ProofArgraw.
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word tfp ws (tf_arg_idx 4%nat) v Hws with "Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 4%nat Hk with "Htext") as "Hild".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 4%nat) : mword 5) ('b"000"))))
                     = a_tf_word tfp (tf_arg_idx 4%nat))
@@ -1068,7 +1054,6 @@ Section ProofArgraw.
     iPoseProof (ar_table_word 5%nat Hk with "Hdata") as "#Hent".
     (* +0x22: c.lw a5,0(s1) -- read the jump-table entry *)
     iPoseProof (ari_22 with "Htext") as "Hi22".
-    iEval (rewrite ar_cr1; rewrite ar_cr7) in "Hi22".
     assert (Hta : add_vec (M !!! Regidx ar_s1)
                     (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00"))))
                   = mword_of_int (ar_tbl + 4 * Z.of_nat 5%nat))
@@ -1109,7 +1094,6 @@ Section ProofArgraw.
     iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite Hrt26) in "Hpc".
     (* the case body: c.ld a5,88(a0) -- p->trapframe *)
     iPoseProof (ar_i_tf 5%nat Hk with "Htext") as "Hitf".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hitf".
     assert (HB6a0 : B6 !!! Regidx ar_a0 = p).
     { rewrite /B6 upd_ne; [| vm_compute; discriminate].
       rewrite /B5 upd_ne; [| vm_compute; discriminate]. exact HMa0. }
@@ -1131,7 +1115,6 @@ Section ProofArgraw.
        identity map, so it crosses with [tf_word_to_mem] and back. *)
     iDestruct (tf_page_word tfp ws (tf_arg_idx 5%nat) v Hws with "Htf") as "[Hw Hwback]".
     iPoseProof (ar_i_ld 5%nat Hk with "Htext") as "Hild".
-    iEval (rewrite ar_cr2; rewrite ar_cr7) in "Hild".
     assert (Harga : add_vec (C0 !!! Regidx ar_a5)
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat 5%nat) : mword 5) ('b"000"))))
                     = a_tf_word tfp (tf_arg_idx 5%nat))

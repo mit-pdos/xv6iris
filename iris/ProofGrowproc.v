@@ -52,6 +52,7 @@ Require Import FdSlots FileInv ProcInv.
 Require Import CodeGrowproc.
 Require Import SpecMyproc SpecUvmalloc SpecUvmdealloc SpecGrowproc.
 From Kernel Require KernelSyms.
+Require Import CodeGrowprocAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
@@ -617,7 +618,6 @@ Section ProofGrowproc.
     { intros r Hr Ncsp N8 N9 N18.
       rewrite /A1 upd_ne; [| congruence]. apply HthrA; assumption. }
     (* ---- +0x14: c.ld a1,72(a0) -- a1 := p->sz ---- *)
-    iEval (rewrite gpshape_652c) in "Hi14".
     assert (Hszaddr : add_vec (A1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p)
       by (rewrite HA1a0; reflexivity).
     iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x14)) Ra1 Ra0
@@ -900,7 +900,6 @@ Section ProofGrowproc.
       iEval (rewrite Hpp2c) in "Hpc".
       (* ---- +0x2c: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
       assert (HC1a0 : C1 !!! Regidx Ra0 = p) by (rewrite /C1 upd_ne; [exact HB4a0 | reg_neq]).
-      iEval (rewrite cshape_6928) in "Hi2c".
       assert (Hpta : add_vec (C1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                      = p_pagetable p) by (rewrite HC1a0; reflexivity).
       iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x2c)) Ra0 Ra0
@@ -1254,7 +1253,6 @@ Section ProofGrowproc.
     iEval (rewrite Hpp50) in "Hpc".
     (* ---- +0x50: c.ld a0,80(a0) -- a0 STILL holds p on this path ---- *)
     assert (HE1a0 : E1 !!! Regidx Ra0 = p) by (rewrite /E1 upd_ne; [exact HA2a0 | reg_neq]).
-    iEval (rewrite cshape_6928) in "Hi50".
     assert (Hpta2 : add_vec (E1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                     = p_pagetable p) by (rewrite HE1a0; reflexivity).
     iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x50)) Ra0 Ra0

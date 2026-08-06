@@ -33,6 +33,9 @@ From Kernel Require KernelSyms.
 Require Import CodeStart.
 Require Import CodeTimerinit.
 Require Import CodeEntry.
+Require Import CodeEntryAux.
+Require Import CodeStartAux.
+Require Import CodeTimerinitAux.
 Local Open Scope Z_scope.
 
 Module EntryProof : ENTRY.

@@ -32,6 +32,7 @@ Require Import SpecUart.
 Require Import WpSmodeUart.
 Require Import CodeUartPutcSync.
 From Kernel Require KernelSyms.
+Require Import CodeUartPutcSyncAux.
 Local Open Scope Z_scope.
 
 Module UartAccessProof (Uart : UART).

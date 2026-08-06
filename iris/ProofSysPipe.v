@@ -1798,8 +1798,6 @@ Section ProofSysPipe.
     iPoseProof (spi_72 with "Htext") as "Hi72".
     iPoseProof (spi_76 with "Htext") as "Hi76".
     iPoseProof (spi_78 with "Htext") as "Hi78".
-    iEval (rewrite cshape_68a8) in "Hi5a".
-    iEval (rewrite cshape_68a8) in "Hi70".
     (* the +0x7c tail's pc arithmetic and instruction facts *)
     iPoseProof (spi_7c with "Htext") as "Hi7c".
     iPoseProof (spi_80 with "Htext") as "Hi80".

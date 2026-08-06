@@ -34,6 +34,7 @@ Require Import CodeMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecMycpu.
 Require Import KernelRvcDecode.
+Require Import CodeMycpuAux.
 Import Defs.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the
