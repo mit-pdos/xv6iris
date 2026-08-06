@@ -382,6 +382,91 @@ Proof.
   cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
 Qed.
 
+(* The EXCLUSIVE PTE read: the read half of the fork's atomic A/D update
+   ([read_pte_exclusive]).  Identical to the plain read except for the
+   [res_or_con] flag, which selects the reserved read kind -- and which the PTE
+   arm of [pmaCheck] no longer asserts against, precisely so this is legal. *)
+Lemma exec_read_pte_exclusive_S (addr : mword 64) (region : PMA_Region) (w : bv 64) s :
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+    (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+    (uint addr) (uint (to_bits 64 8)) = PMP_Match ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
+  is_aligned_paddr (Physaddr addr) 8 = true ->
+  (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
+  exec (within_clint (Physaddr addr) 8) s = Some (false, s) ->
+  exec (within_sig (Physaddr addr) 8) s = Some (false, s) ->
+  exec (within_htif_readable (Physaddr addr) 8) s = Some (false, s) ->
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_pte_exclusive (Physaddr addr) 8) s = Some (Ok w, s).
+Proof.
+  intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes.
+  (* pmaCheck now answers a splitting plan; an aligned access's plan is
+     [pma_ok_aligned], and check_pma_with_pmp_priority is pmaCheck on the
+     success path (RiscvExtras). *)
+  assert (Hpma : exec (pmaCheck (Physaddr addr) 8 (Load PageTableEntry) PBMT_PMA true) s
+                 = Some (Ok pma_ok_aligned, s)).
+  { destruct region as [rbase rsize rattr rdtree].
+    pma_ok_peel Hmatch Hread (exec_is_mag_applicable_load_pte 8 s) Halign. }
+  assert (Hcp : exec (check_pma_with_pmp_priority (Load PageTableEntry) PBMT_PMA Supervisor
+                        (Physaddr addr) 8 true) s = Some (Ok pma_ok_aligned, s)).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _ Hpma). cbn match. apply exec_returnM. }
+  assert (Hmmio : exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s)).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  assert (Hchk : exec (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor (Physaddr addr) 8 false false true false)
+                   s = Some (Ok (w, default_meta), s)).
+  { unfold checked_mem_read. rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+    rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+    rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)). cbn beta.
+    rewrite misaligned_order_1. cbn zeta.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (_ : exec (read_kind_of_flags false false true) s = Some (rv64d_types.Read_RISCV_reserved, s))).
+    2:{ unfold read_kind_of_flags. apply exec_returnM. }
+    cbn beta.
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+    { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr addr)) with addr.
+      rewrite avi0_mul8.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                 (exec_pmpCheck_supervisor_grant_load addr 8 s HA Hord Hrange HR)). cbn beta.
+      cbn match.
+      match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+        assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+      { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+        rewrite execR_liftR. rewrite Hmmio. reflexivity. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+      match goal with
+        |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+        assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                      = Some (inr w, s)) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_resv_8 addr w s Hdev Hbytes)).
+        cbn beta match. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+      rewrite autocast_id. rewrite usvd_zeros_full_64.
+      apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+    rewrite autocast_id. rewrite execR_returnR. reflexivity. }
+  unfold read_pte_exclusive, mem_read_priv.
+  rewrite (exec_bind_Some _ _ _ _ _
+            (_ : exec (mem_read_priv_meta _ _ _ _ 8 _ _ _ _) s = Some (Ok (w, default_meta), s))).
+  2:{ unfold mem_read_priv_meta. cbn [orb andb].
+      rewrite (exec_bind_Some _ _ _ _ _ Hchk).
+      cbn match. unfold mem_read_callback. apply exec_returnM. }
+  cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
+Qed.
+
 Lemma exec_lookup_TLB_miss (vpn : mword 27) (asid : mword 16) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) s :
   register_lookup tlb s.(sregs) = tlbvec ->
   vec_access_dec tlbvec (tlb_hash (__id 39) vpn) = None ->

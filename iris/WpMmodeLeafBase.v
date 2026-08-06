@@ -505,6 +505,25 @@ Proof.
   reflexivity.
 Qed.
 
+(* ...and at the CONDITIONAL write kind, which is what the fork's atomic A/D
+   update issues ([write_pte_conditional]).  Same memory effect: the interpreter
+   routes by address and ignores the kind, and sail_mem_write's Ok answer makes
+   the conditional write report success. *)
+Lemma exec_write_ram_cond_8 (addr : mword 64) (data : bv 64) s :
+  dev_addr addr = false ->
+  exec (write_ram rv64d_types.Write_RISCV_conditional (Physaddr addr) 8 data tt) s
+  = Some (true, MState s.(sregs) (write_bytes s.(mem) addr 8 data) s.(mdev)).
+Proof.
+  intros Hdev.
+  unfold write_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_write. cbn beta zeta iota match.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  cbn match.
+  rewrite exec_MemWrite; last exact Hdev.
+  reflexivity.
+Qed.
+
 (* WpGprStore.v : within_htif_writable_false *)
 Lemma within_htif_writable_false (a : Arch.pa) (w : Z) s :
   register_lookup htif_tohost_base s.(sregs) = None ->

@@ -90,6 +90,33 @@ Proof.
     exact (Hbytes j Hj).
 Qed.
 
+(* the same leaf at the EXCLUSIVE read kind: the fork's atomic A/D update reads
+   the PTE with [read_pte_exclusive].  The interpreter routes by address and
+   ignores the access kind, so the memory effect is identical. *)
+Lemma exec_read_ram_resv_8 (addr : mword 64) (w : bv 64) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram rv64d_types.Read_RISCV_reserved (Physaddr addr) 8 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_plain_8_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 8) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
+
 (* pmaCheck for Load Data: returns None when the region is readable+aligned. *)
 Lemma exec_pmaCheck_ram_load (addr : mword 64) (pbmt : page_based_mem_type)
     (region : PMA_Region) s :
