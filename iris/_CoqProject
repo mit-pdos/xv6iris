@@ -764,3 +764,4 @@ WeakFunnel.v
 WeakBranch.v
 WeakWord8.v
 WeakRacy.v
+WeakEffSkel.v
