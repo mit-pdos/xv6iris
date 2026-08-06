@@ -27,6 +27,8 @@
 
 SWITCH  ?= /shared/xv6rocq
 RUN     := opam exec --switch=$(SWITCH) --
+# stack limit for the proof build, in KB (see the [proofs] target)
+STACK_KB ?= 65536
 PYTHON  ?= python3
 OBJDUMP ?= riscv64-linux-gnu-objdump
 SAIL_RISCV_DIR ?=
@@ -183,7 +185,11 @@ dump-force: xv6-rev-check
 # ---- 4. The Iris proofs (depend on the model and the kernel dump) ----
 $(IRIS)/CoqMakefile: $(IRIS)/_CoqProject
 	cd $(IRIS) && $(RUN) coq_makefile -f _CoqProject -o CoqMakefile
+# The 8 MB default stack is NOT enough for this tree: ProofWriteiParts.v's
+# [reflexivity] over (MAXFILE * BSIZE)%nat dies with a bare
+# "Error: Stack overflow." that reads like a code error and is not one.
 proofs: model kernel-rocq $(IRIS)/CoqMakefile
+	ulimit -s $(STACK_KB) 2>/dev/null || true; \
 	$(RUN) $(MAKE) -C $(IRIS) -f CoqMakefile -j$(JOBS)
 
 # ---- cleaning ----

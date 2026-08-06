@@ -118,6 +118,23 @@ sees through every functor and seal. Do it once at the end of any interface
 change and diff the axiom list against what the coverage report says should be
 assumed; anything else is a regression.
 
+## Two ways a build check can LIE about being green
+
+Both cost real time in one session; check for them before believing a
+"clean build".
+
+- **`make ... | grep -E ... | head -N` truncates the check, not just the
+  output.**  Once `head` has its N lines it closes the pipe, so any later
+  error is never seen -- and `echo $?` after the pipeline reports the LAST
+  command's status, not make's.  Capture make's own exit status
+  (`make proofs > log 2>&1; echo $?`) and grep the file afterwards.
+- **`ulimit -s 8192` is too small for this tree.**  `ProofWriteiParts.v`
+  fails with a bare `Error: Stack overflow.` on a `reflexivity` over a large
+  `nat` (`(MAXFILE * BSIZE)%nat = 274432%nat`); Rocq even warns about it one
+  line earlier ("large numbers in nat are interpreted as applications of
+  `Init.Nat.of_num_uint`").  Nothing is wrong with the file -- build with
+  `ulimit -s 65536`.  The symptom looks like a code error and is not one.
+
 ## Proof coverage report
 
 `tools/proof_coverage.py` answers "what of the kernel is proved?" — a hierarchy
