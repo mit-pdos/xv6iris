@@ -286,73 +286,80 @@ Independent of the above, and the reason for the bump:
   Its §1 PTE-store stack keeps working: the `Store PageTableEntry` arm of
   `pmaCheck` is exactly the one the fork stopped asserting on.
 
-## Where the build stands
+## Where the build stands (checkpoint)
 
-`make model` is green (the regenerated model compiles under the project's
-`coq-sail-stdpp` 0.20.1 — the checkout asks for a newer `sail` than the one
-installed here, and the regen script passes the version it has and says so).
+`make model` is green. `iris/` builds **504 of 792** files (17 before this work).
+Branch **`sail-model-bump`**, 10 commits on top of `main`; NOT pushed (waiting on
+a green build). There are no `Admitted`s and `tools/lemma_diff.py` is clean.
 
-`make -f CoqMakefile -j32 -k` in `iris/` builds **365 of the 802 files** and
-stops on **THREE root failures**; everything else is blocked behind them, not
-broken:
+**Environment gotcha that will bite immediately:** `git add` fails with
+`fatal: unable to write new index file`. This is NOT repo damage — `/shared` is
+an idmapped mount and `.git/index` is unlinkable (`rm`/`mv` give EOVERFLOW).
+Work around it with a scratch index:
+
+    export GIT_INDEX_FILE=/tmp/<scratch>/gitindex && git read-tree HEAD
+    git add -A . && git commit ...
+
+**Build/wait discipline:** never poll for `rocqworker`/`coqc` (the self-match trap
+in `durable-notes.md`). Run the build in the background writing its own sentinel
+(`…; echo "EXIT=$?" >> log`) and wait with `until grep -q EXIT log; do sleep 30; done`.
+A single-file check is `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel
+-w -notation-overridden <F>.v` under `ulimit -s 65536`, but ONLY for a file whose
+dependencies are already built — after touching `RiscvExtras.v` you must run the
+whole `make -f CoqMakefile -j32 -k` or every single-file check dies with
+"inconsistent assumptions".
+
+### Root failures remaining
 
 | file | what it needs |
 |---|---|
-| `WpLoad.v` | the vmem level: `split_on_page_boundary` + `translate_and_read_value` (its `checked_mem_read`/`pmaCheck` chain IS ported — copy that) |
-| `CommonWalk.v` | the fork delta: `_rec_pt_walk`'s new shape + `check_leaf_pte` |
-| `WpGprCsrwB.v` | `stimecmp`'s write now refreshes the timer-pending bits (see below) |
+| `PtTreeAdue` | in progress: the PTE write is ported, the A/D write-back arms (§2–§4) are not |
+| `WpPlicExec`, `WpSmodeUart` | the MMIO variant of the split-loop recipe (`within_mmio_*` is TRUE, so the body takes the `mmio_read`/`mmio_write` arm instead of `read_ram`/`write_ram`) |
+| `WpSmodeMemGen`, `WpSmodePtLock`, `PtBuild` | the RAM recipe again |
+| `WpGprCsrwB` | `stimecmp` — see its in-file PORT PENDING comment; the only item that is not just the recipe |
 
-The CSR layer is otherwise done: `is_CSR_accessible` now conjoins a CONFIG
-predicate with the extension gate for the `xenvcfg` CSRs (menvcfg 0x30A is
-`and_boolM (currentlyEnabled Ext_U) (returnM xenvcfg_csrs_are_defined)`), which
-`WpGprCsrwCommon.exec_check_CSR_result_csrw_U_and` absorbs with one extra
-premise; `WpGprCsrrB`'s read-side site opens the `and_boolM` by hand.
-`mideleg_legalized` is re-stated for the new masking: the written value is masked
-by `plat_mideleg_delegatable_bits` (0x2222) BEFORE the per-extension gates, and
-the old value plays no part any more (the model's first parameter is `_o`).
-`legalize_medeleg` masks by `plat_medeleg_delegatable_bits` and additionally
-clears the new Double_Trap bit.
+Everything below `PtTree` is done, including the fork's own delta on both the
+walk (`CommonWalk`) and the TLB-hit (`PtTree`) paths.
 
-`legalize_satp` is DONE and is the pattern for every configuration-derived
-field mask the bump introduces: it re-writes satp's PPN through
-`zero_extend' 44 (subrange_vec_dec (PPN s) (min (physaddr_bits - pagesize_bits) 44 - 1) 0)`
-before dispatching on the mode, and at `physaddr_bits = 56` that window is the
-FULL 44-bit field, so the mask is the IDENTITY. `RiscvExtras.satp_ppn_mask_id`
-absorbs it in one rewrite and `satp_legalized` needed no change at all. **Do not
-re-state a legalized-value definition around such a mask** — it would bake a
-platform constant into a definition that does not depend on it, and every
-downstream satp fact would then have to carry the wrapper.
+### The recipe, in one place
 
-Its proof is the reusable kit for bit-field write-back identities, in
-`RiscvExtras.v`: `z_lor_split` and `z_field_writeback` over PLAIN `Z` variables
-(mandatory — `lia` answers "Cannot find witness" as soon as a `bv_unsigned` is
-merely in scope), then `usvd_get_bottom_44` = the bv-level peel that hands them a
-closed `Z` goal, then `subrange_full_44` / `zero_extend'_id44` for the two
-wrappers. Two ssreflect traps while writing it: `rewrite lem by tac` does not
-parse (use `assert … by tac`, or `rewrite lem; [| tac]`), and ssreflect's
-`rewrite` hits ALL copies of a pattern, so a proof that peels the same wrapper
-twice wants `rewrite ?autocast_id`, not two `rewrite autocast_id`s.
+Every remaining file is some composition of these four peels. Worked, compiling
+instances: `RiscvFetchExec` (widths 4, 2), `WpLoad` (8), `SmodePte` (PTE read),
+`WpMmodeLeafBase` (all six shapes), `MemAccessGen` (width-generic), `WpAmo`
+(AMO/res=true), `WpSmodeGpr`, `SmodeCore`, `UserMem`.
 
-**`WpGprCsrwB`'s remaining failure is `stimecmp`, and it is a real semantic
-change, not a shape change.** Writing `stimecmp` (0x14D) now runs
-`clint_dispatch false` between the register write and the read-back, which
-REFRESHES the timer-pending bits: it writes `mip[7]` (MTIP) from `mtimecmp <=
-mtime` unconditionally, and `mip[5]` (STIP) from `stimecmp <= mtime` when
-`Ext_Sstc` is enabled and `menvcfg.STCE = 1`. So `exec_write_CSR_stimecmp`'s
-post-state is no longer `set_reg s stimecmp _` — it gains one or two `mip`
-writes, and the lemma has to grow hypotheses naming `mtime`/`mtimecmp` (and
-`menvcfg.STCE`, which decides whether the STIP arm runs at all). That is a
-contract change that ripples to its callers, so plan it rather than patching the
-proof: decide first whether the STCE arm is live in the states these proofs are
-about.
+1. **`pmaCheck`** → `Ltac pma_ok_peel Hmatch Hfield Hmag Halign` (RiscvExtras).
+   Needs the region destructed first. `Hmag` is one of the
+   `exec_is_mag_applicable_*` facts.
+2. **`check_pma_with_pmp_priority`** is `pmaCheck` on the success path:
+   `unfold`, `rewrite (exec_bind_Some … <the pmaCheck lemma>)`, `cbn match`,
+   `apply exec_returnM`.
+3. **`checked_mem_read`/`checked_mem_write`/`mem_write_ea`** — the
+   `catch_early_return` + one-iteration `untilMT` walk. Copy
+   `WpLoad.exec_checked_mem_read_ram_load` verbatim and swap the four
+   applications (pma, pmp, ram, and the `usvd_zeros_full_*` / `subrange_full_*`
+   at the width).
+4. **`vmem_read_addr`/`vmem_write_addr`** — straight-line now; page split, then
+   `do_split_access = false`, then one `translate_and_read_value` /
+   `translateAddr`+`mem_write_ea`+`mem_write_value`. Copy
+   `WpLoad.exec_vmem_read_addr_8` or `WpMmodeLeafBase.exec_vmem_write_addr_8`.
 
-There are no `Admitted`s: `WpLoad.exec_vmem_read_addr_8` is left in its OLD form
-behind a `PORT PENDING` comment, so the build points at it rather than a proof
-being silently assumed.
+Traps, all of which cost real time at least once:
 
-**Work the build, not the greps.** The grep counts overstate the damage badly
-(370 `is_aligned_paddr` hits are all unaffected; the 46 `translateAddr` files
-mostly just mention it in a statement). What actually decides the work is which
-lemmas STEP THROUGH a changed body, and that is what a `make -f CoqMakefile
--j32 -k` tells you. Expect the failing set to stay small and to move DOWN the
-tree one layer at a time; a single low file blocks hundreds.
+- `execR_liftR_seq` only fires when `execR (bind (liftR m) k)` is ITSELF a
+  subterm. An inner bind (the `bind0` seq into `within_mmio_*`, the RAM read that
+  drops its meta, the RAM write that folds the success flag) must be `assert`ed
+  and fed to `execR_bind_Some` first.
+- The outer `catch_early_return` closes with `rewrite execR_returnR; reflexivity`,
+  never `apply execR_returnR_fwd`.
+- The reservation-check `if` in `vmem_write_addr` must be stripped by CONVERSION
+  with the else branch held opaque (nested `assert` so the goal is `execR _ = _`,
+  or `set (NN := …)`). A bare `cbn` there reduces through `mem_write_ea` into the
+  monad's bind fixpoint and the goal explodes.
+- `generic_neq` on the access type compares the WHOLE payload, so with abstract
+  aq/rl it does not reduce — `destruct aq, rl` first.
+- `mem_read_priv_meta` no longer guards on alignment; `mem_write_value_priv_meta`
+  still does, but only for `rl || con`.
+- Consumers of a ported lemma often need `Require Import RiscvExtras` (and
+  `RiscvFetchExec`, for `execR_untilMT_1`) added — `Import` is not transitive.
+
