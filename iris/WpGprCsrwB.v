@@ -12,6 +12,7 @@ Require Import InstrBytes.
 Local Open Scope Z_scope.
 Require Import WpGprCsrwCommon.
 Require Import RiscvExtras.   (* satp_ppn_mask_id: the PPN mask is a no-op here *)
+Require Import MinstretInv.   (* exec_clint_dispatch_false: writing stimecmp refreshes mip *)
 
 (* ===================================================================== *)
 (* MONADIC-LEGALIZE REDUCTION LAYER.  Each legalize_* chains             *)
@@ -565,39 +566,37 @@ Proof.
   apply (exec_is_stimecmp_accessible_M s HS).
 Qed.
 
-(* PORT PENDING (claude-notes/projects/sail-model-bump.md).  Writing stimecmp now
-   REFRESHES THE TIMER-PENDING BITS: the CSR write runs [clint_dispatch false]
-   between the register write and the read-back, setting mip.MTIP from
-   (mtimecmp <=u mtime) and -- under Sstc with menvcfg.STCE -- mip.STIP from
-   (stimecmp <=u mtime).  So the post-state gains an mip write and this contract
-   has to become existential in that value:
-
-     exists p, exec (write_CSR csr_stimecmp v) s
-               = Some (Ok …, set_reg (set_reg s stimecmp …) mip p)
-
-   [MinstretInv.exec_clint_dispatch_false] already proves exactly that shape for
-   the clock tick, and mip lives in the value-agnostic [clock_inv], so the WP
-   consumers (WpSconfTimer, and through it timerinit/clockintr) can re-establish
-   the invariant with whatever value comes out.  THE OBSTACLE IS MECHANICAL: by
-   the time the CSR-clause peel reaches the dispatch, the goal has [clint_dispatch]
-   INLINED into a raw monad-bind fixpoint (`Interface.Next (RegRead mip …)`), so
-   neither `rewrite` nor `erewrite` can fold it back, and `Opaque clint_dispatch`
-   does not prevent it.  Find which step over-reduces (probe the goal after each
-   of `skip_csr_false_clauses`, the `replace g with true`, and the `cbn match`)
-   and hold the continuation opaque across it -- the `set (NN := …)` trick the
-   store proofs use for the same reason. *)
+(* Writing stimecmp REFRESHES THE TIMER-PENDING BITS: the CSR write runs
+   [clint_dispatch false] between the register write and the read-back, setting
+   mip.MTIP from (mtimecmp <=u mtime) and -- under Sstc with menvcfg.STCE --
+   mip.STIP from (stimecmp <=u mtime).  So the post-state gains an mip write and
+   this contract is existential in that value; mip lives in the value-agnostic
+   [clock_inv], so the WP consumers re-establish the invariant with whatever
+   comes out.  [set] holds [clint_dispatch] opaque across the CSR-clause peel:
+   the [cbn match] that resolves the address dispatch would otherwise inline it
+   into a raw monad-bind fixpoint that no [rewrite] can fold back. *)
 Lemma exec_write_CSR_stimecmp (v : mword 64) s :
+  exists mp : mword 64,
   exec (write_CSR csr_stimecmp v) s
     = Some (Ok (subrange_vec_dec (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v) (Z.sub xlen 1) 0),
-            set_reg s stimecmp (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v)).
+            set_reg (set_reg s stimecmp (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v)) mip mp).
 Proof.
+  destruct (MinstretInv.exec_clint_dispatch_false
+              (set_reg s stimecmp (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v)))
+    as [mp Hcd].
+  exists mp.
   unfold write_CSR, stimecmp_legalized.
+  set (CD := clint_dispatch false).
   skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg stimecmp s)).
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg stimecmp _ s)).
+  unfold CD; clear CD.
+  rewrite (exec_bind0_Some _ _ _ _ _ Hcd).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg stimecmp _)).
+  rewrite sregs_set_reg.
+  rewrite irrelevant_register_set by (vm_compute; reflexivity).
   rewrite register_lookup_set.
   apply exec_returnM.
 Qed.
@@ -613,22 +612,27 @@ Lemma exec_execute_csrw_stimecmp (rs1 : mword 5) s :
   uint rs1 <> 0 ->
   register_lookup cur_privilege s.(sregs) = Machine ->
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exists mp : mword 64,
   exec (execute_CSRReg csr_stimecmp (Regidx rs1) zreg CSRRW) s
     = Some (RETIRE_SUCCESS,
-            set_reg s stimecmp
+            set_reg (set_reg s stimecmp
               (stimecmp_legalized (register_lookup stimecmp s.(sregs))
-                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
+                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))) mip mp).
 Proof.
   intros Hrs1 Hpriv HS.
   replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
     with (if Z.eqb (uint rs1) 0 then zero_reg
           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
     by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
+  destruct (exec_write_CSR_stimecmp
+              (if Z.eqb (uint rs1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) s)
+    as [mp Hw].
+  exists mp.
   apply (exec_execute_csrw_gpr csr_stimecmp rs1 s _
            (subrange_vec_dec (stimecmp_legalized (register_lookup stimecmp s.(sregs))
               ((if Z.eqb (uint rs1) 0 then zero_reg
                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))) (Z.sub xlen 1) 0)).
-  
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw csr_stimecmp s).
     apply exec_check_CSR_csrw;
@@ -639,7 +643,7 @@ Proof.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
-  - apply exec_write_CSR_stimecmp.
+  - exact Hw.
   - apply exec_csr_id_write_callback_stimecmp.
 Qed.
 

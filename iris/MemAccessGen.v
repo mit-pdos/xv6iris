@@ -92,6 +92,68 @@ Proof.
   cbn. reflexivity.
 Qed.
 
+(* The READ counterpart of [exec_vmem_write_addr_aligned_store], and the brick
+   it is built from.  [translate_and_read_value] is just translate-then-read;
+   [vmem_read_addr] wraps it in the page split, which an aligned in-page access
+   does not take, so the accumulator [zeros'] is overwritten in full and the
+   result is the value itself ([usvd_zeros_full_gen]). *)
+Lemma exec_translate_and_read_value_g (width : Z) (va pa : mword 64)
+    (pbmt : page_based_mem_type) (v : mword (8*width)) s s' :
+  exec (translateAddr (Virtaddr va) (Load Data)) s
+    = Some (Ok (Physaddr pa, pbmt, init_ext_ptw), s') ->
+  exec (mem_read (Load Data) pbmt (Physaddr pa) width false false false) s'
+    = Some (Ok v, s') ->
+  exec (translate_and_read_value (Virtaddr va) width (Load Data) false false false) s
+    = Some (Ok (Physaddr pa, v), s').
+Proof.
+  intros Htr Hmr.
+  unfold translate_and_read_value.
+  rewrite (exec_bind_Some _ _ _ _ _ Htr). cbn match beta.
+  rewrite (exec_bind_Some _ _ _ _ _ Hmr). cbn match beta.
+  apply exec_returnM.
+Qed.
+
+Lemma exec_vmem_read_addr_aligned_load (width : Z) (va pa : mword 64)
+    (v : mword (8*width)) (ep : Privilege) (md : SATPMode) s s' :
+  vmem_width width ->
+  is_aligned_vaddr (Virtaddr va) width = true ->
+  exec (effectivePrivilege (Load Data) (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  exec (translate_and_read_value (Virtaddr va) width (Load Data) false false false) s
+    = Some (Ok (Physaddr pa, v), s') ->
+  exec (vmem_read_addr (Virtaddr va) width (Load Data) false false false) s
+    = Some (Ok v, s').
+Proof.
+  intros Hw Halign Heff Htm Htrv.
+  assert (Hpos : 0 < width) by (apply vmem_width_pos; exact Hw).
+  unfold vmem_read_addr. rewrite exec_catch_early_return.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+  cbn [bits_of_virtaddr]. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_on_page_boundary_aligned va width s Hw Halign)).
+  cbn beta zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Heff). cbn beta.
+  match goal with |- context[Defs.and_boolM ?A ?B] =>
+    assert (Hds : execR (Defs.and_boolM A B) s = Some (inr false, s)) end.
+  { unfold Defs.and_boolM.
+    match goal with |- context[Defs.bind (Defs.bind (Defs.liftR ?m) ?k1) _] =>
+      assert (Hl : execR (Defs.bind (Defs.liftR m) k1) s
+                   = Some (inr (generic_neq md Bare), s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ Htm). cbn beta. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hl). cbn match beta.
+    destruct (generic_neq md Bare); apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hds). cbn match beta zeta.
+  rewrite andb_false_r. cbn match beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (zeros' (8 * width)) s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Htrv). cbn match beta.
+  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s')). cbn beta zeta.
+  rewrite (usvd_zeros_full_gen (8 * width) v ltac:(lia)).
+  reflexivity.
+Qed.
+
 (* [mem_write_ea] resolves the effective privilege, runs the PMA/PMP check and
    walks the same one-iteration split loop as [checked_mem_write], announcing the
    write address per split ([write_ram_ea], a state no-op).  Width-generic, with

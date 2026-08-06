@@ -1233,6 +1233,59 @@ Lemma usvd_zeros_full_64 (v : mword 64) :
   update_subrange_vec_dec (zeros' (8 * 1 * 8)) (8 * (0 + 1) * 8 - 1) (8 * 0 * 8) v = v.
 Proof. usvd_zeros_full_tac. Qed.
 
+(* The width-GENERIC form the note above says the [k]-generic access lemmas
+   want.  It cannot be an instance of the tactic: with a symbolic width the
+   value argument's [autocast] is a REAL transport ([8*width] to
+   [8*width-1-(0-1)], equal only by [lia]), so [autocast_id] -- which needs the
+   two indices to unify syntactically -- never fires, and the proof has to go
+   through [bv_unsigned] instead. *)
+Lemma zeros'_unsigned (n : Z) : bv_unsigned (zeros' n) = 0.
+Proof. unfold zeros'; destruct n; reflexivity. Qed.
+
+Lemma usvd_zeros_full_gen (n : Z) (w : mword n) :
+  0 < n ->
+  update_subrange_vec_dec (zeros' n) (n - 1) 0 (autocast (T := mword) w) = w.
+Proof.
+  intro Hn.
+  assert (EN : MachineWord.MachineWord.Z_idx (n - 1 - (0 - 1))
+               = MachineWord.MachineWord.Z_idx n) by (f_equal; lia).
+  pose proof (bv_unsigned_in_range (MachineWord.MachineWord.Z_idx n) w) as Hr.
+  apply bv_eq.
+  unfold update_subrange_vec_dec.
+  rewrite (autocast_unsigned _ n _ (MachineWord.MachineWord.idx_Z_idx n ltac:(lia))).
+  unfold to_word_idx, Values.to_word.
+  unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
+  rewrite cast_idx_unsigned.
+  rewrite !bv_concat_unsigned'.
+  rewrite !bv_extract_unsigned.
+  rewrite !zeros'_unsigned.
+  rewrite !Z.shiftr_0_l.
+  rewrite !bv_wrap_0.
+  rewrite Z.shiftl_0_l.
+  rewrite Z.lor_0_r. rewrite Z.lor_0_l.
+  change (MachineWord.MachineWord.Z_idx 0) with 0%N.
+  change (Z.of_N 0) with 0. rewrite Z.shiftl_0_r.
+  rewrite (autocast_unsigned n (n - 1 - (0 - 1)) w ltac:(lia)).
+  rewrite EN. rewrite N.add_0_l.
+  rewrite bv_wrap_idemp. apply bv_wrap_small. exact Hr.
+Qed.
+
+(* ...and the same problem one level up: an [autocast] between two CONVERTIBLE
+   but not syntactically equal widths, which a symbolic width leaves at the top
+   of a reduced goal.  [autocast_id] cannot see it; [bv_unsigned] can. *)
+Ltac kill_autocast :=
+  repeat
+    match goal with
+    | |- context[@autocast _ ?m ?nn ?I (@autocast _ ?m2 ?m ?I2 ?x)] =>
+        replace (@autocast mword m nn I (@autocast mword m2 m I2 x)) with x
+          by (symmetry; apply bv_eq;
+              rewrite (autocast_unsigned m nn _ ltac:(lia));
+              rewrite (autocast_unsigned m2 m x ltac:(lia)); reflexivity)
+    | |- context[@autocast _ ?m ?nn ?I ?x] =>
+        replace (@autocast mword m nn I x) with x
+          by (apply bv_eq; symmetry; apply (autocast_unsigned m nn x); lia)
+    end.
+
 (* The same identity in NUMERAL form, which is the shape the vmem-level
    [update_subrange_vec_dec (zeros' (8 * width)) (8 * access_width - 1) 0 …]
    normalises to.  [rewrite] is syntactic, so a proof reaches these by
@@ -1371,6 +1424,41 @@ Proof.
   unfold bv_wrap, bv_modulus.
   change (Z.of_N (MachineWord.Z_idx 0)) with 0. change (Z.of_N 32) with 32.
   rewrite Z.shiftr_0_r. apply Z.mod_small. exact Hr.
+Qed.
+
+(* The width-GENERIC full-width subrange: with a symbolic width the result
+   type is [mword (n-1-0+1)], so the identity can only be stated up to the
+   [autocast] that transports it back to [mword n]. *)
+Lemma subrange_full_gen (n : Z) (a : mword n) :
+  0 < n -> subrange_vec_dec a (n - 1) 0 = autocast (T := mword) a.
+Proof.
+  intro Hn.
+  pose proof (bv_unsigned_in_range (MachineWord.MachineWord.Z_idx n) a) as Hr.
+  unfold bv_modulus in Hr.
+  assert (Hpow : 2 ^ Z.of_N (MachineWord.MachineWord.Z_idx n) = 2 ^ n)
+    by (cbn; rewrite Z2N.id; [ reflexivity | lia ]).
+  rewrite Hpow in Hr.
+  apply bv_eq.
+  rewrite (subrange_dec_unsigned_lo0 a (n - 1) (2 ^ n) ltac:(lia) ltac:(f_equal; lia)).
+  rewrite (autocast_unsigned n (n - 1 - 0 + 1) a ltac:(lia)).
+  apply Z.mod_small. exact Hr.
+Qed.
+
+(* ...and the same, composed with the [autocast] that transports it back --
+   the shape [checked_mem_write]'s split loop hands to [write_ram]. *)
+Lemma subrange_full_gen_cast (n : Z) (a : mword n) :
+  0 < n -> (autocast (T := mword) (subrange_vec_dec a (n - 1) 0) : mword n) = a.
+Proof.
+  intro Hn.
+  pose proof (bv_unsigned_in_range (MachineWord.MachineWord.Z_idx n) a) as Hr.
+  unfold bv_modulus in Hr.
+  assert (Hpow : 2 ^ Z.of_N (MachineWord.MachineWord.Z_idx n) = 2 ^ n)
+    by (cbn; rewrite Z2N.id; [ reflexivity | lia ]).
+  rewrite Hpow in Hr.
+  apply bv_eq.
+  rewrite (autocast_unsigned (n - 1 - 0 + 1) n _ ltac:(lia)).
+  rewrite (subrange_dec_unsigned_lo0 a (n - 1) (2 ^ n) ltac:(lia) ltac:(f_equal; lia)).
+  apply Z.mod_small. exact Hr.
 Qed.
 
 Lemma subrange_full_64 (a : mword 64) : subrange_vec_dec a 63 0 = a.
