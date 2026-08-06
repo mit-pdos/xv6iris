@@ -28,7 +28,12 @@ below is something the slice actually hit.
   `coq_makefile -f _CoqProject -o CoqMakefile` after editing `_CoqProject`.
 - Per batch: full `make -f CoqMakefile -j16` (grep the log for `Error`),
   `tools/proof_coverage.py --check`, `tools/lemma_diff.py`,
-  `tools/spec_vacuity.py`.
+  `tools/spec_vacuity.py` — and, because the weak layer's contracts are plain
+  lemmas rather than `_body` definitions, **also
+  `tools/spec_vacuity.py --lemmas iris/Weak*.v`** (the bare run scans only
+  `Spec*.v`/`Wp*.v`/`Code*.v` for `Definition …_body`, so it says nothing at
+  all about a `Weak*.v`; the file-argument + `--lemmas` mode was added at M3c
+  for exactly that).
 
 ---
 
@@ -102,7 +107,86 @@ instruction's WEAK-MEMORY EFFECT (the `.aq` raised the scalar floor; the
 fence moved the index; the store appended THIS message).  `exec` ignores
 access kinds and barriers entirely, so no argument over `exec` can produce
 it.  It stays a per-instruction ISA obligation of the same nature as a decode
-fact, and only the three sync instructions have one worth stating.
+fact: see §2c, which is the recipe for it and the honest price.
+
+---
+
+## 2b. Composing a leaf into a WP: the four moves (M3c)
+
+`iris/WeakAcquire.v` is the worked example — the spinlock's acquire, its spin
+loop, the release and the `started` setter, each ONE `wp_winstr` application.
+Four things recur, and they are the whole pattern:
+
+1. **BORROW THE LATEST-WRITE AUTHORITY, NOTHING ELSE.**
+   `WeakGhost.wmstate_interp σ` is seven conjuncts and a racy leaf needs to
+   update exactly one of them — `wlat_interp (wm_img σ) (wm_log σ)`, the "every
+   element IS the latest write" authority. `WeakAcquire.wmstate_rest` +
+   `wmstate_interp_split` peel it off; the leaf's caller keeps registers,
+   devices, the log auth and this hart's `wstate` cell, and updates them with
+   the SC register tower it already has. A caller that only READS memory
+   (deriving `wpt4_flat` / `wkernel_text_flat` facts) borrows the authority and
+   hands it straight back — that is why the callbacks below take it and return
+   it.
+
+2. **OPEN THE INVARIANT AT ⊤, HOLD IT ACROSS THE `▷`, CLOSE IT ON THE WAY
+   BACK.** `wp_winstr`'s callback is `wmstate_interp σ ={⊤,∅}=∗ … ▷ (… ={∅,⊤}=∗
+   …)`, i.e. the ordinary atomic-step shape, so `iInv wlockN as … "Hclose"`
+   inside it just works and what the leaf's own caller then sees is the SAME
+   callback at `⊤ ∖ ↑wlockN`. `iNext` in the continuation strips the `▷` off
+   the invariant body along with everything else. The invariant body must be
+   destructed under the `▷` (`iInv … as (st t v) "(>Hw & Hlk)"`): the element
+   bundle is timeless and comes out, the payload `monPred_at R V` is NOT
+   timeless and stays under the later until after the step, which is exactly
+   where it is wanted.
+
+3. **READ THE SHARED WORD OUT OF THE ELEMENTS *BEFORE* THE STEP.**
+   The caller's `exec` fact is a statement about `WeakBridge.wflat_st σ`, so it
+   can only be supplied at a KNOWN word. `WeakLock.wlat4_flat_gen` turns the
+   invariant's `wlat4` bundle into that word with no view hypothesis and no
+   ownership (`iDestruct … as %pure` keeps the bundle), so the callback is
+   parameterised by the value `v` the AMO will return and the post-step branch
+   is on the same `v`. When a core (`wacquire_core`) re-derives the word for
+   itself, identify the two with `WeakAcquire.wflat_word_agree`.
+
+4. **THE LOOP IS THE LÖB RULE AND NOTHING ELSE.**
+   `WeakAcquire.wwp_spin_loop : □ (K -∗ ▷ (K -∗ WP) -∗ WP) -∗ K -∗ WP`. A
+   spinlock's weak-memory content is entirely in the ONE attempt that succeeds
+   — a failed `amoswap` leaves `⌜v ≠ 0⌝` and no resource — so the loop needs no
+   weak-memory reasoning at all, and the `▷` it consumes is the one every
+   `wp_winstr` already provides. Until the branch leaves are ported the retry
+   edge is a premise of the loop lemma (`wwp_acquire_loop`); when they exist,
+   the body becomes `attempt ; branch` and the statement does not change.
+
+---
+
+## 2c. The certificate's `Q` half: the ONE thing that is irreducibly per-instruction
+
+`WeakCert`'s confinement trick discharges the `wstep_ok` half of
+`WeakInstr.wstep_cert` for every instruction at once. **It cannot produce the
+`Q` half, and no argument over `exec` can**, because `Q` is about the weak
+machine's own effects: which message the step appended, that the `.aq` raised
+the scalar floor, that the fence moved the index. Three consequences worth
+internalising before the sweep:
+
+- **`Q` is over the successor STATE (`wmstate -> wmstate -> Prop`), not its
+  views.** An invariant that owns a byte's latest-write ELEMENTS must retarget
+  them at the message the step appended, so the certificate has to name that
+  message (`wQ_store tid ea v`'s second conjunct). `wstep_post`'s
+  `∃ l, log' = log ++ l` is not enough. (M3b found this the hard way; the fix
+  landed at M3c and cost ~40 lines across four files.)
+- **Do not try to derive the message identity from the memory.** The tempting
+  routes all fail: the SC successor's `mem` pins the final VALUE of every byte
+  but not how many messages wrote it; a domain-growth argument sees only
+  writes to bytes that were absent from the confined map, so it can never rule
+  out a (value-preserving) write to the TEXT, which is precisely what would
+  invalidate the `wkernel_text` elements. Something structural about the run
+  is genuinely needed.
+- **So the `Q` half is a per-instruction ISA obligation of the same nature as
+  a decode fact** — state it that way, as a premise of the leaf, and discharge
+  it by the model peel the durable notes describe (lazymatch dispatch, folded
+  state, resolve reads instantly). Its per-instruction shape is short: an
+  effect list `[fetch read; the instruction's own access]`, over which every
+  `wQ_*` is view arithmetic.
 
 ---
 
@@ -118,11 +202,32 @@ writing:
 - **the lock word** — `iris/WeakLock.v`; nothing else in the kernel touches
   it, so port `acquire`/`release` once and every client is unchanged in
   statement (`wlocked γ i` IS `WpLock.locked γ i`);
+- **the view layer is NOT re-exported** (a five-minute trap, hit twice): a
+  file that `Require Import WeakInstr`s still does not have `view`, `ws_view`,
+  `amo_acq_gain` in scope — `Require Import` is not transitive. Any file that
+  names a view-layer constant must require `WeakView WeakVProp WeakFence`
+  itself. The error is `The reference view was not found`;
+
 - **`started`** — `iris/WeakStarted.v`; the reader's load may read a STALE
   message, which is the one thing the SC escrow never had to say.  The escrow
   carries `wstarted_oneshot` (every non-clear write to the byte is the
   setter's message) precisely to turn "the value I read is nonzero" into "the
-  timestamp I read is the escrow's";
+  timestamp I read is the escrow's".
+  **AND ITS LOAD IS THE ONE INSTRUCTION `wp_winstr` CANNOT RUN** (M3c, see the
+  note at the end of `iris/WeakAcquire.v`): the rule rests on the
+  PINNED-fragment bridge, whose read arm demands that the hart's index already
+  cover the latest write to every byte read, and a waiting hart legally reads
+  the era image while the flat projection already holds the setter's 1 — so no
+  `exec` fact about `wflat_st σ` describes the step. The AMO is unaffected
+  (its read half is `ak_latest`, whose admissibility condition IS "read the
+  latest"), which is why the whole SPINLOCK composes and this does not.
+  What it needs is a load rule that quantifies over the ADMISSIBLE READ
+  RESULTS — one `exec` fact per admissible value (two, for a one-shot flag),
+  yielding a disjunction that `wstarted_oneshot` collapses — built over
+  `WeakExec.wp_wrun_step`, the primitive rule that has no bridge premise.
+  **Build that rule before porting `ProofMainSecondary`;** the setter
+  (`WeakAcquire.wwp_started_set`) and the reader's FENCE
+  (`wwp_fence_step` + `wwp_started_fence_deliver`) are done;
 - **the virtio ring and the MMIO seams** — M5, and the driver gets patched
   (`fence w,o` / `fence i,r`) rather than the model accommodated.
 
@@ -165,10 +270,21 @@ Every one of these type-checks and is wrong or vacuous.
    stops applying and the failure reads as a "does not match any subterm" on
    an address that visibly matches.
 6. **The vacuity trap is unchanged** (`tools/spec_vacuity.py`): an
-   unparenthesised `∀` inside a wand chain swallows the trailing `WP`.  Note
-   that the tool scans `Spec*.v`/`Wp*.v`/`Code*.v` for `_body` definitions and
-   IGNORES a file argument — a new `Weak*.v` is not covered, so hand-check
-   that every `∀` in a wand chain is a Coq binder before the chain.
+   unparenthesised `∀` inside a wand chain swallows the trailing `WP`.  The
+   tool now takes file arguments and a `--lemmas` mode; run
+   `tools/spec_vacuity.py --lemmas iris/Weak*.v` per batch (§0), because the
+   default run scans only `_body` definitions and a `Weak*.v` has none.
+7. **A `Q` that is too WEAK still type-checks and still composes** — until the
+   invariant has to be re-established, hundreds of lines later, in the
+   `wmstate_interp σ'` obligation.  The characteristic version is a store
+   whose `Q` gives views but not the message (see §2c).  Fix the `Q`, never
+   the proof.
+8. **A window `W` big enough for the reads but not the writes** is failure
+   mode 4 above; the twin at the `Q` level is an effect list that omits the
+   FETCH read.  Every instruction's trace begins with the fetch — rv64d emits
+   `Read_plain` for instruction fetch, so it is an ordinary weak read that
+   raises views, and a `Q` proved against a trace without it is about a
+   different machine.
 7. **`Print Assumptions` is the only real check on a functor/seal cone.**
    Expect the 5 rv64d platform axioms for anything mentioning `riscv_step`,
    and "Closed under the global context" for everything that does not — the
@@ -179,13 +295,25 @@ Every one of these type-checks and is wrong or vacuous.
 
 ## 5. Order of the sweep
 
+0. **the `Q`-half machinery for the sync instructions FIRST** (§2c): until an
+   `amoswap.w.aq` / `sw` / `fence` at a concrete pc has its certificate `Q`,
+   the composed acquire/release of `iris/WeakAcquire.v` still carry it as a
+   premise, and nothing downstream can be closed. It is also the only item on
+   this list whose cost is a model peel rather than a restatement, so it
+   decides the sweep's schedule.
 1. the leaf libraries' MEMORY arms (`Wp*Load`, `Wp*Store`, `WpSconfMem`) —
    each is one `wpt4_flat` + one `wstep_cert` per instruction shape;
    everything else in them is the config tower and transfers as-is;
-2. `WpLock` clients — nothing to do beyond the `iProp`→`vProp` altitude
+2. **the BRANCH leaves** (`bnez`/`j`), which the spin loops' retry edge is
+   currently abstracted over — they carry no memory content at all
+   (`Q = wQ_none`, certificate unconditional), so they are the cheapest real
+   instructions in the tree and they turn `wwp_acquire_loop`'s premise into a
+   proof;
+3. `WpLock` clients — nothing to do beyond the `iProp`→`vProp` altitude
    change of `R`, since the interface is unchanged;
-3. the straight-line function proofs, batched by subagent;
-4. `StartedInv` consumers (`ProofMainSecondary`), then the virtio cone (M5).
+4. the straight-line function proofs, batched by subagent;
+5. the RACY-LOAD RULE (§3), then `StartedInv` consumers
+   (`ProofMainSecondary`), then the virtio cone (M5).
 
 `tools/lemma_diff.py` after every batch: the characteristic failure of a
 sweep is not a red build, it is a file that compiles because something was
