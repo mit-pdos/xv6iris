@@ -293,14 +293,35 @@ Independent of the above, and the reason for the bump:
 installed here, and the regen script passes the version it has and says so).
 
 `make -f CoqMakefile -j32 -k` in `iris/` builds **366 of the 802 files** and
-stops on **FIVE root failures**; everything else is blocked behind them, not
+stops on **THREE root failures**; everything else is blocked behind them, not
 broken:
 
 | file | what it needs |
 |---|---|
 | `WpLoad.v` | the vmem level: `split_on_page_boundary` + `translate_and_read_value` (its `checked_mem_read`/`pmaCheck` chain IS ported — copy that) |
 | `CommonWalk.v` | the fork delta: `_rec_pt_walk`'s new shape + `check_leaf_pte` |
-| `WpGprCsrrB.v`, `WpGprCsrwA.v`, `WpGprCsrwB.v` | the CSR layer (`is_CSR_accessible`, `write_CSR`, the `legalize_*` masks) |
+| `WpGprCsrwB.v` | `legalize_satp`'s new PPN mask (see below) |
+
+The CSR layer is otherwise done: `is_CSR_accessible` now conjoins a CONFIG
+predicate with the extension gate for the `xenvcfg` CSRs (menvcfg 0x30A is
+`and_boolM (currentlyEnabled Ext_U) (returnM xenvcfg_csrs_are_defined)`), which
+`WpGprCsrwCommon.exec_check_CSR_result_csrw_U_and` absorbs with one extra
+premise; `WpGprCsrrB`'s read-side site opens the `and_boolM` by hand.
+`mideleg_legalized` is re-stated for the new masking: the written value is masked
+by `plat_mideleg_delegatable_bits` (0x2222) BEFORE the per-extension gates, and
+the old value plays no part any more (the model's first parameter is `_o`).
+`legalize_medeleg` masks by `plat_medeleg_delegatable_bits` and additionally
+clears the new Double_Trap bit.
+
+**`legalize_satp` next**: it now re-writes satp's PPN through
+`zero_extend' 44 (subrange_vec_dec (PPN s) (min (physaddr_bits - pagesize_bits) 44 - 1) 0)`
+before dispatching on the mode. With `physaddr_bits = 56` that window is the full
+44 bits, so it is the IDENTITY — the clean fix is one bitfield lemma
+(`_update_Satp64_PPN s (_get_Satp64_PPN s) = s`, a write-back-own-value at the
+BOTTOM window, so stdpp's `bv_extract_concat_here` applies — see
+`durable-notes.md`'s Sail-bit-field bullet) and then `satp_legalized` needs no
+change at all. Do NOT re-state `satp_legalized` around the mask; that would bake
+a platform constant into a definition that does not depend on it.
 
 There are no `Admitted`s: `WpLoad.exec_vmem_read_addr_8` is left in its OLD form
 behind a `PORT PENDING` comment, so the build points at it rather than a proof

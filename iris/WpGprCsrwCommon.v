@@ -178,6 +178,27 @@ Proof.
 Qed.
 
 
+(* Some U/S-gated CSRs now conjoin a CONFIG predicate with the extension gate
+   -- menvcfg (0x30A) and senvcfg (0x10A) are
+   [and_boolM (currentlyEnabled Ext_U/S) (returnM xenvcfg_csrs_are_defined)].
+   Same lemma, one more premise: the config predicate's value. *)
+Lemma exec_check_CSR_result_csrw_U_and (csr : mword 12) (b : bool) s :
+  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (check_CSR_priv csr Machine) s = Some (true, s) ->
+  check_CSR_access csr CSRWrite = true ->
+  is_CSR_accessible csr Machine CSRWrite
+    = Defs.and_boolM ((currentlyEnabled Ext_U) : M bool) (returnM b) ->
+  b = true ->
+  exec (stateen_allows_CSR_access csr Machine CSRWrite) s = Some (true, s) ->
+  exec (check_CSR_result csr Machine CSRWrite) s = Some (CSR_Check_OK tt, s).
+Proof.
+  intros HU Hpriv Hca Hacceq Hb Hst.
+  apply exec_check_CSR_result_csrw. apply exec_check_CSR_csrw; try assumption.
+  rewrite Hacceq.
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_U s HU)). cbn match.
+  rewrite Hb. apply exec_returnm.
+Qed.
+
 Lemma exec_check_CSR_result_csrw_U (csr : mword 12) s :
   eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (check_CSR_priv csr Machine) s = Some (true, s) ->

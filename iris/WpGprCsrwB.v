@@ -58,16 +58,22 @@ Proof.
   apply exec_hartSupports_Zicsr.
 Qed.
 
-(* The SYMBOLIC legalized mideleg value (S-mode enabled, Sscofpmf enabled). *)
-Definition mideleg_legalized (o v : mword 64) : mword 64 :=
-  let v := Mk_Minterrupts v in
+(* The SYMBOLIC legalized mideleg value (S-mode enabled, Sscofpmf enabled).
+
+   The written value is now MASKED by the platform's delegatable-interrupt set
+   ([plat_mideleg_delegatable_bits] = 0x2222, i.e. SSI/STI/SEI/LCOFI) before the
+   per-extension gates are applied, instead of being merged into the OLD value
+   with the M-mode bits cleared -- so the old value plays no part any more (the
+   model calls its first parameter [_o]).  With S and Sscofpmf both enabled every
+   gate writes a field back with its own value, so this is the mask plus a tower
+   of identity updates; it is kept in the model's shape rather than simplified,
+   as before. *)
+Definition mideleg_legalized (_o v : mword 64) : mword 64 :=
+  let v := Mk_Minterrupts (and_vec v plat_mideleg_delegatable_bits) in
   _update_Minterrupts_SSI
     (_update_Minterrupts_STI
        (_update_Minterrupts_SEI
-          (_update_Minterrupts_MSI
-             (_update_Minterrupts_MTI
-                (_update_Minterrupts_MEI
-                   (_update_Minterrupts_LCOFI o (_get_Minterrupts_LCOFI v)) ('b"0")) ('b"0")) ('b"0"))
+          (_update_Minterrupts_LCOFI v (_get_Minterrupts_LCOFI v))
           (_get_Minterrupts_SEI v))
        (_get_Minterrupts_STI v))
     (_get_Minterrupts_SSI v).
