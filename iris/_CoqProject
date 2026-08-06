@@ -759,3 +759,4 @@ WeakCert.v
 WeakLock.v
 WeakStarted.v
 WeakAcquire.v
+WeakFunnel.v
