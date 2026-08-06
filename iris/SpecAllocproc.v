@@ -42,11 +42,15 @@
    [trap_csrs_pay].  On the empty-table path (a0 = 0) every lock the scan
    touched has been released and [cpu_own] is back at [lvl].
 
-   COUNTED-ONLY, like the rest of the kalloc cone: with more than
+   TWO CONTRACTS, ONE PROOF.  [ALLOCPROC_GEN] below states what allocproc
+   does at ANY page budget: there both failure tails are live code, they run
+   freeproc for real, and the third arm of [allocproc_post] is what they
+   return.  [ALLOCPROC] is the COUNTED specialisation -- with more than
    [K_allocproc] free pages neither the trapframe [kalloc] nor
-   proc_pagetable can fail, so BOTH failure tails -- which call freeproc(),
-   which is not verified -- are DEAD.  That is what keeps freeproc out of
-   this function's callee list entirely.
+   proc_pagetable can run dry, so that third arm is REFUTABLE from the
+   caller's own premise and a counted caller never sees a resealed budget.
+   The refutation is thirty lines (ProofAllocproc's [AllocprocSeal]); the
+   instruction-level proof is elaborated once, for both.
 
    WHAT THE POST SAYS ABOUT THE PROCESS.  Its user address space is EMPTY
    ([pv_upt V = upt_desc root tfp], whose [ud_um] is the empty map): the

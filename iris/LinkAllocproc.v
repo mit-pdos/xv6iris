@@ -2,9 +2,18 @@
    proofs.  Sealed, so this is the only place they ever meet.
 
    Every callee is a real proof -- allocpid, acquire, release, kalloc,
-   proc_pagetable and the general array memset -- so the whole cone is
-   axiom-free. *)
-Require Import LinkAcquire LinkRelease LinkAllocpid LinkKalloc LinkProcPagetable LinkMemsetArray.
+   proc_pagetable, the general array memset and now freeproc -- so the whole
+   cone is axiom-free.
+
+   TWO MODULES COME OUT, and both are wanted.  [AllocprocGen] is the general
+   contract: it says what allocproc does at ANY page budget, including the
+   two freeproc failure tails, and it is what kfork (which has no budget)
+   will call.  [Allocproc] is the counted one derived from it, whose caller's
+   [K_allocproc < nb] refutes those tails; userinit uses that.  The general
+   proof is elaborated ONCE and the seal is a thirty-line wrapper over it. *)
+Require Import LinkAcquire LinkRelease LinkAllocpid LinkKalloc LinkProcPagetable LinkMemsetArray LinkFreeproc.
 Require Import ProofAllocproc.
 
-Module Allocproc := AllocprocProof Acquire Release Allocpid Kalloc ProcPagetable MemsetArray.
+Module AllocprocGen :=
+  AllocprocCore Acquire Release Allocpid Kalloc ProcPagetableGen MemsetArray Freeproc.
+Module Allocproc := AllocprocSeal AllocprocGen.

@@ -631,7 +631,8 @@ the evidence for every offset. This file is only the worklist.
       * The two `freeproc` tails (+0x86 / +0x96) are NOT decoded: under the
         counted premise both `c.beqz`s fall through.  See the next item.
 
-- [ ] **S7 — `allocproc` in the UNCOUNTED regime (what `kfork` needs).**
+- [x] **S7 — `allocproc` in the UNCOUNTED regime (what `kfork` needs) --
+      DONE (2026-08-06).**
       `kfork` calls allocproc with no page budget (`on = None`, kalloc may
       fail), and there the two `freeproc` tails are LIVE.  The chain is
       exact, and every link below it is already proven:
@@ -666,7 +667,7 @@ the evidence for every offset. This file is only the worklist.
          `vm_compute; discriminate`-style `reg_neq`: the register is a
          VARIABLE there, so each `upd_ne` side goal has to go to
          `congruence` against explicitly-derived `r <> <literal>` facts.
-      2. **`proc_pagetable` uncounted** -- it has only TWO tails to prove,
+      2. [x] **`proc_pagetable` uncounted -- DONE.**  It has only TWO tails to prove,
          not three: the `beqz a0` after `uvmcreate` (+0x14) jumps straight
          to the shared epilogue at +0x4c with `s1 = 0`, so that arm is free.
          What is left is the two `bltz a0` mappages arms — +0x5a
@@ -780,7 +781,7 @@ the evidence for every offset. This file is only the worklist.
          strengthening proc_dormant's ZOMBIE arm.  It costs allocproc
          nothing -- both of its tails run at `opt = None`, where the arm is
          vacuous.
-      4. **allocproc's two tails** -- ten instructions each, all already
+      4. [x] **allocproc's two tails -- DONE.**  Six instructions each, all already
          decoded (`CodeAllocproc.v` is GENERATED now, so `api_86`..`api_a4`
          exist).  Each is `mv a0,s1; jal freeproc; mv a0,s1; jal release;
          mv s1,s2; j +0x78` -- and note `s2` holds the failed callee's `a0`,
@@ -799,51 +800,57 @@ the evidence for every offset. This file is only the worklist.
          `proc_slots_unused`, for rebuilding the lock resource after
          freeproc's `proc_dormant _ UNUSED`).
 
-         **WHAT IS ACTUALLY LEFT, in dependency order.**  The two `c.beqz`s
-         are still proved on their FALL arms, and making them branch is not
-         a local edit -- each one's non-null fact comes from a COUNTED
-         callee, so the callee's call site has to be generalised first:
+         **DONE (2026-08-06): both tails are proved and allocproc is
+         complete on every path.**  The four steps below are the record of
+         what it actually took; nothing is left.
 
-         1. `+0x4a` needs kalloc generic.  Today the site does
-            `destruct nb as [| nb']` and calls at `Some (S nb')`, then reads
-            `kalloc_post_success` (which only exists at a positive count).
-            Generic means calling at `on` and destructing the raw
-            `kalloc_post` disjunction.  Every `Some nb'` downstream
-            (including the `iAssert (kalloc_env γa (Some nb'))` at
-            `ProofAllocproc.v:1035`) becomes `avail_sub on 1`.
-         2. `+0x56` needs proc_pagetable generic: call
-            `ProcPagetableGen.wp_proc_pagetable_core` (LinkProcPagetable
-            already exports it) instead of `PPT.wp_proc_pagetable_sconf`,
-            and destruct `ppt_post`.  Its failure arm supplies both the
-            `kalloc_env _ None` and the exhaustion witness the third post
-            arm wants.
-         3. The tail body.  **WRITE IT TWICE -- an earlier note in this file
-            said "one `iAssert`ed block, not two" and that was WRONG.**  The
-            two tails are the same six instructions but at DIFFERENT
-            ADDRESSES (+0x86 and +0x96), so they have different `instr`
-            facts, and the two `jal`s have different immediates (the
-            relative distance to freeproc/release differs by 0x10:
-            `api_88` vs `api_98`, `api_8e` vs `api_9e`).  A shared block
-            would have to take the pc offset AND all six facts as
-            parameters, which is more machinery than the ~60 lines it
-            saves.  (This is the opposite of proc_pagetable's epilogue,
-            where all four exits `j` to the SAME address -- that is what
-            made one block right there.)
-
-            What the two bodies share is only their SHAPE: assemble
-            freeproc's precondition, call freeproc, rebuild `proc_lock_res`
-            (the two bridges above), `release`, `mv s1,s2` (s2 holds the
-            failed callee's a0, i.e. 0), `j +0x78` into `ap_tail`, then
-            `allocproc_post`'s third arm.  They differ in `fp_tf` (tail 1
-            `None`, tail 2 `Some (tfp, ws)`) and in the witness.  Both have
-            `fp_pt _ _ None` -- tail 1 because the dormant block's cell was
-            never written, tail 2 because the `sd a0,80(s1)` at +0x54
-            stores the 0 before the branch.
-         4. Seal: `AllocprocCore : ALLOCPROC_GEN` plus the counted
-            `AllocprocProof : ALLOCPROC`, whose only job is to refute the
-            third arm from `K_allocproc < nb`.  `LinkAllocproc` gains
-            `Freeproc` as a functor argument and exports both.
-      5. **The spec's third arm.** Keep ONE spec, generic in `on`, and give
+         1. [x] **`+0x4a` kalloc generic.**  The `destruct nb as [| nb']` and
+            the `kalloc_post_success` read are gone; the site calls at `on`
+            and destructs the raw `kalloc_post` disjunction.  *Where to
+            split matters:* +0x46 (`c.mv s2,a0`) and +0x48 (`c.sd a0,88(s1)`)
+            move the returned word WITHOUT branching on it, so `Hkpost` is
+            carried whole past both and destructed only at the `c.beqz`.
+            Splitting at the call site instead would have duplicated those
+            two instructions into the tail for nothing.
+         2. [x] **`+0x56` proc_pagetable generic.**  Now
+            `PPT.wp_proc_pagetable_core` at `avail_dec on`, with `PPT :
+            PROC_PAGETABLE_GEN`.  Same trick: +0x52/+0x54 run before the
+            `ppt_post` destruct, so `HF7a0` is stated as `F7 !!! a0 = mpt !!!
+            a0` (the value, uninspected) and each arm rewrites it afterwards.
+            The budget re-association is `ap_sub_dec : avail_sub (avail_dec
+            on) n = avail_sub on (S n)` -- used in BOTH directions, forward
+            for tail 2's witness and backward for the success arm's
+            `kalloc_env`.
+         3. [x] **The two tail bodies, written twice** -- see the WRONG/right
+            note above; that call held up.  ~180 lines each.  *Three things
+            that were not obvious:*
+            - `kalloc_env γa None` is **persistent**, so tail 1 can `iMod`
+              the seal into `#Henv`, hand it to freeproc, and still have one
+              for `allocproc_post`'s third arm.  Tail 2 does not seal at all:
+              proc_pagetable already did on its way out.
+            - `zero` has three spellings on these paths and they are NOT
+              interconvertible: kalloc reports failure as `nullp`,
+              proc_pagetable as `mword_of_int 0`, and `c.beqz` tests against
+              `zero_reg`.  `ap_null_eqz` / `ap_zero_eqz` / `ap_zero_of_int`
+              exist only to bridge them; without the third, `HF7s2`'s
+              `exact` fails with `mword_of_int 0` vs `zero_reg` AFTER
+              `upd_eq` has already stripped nothing (`upd_eq` leaves
+              `regval_into_reg`, which IS convertible -- the mismatch is
+              entirely in the zero).
+            - the park receipt rejoins here.  The found arm keeps BOTH
+              halves (`Hparka` into `proc_held`, `Hparkb` for the caller);
+              a tail gives `Hparka` to freeproc, gets it back in the
+              returned `proc_held`, and `park_split` + `park_at_full_intro`
+              put the whole receipt back into the lock, which is what
+              `proc_slots_unused_intro` needs.
+         4. [x] **Seal.**  `AllocprocCore : ALLOCPROC_GEN` (the whole
+            instruction-level proof) plus `AllocprocSeal (Core :
+            ALLOCPROC_GEN) : ALLOCPROC`, thirty lines whose only content is
+            `ap_refute_dry`.  `LinkAllocproc` applies the Core ONCE and seals
+            it, exporting `AllocprocGen` (for kfork) and `Allocproc` (for
+            userinit) -- applying the functor twice would re-elaborate the
+            big proof for nothing.
+      5. [x] **The spec's third arm -- DONE.** Keep ONE spec, generic in `on`, and give
          `allocproc_post` an out-of-memory disjunct carrying
          `⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝` -- which
          a COUNTED caller (userinit) refutes from its own `K_allocproc < nb`
