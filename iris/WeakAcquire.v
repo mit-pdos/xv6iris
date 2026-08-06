@@ -34,6 +34,11 @@
         statement about [WeakBridge.wflat_st σ] — can be supplied at a KNOWN
         lock word, and the post-step branch on "did I get it" is the same [v].
 
+    §3–§8 take the instruction certificate as a PREMISE (the way an SC leaf
+    takes an [instr] fact); §9 discharges it with [WeakCert]'s trace-indexed
+    certificates, so the composed acquire / release / setter rest on nothing
+    per-instruction but ONE [exec_eff] fact inside the caller's own callback.
+
     ==================== WHAT IS ABSTRACT, AND WHY ====================
 
     The BRANCH instructions of the spin loop have no weak leaf yet (the M4
@@ -64,6 +69,7 @@ Require Import WeakFence.
 Require Import WeakBridge.
 Require Import WeakInstr.
 Require Import WeakStore.
+Require Import WeakCert.
 Require Import WeakLock.
 Require Import WeakStarted.
 Require Import RiscvLang RiscvPtsto RiscvExec.
@@ -483,6 +489,100 @@ Section wp_lock.
     iModIntro.
     iApply (wwp_release_store Φ γ lk R pcs Ps Hgid Haccs Hcerts
               with "Hinv Htok Hrel").
+  Qed.
+
+(* ====================================================================== *)
+(** ** 9. THE SAME THREE RULES, OVER A DISCHARGED CERTIFICATE
+
+    §3–§6 take the instruction certificate as a premise, the way the SC leaves
+    take an [instr] fact.  [WeakCert] discharges it: [wcert_amo_aq] /
+    [wcert_store] / [wcert_fence] prove [wstep_cert] outright for a step whose
+    EFFECT TRACE is the given one, under the single obligation [wP_conf]
+    strengthened to [WeakCert.wP_eff] — "the confined SC run succeeds and its
+    trace is exactly these effects".  So the corollaries below have NO
+    certificate premise at all: what is left for the caller is one
+    [exec_eff]-level fact per instruction, inside the σ-callback, exactly
+    where its own SC library lemma already lives.
+
+    The trace of each instruction is: the FETCH read, then the instruction's
+    own access(es).  The fetch is left generic in kind/address/width, so a
+    compressed 2-byte fetch instantiates these too. *)
+
+  Corollary wwp_acquire_swap_cert Φ (γ : gname) (lk : Arch.pa) R
+      (pc : SailStdpp.Values.mword 64)
+      (akf : akinfo) (pf : Arch.pa) (nf : N) (aka akw : akinfo) :
+    gen_id = 0%nat →
+    acc_wf pc 4 →
+    acc_wf lk 4 →
+    ak_coh aka = false →
+    ak_sync aka = true →
+    inv wlockN (wlock_inv γ lk R) -∗
+    wacq_cb Φ γ lk R pc
+      (wP_eff (Some (fin_to_nat cpu_id))
+         [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one]) -∗
+    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hgid Haccpc Hacclk Hcoh Hsync. iIntros "#Hinv Hk".
+    iApply (wwp_acquire_swap Φ γ lk R pc _ Hgid Haccpc Hacclk
+              (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
+                 Hcoh Hsync) with "Hinv Hk").
+  Qed.
+
+  Corollary wwp_release_store_cert Φ (γ : gname) (lk : Arch.pa) R
+      (pc : SailStdpp.Values.mword 64)
+      (akf : akinfo) (pf : Arch.pa) (nf : N) (akw : akinfo) :
+    gen_id = 0%nat →
+    acc_wf pc 4 →
+    inv wlockN (wlock_inv γ lk R) -∗
+    locked γ cpu_id -∗
+    wrel_cb Φ R pc
+      (wP_eff (Some (fin_to_nat cpu_id))
+         [WEread akf pf nf; WEwrite akw lk 4 lock_zero]) wlockN -∗
+    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hgid Haccpc. iIntros "#Hinv Htok Hk".
+    iApply (wwp_release_store Φ γ lk R pc _ Hgid Haccpc
+              (wcert_store (fin_to_nat cpu_id) pc akf pf nf akw lk lock_zero)
+              with "Hinv Htok Hk").
+  Qed.
+
+  Corollary wwp_started_set_cert Φ (a : Arch.pa) (Pl : vProp Σ)
+      (pc : SailStdpp.Values.mword 64)
+      (akf : akinfo) (pf : Arch.pa) (nf : N) (akw : akinfo) :
+    gen_id = 0%nat →
+    acc_wf pc 4 →
+    inv wstartedN (wstarted_body a Pl) -∗
+    wrel_cb Φ Pl pc
+      (wP_eff (Some (fin_to_nat cpu_id))
+         [WEread akf pf nf; WEwrite akw a 4 lock_one]) wstartedN -∗
+    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hgid Haccpc. iIntros "#Hinv Hk".
+    iApply (wwp_started_set Φ a Pl pc _ Hgid Haccpc
+              (wcert_store (fin_to_nat cpu_id) pc akf pf nf akw a lock_one)
+              with "Hinv Hk").
+  Qed.
+
+  (** ... and the loop, whose only premise is now the caller's retry edge. *)
+  Corollary wwp_acquire_loop_cert Φ (γ : gname) (lk : Arch.pa) R
+      (pc : SailStdpp.Values.mword 64)
+      (akf : akinfo) (pf : Arch.pa) (nf : N) (aka akw : akinfo) (K : iProp Σ) :
+    gen_id = 0%nat →
+    acc_wf pc 4 →
+    acc_wf lk 4 →
+    ak_coh aka = false →
+    ak_sync aka = true →
+    inv wlockN (wlock_inv γ lk R) -∗
+    □ (K -∗ ▷ (K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
+         wacq_cb Φ γ lk R pc
+           (wP_eff (Some (fin_to_nat cpu_id))
+              [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one])) -∗
+    K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+  Proof.
+    intros Hgid Haccpc Hacclk Hcoh Hsync. iIntros "#Hinv #Hatt HK".
+    iApply (wwp_acquire_loop Φ γ lk R pc _ K Hgid Haccpc Hacclk
+              (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
+                 Hcoh Hsync) with "Hinv Hatt HK").
   Qed.
 
 End wp_lock.
