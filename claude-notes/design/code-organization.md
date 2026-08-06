@@ -54,6 +54,58 @@
   - **A dead `Require` costs a DAG edge, not CPU.** A `Require` of a file none of whose names are used is worth ~0.5 s of load (measured isolated); delete such lines to keep the dependency graph honest — but do not expect a CPU win, and check whether the edge was on a tail before claiming a wall win.
   - **A whole-function proof file (`Proof<Function>.v`) must contain only the function's body/chunk/whole-function WPs — never a single-instruction leaf WP.** Base ALU leaves go in `WpSconfAlu.v` (e.g. `wp_lui_s_sconf`, `wp_andi_s_sconf`); call-site-specialized **device-access** leaves (one MMIO instruction, geometry pre-discharged) go in a leaf **functor over the device module** — e.g. `WpSconfUartAccess.v`'s `UartAccessProof (Uart : UART)` holding `wp_uart_lsr_read_s_sconf` / `wp_uart_thr_write_s_sconf`, which a function proof instantiates with `Module UAcc := UartAccessProof Uart.`. Don't clone a leaf locally when a more general one already exists at the right altitude (the general `wp_andi_s_sconf` is wval-parametric; pass `_` + `eq_refl`).
 
+## A hand-written decode layer beside a generated one: convert, don't restate
+
+`Code<F>.v` is generated (`make gen-code`) and states each instruction's
+`instr` fact with the encoding word and every decoded immediate as literals
+read off the tracked dump. Three functions — `_entry`, `start`, `timerinit` —
+also had a **complete hand-written duplicate** in `Code<F>Aux.v`: 68 `instr`
+facts, 59 `<f>_decodeN` word-keyed decode templates, and private copies of the
+encoding words, all predating the generator. The M-mode WPs were written in the
+hand-written *operand vocabulary* (`i9`, `si52`, `ti_a5`, `imm_caddi`, …), not
+in literals, so the duplicate could not simply be deleted.
+
+**The move that dissolves it is a conversion, not a rewrite.** The two
+statements differ only in spelling — `sign_extend' 12 i9` vs
+`sign_extend' 12 (mword_of_int 48 : mword 6)`, `Regidx csp_rs1` vs
+`Regidx (mword_of_int 2)` — and Rocq's conversion sees through both, so each
+hand-written fact becomes one line:
+
+```coq
+Lemma ti_instr9 :
+  kernel_text -∗ instr ti_pc9 true (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+Proof. exact tmi_00. Qed.
+```
+
+All 68 went through unchanged (21 timerinit + 39 start + 8 `_entry`), after
+which the decode templates and 55 encoding-word `Definition`s were dead, and
+`CodeEntryAux.v` also gave up **fifteen empty `Section` husks** — `Context` /
+`Hypothesis` / `Let` scaffolding whose lemmas earlier cleanups had already
+removed. 902 → 729 lines across the three files, and `CodeEntryAux.v` alone
+455 → 154.
+
+**The conversion is also the staleness check, and that is the reason to prefer
+it to deleting the vocabulary.** The hand-written operand constants are now
+checked against the dump on every build: an upstream bump that re-encodes an
+instruction updates the generated literal, and the `exact` stops typechecking —
+a loud failure, where a private copy of a word just goes quietly stale. So the
+rule for a hand-written layer that survives beside a generated one is: keep
+whatever vocabulary the proofs are written in, and make every fact a
+`Proof. exact <generated>. Qed.` so the two are pinned together.
+
+Two related things this turned up:
+
+- **`make check-decode` diffs the MANIFEST's outputs, not the `iris/Code*.v`
+  glob.** The glob also sweeps the hand-written `Code<F>Aux.v`, so any
+  uncommitted edit to one of those failed the target with a diff that had
+  nothing to do with the dump (it fired twice on unrelated work before being
+  narrowed).
+- `CodeStartAux.v` still imports `CodeTimerinitAux.v`, but now only for the
+  register indices and frame immediates the two functions genuinely share
+  (same 16-byte frame, same registers) — not for words. That is the residue of
+  the "no `Code<F>.v` imports another function's" rule, and the fix when it
+  next matters is to move those constants down, not to re-copy them.
+
 ## Two literals in every decode site are the IMAGE's, not the proof's
 
 A `mk_rvc` / `mk_base` site states three things about an instruction: its

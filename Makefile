@@ -169,8 +169,14 @@ dump: kernel-rocq user-rocq
 # real code change, and its proof needs a human.
 gen-code:
 	$(PYTHON) $(GENCODE) --iris $(IRIS) --kernel-rocq $(KDUMP)
+# The diff is scoped to the files gen_code.py actually WRITES -- the manifest's
+# outputs plus the shared decode catalogs -- not to the $(IRIS)/Code*.v glob:
+# that glob also sweeps the HAND-WRITTEN Code<F>Aux.v files, so any uncommitted
+# edit to one of those failed this target with a diff that has nothing to do
+# with the dump.  (It fired twice on unrelated work before being narrowed.)
+GENFILES := $(addprefix $(IRIS)/,$(shell $(PYTHON) -c "import json;print(' '.join(sorted(set(e[0] for e in json.load(open('tools/code_manifest.json'))))))"))
 check-decode: gen-code
-	git diff --exit-code -- $(IRIS)/KernelDecode*.v $(IRIS)/Code*.v
+	git diff --exit-code -- $(IRIS)/KernelDecode*.v $(GENFILES)
 update-decode: gen-code
 
 # Re-dump every image from the ELFs currently in xv6-riscv/, even if make
