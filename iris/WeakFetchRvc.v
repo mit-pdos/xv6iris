@@ -46,6 +46,7 @@ Require Import WeakPmpEff.
 Require Import WeakFunnel.
 Require Import WpDecodeBridge.
 Require Import WeakTickEff.
+Require Import WeakLeafEffCommon.
 Require Import WeakFetchEff.
 
 Local Open Scope Z_scope.

@@ -66,34 +66,17 @@ Require Import WeakPmpEff.
 Require Import WeakFunnel.
 Require Import WpDecodeBridge.
 Require Import WeakTickEff.
+Require Import WeakLeafEffCommon.
 
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
-(** ** 0. The trivial twins
+(** ** 0. The trivial twins: [WeakLeafEffCommon]
 
-    [RiscvTryStep.exec_returnM] and the two boolean connectives, at
-    [exec_eff].  All three are the SC statement with [[]] appended and the
-    SC script with the bind lemma renamed. *)
-
-Lemma exec_eff_returnM {X} (x : X) s : exec_eff (returnM x) s = Some (x, s, []).
-Proof. reflexivity. Qed.
-
-Lemma exec_eff_and_boolM_nil (l r : M bool) s bl sl :
-  exec_eff l s = Some (bl, sl, []) ->
-  exec_eff (Defs.and_boolM l r) s = (if bl then exec_eff r sl else Some (false, sl, [])).
-Proof.
-  intro H. unfold Defs.and_boolM. rewrite (exec_eff_bind_nil _ _ _ _ _ H).
-  destruct bl; [reflexivity | apply exec_eff_returnm].
-Qed.
-
-Lemma exec_eff_or_boolM_nil (l r : M bool) s bl sl :
-  exec_eff l s = Some (bl, sl, []) ->
-  exec_eff (Defs.or_boolM l r) s = (if bl then Some (true, sl, []) else exec_eff r sl).
-Proof.
-  intro H. unfold Defs.or_boolM. rewrite (exec_eff_bind_nil _ _ _ _ _ H).
-  destruct bl; [apply exec_eff_returnm | reflexivity].
-Qed.
+    [RiscvTryStep.exec_returnM] and the two boolean connectives at
+    [exec_eff] (each the SC statement with [[]] appended and the SC script
+    with the bind lemma renamed), and [translationMode] at Machine, are
+    [WeakLeafEffCommon]'s — the shape files need exactly the same four. *)
 
 (* ====================================================================== *)
 (** ** 1. THE REGISTER-ONLY CONE, AT THE EMPTY TRACE
@@ -139,14 +122,6 @@ Proof.
   unfold effectivePrivilege.
   replace (generic_neq (InstructionFetch tt) (InstructionFetch tt)) with false
     by (vm_compute; reflexivity).
-  apply exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_translationMode_M s :
-  exec_eff (translationMode Machine) s = Some (Bare, s, []).
-Proof.
-  unfold translationMode.
-  replace (generic_eq Machine Machine) with true by (vm_compute; reflexivity).
   apply exec_eff_returnM.
 Qed.
 

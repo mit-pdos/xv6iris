@@ -65,56 +65,21 @@ Require Import SailStdpp.Operators_mwords Riscv.rv64d_types Riscv.rv64d Riscv.ri
 Require Import WeakMem WeakInterp WeakLang WeakBridge.
 Require Import WeakView WeakVProp WeakFence WeakInstr WeakCert WeakEff WeakEffSkel.
 Require Import WpGpr WpLoad WpMmodeLeafBase.
+Require Import WeakLeafEffCommon.
 Import Defs.
 Local Open Scope Z_scope.
 
 (* ====================================================================== *)
-(** ** 0. The local twins the name-swap table calls for
+(** ** 0. The kit, and the width-independent leaves: [WeakLeafEffCommon]
 
-    [RiscvTryStep.exec_returnM] (the model's own [returnM], which is
-    [Defs.returnm] at [E := exception] and must have its own lemma so a
-    SYNTACTIC rewrite matches the [returnM …] appearing in model terms), the
-    two short-circuit connectives, and the one [exec_eff] arm lemma that the
-    memory step needs — [RiscvFetchExec.exec_MemWrite]'s twin, which is where
-    the [WEwrite] is born. *)
-
-Local Lemma wl8s_exec_eff_returnM {X} (x : X) s :
-  exec_eff (returnM x) s = Some (x, s, []).
-Proof. reflexivity. Qed.
-
-Local Lemma wl8s_exec_eff_MemWrite {X} (n : N) (req : Interface.WriteReq.t n)
-    (k : (option bool + Arch.abort)%type -> M X) s :
-  dev_addr (Interface.WriteReq.pa req) = false ->
-  exec_eff (Interface.Next (Interface.MemWrite n req) k) s
-  = match exec_eff (k (inl None))
-            (MState s.(sregs)
-               (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                            (Interface.WriteReq.value req)) s.(mdev)) with
-    | Some (y, s', es) =>
-        Some (y, s', WEwrite (classify (Interface.WriteReq.access_kind req))
-                             (Interface.WriteReq.pa req) n
-                             (Interface.WriteReq.value req) :: es)
-    | None => None
-    end.
-Proof. intros Hd. cbn [exec_eff]. rewrite Hd. reflexivity. Qed.
-
-Local Lemma wl8s_exec_eff_and_boolM (l r : M bool) s bl sl :
-  exec_eff l s = Some (bl, sl, []) ->
-  exec_eff (and_boolM l r) s
-  = (if bl then exec_eff r sl else Some (false, sl, [])).
-Proof.
-  intro H. unfold and_boolM. rewrite (exec_eff_bind_nil _ _ _ _ _ H).
-  destruct bl; [reflexivity | apply wl8s_exec_eff_returnM].
-Qed.
-
-Local Lemma wl8s_exec_eff_or_boolM (l r : M bool) s bl sl :
-  exec_eff l s = Some (bl, sl, []) ->
-  exec_eff (or_boolM l r) s
-  = (if bl then Some (true, sl, []) else exec_eff r sl).
-Proof.
-  intro H. unfold or_boolM. rewrite (exec_eff_bind_nil _ _ _ _ _ H).
-  destruct bl; [apply wl8s_exec_eff_returnM | reflexivity].
-Qed.
+    [exec_eff_returnM] (the model's own [returnM], which is [Defs.returnm] at
+    [E := exception] and must have its own lemma so a SYNTACTIC rewrite
+    matches the [returnM …] appearing in model terms), the two short-circuit
+    connectives, [exec_eff_MemWrite] — [RiscvFetchExec.exec_MemWrite]'s twin,
+    where the [WEwrite] is born — and the leaves that are about neither the
+    width nor the access ([_translationMode_M],
+    [_split_misaligned_aligned], [_rX_bits_gpr], [_ext_data_get_addr_gpr],
+    [execR_eff_untilMT_1]) all live in [WeakLeafEffCommon]. *)
 
 (* ====================================================================== *)
 (** ** 1. THE ONE MEMORY-TOUCHING STEP
@@ -135,12 +100,12 @@ Lemma exec_eff_write_ram_plain_8 (addr : mword 64) (data : bv 64) s :
 Proof.
   intros Hdev.
   unfold write_ram. cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl8s_exec_eff_returnM _ s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   cbn beta zeta.
   unfold Defs.sail_mem_write. cbn beta zeta iota match.
   unfold Defs.bind. cbn [Interface.iMon_bind].
   cbn match.
-  rewrite wl8s_exec_eff_MemWrite; last exact Hdev.
+  rewrite exec_eff_MemWrite; last exact Hdev.
   reflexivity.
 Qed.
 
@@ -168,14 +133,14 @@ Proof.
   destruct region as [rbase rsize rattr rdtree].
   cbn [PMA_Region_attributes] in Hwrite |- *.
   rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl8s_exec_eff_returnM None s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM None s)).
   cbn match beta.
   change (assert_exp' true "sys/mem.sail:106.61-106.62" >>=
           (fun _ : true = true => returnM (PMA_writable (override_PMA rattr pbmt))))
     with (returnM (PMA_writable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl8s_exec_eff_returnM _ s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   rewrite Hwrite. cbn match.
-  apply wl8s_exec_eff_returnM.
+  apply exec_eff_returnM.
 Qed.
 
 Lemma exec_eff_effectivePrivilege_store (m : mword 64) s :
@@ -189,23 +154,7 @@ Qed.
 Lemma exec_eff_is_shadow_stack_store s :
   exec_eff (is_shadow_stack_access (Store Data)) s = Some (false, s, []).
 Proof.
-  unfold is_shadow_stack_access. cbn match. apply wl8s_exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_translationMode_M s :
-  exec_eff (translationMode Machine) s = Some (Bare, s, []).
-Proof.
-  unfold translationMode.
-  replace (generic_eq Machine Machine) with true by (vm_compute; reflexivity).
-  apply wl8s_exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_split_misaligned_aligned (vaddr : virtaddr) s :
-  is_aligned_vaddr vaddr 8 = true ->
-  exec_eff (split_misaligned vaddr 8) s = Some ((1, 8), s, []).
-Proof.
-  intro H. unfold split_misaligned. rewrite H. cbn [orb].
-  apply wl8s_exec_eff_returnM.
+  unfold is_shadow_stack_access. cbn match. apply exec_eff_returnM.
 Qed.
 
 (* ====================================================================== *)
@@ -247,20 +196,20 @@ Proof.
       cbn match.
       rewrite (exec_eff_bind_nil _ _ _ _ _
                 (exec_eff_pmaCheck_ram_store addr pbmt region s Hmatch Halign Hwrite)).
-      cbn match. apply wl8s_exec_eff_returnM. }
+      cbn match. apply exec_eff_returnM. }
   cbn match.
   rewrite (exec_eff_bind_nil _ _ _ _ _
             (_ : exec_eff (within_mmio_writable (Physaddr addr) 8) s
                  = Some (false, s, []))).
   2:{ unfold within_mmio_writable. cbn [get_config_rvfi].
-      rewrite (wl8s_exec_eff_or_boolM _ _ _ _ _ Hc). cbn match.
-      rewrite (wl8s_exec_eff_or_boolM _ _ _ _ _ Hsig). cbn match.
-      rewrite (wl8s_exec_eff_and_boolM _ _ _ _ _ Hh). cbn match. reflexivity. }
+      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
+      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
+      rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
   cbn match.
   rewrite (exec_eff_bind_nil _ _ _ _ _
             (_ : exec_eff (write_kind_of_flags false false false) s
                  = Some (rv64d_types.Write_plain, s, []))).
-  2:{ unfold write_kind_of_flags. cbn match. apply wl8s_exec_eff_returnM. }
+  2:{ unfold write_kind_of_flags. cbn match. apply exec_eff_returnM. }
   rewrite (exec_eff_bind_Some _ _ _ _ _ _
             (exec_eff_write_ram_plain_8 addr data s Hdev)).
   reflexivity.
@@ -274,8 +223,8 @@ Proof.
   rewrite (exec_eff_bind_nil _ _ _ _ _
             (_ : exec_eff (write_kind_of_flags false false false) s
                  = Some (rv64d_types.Write_plain, s, []))).
-  2:{ unfold write_kind_of_flags. cbn match. apply wl8s_exec_eff_returnM. }
-  apply wl8s_exec_eff_returnM.
+  2:{ unfold write_kind_of_flags. cbn match. apply exec_eff_returnM. }
+  apply exec_eff_returnM.
 Qed.
 
 Lemma exec_eff_mem_write_value_8 (pbmt : page_based_mem_type) (addr : mword 64)
@@ -345,25 +294,6 @@ Qed.
 (** [WpLoad.execR_untilMT_1] with the body's trace carried out of the loop:
     the guard and the measure step are empty-traced, so the loop's trace IS
     the body's. *)
-Lemma execR_eff_untilMT_1 {R Vars} (vars vars' : Vars) (measure : Vars -> Z)
-    (cond : Vars -> Defs.monadR R exception bool)
-    (body : Vars -> Defs.monadR R exception Vars) s s' es :
-  measure vars = 1 ->
-  execR_eff (body vars) s = Some (inr vars', s', es) ->
-  execR_eff (cond vars') s' = Some (inr true, s', []) ->
-  execR_eff (Defs.untilMT vars measure cond body) s = Some (inr vars', s', es).
-Proof.
-  intros Hm Hb Hc. unfold Defs.untilMT.
-  destruct (Defs.Zwf_guarded (measure vars)).
-  cbn [Defs.untilMT'].
-  destruct (Z_ge_dec (measure vars) 0) as [Hge|Hge];
-    [| exfalso; rewrite Hm in Hge; lia ].
-  rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hb).
-  rewrite (execR_eff_bind_nil _ _ _ _ _ Hc).
-  cbn match.
-  rewrite execR_eff_returnR. rewrite ?app_nil_r. reflexivity.
-Qed.
-
 (* [WpMmodeLeafBase.v : SW] *)
 Section SWeff.
 Variable a : mword 64.
@@ -492,24 +422,24 @@ Lemma exec_eff_is_pmm_applicable_store s :
   exec_eff (is_pmm_applicable (Store Data) Machine) s = Some (true, s, []).
 Proof.
   unfold is_pmm_applicable.
-  rewrite (wl8s_exec_eff_and_boolM _ _ _ _ _ (wl8s_exec_eff_returnM _ s)).
+  rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   replace (generic_neq (Store Data) (InstructionFetch tt)) with true
     by (vm_compute; reflexivity). cbn match.
-  rewrite (wl8s_exec_eff_and_boolM _ _ _ _ _ (wl8s_exec_eff_returnM _ s)).
+  rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   replace (generic_neq (Store Data) (Load PageTableEntry)) with true
     by (vm_compute; reflexivity). cbn match.
-  rewrite (wl8s_exec_eff_and_boolM _ _ _ _ _ (wl8s_exec_eff_returnM _ s)).
+  rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   replace (generic_neq (Store Data) (Store PageTableEntry)) with true
     by (vm_compute; reflexivity). cbn match.
   match goal with
   | |- context [ and_boolM ?orb _ ] => assert (Hor : exec_eff orb s = Some (true, s, []))
   end.
-  { rewrite (wl8s_exec_eff_or_boolM _ _ _ _ _ (wl8s_exec_eff_returnM _ s)).
+  { rewrite (exec_eff_or_boolM_nil _ _ _ _ _ (exec_eff_returnM _ s)).
     replace (generic_eq Machine Machine) with true by (vm_compute; reflexivity).
     reflexivity. }
-  rewrite (wl8s_exec_eff_and_boolM _ _ _ _ _ Hor).
+  rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hor).
   cbn match.
-  rewrite (wl8s_exec_eff_returnM _ s).
+  rewrite (exec_eff_returnM _ s).
   replace (xlen =? 64) with true by (vm_compute; reflexivity). reflexivity.
 Qed.
 
@@ -525,10 +455,10 @@ Proof.
           = Some (pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs))), s, [])).
   { unfold get_pmm.
     rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg mseccfg s)).
-    apply wl8s_exec_eff_returnM. }
+    apply exec_eff_returnM. }
   rewrite (exec_eff_bind_nil _ _ _ _ _ Hgp).
   rewrite Hpmm.
-  apply wl8s_exec_eff_returnM.
+  apply exec_eff_returnM.
 Qed.
 
 Lemma exec_eff_transform_effective_address_store (ea : mword 64) s :
@@ -547,37 +477,7 @@ Proof.
   rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_get_pmlen_store s Hpmm)).
   rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_translationMode_M s)).
   replace (generic_eq Bare Bare) with true by (vm_compute; reflexivity). cbn match.
-  apply wl8s_exec_eff_returnM.
-Qed.
-
-(** [WpGpr]'s two register-file readers, at [exec_eff]. *)
-
-Lemma exec_eff_rX_bits_gpr (i : mword 5) s :
-  exec_eff (rX_bits (Regidx i)) s
-  = Some (if Z.eqb (uint i) 0 then zero_reg
-          else register_lookup (R_bitvector_64 (gpr_of_Z (uint i))) s.(sregs), s, []).
-Proof.
-  pose proof (uint5_lt i) as Hb.
-  assert (Hc : uint i = 0 \/ uint i = 1 \/ uint i = 2 \/ uint i = 3 \/ uint i = 4 \/
-    uint i = 5 \/ uint i = 6 \/ uint i = 7 \/ uint i = 8 \/ uint i = 9 \/ uint i = 10 \/
-    uint i = 11 \/ uint i = 12 \/ uint i = 13 \/ uint i = 14 \/ uint i = 15 \/ uint i = 16 \/
-    uint i = 17 \/ uint i = 18 \/ uint i = 19 \/ uint i = 20 \/ uint i = 21 \/ uint i = 22 \/
-    uint i = 23 \/ uint i = 24 \/ uint i = 25 \/ uint i = 26 \/ uint i = 27 \/ uint i = 28 \/
-    uint i = 29 \/ uint i = 30 \/ uint i = 31) by lia.
-  destruct Hc as [H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|[H|H]]]]]]]]]]]]]]]]]]]]]]]]]]]]]]].
-  all: unfold rX_bits, rX; rewrite H; cbn match; reflexivity.
-Qed.
-
-Lemma exec_eff_ext_data_get_addr_gpr (rs1 : mword 5) (offset : mword 64) acc w s :
-  exec_eff (ext_data_get_addr (Regidx rs1) offset acc w) s
-  = Some (Ext_DataAddr_OK (Virtaddr (add_vec
-      (if Z.eqb (uint rs1) 0 then zero_reg
-       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) offset)),
-          s, []).
-Proof.
-  unfold ext_data_get_addr.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_rX_bits_gpr rs1 s)).
-  cbn match. apply wl8s_exec_eff_returnM.
+  apply exec_eff_returnM.
 Qed.
 
 (* [WpMmodeLeafBase.v : VWg] *)
@@ -620,7 +520,7 @@ Proof.
     cbn match.
     rewrite (exec_eff_bind_nil _ _ _ _ _
               (exec_eff_transform_effective_address_store ea s Hcp Hmprv Hpmm)).
-    apply wl8s_exec_eff_returnM. }
+    apply exec_eff_returnM. }
   rewrite (execR_eff_liftR_seq _ _ _ _ _ Hgta).
   cbn match.
   rewrite (execR_eff_bind_nil _ _ _ _ _ (execR_eff_returnR (Virtaddr a8) s)).
@@ -685,7 +585,7 @@ Proof.
     (exec_eff_vmem_write_8_gpr rs1 offset _ region s Hcp Hmprv Hpmm Halign
        Hpmp_eff Hmatch Hpalign Hwrite Hc Hsig Hh Hdev)).
   cbn match.
-  rewrite (wl8s_exec_eff_returnM _ _).
+  rewrite (exec_eff_returnM _ _).
   cbn match.
   rewrite autocast_subrange_id.
   reflexivity.

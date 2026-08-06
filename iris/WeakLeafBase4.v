@@ -90,7 +90,7 @@ Require Import ExecCommon RegFile.
 Require Import WeakMem WeakInterp WeakLang WeakBridge.
 Require Import WeakView WeakVProp WeakFence WeakInstr WeakCert WeakEff WeakEffSkel.
 Require Import WpGpr WpLoad WpMmodeLeafBase.
-Require Import WeakLeafEff8 WeakLeafEff8s.
+Require Import WeakLeafEffCommon WeakLeafEff8 WeakLeafEff8s.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -709,75 +709,14 @@ End ExecStoreG4.
 (* ====================================================================== *)
 (** ** HALF B: the [exec_eff] mirrors
 
-    §0 first: the local twins of the model's own [returnM], of the two
-    short-circuit connectives, and of the two bus arms — the ONLY two places
-    in either chain where a trace element is born. *)
-
-Local Lemma wl4_exec_eff_returnM {X} (x : X) s :
-  exec_eff (returnM x) s = Some (x, s, []).
-Proof. reflexivity. Qed.
-
-Local Lemma wl4_exec_eff_and_boolM (l r : M bool) s bl sl :
-  exec_eff l s = Some (bl, sl, []) ->
-  exec_eff (and_boolM l r) s
-  = (if bl then exec_eff r sl else Some (false, sl, [])).
-Proof.
-  intro H. unfold and_boolM. rewrite (exec_eff_bind_nil _ _ _ _ _ H).
-  destruct bl; [reflexivity | apply wl4_exec_eff_returnM].
-Qed.
-
-Local Lemma wl4_exec_eff_or_boolM (l r : M bool) s bl sl :
-  exec_eff l s = Some (bl, sl, []) ->
-  exec_eff (or_boolM l r) s
-  = (if bl then Some (true, sl, []) else exec_eff r sl).
-Proof.
-  intro H. unfold or_boolM. rewrite (exec_eff_bind_nil _ _ _ _ _ H).
-  destruct bl; [apply wl4_exec_eff_returnM | reflexivity].
-Qed.
-
-Local Lemma wl4_exec_eff_MemRead {X} (n : N) (req : Interface.ReadReq.t n)
-    (k : (bv (8 * n) * option bool + Arch.abort)%type -> M X) s :
-  dev_addr (Interface.ReadReq.pa req) = false ->
-  exec_eff (Interface.Next (Interface.MemRead n req) k) s
-  = match read_bytes s.(mem) (Interface.ReadReq.pa req) n with
-    | Some w =>
-        match exec_eff (k (inl (w, None))) s with
-        | Some (y, s', es) =>
-            Some (y, s',
-                  WEread (classify (Interface.ReadReq.access_kind req))
-                         (Interface.ReadReq.pa req) n :: es)
-        | None => None
-        end
-    | None => None
-    end.
-Proof. intros Hd. cbn [exec_eff]. rewrite Hd. reflexivity. Qed.
-
-Local Lemma wl4_exec_eff_MemWrite {X} (n : N) (req : Interface.WriteReq.t n)
-    (k : (option bool + Arch.abort)%type -> M X) s :
-  dev_addr (Interface.WriteReq.pa req) = false ->
-  exec_eff (Interface.Next (Interface.MemWrite n req) k) s
-  = match exec_eff (k (inl None))
-            (MState s.(sregs)
-               (write_bytes s.(mem) (Interface.WriteReq.pa req) n
-                            (Interface.WriteReq.value req)) s.(mdev)) with
-    | Some (y, s', es) =>
-        Some (y, s', WEwrite (classify (Interface.WriteReq.access_kind req))
-                             (Interface.WriteReq.pa req) n
-                             (Interface.WriteReq.value req) :: es)
-    | None => None
-    end.
-Proof. intros Hd. cbn [exec_eff]. rewrite Hd. reflexivity. Qed.
+    The kit — the twins of the model's own [returnM], of the two
+    short-circuit connectives, and of the two bus arms (the ONLY two places
+    in either chain where a trace element is born) — plus the
+    width-independent leaves, including [exec_eff_split_misaligned_aligned_4],
+    come from [WeakLeafEffCommon]. *)
 
 (* ---------------------------------------------------------------------- *)
 (** *** B1. The width-4 LOAD, mirrored *)
-
-Lemma exec_eff_split_misaligned_aligned_4 (vaddr : virtaddr) s :
-  is_aligned_vaddr vaddr 4 = true ->
-  exec_eff (split_misaligned vaddr 4) s = Some ((1, 4), s, []).
-Proof.
-  intro H. unfold split_misaligned. rewrite H. cbn [orb].
-  apply wl4_exec_eff_returnM.
-Qed.
 
 Lemma exec_eff_read_ram_plain_4 (addr : mword 64) (w : bv 32) s :
   dev_addr addr = false ->
@@ -790,12 +729,12 @@ Proof.
   pose proof (exec_read_ram_plain_4 addr w s Hdev Hbytes) as Hsc.
   unfold read_ram in Hsc |- *. cbn match in Hsc |- *.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)) in Hsc.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl4_exec_eff_returnM _ s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   cbn beta zeta in Hsc |- *.
   unfold Defs.sail_mem_read in Hsc |- *. cbn beta zeta in Hsc |- *.
   unfold Defs.bind in Hsc |- *. cbn [Interface.iMon_bind] in Hsc |- *.
   rewrite exec_MemRead in Hsc; [| exact Hdev].
-  rewrite wl4_exec_eff_MemRead; [| exact Hdev].
+  rewrite exec_eff_MemRead; [| exact Hdev].
   cbn [Interface.ReadReq.pa Interface.ReadReq.access_kind
        ConcurrencyInterfaceTypes.Mem_read_request_pa
        ConcurrencyInterfaceTypes.Mem_read_request_access_kind] in Hsc |- *.
@@ -804,7 +743,7 @@ Proof.
       destruct (read_bytes mm pp nn) as [w0|] eqn:Hrb
   end; [| discriminate].
   cbn [Interface.iMon_bind] in Hsc |- *. cbn match beta iota in Hsc |- *.
-  rewrite exec_returnM in Hsc. rewrite wl4_exec_eff_returnM.
+  rewrite exec_returnM in Hsc. rewrite exec_eff_returnM.
   cbn match beta iota.
   match goal with
   | |- context [ classify ?ak ] =>
@@ -830,14 +769,14 @@ Proof.
   destruct region as [rbase rsize rattr rdtree].
   cbn [PMA_Region_attributes] in Hread |- *.
   rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl4_exec_eff_returnM None s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM None s)).
   cbn match beta.
   change (assert_exp' true "sys/mem.sail:103.61-103.62" >>=
           (fun _ : true = true => returnM (PMA_readable (override_PMA rattr pbmt))))
     with (returnM (PMA_readable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl4_exec_eff_returnM _ s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   rewrite Hread. cbn match.
-  apply wl4_exec_eff_returnM.
+  apply exec_eff_returnM.
 Qed.
 
 Lemma exec_eff_checked_mem_read_ram_load_4 (pbmt : page_based_mem_type)
@@ -865,19 +804,19 @@ Proof.
       cbn match.
       rewrite (exec_eff_bind_nil _ _ _ _ _
                 (exec_eff_pmaCheck_ram_load_4 addr pbmt _ s Hmatch Halign Hread)).
-      cbn match. apply wl4_exec_eff_returnM. }
+      cbn match. apply exec_eff_returnM. }
   rewrite (exec_eff_bind_nil _ _ _ _ _
             (_ : exec_eff (within_mmio_readable (Physaddr addr) 4) s = Some (false, s, []))).
   2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (wl4_exec_eff_or_boolM _ _ _ _ _ Hc). cbn match.
-      rewrite (wl4_exec_eff_or_boolM _ _ _ _ _ Hsig). cbn match.
-      rewrite (wl4_exec_eff_and_boolM _ _ _ _ _ Hh). cbn match. reflexivity. }
+      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
+      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
+      rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
   rewrite (exec_eff_bind_nil _ _ _ _ _
             (_ : exec_eff (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_plain, s, []))).
-  2:{ unfold read_kind_of_flags. apply wl4_exec_eff_returnM. }
+  2:{ unfold read_kind_of_flags. apply exec_eff_returnM. }
   rewrite (exec_eff_bind_Some _ _ _ _ _ _
             (exec_eff_read_ram_plain_4 addr w s Hdev Hbytes)).
-  rewrite wl4_exec_eff_returnM. cbn [app]. reflexivity.
+  rewrite exec_eff_returnM. cbn [app]. reflexivity.
 Qed.
 
 Lemma exec_eff_mem_read_load_4 (pbmt : page_based_mem_type) (addr : mword 64)
@@ -919,9 +858,9 @@ Proof.
       2:{ cbn match.
           apply exec_eff_checked_mem_read_ram_load_4 with (region := region); assumption. }
       cbn match. unfold mem_read_callback.
-      rewrite wl4_exec_eff_returnM. cbn [app]. reflexivity. }
+      rewrite exec_eff_returnM. cbn [app]. reflexivity. }
   cbn [MemoryOpResult_drop_meta].
-  rewrite wl4_exec_eff_returnM. cbn [app]. reflexivity.
+  rewrite exec_eff_returnM. cbn [app]. reflexivity.
 Qed.
 
 Section SEff4.
@@ -1035,7 +974,7 @@ Proof.
     cbn match.
     rewrite (exec_eff_bind_nil _ _ _ _ _
               (exec_eff_transform_effective_address_load ea s Hcp Hmprv Hpmm)).
-    apply wl4_exec_eff_returnM. }
+    apply exec_eff_returnM. }
   rewrite (execR_eff_liftR_seq _ _ _ _ _ Hgta).
   cbn match.
   rewrite (execR_eff_bind_nil _ _ _ _ _ (execR_eff_returnR (Virtaddr a4) s)).
@@ -1099,7 +1038,7 @@ Proof.
   { rewrite (exec_eff_wX_bits_gpr rd (extend_value u data2) s).
     rewrite (proj2 (Z.eqb_neq (uint rd) 0) Hrd). reflexivity. }
   rewrite (exec_eff_bind0_nil _ _ _ _ _ Hw).
-  rewrite wl4_exec_eff_returnM. cbn match. cbn [app]. reflexivity.
+  rewrite exec_eff_returnM. cbn match. cbn [app]. reflexivity.
 Qed.
 End ExecLoadGEff4.
 
@@ -1114,12 +1053,12 @@ Lemma exec_eff_write_ram_plain_4 (addr : mword 64) (data : bv 32) s :
 Proof.
   intros Hdev.
   unfold write_ram. cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl4_exec_eff_returnM _ s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   cbn beta zeta.
   unfold Defs.sail_mem_write. cbn beta zeta iota match.
   unfold Defs.bind. cbn [Interface.iMon_bind].
   cbn match.
-  rewrite wl4_exec_eff_MemWrite; last exact Hdev.
+  rewrite exec_eff_MemWrite; last exact Hdev.
   reflexivity.
 Qed.
 
@@ -1138,14 +1077,14 @@ Proof.
   destruct region as [rbase rsize rattr rdtree].
   cbn [PMA_Region_attributes] in Hwrite |- *.
   rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl4_exec_eff_returnM None s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM None s)).
   cbn match beta.
   change (assert_exp' true "sys/mem.sail:106.61-106.62" >>=
           (fun _ : true = true => returnM (PMA_writable (override_PMA rattr pbmt))))
     with (returnM (PMA_writable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (wl4_exec_eff_returnM _ s)).
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM _ s)).
   rewrite Hwrite. cbn match.
-  apply wl4_exec_eff_returnM.
+  apply exec_eff_returnM.
 Qed.
 
 Lemma exec_eff_checked_mem_write_ram_store_4 (pbmt : page_based_mem_type)
@@ -1174,19 +1113,19 @@ Proof.
       cbn match.
       rewrite (exec_eff_bind_nil _ _ _ _ _
                 (exec_eff_pmaCheck_ram_store_4 addr pbmt region s Hmatch Halign Hwrite)).
-      cbn match. apply wl4_exec_eff_returnM. }
+      cbn match. apply exec_eff_returnM. }
   cbn match.
   rewrite (exec_eff_bind_nil _ _ _ _ _
             (_ : exec_eff (within_mmio_writable (Physaddr addr) 4) s = Some (false, s, []))).
   2:{ unfold within_mmio_writable. cbn [get_config_rvfi].
-      rewrite (wl4_exec_eff_or_boolM _ _ _ _ _ Hc). cbn match.
-      rewrite (wl4_exec_eff_or_boolM _ _ _ _ _ Hsig). cbn match.
-      rewrite (wl4_exec_eff_and_boolM _ _ _ _ _ Hh). cbn match. reflexivity. }
+      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
+      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
+      rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
   cbn match.
   rewrite (exec_eff_bind_nil _ _ _ _ _
             (_ : exec_eff (write_kind_of_flags false false false) s
                  = Some (rv64d_types.Write_plain, s, []))).
-  2:{ unfold write_kind_of_flags. cbn match. apply wl4_exec_eff_returnM. }
+  2:{ unfold write_kind_of_flags. cbn match. apply exec_eff_returnM. }
   rewrite (exec_eff_bind_Some _ _ _ _ _ _
             (exec_eff_write_ram_plain_4 addr data s Hdev)).
   reflexivity.
@@ -1200,8 +1139,8 @@ Proof.
   rewrite (exec_eff_bind_nil _ _ _ _ _
             (_ : exec_eff (write_kind_of_flags false false false) s
                  = Some (rv64d_types.Write_plain, s, []))).
-  2:{ unfold write_kind_of_flags. cbn match. apply wl4_exec_eff_returnM. }
-  apply wl4_exec_eff_returnM.
+  2:{ unfold write_kind_of_flags. cbn match. apply exec_eff_returnM. }
+  apply exec_eff_returnM.
 Qed.
 
 Lemma exec_eff_mem_write_value_4 (pbmt : page_based_mem_type) (addr : mword 64)
@@ -1383,7 +1322,7 @@ Proof.
     cbn match.
     rewrite (exec_eff_bind_nil _ _ _ _ _
               (exec_eff_transform_effective_address_store ea s Hcp Hmprv Hpmm)).
-    apply wl4_exec_eff_returnM. }
+    apply exec_eff_returnM. }
   rewrite (execR_eff_liftR_seq _ _ _ _ _ Hgta).
   cbn match.
   rewrite (execR_eff_bind_nil _ _ _ _ _ (execR_eff_returnR (Virtaddr a4) s)).
@@ -1440,7 +1379,7 @@ Proof.
     (exec_eff_vmem_write_4_gpr rs1 offset _ region s Hcp Hmprv Hpmm Halign
        Hpmp_eff Hmatch Hpalign Hwrite Hc Hsig Hh Hdev)).
   cbn match.
-  rewrite (wl4_exec_eff_returnM _ _).
+  rewrite (exec_eff_returnM _ _).
   cbn match.
   rewrite autocast_subrange_id_4.
   cbn [app]. reflexivity.

@@ -767,6 +767,7 @@ WeakRacy.v
 WeakEffSkel.v
 WeakPmpEff.v
 WeakTickEff.v
+WeakLeafEffCommon.v
 WeakFetchEff.v
 WeakLeafEff8.v
 WeakLeafEff8s.v
