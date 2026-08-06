@@ -86,6 +86,7 @@ change that produced it.
   The addresses need no attention: they are symbol-relative already. Design and
   the measured numbers: [`design/code-organization.md`](design/code-organization.md).
 - **Editing a file near the BOTTOM of the tree kills the single-file check loop.** Touch `RiscvFetchExec.v` / `SmodeCore.v` / `IntrDefs.v` / `WpSconfMem.v` and every downstream `coqc <one file>.v` fails with *"Compiled library X makes inconsistent assumptions over library Y"* — the siblings' `.vo`s were built against the old interface, so there is no hand-orderable sequence of single-file compiles that works. Validate such an edit with **`make -f CoqMakefile -j16 -k`** (coqdep orders it; `-k` reports every independent error in one pass) and grep the log for `Error`; reserve single-file `coqc` for leaf/proof files whose dependencies you have not touched.
+- **A `nat` EQUALITY WHOSE RHS IS A LARGE LITERAL NEEDS `Z`, NOT A BIGGER STACK.** Any route to closing such a goal — `reflexivity`, `vm_compute`, even `vm_cast_no_check` — eventually makes something materialize a literal-deep unary successor chain, and that overflows a normal 8 MB stack outright (`ProofWriteiParts.v`'s old `wi_maxfile_bsize : (MAXFILE * BSIZE)%nat = 274432%nat` died this way, deterministically, in under 4 s and under 1 GB RSS — so it does NOT look like memory pressure or a `-j` artifact, it looks like a broken proof in a file you did not touch). `Z` literals are binary `Z.pos` trees (~log2 depth), so state the fact at `Z.of_nat (… )  = <literal>` instead (`rewrite Nat2Z.inj_mul` first if the LHS is a product) and close with `vm_compute; reflexivity` — the `nat`-side factors being unfolded stay small, and the literal itself is never forced into unary form. No shell tuning needed.
 - **Fork/parallel discipline:** `make clean-proofs` nukes the shared `.vo` tree and breaks concurrent siblings — a fork must `coqc` only its OWN file, one compile at a time. Never `pkill -f coqc` (the pattern matches the killer's own shell → kills Bash, exit 144; and kills sibling compiles) — use `pkill -x coqc` or kill the `rocqworker` by PID. The same self-match trap breaks WAIT loops: `until ! pgrep -f "CoqMakefile -j16"; do …` never terminates (the waiter's own command line contains the pattern) and then makes `pgrep -f CoqMakefile` report a phantom in-progress build to everyone else. Don't poll processes at all — have the build write its own sentinel (`…; echo "EXIT=$?" >> log`) and wait on `grep EXIT` of the log.
 - **Profiling:** per-file times via `make TIMED=1` (or `make proofs TIMING=1 JOBS=32` → per-sentence `*.v.timing`, parse `Chars A-B [snip] T secs`, map offset→line); per-command via `coqc -time` (a stall right after a lemma's last tactic = stuck in `Qed`). Optimize the longest Require chain, not `-j`. Delete `*.v.timing` after (don't commit). Measure any `vm_compute`/decode tactic ONE variant per `coqc` process — the 2nd variant in a process wins ~35% from bytecode-cache reuse (fabricates false savings).
   - **`tools/proof_profile.py` does all of this in one pass** and runs in CI on every checkin (`.github/workflows/ci.yml`): the iris build there is `make … --output-sync=target TIMED=1 TIMING=1` (`tee`d to a log), and the profiler consumes that log + the `*.v.timing` files + coqdep's `.CoqMakefile.d` + `.vo` mtimes to emit most-expensive statements/files, the weighted critical path (+ other deep chains), and a parallelism-over-time chart. All of it — tables + an inline Unicode block-chart of concurrent compiles — lands in the job's **step summary** and nowhere else (no artifact upload): GitHub sanitizes raw SVG/`<img>`/`data:` out of the summary, so the chart is drawn in text. The tool still writes a higher-res `parallelism.svg` + full `report-full.txt` to its `--out-dir` for local runs. Stdlib-only, `continue-on-error`, so it never fails a green build. Run it locally the same way: `python3 tools/proof_profile.py --build-log <TIMED-log> --iris-dir iris --out-dir /tmp/prof --jobs $(nproc)`.
@@ -127,17 +128,6 @@ Both cost real time in one session; check for them before believing a
   error is never seen -- and `echo $?` after the pipeline reports the LAST
   command's status, not make's.  Capture make's own exit status
   (`make proofs > log 2>&1; echo $?`) and grep the file afterwards.
-- **`ulimit -s 8192` is too small for this tree.**  `ProofWriteiParts.v`
-  fails with a bare `Error: Stack overflow.` on a `reflexivity` over a large
-  `nat` (`(MAXFILE * BSIZE)%nat = 274432%nat`); Rocq even warns about it one
-  line earlier ("large numbers in nat are interpreted as applications of
-  `Init.Nat.of_num_uint`").  Nothing is wrong with the file -- build with
-  `ulimit -s 65536`.  The symptom looks like a code error and is not one:
-  it is DETERMINISTIC, arrives in under 4 s at under 1 GB RSS, and so reads as
-  neither memory pressure nor a `-j` artifact.  `make proofs` sets the limit
-  itself (`STACK_KB`), but **`make -f CoqMakefile` from inside `iris/` does
-  not** -- it inherits the invoking shell's, so raise it in the same
-  `bash -c` when driving CoqMakefile directly.
 
 ## Proof coverage report
 

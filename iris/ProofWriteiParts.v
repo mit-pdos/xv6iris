@@ -248,8 +248,15 @@ Qed.
 Lemma wi_lui43 : luival (mword_of_int 67 : mword 20) = (mword_of_int 274432 : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
-Lemma wi_maxfile_bsize : (MAXFILE * BSIZE)%nat = 274432%nat.
-Proof. reflexivity. Qed.
+(* Stated over [Z], not [nat]: a [nat] literal "274432" -- however it is
+   reached, [reflexivity], [vm_compute], even [vm_cast_no_check] -- forces
+   SOME machinery to materialize a 274432-deep unary successor chain, and
+   that overflows an 8 MB stack outright.  [Z]'s literals are binary
+   [Z.pos] trees (~19 levels for this value), so routing the multiplication
+   through [Z.of_nat] and closing at THIS type never touches unary [nat]
+   above the two small factors [MAXFILE]/[BSIZE]. *)
+Lemma wi_maxfile_bsize : Z.of_nat (MAXFILE * BSIZE) = 274432.
+Proof. rewrite Nat2Z.inj_mul. unfold MAXFILE, BSIZE. vm_compute. reflexivity. Qed.
 
 (* the two [c.li]s and the [li s9,1024] *)
 Lemma wi_li_m1 :
