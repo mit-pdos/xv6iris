@@ -1276,97 +1276,116 @@ Section ProofMain.
     iIntros "#Hpenv #Hpinv #Hsched #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     iPoseProof (mni_a2 with "Htext") as "Hia2".
     iPoseProof (mni_a6 with "Htext") as "Hia6".
-    iPoseProof (mni_a8 with "Htext") as "Hia8".
+    iPoseProof (mni_aa with "Htext") as "Hiaa".
     iPoseProof (mni_ac with "Htext") as "Hiac".
     iPoseProof (mni_b0 with "Htext") as "Hib0".
+    iPoseProof (mni_b2 with "Htext") as "Hib2".
     iPoseProof (mni_3e with "Htext") as "Hi3e".
     (* the deposit itself: everything main built, through the □-wand *)
     iAssert P as "#HP".
     { iApply ("Hwand" $! γpr γs γk pd pav pu root pas
                 with "Hpenv Hpinv Hsched Hdlock Hgeom Hkinv Hkptp Htramp Hkstx"). }
-    (* ---- +0xa2 fence rw,rw : the release barrier ---- *)
-    iApply (wp_fence_gen_s_sconf Φ (mword_of_int (KernelSyms.main + 0xa2))
-              (mword_of_int 0 : mword 4) (mword_of_int 3 : mword 4)
-              (mword_of_int 3 : mword 4) (Regidx (mword_of_int 0))
-              (Regidx (mword_of_int 0)) m n false with "Hcg Hpc Hia2").
+    (* The release sequence.  Note the shape: the address is materialized
+       BEFORE the barrier and the store is the compressed [c.sw], so the
+       fence separates the whole deposit from the store alone -- and it is
+       [rw,w], not [rw,rw]: nothing after it reads. *)
+    (* ---- +0xa2 auipc a5,0x9 : start materializing &started ---- *)
+    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.main + 0xa2)) (mword_of_int 15 : mword 5)
+              (mword_of_int 9 : mword 20) m n false
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hia2").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
+    pose (S1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+        (add_vec (mword_of_int (KernelSyms.main + 0xa2) : mword 64)
+           (auipc_off (mword_of_int 9 : mword 20)))]> m).
     assert (Hpa6 : add_vec_int (mword_of_int (KernelSyms.main + 0xa2) : mword 64) 4
                    = mword_of_int (KernelSyms.main + 0xa6)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpa6) in "Hpc".
-    (* ---- +0xa6 li a5,1 ---- *)
-    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.main + 0xa6)) (mword_of_int 15 : mword 5)
-              (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) m n false
+    (* ---- +0xa6 addi a5,a5,784 : a5 := &started ---- *)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.main + 0xa6)) (mword_of_int 15 : mword 5)
+              (mword_of_int 15 : mword 5) (mword_of_int 784 : mword 12) S1 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hia6").
+              with "Hcg Hpc Hia6").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
-    pose (S1 := <[Regidx (mword_of_int 15 : mword 5) :=
-        regval_into_reg (mword_of_int 1 : mword 64)]> m).
-    assert (Hpa8 : add_vec_int (mword_of_int (KernelSyms.main + 0xa6) : mword 64) 2
-                   = mword_of_int (KernelSyms.main + 0xa8)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpa8) in "Hpc".
-    (* ---- +0xa8 auipc a4,0x9 : re-materialize &started ---- *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.main + 0xa8)) (mword_of_int 14 : mword 5)
-              (mword_of_int 9 : mword 20) S1 n false
+    pose (S2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
+        (add_vec (rget S1 (mword_of_int 15 : mword 5))
+           (sign_extend' 64 (mword_of_int 784 : mword 12)))]> S1).
+    assert (Hpaa : add_vec_int (mword_of_int (KernelSyms.main + 0xa6) : mword 64) 4
+                   = mword_of_int (KernelSyms.main + 0xaa)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpaa) in "Hpc".
+    (* ---- +0xaa li a4,1 ---- *)
+    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.main + 0xaa)) (mword_of_int 14 : mword 5)
+              (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) S2 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hia8").
+              ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hiaa").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
-    pose (S2 := <[Regidx (mword_of_int 14 : mword 5) := regval_into_reg
-        (add_vec (mword_of_int (KernelSyms.main + 0xa8) : mword 64)
-           (auipc_off (mword_of_int 9 : mword 20)))]> S1).
-    assert (Hpac : add_vec_int (mword_of_int (KernelSyms.main + 0xa8) : mword 64) 4
+    pose (S3 := <[Regidx (mword_of_int 14 : mword 5) :=
+        regval_into_reg (mword_of_int 1 : mword 64)]> S2).
+    assert (Hpac : add_vec_int (mword_of_int (KernelSyms.main + 0xaa) : mword 64) 2
                    = mword_of_int (KernelSyms.main + 0xac)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpac) in "Hpc".
-    assert (Hsa : add_vec (rget S2 (mword_of_int 14 : mword 5))
-                    (sign_extend' 64 (mword_of_int 778 : mword 12)) = started_addr).
-    { rgne. rewrite /S2 upd_eq /started_addr. apply bv_eq; vm_compute; reflexivity. }
-    assert (HS2a5 : rget S2 (mword_of_int 15 : mword 5)
+    (* ---- +0xac fence rw,w : the release barrier ---- *)
+    iApply (wp_fence_gen_s_sconf Φ (mword_of_int (KernelSyms.main + 0xac))
+              (mword_of_int 0 : mword 4) (mword_of_int 3 : mword 4)
+              (mword_of_int 1 : mword 4) (Regidx (mword_of_int 0))
+              (Regidx (mword_of_int 0)) S3 n false with "Hcg Hpc Hiac").
+    iApply wp_next_off_intro.
+    iIntros "Hcg Hpc".
+    assert (Hpb0 : add_vec_int (mword_of_int (KernelSyms.main + 0xac) : mword 64) 4
+                   = mword_of_int (KernelSyms.main + 0xb0)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpb0) in "Hpc".
+    assert (Hsa : add_vec (rget S3 (mword_of_int 15 : mword 5))
+                    (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr).
+    { rgne. rewrite /S3 upd_ne; [| reg_neq]. rewrite /S2 upd_eq. rgne.
+      rewrite /S1 upd_eq /started_addr. apply bv_eq; vm_compute; reflexivity. }
+    assert (HS3a4 : rget S3 (mword_of_int 14 : mword 5)
                     = (mword_of_int 1 : mword 64)).
-    { rgne. rewrite /S2 upd_ne; [| reg_neq]. rewrite /S1 upd_eq. reflexivity. }
-    assert (Hsvst : trunc32 (rget S2 (mword_of_int 15 : mword 5)) = started_set).
-    { rewrite HS2a5 /trunc32 /started_set. apply bv_eq; vm_compute; reflexivity. }
-    (* ---- +0xac sw a5,778(a4) : started = 1, paying [P] into the escrow ---- *)
-    iApply (wp_store_s_sconf_au 4 false Φ (mword_of_int (KernelSyms.main + 0xac))
-              (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
-              (mword_of_int 778 : mword 12) S2 n
-              (trunc32 (rget S2 (mword_of_int 15 : mword 5))) True%I
+    { rgne. rewrite /S3 upd_eq. reflexivity. }
+    assert (Hsvst : trunc32 (rget S3 (mword_of_int 14 : mword 5)) = started_set).
+    { rewrite HS3a4 /trunc32 /started_set. apply bv_eq; vm_compute; reflexivity. }
+    (* ---- +0xb0 sw a4,0(a5) : started = 1, paying [P] into the escrow ---- *)
+    iApply (wp_store_s_sconf_au 4 true Φ (mword_of_int (KernelSyms.main + 0xb0))
+              (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5)
+              (mword_of_int 0 : mword 12) S3 n
+              (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
               ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
-              (store_ext_4 (rget S2 (mword_of_int 15 : mword 5)))
-              ltac:(solve_ndisj) with "Hcg Hpc Hiac [HP]").
+              (store_ext_4 (rget S3 (mword_of_int 14 : mword 5)))
+              ltac:(solve_ndisj) with "Hcg Hpc Hib0 [HP]").
     { rewrite Hsa Hsvst.
       iApply (started_inv_store_au (⊤ ∖ ↑minstretN) P ltac:(solve_ndisj)
                 with "Hsinv HP"). }
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc _".
-    iEval (change (if false then 2%Z else 4%Z) with 4%Z) in "Hpc".
-    assert (Hpb0 : add_vec_int (mword_of_int (KernelSyms.main + 0xac) : mword 64) 4
-                   = mword_of_int (KernelSyms.main + 0xb0)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpb0) in "Hpc".
-    (* ---- +0xb0 j 0x3e : back to the join the secondary arm also reaches ---- *)
-    iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.main + 0xb0))
-              (sign_extend' 21 (concat_vec (mword_of_int 1991 : mword 11) ('b"0")))
-              S2 n false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib0").
+    iEval (change (if true then 2%Z else 4%Z) with 2%Z) in "Hpc".
+    assert (Hpb2 : add_vec_int (mword_of_int (KernelSyms.main + 0xb0) : mword 64) 2
+                   = mword_of_int (KernelSyms.main + 0xb2)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpb2) in "Hpc".
+    (* ---- +0xb2 j 0x3e : back to the join the secondary arm also reaches ---- *)
+    iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.main + 0xb2))
+              (sign_extend' 21 (concat_vec (mword_of_int 1990 : mword 11) ('b"0")))
+              S3 n false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib2").
     iApply wp_next_off_intro.
     iApply bi.later_intro. iIntros "Hcg Hpc".
-    assert (Htgtj : add_vec (mword_of_int (KernelSyms.main + 0xb0) : mword 64)
+    assert (Htgtj : add_vec (mword_of_int (KernelSyms.main + 0xb2) : mword 64)
               (sign_extend' 64 (sign_extend' 21
-                 (concat_vec (mword_of_int 1991 : mword 11) ('b"0"))))
+                 (concat_vec (mword_of_int 1990 : mword 11) ('b"0"))))
               = (mword_of_int (KernelSyms.main + 0x3e) : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtj) in "Hpc".
     (* ---- +0x3e jal scheduler : main's exit; scheduler never returns ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.main + 0x3e)) (mword_of_int 1 : mword 5)
-              (mword_of_int 3784 : mword 21) S2 n false
+              (mword_of_int 3784 : mword 21) S3 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3e").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (SS := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
-        (add_vec_int (mword_of_int (KernelSyms.main + 0x3e) : mword 64) 4)]> S2).
+        (add_vec_int (mword_of_int (KernelSyms.main + 0x3e) : mword 64) 4)]> S3).
     assert (Htgtsc : add_vec (mword_of_int (KernelSyms.main + 0x3e) : mword 64)
               (sign_extend' 64 (mword_of_int 3784 : mword 21))
               = (mword_of_int KernelSyms.scheduler : mword 64))

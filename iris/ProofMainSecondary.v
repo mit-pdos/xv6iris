@@ -300,7 +300,7 @@ Section ProofMainSecondary.
   Qed.
 
   (* =================================================================== *)
-  (* 0x16 .. 0x1c -- [while (started == 0) ;] and the acquire fence.      *)
+  (* 0x16 .. 0x1e -- [while (started == 0) ;] with the acquire fence.     *)
   (* =================================================================== *)
   Local Lemma ms_spin (Φ : mval -> iProp Σ)
       (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
@@ -322,8 +322,8 @@ Section ProofMainSecondary.
     iLöb as "IH" forall (m Ha4).
     iPoseProof (mni_16 with "Htext") as "Hi16".
     iPoseProof (mni_18 with "Htext") as "Hi18".
-    iPoseProof (mni_1a with "Htext") as "Hi1a".
     iPoseProof (mni_1c with "Htext") as "Hi1c".
+    iPoseProof (mni_1e with "Htext") as "Hi1e".
     (* ---- +0x16 c.lw a5,0(a4) : the spin load, under the invariant ---- *)
     iApply (wp_load_s_sconf_au 4 true false Φ (mword_of_int (KernelSyms.main + 0x16))
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
@@ -347,20 +347,36 @@ Section ProofMainSecondary.
     assert (Hp18 : add_vec_int (mword_of_int (KernelSyms.main + 0x16) : mword 64) 2
                    = mword_of_int (KernelSyms.main + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
-    (* ---- +0x18 c.addiw a5,0 : sext.w a5 ---- *)
-    iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.main + 0x18)) (mword_of_int 15 : mword 5)
+    (* ---- +0x18 fence r,rw : THE ACQUIRE BARRIER.  9dd28f5 moved it INSIDE
+           the loop, so it now runs on every iteration rather than once on the
+           way out -- but it is still the one step whose continuation is under
+           a [▷], which is what turns the invariant's [▷ deposit] into the
+           deposit.  Stripping here rather than on the exit path is harmless:
+           the iteration that goes around again just drops the payload. ---- *)
+    iApply (wp_fence_gen_later_s_sconf Φ (mword_of_int (KernelSyms.main + 0x18))
+              (mword_of_int 0 : mword 4) (mword_of_int 2 : mword 4)
+              (mword_of_int 3 : mword 4) (Regidx (mword_of_int 0))
+              (Regidx (mword_of_int 0)) M1 n false with "Hcg Hpc Hi18").
+    iApply wp_next_off_intro.
+    iNext.
+    iIntros "Hcg Hpc".
+    assert (Hp1c : add_vec_int (mword_of_int (KernelSyms.main + 0x18) : mword 64) 4
+                   = mword_of_int (KernelSyms.main + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp1c) in "Hpc".
+    (* ---- +0x1c c.addiw a5,0 : sext.w a5 ---- *)
+    iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.main + 0x1c)) (mword_of_int 15 : mword 5)
               (mword_of_int 0 : mword 6) M1 n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
-              with "Hcg Hpc Hi18").
+              with "Hcg Hpc Hi1c").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     pose (M2 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg
         (sign_extend' 64 (subrange_vec_dec
            (add_vec (rget M1 (mword_of_int 15 : mword 5))
               (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))]> M1).
-    assert (Hp1a : add_vec_int (mword_of_int (KernelSyms.main + 0x18) : mword 64) 2
-                   = mword_of_int (KernelSyms.main + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hp1a) in "Hpc".
+    assert (Hp1e : add_vec_int (mword_of_int (KernelSyms.main + 0x1c) : mword 64) 2
+                   = mword_of_int (KernelSyms.main + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hp1e) in "Hpc".
     assert (HM2a5 : rget M2 (mword_of_int 15 : mword 5)
               = sign_extend' 64 (subrange_vec_dec
                    (add_vec (sign_extend' 64 (v : mword 32))
@@ -370,52 +386,41 @@ Section ProofMainSecondary.
                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr).
     { rgne. rewrite /M2 upd_ne; [| reg_neq]. rewrite /M1 upd_ne; [| reg_neq].
       rewrite -Ha4. rgne. reflexivity. }
-    (* ---- +0x1a c.beqz a5,-4 : back to the load while [started] is 0 ---- *)
+    (* ---- +0x1e c.beqz a5,-8 : back to the load while [started] is 0.  The
+           back edge is 8 now, not 4: the fence is inside the loop. ---- *)
     destruct (eq_vec (rget M2 (mword_of_int 15 : mword 5)) zero_reg) eqn:Hbz.
     - (* still zero: around the loop again, and the payload is dropped *)
-      iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (KernelSyms.main + 0x1a))
-                (mword_of_int 254 : mword 8) (Cregidx (mword_of_int 7))
+      iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (KernelSyms.main + 0x1e))
+                (mword_of_int 252 : mword 8) (Cregidx (mword_of_int 7))
                 (mword_of_int 15 : mword 5) M2 n false
                 creg_c7 ltac:(vm_compute; discriminate) Hbz
-                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1a").
+                ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1e").
       iApply wp_next_off_intro.
       iNext. iIntros "Hcg Hpc".
-      assert (Htgtl : add_vec (mword_of_int (KernelSyms.main + 0x1a) : mword 64)
+      assert (Htgtl : add_vec (mword_of_int (KernelSyms.main + 0x1e) : mword 64)
                 (sign_extend' 64 (sign_extend' 13
-                   (concat_vec (mword_of_int 254 : mword 8) ('b"0"))))
+                   (concat_vec (mword_of_int 252 : mword 8) ('b"0"))))
                 = (mword_of_int (KernelSyms.main + 0x16) : mword 64))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtl) in "Hpc".
       iApply ("IH" $! M2 with "[%] Hcg Hpc Hcont").
       { exact HM2a4. }
-    - (* [started] is set: fall through to the fence *)
-      iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.main + 0x1a))
-                (mword_of_int 254 : mword 8) (Cregidx (mword_of_int 7))
+    - (* [started] is set: fall through, carrying the deposit the fence at
+         +0x18 already brought out from under its [▷] *)
+      iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.main + 0x1e))
+                (mword_of_int 252 : mword 8) (Cregidx (mword_of_int 7))
                 (mword_of_int 15 : mword 5) M2 n false
                 creg_c7 ltac:(vm_compute; discriminate) Hbz
-                with "Hcg Hpc Hi1a").
+                with "Hcg Hpc Hi1e").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
-      assert (Hp1c : add_vec_int (mword_of_int (KernelSyms.main + 0x1a) : mword 64) 2
-                     = mword_of_int (KernelSyms.main + 0x1c)) by (apply bv_eq; vm_compute; reflexivity).
-      iEval (rewrite Hp1c) in "Hpc".
-      (* ---- +0x1c fence rw,rw : THE ACQUIRE BARRIER.  This is the one step
-             on the exit path whose continuation is under a [▷], which is what
-             turns the invariant's [▷ deposit] into the deposit. ---- *)
-      iApply (wp_fence_gen_later_s_sconf Φ (mword_of_int (KernelSyms.main + 0x1c))
-                (mword_of_int 0 : mword 4) (mword_of_int 3 : mword 4)
-                (mword_of_int 3 : mword 4) (Regidx (mword_of_int 0))
-                (Regidx (mword_of_int 0)) M2 n false with "Hcg Hpc Hi1c").
-      iApply wp_next_off_intro.
-      iNext.
+      assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.main + 0x1e) : mword 64) 2
+                     = mword_of_int (KernelSyms.main + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
+      iEval (rewrite Hp20) in "Hpc".
       iDestruct "HPsi" as "[%Hv0 | #Hdep]".
       + (* the word read as 0 contradicts the branch having fallen through *)
         exfalso. rewrite HM2a5 Hv0 in Hbz. vm_compute in Hbz. discriminate.
-      + iIntros "Hcg Hpc".
-        assert (Hp20 : add_vec_int (mword_of_int (KernelSyms.main + 0x1c) : mword 64) 4
-                       = mword_of_int (KernelSyms.main + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
-        iEval (rewrite Hp20) in "Hpc".
-        iApply ("Hcont" $! M2 with "Hcg Hpc Hdep").
+      + iApply ("Hcont" $! M2 with "Hcg Hpc Hdep").
   Qed.
 
   (* =================================================================== *)
