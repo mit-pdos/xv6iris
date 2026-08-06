@@ -771,4 +771,5 @@ WeakFetchEff.v
 WeakLeafEff8.v
 WeakLeafEff8s.v
 WeakLeafBase4.v
+WeakLeafAmo4.v
 WeakFetchRvc.v
