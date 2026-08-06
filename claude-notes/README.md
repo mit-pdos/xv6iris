@@ -84,12 +84,13 @@ are working on that effort — the relevant `projects/` file.
   guards), and `proc_priv`, the exclusive private bundle
   (`sz`/`pagetable`/`trapframe`/`ofile`/`cwd`) that rides alongside
   `cur_proc p` and carries a `FileInv.file_ref` per open fd.
-- **[`weak-memory.md`](design/weak-memory.md)** — PROPOSAL (nothing landed):
-  the RVWMO weak-memory model — the promise-free view machine (global write
-  log + per-hart views, Promising-RISC-V shape), the read-oracle `exec` seam,
-  the Cosmo-style vProp surface (objective invariants, `⊒V`/`@V`, SC-shaped
-  `↦ₘ`, fence modalities, view-transferring locks), the device/MMIO/fetch/
-  walker decisions, and the staged migration + LB-gap story.
+- **[`weak-memory.md`](design/weak-memory.md)** — the RVWMO weak-memory
+  model (M0–M3 LANDED on branch `weak-memory`): the promise-free view
+  machine (global write log + per-hart views, Promising-RISC-V shape), the
+  read-oracle `exec` seam, the pinned-fragment transfer bridge, the
+  Cosmo-style vProp surface (objective invariants, `⊒V`/`@@`, SC-shaped
+  points-to, view-transferring locks), the device/MMIO/fetch/walker
+  decisions, and the staged migration + store-reordering-gap story.
 - **[`kernel-proofs.md`](design/kernel-proofs.md)** — kernel-side proof
   architecture (swtch/contexts, proc locks/wakeup, loop shapes), whole-function
   WP specs (`callee_saved`/`stack_own`), spinlocks (`WpLock.v`), and the kernel
