@@ -292,8 +292,7 @@ Proof.
     rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
     rewrite execR_returnR. reflexivity. }
   unfold write_pte_conditional, mem_write_value_priv, mem_write_value_priv_meta.
-  rewrite Halign. cbn [orb andb Riscv.rv64d.not negb].
-  cbn [orb andb].
+  cbn [orb andb Riscv.rv64d.not negb].
   rewrite (exec_bind_Some _ _ _ _ _ Hchk).
   cbn match. unfold mem_write_callback. apply exec_returnM.
 Qed.
@@ -373,11 +372,14 @@ Section PtUpd.
       = Some (Ok p1, s) ->
     exec (read_pte (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8) s
       = Some (Ok p0, s) ->
+    (* the fork's atomic update re-reads the PTE exclusively before writing *)
+    exec (read_pte_exclusive (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok p0, s) ->
     register_lookup misa s.(sregs) = MISA_C ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     eq_vec (_get_MEnvcfg_ADUE menvcfg0) ('b"1") = true ->
-    exec (write_pte (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8
+    exec (write_pte_conditional (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8
             (p0' : mword 64)) s
       = Some (Ok true, sw) ->
     sw.(sregs) = s.(sregs) ->
@@ -388,7 +390,7 @@ Section PtUpd.
                               (Some (u_walk_entry vpn p2 p1 p0' asid)))).
   Proof.
     intros Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hchk Hupd
-           Hrd2 Hrd1 Hrd0 Hmisa Hmenv HPBMTE HADUE Hwrite Hswregs.
+           Hrd2 Hrd1 Hrd0 Hrdx Hmisa Hmenv HPBMTE HADUE Hwrite Hswregs.
     unfold translate_TLB_miss. cbn zeta.
     match goal with |- context[pt_walk 39 _ _ _ _ _ _ ?l false ?e] =>
       change l with 2 end.
@@ -397,8 +399,17 @@ Section PtUpd.
                   Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hchk Hnap menvcfg0 s
                   Hmisa Hrd2 Hrd1 Hrd0 Hmenv HPBMTE)).
     cbn match. cbn zeta.
-    match goal with |- context[update_and_write_pte ?aa ?wd ?pv ?ac] =>
-      assert (Hu : exec (update_and_write_pte aa wd pv ac) s = Some (Ok (Some p0'), sw)) end.
+    (* THE FORK'S CHANGE, in full: the A/D update is an atomic read-check-write.
+       After the Svadu/ADUE gate it re-reads the PTE with an EXCLUSIVE read,
+       re-runs the tablewalk checks on the freshly read value ([check_leaf_pte],
+       the same lemma the walk's leaf arm uses), recomputes the A/D bits on that
+       value, and writes it back with a CONDITIONAL write.  Sequentially the
+       re-read returns what the walk read, so every step agrees with the old
+       single-write model -- which is exactly the observation that makes this
+       change conservative for these proofs. *)
+    match goal with |- context[update_and_write_pte ?w ?vp ?aa ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hu : exec (update_and_write_pte w vp aa pv lv ac pr mx ds e) s
+                   = Some (Ok (Some p0', tt), sw)) end.
     { unfold update_and_write_pte.
       match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
         assert (Hupd' : @update_PTE_Bits w pv ac = Some p0') by exact Hupd end.
@@ -419,9 +430,22 @@ Section PtUpd.
         rewrite (exec_bind_Some _ _ _ _ _ Hand).
         cbn match. apply exec_returnm. }
       rewrite (exec_bind_Some _ _ _ _ _ Hgate).
+      cbn match zeta.
+      (* the exclusive re-read returns the value the walk read *)
+      rewrite (exec_bind_Some _ _ _ _ _ Hrdx).
+      cbn match beta.
+      rewrite autocast_id.
+      (* the re-check succeeds, on the same hypotheses the walk's leaf arm used *)
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_check_leaf_pte_leaf0 vpn p0 acc p mxr do_sum Hv0 Hl0 Hchk Hnap
+                    (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0)))
+                    menvcfg0 s Hmisa Hmenv HPBMTE)).
+      cbn match beta.
+      rewrite Hupd'.
       cbn match.
-      match goal with |- context[Defs.bind (write_pte ?aa' ?wd' ?pv') ?k] =>
-        assert (Hwrite' : exec (write_pte aa' wd' pv') s = Some (Ok true, sw))
+      rewrite autocast_id.
+      match goal with |- context[Defs.bind (write_pte_conditional ?aa' ?wd' ?pv') ?k] =>
+        assert (Hwrite' : exec (write_pte_conditional aa' wd' pv') s = Some (Ok true, sw))
           by exact Hwrite end.
       rewrite (exec_bind_Some _ _ _ _ _ Hwrite').
       cbn match. apply exec_returnm. }
@@ -475,7 +499,14 @@ Section PtUpdHit.
     pte_pbmt0 q0 ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_ADUE menvcfg0) ('b"1") = true ->
-    exec (write_pte (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))) 8
+    (* the fork's atomic update: an exclusive re-read, the tablewalk checks
+       re-run on the fresh value, then a CONDITIONAL write *)
+    exec (read_pte_exclusive (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok q0, s) ->
+    pte_valid q0 -> pte_leaf q0 -> pte_no_napot q0 ->
+    register_lookup misa s.(sregs) = MISA_C ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    exec (write_pte_conditional (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))) 8
             (q0' : mword 64)) s
       = Some (Ok true, sw) ->
     sw.(sregs) = s.(sregs) ->
@@ -485,14 +516,15 @@ Section PtUpdHit.
             set_reg sw tlb (vec_update_dec (register_lookup tlb s.(sregs)) idx
                               (Some (u_walk_entry vpn q2 q1 q0' asid)))).
   Proof.
-    intros Hchk Hupd Hpb Hmenv HADUE Hwrite Hswregs.
+    intros Hchk Hupd Hpb Hmenv HADUE Hrdx Hv0 Hl0 Hnap Hmisa HPBMTE Hwrite Hswregs.
     unfold translate_TLB_hit. cbn zeta.
     match goal with |- context[tlb_get_pte ?sz ?e] => change sz with 8 end.
     rewrite uwe_pte.
     rewrite autocast_id.
     rewrite (exec_bind_Some _ _ _ _ _ (Hchk s)). cbn match.
-    match goal with |- context[update_and_write_pte ?aa ?wd ?pv ?ac] =>
-      assert (Hu : exec (update_and_write_pte aa wd pv ac) s = Some (Ok (Some q0'), sw)) end.
+    match goal with |- context[update_and_write_pte ?w ?vp ?aa ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hu : exec (update_and_write_pte w vp aa pv lv ac pr mx ds e) s
+                   = Some (Ok (Some q0', tt), sw)) end.
     { unfold update_and_write_pte.
       match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
         assert (Hupd' : @update_PTE_Bits w pv ac = Some q0') by exact Hupd end.
@@ -513,9 +545,17 @@ Section PtUpdHit.
         rewrite (exec_bind_Some _ _ _ _ _ Hand).
         cbn match. apply exec_returnm. }
       rewrite (exec_bind_Some _ _ _ _ _ Hgate).
-      cbn match.
-      match goal with |- context[Defs.bind (write_pte ?aa' ?wd' ?pv') ?k] =>
-        assert (Hwrite' : exec (write_pte aa' wd' pv') s = Some (Ok true, sw))
+      cbn match zeta.
+      rewrite (exec_bind_Some _ _ _ _ _ Hrdx). cbn match beta.
+      rewrite autocast_id.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_check_leaf_pte_leaf0 vpn q0 acc p mxr do_sum Hv0 Hl0 Hchk Hnap
+                    (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)))
+                    menvcfg0 s Hmisa Hmenv HPBMTE)).
+      cbn match beta.
+      rewrite Hupd'. cbn match. rewrite autocast_id.
+      match goal with |- context[Defs.bind (write_pte_conditional ?aa' ?wd' ?pv') ?k] =>
+        assert (Hwrite' : exec (write_pte_conditional aa' wd' pv') s = Some (Ok true, sw))
           by exact Hwrite end.
       rewrite (exec_bind_Some _ _ _ _ _ Hwrite').
       cbn match. apply exec_returnm. }
