@@ -281,14 +281,14 @@ Section ProofBwrite.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
     (* ===== +0x0e jal ra,holdingsleep ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.bwrite + 0x0e)) Rra (mword_of_int 0x1330 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.bwrite + 0x0e)) Rra (mword_of_int 0x1336 : mword 21)
               R4 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi0e [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.bwrite + 0x0e) : mword 64) 4)]> R4).
     assert (Htgthsl : add_vec (mword_of_int (KernelSyms.bwrite + 0x0e) : mword 64)
-                        (sign_extend' 64 (mword_of_int 0x1330 : mword 21))
+                        (sign_extend' 64 (mword_of_int 0x1336 : mword 21))
                       = mword_of_int KernelSyms.holdingsleep)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgthsl) in "Hpc".

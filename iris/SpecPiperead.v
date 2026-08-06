@@ -8,7 +8,7 @@
    sleeping on [&pi->nread] while the pipe is empty and the write end is
    still open, and returns the number it copied -- or -1 if the process was
    killed while it waited, or if the very first copyout failed.
-   @ KernelSyms.piperead = 0x80004596, ~80 instructions, a 96-byte frame;
+   @ KernelSyms.piperead = 0x8000459c, ~80 instructions, a 96-byte frame;
    ra/s0..s5 saved in the prologue, s6..s8 SHRINK-WRAPPED onto the paths
    that need them.
 

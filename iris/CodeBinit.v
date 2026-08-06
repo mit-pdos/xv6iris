@@ -153,9 +153,9 @@ Section CodeBinit.
   Proof. mk_base (KernelSyms.binit + 0x5c) (mword_of_int 0x01048513 : mword 32)
     (mword_of_int (KernelSyms.binit + 0x5c) : mword 64) (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) kd_01048513. Qed.
 
-  Lemma bii_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.binit + 0x60) : mword 64) false (JAL (mword_of_int 4998 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.binit + 0x60) (mword_of_int 0x386010ef : mword 32)
-    (mword_of_int (KernelSyms.binit + 0x60) : mword 64) (JAL (mword_of_int 4998 : mword 21, Regidx (mword_of_int 1))) kd_386010ef. Qed.
+  Lemma bii_60 : kernel_text -∗ instr (mword_of_int (KernelSyms.binit + 0x60) : mword 64) false (JAL (mword_of_int 5004 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.binit + 0x60) (mword_of_int 0x38c010ef : mword 32)
+    (mword_of_int (KernelSyms.binit + 0x60) : mword 64) (JAL (mword_of_int 5004 : mword 21, Regidx (mword_of_int 1))) kd_38c010ef. Qed.
 
   Lemma bii_64 : kernel_text -∗ instr (mword_of_int (KernelSyms.binit + 0x64) : mword 64) false (LOAD (mword_of_int 696 : mword 12, Regidx (mword_of_int 18), Regidx (mword_of_int 15), false, 8)).
   Proof. mk_base (KernelSyms.binit + 0x64) (mword_of_int 0x2b893783 : mword 32)

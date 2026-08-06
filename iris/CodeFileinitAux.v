@@ -1,7 +1,7 @@
 (* CodeFileinitAux.v -- the instruction-DECODE layer for xv6's fileinit().
    For every instruction of
 
-     fileinit @ 0x80003f94 .. 0x80003fb6   (offsets 0x00 .. 0x22)
+     fileinit @ 0x80003f9a .. 0x80003fbc   (offsets 0x00 .. 0x22)
 
    it proves a [kernel_text -* instr pc <is_rvc> <AST>] fact ([fii_<off>]), and
    bundles the thirteen of them into the [ilw_code] pattern
@@ -38,23 +38,23 @@ Import Defs.
 (* Base (32-bit) decode facts unique to fileinit.                        *)
 (* ===================================================================== *)
 
-(* addi a1,a1,1468  -- a1 := &"ftable" *)
-Lemma fidb_5bc58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x5bc58593 : mword 32)) s
-  = Some (ITYPE (mword_of_int 1468 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
+(* addi a1,a1,1462  -- a1 := &"ftable" *)
+Lemma fidb_5b658593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x5b658593 : mword 32)) s
+  = Some (ITYPE (mword_of_int 1462 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
 (* auipc a0,0x1e *)
-(* addi a0,a0,1212  -- a0 := &ftable *)
-Lemma fidb_4bc50513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0x4bc50513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 1212 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
+(* addi a0,a0,1206  -- a0 := &ftable *)
+Lemma fidb_4b650513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x4b650513 : mword 32)) s
+  = Some (ITYPE (mword_of_int 1206 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
 (* jal ra,initlock  (backwards: 2^21 - 13348) *)
-Lemma fidb_bddfc0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xbddfc0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2083804 : mword 21, Regidx (mword_of_int 1)), s).
+Lemma fidb_bd7fc0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xbd7fc0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2083798 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Section CodeFileinitAux.
@@ -81,21 +81,21 @@ Section CodeFileinitAux.
   Proof. mk_base (KernelSyms.fileinit + 0x08)%Z (mword_of_int 0x00003597 : mword 32)
     (mword_of_int (KernelSyms.fileinit + 0x08) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00003597. Qed.
 
-  Lemma fii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x0c) : mword 64) false (ITYPE (mword_of_int 1468 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.fileinit + 0x0c)%Z (mword_of_int 0x5bc58593 : mword 32)
-    (mword_of_int (KernelSyms.fileinit + 0x0c) : mword 64) (ITYPE (mword_of_int 1468 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) fidb_5bc58593. Qed.
+  Lemma fii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x0c) : mword 64) false (ITYPE (mword_of_int 1462 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.fileinit + 0x0c)%Z (mword_of_int 0x5b658593 : mword 32)
+    (mword_of_int (KernelSyms.fileinit + 0x0c) : mword 64) (ITYPE (mword_of_int 1462 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) fidb_5b658593. Qed.
 
   Lemma fii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x10) : mword 64) false (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.fileinit + 0x10)%Z (mword_of_int 0x0001e517 : mword 32)
     (mword_of_int (KernelSyms.fileinit + 0x10) : mword 64) (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_0001e517. Qed.
 
-  Lemma fii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x14) : mword 64) false (ITYPE (mword_of_int 1212 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.fileinit + 0x14)%Z (mword_of_int 0x4bc50513 : mword 32)
-    (mword_of_int (KernelSyms.fileinit + 0x14) : mword 64) (ITYPE (mword_of_int 1212 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) fidb_4bc50513. Qed.
+  Lemma fii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x14) : mword 64) false (ITYPE (mword_of_int 1206 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.fileinit + 0x14)%Z (mword_of_int 0x4b650513 : mword 32)
+    (mword_of_int (KernelSyms.fileinit + 0x14) : mword 64) (ITYPE (mword_of_int 1206 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) fidb_4b650513. Qed.
 
-  Lemma fii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x18) : mword 64) false (JAL (mword_of_int 2083804 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.fileinit + 0x18)%Z (mword_of_int 0xbddfc0ef : mword 32)
-    (mword_of_int (KernelSyms.fileinit + 0x18) : mword 64) (JAL (mword_of_int 2083804 : mword 21, Regidx (mword_of_int 1))) fidb_bddfc0ef. Qed.
+  Lemma fii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x18) : mword 64) false (JAL (mword_of_int 2083798 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.fileinit + 0x18)%Z (mword_of_int 0xbd7fc0ef : mword 32)
+    (mword_of_int (KernelSyms.fileinit + 0x18) : mword 64) (JAL (mword_of_int 2083798 : mword 21, Regidx (mword_of_int 1))) fidb_bd7fc0ef. Qed.
 
   Lemma fii_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.fileinit + 0x1c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.fileinit + 0x1c)%Z (mword_of_int 0x60a2 : mword 16)
@@ -118,7 +118,7 @@ Section CodeFileinitAux.
      know about fileinit's code. *)
   Lemma fii_code :
     kernel_text -∗ ilw_code KernelSyms.fileinit (mword_of_int 3) (mword_of_int 30)
-                            (mword_of_int 1468) (mword_of_int 1212) (mword_of_int 2083804).
+                            (mword_of_int 1462) (mword_of_int 1206) (mword_of_int 2083798).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (fii_00 with "Ht")|].

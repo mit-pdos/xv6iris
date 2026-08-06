@@ -725,14 +725,14 @@ Section ProofBrelse.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 jal ra,holdingsleep ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.brelse + 0x14)) Rra (mword_of_int 4856 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.brelse + 0x14)) Rra (mword_of_int 4862 : mword 21)
               R5 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi14 [-]").
     iIntros (CID10 Hs10) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.brelse + 0x14) : mword 64) 4)]> R5).
     assert (Htgthsl : add_vec (mword_of_int (KernelSyms.brelse + 0x14) : mword 64)
-                        (sign_extend' 64 (mword_of_int 4856 : mword 21))
+                        (sign_extend' 64 (mword_of_int 4862 : mword 21))
                       = mword_of_int KernelSyms.holdingsleep)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgthsl) in "Hpc".
@@ -817,14 +817,14 @@ Section ProofBrelse.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c jal ra,releasesleep ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.brelse + 0x1c)) Rra (mword_of_int 4792 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.brelse + 0x1c)) Rra (mword_of_int 4798 : mword 21)
               H1 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1c [-]").
     iIntros (CID14 Hs14) "Hcg Hpc".
     set (H2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.brelse + 0x1c) : mword 64) 4)]> H1).
     assert (Htgtrsl : add_vec (mword_of_int (KernelSyms.brelse + 0x1c) : mword 64)
-                        (sign_extend' 64 (mword_of_int 4792 : mword 21))
+                        (sign_extend' 64 (mword_of_int 4798 : mword 21))
                       = mword_of_int KernelSyms.releasesleep)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtrsl) in "Hpc".

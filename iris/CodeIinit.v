@@ -113,9 +113,9 @@ Section CodeIinit.
   Proof. mk_rvc (KernelSyms.iinit + 0x3c) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.iinit + 0x3c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma iii_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x3e) : mword 64) false (JAL (mword_of_int 3666 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.iinit + 0x3e) (mword_of_int 0x653000ef : mword 32)
-    (mword_of_int (KernelSyms.iinit + 0x3e) : mword 64) (JAL (mword_of_int 3666 : mword 21, Regidx (mword_of_int 1))) kd_653000ef. Qed.
+  Lemma iii_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x3e) : mword 64) false (JAL (mword_of_int 3672 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.iinit + 0x3e) (mword_of_int 0x659000ef : mword 32)
+    (mword_of_int (KernelSyms.iinit + 0x3e) : mword 64) (JAL (mword_of_int 3672 : mword 21, Regidx (mword_of_int 1))) kd_659000ef. Qed.
 
   Lemma iii_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.iinit + 0x42) : mword 64) false (ITYPE (mword_of_int 136 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_base (KernelSyms.iinit + 0x42) (mword_of_int 0x08848493 : mword 32)

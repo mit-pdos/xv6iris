@@ -61,9 +61,9 @@ Section CodeBwrite.
   Proof. mk_rvc (KernelSyms.bwrite + 0xc) (mword_of_int 0x0541 : mword 16)
     (mword_of_int (KernelSyms.bwrite + 0xc) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_0541 exec_execute_C_ADDI. Qed.
 
-  Lemma bwi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.bwrite + 0xe) : mword 64) false (JAL (mword_of_int 4912 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bwrite + 0xe) (mword_of_int 0x330010ef : mword 32)
-    (mword_of_int (KernelSyms.bwrite + 0xe) : mword 64) (JAL (mword_of_int 4912 : mword 21, Regidx (mword_of_int 1))) kd_330010ef. Qed.
+  Lemma bwi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.bwrite + 0xe) : mword 64) false (JAL (mword_of_int 4918 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bwrite + 0xe) (mword_of_int 0x336010ef : mword 32)
+    (mword_of_int (KernelSyms.bwrite + 0xe) : mword 64) (JAL (mword_of_int 4918 : mword 21, Regidx (mword_of_int 1))) kd_336010ef. Qed.
 
   Lemma bwi_12 : kernel_text -∗ instr (mword_of_int (KernelSyms.bwrite + 0x12) : mword 64) true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 10 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
   Proof. mk_rvc (KernelSyms.bwrite + 0x12) (mword_of_int 0xc911 : mword 16)

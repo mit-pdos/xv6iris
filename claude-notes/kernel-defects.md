@@ -13,7 +13,10 @@ A note on fixing any of them: the kernel image is pinned by `XV6_REV` in
 the top-level `Makefile`, and the tracked `kernel-rocq/*.v` dumps come from
 that exact revision. Editing `xv6-riscv/` moves symbol addresses, and every
 proof that names one breaks — the README says so explicitly, and
-`make xv6-rev-check` exists to catch drift. So "just fix the C" is never
+`make xv6-rev-check` exists to catch drift. **The procedure for doing it
+anyway — and the gate that must pass first — is
+[`../durable-notes.md`](durable-notes.md) §"Changing the kernel SOURCE";
+read it before touching `xv6-riscv/`.** So "just fix the C" is never
 cheap in this tree, and none of these entries should be fixed casually.
 
 ---
@@ -21,9 +24,11 @@ cheap in this tree, and none of these entries should be fixed casually.
 ## D1 — `writei` releases a modified buffer without logging it
 
 **Found:** 2026-08-06, proving `writei` (`fs.c`).
-**Status:** OPEN. `writei` is specified and partly proven but deliberately
-not linked; see [`projects/fs-inode.md`](projects/fs-inode.md) for the
-proof-side detail.
+**Status:** **FIXED IN THE SOURCE, 2026-08-06** — `log_write(bp)` added
+before the `brelse` on the failure path (upstream `fb0fed8 "fix writei
+bug"`, cherry-picked onto the pinned rev as `7efd08f`; `XV6_REV` bumped and
+the image re-dumped). See "How it was fixed, and what that cost" below, and
+[`projects/fs-inode.md`](projects/fs-inode.md) for the proof-side detail.
 
 ### The code
 
@@ -116,14 +121,34 @@ advanced on the break), which is odd but *consistent* — no cache/disk
 divergence. The alternative — snapshotting and restoring `bp->data` — costs
 a copy on every write.
 
-### Why it is not fixed here
+### How it was fixed, and what that cost
 
-Editing `fs.c` moves every symbol address in the image (see the note at the
-top of this file), and this machine has no riscv toolchain to rebuild the
-ELF in any case. Modelling the anomaly instead was considered and rejected:
-it would mean letting the escrow park bytes decoupled from the logical
-content, which destroys `bread`'s postcondition — the promise every
-FS-layer proof above it consumes — in order to describe a bug.
+The C now logs the partially-modified buffer before releasing it. The
+alternative that was considered and REJECTED was modelling the anomaly
+instead: letting the escrow park bytes decoupled from the logical content
+would have destroyed `bread`'s postcondition — the promise every FS-layer
+proof above it consumes — in order to describe a bug.
+
+The full migration recipe is
+[`../durable-notes.md`](durable-notes.md) §"Changing the kernel SOURCE".
+In summary, the 6-byte change moved 46 symbols by +6 over
+`[0x80003752, 0x80005420)` and cost ~30 proof files / ~130 edit sites,
+almost all of them PC-relative immediates that no address grep can find.
+The step that made it safe was proving the toolchain reproduced the pinned
+image byte-for-byte BEFORE applying the fix.
+
+### What the fix changes in the SPEC
+
+Worth knowing before reading writei's contract: the partial bytes are now
+COMMITTED rather than stranded in the cache. So writei genuinely modifies
+the file beyond the range it reports having written, and the postcondition
+cannot claim "everything outside `[off, off+tot)` is unchanged". It admits
+a bounded disturbed region instead — at most one block past `off+tot`, with
+unspecified contents, and `dist = 0` on every arm where no copy failed.
+
+That is not a wart. The old code had the same anomaly, but *invisibly*, in
+the buffer cache where no specification could see it; the fix moves it into
+the logged state where it can be stated and reasoned about.
 
 ---
 

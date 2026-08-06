@@ -544,6 +544,167 @@ Proof.
     exact Hd.
 Qed.
 
+(* --- the block index of the current cursor, and the two Z readings the
+       instruction stream computes --- *)
+
+Lemma wi_maxfile_val : MAXFILE = 268%nat.
+Proof. reflexivity. Qed.
+
+Lemma wi_bsize_val : BSIZE = 1024%nat.
+Proof. reflexivity. Qed.
+
+Lemma wi_fbn_lt (x : nat) : (x < MAXFILE * BSIZE)%nat -> (x `div` BSIZE < MAXFILE)%nat.
+Proof.
+  intros H. apply Nat.div_lt_upper_bound; [unfold BSIZE; lia|].
+  rewrite Nat.mul_comm. exact H.
+Qed.
+
+Lemma wi_div_z (x : nat) : Z.of_nat (x `div` BSIZE) = (Z.of_nat x / 1024)%Z.
+Proof. rewrite Nat2Z.inj_div. reflexivity. Qed.
+
+Lemma wi_mod_z (x : nat) : Z.of_nat (x `mod` BSIZE) = (Z.of_nat x mod 1024)%Z.
+Proof. rewrite Nat2Z.inj_mod. reflexivity. Qed.
+
+(* --- what bmap's DEPOSIT does to the two invariants the loop carries.
+       Both are consequences of the zero side condition on the deposit and
+       of "bmap never un-allocates" (SpecBmap.v), and both are needed at
+       EVERY iteration, not just the allocating one. --- *)
+
+Lemma wi_bmap_data (bm : blkmap) (data data' : nat -> list (bv 8)) (fbn : nat) :
+  blk_holes_zero bm data ->
+  (fbn < MAXFILE)%nat ->
+  (data' = data \/ (bv_unsigned (blkmap_get bm fbn) = 0
+                    /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)) ->
+  forall k : nat, file_byte data' k = file_byte data k.
+Proof.
+  intros Hhz Hfbn [-> | [Hz ->]] k; [reflexivity|].
+  exact (wi_file_byte_same data fbn (replicate BSIZE (bv_0 8)) k (Hhz fbn Hfbn Hz)).
+Qed.
+
+Lemma wi_holes_bmap (bm bm' : blkmap) (data data' : nat -> list (bv 8)) (fbn : nat) :
+  (fbn < MAXFILE)%nat ->
+  (forall i : nat, (i < MAXFILE)%nat -> i <> fbn -> blkmap_get bm' i = blkmap_get bm i) ->
+  (forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) <> 0 ->
+     blkmap_get bm' i = blkmap_get bm i) ->
+  (data' = data \/ (bv_unsigned (blkmap_get bm fbn) = 0
+                    /\ data' = <[fbn := replicate BSIZE (bv_0 8)]> data)) ->
+  blk_holes_zero bm data -> blk_holes_zero bm' data'.
+Proof.
+  intros Hfbn Hagr Hnoun Hdep Hhz i Hi Hz'.
+  destruct (decide (i = fbn)) as [->|Hne].
+  - destruct Hdep as [-> | [Hz ->]].
+    + apply (Hhz fbn Hfbn).
+      destruct (decide (bv_unsigned (blkmap_get bm fbn) = 0)) as [H0|Hnz]; [exact H0|].
+      exfalso. rewrite (Hnoun fbn Hfbn Hnz) in Hz'. exact (Hnz Hz').
+    + rewrite fn_lookup_insert. reflexivity.
+  - assert (Hg : blkmap_get bm' i = blkmap_get bm i) by exact (Hagr i Hi Hne).
+    rewrite Hg in Hz'.
+    destruct Hdep as [-> | [_ ->]]; [exact (Hhz i Hi Hz')|].
+    rewrite fn_lookup_insert_ne; [| congruence]. exact (Hhz i Hi Hz').
+Qed.
+
+(* --- the range invariant, one iteration at a time --- *)
+
+(* the SUCCESS step: the chunk lands inside the written range, which grows *)
+Lemma wi_range_step (data dataI : nat -> list (bv 8))
+    (off tot mm fb o : nat) (wroteI g : nat -> bv 8) :
+  (o + mm <= BSIZE)%nat ->
+  (fb * BSIZE + o = off + tot)%nat ->
+  (forall k : nat, file_byte dataI k
+     = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
+       then wroteI (k - off)%nat else file_byte data k) ->
+  forall k : nat,
+    file_byte (<[fb := wi_splice (dataI fb) o mm g]> dataI) k
+    = if decide ((off <= k)%nat /\ (k < off + (tot + mm))%nat)
+      then (fun i : nat => if decide (i < tot)%nat then wroteI i else g (i - tot)%nat)
+             (k - off)%nat
+      else file_byte data k.
+Proof.
+  intros Hol Hfb Hinv k.
+  rewrite (wi_file_byte_splice dataI fb o mm g k Hol) Hfb.
+  case_decide as Hc.
+  - rewrite decide_True; [| lia]. rewrite decide_False; [| lia]. f_equal. lia.
+  - rewrite Hinv. case_decide as Hd.
+    + rewrite decide_True; [| lia]. rewrite decide_True; [reflexivity | lia].
+    + rewrite decide_False; [reflexivity | lia].
+Qed.
+
+(* the FAILURE step: the chunk lands in the DISTURBED region instead --
+   [tot] is not advanced, so the bytes are logged but not claimed. *)
+Lemma wi_range_fail (data dataI : nat -> list (bv 8))
+    (off tot mm fb o : nat) (wroteI g : nat -> bv 8) :
+  (o + mm <= BSIZE)%nat ->
+  (fb * BSIZE + o = off + tot)%nat ->
+  (forall k : nat, file_byte dataI k
+     = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
+       then wroteI (k - off)%nat else file_byte data k) ->
+  forall k : nat,
+    file_byte (<[fb := wi_splice (dataI fb) o mm g]> dataI) k
+    = if decide ((off <= k)%nat /\ (k < off + tot)%nat) then wroteI (k - off)%nat
+      else if decide ((off + tot <= k)%nat /\ (k < off + tot + mm)%nat)
+           then g (k - (off + tot))%nat
+           else file_byte data k.
+Proof.
+  intros Hol Hfb Hinv k.
+  rewrite (wi_file_byte_splice dataI fb o mm g k Hol) Hfb.
+  case_decide as Hc.
+  - rewrite decide_False; [| lia].
+    first [ reflexivity | rewrite decide_True; [reflexivity | lia] ].
+  - rewrite Hinv.
+    first [ reflexivity
+          | (case_decide as Hd; [reflexivity|]);
+            rewrite decide_False; [reflexivity | lia] ].
+Qed.
+
+(* an UNDISTURBED exit: the two-clause invariant read as a three-clause
+   postcondition with [dist = 0] *)
+Lemma wi_range_dist0 (data data' : nat -> list (bv 8)) (off tot : nat)
+    (wrote dstb : nat -> bv 8) :
+  (forall k : nat, file_byte data' k
+     = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
+       then wrote (k - off)%nat else file_byte data k) ->
+  forall k : nat,
+    file_byte data' k
+    = if decide ((off <= k)%nat /\ (k < off + tot)%nat) then wrote (k - off)%nat
+      else if decide ((off + tot <= k)%nat /\ (k < off + tot + 0)%nat)
+           then dstb (k - (off + tot))%nat else file_byte data k.
+Proof.
+  intros H k. rewrite H. case_decide as Hc; [reflexivity|].
+  rewrite decide_False; [reflexivity | lia].
+Qed.
+
+(* the kernel-arm tie, extended by one chunk *)
+Lemma wi_ker_step (user : bool) (src_bytes wroteI g : nat -> bv 8) (tot mm : nat) :
+  (user = false -> forall i : nat, (i < tot)%nat -> wroteI i = src_bytes i) ->
+  (user = false -> forall i : nat, (i < mm)%nat -> g i = src_bytes (tot + i)%nat) ->
+  user = false -> forall i : nat, (i < tot + mm)%nat ->
+    (if decide (i < tot)%nat then wroteI i else g (i - tot)%nat) = src_bytes i.
+Proof.
+  intros H1 H2 Hu i Hi. case_decide as Hd; [exact (H1 Hu i Hd)|].
+  rewrite (H2 Hu (i - tot)%nat ltac:(lia)). f_equal. lia.
+Qed.
+
+Lemma wi_nat_u (k : nat) : (Z.of_nat k < 18446744073709551616)%Z ->
+  bv_unsigned (mword_of_int (Z.of_nat k) : mword 64) = Z.of_nat k.
+Proof. intro Hk. apply moi64_small. split; [apply Nat2Z.is_nonneg | exact Hk]. Qed.
+
+(* the [bltu] reading, off the two unsigned values *)
+Lemma wi_ltu_read (x y : mword 64) (a c : Z) :
+  bv_unsigned x = a -> bv_unsigned y = c -> zopz0zI_u x y = Z.ltb a c.
+Proof.
+  intros <- <-. unfold zopz0zI_u. rewrite !RiscvExtras.uint_unsigned. reflexivity.
+Qed.
+
+(* the [beqz] on bmap's answer, on the arm where a block WAS found *)
+Lemma wi_sext_nonzero (w : mword 32) :
+  bv_unsigned w <> 0 -> bv_unsigned w < 2147483648 ->
+  eq_vec (sign_extend' 64 w : mword 64) zero_reg = false.
+Proof.
+  intros Hnz Hlt.
+  apply eq_vec_false_iff. intro Hc. apply (f_equal bv_unsigned) in Hc.
+  rewrite (wi_sext32_unsigned w Hlt) bc_zero_reg_unsigned in Hc. exact (Hnz Hc).
+Qed.
+
 (* ===================================================================== *)
 (*  (4) THE BUDGET                                                        *)
 (* ===================================================================== *)

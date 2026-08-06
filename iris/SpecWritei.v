@@ -45,6 +45,30 @@
 
    -- which covers a full write, a short write and a zero write uniformly.
 
+   ==== ...PLUS A BOUNDED DISTURBED REGION ==============================
+
+   The clause above is NOT the whole truth, and the reason is the fix to
+   kernel defect D1 (claude-notes/kernel-defects.md).  When either_copyin
+   fails part-way it has already copied a PREFIX of the chunk into the
+   buffer, and writei now does
+
+       log_write(bp);  brelse(bp);  break;
+
+   -- i.e. it COMMITS the partial chunk rather than stranding it in the
+   buffer cache.  That is the consistent thing to do (the alternative is a
+   block whose contents depend on cache state), but it means the file
+   genuinely changes OUTSIDE [off, off+tot): the return value [tot] is not
+   advanced over the failed chunk, while the chunk's bytes are logged.
+
+   So the postcondition admits a DISTURBED REGION immediately after the
+   written range: [dist] bytes at [off+tot], with [dist <= BSIZE] because
+   one chunk never crosses a block boundary, holding unspecified bytes
+   [dstb].  Everything at or beyond [off+tot+dist] is unchanged, and
+   [dist = 0] whenever no copy failed -- which a caller reads off
+   [tot = n].  Both the bound and the [tot = n] tie are what make the
+   clause usable: without them "the rest of the file is untouched" would be
+   unavailable at every offset.
+
    WHAT THE "BYTE WRITTEN" IS, AND WHY IT IS AN EXISTENTIAL.  On the KERNEL
    arm the source bytes are the caller's own and the clause pins them.  On
    the USER arm they are copied out of user memory, about which the kernel
@@ -75,9 +99,10 @@
 
    The -1 arm additionally reports WHY (off past the end, or the range past
    MAXFILE*BSIZE), so a caller that has checked those knows it will not be
-   taken.  The overflow test at +0x02e is DEAD given the two numeric
-   premises below: [off + n] cannot both survive the [lui a4,0x43] compare
-   and wrap.
+   taken.  The overflow test at +0x02e is DEAD BY THE JOINT NUMERIC PREMISE
+   [off + n < 2^31] below -- NOT by two separate bounds on [off] and [n],
+   which would let the [addw] at +0x022 wrap.  See that premise's comment,
+   including the coverage note it carries.
 
    ==== SIZE AND FLUSH ==================================================
 
@@ -248,12 +273,23 @@ Definition wp_writei_sconf_body
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->
-  (* the two uint arguments and the current size are honest 32-bit
-     quantities.  With these the [bltu a5,a3] overflow test at +0x02e is
-     DEAD: a sum that survives the MAXFILE*BSIZE compare cannot have
-     wrapped. *)
-  (Z.of_nat off < 2 ^ 31) ->
-  (Z.of_nat n < 2 ^ 31) ->
+  (* THE JOINT NUMERIC PREMISE.  [off] and [n] are uints whose SUM stays in
+     int range -- not two separate bounds.  It is what makes the
+     [addw a5,a3,a4] at +0x022 non-wrapping, and hence what makes the
+     [bltu a5,a3] overflow test at +0x02e DEAD.  Two separate 2^31 bounds
+     do NOT suffice: their sum can reach 2^32, the 32-bit add wraps, the
+     sign-extended result is huge, and the MAXFILE*BSIZE compare at +0x02a
+     is then taken -- a live arm whose proof would need a wrapping-[addw]
+     reading that this tree does not have.
+
+     Every caller can discharge it: filewrite's [off] is bounded by the
+     file size (<= MAXFILE*BSIZE = 274432) and its [n] is chunked, and the
+     in-kernel callers (dirlink, the create path) pass small constants.
+
+     COVERAGE NOTE: this means xv6's own [off + n < off] overflow check is
+     not exercised by the proof -- the premise makes that arm dead rather
+     than proving what the code does when it fires. *)
+  (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
@@ -315,19 +351,26 @@ Definition wp_writei_sconf_body
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' : dinode) (ds' : list dinode) (n' : nat)
-    (wrote : nat -> bv 8) (P' : uptd),
+    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       ⌜blk_holes_zero bm' data'⌝ -∗
       ⌜diblk_wf ds'⌝ -∗
       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
       ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
+      (* THE DISTURBED REGION: at most one block, immediately after the
+         written range, and EMPTY unless a copy failed part-way.  See the
+         header. *)
+      ⌜(dist <= BSIZE)%nat⌝ -∗
+      ⌜(tot = n)%nat -> dist = 0%nat⌝ -∗
       (* THE RANGE CLAUSE -- the whole effect of the write, in one line *)
       ⌜forall k : nat,
          file_byte data' k
          = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
            then wrote (k - off)%nat
-           else file_byte data k⌝ -∗
+           else if decide ((off + tot <= k)%nat /\ (k < off + tot + dist)%nat)
+                then dstb (k - (off + tot))%nat
+                else file_byte data k⌝ -∗
       (* ...and, on the KERNEL arm only, what those bytes were *)
       ⌜user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i⌝ -∗
       (* THE TWO ARMS, on the returned a0.  A SHORT WRITE IS THE SECOND
@@ -335,7 +378,8 @@ Definition wp_writei_sconf_body
       ⌜(mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
         /\ (bv_unsigned (di_size dn) < Z.of_nat off
             \/ (MAXFILE * BSIZE < off + n)%nat)
-        /\ tot = 0%nat /\ bm' = bm /\ data' = data /\ dn' = dn /\ ds' = ds
+        /\ tot = 0%nat /\ dist = 0%nat
+        /\ bm' = bm /\ data' = data /\ dn' = dn /\ ds' = ds
         /\ n' = ncount)
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (Z.of_nat tot) : mword 64)

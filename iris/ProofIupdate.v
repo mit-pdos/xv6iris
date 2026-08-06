@@ -257,14 +257,14 @@ Section IupdateTail.
     iEval (rewrite Hpp68) in "Hpc".
     (* ===== +0x68 jal ra,log_write ===== *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.iupdate + 0x68)) Rra
-              (mword_of_int 3050 : mword 21) T0 (K - 4)%nat b
+              (mword_of_int 3056 : mword 21) T0 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi68").
     iIntros (CID2 Hq2) "Hcg Hpc".
     set (T1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) 4)]> T0).
     assert (Htgtlw : add_vec (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64)
-                       (sign_extend' 64 (mword_of_int 3050 : mword 21))
+                       (sign_extend' 64 (mword_of_int 3056 : mword 21))
                      = mword_of_int KernelSyms.log_write) by pcw.
     iEval (rewrite Htgtlw) in "Hpc".
     assert (HT1a0 : T1 !!! Regidx Ra0 = bnode kk)

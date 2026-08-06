@@ -161,9 +161,9 @@ Section CodeBread.
   Proof. mk_base (KernelSyms.bread + 0x5a) (mword_of_int 0x01048513 : mword 32)
     (mword_of_int (KernelSyms.bread + 0x5a) : mword 64) (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) kd_01048513. Qed.
 
-  Lemma bdi_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0x5e) : mword 64) false (JAL (mword_of_int 4920 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bread + 0x5e) (mword_of_int 0x338010ef : mword 32)
-    (mword_of_int (KernelSyms.bread + 0x5e) : mword 64) (JAL (mword_of_int 4920 : mword 21, Regidx (mword_of_int 1))) kd_338010ef. Qed.
+  Lemma bdi_5e : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0x5e) : mword 64) false (JAL (mword_of_int 4926 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bread + 0x5e) (mword_of_int 0x33e010ef : mword 32)
+    (mword_of_int (KernelSyms.bread + 0x5e) : mword 64) (JAL (mword_of_int 4926 : mword 21, Regidx (mword_of_int 1))) kd_33e010ef. Qed.
 
   Lemma bdi_62 : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0x62) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 41 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.bread + 0x62) (mword_of_int 0xa889 : mword 16)
@@ -257,9 +257,9 @@ Section CodeBread.
   Proof. mk_base (KernelSyms.bread + 0xac) (mword_of_int 0x01048513 : mword 32)
     (mword_of_int (KernelSyms.bread + 0xac) : mword 64) (ITYPE (mword_of_int 16 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 10), ADDI)) kd_01048513. Qed.
 
-  Lemma bdi_b0 : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0xb0) : mword 64) false (JAL (mword_of_int 4838 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bread + 0xb0) (mword_of_int 0x2e6010ef : mword 32)
-    (mword_of_int (KernelSyms.bread + 0xb0) : mword 64) (JAL (mword_of_int 4838 : mword 21, Regidx (mword_of_int 1))) kd_2e6010ef. Qed.
+  Lemma bdi_b0 : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0xb0) : mword 64) false (JAL (mword_of_int 4844 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bread + 0xb0) (mword_of_int 0x2ec010ef : mword 32)
+    (mword_of_int (KernelSyms.bread + 0xb0) : mword 64) (JAL (mword_of_int 4844 : mword 21, Regidx (mword_of_int 1))) kd_2ec010ef. Qed.
 
   Lemma bdi_b4 : kernel_text -∗ instr (mword_of_int (KernelSyms.bread + 0xb4) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.bread + 0xb4) (mword_of_int 0x409c : mword 16)

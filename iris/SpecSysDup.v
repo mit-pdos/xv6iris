@@ -10,7 +10,7 @@
        return fd;
      }
 
-   @ KernelSyms.sys_dup = 0x80004bd6, 24 instructions (a 48-byte frame; the
+   @ KernelSyms.sys_dup = 0x80004bdc, 24 instructions (a 48-byte frame; the
    [struct file *f] local lives at s0-40, [f] rides in the callee-saved s1 and
    the descriptor in s2 across the filedup call).  Decode: CodeSysDup.v.
 

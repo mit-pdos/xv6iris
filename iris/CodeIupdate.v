@@ -173,9 +173,9 @@ Section CodeIupdate.
   Proof. mk_rvc (KernelSyms.iupdate + 0x66) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.iupdate + 0x66) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma iui_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) false (JAL (mword_of_int 3050 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.iupdate + 0x68) (mword_of_int 0x3eb000ef : mword 32)
-    (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) (JAL (mword_of_int 3050 : mword 21, Regidx (mword_of_int 1))) kd_3eb000ef. Qed.
+  Lemma iui_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) false (JAL (mword_of_int 3056 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.iupdate + 0x68) (mword_of_int 0x3f1000ef : mword 32)
+    (mword_of_int (KernelSyms.iupdate + 0x68) : mword 64) (JAL (mword_of_int 3056 : mword 21, Regidx (mword_of_int 1))) kd_3f1000ef. Qed.
 
   Lemma iui_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.iupdate + 0x6c) : mword 64) true (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.iupdate + 0x6c) (mword_of_int 0x854a : mword 16)

@@ -5,10 +5,21 @@ This file is the worklist.
 
 ## Status (2026-08-06)
 
-**Stages 1 and 2 are COMPLETE. `bmap` is proven and linked** — fs.c is
-2/24 (`iinit`, `bmap`), 280/3332 bytes, and bmap carries the `!` caveat for
-the still-assumed `balloc`. `proof_coverage.py --check` rc=0,
-`spec_vacuity.py` clean, `lemma_diff.py` clean.
+**Stages 1–3 are COMPLETE: `bmap`, `iupdate` and `writei` are all proven
+and linked.** fs.c is **4/24, 668/3338 bytes (20.0%)**; tree totals 123
+proven / 13278 of 23342 bytes (57%). `bmap` and `writei` carry the `!`
+caveat for the still-assumed `balloc` (writei inherits it through bmap);
+`iinit` and `iupdate` rest on nothing assumed. `proof_coverage.py --check`
+rc=0, `lemma_diff.py` clean, zero admits tree-wide.
+
+**writei required fixing a bug in the xv6 SOURCE** — see
+[`../kernel-defects.md`](../kernel-defects.md) D1, and
+[`../durable-notes.md`](../durable-notes.md) §"Changing the kernel SOURCE"
+for the image-migration recipe that fix cost. The image is now built from
+`XV6_REV = 7efd08f` (the pinned rev plus the one-commit fix).
+
+Note `spec_vacuity.py` no longer exists — it was removed upstream. The
+checker set is now `proof_coverage.py --check` + `lemma_diff.py`.
 
 What is in the tree:
 
@@ -146,13 +157,50 @@ Bmap.wp_bmap_sconf` is unchanged.
         pointwise reading premise, out at `d` and back at any `d'`.  It
         keeps the block-level offset arithmetic (`diblk_bytes_*`) entirely
         out of the Iris proof.
-- [~] `writei` — **SPECIFIED AND PARTLY PROVEN; BLOCKED ON A REAL DEFECT
-      IN THE CODE.**  Files: `SpecWritei.v` (the contract),
-      `ProofWriteiParts.v` (the vocabulary), `ProofWritei.v` (the last
-      three of five blocks, +0x0b6..+0x0e6, UNSEALED — there is no
-      `LinkWritei.v` and writei is not counted proven).
+- [x] `writei` — **PROVEN AND LINKED** (`SpecWritei.v`,
+      `ProofWriteiParts.v`, `ProofWritei.v` 3957 lines, `LinkWritei.v`).
+      Footprint is the standing six plus `LinkBalloc.Balloc.wp_balloc_sconf`
+      inherited via bmap, and nothing else.
 
-      ### THE BLOCKER: brelse of a modified, unlogged buffer
+      It was blocked on a real defect in the C, which has since been FIXED
+      (D1); the record of that blocker is kept below because the reasoning
+      is what justified changing the kernel.
+
+      Proof shape: `wi_ret` (+0xdc, the epilogue) / `wi_join` (+0xd2,
+      iupdate and the three-path join) / `wi_size` (+0xbc, the size test and
+      the five conditional restores) / `wi_loop` (+0x82 head, +0x4c body,
+      **+0xb0 failure tail**, fuel induction on the straddled-block count) /
+      `wp_writei_sconf` (the prologue, the `n = 0` arm and the three −1
+      exits). The failure arm is the success arm's sequence verbatim at the
+      other pair of pcs — `log_write` re-indexes the payload to the spliced
+      bytes and returns the `bio_locked` that `brelse` demands.
+
+      **THE CONTRACT ADMITS A DISTURBED REGION.** Because the fix logs the
+      partially-copied chunk, writei modifies the file beyond what it
+      reports writing. The range clause is three-way: `[off, off+tot)` is
+      `wrote`; `[off+tot, off+tot+dist)` is unspecified `dstb` with
+      `dist <= BSIZE`; beyond that unchanged; and `tot = n -> dist = 0`.
+      Do not "simplify" this back to two arms — it would be false.
+
+      **THE NUMERIC PREMISE IS JOINT**: `off + n < 2^31`, not two separate
+      bounds. Two separate 2^31 bounds let the sum reach 2^32, the `addw` at
+      +0x022 wraps, and the MAXFILE*BSIZE compare becomes a live arm needing
+      a wrapping-`addw` reading the tree does not have. COVERAGE NOTE: this
+      makes xv6's own `off + n < off` overflow check dead by premise rather
+      than proving what the code does when it fires.
+
+      Two traps this proof paid for, both worth reusing:
+      - **`lia` cannot use a large literal like `274432`** — Coq encodes a
+        nat that big as `Init.Nat.of_num_uint`, which zify does not read, so
+        a trivially-true goal fails with "Cannot find witness". Rewrite to
+        the small factors first (`268` and `1024`) and then `lia`.
+      - **A leaf's stored value is spelled `M !!! Regidx r`, not
+        `rget M r`,** by the time it reaches the hypothesis — even though
+        `wp_csdsp_s_sconf`'s post binds `storeval := rget m rs2`. Thirteen
+        prologue store sites hit this.
+
+      ### THE BLOCKER THAT WAS (fixed in the source, kept for the record):
+      ### brelse of a modified, unlogged buffer
 
       This is a defect in the xv6 SOURCE, not a proof gap. It is written up
       for the kernel-side reader — reachability, observable consequence,
@@ -160,7 +208,7 @@ Bmap.wp_bmap_sconf` is unchanged.
       [`../kernel-defects.md`](../kernel-defects.md). What follows here is
       the proof-side detail.
 
-      DECIDED 2026-08-06: stop at the write-up. writei stays specified,
+      SUPERSEDED 2026-08-06: the source was fixed instead (D1). writei is now
       partly proven and UNLINKED. The three ways out below were all
       considered and none taken — in particular the cheap one (premise
       `user = false`, which would make writei provable for the in-kernel

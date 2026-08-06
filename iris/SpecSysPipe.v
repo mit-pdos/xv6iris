@@ -23,7 +23,7 @@
        return 0;
      }
 
-   @ KernelSyms.sys_pipe = 0x80005338, 71 instructions (offsets 0x00 .. 0xe0;
+   @ KernelSyms.sys_pipe = 0x8000533e, 71 instructions (offsets 0x00 .. 0xe0;
    see CodeSysPipe.v for the listing).  A 64-byte frame: [fdarray] at
    s0-40, [rf] at s0-48, [wf] at s0-56, and the two [int]s sharing the
    bottom slot -- [fd1] in its LOW word (s0-64), [fd0] in its HIGH word

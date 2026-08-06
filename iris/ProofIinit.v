@@ -356,13 +356,13 @@ Section ProofIinit.
     assert (Hpp3e : add_vec_int (mword_of_int (KernelSyms.iinit + 0x3c) : mword 64) 2 = mword_of_int (KernelSyms.iinit + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp3e) in "Hpc".
     (* +0x3e jal ra,initsleeplock *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.iinit + 0x3e)) (mword_of_int 1 : mword 5) (mword_of_int 3666 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.iinit + 0x3e)) (mword_of_int 1 : mword 5) (mword_of_int 3672 : mword 21)
               M2 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi3e [-]").
     iIntros (CIDc Hsc) "Hcg Hpc".
     set (M3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.iinit + 0x3e) : mword 64) 4)]> M2).
-    assert (Htgtisl : add_vec (mword_of_int (KernelSyms.iinit + 0x3e) : mword 64) (sign_extend' 64 (mword_of_int 3666 : mword 21)) = mword_of_int KernelSyms.initsleeplock)
+    assert (Htgtisl : add_vec (mword_of_int (KernelSyms.iinit + 0x3e) : mword 64) (sign_extend' 64 (mword_of_int 3672 : mword 21)) = mword_of_int KernelSyms.initsleeplock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtisl) in "Hpc".
     assert (HM3a0 : M3 !!! Regidx (mword_of_int 10 : mword 5) = inode_lock j)

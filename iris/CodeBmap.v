@@ -289,9 +289,9 @@ Section CodeBmap.
   Proof. mk_rvc (KernelSyms.bmap + 0xaa) (mword_of_int 0x8552 : mword 16)
     (mword_of_int (KernelSyms.bmap + 0xaa) : mword 64) (RTYPE (Regidx (mword_of_int 20), zreg, Regidx (mword_of_int 10), ADD)) kd_8552 exec_execute_C_MV. Qed.
 
-  Lemma bmi_ac : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xac) : mword 64) false (JAL (mword_of_int 3620 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bmap + 0xac) (mword_of_int 0x625000ef : mword 32)
-    (mword_of_int (KernelSyms.bmap + 0xac) : mword 64) (JAL (mword_of_int 3620 : mword 21, Regidx (mword_of_int 1))) kd_625000ef. Qed.
+  Lemma bmi_ac : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xac) : mword 64) false (JAL (mword_of_int 3626 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bmap + 0xac) (mword_of_int 0x62b000ef : mword 32)
+    (mword_of_int (KernelSyms.bmap + 0xac) : mword 64) (JAL (mword_of_int 3626 : mword 21, Regidx (mword_of_int 1))) kd_62b000ef. Qed.
 
   Lemma bmi_b0 : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xb0) : mword 64) true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")), zreg)).
   Proof. mk_rvc (KernelSyms.bmap + 0xb0) (mword_of_int 0xbfc9 : mword 16)

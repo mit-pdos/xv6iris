@@ -96,6 +96,82 @@ change that produced it.
 - **A slow `Qed` is usually proof-term SIZE, not conversion — and `rocq compile -profile <f>.json` is what tells you which.** It breaks each `Qed` into `HConstr.of_constr` / `Typeops.execute` / `close_proof` / `sort_and_universes_of_constr`; measured across this tree only ~25 % is `Typeops` (real typechecking) and the rest is term-size-linear plumbing that re-walks every *occurrence* of a shared subterm. The one-command tell is **`Set Debug "hconstr".`**, which prints each `Qed`'s `tree size` and `bindings` (the DAG): a high **tree/bindings ratio** means a small proof with an exponentially unfolded term. To localise it inside a lemma, bisect with an `Axiom cheat_ : forall (A : Type), A.` stub (unlike `Admitted` this still runs `Qed`). See `optimization.md` for the whole method and for the `unfold set_reg` 3^N trap it found.
 - **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
 
+## Changing the kernel SOURCE: what an image shift breaks, and how to find it
+
+Done once, 2026-08-06, for a 6-byte fix inside `writei` (`kernel-defects.md`
+D1). It touched ~30 proof files and ~130 sites. Every step below was paid
+for; do them in this order.
+
+**1. GATE: prove the toolchain reproduces the image BEFORE changing anything.**
+There is no record of which gcc built the tracked dumps — CI never builds the
+ELF, it uses the checked-in `kernel-rocq/*.v`. So install a toolchain, build
+at the **unchanged** pinned `XV6_REV`, dump to a scratch dir and diff against
+the tracked files. All three must be byte-identical. (Ubuntu's
+`gcc-riscv64-linux-gnu` 15.2.0 did reproduce it exactly, as of that date.)
+If they differ, STOP: a rebuild would re-do register allocation and inlining
+across the whole kernel and take every proof with it, and you would be
+debugging that instead of your change. This is the same discipline the
+README already mandates for regenerating the Sail model.
+
+**2. Take the MINIMAL source change.** Cherry-pick the one commit onto the
+pinned rev; do not move to a branch head. The `riscv` branch was 13 commits
+ahead touching 8 kernel files including `trampoline.S`, `memlayout.h` and
+`bio.c` — all fully-proven subsystems. Bundling them would make it
+impossible to tell which change broke what.
+
+**3. Measure the shift from the symbol tables, not by assumption.** Diff old
+vs new `KernelSyms.v`. Expect ONE uniform delta over a bounded window: the
+writei fix moved 46 symbols by +6 over `[0x80003752, 0x80005420)` and
+**nothing above it**, because `kernelvec`'s alignment padding absorbed the 6
+bytes. Data (`sb` &c.) did not move at all. A first pass that assumed
+"everything above the change shifts" flagged 92 literals in 70 files; the
+true set was 14. Shifting the other 78 would have broken working proofs.
+
+**4. Regenerate, then repair, in this order:** re-dump `kernel-rocq/`; bump
+`XV6_REV`; run `tools/gen_code.py` (it regenerates every Code file in
+`tools/code_manifest.json` straight from the image — 117 files, and it is
+what makes this tractable at all); then fix what it does NOT cover.
+
+### The three things that bite, none of which a grep for addresses finds
+
+- **A function that moves changes its instruction WORDS, not just its
+  address.** Every PC-relative `jal`, branch, and `auipc`/`addi` pair that
+  crosses the moved/unmoved boundary re-encodes: **−6 leaving** a moved
+  function, **+6 entering** one; both-moved and both-unmoved are unchanged.
+  That rule held for all 146 changed immediates with zero exceptions. It is
+  why proofs of functions that did NOT move (`bread`, `brelse`, `binit`,
+  `main`, `bmap`, `iupdate`) still break — they call into code that did.
+
+- **NEVER compute the fix set by value arithmetic.** Three separate ways it
+  is wrong, each hit for real: (a) `removed − added` set-difference silently
+  drops any value that reappears as a NEW immediate elsewhere — that hid
+  `ProofFilealloc` entirely; (b) immediates are written in HEX in some
+  proofs and DECIMAL in others (`0x6a2` vs `1698`), so a decimal grep misses
+  sites; (c) **adjacent call sites 6 bytes apart collide**, e.g. `iti_56`
+  2093404→2093398 next to `iti_5c` 2093398→2093392 — a sequential value
+  sweep double-shifts the first. **Build the map keyed by LEMMA NAME from
+  the regenerated `Code<F>.v` diff, and apply it by LINE NUMBER.**
+
+- **Hand-written decode files state the word AND its decoded AST, and both
+  must move together.** `gen_code.py` does not cover the `Code*Aux.v` files.
+  Fixing only the word in `CodeFileinitAux.v` left the lemma asserting
+  `ITYPE (1468, …)` against a word that now decodes to 1462, and the file
+  failed again on the next build. Diff every asserted word in such a file
+  against the image rather than patching the one the error names.
+
+### Expect cascades, and let `-k` enumerate them
+
+Each build reveals only the next layer: a file that fails blocks its
+dependants from being attempted at all, so they surface only once it is
+fixed (`ProofFileinit` appeared two builds after `CodeFileinitAux`, which it
+depends on). Run `make -k`, collect the whole failure set, fix it as a
+batch, repeat. Do not fix-and-restart one file at a time.
+
+Also: each immediate typically appears **twice** per call site — once as the
+explicit `wp_*_s_sconf` argument and once inside a companion
+`add_vec … sign_extend'` assert or `set`. Update both, or the file fails
+again at the same offset.
+
 ## Write the checker for a refactor's SILENT failure mode, before the sweep
 
 If a change has a way of going wrong that still compiles, that way WILL be

@@ -11,7 +11,7 @@
        return -1;
      }
 
-   @ KernelSyms.fdalloc = 0x80004a5e, 22 instructions (a 32-byte frame; [f]
+   @ KernelSyms.fdalloc = 0x80004a64, 22 instructions (a 32-byte frame; [f]
    rides in the callee-saved s1 across the myproc call, and the loop walks a
    POINTER [a5 = &p->ofile[fd]] rather than re-indexing).
 
