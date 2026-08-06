@@ -478,6 +478,24 @@ Section ProcInv.
     rewrite /byte_any. iExact "Htail".
   Qed.
 
+  (* DESTRUCTION, the converse: freeproc hands the page back to kfree, which
+     wants the 4096 anonymous bytes and nothing else.  The struct words and
+     the tail forget their contents and rejoin. *)
+  Lemma tf_page_to_page_own (tfp : mword 44) (ws : list (mword 64)) :
+    tf_page tfp ws ⊢ page_own (page_base tfp).
+  Proof.
+    rewrite /tf_page /tf_words /tf_tail /a_tf_word /page_own.
+    iIntros "(%Hlen & Hws & Htail)".
+    replace 4096%nat with (8 * TFWORDS + 3808)%nat by (vm_compute; reflexivity).
+    rewrite (bwin_split (page_base tfp) 0 (8 * TFWORDS) 3808).
+    iSplitL "Hws".
+    - rewrite -Hlen. iApply (page_words8_back (page_base tfp) ws with "Hws").
+    - rewrite Nat.add_0_l.
+      replace (8 * TFWORDS)%nat with (Z.to_nat TFBYTES) by (vm_compute; reflexivity).
+      replace 3808%nat with (4096 - Z.to_nat TFBYTES)%nat by (vm_compute; reflexivity).
+      rewrite /byte_any. iExact "Htail".
+  Qed.
+
   (* borrow one trapframe word -- the nth syscall argument is [tf_arg_idx n] *)
   Lemma tf_page_word (tfp : mword 44) (ws : list (mword 64)) (i : nat) (w : mword 64) :
     ws !! i = Some w ->

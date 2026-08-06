@@ -210,6 +210,12 @@
   2
  ],
  [
+  "CodeFreeproc.v",
+  "freeproc",
+  "fri_",
+  2
+ ],
+ [
   "CodeFreerange.v",
   "freerange",
   "fri_",

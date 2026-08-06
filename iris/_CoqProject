@@ -744,6 +744,10 @@ SpecAllocpid.v
 CodeAllocpid.v
 ProofAllocpid.v
 LinkAllocpid.v
+SpecFreeproc.v
+CodeFreeproc.v
+ProofFreeproc.v
+LinkFreeproc.v
 SpecAllocproc.v
 CodeAllocproc.v
 ProofAllocproc.v
