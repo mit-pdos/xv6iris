@@ -37,6 +37,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import KernelText WpAuipc.
+Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.

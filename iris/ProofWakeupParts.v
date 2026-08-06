@@ -18,6 +18,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore.
 Require Import WpAuipc.
+Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext IntrDefs.
 Require Import WpLock.
@@ -27,9 +28,9 @@ Require Import WpSmodeIntr.
 Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import CodeWakeup.
+Require Import ProcGeom.
 Require Import SpecWakeupParts.
 From Kernel Require KernelSyms.
-Require Import CodeWakeupAux.
 Local Open Scope Z_scope.
 
 (* [rget m k] at a NON-tp index is the plain map lookup ([rget_ne]) -- the

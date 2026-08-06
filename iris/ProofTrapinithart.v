@@ -18,6 +18,7 @@ Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore RegFile WpMmodeLeafBase.
 Require Import HartTp WpNext IntrDefs.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr WpAuipc.
+Require Import RiscvExtras.
 Require Import CalleeSaved StackOwn.
 Require Import KernelRvcDecode.
 Require Import CodeTrapinithart.

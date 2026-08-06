@@ -44,7 +44,7 @@ Require Import RegFile WpMmodeLeafBase SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import IntrDefs.
 Require Import HartTp WpNext CpuOwn.
-Require Import WpLock CodeMycpu.
+Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import KernelRvcDecode.
 Require Import VcGen.
@@ -55,7 +55,6 @@ Require Import CodeSleeplock.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
 From Kernel Require KernelSyms.
-Require Import CodeMycpuAux.
 Import Defs.
 Local Open Scope Z_scope.
 

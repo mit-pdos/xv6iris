@@ -25,14 +25,13 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import KernelRvcDecode WpAuipc.
-Require Import CodeMycpu ProcGeom.
+Require Import ProcGeom.
 Require Import CodeMyproc.
 Require Import CpuOwn.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import SpecPushOff.
 Require Import SpecMyproc.
-Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

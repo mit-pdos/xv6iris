@@ -10,6 +10,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpDecode.
 Require Import WpAuipc.
+Require Import RiscvExtras.
 Require Import WpMmodeLeafBase.
 Require Import InstrBytes KernelText.
 From iris.base_logic.lib Require Import invariants.

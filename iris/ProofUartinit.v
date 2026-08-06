@@ -44,6 +44,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import WpMmodeLeafBase WpAuipc.
+Require Import RiscvExtras.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import KernelDataInv.

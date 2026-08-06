@@ -52,7 +52,7 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn StackBytes CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
-Require Import WpLock CodeMycpu ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import KallocInv.
@@ -66,7 +66,6 @@ Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyin
 Require Import CodePipewrite.
 Require Import SpecPipewrite.
 From Kernel Require KernelSyms.
-Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.

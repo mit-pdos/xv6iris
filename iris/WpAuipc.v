@@ -5,7 +5,7 @@ Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import RiscvLang RiscvPtsto RiscvExec RiscvExtras.
 From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Import Defs.
@@ -15,10 +15,8 @@ Lemma exec_get_arch_pc s :
   exec (get_arch_pc tt) s = Some (register_lookup PC s.(sregs), s).
 Proof. unfold get_arch_pc. exact (exec_read_reg PC s). Qed.
 
-(* --- execute (UTYPE imm rd AUIPC): read PC, add imm<<12, write rd, retire. --- *)
-Definition auipc_off (imm : mword 20) : mword 64 :=
-  sign_extend' 64 (concat_vec imm (Ox"000")).
-
+(* --- execute (UTYPE imm rd AUIPC): read PC, add imm<<12, write rd, retire. ---
+   [auipc_off] itself is pure bit-shuffling and lives in RiscvExtras.v. *)
 
 (* ---------------------------------------------------------------------- *)
 (* forward_exec_auipc: thread the generic try_step wrapper + the generic    *)

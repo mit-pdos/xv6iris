@@ -100,7 +100,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import FdSlots.
-Require Import ProcGeom CodeMycpu.
+Require Import ProcGeom.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
@@ -119,7 +119,6 @@ Require Import FsCrash.
 Require Import SpecEndOp.
 From Kernel Require KernelSyms.
 
-Require Import CodeMycpuAux.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error

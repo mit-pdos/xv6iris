@@ -51,7 +51,7 @@ Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
-Require Import WpLock CodeMycpu ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
 Require Import SpecUart CodeUartPutcSync WpSconfUartAccess WpUartgetc.
@@ -64,7 +64,6 @@ Require Import CodeUartintr.
 Require Import SpecUartintr.
 From Kernel Require KernelSyms.
 Require Import CodeUartPutcSyncAux.
-Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.

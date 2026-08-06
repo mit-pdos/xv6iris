@@ -40,12 +40,12 @@ Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
 Require Import WpLock.
-Require Import KernelRvcDecode CodeMycpu SpecMycpu.
+Require Import KernelRvcDecode SpecMycpu.
 Require Import CodeHolding WpHoldingInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecHolding.
 Require Import CodeHoldingAux.
-Require Import CodeMycpuAux.
+Require Import ProcGeom.
 Import Defs.
 
 

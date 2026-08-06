@@ -283,7 +283,6 @@ WpSieFlipBits.v
 WpSconfCsr.v
 WpPushOffCsr.v
 CodeMycpu.v
-CodeMycpuAux.v
 ProcGeom.v
 KernelBaseDecode.v
 KernelRvcDecode.v
@@ -360,7 +359,6 @@ CodeSleep.v
 ProofSleep.v
 LinkSleep.v
 CodeWakeup.v
-CodeWakeupAux.v
 SpecWakeup.v
 ProofWakeup.v
 LinkWakeup.v

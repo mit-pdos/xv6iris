@@ -61,7 +61,7 @@ Require Import ExecCommon WpGpr.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
-Require Import WpLock CodeMycpu ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
@@ -72,7 +72,6 @@ Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyou
 Require Import CodePiperead.
 Require Import SpecPiperead.
 From Kernel Require KernelSyms.
-Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
 Import Defs.

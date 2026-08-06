@@ -23,6 +23,21 @@ Qed.
 Lemma autocast_id (m : Z) (x : mword m) : autocast x = x.
 Proof. apply autocast_refl. Qed.
 
+(* [eq_vec] is reflexive.  Every loop whose termination test is a compare of a
+   cursor against its own limit needs it at the last iteration; it is stated
+   here so no proof re-proves it locally. *)
+Lemma eq_vec_refl {n} (x : mword n) : eq_vec x x = true.
+Proof. apply eq_vec_true_iff. reflexivity. Qed.
+
+(* The 64-bit offset an AUIPC's 20-bit immediate contributes (imm << 12,
+   sign-extended).  A pure bit-shuffling definition, so it lives here rather
+   than in the AUIPC WP leaf ([WpAuipc.v]) that used to hold it: the closed
+   forms of several functions' returned pointers ([ProcGeom.mycpu_ret], the
+   auipc/addi pairs every kernel-symbol materialization compiles to) are pure
+   spec vocabulary and must not have to import a weakest precondition. *)
+Definition auipc_off (imm : mword 20) : mword 64 :=
+  sign_extend' 64 (concat_vec imm (Ox"000")).
+
 (* Truncate a 64-bit value to its low 32 bits (the value a 4-byte store commits).
    Lives here (rather than in [VcGen]) so the low-level S-mode load/store WPs in
    [WpPushOffMem] can state their [_ram] postconditions with it. *)

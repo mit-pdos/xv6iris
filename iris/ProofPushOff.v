@@ -18,12 +18,12 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import HartTp WpNext.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode KernelBaseDecode WpPushOffCsr CodeMycpu SpecMycpu CodePushOff CodePopOff.
+Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode KernelBaseDecode WpPushOffCsr SpecMycpu CodePushOff CodePopOff.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CpuOwn.
 Require Import WpPushOffBridges.
 Require Import SpecPushOff.
-Require Import CodeMycpuAux.
+Require Import ProcGeom.
 Require Import CodePopOffAux.
 Import Defs.
 

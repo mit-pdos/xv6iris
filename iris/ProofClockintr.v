@@ -48,7 +48,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
-Require Import CodeMycpu ProcGeom.
+Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext CpuOwn.
 Require Import KernelRvcDecode WpAuipc.
@@ -59,7 +59,6 @@ Require Import ProcGeom.
 Require Import CodeClockintr.
 Require Import SpecCpuid SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecClockintr.
-Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

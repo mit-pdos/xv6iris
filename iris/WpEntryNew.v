@@ -34,6 +34,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RegFile RiscvPtsto RiscvFetchExec WpDecode WpGpr.
 Require Import WpAuipc WpMmodeMul WpMmodeJal.
+Require Import RiscvExtras.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeLoad.
 Require Import WpGprCsrrA.

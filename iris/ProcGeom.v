@@ -2,10 +2,10 @@
    resource.
 
    Pure layout facts shared by the proc-lock invariant (SchedCtx.v), the
-   wakeup proof (CodeWakeup.v) and the myproc/sched/yield whole-function specs.
-   All per-CPU cell addresses are stated tp-indexed via [mycpu_ret tp0]
-   (CodeMycpu.v), the same closed form the acquire/release/push_off/pop_off
-   specs already use, so cells unify across call boundaries by name.
+   wakeup proof (ProofWakeup.v) and the myproc/sched/yield whole-function
+   specs.  All per-CPU cell addresses are stated tp-indexed via [mycpu_ret
+   tp0] (defined below), the same closed form the acquire/release/push_off/
+   pop_off specs already use, so cells unify across call boundaries by name.
 
    Layout (kernel/proc.h, corroborated by the compiled image):
 
@@ -28,10 +28,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Export HartTp.   (* cid_word_of / cid_word live here now; EXPORTED so the
                             ~90 existing references through ProcGeom keep working *)
-Require Import CodeMycpu.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
-Require Import CodeMycpuAux.
 Local Open Scope Z_scope.
 
 
@@ -377,6 +375,28 @@ Qed.
 (* ===================================================================== *)
 (* struct cpu cell addresses, tp-indexed via [mycpu_ret].                 *)
 (* ===================================================================== *)
+
+(* [mycpu_ret tp0] is &cpus[tp0], in the EXACT closed form mycpu()'s five
+   instructions leave in a0 -- [c.mv a5,tp] / [sext.w] / [c.slli a5,7] build
+   [mycpu_a5], and the [auipc a0,0x11] / [addi a0,a0,-1404] pair materializes
+   &cpus.  Every per-CPU cell address below, and every acquire / release /
+   push_off / pop_off / myproc contract, is stated in this form, so cells unify
+   by name across call boundaries with no arithmetic at the seam.
+   [mycpu_ret_unsigned] below is what turns it back into a plain address. *)
+Definition mycpu_a5 (tp0 : mword 64) : mword 64 :=
+  shift_bits_left
+    (sign_extend' 64 (subrange_vec_dec
+       (add_vec (add_vec zero_reg tp0)
+                (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0))
+    (subrange_vec_dec (mword_of_int 7 : mword 6) (Z.sub log2_xlen 1) 0).
+
+Definition mycpu_ret (tp0 : mword 64) : mword 64 :=
+  add_vec
+    (add_vec
+       (add_vec (add_vec_int (mword_of_int KernelSyms.mycpu : mword 64) 14)
+                (auipc_off (mword_of_int 0x11 : mword 20)))
+       (sign_extend' 64 (mword_of_int 0xa84 : mword 12)))
+    (mycpu_a5 tp0).
 
 (* c->proc (offset 0): the cell the current-process resource owns. *)
 Definition a_cpu_proc (tp0 : mword 64) : mword 64 := mycpu_ret tp0.

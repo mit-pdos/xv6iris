@@ -19,6 +19,7 @@ Require Import RegFile.
 Require Import WpNext.
 Require Import CpuOwn.
 Require Import WpMmodeLeafBase WpAuipc.
+Require Import RiscvExtras.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
 Require Import KernelDataInv.

@@ -249,11 +249,20 @@ IMM_RE = re.compile(r'mword_of_int\s+(0x[0-9a-fA-F]+|\d+)(?:\s*:\s*mword\s+(\d+)
 
 
 def proof_files(iris):
+    """Every hand-written .v -- the auto-generated Code<F>.v are gen_code.py's.
+
+    Keyed by CONTENT (the generator's header marker), never by filename: a
+    restated relocation can live in any hand-written file, and a name-keyed
+    whitelist silently drops one the moment a definition is relocated to its
+    proper altitude ([ProcGeom.mycpu_ret], whose auipc/addi pair moves on
+    every upstream bump, is exactly that case).
+    """
     out = []
     for p in sorted(glob.glob(os.path.join(iris, '*.v'))):
-        b = os.path.basename(p)
-        if b.startswith(('Proof', 'Wp', 'Spec')) or b.endswith('Aux.v'):
-            out.append(p)
+        with open(p, encoding='utf8', errors='replace') as f:
+            if 'AUTO-GENERATED' in f.read(2000):
+                continue
+        out.append(p)
     return out
 
 
@@ -363,7 +372,7 @@ def main():
             # window belongs to the instruction at pc+4, not to this one.
             # Without this the site is skipped (widths disagree) and the stale
             # lo-12 survives: ProofAllocpid's pid_lock relocation, ProofSched's
-            # and ProofScheduler's, CodeMycpuAux's mycpu_ret.
+            # and ProofScheduler's, ProcGeom's mycpu_ret.
             if kind == 'U20' and 'auipc_off' in seg:
                 nxt = word_at(by, addr + 4, 4)
                 if nxt is not None:

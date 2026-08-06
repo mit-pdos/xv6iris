@@ -31,7 +31,6 @@ Require Import SpecAcquire SpecRelease SpecMyproc.
 Require Import SpecHoldingsleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
-Require Import CodeWakeupAux.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -387,7 +386,7 @@ Section ProofHoldingsleep.
     assert (HC3e_s1 : C3e !!! Regidx (mword_of_int 9 : mword 5) = sub_vec (C3c !!! Regidx (mword_of_int 9 : mword 5)) (C3c !!! Regidx (mword_of_int 19 : mword 5)))
       by (rewrite /C3e upd_eq; reflexivity).
     assert (Heqpid : eq_vec (C3c !!! Regidx (mword_of_int 9 : mword 5)) (C3c !!! Regidx (mword_of_int 19 : mword 5)) = true)
-      by (rewrite HC3c_s1 HC3c_s3; apply wk_eq_vec_refl).
+      by (rewrite HC3c_s1 HC3c_s3; apply eq_vec_refl).
     (* +0x42 seqz s1,s1 (sltiu s1,s1,1) : s1 := 1 *)
     iPoseProof (hsl_42 with "Htext") as "Hi42".
     iApply (wp_sltiu_s_sconf Φ (mword_of_int (KernelSyms.holdingsleep + 0x42)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 1 : mword 12)

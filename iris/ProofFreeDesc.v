@@ -42,7 +42,7 @@ Require Import RegFile.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
-Require Import CodeMycpu ProcGeom.
+Require Import ProcGeom.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext CpuOwn.
 Require Import FdSlots.
@@ -53,7 +53,6 @@ Require Import VirtioModel DiskPtsto DiskInv.
 Require Import SpecWakeup.
 Require Import CodeFreeDesc.
 Require Import SpecFreeDesc.
-Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

@@ -38,6 +38,33 @@ It requires only the definitional layer — never a `Proof*` proof file. A
 callee's proof-file require becomes that callee's `Spec` file. Spec files
 compile in ~2 s.
 
+**A `Spec<F>.v` must not require a `Code<F>.v` either, its own or anyone
+else's** — not directly and not through a definitional file it requires. A
+`Code` file is the function's machine code (decode templates + `instr` facts,
+see [`code-organization.md`](code-organization.md)); a spec is about what the
+function DOES, so needing a name from a `Code` file always means that name is
+misfiled, and the fix is to move the name down, never to add the require.
+Where "down" is:
+
+- **pure vocabulary the contract is stated over** → the definitional file that
+  owns the subject. `mycpu_a5`/`mycpu_ret` (the closed form of &cpus[tp]) are
+  `struct cpu` geometry and live in `ProcGeom.v` beside `a_cpu_*`; wakeup's
+  frame-cell address `wk_fcell` is part of `SpecWakeupParts`' own statement and
+  lives there.
+- **a generic bv/instruction-encoding identity** → `RiscvExtras.v`
+  (`auipc_off`, `eq_vec_refl`).
+- **something only the proof consumes** → the `Proof<F>.v`.
+
+The check is one line and worth running after any relocation — no Spec file
+may have a `Code*` in its require closure:
+
+```
+grep -l 'Require.*\bCode[A-Z]' iris/*.v      # only Code/Proof/Wp/Link may match
+```
+
+The one file still outside the rule is `SpecEntry.v`, and only transitively:
+see the M-mode boot section below.
+
 **`Proof<F>.v`** — the proof, a *sealed functor* over its callees' interfaces.
 The lemma keeps its original header and concludes with the `_body`:
 
@@ -160,10 +187,17 @@ other one:
   `iEval (change pcE with pc_e0) in "Hpc"` at the head and
   `iEval (change st_main with pcMain) in "Hpc"` / `… in "Hmepc"` at the tail.
 - **`SpecEntry.v` is the one Spec file not stated over the definitional layer
-  alone.** Its post-state vocabulary (`m_jal`, `entry_ld_ea`, `st_mout`,
-  `st_pmpcfg1`, `ti_deadline`, …) is defined inside the M-mode Wp files, so it
-  requires them. Moving that pure vocabulary into a definitional file is what
-  would decouple it; nothing else depends on that split.
+  alone**, and the one exception to the no-`Code`-in-the-closure rule above.
+  Its post-state vocabulary — 16 definitions: `m_jal`/`entry_ld_ea`
+  (WpEntryNew.v), `ti_sp1`/`ti_ea_ra`/`ti_ea_s0`/`ti_menv1`/`ti_mcen1`/
+  `ti_deadline` (WpTimerinit.v), `st_ms1`/`st_mout`/`st_ffff`/`st_mdl1`/
+  `st_mie1`/`st_menv_adue`/`st_pmpcfg1`/`st_pmpaddr1` (WpStartNew.v), plus
+  `cms5` (WpGprMretWp.v) — is defined inside the M-mode Wp files, so it
+  requires those, and reaches `CodeEntry`/`CodeStart`/`CodeTimerinit` through
+  them. Lifting those 16 into a definitional `MbootVocab.v` is what would
+  decouple it, and would put the M-mode boot on the same footing as every
+  other Spec file; nothing else depends on that split, which is why it has not
+  been done.
 
 ## Thin initlock wrappers: one proof, one instance per function
 
