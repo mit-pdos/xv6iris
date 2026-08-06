@@ -46,6 +46,7 @@ Require Import UserBits.
 Require Import SmodeCorePt SRegime.
 Require Import KptShare.
 Require Import Riscv.rv64d_types Riscv.rv64d.
+Require Import MemAccessGen.
 Local Open Scope Z_scope.
 Import Defs.
 

@@ -711,7 +711,7 @@ Local Ltac uvm_perm_tac p :=
            split; [vm_compute; reflexivity|];
            split; [vm_compute; reflexivity | vm_compute; reflexivity]
          | split; [ uvm_leaf_tac Hp
-                  | intros r acc [-> | [-> | [-> | [-> | [-> | (op & ->)]]]]];
+                  | intros r acc [-> | [-> | [-> | [(aq & rl & ->) | [(aq & rl & ->) | (op & aq & rl & ->)]]]]];
                     first [ left; uvm_acc_one Hp | right; uvm_acc_one Hp ] ] ].
 
 (* PTE_R|PTE_U -- exec's read-only segments *)

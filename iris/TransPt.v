@@ -109,7 +109,12 @@ Section Pt2Translate.
                                  (pte_set_ad p0p a1 d1))
                               σ.(mdev))
                      tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
-                            (Some (u_walk_entry vpn pp2 pp1 (pte_set_ad p0p a1 d1) (mword_of_int 0)))))).
+                            (Some (u_walk_entry vpn pp2 pp1 (pte_set_ad p0p a1 d1) (mword_of_int 0)))))
+         (* the fork's atomic update re-reads MEMORY: if the previous tree's
+            leaf ALREADY has the bits the cached copy lacks, nothing is
+            written and the entry is merely refreshed *)
+         \/ σ' = set_reg σ tlb (vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                                  (Some (u_walk_entry vpn pp2 pp1 p0p (mword_of_int 0))))).
   Proof.
     intros vpn p0p p0c Hchk Hcanon Hout Hvarp Hbase Hmaps_p Hmaps_c Htlbok
            Hsm2 Hsm1 Hsm0 Hsm0p
@@ -139,6 +144,17 @@ Section Pt2Translate.
     pose proof (pt_read_pte_slot σ _ pc2 region2 Hsm2' HA Hord HR Hcov Hm2 Hs2 Hhtif) as Hrd2.
     pose proof (pt_read_pte_slot σ _ pc1 region1 Hsm1' HA Hord HR Hcov Hm1 Hs1 Hhtif) as Hrd1.
     pose proof (pt_read_pte_slot σ _ p0c region0 Hsm0' HA Hord HR Hcov Hm0r Hs0 Hhtif) as Hrd0.
+    pose proof (pt_read_pte_exclusive_slot σ _ p0c region0 Hsm0' HA Hord HR Hcov Hm0r Hs0 Hhtif)
+      as Hrdx.
+    (* the PREVIOUS tree's leaf: the fork's re-read on a hit reads THIS slot *)
+    pose proof Hmaps_p as (cp1 & cp0 & _ & _ & _ & _ & _ & _ & _ &
+                           Hv2p & Hn2p & Hv1p & Hn1p & Hv0p & Hl0p & Hnapp & Hpb0p).
+    assert (Hsm0p' : pt_slot_mem σ (u_pte_addr (u_next_base pp1) (subrange_vec_dec vpn 8 0)) p0p)
+      by exact Hsm0p.
+    destruct (Hpmar (u_pte_addr (u_next_base pp1) (subrange_vec_dec vpn 8 0))
+           (pt_slot_ram_access _ _ _ Hsm0p')) as (region0p & Hm0p & Hs0p).
+    pose proof (pt_read_pte_exclusive_slot σ _ p0p region0p Hsm0p' HA Hord HR Hcov Hm0p Hs0p Hhtif)
+      as Hrdxp.
     assert (Htm : exec (translationMode Supervisor) σ = Some (Sv39, σ))
       by exact (exec_translationMode_S_sv39 satp0 σ HSXL Hsatp Hmode).
     (* output geometry for the current tree's leaf *)
@@ -168,7 +184,7 @@ Section Pt2Translate.
     { intros Hlk.
       destruct (ptree_translate_miss_core acc Supervisor rc va w tlbvec pc2 pc1 ac dc σ Hchk
                   Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hsm0
-                  Hrd2 Hrd1 Hrd0 Hmisa Hmenv Hhtif Htlb Hlk
+                  Hrd2 Hrd1 Hrd0 Hrdx Hmisa Hmenv Hhtif Htlb Hlk
                   HA Hord HW Hcov Hpmaw)
         as (σ' & Htr & Hshape).
       exists σ'. split.
@@ -210,43 +226,69 @@ Section Pt2Translate.
                       (PPN_of_PTE (pte_set_ad p0p a' d' : mword 64))) : mword 44)) : mword 44)
                   (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
         { rewrite pte_set_ad_ppn. unfold p0p. rewrite pte_set_ad_ppn. exact Hout. }
+        assert (Hvarm : exists a2 d2 : mword 1, p0p = pte_set_ad (pte_set_ad p0p a' d') a2 d2).
+        { exists ap, dp. rewrite pte_set_ad_absorb.
+          unfold p0p. rewrite pte_set_ad_absorb. reflexivity. }
         destruct (update_PTE_Bits (pte_set_ad p0p a' d' : mword 64) acc) as [q0'|] eqn:Hupq.
-        * (* hit + write-back through the cached pteAddr: the PREVIOUS
-             tree's L0 slot (O3prev) *)
-          destruct Hsm0p as (Hbytes0 & Hram0 & Hram0' & Hal0).
-          destruct (Hpmaw (pt_addr0 pp1 vpn)
-            (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
-               eq_refl eq_refl)) as (regionw & Hmw & Hww).
-          assert (Hwr : exec (write_pte
-                     (Physaddr (u_pte_addr (u_next_base pp1) (subrange_vec_dec vpn 8 0))) 8
-                     (q0' : mword 64)) σ
-                   = Some (Ok true, MState σ.(sregs)
-                              (write_bytes σ.(mem) (pt_addr0 pp1 vpn) 8 q0') σ.(mdev)))
-            by exact (exec_write_pte_ram (pt_addr0 pp1 vpn) q0' regionw σ
-                        Hram0 Hram0' Hal0 HA Hord HW Hcov Hmw Hww Hhtif).
-          destruct (update_PTE_Bits_set_ad _ _ _ Hupq) as (a1 & d1 & Hq).
-          assert (Hq' : q0' = pte_set_ad p0p a1 d1)
-            by exact (eq_trans Hq (pte_set_ad_absorb p0p a' d' a1 d1)).
-          eexists. split.
-          { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
-                     (autocast (T := mword) ((autocast (T := mword)
-                        (PPN_of_PTE (pte_set_ad p0p a' d' : mword 64))) : mword 44))
-                     satp0 va pa σ _
-                     Heff Hss Hcp Htm Hsatp Hppn Hasid
-                     Hcanon eq_refl).
-            2:{ exact Hidc. }
-            intros mxr do_sum.
-            unfold translate.
-            rewrite (exec_bind_Some _ _ _ _ _
-                       (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ σ Htlb Hslot
-                          (uwe_match_self vpn pp2 pp1 (pte_set_ad p0p a' d')))).
-            cbn match.
-            apply (exec_translate_TLB_hit_pt_upd acc Supervisor mxr do_sum
-                     vpn pp2 pp1 (pte_set_ad p0p a' d') q0' MENVCFG_S (mword_of_int 0)
-                     (tlb_hash (__id 39) vpn) _ σ
-                     (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE Hwr eq_refl). }
-          right. right. right. exists a1, d1.
-          rewrite <- Hq'. rewrite Htlb. reflexivity.
+        * destruct (update_PTE_Bits (p0p : mword 64) acc) as [p0p'|] eqn:Hupm.
+          -- (* hit + write-back through the cached pteAddr: the PREVIOUS
+                tree's L0 slot (O3prev) *)
+             destruct Hsm0p as (Hbytes0 & Hram0 & Hram0' & Hal0).
+             destruct (Hpmaw (pt_addr0 pp1 vpn)
+               (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
+                  eq_refl eq_refl)) as (regionw & Hmw & Hww).
+             assert (Hwr : exec (write_pte_conditional
+                        (Physaddr (u_pte_addr (u_next_base pp1) (subrange_vec_dec vpn 8 0))) 8
+                        (p0p' : mword 64)) σ
+                      = Some (Ok true, MState σ.(sregs)
+                                 (write_bytes σ.(mem) (pt_addr0 pp1 vpn) 8 p0p') σ.(mdev)))
+               by exact (exec_write_pte_conditional_ram (pt_addr0 pp1 vpn) p0p' regionw σ
+                           Hram0 Hram0' Hal0 HA Hord HW Hcov Hmw Hww Hhtif).
+             destruct (update_PTE_Bits_set_ad _ _ _ Hupm) as (a1 & d1 & Hq).
+             eexists. split.
+             { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
+                        (autocast (T := mword) ((autocast (T := mword)
+                           (PPN_of_PTE (pte_set_ad p0p a' d' : mword 64))) : mword 44))
+                        satp0 va pa σ _
+                        Heff Hss Hcp Htm Hsatp Hppn Hasid
+                        Hcanon eq_refl).
+               2:{ exact Hidc. }
+               intros mxr do_sum.
+               unfold translate.
+               rewrite (exec_bind_Some _ _ _ _ _
+                          (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ σ Htlb Hslot
+                             (uwe_match_self vpn pp2 pp1 (pte_set_ad p0p a' d')))).
+               cbn match.
+               apply (exec_translate_TLB_hit_pt_upd acc Supervisor mxr do_sum
+                        vpn pp2 pp1 (pte_set_ad p0p a' d') q0' p0p p0p' MENVCFG_S (mword_of_int 0)
+                        (tlb_hash (__id 39) vpn) _ σ
+                        (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE
+                        Hrdxp Hv0p Hl0p Hnapp (Hchk ap dp mxr do_sum) Hmisa HPBMTE
+                        Hvarm Hupm Hwr eq_refl). }
+             right. right. right. left. exists a1, d1.
+             rewrite <- Hq. rewrite Htlb. reflexivity.
+          -- (* memory already has them: TLB-only refresh *)
+             eexists. split.
+             { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
+                        (autocast (T := mword) ((autocast (T := mword)
+                           (PPN_of_PTE (pte_set_ad p0p a' d' : mword 64))) : mword 44))
+                        satp0 va pa σ _
+                        Heff Hss Hcp Htm Hsatp Hppn Hasid
+                        Hcanon eq_refl).
+               2:{ exact Hidc. }
+               intros mxr do_sum.
+               unfold translate.
+               rewrite (exec_bind_Some _ _ _ _ _
+                          (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ σ Htlb Hslot
+                             (uwe_match_self vpn pp2 pp1 (pte_set_ad p0p a' d')))).
+               cbn match.
+               apply (exec_translate_TLB_hit_pt_refresh acc Supervisor mxr do_sum
+                        vpn pp2 pp1 (pte_set_ad p0p a' d') q0' p0p MENVCFG_S (mword_of_int 0)
+                        (tlb_hash (__id 39) vpn) σ
+                        (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE
+                        Hrdxp Hv0p Hl0p Hnapp (Hchk ap dp mxr do_sum) Hmisa HPBMTE
+                        Hvarm Hupm). }
+             right. right. right. right. rewrite Htlb. reflexivity.
         * (* hit, A/D already sufficient (O1) *)
           assert (Hupq' : update_PTE_Bits
                     (autocast (T := mword) (pte_set_ad p0p a' d') : mword 64) acc = None)
@@ -287,42 +329,69 @@ Section Pt2Translate.
                       (PPN_of_PTE (pte_set_ad p0c a' d' : mword 64))) : mword 44)) : mword 44)
                   (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub pagesize_bits 1) 0)) = pa).
         { rewrite pte_set_ad_ppn. exact Hid. }
+        assert (Hvarmc : exists a2 d2 : mword 1, p0c = pte_set_ad (pte_set_ad p0c a' d') a2 d2).
+        { exists ac, dc. rewrite pte_set_ad_absorb.
+          unfold p0c. rewrite pte_set_ad_absorb. reflexivity. }
         destruct (update_PTE_Bits (pte_set_ad p0c a' d' : mword 64) acc) as [q0'|] eqn:Hupq.
-        * (* hit + write-back into the CURRENT tree's L0 slot (O3cur) *)
-          destruct Hsm0 as (Hbytes0 & Hram0 & Hram0' & Hal0).
-          destruct (Hpmaw (pt_addr0 pc1 vpn)
-            (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
-               eq_refl eq_refl)) as (regionw & Hmw & Hww).
-          assert (Hwr : exec (write_pte
-                     (Physaddr (u_pte_addr (u_next_base pc1) (subrange_vec_dec vpn 8 0))) 8
-                     (q0' : mword 64)) σ
-                   = Some (Ok true, MState σ.(sregs)
-                              (write_bytes σ.(mem) (pt_addr0 pc1 vpn) 8 q0') σ.(mdev)))
-            by exact (exec_write_pte_ram (pt_addr0 pc1 vpn) q0' regionw σ
-                        Hram0 Hram0' Hal0 HA Hord HW Hcov Hmw Hww Hhtif).
-          destruct (update_PTE_Bits_set_ad _ _ _ Hupq) as (a1 & d1 & Hq).
-          assert (Hq' : q0' = pte_set_ad p0c a1 d1)
-            by exact (eq_trans Hq (pte_set_ad_absorb p0c a' d' a1 d1)).
-          eexists. split.
-          { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
-                     (autocast (T := mword) ((autocast (T := mword)
-                        (PPN_of_PTE (pte_set_ad p0c a' d' : mword 64))) : mword 44))
-                     satp0 va pa σ _
-                     Heff Hss Hcp Htm Hsatp Hppn Hasid
-                     Hcanon eq_refl).
-            2:{ exact Hidc. }
-            intros mxr do_sum.
-            unfold translate.
-            rewrite (exec_bind_Some _ _ _ _ _
-                       (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ σ Htlb Hslot
-                          (uwe_match_self vpn pc2 pc1 (pte_set_ad p0c a' d')))).
-            cbn match.
-            apply (exec_translate_TLB_hit_pt_upd acc Supervisor mxr do_sum
-                     vpn pc2 pc1 (pte_set_ad p0c a' d') q0' MENVCFG_S (mword_of_int 0)
-                     (tlb_hash (__id 39) vpn) _ σ
-                     (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE Hwr eq_refl). }
-          right. right. left. exists a1, d1.
-          rewrite <- Hq'. rewrite Htlb. reflexivity.
+        * destruct (update_PTE_Bits (p0c : mword 64) acc) as [p0c'|] eqn:Hupm.
+          -- (* hit + write-back into the CURRENT tree's L0 slot (O3cur) *)
+             destruct Hsm0 as (Hbytes0 & Hram0 & Hram0' & Hal0).
+             destruct (Hpmaw (pt_addr0 pc1 vpn)
+               (pma_access_ram _ _ _ Hram0 Hram0' (pma_width_ok 8 eq_refl eq_refl)
+                  eq_refl eq_refl)) as (regionw & Hmw & Hww).
+             assert (Hwr : exec (write_pte_conditional
+                        (Physaddr (u_pte_addr (u_next_base pc1) (subrange_vec_dec vpn 8 0))) 8
+                        (p0c' : mword 64)) σ
+                      = Some (Ok true, MState σ.(sregs)
+                                 (write_bytes σ.(mem) (pt_addr0 pc1 vpn) 8 p0c') σ.(mdev)))
+               by exact (exec_write_pte_conditional_ram (pt_addr0 pc1 vpn) p0c' regionw σ
+                           Hram0 Hram0' Hal0 HA Hord HW Hcov Hmw Hww Hhtif).
+             destruct (update_PTE_Bits_set_ad _ _ _ Hupm) as (a1 & d1 & Hq).
+             eexists. split.
+             { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
+                        (autocast (T := mword) ((autocast (T := mword)
+                           (PPN_of_PTE (pte_set_ad p0c a' d' : mword 64))) : mword 44))
+                        satp0 va pa σ _
+                        Heff Hss Hcp Htm Hsatp Hppn Hasid
+                        Hcanon eq_refl).
+               2:{ exact Hidc. }
+               intros mxr do_sum.
+               unfold translate.
+               rewrite (exec_bind_Some _ _ _ _ _
+                          (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ σ Htlb Hslot
+                             (uwe_match_self vpn pc2 pc1 (pte_set_ad p0c a' d')))).
+               cbn match.
+               apply (exec_translate_TLB_hit_pt_upd acc Supervisor mxr do_sum
+                        vpn pc2 pc1 (pte_set_ad p0c a' d') q0' p0c p0c' MENVCFG_S (mword_of_int 0)
+                        (tlb_hash (__id 39) vpn) _ σ
+                        (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE
+                        Hrdx Hv0 Hl0 Hnap (Hchk ac dc mxr do_sum) Hmisa HPBMTE
+                        Hvarmc Hupm Hwr eq_refl). }
+             right. right. left. exists a1, d1.
+             rewrite <- Hq. rewrite Htlb. reflexivity.
+          -- (* memory already has them: TLB-only refresh, which is exactly the
+                clean fill from the current tree (O2) *)
+             eexists. split.
+             { apply (exec_translateAddr_pt_front acc Supervisor vpn rc
+                        (autocast (T := mword) ((autocast (T := mword)
+                           (PPN_of_PTE (pte_set_ad p0c a' d' : mword 64))) : mword 44))
+                        satp0 va pa σ _
+                        Heff Hss Hcp Htm Hsatp Hppn Hasid
+                        Hcanon eq_refl).
+               2:{ exact Hidc. }
+               intros mxr do_sum.
+               unfold translate.
+               rewrite (exec_bind_Some _ _ _ _ _
+                          (exec_lookup_TLB_hit_ent vpn (mword_of_int 0) tlbvec _ σ Htlb Hslot
+                             (uwe_match_self vpn pc2 pc1 (pte_set_ad p0c a' d')))).
+               cbn match.
+               apply (exec_translate_TLB_hit_pt_refresh acc Supervisor mxr do_sum
+                        vpn pc2 pc1 (pte_set_ad p0c a' d') q0' p0c MENVCFG_S (mword_of_int 0)
+                        (tlb_hash (__id 39) vpn) σ
+                        (Hchkc mxr do_sum) Hupq Hpbc Hmenv HADUE
+                        Hrdx Hv0 Hl0 Hnap (Hchk ac dc mxr do_sum) Hmisa HPBMTE
+                        Hvarmc Hupm). }
+             right. left. rewrite Htlb. reflexivity.
         * (* hit, A/D already sufficient (O1) *)
           assert (Hupq' : update_PTE_Bits
                     (autocast (T := mword) (pte_set_ad p0c a' d') : mword 64) acc = None)
@@ -575,7 +644,7 @@ Section Pt2TranslateIris.
     iAssert (pmp_config rc) with "[Hpc Hpa]" as "Hpmp".
     { iApply (pmp_config_intro rc pmpcfg0 pmpaddr00
                 HA Hord HX HW HR Hcov with "Hpc Hpa"). }
-    destruct Hshape as [-> | [-> | [ (a1 & d1 & ->) | (a1 & d1 & ->) ]]].
+    destruct Hshape as [-> | [-> | [ (a1 & d1 & ->) | [ (a1 & d1 & ->) | -> ] ]]].
     - (* O1: nothing moved *)
       iModIntro. iExists σ.
       iSplit; [iPureIntro; exact Htrans |].
@@ -682,6 +751,25 @@ Section Pt2TranslateIris.
                     Hmaps_p Hv' Hl' Hn' Hp' Hok2)). }
       iApply (tlb_inv_pt2_intro rc Sp Sc satp0 tv' (ptree_set_leaf tp vpn w') tc
                 Hmode Hasid Hppn Hok' HSp' HSc Hpmawimpl
+                with "Hsatp Htlb Htp Htc Hpmp").
+    - (* O2prev: the fork's re-read found the previous tree's leaf ALREADY
+         carrying the bits the cached copy lacked, so memory is untouched and
+         only the TLB entry is refreshed *)
+      set (tv' := vec_update_dec tlbvec (tlb_hash (__id 39) vpn)
+                    (Some (u_walk_entry vpn pp2 pp1 (pte_set_ad w ap dp) (mword_of_int 0)))).
+      iMod (reg_update σ.(sregs) tlb tlbvec tv' with "Hri Htlb") as "[Hri Htlb]".
+      iModIntro. iExists (set_reg σ tlb tv').
+      cbn [set_reg sregs mem mdev].
+      iSplit; [iPureIntro; exact Htrans |].
+      iSplit; [iPureIntro; reflexivity |].
+      iSplit; [iPureIntro; right; eexists; reflexivity |].
+      iFrame "Hri Hgh".
+      assert (Hok' : tlb_ok_pt2 (mword_of_int 0) tp tc tv').
+      { apply (tlb_ok_pt2_fill_prev (mword_of_int 0) tp tc tlbvec vpn pp2 pp1
+                 (pte_set_ad w ap dp) (pte_set_ad w ap dp) Hmaps_p
+                 (pte_set_ad_refl _) Hok2). }
+      iApply (tlb_inv_pt2_intro rc Sp Sc satp0 tv' tp tc
+                Hmode Hasid Hppn Hok' HSp HSc Hpmawimpl
                 with "Hsatp Htlb Htp Htc Hpmp").
   Qed.
 

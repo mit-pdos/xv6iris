@@ -363,3 +363,57 @@ Traps, all of which cost real time at least once:
 - Consumers of a ported lemma often need `Require Import RiscvExtras` (and
   `RiscvFetchExec`, for `execR_untilMT_1`) added — `Import` is not transitive.
 
+
+## Status at the second full build (Aug 6, late)
+
+`make proofs -k` reaches 344 files. Green and COMMITTED: the whole width-generic
+memory stack (`WpSmodeMemGen` + the new kit in `RiscvExtras`/`MemAccessGen`),
+both A/D write-back arms (`PtTreeAdue`), `KptTree`, `TransPt`, `PtBuild`,
+`WpSmodePtLock`, `WpGprCsrwB`+`WpSconfTimer` (stimecmp/clint_dispatch),
+`WpPlicExec`, `WpSmodeUart`, `UserretPt`, `UserPtTree`/`ProcPtOwn` (the `u_acc`
+patterns).
+
+Still to port: `WpSmodePtLeaves`, `WpSmodePtUart`, `WpPlic`, `WpVirtioDev`, and
+whatever the next `-k` sweep turns up behind them.
+
+### The three shared moves, and what they cost callers
+
+1. **The vmem level resolves the effective privilege AND ITS TRANSLATION MODE
+   before the access.** Every section that proves a `vmem_read_addr` /
+   `vmem_write_addr` fact therefore grows FOUR things:
+
+       Variable md : SATPMode.
+       Hypothesis Hcps  : register_lookup cur_privilege s.(sregs) = Supervisor.
+       Hypothesis Hmprvs: eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
+       Hypothesis Htm   : exec (translationMode Supervisor) s = Some (md, s).
+
+   BUT: a section that already carries `Hcp`/`Hmprv`/`HSXL`/`Hsatp`/`Hmode`
+   (every gpr/execute-level section does) should NOT grow them -- derive
+   `Htm` in the proof with `exec_translationMode_S_sv39` and pass
+   `Sv39 Hcp Hmprv Htmv`. Adding them mechanically everywhere makes the call
+   sites worse, not better.
+
+2. **`Htr` is stated at the BARE vaddr** (`Virtaddr a`), not at
+   `Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * w))` -- the split
+   offset no longer exists. Call sites lose their `avi0_mul8` rewrite.
+
+3. **The vmem level returns the VALUE, not the split accumulator.** Delete the
+   `Let data2 := update_subrange_vec_dec (zeros' …) … v` from each section and
+   substitute `v`; declare the value `Variable v : mword (8*W)` (NOT `bv 64` --
+   `extend_value`'s width becomes uninferable). Consumers that bridged through
+   `data2_id` now just need `extend_value (n := 8*W) false v = v`, i.e.
+   `sign_extend'_id`.
+
+Argument order after the edit is declaration order: `md Hcps Hmprvs Htm Htr`
+goes exactly where `Htr` used to be.
+
+### Two more model deltas found in this sweep
+
+- `pte_is_invalid` gained TWO disjuncts: an unknown-PBMT one gated on Svpbmt,
+  and a `pte_reserved_bits_must_be_zero` gate that the rest now sits under.
+  `PtBuild.pte_valid_ptr_ext0` peels both (the gate is discharged by
+  `vm_compute in Eprb; discriminate`).
+- `execute_AMO` reordered: `mem_write_ea` and the load now run BEFORE `rs2` is
+  read, and the `Atomic`/`LoadReserved`/`StoreConditional` access-type
+  constructors carry `aq`/`rl` (so `u_acc`-style destructuring patterns need
+  `(aq & rl & ->)` / `(op & aq & rl & ->)`).

@@ -69,7 +69,7 @@ Lemma exec_is_shadow_stack_u_acc (acc : MemoryAccessType mem_payload) s :
   u_acc acc ->
   exec (is_shadow_stack_access acc) s = Some (false, s).
 Proof.
-  intros [-> | [-> | [-> | [-> | [-> | (op & ->)]]]]];
+  intros [-> | [-> | [-> | [(aq & rl & ->) | [(aq & rl & ->) | (op & aq & rl & ->)]]]]];
     unfold is_shadow_stack_access; cbn match; apply exec_returnM.
 Qed.
 

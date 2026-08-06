@@ -242,7 +242,7 @@ Proof.
                          (register_lookup cur_privilege s.(sregs))) s = Some (Supervisor, s)).
   { rewrite Hcps. apply exec_effectivePrivilege_load_S. exact Hmprvs. }
   apply (exec_vmem_read_addr_aligned_load width a pa v Supervisor md s s' Hvw Halign Heff Htm).
-  apply (exec_translate_and_read_value_g width a pa PBMT_PMA v s s' Htr).
+  apply (exec_translate_and_read_value_g width a pa PBMT_PMA v s s' s' Htr).
   apply (exec_mem_read_load_w_S PBMT_PMA pa region v (register_lookup mstatus s'.(sregs)) s'
            HA Hord Hrange HR Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes eq_refl Hmprv' Hcp').
 Qed.

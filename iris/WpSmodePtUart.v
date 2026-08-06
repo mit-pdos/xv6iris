@@ -20,6 +20,7 @@ Require Import SmodeCore.
 Require Import WpLoad WpGpr.
 Require Import WpMmodeLeafBase.
 Require Import WpUart WpSmodeUart.
+Require Import MemAccessGen.
 Local Open Scope Z_scope.
 Import Defs.
 
