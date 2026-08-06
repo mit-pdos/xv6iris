@@ -56,7 +56,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - bug: fence.i missing when jumping to userspace code
 - bug: missing fence iorw,iorw in virtio disk driver
 - RVWMO doesn't cover icache behavior, Sail model doesn't include icache either; also no precise model of MMIO/DMA
-- Sail model represents A/D page table flushes as regular reads, but actual RISC-V spec doc says they should be atomic w.r.t. other PTE accesses.  problem with model: uvmunmap clears PTE entry, another HART writes it back with A|D.  not possible on HW, but Sail allows this.
+- Sail model represents A/D page table flushes as regular reads/writes, but actual RISC-V spec doc says they should be atomic w.r.t. other PTE accesses.  problem with model: uvmunmap clears PTE entry, another HART writes it back with A|D.  not possible on HW, but Sail allows this.
 
 Big things that still need to be done/explored:
 
