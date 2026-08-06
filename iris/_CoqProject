@@ -284,6 +284,7 @@ WpSconfCsr.v
 WpPushOffCsr.v
 CodeMycpu.v
 ProcGeom.v
+WaitInv.v
 KernelBaseDecode.v
 KernelRvcDecode.v
 KernelDecode00.v
@@ -358,6 +359,8 @@ CodeWakeup.v
 SpecWakeup.v
 ProofWakeup.v
 LinkWakeup.v
+CodeReparent.v
+SpecReparent.v
 SpecInitlock.v
 ProofInitlock.v
 LinkInitlock.v

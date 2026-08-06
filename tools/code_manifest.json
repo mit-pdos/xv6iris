@@ -486,6 +486,12 @@
   2
  ],
  [
+  "CodeReparent.v",
+  "reparent",
+  "rpi_",
+  2
+ ],
+ [
   "CodeSched.v",
   "sched",
   "sdi_",

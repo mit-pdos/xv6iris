@@ -221,6 +221,11 @@ Lemma kd_89ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 14)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_00008a17 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00008a17 : mword 32) : M instruction) s
+  = Some (UTYPE (mword_of_int 8 : mword 20, Regidx (mword_of_int 20), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_9281 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x9281 : mword 16)) s
   = Some (C_SRLI (mword_of_int 32, Cregidx (mword_of_int 5)), s).
