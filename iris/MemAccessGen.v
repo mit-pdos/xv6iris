@@ -25,7 +25,7 @@ Import Defs.
    and its translation mode are DEFINED at [s] (the and_boolM evaluates its left
    operand before short-circuiting on the right). *)
 Lemma exec_vmem_write_addr_aligned_store (width : Z) (va pa : mword 64) (dat : mword (8*width))
-    (ep : Privilege) (md : SATPMode) (s s' : mstate) :
+    (ep : Privilege) (md : SATPMode) (s s' sfin : mstate) :
   vmem_width width ->
   is_aligned_vaddr (Virtaddr va) width = true ->
   exec (effectivePrivilege (Store Data) (register_lookup mstatus s.(sregs))
@@ -38,12 +38,12 @@ Lemma exec_vmem_write_addr_aligned_store (width : Z) (va pa : mword 64) (dat : m
   exec (mem_write_value (Physaddr pa) width
           (autocast (T := mword) (subrange_vec_dec dat (8*width-1) 0))
           (Store Data) PBMT_PMA false false false) s'
-    = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) dat) s'.(mdev)) ->
+    = Some (Ok true, sfin) ->
   exec (vmem_write_addr (Virtaddr va) width dat (Store Data) false false false) s
-    = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) dat) s'.(mdev)).
+    = Some (Ok true, sfin).
 Proof.
   intros Hw Halign Heff Htm Htr Hea Hwv.
-  set (sw := MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) dat) s'.(mdev)).
+  set (sw := sfin).
   unfold vmem_write_addr.
   rewrite exec_catch_early_return.
   rewrite Halign. cbn [Riscv.rv64d.not negb].
@@ -98,13 +98,13 @@ Qed.
    does not take, so the accumulator [zeros'] is overwritten in full and the
    result is the value itself ([usvd_zeros_full_gen]). *)
 Lemma exec_translate_and_read_value_g (width : Z) (va pa : mword 64)
-    (pbmt : page_based_mem_type) (v : mword (8*width)) s s' :
+    (pbmt : page_based_mem_type) (v : mword (8*width)) s s1 s2 :
   exec (translateAddr (Virtaddr va) (Load Data)) s
-    = Some (Ok (Physaddr pa, pbmt, init_ext_ptw), s') ->
-  exec (mem_read (Load Data) pbmt (Physaddr pa) width false false false) s'
-    = Some (Ok v, s') ->
+    = Some (Ok (Physaddr pa, pbmt, init_ext_ptw), s1) ->
+  exec (mem_read (Load Data) pbmt (Physaddr pa) width false false false) s1
+    = Some (Ok v, s2) ->
   exec (translate_and_read_value (Virtaddr va) width (Load Data) false false false) s
-    = Some (Ok (Physaddr pa, v), s').
+    = Some (Ok (Physaddr pa, v), s2).
 Proof.
   intros Htr Hmr.
   unfold translate_and_read_value.
