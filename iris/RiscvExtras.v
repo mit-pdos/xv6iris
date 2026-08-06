@@ -1357,6 +1357,22 @@ Proof.
   apply bv_eq. rewrite bv_zero_extend_unsigned. reflexivity. lia.
 Qed.
 
+Lemma subrange_full_32 (a : mword 32) : subrange_vec_dec a 31 0 = a.
+Proof.
+  apply bv_eq.
+  unfold subrange_vec_dec, Operators_mwords.subrange_vec_dec, get_word.
+  rewrite ?autocast_id.
+  unfold to_word_idx, to_word. rewrite ?MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
+  change (MachineWord.Z_idx (31 - 0 + 1)) with 32%N.
+  rewrite ?bv_extract_unsigned.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 32)) with (2 ^ 32) in Hr.
+  unfold bv_wrap, bv_modulus.
+  change (Z.of_N (MachineWord.Z_idx 0)) with 0. change (Z.of_N 32) with 32.
+  rewrite Z.shiftr_0_r. apply Z.mod_small. exact Hr.
+Qed.
+
 Lemma subrange_full_64 (a : mword 64) : subrange_vec_dec a 63 0 = a.
 Proof.
   apply bv_eq.
