@@ -1093,8 +1093,11 @@ step the same tactics see through).
 
 ### WHAT M4 STILL OWES (the shared `exec_eff` skeleton)
 
-The one thing M4-prep did NOT build, and the only remaining model work
-(**items 1 and 2 are now DONE — see the batch-0 block below**):
+The one thing M4-prep did NOT build, and the only remaining model work.
+**ALL FOUR ITEMS ARE NOW DONE** (1 and 2 at batch 0, 3 at batch 0b, 4 —
+partly — at batch 1); the list is kept because its per-item estimates are
+what the batch-0b/1 blocks below correct, and the correction is the durable
+lesson:
 
 1. `execR_eff` — the early-return interpreter instrumented, plus its ~8
    rewriting lemmas (`execR_eff_bind`/`_bind0`/`_liftR`/`_returnR`/
@@ -1107,13 +1110,24 @@ The one thing M4-prep did NOT build, and the only remaining model work
    `translateAddr`, `within_clint`/`_sig`/`_htif`, `currentlyEnabled`) is
    memory-free and therefore FREE via the detector; only the `MemRead` arm is
    explicit.  ~100–150 lines.
+   → **WRONG ON BOTH COUNTS, and this is the correction to keep.** The
+   detector is NOT usable there (it gives `quiet_trace`, the certificates
+   need `nowrite_trace` — the zero-width residue), so `pmpCheck` and friends
+   all had to be mirrored; and the *transitive* cone is what costs. Actual:
+   **1867 lines** (batch 0b), of which the named chain itself was ~250, as
+   estimated.
 4. Per instruction SHAPE (not per call site), the memory-touching `execute`
    mirrored: the memory-free prefix by the detector, the one `MemRead`/
    `MemWrite` arm explicit.  ~40–60 lines each, ~9 shapes (LOAD/STORE at
    1/2/4/8 and the AMO).
+   → same correction: the `vmem_read`/`vmem_write` cone under an `execute`
+   is not detectable either, so a shape is **≈ 700 lines**, not 40–60.
 
 Total ≈ 400–600 lines of shared skeleton plus ≈ 450 of per-shape mirrors, at
 the measured replay rate of ≈ 1.05× the SC script's lines.
+→ **the replay RATE was about right (measured 1.03–1.14× on scripts); the
+LINE COUNTS were 4–10× low, because they priced the script in front of the
+author rather than the transitive cone of lemmas it names.**
 
 ### What M4 BATCH 0 established (read before batch 1)
 
