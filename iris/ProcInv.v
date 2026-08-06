@@ -1047,6 +1047,28 @@ Section ProcInv.
     apply lookup_replicate in Hv as [-> _]. iFrame "Hcell". iLeft. by iFrame "Hslot".
   Qed.
 
+  (* ... and back, at ALL-NULL descriptors: the shape [proc_dormant] parks.
+     freeproc's precondition is the dormant block SPLIT (its two
+     address-space cells have to be independently optional), so a caller
+     that took the block apart with [proc_dormant_unused] and now wants to
+     hand freeproc the rest needs this direction.  allocproc's two failure
+     tails are the first consumers. *)
+  Lemma proc_ofiles_null_split (γf : gname) (pa : mword 64) (fs : list (mword 64)) :
+    fs = replicate NOFILE (zero_reg : mword 64) ->
+    proc_ofiles γf pa fs -∗
+    ofile_cells pa fs ∗ ([∗ list] _ ∈ fs, fd_slot).
+  Proof.
+    intros Hfs. rewrite /proc_ofiles /ofile_cells.
+    iIntros "[_ Ho]".
+    iAssert ([∗ list] fd ↦ v ∈ fs, (p_ofile pa fd ↦₈ v ∗ fd_slot))%I
+      with "[Ho]" as "Ho".
+    { iApply (big_sepL_impl with "Ho"). iIntros "!>" (fd v Hv) "Hs".
+      rewrite Hfs in Hv. apply lookup_replicate in Hv as [-> _].
+      iApply (ofile_slot_null γf pa fd with "Hs"). }
+    rewrite big_sepL_sep. iDestruct "Ho" as "[$ Hs]".
+    iApply (big_sepL_mono with "Hs"). iIntros (fd v _) "$".
+  Qed.
+
   (* =================================================================== *)
   (* The saved-context save area AS BYTES.                                *)
   (* =================================================================== *)

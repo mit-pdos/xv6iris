@@ -717,6 +717,17 @@ Section SchedCtx.
     iIntros "[_ [$ $]]".
   Qed.
 
+  (* the converse: putting a slot BACK at UNUSED.  freeproc's post is exactly
+     [proc_dormant _ UNUSED], so allocproc's failure tails rebuild the lock
+     resource through this before they release. *)
+  Lemma proc_slots_unused_intro (pa : mword 64) :
+    proc_dormant pa UNUSED -∗ park_at_full pa false -∗ proc_slots pa UNUSED.
+  Proof.
+    rewrite /proc_slots inv_dormant_UNUSED not_running_UNUSED.
+    rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
+    iIntros "Hd Hp". iSplitR; [done|]. iFrame "Hd Hp".
+  Qed.
+
   (* ... and its inverse at USED, where BOTH the context and the dormant
      guards are false and only the receipt is owed. *)
   Lemma proc_slots_used (pa : mword 64) :

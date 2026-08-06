@@ -792,11 +792,45 @@ the evidence for every offset. This file is only the worklist.
          bounds and one `iRight` -> `iRight; iLeft` (the post is three-way
          now).  What is LEFT is the two tails themselves plus the
          Core/counted-seal split.
-         *One bridge to expect:* `proc_dormant_unused` hands back
-         `proc_ofiles γf pa (pv_ofile V)`, but freeproc's `fp_rest` wants
-         `ofile_cells` + the `fd_slot` units (the shape `proc_dormant`
-         itself holds).  At all-null descriptors that converse is easy, but
-         it does not exist yet.
+         **The two bridges are LANDED (2026-08-06):**
+         `ProcInv.proc_ofiles_null_split` (`proc_ofiles` at all-null back
+         into `ofile_cells` + the `fd_slot` units, which is what `fp_rest`
+         wants) and `SchedCtx.proc_slots_unused_intro` (the converse of
+         `proc_slots_unused`, for rebuilding the lock resource after
+         freeproc's `proc_dormant _ UNUSED`).
+
+         **WHAT IS ACTUALLY LEFT, in dependency order.**  The two `c.beqz`s
+         are still proved on their FALL arms, and making them branch is not
+         a local edit -- each one's non-null fact comes from a COUNTED
+         callee, so the callee's call site has to be generalised first:
+
+         1. `+0x4a` needs kalloc generic.  Today the site does
+            `destruct nb as [| nb']` and calls at `Some (S nb')`, then reads
+            `kalloc_post_success` (which only exists at a positive count).
+            Generic means calling at `on` and destructing the raw
+            `kalloc_post` disjunction.  Every `Some nb'` downstream
+            (including the `iAssert (kalloc_env γa (Some nb'))` at
+            `ProofAllocproc.v:1035`) becomes `avail_sub on 1`.
+         2. `+0x56` needs proc_pagetable generic: call
+            `ProcPagetableGen.wp_proc_pagetable_core` (LinkProcPagetable
+            already exports it) instead of `PPT.wp_proc_pagetable_sconf`,
+            and destruct `ppt_post`.  Its failure arm supplies both the
+            `kalloc_env _ None` and the exhaustion witness the third post
+            arm wants.
+         3. The tail body itself is ONE `iAssert`ed block, not two: the two
+            tails are identical code and differ only in the register map,
+            in `fp_tf` (tail 1 `None`, tail 2 `Some (tfp, ws)`), and in the
+            witness.  Both have `fp_pt _ _ None` -- tail 1 because the
+            dormant block's cell was never written, tail 2 because
+            `sd a0,80(s1)` at `+0x54` stored the 0 before the branch.
+            Block: assemble freeproc's precondition, call freeproc, rebuild
+            `proc_lock_res` (the two bridges above), `release`,
+            `mv s1,s2` (s2 holds the failed callee's a0, i.e. 0), `j +0x78`
+            into `ap_tail`, then `allocproc_post`'s third arm.
+         4. Seal: `AllocprocCore : ALLOCPROC_GEN` plus the counted
+            `AllocprocProof : ALLOCPROC`, whose only job is to refute the
+            third arm from `K_allocproc < nb`.  `LinkAllocproc` gains
+            `Freeproc` as a functor argument and exports both.
       5. **The spec's third arm.** Keep ONE spec, generic in `on`, and give
          `allocproc_post` an out-of-memory disjunct carrying
          `⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝` -- which
