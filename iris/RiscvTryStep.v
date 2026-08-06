@@ -899,16 +899,6 @@ Section ExecPending.
   Hypothesis HmIE :
     eq_vec (_get_Mstatus_MIE (register_lookup mstatus s.(sregs))) ('b"1") = false.
 
-  Lemma exec_guard_true :
-    exec (or_boolM (currentlyEnabled Ext_S)
-                   (Defs.bind (read_reg mideleg)
-                      (fun w1 : mword 64 => returnM (eq_vec w1 (zeros' 64))))) s
-      = Some (true, s).
-  Proof using All.
-    rewrite (exec_or_boolM_Some _ _ _ _ _ HecES).
-    destruct cES; [reflexivity | discriminate HcEStrue].
-  Qed.
-
   Lemma exec_ext_int_some :
     exists ev, exec (external_interrupts_pending tt) s = Some (ev, s).
   Proof using All.
@@ -969,21 +959,20 @@ Section ExecPending.
     change (generic_eq Machine User) with false. apply exec_returnm.
   Qed.
 
+  (* [getPendingSet] reads mideleg only when the S extension is enabled (it
+     substitutes zeros otherwise), so the S-enabled branch is picked by
+     [HcEStrue] and there is no guard/assert to peel ahead of it. *)
   Lemma exec_getPendingSet_machine_none :
     exec (getPendingSet Machine) s = Some (None, s).
   Proof using All.
     destruct exec_read_mip_some as [mipv Hmip].
-    assert (Hae : exec (assert_exp' true "sys/sys_control.sail:107.58-107.59") s
-                  = Some (eq_refl, s)).
-    { unfold assert_exp'. cbn match. apply exec_returnm. }
     unfold getPendingSet.
-    rewrite (exec_bind_Some _ _ _ _ _ exec_guard_true).
-    rewrite (exec_bind_Some _ _ _ _ _ Hae).
+    rewrite (exec_bind_Some _ _ _ _ _ HecES).
+    rewrite HcEStrue. cbn match.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
     rewrite (exec_bind_Some _ _ _ _ _ Hmip).
     rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mie s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
     rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mie s)).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
     rewrite (exec_bind_Some _ _ _ _ _ exec_mIE_false).
     rewrite (exec_bind_Some _ _ _ _ _ exec_sIE_false).
     cbn [andb]. apply exec_returnm.

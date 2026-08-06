@@ -106,24 +106,11 @@ Lemma exec_pmaCheck_ram_load (addr : mword 64) (pbmt : page_based_mem_type)
     = Some region ->
   is_aligned_paddr (Physaddr addr) 8 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  exec (pmaCheck (Physaddr addr) 8 (Load Data) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) 8 (Load Data) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Halign Hread.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hread |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  (* Load Data arm: assert_exp' true >>= fun _ => returnM PMA_readable  ≡  returnM PMA_readable *)
-  change (assert_exp' true "sys/mem.sail:103.61-103.62" >>=
-          (fun _ : true = true => returnM (PMA_readable (override_PMA rattr pbmt))))
-    with (returnM (PMA_readable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hread. cbn match.
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hread (exec_is_mag_applicable_load_data 8 s) Halign.
 Qed.
 
 (* checked_mem_read for Load Data, width 8. *)
@@ -241,22 +228,6 @@ Qed.
 (* The loop's Acc (Zwf 0) recursion is unfolded by destructing Zwf_guarded *)
 (* (same technique as currentlyEnabled), so it is axiom-free.              *)
 (* ====================================================================== *)
-Lemma execR_untilMT_1 {R Vars} (vars vars' : Vars) (measure : Vars -> Z)
-   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars) s s' :
-  measure vars = 1 ->
-  execR (body vars) s = Some (inr vars', s') ->
-  execR (cond vars') s' = Some (inr true, s') ->
-  execR (Defs.untilMT vars measure cond body) s = Some (inr vars', s').
-Proof.
-  intros Hm Hb Hc. unfold Defs.untilMT.
-  destruct (Defs.Zwf_guarded (measure vars)).
-  cbn [Defs.untilMT'].
-  destruct (Z_ge_dec (measure vars) 0) as [Hge|Hge]; [| exfalso; rewrite Hm in Hge; lia ].
-  rewrite (execR_bind_Some _ _ _ _ _ Hb).
-  rewrite (execR_bind_Some _ _ _ _ _ Hc).
-  cbn match.
-  apply execR_returnR_fwd.
-Qed.
 
 Section S.
 Variable a : mword 64.

@@ -158,9 +158,12 @@ End TransformFront.
 (* ===================================================================== *)
 
 (* the access classes the S-mode leaves use *)
+(* [Atomic]'s two booleans are the instruction's aq/rl annotations, which
+   nothing in the translation or PMP/PMA path inspects -- so the AMO arm
+   quantifies them rather than pinning one annotation pair. *)
 Definition s_acc_ok (acc : MemoryAccessType mem_payload) : Prop :=
   acc = InstructionFetch tt \/ acc = Load Data \/ acc = Store Data \/
-  acc = Atomic (AMOSWAP, Data, Data).
+  (exists aq rl, acc = Atomic (AMOSWAP, aq, rl, Data, Data)).
 
 (* the PMP grant facts at a state: the kernel TOR entry 0 covering RAM
    with R/W/X (what every post-translate memory access checks) *)

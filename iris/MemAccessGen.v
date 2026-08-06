@@ -104,23 +104,11 @@ Lemma exec_pmaCheck_ram_load_g (k : Z) (addr : mword 64) (pbmt : page_based_mem_
     = Some region ->
   is_aligned_paddr (Physaddr addr) k = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  exec (pmaCheck (Physaddr addr) k (Load Data) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) k (Load Data) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Halign Hread.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hread |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:103.61-103.62" >>=
-          (fun _ : true = true => returnM (PMA_readable (override_PMA rattr pbmt))))
-    with (returnM (PMA_readable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hread. cbn match.
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hread (exec_is_mag_applicable_load_data k s) Halign.
 Qed.
 
 Lemma exec_pmaCheck_ram_store_g (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
@@ -128,23 +116,11 @@ Lemma exec_pmaCheck_ram_store_g (k : Z) (addr : mword 64) (pbmt : page_based_mem
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
   is_aligned_paddr (Physaddr addr) k = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  exec (pmaCheck (Physaddr addr) k (Store Data) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) k (Store Data) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Halign Hwrite.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hwrite |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:106.61-106.62" >>=
-          (fun _ : true = true => returnM (PMA_writable (override_PMA rattr pbmt))))
-    with (returnM (PMA_writable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hwrite. cbn match.
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hwrite (exec_is_mag_applicable_store_data k s) Halign.
 Qed.
 
 Lemma exec_write_ram_plain_1 (addr : mword 64) (data : bv 8) s :

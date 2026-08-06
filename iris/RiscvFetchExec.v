@@ -404,6 +404,29 @@ Proof.
     rewrite (Hb j Hjn) in Hnone. congruence.
 Qed.
 
+(* A one-iteration [untilMT]: the body runs once and the condition then holds.
+   Every memory access these proofs perform is naturally aligned, so
+   [checked_mem_read]/[checked_mem_write]'s split loop is always this case.
+   (Lives here, not with its consumers: the fetch path needs it too.) *)
+Lemma execR_untilMT_1 {R Vars} (vars vars' : Vars) (measure : Vars -> Z)
+   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars) s s' :
+  measure vars = 1 ->
+  execR (body vars) s = Some (inr vars', s') ->
+  execR (cond vars') s' = Some (inr true, s') ->
+  execR (Defs.untilMT vars measure cond body) s = Some (inr vars', s').
+Proof.
+  intros Hm Hb Hc. unfold Defs.untilMT.
+  destruct (Defs.Zwf_guarded (measure vars)).
+  cbn [Defs.untilMT'].
+  destruct (Z_ge_dec (measure vars) 0) as [Hge|Hge]; [| exfalso; rewrite Hm in Hge; lia ].
+  rewrite (execR_bind_Some _ _ _ _ _ Hb).
+  rewrite (execR_bind_Some _ _ _ _ _ Hc).
+  cbn match.
+  apply execR_returnR_fwd.
+Qed.
+
+
+
 (* read_ram (4 bytes present) reduces -- via the run-fact + read_bytes <> None. *)
 Lemma exec_read_ram_plain_4 (addr : mword 64) (w : bv 32) s :
   dev_addr addr = false ->
@@ -521,7 +544,13 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
-(* pmaCheck = None (RAM), exec version.                                    *)
+(* pmaCheck = the aligned access plan (RAM), exec version.                 *)
+(*                                                                        *)
+(* [pmaCheck] is an early-return body now (the no-matching-region arm      *)
+(* escapes), so it is peeled at the [execR] level: read the region list,   *)
+(* resolve the match to the region's overridden attributes, resolve the    *)
+(* access arm to its [canAccess] field, then run [mag_pma_check], which an  *)
+(* aligned access answers with [CannotSplit] (RiscvExtras).                *)
 (* ---------------------------------------------------------------------- *)
 
 Lemma exec_pmaCheck_ram (addr : mword 64) (pbmt : page_based_mem_type)
@@ -530,20 +559,12 @@ Lemma exec_pmaCheck_ram (addr : mword 64) (pbmt : page_based_mem_type)
     = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
-  exec (pmaCheck (Physaddr addr) 4 (InstructionFetch tt) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) 4 (InstructionFetch tt) pbmt false) s
+    = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Halign Hexec.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hexec |- *.
-  rewrite Halign. cbn [negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hexec. cbn [andb negb].
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hexec (exec_is_mag_applicable_fetch 4 s) Halign.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1127,20 +1148,11 @@ Lemma exec_pmaCheck_ram_2 (addr : mword 64) (pbmt : page_based_mem_type)
     = Some region ->
   is_aligned_paddr (Physaddr addr) 2 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
-  exec (pmaCheck (Physaddr addr) 2 (InstructionFetch tt) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) 2 (InstructionFetch tt) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Halign Hexec.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hexec |- *.
-  rewrite Halign. cbn [negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hexec. cbn [andb negb].
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hexec (exec_is_mag_applicable_fetch 2 s) Halign.
 Qed.
 
 Lemma exec_checked_mem_read_ram_2 (pbmt : page_based_mem_type) (addr : mword 64)

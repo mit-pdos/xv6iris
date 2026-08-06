@@ -23,38 +23,42 @@ Definition neq_int (x : Z) (y : Z) : bool := negb ((Z.eqb (x) (y))).
 
 Definition neq_bool (x : bool) (y : bool) : bool := negb ((Bool.eqb (x) (y))).
 
-Definition isa_version_le (x : IsaVersion) (y : IsaVersion) : bool :=
-   Z.leb ((num_of_IsaVersion (x))) ((num_of_IsaVersion (y))).
-
 Definition pma_atomicity_support_le (x : AtomicSupport) (y : AtomicSupport) : bool :=
    Z.leb ((num_of_AtomicSupport (x))) ((num_of_AtomicSupport (y))).
+
+Definition privileged_isa_version_le (x : Privileged_ISA_Version) (y : Privileged_ISA_Version)
+: bool :=
+   Z.leb ((num_of_Privileged_ISA_Version (x))) ((num_of_Privileged_ISA_Version (y))).
 
 Definition vector_support_le (x : vector_support) (y : vector_support) : bool :=
    Z.leb ((num_of_vector_support (x))) ((num_of_vector_support (y))).
 
-Definition isa_version_lt (x : IsaVersion) (y : IsaVersion) : bool :=
-   Z.ltb ((num_of_IsaVersion (x))) ((num_of_IsaVersion (y))).
-
 Definition pma_atomicity_support_lt (x : AtomicSupport) (y : AtomicSupport) : bool :=
    Z.ltb ((num_of_AtomicSupport (x))) ((num_of_AtomicSupport (y))).
+
+Definition privileged_isa_version_lt (x : Privileged_ISA_Version) (y : Privileged_ISA_Version)
+: bool :=
+   Z.ltb ((num_of_Privileged_ISA_Version (x))) ((num_of_Privileged_ISA_Version (y))).
 
 Definition vector_support_lt (x : vector_support) (y : vector_support) : bool :=
    Z.ltb ((num_of_vector_support (x))) ((num_of_vector_support (y))).
 
-Definition isa_version_ge (x : IsaVersion) (y : IsaVersion) : bool :=
-   Z.geb ((num_of_IsaVersion (x))) ((num_of_IsaVersion (y))).
-
 Definition pma_atomicity_support_ge (x : AtomicSupport) (y : AtomicSupport) : bool :=
    Z.geb ((num_of_AtomicSupport (x))) ((num_of_AtomicSupport (y))).
+
+Definition privileged_isa_version_ge (x : Privileged_ISA_Version) (y : Privileged_ISA_Version)
+: bool :=
+   Z.geb ((num_of_Privileged_ISA_Version (x))) ((num_of_Privileged_ISA_Version (y))).
 
 Definition vector_support_ge (x : vector_support) (y : vector_support) : bool :=
    Z.geb ((num_of_vector_support (x))) ((num_of_vector_support (y))).
 
-Definition isa_version_gt (x : IsaVersion) (y : IsaVersion) : bool :=
-   Z.gtb ((num_of_IsaVersion (x))) ((num_of_IsaVersion (y))).
-
 Definition pma_atomicity_support_gt (x : AtomicSupport) (y : AtomicSupport) : bool :=
    Z.gtb ((num_of_AtomicSupport (x))) ((num_of_AtomicSupport (y))).
+
+Definition privileged_isa_version_gt (x : Privileged_ISA_Version) (y : Privileged_ISA_Version)
+: bool :=
+   Z.gtb ((num_of_Privileged_ISA_Version (x))) ((num_of_Privileged_ISA_Version (y))).
 
 Definition vector_support_gt (x : vector_support) (y : vector_support) : bool :=
    Z.gtb ((num_of_vector_support (x))) ((num_of_vector_support (y))).
@@ -5111,60 +5115,60 @@ Definition is_highest_zero {n : Z} (op : mword n) (*n >=? 0*) (*0 <? n*) : bool 
 Definition is_all_zeros {n : Z} (op : mword n) (*n >=? 0*) (*0 <? n*) : bool :=
    eq_vec (op) ((zeros n)).
 
-Definition float_is_nan {ex341723_ : Z} (op : mword ex341723_)
-(*member_Z_list ex341723_ [16; 32; 64; 128]*)
+Definition float_is_nan {ex569625_ : Z} (op : mword ex569625_)
+(*member_Z_list ex569625_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_ones (exp))) ((negb ((is_all_zeros (mantissa))))).
 
-Definition float_is_snan {ex341740_ : Z} (op : mword ex341740_)
-(*member_Z_list ex341740_ [16; 32; 64; 128]*)
+Definition float_is_snan {ex569642_ : Z} (op : mword ex569642_)
+(*member_Z_list ex569642_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_mantissa := mantissa; float_bits_sign := _; float_bits_exp := _ |}) :=
      float_decompose (op) in
    andb ((float_is_nan (op))) ((is_highest_zero (mantissa))).
 
-Definition float_is_qnan {ex341747_ : Z} (op : mword ex341747_)
-(*member_Z_list ex341747_ [16; 32; 64; 128]*)
+Definition float_is_qnan {ex569649_ : Z} (op : mword ex569649_)
+(*member_Z_list ex569649_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_mantissa := mantissa; float_bits_sign := _; float_bits_exp := _ |}) :=
      float_decompose (op) in
    andb ((float_is_nan (op))) ((is_highest_one (mantissa))).
 
-Definition float_is_inf {ex341754_ : Z} (op : mword ex341754_)
-(*member_Z_list ex341754_ [16; 32; 64; 128]*)
+Definition float_is_inf {ex569656_ : Z} (op : mword ex569656_)
+(*member_Z_list ex569656_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_ones (exp))) ((is_all_zeros (mantissa))).
 
-Definition float_is_positive {ex341761_ : Z} (op : mword ex341761_)
-(*member_Z_list ex341761_ [16; 32; 64; 128]*)
+Definition float_is_positive {ex569663_ : Z} (op : mword ex569663_)
+(*member_Z_list ex569663_ [16; 32; 64; 128]*)
 : bool :=
    is_highest_zero (op).
 
-Definition float_is_negative {ex341763_ : Z} (op : mword ex341763_)
-(*member_Z_list ex341763_ [16; 32; 64; 128]*)
+Definition float_is_negative {ex569665_ : Z} (op : mword ex569665_)
+(*member_Z_list ex569665_ [16; 32; 64; 128]*)
 : bool :=
    is_highest_one (op).
 
-Definition float_is_zero {ex341765_ : Z} (op : mword ex341765_)
-(*member_Z_list ex341765_ [16; 32; 64; 128]*)
+Definition float_is_zero {ex569667_ : Z} (op : mword ex569667_)
+(*member_Z_list ex569667_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_zeros (exp))) ((is_all_zeros (mantissa))).
 
-Definition float_is_normal {ex341772_ : Z} (op : mword ex341772_)
-(*member_Z_list ex341772_ [16; 32; 64; 128]*)
+Definition float_is_normal {ex569674_ : Z} (op : mword ex569674_)
+(*member_Z_list ex569674_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_sign := _; float_bits_mantissa := _ |}) :=
      float_decompose (op) in
    andb ((negb ((is_all_ones (exp))))) ((negb ((is_all_zeros (exp))))).
 
-Definition float_is_subnormal {ex341790_ : Z} (op : mword ex341790_)
-(*member_Z_list ex341790_ [16; 32; 64; 128]*)
+Definition float_is_subnormal {ex569692_ : Z} (op : mword ex569692_)
+(*member_Z_list ex569692_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
@@ -5507,8 +5511,8 @@ Definition undefined_float_class '(tt : unit) : M (float_class) :=
       float_class_qnan]))
     : M (float_class).
 
-Definition float_classify {ex342166_ : Z} (f : mword ex342166_)
-(*member_Z_list ex342166_ [16; 32; 64; 128]*)
+Definition float_classify {ex570068_ : Z} (f : mword ex570068_)
+(*member_Z_list ex570068_ [16; 32; 64; 128]*)
 : M (float_class) :=
    (if float_is_snan (f) then returnM (float_class_snan)
     else if float_is_qnan (f) then returnM (float_class_qnan)
@@ -5546,6 +5550,8 @@ Definition get_config_print_interrupt '(tt : unit) : bool := false.
 Definition get_config_print_htif '(tt : unit) : bool := false.
 
 Definition get_config_print_pma '(tt : unit) : bool := false.
+
+Definition get_config_print_pmp '(tt : unit) : bool := false.
 
 Definition get_config_rvfi '(tt : unit) : bool := false.
 
@@ -5866,14 +5872,59 @@ Definition is_supported_pmm (ext : PM_Ext) (pmm : PointerMaskingMode) : bool :=
    | (PM_SMNPM, PMM_PMLEN_16) => true
    end.
 
-Definition undefined_IsaVersion '(tt : unit) : M (IsaVersion) :=
-   (internal_pick ([Isa_20191213; Isa_Draft_20211102; Isa_20211203; Isa_20240411; Isa_Latest]))
-    : M (IsaVersion).
+Definition undefined_Privileged_ISA_Version '(tt : unit) : M (Privileged_ISA_Version) :=
+   (internal_pick ([Privileged_ISA_1_11; Privileged_ISA_1_12; Privileged_ISA_1_13]))
+    : M (Privileged_ISA_Version).
 
-Definition isa_version : IsaVersion := Isa_Latest.
-#[export] Hint Unfold isa_version : sail.
-Definition pte_reserved_bits_must_be_zero := isa_version_ge (isa_version) (Isa_Draft_20211102).
+Definition privileged_isa_version_name_forwards (arg_ : Privileged_ISA_Version) : string :=
+   match arg_ with
+   | Privileged_ISA_1_11 => "1.11"
+   | Privileged_ISA_1_12 => "1.12"
+   | Privileged_ISA_1_13 => "1.13"
+   end.
+
+Definition privileged_isa_version_name_backwards (arg_ : string) : M (Privileged_ISA_Version) :=
+   let p0_ := arg_ in
+   (if generic_eq (p0_) ("1.11") then returnM (Privileged_ISA_1_11)
+    else if generic_eq (p0_) ("1.12") then returnM (Privileged_ISA_1_12)
+    else if generic_eq (p0_) ("1.13") then returnM (Privileged_ISA_1_13)
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (Privileged_ISA_Version).
+
+Definition privileged_isa_version_name_forwards_matches (arg_ : Privileged_ISA_Version) : bool :=
+   match arg_ with
+   | Privileged_ISA_1_11 => true
+   | Privileged_ISA_1_12 => true
+   | Privileged_ISA_1_13 => true
+   end.
+
+Definition privileged_isa_version_name_backwards_matches (arg_ : string) : bool :=
+   let p0_ := arg_ in
+   if generic_eq (p0_) ("1.11") then true
+   else if generic_eq (p0_) ("1.12") then true
+   else if generic_eq (p0_) ("1.13") then true
+   else false.
+
+Definition priv_isa_version : Privileged_ISA_Version := Privileged_ISA_1_13.
+#[export] Hint Unfold priv_isa_version : sail.
+Definition pte_reserved_bits_must_be_zero :=
+privileged_isa_version_ge (priv_isa_version) (Privileged_ISA_1_12).
 #[export] Hint Unfold pte_reserved_bits_must_be_zero : sail.
+Definition xenvcfg_csrs_are_defined :=
+privileged_isa_version_ge (priv_isa_version) (Privileged_ISA_1_12).
+#[export] Hint Unfold xenvcfg_csrs_are_defined : sail.
+Definition mconfigptr_is_defined :=
+privileged_isa_version_ge (priv_isa_version) (Privileged_ISA_1_12).
+#[export] Hint Unfold mconfigptr_is_defined : sail.
+Definition mseccfg_csrs_are_defined :=
+privileged_isa_version_ge (priv_isa_version) (Privileged_ISA_1_12).
+#[export] Hint Unfold mseccfg_csrs_are_defined : sail.
+Definition mstatush_is_defined :=
+privileged_isa_version_ge (priv_isa_version) (Privileged_ISA_1_12).
+#[export] Hint Unfold mstatush_is_defined : sail.
+Definition delegh_csrs_are_defined :=
+privileged_isa_version_ge (priv_isa_version) (Privileged_ISA_1_13).
+#[export] Hint Unfold delegh_csrs_are_defined : sail.
 Definition log2_xlen := 6.
 #[export] Hint Unfold log2_xlen : sail.
 Definition xlen_bytes := 8.
@@ -5906,6 +5957,8 @@ Definition bits_of_physaddr '((Physaddr paddr) : physaddr) : mword ((if 64 =? 32
 
 Definition bits_of_virtaddr '((Virtaddr vaddr) : virtaddr) : mword 64 := vaddr.
 
+Definition physaddr_bits := 56.
+#[export] Hint Unfold physaddr_bits : sail.
 Definition default_meta : mem_meta := tt.
 #[export] Hint Unfold default_meta : sail.
 Definition __WriteRAM_Meta
@@ -5936,42 +5989,42 @@ Definition unwrap_or {a : Type} {b : Type} (r : result a b) (y : a) : a :=
 
 Axiom read_mem_ :
   forall
-  {fv38082_a : Type}
-  (_ : fv38082_a) (fv38083_addrsize : Z) (_ : mword fv38083_addrsize) (fv38084_n : Z)
-  (*fv38084_n >=? 0*) (*fv38083_addrsize >=? 0*) (*(fv38084_n >=? 0) &&
-    member_Z_list fv38083_addrsize [32; 64]*),
-  mword (8 * fv38084_n).
+  {fv38629_a : Type}
+  (_ : fv38629_a) (fv38630_addrsize : Z) (_ : mword fv38630_addrsize) (fv38631_n : Z)
+  (*fv38631_n >=? 0*) (*fv38630_addrsize >=? 0*) (*(fv38631_n >=? 0) &&
+    member_Z_list fv38630_addrsize [32; 64]*),
+  mword (8 * fv38631_n).
 
 Axiom read_mem_ifetch_ :
   forall
-  {fv38085_a : Type}
-  (_ : fv38085_a) (fv38086_addrsize : Z) (_ : mword fv38086_addrsize) (fv38087_n : Z)
-  (*fv38087_n >=? 0*) (*fv38086_addrsize >=? 0*) (*(fv38087_n >=? 0) &&
-    member_Z_list fv38086_addrsize [32; 64]*),
-  mword (8 * fv38087_n).
+  {fv38632_a : Type}
+  (_ : fv38632_a) (fv38633_addrsize : Z) (_ : mword fv38633_addrsize) (fv38634_n : Z)
+  (*fv38634_n >=? 0*) (*fv38633_addrsize >=? 0*) (*(fv38634_n >=? 0) &&
+    member_Z_list fv38633_addrsize [32; 64]*),
+  mword (8 * fv38634_n).
 
 Axiom read_mem_exclusive_ :
   forall
-  {fv38088_a : Type}
-  (_ : fv38088_a) (fv38089_addrsize : Z) (_ : mword fv38089_addrsize) (fv38090_n : Z)
-  (*fv38090_n >=? 0*) (*fv38089_addrsize >=? 0*) (*(fv38090_n >=? 0) &&
-    member_Z_list fv38089_addrsize [32; 64]*),
-  mword (8 * fv38090_n).
+  {fv38635_a : Type}
+  (_ : fv38635_a) (fv38636_addrsize : Z) (_ : mword fv38636_addrsize) (fv38637_n : Z)
+  (*fv38637_n >=? 0*) (*fv38636_addrsize >=? 0*) (*(fv38637_n >=? 0) &&
+    member_Z_list fv38636_addrsize [32; 64]*),
+  mword (8 * fv38637_n).
 
 Axiom write_mem_ :
   forall
-  {fv38091_a : Type}
-  (_ : fv38091_a) (fv38092_addrsize : Z) (_ : mword fv38092_addrsize) (fv38093_n : Z) (_ : mword (8 * fv38093_n))
-  (*fv38093_n >=? 0*) (*fv38092_addrsize >=? 0*) (*(fv38093_n >? 0) &&
-    member_Z_list fv38092_addrsize [32; 64]*),
+  {fv38638_a : Type}
+  (_ : fv38638_a) (fv38639_addrsize : Z) (_ : mword fv38639_addrsize) (fv38640_n : Z) (_ : mword (8 * fv38640_n))
+  (*fv38640_n >=? 0*) (*fv38639_addrsize >=? 0*) (*(fv38640_n >? 0) &&
+    member_Z_list fv38639_addrsize [32; 64]*),
   bool.
 
 Axiom write_mem_exclusive_ :
   forall
-  {fv38094_a : Type}
-  (_ : fv38094_a) (fv38095_addrsize : Z) (_ : mword fv38095_addrsize) (fv38096_n : Z) (_ : mword (8 * fv38096_n))
-  (*fv38096_n >=? 0*) (*fv38095_addrsize >=? 0*) (*(fv38096_n >? 0) &&
-    member_Z_list fv38095_addrsize [32; 64]*),
+  {fv38641_a : Type}
+  (_ : fv38641_a) (fv38642_addrsize : Z) (_ : mword fv38642_addrsize) (fv38643_n : Z) (_ : mword (8 * fv38643_n))
+  (*fv38643_n >=? 0*) (*fv38642_addrsize >=? 0*) (*(fv38643_n >? 0) &&
+    member_Z_list fv38642_addrsize [32; 64]*),
   bool.
 
 Definition sail_instr_announce {n : Z} (_ : mword n) (*n >=? 0*) (*n >? 0*) : unit := tt.
@@ -6182,16 +6235,16 @@ Definition read_ram (rk : read_kind) '((Physaddr addr) : physaddr) (width : Z) (
 
 Axiom __TraceMemoryWrite :
   forall
-  {fv38111_m : Z}
-  (fv38112_n : Z) (_ : mword fv38111_m) (_ : mword (8 * fv38112_n))
-  (*fv38112_n >=? 0*) (*fv38111_m >=? 0*),
+  {fv38658_m : Z}
+  (fv38659_n : Z) (_ : mword fv38658_m) (_ : mword (8 * fv38659_n))
+  (*fv38659_n >=? 0*) (*fv38658_m >=? 0*),
   unit.
 
 Axiom __TraceMemoryRead :
   forall
-  {fv38113_m : Z}
-  (fv38114_n : Z) (_ : mword fv38113_m) (_ : mword (8 * fv38114_n))
-  (*fv38114_n >=? 0*) (*fv38113_m >=? 0*),
+  {fv38660_m : Z}
+  (fv38661_n : Z) (_ : mword fv38660_m) (_ : mword (8 * fv38661_n))
+  (*fv38661_n >=? 0*) (*fv38660_m >=? 0*),
   unit.
 
 Definition brev8 {m : Z} (input : mword m) (*m >=? 0*) (*(m >=? 0) && ((ZEuclid.modulo m 8) =? 0)*)
@@ -8030,6 +8083,12 @@ Definition plat_mtvec_vectored_base_alignment_exp := 2  : Z.
 #[export] Hint Unfold plat_mtvec_vectored_base_alignment_exp : sail.
 Definition plat_stvec_vectored_base_alignment_exp := 2  : Z.
 #[export] Hint Unfold plat_stvec_vectored_base_alignment_exp : sail.
+Definition plat_medeleg_delegatable_bits : bits 64 :=
+('b"0000000000000000000000000000000000000000000011001011001111111111").
+#[export] Hint Unfold plat_medeleg_delegatable_bits : sail.
+Definition plat_mideleg_delegatable_bits : xlenbits :=
+sail_mask (64) (('b"0000000000000000000000000000000000000000000000000010001000100010")).
+#[export] Hint Unfold plat_mideleg_delegatable_bits : sail.
 Definition plat_cache_block_size_exp := 6  : Z.
 #[export] Hint Unfold plat_cache_block_size_exp : sail.
 Definition plat_reservation_set_size_exp := 3  : Z.
@@ -8068,10 +8127,10 @@ Definition sp : regidx := Regidx ((zero_extend' (5) (('b"10")))).
 Definition accessType_to_str (access : MemoryAccessType mem_payload) : string :=
    match access with
    | Load p => String.append ("R") ((mem_payload_str_forwards (p)))
-   | LoadReserved p => String.append ("R") ((mem_payload_str_forwards (p)))
+   | LoadReserved (_, _, p) => String.append ("R") ((mem_payload_str_forwards (p)))
    | Store p => String.append ("W") ((mem_payload_str_forwards (p)))
-   | StoreConditional p => String.append ("W") ((mem_payload_str_forwards (p)))
-   | Atomic (_, lp, sp) =>
+   | StoreConditional (_, _, p) => String.append ("W") ((mem_payload_str_forwards (p)))
+   | Atomic (_, _, _, lp, sp) =>
       String.append ("R")
         ((String.append ((mem_payload_str_forwards (lp)))
             ((String.append ("W") ((mem_payload_str_forwards (sp)))))))
@@ -10043,6 +10102,7 @@ exact (
    | Ext_Zabha => returnM (true)
    | Ext_Zacas => returnM (true)
    | Ext_Zalrsc => returnM (false)
+   | Ext_Zama16b => returnM (true)
    | Ext_Zawrs => returnM (true)
    | Ext_Za64rs =>
       returnM ((andb ((Z.leb (plat_reservation_set_size_exp) (6)))
@@ -10598,6 +10658,7 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    assert_exp' (Z.geb (_reclimit) (0)) "recursion limit reached" >>= fun _ =>
    match merge_var with
    | Ext_Zic64b => (hartSupports (Ext_Zic64b))  : M (bool)
+   | Ext_Zama16b => (hartSupports (Ext_Zama16b))  : M (bool)
    | Ext_Ziccif => (hartSupports (Ext_Ziccif))  : M (bool)
    | Ext_Zicclsm => (hartSupports (Ext_Zicclsm))  : M (bool)
    | Ext_Zkt => (hartSupports (Ext_Zkt))  : M (bool)
@@ -10638,8 +10699,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    | Ext_U =>
       (and_boolM ((hartSupports (Ext_U))  : M (bool))
          ((and_boolM
-             (((read_reg misa)  : M (mword 64)) >>= fun (w__27 : mword 64) =>
-              returnM (((eq_vec ((_get_Misa_U (w__27))) (('b"1")))  : bool)))
+             (((read_reg misa)  : M (mword 64)) >>= fun (w__28 : mword 64) =>
+              returnM (((eq_vec ((_get_Misa_U (w__28))) (('b"1")))  : bool)))
              ((_rec_currentlyEnabled (Ext_Zicsr) ((Z.sub (_reclimit) (1)))
                  (_limit_reduces_bool _acc ltac:(assumption)))
               : M (bool)))
@@ -10648,8 +10709,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    | Ext_S =>
       (and_boolM ((hartSupports (Ext_S))  : M (bool))
          ((and_boolM
-             (((read_reg misa)  : M (mword 64)) >>= fun (w__32 : mword 64) =>
-              returnM (((eq_vec ((_get_Misa_S (w__32))) (('b"1")))  : bool)))
+             (((read_reg misa)  : M (mword 64)) >>= fun (w__33 : mword 64) =>
+              returnM (((eq_vec ((_get_Misa_S (w__33))) (('b"1")))  : bool)))
              ((_rec_currentlyEnabled (Ext_Zicsr) ((Z.sub (_reclimit) (1)))
                  (_limit_reduces_bool _acc ltac:(assumption)))
               : M (bool)))
@@ -10716,11 +10777,11 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    | Ext_F =>
       (and_boolM ((hartSupports (Ext_F))  : M (bool))
          ((and_boolM
-             (((read_reg misa)  : M (mword 64)) >>= fun (w__65 : mword 64) =>
-              returnM (((eq_vec ((_get_Misa_F (w__65))) (('b"1")))  : bool)))
+             (((read_reg misa)  : M (mword 64)) >>= fun (w__66 : mword 64) =>
+              returnM (((eq_vec ((_get_Misa_F (w__66))) (('b"1")))  : bool)))
              ((and_boolM
-                 (((read_reg mstatus)  : M (mword 64)) >>= fun (w__66 : mword 64) =>
-                  returnM (((neq_vec ((_get_Mstatus_FS (w__66))) (('b"00")))  : bool)))
+                 (((read_reg mstatus)  : M (mword 64)) >>= fun (w__67 : mword 64) =>
+                  returnM (((neq_vec ((_get_Mstatus_FS (w__67))) (('b"00")))  : bool)))
                  ((_rec_currentlyEnabled (Ext_Zicsr) ((Z.sub (_reclimit) (1)))
                      (_limit_reduces_bool _acc ltac:(assumption)))
                   : M (bool)))
@@ -10730,11 +10791,11 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    | Ext_D =>
       (and_boolM ((hartSupports (Ext_D))  : M (bool))
          ((and_boolM
-             (((read_reg misa)  : M (mword 64)) >>= fun (w__72 : mword 64) =>
-              returnM (((eq_vec ((_get_Misa_D (w__72))) (('b"1")))  : bool)))
+             (((read_reg misa)  : M (mword 64)) >>= fun (w__73 : mword 64) =>
+              returnM (((eq_vec ((_get_Misa_D (w__73))) (('b"1")))  : bool)))
              ((and_boolM
-                 (((read_reg mstatus)  : M (mword 64)) >>= fun (w__73 : mword 64) =>
-                  returnM (((neq_vec ((_get_Mstatus_FS (w__73))) (('b"00")))  : bool)))
+                 (((read_reg mstatus)  : M (mword 64)) >>= fun (w__74 : mword 64) =>
+                  returnM (((neq_vec ((_get_Mstatus_FS (w__74))) (('b"00")))  : bool)))
                  ((and_boolM (returnM (((Z.geb (flen) (64))  : bool)))
                      ((_rec_currentlyEnabled (Ext_Zicsr) ((Z.sub (_reclimit) (1)))
                          (_limit_reduces_bool _acc ltac:(assumption)))
@@ -10767,8 +10828,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
                  (_limit_reduces_bool _acc ltac:(assumption)))
               : M (bool))
              ((and_boolM
-                 (((read_reg mstatus)  : M (mword 64)) >>= fun (w__92 : mword 64) =>
-                  returnM (((neq_vec ((_get_Mstatus_VS (w__92))) (('b"00")))  : bool)))
+                 (((read_reg mstatus)  : M (mword 64)) >>= fun (w__93 : mword 64) =>
+                  returnM (((neq_vec ((_get_Mstatus_VS (w__93))) (('b"00")))  : bool)))
                  ((_rec_currentlyEnabled (Ext_Zicsr) ((Z.sub (_reclimit) (1)))
                      (_limit_reduces_bool _acc ltac:(assumption)))
                   : M (bool)))
@@ -10822,8 +10883,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    | Ext_V =>
       (and_boolM ((hartSupports (Ext_V))  : M (bool))
          ((and_boolM
-             (((read_reg misa)  : M (mword 64)) >>= fun (w__118 : mword 64) =>
-              returnM (((eq_vec ((_get_Misa_V (w__118))) (('b"1")))  : bool)))
+             (((read_reg misa)  : M (mword 64)) >>= fun (w__119 : mword 64) =>
+              returnM (((eq_vec ((_get_Misa_V (w__119))) (('b"1")))  : bool)))
              ((and_boolM
                  ((_rec_currentlyEnabled (Ext_Zvl128b) ((Z.sub (_reclimit) (1)))
                      (_limit_reduces_bool _acc ltac:(assumption)))
@@ -10868,8 +10929,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
              (_limit_reduces_bool _acc ltac:(assumption)))
           : M (bool))
          ((and_boolM ((hartSupports (Ext_Zicfilp))  : M (bool))
-             (read_reg cur_privilege >>= fun (w__139 : Privilege) =>
-              (_rec_get_xLPE (w__139) ((Z.sub (_reclimit) (1)))
+             (read_reg cur_privilege >>= fun (w__140 : Privilege) =>
+              (_rec_get_xLPE (w__140) ((Z.sub (_reclimit) (1)))
                  (_limit_reduces_bool _acc ltac:(assumption)))
                : M (bool)))
           : M (bool)))
@@ -10921,8 +10982,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    | Ext_Zihintpause => (hartSupports (Ext_Zihintpause))  : M (bool)
    | Ext_C =>
       (and_boolM ((hartSupports (Ext_C))  : M (bool))
-         (((read_reg misa)  : M (mword 64)) >>= fun (w__168 : mword 64) =>
-          returnM (((eq_vec ((_get_Misa_C (w__168))) (('b"1")))  : bool))))
+         (((read_reg misa)  : M (mword 64)) >>= fun (w__169 : mword 64) =>
+          returnM (((eq_vec ((_get_Misa_C (w__169))) (('b"1")))  : bool))))
        : M (bool)
    | Ext_Zca =>
       (and_boolM ((hartSupports (Ext_Zca))  : M (bool))
@@ -10930,13 +10991,13 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
              ((_rec_currentlyEnabled (Ext_C) ((Z.sub (_reclimit) (1)))
                  (_limit_reduces_bool _acc ltac:(assumption)))
               : M (bool))
-             ((hartSupports (Ext_C)) >>= fun (w__172 : bool) => returnM (((not (w__172))  : bool))))
+             ((hartSupports (Ext_C)) >>= fun (w__173 : bool) => returnM (((not (w__173))  : bool))))
           : M (bool)))
        : M (bool)
    | Ext_A =>
       (and_boolM ((hartSupports (Ext_A))  : M (bool))
-         (((read_reg misa)  : M (mword 64)) >>= fun (w__176 : mword 64) =>
-          returnM (((eq_vec ((_get_Misa_A (w__176))) (('b"1")))  : bool))))
+         (((read_reg misa)  : M (mword 64)) >>= fun (w__177 : mword 64) =>
+          returnM (((eq_vec ((_get_Misa_A (w__177))) (('b"1")))  : bool))))
        : M (bool)
    | Ext_Zaamo =>
       (or_boolM ((hartSupports (Ext_Zaamo))  : M (bool))
@@ -10979,8 +11040,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    | Ext_Ziccrse => (hartSupports (Ext_Ziccrse))  : M (bool)
    | Ext_M =>
       (and_boolM ((hartSupports (Ext_M))  : M (bool))
-         (((read_reg misa)  : M (mword 64)) >>= fun (w__200 : mword 64) =>
-          returnM (((eq_vec ((_get_Misa_M (w__200))) (('b"1")))  : bool))))
+         (((read_reg misa)  : M (mword 64)) >>= fun (w__201 : mword 64) =>
+          returnM (((eq_vec ((_get_Misa_M (w__201))) (('b"1")))  : bool))))
        : M (bool)
    | Ext_Zmmul =>
       (or_boolM ((hartSupports (Ext_Zmmul))  : M (bool))
@@ -10990,8 +11051,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
        : M (bool)
    | Ext_B =>
       (and_boolM ((hartSupports (Ext_B))  : M (bool))
-         (((read_reg misa)  : M (mword 64)) >>= fun (w__206 : mword 64) =>
-          returnM (((eq_vec ((_get_Misa_B (w__206))) (('b"1")))  : bool))))
+         (((read_reg misa)  : M (mword 64)) >>= fun (w__207 : mword 64) =>
+          returnM (((eq_vec ((_get_Misa_B (w__207))) (('b"1")))  : bool))))
        : M (bool)
    | Ext_Zba =>
       (or_boolM ((hartSupports (Ext_Zba))  : M (bool))
@@ -11023,8 +11084,8 @@ with _rec_virtual_memory_supported (arg0 : unit) (_reclimit : Z) (_acc : Acc (Zw
    | Ext_H =>
       (and_boolM ((hartSupports (Ext_H))  : M (bool))
          ((and_boolM
-             (((read_reg misa)  : M (mword 64)) >>= fun (w__224 : mword 64) =>
-              returnM (((eq_vec ((_get_Misa_H (w__224))) (('b"1")))  : bool)))
+             (((read_reg misa)  : M (mword 64)) >>= fun (w__225 : mword 64) =>
+              returnM (((eq_vec ((_get_Misa_H (w__225))) (('b"1")))  : bool)))
              ((_rec_virtual_memory_supported (tt) ((Z.sub (_reclimit) (1)))
                  (_limit_reduces_bool _acc ltac:(assumption)))
               : M (bool)))
@@ -12644,7 +12705,18 @@ Definition pma_attributes_to_str (attr : PMA) : string :=
                                                                      ((if attr.(PMA_supports_pte_write)
                                                                        then
                                                                          " supports-pte-write"
-                                                                       else "")) (" "))))))))))))))))))))))))))))))))).
+                                                                       else ""))
+                                                                     ((String.append
+                                                                         (" misaligned_atomicity_granule_size_exp=")
+                                                                         ((String.append
+                                                                             ((dec_str
+                                                                                 (attr.(PMA_misaligned_atomicity_granule_size_exp))))
+                                                                             ((String.append
+                                                                                 (" vector_misaligned_atomicity_granule_size_exp=")
+                                                                                 ((String.append
+                                                                                     ((dec_str
+                                                                                         (attr.(PMA_vector_misaligned_atomicity_granule_size_exp))))
+                                                                                     (" "))))))))))))))))))))))))))))))))))))))))).
 
 Definition pma_region_to_str (region : PMA_Region) : string :=
    String.append ("base: ")
@@ -12712,8 +12784,8 @@ Definition misaligned_exception_is_access_fault (e : option misaligned_exception
 Definition plat_misaligned_access : GlobalMisalignedExceptions :=
 {| GlobalMisalignedExceptions_load_store := None;
    GlobalMisalignedExceptions_vector := None;
-   GlobalMisalignedExceptions_lrsc := AccessFault;
-   GlobalMisalignedExceptions_amo := AccessFault |}.
+   GlobalMisalignedExceptions_amo := None;
+   GlobalMisalignedExceptions_lrsc := AccessFault |}.
 #[export] Hint Unfold plat_misaligned_access : sail.
 Definition undefined_ExtContextPolicy '(tt : unit) : M (ExtContextPolicy) :=
    (internal_pick ([ExtContext_Off; ExtContext_TwoState; ExtContext_FourState]))
@@ -12822,6 +12894,12 @@ Definition illegal_vtype_reserved_behavior : IllegalVtypeReservedBehavior := Ill
 #[export] Hint Unfold illegal_vtype_reserved_behavior : sail.
 Definition vstart_reserved_behavior : OOBVstartReservedBehavior := Vstart_Illegal.
 #[export] Hint Unfold vstart_reserved_behavior : sail.
+Definition undefined_FflagsDirtyPolicy '(tt : unit) : M (FflagsDirtyPolicy) :=
+   (internal_pick ([Fflags_Dirty_Precise; Fflags_Dirty_Flag; Fflags_Dirty_Instruction]))
+    : M (FflagsDirtyPolicy).
+
+Definition fflags_dirty_policy : FflagsDirtyPolicy := Fflags_Dirty_Precise.
+#[export] Hint Unfold fflags_dirty_policy : sail.
 Definition extensionName_forwards (arg_ : extension) : string :=
    match arg_ with
    | Ext_M => "m"
@@ -12853,6 +12931,7 @@ Definition extensionName_forwards (arg_ : extension) : string :=
    | Ext_Zabha => "zabha"
    | Ext_Zacas => "zacas"
    | Ext_Zalrsc => "zalrsc"
+   | Ext_Zama16b => "zama16b"
    | Ext_Zawrs => "zawrs"
    | Ext_Za64rs => "za64rs"
    | Ext_Za128rs => "za128rs"
@@ -12982,6 +13061,7 @@ Definition extensionName_backwards (arg_ : string) : M (extension) :=
     else if generic_eq (p0_) ("zabha") then returnM (Ext_Zabha)
     else if generic_eq (p0_) ("zacas") then returnM (Ext_Zacas)
     else if generic_eq (p0_) ("zalrsc") then returnM (Ext_Zalrsc)
+    else if generic_eq (p0_) ("zama16b") then returnM (Ext_Zama16b)
     else if generic_eq (p0_) ("zawrs") then returnM (Ext_Zawrs)
     else if generic_eq (p0_) ("za64rs") then returnM (Ext_Za64rs)
     else if generic_eq (p0_) ("za128rs") then returnM (Ext_Za128rs)
@@ -13112,6 +13192,7 @@ Definition extensionName_forwards_matches (arg_ : extension) : bool :=
    | Ext_Zabha => true
    | Ext_Zacas => true
    | Ext_Zalrsc => true
+   | Ext_Zama16b => true
    | Ext_Zawrs => true
    | Ext_Za64rs => true
    | Ext_Za128rs => true
@@ -13241,6 +13322,7 @@ Definition extensionName_backwards_matches (arg_ : string) : bool :=
    else if generic_eq (p0_) ("zabha") then true
    else if generic_eq (p0_) ("zacas") then true
    else if generic_eq (p0_) ("zalrsc") then true
+   else if generic_eq (p0_) ("zama16b") then true
    else if generic_eq (p0_) ("zawrs") then true
    else if generic_eq (p0_) ("za64rs") then true
    else if generic_eq (p0_) ("za128rs") then true
@@ -13344,18 +13426,18 @@ vec_of_list_len [Ext_M;Ext_A;Ext_F;Ext_D;Ext_C;Ext_B;Ext_V;Ext_H;Ext_Zic64b;Ext_
                  Ext_Zicbop;Ext_Zicboz;Ext_Ziccamoa;Ext_Ziccamoc;Ext_Ziccif;Ext_Zicclsm;Ext_Ziccrse;
                  Ext_Zicfilp;Ext_Zicfiss;Ext_Zicntr;Ext_Zicond;Ext_Zicsr;Ext_Zifencei;Ext_Zihintntl;
                  Ext_Zihintpause;Ext_Zihpm;Ext_Zimop;Ext_Zmmul;Ext_Za128rs;Ext_Za64rs;Ext_Zaamo;
-                 Ext_Zabha;Ext_Zacas;Ext_Zalrsc;Ext_Zawrs;Ext_Zfa;Ext_Zfbfmin;Ext_Zfh;Ext_Zfhmin;
-                 Ext_Zfinx;Ext_Zdinx;Ext_Zhinx;Ext_Zhinxmin;Ext_Zca;Ext_Zcb;Ext_Zcd;Ext_Zcf;
-                 Ext_Zcmop;Ext_Zba;Ext_Zbb;Ext_Zbc;Ext_Zbkb;Ext_Zbkc;Ext_Zbkx;Ext_Zbs;Ext_Zknd;
-                 Ext_Zkne;Ext_Zknh;Ext_Zkr;Ext_Zksed;Ext_Zksh;Ext_Zkt;Ext_Zvabd;Ext_Zvbb;Ext_Zvbc;
-                 Ext_Zve32f;Ext_Zve32x;Ext_Zve64d;Ext_Zve64f;Ext_Zve64x;Ext_Zvfbfmin;Ext_Zvfbfwma;
-                 Ext_Zvfh;Ext_Zvfhmin;Ext_Zvkb;Ext_Zvkg;Ext_Zvkn;Ext_Zvknc;Ext_Zvkned;Ext_Zvkng;
-                 Ext_Zvknha;Ext_Zvknhb;Ext_Zvks;Ext_Zvksc;Ext_Zvksed;Ext_Zvksg;Ext_Zvksh;Ext_Zvkt;
-                 Ext_Zvl32b;Ext_Zvl64b;Ext_Zvl128b;Ext_Zvl256b;Ext_Zvl512b;Ext_Zvl1024b;Ext_Ssccptr;
-                 Ext_Sscofpmf;Ext_Sscounterenw;Ext_Ssnpm;Ext_Sspm;Ext_Ssqosid;Ext_Ssstateen;Ext_Sstc;
-                 Ext_Sstvala;Ext_Sstvecd;Ext_Ssu64xl;Ext_Supm;Ext_Svade;Ext_Svadu;Ext_Svinval;
-                 Ext_Svnapot;Ext_Svpbmt;Ext_Svrsw60t59b;Ext_Svvptc;Ext_Smcntrpmf;Ext_Smmpm;Ext_Smnpm;
-                 Ext_Smstateen].
+                 Ext_Zabha;Ext_Zacas;Ext_Zalrsc;Ext_Zama16b;Ext_Zawrs;Ext_Zfa;Ext_Zfbfmin;Ext_Zfh;
+                 Ext_Zfhmin;Ext_Zfinx;Ext_Zdinx;Ext_Zhinx;Ext_Zhinxmin;Ext_Zca;Ext_Zcb;Ext_Zcd;
+                 Ext_Zcf;Ext_Zcmop;Ext_Zba;Ext_Zbb;Ext_Zbc;Ext_Zbkb;Ext_Zbkc;Ext_Zbkx;Ext_Zbs;
+                 Ext_Zknd;Ext_Zkne;Ext_Zknh;Ext_Zkr;Ext_Zksed;Ext_Zksh;Ext_Zkt;Ext_Zvabd;Ext_Zvbb;
+                 Ext_Zvbc;Ext_Zve32f;Ext_Zve32x;Ext_Zve64d;Ext_Zve64f;Ext_Zve64x;Ext_Zvfbfmin;
+                 Ext_Zvfbfwma;Ext_Zvfh;Ext_Zvfhmin;Ext_Zvkb;Ext_Zvkg;Ext_Zvkn;Ext_Zvknc;Ext_Zvkned;
+                 Ext_Zvkng;Ext_Zvknha;Ext_Zvknhb;Ext_Zvks;Ext_Zvksc;Ext_Zvksed;Ext_Zvksg;Ext_Zvksh;
+                 Ext_Zvkt;Ext_Zvl32b;Ext_Zvl64b;Ext_Zvl128b;Ext_Zvl256b;Ext_Zvl512b;Ext_Zvl1024b;
+                 Ext_Ssccptr;Ext_Sscofpmf;Ext_Sscounterenw;Ext_Ssnpm;Ext_Sspm;Ext_Ssqosid;
+                 Ext_Ssstateen;Ext_Sstc;Ext_Sstvala;Ext_Sstvecd;Ext_Ssu64xl;Ext_Supm;Ext_Svade;
+                 Ext_Svadu;Ext_Svinval;Ext_Svnapot;Ext_Svpbmt;Ext_Svrsw60t59b;Ext_Svvptc;
+                 Ext_Smcntrpmf;Ext_Smmpm;Ext_Smnpm;Ext_Smstateen].
 #[export] Hint Unfold extensions_ordered_for_isa_string : sail.
 Definition init_ext_ptw : ext_ptw := tt.
 #[export] Hint Unfold init_ext_ptw : sail.
@@ -14068,30 +14150,30 @@ Definition is_shadow_stack_access (access : MemoryAccessType mem_payload) : M (b
    match access with
    | Load ShadowStack => returnM (true)
    | Store ShadowStack => returnM (true)
-   | Atomic (_, ShadowStack, ShadowStack) => returnM (true)
+   | Atomic (_, _, _, ShadowStack, ShadowStack) => returnM (true)
    | InstructionFetch tt => returnM (false)
    | Load Data => returnM (false)
    | Load Vector => returnM (false)
    | Load PageTableEntry => returnM (false)
-   | LoadReserved Data => returnM (false)
+   | LoadReserved (_, _, Data) => returnM (false)
    | Store Data => returnM (false)
    | Store Vector => returnM (false)
    | Store PageTableEntry => returnM (false)
-   | StoreConditional Data => returnM (false)
-   | Atomic (_, Data, Data) => returnM (false)
+   | StoreConditional (_, _, Data) => returnM (false)
+   | Atomic (_, _, _, Data, Data) => returnM (false)
    | CacheAccess _ => returnM (false)
-   | LoadReserved p =>
-      (internal_error ("core/vmem_types.sail") (86)
+   | LoadReserved (_, _, p) =>
+      (internal_error ("core/vmem_types.sail") (87)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved."))))))
        : M (bool)
-   | StoreConditional p =>
-      (internal_error ("core/vmem_types.sail") (87)
+   | StoreConditional (_, _, p) =>
+      (internal_error ("core/vmem_types.sail") (88)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional."))))))
        : M (bool)
-   | Atomic (_, rp, wp) =>
-      (internal_error ("core/vmem_types.sail") (88)
+   | Atomic (_, _, _, rp, wp) =>
+      (internal_error ("core/vmem_types.sail") (89)
          ((String.append ("Invalid payloads (")
              ((String.append ((mem_payload_name_forwards (rp)))
                  ((String.append (", ")
@@ -14104,7 +14186,7 @@ Definition is_amo_access (access : MemoryAccessType mem_payload) : bool :=
    match access with | Atomic _ => true | _ => false end.
 
 Definition is_shadow_stack_amo (access : MemoryAccessType mem_payload) : bool :=
-   match access with | Atomic (_, ShadowStack, ShadowStack) => true | _ => false end.
+   match access with | Atomic (_, _, _, ShadowStack, ShadowStack) => true | _ => false end.
 
 Definition is_vector_access (access : MemoryAccessType mem_payload) : bool :=
    match access with | Load Vector => true | Store Vector => true | _ => false end.
@@ -14139,27 +14221,27 @@ Definition accessFaultFromAccessType (access : MemoryAccessType mem_payload) : M
    | Load Data => returnM ((E_Load_Access_Fault (tt)))
    | Load Vector => returnM ((E_Load_Access_Fault (tt)))
    | Load PageTableEntry => returnM ((E_Load_Access_Fault (tt)))
-   | LoadReserved Data => returnM ((E_Load_Access_Fault (tt)))
+   | LoadReserved (_, _, Data) => returnM ((E_Load_Access_Fault (tt)))
    | Store Data => returnM ((E_SAMO_Access_Fault (tt)))
    | Store Vector => returnM ((E_SAMO_Access_Fault (tt)))
    | Store PageTableEntry => returnM ((E_SAMO_Access_Fault (tt)))
-   | StoreConditional Data => returnM ((E_SAMO_Access_Fault (tt)))
-   | Atomic (_, Data, Data) => returnM ((E_SAMO_Access_Fault (tt)))
+   | StoreConditional (_, _, Data) => returnM ((E_SAMO_Access_Fault (tt)))
+   | Atomic (_, _, _, Data, Data) => returnM ((E_SAMO_Access_Fault (tt)))
    | Load ShadowStack => returnM ((E_SAMO_Access_Fault (tt)))
    | Store ShadowStack => returnM ((E_SAMO_Access_Fault (tt)))
-   | Atomic (_, ShadowStack, ShadowStack) => returnM ((E_SAMO_Access_Fault (tt)))
-   | LoadReserved p =>
-      (internal_error ("core/mem_type_utils.sail") (30)
+   | Atomic (_, _, _, ShadowStack, ShadowStack) => returnM ((E_SAMO_Access_Fault (tt)))
+   | LoadReserved (_, _, p) =>
+      (internal_error ("core/mem_type_utils.sail") (31)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved."))))))
        : M (ExceptionType)
-   | StoreConditional p =>
-      (internal_error ("core/mem_type_utils.sail") (31)
+   | StoreConditional (_, _, p) =>
+      (internal_error ("core/mem_type_utils.sail") (32)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional."))))))
        : M (ExceptionType)
-   | Atomic (_, rp, wp) =>
-      (internal_error ("core/mem_type_utils.sail") (32)
+   | Atomic (_, _, _, rp, wp) =>
+      (internal_error ("core/mem_type_utils.sail") (33)
          ((String.append ("Invalid payloads (")
              ((String.append ((mem_payload_name_forwards (rp)))
                  ((String.append (", ")
@@ -14182,27 +14264,27 @@ Definition alignmentFaultFromAccessType (access : MemoryAccessType mem_payload) 
    | Load Data => returnM ((E_Load_Addr_Align (tt)))
    | Load Vector => returnM ((E_Load_Addr_Align (tt)))
    | Load PageTableEntry => returnM ((E_Load_Addr_Align (tt)))
-   | LoadReserved Data => returnM ((E_Load_Addr_Align (tt)))
+   | LoadReserved (_, _, Data) => returnM ((E_Load_Addr_Align (tt)))
    | Store Data => returnM ((E_SAMO_Addr_Align (tt)))
    | Store Vector => returnM ((E_SAMO_Addr_Align (tt)))
    | Store PageTableEntry => returnM ((E_SAMO_Addr_Align (tt)))
-   | StoreConditional Data => returnM ((E_SAMO_Addr_Align (tt)))
-   | Atomic (_, Data, Data) => returnM ((E_SAMO_Addr_Align (tt)))
+   | StoreConditional (_, _, Data) => returnM ((E_SAMO_Addr_Align (tt)))
+   | Atomic (_, _, _, Data, Data) => returnM ((E_SAMO_Addr_Align (tt)))
    | Load ShadowStack => returnM ((E_SAMO_Addr_Align (tt)))
    | Store ShadowStack => returnM ((E_SAMO_Addr_Align (tt)))
-   | Atomic (_, ShadowStack, ShadowStack) => returnM ((E_SAMO_Addr_Align (tt)))
-   | LoadReserved p =>
-      (internal_error ("core/mem_type_utils.sail") (70)
+   | Atomic (_, _, _, ShadowStack, ShadowStack) => returnM ((E_SAMO_Addr_Align (tt)))
+   | LoadReserved (_, _, p) =>
+      (internal_error ("core/mem_type_utils.sail") (72)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved."))))))
        : M (ExceptionType)
-   | StoreConditional p =>
-      (internal_error ("core/mem_type_utils.sail") (71)
+   | StoreConditional (_, _, p) =>
+      (internal_error ("core/mem_type_utils.sail") (73)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional."))))))
        : M (ExceptionType)
-   | Atomic (_, rp, wp) =>
-      (internal_error ("core/mem_type_utils.sail") (72)
+   | Atomic (_, _, _, rp, wp) =>
+      (internal_error ("core/mem_type_utils.sail") (74)
          ((String.append ("Invalid payloads (")
              ((String.append ((mem_payload_name_forwards (rp)))
                  ((String.append (", ")
@@ -14247,9 +14329,9 @@ Definition csr_full_read_callback (_ : string) (_ : mword 12) (_ : mword 64) : u
 
 Definition redirect_callback (_ : mword 64) : unit := tt.
 
-Definition trap_callback (ex347309_ : bool) (_ : mword 6) : unit := tt.
+Definition trap_callback (ex575285_ : bool) (_ : mword 6) : unit := tt.
 
-Definition xret_callback (ex347310_ : bool) : unit := tt.
+Definition xret_callback (ex575286_ : bool) : unit := tt.
 
 Definition csr_name_map_backwards (arg_ : string) : M (mword 12) :=
    let head_exp_ := arg_ in
@@ -16338,6 +16420,11 @@ Definition Mk_Satp32 (v : mword 32) : mword 32 := v.
 Definition legalize_satp (arch : Architecture) (prev_value : mword 64) (written_value : mword 64)
 : M (mword 64) :=
    let s := Mk_Satp64 (written_value) in
+   let s :=
+     _update_Satp64_PPN (s)
+       ((zero_extend' (44)
+           ((subrange_vec_dec ((_get_Satp64_PPN (s)))
+               ((Z.sub ((Z.min ((Z.sub (physaddr_bits) (pagesize_bits))) (44))) (1))) (0))))) in
    match satpMode_of_bits (arch) ((_get_Satp64_Mode (s))) with
    | None => returnM (prev_value)
    | Some Sv_mode =>
@@ -16446,9 +16533,19 @@ Definition _get_Minterrupts_MEI (v : mword 64) : mword 1 := subrange_vec_dec (v)
 Definition _update_Minterrupts_MEI (v : mword 64) (x : mword 1) : mword 64 :=
    update_subrange_vec_dec (v) (11) (11) (x).
 
+Definition _update_Sinterrupts_MEI (v : mword 64) (x : mword 1) : mword 64 :=
+   update_subrange_vec_dec (v) (11) (11) (x).
+
 Definition _set_Minterrupts_MEI (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
    (reg_deref (r_ref)) >>= fun r =>
    write_reg_ref r_ref (_update_Minterrupts_MEI (r) (v))
+    : M (unit).
+
+Definition _get_Sinterrupts_MEI (v : mword 64) : mword 1 := subrange_vec_dec (v) (11) (11).
+
+Definition _set_Sinterrupts_MEI (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
+   (reg_deref (r_ref)) >>= fun r =>
+   write_reg_ref r_ref (_update_Sinterrupts_MEI (r) (v))
     : M (unit).
 
 Definition _get_Minterrupts_MSI (v : mword 64) : mword 1 := subrange_vec_dec (v) (3) (3).
@@ -16456,9 +16553,19 @@ Definition _get_Minterrupts_MSI (v : mword 64) : mword 1 := subrange_vec_dec (v)
 Definition _update_Minterrupts_MSI (v : mword 64) (x : mword 1) : mword 64 :=
    update_subrange_vec_dec (v) (3) (3) (x).
 
+Definition _update_Sinterrupts_MSI (v : mword 64) (x : mword 1) : mword 64 :=
+   update_subrange_vec_dec (v) (3) (3) (x).
+
 Definition _set_Minterrupts_MSI (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
    (reg_deref (r_ref)) >>= fun r =>
    write_reg_ref r_ref (_update_Minterrupts_MSI (r) (v))
+    : M (unit).
+
+Definition _get_Sinterrupts_MSI (v : mword 64) : mword 1 := subrange_vec_dec (v) (3) (3).
+
+Definition _set_Sinterrupts_MSI (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
+   (reg_deref (r_ref)) >>= fun r =>
+   write_reg_ref r_ref (_update_Sinterrupts_MSI (r) (v))
     : M (unit).
 
 Definition _get_Minterrupts_MTI (v : mword 64) : mword 1 := subrange_vec_dec (v) (7) (7).
@@ -16466,9 +16573,19 @@ Definition _get_Minterrupts_MTI (v : mword 64) : mword 1 := subrange_vec_dec (v)
 Definition _update_Minterrupts_MTI (v : mword 64) (x : mword 1) : mword 64 :=
    update_subrange_vec_dec (v) (7) (7) (x).
 
+Definition _update_Sinterrupts_MTI (v : mword 64) (x : mword 1) : mword 64 :=
+   update_subrange_vec_dec (v) (7) (7) (x).
+
 Definition _set_Minterrupts_MTI (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
    (reg_deref (r_ref)) >>= fun r =>
    write_reg_ref r_ref (_update_Minterrupts_MTI (r) (v))
+    : M (unit).
+
+Definition _get_Sinterrupts_MTI (v : mword 64) : mword 1 := subrange_vec_dec (v) (7) (7).
+
+Definition _set_Sinterrupts_MTI (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
+   (reg_deref (r_ref)) >>= fun r =>
+   write_reg_ref r_ref (_update_Sinterrupts_MTI (r) (v))
     : M (unit).
 
 Definition _get_Minterrupts_SEI (v : mword 64) : mword 1 := subrange_vec_dec (v) (9) (9).
@@ -16611,8 +16728,8 @@ Definition legalize_mie (o : mword 64) (v : mword 64) : M (mword 64) :=
                                    ((_get_Minterrupts_MEI (v))))) ((_get_Minterrupts_MTI (v)))))
                            ((_get_Minterrupts_MSI (v))))) (w__3))) (w__5))) (w__7))).
 
-Definition legalize_mideleg (o : mword 64) (v : mword 64) : M (mword 64) :=
-   let v := Mk_Minterrupts (v) in
+Definition legalize_mideleg (_o : mword 64) (v : mword 64) : M (mword 64) :=
+   let v := Mk_Minterrupts ((and_vec (v) (plat_mideleg_delegatable_bits))) in
    (currentlyEnabled (Ext_Sscofpmf)) >>= fun (w__0 : bool) =>
    let w__1 : mword 1 := if w__0 then _get_Minterrupts_LCOFI (v) else ('b"0") in
    (currentlyEnabled (Ext_S)) >>= fun (w__2 : bool) =>
@@ -16623,11 +16740,8 @@ Definition legalize_mideleg (o : mword 64) (v : mword 64) : M (mword 64) :=
    let w__7 : mword 1 := if w__6 then _get_Minterrupts_SSI (v) else ('b"0") in
    returnM ((_update_Minterrupts_SSI
                ((_update_Minterrupts_STI
-                   ((_update_Minterrupts_SEI
-                       ((_update_Minterrupts_MSI
-                           ((_update_Minterrupts_MTI
-                               ((_update_Minterrupts_MEI ((_update_Minterrupts_LCOFI (o) (w__1)))
-                                   (('b"0")))) (('b"0")))) (('b"0")))) (w__3))) (w__5))) (w__7))).
+                   ((_update_Minterrupts_SEI ((_update_Minterrupts_LCOFI (v) (w__1))) (w__3)))
+                   (w__5))) (w__7))).
 
 Definition undefined_Medeleg '(tt : unit) : M (mword 64) :=
    (undefined_bitvector (64))  : M (mword 64).
@@ -16642,6 +16756,16 @@ Definition _update_Medeleg_Breakpoint (v : mword 64) (x : mword 1) : mword 64 :=
 Definition _set_Medeleg_Breakpoint (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
    (reg_deref (r_ref)) >>= fun r =>
    write_reg_ref r_ref (_update_Medeleg_Breakpoint (r) (v))
+    : M (unit).
+
+Definition _get_Medeleg_Double_Trap (v : mword 64) : mword 1 := subrange_vec_dec (v) (16) (16).
+
+Definition _update_Medeleg_Double_Trap (v : mword 64) (x : mword 1) : mword 64 :=
+   update_subrange_vec_dec (v) (16) (16) (x).
+
+Definition _set_Medeleg_Double_Trap (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
+   (reg_deref (r_ref)) >>= fun r =>
+   write_reg_ref r_ref (_update_Medeleg_Double_Trap (r) (v))
     : M (unit).
 
 Definition _get_Medeleg_Fetch_Access_Fault (v : mword 64) : mword 1 := subrange_vec_dec (v) (1) (1).
@@ -16673,6 +16797,16 @@ Definition _update_Medeleg_Fetch_Page_Fault (v : mword 64) (x : mword 1) : mword
 Definition _set_Medeleg_Fetch_Page_Fault (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
    (reg_deref (r_ref)) >>= fun r =>
    write_reg_ref r_ref (_update_Medeleg_Fetch_Page_Fault (r) (v))
+    : M (unit).
+
+Definition _get_Medeleg_Hardware_Error (v : mword 64) : mword 1 := subrange_vec_dec (v) (19) (19).
+
+Definition _update_Medeleg_Hardware_Error (v : mword 64) (x : mword 1) : mword 64 :=
+   update_subrange_vec_dec (v) (19) (19) (x).
+
+Definition _set_Medeleg_Hardware_Error (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
+   (reg_deref (r_ref)) >>= fun r =>
+   write_reg_ref r_ref (_update_Medeleg_Hardware_Error (r) (v))
     : M (unit).
 
 Definition _get_Medeleg_Illegal_Instr (v : mword 64) : mword 1 := subrange_vec_dec (v) (2) (2).
@@ -16765,6 +16899,16 @@ Definition _set_Medeleg_SEnvCall (r_ref : register_ref (mword 64)) (v : mword 1)
    write_reg_ref r_ref (_update_Medeleg_SEnvCall (r) (v))
     : M (unit).
 
+Definition _get_Medeleg_Software_Check (v : mword 64) : mword 1 := subrange_vec_dec (v) (18) (18).
+
+Definition _update_Medeleg_Software_Check (v : mword 64) (x : mword 1) : mword 64 :=
+   update_subrange_vec_dec (v) (18) (18) (x).
+
+Definition _set_Medeleg_Software_Check (r_ref : register_ref (mword 64)) (v : mword 1) : M (unit) :=
+   (reg_deref (r_ref)) >>= fun r =>
+   write_reg_ref r_ref (_update_Medeleg_Software_Check (r) (v))
+    : M (unit).
+
 Definition _get_Medeleg_UEnvCall (v : mword 64) : mword 1 := subrange_vec_dec (v) (8) (8).
 
 Definition _update_Medeleg_UEnvCall (v : mword 64) (x : mword 1) : mword 64 :=
@@ -16776,7 +16920,9 @@ Definition _set_Medeleg_UEnvCall (r_ref : register_ref (mword 64)) (v : mword 1)
     : M (unit).
 
 Definition legalize_medeleg (_o : mword 64) (v : mword 64) : mword 64 :=
-   _update_Medeleg_MEnvCall ((Mk_Medeleg (v))) (('b"0")).
+   _update_Medeleg_MEnvCall
+     ((_update_Medeleg_Double_Trap ((Mk_Medeleg ((and_vec (v) (plat_medeleg_delegatable_bits)))))
+         (('b"0")))) (('b"0")).
 
 Definition undefined_XipReadType '(tt : unit) : M (XipReadType) :=
    (internal_pick ([IncludePlatformInterrupts; ExcludePlatformInterrupts]))  : M (XipReadType).
@@ -16811,23 +16957,35 @@ Definition Mk_Sinterrupts (v : mword 64) : mword 64 := v.
 Definition lower_mip (m : mword 64) (d : mword 64) : mword 64 :=
    let s : Sinterrupts := Mk_Sinterrupts ((zeros' (64))) in
    _update_Sinterrupts_SSI
-     ((_update_Sinterrupts_STI
-         ((_update_Sinterrupts_SEI
-             ((_update_Sinterrupts_LCOFI (s)
-                 ((and_vec ((_get_Minterrupts_LCOFI (m))) ((_get_Minterrupts_LCOFI (d)))))))
-             ((and_vec ((_get_Minterrupts_SEI (m))) ((_get_Minterrupts_SEI (d)))))))
-         ((and_vec ((_get_Minterrupts_STI (m))) ((_get_Minterrupts_STI (d)))))))
+     ((_update_Sinterrupts_MSI
+         ((_update_Sinterrupts_STI
+             ((_update_Sinterrupts_MTI
+                 ((_update_Sinterrupts_SEI
+                     ((_update_Sinterrupts_MEI
+                         ((_update_Sinterrupts_LCOFI (s)
+                             ((and_vec ((_get_Minterrupts_LCOFI (m))) ((_get_Minterrupts_LCOFI (d)))))))
+                         ((and_vec ((_get_Minterrupts_MEI (m))) ((_get_Minterrupts_MEI (d)))))))
+                     ((and_vec ((_get_Minterrupts_SEI (m))) ((_get_Minterrupts_SEI (d)))))))
+                 ((and_vec ((_get_Minterrupts_MTI (m))) ((_get_Minterrupts_MTI (d)))))))
+             ((and_vec ((_get_Minterrupts_STI (m))) ((_get_Minterrupts_STI (d)))))))
+         ((and_vec ((_get_Minterrupts_MSI (m))) ((_get_Minterrupts_MSI (d)))))))
      ((and_vec ((_get_Minterrupts_SSI (m))) ((_get_Minterrupts_SSI (d))))).
 
 Definition lower_mie (m : mword 64) (d : mword 64) : mword 64 :=
    let s : Sinterrupts := Mk_Sinterrupts ((zeros' (64))) in
    _update_Sinterrupts_SSI
-     ((_update_Sinterrupts_STI
-         ((_update_Sinterrupts_SEI
-             ((_update_Sinterrupts_LCOFI (s)
-                 ((and_vec ((_get_Minterrupts_LCOFI (m))) ((_get_Minterrupts_LCOFI (d)))))))
-             ((and_vec ((_get_Minterrupts_SEI (m))) ((_get_Minterrupts_SEI (d)))))))
-         ((and_vec ((_get_Minterrupts_STI (m))) ((_get_Minterrupts_STI (d)))))))
+     ((_update_Sinterrupts_MSI
+         ((_update_Sinterrupts_STI
+             ((_update_Sinterrupts_MTI
+                 ((_update_Sinterrupts_SEI
+                     ((_update_Sinterrupts_MEI
+                         ((_update_Sinterrupts_LCOFI (s)
+                             ((and_vec ((_get_Minterrupts_LCOFI (m))) ((_get_Minterrupts_LCOFI (d)))))))
+                         ((and_vec ((_get_Minterrupts_MEI (m))) ((_get_Minterrupts_MEI (d)))))))
+                     ((and_vec ((_get_Minterrupts_SEI (m))) ((_get_Minterrupts_SEI (d)))))))
+                 ((and_vec ((_get_Minterrupts_MTI (m))) ((_get_Minterrupts_MTI (d)))))))
+             ((and_vec ((_get_Minterrupts_STI (m))) ((_get_Minterrupts_STI (d)))))))
+         ((and_vec ((_get_Minterrupts_MSI (m))) ((_get_Minterrupts_MSI (d)))))))
      ((and_vec ((_get_Minterrupts_SSI (m))) ((_get_Minterrupts_SSI (d))))).
 
 Definition lift_sip (o : mword 64) (d : mword 64) (s : mword 64) : mword 64 :=
@@ -16855,12 +17013,24 @@ Definition write_sip (value : mword 64) : M (unit) :=
 Definition lift_sie (o : mword 64) (d : mword 64) (s : mword 64) : mword 64 :=
    _update_Minterrupts_LCOFI
      ((_update_Minterrupts_SSI
-         ((_update_Minterrupts_STI
-             ((_update_Minterrupts_SEI (o)
-                 ((if eq_vec ((_get_Minterrupts_SEI (d))) (('b"1")) then _get_Sinterrupts_SEI (s)
-                   else _get_Minterrupts_SEI (o)))))
-             ((if eq_vec ((_get_Minterrupts_STI (d))) (('b"1")) then _get_Sinterrupts_STI (s)
-               else _get_Minterrupts_STI (o)))))
+         ((_update_Minterrupts_MSI
+             ((_update_Minterrupts_STI
+                 ((_update_Minterrupts_MTI
+                     ((_update_Minterrupts_SEI
+                         ((_update_Minterrupts_MEI (o)
+                             ((if eq_vec ((_get_Minterrupts_MEI (d))) (('b"1")) then
+                                 _get_Sinterrupts_MEI (s)
+                               else _get_Minterrupts_MEI (o)))))
+                         ((if eq_vec ((_get_Minterrupts_SEI (d))) (('b"1")) then
+                             _get_Sinterrupts_SEI (s)
+                           else _get_Minterrupts_SEI (o)))))
+                     ((if eq_vec ((_get_Minterrupts_MTI (d))) (('b"1")) then
+                         _get_Sinterrupts_MTI (s)
+                       else _get_Minterrupts_MTI (o)))))
+                 ((if eq_vec ((_get_Minterrupts_STI (d))) (('b"1")) then _get_Sinterrupts_STI (s)
+                   else _get_Minterrupts_STI (o)))))
+             ((if eq_vec ((_get_Minterrupts_MSI (d))) (('b"1")) then _get_Sinterrupts_MSI (s)
+               else _get_Minterrupts_MSI (o)))))
          ((if eq_vec ((_get_Minterrupts_SSI (d))) (('b"1")) then _get_Sinterrupts_SSI (s)
            else _get_Minterrupts_SSI (o)))))
      ((if eq_vec ((_get_Minterrupts_LCOFI (d))) (('b"1")) then _get_Sinterrupts_LCOFI (s)
@@ -17033,21 +17203,21 @@ Axiom riscv_f64Eq : forall  (_ : mword 64) (_ : mword 64) , (mword 5 * bool).
 Axiom riscv_f16roundToInt :
   forall
 
-  (_ : mword 3) (_ : mword 16) (ex385344_ : bool)
+  (_ : mword 3) (_ : mword 16) (ex654358_ : bool)
   ,
   (mword 5 * mword 16).
 
 Axiom riscv_f32roundToInt :
   forall
 
-  (_ : mword 3) (_ : mword 32) (ex385345_ : bool)
+  (_ : mword 3) (_ : mword 32) (ex654359_ : bool)
   ,
   (mword 5 * mword 32).
 
 Axiom riscv_f64roundToInt :
   forall
 
-  (_ : mword 3) (_ : mword 64) (ex385346_ : bool)
+  (_ : mword 3) (_ : mword 64) (ex654360_ : bool)
   ,
   (mword 5 * mword 64).
 
@@ -17294,7 +17464,8 @@ Definition pmpWriteCfgReg (n : Z) (v : mword 64) (*(0 <=? n) && (n <=? 15)*) : M
 
 Definition pmpWriteAddr (locked : bool) (tor_locked : bool) (reg : mword 64) (v : mword 64)
 : mword 64 :=
-   if orb (locked) (tor_locked) then reg else zero_extend' (64) ((subrange_vec_dec (v) (53) (0))).
+   if orb (locked) (tor_locked) then reg
+   else zero_extend' (64) ((subrange_vec_dec (v) ((Z.min ((Z.sub (physaddr_bits) (3))) (53))) (0))).
 
 Definition pmpWriteAddrReg (n : Z) (v : mword 64) (*(0 <=? n) && (n <=? 63)*) : M (unit) :=
    (if Z.ltb (n) (sys_pmp_usable_count) return M (unit) then
@@ -17319,12 +17490,12 @@ Definition pmpCheckRWX (ent : mword 8) (access : MemoryAccessType mem_payload) :
    | Load Data => returnM ((eq_vec ((_get_Pmpcfg_ent_R (ent))) (('b"1"))))
    | Load Vector => returnM ((eq_vec ((_get_Pmpcfg_ent_R (ent))) (('b"1"))))
    | Load PageTableEntry => returnM ((eq_vec ((_get_Pmpcfg_ent_R (ent))) (('b"1"))))
-   | LoadReserved Data => returnM ((eq_vec ((_get_Pmpcfg_ent_R (ent))) (('b"1"))))
+   | LoadReserved (_, _, Data) => returnM ((eq_vec ((_get_Pmpcfg_ent_R (ent))) (('b"1"))))
    | Store Data => returnM ((eq_vec ((_get_Pmpcfg_ent_W (ent))) (('b"1"))))
    | Store Vector => returnM ((eq_vec ((_get_Pmpcfg_ent_W (ent))) (('b"1"))))
    | Store PageTableEntry => returnM ((eq_vec ((_get_Pmpcfg_ent_W (ent))) (('b"1"))))
-   | StoreConditional Data => returnM ((eq_vec ((_get_Pmpcfg_ent_W (ent))) (('b"1"))))
-   | Atomic (_, Data, Data) =>
+   | StoreConditional (_, _, Data) => returnM ((eq_vec ((_get_Pmpcfg_ent_W (ent))) (('b"1"))))
+   | Atomic (_, _, _, Data, Data) =>
       returnM ((andb ((eq_vec ((_get_Pmpcfg_ent_R (ent))) (('b"1"))))
                   ((eq_vec ((_get_Pmpcfg_ent_W (ent))) (('b"1"))))))
    | InstructionFetch tt => returnM ((eq_vec ((_get_Pmpcfg_ent_X (ent))) (('b"1"))))
@@ -17334,20 +17505,20 @@ Definition pmpCheckRWX (ent : mword 8) (access : MemoryAccessType mem_payload) :
    | Store ShadowStack =>
       returnM ((andb ((eq_vec ((_get_Pmpcfg_ent_R (ent))) (('b"1"))))
                   ((eq_vec ((_get_Pmpcfg_ent_W (ent))) (('b"1"))))))
-   | Atomic (_, ShadowStack, ShadowStack) =>
+   | Atomic (_, _, _, ShadowStack, ShadowStack) =>
       returnM ((andb ((eq_vec ((_get_Pmpcfg_ent_R (ent))) (('b"1"))))
                   ((eq_vec ((_get_Pmpcfg_ent_W (ent))) (('b"1"))))))
-   | LoadReserved p =>
+   | LoadReserved (_, _, p) =>
       (internal_error ("pmp/pmp_control.sail") (32)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved."))))))
        : M (bool)
-   | StoreConditional p =>
+   | StoreConditional (_, _, p) =>
       (internal_error ("pmp/pmp_control.sail") (33)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional."))))))
        : M (bool)
-   | Atomic (_, rp, wp) =>
+   | Atomic (_, _, _, rp, wp) =>
       (internal_error ("pmp/pmp_control.sail") (34)
          ((String.append ("Invalid payloads (")
              ((String.append ((mem_payload_name_forwards (rp)))
@@ -17425,6 +17596,13 @@ Definition pmpCheck
              match w__3 with
              | PMP_NoMatch => returnR (option ExceptionType) (tt)
              | PMP_PartialMatch =>
+                let '(_) :=
+                  (if get_config_print_pmp (tt) then
+                     print_endline
+                       ((String.append ("PMP check failed with a partial match at entry #")
+                           ((String.append ((dec_str (i))) (".")))))
+                   else tt)
+                   : unit in
                 liftR ((accessFaultFromAccessType (access))) >>= fun (w__4 : ExceptionType) =>
                 (early_return ((Some (w__4))
                  : option ExceptionType) :
@@ -17437,6 +17615,13 @@ Definition pmpCheck
                      : bool)))) >>= fun (w__6 : bool) =>
                 (if w__6 then returnR (option ExceptionType) (None)
                  else
+                   let '(_) :=
+                     (if get_config_print_pmp (tt) then
+                        print_endline
+                          ((String.append ("PMP check failed at matching entry #")
+                              ((String.append ((dec_str (i))) (".")))))
+                      else tt)
+                      : unit in
                    liftR ((accessFaultFromAccessType (access))) >>= fun (w__7 : ExceptionType) =>
                    returnR (option ExceptionType) ((Some (w__7)))) >>= fun (w__8 : option ExceptionType) =>
                 (early_return (w__8  : option ExceptionType) : MR (option ExceptionType) unit)
@@ -17445,6 +17630,11 @@ Definition pmpCheck
               : MR (option ExceptionType) (unit)))) >>
          (if generic_eq (priv) (Machine) then returnR (option ExceptionType) (None)
           else
+            let '(_) :=
+              (if get_config_print_pmp (tt) then
+                 print_endline ("PMP check failed with no matching entry.")
+               else tt)
+               : unit in
             liftR ((accessFaultFromAccessType (access))) >>= fun (w__9 : ExceptionType) =>
             returnR (option ExceptionType) ((Some (w__9))))
           : MR (option ExceptionType) (option ExceptionType))
@@ -18876,13 +19066,18 @@ Definition write_fcsr (frm : mword 3) (fflags : mword 5) : M (unit) :=
 
 Definition accrue_fflags (flags : mword 5) : M (unit) :=
    ((read_reg fcsr)  : M (mword 32)) >>= fun (w__0 : mword 32) =>
-   let f := or_vec ((_get_Fcsr_FFLAGS (w__0))) (flags) in
+   let new_fflags := or_vec ((_get_Fcsr_FFLAGS (w__0))) (flags) in
    ((read_reg fcsr)  : M (mword 32)) >>= fun (w__1 : mword 32) =>
-   (if neq_vec ((_get_Fcsr_FFLAGS (w__1))) (f) return M (unit) then
-      ((read_reg fcsr)  : M (mword 32)) >>= fun (w__2 : mword 32) =>
-      write_reg fcsr (update_subrange_vec_dec (w__2) (4) (0) (f)) >>
-      (dirty_fd_context_if_present (tt))
-       : M (unit)
+   let fflags_changed := neq_vec ((_get_Fcsr_FFLAGS (w__1))) (new_fflags) in
+   let set_dirty : bool :=
+     match fflags_dirty_policy with
+     | Fflags_Dirty_Precise => fflags_changed
+     | Fflags_Dirty_Flag => neq_vec (flags) ((zeros' (5)))
+     | Fflags_Dirty_Instruction => true
+     end in
+   ((read_reg fcsr)  : M (mword 32)) >>= fun (w__2 : mword 32) =>
+   write_reg fcsr (update_subrange_vec_dec (w__2) (4) (0) (new_fflags)) >>
+   (if set_dirty return M (unit) then (dirty_fd_context_if_present (tt))  : M (unit)
     else returnM (tt)) >>
    ((read_reg fcsr)  : M (mword 32)) >>= fun (w__3 : mword 32) =>
    (csr_name_write_callback ("fflags") ((zero_extend' (64) ((_get_Fcsr_FFLAGS (w__3)))))) >>
@@ -19937,6 +20132,20 @@ Definition write_vcsr (vxrm_val : mword 2) (vxsat_val : mword 1) : M (unit) :=
    (dirty_v_context (tt))
     : M (unit).
 
+Definition write_vxsat (vxsat_val : mword 1) : M (unit) :=
+   ((read_reg vcsr)  : M (mword 3)) >>= fun (w__0 : mword 3) =>
+   (if neq_vec ((_get_Vcsr_vxsat (w__0))) (vxsat_val) return M (unit) then
+      ((read_reg vcsr)  : M (mword 3)) >>= fun (w__1 : mword 3) =>
+      write_reg vcsr (update_subrange_vec_dec (w__1) (0) (0) (vxsat_val)) >>
+      (dirty_v_context (tt))
+       : M (unit)
+    else returnM (tt)) >>
+   ((read_reg vcsr)  : M (mword 3)) >>= fun (w__2 : mword 3) =>
+   (csr_name_write_callback ("vxsat") ((zero_extend' (64) ((_get_Vcsr_vxsat (w__2)))))) >>
+   ((read_reg vcsr)  : M (mword 3)) >>= fun (w__3 : mword 3) =>
+   (csr_name_write_callback ("vcsr") ((zero_extend' (64) (w__3))))
+    : M (unit).
+
 Definition max_index_eew_exp := 6  : Z.
 #[export] Hint Unfold max_index_eew_exp : sail.
 Definition get_num_elem (LMUL_pow : Z) (SEW : Z) (*(((- 3)) <=? LMUL_pow) && (LMUL_pow <=? 3)*)
@@ -20813,8 +21022,8 @@ Definition pm_transform_PA '((Virtaddr effective_address) : virtaddr) (pmlen : Z
 Axiom load_reservation :
   forall
 
-  (_ : mword ((if 64 =? 32 then 34 else 64))) (fv38695_n : Z)
-  (*(0 <? fv38695_n) && (fv38695_n <? 4096)*),
+  (_ : mword ((if 64 =? 32 then 34 else 64))) (fv39242_n : Z)
+  (*(0 <? fv39242_n) && (fv39242_n <? 4096)*),
   M (unit).
 
 Axiom match_reservation : forall  (_ : mword ((if 64 =? 32 then 34 else 64))) , bool.
@@ -20935,26 +21144,32 @@ Definition satp_accessible (priv : Privilege) : M (bool) :=
 Definition is_CSR_accessible (p0_ : mword 12) (g__4 : Privilege) (g__5 : CSRAccessType) : M (bool) :=
    (if eq_vec (p0_) ((Ox"301")) then returnM (true)
     else if eq_vec (p0_) ((Ox"300")) then returnM (true)
-    else if eq_vec (p0_) ((Ox"310")) then returnM ((Z.eqb (xlen) (32)))
+    else if eq_vec (p0_) ((Ox"310")) then
+      returnM ((andb (mstatush_is_defined) ((Z.eqb (xlen) (32)))))
     else if eq_vec (p0_) ((Ox"747")) return M (bool) then
-      (or_boolM ((currentlyEnabled (Ext_Zkr))  : M (bool))
-         ((or_boolM ((hartSupports (Ext_Zicfilp))  : M (bool))
-             ((currentlyEnabled (Ext_Smmpm))
-              : M (bool)))
-          : M (bool)))
-       : M (bool)
+      and_boolM (returnM (mseccfg_csrs_are_defined))
+        ((or_boolM ((currentlyEnabled (Ext_Zkr))  : M (bool))
+            ((or_boolM ((hartSupports (Ext_Zicfilp))  : M (bool))
+                ((currentlyEnabled (Ext_Smmpm))
+                 : M (bool)))
+             : M (bool)))
+         : M (bool))
     else if eq_vec (p0_) ((Ox"757")) return M (bool) then
-      (and_boolM
-         ((or_boolM ((currentlyEnabled (Ext_Zkr))  : M (bool))
-             ((hartSupports (Ext_Zicfilp))
-              : M (bool)))
-          : M (bool)) (returnM (((Z.eqb (xlen) (32))  : bool))))
-       : M (bool)
-    else if eq_vec (p0_) ((Ox"30A")) return M (bool) then (currentlyEnabled (Ext_U))  : M (bool)
+      and_boolM (returnM (mseccfg_csrs_are_defined))
+        ((and_boolM
+            ((or_boolM ((currentlyEnabled (Ext_Zkr))  : M (bool))
+                ((hartSupports (Ext_Zicfilp))
+                 : M (bool)))
+             : M (bool)) (returnM (((Z.eqb (xlen) (32))  : bool))))
+         : M (bool))
+    else if eq_vec (p0_) ((Ox"30A")) return M (bool) then
+      and_boolM ((currentlyEnabled (Ext_U))  : M (bool)) (returnM (xenvcfg_csrs_are_defined))
     else if eq_vec (p0_) ((Ox"31A")) return M (bool) then
-      (and_boolM ((currentlyEnabled (Ext_U))  : M (bool)) (returnM (((Z.eqb (xlen) (32))  : bool))))
+      (and_boolM ((currentlyEnabled (Ext_U))  : M (bool))
+         (returnM ((andb ((Z.eqb (xlen) (32))) (xenvcfg_csrs_are_defined)))))
        : M (bool)
-    else if eq_vec (p0_) ((Ox"10A")) return M (bool) then (currentlyEnabled (Ext_S))  : M (bool)
+    else if eq_vec (p0_) ((Ox"10A")) return M (bool) then
+      and_boolM ((currentlyEnabled (Ext_S))  : M (bool)) (returnM (xenvcfg_csrs_are_defined))
     else if eq_vec (p0_) ((Ox"342")) then returnM (true)
     else if eq_vec (p0_) ((Ox"343")) then returnM (true)
     else if eq_vec (p0_) ((Ox"340")) then returnM (true)
@@ -20965,7 +21180,7 @@ Definition is_CSR_accessible (p0_ : mword 12) (g__4 : Privilege) (g__5 : CSRAcce
     else if eq_vec (p0_) ((Ox"F12")) then returnM (true)
     else if eq_vec (p0_) ((Ox"F13")) then returnM (true)
     else if eq_vec (p0_) ((Ox"F14")) then returnM (true)
-    else if eq_vec (p0_) ((Ox"F15")) then returnM (true)
+    else if eq_vec (p0_) ((Ox"F15")) then returnM (mconfigptr_is_defined)
     else if eq_vec (p0_) ((Ox"100")) return M (bool) then (currentlyEnabled (Ext_S))  : M (bool)
     else if eq_vec (p0_) ((Ox"140")) return M (bool) then (currentlyEnabled (Ext_S))  : M (bool)
     else if eq_vec (p0_) ((Ox"142")) return M (bool) then (currentlyEnabled (Ext_S))  : M (bool)
@@ -20975,8 +21190,10 @@ Definition is_CSR_accessible (p0_ : mword 12) (g__4 : Privilege) (g__5 : CSRAcce
     else if eq_vec (p0_) ((Ox"344")) then returnM (true)
     else if eq_vec (p0_) ((Ox"302")) return M (bool) then (currentlyEnabled (Ext_S))  : M (bool)
     else if eq_vec (p0_) ((Ox"312")) return M (bool) then
-      (and_boolM ((currentlyEnabled (Ext_S))  : M (bool)) (returnM (((Z.eqb (xlen) (32))  : bool))))
-       : M (bool)
+      and_boolM (returnM (delegh_csrs_are_defined))
+        ((and_boolM ((currentlyEnabled (Ext_S))  : M (bool))
+            (returnM (((Z.eqb (xlen) (32))  : bool))))
+         : M (bool))
     else if eq_vec (p0_) ((Ox"303")) return M (bool) then (currentlyEnabled (Ext_S))  : M (bool)
     else if eq_vec (p0_) ((Ox"144")) return M (bool) then (currentlyEnabled (Ext_S))  : M (bool)
     else if eq_vec (p0_) ((Ox"104")) return M (bool) then (currentlyEnabled (Ext_S))  : M (bool)
@@ -21288,27 +21505,24 @@ Definition findPendingInterrupt (ip : mword 64) : option InterruptType :=
    else None.
 
 Definition getPendingSet (priv : Privilege) : M (option ((mword 64 * Privilege))) :=
-   (or_boolM ((currentlyEnabled (Ext_S))  : M (bool))
-      (((read_reg mideleg)  : M (mword 64)) >>= fun (w__1 : mword 64) =>
-       returnM (((eq_vec (w__1) ((zeros' (64))))  : bool)))) >>= fun (w__2 : bool) =>
-   assert_exp' w__2 "sys/sys_control.sail:107.58-107.59" >>= fun _ =>
+   (currentlyEnabled (Ext_S)) >>= fun (w__0 : bool) =>
+   (if w__0 return M (mword 64) then ((read_reg mideleg)  : M (mword 64))  : M (mword 64)
+    else returnM ((zeros' (64)))) >>= fun mideleg_bits =>
    (read_mip (IncludePlatformInterrupts)) >>= fun mip_bits =>
+   ((read_reg mie)  : M (mword 64)) >>= fun (w__2 : mword 64) =>
+   let pending_m := and_vec (mip_bits) ((and_vec (w__2) ((not_vec (mideleg_bits))))) in
    ((read_reg mie)  : M (mword 64)) >>= fun (w__3 : mword 64) =>
-   ((read_reg mideleg)  : M (mword 64)) >>= fun (w__4 : mword 64) =>
-   let pending_m := and_vec (mip_bits) ((and_vec (w__3) ((not_vec (w__4))))) in
-   ((read_reg mie)  : M (mword 64)) >>= fun (w__5 : mword 64) =>
-   ((read_reg mideleg)  : M (mword 64)) >>= fun (w__6 : mword 64) =>
-   let pending_s := and_vec (mip_bits) ((and_vec (w__5) (w__6))) in
+   let pending_s := and_vec (mip_bits) ((and_vec (w__3) (mideleg_bits))) in
    (or_boolM
       ((and_boolM (returnM (((generic_eq (priv) (Machine))  : bool)))
-          (((read_reg mstatus)  : M (mword 64)) >>= fun (w__7 : mword 64) =>
-           returnM (((eq_vec ((_get_Mstatus_MIE (w__7))) (('b"1")))  : bool))))
+          (((read_reg mstatus)  : M (mword 64)) >>= fun (w__4 : mword 64) =>
+           returnM (((eq_vec ((_get_Mstatus_MIE (w__4))) (('b"1")))  : bool))))
        : M (bool))
       (returnM (((orb ((generic_eq (priv) (Supervisor))) ((generic_eq (priv) (User))))  : bool)))) >>= fun mIE =>
    (or_boolM
       ((and_boolM (returnM (((generic_eq (priv) (Supervisor))  : bool)))
-          (((read_reg mstatus)  : M (mword 64)) >>= fun (w__9 : mword 64) =>
-           returnM (((eq_vec ((_get_Mstatus_SIE (w__9))) (('b"1")))  : bool))))
+          (((read_reg mstatus)  : M (mword 64)) >>= fun (w__6 : mword 64) =>
+           returnM (((eq_vec ((_get_Mstatus_SIE (w__6))) (('b"1")))  : bool))))
        : M (bool)) (returnM (((generic_eq (priv) (User))  : bool)))) >>= fun sIE =>
    returnM ((if andb (mIE) ((neq_vec (pending_m) ((zeros' (64))))) then Some ((pending_m, Machine))
              else if andb (sIE) ((neq_vec (pending_s) ((zeros' (64))))) then
@@ -21353,12 +21567,12 @@ Definition track_trap (p : Privilege) (is_interrupt : bool) (cause : mword 6) : 
       ((read_reg sepc)  : M (mword 64)) >>= fun (w__6 : mword 64) =>
       (csr_name_write_callback ("sepc") (w__6))
        : M (unit)
-   | User => (internal_error ("sys/sys_control.sail") (180) ("Invalid privilege level"))  : M (unit)
+   | User => (internal_error ("sys/sys_control.sail") (187) ("Invalid privilege level"))  : M (unit)
    | VirtualUser =>
-      (internal_error ("sys/sys_control.sail") (181) ("Hypervisor extension not supported"))
+      (internal_error ("sys/sys_control.sail") (188) ("Hypervisor extension not supported"))
        : M (unit)
    | VirtualSupervisor =>
-      (internal_error ("sys/sys_control.sail") (182) ("Hypervisor extension not supported"))
+      (internal_error ("sys/sys_control.sail") (189) ("Hypervisor extension not supported"))
        : M (unit)
    end >>
    returnM ((trap_callback (is_interrupt) (cause))).
@@ -21435,13 +21649,13 @@ Definition trap_handler
       | User => returnM (('b"0"))
       | Supervisor => returnM (('b"1"))
       | Machine =>
-         (internal_error ("sys/sys_control.sail") (231) ("invalid privilege for s-mode trap"))
+         (internal_error ("sys/sys_control.sail") (238) ("invalid privilege for s-mode trap"))
           : M (mword (8 - (8 - 1)))
       | VirtualUser =>
-         (internal_error ("sys/sys_control.sail") (232) ("Hypervisor extension not supported"))
+         (internal_error ("sys/sys_control.sail") (239) ("Hypervisor extension not supported"))
           : M (mword (8 - (8 - 1)))
       | VirtualSupervisor =>
-         (internal_error ("sys/sys_control.sail") (233) ("Hypervisor extension not supported"))
+         (internal_error ("sys/sys_control.sail") (240) ("Hypervisor extension not supported"))
           : M (mword (8 - (8 - 1)))
       end >>= fun (w__22 : mword (8 - (8 - 1))) =>
       write_reg mstatus (update_subrange_vec_dec (w__17) (8) (8) (w__22)) >>
@@ -21454,12 +21668,12 @@ Definition trap_handler
       (prepare_trap_vector (del_priv) (w__23))
        : M (mword 64)
    | User =>
-      (internal_error ("sys/sys_control.sail") (246) ("Invalid privilege level"))  : M (mword 64)
+      (internal_error ("sys/sys_control.sail") (253) ("Invalid privilege level"))  : M (mword 64)
    | VirtualUser =>
-      (internal_error ("sys/sys_control.sail") (247) ("Hypervisor extension not supported"))
+      (internal_error ("sys/sys_control.sail") (254) ("Hypervisor extension not supported"))
        : M (mword 64)
    | VirtualSupervisor =>
-      (internal_error ("sys/sys_control.sail") (248) ("Hypervisor extension not supported"))
+      (internal_error ("sys/sys_control.sail") (255) ("Hypervisor extension not supported"))
        : M (mword 64)
    end
     : M (mword 64).
@@ -21561,7 +21775,7 @@ Definition reset_misa '(tt : unit) : M (unit) :=
    write_reg misa (update_subrange_vec_dec (w__15) (8) (8) ((not_vec ((_get_Misa_E (w__16)))))) >>
    (and_boolM ((hartSupports (Ext_F))  : M (bool)) ((hartSupports (Ext_Zfinx))  : M (bool))) >>= fun (w__19 : bool) =>
    (if w__19 return M (unit) then
-      (internal_error ("sys/sys_control.sail") (318) ("F and Zfinx cannot both be enabled!"))
+      (internal_error ("sys/sys_control.sail") (325) ("F and Zfinx cannot both be enabled!"))
        : M (unit)
     else returnM (tt)) >>
    ((read_reg misa)  : M (mword 64)) >>= fun (w__20 : mword 64) =>
@@ -21629,48 +21843,52 @@ Definition reset_sys '(tt : unit) : M (unit) :=
    write_reg vtype (update_subrange_vec_dec (w__17) (2) (0) (('b"000")))
     : M (unit).
 
-Definition MemoryOpResult_add_meta {t : Type} (r : result t ExceptionType) (m : unit)
-: result ((t * unit)) ExceptionType :=
+Definition MemoryOpResult_add_meta {t : Type} (r : result t ((physaddr * ExceptionType))) (m : unit)
+: result ((t * unit)) ((physaddr * ExceptionType)) :=
    match r with | Ok v => Ok ((v, m)) | Err e => Err (e) end.
 
-Definition MemoryOpResult_drop_meta {t : Type} (r : result ((t * unit)) ExceptionType)
-: result t ExceptionType :=
+Definition MemoryOpResult_drop_meta {t : Type}
+(r : result ((t * unit)) ((physaddr * ExceptionType)))
+: result t ((physaddr * ExceptionType)) :=
    match r with | Ok (v, _m) => Ok (v) | Err e => Err (e) end.
 
 Definition SIG_VERSION_OFFSET := 0.
 #[export] Hint Unfold SIG_VERSION_OFFSET : sail.
 Definition SIG_PLATFORM_OFFSET := 4.
 #[export] Hint Unfold SIG_PLATFORM_OFFSET : sail.
-Definition sig_load
-(access : MemoryAccessType mem_payload) '((Physaddr paddr) : physaddr) (width : Z) (*width >=? 0*)
-(*(0 <? width) && (width <=? 4096)*)
-: M (result (mword (8 * width)) ExceptionType) :=
+Definition sig_load (access : MemoryAccessType mem_payload) (addr : physaddr) (width : Z)
+(*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
+: M (result (mword (8 * width)) ((physaddr * ExceptionType))) :=
+   let '((Physaddr paddr)) := addr in
    let VERSION := (Ox"00010000") in
    (if orb ((neq_int (width) (4)))
          ((neq_vec ((subrange_vec_dec (paddr) (1) (0))) ((zeros' ((Z.add ((Z.sub (1) (0))) (1)))))))
       return
-      M (result (mword (8 * width)) ExceptionType) then
-      (accessFaultFromAccessType (access)) >>= fun (w__0 : ExceptionType) => returnM ((Err (w__0)))
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
+      (accessFaultFromAccessType (access)) >>= fun (w__0 : ExceptionType) =>
+      returnM ((Err ((addr, w__0))))
     else if eq_vec (paddr) ((add_vec_int (plat_sig_base) (SIG_VERSION_OFFSET))) then
       returnM ((Ok ((autocast (T := mword)  VERSION))))
     else if eq_vec (paddr) ((add_vec_int (plat_sig_base) (SIG_PLATFORM_OFFSET))) then
       returnM ((Ok ((zeros' ((Z.mul (8) ((__id (width)))))))))
     else
-      (accessFaultFromAccessType (access)) >>= fun (w__1 : ExceptionType) => returnM ((Err (w__1))))
-    : M (result (mword (8 * width)) ExceptionType).
+      (accessFaultFromAccessType (access)) >>= fun (w__1 : ExceptionType) =>
+      returnM ((Err ((addr, w__1)))))
+    : M (result (mword (8 * width)) ((physaddr * ExceptionType))).
 
-Definition sig_store '((Physaddr paddr) : physaddr) (width : Z) (data : mword (8 * width))
-(*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
-: M (result bool ExceptionType) :=
+Definition sig_store (addr : physaddr) (width : Z) (data : mword (8 * width)) (*width >=? 0*)
+(*(0 <? width) && (width <=? 4096)*)
+: M (result bool ((physaddr * ExceptionType))) :=
+   let '((Physaddr paddr)) := addr in
    (if orb ((neq_int (width) (4)))
          ((neq_vec ((subrange_vec_dec (paddr) (1) (0))) ((zeros' ((Z.add ((Z.sub (1) (0))) (1)))))))
     then
-      returnM ((Err ((E_SAMO_Access_Fault (tt)))))
+      returnM ((Err ((addr, E_SAMO_Access_Fault (tt)))))
     else if eq_vec (paddr) ((add_vec_int (plat_sig_base) (SIG_VERSION_OFFSET))) then
       returnM ((Ok (true)))
     else if eq_vec (paddr) ((add_vec_int (plat_sig_base) (SIG_PLATFORM_OFFSET)))
       return
-      M (result bool ExceptionType) then
+      M (result bool ((physaddr * ExceptionType))) then
       let value := access_vec_dec (data) (31) in
       let data := Mk_Minterrupts ((zero_extend' (64) (data))) in
       (if neq_vec
@@ -21680,7 +21898,7 @@ Definition sig_store '((Physaddr paddr) : physaddr) (width : Z) (data : mword (8
                         ((_update_Minterrupts_SEI ((_update_Minterrupts_MEI (data) (('b"0"))))
                             (('b"0")))) (('b"0")))) (('b"0")))) (30) (0)))
             ((zeros' ((Z.add ((Z.sub (30) (0))) (1))))) then
-         returnM ((Err ((E_SAMO_Access_Fault (tt)))))
+         returnM ((Err ((addr, E_SAMO_Access_Fault (tt)))))
        else
          (if eq_vec ((_get_Minterrupts_MEI (data))) (('b"1")) return M (unit) then
             write_reg sig_meip value
@@ -21705,9 +21923,9 @@ Definition sig_store '((Physaddr paddr) : physaddr) (width : Z) (data : mword (8
           else returnM (tt)) >>
          (read_mip (IncludePlatformInterrupts)) >>= fun (w__4 : mword 64) =>
          (csr_name_write_callback ("mip") (w__4)) >> returnM ((Ok (true))))
-       : M (result bool ExceptionType)
-    else returnM ((Err ((E_SAMO_Access_Fault (tt))))))
-    : M (result bool ExceptionType).
+       : M (result bool ((physaddr * ExceptionType)))
+    else returnM ((Err ((addr, E_SAMO_Access_Fault (tt))))))
+    : M (result bool ((physaddr * ExceptionType))).
 
 Definition htif_tohost_size := 8.
 #[export] Hint Unfold htif_tohost_size : sail.
@@ -21764,15 +21982,15 @@ Definition MTIME_BASE : physaddrbits := zero_extend' (64) ((Ox"0BFF8")).
 #[export] Hint Unfold MTIME_BASE : sail.
 Definition MTIME_BASE_HI : physaddrbits := zero_extend' (64) ((Ox"0BFFC")).
 #[export] Hint Unfold MTIME_BASE_HI : sail.
-Definition clint_load
-(access : MemoryAccessType mem_payload) '((Physaddr addr) : physaddr) (width : Z) (*width >=? 0*)
-(*width >? 0*)
-: M (result (mword (8 * width)) ExceptionType) :=
+Definition clint_load (access : MemoryAccessType mem_payload) (paddr : physaddr) (width : Z)
+(*width >=? 0*) (*width >? 0*)
+: M (result (mword (8 * width)) ((physaddr * ExceptionType))) :=
+   let '((Physaddr addr)) := paddr in
    let addr := sub_vec (addr) (plat_clint_base) in
    (if andb ((eq_vec (addr) (MSIP_BASE)))
          ((orb ((Z.eqb ((__id (width))) (8))) ((Z.eqb ((__id (width))) (4)))))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       (if get_config_print_clint (tt) return M (unit) then
          ((read_reg mip)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
          returnM ((print_endline
@@ -21785,7 +22003,7 @@ Definition clint_load
       returnM ((Ok ((zero_extend' ((Z.mul (8) ((__id (width))))) ((_get_Minterrupts_MSI (w__1)))))))
     else if andb ((eq_vec (addr) (MTIMECMP_BASE))) ((Z.eqb ((__id (width))) (4)))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       (if get_config_print_clint (tt) return M (unit) then
          ((read_reg mtimecmp)  : M (mword 64)) >>= fun (w__2 : mword 64) =>
          returnM ((print_endline
@@ -21798,7 +22016,7 @@ Definition clint_load
       returnM ((Ok ((zero_extend' _ ((subrange_vec_dec (w__3) (31) (0)))))))
     else if andb ((eq_vec (addr) (MTIMECMP_BASE))) ((Z.eqb ((__id (width))) (8)))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       (if get_config_print_clint (tt) return M (unit) then
          ((read_reg mtimecmp)  : M (mword 64)) >>= fun (w__4 : mword 64) =>
          returnM ((print_endline
@@ -21810,7 +22028,7 @@ Definition clint_load
       returnM ((Ok ((zero_extend' _ (w__5)))))
     else if andb ((eq_vec (addr) (MTIMECMP_BASE_HI))) ((Z.eqb ((__id (width))) (4)))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       (if get_config_print_clint (tt) return M (unit) then
          ((read_reg mtimecmp)  : M (mword 64)) >>= fun (w__6 : mword 64) =>
          returnM ((print_endline
@@ -21823,7 +22041,7 @@ Definition clint_load
       returnM ((Ok ((zero_extend' _ ((subrange_vec_dec (w__7) (63) (32)))))))
     else if andb ((eq_vec (addr) (MTIME_BASE))) ((Z.eqb ((__id (width))) (4)))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       (if get_config_print_clint (tt) return M (unit) then
          ((read_reg mtime)  : M (mword 64)) >>= fun (w__8 : mword 64) =>
          returnM ((print_endline
@@ -21835,7 +22053,7 @@ Definition clint_load
       returnM ((Ok ((zero_extend' _ ((subrange_vec_dec (w__9) (31) (0)))))))
     else if andb ((eq_vec (addr) (MTIME_BASE))) ((Z.eqb ((__id (width))) (8)))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       (if get_config_print_clint (tt) return M (unit) then
          ((read_reg mtime)  : M (mword 64)) >>= fun (w__10 : mword 64) =>
          returnM ((print_endline
@@ -21847,7 +22065,7 @@ Definition clint_load
       returnM ((Ok ((zero_extend' _ (w__11)))))
     else if andb ((eq_vec (addr) (MTIME_BASE_HI))) ((Z.eqb ((__id (width))) (4)))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       (if get_config_print_clint (tt) return M (unit) then
          ((read_reg mtime)  : M (mword 64)) >>= fun (w__12 : mword 64) =>
          returnM ((print_endline
@@ -21866,8 +22084,8 @@ Definition clint_load
          else tt)
          : unit in
       (accessFaultFromAccessType (access)) >>= fun (w__14 : ExceptionType) =>
-      returnM ((Err (w__14))))
-    : M (result (mword (8 * width)) ExceptionType).
+      returnM ((Err ((paddr, w__14)))))
+    : M (result (mword (8 * width)) ((physaddr * ExceptionType))).
 
 Definition clint_dispatch (mip_was_written : bool) : M (unit) :=
    ((read_reg mip)  : M (mword 64)) >>= fun old_mip =>
@@ -21903,14 +22121,15 @@ Definition clint_dispatch (mip_was_written : bool) : M (unit) :=
     else returnM (tt))
     : M (unit).
 
-Definition clint_store '((Physaddr addr) : physaddr) (width : Z) (data : mword (8 * width))
-(*width >=? 0*) (*width >? 0*)
-: M (result bool ExceptionType) :=
+Definition clint_store (paddr : physaddr) (width : Z) (data : mword (8 * width)) (*width >=? 0*)
+(*width >? 0*)
+: M (result bool ((physaddr * ExceptionType))) :=
+   let '((Physaddr addr)) := paddr in
    let addr := sub_vec (addr) (plat_clint_base) in
    (if andb ((eq_vec (addr) (MSIP_BASE)))
          ((orb ((Z.eqb ((__id (width))) (8))) ((Z.eqb ((__id (width))) (4)))))
       return
-      M (result bool ExceptionType) then
+      M (result bool ((physaddr * ExceptionType))) then
       let '(_) :=
         (if get_config_print_clint (tt) then
            print_endline
@@ -21931,7 +22150,7 @@ Definition clint_store '((Physaddr addr) : physaddr) (width : Z) (data : mword (
       (clint_dispatch (true)) >> returnM ((Ok (true)))
     else if andb ((eq_vec (addr) (MTIMECMP_BASE))) ((Z.eqb ((__id (width))) (8)))
       return
-      M (result bool ExceptionType) then
+      M (result bool ((physaddr * ExceptionType))) then
       let '(_) :=
         (if get_config_print_clint (tt) then
            print_endline
@@ -21945,7 +22164,7 @@ Definition clint_store '((Physaddr addr) : physaddr) (width : Z) (data : mword (
       (clint_dispatch (false)) >> returnM ((Ok (true)))
     else if andb ((eq_vec (addr) (MTIMECMP_BASE))) ((Z.eqb ((__id (width))) (4)))
       return
-      M (result bool ExceptionType) then
+      M (result bool ((physaddr * ExceptionType))) then
       let '(_) :=
         (if get_config_print_clint (tt) then
            print_endline
@@ -21960,7 +22179,7 @@ Definition clint_store '((Physaddr addr) : physaddr) (width : Z) (data : mword (
       (clint_dispatch (false)) >> returnM ((Ok (true)))
     else if andb ((eq_vec (addr) (MTIMECMP_BASE_HI))) ((Z.eqb ((__id (width))) (4)))
       return
-      M (result bool ExceptionType) then
+      M (result bool ((physaddr * ExceptionType))) then
       let '(_) :=
         (if get_config_print_clint (tt) then
            print_endline
@@ -21975,7 +22194,7 @@ Definition clint_store '((Physaddr addr) : physaddr) (width : Z) (data : mword (
       (clint_dispatch (false)) >> returnM ((Ok (true)))
     else if andb ((eq_vec (addr) (MTIME_BASE))) ((Z.eqb ((__id (width))) (8)))
       return
-      M (result bool ExceptionType) then
+      M (result bool ((physaddr * ExceptionType))) then
       let '(_) :=
         (if get_config_print_clint (tt) then
            print_endline
@@ -21989,7 +22208,7 @@ Definition clint_store '((Physaddr addr) : physaddr) (width : Z) (data : mword (
       (clint_dispatch (false)) >> returnM ((Ok (true)))
     else if andb ((eq_vec (addr) (MTIME_BASE))) ((Z.eqb ((__id (width))) (4)))
       return
-      M (result bool ExceptionType) then
+      M (result bool ((physaddr * ExceptionType))) then
       let '(_) :=
         (if get_config_print_clint (tt) then
            print_endline
@@ -22004,7 +22223,7 @@ Definition clint_store '((Physaddr addr) : physaddr) (width : Z) (data : mword (
       (clint_dispatch (false)) >> returnM ((Ok (true)))
     else if andb ((eq_vec (addr) (MTIME_BASE_HI))) ((Z.eqb ((__id (width))) (4)))
       return
-      M (result bool ExceptionType) then
+      M (result bool ((physaddr * ExceptionType))) then
       let '(_) :=
         (if get_config_print_clint (tt) then
            print_endline
@@ -22027,8 +22246,8 @@ Definition clint_store '((Physaddr addr) : physaddr) (width : Z) (data : mword (
                          ((String.append ((string_of_bits (data))) (" (<unmapped>)")))))))))
          else tt)
          : unit in
-      returnM ((Err ((E_SAMO_Access_Fault (tt))))))
-    : M (result bool ExceptionType).
+      returnM ((Err ((paddr, E_SAMO_Access_Fault (tt))))))
+    : M (result bool ((physaddr * ExceptionType))).
 
 Definition should_inc_mcycle (priv : Privilege) : M (bool) :=
    (and_boolM
@@ -22098,10 +22317,10 @@ Definition reset_htif '(tt : unit) : M (unit) :=
    write_reg htif_cmd_write ('b"0") >>
    write_reg htif_payload_writes (Ox"0") >> write_reg htif_tohost (zeros' (64))  : M (unit).
 
-Definition htif_load
-(access : MemoryAccessType mem_payload) '((Physaddr paddr) : physaddr) (width : Z) (*width >=? 0*)
-(*(0 <? width) && (width <=? 4096)*)
-: M (result (mword (8 * width)) ExceptionType) :=
+Definition htif_load (access : MemoryAccessType mem_payload) (addr : physaddr) (width : Z)
+(*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
+: M (result (mword (8 * width)) ((physaddr * ExceptionType))) :=
+   let '((Physaddr paddr)) := addr in
    (if get_config_print_htif (tt) return M (unit) then
       ((read_reg htif_tohost)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
       returnM ((print_endline
@@ -22113,33 +22332,35 @@ Definition htif_load
    match w__1 with
    | Some base => returnM (base)
    | None =>
-      (internal_error ("sys/platform.sail") (268) ("HTIF load while HTIF isn't enabled"))
+      (internal_error ("sys/platform.sail") (271) ("HTIF load while HTIF isn't enabled"))
        : M (mword ((if 64 =? 32 then 34 else 64)))
    end >>= fun (base : physaddrbits) =>
    (if andb ((Z.eqb (width) (8))) ((eq_vec (paddr) (base)))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       ((read_reg htif_tohost)  : M (mword 64)) >>= fun (w__3 : mword 64) =>
       returnM ((Ok ((zero_extend' _ (w__3)))))
     else if andb ((Z.eqb (width) (4))) ((eq_vec (paddr) (base)))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       ((read_reg htif_tohost)  : M (mword 64)) >>= fun (w__4 : mword 64) =>
       returnM ((Ok ((zero_extend' _ ((subrange_vec_dec (w__4) (31) (0)))))))
     else if andb ((Z.eqb (width) (4))) ((eq_vec (paddr) ((add_vec_int (base) (4)))))
       return
-      M (result (mword (8 * width)) ExceptionType) then
+      M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       ((read_reg htif_tohost)  : M (mword 64)) >>= fun (w__5 : mword 64) =>
       returnM ((Ok ((zero_extend' _ ((subrange_vec_dec (w__5) (63) (32)))))))
     else
-      (accessFaultFromAccessType (access)) >>= fun (w__6 : ExceptionType) => returnM ((Err (w__6))))
-    : M (result (mword (8 * width)) ExceptionType).
+      (accessFaultFromAccessType (access)) >>= fun (w__6 : ExceptionType) =>
+      returnM ((Err ((addr, w__6)))))
+    : M (result (mword (8 * width)) ((physaddr * ExceptionType))).
 
-Definition htif_store '((Physaddr paddr) : physaddr) (width : Z) (data : mword (8 * width))
-(*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
-: M (result bool ExceptionType) :=
+Definition htif_store (addr : physaddr) (width : Z) (data : mword (8 * width)) (*width >=? 0*)
+(*(0 <? width) && (width <=? 4096)*)
+: M (result bool ((physaddr * ExceptionType))) :=
    catch_early_return
-     (let '(_) :=
+     (let '((Physaddr paddr)) := addr in
+     let '(_) :=
        (if get_config_print_htif (tt) then
           print_endline
             ((String.append ("htif[")
@@ -22149,71 +22370,83 @@ Definition htif_store '((Physaddr paddr) : physaddr) (width : Z) (data : mword (
         : unit in
      liftR (read_reg htif_tohost_base) >>= fun (w__0 : option (mword ((if 64 =? 32 then 34 else 64)))) =>
      match w__0 with
-     | Some base => returnR (result bool ExceptionType) (base)
+     | Some base => returnR (result bool ((physaddr * ExceptionType))) (base)
      | None =>
-        liftR ((internal_error ("sys/platform.sail") (288) ("HTIF store while HTIF isn't enabled")))
-         : MR (result bool ExceptionType) (mword ((if 64 =? 32 then 34 else 64)))
+        liftR ((internal_error ("sys/platform.sail") (292) ("HTIF store while HTIF isn't enabled")))
+         : MR (result bool ((physaddr * ExceptionType))) (mword ((if 64 =? 32 then 34 else 64)))
      end >>= fun (base : physaddrbits) =>
      (if andb ((Z.eqb (width) (8))) ((eq_vec (paddr) (base)))
         return
-        MR (result bool ExceptionType) (unit) then
+        MR (result bool ((physaddr * ExceptionType))) (unit) then
         liftR (write_reg htif_cmd_write ('b"1")) >>
-        ((liftR (read_reg htif_payload_writes))  : MR (result bool ExceptionType) (mword 4)) >>= fun (w__2 : mword 4) =>
+        ((liftR (read_reg htif_payload_writes))
+          : MR (result bool ((physaddr * ExceptionType))) (mword 4)) >>= fun (w__2 : mword 4) =>
         liftR (write_reg htif_payload_writes (add_vec_int (w__2) (1))) >>
         liftR (write_reg htif_tohost (zero_extend' (64) (data)))
-         : MR (result bool ExceptionType) (unit)
+         : MR (result bool ((physaddr * ExceptionType))) (unit)
       else if andb ((Z.eqb (width) (4))) ((eq_vec (paddr) (base)))
         return
-        MR (result bool ExceptionType) (unit) then
-        ((liftR (read_reg htif_tohost))  : MR (result bool ExceptionType) (mword 64)) >>= fun (w__3 : mword 64) =>
+        MR (result bool ((physaddr * ExceptionType))) (unit) then
+        ((liftR (read_reg htif_tohost))  : MR (result bool ((physaddr * ExceptionType))) (mword 64)) >>= fun (w__3 : mword 64) =>
         (if eq_vec (data) ((autocast (T := mword) (subrange_vec_dec (w__3) (31) (0))))
            return
-           MR (result bool ExceptionType) (unit) then
-           ((liftR (read_reg htif_payload_writes))  : MR (result bool ExceptionType) (mword 4)) >>= fun (w__4 : mword 4) =>
+           MR (result bool ((physaddr * ExceptionType))) (unit) then
+           ((liftR (read_reg htif_payload_writes))
+             : MR (result bool ((physaddr * ExceptionType))) (mword 4)) >>= fun (w__4 : mword 4) =>
            liftR (write_reg htif_payload_writes (add_vec_int (w__4) (1)))
-            : MR (result bool ExceptionType) (unit)
-         else liftR (write_reg htif_payload_writes (Ox"1"))  : MR (result bool ExceptionType) (unit)) >>
-        ((liftR (read_reg htif_tohost))  : MR (result bool ExceptionType) (mword 64)) >>= fun (w__5 : mword 64) =>
+            : MR (result bool ((physaddr * ExceptionType))) (unit)
+         else
+           liftR (write_reg htif_payload_writes (Ox"1"))
+            : MR (result bool ((physaddr * ExceptionType))) (unit)) >>
+        ((liftR (read_reg htif_tohost))  : MR (result bool ((physaddr * ExceptionType))) (mword 64)) >>= fun (w__5 : mword 64) =>
         liftR (write_reg
           htif_tohost
           (update_subrange_vec_dec (w__5) (31) (0) ((autocast (T := mword)  data))))
-         : MR (result bool ExceptionType) (unit)
+         : MR (result bool ((physaddr * ExceptionType))) (unit)
       else if andb ((Z.eqb (width) (4))) ((eq_vec (paddr) ((add_vec_int (base) (4)))))
         return
-        MR (result bool ExceptionType) (unit) then
-        ((liftR (read_reg htif_tohost))  : MR (result bool ExceptionType) (mword 64)) >>= fun (w__6 : mword 64) =>
+        MR (result bool ((physaddr * ExceptionType))) (unit) then
+        ((liftR (read_reg htif_tohost))  : MR (result bool ((physaddr * ExceptionType))) (mword 64)) >>= fun (w__6 : mword 64) =>
         (if eq_vec ((subrange_vec_dec (data) (15) (0))) ((subrange_vec_dec (w__6) (47) (32)))
            return
-           MR (result bool ExceptionType) (unit) then
-           ((liftR (read_reg htif_payload_writes))  : MR (result bool ExceptionType) (mword 4)) >>= fun (w__7 : mword 4) =>
+           MR (result bool ((physaddr * ExceptionType))) (unit) then
+           ((liftR (read_reg htif_payload_writes))
+             : MR (result bool ((physaddr * ExceptionType))) (mword 4)) >>= fun (w__7 : mword 4) =>
            liftR (write_reg htif_payload_writes (add_vec_int (w__7) (1)))
-            : MR (result bool ExceptionType) (unit)
-         else liftR (write_reg htif_payload_writes (Ox"1"))  : MR (result bool ExceptionType) (unit)) >>
+            : MR (result bool ((physaddr * ExceptionType))) (unit)
+         else
+           liftR (write_reg htif_payload_writes (Ox"1"))
+            : MR (result bool ((physaddr * ExceptionType))) (unit)) >>
         liftR (write_reg htif_cmd_write ('b"1")) >>
-        ((liftR (read_reg htif_tohost))  : MR (result bool ExceptionType) (mword 64)) >>= fun (w__8 : mword 64) =>
+        ((liftR (read_reg htif_tohost))  : MR (result bool ((physaddr * ExceptionType))) (mword 64)) >>= fun (w__8 : mword 64) =>
         liftR (write_reg
           htif_tohost
           (update_subrange_vec_dec (w__8) (63) (32) ((autocast (T := mword)  data))))
-         : MR (result bool ExceptionType) (unit)
+         : MR (result bool ((physaddr * ExceptionType))) (unit)
       else
-        (early_return ((Err ((E_SAMO_Access_Fault (tt))))
-         : result bool ExceptionType) :
-          MR (result bool ExceptionType) unit)
-         : MR (result bool ExceptionType) (unit)) >>
+        (early_return ((Err ((addr, E_SAMO_Access_Fault (tt))))
+         : result bool ((physaddr * ExceptionType))) :
+          MR (result bool ((physaddr * ExceptionType))) unit)
+         : MR (result bool ((physaddr * ExceptionType))) (unit)) >>
      (or_boolM
         ((and_boolM
-            (((liftR (read_reg htif_cmd_write))  : MR (result bool ExceptionType) (mword 1)) >>= fun (w__9 : mword 1) =>
-             returnR (result bool ExceptionType) (((eq_vec (w__9) (('b"1")))  : bool)))
-            (((liftR (read_reg htif_payload_writes))  : MR (result bool ExceptionType) (mword 4)) >>= fun (w__10 : mword 4) =>
-             returnR (result bool ExceptionType) (((Z.gtb ((uint (w__10))) (0))  : bool))))
-         : MR (result bool ExceptionType) (bool))
-        (((liftR (read_reg htif_payload_writes))  : MR (result bool ExceptionType) (mword 4)) >>= fun (w__12 : mword 4) =>
-         returnR (result bool ExceptionType) (((Z.gtb ((uint (w__12))) (2))  : bool)))) >>= fun (w__13 : bool) =>
-     (if w__13 return MR (result bool ExceptionType) (unit) then
-        ((liftR (read_reg htif_tohost))  : MR (result bool ExceptionType) (mword 64)) >>= fun (w__14 : mword 64) =>
+            (((liftR (read_reg htif_cmd_write))
+               : MR (result bool ((physaddr * ExceptionType))) (mword 1)) >>= fun (w__9 : mword 1) =>
+             returnR (result bool ((physaddr * ExceptionType))) (((eq_vec (w__9) (('b"1")))
+              : bool)))
+            (((liftR (read_reg htif_payload_writes))
+               : MR (result bool ((physaddr * ExceptionType))) (mword 4)) >>= fun (w__10 : mword 4) =>
+             returnR (result bool ((physaddr * ExceptionType))) (((Z.gtb ((uint (w__10))) (0))
+              : bool))))
+         : MR (result bool ((physaddr * ExceptionType))) (bool))
+        (((liftR (read_reg htif_payload_writes))
+           : MR (result bool ((physaddr * ExceptionType))) (mword 4)) >>= fun (w__12 : mword 4) =>
+         returnR (result bool ((physaddr * ExceptionType))) (((Z.gtb ((uint (w__12))) (2))  : bool)))) >>= fun (w__13 : bool) =>
+     (if w__13 return MR (result bool ((physaddr * ExceptionType))) (unit) then
+        ((liftR (read_reg htif_tohost))  : MR (result bool ((physaddr * ExceptionType))) (mword 64)) >>= fun (w__14 : mword 64) =>
         let cmd := Mk_htif_cmd (w__14) in
         let p0_ := _get_htif_cmd_device (cmd) in
-        (if eq_vec (p0_) ((Ox"00")) return MR (result bool ExceptionType) (unit) then
+        (if eq_vec (p0_) ((Ox"00")) return MR (result bool ((physaddr * ExceptionType))) (unit) then
            let '(_) :=
              (if get_config_print_htif (tt) then
                 print_endline
@@ -22223,15 +22456,17 @@ Definition htif_store '((Physaddr paddr) : physaddr) (width : Z) (data : mword (
               : unit in
            (if eq_vec ((access_vec_dec ((_get_htif_cmd_payload (cmd))) (0))) (('b"1"))
               return
-              MR (result bool ExceptionType) (unit) then
+              MR (result bool ((physaddr * ExceptionType))) (unit) then
               liftR (write_reg htif_done true) >>
               liftR (write_reg
                 htif_exit_code
                 (shiftr ((zero_extend' (64) ((_get_htif_cmd_payload (cmd))))) (1)))
-               : MR (result bool ExceptionType) (unit)
-            else returnR (result bool ExceptionType) (tt))
-            : MR (result bool ExceptionType) (unit)
-         else if eq_vec (p0_) ((Ox"01")) return MR (result bool ExceptionType) (unit) then
+               : MR (result bool ((physaddr * ExceptionType))) (unit)
+            else returnR (result bool ((physaddr * ExceptionType))) (tt))
+            : MR (result bool ((physaddr * ExceptionType))) (unit)
+         else if eq_vec (p0_) ((Ox"01"))
+           return
+           MR (result bool ((physaddr * ExceptionType))) (unit) then
            let '(_) :=
              (if get_config_print_htif (tt) then
                 print_endline
@@ -22241,27 +22476,32 @@ Definition htif_store '((Physaddr paddr) : physaddr) (width : Z) (data : mword (
               : unit in
            match _get_htif_cmd_cmd (cmd) with
            | p0_ =>
-              (if eq_vec (p0_) ((Ox"00")) then returnR (result bool ExceptionType) (tt)
-               else if eq_vec (p0_) ((Ox"01")) return MR (result bool ExceptionType) (unit) then
+              (if eq_vec (p0_) ((Ox"00")) then
+                 returnR (result bool ((physaddr * ExceptionType))) (tt)
+               else if eq_vec (p0_) ((Ox"01"))
+                 return
+                 MR (result bool ((physaddr * ExceptionType))) (unit) then
                  liftR ((plat_term_write
                            ((subrange_vec_dec ((_get_htif_cmd_payload (cmd))) (7) (0)))))
-                  : MR (result bool ExceptionType) (unit)
+                  : MR (result bool ((physaddr * ExceptionType))) (unit)
                else
                  let c := p0_ in
-                 returnR (result bool ExceptionType) ((print
-                                                         ((String.append ("Unknown term cmd: ")
-                                                             ((string_of_bits (c))))))))
-               : MR (result bool ExceptionType) (unit)
+                 returnR (result bool ((physaddr * ExceptionType))) ((print
+                                                                        ((String.append
+                                                                            ("Unknown term cmd: ")
+                                                                            ((string_of_bits (c))))))))
+               : MR (result bool ((physaddr * ExceptionType))) (unit)
            end >>
            liftR ((reset_htif (tt)))
-            : MR (result bool ExceptionType) (unit)
+            : MR (result bool ((physaddr * ExceptionType))) (unit)
          else
-           returnR (result bool ExceptionType) ((print
-                                                   ((String.append ("htif-???? cmd: ")
-                                                       ((string_of_bits (data))))))))
-         : MR (result bool ExceptionType) (unit)
-      else returnR (result bool ExceptionType) (tt)) >>
-     returnR (result bool ExceptionType) ((Ok (true)))).
+           returnR (result bool ((physaddr * ExceptionType))) ((print
+                                                                  ((String.append
+                                                                      ("htif-???? cmd: ")
+                                                                      ((string_of_bits (data))))))))
+         : MR (result bool ((physaddr * ExceptionType))) (unit)
+      else returnR (result bool ((physaddr * ExceptionType))) (tt)) >>
+     returnR (result bool ((physaddr * ExceptionType))) ((Ok (true)))).
 
 Definition within_mmio_readable (addr : physaddr) (width : Z) (*(0 <? width) && (width <=? 4096)*)
 : M (bool) :=
@@ -22291,49 +22531,165 @@ Definition within_mmio_writable (addr : physaddr) (width : Z) (*(0 <? width) && 
 
 Definition mmio_read (access : MemoryAccessType mem_payload) (paddr : physaddr) (width : Z)
 (*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
-: M (result (mword (8 * width)) ExceptionType) :=
+: M (result (mword (8 * width)) ((physaddr * ExceptionType))) :=
    (within_clint (paddr) (width)) >>= fun (w__0 : bool) =>
-   (if w__0 return M (result (mword (8 * width)) ExceptionType) then
+   (if w__0 return M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
       (clint_load (access) (paddr) (width))
-       : M (result (mword (8 * width)) ExceptionType)
+       : M (result (mword (8 * width)) ((physaddr * ExceptionType)))
     else
       (within_sig (paddr) (width)) >>= fun (w__2 : bool) =>
-      (if w__2 return M (result (mword (8 * width)) ExceptionType) then
+      (if w__2 return M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
          (sig_load (access) (paddr) (width))
-          : M (result (mword (8 * width)) ExceptionType)
+          : M (result (mword (8 * width)) ((physaddr * ExceptionType)))
        else
          (within_htif_readable (paddr) (width)) >>= fun (w__4 : bool) =>
-         (if w__4 return M (result (mword (8 * width)) ExceptionType) then
+         (if w__4 return M (result (mword (8 * width)) ((physaddr * ExceptionType))) then
             (htif_load (access) (paddr) (width))
-             : M (result (mword (8 * width)) ExceptionType)
+             : M (result (mword (8 * width)) ((physaddr * ExceptionType)))
           else
             (accessFaultFromAccessType (access)) >>= fun (w__6 : ExceptionType) =>
-            returnM ((Err (w__6))))
-          : M (result (mword (8 * width)) ExceptionType))
-       : M (result (mword (8 * width)) ExceptionType))
-    : M (result (mword (8 * width)) ExceptionType).
+            returnM ((Err ((paddr, w__6)))))
+          : M (result (mword (8 * width)) ((physaddr * ExceptionType))))
+       : M (result (mword (8 * width)) ((physaddr * ExceptionType))))
+    : M (result (mword (8 * width)) ((physaddr * ExceptionType))).
 
 Definition mmio_write (paddr : physaddr) (width : Z) (data : mword (8 * width)) (*width >=? 0*)
 (*(0 <? width) && (width <=? 4096)*)
-: M (result bool ExceptionType) :=
+: M (result bool ((physaddr * ExceptionType))) :=
    (within_clint (paddr) (width)) >>= fun (w__0 : bool) =>
-   (if w__0 return M (result bool ExceptionType) then
+   (if w__0 return M (result bool ((physaddr * ExceptionType))) then
       (clint_store (paddr) (width) (data))
-       : M (result bool ExceptionType)
+       : M (result bool ((physaddr * ExceptionType)))
     else
       (within_sig (paddr) (width)) >>= fun (w__2 : bool) =>
-      (if w__2 return M (result bool ExceptionType) then
+      (if w__2 return M (result bool ((physaddr * ExceptionType))) then
          (sig_store (paddr) (width) (data))
-          : M (result bool ExceptionType)
+          : M (result bool ((physaddr * ExceptionType)))
        else
          (within_htif_writable (paddr) (width)) >>= fun (w__4 : bool) =>
-         (if w__4 return M (result bool ExceptionType) then
+         (if w__4 return M (result bool ((physaddr * ExceptionType))) then
             (htif_store (paddr) (width) (data))
-             : M (result bool ExceptionType)
-          else returnM ((Err ((E_SAMO_Access_Fault (tt))))))
-          : M (result bool ExceptionType))
-       : M (result bool ExceptionType))
-    : M (result bool ExceptionType).
+             : M (result bool ((physaddr * ExceptionType)))
+          else returnM ((Err ((paddr, E_SAMO_Access_Fault (tt))))))
+          : M (result bool ((physaddr * ExceptionType))))
+       : M (result bool ((physaddr * ExceptionType))))
+    : M (result bool ((physaddr * ExceptionType))).
+
+Definition access_within {width : Z} (addr : mword width) (bytes : Z) (region_width_exp : Z)
+(*width >=? 0*) (*region_width_exp >=? 0*)
+(*(region_width_exp <=? width) && ((1 <=? bytes) && (bytes <=? (2 ^ region_width_exp)))*)
+: bool :=
+   let mask : bits width := not_vec ((zero_extend' width ((ones (region_width_exp))))) in
+   eq_vec ((and_vec (addr) (mask))) ((and_vec ((add_vec_int (addr) ((Z.sub (bytes) (1))))) (mask))).
+
+Definition prop_access_within_is_aligned (addr : mword 32) (region_width_exp : mword 4) : bool :=
+   let region_width_exp := uint (region_width_exp) in
+   let bytes := pow2 (region_width_exp) in
+   Bool.eqb ((access_within (addr) (bytes) (region_width_exp)))
+     ((Z.eqb ((Z.rem ((uint (addr))) (bytes))) (0))).
+
+Definition prop_access_within_single (addr : mword 32) : bool := access_within (addr) (1) (0).
+
+Definition allowed_misaligned (addr : mword 64) (width : Z) (region_width_exp : Z)
+(*(0 <? width) && (width <=? 4096)*) (*(0 <=? region_width_exp) && (region_width_exp <=? 12)*)
+: bool :=
+   let region_width := pow2 (region_width_exp) in
+   if Z.gtb (width) (region_width) then false
+   else access_within (addr) (width) (region_width_exp).
+
+Definition is_aligned_paddr '((Physaddr addr) : physaddr) (width : Z) (*width >? 0*) : bool :=
+   Z.eqb ((Z.rem ((uint (addr))) (width))) (0).
+
+Definition is_aligned_vaddr '((Virtaddr addr) : virtaddr) (width : Z) (*width >? 0*) : bool :=
+   Z.eqb ((Z.rem ((uint (addr))) (width))) (0).
+
+Definition sys_misaligned_allowed_within_exp := 0  : Z.
+#[export] Hint Unfold sys_misaligned_allowed_within_exp : sail.
+Definition sys_misaligned_order_decreasing : bool := false.
+#[export] Hint Unfold sys_misaligned_order_decreasing : sail.
+Definition split_access {n : Z} (addr : mword n) (width : Z) (*n >=? 0*)
+(*(13 <=? n) && (n <=? 64) && ((0 <? width) && (width <=? 4096))*)
+: M ((Z * Z)) :=
+   let addr_align := count_trailing_zeros (addr) in
+   let width_align := count_trailing_zeros ((to_bits ((Z.add (12) (1))) (width))) in
+   let bytes_per_access := pow2 ((Z.min (addr_align) (width_align))) in
+   let num_accesses := Z.quot (width) (bytes_per_access) in
+   assert_exp' (Z.eqb (width) ((Z.mul (num_accesses) (bytes_per_access)))) "sys/split_access_utils.sail:53.49-53.50" >>= fun _ =>
+   returnM ((num_accesses, bytes_per_access)).
+
+Definition prop_split_access (addr : mword 16) (width : Z) (*(0 <? width) && (width <=? 4096)*)
+: M (bool) :=
+   (split_access (addr) (width)) >>= fun '((splits, split_width)) =>
+   returnM ((Z.eqb ((Z.mul (splits) (split_width))) (width))).
+
+Definition sys_misaligned_byte_by_byte : bool := false.
+#[export] Hint Unfold sys_misaligned_byte_by_byte : sail.
+Definition undefined_Splittability '(tt : unit) : M (Splittability) :=
+   (internal_pick ([CanSplit; CannotSplit]))  : M (Splittability).
+
+Definition split_misaligned
+'((Physaddr addr) : physaddr) (width : Z) (allowed_within_exp : Z) (splittable : Splittability)
+(*(0 <? width) && (width <=? 4096)*) (*(0 <=? allowed_within_exp) && (allowed_within_exp <=? 12)*)
+: M ((Z * Z)) :=
+   let do_not_split :=
+     orb ((generic_eq (splittable) (CannotSplit)))
+       (((orb ((Z.eqb ((Z.rem ((uint (addr))) (width))) (0)))
+            ((allowed_misaligned ((subrange_vec_dec (addr) ((Z.sub (xlen) (1))) (0))) (width)
+                (allowed_within_exp))))
+        : bool)) in
+   (if do_not_split then returnM ((1, width))
+    else if sys_misaligned_byte_by_byte then returnM ((width, 1))
+    else (split_access (addr) (width))  : M ((Z * Z)))
+    : M ((Z * Z)).
+
+Definition misaligned_order (n : Z) : (Z * Z * Z) :=
+   if sys_misaligned_order_decreasing then ((Z.sub (n) (1), 0, Z.opp (1)))
+   else ((0, Z.sub (n) (1), 1)).
+
+Definition split_on_page_boundary {n : Z} (addr : mword n) (width : Z) (*n >=? 0*)
+(*(13 <=? n) && (n <=? 64) && member_Z_list width [1; 2; 4; 8]*)
+: M ((Z * Z)) :=
+   let page_mask :=
+     update_subrange_vec_dec (((ones n)  : bits n)) ((Z.sub (pagesize_bits) (1))) (0)
+       ((zeros' ((Z.sub ((Z.sub (12) (1))) ((Z.sub (0) (1))))))) in
+   let intra_page_access :=
+     eq_vec ((and_vec (addr) (page_mask)))
+       ((and_vec ((sub_vec_int ((add_vec_int (addr) (width))) (1))) (page_mask))) in
+   (if intra_page_access then returnM ((width, 0))
+    else
+      let nbytes_to_boundary :=
+        Z.sub ((pow2 (3))) ((uint ((subrange_vec_dec (addr) ((Z.sub (3) (1))) (0))))) in
+      assert_exp' (Z.ltb (nbytes_to_boundary) (width)) "sys/split_access_utils.sail:111.37-111.38" >>= fun _ =>
+      returnM ((nbytes_to_boundary, Z.sub (width) (nbytes_to_boundary))))
+    : M ((Z * Z)).
+
+Definition prop_access_in_same_page (addr : mword 16) (width : Z)
+(*member_Z_list width [1; 2; 4; 8]*)
+: M (bool) :=
+   (split_on_page_boundary (addr) (width)) >>= fun '((p, q)) =>
+   let page_mask : bits 16 := (Ox"F000") in
+   returnM ((andb
+               ((zopz0zJzJzK ((Z.eqb (q) (0)))
+                   ((eq_vec ((and_vec (addr) (page_mask)))
+                       ((and_vec ((sub_vec_int ((add_vec_int (addr) (width))) (1))) (page_mask)))))))
+               ((zopz0zJzJzK
+                   ((eq_vec ((and_vec (addr) (page_mask)))
+                       ((and_vec ((sub_vec_int ((add_vec_int (addr) (width))) (1))) (page_mask)))))
+                   ((Z.eqb (q) (0))))))).
+
+Definition prop_access_across_page_boundary (addr : mword 16) (width : Z)
+(*member_Z_list width [1; 2; 4; 8]*)
+: M (bool) :=
+   (split_on_page_boundary (addr) (width)) >>= fun '((p, q)) =>
+   let page_mask : bits 16 := (Ox"F000") in
+   returnM ((andb
+               ((zopz0zJzJzK ((neq_int (q) (0)))
+                   ((neq_vec ((and_vec (addr) (page_mask)))
+                       ((and_vec ((sub_vec_int ((add_vec_int (addr) (width))) (1))) (page_mask)))))))
+               ((zopz0zJzJzK
+                   ((neq_vec ((and_vec (addr) (page_mask)))
+                       ((and_vec ((sub_vec_int ((add_vec_int (addr) (width))) (1))) (page_mask)))))
+                   ((neq_int (q) (0))))))).
 
 Definition undefined_AtomicSupport '(tt : unit) : M (AtomicSupport) :=
    (internal_pick ([AMONone; AMOSwap; AMOLogical; AMOArithmetic; AMOCASW; AMOCASD; AMOCASQ]))
@@ -22419,7 +22775,11 @@ Definition override_PMA (pma : PMA) (pbmt : page_based_mem_type) : PMA :=
          PMA_reservability := pma.(PMA_reservability);
          PMA_supports_cbo_zero := pma.(PMA_supports_cbo_zero);
          PMA_supports_pte_read := pma.(PMA_supports_pte_read);
-         PMA_supports_pte_write := pma.(PMA_supports_pte_write) |}
+         PMA_supports_pte_write := pma.(PMA_supports_pte_write);
+         PMA_misaligned_atomicity_granule_size_exp :=
+           pma.(PMA_misaligned_atomicity_granule_size_exp);
+         PMA_vector_misaligned_atomicity_granule_size_exp :=
+           pma.(PMA_vector_misaligned_atomicity_granule_size_exp) |}
    | PBMT_IO =>
       {| PMA_mem_type := IOMemory;
          PMA_cacheable := false;
@@ -22434,7 +22794,11 @@ Definition override_PMA (pma : PMA) (pbmt : page_based_mem_type) : PMA :=
          PMA_reservability := pma.(PMA_reservability);
          PMA_supports_cbo_zero := pma.(PMA_supports_cbo_zero);
          PMA_supports_pte_read := pma.(PMA_supports_pte_read);
-         PMA_supports_pte_write := pma.(PMA_supports_pte_write) |}
+         PMA_supports_pte_write := pma.(PMA_supports_pte_write);
+         PMA_misaligned_atomicity_granule_size_exp :=
+           pma.(PMA_misaligned_atomicity_granule_size_exp);
+         PMA_vector_misaligned_atomicity_granule_size_exp :=
+           pma.(PMA_vector_misaligned_atomicity_granule_size_exp) |}
    end.
 
 Definition pma_misaligned_exception (pma : PMA) (access : MemoryAccessType mem_payload)
@@ -22442,32 +22806,117 @@ Definition pma_misaligned_exception (pma : PMA) (access : MemoryAccessType mem_p
    let exceptions := pma.(PMA_misaligned_exceptions) in
    match access with
    | Load Data => returnM (exceptions.(PMAMisalignedExceptions_load_store))
-   | Load PageTableEntry => returnM (exceptions.(PMAMisalignedExceptions_load_store))
-   | Load ShadowStack => returnM (exceptions.(PMAMisalignedExceptions_load_store))
    | Store Data => returnM (exceptions.(PMAMisalignedExceptions_load_store))
-   | Store PageTableEntry => returnM (exceptions.(PMAMisalignedExceptions_load_store))
-   | Store ShadowStack => returnM (exceptions.(PMAMisalignedExceptions_load_store))
    | Load Vector => returnM (exceptions.(PMAMisalignedExceptions_vector))
    | Store Vector => returnM (exceptions.(PMAMisalignedExceptions_vector))
-   | Atomic (_, _, _) => returnM ((Some (exceptions.(PMAMisalignedExceptions_amo))))
+   | Atomic _ => returnM ((Some (exceptions.(PMAMisalignedExceptions_amo))))
    | InstructionFetch tt =>
       (internal_error ("sys/pma.sail") (153) ("PMA: Invalid misaligned instruction fetch."))
        : M (option misaligned_exception)
-   | LoadReserved p =>
-      (internal_error ("sys/pma.sail") (154)
+   | Load PageTableEntry =>
+      (internal_error ("sys/pma.sail") (154) ("PMA: Invalid misaligned load of page-table entry."))
+       : M (option misaligned_exception)
+   | Store PageTableEntry =>
+      (internal_error ("sys/pma.sail") (155) ("PMA: Invalid misaligned store of page-table entry."))
+       : M (option misaligned_exception)
+   | LoadReserved (_, _, p) =>
+      (internal_error ("sys/pma.sail") (156)
          ((String.append ("PMA: Invalid misaligned load-reserved (")
              ((String.append ((mem_payload_name_forwards (p))) (")."))))))
        : M (option misaligned_exception)
-   | StoreConditional p =>
-      (internal_error ("sys/pma.sail") (155)
+   | StoreConditional (_, _, p) =>
+      (internal_error ("sys/pma.sail") (157)
          ((String.append ("PMA: Invalid misaligned store-conditional (")
              ((String.append ((mem_payload_name_forwards (p))) (")."))))))
        : M (option misaligned_exception)
+   | Load ShadowStack =>
+      (internal_error ("sys/pma.sail") (158) ("PMA: Invalid misaligned shadow-stack load."))
+       : M (option misaligned_exception)
+   | Store ShadowStack =>
+      (internal_error ("sys/pma.sail") (159) ("PMA: Invalid misaligned shadow-stack store."))
+       : M (option misaligned_exception)
    | CacheAccess _ =>
-      (internal_error ("sys/pma.sail") (156) ("PMA: Invalid misaligned cache-access."))
+      (internal_error ("sys/pma.sail") (160) ("PMA: Invalid misaligned cache-access."))
        : M (option misaligned_exception)
    end
     : M (option misaligned_exception).
+
+Definition is_mag_applicable_access (access : MemoryAccessType mem_payload) (width : Z)
+(*0 <=? width*)
+: M (bool) :=
+   match access with
+   | Load Data => returnM ((Z.leb (width) (xlen_bytes)))
+   | Store Data => returnM ((Z.leb (width) (xlen_bytes)))
+   | Load Vector => returnM (true)
+   | Store Vector => returnM (true)
+   | Load PageTableEntry => returnM (false)
+   | Store PageTableEntry => returnM (false)
+   | Load ShadowStack => returnM (false)
+   | Store ShadowStack => returnM (false)
+   | Atomic (_, _, _, Data, Data) => returnM (true)
+   | Atomic (_, _, _, ShadowStack, ShadowStack) => returnM (true)
+   | InstructionFetch tt => returnM (false)
+   | LoadReserved (_, _, Data) => returnM (false)
+   | StoreConditional (_, _, Data) => returnM (false)
+   | CacheAccess _ => returnM (false)
+   | Atomic (_, _, _, rp, wp) =>
+      (internal_error ("sys/pma.sail") (192)
+         ((String.append ("Invalid payloads (")
+             ((String.append ((mem_payload_name_forwards (rp)))
+                 ((String.append (", ")
+                     ((String.append ((mem_payload_name_forwards (wp))) (") for Atomic."))))))))))
+       : M (bool)
+   | LoadReserved (_, _, p) =>
+      (internal_error ("sys/pma.sail") (193)
+         ((String.append ("Invalid payload (")
+             ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved."))))))
+       : M (bool)
+   | StoreConditional (_, _, p) =>
+      (internal_error ("sys/pma.sail") (194)
+         ((String.append ("Invalid payload (")
+             ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional."))))))
+       : M (bool)
+   end
+    : M (bool).
+
+Definition mag_of_pma (pma : PMA) (is_vector : bool) : option Z :=
+   let mag :=
+     if is_vector then pma.(PMA_vector_misaligned_atomicity_granule_size_exp)
+     else pma.(PMA_misaligned_atomicity_granule_size_exp) in
+   if Z.eqb (mag) (0) then None
+   else Some (mag).
+
+Definition within_pma_mag (pma : PMA) '((Physaddr addr) : physaddr) (width : Z) (is_vector : bool)
+(*(0 <? width) && (width <=? 4096)*)
+: bool :=
+   match mag_of_pma (pma) (is_vector) with
+   | None => false
+   | Some mag =>
+      allowed_misaligned ((subrange_vec_dec (addr) ((Z.sub (xlen) (1))) (0))) (width) (mag)
+   end.
+
+Definition mag_pma_check
+(pma : PMA) (access : MemoryAccessType mem_payload) (paddr : physaddr) (width : Z)
+(*(0 <? width) && (width <=? 4096)*)
+: M (result ((Splittability * Z)) misaligned_exception) :=
+   (is_mag_applicable_access (access) (width)) >>= fun is_mag_applicable =>
+   (if orb ((is_aligned_paddr (paddr) (width)))
+         ((andb (is_mag_applicable)
+             ((within_pma_mag (pma) (paddr) (width) ((is_vector_access (access))))))) then
+      returnM ((Ok ((CannotSplit, 0))))
+    else
+      (pma_misaligned_exception (pma) (access)) >>= fun (w__0 : option misaligned_exception) =>
+      let w__1 : result ((Splittability * Z)) misaligned_exception :=
+        match w__0 with
+        | Some e => Err (e)
+        | None =>
+           match (is_mag_applicable, mag_of_pma (pma) ((is_vector_access (access)))) with
+           | (true, Some mag) => Ok ((CanSplit, mag))
+           | (_, _) => Ok ((CanSplit, sys_misaligned_allowed_within_exp))
+           end
+        end in
+      returnM (w__1))
+    : M (result ((Splittability * Z)) misaligned_exception).
 
 Fixpoint matching_pma_region_bits_range
 (regions : list PMA_Region) (base : mword 64) (size : mword 64)
@@ -22486,54 +22935,26 @@ Definition matching_pma_region (regions : list PMA_Region) (addr : physaddr) (wi
    matching_pma_region_bits_range (regions) ((zero_extend' (64) ((bits_of_physaddr (addr)))))
      ((to_bits (64) (width))).
 
-Definition access_within {width : Z} (addr : mword width) (bytes : Z) (region_width_exp : Z)
-(*width >=? 0*) (*region_width_exp >=? 0*)
-(*(region_width_exp <=? width) && ((1 <=? bytes) && (bytes <=? (2 ^ region_width_exp)))*)
-: bool :=
-   let mask : bits width := not_vec ((zero_extend' width ((ones (region_width_exp))))) in
-   eq_vec ((and_vec (addr) (mask))) ((and_vec ((add_vec_int (addr) ((Z.sub (bytes) (1))))) (mask))).
-
-Definition prop_access_within_is_aligned (addr : mword 32) (region_width_exp : mword 4) : bool :=
-   let region_width_exp := uint (region_width_exp) in
-   let bytes := pow2 (region_width_exp) in
-   Bool.eqb ((access_within (addr) (bytes) (region_width_exp)))
-     ((Z.eqb ((Z.rem ((uint (addr))) (bytes))) (0))).
-
-Definition prop_access_within_single (addr : mword 32) : bool := access_within (addr) (1) (0).
-
-Definition allowed_misaligned (addr : mword 64) (width : Z) (region_width_exp : Z)
-(*(0 <? width) && (width <=? 4096)*) (*(0 <=? region_width_exp) && (region_width_exp <=? 12)*)
-: bool :=
-   let region_width := pow2 (region_width_exp) in
-   if Z.gtb (width) (region_width) then false
-   else access_within (addr) (width) (region_width_exp).
-
-Definition is_aligned_paddr '((Physaddr addr) : physaddr) (width : Z) (*width >? 0*) : bool :=
-   Z.eqb ((Z.rem ((uint (addr))) (width))) (0).
-
-Definition is_aligned_vaddr '((Virtaddr addr) : virtaddr) (width : Z) (*width >? 0*) : bool :=
-   Z.eqb ((Z.rem ((uint (addr))) (width))) (0).
-
 Definition read_kind_of_flags (aq : bool) (rl : bool) (res : bool) : M (read_kind) :=
    match (aq, rl, res) with
    | (false, false, false) => returnM (Read_plain)
    | (true, false, false) =>
-      (internal_error ("sys/mem.sail") (52)
+      (internal_error ("sys/mem.sail") (40)
          ("Unreserved load with acquire semantics should be unreachable"))
        : M (read_kind)
    | (true, true, false) =>
-      (internal_error ("sys/mem.sail") (53)
+      (internal_error ("sys/mem.sail") (41)
          ("Unreserved load with acquire-release semantics should be unreachable"))
        : M (read_kind)
    | (false, false, true) => returnM (Read_RISCV_reserved)
    | (true, false, true) => returnM (Read_RISCV_reserved_acquire)
    | (true, true, true) => returnM (Read_RISCV_reserved_strong_acquire)
    | (false, true, false) =>
-      (internal_error ("sys/mem.sail") (58)
+      (internal_error ("sys/mem.sail") (46)
          ("Unreserved Load with release semantics should be unreachable"))
        : M (read_kind)
    | (false, true, true) =>
-      (internal_error ("sys/mem.sail") (59)
+      (internal_error ("sys/mem.sail") (47)
          ("Load-reserved with release semantics should be unreachable"))
        : M (read_kind)
    end
@@ -22543,235 +22964,326 @@ Definition write_kind_of_flags (aq : bool) (rl : bool) (con : bool) : M (write_k
    match (aq, rl, con) with
    | (false, false, false) => returnM (Write_plain)
    | (false, true, false) =>
-      (internal_error ("sys/mem.sail") (65)
+      (internal_error ("sys/mem.sail") (53)
          ("Unconditional store with release semantics should be unreachable"))
        : M (write_kind)
    | (false, false, true) => returnM (Write_RISCV_conditional)
    | (false, true, true) => returnM (Write_RISCV_conditional_release)
    | (true, true, false) =>
-      (internal_error ("sys/mem.sail") (68)
+      (internal_error ("sys/mem.sail") (56)
          ("Unconditional store with acquire-release semantics should be unreachable"))
        : M (write_kind)
    | (true, true, true) => returnM (Write_RISCV_conditional_strong_release)
    | (true, false, false) =>
-      (internal_error ("sys/mem.sail") (71)
+      (internal_error ("sys/mem.sail") (59)
          ("Unconditional store with acquire semantics should be unreachable"))
        : M (write_kind)
    | (true, false, true) =>
-      (internal_error ("sys/mem.sail") (72)
+      (internal_error ("sys/mem.sail") (60)
          ("Store-conditional with acquire semantics should be unreachable"))
        : M (write_kind)
    end
     : M (write_kind).
 
+Definition undefined_Phys_Mem_Access_Info '(tt : unit) : M (Phys_Mem_Access_Info) :=
+   (undefined_Splittability (tt)) >>= fun (w__0 : Splittability) =>
+   (undefined_range (0) (12)) >>= fun (w__1 : Z) =>
+   returnM (({| Phys_Mem_Access_Info_splittable := w__0;
+                Phys_Mem_Access_Info_granule_size_exp := w__1 |})).
+
 Definition pmaCheck
 (paddr : physaddr) (width : Z) (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type)
 (res_or_con : bool) (*(0 <? width) && (width <=? 4096)*)
-: M (option ExceptionType) :=
-   read_reg pma_regions >>= fun (w__0 : list PMA_Region) =>
-   match matching_pma_region (w__0) (paddr) (width) with
-   | None =>
-      (accessFaultFromAccessType (access)) >>= fun (w__1 : ExceptionType) => returnM ((Some (w__1)))
-   | Some
-     {| PMA_Region_attributes := attributes; PMA_Region_size := _; PMA_Region_include_in_device_tree := _; PMA_Region_base := _ |} =>
-      let attributes := override_PMA (attributes) (pbmt) in
-      let misaligned := not ((is_aligned_paddr (paddr) (width))) in
-      (if not (misaligned) then returnM (None)
-       else (pma_misaligned_exception (attributes) (access))  : M (option misaligned_exception)) >>= fun (misaligned_exception : option misaligned_exception) =>
-      match misaligned_exception with
-      | Some AccessFault =>
-         (accessFaultFromAccessType (access)) >>= fun (w__3 : ExceptionType) =>
-         returnM ((Some (w__3)))
-      | Some AlignmentException =>
-         (alignmentFaultFromAccessType (access)) >>= fun (w__4 : ExceptionType) =>
-         returnM ((Some (w__4)))
-      | None =>
-         match access with
-         | InstructionFetch tt => returnM (attributes.(PMA_executable))
-         | Load Data =>
-            assert_exp' (not (res_or_con)) "sys/mem.sail:103.61-103.62" >>= fun _ =>
-            returnM (attributes.(PMA_readable))
-         | Load Vector =>
-            assert_exp' (not (res_or_con)) "sys/mem.sail:104.61-104.62" >>= fun _ =>
-            returnM (attributes.(PMA_readable))
-         | Load PageTableEntry =>
-            assert_exp' (not (res_or_con)) "sys/mem.sail:105.61-105.62" >>= fun _ =>
-            returnM (attributes.(PMA_supports_pte_read))
-         | Store Data =>
-            assert_exp' (not (res_or_con)) "sys/mem.sail:106.61-106.62" >>= fun _ =>
-            returnM (attributes.(PMA_writable))
-         | Store Vector =>
-            assert_exp' (not (res_or_con)) "sys/mem.sail:107.61-107.62" >>= fun _ =>
-            returnM (attributes.(PMA_writable))
-         | Store PageTableEntry =>
-            assert_exp' (not (res_or_con)) "sys/mem.sail:108.61-108.62" >>= fun _ =>
-            returnM (attributes.(PMA_supports_pte_write))
-         | LoadReserved Data =>
-            assert_exp' res_or_con "sys/mem.sail:111.56-111.57" >>= fun _ =>
-            returnM ((andb (attributes.(PMA_readable))
-                        ((generic_neq (attributes.(PMA_reservability)) (RsrvNone)))))
-         | StoreConditional Data =>
-            assert_exp' res_or_con "sys/mem.sail:112.56-112.57" >>= fun _ =>
-            returnM ((andb (attributes.(PMA_writable))
-                        ((generic_neq (attributes.(PMA_reservability)) (RsrvNone)))))
-         | Atomic (op, Data, Data) =>
-            assert_exp' res_or_con "sys/mem.sail:113.57-113.58" >>= fun _ =>
-            returnM ((andb (attributes.(PMA_readable))
-                        ((andb (attributes.(PMA_writable))
-                            ((pma_allows_atomic_op (attributes.(PMA_atomic_support)) (op) (width)))))))
-         | Load ShadowStack =>
-            assert_exp' (not (res_or_con)) "sys/mem.sail:117.61-117.62" >>= fun _ =>
-            returnM ((andb (attributes.(PMA_readable)) (attributes.(PMA_read_idempotent))))
-         | Store ShadowStack =>
-            assert_exp' (not (res_or_con)) "sys/mem.sail:118.61-118.62" >>= fun _ =>
-            returnM ((andb (attributes.(PMA_writable)) (attributes.(PMA_write_idempotent))))
-         | Atomic (AMOSWAP, ShadowStack, ShadowStack) =>
-            assert_exp' res_or_con "sys/mem.sail:119.75-119.76" >>= fun _ =>
-            returnM ((andb (attributes.(PMA_readable))
-                        ((andb (attributes.(PMA_writable))
-                            ((andb (attributes.(PMA_read_idempotent))
-                                ((andb (attributes.(PMA_write_idempotent))
-                                    ((pma_allows_atomic_op (attributes.(PMA_atomic_support))
-                                        (AMOSWAP) (width)))))))))))
-         | CacheAccess (CB_zero tt) =>
-            returnM ((andb (attributes.(PMA_writable)) (attributes.(PMA_supports_cbo_zero))))
-         | CacheAccess (CB_manage _) =>
-            returnM ((orb (attributes.(PMA_readable)) (attributes.(PMA_writable))))
-         | CacheAccess (CB_prefetch p) =>
-            returnM (match p with
-            | PREFETCH_R => attributes.(PMA_readable)
-            | PREFETCH_W => attributes.(PMA_writable)
-            | PREFETCH_I => attributes.(PMA_executable)
-            end)
-         | LoadReserved p =>
-            (internal_error ("sys/mem.sail") (156)
-               ((String.append ("Invalid payload (")
-                   ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved."))))))
-             : M (bool)
-         | StoreConditional p =>
-            (internal_error ("sys/mem.sail") (157)
-               ((String.append ("Invalid payload (")
-                   ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional."))))))
-             : M (bool)
-         | Atomic (op, ShadowStack, ShadowStack) =>
-            (internal_error ("sys/mem.sail") (159)
-               ((String.append ("Invalid op (")
-                   ((String.append ((amo_mnemonic_forwards (op))) (") for ShadowStack Atomic."))))))
-             : M (bool)
-         | Atomic (_, rp, wp) =>
-            (internal_error ("sys/mem.sail") (160)
-               ((String.append ("Invalid payloads (")
-                   ((String.append ((mem_payload_name_forwards (rp)))
-                       ((String.append (", ")
-                           ((String.append ((mem_payload_name_forwards (wp))) (") for Atomic."))))))))))
-             : M (bool)
-         end >>= fun (canAccess : bool) =>
-         let '(_) :=
-           (if andb ((get_config_print_pma (tt))) ((not (canAccess))) then
-              print_endline
-                ((String.append ("PMA check failed for a ")
-                    ((String.append ((dec_str (width)))
-                        ((String.append ("-byte wide ")
-                            ((String.append ((accessType_to_str (access)))
-                                ((String.append (" access to address ")
-                                    ((String.append ((hex_bits_str ((bits_of_physaddr (paddr)))))
-                                        ((String.append (" with PMA {")
-                                            ((String.append ((pma_attributes_to_str (attributes)))
-                                                ("}")))))))))))))))))
-            else tt)
-            : unit in
-         (if canAccess then returnM (None)
-          else
-            (accessFaultFromAccessType (access)) >>= fun (w__9 : ExceptionType) =>
-            returnM ((Some (w__9))))
-          : M (option ExceptionType)
-      end
-       : M (option ExceptionType)
-   end
-    : M (option ExceptionType).
-
-Definition alignmentOrAccessFaultPriority (exc : ExceptionType) : M (Z) :=
-   match exc with
-   | E_Fetch_Access_Fault tt => returnM (1)
-   | E_Load_Access_Fault tt => returnM (1)
-   | E_SAMO_Access_Fault tt => returnM (1)
-   | E_Fetch_Addr_Align tt => returnM (0)
-   | E_Load_Addr_Align tt => returnM (0)
-   | E_SAMO_Addr_Align tt => returnM (0)
-   | _ =>
-      (internal_error ("sys/mem.sail") (181)
-         ((String.append ("Invalid exception: ") ((exceptionType_to_str (exc))))))
-       : M (Z)
-   end
-    : M (Z).
-
-Definition highestPriorityAlignmentOrAccessFault (l : ExceptionType) (r : ExceptionType)
-: M (ExceptionType) :=
-   (alignmentOrAccessFaultPriority (l)) >>= fun (w__0 : Z) =>
-   (alignmentOrAccessFaultPriority (r)) >>= fun (w__1 : Z) =>
-   let w__2 : ExceptionType := if Z.gtb (w__0) (w__1) then l else r in
-   returnM (w__2).
+: M (result Phys_Mem_Access_Info ExceptionType) :=
+   catch_early_return
+     (liftR (read_reg pma_regions) >>= fun (w__0 : list PMA_Region) =>
+     match matching_pma_region (w__0) (paddr) (width) with
+     | None =>
+        liftR ((accessFaultFromAccessType (access))) >>= fun (w__1 : ExceptionType) =>
+        (early_return ((Err (w__1))
+         : result Phys_Mem_Access_Info ExceptionType) :
+          MR (result Phys_Mem_Access_Info ExceptionType) PMA)
+         : MR (result Phys_Mem_Access_Info ExceptionType) (PMA)
+     | Some
+       {| PMA_Region_attributes := attributes; PMA_Region_size := _; PMA_Region_include_in_device_tree := _; PMA_Region_base := _ |} =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((override_PMA (attributes) (pbmt)))
+     end >>= fun (attributes : PMA) =>
+     match access with
+     | InstructionFetch tt =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) (attributes.(PMA_executable))
+     | Load Data =>
+        liftR (assert_exp' (not (res_or_con)) "sys/mem.sail:101.53-101.54") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) (attributes.(PMA_readable))
+     | Load Vector =>
+        liftR (assert_exp' (not (res_or_con)) "sys/mem.sail:102.53-102.54") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) (attributes.(PMA_readable))
+     | Load PageTableEntry =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) (attributes.(PMA_supports_pte_read))
+     | Store Data =>
+        liftR (assert_exp' (not (res_or_con)) "sys/mem.sail:104.53-104.54") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) (attributes.(PMA_writable))
+     | Store Vector =>
+        liftR (assert_exp' (not (res_or_con)) "sys/mem.sail:105.53-105.54") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) (attributes.(PMA_writable))
+     | Store PageTableEntry =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) (attributes.(PMA_supports_pte_write))
+     | LoadReserved (_, _, Data) =>
+        liftR (assert_exp' res_or_con "sys/mem.sail:110.55-110.56") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((andb (attributes.(PMA_readable))
+                                                                ((generic_neq
+                                                                    (attributes.(PMA_reservability))
+                                                                    (RsrvNone)))))
+     | StoreConditional (_, _, Data) =>
+        liftR (assert_exp' res_or_con "sys/mem.sail:111.55-111.56") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((andb (attributes.(PMA_writable))
+                                                                ((generic_neq
+                                                                    (attributes.(PMA_reservability))
+                                                                    (RsrvNone)))))
+     | Atomic (op, _, _, Data, Data) =>
+        liftR (assert_exp' res_or_con "sys/mem.sail:112.55-112.56") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((andb (attributes.(PMA_readable))
+                                                                ((andb (attributes.(PMA_writable))
+                                                                    ((pma_allows_atomic_op
+                                                                        (attributes.(PMA_atomic_support))
+                                                                        (op) (width)))))))
+     | Load ShadowStack =>
+        liftR (assert_exp' (not (res_or_con)) "sys/mem.sail:116.53-116.54") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((andb (attributes.(PMA_readable))
+                                                                (attributes.(PMA_read_idempotent))))
+     | Store ShadowStack =>
+        liftR (assert_exp' (not (res_or_con)) "sys/mem.sail:117.53-117.54") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((andb (attributes.(PMA_writable))
+                                                                (attributes.(PMA_write_idempotent))))
+     | Atomic (AMOSWAP, _, _, ShadowStack, ShadowStack) =>
+        liftR (assert_exp' res_or_con "sys/mem.sail:118.73-118.74") >>= fun _ =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((andb (attributes.(PMA_readable))
+                                                                ((andb (attributes.(PMA_writable))
+                                                                    ((andb
+                                                                        (attributes.(PMA_read_idempotent))
+                                                                        ((andb
+                                                                            (attributes.(PMA_write_idempotent))
+                                                                            ((pma_allows_atomic_op
+                                                                                (attributes.(PMA_atomic_support))
+                                                                                (AMOSWAP) (width)))))))))))
+     | CacheAccess (CB_zero tt) =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((andb (attributes.(PMA_writable))
+                                                                (attributes.(PMA_supports_cbo_zero))))
+     | CacheAccess (CB_manage _) =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((orb (attributes.(PMA_readable))
+                                                                (attributes.(PMA_writable))))
+     | CacheAccess (CB_prefetch p) =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) (match p with
+        | PREFETCH_R => attributes.(PMA_readable)
+        | PREFETCH_W => attributes.(PMA_writable)
+        | PREFETCH_I => attributes.(PMA_executable)
+        end)
+     | LoadReserved (_, _, p) =>
+        liftR ((internal_error ("sys/mem.sail") (155)
+                  ((String.append ("Invalid payload (")
+                      ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved.")))))))
+         : MR (result Phys_Mem_Access_Info ExceptionType) (bool)
+     | StoreConditional (_, _, p) =>
+        liftR ((internal_error ("sys/mem.sail") (156)
+                  ((String.append ("Invalid payload (")
+                      ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional.")))))))
+         : MR (result Phys_Mem_Access_Info ExceptionType) (bool)
+     | Atomic (op, _, _, ShadowStack, ShadowStack) =>
+        liftR ((internal_error ("sys/mem.sail") (158)
+                  ((String.append ("Invalid op (")
+                      ((String.append ((amo_mnemonic_forwards (op))) (") for ShadowStack Atomic.")))))))
+         : MR (result Phys_Mem_Access_Info ExceptionType) (bool)
+     | Atomic (_, _, _, rp, wp) =>
+        liftR ((internal_error ("sys/mem.sail") (159)
+                  ((String.append ("Invalid payloads (")
+                      ((String.append ((mem_payload_name_forwards (rp)))
+                          ((String.append (", ")
+                              ((String.append ((mem_payload_name_forwards (wp))) (") for Atomic.")))))))))))
+         : MR (result Phys_Mem_Access_Info ExceptionType) (bool)
+     end >>= fun (canAccess : bool) =>
+     (if not (canAccess)
+        return
+        MR (result Phys_Mem_Access_Info ExceptionType) (result Phys_Mem_Access_Info ExceptionType)
+      then
+        let '(_) :=
+          (if get_config_print_pma (tt) then
+             print_endline
+               ((String.append ("PMA access check failed for a ")
+                   ((String.append ((dec_str (width)))
+                       ((String.append ("-byte wide ")
+                           ((String.append ((accessType_to_str (access)))
+                               ((String.append (" access to address ")
+                                   ((String.append ((hex_bits_str ((bits_of_physaddr (paddr)))))
+                                       ((String.append (" with PMA {")
+                                           ((String.append ((pma_attributes_to_str (attributes)))
+                                               ("}")))))))))))))))))
+           else tt)
+           : unit in
+        liftR ((accessFaultFromAccessType (access))) >>= fun (w__7 : ExceptionType) =>
+        returnR (result Phys_Mem_Access_Info ExceptionType) ((Err (w__7)))
+      else
+        liftR ((mag_pma_check (attributes) (access) (paddr) (width))) >>= fun (w__8 : result ((Splittability * Z)) misaligned_exception) =>
+        match w__8 with
+        | Ok (splittable, granule_size_exp) =>
+           returnR (result Phys_Mem_Access_Info ExceptionType) ((Ok
+                                                                   (({| Phys_Mem_Access_Info_splittable :=
+                                                                          splittable;
+                                                                        Phys_Mem_Access_Info_granule_size_exp :=
+                                                                          granule_size_exp |}))))
+        | Err e =>
+           let '(_) :=
+             (if get_config_print_pma (tt) then
+                print_endline
+                  ((String.append ("MAG PMA check failed for a ")
+                      ((String.append ((dec_str (width)))
+                          ((String.append ("-byte wide ")
+                              ((String.append ((accessType_to_str (access)))
+                                  ((String.append (" access to address ")
+                                      ((String.append ((hex_bits_str ((bits_of_physaddr (paddr)))))
+                                          ((String.append (" with PMA {")
+                                              ((String.append ((pma_attributes_to_str (attributes)))
+                                                  ("}")))))))))))))))))
+              else tt)
+              : unit in
+           match e with
+           | AccessFault =>
+              liftR ((accessFaultFromAccessType (access))) >>= fun (w__9 : ExceptionType) =>
+              returnR (result Phys_Mem_Access_Info ExceptionType) ((Err (w__9)))
+           | AlignmentException =>
+              liftR ((alignmentFaultFromAccessType (access))) >>= fun (w__10 : ExceptionType) =>
+              returnR (result Phys_Mem_Access_Info ExceptionType) ((Err (w__10)))
+           end
+            : MR (result Phys_Mem_Access_Info ExceptionType) (result Phys_Mem_Access_Info ExceptionType)
+        end
+         : MR (result Phys_Mem_Access_Info ExceptionType) (result Phys_Mem_Access_Info ExceptionType))
+      : MR (result Phys_Mem_Access_Info ExceptionType) (result Phys_Mem_Access_Info ExceptionType)).
 
 Definition phys_access_check
 (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type) (priv : Privilege)
 (paddr : physaddr) (width : Z) (res_or_con : bool) (*(0 <? width) && (width <=? 4096)*)
-: M (option ExceptionType) :=
-   (pmpCheck (paddr) (width) (access) (priv)) >>= fun (pmpError : option ExceptionType) =>
-   (pmaCheck (paddr) (width) (access) (pbmt) (res_or_con)) >>= fun (pmaError : option ExceptionType) =>
-   match (pmpError, pmaError) with
-   | (None, None) => returnM (None)
-   | (Some e, None) => returnM ((Some (e)))
-   | (None, Some e) => returnM ((Some (e)))
-   | (Some e0, Some e1) =>
-      (highestPriorityAlignmentOrAccessFault (e0) (e1)) >>= fun (w__0 : ExceptionType) =>
-      returnM ((Some (w__0)))
+: M (result Phys_Mem_Access_Info ExceptionType) :=
+   (pmpCheck (paddr) (width) (access) (priv)) >>= fun (w__0 : option ExceptionType) =>
+   match w__0 with
+   | Some e => returnM ((Err (e)))
+   | None =>
+      (pmaCheck (paddr) (width) (access) (pbmt) (res_or_con))
+       : M (result Phys_Mem_Access_Info ExceptionType)
    end
-    : M (option ExceptionType).
+    : M (result Phys_Mem_Access_Info ExceptionType).
+
+Definition check_pma_with_pmp_priority
+(access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type) (priv : Privilege)
+(paddr : physaddr) (width : Z) (res_or_con : bool) (*(0 <? width) && (width <=? 4096)*)
+: M (result Phys_Mem_Access_Info ExceptionType) :=
+   (pmaCheck (paddr) (width) (access) (pbmt) (res_or_con)) >>= fun (w__0 : result Phys_Mem_Access_Info ExceptionType) =>
+   match w__0 with
+   | Ok access_info => returnM ((Ok (access_info)))
+   | Err pmaExc =>
+      (pmpCheck (paddr) (width) (access) (priv)) >>= fun (w__1 : option ExceptionType) =>
+      let w__2 : result Phys_Mem_Access_Info ExceptionType :=
+        match w__1 with | Some pmpExc => Err (pmpExc) | None => Err (pmaExc) end in
+      returnM (w__2)
+   end
+    : M (result Phys_Mem_Access_Info ExceptionType).
 
 Definition checked_mem_read
 (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type) (priv : Privilege)
 (paddr : physaddr) (width : Z) (aq : bool) (rl : bool) (res : bool) (meta : bool) (*width >=? 0*)
 (*(0 <? width) && (width <=? 4096)*)
-: M (result ((mword (8 * width) * unit)) ExceptionType) :=
-   (phys_access_check (access) (pbmt) (priv) (paddr) (width) (res)) >>= fun (w__0 : option ExceptionType) =>
-   match w__0 with
-   | Some e => returnM ((Err (e)))
-   | None =>
-      (within_mmio_readable (paddr) (width)) >>= fun (w__1 : bool) =>
-      (if w__1 return M (result ((mword (8 * width) * unit)) ExceptionType) then
-         (mmio_read (access) (paddr) (width)) >>= fun (w__2 : result (mword (8 * width)) ExceptionType) =>
-         returnM ((MemoryOpResult_add_meta (w__2) (default_meta)))
-       else
-         (read_kind_of_flags (aq) (rl) (res)) >>= fun rk =>
-         (read_ram (rk) (paddr) (width) (meta)) >>= fun (w__3 : (mword (8 * width) * unit)) =>
-         returnM ((Ok (w__3))))
-       : M (result ((mword (8 * width) * unit)) ExceptionType)
-   end
-    : M (result ((mword (8 * width) * unit)) ExceptionType).
+: M (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) :=
+   catch_early_return
+     (liftR ((check_pma_with_pmp_priority (access) (pbmt) (priv) (paddr) (width) (res))) >>= fun (w__0 : result Phys_Mem_Access_Info ExceptionType) =>
+     match w__0 with
+     | Ok access_info =>
+        returnR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (access_info)
+     | Err e =>
+        (early_return ((Err ((paddr, e)))
+         : result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) :
+          MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) Phys_Mem_Access_Info)
+         : MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (Phys_Mem_Access_Info)
+     end >>= fun (access_info : Phys_Mem_Access_Info) =>
+     liftR ((split_misaligned (paddr) (width) (access_info.(Phys_Mem_Access_Info_granule_size_exp))
+               (access_info.(Phys_Mem_Access_Info_splittable)))) >>= fun '((N, split_width)) =>
+     let paddr_bits := bits_of_physaddr (paddr) in
+     let data := zeros' ((Z.mul ((Z.mul (8) (N))) (split_width))) in
+     let '((first, last, step)) := misaligned_order (N) in
+     let i : Z := first in
+     let finished : bool := false in
+     liftR ((read_kind_of_flags (aq) (rl) (res))) >>= fun rk =>
+     (untilMT
+       (data, finished, i)
+       (fun '(data, finished, i) => N)
+       (fun '(data, finished, i) =>
+         returnR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (finished))
+       (fun '(data, finished, i) =>
+         (liftR (assert_exp' true "loop dummy assert") >>= fun _ =>
+          let offset := i in
+          let paddr := Physaddr ((add_vec_int (paddr_bits) ((Z.mul (offset) (split_width))))) in
+          liftR ((pmpCheck (paddr) (split_width) (access) (priv))) >>= fun (w__2 : option ExceptionType) =>
+          match w__2 with
+          | Some e =>
+             (early_return ((Err ((paddr, e)))
+              : result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) :
+               MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) unit)
+              : MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (unit)
+          | None => returnR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (tt)
+          end >>
+          liftR ((within_mmio_readable (paddr) (split_width))) >>= fun (w__3 : bool) =>
+          (if w__3
+             return
+             MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (mword (8 * split_width))
+           then
+             liftR ((mmio_read (access) (paddr) (split_width))) >>= fun (w__4 : result (mword (8 * split_width)) ((physaddr * ExceptionType))) =>
+             match w__4 with
+             | Err e =>
+                (early_return ((Err (e))
+                 : result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) :
+                  MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (mword (8 * split_width)))
+                 : MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (mword (8 * split_width))
+             | Ok mmio_data =>
+                returnR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (mmio_data)
+             end
+              : MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (mword (8 * split_width))
+           else
+             liftR ((read_ram (rk) (paddr) (split_width) (meta))) >>= fun '((ram_data, _meta)) =>
+             returnR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) (ram_data)) >>= fun split_data =>
+          let data : mword (8 * N * split_width) :=
+            update_subrange_vec_dec (data)
+              ((Z.sub ((Z.mul ((Z.mul (8) ((Z.add (offset) (1))))) (split_width))) (1)))
+              ((Z.mul ((Z.mul (8) (offset))) (split_width))) ((autocast (T := mword)  split_data)) in
+          let '((finished, i)) :=
+            (if Z.eqb (offset) (last) then
+               let finished : bool := true in
+               (finished, i)
+             else
+               let i : Z := Z.add (offset) (step) in
+               (finished, i))
+             : (bool * Z) in
+          returnR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) ((data, finished, i)))
+          : MR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) ((mword (8 * N * split_width) * bool * Z)))) >>= fun '((data, finished, i)
+     : (mword (8 * N * split_width) * bool * Z)) =>
+     returnR (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) ((Ok
+                                                                                    ((autocast (T := mword) 
+                                                                                    data, default_meta))))).
 
 Definition mem_read_priv_meta
 (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type) (priv : Privilege)
 (paddr : physaddr) (width : Z) (aq : bool) (rl : bool) (res : bool) (meta : bool) (*width >=? 0*)
 (*(0 <? width) && (width <=? 4096)*)
-: M (result ((mword (8 * width) * unit)) ExceptionType) :=
-   (if andb ((orb (aq) (res))) ((not ((is_aligned_paddr (paddr) (width))))) then
-      returnM ((Err ((E_Load_Addr_Align (tt)))))
-    else
-      match (aq, rl, res) with
-      | (false, true, false) => throw (Error_not_implemented ("load.rl"))
-      | (false, true, true) => throw (Error_not_implemented ("lr.rl"))
-      | (_, _, _) =>
-         (checked_mem_read (access) (pbmt) (priv) (paddr) (width) (aq) (rl) (res) (meta))
-          : M (result ((mword (8 * width) * unit)) ExceptionType)
-      end
-       : M (result ((mword (8 * width) * unit)) ExceptionType)) >>= fun (result' : MemoryOpResult ((bits (8 * width) * mem_meta))) =>
+: M (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) :=
+   match (aq, rl, res) with
+   | (false, true, false) => throw (Error_not_implemented ("load.rl"))
+   | (false, true, true) => throw (Error_not_implemented ("lr.rl"))
+   | (_, _, _) =>
+      (checked_mem_read (access) (pbmt) (priv) (paddr) (width) (aq) (rl) (res) (meta))
+       : M (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType)))
+   end >>= fun (result' : MemoryOpResult ((bits (8 * width) * mem_meta))) =>
    let '(_) :=
      match result' with
      | Ok (value, _) =>
         mem_read_callback ((accessType_to_str (access))) ((bits_of_physaddr (paddr))) (width)
           (value)
-     | Err e =>
-        mem_exception_callback ((bits_of_physaddr (paddr))) ((exceptionType_bits_forwards (e)))
+     | Err (addr, e) =>
+        mem_exception_callback ((bits_of_physaddr (addr))) ((exceptionType_bits_forwards (e)))
      end
       : unit in
    returnM (result').
@@ -22780,110 +23292,208 @@ Definition mem_read_meta
 (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type) (paddr : physaddr) (width : Z)
 (aq : bool) (rl : bool) (res : bool) (meta : bool) (*width >=? 0*)
 (*(0 <? width) && (width <=? 4096)*)
-: M (result ((mword (8 * width) * unit)) ExceptionType) :=
+: M (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) :=
    ((read_reg mstatus)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
    read_reg cur_privilege >>= fun (w__1 : Privilege) =>
    (effectivePrivilege (access) (w__0) (w__1)) >>= fun (w__2 : Privilege) =>
    (mem_read_priv_meta (access) (pbmt) (w__2) (paddr) (width) (aq) (rl) (res) (meta))
-    : M (result ((mword (8 * width) * unit)) ExceptionType).
+    : M (result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))).
 
 Definition mem_read_priv
 (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type) (priv : Privilege)
 (paddr : physaddr) (width : Z) (aq : bool) (rl : bool) (res : bool) (*width >=? 0*)
 (*(0 <? width) && (width <=? 4096)*)
-: M (result (mword (8 * width)) ExceptionType) :=
-   (mem_read_priv_meta (access) (pbmt) (priv) (paddr) (width) (aq) (rl) (res) (false)) >>= fun (w__0 : result ((mword (8 * width) * unit)) ExceptionType) =>
+: M (result (mword (8 * width)) ((physaddr * ExceptionType))) :=
+   (mem_read_priv_meta (access) (pbmt) (priv) (paddr) (width) (aq) (rl) (res) (false)) >>= fun (w__0 : result ((mword (8 * width) * unit)) ((physaddr * ExceptionType))) =>
    returnM ((MemoryOpResult_drop_meta (w__0))).
 
 Definition mem_read
 (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type) (paddr : physaddr) (width : Z)
 (aq : bool) (rel : bool) (res : bool) (*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
-: M (result (mword (8 * width)) ExceptionType) :=
+: M (result (mword (8 * width)) ((physaddr * ExceptionType))) :=
    ((read_reg mstatus)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
    read_reg cur_privilege >>= fun (w__1 : Privilege) =>
    (effectivePrivilege (access) (w__0) (w__1)) >>= fun (w__2 : Privilege) =>
    (mem_read_priv (access) (pbmt) (w__2) (paddr) (width) (aq) (rel) (res))
-    : M (result (mword (8 * width)) ExceptionType).
+    : M (result (mword (8 * width)) ((physaddr * ExceptionType))).
 
-Definition mem_write_ea (addr : physaddr) (width : Z) (aq : bool) (rl : bool) (con : bool)
-(*(0 <? width) && (width <=? 4096)*)
-: M (result unit ExceptionType) :=
-   (if andb ((orb (rl) (con))) ((not ((is_aligned_paddr (addr) (width))))) then
-      returnM ((Err ((E_SAMO_Addr_Align (tt)))))
-    else
-      (write_kind_of_flags (aq) (rl) (con)) >>= fun (w__0 : write_kind) =>
-      returnM ((Ok ((write_ram_ea (w__0) (addr) (width))))))
-    : M (result unit ExceptionType).
+Definition mem_write_ea
+(paddr : physaddr) (width : Z) (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type)
+(aq : bool) (rl : bool) (con : bool) (*(0 <? width) && (width <=? 4096)*)
+: M (result unit ((physaddr * ExceptionType))) :=
+   catch_early_return
+     (((liftR (read_reg mstatus))  : MR (result unit ((physaddr * ExceptionType))) (mword 64)) >>= fun (w__0 : mword 64) =>
+     liftR (read_reg cur_privilege) >>= fun (w__1 : Privilege) =>
+     liftR ((effectivePrivilege (access) (w__0) (w__1))) >>= fun priv =>
+     liftR ((check_pma_with_pmp_priority (access) (pbmt) (priv) (paddr) (width) (con))) >>= fun (w__2 : result Phys_Mem_Access_Info ExceptionType) =>
+     match w__2 with
+     | Ok access_info => returnR (result unit ((physaddr * ExceptionType))) (access_info)
+     | Err e =>
+        (early_return ((Err ((paddr, e)))
+         : result unit ((physaddr * ExceptionType))) :
+          MR (result unit ((physaddr * ExceptionType))) Phys_Mem_Access_Info)
+         : MR (result unit ((physaddr * ExceptionType))) (Phys_Mem_Access_Info)
+     end >>= fun (access_info : Phys_Mem_Access_Info) =>
+     liftR ((split_misaligned (paddr) (width) (access_info.(Phys_Mem_Access_Info_granule_size_exp))
+               (access_info.(Phys_Mem_Access_Info_splittable)))) >>= fun '((N, split_width)) =>
+     let paddr_bits := bits_of_physaddr (paddr) in
+     let '((first, last, step)) := misaligned_order (N) in
+     let i : Z := first in
+     let finished : bool := false in
+     liftR ((write_kind_of_flags (aq) (rl) (con))) >>= fun wk =>
+     (untilMT
+       (finished, i)
+       (fun '(finished, i) => N)
+       (fun '(finished, i) => returnR (result unit ((physaddr * ExceptionType))) (finished))
+       (fun '(finished, i) =>
+         (liftR (assert_exp' true "loop dummy assert") >>= fun _ =>
+          let offset := i in
+          let paddr := Physaddr ((add_vec_int (paddr_bits) ((Z.mul (offset) (split_width))))) in
+          liftR ((pmpCheck (paddr) (split_width) (access) (priv))) >>= fun (w__4 : option ExceptionType) =>
+          match w__4 with
+          | Some e =>
+             (early_return ((Err ((paddr, e)))
+              : result unit ((physaddr * ExceptionType))) :
+               MR (result unit ((physaddr * ExceptionType))) unit)
+              : MR (result unit ((physaddr * ExceptionType))) (unit)
+          | None =>
+             returnR (result unit ((physaddr * ExceptionType))) ((write_ram_ea (wk) (paddr)
+                                                                    (split_width)))
+          end >>
+          let '((finished, i)) :=
+            (if Z.eqb (offset) (last) then
+               let finished : bool := true in
+               (finished, i)
+             else
+               let i : Z := Z.add (offset) (step) in
+               (finished, i))
+             : (bool * Z) in
+          returnR (result unit ((physaddr * ExceptionType))) ((finished, i)))
+          : MR (result unit ((physaddr * ExceptionType))) ((bool * Z)))) >>= fun '((finished, i)
+     : (bool * Z)) =>
+     returnR (result unit ((physaddr * ExceptionType))) ((Ok (tt)))).
 
 Definition checked_mem_write
 (paddr : physaddr) (width : Z) (data : mword (8 * width)) (access : MemoryAccessType mem_payload)
 (pbmt : page_based_mem_type) (priv : Privilege) (meta : unit) (aq : bool) (rl : bool) (con : bool)
 (*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
-: M (result bool ExceptionType) :=
-   (phys_access_check (access) (pbmt) (priv) (paddr) (width) (con)) >>= fun (w__0 : option ExceptionType) =>
-   match w__0 with
-   | Some e => returnM ((Err (e)))
-   | None =>
-      (within_mmio_writable (paddr) (width)) >>= fun (w__1 : bool) =>
-      (if w__1 return M (result bool ExceptionType) then
-         (mmio_write (paddr) (width) (data))
-          : M (result bool ExceptionType)
-       else
-         (write_kind_of_flags (aq) (rl) (con)) >>= fun wk =>
-         (write_ram (wk) (paddr) (width) (data) (meta)) >>= fun (w__3 : bool) =>
-         returnM ((Ok (w__3))))
-       : M (result bool ExceptionType)
-   end
-    : M (result bool ExceptionType).
+: M (result bool ((physaddr * ExceptionType))) :=
+   catch_early_return
+     (liftR ((check_pma_with_pmp_priority (access) (pbmt) (priv) (paddr) (width) (con))) >>= fun (w__0 : result Phys_Mem_Access_Info ExceptionType) =>
+     match w__0 with
+     | Ok access_info => returnR (result bool ((physaddr * ExceptionType))) (access_info)
+     | Err e =>
+        (early_return ((Err ((paddr, e)))
+         : result bool ((physaddr * ExceptionType))) :
+          MR (result bool ((physaddr * ExceptionType))) Phys_Mem_Access_Info)
+         : MR (result bool ((physaddr * ExceptionType))) (Phys_Mem_Access_Info)
+     end >>= fun (access_info : Phys_Mem_Access_Info) =>
+     liftR ((split_misaligned (paddr) (width) (access_info.(Phys_Mem_Access_Info_granule_size_exp))
+               (access_info.(Phys_Mem_Access_Info_splittable)))) >>= fun '((N, split_width)) =>
+     let paddr_bits := bits_of_physaddr (paddr) in
+     let write_success : bool := true in
+     let '((first, last, step)) := misaligned_order (N) in
+     let i : Z := first in
+     let finished : bool := false in
+     liftR ((write_kind_of_flags (aq) (rl) (con))) >>= fun wk =>
+     (untilMT
+       (finished, i, write_success)
+       (fun '(finished, i, write_success) => N)
+       (fun '(finished, i, write_success) =>
+         returnR (result bool ((physaddr * ExceptionType))) (finished))
+       (fun '(finished, i, write_success) =>
+         (liftR (assert_exp' true "loop dummy assert") >>= fun _ =>
+          let offset := i in
+          let paddr := Physaddr ((add_vec_int (paddr_bits) ((Z.mul (offset) (split_width))))) in
+          liftR ((pmpCheck (paddr) (split_width) (access) (priv))) >>= fun (w__2 : option ExceptionType) =>
+          match w__2 with
+          | Some e =>
+             (early_return ((Err ((paddr, e)))
+              : result bool ((physaddr * ExceptionType))) :
+               MR (result bool ((physaddr * ExceptionType))) unit)
+              : MR (result bool ((physaddr * ExceptionType))) (unit)
+          | None => returnR (result bool ((physaddr * ExceptionType))) (tt)
+          end >>
+          let write_value :=
+            subrange_vec_dec (data)
+              ((Z.sub ((Z.mul ((Z.mul (8) ((Z.add (offset) (1))))) (split_width))) (1)))
+              ((Z.mul ((Z.mul (8) (offset))) (split_width))) in
+          liftR ((within_mmio_writable (paddr) (split_width))) >>= fun (w__3 : bool) =>
+          (if w__3 return MR (result bool ((physaddr * ExceptionType))) (bool) then
+             liftR ((mmio_write (paddr) (split_width) ((autocast (T := mword)  write_value)))) >>= fun (w__4 : result bool ((physaddr * ExceptionType))) =>
+             match w__4 with
+             | Ok v =>
+                let write_success : bool := andb (write_success) (v) in
+                returnR (result bool ((physaddr * ExceptionType))) (write_success)
+             | Err e =>
+                (early_return ((Err (e))
+                 : result bool ((physaddr * ExceptionType))) :
+                  MR (result bool ((physaddr * ExceptionType))) unit) >>
+                returnR (result bool ((physaddr * ExceptionType))) (write_success)
+             end
+              : MR (result bool ((physaddr * ExceptionType))) (bool)
+           else
+             liftR ((write_ram (wk) (paddr) (split_width) ((autocast (T := mword)  write_value))
+                       (meta))) >>= fun v =>
+             let write_success : bool := andb (write_success) (v) in
+             returnR (result bool ((physaddr * ExceptionType))) (write_success)) >>= fun (write_success : bool) =>
+          let '((finished, i)) :=
+            (if Z.eqb (offset) (last) then
+               let finished : bool := true in
+               (finished, i)
+             else
+               let i : Z := Z.add (offset) (step) in
+               (finished, i))
+             : (bool * Z) in
+          returnR (result bool ((physaddr * ExceptionType))) ((finished, i, write_success)))
+          : MR (result bool ((physaddr * ExceptionType))) ((bool * Z * bool)))) >>= fun '((finished, i, write_success)
+     : (bool * Z * bool)) =>
+     returnR (result bool ((physaddr * ExceptionType))) ((Ok (write_success)))).
 
 Definition mem_write_value_priv_meta
 (paddr : physaddr) (width : Z) (value : mword (8 * width)) (access : MemoryAccessType mem_payload)
 (pbmt : page_based_mem_type) (priv : Privilege) (meta : unit) (aq : bool) (rl : bool) (con : bool)
 (*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
-: M (result bool ExceptionType) :=
-   (if andb ((orb (rl) (con))) ((not ((is_aligned_paddr (paddr) (width))))) then
-      returnM ((Err ((E_SAMO_Addr_Align (tt)))))
-    else
-      (checked_mem_write (paddr) (width) (value) (access) (pbmt) (priv) (meta) (aq) (rl) (con)) >>= fun result' =>
-      let '(_) :=
-        match result' with
-        | Ok _ =>
-           mem_write_callback ((accessType_to_str (access))) ((bits_of_physaddr (paddr))) (width)
-             (value)
-        | Err e =>
-           mem_exception_callback ((bits_of_physaddr (paddr))) ((exceptionType_bits_forwards (e)))
-        end
-         : unit in
-      returnM (result'))
-    : M (result bool ExceptionType).
+: M (result bool ((physaddr * ExceptionType))) :=
+   (checked_mem_write (paddr) (width) (value) (access) (pbmt) (priv) (meta) (aq) (rl) (con)) >>= fun result' =>
+   let '(_) :=
+     match result' with
+     | Ok _ =>
+        mem_write_callback ((accessType_to_str (access))) ((bits_of_physaddr (paddr))) (width)
+          (value)
+     | Err (addr, e) =>
+        mem_exception_callback ((bits_of_physaddr (addr))) ((exceptionType_bits_forwards (e)))
+     end
+      : unit in
+   returnM (result').
 
 Definition mem_write_value_priv
 (paddr : physaddr) (width : Z) (value : mword (8 * width)) (priv : Privilege)
 (access : MemoryAccessType mem_payload) (pbmt : page_based_mem_type) (aq : bool) (rl : bool)
 (con : bool) (*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
-: M (result bool ExceptionType) :=
+: M (result bool ((physaddr * ExceptionType))) :=
    (mem_write_value_priv_meta (paddr) (width) (value) (access) (pbmt) (priv) (default_meta) (aq)
       (rl) (con))
-    : M (result bool ExceptionType).
+    : M (result bool ((physaddr * ExceptionType))).
 
 Definition mem_write_value_meta
 (paddr : physaddr) (width : Z) (value : mword (8 * width)) (access : MemoryAccessType mem_payload)
 (pbmt : page_based_mem_type) (meta : unit) (aq : bool) (rl : bool) (con : bool) (*width >=? 0*)
 (*(0 <? width) && (width <=? 4096)*)
-: M (result bool ExceptionType) :=
+: M (result bool ((physaddr * ExceptionType))) :=
    ((read_reg mstatus)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
    read_reg cur_privilege >>= fun (w__1 : Privilege) =>
    (effectivePrivilege (access) (w__0) (w__1)) >>= fun ep =>
    (mem_write_value_priv_meta (paddr) (width) (value) (access) (pbmt) (ep) (meta) (aq) (rl) (con))
-    : M (result bool ExceptionType).
+    : M (result bool ((physaddr * ExceptionType))).
 
 Definition mem_write_value
 (paddr : physaddr) (width : Z) (value : mword (8 * width)) (access : MemoryAccessType mem_payload)
 (pbmt : page_based_mem_type) (aq : bool) (rl : bool) (con : bool) (*width >=? 0*)
 (*(0 <? width) && (width <=? 4096)*)
-: M (result bool ExceptionType) :=
+: M (result bool ((physaddr * ExceptionType))) :=
    (mem_write_value_meta (paddr) (width) (value) (access) (pbmt) (default_meta) (aq) (rl) (con))
-    : M (result bool ExceptionType).
+    : M (result bool ((physaddr * ExceptionType))).
 
 Definition undefined_PTE_Ext '(tt : unit) : M (mword 10) :=
    (undefined_bitvector (10))  : M (mword 10).
@@ -22934,168 +23544,161 @@ Definition pte_is_non_leaf (pte_flags : mword 8) : bool :=
          ((eq_vec ((_get_PTE_Flags_R (pte_flags))) (('b"0")))))).
 
 Definition pte_is_invalid (pte_flags : mword 8) (pte_ext : mword 10) : M (bool) :=
-   (or_boolM (returnM (((eq_vec ((_get_PTE_Flags_V (pte_flags))) (('b"0")))  : bool)))
-      ((or_boolM
-          ((and_boolM (returnM (((eq_vec ((_get_PTE_Flags_R (pte_flags))) (('b"0")))  : bool)))
-              ((and_boolM (returnM (((eq_vec ((_get_PTE_Flags_W (pte_flags))) (('b"1")))  : bool)))
-                  ((and_boolM
-                      (returnM (((eq_vec ((_get_PTE_Flags_X (pte_flags))) (('b"0")))  : bool)))
-                      (((read_reg menvcfg)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
-                       returnM (((eq_vec ((_get_MEnvcfg_SSE (w__0))) (('b"0")))  : bool))))
-                   : M (bool)))
-               : M (bool)))
-           : M (bool))
-          ((or_boolM
-              (returnM (((andb ((eq_vec ((_get_PTE_Flags_R (pte_flags))) (('b"0"))))
-                            ((andb ((eq_vec ((_get_PTE_Flags_W (pte_flags))) (('b"1"))))
-                                ((eq_vec ((_get_PTE_Flags_X (pte_flags))) (('b"1")))))))
-                : bool)))
-              ((or_boolM
-                  (returnM (((andb ((pte_is_non_leaf (pte_flags)))
-                                ((orb ((eq_vec ((_get_PTE_Flags_A (pte_flags))) (('b"1"))))
-                                    ((orb ((eq_vec ((_get_PTE_Flags_D (pte_flags))) (('b"1"))))
-                                        ((orb ((eq_vec ((_get_PTE_Flags_U (pte_flags))) (('b"1"))))
-                                            ((neq_vec (pte_ext) ((zeros' (10))))))))))))
-                    : bool)))
-                  ((or_boolM
-                      ((and_boolM
-                          (returnM (((neq_vec ((_get_PTE_Ext_N (pte_ext))) (('b"0")))  : bool)))
-                          ((currentlyEnabled (Ext_Svnapot)) >>= fun (w__4 : bool) =>
-                           returnM (((not (w__4))  : bool))))
-                       : M (bool))
-                      ((or_boolM
-                          ((and_boolM
-                              (returnM (((neq_vec ((_get_PTE_Ext_PBMT (pte_ext))) ((zeros' (2))))
-                                : bool)))
-                              ((or_boolM
-                                  (((read_reg menvcfg)  : M (mword 64)) >>= fun (w__6 : mword 64) =>
-                                   returnM (((eq_vec ((_get_MEnvcfg_PBMTE (w__6))) (('b"0")))
-                                    : bool)))
-                                  (returnM (((not
-                                                ((page_based_mem_type_forwards_matches
-                                                    ((_get_PTE_Ext_PBMT (pte_ext))))))
-                                    : bool))))
-                               : M (bool)))
-                           : M (bool))
-                          ((or_boolM
-                              ((and_boolM
-                                  (returnM (((neq_vec ((_get_PTE_Ext_RSW_60t59b (pte_ext)))
-                                                ((zeros' (2))))
-                                    : bool)))
-                                  ((currentlyEnabled (Ext_Svrsw60t59b)) >>= fun (w__9 : bool) =>
-                                   returnM (((not (w__9))  : bool))))
-                               : M (bool))
-                              (returnM (((neq_vec ((_get_PTE_Ext_reserved (pte_ext))) ((zeros' (5))))
-                                : bool))))
-                           : M (bool)))
-                       : M (bool)))
-                   : M (bool)))
-               : M (bool)))
-           : M (bool)))
-       : M (bool)))
-    : M (bool).
+   or_boolM (returnM (((eq_vec ((_get_PTE_Flags_V (pte_flags))) (('b"0")))  : bool)))
+     (or_boolM
+        ((and_boolM (returnM (((eq_vec ((_get_PTE_Flags_R (pte_flags))) (('b"0")))  : bool)))
+            ((and_boolM (returnM (((eq_vec ((_get_PTE_Flags_W (pte_flags))) (('b"1")))  : bool)))
+                ((and_boolM
+                    (returnM (((eq_vec ((_get_PTE_Flags_X (pte_flags))) (('b"0")))  : bool)))
+                    (((read_reg menvcfg)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
+                     returnM (((eq_vec ((_get_MEnvcfg_SSE (w__0))) (('b"0")))  : bool))))
+                 : M (bool)))
+             : M (bool)))
+         : M (bool))
+        (or_boolM
+           (returnM (((andb ((eq_vec ((_get_PTE_Flags_R (pte_flags))) (('b"0"))))
+                         ((andb ((eq_vec ((_get_PTE_Flags_W (pte_flags))) (('b"1"))))
+                             ((eq_vec ((_get_PTE_Flags_X (pte_flags))) (('b"1")))))))
+             : bool)))
+           (or_boolM
+              ((and_boolM
+                  (returnM (((not
+                                ((page_based_mem_type_forwards_matches
+                                    ((_get_PTE_Ext_PBMT (pte_ext))))))
+                    : bool))) ((currentlyEnabled (Ext_Svpbmt))  : M (bool)))
+               : M (bool))
+              (and_boolM (returnM (pte_reserved_bits_must_be_zero))
+                 ((or_boolM
+                     (returnM (((andb ((pte_is_non_leaf (pte_flags)))
+                                   ((orb ((eq_vec ((_get_PTE_Flags_A (pte_flags))) (('b"1"))))
+                                       ((orb ((eq_vec ((_get_PTE_Flags_D (pte_flags))) (('b"1"))))
+                                           ((orb
+                                               ((eq_vec ((_get_PTE_Flags_U (pte_flags))) (('b"1"))))
+                                               ((neq_vec (pte_ext) ((zeros' (10))))))))))))
+                       : bool)))
+                     ((or_boolM
+                         ((and_boolM
+                             (returnM (((neq_vec ((_get_PTE_Ext_N (pte_ext))) ((zeros' (1))))
+                               : bool)))
+                             ((currentlyEnabled (Ext_Svnapot)) >>= fun (w__6 : bool) =>
+                              returnM (((not (w__6))  : bool))))
+                          : M (bool))
+                         ((or_boolM
+                             ((and_boolM
+                                 (returnM (((neq_vec ((_get_PTE_Ext_PBMT (pte_ext))) ((zeros' (2))))
+                                   : bool)))
+                                 ((or_boolM
+                                     (((read_reg menvcfg)  : M (mword 64)) >>= fun (w__8 : mword 64) =>
+                                      returnM (((eq_vec ((_get_MEnvcfg_PBMTE (w__8))) (('b"0")))
+                                       : bool)))
+                                     (returnM (((not
+                                                   ((page_based_mem_type_forwards_matches
+                                                       ((_get_PTE_Ext_PBMT (pte_ext))))))
+                                       : bool))))
+                                  : M (bool)))
+                              : M (bool))
+                             ((or_boolM
+                                 ((and_boolM
+                                     (returnM (((neq_vec ((_get_PTE_Ext_RSW_60t59b (pte_ext)))
+                                                   ((zeros' (2))))
+                                       : bool)))
+                                     ((currentlyEnabled (Ext_Svrsw60t59b)) >>= fun (w__11 : bool) =>
+                                      returnM (((not (w__11))  : bool))))
+                                  : M (bool))
+                                 (returnM (((neq_vec ((_get_PTE_Ext_reserved (pte_ext)))
+                                               ((zeros' (5))))
+                                   : bool))))
+                              : M (bool)))
+                          : M (bool)))
+                      : M (bool)))
+                  : M (bool)))))).
 
 Definition check_PTE_permission
 (access : MemoryAccessType mem_payload) (priv : Privilege) (mxr : bool) (do_sum : bool)
 (pte_flags : mword 8) (_ext : mword 10) (_ext_ptw : unit)
 : M (PTE_Check) :=
-   catch_early_return
-     (let pte_U := bit_to_bool ((_get_PTE_Flags_U (pte_flags))) in
-     let pte_R := bit_to_bool ((_get_PTE_Flags_R (pte_flags))) in
-     let pte_W := bit_to_bool ((_get_PTE_Flags_W (pte_flags))) in
-     let pte_X := bit_to_bool ((_get_PTE_Flags_X (pte_flags))) in
-     liftR (assert_exp (zopz0zJzJzK (pte_W) (pte_R)) "sys/vmem_pte.sail:143.24-143.25") >>
-     match priv with
-     | User => returnR (PTE_Check) (pte_U)
-     | Supervisor =>
-        returnR (PTE_Check) ((orb ((not (pte_U))) ((andb (do_sum) ((is_load_store (access)))))))
-     | Machine =>
-        liftR ((internal_error ("sys/vmem_pte.sail") (151) ("m-mode mem perm check")))
-         : MR (PTE_Check) (bool)
-     | VirtualUser =>
-        liftR ((internal_error ("sys/vmem_pte.sail") (152) ("Hypervisor extension not supported")))
-         : MR (PTE_Check) (bool)
-     | VirtualSupervisor =>
-        liftR ((internal_error ("sys/vmem_pte.sail") (153) ("Hypervisor extension not supported")))
-         : MR (PTE_Check) (bool)
-     end >>= fun (priv_ok : bool) =>
-     (if not (priv_ok) then returnR (PTE_Check) ((PTE_Check_Failure ((tt, PTE_No_Permission (tt)))))
-      else
-        (if andb ((not (pte_R))) ((andb (pte_W) ((not (pte_X))))) return MR (PTE_Check) (unit) then
-           ((liftR (read_reg menvcfg))  : MR (PTE_Check) (mword 64)) >>= fun (w__3 : mword 64) =>
-           liftR (assert_exp (bool_bit_backwards ((_get_MEnvcfg_SSE (w__3)))) "sys/vmem_pte.sail:162.33-162.34") >>
-           match access with
-           | InstructionFetch tt => returnR (PTE_Check) (false)
-           | Load PageTableEntry => returnR (PTE_Check) (false)
-           | Store PageTableEntry => returnR (PTE_Check) (false)
-           | Load Data => returnR (PTE_Check) (true)
-           | Load Vector => returnR (PTE_Check) (true)
-           | Load ShadowStack => returnR (PTE_Check) (true)
-           | LoadReserved Data => returnR (PTE_Check) (true)
-           | Store Data => returnR (PTE_Check) (false)
-           | Store Vector => returnR (PTE_Check) (false)
-           | StoreConditional Data => returnR (PTE_Check) (false)
-           | Atomic (_, Data, Data) => returnR (PTE_Check) (false)
-           | Store ShadowStack => returnR (PTE_Check) (true)
-           | Atomic (_, ShadowStack, ShadowStack) => returnR (PTE_Check) (true)
-           | CacheAccess _ => returnR (PTE_Check) (false)
-           | LoadReserved p =>
-              liftR ((internal_error ("sys/vmem_pte.sail") (191)
-                        ((String.append ("Invalid payload (")
-                            ((String.append ((mem_payload_name_forwards (p)))
-                                (") for LoadReserved.")))))))
-               : MR (PTE_Check) (bool)
-           | StoreConditional p =>
-              liftR ((internal_error ("sys/vmem_pte.sail") (192)
-                        ((String.append ("Invalid payload (")
-                            ((String.append ((mem_payload_name_forwards (p)))
-                                (") for StoreConditional.")))))))
-               : MR (PTE_Check) (bool)
-           | Atomic (_, rp, wp) =>
-              liftR ((internal_error ("sys/vmem_pte.sail") (193)
-                        ((String.append ("Invalid payloads (")
-                            ((String.append ((mem_payload_name_forwards (rp)))
-                                ((String.append (", ")
-                                    ((String.append ((mem_payload_name_forwards (wp)))
-                                        (") for Atomic.")))))))))))
-               : MR (PTE_Check) (bool)
-           end >>= fun (shadow_stack_ok : bool) =>
-           (if not (shadow_stack_ok) return MR (PTE_Check) (unit) then
-              (early_return ((PTE_Check_Failure ((tt, PTE_No_Access (tt))))
-               : PTE_Check) :
-                MR PTE_Check unit)
-               : MR (PTE_Check) (unit)
-            else returnR (PTE_Check) (tt))
-            : MR (PTE_Check) (unit)
-         else
-         liftR ((is_shadow_stack_access (access))) >>= fun (w__7 : bool) =>
-         if w__7 return MR (PTE_Check) (unit) then
-           let is_read_only := andb (pte_R) ((andb ((not (pte_W))) ((not (pte_X))))) in
-           (early_return ((PTE_Check_Failure
-                             ((tt, if is_read_only then PTE_No_Permission (tt)
-                             else PTE_No_Access (tt))))
-            : PTE_Check) :
-             MR PTE_Check unit)
-            : MR (PTE_Check) (unit)
-         else returnR (PTE_Check) (tt)) >>
-        let pte_R := orb (pte_R) ((andb (pte_X) (mxr))) in
-        let access_ok : bool :=
-          match access with
-          | Load _ => pte_R
-          | LoadReserved _ => pte_R
-          | Store _ => pte_W
-          | StoreConditional _ => pte_W
-          | Atomic (_, _, _) => andb (pte_W) (pte_R)
-          | InstructionFetch _ => pte_X
-          | CacheAccess (CB_zero tt) => pte_W
-          | CacheAccess (CB_prefetch p) =>
-             match p with | PREFETCH_R => pte_R | PREFETCH_W => pte_W | PREFETCH_I => pte_X end
-          | CacheAccess (CB_manage _) => orb (pte_R) (pte_W)
-          end in
-        returnR (PTE_Check) ((if not (access_ok) then
-                                PTE_Check_Failure ((tt, PTE_No_Permission (tt)))
-                              else PTE_Check_Success (tt))))
-      : MR (PTE_Check) (PTE_Check)).
+   let pte_U := bit_to_bool ((_get_PTE_Flags_U (pte_flags))) in
+   let pte_R := bit_to_bool ((_get_PTE_Flags_R (pte_flags))) in
+   let pte_W := bit_to_bool ((_get_PTE_Flags_W (pte_flags))) in
+   let pte_X := bit_to_bool ((_get_PTE_Flags_X (pte_flags))) in
+   assert_exp (zopz0zJzJzK (pte_W) ((orb (pte_R) ((not (pte_X)))))) "sys/vmem_pte.sail:149.39-149.40" >>
+   match priv with
+   | User => returnM (pte_U)
+   | Supervisor => returnM ((orb ((not (pte_U))) ((andb (do_sum) ((is_load_store (access)))))))
+   | Machine => (internal_error ("sys/vmem_pte.sail") (157) ("m-mode mem perm check"))  : M (bool)
+   | VirtualUser =>
+      (internal_error ("sys/vmem_pte.sail") (158) ("Hypervisor extension not supported"))
+       : M (bool)
+   | VirtualSupervisor =>
+      (internal_error ("sys/vmem_pte.sail") (159) ("Hypervisor extension not supported"))
+       : M (bool)
+   end >>= fun (priv_ok : bool) =>
+   (if not (priv_ok) then returnM ((PTE_Check_Failure ((tt, PTE_No_Permission (tt)))))
+    else if andb ((not (pte_R))) ((andb (pte_W) ((not (pte_X))))) return M (PTE_Check) then
+      ((read_reg menvcfg)  : M (mword 64)) >>= fun (w__3 : mword 64) =>
+      assert_exp (bool_bit_backwards ((_get_MEnvcfg_SSE (w__3)))) "sys/vmem_pte.sail:168.33-168.34" >>
+      match access with
+      | InstructionFetch tt => returnM (false)
+      | Load PageTableEntry => returnM (false)
+      | Store PageTableEntry => returnM (false)
+      | Load Data => returnM (true)
+      | Load Vector => returnM (true)
+      | Load ShadowStack => returnM (true)
+      | LoadReserved (_, _, Data) => returnM (true)
+      | Store Data => returnM (false)
+      | Store Vector => returnM (false)
+      | StoreConditional (_, _, Data) => returnM (false)
+      | Atomic (_, _, _, Data, Data) => returnM (false)
+      | Store ShadowStack => returnM (true)
+      | Atomic (_, _, _, ShadowStack, ShadowStack) => returnM (true)
+      | CacheAccess _ => returnM (false)
+      | LoadReserved (_, _, p) =>
+         (internal_error ("sys/vmem_pte.sail") (197)
+            ((String.append ("Invalid payload (")
+                ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved."))))))
+          : M (bool)
+      | StoreConditional (_, _, p) =>
+         (internal_error ("sys/vmem_pte.sail") (198)
+            ((String.append ("Invalid payload (")
+                ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional."))))))
+          : M (bool)
+      | Atomic (_, _, _, rp, wp) =>
+         (internal_error ("sys/vmem_pte.sail") (199)
+            ((String.append ("Invalid payloads (")
+                ((String.append ((mem_payload_name_forwards (rp)))
+                    ((String.append (", ")
+                        ((String.append ((mem_payload_name_forwards (wp))) (") for Atomic."))))))))))
+          : M (bool)
+      end >>= fun (shadow_stack_ok : bool) =>
+      returnM ((if not (shadow_stack_ok) then PTE_Check_Failure ((tt, PTE_No_Access (tt)))
+                else PTE_Check_Success (tt)))
+    else
+      (is_shadow_stack_access (access)) >>= fun (w__7 : bool) =>
+      let w__8 : PTE_Check :=
+        if w__7 then
+          let is_read_only := andb (pte_R) ((andb ((not (pte_W))) ((not (pte_X))))) in
+          PTE_Check_Failure
+            ((tt, if is_read_only then PTE_No_Permission (tt)
+            else PTE_No_Access (tt)))
+        else
+          let pte_R := orb (pte_R) ((andb (pte_X) (mxr))) in
+          let access_ok : bool :=
+            match access with
+            | Load _ => pte_R
+            | LoadReserved _ => pte_R
+            | Store _ => pte_W
+            | StoreConditional _ => pte_W
+            | Atomic _ => andb (pte_W) (pte_R)
+            | InstructionFetch _ => pte_X
+            | CacheAccess (CB_zero tt) => pte_W
+            | CacheAccess (CB_prefetch p) =>
+               match p with | PREFETCH_R => pte_R | PREFETCH_W => pte_W | PREFETCH_I => pte_X end
+            | CacheAccess (CB_manage _) => orb (pte_R) (pte_W)
+            end in
+          if not (access_ok) then PTE_Check_Failure ((tt, PTE_No_Permission (tt)))
+          else PTE_Check_Success (tt) in
+      returnM (w__8))
+    : M (PTE_Check).
 
 Definition update_PTE_Bits {pte_size : Z}
 (pte : mword pte_size) (access : MemoryAccessType mem_payload) (*pte_size >=? 0*)
@@ -23110,7 +23713,7 @@ Definition update_PTE_Bits {pte_size : Z}
        | LoadReserved _ => false
        | Store _ => true
        | StoreConditional _ => true
-       | Atomic (_, _, _) => true
+       | Atomic _ => true
        | CacheAccess (CB_manage _) => false
        | CacheAccess (CB_zero tt) => true
        | CacheAccess (CB_prefetch _) => false
@@ -23138,27 +23741,27 @@ Definition translationException (access : MemoryAccessType mem_payload) (err : P
 : M (ExceptionType) :=
    match (access, err) with
    | (_, PTW_Ext_Error e) => returnM ((E_Extension ((ext_translate_exception (e)))))
-   | (Atomic (_, Data, Data), PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
-   | (Atomic (_, Data, Data), _) => returnM ((E_SAMO_Page_Fault (tt)))
+   | (Atomic (_, _, _, Data, Data), PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
+   | (Atomic (_, _, _, Data, Data), _) => returnM ((E_SAMO_Page_Fault (tt)))
    | (Load Data, PTW_No_Access tt) => returnM ((E_Load_Access_Fault (tt)))
    | (Load Data, _) => returnM ((E_Load_Page_Fault (tt)))
    | (Load Vector, PTW_No_Access tt) => returnM ((E_Load_Access_Fault (tt)))
    | (Load Vector, _) => returnM ((E_Load_Page_Fault (tt)))
    | (Load PageTableEntry, PTW_No_Access tt) => returnM ((E_Load_Access_Fault (tt)))
    | (Load PageTableEntry, _) => returnM ((E_Load_Page_Fault (tt)))
-   | (LoadReserved Data, PTW_No_Access tt) => returnM ((E_Load_Access_Fault (tt)))
-   | (LoadReserved Data, _) => returnM ((E_Load_Page_Fault (tt)))
+   | (LoadReserved (_, _, Data), PTW_No_Access tt) => returnM ((E_Load_Access_Fault (tt)))
+   | (LoadReserved (_, _, Data), _) => returnM ((E_Load_Page_Fault (tt)))
    | (Store Data, PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
    | (Store Data, _) => returnM ((E_SAMO_Page_Fault (tt)))
    | (Store Vector, PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
    | (Store Vector, _) => returnM ((E_SAMO_Page_Fault (tt)))
    | (Store PageTableEntry, PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
    | (Store PageTableEntry, _) => returnM ((E_SAMO_Page_Fault (tt)))
-   | (StoreConditional Data, PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
-   | (StoreConditional Data, _) => returnM ((E_SAMO_Page_Fault (tt)))
-   | (Atomic (_, ShadowStack, ShadowStack), PTW_No_Access tt) =>
+   | (StoreConditional (_, _, Data), PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
+   | (StoreConditional (_, _, Data), _) => returnM ((E_SAMO_Page_Fault (tt)))
+   | (Atomic (_, _, _, ShadowStack, ShadowStack), PTW_No_Access tt) =>
       returnM ((E_SAMO_Access_Fault (tt)))
-   | (Atomic (_, ShadowStack, ShadowStack), _) => returnM ((E_SAMO_Page_Fault (tt)))
+   | (Atomic (_, _, _, ShadowStack, ShadowStack), _) => returnM ((E_SAMO_Page_Fault (tt)))
    | (Load ShadowStack, PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
    | (Load ShadowStack, _) => returnM ((E_SAMO_Page_Fault (tt)))
    | (Store ShadowStack, PTW_No_Access tt) => returnM ((E_SAMO_Access_Fault (tt)))
@@ -23181,18 +23784,18 @@ Definition translationException (access : MemoryAccessType mem_payload) (err : P
       | PREFETCH_W => E_SAMO_Page_Fault (tt)
       | PREFETCH_I => E_Fetch_Page_Fault (tt)
       end)
-   | (LoadReserved p, _) =>
-      (internal_error ("sys/vmem_ptw.sail") (113)
+   | (LoadReserved (_, _, p), _) =>
+      (internal_error ("sys/vmem_ptw.sail") (114)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for LoadReserved."))))))
        : M (ExceptionType)
-   | (StoreConditional p, _) =>
-      (internal_error ("sys/vmem_ptw.sail") (114)
+   | (StoreConditional (_, _, p), _) =>
+      (internal_error ("sys/vmem_ptw.sail") (115)
          ((String.append ("Invalid payload (")
              ((String.append ((mem_payload_name_forwards (p))) (") for StoreConditional."))))))
        : M (ExceptionType)
-   | (Atomic (_, rp, wp), _) =>
-      (internal_error ("sys/vmem_ptw.sail") (115)
+   | (Atomic (_, _, _, rp, wp), _) =>
+      (internal_error ("sys/vmem_ptw.sail") (116)
          ((String.append ("Invalid payloads (")
              ((String.append ((mem_payload_name_forwards (rp)))
                  ((String.append (", ")
@@ -23207,19 +23810,19 @@ Definition ptw_start_callback
    tt.
 
 Definition ptw_step_callback
-(ex360659_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64))) (_ : mword 64)
-(*(0 <=? ex360659_) && (ex360659_ <=? 4)*)
+(ex611155_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64))) (_ : mword 64)
+(*(0 <=? ex611155_) && (ex611155_ <=? 4)*)
 : unit :=
    tt.
 
-Definition ptw_success_callback (_ : mword 64) (ex360660_ : Z)
-(*(0 <=? ex360660_) && (ex360660_ <=? 4)*)
+Definition ptw_success_callback (_ : mword 64) (ex611156_ : Z)
+(*(0 <=? ex611156_) && (ex611156_ <=? 4)*)
 : unit :=
    tt.
 
 Definition ptw_fail_callback
-(_ : PTW_Error) (ex360661_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64)))
-(*(0 <=? ex360661_) && (ex360661_ <=? 4)*)
+(_ : PTW_Error) (ex611157_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64)))
+(*(0 <=? ex611157_) && (ex611157_ <=? 4)*)
 : unit :=
    tt.
 
@@ -23249,6 +23852,26 @@ Definition tlb_get_ppn (sv_width : Z) (ent : TLB_Entry) (vpn : mword (sv_width -
    trunc ((if Z.eqb ((__id (sv_width))) (32) then 22 else 44))
      ((or_vec (ppn) ((and_vec (vpn) (levelMask))))).
 
+Definition tlb_get_level (sv_width : Z) (ent : TLB_Entry)
+(*member_Z_list sv_width [32; 39; 48; 57]*)
+: Z :=
+   let bits_per_level := if Z.eqb ((__id (sv_width))) (32) then 10 else 9 in
+   let max_level :=
+     if Z.eqb ((__id (sv_width))) (32) then 1
+     else if Z.eqb ((__id (sv_width))) (39) then 2
+     else if Z.eqb ((__id (sv_width))) (48) then 3
+     else 4 in
+   let level : level_range sv_width := 0 in
+   let '(loop_l_lower) := 1 in
+   let '(loop_l_upper) := max_level in
+   (foreach_Z_up loop_l_lower loop_l_upper 1 level
+     (fun l level =>
+       if eq_vec
+            ((access_vec_dec (ent.(TLB_Entry_levelMask))
+                ((Z.sub ((Z.mul (l) (bits_per_level))) (1))))) (('b"1")) then
+         l
+       else level)).
+
 Definition tlb_get_pbmt (ent : TLB_Entry) : M (page_based_mem_type) :=
    let pte_ext := ext_bits_of_PTE (ent.(TLB_Entry_pte)) in
    (page_based_mem_type_forwards ((_get_PTE_Ext_PBMT (pte_ext))))
@@ -23256,14 +23879,14 @@ Definition tlb_get_pbmt (ent : TLB_Entry) : M (page_based_mem_type) :=
 
 Definition num_tlb_entries_exp := 6.
 #[export] Hint Unfold num_tlb_entries_exp : sail.
-Definition tlb_add_callback (_ : vec (option TLB_Entry) (2 ^ 6)) (ex360712_ : Z)
-(*(0 <=? ex360712_) && (ex360712_ <=? (2 ^ 6))*)
+Definition tlb_add_callback (_ : vec (option TLB_Entry) (2 ^ 6)) (ex611227_ : Z)
+(*(0 <=? ex611227_) && (ex611227_ <=? (2 ^ 6))*)
 : unit :=
    tt.
 
 Definition tlb_flush_begin_callback (_ : unit) : unit := tt.
 
-Definition tlb_flush_callback (ex360713_ : Z) (*(0 <=? ex360713_) && (ex360713_ <=? (2 ^ 6))*)
+Definition tlb_flush_callback (ex611228_ : Z) (*(0 <=? ex611228_) && (ex611228_ <=? (2 ^ 6))*)
 : unit :=
    tt.
 
@@ -23379,25 +24002,207 @@ Definition flush_TLB
 
 Definition write_pte (paddr : physaddr) (pte_size : Z) (pte : mword (pte_size * 8))
 (*pte_size >=? 0*) (*member_Z_list pte_size [4; 8]*)
-: M (result bool ExceptionType) :=
+: M (result bool ((physaddr * ExceptionType))) :=
    (mem_write_value_priv (paddr) (pte_size) ((autocast (T := mword)  pte)) (Supervisor)
       ((Store (PageTableEntry))) (PBMT_PMA) (false) (false) (false))
-    : M (result bool ExceptionType).
+    : M (result bool ((physaddr * ExceptionType))).
+
+Definition write_pte_conditional (paddr : physaddr) (pte_size : Z) (pte : mword (pte_size * 8))
+(*pte_size >=? 0*) (*member_Z_list pte_size [4; 8]*)
+: M (result bool ((physaddr * ExceptionType))) :=
+   (mem_write_value_priv (paddr) (pte_size) ((autocast (T := mword)  pte)) (Supervisor)
+      ((Store (PageTableEntry))) (PBMT_PMA) (false) (false) (true))
+    : M (result bool ((physaddr * ExceptionType))).
 
 Definition read_pte (paddr : physaddr) (pte_size : Z) (*pte_size >=? 0*)
 (*member_Z_list pte_size [4; 8]*)
-: M (result (mword (8 * pte_size)) ExceptionType) :=
+: M (result (mword (8 * pte_size)) ((physaddr * ExceptionType))) :=
    (mem_read_priv ((Load (PageTableEntry))) (PBMT_PMA) (Supervisor) (paddr) (pte_size) (false)
       (false) (false))
-    : M (result (mword (8 * pte_size)) ExceptionType).
+    : M (result (mword (8 * pte_size)) ((physaddr * ExceptionType))).
+
+Definition read_pte_exclusive (paddr : physaddr) (pte_size : Z) (*pte_size >=? 0*)
+(*member_Z_list pte_size [4; 8]*)
+: M (result (mword (8 * pte_size)) ((physaddr * ExceptionType))) :=
+   (mem_read_priv ((Load (PageTableEntry))) (PBMT_PMA) (Supervisor) (paddr) (pte_size) (false)
+      (false) (true))
+    : M (result (mword (8 * pte_size)) ((physaddr * ExceptionType))).
+
+Definition check_leaf_pte
+(sv_width : Z) (vpn : mword (sv_width - 12)) (access : MemoryAccessType mem_payload)
+(priv : Privilege) (mxr : bool) (do_sum : bool) (pte : mword ((if sv_width =? 32 then 32 else 64)))
+(pte_addr : physaddr) (level : Z) (ext_ptw : unit) (*member_Z_list sv_width [32; 39; 48; 57]*)
+(*(0 <=? level) &&
+  (level <=?
+    ((if sv_width =? 32 then 1 else ((if sv_width =? 39 then 2 else ((if sv_width =? 48 then 3 else 4)))))))*)
+:
+M (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) :=
+   catch_early_return
+     (let pte_flags := Mk_PTE_Flags ((subrange_vec_dec (pte) (7) (0))) in
+     let pte_ext := ext_bits_of_PTE (pte) in
+     liftR ((pte_is_invalid (pte_flags) (pte_ext))) >>= fun (w__0 : bool) =>
+     (if w__0 then
+        let '(_) :=
+          (ptw_fail_callback ((PTW_Invalid_PTE (tt))) (level) ((bits_of_physaddr (pte_addr))))
+           : unit in
+        returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) ((Err
+                                                                                                                               ((PTW_Invalid_PTE
+                                                                                                                                   (tt), ext_ptw))))
+      else if pte_is_non_leaf (pte_flags) then
+        let '(_) :=
+          (ptw_fail_callback ((PTW_Invalid_PTE (tt))) (level) ((bits_of_physaddr (pte_addr))))
+           : unit in
+        returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) ((Err
+                                                                                                                               ((PTW_Invalid_PTE
+                                                                                                                                   (tt), ext_ptw))))
+      else
+        let ppn := PPN_of_PTE (pte) in
+        let ppn_size_bits := if Z.eqb ((__id (sv_width))) (32) then 10 else 9 in
+        (if Z.gtb (level) (0)
+           return
+           MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (unit)
+         then
+           let low_bits := Z.mul (ppn_size_bits) (level) in
+           (if neq_vec ((subrange_vec_dec (ppn) ((Z.sub (low_bits) (1))) (0)))
+                 ((zeros'
+                     ((Z.add
+                         ((Z.sub
+                             ((Z.sub
+                                 ((Z.mul ((if Z.eqb ((__id (sv_width))) (32) then 10 else 9))
+                                     ((__id (level))))) (1))) (0))) (1)))))
+              return
+              MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (unit)
+            then
+              let '(_) :=
+                (ptw_fail_callback ((PTW_Misaligned (tt))) (level) ((bits_of_physaddr (pte_addr))))
+                 : unit in
+              (early_return ((Err ((PTW_Misaligned (tt), ext_ptw)))
+               : result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) :
+                MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) unit)
+               : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (unit)
+            else
+              returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (tt))
+            : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (unit)
+         else
+           returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (tt)) >>
+        liftR ((check_PTE_permission (access) (priv) (mxr) (do_sum) (pte_flags) (pte_ext) (ext_ptw))) >>= fun (w__1 : PTE_Check) =>
+        match w__1 with
+        | PTE_Check_Failure (ext_ptw, pte_failure) =>
+           let '(_) :=
+             (ptw_fail_callback ((ext_get_ptw_error (pte_failure))) (level)
+                ((bits_of_physaddr (pte_addr))))
+              : unit in
+           returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) ((Err
+                                                                                                                                  ((ext_get_ptw_error
+                                                                                                                                      (pte_failure), ext_ptw))))
+        | PTE_Check_Success ext_ptw =>
+           (if Z.gtb (level) (0)
+              return
+              MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                32 then 22 else 44))) then
+              (if andb ((eq_vec ((_get_PTE_Ext_N (pte_ext))) (('b"1"))))
+                    (pte_reserved_bits_must_be_zero)
+                 return
+                 MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                   32 then 22 else 44))) then
+                 (early_return ((Err ((PTW_Invalid_PTE (tt), ext_ptw)))
+                  : result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) :
+                   MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                     32 then 22 else 44))))
+                  : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                   32 then 22 else 44)))
+               else
+                 let low_bits := Z.mul (ppn_size_bits) (level) in
+                 returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) ((autocast (T := mword)
+                                                                                                                                      (concat_vec
+                                                                                                                                         ((subrange_vec_dec
+                                                                                                                                             (ppn)
+                                                                                                                                             ((Z.sub
+                                                                                                                                                 ((length_mword
+                                                                                                                                                     (ppn)))
+                                                                                                                                                 (1)))
+                                                                                                                                             (low_bits)))
+                                                                                                                                         ((subrange_vec_dec
+                                                                                                                                             (vpn)
+                                                                                                                                             ((Z.sub
+                                                                                                                                                 (low_bits)
+                                                                                                                                                 (1)))
+                                                                                                                                             (0)))))))
+               : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                32 then 22 else 44)))
+            else
+              (and_boolM
+                 (liftR ((currentlyEnabled (Ext_Svnapot)))
+                  : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (bool))
+                 (returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (((eq_vec
+                                                                                                                                          ((_get_PTE_Ext_N
+                                                                                                                                              (pte_ext)))
+                                                                                                                                          (('b"1")))
+                   : bool)))) >>= fun (w__5 : bool) =>
+              (if w__5
+                 return
+                 MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                   32 then 22 else 44))) then
+                 let pte_napot_bits := 4 in
+                 (if neq_vec ((subrange_vec_dec (ppn) ((Z.sub (pte_napot_bits) (1))) (0)))
+                       (('b"1000"))
+                    return
+                    MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                      32 then 22 else 44))) then
+                    (early_return ((Err ((PTW_Invalid_PTE (tt), ext_ptw)))
+                     : result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) :
+                      MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                        32 then 22 else 44))))
+                     : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                      32 then 22 else 44)))
+                  else
+                    returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) ((update_subrange_vec_dec
+                                                                                                                                           ((autocast (T := mword) 
+                                                                                                                                           ppn))
+                                                                                                                                           ((Z.sub
+                                                                                                                                               (pte_napot_bits)
+                                                                                                                                               (1)))
+                                                                                                                                           (0)
+                                                                                                                                           ((subrange_vec_dec
+                                                                                                                                               (vpn)
+                                                                                                                                               ((Z.sub
+                                                                                                                                                   (pte_napot_bits)
+                                                                                                                                                   (1)))
+                                                                                                                                               (0))))))
+                  : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                   32 then 22 else 44)))
+               else
+                 returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) ((autocast (T := mword) 
+                 ppn)))
+               : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword ((if sv_width =?
+                32 then 22 else 44)))) >>= fun (ppn : ppn_bits sv_width) =>
+           ((liftR (read_reg menvcfg))
+             : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (mword 64)) >>= fun (w__9 : mword 64) =>
+           (if eq_vec ((_get_MEnvcfg_PBMTE (w__9))) (('b"0")) then
+              returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (PBMT_PMA)
+            else
+              liftR ((page_based_mem_type_forwards ((_get_PTE_Ext_PBMT (pte_ext)))))
+               : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (page_based_mem_type)) >>= fun pbmt =>
+           returnR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) ((Ok
+                                                                                                                                  ((ppn, pbmt, ext_ptw))))
+        end
+         : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (result ((mword ((if sv_width =?
+          32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))))
+      : MR (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) (result ((mword ((if sv_width =?
+       32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit)))).
 
 Definition update_and_write_pte
-(pteAddr : physaddr) (pteWidth : Z) (pte : mword (pteWidth * 8))
-(access : MemoryAccessType mem_payload) (*pteWidth >=? 0*) (*member_Z_list pteWidth [4; 8]*)
-: M (result (option (mword (pteWidth * 8))) PTW_Error) :=
+(sv_width : Z) (vpn : mword (sv_width - 12)) (pteAddr : physaddr)
+(pte : mword ((if sv_width =? 32 then 32 else 64))) (level : Z)
+(access : MemoryAccessType mem_payload) (priv : Privilege) (mxr : bool) (do_sum : bool)
+(ext_ptw : unit) (*member_Z_list sv_width [32; 39; 48; 57]*)
+(*(0 <=? level) &&
+  (level <=?
+    ((if sv_width =? 32 then 1 else ((if sv_width =? 39 then 2 else ((if sv_width =? 48 then 3 else 4)))))))*)
+: M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit))) :=
    match update_PTE_Bits (pte) (access) with
-   | None => returnM ((Ok (None)))
-   | Some pte =>
+   | None => returnM ((Ok ((None, ext_ptw))))
+   | Some _ =>
       (or_boolM
          ((and_boolM ((currentlyEnabled (Ext_Svadu))  : M (bool))
              (((read_reg menvcfg)  : M (mword 64)) >>= fun (w__1 : mword 64) =>
@@ -23409,15 +24214,43 @@ Definition update_and_write_pte
              ((currentlyEnabled (Ext_Svade)) >>= fun (w__4 : bool) =>
               returnM (((not (w__4))  : bool))))
           : M (bool))) >>= fun (w__6 : bool) =>
-      (if w__6 return M (result (option (mword (pteWidth * 8))) PTW_Error) then
-         (write_pte (pteAddr) (pteWidth) (pte)) >>= fun (w__7 : result bool ExceptionType) =>
-         let w__8 : result (option (mword (pteWidth * 8))) PTW_Error :=
-           match w__7 with | Ok _ => Ok ((Some (pte))) | Err _ => Err ((PTW_No_Access (tt))) end in
-         returnM (w__8)
-       else returnM ((Err ((PTW_PTE_Needs_Update (tt))))))
-       : M (result (option (mword (pteWidth * 8))) PTW_Error)
+      (if w__6
+         return
+         M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit)))
+       then
+         let pte_width := if Z.eqb (sv_width) (32) then 4 else 8 in
+         (read_pte_exclusive (pteAddr) (pte_width)) >>= fun (w__7 : result (mword (8 * pte_width)) ((physaddr * ExceptionType))) =>
+         match w__7 with
+         | Err _ => returnM ((Err ((PTW_No_Access (tt), ext_ptw))))
+         | Ok pte =>
+            (check_leaf_pte (sv_width) (vpn) (access) (priv) (mxr) (do_sum)
+               ((autocast (T := mword) 
+               pte)) (pteAddr) (level) (ext_ptw)) >>= fun (w__8 : result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) =>
+            match w__8 with
+            | Err (e, ext_ptw) => returnM ((Err ((e, ext_ptw))))
+            | Ok (_, _, ext_ptw) =>
+               match update_PTE_Bits (pte) (access) with
+               | None => returnM ((Ok ((Some ((autocast (T := mword)  pte)), ext_ptw))))
+               | Some pte =>
+                  (write_pte_conditional (pteAddr) (pte_width) ((autocast (T := mword)  pte))) >>= fun (w__9 : result bool ((physaddr * ExceptionType))) =>
+                  match w__9 with
+                  | Ok true => returnM ((Ok ((Some ((autocast (T := mword)  pte)), ext_ptw))))
+                  | Ok false =>
+                     (internal_error ("sys/vmem.sail") (226) ("PTE conditional write failed"))
+                      : M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit)))
+                  | Err _ => returnM ((Err ((PTW_No_Access (tt), ext_ptw))))
+                  end
+                   : M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit)))
+               end
+                : M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit)))
+            end
+             : M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit)))
+         end
+          : M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit)))
+       else returnM ((Err ((PTW_PTE_Needs_Update (tt), ext_ptw)))))
+       : M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit)))
    end
-    : M (result (option (mword (pteWidth * 8))) PTW_Error).
+    : M (result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit))).
 
 Fixpoint _rec_pt_walk
 (sv_width : Z) (vpn : mword (sv_width - 12)) (access : MemoryAccessType mem_payload)
@@ -23430,207 +24263,62 @@ Fixpoint _rec_pt_walk
 (_acc : Acc (Zwf 0) _reclimit)
 {struct _acc} : M (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))).
 exact (
-   catch_early_return
-     (liftR (assert_exp' (Z.geb (_reclimit) (0)) "recursion limit reached") >>= fun _ =>
-      let '(_) := (ptw_start_callback ((zero_extend' (64) (vpn))) (access) ((priv, tt)))  : unit in
-      let vpn_i_size := if Z.eqb ((__id (sv_width))) (32) then 10 else 9 in
-      let vpn_i :=
-        subrange_vec_dec (vpn) ((Z.sub ((Z.mul ((Z.add (level) (1))) (vpn_i_size))) (1)))
-          ((Z.mul (level) (vpn_i_size))) in
-      let log_pte_size_bytes := if Z.eqb ((__id (sv_width))) (32) then 2 else 3 in
-      let pte_addr :=
-        concat_vec (pt_base) ((concat_vec (vpn_i) ((zeros' ((__id (log_pte_size_bytes))))))) in
-      liftR (assert_exp' (orb ((Z.eqb (sv_width) (32))) ((Z.eqb (xlen) (64)))) "sys/vmem.sail:128.36-128.37") >>= fun _ =>
-      let pte_addr := Physaddr ((zero_extend' (64) (pte_addr))) in
-      liftR ((read_pte (pte_addr) ((pow2 (log_pte_size_bytes))))) >>= fun (w__0 : result (mword (8 * 2 ^ log_pte_size_bytes)) ExceptionType) =>
-      match w__0 with
-      | Err _ =>
-         let '(_) :=
-           (ptw_fail_callback ((PTW_No_Access (tt))) (level) ((bits_of_physaddr (pte_addr))))
-            : unit in
-         returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) ((Err
-                                                                                  ((PTW_No_Access
-                                                                                      (tt), ext_ptw))))
-      | Ok pte =>
-         let '(_) :=
-           (ptw_step_callback (level) ((bits_of_physaddr (pte_addr))) ((zero_extend' (64) (pte))))
-            : unit in
-         let pte_flags := Mk_PTE_Flags ((subrange_vec_dec (pte) (7) (0))) in
-         let pte_ext := ext_bits_of_PTE (pte) in
-         liftR ((pte_is_invalid (pte_flags) (pte_ext))) >>= fun (w__1 : bool) =>
-         (if w__1 then
-            let '(_) :=
-              (ptw_fail_callback ((PTW_Invalid_PTE (tt))) (level) ((bits_of_physaddr (pte_addr))))
-               : unit in
-            returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) ((Err
-                                                                                     ((PTW_Invalid_PTE
-                                                                                         (tt), ext_ptw))))
-          else
-            let ppn := PPN_of_PTE (pte) in
-            let global := orb (global) ((eq_vec ((_get_PTE_Flags_G (pte_flags))) (('b"1")))) in
-            (if pte_is_non_leaf (pte_flags)
-               return
-               MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)))
-             then
-               (if Z.gtb (level) (0)
-                  return
-                  MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)))
-                then
-                  liftR ((_rec_pt_walk (sv_width) (vpn) (access) (priv) (mxr) (do_sum)
-                            ((autocast (T := mword) 
-                            ppn)) ((Z.sub (level) (1))) (global) (ext_ptw) ((Z.sub (_reclimit) (1)))
-                            (_limit_reduces_bool _acc ltac:(assumption))))
-                   : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)))
-                else
-                  let '(_) :=
-                    (ptw_fail_callback ((PTW_Invalid_PTE (tt))) (level)
-                       ((bits_of_physaddr (pte_addr))))
-                     : unit in
-                  returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) ((Err
-                                                                                           ((PTW_Invalid_PTE
-                                                                                               (tt), ext_ptw)))))
-                : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)))
-             else
-               let ppn_size_bits := if Z.eqb ((__id (sv_width))) (32) then 10 else 9 in
-               (if Z.gtb (level) (0)
-                  return
-                  MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (unit) then
-                  let low_bits := Z.mul (ppn_size_bits) (level) in
-                  (if neq_vec ((subrange_vec_dec (ppn) ((Z.sub (low_bits) (1))) (0)))
-                        ((zeros'
-                            ((Z.add
-                                ((Z.sub
-                                    ((Z.sub
-                                        ((Z.mul ((if Z.eqb ((__id (sv_width))) (32) then 10 else 9))
-                                            ((__id (level))))) (1))) (0))) (1)))))
-                     return
-                     MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (unit) then
-                     let '(_) :=
-                       (ptw_fail_callback ((PTW_Misaligned (tt))) (level)
-                          ((bits_of_physaddr (pte_addr))))
-                        : unit in
-                     (early_return ((Err ((PTW_Misaligned (tt), ext_ptw)))
-                      : result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) :
-                       MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) unit)
-                      : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (unit)
-                   else returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (tt))
-                   : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (unit)
-                else returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (tt)) >>
-               liftR ((check_PTE_permission (access) (priv) (mxr) (do_sum) (pte_flags) (pte_ext)
-                         (ext_ptw))) >>= fun (w__4 : PTE_Check) =>
-               match w__4 with
-               | PTE_Check_Failure (ext_ptw, pte_failure) =>
-                  let '(_) :=
-                    (ptw_fail_callback ((ext_get_ptw_error (pte_failure))) (level)
-                       ((bits_of_physaddr (pte_addr))))
-                     : unit in
-                  returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) ((Err
-                                                                                           ((ext_get_ptw_error
-                                                                                               (pte_failure), ext_ptw))))
-               | PTE_Check_Success ext_ptw =>
-                  (if Z.gtb (level) (0)
-                     return
-                     MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (mword ((if (8 * 2 ^ log_pte_size_bytes) =?
-                       32 then 22 else 44) - 1 - (if sv_width =? 32 then 10 else 9) * level + 1 + ((if sv_width =?
-                       32 then 10 else 9) * level - 1 - 0 + 1))) then
-                     if eq_vec ((_get_PTE_Ext_N (pte_ext))) (('b"1"))
-                       return
-                       MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (mword ((if (8 * 2 ^ log_pte_size_bytes) =?
-                         32 then 22 else 44) - 1 - (if sv_width =? 32 then 10 else 9) * level + 1 + ((if sv_width =?
-                         32 then 10 else 9) * level - 1 - 0 + 1))) then
-                       (early_return ((Err ((PTW_Invalid_PTE (tt), ext_ptw)))
-                        : result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) :
-                         MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (mword ((if (8 * 2 ^ log_pte_size_bytes) =?
-                           32 then 22 else 44) - 1 - (if sv_width =? 32 then 10 else 9) * level + 1 + ((if sv_width =?
-                           32 then 10 else 9) * level - 1 - 0 + 1))))
-                     else
-                       let low_bits := Z.mul (ppn_size_bits) (level) in
-                       returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) ((concat_vec
-                                                                                                ((subrange_vec_dec
-                                                                                                    (ppn)
-                                                                                                    ((Z.sub
-                                                                                                        ((length_mword
-                                                                                                            (ppn)))
-                                                                                                        (1)))
-                                                                                                    (low_bits)))
-                                                                                                ((subrange_vec_dec
-                                                                                                    (vpn)
-                                                                                                    ((Z.sub
-                                                                                                        (low_bits)
-                                                                                                        (1)))
-                                                                                                    (0)))))
-                   else
-                     (and_boolM
-                        (liftR ((currentlyEnabled (Ext_Svnapot)))
-                         : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (bool))
-                        (returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (((eq_vec
-                                                                                                   ((_get_PTE_Ext_N
-                                                                                                       (pte_ext)))
-                                                                                                   (('b"1")))
-                          : bool)))) >>= fun (w__8 : bool) =>
-                     if w__8
-                       return
-                       MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (mword ((if (8 * 2 ^ log_pte_size_bytes) =?
-                         32 then 22 else 44) - 1 - (if sv_width =? 32 then 10 else 9) * level + 1 + ((if sv_width =?
-                         32 then 10 else 9) * level - 1 - 0 + 1))) then
-                       let pte_napot_bits := 4 in
-                       if neq_vec ((subrange_vec_dec (ppn) ((Z.sub (pte_napot_bits) (1))) (0)))
-                            (('b"1000"))
-                         return
-                         MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (mword ((if (8 * 2 ^ log_pte_size_bytes) =?
-                           32 then 22 else 44) - 1 - (if sv_width =? 32 then 10 else 9) * level + 1 + ((if sv_width =?
-                           32 then 10 else 9) * level - 1 - 0 + 1))) then
-                         (early_return ((Err ((PTW_Invalid_PTE (tt), ext_ptw)))
-                          : result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) :
-                           MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (mword ((if (8 * 2 ^ log_pte_size_bytes) =?
-                             32 then 22 else 44) - 1 - (if sv_width =? 32 then 10 else 9) * level + 1 + ((if sv_width =?
-                             32 then 10 else 9) * level - 1 - 0 + 1))))
-                       else
-                         returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) ((update_subrange_vec_dec
-                                                                                                  ((autocast (T := mword) 
-                                                                                                  ppn))
-                                                                                                  ((Z.sub
-                                                                                                      (pte_napot_bits)
-                                                                                                      (1)))
-                                                                                                  (0)
-                                                                                                  ((subrange_vec_dec
-                                                                                                      (vpn)
-                                                                                                      ((Z.sub
-                                                                                                          (pte_napot_bits)
-                                                                                                          (1)))
-                                                                                                      (0)))))
-                     else
-                       returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) ((autocast (T := mword) 
-                       ppn))) >>= fun ppn =>
-                  ((liftR (read_reg menvcfg))
-                    : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (mword 64)) >>= fun (w__12 : mword 64) =>
-                  (if eq_vec ((_get_MEnvcfg_PBMTE (w__12))) (('b"0")) then
-                     returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (PBMT_PMA)
-                   else
-                     liftR ((page_based_mem_type_forwards ((_get_PTE_Ext_PBMT (pte_ext)))))
-                      : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (page_based_mem_type)) >>= fun pbmt =>
-                  let '(_) := (ptw_success_callback ((zero_extend' (64) (ppn))) (level))  : unit in
-                  returnR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) ((Ok
-                                                                                           (({| PTW_Output_ppn :=
-                                                                                                  autocast (T := mword) 
-                                                                                                  ppn;
-                                                                                                PTW_Output_pte :=
-                                                                                                  autocast (T := mword) 
-                                                                                                  pte;
-                                                                                                PTW_Output_pteAddr :=
-                                                                                                  pte_addr;
-                                                                                                PTW_Output_level :=
-                                                                                                  level;
-                                                                                                PTW_Output_pbmt :=
-                                                                                                  pbmt;
-                                                                                                PTW_Output_global :=
-                                                                                                  global |}, ext_ptw))))
-               end
-                : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))))
-             : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))))
-          : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)))
-      end
-       : MR (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))))
+   assert_exp' (Z.geb (_reclimit) (0)) "recursion limit reached" >>= fun _ =>
+   let '(_) := (ptw_start_callback ((zero_extend' (64) (vpn))) (access) ((priv, tt)))  : unit in
+   let vpn_i_size := if Z.eqb ((__id (sv_width))) (32) then 10 else 9 in
+   let vpn_i :=
+     subrange_vec_dec (vpn) ((Z.sub ((Z.mul ((Z.add (level) (1))) (vpn_i_size))) (1)))
+       ((Z.mul (level) (vpn_i_size))) in
+   let log_pte_size_bytes := if Z.eqb ((__id (sv_width))) (32) then 2 else 3 in
+   let pte_addr :=
+     concat_vec (pt_base) ((concat_vec (vpn_i) ((zeros' ((__id (log_pte_size_bytes))))))) in
+   assert_exp' (orb ((Z.eqb (sv_width) (32))) ((Z.eqb (xlen) (64)))) "sys/vmem.sail:277.36-277.37" >>= fun _ =>
+   let pte_addr := Physaddr ((zero_extend' (64) (pte_addr))) in
+   (read_pte (pte_addr) ((pow2 (log_pte_size_bytes)))) >>= fun (w__0 : result (mword (8 * 2 ^ log_pte_size_bytes)) ((physaddr * ExceptionType))) =>
+   match w__0 with
+   | Err _ =>
+      let '(_) :=
+        (ptw_fail_callback ((PTW_No_Access (tt))) (level) ((bits_of_physaddr (pte_addr))))
+         : unit in
+      returnM ((Err ((PTW_No_Access (tt), ext_ptw))))
+   | Ok pte =>
+      let '(_) :=
+        (ptw_step_callback (level) ((bits_of_physaddr (pte_addr))) ((zero_extend' (64) (pte))))
+         : unit in
+      let pte_flags := Mk_PTE_Flags ((subrange_vec_dec (pte) (7) (0))) in
+      let global := orb (global) ((eq_vec ((_get_PTE_Flags_G (pte_flags))) (('b"1")))) in
+      (and_boolM
+         ((pte_is_invalid (pte_flags) ((ext_bits_of_PTE (pte)))) >>= fun (w__1 : bool) =>
+          returnM (((not (w__1))  : bool)))
+         (returnM ((andb ((pte_is_non_leaf (pte_flags))) ((Z.gtb (level) (0))))))) >>= fun w__2 =>
+      (if w__2 return M (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit))) then
+         let ppn := PPN_of_PTE (pte) in
+         (_rec_pt_walk (sv_width) (vpn) (access) (priv) (mxr) (do_sum)
+            ((autocast (T := mword) 
+            ppn)) ((Z.sub (level) (1))) (global) (ext_ptw) ((Z.sub (_reclimit) (1)))
+            (_limit_reduces_bool _acc ltac:(assumption)))
+          : M (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)))
+       else
+         (check_leaf_pte (sv_width) (vpn) (access) (priv) (mxr) (do_sum)
+            ((autocast (T := mword) 
+            pte)) (pte_addr) (level) (ext_ptw)) >>= fun (w__4 : result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit))) =>
+         let w__5 : result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)) :=
+           match w__4 with
+           | Err (e, ext_ptw) => Err ((e, ext_ptw))
+           | Ok (ppn, pbmt, ext_ptw) =>
+              let '(_) := (ptw_success_callback ((zero_extend' (64) (ppn))) (level))  : unit in
+              Ok
+                (({| PTW_Output_ppn := ppn;
+                     PTW_Output_pte := autocast (T := mword)  pte;
+                     PTW_Output_pteAddr := pte_addr;
+                     PTW_Output_level := level;
+                     PTW_Output_pbmt := pbmt;
+                     PTW_Output_global := global |}, ext_ptw))
+           end in
+         returnM (w__5))
+       : M (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)))
+   end
+    : M (result ((PTW_Output sv_width * unit)) ((PTW_Error * unit)))
 ).
 Defined.
 
@@ -23668,19 +24356,19 @@ Definition translationMode (priv : Privilege) : M (SATPMode) :=
       (architecture (Supervisor)) >>= fun arch =>
       match arch with
       | RV64 =>
-         assert_exp' (Z.geb (xlen) (64)) "sys/vmem.sail:254.25-254.26" >>= fun _ =>
+         assert_exp' (Z.geb (xlen) (64)) "sys/vmem.sail:355.25-355.26" >>= fun _ =>
          ((read_reg satp)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
          returnM ((_get_Satp64_Mode ((Mk_Satp64 (w__0)))))
       | RV32 =>
          ((read_reg satp)  : M (mword 64)) >>= fun (w__1 : mword 64) =>
          returnM ((concat_vec (('b"000"))
                      ((_get_Satp32_Mode ((Mk_Satp32 ((subrange_vec_dec (w__1) (31) (0)))))))))
-      | RV128 => (internal_error ("sys/vmem.sail") (258) ("RV128 not supported"))  : M (mword 4)
+      | RV128 => (internal_error ("sys/vmem.sail") (359) ("RV128 not supported"))  : M (mword 4)
       end >>= fun (mbits : satp_mode) =>
       match satpMode_of_bits (arch) (mbits) with
       | Some m => returnM (m)
       | None =>
-         (internal_error ("sys/vmem.sail") (263) ("invalid translation mode in satp"))
+         (internal_error ("sys/vmem.sail") (364) ("invalid translation mode in satp"))
           : M (SATPMode)
       end
        : M (SATPMode))
@@ -23702,18 +24390,20 @@ M (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * 
    | PTE_Check_Failure (ext_ptw, pte_failure) =>
       returnM ((Err ((ext_get_ptw_error (pte_failure), ext_ptw))))
    | PTE_Check_Success ext_ptw =>
-      (update_and_write_pte (ent.(TLB_Entry_pteAddr)) (pte_size) (pte) (access)) >>= fun (w__0 : result (option (mword ((if sv_width =?
-        32 then 4 else 8) * 8))) PTW_Error) =>
+      (update_and_write_pte (sv_width) (vpn) (ent.(TLB_Entry_pteAddr))
+         ((autocast (T := mword) 
+         pte)) ((tlb_get_level (sv_width) (ent))) (access) (priv) (mxr) (do_sum) (ext_ptw)) >>= fun (w__0 : result ((option (mword ((if sv_width =?
+        32 then 32 else 64))) * unit)) ((PTW_Error * unit))) =>
       match w__0 with
-      | Ok (Some pte) =>
-         (write_TLB (tlb_index) ((tlb_set_pte (ent) (pte)))) >>
+      | Ok (Some pte, ext_ptw) =>
+         (write_TLB (tlb_index)
+            ((tlb_set_pte (ent) (((autocast (T := mword)  pte)  : bits (pte_size * 8)))))) >>
          (tlb_get_pbmt (ent)) >>= fun (w__1 : page_based_mem_type) =>
          returnM ((Ok ((tlb_get_ppn (sv_width) (ent) (vpn), w__1, ext_ptw))))
-      | Ok None =>
+      | Ok (None, ext_ptw) =>
          (tlb_get_pbmt (ent)) >>= fun (w__2 : page_based_mem_type) =>
          returnM ((Ok ((tlb_get_ppn (sv_width) (ent) (vpn), w__2, ext_ptw))))
-      | Err (PTW_PTE_Needs_Update tt) => returnM ((Err ((PTW_PTE_Needs_Update (tt), ext_ptw))))
-      | Err e => returnM ((Err ((e, ext_ptw))))
+      | Err (e, ext_ptw) => returnM ((Err ((e, ext_ptw))))
       end
        : M (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit)))
    end
@@ -23731,24 +24421,22 @@ M (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * 
      else if Z.eqb ((__id (sv_width))) (39) then 2
      else if Z.eqb ((__id (sv_width))) (48) then 3
      else 4 in
-   let pte_size := if Z.eqb (sv_width) (32) then 4 else 8 in
    (pt_walk (sv_width) (vpn) (access) (priv) (mxr) (do_sum) (base_ppn) (initial_level) (false)
       (ext_ptw)) >>= fun ptw_result =>
    match ptw_result with
    | Err (f, ext_ptw) => returnM ((Err ((f, ext_ptw))))
    | Ok
      ({| PTW_Output_ppn := ppn; PTW_Output_pte := pte; PTW_Output_pteAddr := pteAddr; PTW_Output_level := level; PTW_Output_pbmt := pbmt; PTW_Output_global := global |}, ext_ptw) =>
-      let ext_pte := ext_bits_of_PTE (pte) in
-      (update_and_write_pte (pteAddr) (pte_size) ((autocast (T := mword)  pte)) (access)) >>= fun (w__0 : result (option (mword (pte_size * 8))) PTW_Error) =>
+      (update_and_write_pte (sv_width) (vpn) (pteAddr) (pte) (level) (access) (priv) (mxr) (do_sum)
+         (ext_ptw)) >>= fun (w__0 : result ((option (mword ((if sv_width =? 32 then 32 else 64))) * unit)) ((PTW_Error * unit))) =>
       match w__0 with
-      | Ok (Some new_pte) =>
-         (add_to_TLB (sv_width) (asid) (vpn) (ppn) ((autocast (T := mword)  new_pte)) (pteAddr)
-            (level) (global)) >>
+      | Ok (Some new_pte, ext_ptw) =>
+         (add_to_TLB (sv_width) (asid) (vpn) (ppn) (new_pte) (pteAddr) (level) (global)) >>
          returnM ((Ok ((ppn, pbmt, ext_ptw))))
-      | Ok None =>
+      | Ok (None, ext_ptw) =>
          (add_to_TLB (sv_width) (asid) (vpn) (ppn) (pte) (pteAddr) (level) (global)) >>
          returnM ((Ok ((ppn, pbmt, ext_ptw))))
-      | Err e => returnM ((Err ((e, ext_ptw))))
+      | Err (e, ext_ptw) => returnM ((Err ((e, ext_ptw))))
       end
        : M (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * unit)) ((PTW_Error * unit)))
    end
@@ -23805,7 +24493,7 @@ M (result ((mword ((if sv_width =? 32 then 22 else 44)) * page_based_mem_type * 
 
 Definition get_satp (sv_width : Z) (*member_Z_list sv_width [32; 39; 48; 57]*)
 : M (mword ((if sv_width =? 32 then 32 else 64))) :=
-   assert_exp' (orb ((Z.eqb ((__id (sv_width))) (32))) ((Z.eqb (xlen) (64)))) "sys/vmem.sail:395.30-395.31" >>= fun _ =>
+   assert_exp' (orb ((Z.eqb ((__id (sv_width))) (32))) ((Z.eqb (xlen) (64)))) "sys/vmem.sail:501.30-501.31" >>= fun _ =>
    (if Z.eqb (sv_width) (32) return M (mword ((if sv_width =? 32 then 32 else 64))) then
       ((read_reg satp)  : M (mword 64)) >>= fun (w__0 : mword 64) =>
       returnM ((autocast (T := mword) (subrange_vec_dec (w__0) (31) (0))))
@@ -23847,7 +24535,7 @@ Definition translateAddr (vAddr : virtaddr) (access : MemoryAccessType mem_paylo
       else
         liftR ((satp_mode_width_forwards (mode))) >>= fun sv_width =>
         liftR ((get_satp (sv_width))) >>= fun satp_sxlen =>
-        liftR (assert_exp' (orb ((Z.eqb (sv_width) (32))) ((Z.eqb (xlen) (64)))) "sys/vmem.sail:431.36-431.37") >>= fun _ =>
+        liftR (assert_exp' (orb ((Z.eqb (sv_width) (32))) ((Z.eqb (xlen) (64)))) "sys/vmem.sail:537.36-537.37") >>= fun _ =>
         let svAddr := subrange_vec_dec ((bits_of_virtaddr (vAddr))) ((Z.sub (sv_width) (1))) (0) in
         (if neq_vec ((bits_of_virtaddr (vAddr))) ((sign_extend' (64) (svAddr)))
            return
@@ -23901,37 +24589,19 @@ Definition trap (exc : sync_exception) : M (ExecutionResult) :=
 Definition memory_exception (vaddr : virtaddr) (exc : ExceptionType) : M (ExecutionResult) :=
    (trap ((make_sync_exception (exc) ((bits_of_virtaddr (vaddr))))))  : M (ExecutionResult).
 
-Definition sys_misaligned_order_decreasing : bool := false.
-#[export] Hint Unfold sys_misaligned_order_decreasing : sail.
-Definition sys_misaligned_byte_by_byte : bool := false.
-#[export] Hint Unfold sys_misaligned_byte_by_byte : sail.
-Definition sys_misaligned_allowed_within_exp := 0  : Z.
-#[export] Hint Unfold sys_misaligned_allowed_within_exp : sail.
-Definition split_misaligned (vaddr : virtaddr) (width : Z) (*member_Z_list width [1; 2; 4; 8]*)
-: M ((Z * Z)) :=
-   let vaddr_bits := bits_of_virtaddr (vaddr) in
-   (if orb ((is_aligned_vaddr (vaddr) (width)))
-         ((allowed_misaligned (vaddr_bits) (width) (sys_misaligned_allowed_within_exp))) then
-      returnM ((1, width))
-    else if sys_misaligned_byte_by_byte then returnM ((width, 1))
-    else
-      let bytes_per_access := pow2 ((count_trailing_zeros (vaddr_bits))) in
-      let num_accesses := Z.quot (width) (bytes_per_access) in
-      assert_exp' (Z.eqb (width) ((Z.mul (num_accesses) (bytes_per_access)))) "sys/vmem_utils.sail:63.51-63.52" >>= fun _ =>
-      returnM ((num_accesses, bytes_per_access)))
-    : M ((Z * Z)).
-
-Definition misaligned_order (n : Z) : (Z * Z * Z) :=
-   if sys_misaligned_order_decreasing then ((Z.sub (n) (1), 0, Z.opp (1)))
-   else ((0, Z.sub (n) (1), 1)).
-
 Definition plat_misaligned_exception (access : MemoryAccessType mem_payload) (res : bool)
-: M (option misaligned_exception) :=
-   assert_exp (not ((is_amo_access (access)))) "sys/vmem_utils.sail:85.35-85.36" >>
-   returnM ((if res then Some (plat_misaligned_access.(GlobalMisalignedExceptions_lrsc))
-             else if is_vector_access (access) then
-               plat_misaligned_access.(GlobalMisalignedExceptions_vector)
-             else plat_misaligned_access.(GlobalMisalignedExceptions_load_store))).
+: option misaligned_exception :=
+   if is_amo_access (access) then plat_misaligned_access.(GlobalMisalignedExceptions_amo)
+   else if res then Some (plat_misaligned_access.(GlobalMisalignedExceptions_lrsc))
+   else if is_vector_access (access) then plat_misaligned_access.(GlobalMisalignedExceptions_vector)
+   else plat_misaligned_access.(GlobalMisalignedExceptions_load_store).
+
+Definition offset_virtaddr_by
+'((Virtaddr base_vaddr) : virtaddr) '((Physaddr base_paddr) : physaddr)
+'((Physaddr exc_paddr) : physaddr)
+: virtaddr :=
+   let offset := subrange_vec_dec ((sub_vec (exc_paddr) (base_paddr))) ((Z.sub (xlen) (1))) (0) in
+   Virtaddr ((add_vec (base_vaddr) (offset))).
 
 Definition transform_effective_address (vaddr : virtaddr) (access : MemoryAccessType mem_payload)
 : M (virtaddr) :=
@@ -23943,6 +24613,27 @@ Definition transform_effective_address (vaddr : virtaddr) (access : MemoryAccess
    returnM ((if generic_eq (mode) (Bare) then pm_transform_PA (vaddr) (pmlen)
              else pm_transform_VA (vaddr) (pmlen))).
 
+Definition translate_and_read_value
+(vaddr : virtaddr) (width : Z) (access : MemoryAccessType mem_payload) (aq : bool) (rl : bool)
+(res : bool) (*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
+: M (result ((physaddr * mword (8 * width))) ExecutionResult) :=
+   (translateAddr (vaddr) (access)) >>= fun (w__0 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
+   match w__0 with
+   | Err (e, _) =>
+      (memory_exception (vaddr) (e)) >>= fun (w__1 : ExecutionResult) => returnM ((Err (w__1)))
+   | Ok (paddr, pbmt, _) =>
+      (mem_read (access) (pbmt) (paddr) (width) (aq) (rl) (res)) >>= fun (w__2 : result (mword (8 * width)) ((physaddr * ExceptionType))) =>
+      match w__2 with
+      | Err (exc_paddr, e) =>
+         let exc_vaddr := offset_virtaddr_by (vaddr) (paddr) (exc_paddr) in
+         (memory_exception (exc_vaddr) (e)) >>= fun (w__3 : ExecutionResult) =>
+         returnM ((Err (w__3)))
+      | Ok v => returnM ((Ok ((paddr, v))))
+      end
+       : M (result ((physaddr * mword (8 * width))) ExecutionResult)
+   end
+    : M (result ((physaddr * mword (8 * width))) ExecutionResult).
+
 Definition vmem_read_addr
 (vaddr : virtaddr) (width : Z) (access : MemoryAccessType mem_payload) (aq : bool) (rl : bool)
 (res : bool) (*width >=? 0*) (*member_Z_list width [1; 2; 4; 8]*)
@@ -23951,17 +24642,16 @@ Definition vmem_read_addr
      ((if not ((is_aligned_vaddr (vaddr) (width)))
          return
          MR (result (mword (8 * width)) ExecutionResult) (unit) then
-         liftR ((plat_misaligned_exception (access) (res))) >>= fun (w__0 : option misaligned_exception) =>
-         match w__0 with
+         match plat_misaligned_exception (access) (res) with
          | Some AccessFault =>
-            liftR ((memory_exception (vaddr) ((E_Load_Access_Fault (tt))))) >>= fun (w__1 : ExecutionResult) =>
-            (early_return ((Err (w__1))
+            liftR ((memory_exception (vaddr) ((E_Load_Access_Fault (tt))))) >>= fun (w__0 : ExecutionResult) =>
+            (early_return ((Err (w__0))
              : result (mword (8 * width)) ExecutionResult) :
               MR (result (mword (8 * width)) ExecutionResult) unit)
              : MR (result (mword (8 * width)) ExecutionResult) (unit)
          | Some AlignmentException =>
-            liftR ((memory_exception (vaddr) ((E_Load_Addr_Align (tt))))) >>= fun (w__2 : ExecutionResult) =>
-            (early_return ((Err (w__2))
+            liftR ((memory_exception (vaddr) ((E_Load_Addr_Align (tt))))) >>= fun (w__1 : ExecutionResult) =>
+            (early_return ((Err (w__1))
              : result (mword (8 * width)) ExecutionResult) :
               MR (result (mword (8 * width)) ExecutionResult) unit)
              : MR (result (mword (8 * width)) ExecutionResult) (unit)
@@ -23969,62 +24659,108 @@ Definition vmem_read_addr
          end
           : MR (result (mword (8 * width)) ExecutionResult) (unit)
        else returnR (result (mword (8 * width)) ExecutionResult) (tt)) >>
-     liftR ((split_misaligned (vaddr) (width))) >>= fun '((n, bytes)) =>
-     let data := zeros' ((Z.mul ((Z.mul (8) (n))) (bytes))) in
-     let '((first, last, step)) := misaligned_order (n) in
-     let i : Z := first in
-     let finished : bool := false in
-     let vaddr := bits_of_virtaddr (vaddr) in
-     (untilMT
-       (data, finished, i)
-       (fun '(data, finished, i) => n)
-       (fun '(data, finished, i) => returnR (result (mword (8 * width)) ExecutionResult) (finished))
-       (fun '(data, finished, i) =>
-         (liftR (assert_exp' true "loop dummy assert") >>= fun _ =>
-          let offset := i in
-          let vaddr := add_vec_int (vaddr) ((Z.mul (offset) (bytes))) in
-          liftR ((translateAddr ((Virtaddr (vaddr))) (access))) >>= fun (w__3 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
-          match w__3 with
-          | Err (e, _) =>
-             liftR ((memory_exception ((Virtaddr (vaddr))) (e))) >>= fun (w__4 : ExecutionResult) =>
-             (early_return ((Err (w__4))
-              : result (mword (8 * width)) ExecutionResult) :
-               MR (result (mword (8 * width)) ExecutionResult) unit) >>
-             returnR (result (mword (8 * width)) ExecutionResult) (data)
-          | Ok (paddr, pbmt, _) =>
-             liftR ((mem_read (access) (pbmt) (paddr) (bytes) (aq) (rl) (res))) >>= fun (w__5 : result (mword (8 * bytes)) ExceptionType) =>
-             match w__5 with
-             | Err e =>
-                liftR ((memory_exception ((Virtaddr (vaddr))) (e))) >>= fun (w__6 : ExecutionResult) =>
-                (early_return ((Err (w__6))
-                 : result (mword (8 * width)) ExecutionResult) :
-                  MR (result (mword (8 * width)) ExecutionResult) unit) >>
-                returnR (result (mword (8 * width)) ExecutionResult) (data)
-             | Ok v =>
-                (if res return MR (result (mword (8 * width)) ExecutionResult) (unit) then
-                   liftR ((load_reservation ((bits_of_physaddr (paddr))) (width)))
-                    : MR (result (mword (8 * width)) ExecutionResult) (unit)
-                 else returnR (result (mword (8 * width)) ExecutionResult) (tt)) >>
-                let data : mword (8 * n * bytes) :=
-                  update_subrange_vec_dec (data)
-                    ((Z.sub ((Z.mul ((Z.mul (8) ((Z.add (offset) (1))))) (bytes))) (1)))
-                    ((Z.mul ((Z.mul (8) (offset))) (bytes))) ((autocast (T := mword)  v)) in
-                returnR (result (mword (8 * width)) ExecutionResult) (data)
-             end
-              : MR (result (mword (8 * width)) ExecutionResult) (mword (8 * n * bytes))
-          end >>= fun (data : mword (8 * n * bytes)) =>
-          let '((finished, i)) :=
-            (if Z.eqb (offset) (last) then
-               let finished : bool := true in
-               (finished, i)
-             else
-               let i : Z := Z.add (offset) (step) in
-               (finished, i))
-             : (bool * Z) in
-          returnR (result (mword (8 * width)) ExecutionResult) ((data, finished, i)))
-          : MR (result (mword (8 * width)) ExecutionResult) ((mword (8 * n * bytes) * bool * Z)))) >>= fun '((data, finished, i)
-     : (mword (8 * n * bytes) * bool * Z)) =>
-     returnR (result (mword (8 * width)) ExecutionResult) ((Ok ((autocast (T := mword)  data))))).
+     let vaddr_bits := bits_of_virtaddr (vaddr) in
+     liftR ((split_on_page_boundary (vaddr_bits) (width))) >>= fun '((in_page_bytes, next_page_bytes)) =>
+     let data := zeros' ((Z.mul (8) (width))) in
+     ((liftR (read_reg mstatus))  : MR (result (mword (8 * width)) ExecutionResult) (mword 64)) >>= fun (w__2 : mword 64) =>
+     liftR (read_reg cur_privilege) >>= fun (w__3 : Privilege) =>
+     liftR ((effectivePrivilege (access) (w__2) (w__3))) >>= fun effPriv =>
+     (and_boolM
+        (liftR ((translationMode (effPriv))) >>= fun (w__4 : SATPMode) =>
+         returnR (result (mword (8 * width)) ExecutionResult) (((generic_neq (w__4) (Bare))
+          : bool)))
+        (returnR (result (mword (8 * width)) ExecutionResult) ((Z.gtb (next_page_bytes) (0))))) >>= fun do_split_access =>
+     (if andb (sys_misaligned_order_decreasing) (do_split_access)
+        return
+        MR (result (mword (8 * width)) ExecutionResult) (mword (8 * width)) then
+        liftR (assert_exp' (not (res)) "sys/vmem_utils.sail:118.19-118.20") >>= fun _ =>
+        let access_addr := Virtaddr ((add_vec_int (vaddr_bits) (in_page_bytes))) in
+        liftR ((translate_and_read_value (access_addr) (next_page_bytes) (access) (aq) (rl) (res))) >>= fun w__5 =>
+        match w__5 with
+        | Err e =>
+           (early_return ((Err (e))
+            : result (mword (8 * width)) ExecutionResult) :
+             MR (result (mword (8 * width)) ExecutionResult) unit) >>
+           returnR (result (mword (8 * width)) ExecutionResult) (data)
+        | Ok (_, v) =>
+           let data : mword (8 * width) :=
+             update_subrange_vec_dec (data) ((Z.sub ((Z.mul (8) (width))) (1)))
+               ((Z.mul (8) (in_page_bytes))) ((autocast (T := mword)  v)) in
+           returnR (result (mword (8 * width)) ExecutionResult) (data)
+        end
+         : MR (result (mword (8 * width)) ExecutionResult) (mword (8 * width))
+      else returnR (result (mword (8 * width)) ExecutionResult) (data)) >>= fun (data : mword (8 * width)) =>
+     let access_width := if do_split_access then in_page_bytes else width in
+     liftR ((translate_and_read_value (vaddr) (access_width) (access) (aq) (rl) (res))) >>= fun w__6 =>
+     match w__6 with
+     | Err e =>
+        (early_return ((Err (e))
+         : result (mword (8 * width)) ExecutionResult) :
+          MR (result (mword (8 * width)) ExecutionResult) unit) >>
+        returnR (result (mword (8 * width)) ExecutionResult) (data)
+     | Ok (paddr, v) =>
+        (if res return MR (result (mword (8 * width)) ExecutionResult) (unit) then
+           liftR (assert_exp' (Z.eqb (width) (access_width)) "sys/vmem_utils.sail:136.36-136.37") >>= fun _ =>
+           liftR ((load_reservation ((bits_of_physaddr (paddr))) (width)))
+            : MR (result (mword (8 * width)) ExecutionResult) (unit)
+         else returnR (result (mword (8 * width)) ExecutionResult) (tt)) >>
+        let data : mword (8 * width) :=
+          update_subrange_vec_dec (data) ((Z.sub ((Z.mul (8) (access_width))) (1))) (0)
+            ((autocast (T := mword) 
+            v)) in
+        returnR (result (mword (8 * width)) ExecutionResult) (data)
+     end >>= fun (data : mword (8 * width)) =>
+     (if andb ((not (sys_misaligned_order_decreasing))) (do_split_access)
+        return
+        MR (result (mword (8 * width)) ExecutionResult) (mword (8 * width)) then
+        liftR (assert_exp' (not (res)) "sys/vmem_utils.sail:145.19-145.20") >>= fun _ =>
+        let access_addr := Virtaddr ((add_vec_int (vaddr_bits) (in_page_bytes))) in
+        liftR ((translate_and_read_value (access_addr) (next_page_bytes) (access) (aq) (rl) (res))) >>= fun w__7 =>
+        match w__7 with
+        | Err e =>
+           (early_return ((Err (e))
+            : result (mword (8 * width)) ExecutionResult) :
+             MR (result (mword (8 * width)) ExecutionResult) unit) >>
+           returnR (result (mword (8 * width)) ExecutionResult) (data)
+        | Ok (_, v) =>
+           let data : mword (8 * width) :=
+             update_subrange_vec_dec (data) ((Z.sub ((Z.mul (8) (width))) (1)))
+               ((Z.mul (8) (in_page_bytes))) ((autocast (T := mword)  v)) in
+           returnR (result (mword (8 * width)) ExecutionResult) (data)
+        end
+         : MR (result (mword (8 * width)) ExecutionResult) (mword (8 * width))
+      else returnR (result (mword (8 * width)) ExecutionResult) (data)) >>= fun (data : mword (8 * width)) =>
+     returnR (result (mword (8 * width)) ExecutionResult) ((Ok (data)))).
+
+Definition translate_and_write_value
+(vaddr : virtaddr) (width : Z) (value : mword (8 * width)) (access : MemoryAccessType mem_payload)
+(aq : bool) (rl : bool) (res : bool) (*width >=? 0*) (*(0 <? width) && (width <=? 4096)*)
+: M (result bool ExecutionResult) :=
+   (translateAddr (vaddr) (access)) >>= fun (w__0 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
+   match w__0 with
+   | Err (e, _) =>
+      (memory_exception (vaddr) (e)) >>= fun (w__1 : ExecutionResult) => returnM ((Err (w__1)))
+   | Ok (paddr, pbmt, _) =>
+      (mem_write_ea (paddr) (width) (access) (pbmt) (aq) (rl) (res)) >>= fun (w__2 : result unit ((physaddr * ExceptionType))) =>
+      match w__2 with
+      | Err (exc_paddr, e) =>
+         let exc_vaddr := offset_virtaddr_by (vaddr) (paddr) (exc_paddr) in
+         (memory_exception (exc_vaddr) (e)) >>= fun (w__3 : ExecutionResult) =>
+         returnM ((Err (w__3)))
+      | Ok tt =>
+         (mem_write_value (paddr) (width) (value) (access) (pbmt) (aq) (rl) (res)) >>= fun (w__4 : result bool ((physaddr * ExceptionType))) =>
+         match w__4 with
+         | Err (exc_paddr, e) =>
+            let exc_vaddr := offset_virtaddr_by (vaddr) (paddr) (exc_paddr) in
+            (memory_exception (exc_vaddr) (e)) >>= fun (w__5 : ExecutionResult) =>
+            returnM ((Err (w__5)))
+         | Ok s => returnM ((Ok (s)))
+         end
+          : M (result bool ExecutionResult)
+      end
+       : M (result bool ExecutionResult)
+   end
+    : M (result bool ExecutionResult).
 
 Definition vmem_write_addr
 (vaddr : virtaddr) (width : Z) (data : mword (8 * width)) (access : MemoryAccessType mem_payload)
@@ -24034,17 +24770,16 @@ Definition vmem_write_addr
      ((if not ((is_aligned_vaddr (vaddr) (width)))
          return
          MR (result bool ExecutionResult) (unit) then
-         liftR ((plat_misaligned_exception (access) (res))) >>= fun (w__0 : option misaligned_exception) =>
-         match w__0 with
+         match plat_misaligned_exception (access) (res) with
          | Some AccessFault =>
-            liftR ((memory_exception (vaddr) ((E_SAMO_Access_Fault (tt))))) >>= fun (w__1 : ExecutionResult) =>
-            (early_return ((Err (w__1))
+            liftR ((memory_exception (vaddr) ((E_SAMO_Access_Fault (tt))))) >>= fun (w__0 : ExecutionResult) =>
+            (early_return ((Err (w__0))
              : result bool ExecutionResult) :
               MR (result bool ExecutionResult) unit)
              : MR (result bool ExecutionResult) (unit)
          | Some AlignmentException =>
-            liftR ((memory_exception (vaddr) ((E_SAMO_Addr_Align (tt))))) >>= fun (w__2 : ExecutionResult) =>
-            (early_return ((Err (w__2))
+            liftR ((memory_exception (vaddr) ((E_SAMO_Addr_Align (tt))))) >>= fun (w__1 : ExecutionResult) =>
+            (early_return ((Err (w__1))
              : result bool ExecutionResult) :
               MR (result bool ExecutionResult) unit)
              : MR (result bool ExecutionResult) (unit)
@@ -24052,90 +24787,120 @@ Definition vmem_write_addr
          end
           : MR (result bool ExecutionResult) (unit)
        else returnR (result bool ExecutionResult) (tt)) >>
-     liftR ((split_misaligned (vaddr) (width))) >>= fun '((n, bytes)) =>
-     let '((first, last, step)) := misaligned_order (n) in
-     let i : Z := first in
-     let finished : bool := false in
+     let vaddr_bits := bits_of_virtaddr (vaddr) in
      let write_success : bool := true in
-     let vaddr := bits_of_virtaddr (vaddr) in
-     (untilMT
-       (finished, i, write_success)
-       (fun '(finished, i, write_success) => n)
-       (fun '(finished, i, write_success) => returnR (result bool ExecutionResult) (finished))
-       (fun '(finished, i, write_success) =>
-         (liftR (assert_exp' true "loop dummy assert") >>= fun _ =>
-          let offset := i in
-          let vaddr := add_vec_int (vaddr) ((Z.mul (offset) (bytes))) in
-          liftR ((translateAddr ((Virtaddr (vaddr))) (access))) >>= fun (w__3 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
-          match w__3 with
-          | Err (e, _) =>
-             liftR ((memory_exception ((Virtaddr (vaddr))) (e))) >>= fun (w__4 : ExecutionResult) =>
-             (early_return ((Err (w__4))
-              : result bool ExecutionResult) :
-               MR (result bool ExecutionResult) unit) >>
-             returnR (result bool ExecutionResult) (write_success)
-          | Ok (paddr, pbmt, _) =>
-             liftR (assert_exp (Bool.eqb (res) ((is_store_conditional (access)))) "sys/vmem_utils.sail:197.50-197.51") >>
-             (if andb (res) ((not ((match_reservation ((bits_of_physaddr (paddr)))))))
-                return
-                MR (result bool ExecutionResult) (bool) then
-                ((liftR (read_reg mstatus))  : MR (result bool ExecutionResult) (mword 64)) >>= fun (w__5 : mword 64) =>
-                liftR (read_reg cur_privilege) >>= fun (w__6 : Privilege) =>
-                liftR ((effectivePrivilege (access) (w__5) (w__6))) >>= fun effPriv =>
-                liftR ((phys_access_check (access) (pbmt) (effPriv) (paddr) (bytes) (true))) >>= fun (w__7 : option ExceptionType) =>
-                match w__7 with
-                | Some e =>
-                   liftR ((memory_exception ((Virtaddr (vaddr))) (e))) >>= fun (w__8 : ExecutionResult) =>
-                   (early_return ((Err (w__8))
-                    : result bool ExecutionResult) :
-                     MR (result bool ExecutionResult) unit) >>
-                   returnR (result bool ExecutionResult) (write_success)
-                | None => returnR (result bool ExecutionResult) (false)
-                end
-                 : MR (result bool ExecutionResult) (bool)
-              else
-                liftR ((mem_write_ea (paddr) (bytes) (aq) (rl) (res))) >>= fun (w__9 : result unit ExceptionType) =>
-                match w__9 with
-                | Err e =>
-                   liftR ((memory_exception ((Virtaddr (vaddr))) (e))) >>= fun (w__10 : ExecutionResult) =>
-                   (early_return ((Err (w__10))
-                    : result bool ExecutionResult) :
-                     MR (result bool ExecutionResult) unit) >>
-                   returnR (result bool ExecutionResult) (write_success)
-                | Ok tt =>
-                   let write_value :=
-                     subrange_vec_dec (data)
-                       ((Z.sub ((Z.mul ((Z.mul (8) ((Z.add (offset) (1))))) (bytes))) (1)))
-                       ((Z.mul ((Z.mul (8) (offset))) (bytes))) in
-                   liftR ((mem_write_value (paddr) (bytes) ((autocast (T := mword)  write_value))
-                             (access) (pbmt) (aq) (rl) (res))) >>= fun (w__11 : result bool ExceptionType) =>
-                   match w__11 with
-                   | Err e =>
-                      liftR ((memory_exception ((Virtaddr (vaddr))) (e))) >>= fun (w__12 : ExecutionResult) =>
-                      (early_return ((Err (w__12))
-                       : result bool ExecutionResult) :
-                        MR (result bool ExecutionResult) unit) >>
-                      returnR (result bool ExecutionResult) (write_success)
-                   | Ok s =>
-                      let write_success : bool := andb (write_success) (s) in
-                      returnR (result bool ExecutionResult) (write_success)
-                   end
-                    : MR (result bool ExecutionResult) (bool)
-                end
-                 : MR (result bool ExecutionResult) (bool))
-              : MR (result bool ExecutionResult) (bool)
-          end >>= fun (write_success : bool) =>
-          let '((finished, i)) :=
-            (if Z.eqb (offset) (last) then
-               let finished : bool := true in
-               (finished, i)
-             else
-               let i : Z := Z.add (offset) (step) in
-               (finished, i))
-             : (bool * Z) in
-          returnR (result bool ExecutionResult) ((finished, i, write_success)))
-          : MR (result bool ExecutionResult) ((bool * Z * bool)))) >>= fun '((finished, i, write_success)
-     : (bool * Z * bool)) =>
+     liftR ((split_on_page_boundary (vaddr_bits) (width))) >>= fun '((in_page_bytes, next_page_bytes)) =>
+     ((liftR (read_reg mstatus))  : MR (result bool ExecutionResult) (mword 64)) >>= fun (w__2 : mword 64) =>
+     liftR (read_reg cur_privilege) >>= fun (w__3 : Privilege) =>
+     liftR ((effectivePrivilege (access) (w__2) (w__3))) >>= fun effPriv =>
+     (and_boolM
+        (liftR ((translationMode (effPriv))) >>= fun (w__4 : SATPMode) =>
+         returnR (result bool ExecutionResult) (((generic_neq (w__4) (Bare))  : bool)))
+        (returnR (result bool ExecutionResult) ((Z.gtb (next_page_bytes) (0))))) >>= fun do_split_access =>
+     (if andb (sys_misaligned_order_decreasing) (do_split_access)
+        return
+        MR (result bool ExecutionResult) (bool) then
+        liftR (assert_exp (not ((is_store_conditional (access)))) "sys/vmem_utils.sail:215.44-215.45") >>
+        let access_addr := Virtaddr ((add_vec_int (vaddr_bits) (in_page_bytes))) in
+        let write_value :=
+          subrange_vec_dec (data) ((Z.sub ((Z.mul (8) (width))) (1))) ((Z.mul (8) (in_page_bytes))) in
+        liftR ((translate_and_write_value (access_addr) (next_page_bytes)
+                  ((autocast (T := mword) 
+                  write_value)) (access) (aq) (rl) (res))) >>= fun (w__5 : result bool ExecutionResult) =>
+        match w__5 with
+        | Err e =>
+           (early_return ((Err (e))
+            : result bool ExecutionResult) :
+             MR (result bool ExecutionResult) unit) >>
+           returnR (result bool ExecutionResult) (write_success)
+        | Ok s =>
+           let write_success : bool := andb (write_success) (s) in
+           returnR (result bool ExecutionResult) (write_success)
+        end
+         : MR (result bool ExecutionResult) (bool)
+      else returnR (result bool ExecutionResult) (write_success)) >>= fun (write_success : bool) =>
+     let access_width := if do_split_access then in_page_bytes else width in
+     liftR ((translateAddr (vaddr) (access))) >>= fun (w__6 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
+     match w__6 with
+     | Err (e, _) =>
+        liftR ((memory_exception (vaddr) (e))) >>= fun (w__7 : ExecutionResult) =>
+        (early_return ((Err (w__7))
+         : result bool ExecutionResult) :
+          MR (result bool ExecutionResult) unit) >>
+        returnR (result bool ExecutionResult) (write_success)
+     | Ok (paddr, pbmt, _) =>
+        liftR (assert_exp (Bool.eqb (res) ((is_store_conditional (access)))) "sys/vmem_utils.sail:231.48-231.49") >>
+        (if andb (res) ((not ((match_reservation ((bits_of_physaddr (paddr)))))))
+           return
+           MR (result bool ExecutionResult) (bool) then
+           ((liftR (read_reg mstatus))  : MR (result bool ExecutionResult) (mword 64)) >>= fun (w__8 : mword 64) =>
+           liftR (read_reg cur_privilege) >>= fun (w__9 : Privilege) =>
+           liftR ((effectivePrivilege (access) (w__8) (w__9))) >>= fun effPriv =>
+           liftR ((phys_access_check (access) (pbmt) (effPriv) (paddr) (access_width) (true))) >>= fun (w__10 : result Phys_Mem_Access_Info ExceptionType) =>
+           match w__10 with
+           | Err e =>
+              liftR ((memory_exception (vaddr) (e))) >>= fun (w__11 : ExecutionResult) =>
+              (early_return ((Err (w__11))
+               : result bool ExecutionResult) :
+                MR (result bool ExecutionResult) unit) >>
+              returnR (result bool ExecutionResult) (write_success)
+           | Ok _ => returnR (result bool ExecutionResult) (false)
+           end
+            : MR (result bool ExecutionResult) (bool)
+         else
+           liftR ((mem_write_ea (paddr) (access_width) (access) (pbmt) (aq) (rl) (res))) >>= fun (w__12 : result unit ((physaddr * ExceptionType))) =>
+           match w__12 with
+           | Err (exc_paddr, e) =>
+              let exc_vaddr := offset_virtaddr_by (vaddr) (paddr) (exc_paddr) in
+              liftR ((memory_exception (exc_vaddr) (e))) >>= fun (w__13 : ExecutionResult) =>
+              (early_return ((Err (w__13))
+               : result bool ExecutionResult) :
+                MR (result bool ExecutionResult) unit) >>
+              returnR (result bool ExecutionResult) (write_success)
+           | Ok tt =>
+              let write_value :=
+                subrange_vec_dec (data) ((Z.sub ((Z.mul (8) (access_width))) (1))) (0) in
+              liftR ((mem_write_value (paddr) (access_width) ((autocast (T := mword)  write_value))
+                        (access) (pbmt) (aq) (rl) (res))) >>= fun (w__14 : result bool ((physaddr * ExceptionType))) =>
+              match w__14 with
+              | Err (exc_paddr, e) =>
+                 let exc_vaddr := offset_virtaddr_by (vaddr) (paddr) (exc_paddr) in
+                 liftR ((memory_exception (exc_vaddr) (e))) >>= fun (w__15 : ExecutionResult) =>
+                 (early_return ((Err (w__15))
+                  : result bool ExecutionResult) :
+                   MR (result bool ExecutionResult) unit) >>
+                 returnR (result bool ExecutionResult) (write_success)
+              | Ok s =>
+                 let write_success : bool := andb (write_success) (s) in
+                 returnR (result bool ExecutionResult) (write_success)
+              end
+               : MR (result bool ExecutionResult) (bool)
+           end
+            : MR (result bool ExecutionResult) (bool))
+         : MR (result bool ExecutionResult) (bool)
+     end >>= fun (write_success : bool) =>
+     (if andb ((not (sys_misaligned_order_decreasing))) (do_split_access)
+        return
+        MR (result bool ExecutionResult) (bool) then
+        liftR (assert_exp (not ((is_store_conditional (access)))) "sys/vmem_utils.sail:266.44-266.45") >>
+        let access_addr := Virtaddr ((add_vec_int (vaddr_bits) (in_page_bytes))) in
+        let write_value :=
+          subrange_vec_dec (data) ((Z.sub ((Z.mul (8) (width))) (1))) ((Z.mul (8) (in_page_bytes))) in
+        liftR ((translate_and_write_value (access_addr) (next_page_bytes)
+                  ((autocast (T := mword) 
+                  write_value)) (access) (aq) (rl) (res))) >>= fun (w__16 : result bool ExecutionResult) =>
+        match w__16 with
+        | Err e =>
+           (early_return ((Err (e))
+            : result bool ExecutionResult) :
+             MR (result bool ExecutionResult) unit) >>
+           returnR (result bool ExecutionResult) (write_success)
+        | Ok s =>
+           let write_success : bool := andb (write_success) (s) in
+           returnR (result bool ExecutionResult) (write_success)
+        end
+         : MR (result bool ExecutionResult) (bool)
+      else returnR (result bool ExecutionResult) (write_success)) >>= fun (write_success : bool) =>
      returnR (result bool ExecutionResult) ((Ok (write_success)))).
 
 Definition get_transformed_data_addr
@@ -26221,6 +26986,7 @@ Definition write_CSR (p0_ : mword 12) (value : mword 64) : M (result (mword 64) 
     else if eq_vec (p0_) ((Ox"14D")) return M (result (mword 64) unit) then
       ((read_reg stimecmp)  : M (mword 64)) >>= fun (w__213 : mword 64) =>
       write_reg stimecmp (update_subrange_vec_dec (w__213) ((Z.sub (xlen) (1))) (0) (value)) >>
+      (clint_dispatch (false)) >>
       ((read_reg stimecmp)  : M (mword 64)) >>= fun (w__214 : mword 64) =>
       returnM ((Ok ((subrange_vec_dec (w__214) ((Z.sub (xlen) (1))) (0)))))
     else if andb ((Z.eqb (xlen) (32))) ((eq_vec (p0_) ((Ox"15D"))))
@@ -26230,6 +26996,7 @@ Definition write_CSR (p0_ : mword 12) (value : mword 64) : M (result (mword 64) 
       write_reg
         stimecmp
         (update_subrange_vec_dec (w__215) (63) (32) ((autocast (T := mword)  value))) >>
+      (clint_dispatch (false)) >>
       ((read_reg stimecmp)  : M (mword 64)) >>= fun (w__216 : mword 64) =>
       returnM ((Ok ((autocast (T := mword) (subrange_vec_dec (w__216) (63) (32))))))
     else if eq_vec (p0_) ((Ox"011")) return M (result (mword 64) unit) then
@@ -26512,10 +27279,10 @@ Definition process_clean_inval (rs1 : regidx) (cbop : cbop_zicbom) : M (Executio
          ((read_reg mstatus)  : M (mword 64)) >>= fun (w__2 : mword 64) =>
          read_reg cur_privilege >>= fun (w__3 : Privilege) =>
          (effectivePrivilege (access) (w__2) (w__3)) >>= fun ep =>
-         (phys_access_check (access) (pbmt) (ep) (paddr) (cache_block_size) (false)) >>= fun (w__4 : option ExceptionType) =>
+         (phys_access_check (access) (pbmt) (ep) (paddr) (cache_block_size) (false)) >>= fun (w__4 : result Phys_Mem_Access_Info ExceptionType) =>
          match w__4 with
-         | Some e => (memory_exception (vaddr_for_error) (e))  : M (ExecutionResult)
-         | None => returnM (RETIRE_SUCCESS)
+         | Err e => (memory_exception (vaddr_for_error) (e))  : M (ExecutionResult)
+         | Ok _ => returnM (RETIRE_SUCCESS)
          end
           : M (ExecutionResult)
       | Err (e, _) => (memory_exception (vaddr_for_error) (e))  : M (ExecutionResult)
@@ -39087,7 +39854,7 @@ Definition execute_ZICBOZ (rs1 : regidx) : M (ExecutionResult) :=
      end >>
      liftR ((rX_bits (rs1))) >>= fun rs1_val =>
      let cache_block_size := pow2 (plat_cache_block_size_exp) in
-     let access := Store (Data) in
+     let access : MemoryAccessType mem_payload := CacheAccess ((CB_zero (tt))) in
      let negative_offset :=
        sub_vec
          ((and_vec (rs1_val) ((not_vec ((zero_extend' (64) ((ones (plat_cache_block_size_exp)))))))))
@@ -39102,22 +39869,24 @@ Definition execute_ZICBOZ (rs1 : regidx) : M (ExecutionResult) :=
            liftR ((memory_exception ((sub_virtaddr_xlenbits (vaddr) (negative_offset))) (e)))
             : MR (ExecutionResult) (ExecutionResult)
         | Ok (paddr, pbmt, _) =>
-           liftR ((mem_write_ea (paddr) (cache_block_size) (false) (false) (false))) >>= fun (w__7 : result unit ExceptionType) =>
+           liftR ((mem_write_ea (paddr) (cache_block_size) (access) (pbmt) (false) (false) (false))) >>= fun (w__7 : result unit ((physaddr * ExceptionType))) =>
            match w__7 with
-           | Err e =>
+           | Err (exc_addr, e) =>
+              liftR (assert_exp (generic_eq (exc_addr) (paddr)) "extensions/Zicboz/zicboz_insts.sail:57.38-57.39") >>
               liftR ((memory_exception ((sub_virtaddr_xlenbits (vaddr) (negative_offset))) (e)))
                : MR (ExecutionResult) (ExecutionResult)
            | Ok _ =>
               liftR ((mem_write_value (paddr) (cache_block_size)
                         ((zeros' ((Z.mul (8) ((pow2 ((__id (plat_cache_block_size_exp)))))))))
-                        (access) (pbmt) (false) (false) (false))) >>= fun (w__9 : result bool ExceptionType) =>
+                        (access) (pbmt) (false) (false) (false))) >>= fun (w__9 : result bool ((physaddr * ExceptionType))) =>
               match w__9 with
               | Ok true => returnR (ExecutionResult) (RETIRE_SUCCESS)
               | Ok false =>
-                 liftR ((internal_error ("extensions/Zicboz/zicboz_insts.sail") (59)
+                 liftR ((internal_error ("extensions/Zicboz/zicboz_insts.sail") (63)
                            ("store got false from mem_write_value")))
                   : MR (ExecutionResult) (ExecutionResult)
-              | Err e =>
+              | Err (exc_addr, e) =>
+                 liftR (assert_exp (generic_eq (exc_addr) (paddr)) "extensions/Zicboz/zicboz_insts.sail:66.42-66.43") >>
                  liftR ((memory_exception ((sub_virtaddr_xlenbits (vaddr) (negative_offset))) (e)))
                   : MR (ExecutionResult) (ExecutionResult)
               end
@@ -39148,8 +39917,8 @@ Definition execute_ZICBOP (cbop : cbop_zicbop) (rs1 : regidx) (offset : mword 12
          ((read_reg mstatus)  : M (mword 64)) >>= fun (w__2 : mword 64) =>
          read_reg cur_privilege >>= fun (w__3 : Privilege) =>
          (effectivePrivilege (access) (w__2) (w__3)) >>= fun ep =>
-         (phys_access_check (access) (pbmt) (ep) (paddr) (cache_block_size) (false)) >>= fun (w__4 : option ExceptionType) =>
-         let '(_) := match w__4 with | Some _e => tt | None => tt end  : unit in
+         (phys_access_check (access) (pbmt) (ep) (paddr) (cache_block_size) (false)) >>= fun (w__4 : result Phys_Mem_Access_Info ExceptionType) =>
+         let '(_) := match w__4 with | Err _e => tt | Ok _ => tt end  : unit in
          returnM (tt)
       | Err _ => returnM (tt)
       end
@@ -39305,10 +40074,10 @@ Definition execute_WFI '(tt : unit) : M (ExecutionResult) :=
       returnM ((if plat_wfi_available_to_usermode then Enter_Wait (WAIT_WFI)
                 else Illegal_Instruction (tt)))
    | VirtualUser =>
-      (internal_error ("extensions/I/base_insts.sail") (661) ("Hypervisor extension not supported"))
+      (internal_error ("extensions/I/base_insts.sail") (665) ("Hypervisor extension not supported"))
        : M (ExecutionResult)
    | VirtualSupervisor =>
-      (internal_error ("extensions/I/base_insts.sail") (662) ("Hypervisor extension not supported"))
+      (internal_error ("extensions/I/base_insts.sail") (666) ("Hypervisor extension not supported"))
        : M (ExecutionResult)
    end
     : M (ExecutionResult).
@@ -39329,7 +40098,7 @@ Definition execute_STORECON
    (rX_bits (rs2)) >>= fun (w__0 : mword 64) =>
    let data := subrange_vec_dec (w__0) ((Z.sub ((Z.mul (width) (8))) (1))) (0) in
    (vmem_write (rs1) ((zeros' (64))) (width) ((autocast (T := mword)  data))
-      ((StoreConditional (Data))) ((andb (aq) (rl))) (rl) (true)) >>= fun (w__1 : result bool ExecutionResult) =>
+      ((StoreConditional ((aq, rl, Data)))) ((andb (aq) (rl))) (rl) (true)) >>= fun (w__1 : result bool ExecutionResult) =>
    match w__1 with
    | Ok b =>
       (wX_bits (rd) ((zero_extend' (64) ((bool_bit_forwards ((negb (b)))))))) >>
@@ -39468,7 +40237,7 @@ Definition execute_SSAMOSWAP
          else returnR (ExecutionResult) (tt))
          : MR (ExecutionResult) (unit)
      end >>
-     let access := Atomic ((AMOSWAP, ShadowStack, ShadowStack)) in
+     let access := Atomic ((AMOSWAP, aq, rl, ShadowStack, ShadowStack)) in
      liftR ((get_transformed_data_addr (rs1) ((zeros' (64))) (access) (width))) >>= fun (w__8 : Ext_DataAddr_Check unit) =>
      match w__8 with
      | Ext_DataAddr_Error e =>
@@ -39478,66 +40247,73 @@ Definition execute_SSAMOSWAP
          : MR (ExecutionResult) (virtaddr)
      | Ext_DataAddr_OK vaddr => returnR (ExecutionResult) (vaddr)
      end >>= fun (vaddr : virtaddr) =>
-     (if not ((is_aligned_vaddr (vaddr) (width))) return MR (ExecutionResult) (ExecutionResult) then
-        let exc : ExceptionType :=
-          match plat_misaligned_access.(GlobalMisalignedExceptions_amo) with
-          | AccessFault => E_SAMO_Access_Fault (tt)
-          | AlignmentException => E_SAMO_Addr_Align (tt)
-          end in
-        liftR ((memory_exception (vaddr) (exc)))
-         : MR (ExecutionResult) (ExecutionResult)
-      else
-        liftR ((translateAddr (vaddr) (access))) >>= fun (w__11 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
-        match w__11 with
-        | Ok (addr, pbmt, _) => returnR (ExecutionResult) ((addr, pbmt))
-        | Err (e, _) =>
-           liftR ((memory_exception (vaddr) (e))) >>= fun (w__12 : ExecutionResult) =>
-           (early_return (w__12
-            : ExecutionResult) :
-             MR ExecutionResult (physaddr * page_based_mem_type))
-            : MR (ExecutionResult) ((physaddr * page_based_mem_type))
-        end >>= fun '((paddr, pbmt)
-        : (physaddr * page_based_mem_type)) =>
-        let width := width in
-        liftR ((mem_write_ea (paddr) (width) ((andb (aq) (rl))) (rl) (true))) >>= fun (w__14 : result unit ExceptionType) =>
-        match w__14 with
-        | Err e =>
-           liftR ((memory_exception (vaddr) (e))) >>= fun (w__15 : ExecutionResult) =>
-           (early_return (w__15  : ExecutionResult) : MR ExecutionResult (mword (width * 8)))
-            : MR (ExecutionResult) (mword (width * 8))
-        | Ok _ =>
-           liftR ((mem_read (access) (pbmt) (paddr) (width) (aq) ((andb (aq) (rl))) (true))) >>= fun (w__17 : result (mword (8 * width)) ExceptionType) =>
-           match w__17 with
-           | Err e =>
-              liftR ((memory_exception (vaddr) (e))) >>= fun (w__18 : ExecutionResult) =>
-              (early_return (w__18  : ExecutionResult) : MR ExecutionResult (mword (width * 8)))
-               : MR (ExecutionResult) (mword (width * 8))
-           | Ok v => returnR (ExecutionResult) ((autocast (T := mword)  v))
-           end
-            : MR (ExecutionResult) (mword (width * 8))
-        end >>= fun (mem_val : bits (width * 8)) =>
-        liftR (assert_exp' (orb ((Z.eqb ((__id (width))) (4)))
-                              ((andb ((Z.eqb (xlen) (64))) ((Z.eqb (width) (8)))))) "extensions/cfi/zicfiss_insts.sail:208.48-208.49") >>= fun _ =>
-        liftR ((rX_bits (rs2))) >>= fun (w__21 : mword 64) =>
-        let write_val : bits (width * 8) :=
-          autocast (T := mword)
-          (subrange_vec_dec (w__21) ((Z.sub ((Z.mul ((__id (width))) (8))) (1))) (0)) in
-        liftR ((mem_write_value (paddr) (width) ((autocast (T := mword)  write_val)) (access) (pbmt)
-                  ((andb (aq) (rl))) (rl) (true))) >>= fun (w__22 : result bool ExceptionType) =>
-        match w__22 with
-        | Ok true =>
-           liftR ((wX_bits (rd) ((sign_extend' (64) (mem_val)))))  : MR (ExecutionResult) (unit)
-        | Ok false =>
-           liftR ((internal_error ("extensions/cfi/zicfiss_insts.sail") (212)
-                     ("AMOSWAP_SS got false from mem_write_value")))
+     (if not ((is_aligned_vaddr (vaddr) (width))) return MR (ExecutionResult) (unit) then
+        match plat_misaligned_exception (access) (false) with
+        | Some AccessFault =>
+           liftR ((memory_exception (vaddr) ((E_SAMO_Access_Fault (tt))))) >>= fun (w__10 : ExecutionResult) =>
+           (early_return (w__10  : ExecutionResult) : MR ExecutionResult unit)
             : MR (ExecutionResult) (unit)
-        | Err e =>
-           liftR ((memory_exception (vaddr) (e))) >>= fun (w__23 : ExecutionResult) =>
-           (early_return (w__23  : ExecutionResult) : MR ExecutionResult unit)
+        | Some AlignmentException =>
+           liftR ((memory_exception (vaddr) ((E_SAMO_Addr_Align (tt))))) >>= fun (w__11 : ExecutionResult) =>
+           (early_return (w__11  : ExecutionResult) : MR ExecutionResult unit)
             : MR (ExecutionResult) (unit)
-        end >>
-        returnR (ExecutionResult) (RETIRE_SUCCESS))
-      : MR (ExecutionResult) (ExecutionResult)).
+        | None => returnR (ExecutionResult) (tt)
+        end
+         : MR (ExecutionResult) (unit)
+      else returnR (ExecutionResult) (tt)) >>
+     liftR ((translateAddr (vaddr) (access))) >>= fun (w__12 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
+     match w__12 with
+     | Ok (addr, pbmt, _) => returnR (ExecutionResult) ((addr, pbmt))
+     | Err (e, _) =>
+        liftR ((memory_exception (vaddr) (e))) >>= fun (w__13 : ExecutionResult) =>
+        (early_return (w__13
+         : ExecutionResult) :
+          MR ExecutionResult (physaddr * page_based_mem_type))
+         : MR (ExecutionResult) ((physaddr * page_based_mem_type))
+     end >>= fun '((paddr, pbmt)
+     : (physaddr * page_based_mem_type)) =>
+     let width := width in
+     liftR ((mem_write_ea (paddr) (width) (access) (pbmt) ((andb (aq) (rl))) (rl) (true))) >>= fun (w__15 : result unit ((physaddr * ExceptionType))) =>
+     match w__15 with
+     | Err (exc_addr, e) =>
+        liftR (assert_exp (generic_eq (exc_addr) (paddr)) "extensions/cfi/zicfiss_insts.sail:206.30-206.31") >>
+        liftR ((memory_exception (vaddr) (e))) >>= fun (w__16 : ExecutionResult) =>
+        (early_return (w__16  : ExecutionResult) : MR ExecutionResult (mword (width * 8)))
+         : MR (ExecutionResult) (mword (width * 8))
+     | Ok _ =>
+        liftR ((mem_read (access) (pbmt) (paddr) (width) (aq) ((andb (aq) (rl))) (true))) >>= fun (w__18 : result (mword (8 * width)) ((physaddr * ExceptionType))) =>
+        match w__18 with
+        | Err (exc_addr, e) =>
+           liftR (assert_exp (generic_eq (exc_addr) (paddr)) "extensions/cfi/zicfiss_insts.sail:212.32-212.33") >>
+           liftR ((memory_exception (vaddr) (e))) >>= fun (w__19 : ExecutionResult) =>
+           (early_return (w__19  : ExecutionResult) : MR ExecutionResult (mword (width * 8)))
+            : MR (ExecutionResult) (mword (width * 8))
+        | Ok v => returnR (ExecutionResult) ((autocast (T := mword)  v))
+        end
+         : MR (ExecutionResult) (mword (width * 8))
+     end >>= fun (mem_val : bits (width * 8)) =>
+     liftR (assert_exp' (orb ((Z.eqb ((__id (width))) (4)))
+                           ((andb ((Z.eqb (xlen) (64))) ((Z.eqb (width) (8)))))) "extensions/cfi/zicfiss_insts.sail:220.48-220.49") >>= fun _ =>
+     liftR ((rX_bits (rs2))) >>= fun (w__22 : mword 64) =>
+     let write_val : bits (width * 8) :=
+       autocast (T := mword)
+       (subrange_vec_dec (w__22) ((Z.sub ((Z.mul ((__id (width))) (8))) (1))) (0)) in
+     liftR ((mem_write_value (paddr) (width) ((autocast (T := mword)  write_val)) (access) (pbmt)
+               ((andb (aq) (rl))) (rl) (true))) >>= fun (w__23 : result bool ((physaddr * ExceptionType))) =>
+     match w__23 with
+     | Ok true =>
+        liftR ((wX_bits (rd) ((sign_extend' (64) (mem_val)))))  : MR (ExecutionResult) (unit)
+     | Ok false =>
+        liftR ((internal_error ("extensions/cfi/zicfiss_insts.sail") (227)
+                  ("AMOSWAP_SS got false from mem_write_value")))
+         : MR (ExecutionResult) (unit)
+     | Err (exc_addr, e) =>
+        liftR (assert_exp (generic_eq (exc_addr) (paddr)) "extensions/cfi/zicfiss_insts.sail:230.30-230.31") >>
+        liftR ((memory_exception (vaddr) (e))) >>= fun (w__24 : ExecutionResult) =>
+        (early_return (w__24  : ExecutionResult) : MR ExecutionResult unit)
+         : MR (ExecutionResult) (unit)
+     end >>
+     returnR (ExecutionResult) (RETIRE_SUCCESS)).
 
 Definition execute_SRET '(tt : unit) : M (ExecutionResult) :=
    read_reg cur_privilege >>= fun (w__0 : Privilege) =>
@@ -39551,10 +40327,10 @@ Definition execute_SRET '(tt : unit) : M (ExecutionResult) :=
        : M (bool)
    | Machine => (currentlyEnabled (Ext_S)) >>= fun (w__4 : bool) => returnM ((not (w__4)))
    | VirtualUser =>
-      (internal_error ("extensions/I/base_insts.sail") (603) ("Hypervisor extension not supported"))
+      (internal_error ("extensions/I/base_insts.sail") (607) ("Hypervisor extension not supported"))
        : M (bool)
    | VirtualSupervisor =>
-      (internal_error ("extensions/I/base_insts.sail") (604) ("Hypervisor extension not supported"))
+      (internal_error ("extensions/I/base_insts.sail") (608) ("Hypervisor extension not supported"))
        : M (bool)
    end >>= fun (sret_illegal : bool) =>
    (if sret_illegal then returnM ((Illegal_Instruction (tt)))
@@ -39669,7 +40445,7 @@ Definition execute_SFENCE_VMA (rs1 : regidx) (rs2 : regidx) : M (ExecutionResult
       returnM (RETIRE_SUCCESS)
    | VirtualUser => returnM ((Virtual_Instruction (tt)))
    | VirtualSupervisor =>
-      (internal_error ("extensions/I/base_insts.sail") (688) ("Hypervisor extension not supported"))
+      (internal_error ("extensions/I/base_insts.sail") (692) ("Hypervisor extension not supported"))
        : M (ExecutionResult)
    end
     : M (ExecutionResult).
@@ -39885,7 +40661,8 @@ Definition execute_LOADRES (aq : bool) (rl : bool) (rs1 : regidx) (width : Z) (r
 (*member_Z_list width [1; 2; 4; 8]*)
 : M (ExecutionResult) :=
    assert_exp' (Z.leb (width) (xlen_bytes)) "extensions/A/zalrsc_insts.sail:43.28-43.29" >>= fun _ =>
-   (vmem_read (rs1) ((zeros' (64))) (width) ((LoadReserved (Data))) (aq) ((andb (aq) (rl))) (true)) >>= fun w__0 =>
+   (vmem_read (rs1) ((zeros' (64))) (width) ((LoadReserved ((aq, rl, Data)))) (aq)
+      ((andb (aq) (rl))) (true)) >>= fun w__0 =>
    match w__0 with
    | Ok data => (wX_bits (rd) ((sign_extend' (64) (data)))) >> returnM (RETIRE_SUCCESS)
    | Err e => returnM (e)
@@ -39999,10 +40776,10 @@ Definition execute_ECALL '(tt : unit) : M (ExecutionResult) :=
    | Supervisor => returnM ((E_S_EnvCall (tt)))
    | Machine => returnM ((E_M_EnvCall (tt)))
    | VirtualUser =>
-      (internal_error ("extensions/I/base_insts.sail") (542) ("Hypervisor extension not supported"))
+      (internal_error ("extensions/I/base_insts.sail") (546) ("Hypervisor extension not supported"))
        : M (ExceptionType)
    | VirtualSupervisor =>
-      (internal_error ("extensions/I/base_insts.sail") (543) ("Hypervisor extension not supported"))
+      (internal_error ("extensions/I/base_insts.sail") (547) ("Hypervisor extension not supported"))
        : M (ExceptionType)
    end >>= fun (exc_type : ExceptionType) =>
    let t : sync_exception :=
@@ -40354,7 +41131,7 @@ Definition execute_AMO
    catch_early_return
      (let width := width in
      liftR (assert_exp' (Z.leb (width) ((Z.mul (xlen_bytes) (2)))) "extensions/A/zaamo_insts.sail:73.32-73.33") >>= fun _ =>
-     let access := Atomic ((op, Data, Data)) in
+     let access := Atomic ((op, aq, rl, Data, Data)) in
      liftR ((get_transformed_data_addr (rs1) ((zeros' (64))) (access) (width))) >>= fun (w__0 : Ext_DataAddr_Check unit) =>
      match w__0 with
      | Ext_DataAddr_Error e =>
@@ -40364,71 +41141,91 @@ Definition execute_AMO
          : MR (ExecutionResult) (virtaddr)
      | Ext_DataAddr_OK vaddr => returnR (ExecutionResult) (vaddr)
      end >>= fun (vaddr : virtaddr) =>
-     (if not ((is_aligned_vaddr (vaddr) (width))) return MR (ExecutionResult) (ExecutionResult) then
-        let exc : ExceptionType :=
-          match plat_misaligned_access.(GlobalMisalignedExceptions_amo) with
-          | AccessFault => E_SAMO_Access_Fault (tt)
-          | AlignmentException => E_SAMO_Addr_Align (tt)
-          end in
-        liftR ((memory_exception (vaddr) (exc)))
-         : MR (ExecutionResult) (ExecutionResult)
+     (if not ((is_aligned_vaddr (vaddr) (width))) return MR (ExecutionResult) (unit) then
+        match plat_misaligned_exception (access) (false) with
+        | Some AccessFault =>
+           liftR ((memory_exception (vaddr) ((E_SAMO_Access_Fault (tt))))) >>= fun (w__2 : ExecutionResult) =>
+           (early_return (w__2  : ExecutionResult) : MR ExecutionResult unit)
+            : MR (ExecutionResult) (unit)
+        | Some AlignmentException =>
+           liftR ((memory_exception (vaddr) ((E_SAMO_Addr_Align (tt))))) >>= fun (w__3 : ExecutionResult) =>
+           (early_return (w__3  : ExecutionResult) : MR ExecutionResult unit)
+            : MR (ExecutionResult) (unit)
+        | None => returnR (ExecutionResult) (tt)
+        end
+         : MR (ExecutionResult) (unit)
+      else returnR (ExecutionResult) (tt)) >>
+     liftR ((translateAddr (vaddr) (access))) >>= fun (w__4 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
+     match w__4 with
+     | Err (e, _) =>
+        liftR ((memory_exception (vaddr) (e))) >>= fun (w__5 : ExecutionResult) =>
+        (early_return (w__5
+         : ExecutionResult) :
+          MR ExecutionResult (physaddr * page_based_mem_type))
+         : MR (ExecutionResult) ((physaddr * page_based_mem_type))
+     | Ok (addr, pbmt, _) => returnR (ExecutionResult) ((addr, pbmt))
+     end >>= fun '((addr, pbmt)
+     : (physaddr * page_based_mem_type)) =>
+     liftR ((mem_write_ea (addr) (width) (access) (pbmt) ((andb (aq) (rl))) (rl) (true))) >>= fun (w__7 : result unit ((physaddr * ExceptionType))) =>
+     match w__7 with
+     | Err (exc_addr, e) =>
+        liftR (assert_exp (generic_eq (exc_addr) (addr)) "extensions/A/zaamo_insts.sail:104.29-104.30") >>
+        liftR ((memory_exception (vaddr) (e))) >>= fun (w__8 : ExecutionResult) =>
+        (early_return (w__8  : ExecutionResult) : MR ExecutionResult (mword (width * 8)))
+         : MR (ExecutionResult) (mword (width * 8))
+     | Ok _ =>
+        liftR ((mem_read (access) (pbmt) (addr) (width) (aq) ((andb (aq) (rl))) (true))) >>= fun (w__10 : result (mword (8 * width)) ((physaddr * ExceptionType))) =>
+        match w__10 with
+        | Err (exc_addr, e) =>
+           liftR (assert_exp (generic_eq (exc_addr) (addr)) "extensions/A/zaamo_insts.sail:110.31-110.32") >>
+           liftR ((memory_exception (vaddr) (e))) >>= fun (w__11 : ExecutionResult) =>
+           (early_return (w__11  : ExecutionResult) : MR ExecutionResult (mword (width * 8)))
+            : MR (ExecutionResult) (mword (width * 8))
+        | Ok loaded => returnR (ExecutionResult) ((autocast (T := mword)  loaded))
+        end
+         : MR (ExecutionResult) (mword (width * 8))
+     end >>= fun (loaded : bits (width * 8)) =>
+     (if Z.leb (width) (xlen_bytes) return MR (ExecutionResult) (mword (width * 8)) then
+        liftR ((rX_bits (rs2))) >>= fun (w__14 : mword 64) =>
+        returnR (ExecutionResult) ((trunc ((Z.mul ((__id (width))) (8))) (w__14)))
       else
-        liftR ((translateAddr (vaddr) (access))) >>= fun (w__3 : result ((physaddr * page_based_mem_type * unit)) ((ExceptionType * unit))) =>
-        match w__3 with
-        | Err (e, _) =>
-           liftR ((memory_exception (vaddr) (e))) >>= fun (w__4 : ExecutionResult) =>
-           (early_return (w__4
-            : ExecutionResult) :
-             MR ExecutionResult (physaddr * page_based_mem_type))
-            : MR (ExecutionResult) ((physaddr * page_based_mem_type))
-        | Ok (addr, pbmt, _) => returnR (ExecutionResult) ((addr, pbmt))
-        end >>= fun '((addr, pbmt)
-        : (physaddr * page_based_mem_type)) =>
-        (if Z.leb (width) (xlen_bytes) return MR (ExecutionResult) (mword (width * 8)) then
-           liftR ((rX_bits (rs2))) >>= fun (w__6 : mword 64) =>
-           returnR (ExecutionResult) ((trunc ((Z.mul ((__id (width))) (8))) (w__6)))
+        liftR ((rX_pair_bits (rs2))) >>= fun (w__15 : mword (64 * 2)) =>
+        returnR (ExecutionResult) ((trunc ((Z.mul ((__id (width))) (8))) (w__15)))) >>= fun (rs2_val : bits (width * 8)) =>
+     let result' : bits (width * 8) :=
+       match op with
+       | AMOSWAP => rs2_val
+       | AMOADD => add_vec (rs2_val) (loaded)
+       | AMOXOR => xor_vec (rs2_val) (loaded)
+       | AMOAND => and_vec (rs2_val) (loaded)
+       | AMOOR => or_vec (rs2_val) (loaded)
+       | AMOMIN => if zopz0zI_s (rs2_val) (loaded) then rs2_val else loaded
+       | AMOMAX => if zopz0zK_s (rs2_val) (loaded) then rs2_val else loaded
+       | AMOMINU => if zopz0zI_u (rs2_val) (loaded) then rs2_val else loaded
+       | AMOMAXU => if zopz0zK_u (rs2_val) (loaded) then rs2_val else loaded
+       | AMOCAS => rs2_val
+       end in
+     (and_boolM (returnR (ExecutionResult) (((generic_eq (op) (AMOCAS))  : bool)))
+        ((if Z.leb (width) (xlen_bytes) return MR (ExecutionResult) (mword (width * 8)) then
+            liftR ((rX_bits (rd))) >>= fun (w__16 : mword 64) =>
+            returnR (ExecutionResult) ((trunc ((Z.mul ((__id (width))) (8))) (w__16)))
+          else
+            liftR ((rX_pair_bits (rd))) >>= fun (w__17 : mword (64 * 2)) =>
+            returnR (ExecutionResult) ((trunc ((Z.mul ((__id (width))) (8))) (w__17)))) >>= fun (w__18 : mword (width * 8)) =>
+         returnR (ExecutionResult) (((neq_vec (loaded) (w__18))  : bool)))) >>= fun (w__19 : bool) =>
+     (if w__19 return MR (ExecutionResult) (ExecutionResult) then
+        (if Z.leb (width) (xlen_bytes) return MR (ExecutionResult) (unit) then
+           liftR ((wX_bits (rd) ((sign_extend' (64) (loaded)))))
+            : MR (ExecutionResult) (unit)
          else
-           liftR ((rX_pair_bits (rs2))) >>= fun (w__7 : mword (64 * 2)) =>
-           returnR (ExecutionResult) ((trunc ((Z.mul ((__id (width))) (8))) (w__7)))) >>= fun (rs2_val : bits (width * 8)) =>
-        liftR ((mem_write_ea (addr) (width) ((andb (aq) (rl))) (rl) (true))) >>= fun (w__8 : result unit ExceptionType) =>
-        match w__8 with
-        | Err e =>
-           liftR ((memory_exception (vaddr) (e))) >>= fun (w__9 : ExecutionResult) =>
-           (early_return (w__9  : ExecutionResult) : MR ExecutionResult (mword (width * 8)))
-            : MR (ExecutionResult) (mword (width * 8))
-        | Ok _ =>
-           liftR ((mem_read (access) (pbmt) (addr) (width) (aq) ((andb (aq) (rl))) (true))) >>= fun (w__11 : result (mword (8 * width)) ExceptionType) =>
-           match w__11 with
-           | Err e =>
-              liftR ((memory_exception (vaddr) (e))) >>= fun (w__12 : ExecutionResult) =>
-              (early_return (w__12  : ExecutionResult) : MR ExecutionResult (mword (width * 8)))
-               : MR (ExecutionResult) (mword (width * 8))
-           | Ok loaded => returnR (ExecutionResult) ((autocast (T := mword)  loaded))
-           end
-            : MR (ExecutionResult) (mword (width * 8))
-        end >>= fun (loaded : bits (width * 8)) =>
-        let result' : bits (width * 8) :=
-          match op with
-          | AMOSWAP => rs2_val
-          | AMOADD => add_vec (rs2_val) (loaded)
-          | AMOXOR => xor_vec (rs2_val) (loaded)
-          | AMOAND => and_vec (rs2_val) (loaded)
-          | AMOOR => or_vec (rs2_val) (loaded)
-          | AMOMIN => if zopz0zI_s (rs2_val) (loaded) then rs2_val else loaded
-          | AMOMAX => if zopz0zK_s (rs2_val) (loaded) then rs2_val else loaded
-          | AMOMINU => if zopz0zI_u (rs2_val) (loaded) then rs2_val else loaded
-          | AMOMAXU => if zopz0zK_u (rs2_val) (loaded) then rs2_val else loaded
-          | AMOCAS => rs2_val
-          end in
-        (and_boolM (returnR (ExecutionResult) (((generic_eq (op) (AMOCAS))  : bool)))
-           ((if Z.leb (width) (xlen_bytes) return MR (ExecutionResult) (mword (width * 8)) then
-               liftR ((rX_bits (rd))) >>= fun (w__15 : mword 64) =>
-               returnR (ExecutionResult) ((trunc ((Z.mul ((__id (width))) (8))) (w__15)))
-             else
-               liftR ((rX_pair_bits (rd))) >>= fun (w__16 : mword (64 * 2)) =>
-               returnR (ExecutionResult) ((trunc ((Z.mul ((__id (width))) (8))) (w__16)))) >>= fun (w__17 : mword (width * 8)) =>
-            returnR (ExecutionResult) (((neq_vec (loaded) (w__17))  : bool)))) >>= fun (w__18 : bool) =>
-        (if w__18 return MR (ExecutionResult) (ExecutionResult) then
+           liftR ((wX_pair_bits (rd) ((sign_extend' ((Z.mul (64) (2))) (loaded)))))
+            : MR (ExecutionResult) (unit)) >>
+        returnR (ExecutionResult) (RETIRE_SUCCESS)
+      else
+        liftR ((mem_write_value (addr) (width)
+                  ((sign_extend' ((Z.mul (8) ((__id (width))))) (result'))) (access) (pbmt)
+                  ((andb (aq) (rl))) (rl) (true))) >>= fun (w__20 : result bool ((physaddr * ExceptionType))) =>
+        match w__20 with
+        | Ok true =>
            (if Z.leb (width) (xlen_bytes) return MR (ExecutionResult) (unit) then
               liftR ((wX_bits (rd) ((sign_extend' (64) (loaded)))))
                : MR (ExecutionResult) (unit)
@@ -40436,27 +41233,15 @@ Definition execute_AMO
               liftR ((wX_pair_bits (rd) ((sign_extend' ((Z.mul (64) (2))) (loaded)))))
                : MR (ExecutionResult) (unit)) >>
            returnR (ExecutionResult) (RETIRE_SUCCESS)
-         else
-           liftR ((mem_write_value (addr) (width)
-                     ((sign_extend' ((Z.mul (8) ((__id (width))))) (result'))) (access) (pbmt)
-                     ((andb (aq) (rl))) (rl) (true))) >>= fun (w__19 : result bool ExceptionType) =>
-           match w__19 with
-           | Ok true =>
-              (if Z.leb (width) (xlen_bytes) return MR (ExecutionResult) (unit) then
-                 liftR ((wX_bits (rd) ((sign_extend' (64) (loaded)))))
-                  : MR (ExecutionResult) (unit)
-               else
-                 liftR ((wX_pair_bits (rd) ((sign_extend' ((Z.mul (64) (2))) (loaded)))))
-                  : MR (ExecutionResult) (unit)) >>
-              returnR (ExecutionResult) (RETIRE_SUCCESS)
-           | Ok false =>
-              liftR ((internal_error ("extensions/A/zaamo_insts.sail") (138)
-                        ("AMO got false from mem_write_value")))
-               : MR (ExecutionResult) (ExecutionResult)
-           | Err e =>
-              liftR ((memory_exception (vaddr) (e)))  : MR (ExecutionResult) (ExecutionResult)
-           end
-            : MR (ExecutionResult) (ExecutionResult))
+        | Ok false =>
+           liftR ((internal_error ("extensions/A/zaamo_insts.sail") (153)
+                     ("AMO got false from mem_write_value")))
+            : MR (ExecutionResult) (ExecutionResult)
+        | Err (exc_addr, e) =>
+           liftR (assert_exp (generic_eq (exc_addr) (addr)) "extensions/A/zaamo_insts.sail:156.29-156.30") >>
+           liftR ((memory_exception (vaddr) (e)))
+            : MR (ExecutionResult) (ExecutionResult)
+        end
          : MR (ExecutionResult) (ExecutionResult))
       : MR (ExecutionResult) (ExecutionResult)).
 
@@ -41446,13 +42231,15 @@ Definition fetch_bytes (fetch_start : mword 64) (granule_start : mword 64) (widt
      | Ok (paddr, pbmt, _) => returnR (FetchBytes_Result width) ((paddr, pbmt))
      end >>= fun '((paddr, pbmt)
      : (physaddr * page_based_mem_type)) =>
-     liftR ((mem_read ((InstructionFetch (tt))) (pbmt) (paddr) (width) (false) (false) (false))) >>= fun (w__2 : result (mword (8 * width)) ExceptionType) =>
-     let w__3 : FetchBytes_Result width :=
-       match w__2 with
-       | Err e => FetchBytes_Exception (e)
-       | Ok bytes => FetchBytes_Success ((autocast (T := mword)  bytes))
-       end in
-     returnR (FetchBytes_Result width) (w__3)).
+     liftR ((mem_read ((InstructionFetch (tt))) (pbmt) (paddr) (width) (false) (false) (false))) >>= fun (w__2 : result (mword (8 * width)) ((physaddr * ExceptionType))) =>
+     match w__2 with
+     | Err (exc_addr, e) =>
+        liftR (assert_exp (generic_eq (exc_addr) (paddr)) "postlude/fetch.sail:44.30-44.31") >>
+        returnR (FetchBytes_Result width) ((FetchBytes_Exception (e)))
+     | Ok bytes =>
+        returnR (FetchBytes_Result width) ((FetchBytes_Success ((autocast (T := mword)  bytes))))
+     end
+      : MR (FetchBytes_Result width) (FetchBytes_Result width)).
 
 Definition fetch '(tt : unit) : M (FetchResult) :=
    catch_early_return
@@ -41829,7 +42616,7 @@ Definition try_step (step_no : Z) (exit_wait : bool) (*0 <=? step_no*) : M (bool
    end
     : M (bool).
 
-Definition loop '(tt : unit) : M (unit) :=
+Definition loop '(tt : unit) : M (Z) :=
    let i : Z := 0 in
    let step_no : Z := 0 in
    (whileMT
@@ -41847,27 +42634,22 @@ Definition loop '(tt : unit) : M (unit) :=
            (cycle_count (tt)) >> returnM (step_no)
          else returnM (step_no)) >>= fun (step_no : Z) =>
         read_reg htif_done >>= fun (w__1 : bool) =>
-        (if w__1 return M (Z) then
-           ((read_reg htif_exit_code)  : M (mword 64)) >>= fun (w__2 : mword 64) =>
-           let exit_val := uint (w__2) in
-           (if Z.eqb (exit_val) (0) then returnM ((print ("SUCCESS")))
-            else
-              ((read_reg htif_exit_code)  : M (mword 64)) >>= fun (w__3 : mword 64) =>
-              returnM ((print_endline
-                          ((String.append ("FAILURE: ")
-                              ((String.append ((dec_str (exit_val)))
-                                  ((String.append (" (")
-                                      ((String.append ((string_of_bits (w__3))) (")")))))))))))) >>
-           returnM (i)
-         else
+        (if not (w__1) return M (Z) then
            let i : Z := Z.add (i) (1) in
            (if Z.eqb (i) (plat_insns_per_tick) return M (Z) then (tick_clock (tt)) >> returnM (0)
             else returnM (i))
-            : M (Z)) >>= fun (i : Z) =>
+            : M (Z)
+         else returnM (i)) >>= fun (i : Z) =>
         returnM ((i, step_no)))
         : M ((Z * Z)))) >>= fun '((i, step_no)
    : (Z * Z)) =>
-   returnM (tt).
+   ((read_reg htif_exit_code)  : M (mword 64)) >>= fun (w__2 : mword 64) =>
+   let exit_val := uint (w__2) in
+   let '(_) :=
+     (if Z.eqb (exit_val) (0) then print_endline ("SUCCESS")
+      else print_int ("FAILURE: ") (exit_val))
+      : unit in
+   returnM (exit_val).
 
 Definition check_privs '(tt : unit) : bool :=
    if andb ((true  : bool)) ((not ((true  : bool)))) then
@@ -42313,13 +43095,15 @@ Definition undefined_pma_check_opts '(tt : unit) : M (pma_check_opts) :=
    (undefined_bool (tt)) >>= fun (w__4 : bool) =>
    (undefined_bool (tt)) >>= fun (w__5 : bool) =>
    (undefined_bool (tt)) >>= fun (w__6 : bool) =>
-   returnM (({| pma_check_opts_ziccamoa := w__0;
-                pma_check_opts_ziccamoc := w__1;
-                pma_check_opts_ziccif := w__2;
-                pma_check_opts_zicclsm := w__3;
-                pma_check_opts_ziccrse := w__4;
-                pma_check_opts_ssccptr := w__5;
-                pma_check_opts_svadu := w__6 |})).
+   (undefined_bool (tt)) >>= fun (w__7 : bool) =>
+   returnM (({| pma_check_opts_zama16b := w__0;
+                pma_check_opts_ziccamoa := w__1;
+                pma_check_opts_ziccamoc := w__2;
+                pma_check_opts_ziccif := w__3;
+                pma_check_opts_zicclsm := w__4;
+                pma_check_opts_ziccrse := w__5;
+                pma_check_opts_ssccptr := w__6;
+                pma_check_opts_svadu := w__7 |})).
 
 Fixpoint check_pma_regions
 (regions : list PMA_Region) (prev_base : mword 64) (prev_size : mword 64)
@@ -42349,6 +43133,23 @@ Fixpoint check_pma_regions
                                         ((string_of_bits ((add_vec (prev_base) (prev_size))))) ("."))))))))))))))
               : unit in
            inr (false)
+         else if Z.gtb
+                   ((Z.add ((uint (region.(PMA_Region_base)))) ((uint (region.(PMA_Region_size))))))
+                   ((pow2 (physaddr_bits))) then
+           let '(_) :=
+             (print_endline
+                ((String.append ("Memory region starting at ")
+                    ((String.append ((string_of_bits (region.(PMA_Region_base))))
+                        ((String.append (" ends at ")
+                            ((String.append
+                                ((string_of_bits
+                                    ((add_vec (region.(PMA_Region_base)) (region.(PMA_Region_size))))))
+                                ((String.append
+                                    (" which is above the representable limit of the physical address bit size (i.e. ")
+                                    ((String.append ((dec_str (physaddr_bits)))
+                                        (" from `memory.physaddr_bits`)."))))))))))))))
+              : unit in
+           inr (false)
          else if not ((check_pma_region (region))) then inr (false)
          else
            let attributes := region.(PMA_Region_attributes) in
@@ -42356,8 +43157,29 @@ Fixpoint check_pma_regions
                  ((andb (attributes.(PMA_cacheable)) (attributes.(PMA_coherent))))
               return
               sum (bool) (unit) then
-              (if andb (check_opts.(pma_check_opts_ziccamoa))
-                    ((pma_atomicity_support_lt (attributes.(PMA_atomic_support)) (AMOArithmetic)))
+              let mag := attributes.(PMA_misaligned_atomicity_granule_size_exp) in
+              (if andb (check_opts.(pma_check_opts_zama16b)) ((Z.ltb (mag) (4)))
+                 return
+                 sum (bool) (unit) then
+                 let '(_) :=
+                   (print_endline
+                      ((String.append ("Main memory region starting at ")
+                          ((String.append ((string_of_bits (region.(PMA_Region_base))))
+                              ((String.append (" is coherent and cacheable with ")
+                                  ((String.append
+                                      ((if Z.eqb (mag) (0) then
+                                          "no specified misaligned atomicity granule PMA"
+                                        else
+                                          String.append
+                                            ("a misaligned atomicity granule size of 2^")
+                                            ((dec_str (mag)))))
+                                      (", but Zama16b is enabled which requires granule size of at least 2^4 bytes."))))))))))
+                    : unit in
+                 (inl (false  : bool) : sum bool unit)
+                  : sum (bool) (unit)
+               else if andb (check_opts.(pma_check_opts_ziccamoa))
+                         ((pma_atomicity_support_lt (attributes.(PMA_atomic_support))
+                             (AMOArithmetic)))
                  return
                  sum (bool) (unit) then
                  let '(_) :=
@@ -42514,7 +43336,8 @@ Definition check_mem_layout '(tt : unit) : M (bool) :=
       returnM (false)
     else
       let check_opts : pma_check_opts :=
-        {| pma_check_opts_ziccamoa := true;
+        {| pma_check_opts_zama16b := true;
+           pma_check_opts_ziccamoa := true;
            pma_check_opts_ziccamoc := true;
            pma_check_opts_ziccif := true;
            pma_check_opts_zicclsm := true;
@@ -42791,31 +43614,75 @@ Definition check_extension_param_constraints '(tt : unit) : bool :=
           : unit in
        valid
      else valid in
-   if true  : bool then
-     let valid : bool :=
+   let valid : bool :=
+     if true  : bool then
+       let valid : bool :=
+         if misaligned_exception_is_access_fault
+              ((({| GlobalMisalignedExceptions_load_store := None;
+                    GlobalMisalignedExceptions_vector := None;
+                    GlobalMisalignedExceptions_amo := None;
+                    GlobalMisalignedExceptions_lrsc := AccessFault |})
+               : GlobalMisalignedExceptions).(GlobalMisalignedExceptions_load_store)) then
+           let valid : bool := false in
+           let '(_) :=
+             (print_endline
+                ("The Zicclsm extension is enabled, but misaligned scalar loads/stores raise access faults before address translation (as per `memory.misaligned.exceptions.load_store`); Zicclsm requires no exceptions or only misaligned exceptions for such accesses."))
+              : unit in
+           valid
+         else valid in
        if misaligned_exception_is_access_fault
             ((({| GlobalMisalignedExceptions_load_store := None;
                   GlobalMisalignedExceptions_vector := None;
-                  GlobalMisalignedExceptions_lrsc := AccessFault;
-                  GlobalMisalignedExceptions_amo := AccessFault |})
-             : GlobalMisalignedExceptions).(GlobalMisalignedExceptions_load_store)) then
+                  GlobalMisalignedExceptions_amo := None;
+                  GlobalMisalignedExceptions_lrsc := AccessFault |})
+             : GlobalMisalignedExceptions).(GlobalMisalignedExceptions_vector)) then
          let valid : bool := false in
          let '(_) :=
            (print_endline
-              ("The Zicclsm extension is enabled, but misaligned scalar loads/stores raise access faults before address translation (as per `memory.misaligned.exceptions.load_store`); Zicclsm requires no exceptions or only misaligned exceptions for such accesses."))
+              ("The Zicclsm extension is enabled, but misaligned vector loads/stores raise access faults before address translation (as per `memory.misaligned.exceptions.vector`); Zicclsm requires no exceptions or only misaligned exceptions for such accesses."))
+            : unit in
+         valid
+       else valid
+     else valid in
+   if true  : bool then
+     let medelegation :=
+       Mk_Medeleg (('b"0000000000000000000000000000000000000000000011001011001111111111")) in
+     let valid : bool :=
+       if neq_vec ((_get_Medeleg_Double_Trap (medelegation))) (('b"0")) then
+         let valid : bool := false in
+         let '(_) :=
+           (print_endline
+              ("Bit 16 (Double Trap) in `base.medeleg.delegatable_bits` is set; Double Trap cannot be delegated."))
             : unit in
          valid
        else valid in
-     if misaligned_exception_is_access_fault
-          ((({| GlobalMisalignedExceptions_load_store := None;
-                GlobalMisalignedExceptions_vector := None;
-                GlobalMisalignedExceptions_lrsc := AccessFault;
-                GlobalMisalignedExceptions_amo := AccessFault |})
-           : GlobalMisalignedExceptions).(GlobalMisalignedExceptions_vector)) then
+     let valid : bool :=
+       if neq_vec ((_get_Medeleg_MEnvCall (medelegation))) (('b"0")) then
+         let valid : bool := false in
+         let '(_) :=
+           (print_endline
+              ("Bit 11 (Environment call from M-mode) in `base.medeleg.delegatable_bits` is set; this environment call cannot be delegated."))
+            : unit in
+         valid
+       else valid in
+     let reserved_exception_mask : bits 64 := zero_extend' (64) ((Ox"0FFFF00F24400")) in
+     let valid : bool :=
+       if neq_vec ((and_vec (medelegation) (reserved_exception_mask))) ((zeros' (64))) then
+         let valid : bool := false in
+         let '(_) :=
+           (print_endline
+              ("Bits for reserved exceptions are set in `base.medeleg.delegatable_bits`."))
+            : unit in
+         valid
+       else valid in
+     let midelegation :=
+       Mk_Minterrupts
+         ((sail_mask (64) (('b"0000000000000000000000000000000000000000000000000010001000100010")))) in
+     let reserved_interrupt_mask : xlenbits := zero_extend' (64) ((Ox"D555")) in
+     if neq_vec ((and_vec (midelegation) (reserved_interrupt_mask))) ((zeros' (64))) then
        let valid : bool := false in
        let '(_) :=
-         (print_endline
-            ("The Zicclsm extension is enabled, but misaligned vector loads/stores raise access faults before address translation (as per `memory.misaligned.exceptions.vector`); Zicclsm requires no exceptions or only misaligned exceptions for such accesses."))
+         (print_endline ("Bits for reserved interrupts are set in `base.mideleg.delegatable_bits`."))
           : unit in
        valid
      else valid
@@ -42913,22 +43780,64 @@ Definition check_mstatus_fields '(tt : unit) : bool :=
      else valid
    else valid.
 
+Definition check_physaddr_bits '(tt : unit) : bool :=
+   let physaddr_bits_nat : Z := physaddr_bits in
+   if Z.gtb (physaddr_bits_nat) (64) then
+     let '(_) :=
+       (print_endline
+          ((String.append ("`memory.physaddr_bits` is ")
+              ((String.append ((dec_str (physaddr_bits))) (" but cannot be greater than 64."))))))
+        : unit in
+     false
+   else if Z.ltb (physaddr_bits_nat) (13) then
+     let '(_) :=
+       (print_endline
+          ((String.append ("`memory.physaddr_bits` is ")
+              ((String.append ((dec_str (physaddr_bits)))
+                  (" but values smaller than 13 are not supported."))))))
+        : unit in
+     false
+   else true.
+
+Definition check_version_constraints '(tt : unit) : bool :=
+   let valid : bool := true in
+   if andb ((Z.gtb (sys_pmp_count) (16)))
+        ((privileged_isa_version_lt (priv_isa_version) (Privileged_ISA_1_12))) then
+     let valid : bool := false in
+     let '(_) :=
+       (print_endline
+          ((String.append
+              ("More than 16 PMP registers are specified, but the privileged ISA version is set to ")
+              ((String.append ((privileged_isa_version_name_forwards (priv_isa_version)))
+                  (" which only allows 16 PMP registers."))))))
+        : unit in
+     valid
+   else valid.
+
 Definition config_is_valid '(tt : unit) : M (bool) :=
    (and_boolM (returnM (((check_privs (tt))  : bool)))
       ((and_boolM (returnM (((check_tvecs (tt))  : bool)))
           ((and_boolM (returnM (((check_mstatus_fields (tt))  : bool)))
-              ((and_boolM ((check_mmu_config (tt))  : M (bool))
-                  ((and_boolM ((check_mem_layout (tt))  : M (bool))
-                      ((and_boolM ((check_mmio_devices (tt))  : M (bool))
-                          ((and_boolM (returnM (((check_vlen_elen (tt))  : bool)))
-                              ((and_boolM ((check_vext_config (tt))  : M (bool))
-                                  ((and_boolM (returnM (((check_pmp (tt))  : bool)))
-                                      ((and_boolM
-                                          ((check_misc_extension_dependencies (tt))
-                                           : M (bool))
+              ((and_boolM (returnM (((check_physaddr_bits (tt))  : bool)))
+                  ((and_boolM ((check_mmu_config (tt))  : M (bool))
+                      ((and_boolM ((check_mem_layout (tt))  : M (bool))
+                          ((and_boolM ((check_mmio_devices (tt))  : M (bool))
+                              ((and_boolM (returnM (((check_vlen_elen (tt))  : bool)))
+                                  ((and_boolM ((check_vext_config (tt))  : M (bool))
+                                      ((and_boolM (returnM (((check_pmp (tt))  : bool)))
                                           ((and_boolM
-                                              (returnM (((check_extension_param_constraints (tt))
-                                                : bool))) ((check_stateen_config (tt))  : M (bool)))
+                                              ((check_misc_extension_dependencies (tt))
+                                               : M (bool))
+                                              ((and_boolM
+                                                  (returnM (((check_extension_param_constraints (tt))
+                                                    : bool)))
+                                                  ((and_boolM
+                                                      (returnM (((check_version_constraints (tt))
+                                                        : bool)))
+                                                      ((check_stateen_config (tt))
+                                                       : M (bool)))
+                                                   : M (bool)))
+                                               : M (bool)))
                                            : M (bool)))
                                        : M (bool)))
                                    : M (bool)))
@@ -43336,7 +44245,9 @@ Definition sail_model_init (_ : unit) : M (unit) :=
               PMA_reservability := RsrvNone;
               PMA_supports_cbo_zero := false;
               PMA_supports_pte_read := false;
-              PMA_supports_pte_write := false |};
+              PMA_supports_pte_write := false;
+              PMA_misaligned_atomicity_granule_size_exp := 0;
+              PMA_vector_misaligned_atomicity_granule_size_exp := 0 |};
          PMA_Region_include_in_device_tree := false |};
      {| PMA_Region_base := ('b"0000000000000000000000000000000000000010000000000000000000000000");
         PMA_Region_size := ('b"0000000000000000000000000000000000010000000000000000000000000000");
@@ -43357,7 +44268,9 @@ Definition sail_model_init (_ : unit) : M (unit) :=
              PMA_reservability := RsrvNone;
              PMA_supports_cbo_zero := false;
              PMA_supports_pte_read := false;
-             PMA_supports_pte_write := false |};
+             PMA_supports_pte_write := false;
+             PMA_misaligned_atomicity_granule_size_exp := 0;
+             PMA_vector_misaligned_atomicity_granule_size_exp := 0 |};
         PMA_Region_include_in_device_tree := false |};
      {| PMA_Region_base := ('b"0000000000000000000000000000000010000000000000000000000000000000");
         PMA_Region_size := ('b"0000000000000000000000000000000000001000000000000000000000000000");
@@ -43378,7 +44291,9 @@ Definition sail_model_init (_ : unit) : M (unit) :=
              PMA_reservability := RsrvEventual;
              PMA_supports_cbo_zero := true;
              PMA_supports_pte_read := true;
-             PMA_supports_pte_write := true |};
+             PMA_supports_pte_write := true;
+             PMA_misaligned_atomicity_granule_size_exp := 4;
+             PMA_vector_misaligned_atomicity_granule_size_exp := 4 |};
         PMA_Region_include_in_device_tree := true |}] >>
    write_reg tlb (vector_init ((pow2 (6))) (None)) >>
    write_reg ssp (zeros' (64)) >>

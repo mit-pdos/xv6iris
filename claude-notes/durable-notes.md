@@ -81,10 +81,15 @@ change that produced it.
   encoding word and decoded immediate, and those go stale in ~145 of 188
   functions on a typical upstream bump *even where the C source did not
   change* (re-encoded call targets; linker relaxation, which can also resize a
-  function). `make update-decode` rewrites them and refuses — with a list — any
-  site where the instruction itself changed rather than just its immediate.
-  The addresses need no attention: they are symbol-relative already. Design and
-  the measured numbers: [`design/code-organization.md`](design/code-organization.md).
+  function). The whole layer is GENERATED from the dump —
+  `iris/KernelDecode*.v` + the per-function `iris/Code<F>.v`, by
+  `tools/gen_code.py` — so `make gen-code` rewrites it and the diff afterwards
+  is what tells you which functions moved (`make check-decode` is that
+  regeneration plus a `git diff --exit-code`, i.e. it FAILS if anything moved).
+  A site where the INSTRUCTION changed rather than just its immediate shows up
+  as a changed `ast`, and its proof needs a human. The addresses need no attention:
+  they are symbol-relative already. Design and the measured numbers:
+  [`design/code-organization.md`](design/code-organization.md).
 - **Editing a file near the BOTTOM of the tree kills the single-file check loop.** Touch `RiscvFetchExec.v` / `SmodeCore.v` / `IntrDefs.v` / `WpSconfMem.v` and every downstream `coqc <one file>.v` fails with *"Compiled library X makes inconsistent assumptions over library Y"* — the siblings' `.vo`s were built against the old interface, so there is no hand-orderable sequence of single-file compiles that works. Validate such an edit with **`make -f CoqMakefile -j16 -k`** (coqdep orders it; `-k` reports every independent error in one pass) and grep the log for `Error`; reserve single-file `coqc` for leaf/proof files whose dependencies you have not touched.
 - **A `nat` EQUALITY WHOSE RHS IS A LARGE LITERAL NEEDS `Z`, NOT A BIGGER STACK.** Any route to closing such a goal — `reflexivity`, `vm_compute`, even `vm_cast_no_check` — eventually makes something materialize a literal-deep unary successor chain, and that overflows a normal 8 MB stack outright (`ProofWriteiParts.v`'s old `wi_maxfile_bsize : (MAXFILE * BSIZE)%nat = 274432%nat` died this way, deterministically, in under 4 s and under 1 GB RSS — so it does NOT look like memory pressure or a `-j` artifact, it looks like a broken proof in a file you did not touch). `Z` literals are binary `Z.pos` trees (~log2 depth), so state the fact at `Z.of_nat (… )  = <literal>` instead (`rewrite Nat2Z.inj_mul` first if the LHS is a product) and close with `vm_compute; reflexivity` — the `nat`-side factors being unfolded stay small, and the literal itself is never forced into unary form. No shell tuning needed.
 - **Fork/parallel discipline:** `make clean-proofs` nukes the shared `.vo` tree and breaks concurrent siblings — a fork must `coqc` only its OWN file, one compile at a time. Never `pkill -f coqc` (the pattern matches the killer's own shell → kills Bash, exit 144; and kills sibling compiles) — use `pkill -x coqc` or kill the `rocqworker` by PID. The same self-match trap breaks WAIT loops: `until ! pgrep -f "CoqMakefile -j16"; do …` never terminates (the waiter's own command line contains the pattern) and then makes `pgrep -f CoqMakefile` report a phantom in-progress build to everyone else. Don't poll processes at all — have the build write its own sentinel (`…; echo "EXIT=$?" >> log`) and wait on `grep EXIT` of the log.

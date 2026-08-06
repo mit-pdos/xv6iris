@@ -94,23 +94,11 @@ Lemma exec_pmaCheck_ram_wpte (addr : mword 64) (pbmt : page_based_mem_type)
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
   is_aligned_paddr (Physaddr addr) 8 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_supports_pte_write) = true ->
-  exec (pmaCheck (Physaddr addr) 8 (Store PageTableEntry) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) 8 (Store PageTableEntry) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Halign Hwrite.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hwrite |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:108.61-108.62" >>=
-          (fun _ : true = true => returnM (PMA_supports_pte_write (override_PMA rattr pbmt))))
-    with (returnM (PMA_supports_pte_write (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hwrite. cbn match.
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hwrite (exec_is_mag_applicable_store_pte 8 s) Halign.
 Qed.
 
 (* the full PTE write to a RAM slot: memory gains the 8 bytes, registers

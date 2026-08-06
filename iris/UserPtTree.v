@@ -61,8 +61,9 @@ Qed.
 (* the access types arbitrary user-mode execution can issue *)
 Definition u_acc (acc : MemoryAccessType mem_payload) : Prop :=
   acc = InstructionFetch tt \/ acc = Load Data \/ acc = Store Data \/
-  acc = LoadReserved Data \/ acc = StoreConditional Data \/
-  (exists op, acc = Atomic (op, Data, Data)).
+  (exists aq rl, acc = LoadReserved (aq, rl, Data)) \/
+  (exists aq rl, acc = StoreConditional (aq, rl, Data)) \/
+  (exists op aq rl, acc = Atomic (op, aq, rl, Data, Data)).
 
 Lemma exec_is_shadow_stack_u_acc (acc : MemoryAccessType mem_payload) s :
   u_acc acc ->

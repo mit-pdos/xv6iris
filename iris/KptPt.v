@@ -762,13 +762,13 @@ Proof.
     vm_compute; reflexivity.
 Qed.
 
-Lemma kperm_check_amo (ad : bool * bool) : forall (mxr do_sum : bool) s',
-  exec (check_PTE_permission (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
+Lemma kperm_check_amo (ad : bool * bool) (aq rl : bool) : forall (mxr do_sum : bool) s',
+  exec (check_PTE_permission (Atomic (AMOSWAP, aq, rl, Data, Data)) Supervisor mxr do_sum
           (Mk_PTE_Flags (mword_of_int (kperm_flags_ad KP_rw ad)))
           (Mk_PTE_Ext (mword_of_int 0)) tt) s'
   = Some (PTE_Check_Success tt, s').
 Proof.
-  intros mxr do_sum s'. destruct ad as [a d]; destruct a, d, mxr, do_sum;
+  intros mxr do_sum s'. destruct ad as [a d]; destruct a, d, aq, rl, mxr, do_sum;
     vm_compute; reflexivity.
 Qed.
 
@@ -777,7 +777,7 @@ Qed.
    SRegime sits above this file.) *)
 Lemma kperm_check (pc : kperm) (acc : MemoryAccessType mem_payload) (ad : bool * bool) :
   (acc = InstructionFetch tt \/ acc = Load Data \/ acc = Store Data \/
-   acc = Atomic (AMOSWAP, Data, Data)) ->
+   (exists aq rl, acc = Atomic (AMOSWAP, aq, rl, Data, Data))) ->
   kperm_allows pc acc ->
   forall (mxr do_sum : bool) s',
   exec (check_PTE_permission acc Supervisor mxr do_sum
@@ -785,7 +785,7 @@ Lemma kperm_check (pc : kperm) (acc : MemoryAccessType mem_payload) (ad : bool *
           (Mk_PTE_Ext (mword_of_int 0)) tt) s'
   = Some (PTE_Check_Success tt, s').
 Proof.
-  intros [-> | [-> | [-> | ->]]] Hall.
+  intros [-> | [-> | [-> | (aq & rl & ->)]]] Hall.
   - cbn in Hall. subst pc. apply kperm_check_fetch.
   - apply kperm_check_load.
   - cbn in Hall. subst pc. apply kperm_check_store.

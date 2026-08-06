@@ -145,6 +145,20 @@ are working on that effort — the relevant `projects/` file.
   deferred bitmap-invariant question that `balloc` waits on, and the owed
   decode-word dedup sweep. Design in
   [`design/fs-inode.md`](design/fs-inode.md).
+- **[`sail-model-bump.md`](projects/sail-model-bump.md)** — the sail-riscv
+  model bump, IN FLIGHT: the model now comes from the `zeldovich/sail-riscv`
+  FORK (pinned by `SAIL_RISCV_REV`), whose delta is the ATOMIC PTE A/D-bit
+  update, and the fork's tip carried 58 upstream commits along with it. Keeps
+  the measured split between the two (the fork changes 9 of the 585 model
+  definitions `iris/` references; the upstream bump changes 63), the
+  interface-change list in build order, the recipes that are already proven and
+  should be reused (`pma_ok_aligned` and why the whole new splitting axis is
+  INERT for this development; the `pma_ok_peel` tactic; `exec_assert_exp'_true`
+  and why a `change` against an assertion's `<file>:<line>` message must never
+  come back), the keystone still to build (one generic
+  `checked_mem_read`/`checked_mem_write` lemma instead of ~17 per-access
+  ports), the page-table-walk worklist the fork itself forces, and exactly
+  where `make proofs` currently stops.
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone

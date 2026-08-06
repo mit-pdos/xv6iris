@@ -203,8 +203,9 @@ Proof.
   apply kperm_check_store.
 Qed.
 
-Lemma kperm_variant_check_amo (ppn : mword 44) (a d : mword 1) (mxr do_sum : bool) :
-  pte_check_ok (Atomic (AMOSWAP, Data, Data)) Supervisor mxr do_sum
+Lemma kperm_variant_check_amo (ppn : mword 44) (a d : mword 1) (aq rl : bool)
+    (mxr do_sum : bool) :
+  pte_check_ok (Atomic (AMOSWAP, aq, rl, Data, Data)) Supervisor mxr do_sum
     (pte_set_ad (mk_pte ppn (kperm_flags KP_rw)) a d).
 Proof.
   intros s. unfold Mk_PTE_Flags.
@@ -217,7 +218,7 @@ Qed.
 Lemma kperm_variant_check (ppn : mword 44) (pc : kperm)
     (acc : MemoryAccessType mem_payload) (a d : mword 1) (mxr do_sum : bool) :
   (acc = InstructionFetch tt \/ acc = Load Data \/ acc = Store Data \/
-   acc = Atomic (AMOSWAP, Data, Data)) ->
+   (exists aq rl, acc = Atomic (AMOSWAP, aq, rl, Data, Data))) ->
   kperm_allows pc acc ->
   pte_check_ok acc Supervisor mxr do_sum (pte_set_ad (mk_pte ppn (kperm_flags pc)) a d).
 Proof.

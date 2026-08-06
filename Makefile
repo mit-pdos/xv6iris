@@ -11,8 +11,8 @@
 #   make kernel-rocq  compile kernel-rocq/ (regenerating its .v if the ELF changed)
 #   make user-rocq  compile user-rocq/ (the dumped user programs, e.g. _sync)
 #   make dump-force force a re-dump of every image, even if the ELF is unchanged
-#   make check-decode   check iris/'s decode layer against the tracked dump
-#   make update-decode  rewrite the decode layer's stale words/immediates
+#   make sail-rev-check  warn if sail-riscv/ is not at the pinned $(SAIL_RISCV_REV)
+#   make model-gen  regenerate model-xv6iris/*.v from sail-riscv (needs `sail`)
 #   make clean      remove Coq build artifacts (.vo/.glob/CoqMakefile)
 #   make distclean  also `make clean` the xv6 tree
 #
@@ -29,7 +29,6 @@ SWITCH  ?= /shared/xv6rocq
 RUN     := opam exec --switch=$(SWITCH) --
 PYTHON  ?= python3
 OBJDUMP ?= riscv64-linux-gnu-objdump
-SAIL_RISCV_DIR ?=
 
 # Parallel compilation: each Coq sub-make (coq_makefile) is run with -j$(JOBS).
 # coq_makefile computes the dependency order, so independent files (e.g. the
@@ -49,6 +48,16 @@ XV6_URL    ?= https://github.com/mit-pdos/xv6-riscv
 KERNEL_ELF := $(XV6_DIR)/kernel/kernel
 USER_DIR   := $(XV6_DIR)/user
 
+# THE Sail model this development is proved against.  Like $(XV6_DIR), the
+# checkout is .gitignored, so these two lines are the only record of where the
+# generated model-xv6iris/*.v came from.  It is a FORK of riscv/sail-riscv: its
+# delta upstream is the atomic PTE A/D-bit update (an exclusive PTE read + a
+# conditional PTE write, with the tablewalk checks re-run on the freshly read
+# value), which is what the page-table proofs are stated against.
+SAIL_RISCV_DIR ?= sail-riscv
+SAIL_RISCV_URL ?= https://github.com/zeldovich/sail-riscv
+SAIL_RISCV_REV ?= c32fbf4111b849061db1812355d6da9df8c2e396
+
 # THE xv6 revision this development is proved against.  $(XV6_DIR) is
 # .gitignored, so this is the only record of which upstream commit the tracked
 # kernel-rocq/*.v came from -- building any other revision moves symbol
@@ -65,7 +74,8 @@ KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.
 USER_DUMPS ?= sync:Sync
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
-        xv6-rev-check gen-code check-decode update-decode clean clean-proofs distclean model-gen
+        xv6-rev-check sail-rev-check gen-code check-decode update-decode \
+        clean clean-proofs distclean model-gen
 
 all: proofs
 
@@ -206,10 +216,33 @@ clean: clean-proofs
 distclean: clean
 	-$(MAKE) -C xv6-riscv clean 2>/dev/null || true
 
+# ---- the Sail sources, pinned at $(SAIL_RISCV_REV) ----
+# Same treatment as $(XV6_DIR): a build input pinned by this Makefile, cloned
+# detached, .gitignored.  An existing checkout is left alone (see
+# sail-rev-check).  Only `model-gen` needs it; a normal build uses the
+# generated .v checked into $(MODEL).
+$(SAIL_RISCV_DIR):
+	git clone $(SAIL_RISCV_URL) $@
+	git -C $@ checkout --detach $(SAIL_RISCV_REV)
+
+sail-rev-check: | $(SAIL_RISCV_DIR)
+	@have=`git -C $(SAIL_RISCV_DIR) rev-parse HEAD 2>/dev/null`; \
+	 want=`git -C $(SAIL_RISCV_DIR) rev-parse $(SAIL_RISCV_REV) 2>/dev/null`; \
+	 if [ -z "$$want" ]; then \
+	   echo "WARNING: $(SAIL_RISCV_DIR) does not have SAIL_RISCV_REV=$(SAIL_RISCV_REV);"; \
+	   echo "         try 'git -C $(SAIL_RISCV_DIR) fetch $(SAIL_RISCV_URL)'."; \
+	 elif [ "$$have" != "$$want" ]; then \
+	   echo "WARNING: $(SAIL_RISCV_DIR) is at $$have,"; \
+	   echo "         not the pinned SAIL_RISCV_REV=$$want."; \
+	   echo "         A model regenerated there is NOT the one the proofs are about."; \
+	   echo "         Fix with: git -C $(SAIL_RISCV_DIR) checkout --detach $(SAIL_RISCV_REV)"; \
+	 fi
+
 # ---- regenerating the Sail model (manual; needs the Sail toolchain) ----
-model-gen:
+model-gen: | $(SAIL_RISCV_DIR)
 	@if command -v sail >/dev/null 2>&1; then \
-		tools/regen_sail_model.sh $(if $(SAIL_RISCV_DIR),"$(SAIL_RISCV_DIR)",); \
+		SAIL_RISCV_URL="$(SAIL_RISCV_URL)" SAIL_RISCV_REV="$(SAIL_RISCV_REV)" \
+		  tools/regen_sail_model.sh "$(SAIL_RISCV_DIR)"; \
 	else \
 		echo "Regenerating $(MODEL)/*.v requires the 'sail' compiler (0.20.1,"; \
 		echo "sail_coq_backend) on PATH -- eval \$$(opam env) into whichever switch"; \

@@ -1050,3 +1050,144 @@ Proof.
   assert (bv_modulus (MachineWord.MachineWord.Z_idx 64) = 18446744073709551616) as -> by (vm_compute; reflexivity).
   reflexivity.
 Qed.
+
+(* ====================================================================== *)
+(* THE PMA CHECK'S ALIGNED OUTCOME.                                        *)
+(*                                                                         *)
+(* [pmaCheck] no longer answers "no exception" ([option ExceptionType]): it *)
+(* answers a [Phys_Mem_Access_Info], the SPLITTING plan for the access --   *)
+(* whether it must be decomposed into several single-copy-atomic            *)
+(* operations, and at what granule.  The plan comes from [mag_pma_check],   *)
+(* which consults the region's Misaligned Atomicity Granule PMA            *)
+(* ([RiscvLang.pma_boot_ram_attrs]'s 16 bytes, per Zama16b).                *)
+(*                                                                         *)
+(* EVERY ACCESS THESE PROOFS PERFORM IS NATURALLY ALIGNED, and for an       *)
+(* aligned access the granule never enters into it: [mag_pma_check]         *)
+(* short-circuits on [is_aligned_paddr] and answers [CannotSplit] at        *)
+(* granule 0 whatever the PMA and whatever the access type.  So the whole   *)
+(* new axis collapses to this one constant, and the memory-access chain      *)
+(* keeps its old shape: [split_misaligned] of [CannotSplit] is one          *)
+(* operation of the full width ([split_misaligned_unsplit] below).          *)
+(* ====================================================================== *)
+
+Definition pma_ok_aligned : Phys_Mem_Access_Info :=
+  {| Phys_Mem_Access_Info_splittable := CannotSplit;
+     Phys_Mem_Access_Info_granule_size_exp := 0 |}.
+
+Lemma exec_mag_pma_check_aligned (pma : PMA) (acc : MemoryAccessType mem_payload)
+    (paddr : physaddr) (width : Z) (b : bool) s :
+  exec (is_mag_applicable_access acc width) s = Some (b, s) ->
+  is_aligned_paddr paddr width = true ->
+  exec (mag_pma_check pma acc paddr width) s = Some (Ok (CannotSplit, 0), s).
+Proof.
+  intros Hma Halign.
+  unfold mag_pma_check.
+  rewrite (exec_bind_Some _ _ _ _ _ Hma).
+  rewrite Halign. cbn [orb]. apply exec_returnM.
+Qed.
+
+(* The premise, for the access types the proofs use: each is a [returnM] of a
+   closed boolean.  (The [Atomic] arms with mismatched read/write payloads are
+   an [internal_error] and have no such fact -- which is why the lemma above
+   takes it as a premise rather than proving it for every access.) *)
+Lemma exec_is_mag_applicable_load_data (width : Z) s :
+  exec (is_mag_applicable_access (Load Data) width) s = Some (Z.leb width xlen_bytes, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_is_mag_applicable_store_data (width : Z) s :
+  exec (is_mag_applicable_access (Store Data) width) s = Some (Z.leb width xlen_bytes, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_is_mag_applicable_load_pte (width : Z) s :
+  exec (is_mag_applicable_access (Load PageTableEntry) width) s = Some (false, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_is_mag_applicable_store_pte (width : Z) s :
+  exec (is_mag_applicable_access (Store PageTableEntry) width) s = Some (false, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_is_mag_applicable_fetch (width : Z) s :
+  exec (is_mag_applicable_access (InstructionFetch tt) width) s = Some (false, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_is_mag_applicable_cache (c : cacheop) (width : Z) s :
+  exec (is_mag_applicable_access (CacheAccess c) width) s = Some (false, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_is_mag_applicable_lr (aq rl : bool) (width : Z) s :
+  exec (is_mag_applicable_access (LoadReserved (aq, rl, Data)) width) s = Some (false, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_is_mag_applicable_sc (aq rl : bool) (width : Z) s :
+  exec (is_mag_applicable_access (StoreConditional (aq, rl, Data)) width) s = Some (false, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_is_mag_applicable_amo (op : amoop) (aq rl : bool) (width : Z) s :
+  exec (is_mag_applicable_access (Atomic (op, aq, rl, Data, Data)) width) s = Some (true, s).
+Proof. apply exec_returnM. Qed.
+
+Lemma exec_assert_exp'_true (msg : string) s :
+  exec (Defs.assert_exp' true msg) s = Some (eq_refl, s).
+Proof. unfold Defs.assert_exp'. cbn match. apply exec_returnM. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* THE PMA-CHECK PEEL, once.                                               *)
+(*                                                                         *)
+(* Every [exec (pmaCheck …) s = Some (Ok pma_ok_aligned, s)] lemma in the   *)
+(* tree is this same six-step walk down [pmaCheck]'s early-return body:     *)
+(* read [pma_regions]; resolve [matching_pma_region] to the region and take  *)
+(* its overridden attributes; resolve the access arm to the PMA field that  *)
+(* licenses the access (some arms first assert [not res_or_con], which is    *)
+(* why the arm peel dispatches on whether an [assert_exp'] is present);     *)
+(* rewrite that field to [true]; and run [mag_pma_check], which an ALIGNED  *)
+(* access answers [CannotSplit].  The caller supplies the four facts and    *)
+(* the region's constructor form.                                          *)
+(*                                                                         *)
+(* Hmatch : matching_pma_region … = Some <the destructed region>            *)
+(* Hfield : the access's PMA permission field = true                        *)
+(* Hmag   : exec (is_mag_applicable_access <acc> <width>) s = Some (_, s)   *)
+(* Halign : is_aligned_paddr <paddr> <width> = true                         *)
+(* ---------------------------------------------------------------------- *)
+Ltac pma_ok_peel Hmatch Hfield Hmag Halign :=
+  unfold pmaCheck; rewrite exec_catch_early_return;
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pma_regions _)); cbn beta;
+  rewrite Hmatch;
+  cbn [PMA_Region_attributes] in Hfield |- *;
+  cbn match;
+  rewrite execR_bind; rewrite execR_returnR; cbn match beta;
+  lazymatch goal with
+  | |- context[Defs.assert_exp' _ _] =>
+      cbn [Riscv.rv64d.not negb];
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ _)); cbn beta;
+      rewrite execR_bind; rewrite execR_returnR; cbn match beta
+  | _ =>
+      rewrite execR_bind; rewrite execR_returnR; cbn match beta
+  end;
+  rewrite Hfield; cbn [Riscv.rv64d.not negb];
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_mag_pma_check_aligned _ _ _ _ _ _ Hmag Halign));
+  cbn beta; cbn match; rewrite execR_returnR; reflexivity.
+
+(* [split_misaligned] at the plan an aligned access yields: ONE operation of
+   the full width.  [CannotSplit] alone decides it -- the address and the
+   granule never enter into it. *)
+Lemma exec_split_misaligned_unsplit (addr : mword 64) (width g : Z) s :
+  exec (split_misaligned (Physaddr addr) width g CannotSplit) s
+    = Some ((1, width), s).
+Proof.
+  unfold split_misaligned.
+  change (generic_eq CannotSplit CannotSplit) with true.
+  cbn [orb]. apply exec_returnm.
+Qed.
+
+(* ...and the two projections of [pma_ok_aligned] that feed it. *)
+Lemma pma_ok_aligned_splittable :
+  Phys_Mem_Access_Info_splittable pma_ok_aligned = CannotSplit.
+Proof. reflexivity. Qed.
+
+Lemma pma_ok_aligned_granule :
+  Phys_Mem_Access_Info_granule_size_exp pma_ok_aligned = 0.
+Proof. reflexivity. Qed.
+
+(* One split means offset 0 only, ascending. *)
+Lemma misaligned_order_1 : misaligned_order 1 = (0, 0, 1).
+Proof. vm_compute. reflexivity. Qed.

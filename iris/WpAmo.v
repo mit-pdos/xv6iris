@@ -4,7 +4,7 @@
         a misa.A hypothesis; [amodec] decodes acquire's 0x0cf4a7af.
      2. exec: Atomic-access clones of the width-4 (Store Data)/(Load Data)
         translation + PMP/PMA + read/write stacks of WpPushOffMem/WpSmodeGpr
-        ((Atomic (AMOSWAP, Data, Data)) checks R&&W everywhere, the read is
+        ((Atomic (AMOSWAP, aq, rl, Data, Data)) checks R&&W everywhere, the read is
         Read_RISCV_reserved_acquire, the write Write_RISCV_conditional), and
         the whole-instruction [exec_execute_AMOSWAP_4_gpr_S] (+ _walk).
      3. the stored/loaded value shims ([amoswap_stored]/[amoswap_loaded])
@@ -65,7 +65,7 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
-(* Part 3 -- Atomic-access ((Atomic (AMOSWAP, Data, Data))) exec layer:   *)
+(* Part 3 -- Atomic-access ((Atomic (AMOSWAP, aq, rl, Data, Data))) exec layer:   *)
 (* clones of the width-4 (Store Data)/(Load Data) stacks with the AMO     *)
 (* access type (PMP checks R&&W, PMA additionally checks atomic support,  *)
 (* the read kind is Read_RISCV_reserved_acquire, the write kind           *)
@@ -73,7 +73,7 @@ Qed.
 (* ===================================================================== *)
 
 (* Supervisor PMP grant for an AMO (R && W bits). *)
-Lemma exec_pmpCheck_supervisor_grant_amo (a : mword 64) (width : Z) s :
+Lemma exec_pmpCheck_supervisor_grant_amo (a : mword 64) (width : Z) (aq rl : bool) s :
   pmpAddrMatchType_encdec_backwards
     (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
   zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
@@ -82,7 +82,7 @@ Lemma exec_pmpCheck_supervisor_grant_amo (a : mword 64) (width : Z) s :
     (uint a) (uint (to_bits 64 width)) = PMP_Match ->
   eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
   eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
-  exec (pmpCheck (Physaddr a) width (Atomic (AMOSWAP, Data, Data)) Supervisor) s = Some (None, s).
+  exec (pmpCheck (Physaddr a) width (Atomic (AMOSWAP, aq, rl, Data, Data)) Supervisor) s = Some (None, s).
 Proof.
   intros HA Hord Hrange HR HW.
   unfold pmpCheck. rewrite exec_catch_early_return.
@@ -105,7 +105,7 @@ Proof.
     rewrite execR_bind.
     rewrite (execR_liftR_seq _ _ _ _ _
                (_ : exec (pmpCheckRWX (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)
-                            (Atomic (AMOSWAP, Data, Data))) s = Some (true, s))).
+                            (Atomic (AMOSWAP, aq, rl, Data, Data))) s = Some (true, s))).
     2:{ unfold pmpCheckRWX. cbn match. rewrite HR HW. apply exec_returnm. }
     cbn match. rewrite execR_returnR. cbn beta.
     cbn match. rewrite execR_bind. rewrite execR_returnR. cbn match.
@@ -115,14 +115,14 @@ Qed.
 
 (* pmaCheck for an aligned RAM AMO with atomic support (res_or_con = true). *)
 Lemma exec_pmaCheck_ram_amo_4 (addr : mword 64) (pbmt : page_based_mem_type)
-    (region : PMA_Region) s :
+    (region : PMA_Region) (aq rl : bool) s :
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
   pma_allows_atomic_op ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support))
     AMOSWAP 4 = true ->
-  exec (pmaCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) pbmt true) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) 4 (Atomic (AMOSWAP, aq, rl, Data, Data)) pbmt true) s = Some (None, s).
 Proof.
   intros Hmatch Halign Hread Hwrite Hamo.
   unfold pmaCheck.
@@ -147,29 +147,29 @@ Proof.
   apply exec_returnM.
 Qed.
 
-Lemma exec_effectivePrivilege_amo_S (m : mword 64) s :
+Lemma exec_effectivePrivilege_amo_S (m : mword 64) (aq rl : bool) s :
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
-  exec (effectivePrivilege (Atomic (AMOSWAP, Data, Data)) m Supervisor) s = Some (Supervisor, s).
+  exec (effectivePrivilege (Atomic (AMOSWAP, aq, rl, Data, Data)) m Supervisor) s = Some (Supervisor, s).
 Proof.
   intro H. unfold effectivePrivilege. cbn [generic_neq generic_eq].
   rewrite H. cbn [andb]. apply exec_returnm.
 Qed.
 
-Lemma exec_is_shadow_stack_amo s :
-  exec (is_shadow_stack_access (Atomic (AMOSWAP, Data, Data))) s = Some (false, s).
+Lemma exec_is_shadow_stack_amo (aq rl : bool) s :
+  exec (is_shadow_stack_access (Atomic (AMOSWAP, aq, rl, Data, Data))) s = Some (false, s).
 Proof. unfold is_shadow_stack_access. cbn match. apply exec_returnM. Qed.
 
-Lemma exec_is_pmm_applicable_amo_S s :
+Lemma exec_is_pmm_applicable_amo_S (aq rl : bool) s :
   eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
-  exec (is_pmm_applicable (Atomic (AMOSWAP, Data, Data)) Supervisor) s = Some (true, s).
+  exec (is_pmm_applicable (Atomic (AMOSWAP, aq, rl, Data, Data)) Supervisor) s = Some (true, s).
 Proof.
   intro Hmxr. unfold is_pmm_applicable.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (InstructionFetch tt)) with true by (vm_compute; reflexivity). cbn match.
+  replace (generic_neq (Atomic (AMOSWAP, aq, rl, Data, Data)) (InstructionFetch tt)) with true by (vm_compute; reflexivity). cbn match.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (Load PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
+  replace (generic_neq (Atomic (AMOSWAP, aq, rl, Data, Data)) (Load PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (Store PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
+  replace (generic_neq (Atomic (AMOSWAP, aq, rl, Data, Data)) (Store PageTableEntry)) with true by (vm_compute; reflexivity). cbn match.
   match goal with
   | |- context [ and_boolM ?orb _ ] => assert (Hor : exec orb s = Some (true, s))
   end.
@@ -182,10 +182,10 @@ Proof.
   replace (xlen =? 64) with true by (vm_compute; reflexivity). reflexivity.
 Qed.
 
-Lemma exec_get_pmlen_amo_S s :
+Lemma exec_get_pmlen_amo_S (aq rl : bool) s :
   eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true ->
   pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg s.(sregs))) = PMM_Disabled ->
-  exec (get_pmlen (Atomic (AMOSWAP, Data, Data)) Supervisor) s = Some (0, s).
+  exec (get_pmlen (Atomic (AMOSWAP, aq, rl, Data, Data)) Supervisor) s = Some (0, s).
 Proof.
   intros Hmxr Hpmm. unfold get_pmlen.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_is_pmm_applicable_amo_S s Hmxr)).
@@ -290,7 +290,7 @@ Lemma exec_checked_mem_read_ram_amo_4_S (pbmt : page_based_mem_type) (addr : mwo
   dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (checked_mem_read (Atomic (AMOSWAP, Data, Data)) pbmt Supervisor (Physaddr addr) 4 true false true false)
+  exec (checked_mem_read (Atomic (AMOSWAP, true, false, Data, Data)) pbmt Supervisor (Physaddr addr) 4 true false true false)
        s = Some (Ok (w, default_meta), s).
 Proof.
   intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes.
@@ -340,7 +340,7 @@ Lemma exec_mem_read_amo_4_S (pbmt : page_based_mem_type) (addr : mword 64)
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
   register_lookup cur_privilege s.(sregs) = Supervisor ->
-  exec (mem_read (Atomic (AMOSWAP, Data, Data)) pbmt (Physaddr addr) 4 true false true)
+  exec (mem_read (Atomic (AMOSWAP, true, false, Data, Data)) pbmt (Physaddr addr) 4 true false true)
        s = Some (Ok w, s).
 Proof.
   intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes Hms Hmprv Hpriv.
@@ -410,7 +410,7 @@ Lemma exec_checked_mem_write_ram_amo_4_S (pbmt : page_based_mem_type) (addr : mw
   exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_htif_writable (Physaddr addr) 4) s = Some (false, s) ->
   dev_addr addr = false ->
-  exec (checked_mem_write (Physaddr addr) 4 data (Atomic (AMOSWAP, Data, Data)) pbmt Supervisor tt false false true) s
+  exec (checked_mem_write (Physaddr addr) 4 data (Atomic (AMOSWAP, true, false, Data, Data)) pbmt Supervisor tt false false true) s
     = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
 Proof.
   intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev.
@@ -461,7 +461,7 @@ Lemma exec_mem_write_value_amo_4_S (pbmt : page_based_mem_type) (addr : mword 64
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
   register_lookup cur_privilege s.(sregs) = Supervisor ->
-  exec (mem_write_value (Physaddr addr) 4 data (Atomic (AMOSWAP, Data, Data)) pbmt false false true) s
+  exec (mem_write_value (Physaddr addr) 4 data (Atomic (AMOSWAP, true, false, Data, Data)) pbmt false false true) s
     = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
 Proof.
   intros HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hms Hmprv Hpriv.
@@ -486,6 +486,8 @@ Section ExecAmoGS4.
   Variable rs2 rs1 rd : mword 5.
   Variable region : PMA_Region.
   Variable satp0 : mword 64.
+  (* the AMO's aq/rl instruction annotations, carried by the access type *)
+  Variable aq rl : bool.
   Variable w : mword 32.
   Variable s : mstate.
   Let vrs2 := if Z.eqb (uint rs2) 0 then zero_reg
@@ -505,7 +507,7 @@ Section ExecAmoGS4.
   Hypothesis Hmxr : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true.
   Hypothesis Hpmm : pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg s.(sregs))) = PMM_Disabled.
   Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 4 = true.
-  Hypothesis Htr : exec (translateAddr (Virtaddr a8) (Atomic (AMOSWAP, Data, Data))) s
+  Hypothesis Htr : exec (translateAddr (Virtaddr a8) (Atomic (AMOSWAP, aq, rl, Data, Data))) s
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s).
   Hypothesis HA : pmpAddrMatchType_encdec_backwards
       (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR.
@@ -536,6 +538,8 @@ Section ExecAmoGS4walk.
   Variable rs2 rs1 rd : mword 5.
   Variable region : PMA_Region.
   Variable satp0 : mword 64.
+  (* the AMO's aq/rl instruction annotations, carried by the access type *)
+  Variable aq rl : bool.
   Variable tlbf : vec (option TLB_Entry) (2 ^ 6).
   Variable w : mword 32.
   Variable s : mstate.
@@ -557,7 +561,7 @@ Section ExecAmoGS4walk.
   Hypothesis Hmxr : eq_vec (_get_Mstatus_MXR (register_lookup mstatus s.(sregs))) ('b"0") = true.
   Hypothesis Hpmm : pmm_mode_backwards (_get_MEnvcfg_PMM (register_lookup menvcfg s.(sregs))) = PMM_Disabled.
   Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 4 = true.
-  Hypothesis Htr : exec (translateAddr (Virtaddr a8) (Atomic (AMOSWAP, Data, Data))) s
+  Hypothesis Htr : exec (translateAddr (Virtaddr a8) (Atomic (AMOSWAP, aq, rl, Data, Data))) s
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
   Hypothesis Hcp' : register_lookup cur_privilege s'.(sregs) = Supervisor.
   Hypothesis Hmprv' : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false.
