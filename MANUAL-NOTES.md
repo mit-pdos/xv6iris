@@ -53,6 +53,9 @@ Some high-level ideas that might be interesting for some eventual paper:
 - tangentially found bug corresponding to usertests partial_write
 - owning current proc should be separate from owning the FD table: we may look up some FD, pass the struct file to another function, but that function also wants to own current proc (and that double-owns the struct file)
 - bug: freeproc did not hold wait_lock when zeroing out p->parent
+- bug: fence.i missing when jumping to userspace code
+- bug: missing fence iorw,iorw in virtio disk driver
+- RVWMO doesn't cover icache behavior, Sail model doesn't include icache either
 
 Big things that still need to be done/explored:
 
