@@ -150,7 +150,6 @@ ProofEntry.v
 LinkEntry.v
 CodeKernelvec.v
 CodeMemset.v
-CodeMemsetAux.v
 MstatusBits.v
 WpIntrCore.v
 PlicPlan.v
@@ -306,9 +305,7 @@ KernelDecode.v
 CodePushOff.v
 WpAmo.v
 CodeHolding.v
-CodeHoldingAux.v
 CodeAcquire.v
-CodeAcquireAux.v
 WpLock.v
 ArrCursor.v
 FdSlots.v
@@ -317,7 +314,6 @@ KallocInv.v
 ByteBuf.v
 WpHoldingInv.v
 CodePopOff.v
-CodePopOffAux.v
 CodeRelease.v
 CodeKalloc.v
 WpMemsetPage.v
@@ -331,7 +327,6 @@ CpuOwn.v
 ProcInv.v
 WpPushOffBridges.v
 CodeSwtch.v
-CodeSwtchAux.v
 WpSwtchVc.v
 SpecSwtch.v
 ProofSwtch.v
@@ -368,7 +363,6 @@ LinkInitlock.v
 WpSmodeUart.v
 KernelDataInv.v
 CodeUartPutcSync.v
-CodeUartPutcSyncAux.v
 SpecUartPutc.v
 WpSconfUartAccess.v
 ProofUartPutc.v
@@ -384,17 +378,14 @@ LinkKinit.v
 SpecInitlockWrapper.v
 WpInitlockWrapper.v
 CodePrintkinit.v
-CodePrintkinitAux.v
 SpecPrintkinit.v
 ProofPrintkinit.v
 LinkPrintkinit.v
 CodeTrapinit.v
-CodeTrapinitAux.v
 SpecTrapinit.v
 ProofTrapinit.v
 LinkTrapinit.v
 CodeFileinit.v
-CodeFileinitAux.v
 SpecFileinit.v
 ProofFileinit.v
 LinkFileinit.v
@@ -546,7 +537,6 @@ ProofSysGetpid.v
 LinkSysGetpid.v
 SpecArgraw.v
 CodeArgraw.v
-CodeArgrawAux.v
 ProofArgraw.v
 LinkArgraw.v
 SpecArgint.v
@@ -558,7 +548,6 @@ ProofArgaddr.v
 LinkArgaddr.v
 SpecKilled.v
 CodeKilled.v
-CodeKilledAux.v
 ProofKilled.v
 LinkKilled.v
 SpecSysPause.v
@@ -792,7 +781,6 @@ LinkArgfd.v
 LinkSysDup.v
 SpecSetkilled.v
 CodeSetkilled.v
-CodeSetkilledAux.v
 ProofSetkilled.v
 LinkSetkilled.v
 SpecKkill.v

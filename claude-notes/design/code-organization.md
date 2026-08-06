@@ -97,6 +97,19 @@ The compressed jumps (`c.j`, `c.beqz`/`c.bnez`) carry relocated immediates too
 and are handled; every other compressed displacement is a stack or struct
 offset that no relayout moves.
 
+Two invariants of `tools/gen_code.py` and its `tools/code_manifest.json`:
+
+- **The manifest's lemma-prefix column must be unique per function.** Prefixes
+  are initials, so collisions are easy (`printk` and `printkinit` both had
+  `pki_`, making `CodePrintk.pki_00` and `CodePrintkinit.pki_00` differ only by
+  which file a proof imported last). Nothing errors — a proof just silently
+  steps the wrong function's instruction. Check the column when adding a row.
+- **`--only` restricts the `Code<F>.v` files, never `KernelDecode*.v`.** The
+  shards are keyed by WORD over the *whole* covered set, so they are always
+  computed from every group; deriving them from a restricted set would rewrite
+  all sixteen with one function's handful of words. The same shape applies to
+  anything else the generator keys globally.
+
 ## Specific-vs-generic leaf lemmas
 
 - The generic gpr-write **engine** (`wp_gpr_write_s_config*`, in `WpSmodeLeafBase.v`) takes an arbitrary `instr` + an `exec (execute i)` obligation. It is *internal plumbing* — call it only from within family-file specific lemmas, never from a higher-level function proof.

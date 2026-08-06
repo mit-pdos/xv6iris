@@ -316,11 +316,16 @@ def main():
         f, sym, pre, wid = row[0], row[1], row[2], row[3]
         lo, hi = rng(sym)
         groups.setdefault(f, []).append((sym, pre, lo, hi, wid))
+    # The decode shards are keyed by WORD over the whole covered set, so they
+    # must always be computed from every group -- restricting to --only and
+    # then emitting them would rewrite each shard with just that function's
+    # handful of words and silently delete everyone else's.
+    all_groups = groups
     if args.only:
         groups = {k: v for k, v in groups.items() if k in args.only}
 
     decoded, undec = {}, []
-    for fams in groups.values():
+    for fams in all_groups.values():
         for _, _, lo, hi, _ in fams:
             for a, w, width in instructions(by, lo, hi):
                 if (w, width) in decoded:
@@ -342,7 +347,9 @@ def main():
         return 0
 
     nc, nb = emit_decode_file(decoded, args.iris)
-    print("KernelDecode.v: %d compressed + %d base decode lemmas" % (nc, nb))
+    print("KernelDecode.v: %d compressed + %d base decode lemmas%s"
+          % (nc, nb, " (all files, --only restricts the Code files only)"
+             if args.only else ""))
     tot = 0
     for f, fams in sorted(groups.items()):
         tot += emit_code_file(os.path.join(args.iris, f), fams, syms, by, decoded)

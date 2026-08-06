@@ -63,7 +63,6 @@ Require Import SpecAcquire SpecRelease SpecWakeup SpecConsoleintr.
 Require Import CodeUartintr.
 Require Import SpecUartintr.
 From Kernel Require KernelSyms.
-Require Import CodeUartPutcSyncAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.

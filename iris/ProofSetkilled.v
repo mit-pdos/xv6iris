@@ -39,9 +39,10 @@ Require Import SpecSetkilled.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSetkilled.
-Require Import CodeSetkilledAux.
 Import Defs.
 Local Open Scope Z_scope.
+
+Notation sk_ra := (mword_of_int 1 : mword 5).
 (* a failing tactic in a whole-function WP over the proc invariant otherwise
    spends tens of minutes FORMATTING the goal -- see durable-notes. *)
 Set Printing Depth 40.

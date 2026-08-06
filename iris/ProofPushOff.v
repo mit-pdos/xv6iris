@@ -24,9 +24,37 @@ Require Import CpuOwn.
 Require Import WpPushOffBridges.
 Require Import SpecPushOff.
 Require Import ProcGeom.
-Require Import CodePopOffAux.
+Require WpGprCsrwC.
 Import Defs.
 
+(* SIE=0 (folded into smode_config) gives pop_off's interrupt-off fact
+   [sstatus & 2 = 0] with mstatus0 hidden.  [mword1_zero_of_ne_one] is the
+   shared pure bitvector fact (RiscvExtras). *)
+Lemma pop_sstatus_clear_neq (m : mword 64) :
+  eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
+  neq_vec (and_vec (sstatus_read m)
+             (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false.
+Proof.
+  intro HSIE.
+  unfold neq_vec. apply negb_false_iff. apply eq_vec_true_iff.
+  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1))
+    by (apply mword1_zero_of_ne_one; exact HSIE).
+  assert (Hb1 : Z.testbit (bv_unsigned (sstatus_read m)) 1 = false).
+  { unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
+    apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz. }
+  assert (Hmask : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)) : mword 64) = 2)
+    by (vm_compute; reflexivity).
+  assert (Hzr : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
+  apply bv_eq. rewrite WpGprCsrwC.and_vec_unsigned. rewrite Hmask. rewrite Hzr.
+  apply Z.bits_inj'. intros j Hj. rewrite Z.land_spec. rewrite Z.bits_0.
+  destruct (decide (j = 1)) as [->|Hne].
+  - rewrite Hb1. reflexivity.
+  - assert (Ht2 : Z.testbit 2 j = false).
+    { destruct (Z.eq_dec j 0) as [->|Hj0].
+      - reflexivity.
+      - apply Z.bits_above_log2; [lia|]. change (Z.log2 2) with 1. lia. }
+    rewrite Ht2. apply andb_false_r.
+Qed.
 
 (* +0x24  0x10016073  csrsi sstatus,2 (rd = x0) -- pop_off's intr_on.  Its
    decode is KernelBaseDecode.v's shared [bdec_10016073], stated with the csr

@@ -51,22 +51,38 @@ From Kernel Require KernelInstrs KernelData.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeArgraw.
-Require Import CodeArgrawAux.
 Import Defs.
 Local Open Scope Z_scope.
+
+Notation ar_ra := (mword_of_int 1 : mword 5).
+Notation ar_s1 := (mword_of_int 9 : mword 5).
+Notation ar_a0 := (mword_of_int 10 : mword 5).
+Notation ar_a4 := (mword_of_int 14 : mword 5).
+Notation ar_a5 := (mword_of_int 15 : mword 5).
+
+(* the case-body PC, the argument-load PC and the re-join displacement, as
+   FUNCTIONS of the switch index -- what lets an arm be proved ONCE over a
+   symbolic [k]. *)
+Definition ar_case_off (k : nat) : Z :=
+match k with 0%nat => 0x28 | 1%nat => 0x36 | 2%nat => 0x3c
+           | 3%nat => 0x42 | 4%nat => 0x48 | _ => 0x4e end.
+Definition ar_ld_off (k : nat) : Z :=
+match k with 0%nat => 0x2a | 1%nat => 0x38 | 2%nat => 0x3e
+           | 3%nat => 0x44 | 4%nat => 0x4a | _ => 0x50 end.
+(* the [c.j] immediate of case k >= 1 (case 0 falls through to +0x2c) *)
+Definition ar_cj_imm (k : nat) : Z :=
+match k with 1%nat => 2041 | 2%nat => 2038 | 3%nat => 2035
+           | 4%nat => 2032 | _ => 2029 end.
 
 (* the jump table: base, and the six entries -- DERIVED, not transcribed.
    gcc emits each entry as the case body's displacement from the table base,
    so the whole table follows from two symbols and the case offsets
-   [CodeArgrawAux.ar_case_off] already states.  Spelling it out cost six
+   [ar_case_off] already states.  Spelling it out cost six
    literals that silently went stale on every relayout (they moved +0xe at
    xv6 9dd28f5); this way a re-dump moves them for free. *)
 Definition ar_tbl : Z := KernelSyms.states_0 + 0x30.
 Definition ar_entry (i : nat) : mword 32 :=
   mword_of_int ((KernelSyms.argraw + ar_case_off i - ar_tbl) mod 4294967296).
-
-(* the case-body and argument-load PCs as FUNCTIONS of the switch index --
-   what lets the arm be proved ONCE over a symbolic [k]. *)
 
 (* ======================= fresh decode templates ======================= *)
 
@@ -103,6 +119,47 @@ Lemma ar_cr2 : creg2reg_idx (Cregidx (mword_of_int 2)) = Regidx ar_a0.
 Proof. vm_compute. reflexivity. Qed.
 Lemma ar_cr7 : creg2reg_idx (Cregidx (mword_of_int 7)) = Regidx ar_a5.
 Proof. vm_compute. reflexivity. Qed.
+
+(* ================================================================== *)
+(* Per-case dispatch over the generated [ari_*] facts (CodeArgraw.v):  *)
+(* the ONLY six-way [destruct]s, each on a TINY goal.  Splitting inside *)
+(* the capstone instead cost 81 s and ~74 GB -- Coq retains all six     *)
+(* arms' Iris proof terms until [Qed], and each branch re-typechecks    *)
+(* the dependently-typed Sail bitvector context.                        *)
+(* ================================================================== *)
+Section ArgrawDispatch.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  Lemma ar_i_tf (k : nat) : (k < NARG)%nat ->
+    kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + ar_case_off k) : mword 64) true
+      (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")),
+             creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
+  Proof.
+    intro Hk. unfold NARG in Hk. destruct k as [|[|[|[|[|[|k']]]]]]; try lia; cbn [ar_case_off];
+      [ exact ari_28 | exact ari_36 | exact ari_3c | exact ari_42 | exact ari_48 | exact ari_4e ].
+  Qed.
+
+  Lemma ar_i_ld (k : nat) : (k < NARG)%nat ->
+    kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + ar_ld_off k) : mword 64) true
+      (LOAD (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat k) : mword 5) ('b"000")),
+             creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
+  Proof.
+    intro Hk. unfold NARG in Hk. destruct k as [|[|[|[|[|[|k']]]]]]; try lia;
+      cbn [ar_ld_off Z.of_nat]; cbn [Z.add];
+      [ exact ari_2a | exact ari_38 | exact ari_3e | exact ari_44 | exact ari_4a | exact ari_50 ].
+  Qed.
+
+  Lemma ar_i_cj (k : nat) : (1 <= k < NARG)%nat ->
+    kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2) : mword 64) true
+      (JAL (sign_extend' 21 (concat_vec (mword_of_int (ar_cj_imm k) : mword 11) ('b"0")), zreg)).
+  Proof.
+    intro Hk. unfold NARG in Hk. destruct k as [|[|[|[|[|[|k']]]]]]; try lia;
+      cbn [ar_ld_off ar_cj_imm];
+      [ exact ari_3a | exact ari_40 | exact ari_46 | exact ari_4c | exact ari_52 ].
+  Qed.
+
+End ArgrawDispatch.
 
 
 Module ArgrawProof (Myproc : MYPROC) : ARGRAW.
