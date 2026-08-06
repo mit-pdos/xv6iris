@@ -1353,11 +1353,46 @@ they unlock.
     `read_bytes` scrutinee silently matches nothing — add
     `ConcurrencyInterfaceTypes.Mem_read_request_pa` / `_access_kind` to the
     `cbn` list, or grab the scrutinee from the goal with `match goal`.
-- **THE DATA ACCESS KINDS ARE PLAIN.** Both the 8-byte load and the 8-byte
-  store carry `classify … = AkInfo false false false` (rv64d's
-  `Read_plain` / `Write_plain` arms). `ak_coh = false` is what
-  `wcert_load`'s premise wants, so a plain load/store leaf discharges it by
-  `reflexivity`.
+- **THE DATA ACCESS KINDS, READ OFF THE MODEL** (all four traced to rv64d
+  line numbers, none guessed):
+  - a plain load/store (`Read_plain` / `Write_plain`) carries
+    `AK_explicit {AV_plain; AS_normal}`, so `classify … = AkInfo false false
+    false`. `ak_coh = false` is what `wcert_load`'s premise wants, so a plain
+    leaf discharges it by `reflexivity`.
+  - **`amoswap.w.aq`'s READ is `AkInfo false true true` — `ak_sync` is
+    TRUE, and the acquire certificate applies.** `execute_AMO` issues its
+    read as `mem_read … aq (aq && rl) true`, i.e. `(aq,rl,res) =
+    (true,false,true)` at `.aq`; `read_kind_of_flags true false true =
+    Read_RISCV_reserved_acquire`, whose `read_ram` arm builds
+    `AK_explicit {AV_exclusive; AS_rel_or_acq}`. This is the one place where
+    a "the model doesn't actually emit the ordering" surprise would have
+    invalidated the whole lock proof, and it does not: `WeakCert.wcert_amo_aq`
+    demands exactly `ak_coh aka = false /\ ak_sync aka = true` of the read.
+  - the AMO's WRITE is `AkInfo false true false` (`Write_RISCV_conditional`
+    → `AK_explicit {AV_exclusive; AS_normal}`): exclusive but NOT
+    synchronising. Harmless — the certificate constrains only the read's
+    kind, and the write's `ak_sync` enters only through
+    `store_post_run_coh`, which is monotone in it.
+- **THE SHAPE FILES ARE ALREADY DUPLICATING EACH OTHER, AND IT SHOULD BE
+  FIXED BEFORE A THIRD WIDTH LANDS.** `WeakLeafEff8.v`, `WeakLeafEff8s.v` and
+  `WeakLeafBase4.v` each declare `exec_eff_rX_bits_gpr`,
+  `exec_eff_translationMode_M`, `exec_eff_ext_data_get_addr_gpr`,
+  `execR_eff_untilMT_1`, `exec_eff_split_misaligned_aligned` and the local
+  `returnM`/`and_boolM`/`or_boolM` twins. The statements are identical so the
+  shadowing is harmless today, but it is exactly the near-duplicate family
+  the guiding principle says not to keep: **hoist them into a shared
+  `WeakLeafEffCommon.v`** (the width-independent eff leaves plus the §0 kit)
+  when the next shape is written.
+- **WIDTH IS NOT ALWAYS COSMETIC.** At width 8 a STORE's
+  `subrange_vec_dec vrs2 63 0` is the whole register (`autocast_subrange_id`
+  concludes `= vrs2`); at width 4 it is a genuine truncation, so the stored
+  value is `subrange_vec_dec vrs2 31 0` and any `sw` WP must carry the
+  truncation in its postcondition. Conversely the LOAD's sign flag is FREE
+  (`LOAD (imm, rs1, rd, u, 4)` with `u` a variable), so one lemma covers `lw`
+  and `lwu` — do that rather than pinning `u := false`.
+- **`Read_plain` / `Write_plain` / `read_kind` ARE AMBIGUOUS** under
+  `RiscvExtras` + `WeakMem` and must be spelled `rv64d_types.*`; the 8-byte
+  mirrors escape it only because their import list is narrower.
 - **DECOUPLING BY `exec_eff` PREMISE WORKS AND SHOULD BE THE HOUSE STYLE FOR
   PARALLEL MIRROR WORK.** Each shape file takes `pmpCheck` and the three
   `within_*` gates in their `exec_eff` form as hypotheses instead of proving
@@ -1397,8 +1432,8 @@ fact**:
 |---|---|---|---|
 | LOAD 8 | `WpMmodeLeafBase.exec_execute_LOAD_8_gpr` (+ `_chk`) | `[WEread akl ea 8]` | **DONE** — `iris/WeakLeafEff8.v`, 691 lines. `ld`; the `wwp_ld8` leaf of `WeakWord8` consumes it. The `_chk` variants were NOT mirrored (nothing needs them yet) |
 | STORE 8 | `WpMmodeLeafBase.exec_execute_STORE_8_gpr` (+ `_chk`) | `[WEwrite akw ea 8 v]` | **DONE** — `iris/WeakLeafEff8s.v`, 698 lines. `sd`. `_chk` not mirrored |
-| LOAD 4 | reached through `exec_execute_C_LW` / `_C_LDSP` → `ExecuteAs (LOAD … 4)`; the width-4 M-mode `LOAD` lemma does NOT exist yet and is part of this batch | `[WEread akl ea 4]` | `lw`, and the spinlock's spin re-read |
-| STORE 4 | ditto via `exec_execute_C_SW` / `_C_SDSP` | `[WEwrite akw ea 4 v]` | `sw`, the release and the `started` setter |
+| LOAD 4 | reached through `exec_execute_C_LW` / `_C_LDSP` → `ExecuteAs (LOAD … 4)`; the width-4 M-mode `LOAD` lemma did not exist | `[WEread akl ea 4]` | **DONE** — `iris/WeakLeafBase4.v`, 613 SC + 742 mirror = 1456 lines. `lw`/`lwu` (the sign flag is left free), and the spinlock's spin re-read |
+| STORE 4 | ditto via `exec_execute_C_SW` / `_C_SDSP` | `[WEwrite akw ea 4 v]` | **DONE** — same file. `sw`, the release and the `started` setter. NOTE the stored value is the TRUNCATION `subrange_vec_dec vrs2 31 0` |
 | AMOSWAP 4 | only `WpAmo`'s S-flavoured chain and `WpSmodePtLock.exec_execute_AMOSWAP_4_gpr_S_walk_pt` exist; the M-mode one is part of this batch | `[WEread aka ea 4; WEwrite akw ea 4 v]` | THE lock instruction; note the two effects are adjacent, which is what `wcert_amo_aq_gen` assumes |
 | LOAD/STORE 1, 2 | `WpSmodePtMem.exec_execute_STORE_1_…` etc. only | | NOT reachable from M-mode kernel text today — defer to batch 6 rather than mirror speculatively |
 
