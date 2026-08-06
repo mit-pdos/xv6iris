@@ -336,6 +336,12 @@
   2
  ],
  [
+  "CodeKwait.v",
+  "kwait",
+  "kwi_",
+  2
+ ],
+ [
   "CodeLogWrite.v",
   "log_write",
   "lwi_",
@@ -609,6 +615,12 @@
   "CodeSysUptime.v",
   "sys_uptime",
   "sui_",
+  2
+ ],
+ [
+  "CodeSysWait.v",
+  "sys_wait",
+  "swi_",
   2
  ],
  [

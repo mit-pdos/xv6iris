@@ -44,18 +44,14 @@
    combinations are all stated even though (live table, no trapframe) never
    occurs -- refusing it would cost a premise and buy nothing.
 
-   WHAT THE CALLER MUST STILL PROVE, and where it will bite.  [fp_pt]'s
-   [Some] arm carries [um_below sz um] and [uint sz + 4096 <= uvm_maxsz]:
-   proc_freepagetable's two size premises, pulled up one level.  Note that
-   [ProcInv.proc_dormant] at ZOMBIE carries NEITHER -- it has only
-   [uint (pv_sz V) <= uvm_maxsz].  It also carries [page_valid] for the
-   TRAPFRAME page ([proc_pt_wf]) but not for the ROOT, which the [c.beqz] at
-   +0x1a needs to refute, so that is a third pure fact the arm has to carry.
-   So the bridge kwait() will need
-   ([proc_dormant _ ZOMBIE] into this precondition) does not exist yet, and
-   writing it means strengthening proc_dormant's ZOMBIE arm.  That is a real
-   gap, recorded here rather than papered over; it costs allocproc nothing,
-   since both of ITS tails run at [opt = None] where the arm is vacuous. *)
+   WHAT THE CALLER MUST STILL PROVE.  [fp_pt]'s [Some] arm carries
+   [um_below sz um] and [uint sz <= uvm_maxsz] -- proc_freepagetable's two
+   size premises, pulled up one level, and both of them facts a ZOMBIE's
+   [ProcInv.proc_dormant] now records.  It carries NO [page_valid]: the
+   trapframe page's comes out of [proc_pt_wf] and the root's out of the
+   tree's own node claim ([ProcPtOwn.proc_pt_root_valid]), which is what the
+   [c.beqz] at +0x1a is refuted from.  [fp_of_dormant_zombie] below is the
+   bridge kwait() reclaims a child through; it has no side condition. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -98,8 +94,7 @@ Section SpecFreeproc.
     | None   => p_pagetable pa ↦₈ (zero_reg : mword 64)
     | Some P => (p_pagetable pa ↦₈ page_base P.(ud_root) ∗
                  proc_pt P ∗
-                 ⌜um_below szv P.(ud_um) /\ (uint szv + 4096 <= uvm_maxsz)%Z /\
-                  page_valid (page_base P.(ud_root))⌝)
+                 ⌜um_below szv P.(ud_um) /\ (uint szv <= uvm_maxsz)%Z⌝)
     end%I.
 
   (* p->trapframe, and what comes with it.  [page_valid] is what kfree
@@ -160,6 +155,50 @@ Section SpecFreeproc.
     rewrite /fp_pt /fp_tf /proc_dormant fp_unused_not_zombie.
     iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hctx Hpg Htf".
     iPureIntro. exact Hpure.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* THE ZOMBIE BRIDGE -- what kwait() reclaims.                          *)
+  (* ------------------------------------------------------------------ *)
+  (* This is the direction the header used to record as a GAP.  It closed
+     from three sides, and none of them was "add a premise":
+       - [proc_dormant]'s ZOMBIE arm gained [um_below] (ProcInv.v), the one
+         fact that is genuinely about the process and cannot be recovered
+         from the resources;
+       - the size bound relaxed to [uint sz <= uvm_maxsz] all the way down
+         through proc_freepagetable to uvmfree, because the [+ 4096] form
+         was undischargeable by any holder of a live [p->sz] (SpecUvmfree.v);
+       - the root page's [page_valid] is READ OFF the table
+         ([ProcPtOwn.proc_pt_root_valid]) instead of being demanded.
+     What a ZOMBIE has and freeproc wants therefore match exactly, and the
+     bridge is a repackaging with no side condition. *)
+  Lemma fp_zombie_is_zombie : bool_decide (ZOMBIE = ZOMBIE) = true.
+  Proof. by apply bool_decide_eq_true_2. Qed.
+
+  Lemma fp_of_dormant_zombie (pa : mword 64) :
+    proc_dormant pa ZOMBIE ⊢
+      ∃ (V : pprivate) (pid : mword 32),
+        fp_rest pa V pid ∗
+        fp_pt pa (pv_sz V) (Some (pv_upt V)) ∗
+        fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
+  Proof.
+    rewrite /proc_dormant fp_zombie_is_zombie.
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hctx & %Hbel & Hpt & Htfp)".
+    iExists V, pid.
+    (* both [page_valid]s come out of the table: the trapframe's from
+       [proc_pt_wf], the root's from the tree's node claim. *)
+    rewrite /proc_pt_at.
+    iDestruct "Hpt" as "(Hpg & Htf & Hpt)".
+    iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
+    iDestruct (proc_pt_root_valid with "Hpt") as %Hroot.
+    rewrite /fp_rest /fp_pt /fp_tf.
+    iSplitL "Hpid Hf Hof Hu Hsp Hctx".
+    { iFrame "Hpid Hf Hof Hu Hsp Hctx". iPureIntro. exact Hpure. }
+    iSplitL "Hpg Hpt".
+    { iFrame "Hpg Hpt". iPureIntro.
+      split; [exact Hbel | exact (proj2 (proj2 Hpure))]. }
+    cbn [fst snd]. iFrame "Htf Htfp". iPureIntro.
+    exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.
 
   (* ------------------------------------------------------------------ *)

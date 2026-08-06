@@ -101,6 +101,11 @@ Lemma kd_4989 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_LI (mword_of_int 2, Regidx (mword_of_int 19)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_4a15 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x4a15 : mword 16)) s
+  = Some (C_LI (mword_of_int 5, Regidx (mword_of_int 20)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_591c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x591c : mword 16)) s
   = Some (C_LW (mword_of_int 12, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
@@ -249,6 +254,11 @@ Proof. intro H. rvc_oneshot s H. Qed.
 Lemma kd_97ba s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x97ba : mword 16)) s
   = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 14)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma kd_a879 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xa879 : mword 16)) s
+  = Some (C_J (mword_of_int 79), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
 Lemma kd_b5b5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
@@ -479,6 +489,11 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_100017b7 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x100017b7 : mword 32) : M instruction) s
   = Some (UTYPE (mword_of_int 65537 : mword 20, Regidx (mword_of_int 15), LUI), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_10250513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x10250513 : mword 32) : M instruction) s
+  = Some (ITYPE (mword_of_int 258 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_10500073 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

@@ -754,6 +754,10 @@ SpecFreeproc.v
 CodeFreeproc.v
 ProofFreeproc.v
 LinkFreeproc.v
+SpecKwait.v
+CodeKwait.v
+ProofKwait.v
+CodeSysWait.v
 SpecAllocproc.v
 CodeAllocproc.v
 ProofAllocproc.v

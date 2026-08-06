@@ -979,8 +979,20 @@ Section ProcInv.
           cells.  So the ZOMBIE -> UNUSED step genuinely MOVES resources,
           which is why [proc_slots_recast] deliberately does not cover the
           dormant class. *)
+       (* A ZOMBIE additionally carries the [p->sz]-bounds-the-user-map
+          coherence conjunct [proc_priv] has.  It is not decoration: it is
+          proc_freepagetable's one real premise, so without it the ZOMBIE
+          block could not be handed to freeproc at all -- which is the whole
+          purpose of the arm ([SpecFreeproc.fp_of_dormant_zombie]).  It costs
+          nothing to establish: kexit reduces a live [proc_priv], which has
+          the same conjunct, and no landed proof produces a ZOMBIE.  The
+          OTHER two facts freeproc's [Some] arm used to demand are gone --
+          the size bound is now [proc_dormant]'s own [uint sz <= uvm_maxsz]
+          (SpecUvmfree.v), and the root page's [page_valid] is derived from
+          the table itself ([ProcPtOwn.proc_pt_root_valid]). *)
        (if bool_decide (st = ZOMBIE)
-        then proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
+        then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+             proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
         else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
              p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
 

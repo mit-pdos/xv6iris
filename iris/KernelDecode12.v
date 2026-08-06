@@ -156,6 +156,11 @@ Lemma kd_86ee s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_MV (Regidx (mword_of_int 13), Regidx (mword_of_int 27)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_8756 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x8756 : mword 16)) s
+  = Some (C_MV (Regidx (mword_of_int 14), Regidx (mword_of_int 21)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_89da s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x89da : mword 16)) s
   = Some (C_MV (Regidx (mword_of_int 19), Regidx (mword_of_int 22)), s).
@@ -340,6 +345,11 @@ Lemma kd_ff65 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   exec (ext_decode_compressed (mword_of_int 0xff65 : mword 16)) s
   = Some (C_BNEZ (mword_of_int 252, Cregidx (mword_of_int 6)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma kd_00010b17 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x00010b17 : mword 32) : M instruction) s
+  = Some (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 22), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
 
 Lemma kd_00016517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00016517 : mword 32) : M instruction) s
@@ -694,6 +704,11 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_a2450513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xa2450513 : mword 32) : M instruction) s
   = Some (ITYPE (mword_of_int 2596 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_aa7fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xaa7fe0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2091686 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_ad9ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

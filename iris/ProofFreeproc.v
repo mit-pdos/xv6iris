@@ -644,7 +644,10 @@ Section ProofFreeproc.
       destruct opt as [P |].
       - (* ---- a LIVE user table: the call runs ---- *)
         iDestruct "Hpg" as "(Hpgc & Hpt & %Hszok)".
-        destruct Hszok as (Hbelow & Hszr & Hrootv).
+        destruct Hszok as (Hbelow & Hszr).
+        (* the root page's [page_valid] -- what refutes the [c.beqz] at +0x1a
+           -- is READ OFF the table rather than demanded of the caller. *)
+        iDestruct (proc_pt_root_valid P with "Hpt") as %Hrootv.
         iApply (wp_cld_s_sconf Φ (mword_of_int (FR + 0x18)) Ra0 Rs1
                   (mword_of_int 80 : mword 12) me (K - 4)%nat (page_base P.(ud_root)) false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
