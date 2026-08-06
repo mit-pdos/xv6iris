@@ -585,19 +585,34 @@ Proof.
               (set_reg s stimecmp (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v)))
     as [mp Hcd].
   exists mp.
-  unfold write_CSR, stimecmp_legalized.
-  set (CD := clint_dispatch false).
+  unfold stimecmp_legalized in Hcd |- *.
+  unfold write_CSR.
+  (* [remember], not [set]: the clause peel's rewrites zeta-expand a let-bound
+     body, and the moment [clint_dispatch] is exposed the surrounding [exec]
+     reduces it into a raw monad-bind fixpoint that no [rewrite] can fold back.
+     A body-less variable cannot be expanded.  (It abstracts [Hcd] too, so
+     [Hcd] below is already stated at [CD].) *)
+  remember (clint_dispatch false) as CD eqn:HCD.
   skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg stimecmp s)).
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg stimecmp _ s)).
-  unfold CD; clear CD.
-  rewrite (exec_bind0_Some _ _ _ _ _ Hcd).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg stimecmp _)).
-  rewrite sregs_set_reg.
-  rewrite irrelevant_register_set by (vm_compute; reflexivity).
-  rewrite register_lookup_set.
+  (* the peel left the remaining two binds delta-unfolded into the raw monad
+     fixpoint; [reflexivity] folds them back *)
+  match goal with |- exec ?M ?st = _ =>
+    assert (HM : M = Defs.bind (Defs.bind0 CD (Defs.read_reg stimecmp))
+                       (fun w : mword 64 => returnM (Ok (subrange_vec_dec w (Z.sub xlen 1) 0))))
+      by reflexivity end.
+  rewrite HM.
+  match goal with |- exec (Defs.bind ?A _) ?st = _ =>
+    assert (Hin : exec A st = Some (register_lookup stimecmp st.(sregs), set_reg st mip mp)) end.
+  { rewrite (exec_bind0_Some _ _ _ _ _ Hcd).
+    rewrite (exec_read_reg stimecmp _).
+    rewrite sregs_set_reg.
+    rewrite irrelevant_register_set; [ reflexivity | vm_compute; reflexivity ]. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hin).
+  rewrite sregs_set_reg. rewrite register_lookup_set.
   apply exec_returnM.
 Qed.
 
@@ -863,24 +878,36 @@ Section WpCsrwGprNewB.
     { rewrite -Lrs1u.
       replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
       reflexivity. }
+    assert (HmisaSp : eq_vec (_get_Misa_S (register_lookup misa s_pc.(sregs))) ('b"1") = true)
+      by (rewrite Lmisap; exact HmisaS).
+    destruct (exec_execute_csrw_stimecmp rs1 s_pc Hrs1 Lprivp HmisaSp) as [mp Hex].
+    rewrite ?Lcsrp Lrs1p in Hex.
+    (* the CSR write runs [clint_dispatch], which refreshes mip -- so this step
+       scribbles a cell that lives in [clock_inv].  Open it, update, close: the
+       invariant is value-agnostic, so any [mp] re-establishes it. *)
+    iPoseProof "Hinv" as "#Hinvc".
+    iDestruct "Hinvc" as "(_ & #Hclk & _)".
+    iInv "Hclk" as ">Hcb" "Hclose".
+    iDestruct "Hcb" as (c0 t0 p0) "(Hc & Ht & Hp)".
     iMod (reg_update _ stimecmp _ (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))
             with "Hreg Hcsr") as "[Hreg Hcsr]".
+    iMod (reg_update _ mip _ mp with "Hreg Hp") as "[Hreg Hp]".
+    iMod ("Hclose" with "[Hc Ht Hp]") as "_".
+    { iNext. iExists c0, t0, mp. iFrame "Hc Ht Hp". }
     iModIntro.
-    iExists (set_reg s_pc stimecmp (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))).
+    iExists (set_reg (set_reg s_pc stimecmp (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))) mip mp).
     iSplitR.
     { iPureIntro. rewrite Hpceq.
       change (execute (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)))
         with (execute_CSRReg csr_stimecmp (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_stimecmp rs1 s_pc Hrs1 Lprivp
-                 ltac:(rewrite Lmisap; exact HmisaS)).
-      rewrite ?Lcsrp Lrs1p. reflexivity. }
+      exact Hex. }
     iSplitL "Hreg Hmem".
     { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc stimecmp (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))).(sregs)
+             (set_reg (set_reg s_pc stimecmp (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))) mip mp).(sregs)
              = add_vec_int pc 4).
-    { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
+    { unfold s_pc. tmig. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".

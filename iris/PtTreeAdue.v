@@ -598,7 +598,7 @@ Section PtUpdHit.
     destruct Hvar as (a2 & d2 & Hm0).
     destruct (update_PTE_Bits_set_ad _ _ _ Hupd) as (a & d & Hq).
     assert (Hqc : m0' = pte_set_ad q0 a d)
-      by (rewrite Hq, Hm0; apply pte_set_ad_absorb).
+      by (rewrite Hq; rewrite Hm0; apply pte_set_ad_absorb).
     rewrite (exec_bind_Some _ _ _ _ _ (uwe_pbmt vpn q2 q1 q0 asid _ Hpb)).
     rewrite uwe_ppn.
     rewrite exec_returnm.
@@ -671,7 +671,7 @@ Section PtUpdHit.
       cbn match beta.
       match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
         assert (Hupd' : @update_PTE_Bits w pv ac = None) by exact Hupd end.
-      rewrite Hupd'. cbn match. rewrite autocast_id.
+      rewrite Hupd'. cbn match. rewrite ?autocast_id.
       apply exec_returnm. }
     rewrite (exec_bind_Some _ _ _ _ _ Hu).
     cbn match.
