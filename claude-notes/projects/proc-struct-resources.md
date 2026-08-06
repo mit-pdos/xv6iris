@@ -817,16 +817,28 @@ the evidence for every offset. This file is only the worklist.
             and destruct `ppt_post`.  Its failure arm supplies both the
             `kalloc_env _ None` and the exhaustion witness the third post
             arm wants.
-         3. The tail body itself is ONE `iAssert`ed block, not two: the two
-            tails are identical code and differ only in the register map,
-            in `fp_tf` (tail 1 `None`, tail 2 `Some (tfp, ws)`), and in the
-            witness.  Both have `fp_pt _ _ None` -- tail 1 because the
-            dormant block's cell was never written, tail 2 because
-            `sd a0,80(s1)` at `+0x54` stored the 0 before the branch.
-            Block: assemble freeproc's precondition, call freeproc, rebuild
-            `proc_lock_res` (the two bridges above), `release`,
-            `mv s1,s2` (s2 holds the failed callee's a0, i.e. 0), `j +0x78`
-            into `ap_tail`, then `allocproc_post`'s third arm.
+         3. The tail body.  **WRITE IT TWICE -- an earlier note in this file
+            said "one `iAssert`ed block, not two" and that was WRONG.**  The
+            two tails are the same six instructions but at DIFFERENT
+            ADDRESSES (+0x86 and +0x96), so they have different `instr`
+            facts, and the two `jal`s have different immediates (the
+            relative distance to freeproc/release differs by 0x10:
+            `api_88` vs `api_98`, `api_8e` vs `api_9e`).  A shared block
+            would have to take the pc offset AND all six facts as
+            parameters, which is more machinery than the ~60 lines it
+            saves.  (This is the opposite of proc_pagetable's epilogue,
+            where all four exits `j` to the SAME address -- that is what
+            made one block right there.)
+
+            What the two bodies share is only their SHAPE: assemble
+            freeproc's precondition, call freeproc, rebuild `proc_lock_res`
+            (the two bridges above), `release`, `mv s1,s2` (s2 holds the
+            failed callee's a0, i.e. 0), `j +0x78` into `ap_tail`, then
+            `allocproc_post`'s third arm.  They differ in `fp_tf` (tail 1
+            `None`, tail 2 `Some (tfp, ws)`) and in the witness.  Both have
+            `fp_pt _ _ None` -- tail 1 because the dormant block's cell was
+            never written, tail 2 because the `sd a0,80(s1)` at +0x54
+            stores the 0 before the branch.
          4. Seal: `AllocprocCore : ALLOCPROC_GEN` plus the counted
             `AllocprocProof : ALLOCPROC`, whose only job is to refute the
             third arm from `K_allocproc < nb`.  `LinkAllocproc` gains
