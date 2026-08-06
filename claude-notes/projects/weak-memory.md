@@ -781,7 +781,7 @@ Validate the operational design before anything depends on it.
     structural about the run is genuinely required, and `exec_eff` is the
     cheapest structural thing that is not a model walk.
 
-- **THE COMPOSITION IS `iris/WeakAcquire.v` (612 lines / 5.9 s), AND IT WENT
+- **THE COMPOSITION IS `iris/WeakAcquire.v` (618 lines / 5.9 s), AND IT WENT
   THROUGH WITH NO NEW MACHINERY** — every M3b core applied as stated. What it
   contains, and the four moves that recur, is written up as §2b of the porting
   guide; the statements are `wwp_acquire_swap` (one `amoswap.w.aq` at a
