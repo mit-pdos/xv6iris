@@ -1263,3 +1263,122 @@ Lemma exec_split_on_page_boundary_intra {n : Z} (addr : mword n) (width : Z) s :
 Proof.
   intro Hin. unfold split_on_page_boundary. rewrite Hin. apply exec_returnm.
 Qed.
+
+(* ====================================================================== *)
+(* WRITING A BIT FIELD BACK WITH ITS OWN VALUE IS THE IDENTITY.            *)
+(*                                                                         *)
+(* The privileged CSR legalizers now re-write a field through a            *)
+(* configuration-derived window before using it -- [legalize_satp] masks    *)
+(* satp's PPN to [min (physaddr_bits - pagesize_bits) 44] bits, which at    *)
+(* this platform's [physaddr_bits = 56] is the FULL 44-bit field.  So the   *)
+(* mask is the identity, and the right way to absorb it is this lemma       *)
+(* rather than restating [satp_legalized] around the mask: the legalized    *)
+(* value does not depend on the platform constant, and no downstream satp   *)
+(* fact should have to carry it.                                           *)
+(*                                                                         *)
+(* The arithmetic is factored into two lemmas over PLAIN [Z] variables --   *)
+(* [lia] answers "Cannot find witness" as soon as a [bv_unsigned] is merely *)
+(* in scope (durable-notes.md), so the bitvector level must hand it closed  *)
+(* [Z] goals.                                                              *)
+(* ====================================================================== *)
+
+Lemma z_lor_split (u k : Z) :
+  0 <= k -> 0 <= u ->
+  Z.lor (Z.shiftl (Z.shiftr u k) k) (u mod 2 ^ k) = u.
+Proof.
+  intros Hk Hu. apply Z.bits_inj_iff'. intros n Hn.
+  rewrite Z.lor_spec.
+  destruct (Z.lt_ge_cases n k) as [Hlt|Hge].
+  - assert (Hhi : Z.testbit (Z.shiftl (Z.shiftr u k) k) n = false)
+      by (apply Z.shiftl_spec_low; lia).
+    assert (Hlo : Z.testbit (u mod 2 ^ k) n = Z.testbit u n)
+      by (apply Z.mod_pow2_bits_low; lia).
+    rewrite Hhi Hlo. reflexivity.
+  - assert (Hhi : Z.testbit (Z.shiftl (Z.shiftr u k) k) n = Z.testbit u n).
+    { rewrite Z.shiftl_spec; [| lia]. rewrite Z.shiftr_spec; [| lia].
+      f_equal. lia. }
+    assert (Hlo : Z.testbit (u mod 2 ^ k) n = false)
+      by (apply Z.mod_pow2_bits_high; lia).
+    rewrite Hhi Hlo. rewrite orb_false_r. reflexivity.
+Qed.
+
+Lemma z_field_writeback (u k m : Z) :
+  0 <= k -> 0 <= m -> 0 <= u < 2 ^ (k + m) ->
+  Z.lor (Z.shiftl ((Z.shiftr u k) mod 2 ^ m) k) (u mod 2 ^ k) = u.
+Proof.
+  intros Hk Hm Hu.
+  assert (Hsm : (Z.shiftr u k) mod 2 ^ m = Z.shiftr u k).
+  { apply Z.mod_small. split; [ apply Z.shiftr_nonneg; lia | ].
+    assert (Hd : Z.shiftr u k = u / 2 ^ k) by (apply Z.shiftr_div_pow2; lia).
+    rewrite Hd.
+    apply Z.div_lt_upper_bound; [ apply Z.pow_pos_nonneg; lia | ].
+    assert (Hp : 2 ^ k * 2 ^ m = 2 ^ (k + m)) by (symmetry; apply Z.pow_add_r; lia).
+    rewrite Hp. lia. }
+  rewrite Hsm. apply z_lor_split; lia.
+Qed.
+
+(* The bottom-window instance the satp legalizer needs: bits 43..0 of 64. *)
+Lemma usvd_get_bottom_44 (v : mword 64) :
+  update_subrange_vec_dec v 43 0 (subrange_vec_dec v 43 0) = v.
+Proof.
+  pose proof (bv_unsigned_in_range _ v) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  apply bv_eq. unfold update_subrange_vec_dec. rewrite ?autocast_id.
+  unfold to_word_idx, to_word. rewrite ?MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
+  erewrite bv_concat_unsigned; [| cbn; lia].
+  erewrite bv_concat_unsigned; [| cbn; lia].
+  change (MachineWord.Z_idx 0 + MachineWord.Z_idx (43 - (0 - 1)))%N with 44%N.
+  change (MachineWord.Z_idx 64 - MachineWord.Z_idx (43 - (0 - 1)) - MachineWord.Z_idx 0)%N with 20%N.
+  change (MachineWord.Z_idx 0) with 0%N.
+  unfold subrange_vec_dec, Operators_mwords.subrange_vec_dec, get_word.
+  rewrite ?bv_extract_unsigned.
+  rewrite Z.shiftl_0_r.
+  rewrite ?autocast_id.
+  unfold to_word_idx, to_word. rewrite ?MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
+  change (MachineWord.Z_idx (43 - 0 + 1)) with 44%N.
+  rewrite ?bv_extract_unsigned.
+  unfold bv_wrap, bv_modulus.
+  change (Z.of_N 0) with 0. change (Z.of_N 44) with 44. change (Z.of_N 20) with 20.
+  rewrite !Z.shiftr_0_r.
+  change (2 ^ 0) with 1. rewrite Z.mod_1_r. rewrite Z.lor_0_r.
+  apply (z_field_writeback (bv_unsigned v) 44 20); [ lia | lia | ].
+  change (44 + 20) with 64. exact Hr.
+Qed.
+
+(* [zero_extend'] and a full-range [subrange_vec_dec] at width 44 -- the two
+   wrappers [legalize_satp]'s PPN mask puts around the field before writing it
+   back, both identities at this platform's [physaddr_bits]. *)
+Lemma zero_extend'_id44 (a : mword 44) : zero_extend' 44 a = a.
+Proof.
+  cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec to_word get_word
+       MachineWord.MachineWord.zero_extend].
+  apply bv_eq. rewrite bv_zero_extend_unsigned. reflexivity. lia.
+Qed.
+
+Lemma subrange_full_44 (a : mword 44) : subrange_vec_dec a 43 0 = a.
+Proof.
+  apply bv_eq.
+  unfold subrange_vec_dec, Operators_mwords.subrange_vec_dec, get_word.
+  rewrite ?autocast_id.
+  unfold to_word_idx, to_word. rewrite ?MachineWord.MachineWord.cast_idx_refl.
+  unfold MachineWord.MachineWord.slice.
+  change (MachineWord.Z_idx (43 - 0 + 1)) with 44%N.
+  rewrite ?bv_extract_unsigned.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 44)) with (2 ^ 44) in Hr.
+  unfold bv_wrap, bv_modulus.
+  change (Z.of_N (MachineWord.Z_idx 0)) with 0. change (Z.of_N 44) with 44.
+  rewrite Z.shiftr_0_r. apply Z.mod_small. exact Hr.
+Qed.
+
+(* ...and the satp instance itself: the PPN mask [legalize_satp] applies is a
+   write-back of the field's own value. *)
+Lemma satp_ppn_mask_id (v : mword 64) :
+  _update_Satp64_PPN v (zero_extend' 44 (subrange_vec_dec (_get_Satp64_PPN v) 43 0)) = v.
+Proof.
+  unfold _update_Satp64_PPN, _get_Satp64_PPN.
+  rewrite subrange_full_44. rewrite zero_extend'_id44.
+  apply usvd_get_bottom_44.
+Qed.

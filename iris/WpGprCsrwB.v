@@ -11,6 +11,7 @@ Require Import RegFile.
 Require Import InstrBytes.
 Local Open Scope Z_scope.
 Require Import WpGprCsrwCommon.
+Require Import RiscvExtras.   (* satp_ppn_mask_id: the PPN mask is a no-op here *)
 
 (* ===================================================================== *)
 (* MONADIC-LEGALIZE REDUCTION LAYER.  Each legalize_* chains             *)
@@ -330,6 +331,11 @@ Lemma exec_legalize_satp_rv64 (prev value : mword 64) s :
   exec (legalize_satp RV64 prev value) s = Some (satp_legalized prev value, s).
 Proof.
   intro HS. unfold legalize_satp, satp_legalized.
+  (* the PPN mask (min (physaddr_bits - pagesize_bits) 44 = 44 here) writes the
+     field back with its own value, so it drops out and the mode dispatch is on
+     the written value exactly as before *)
+  cbn zeta.
+  rewrite satp_ppn_mask_id.
   destruct (satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 value))) as [sv|] eqn:Hm.
   - destruct sv.
     + rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Svbare s HS)). cbn match. apply exec_returnM.

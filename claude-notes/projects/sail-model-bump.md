@@ -292,7 +292,7 @@ Independent of the above, and the reason for the bump:
 `coq-sail-stdpp` 0.20.1 — the checkout asks for a newer `sail` than the one
 installed here, and the regen script passes the version it has and says so).
 
-`make -f CoqMakefile -j32 -k` in `iris/` builds **366 of the 802 files** and
+`make -f CoqMakefile -j32 -k` in `iris/` builds **365 of the 802 files** and
 stops on **THREE root failures**; everything else is blocked behind them, not
 broken:
 
@@ -300,7 +300,7 @@ broken:
 |---|---|
 | `WpLoad.v` | the vmem level: `split_on_page_boundary` + `translate_and_read_value` (its `checked_mem_read`/`pmaCheck` chain IS ported — copy that) |
 | `CommonWalk.v` | the fork delta: `_rec_pt_walk`'s new shape + `check_leaf_pte` |
-| `WpGprCsrwB.v` | `legalize_satp`'s new PPN mask (see below) |
+| `WpGprCsrwB.v` | `stimecmp`'s write now refreshes the timer-pending bits (see below) |
 
 The CSR layer is otherwise done: `is_CSR_accessible` now conjoins a CONFIG
 predicate with the extension gate for the `xenvcfg` CSRs (menvcfg 0x30A is
@@ -313,15 +313,38 @@ the old value plays no part any more (the model's first parameter is `_o`).
 `legalize_medeleg` masks by `plat_medeleg_delegatable_bits` and additionally
 clears the new Double_Trap bit.
 
-**`legalize_satp` next**: it now re-writes satp's PPN through
+`legalize_satp` is DONE and is the pattern for every configuration-derived
+field mask the bump introduces: it re-writes satp's PPN through
 `zero_extend' 44 (subrange_vec_dec (PPN s) (min (physaddr_bits - pagesize_bits) 44 - 1) 0)`
-before dispatching on the mode. With `physaddr_bits = 56` that window is the full
-44 bits, so it is the IDENTITY — the clean fix is one bitfield lemma
-(`_update_Satp64_PPN s (_get_Satp64_PPN s) = s`, a write-back-own-value at the
-BOTTOM window, so stdpp's `bv_extract_concat_here` applies — see
-`durable-notes.md`'s Sail-bit-field bullet) and then `satp_legalized` needs no
-change at all. Do NOT re-state `satp_legalized` around the mask; that would bake
-a platform constant into a definition that does not depend on it.
+before dispatching on the mode, and at `physaddr_bits = 56` that window is the
+FULL 44-bit field, so the mask is the IDENTITY. `RiscvExtras.satp_ppn_mask_id`
+absorbs it in one rewrite and `satp_legalized` needed no change at all. **Do not
+re-state a legalized-value definition around such a mask** — it would bake a
+platform constant into a definition that does not depend on it, and every
+downstream satp fact would then have to carry the wrapper.
+
+Its proof is the reusable kit for bit-field write-back identities, in
+`RiscvExtras.v`: `z_lor_split` and `z_field_writeback` over PLAIN `Z` variables
+(mandatory — `lia` answers "Cannot find witness" as soon as a `bv_unsigned` is
+merely in scope), then `usvd_get_bottom_44` = the bv-level peel that hands them a
+closed `Z` goal, then `subrange_full_44` / `zero_extend'_id44` for the two
+wrappers. Two ssreflect traps while writing it: `rewrite lem by tac` does not
+parse (use `assert … by tac`, or `rewrite lem; [| tac]`), and ssreflect's
+`rewrite` hits ALL copies of a pattern, so a proof that peels the same wrapper
+twice wants `rewrite ?autocast_id`, not two `rewrite autocast_id`s.
+
+**`WpGprCsrwB`'s remaining failure is `stimecmp`, and it is a real semantic
+change, not a shape change.** Writing `stimecmp` (0x14D) now runs
+`clint_dispatch false` between the register write and the read-back, which
+REFRESHES the timer-pending bits: it writes `mip[7]` (MTIP) from `mtimecmp <=
+mtime` unconditionally, and `mip[5]` (STIP) from `stimecmp <= mtime` when
+`Ext_Sstc` is enabled and `menvcfg.STCE = 1`. So `exec_write_CSR_stimecmp`'s
+post-state is no longer `set_reg s stimecmp _` — it gains one or two `mip`
+writes, and the lemma has to grow hypotheses naming `mtime`/`mtimecmp` (and
+`menvcfg.STCE`, which decides whether the STIP arm runs at all). That is a
+contract change that ripples to its callers, so plan it rather than patching the
+proof: decide first whether the STCE arm is live in the states these proofs are
+about.
 
 There are no `Admitted`s: `WpLoad.exec_vmem_read_addr_8` is left in its OLD form
 behind a `PORT PENDING` comment, so the build points at it rather than a proof
