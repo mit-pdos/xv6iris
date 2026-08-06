@@ -539,7 +539,7 @@ Section ProofSched.
     cbv beta delta [wp_sched_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hneeds Heb Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hprocs Hheld Htc Hcpu Hown Hvc Hcont".
+    iIntros "Hcg #Htext Hpc #Hprocs Hheld Hpay Htc Hcpu Hown Hvc Hcont".
     (* the cpu bundle [cpu_own 1 eb pj emp false] arrives whole at level 1;
        it is unfolded to the individual cells + counting token after myproc.
        NOTE: no handler-avail stash is taken from it.  The return path resumes
@@ -930,8 +930,10 @@ Section ProofSched.
     assert (Ha5C9 : C9 !!! Regidx (mword_of_int 15 : mword 5) = add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : mword 6))))
       by (rewrite /C9 upd_eq; reflexivity).
     assert (Hbeq : eq_vec (sign_extend' 64 st) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : mword 6)))) = false).
-    { unfold needs_ctx in Hneeds. apply orb_prop in Hneeds. destruct Hneeds as [H|H];
-        apply bool_decide_eq_true in H; subst st; vm_compute; reflexivity. }
+    { apply park_ok_cases in Hneeds as [Hn | ->].
+      - unfold needs_ctx in Hn. apply orb_prop in Hn. destruct Hn as [H|H];
+          apply bool_decide_eq_true in H; subst st; vm_compute; reflexivity.
+      - vm_compute; reflexivity. }
     assert (Hbeqr : eq_vec (rget C9 (mword_of_int 14 : mword 5)) (rget C9 (mword_of_int 15 : mword 5)) = false)
       by (rgne; rgne; rewrite Ha4C9 Ha5C9; exact Hbeq).
     iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.sched + 0x38)) (mword_of_int 108 : mword 13) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
@@ -1266,7 +1268,7 @@ Section ProofSched.
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
     iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
-                  with "Htc [Hlocked Hstate Hchan Hpub]") as "HP".
+                  with "Htc [Hlocked Hstate Hchan Hpub] Hpay") as "HP".
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     (* apply swtch.  The TARGET record is PINNED at this hart
        (cpus[cid].context is only ever resumed from hart cid's own tp); the

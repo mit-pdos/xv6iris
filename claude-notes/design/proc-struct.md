@@ -548,10 +548,18 @@ SLEEPING → RUNNABLE identically, with no guard ever opened.
   minted by `filedup` and installs it in the child's `ofile_slot`.
 - **scheduler dispatch** needs no change: the resumed thread's `proc_priv`
   comes back out of its own parked closure, not out of `p_sched`.
-- **`exit`** closes every fd (each `ofile_slot` surrenders its `file_ref` to
+- **`kexit`** closes every fd (each `ofile_slot` surrenders its `file_ref` to
   `fileclose`, leaving `⌜v = 0⌝`) and `iput`s `cwd` — which is exactly what
-  reduces its `proc_priv` back down to a `proc_dormant`. It then parks forever
-  at `ZOMBIE`, handing that bundle to the `inv_dormant` guard.
+  reduces its `proc_priv` back down to a `proc_dormant`
+  (`ProcInv.proc_priv_to_dormant_zombie`). It then parks forever at `ZOMBIE`,
+  handing that bundle to the `inv_dormant` guard — but it cannot hand over the
+  bundle's CONTEXT CELLS, which the swtch inside `sched()` is about to write.
+  So the ZOMBIE park hands the block minus its context across the crossing
+  (`ProcInv.proc_dormant_noctx` / `SchedCtx.park_pay`) and the reclaiming
+  scheduler reassembles the two (`SchedCtx.proc_slots_park_gen`), forgetting
+  the parked record down to its cells: nothing ever resumes a zombie. That is
+  the whole of what makes ZOMBIE a different kind of park from RUNNABLE and
+  SLEEPING — see [`../projects/kexit.md`](../projects/kexit.md).
 - **`wait`/`freeproc`** opens `inv_dormant` on a `ZOMBIE` child, frees the
   trapframe page and pagetable, and closes it again at `UNUSED` — the *same*
   `proc_dormant`, no recasting needed, which is the payoff for not indexing

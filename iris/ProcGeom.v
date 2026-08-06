@@ -99,6 +99,32 @@ Definition p_parent (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 56).
 Definition p_kstack (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 64).
 Definition p_cwd    (pa : mword 64) : mword 64 := add_vec pa (mword_of_int 336).
 
+(* ... and the same three in the 12-bit DISPLACEMENT form a base-encoded
+   [lw/sw/ld/sd rd,off(rs)] leaves behind.  ([p_parent]'s twin is
+   [WaitInv.p_parent_sext], beside the resource that uses it.)  kexit is the
+   first function to reach [state] and [xstate] through base rather than
+   compressed encodings, and the first to compute [&p->cwd] with an [addi]. *)
+Lemma p_state_sext (pa : mword 64) :
+  add_vec pa (sign_extend' 64 (mword_of_int 24 : mword 12)) = p_state pa.
+Proof.
+  unfold p_state, state_off.
+  apply (f_equal (add_vec pa)). apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma p_xstate_sext (pa : mword 64) :
+  add_vec pa (sign_extend' 64 (mword_of_int 44 : mword 12)) = p_xstate pa.
+Proof.
+  unfold p_xstate.
+  apply (f_equal (add_vec pa)). apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma p_cwd_sext (pa : mword 64) :
+  add_vec pa (sign_extend' 64 (mword_of_int 336 : mword 12)) = p_cwd pa.
+Proof.
+  unfold p_cwd.
+  apply (f_equal (add_vec pa)). apply bv_eq; vm_compute; reflexivity.
+Qed.
+
 (* p->name is a 16-byte char array, not a word; [p_name pa i] is byte [i]. *)
 Definition PNAMELEN : nat := 16%nat.
 Definition p_name (pa : mword 64) (i : nat) : mword 64 :=
@@ -309,6 +335,57 @@ Proof.
   exact (needs_ctx_not_RUNNING st Hn).
 Qed.
 
+(* THE STATES A THREAD MAY PARK INTO -- what sched() demands of the state its
+   caller has already stored.  Two of them are the resumable ones
+   ([needs_ctx]: yield's RUNNABLE, sleep's SLEEPING); the third is ZOMBIE,
+   where kexit() parks FOREVER.  A zombie's saved context is never resumed --
+   the scheduler dispatches only RUNNABLE procs -- so what its lock slot owns
+   is the dormant block, not a record; the difference is entirely in what the
+   crossing carries ([SchedCtx.park_pay]) and what the reclaiming scheduler
+   rebuilds ([SchedCtx.proc_slots_park_gen]), which is why this predicate,
+   rather than [needs_ctx], is sched's premise. *)
+Definition park_ok (st : mword 32) : bool :=
+  needs_ctx st || bool_decide (st = ZOMBIE).
+
+Lemma park_ok_RUNNABLE : park_ok RUNNABLE = true.
+Proof. rewrite /park_ok needs_ctx_RUNNABLE. reflexivity. Qed.
+Lemma park_ok_SLEEPING : park_ok SLEEPING = true.
+Proof. rewrite /park_ok needs_ctx_SLEEPING. reflexivity. Qed.
+Lemma park_ok_ZOMBIE : park_ok ZOMBIE = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma park_ok_of_needs_ctx (st : mword 32) :
+  needs_ctx st = true -> park_ok st = true.
+Proof. intros Hn. rewrite /park_ok Hn. reflexivity. Qed.
+
+(* the case analysis every consumer of [park_ok] does: a parking state either
+   keeps a resumable record, or IS the zombie state. *)
+Lemma park_ok_cases (st : mword 32) :
+  park_ok st = true -> needs_ctx st = true \/ st = ZOMBIE.
+Proof.
+  rewrite /park_ok. intros H. apply orb_true_iff in H as [H|H].
+  - by left.
+  - right. by apply bool_decide_eq_true in H.
+Qed.
+
+(* a parking state is not RUNNING (this is what refutes sched's
+   "sched running" panic arm, at either kind of park). *)
+Lemma park_ok_not_RUNNING (st : mword 32) :
+  park_ok st = true -> st <> RUNNING.
+Proof.
+  intros H. apply park_ok_cases in H as [H| ->].
+  - exact (needs_ctx_not_RUNNING st H).
+  - vm_compute. discriminate.
+Qed.
+
+Lemma not_running_of_park_ok (st : mword 32) :
+  park_ok st = true -> not_running st = true.
+Proof.
+  intros H. rewrite /not_running.
+  rewrite (bool_decide_eq_false_2 (st = RUNNING)); [done|].
+  exact (park_ok_not_RUNNING st H).
+Qed.
+
 (* p++ : &proc[k] + sizeof(proc) = &proc[k+1].  The addi's 12-bit immediate
    [360] sign-extends to the same 64-bit constant, and mword addition agrees
    with Z addition mod 2^64 (via [avi_mword]). *)
@@ -380,6 +457,46 @@ Lemma proc_addr_inj (i j : nat) :
   (i < NPROC)%nat -> (j < NPROC)%nat ->
   proc_addr i = proc_addr j -> i = j.
 Proof. intros Hi Hj. apply proc_addr_inj_le; lia. Qed.
+
+(* ---- THE ofile SCAN'S EXIT TEST -------------------------------------
+   kexit walks [&p->ofile[0]] by 8 and stops when the cursor equals
+   [&p->cwd].  That is not a coincidence to be worked around: [ofile] runs
+   208..335 and [cwd] sits at 336, so &p->ofile[NOFILE] IS &p->cwd, and the
+   [beq s1,s2] at +0x3a is literally "the cursor has walked off the end".
+   [p_ofile_end] is that identity, and [p_ofile_end_inj] is what the loop
+   needs of it -- the exit test is only worth anything if reaching it pins
+   the cursor's INDEX at NOFILE.  Both are stated at [proc_addr i], where
+   the base has a closed unsigned form, exactly as [proc_addr_inj_le] is. *)
+Lemma p_ofile_end (pa : mword 64) : p_ofile pa NOFILE = p_cwd pa.
+Proof.
+  unfold p_ofile, p_cwd, NOFILE.
+  apply (f_equal (add_vec pa)). apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma p_ofile_unsigned (i fd : nat) :
+  (i < NPROC)%nat -> (fd <= NOFILE)%nat ->
+  bv_unsigned (p_ofile (proc_addr i) fd)
+  = KernelSyms.proc + proc_size * Z.of_nat i + (208 + 8 * Z.of_nat fd).
+Proof.
+  intros Hi Hfd. assert (Hi' := Hi). unfold NPROC in Hi'.
+  unfold NOFILE in Hfd. unfold p_ofile.
+  rewrite add_vec64_unsigned (proc_addr_unsigned i Hi) moi64_unsigned.
+  rewrite bv_wrap_add_idemp_r.
+  apply bv_wrap_small.
+  unfold KernelSyms.proc, proc_size. rewrite bv_modulus64. lia.
+Qed.
+
+Lemma p_ofile_end_inj (i fd : nat) :
+  (i < NPROC)%nat -> (fd <= NOFILE)%nat ->
+  p_ofile (proc_addr i) fd = p_cwd (proc_addr i) -> fd = NOFILE.
+Proof.
+  intros Hi Hfd Heq.
+  rewrite -(p_ofile_end (proc_addr i)) in Heq.
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite (p_ofile_unsigned i fd Hi Hfd) in Heq.
+  rewrite (p_ofile_unsigned i NOFILE Hi ltac:(lia)) in Heq.
+  unfold NOFILE in Heq |- *. lia.
+Qed.
 
 (* proc-context addresses are injective on the array range. *)
 Lemma p_context_proc_addr_inj (i j : nat) :

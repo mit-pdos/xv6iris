@@ -961,7 +961,20 @@ the evidence for every offset. This file is only the worklist.
 
 - [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
       shape. Needs an inode model (per-slot fractional auth over `itable`)
-      that does not exist yet. Fill it and no caller restates.
+      that does not exist yet. Fill it and no caller restates. Two consumers
+      are now written against it and neither will need restating:
+      `ProcInv.proc_priv_cwd` (borrow the cell AND the reference, put back a
+      matching pair — sys_chdir's move as well as kexit's) and
+      `SpecIput.v`'s precondition.
+
+- [ ] **S6 — `kexit`.** CONTRACT LANDED, PROOF NOT WRITTEN — its own file,
+      [`kexit.md`](kexit.md). What it forced into this layer: parking at
+      ZOMBIE is a different kind of park (the private block cannot ride a
+      closure that never resumes), so `SchedCtx.park_pay` /
+      `proc_slots_park_gen` / `ProcInv.proc_dormant_noctx` now carry it across
+      the crossing and the reclaiming scheduler reassembles it.
+      `ProcInv.proc_priv_to_dormant_zombie` is the producer of a ZOMBIE block
+      and the mirror of kwait's `SpecFreeproc.fp_of_dormant_zombie` consumer.
 
 ## The unlinked chain: `fileclose` is the only blocker
 

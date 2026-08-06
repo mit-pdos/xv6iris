@@ -677,9 +677,11 @@ Section ProofYield.
     iModIntro.
     iDestruct ("Hback" with "Hph") as "Hcpuemp".
     iApply (Sched.wp_sched_sconf Φ γs j γl RUNNABLE ch0 C1 (av - 4)%nat true
-              Hj Hgl (needs_ctx_RUNNABLE) eq_refl ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hpub Hpark] Htc Hcpuemp Hown Hvc [-]").
+              Hj Hgl (park_ok_RUNNABLE) eq_refl ltac:(lia)
+              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hpub Hpark] [] Htc Hcpuemp Hown Hvc [-]").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub Hpark". }
+    (* a RUNNABLE park owes the slot nothing beyond its record. *)
+    { iApply (park_pay_needs_ctx (proc_addr j) RUNNABLE needs_ctx_RUNNABLE). }
     (* SCHED RETURNS ON HART [CIDs].  Everything below runs there, inside
        [yield_post_sched] at [(CID0 := CIDs)]. *)
     iIntros (CIDs Hss msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' #Havail Hcpuemp Hown' Hvc'".

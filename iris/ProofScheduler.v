@@ -1307,7 +1307,7 @@ Section ProofScheduler.
         iDestruct (p_sched_at_cpu γs cpu_id A' jj cret (rget m' Rtp) Hjj with "Hpay2")
           as "(%Htpv & %Hcret & %HA' & Hcsrs & Hpay3)".
         subst A'.
-        iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts Hheld']".
+        iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts [Hheld' Hppay]]".
         destruct Hfacts as [Hgl' Hneeds'].
         assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
         iEval (rewrite /proc_held) in "Hheld'".
@@ -1408,16 +1408,25 @@ Section ProofScheduler.
         { rewrite /M5 upd_eq. rewrite Hm23.
           rewrite (HMcthr Rs7 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
           rewrite HM2s7. intro Hbad. discriminate. }
-        (* rebuild the lock resource at the parked state *)
+        (* rebuild the lock resource at the parked state.  ONE lemma for both
+           kinds of park (SchedCtx.proc_slots_park_gen): the record the swtch
+           handed back, the rejoined receipt, and whatever the crossing's
+           [park_pay] carried -- the dormant block at a ZOMBIE park, nothing
+           at a resumable one.  The update is that lemma's ZOMBIE arm
+           forgetting the record down to its cells. *)
+        (* the update is eliminated against the WP through [fupd_wp], the way
+           every other fancy-update step in this tree is -- there is no
+           [ElimModal] instance for a bare [WP] goal here. *)
+        iApply fupd_wp.
+        iMod (proc_slots_park_gen Φ γs ⊤ (proc_addr jj) st' Hneeds'
+                with "[Hvc'] [Hpark] Hppay") as "Hsl".
+        { iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'". }
+        { iApply (park_at_full_intro jj false Hjj with "Hpark"). }
+        iModIntro.
         iAssert (proc_lock_res Φ γs γl (proc_addr jj))
-          with "[Hstate Hchan Hpub Hvc' Hpark]" as "HR".
-        { rewrite /proc_lock_res. iExists st', ch'. iFrame "Hstate Hchan Hpub".
-          rewrite /proc_slots Hneeds' (sc_needs_ctx_not_dormant st' Hneeds')
-                  (not_running_of_needs_ctx st' Hneeds').
-          iSplitL "Hvc'".
-          - iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'".
-          - iSplitR; [done|].
-            iApply (park_at_full_intro jj false Hjj with "Hpark"). }
+          with "[Hstate Hchan Hpub Hsl]" as "HR".
+        { rewrite /proc_lock_res. iExists st', ch'.
+          iFrame "Hstate Hchan Hpub Hsl". }
         (* c->proc is 0 again, so re-tag the bundle back to the idle index --
            this is what keeps [wp_next_idle] available at the loop head. *)
         iEval (rewrite (sc_retag_p M5 (av - 10)%nat (proc_addr jj) zero_reg)) in "Hcg".

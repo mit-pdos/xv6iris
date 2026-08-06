@@ -69,7 +69,11 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
                    in
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
-  needs_ctx st = true ->
+  (* THE PARKED STATE.  Its caller has already stored it: yield RUNNABLE,
+     sleep SLEEPING, kexit ZOMBIE.  [park_ok] rather than [needs_ctx]
+     (ProcGeom.v) because the third one never comes back -- see the
+     [park_pay] premise below, and SchedCtx's [proc_slots_park_gen]. *)
+  park_ok st = true ->
   (* THE PARKING PRECONDITION: the saved base enable is [true].  At level 1
      with [eb = true] the pushing acquire has taken the trap CSRs out of the
      re-enabled SIE arm, so the parking thread genuinely HOLDS them and can
@@ -94,6 +98,12 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
   proc_held cpu_id j γl st ch -∗
+  (* WHAT THE PARKED SLOT OWES BESIDES THE SAVED CONTEXT (SchedCtx.park_pay):
+     [emp] at a resumable park -- the private block stays in the parking
+     thread's own closure -- and, at the ZOMBIE park, the dormant block minus
+     its context cells, because nothing will ever resume the closure and
+     wait()/freeproc must find that block in the lock. *)
+  park_pay pj st -∗
   (* handed over at the crossing, taken back from the dispatch payload. *)
   trap_csrs -∗
   (* the cpu bundle at level 1 (xv6 asserts noff==1 at sched), slot [emp]:

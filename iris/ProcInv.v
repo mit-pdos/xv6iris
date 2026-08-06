@@ -679,6 +679,45 @@ Section ProcInv.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
+  (* THE WORKING DIRECTORY, borrowed and replaced.  kexit and sys_chdir are
+     the two writers, and both do the same thing: hand the reference the cell
+     names to iput, then store a new pointer.  So the accessor gives out the
+     cell AND the reference clause together and takes back a matching pair --
+     which is what will keep both callers standing when [cwd_ref] stops being
+     a placeholder (design/proc-struct.md, "holes to be honest about"). *)
+  Lemma proc_priv_cwd (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    p_cwd pa ↦₈ pv_cwd V ∗ cwd_ref (pv_cwd V) ∗
+    (∀ v' : mword 64,
+       p_cwd pa ↦₈ v' -∗ cwd_ref v' -∗ proc_priv γf pa pid (upd_cwd V v')).
+  Proof.
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iSplitL "Hcwd"; [iExact "Hcwd"|].
+    (* [cwd_ref] is [emp] today, so the proofmode has already normalised the
+       hypothesis to [emp] and [iFrame] cannot MATCH it against the goal's
+       folded [cwd_ref _]; [iExact] closes it by conversion and keeps working
+       when the predicate gains content. *)
+    iSplitL "Hc"; [iExact "Hc"|].
+    iIntros (v') "Hcwd Hc".
+    rewrite /proc_priv /proc_priv_core /proc_fields.
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR "Ho"; [| iExact "Ho"].
+    iSplitR; [done|]. iSplitR; [done|].
+    iFrame "Hpid".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iSplitL "Hpt"; [iExact "Hpt"|].
+    iSplitL "Htfp"; [iExact "Htfp"|].
+    iExact "Hc".
+  Qed.
+
+  (* "no working directory" owes no reference.  A LEMMA rather than a
+     [rewrite /cwd_ref] at the call site, because it is exactly the fact the
+     real predicate will have to keep: a null [p->cwd] names no inode. *)
+  Lemma cwd_ref_null : ⊢ cwd_ref (zero_reg : mword 64).
+  Proof. rewrite /cwd_ref. auto. Qed.
+
   (* The array's length, which a caller needs BEFORE it knows which
      descriptor it wants: an fd below NOFILE always has a slot to look up. *)
   Lemma proc_priv_ofile_len (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
@@ -996,6 +1035,51 @@ Section ProcInv.
         else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
              p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
 
+  (* ------------------------------------------------------------------- *)
+  (* THE SAME BLOCK WITHOUT ITS CONTEXT CELLS.                            *)
+  (*                                                                      *)
+  (* A thread parking FOREVER -- kexit, at ZOMBIE -- owes the dormant      *)
+  (* block to its lock's [inv_dormant] slot, but it cannot hand over the   *)
+  (* fourteen context cells with it: it is about to swtch, and swtch SAVES *)
+  (* into exactly those cells.  So the crossing carries the block minus    *)
+  (* the context ([SchedCtx.park_pay]) and the scheduler -- which is       *)
+  (* handed the parked record itself, by its own swtch -- puts the two     *)
+  (* back together ([SchedCtx.proc_slots_park_gen], where the record is    *)
+  (* FORGOTTEN down to its cells: nothing ever resumes a zombie).          *)
+  (*                                                                      *)
+  (* Splitting here, rather than making the payload carry a rebuild wand,  *)
+  (* is what keeps [proc_dormant] the ONE shape procinit / allocproc /     *)
+  (* freeproc see.                                                        *)
+  (* ------------------------------------------------------------------- *)
+  Definition proc_dormant_noctx (pa : mword 64) (st : mword 32) : iProp Σ :=
+    (∃ (V : pprivate) (pid : mword 32),
+       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
+        pv_cwd V = (zero_reg : mword 64) /\
+        uint (pv_sz V) <= uvm_maxsz⌝ ∗
+       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+       proc_fields pa (DfracOwn 1) V ∗
+       ofile_cells pa (pv_ofile V) ∗
+       ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
+       fd_slots FDSPARE ∗
+       (if bool_decide (st = ZOMBIE)
+        then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+             proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
+        else p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
+             p_trapframe pa ↦₈ (zero_reg : mword 64)))%I.
+
+  Lemma proc_dormant_split (pa : mword 64) (st : mword 32) :
+    proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
+  Proof.
+    iSplit.
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Haddr".
+      iPureIntro; exact Hfacts.
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hctx Haddr".
+      iPureIntro; exact Hfacts.
+  Qed.
+
+
   (* The UNUSED block WITHOUT its fd-slot units: what procinit is handed for
      each process before the supply is distributed.  Nothing in procinit
      touches these cells (the BSS is already zero); the units are the one
@@ -1079,6 +1163,28 @@ Section ProcInv.
       iApply (ofile_slot_null γf pa fd with "Hs"). }
     rewrite big_sepL_sep. iDestruct "Ho" as "[$ Hs]".
     iApply (big_sepL_mono with "Hs"). iIntros (fd v _) "$".
+  Qed.
+
+  (* KEXIT'S MOVE, and the one producer of a ZOMBIE block: a process that has
+     closed every descriptor and dropped its cwd has reduced its private
+     block to the dormant shape.  Everything the ZOMBIE slot owns is already
+     inside [proc_priv] -- the scalar cells, the emptied descriptor array with
+     the units it took back from fileclose, the user page table and the
+     trapframe page wait()/freeproc will reclaim -- except the allowance,
+     which travels BESIDE [proc_priv] (FdSlots.v's [FDSPARE] note), and the
+     context, which is the swtch's.  So this is a repackaging, not a
+     construction, and nothing about the process has to be re-established. *)
+  Lemma proc_priv_to_dormant_zombie (γf : gname) (pa : mword 64)
+      (pid : mword 32) (V : pprivate) :
+    pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
+    pv_cwd V = (zero_reg : mword 64) ->
+    proc_priv γf pa pid V -∗ fd_slots FDSPARE -∗ proc_dormant_noctx pa ZOMBIE.
+  Proof.
+    iIntros (Hof Hcwd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & _) Ho] Hsp".
+    iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho") as "[Ho Hs]".
+    iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp".
+    rewrite bool_decide_eq_true_2; [| reflexivity].
+    iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpt Htfp".
   Qed.
 
   (* =================================================================== *)
