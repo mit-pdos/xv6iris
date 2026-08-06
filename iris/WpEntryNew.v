@@ -47,6 +47,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import CodeEntry.
 Require Import CodeEntryAux.
+Require Import MbootVocab.
 Local Open Scope Z_scope.
 
 (* Moved here from WpDecode.v via the late KernelBoot.v (this file is now their
@@ -59,13 +60,33 @@ Ltac boot_static :=
   destruct jj as [|[|[|[|]]]]; try lia;
   (split; [vm_compute; discriminate | vm_compute; reflexivity]).
 
+(* peel a nested [<[k:=v]>_ !!! j] register-map lookup down to the slot that
+   actually holds it.  Register disequality goes through [regidx_bits]'s
+   [uint], so it works on both the [Regidx (mword_of_int _)] and the
+   [Regidx (regidx_bits _)] spellings the decode fields produce. *)
+Local Ltac en_reg_neq :=
+  let H := fresh in intro H;
+  apply (f_equal (fun r : regidx => uint (regidx_bits r))) in H;
+  vm_compute in H; discriminate H.
+
+Local Ltac en_look :=
+  repeat first [ rewrite upd_eq
+               | rewrite upd_ne; [ | en_reg_neq ] ];
+  first [ reflexivity | assumption ].
+
 Section WpEntryNew.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  (* The load effective address: sp (just set by AUIPC) + sext(imm_ld). *)
+  (* The load effective address: sp (just set by AUIPC) + sext(imm_ld).  The
+     boot contract names it [MbootVocab.mb_ld_ea], which is the same term with
+     [pc_e0] spelled out -- the one address in the interface that has to be
+     the image's, since it is where the [stack0] pointer lives. *)
   Definition entry_ld_ea : mword 64 := add_vec entry_sp1 (sign_extend' 64 imm_ld).
+
+  Lemma entry_ld_ea_mb : entry_ld_ea = mb_ld_ea.
+  Proof. reflexivity. Qed.
 
   (* ---- pure address / register arithmetic, all by vm_compute ---- *)
   Lemma pc_e0_e1 : add_vec_int pc_e0 4 = pc_e1.
@@ -153,6 +174,24 @@ Section WpEntryNew.
       (mhartid_in : mword 64) : regfile :=
     <[Regidx i_jal := regval_into_reg (add_vec_int pc_e7 4)]>
       (m_cadd m v_stack0 mhartid_in).
+
+  (* The bridge OUT of the tower: the only slot of it any client reads.
+     Peeling the eight inserts for sp bottoms out in [m_ld]'s [v_stack0] and
+     [m_clui]/[m_caddi]'s closed operands -- the entry map [m] is never
+     reached -- so the computed sp is nameable before the call, which is what
+     lets [SpecEntry] take it as a parameter instead of spelling this tower.
+     (The a1 slot's immediate is [imm_caddi]; it is 1, and the [replace] is
+     what makes the two sides syntactically equal, since bitvector equality
+     does not close by conversion.) *)
+  Lemma m_jal_sp (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64) :
+    m_jal m v_stack0 mhartid_in !!! Regidx csp_rs1
+    = mb_entry_sp v_stack0 mhartid_in.
+  Proof.
+    unfold mb_entry_sp, m_jal, m_cadd, m_mul, m_caddi, m_csrr, m_clui, m_ld, m_auipc.
+    replace imm_caddi with (mword_of_int 1 : mword 6)
+      by (apply bv_eq; vm_compute; reflexivity).
+    en_look.
+  Qed.
 
   (* ================================================================= *)
   (*  THE THEOREM: the whole [_entry] boot chain, one Qed.             *)

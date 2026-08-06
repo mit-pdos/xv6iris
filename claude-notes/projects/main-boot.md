@@ -479,14 +479,19 @@ half of SpecMain's precondition: `sie_cap_gpr γ mf K` + the tp fact +
 - sp at `<main>` is `sp0 − 16` (start()'s frame stays open across the mret),
   and the whole boot needs 2 + 32 + 52 = 86 slots
   (`boot_stack_slots_main`).
-- SIE=0 / MENVCFG_S / `mie ∧ ¬mideleg = 0` / satp-Bare at `<main>` are NOT
-  derivable from SpecEntry: they enter as reset-state premises, discharged at
-  power-on by `boot_csrs_reset`. (SIE=0 is worth lifting into `mmode_config`
-  some day.)
+- SIE=0 / MENVCFG_S / `mie ∧ ¬mideleg = 0` / satp-Bare at `<main>` are not
+  derivable from the machine alone; they follow from the entry machine being a
+  reset one. SpecEntry now takes `menvcfg0`/`mie0`/`mideleg0 = 0` as PREMISES
+  and EXPORTS the resulting facts (`WpStartNew.st_boot_csr_facts`, applied in
+  ProofEntry), so no client derives them. (SIE=0 is worth lifting into
+  `mmode_config` some day.)
 - The ↦ₚ₈→↦₈ stack tier bridge costs two premises locating the stack in
   `[text_end, PHYSTOP)`.
 - `reg_lookup` OOMs on the 40-deep `st_mout` tower — peel instead (second data
-  point for the durable-notes warning).
+  point for the durable-notes warning). The tower is no longer in the
+  interface: SpecEntry quantifies its post-state and states the two slots
+  anyone reads (`WpStartNew.st_mout_sp` / `st_mout_tp`); see
+  `design/spec-modules.md`.
 
 ## Worklist
 

@@ -48,7 +48,8 @@ Require Import KMap KptPt.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.
 Require Import KernelText KernelDataInv.
-Require Import WpEntryNew WpTimerinit WpStartNew.
+Require Import MbootVocab.
+Require Import MstatusFacts.
 Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom CpuOwn SchedCtx.
@@ -71,13 +72,13 @@ Local Open Scope Z_scope.
 
 (* [_entry]'s `la sp, stack0` is an auipc/ld pair, so the value it loads is a
    WORD OF THE IMAGE, at the pc-relative slot [entry_got]; and the word there
-   is &stack0.  [WpEntryNew.entry_ld_ea] is the address the WP computes; these
+   is &stack0.  [MbootVocab.mb_ld_ea] is the address the WP computes; these
    two lemmas are the only place the tree says what it IS. *)
 Definition entry_got : Z := 0x8000a208.
 
 Definition v_stack0 : mword 64 := mword_of_int KernelSyms.stack0.
 
-Lemma entry_ld_ea_addr : entry_ld_ea = pa_of_z entry_got.
+Lemma entry_ld_ea_addr : mb_ld_ea = pa_of_z entry_got.
 Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
 (* the eight image bytes at the slot ARE &stack0's, little-endian: exactly
@@ -111,12 +112,13 @@ Proof. unfold boot_stack_depth. lia. Qed.
 Lemma boot_stack_depth_bridge : (boot_stack_slots K_main <= boot_stack_depth)%nat.
 Proof. rewrite boot_stack_slots_main. unfold boot_stack_depth. lia. Qed.
 
-(* [_entry]'s eight instructions write sp, a0 and a1, so the computed sp does
-   not mention the initial map at all: peeling the eight-deep insert tower
-   bottoms out in a CLOSED term. *)
-Lemma sp0_val (m : regfile) (n : nat) :
+(* [_entry]'s computed sp, at this image's [stack0] and a concrete hart id.
+   This is what [SpecEntry.wp_entry_boot]'s defining premise for [sp0] wants,
+   and supplying it is what puts every occurrence of sp0 in the contract at
+   the concrete address below. *)
+Lemma sp0_val (n : nat) :
   (n < NCPU)%nat ->
-  m_jal m v_stack0 (boot_w64 (Z.of_nat n)) !!! Regidx csp_rs1
+  mb_entry_sp v_stack0 (boot_w64 (Z.of_nat n))
   = (mword_of_int (sp_of n) : mword 64).
 Proof.
   unfold NCPU. intro Hn.
@@ -136,7 +138,7 @@ Qed.
    ([0, 0xfffffffffffffc)) -- [wp_entry_boot]'s two stack-geometry premises. *)
 Lemma ti_ea_ra_bound (n : nat) :
   (n < NCPU)%nat ->
-  uint (ti_ea_ra (ti_sp1 (mword_of_int (sp_of n) : mword 64))) + 8
+  uint (mb_ti_ra (mword_of_int (sp_of n) : mword 64)) + 8
   <= 0xfffffffffffffc.
 Proof.
   unfold NCPU. intro Hn.
@@ -146,7 +148,7 @@ Qed.
 
 Lemma ti_ea_s0_bound (n : nat) :
   (n < NCPU)%nat ->
-  uint (ti_ea_s0 (ti_sp1 (mword_of_int (sp_of n) : mword 64))) + 8
+  uint (mb_ti_s0 (mword_of_int (sp_of n) : mword 64)) + 8
   <= 0xfffffffffffffc.
 Proof.
   unfold NCPU. intro Hn.
@@ -175,7 +177,7 @@ Qed.
    and [HartTp.cid_word_of] IS [mword_of_int (Z.of_nat (fin_to_nat c))]. *)
 Lemma st_tpv_of_nat (n : nat) :
   (n < NCPU)%nat ->
-  st_tpv (boot_w64 (Z.of_nat n)) = (mword_of_int (Z.of_nat n) : mword 64).
+  mb_tpv (boot_w64 (Z.of_nat n)) = (mword_of_int (Z.of_nat n) : mword 64).
 Proof.
   unfold NCPU. intro Hn.
   destruct n as [|[|[|[|[|[|[|[|n']]]]]]]]; [.. | lia];
@@ -331,11 +333,10 @@ End BootChain.
 (* sixteen pins for the wire invariant, and hands each hart the rest here.  *)
 (* That is why [boot_entry_pre] is a separate fupd rather than folded in.   *)
 (*                                                                        *)
-(* THE ENTRY mstatus IS HANDLED BY THE POST'S FACT BUNDLE.  [HoKF]          *)
-(* ([MstatusFacts.mstatus_kernel_facts ms0], M6c (2b)) plus                *)
-(* [BootBridge.boot_csrs_from_kf] discharge the bridge's two mstatus        *)
-(* premises without the client ever learning the entry value -- which it    *)
-(* cannot, since the contract's post quantifies over it.                    *)
+(* THE ENTRY mstatus IS NEVER SEEN.  The contract's post hands back          *)
+(* [mstatus_kernel_facts] of the FINAL mstatus (M6c (2b)), which is both of  *)
+(* the bridge's mstatus premises one lemma apart, so the client never learns *)
+(* the entry value -- which it could not, since [mmode_config] hides it.     *)
 (* ====================================================================== *)
 
 Section BootRun.
@@ -372,7 +373,7 @@ Section BootRun.
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v) ∗
      (* --- this hart's slice of the image and of the stack --- *)
-     entry_ld_ea ↦ₚ₈{ dq } v_stack0 ∗
+     mb_ld_ea ↦ₚ₈{ dq } v_stack0 ∗
      stack_own_phys (mword_of_int (sp_of (fin_to_nat cpu_id))) boot_stack_depth ∗
      (* --- the bridge's adequacy-minted and .bss inputs --- *)
      strans_bit strans_bit_bare ∗
@@ -424,21 +425,8 @@ Section BootRun.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".
-    (* [wp_entry_boot]'s premises live at the LET-BOUND sp0, i.e. at the
-       computed register value; §1's facts are at [mword_of_int (sp_of n)]. *)
-    assert (Hsp : m_jal (boot_regfile rs) v_stack0
-                    (boot_w64 (Z.of_nat (fin_to_nat cpu_id))) !!! Regidx csp_rs1
-                  = (mword_of_int (sp_of (fin_to_nat cpu_id)) : mword 64))
-      by exact (sp0_val (boot_regfile rs) (fin_to_nat cpu_id) Hn).
-    iEval (rewrite -Hsp) in "Hstk".
-    assert (Hra : uint (ti_ea_ra (ti_sp1 (m_jal (boot_regfile rs) v_stack0
-                    (boot_w64 (Z.of_nat (fin_to_nat cpu_id))) !!! Regidx csp_rs1)))
-                  + 8 <= 0xfffffffffffffc)
-      by (rewrite Hsp; exact (ti_ea_ra_bound _ Hn)).
-    assert (Hs0b : uint (ti_ea_s0 (ti_sp1 (m_jal (boot_regfile rs) v_stack0
-                     (boot_w64 (Z.of_nat (fin_to_nat cpu_id))) !!! Regidx csp_rs1)))
-                   + 8 <= 0xfffffffffffffc)
-      by (rewrite Hsp; exact (ti_ea_s0_bound _ Hn)).
+    (* The contract takes sp0 as a PARAMETER, so it runs at §1's concrete
+       address throughout and there is no rewriting to do on either side. *)
     iApply (Entry.wp_entry_boot Φ (boot_regfile rs) v_stack0
               (boot_w64 (Z.of_nat (fin_to_nat cpu_id)))
               (register_lookup mepc rs) (register_lookup satp rs)
@@ -446,23 +434,21 @@ Section BootRun.
               (register_lookup mie rs) (boot_w64 0)
               (register_lookup stimecmp rs) (register_lookup mcounteren rs)
               (register_lookup pmpcfg_n rs) (register_lookup pmpaddr_n rs)
+              (mword_of_int (sp_of (fin_to_nat cpu_id)))
               boot_stack_depth
-              boot_stack_depth_entry Hpmpc0 menvcfg_boot_lpe
-              Hra Hs0b
+              (sp0_val _ Hn) boot_stack_depth_entry Hpmpc0
+              eq_refl Hmie0 Hmdl0
+              (ti_ea_ra_bound _ Hn) (ti_ea_s0_bound _ Hn)
               with "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
                     Hmenv Hmcen Hstc Hgot Hstk Htext").
-    iIntros (tv ms0 HoIE HoPRV HoSXL HoKF)
-      "Hhs Hpriv Hmst Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
+    (* Everything the M-mode side computed arrives ABSTRACT, with the seven
+       facts the bridge wants; the two mstatus premises are one lemma each off
+       the exported [mstatus_kernel_facts]. *)
+    iIntros (Mf msf satpf medelegf midelegf mief menvcfgf stimecmpf mcounterenf
+             pmpcfgf pmpaddrf)
+      "(%Hsp & %Htpf & %Hkf & %Hmenvl & %Hmiez & %Hsatpm & %Hpmpo)
+       Hhs Hpriv Hmst Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
        Hmenv Hmcen Hstc Hgot Hstk".
-    (* the five CSR side conditions, from the post's own fact bundle *)
-    destruct (boot_csrs_from_kf ms0 (boot_w64 0) (register_lookup mie rs)
-                (register_lookup mideleg rs) (register_lookup satp rs)
-                HoKF eq_refl Hmie0 Hmdl0)
-      as (Hsie & Hmsf & Hmenvl & Hmiez & Hsatpm).
-    (* back to §1's form of sp0, in BOTH resources the bridge takes at it:
-       the stack slice and the register file ([st_mout ... sp0 ...]). *)
-    iEval (rewrite Hsp) in "Hstk".
-    iEval (rewrite Hsp) in "Hfile".
     (* the two stack-location bounds: [sp0_uint] rewrites only at ITS OWN
        elaboration of [uint]'s width index, so the facts are asserted here at
        §1's form and handed to the bridge by [exact] (conversion sees through
@@ -473,17 +459,14 @@ Section BootRun.
     assert (Hhi : uint (mword_of_int (sp_of (fin_to_nat cpu_id)) : mword 64)
                   <= ram_base + ram_size)
       by (rewrite (sp0_uint _ Hn); exact (sp_of_hi _ Hn)).
-    iMod (boot_bridge K_main boot_stack_depth
-              (m_jal (boot_regfile rs) v_stack0
-                 (boot_w64 (Z.of_nat (fin_to_nat cpu_id))))
-              (mword_of_int (sp_of (fin_to_nat cpu_id))) ms0
-              (register_lookup satp rs) (register_lookup mideleg rs)
-              (register_lookup mie rs) (boot_w64 0) tv
-              (boot_w64 (Z.of_nat (fin_to_nat cpu_id)))
-              (register_lookup mcounteren rs) (register_lookup pmpcfg_n rs)
-              (register_lookup pmpaddr_n rs) (register_lookup tlb rs)
+    iMod (boot_bridge K_main boot_stack_depth Mf
+              (mword_of_int (sp_of (fin_to_nat cpu_id)))
+              msf satpf midelegf mief menvcfgf
+              (mb_tpv (boot_w64 (Z.of_nat (fin_to_nat cpu_id))))
+              pmpcfgf pmpaddrf (register_lookup tlb rs)
               (noff_val 0) iv zero_reg
-              Hpmpc0 Hsie Hmsf Hmenvl Hmiez Hsatpm
+              Hsp Htpf (mstatus_kernel_SIE _ Hkf) (sconf_ms_facts_of_kernel _ Hkf)
+              Hmenvl Hmiez Hsatpm Hpmpo
               ltac:(exact (st_tpv_of_nat _ Hn))
               boot_stack_depth_bridge
               Hlo Hhi

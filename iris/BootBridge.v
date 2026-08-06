@@ -90,11 +90,10 @@ Require Import StackOwn.
 Require Import WpMmodeLeafBase.
 Require Import WpGprCsrwA WpGprCsrwB WpGprCsrwC.
 Require Import WpGprMretWp.
-Require Import WpTimerinit WpStartNew.
+Require Import MbootVocab.
 Require Import SRegime SmodeCore.
 Require Import IntrDefs.
 Require Import MstatusFacts.
-Require BootConfig.   (* [mstatus_reset_kernel_facts]: the reset value's own instance *)
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
 From Kernel Require KernelSyms.
@@ -187,120 +186,26 @@ Section BootStack.
 
 End BootStack.
 
-(* ===================================================================== *)
-(* 3. Entry-0 of the PMP start() wrote, as [pmp_config]'s fact set.        *)
-(* [WpStartNew] proves the A = TOR / unlocked half and the address value;  *)
-(* the R/W/X bits and the RAM-coverage bound are the rest of what the      *)
-(* Bare translation arm's [pmp_config] wants.                             *)
-(* ===================================================================== *)
-
-Lemma st_pmpcfg1_xwr (cfg0 : type_of_register pmpcfg_n) :
-  pmp_all_off cfg0 ->
-  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (st_pmpcfg1 cfg0) 0)) ('b"1") = true /\
-  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (st_pmpcfg1 cfg0) 0)) ('b"1") = true /\
-  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (st_pmpcfg1 cfg0) 0)) ('b"1") = true.
-Proof.
-  intro Hoff.
-  assert (HE : vec_access_dec (st_pmpcfg1 cfg0) 0
-               = pmpWriteCfg_val (vec_access_dec cfg0 (Z.add (Z.mul 0 4) 0))
-                   (autocast (T := mword)
-                      (subrange_vec_dec (mword_of_int 15 : mword 64)
-                         (Z.add (Z.mul 8 0) 7) (Z.mul 8 0)))).
-  { unfold st_pmpcfg1, pmpcfg_written.
-    unfold pmpcfg0_vecupd at 1.
-    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 7) 0 _ ltac:(lia)).
-    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 7)) with false by reflexivity.
-    unfold pmpcfg0_vecupd at 1.
-    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 6) 0 _ ltac:(lia)).
-    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 6)) with false by reflexivity.
-    unfold pmpcfg0_vecupd at 1.
-    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 5) 0 _ ltac:(lia)).
-    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 5)) with false by reflexivity.
-    unfold pmpcfg0_vecupd at 1.
-    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 4) 0 _ ltac:(lia)).
-    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 4)) with false by reflexivity.
-    unfold pmpcfg0_vecupd at 1.
-    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 3) 0 _ ltac:(lia)).
-    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 3)) with false by reflexivity.
-    unfold pmpcfg0_vecupd at 1.
-    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 2) 0 _ ltac:(lia)).
-    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 2)) with false by reflexivity.
-    unfold pmpcfg0_vecupd at 1.
-    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 1) 0 _ ltac:(lia)).
-    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 1)) with false by reflexivity.
-    unfold pmpcfg0_vecupd at 1.
-    rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 0) 0 _ ltac:(lia)).
-    replace (Z.eqb 0 (Z.add (Z.mul 0 4) 0)) with true by reflexivity.
-    reflexivity. }
-  rewrite HE.
-  destruct (Hoff (Z.add (Z.mul 0 4) 0)) as [_ HL0].
-  unfold pmpWriteCfg_val.
-  rewrite HL0.
-  split_and!; vm_compute; reflexivity.
-Qed.
-
-Lemma st_pmpaddr1_cov (cfg0 : type_of_register pmpcfg_n)
-    (pa0 : type_of_register pmpaddr_n) :
-  pmp_all_off cfg0 ->
-  zopz0zKzJ_u (zeros' 64) (vec_access_dec (st_pmpaddr1 cfg0 pa0) 0) = false /\
-  (ram_base + ram_size <= uint (vec_access_dec (st_pmpaddr1 cfg0 pa0) 0) * 4)%Z.
-Proof.
-  intro Hoff. rewrite (st_pmpaddr1_entry0 cfg0 pa0 Hoff).
-  split; [vm_compute; reflexivity |].
-  replace (uint st_pmpw) with 0x3fffffffffffff by (vm_compute; reflexivity).
-  unfold ram_base, ram_size. lia.
-Qed.
 
 (* ===================================================================== *)
-(* 4. Two lookups in entry's final register file: sp is start()'s STILL-  *)
-(* OPEN frame base (start() mrets from inside the function, so its        *)
-(* epilogue never runs -- sp = sp0 - 16, s0 = sp0), and tp = sext32(hart). *)
+(* 3. Two facts about what the boot contract hands back, both stated over  *)
+(* [MbootVocab] alone: this file no longer knows anything about the M-mode *)
+(* proofs' symbolic execution, only about the values they produce.         *)
 (* ===================================================================== *)
-
-Local Ltac bb_reg_neq :=
-  let H := fresh in intro H;
-  apply (f_equal (fun r : regidx => uint (regidx_bits r))) in H;
-  vm_compute in H; discriminate H.
-
-Local Ltac bb_look :=
-  repeat first [ rewrite upd_eq
-               | rewrite upd_ne; [ | bb_reg_neq ] ];
-  first [ reflexivity | assumption ].
-
-Local Ltac bb_unfold :=
-  unfold st_mout, st_m61, st_m60, st_mti, st_m59,
-         st_m_ae3, st_m_ae2, st_m_ae1, st_m_ae0, st_m57, st_m55, st_m54,
-         st_m52, st_m51, st_m48, st_m47, st_m45, st_m43, st_m42, st_m40,
-         st_m39, st_m38, st_m37, st_m36, st_m35, st_m34, st_m33, st_m30,
-         ti_mout, ti_m27, ti_m26, ti_m24, ti_m23, ti_m22, ti_m21, ti_m19,
-         ti_m18, ti_m16, ti_m15, ti_m14, ti_m13, ti_m12, ti_m1.
-
-Lemma st_mout_sp (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
-    (mcen0 : mword 32) (mtime0 mh : mword 64) :
-  st_mout m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh !!! Regidx csp_rs1
-  = ti_sp1 sp0.
-Proof. bb_unfold; bb_look. Qed.
-
-Lemma st_mout_tp (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
-    (mcen0 : mword 32) (mtime0 mh : mword 64) :
-  st_mout m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh
-    !!! Regidx (mword_of_int 4 : mword 5)
-  = st_tpv mh.
-Proof. bb_unfold; bb_look. Qed.
 
 (* the tp/cid convention at the boot hart: start() writes tp = mhartid. *)
-Lemma st_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} (mh : mword 64) :
+Lemma mb_tpv_cid_boot `{GEN : GenId} `{CID : CpuId} (mh : mword 64) :
   mh = (mword_of_int 0 : mword 64) ->
   cid_word = (zero_reg : mword 64) ->
-  st_tpv mh = cid_word.
+  mb_tpv mh = cid_word.
 Proof.
   intros -> ->. apply bv_eq. vm_compute. reflexivity.
 Qed.
 
 (* start()'s frame base, as a [pa_stk] slot index: sp = sp0 - 16. *)
-Lemma ti_sp1_pa_stk (sp0 : mword 64) : ti_sp1 sp0 = pa_stk sp0 2.
+Lemma mb_frame_pa_stk (sp0 : mword 64) : mb_frame sp0 = pa_stk sp0 2.
 Proof.
-  unfold ti_sp1, pa_stk, add_vec_int.
+  unfold mb_frame, pa_stk, add_vec_int.
   apply (f_equal (add_vec sp0)).
   apply bv_eq. vm_compute. reflexivity.
 Qed.
@@ -331,59 +236,6 @@ Proof. reflexivity. Qed.
 (* ------------------------------------------------------------------- *)
 Definition mstatus_reset : mword 64 := mword_of_int 0xA00000000.
 
-(* THE GENERAL FORM: the two mstatus conclusions come from the ENTRY mstatus's
-   kernel contract, which is what [SpecEntry.wp_entry_boot]'s postcondition
-   hands out ([HoKF]).  This is what makes the per-hart chain composable: the
-   client never learns the entry mstatus VALUE (it is behind the post's ∀), so
-   [boot_csrs_reset] below -- which needs the value -- can only ever serve the
-   power-on instance.  The other three conclusions are closed arithmetic on the
-   four zeroed CSRs. *)
-(* NB no premise about [satp0]: WRITING 0 selects Bare whatever the old value
-   was ([satp_legalized]'s Bare arm returns the WRITTEN value), so the boot
-   chain owes nothing about the entry satp. *)
-Lemma boot_csrs_from_kf (ms0 menvcfg0 mie0 mideleg0 satp0 : mword 64) :
-  mstatus_kernel_facts ms0 ->
-  menvcfg0 = (mword_of_int 0 : mword 64) ->
-  mie0 = (mword_of_int 0 : mword 64) ->
-  mideleg0 = (mword_of_int 0 : mword 64) ->
-  _get_Mstatus_SIE (cms5 (st_ms1 ms0)) = ('b"0" : mword 1) /\
-  sconf_ms_facts (cms5 (st_ms1 ms0)) /\
-  menvcfg_legalized (st_menv_adue menvcfg0)
-    (ti_menv1 (st_menv_adue menvcfg0)) = MENVCFG_S /\
-  and_vec (st_mie1 mie0 mideleg0) (not_vec (st_mdl1 mideleg0)) = zeros' 64 /\
-  _get_Satp64_Mode (Mk_Satp64 (satp_legalized satp0 (mword_of_int 0)))
-    = ('b"0000" : mword 4).
-Proof.
-  intros HKF -> -> ->.
-  pose proof (st_boot_ms_kernel_facts ms0 HKF) as HKF'.
-  split_and!.
-  - exact (mstatus_kernel_SIE _ HKF').
-  - exact (sconf_ms_facts_of_kernel _ HKF').
-  - first [ vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity ].
-  - first [ vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity ].
-  - first [ vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity ].
-Qed.
-
-(* the power-on instance, kept: a client that DOES pin the entry mstatus (the
-   reset machine) reaches the five premises without the contract's [HoKF]. *)
-Lemma boot_csrs_reset (ms0 menvcfg0 mie0 mideleg0 satp0 : mword 64) :
-  ms0 = mstatus_reset ->
-  menvcfg0 = (mword_of_int 0 : mword 64) ->
-  mie0 = (mword_of_int 0 : mword 64) ->
-  mideleg0 = (mword_of_int 0 : mword 64) ->
-  satp0 = (mword_of_int 0 : mword 64) ->
-  _get_Mstatus_SIE (cms5 (st_ms1 ms0)) = ('b"0" : mword 1) /\
-  sconf_ms_facts (cms5 (st_ms1 ms0)) /\
-  menvcfg_legalized (st_menv_adue menvcfg0)
-    (ti_menv1 (st_menv_adue menvcfg0)) = MENVCFG_S /\
-  and_vec (st_mie1 mie0 mideleg0) (not_vec (st_mdl1 mideleg0)) = zeros' 64 /\
-  _get_Satp64_Mode (Mk_Satp64 (satp_legalized satp0 (mword_of_int 0)))
-    = ('b"0000" : mword 4).
-Proof.
-  intros -> Hmenv Hmie Hmdl _.
-  exact (boot_csrs_from_kf mstatus_reset _ _ _ _
-           BootConfig.mstatus_reset_kernel_facts Hmenv Hmie Hmdl).
-Qed.
 
 Section BootBridge.
   Context `{!riscvGS Σ, !sieG Σ}.
@@ -428,27 +280,32 @@ Section BootBridge.
   (* [boot_bridge]: entry's post-state cells (+ the raw .bss / adequacy    *)
   (* inputs entry does not produce) become main's per-hart bundle.         *)
   (* ------------------------------------------------------------------- *)
+  (* Every value the M-mode boot produces arrives here ABSTRACT: the contract
+     ([SpecEntry.wp_entry_boot]) quantifies its post-state and exports the
+     facts below, so nothing in this file mentions [st_mout] / [cms5] /
+     [st_mie1] or any other name from the M-mode symbolic execution.  The
+     register file is likewise opaque -- the two lookups are premises, which
+     is all that was ever read out of it. *)
   Lemma boot_bridge (K : nat) (n : nat)
-      (m : regfile)
-      (sp0 ms0 satp0 mideleg0 mie0 menvcfg0 tv mhartid_in : mword 64)
-      (mcounteren0 : mword 32)
-      (pmpcfg0 : type_of_register pmpcfg_n)
-      (pmpaddr00 : type_of_register pmpaddr_n)
+      (Mf : regfile)
+      (sp0 msf satpf midelegf mief menvcfgf tpv : mword 64)
+      (pmpcfgf : type_of_register pmpcfg_n)
+      (pmpaddrf : type_of_register pmpaddr_n)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (nv iv : mword 32) (p0 : mword 64) :
-    (* the boot PMP configuration [wp_entry_boot] was entered at *)
-    pmp_all_off pmpcfg0 ->
-    (* the five CSR side conditions of the sconf tier, at entry's concrete
-       post-state values (see [boot_csrs_reset]) *)
-    _get_Mstatus_SIE (cms5 (st_ms1 ms0)) = ('b"0" : mword 1) ->
-    sconf_ms_facts (cms5 (st_ms1 ms0)) ->
-    menvcfg_legalized (st_menv_adue menvcfg0)
-      (ti_menv1 (st_menv_adue menvcfg0)) = MENVCFG_S ->
-    and_vec (st_mie1 mie0 mideleg0) (not_vec (st_mdl1 mideleg0)) = zeros' 64 ->
-    _get_Satp64_Mode (Mk_Satp64 (satp_legalized satp0 (mword_of_int 0)))
-      = ('b"0000" : mword 4) ->
-    (* the tp/cid convention ([st_tpv_cid_boot] at the boot hart) *)
-    st_tpv mhartid_in = cid_word ->
+    (* the register file, in the two slots the S-mode side reads *)
+    Mf !!! Regidx csp_rs1 = mb_frame sp0 ->
+    Mf !!! Regidx (mword_of_int 4 : mword 5) = tpv ->
+    (* the CSR side conditions of the sconf tier *)
+    _get_Mstatus_SIE msf = ('b"0" : mword 1) ->
+    sconf_ms_facts msf ->
+    menvcfgf = MENVCFG_S ->
+    and_vec mief (not_vec midelegf) = zeros' 64 ->
+    _get_Satp64_Mode (Mk_Satp64 satpf) = ('b"0000" : mword 4) ->
+    (* PMP entry 0 as [pmp_config] wants it *)
+    mb_pmp_open pmpcfgf pmpaddrf ->
+    (* the tp/cid convention ([mb_tpv_cid_boot] at the boot hart) *)
+    tpv = cid_word ->
     (* the boot stack: [boot_stack_slots K] slots of kernel data below sp0 *)
     (boot_stack_slots K <= n)%nat ->
     (text_end + 8 * Z.of_nat (boot_stack_slots K) <= uint sp0)%Z ->
@@ -460,15 +317,14 @@ Section BootBridge.
     (* --- entry's post-state cells --- *)
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     cur_privilege ↦ᵣ Supervisor -∗
-    mstatus ↦ᵣ cms5 (st_ms1 ms0) -∗
-    pmpcfg_n ↦ᵣ st_pmpcfg1 pmpcfg0 -∗
-    pmpaddr_n ↦ᵣ st_pmpaddr1 pmpcfg0 pmpaddr00 -∗
-    gpr_file (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in) -∗
-    satp ↦ᵣ satp_legalized satp0 (mword_of_int 0) -∗
-    mideleg ↦ᵣ st_mdl1 mideleg0 -∗
-    mie ↦ᵣ st_mie1 mie0 mideleg0 -∗
-    menvcfg ↦ᵣ menvcfg_legalized (st_menv_adue menvcfg0)
-                 (ti_menv1 (st_menv_adue menvcfg0)) -∗
+    mstatus ↦ᵣ msf -∗
+    pmpcfg_n ↦ᵣ pmpcfgf -∗
+    pmpaddr_n ↦ᵣ pmpaddrf -∗
+    gpr_file Mf -∗
+    satp ↦ᵣ satpf -∗
+    mideleg ↦ᵣ midelegf -∗
+    mie ↦ᵣ mief -∗
+    menvcfg ↦ᵣ menvcfgf -∗
     stack_own_phys sp0 n -∗
     (* --- the adequacy-minted inputs --- *)
     strans_bit strans_bit_bare -∗
@@ -507,7 +363,7 @@ Section BootBridge.
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof.
-    iIntros (Hpmp Hsie Hmsf Hmenv Hmiez Hsatpm Htp Hn Hlo Hhi Hnv)
+    iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
              Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval Hstv
              Hnoff Hint Hproc Hctx".
@@ -533,42 +389,39 @@ Section BootBridge.
                  with "Hcl Hstk") as "Hstk".
     (* --- the Bare translation slot --- *)
     iAssert (bare_inv) with "[Hsatp Hpcf Hpad]" as "Hbare".
-    { rewrite /bare_inv. iExists (satp_legalized satp0 (mword_of_int 0)).
+    { rewrite /bare_inv. iExists satpf.
       iFrame "Hsatp". iSplitR; [iPureIntro; exact Hsatpm |].
-      destruct (st_pmpcfg1_entry0 pmpcfg0 Hpmp) as [HA _].
-      destruct (st_pmpcfg1_xwr pmpcfg0 Hpmp) as (HX & HW & HR).
-      destruct (st_pmpaddr1_cov pmpcfg0 pmpaddr00 Hpmp) as [Hord Hcov].
+      destruct Hpmp as (HA & Hord & HX & HW & HR & Hcov).
       iApply (pmp_config_intro (mword_of_int 0) _ _ HA Hord HX HW HR Hcov
                 with "Hpcf Hpad"). }
     (* --- the capability, at the final register file --- *)
     iDestruct "Hstv" as (stv0) "Hstv".
-    iAssert (stack_own
-               (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in
-                  !!! Regidx csp_rs1)
-               (kv_frame_slots + K)) with "[Hstk]" as "Hstk".
-    { rewrite st_mout_sp ti_sp1_pa_stk. iExact "Hstk". }
-    iDestruct (sie_cap_intro_bare
-                 (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in)
-                 K stv0 (p := p0) with "Hstk Hbit Hbare Hstv He1") as "Hcap".
+    iAssert (stack_own (Mf !!! Regidx csp_rs1) (kv_frame_slots + K))
+      with "[Hstk]" as "Hstk".
+    { rewrite Hsp mb_frame_pa_stk. iExact "Hstk". }
+    iDestruct (sie_cap_intro_bare Mf K stv0 (p := p0)
+                 with "Hstk Hbit Hbare Hstv He1") as "Hcap".
     (* --- the configuration bundle --- *)
     iEval (rewrite Hmenv) in "Hmenv".
-    iAssert (ghost_var sie_gname (1/2) (_get_Mstatus_SIE (cms5 (st_ms1 ms0))))
+    iAssert (ghost_var sie_gname (1/2) (_get_Mstatus_SIE msf))
       with "[Hg2]" as "Hg2".
     { rewrite Hsie. iExact "Hg2". }
-    iDestruct (sconf_intro (cms5 (st_ms1 ms0)) (st_mie1 mie0 mideleg0)
-                 (st_mdl1 mideleg0) MENVCFG_S Hmsf Hmiez eq_refl
+    iDestruct (sconf_intro msf mief midelegf MENVCFG_S Hmsf Hmiez eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hmie Hmdl Hmenv") as "Hsconf".
     (* --- cpus[cid] --- *)
     iDestruct (cpu_own_init_boot p0 nv iv cpu_ctx_free Hnv
                  with "Hnoff Hint He2 Hproc Hctx") as "Hcpu".
     (* --- the register file: boot writes tp itself, so the raw map ALREADY
        carries this hart's id there and IS its own pin ([tp_pin_id]). --- *)
-    assert (Htpm : st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv
-                     mhartid_in !!! Regidx Rtp = cid_word_of cpu_id).
-    { rewrite st_mout_tp. exact Htp. }
-    iEval (rewrite -(tp_pin_id _ Htpm)) in "Hfile".
+    assert (Htpm : Mf !!! Regidx Rtp = cid_word_of cpu_id).
+    { rewrite Htpf. exact Htp. }
+    (* [Mf] is a BARE VARIABLE now, so [rewrite -(tp_pin_id ..)] would rewrite
+       the [Mf] it just introduced, forever; go through the shrinking direction
+       inside an [iAssert] instead. *)
+    iAssert (gpr_file (tp_pin Mf)) with "[Hfile]" as "Hfile".
+    { rewrite (tp_pin_id Mf Htpm). iExact "Hfile". }
     iModIntro.
-    iExists (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in).
+    iExists Mf.
     iSplitL "Hhs Hsconf Hcap Hfile".
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
     iFrame "Hcpu Hg4a".

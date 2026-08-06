@@ -380,7 +380,7 @@ Section BootCarve.
   Qed.
 
   (* ================================================================== *)
-  (* §7  The NAMED data bundle [kernel_data], and the [entry_ld_ea] word. *)
+  (* §7  The NAMED data bundle [kernel_data], and the [mb_ld_ea] word. *)
   (* ================================================================== *)
 
   (* the [↦ₘ] upgrade of a range, at or above [text_end] -- §4's per-byte
@@ -587,9 +587,9 @@ Section BootCarve.
      what M-mode boot code reads (it has no translation).  [kernel_data]'s
      [↦ₘ□] bytes sit at STATIC (identity) kernel-data addresses, so
      [KMap.mem_ident_phys] disassembles each one.  This is the shape the
-     [entry_ld_ea] word ([_entry]'s GOT slot, holding &stack0) comes out at;
+     [mb_ld_ea] word ([_entry]'s GOT slot, holding &stack0) comes out at;
      the instantiation lives with the client, which is the only place that
-     knows [entry_ld_ea]'s literal value (this file stays below the M-mode
+     knows [mb_ld_ea]'s literal value (this file stays below the M-mode
      tower on purpose). *)
   Lemma kernel_data_phys_word (A : Z) (w : bv 64) (a : mword 64) :
     a = pa_of_z A -> text_end <= A -> A + 8 <= img_end ->

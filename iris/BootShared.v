@@ -37,6 +37,7 @@ Require Import SpecMain SpecMainSecondary.
 Require Import BootConfig PowerBoot.
 Require Import BootCarve BootCarveMain.
 Require Import BootChain.
+Require Import MbootVocab.
 Require Import RiscvAdequacy.
 Require Import BootReset.   (* the garbage-anchored register clause's bridge *)
 From Kernel Require KernelData.
@@ -781,7 +782,7 @@ Section BootAlloc.
      pins can be kept back for [wire_inv]. *)
   Lemma boot_hart_pre (h : CPU) (g : gstate) (E : coPset) :
     boot_facts g ->
-    kmap_static_claims -∗ gen_cert -∗ (entry_ld_ea ↦ₚ₈□ v_stack0) -∗
+    kmap_static_claims -∗ gen_cert -∗ (mb_ld_ea ↦ₚ₈□ v_stack0) -∗
     boot_reg_res (CID := h) (g.(gregs) h) -∗
     hart_strans h -∗
     hart_sie h -∗
@@ -880,7 +881,7 @@ Section BootAlloc.
     iDestruct (kernel_data_intro g Hmem with "Himg") as "#Hkdata".
     (* ---- [_entry]'s GOT slot: the &stack0 word, at [DfracDiscarded] so all
            eight harts share it ---- *)
-    iDestruct (kernel_data_phys_word entry_got v_stack0 entry_ld_ea
+    iDestruct (kernel_data_phys_word entry_got v_stack0 mb_ld_ea
                  entry_ld_ea_addr ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  entry_got_bytes with "Hcl Hkdata") as "#Hword".
     (* ---- the fd-slot supply (no memory footprint: a pure ghost) ---- *)
