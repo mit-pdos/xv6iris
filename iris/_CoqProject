@@ -105,10 +105,8 @@ PtBuild.v
 KvmSpec.v
 CodeWalk.v
 CodeMappages.v
-CodeMappagesAux.v
 CodeProcMapstacks.v
 CodeKvmmake.v
-CodeKvmmakeAux.v
 CodeKvminit.v
 CodeKvminithart.v
 CodeKvmmap.v
@@ -564,7 +562,6 @@ ProofUvmcreate.v
 LinkUvmcreate.v
 SpecProcPagetable.v
 CodeProcPagetable.v
-CodeProcPagetableAux.v
 ProofProcPagetable.v
 LinkProcPagetable.v
 ProcPtOwn.v
@@ -735,12 +732,10 @@ ProofAllocproc.v
 LinkAllocproc.v
 SpecGrowproc.v
 CodeGrowproc.v
-CodeGrowprocAux.v
 ProofGrowproc.v
 LinkGrowproc.v
 SpecSysSbrk.v
 CodeSysSbrk.v
-CodeSysSbrkAux.v
 ProofSysSbrk.v
 LinkSysSbrk.v
 SpecUserinit.v

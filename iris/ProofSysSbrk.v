@@ -48,7 +48,6 @@ Require Import FdSlots FileInv ProcInv.
 Require Import CodeSysSbrk.
 Require Import SpecArgint SpecMyproc SpecGrowproc SpecSysSbrk.
 From Kernel Require KernelSyms.
-Require Import CodeSysSbrkAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
