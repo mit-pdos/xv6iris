@@ -765,3 +765,8 @@ WeakBranch.v
 WeakWord8.v
 WeakRacy.v
 WeakEffSkel.v
+WeakPmpEff.v
+WeakTickEff.v
+WeakFetchEff.v
+WeakLeafEff8.v
+WeakLeafEff8s.v
