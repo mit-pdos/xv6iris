@@ -1225,18 +1225,28 @@ they unlock.
   model; the *generated* one does not say so, and every `WeakCert`
   certificate quantifies over the fetch's `akinfo`, which is why nothing
   breaks. Do not "fix" the certificates to pin `AK_ifetch`.
-- **WHICH FETCH ARMS SHIPPED: the 4-aligned `F_Base` one, and only it.**
-  That is every 4-aligned 32-bit instruction — the funnel's main case. The
-  other three arms of `WeakFunnel.exec_fetch_flat` (2-aligned `F_Base`,
-  `F_RVC` at 4 and at 2) go through `exec_fetch_F_Base_2` /
-  `exec_fetch_RVC_4` / `exec_fetch_RVC_2` and each emits a DIFFERENT trace
-  (the split fetch emits TWO 2-byte reads, so a leaf at that alignment needs
-  a 3-element certificate that does not exist yet). A compressed or
-  2-aligned leaf therefore cannot close `wP_eff` today;
-  `WeakFetchEff` §4's comment states the boundary rather than hiding it.
-  Cost to add them: ≈ 150 lines for the two `F_RVC` arms (same chain at
-  width 2, `exec_read_ram_plain_2` already exists), ≈ 200 for the split
-  `F_Base` **plus** a new `wcert_*` family at a 3-element trace.
+- **WHICH FETCH ARMS SHIPPED: the two 4-ALIGNED ones.** `F_Base` at a
+  4-aligned pc (`WeakFetchEff` §4, `wP_eff_of_leaf_base`) and `F_RVC` at a
+  4-aligned pc (`iris/WeakFetchRvc.v`, 405 lines, `wP_eff_of_leaf_rvc4`) —
+  i.e. every instruction, compressed or not, whose pc is 4-aligned. **The
+  compressed arm was nearly free (405 lines, of which ~130 is the `Ext_Zca`
+  probe and ~90 the recipe), because a 4-aligned fetch reads the whole
+  32-bit word whatever the instruction turns out to be: it reuses
+  `exec_eff_fetch_bytes_4` unchanged and its trace is the SAME single
+  element.** Every certificate in `WeakFetchEff` §9a therefore applies to it
+  verbatim.
+  **STILL NOT COVERED, and it is the whole remaining gap: the two 2-ALIGNED
+  arms.** A pc that is 2- but not 4-aligned performs TWO 2-byte reads
+  (`exec_fetch_F_Base_2` / `exec_fetch_RVC_2`), so its trace has two
+  elements and a leaf over it needs a THREE-element `wcert_*` family that
+  does not exist. Cost to add: ≈ 200 lines for the two arms (the width-2
+  memory chain, `exec_read_ram_plain_2`, already exists) **plus** the
+  3-element certificate family (≈ 120: `wcert_load`/`_store`/`_amo_aq` take
+  the fetch's element as ONE `WEread akf pf nf`; generalising the prefix to
+  a `nowrite_trace` list is `WeakEff.wcert_*_gen`, which already exists —
+  so the real work is proving the split fetch's 2-element trace `nowrite`,
+  which is immediate). **This is the first thing to do if a 2-aligned
+  32-bit instruction blocks a batch-2 file.**
 - **THE ACTUAL SIZE: 1112 lines for the 4-aligned arm, vs the 250–350
   estimate.** The estimate counted only the chain
   `exec_fetch_done → … → exec_read_ram_plain_4`; that part came in at ≈ 250

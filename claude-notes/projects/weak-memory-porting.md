@@ -306,9 +306,11 @@ a leaf:
    `iris/WeakPmpEff.v`) and the `tick_clock` mirror
    (`iris/WeakTickEff.v`, joined by `WeakFetchEff` §7). **A leaf now closes
    `wP_eff` — see §2g for the recipe.** Two boundaries to know:
-   - **only the 4-aligned `F_Base` fetch arm is mirrored.** A compressed or
-     2-aligned instruction has no `wP_eff` route yet (the split fetch emits
-     TWO 2-byte reads, so it also needs a 3-element `wcert_*`).
+   - **the two 4-ALIGNED fetch arms are mirrored**, `F_Base`
+     (`wP_eff_of_leaf_base`) and `F_RVC` (`iris/WeakFetchRvc.v`,
+     `wP_eff_of_leaf_rvc4`) — compressed or not, any 4-aligned pc. A pc that
+     is 2- but not 4-aligned has no `wP_eff` route yet (the split fetch
+     emits TWO 2-byte reads, so it also needs a 3-element `wcert_*`).
    - **the fetch's trace element is `WEread (AkInfo false false false) pc 4`**
      (`WeakFetchEff.wak_plain`) — rv64d emits `AK_explicit`/`AV_plain`, not
      `AK_ifetch`, so the fetch is an ordinary view-raising read.
@@ -339,7 +341,10 @@ Landed at batch 0b/1. Five moves; nothing else about an instruction enters.
    exactly where the SC leaf uses `WpDecodeBridge.decode_bridge D dst`; the
    only new obligation is `goodb0 D (ext_decode w) dst = true`, discharged
    by `vm_compute; reflexivity` like its `goodb` sibling. **Do not restate
-   decode lemmas at `exec_eff`.**
+   decode lemmas at `exec_eff`.** The same bridge carries a STATE-GENERIC SC
+   fact — a compressed instruction's `ExecuteAs` expansion, any register-only
+   `execute` — with no reference state at all:
+   `WeakFetchRvc.exec_eff_of_goodb0_self` is the bridge at `dst := s`.
 4. **The window and `wP_eff`.** `WeakFetchEff.wP_eff_of_leaf_base`, fed the
    window's three obligations (`pa_z a ≠ 0` from `addr_is_ram`;
    `pinned_read` from `WeakFunnel.winstr_pinned` for the text and
