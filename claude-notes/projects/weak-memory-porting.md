@@ -498,13 +498,16 @@ Every one of these type-checks and is wrong or vacuous.
    (`iris/WeakTickEff.v`), and `wP_eff_of_leaf_base` (§2g). 1867 lines /
    9.8 s, vs the 250–350 + 25 estimate — **price the transitive cone a chain
    NAMES, not the chain in front of you.** 4-aligned `F_Base` arm only.
-1. **The memory `execute` mirrors, by SHAPE not by call site.**  LOAD 8 and
-   STORE 8 are **DONE** (`iris/WeakLeafEff8.v`, `iris/WeakLeafEff8s.v`, ≈ 700
-   lines each — not the 30–60 estimated, for the same transitive-cone
-   reason).  LOAD 4 / STORE 4 / AMOSWAP 4 additionally need their SC lemma
-   written (the M-mode library has width 8 only, and only S-/U-flavoured
-   AMO chains exist).  Widths 1 and 2 are batch-6 territory: recorded, not
-   built.
+1. **DONE — all five shapes**: LOAD/STORE at 8 (`iris/WeakLeafEff8.v`,
+   `WeakLeafEff8s.v`), LOAD/STORE at 4 (`WeakLeafBase4.v`) and the M-mode
+   `amoswap.w.aq` (`WeakLeafAmo4.v`).  **4082 lines, ≈ 800 per shape**
+   against the 30–60 estimate — the same transitive-cone correction as 0b
+   (the `vmem_read`/`vmem_write` cone below an `execute` is not detectable
+   either, so it is mirrored whole).  Three of the five needed their SC
+   lemma written as well (the M-mode library had width 8 only, and only
+   S-/U-flavoured AMO chains existed); those halves are 399–613 lines and
+   replay the width-8 template essentially line for line.  Widths 1 and 2
+   remain batch-6 territory: recorded, not built.
 2. The M-mode leaf libraries through `WeakFunnel.wwp_instr` (§2d) —
    `WpMmodeLoad`, `WpMmodeStore`, the `WpMmodeLeaf*` family.  Their config
    tower and decode facts transfer as-is.

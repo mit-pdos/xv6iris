@@ -1411,7 +1411,7 @@ numbers come from; the prices below replace M4-prep's).
 |---|---|---|---|
 | 0a | `execR_eff` + kit, the two `run_hart_active` progress mirrors, the step assembly, the certificate join | **DONE — 834 lines / 3.9 s** (`iris/WeakEffSkel.v`) | vs the 400–600 estimate for the whole of batch 0; the interpreter mirror is 3.8× its SC source, the script mirrors 0.65× |
 | 0b | the FETCH's `exec_eff` reduction + the `tick_clock` mirror + `wP_eff_of_leaf_base` | **DONE — 2272 lines / 13.1 s** (`WeakPmpEff.v` 358, `WeakTickEff.v` 397, `WeakFetchEff.v` 1112, `WeakFetchRvc.v` 405) | vs the 250–350 + 25 estimate; the gap is the TRANSITIVE cone (PMP, the interrupt gate, the clock) that the chain merely *names*. Both 4-aligned arms (`F_Base` and `F_RVC`); the 2-aligned ones are the remaining gap |
-| 1 | the memory `execute` mirrors, by SHAPE | LOAD 8 / STORE 8 **DONE — 691 + 698 lines**; LOAD 4 / STORE 4 / AMOSWAP 4 need their SC lemma written first | vs the 30–60-lines-per-shape estimate: a shape is ≈ 700 lines, because the whole `vmem_read`/`vmem_write` cone below the `execute` must be mirrored too (same transitive-cone lesson as 0b) |
+| 1 | the memory `execute` mirrors, by SHAPE | **DONE — all five shapes, 4082 lines** (`WeakLeafEff8.v` 691, `WeakLeafEff8s.v` 698, `WeakLeafBase4.v` 1456, `WeakLeafAmo4.v` 1237) | vs the 30–60-lines-per-shape estimate: a shape is ≈ 800 lines, because the whole `vmem_read`/`vmem_write` cone below the `execute` must be mirrored too (same transitive-cone lesson as 0b). Three of the five needed their SC lemma written as well |
 | 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | 30–55 lines per load/ALU leaf, 60–90 per store/AMO leaf, ON TOP of the SC leaf | of which 20–40 is the certificate's window; the trace join AND the decode fact are now free (batch-0b block) |
 | 3 | `WpLock` clients | ≈ 0 | the interface is unchanged; `iris/WeakWord8.v` covers `cpu`/`name` |
 | 4 | the straight-line M-mode function proofs | batched by subagent | the config tower and every decode fact transfer verbatim |
@@ -1434,14 +1434,16 @@ fact**:
 | STORE 8 | `WpMmodeLeafBase.exec_execute_STORE_8_gpr` (+ `_chk`) | `[WEwrite akw ea 8 v]` | **DONE** — `iris/WeakLeafEff8s.v`, 698 lines. `sd`. `_chk` not mirrored |
 | LOAD 4 | reached through `exec_execute_C_LW` / `_C_LDSP` → `ExecuteAs (LOAD … 4)`; the width-4 M-mode `LOAD` lemma did not exist | `[WEread akl ea 4]` | **DONE** — `iris/WeakLeafBase4.v`, 613 SC + 742 mirror = 1456 lines. `lw`/`lwu` (the sign flag is left free), and the spinlock's spin re-read |
 | STORE 4 | ditto via `exec_execute_C_SW` / `_C_SDSP` | `[WEwrite akw ea 4 v]` | **DONE** — same file. `sw`, the release and the `started` setter. NOTE the stored value is the TRUNCATION `subrange_vec_dec vrs2 31 0` |
-| AMOSWAP 4 | only `WpAmo`'s S-flavoured chain and `WpSmodePtLock.exec_execute_AMOSWAP_4_gpr_S_walk_pt` exist; the M-mode one is part of this batch | `[WEread aka ea 4; WEwrite akw ea 4 v]` | THE lock instruction; note the two effects are adjacent, which is what `wcert_amo_aq_gen` assumes |
-| LOAD/STORE 1, 2 | `WpSmodePtMem.exec_execute_STORE_1_…` etc. only | | NOT reachable from M-mode kernel text today — defer to batch 6 rather than mirror speculatively |
+| AMOSWAP 4 | only `WpAmo`'s S-flavoured chain and `WpSmodePtLock.exec_execute_AMOSWAP_4_gpr_S_walk_pt` existed | `[WEread aka ea 4; WEwrite akw ea 4 v]` | **DONE** — `iris/WeakLeafAmo4.v`, 399 SC + 729 mirror = 1237 lines. THE lock instruction; the two effects come out adjacent, as `wcert_amo_aq_gen` assumes. It probes FOUR MMIO gates (both `within_htif_readable` and `_writable`), not three |
+| LOAD/STORE 1, 2 | `WpSmodePtMem.exec_execute_STORE_1_…` etc. only | | NOT reachable from M-mode kernel text today — **deferred to batch 6, recorded not built**, as planned |
 
-So batch 1 is **≈ 5 shapes (6 with a byte store), 30–60 lines each**, of which
-the memory-free prefix of each `execute` is free by the empty-memory detector
-and only the one `MemRead`/`MemWrite` arm is explicit.  Two of the five are
-NEW SC lemmas rather than mirrors (width-4 M-mode LOAD/STORE and the M-mode
-AMOSWAP), so those cost their SC lemma as well.
+**BATCH 1 IS COMPLETE: all five shapes.** Total **4082 lines** across five
+files, i.e. **≈ 800 per shape**, against the 30–60 estimate — the same
+transitive-cone correction as batch 0b (the `vmem_read`/`vmem_write` cone
+below an `execute` is not detectable either, so it is mirrored whole). Three
+of the five needed their SC lemma written as well (width-4 LOAD, width-4
+STORE, M-mode AMOSWAP); the SC halves came to 399–613 lines each and replay
+their width-8 template essentially line for line.
 
 Batches 0 and 1 are one agent each and must be serial; 2 and 4 parallelise
 freely (each file is independent through the funnel).  Batch 6 must NOT be
