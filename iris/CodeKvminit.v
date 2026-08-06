@@ -57,9 +57,9 @@ Section CodeKvminit.
   Proof. mk_base (KernelSyms.kvminit + 0xc) (mword_of_int 0x00009797 : mword 32)
     (mword_of_int (KernelSyms.kvminit + 0xc) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00009797. Qed.
 
-  Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) false (STORE (mword_of_int 112 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
-  Proof. mk_base (KernelSyms.kvminit + 0x10) (mword_of_int 0x06a7b823 : mword 32)
-    (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 112 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_06a7b823. Qed.
+  Lemma kii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) false (STORE (mword_of_int 110 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)).
+  Proof. mk_base (KernelSyms.kvminit + 0x10) (mword_of_int 0x06a7b723 : mword 32)
+    (mword_of_int (KernelSyms.kvminit + 0x10) : mword 64) (STORE (mword_of_int 110 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), 8)) kd_06a7b723. Qed.
 
   Lemma kii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminit + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.kvminit + 0x14) (mword_of_int 0x60a2 : mword 16)

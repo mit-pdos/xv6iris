@@ -73,7 +73,7 @@ Section ProofMycpu.
     set (imm_dealloc := (mword_of_int 16 : mword 6)).
     set (nzimm_s0 := (mword_of_int 4 : mword 8)).
     set (imm_auipc := (mword_of_int 0x11 : mword 20)).
-    set (imm_addi := (mword_of_int 0xa86 : mword 12)).
+    set (imm_addi := (mword_of_int 0xa84 : mword 12)).
     set (shamt_slli := (mword_of_int 7 : mword 6)).
     set (imm_addiw := (mword_of_int 0 : mword 6)).
     set (sp' := add_vec (m0 !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry))).

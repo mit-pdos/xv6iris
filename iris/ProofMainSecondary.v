@@ -229,7 +229,7 @@ Section ProofMainSecondary.
     iEval (rewrite Hp08) in "Hpc".
     (* +0x08 jal cpuid *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.main + 0x08)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2634 : mword 21) W2 (K - 2)%nat false
+              (mword_of_int 2636 : mword 21) W2 (K - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi08").
     iApply wp_next_off_intro.
@@ -237,7 +237,7 @@ Section ProofMainSecondary.
     pose (W3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x08) : mword 64) 4)]> W2).
     assert (Htgtcp : add_vec (mword_of_int (KernelSyms.main + 0x08) : mword 64)
-              (sign_extend' 64 (mword_of_int 2634 : mword 21))
+              (sign_extend' 64 (mword_of_int 2636 : mword 21))
               = (mword_of_int KernelSyms.cpuid : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtcp) in "Hpc".
@@ -450,7 +450,7 @@ Section ProofMainSecondary.
     pose proof ms_hart_fmt as (Hkh & Hnh & Hlh).
     (* ---- +0x20 jal cpuid ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.main + 0x20)) (mword_of_int 1 : mword 5)
-              (mword_of_int 2610 : mword 21) m n false
+              (mword_of_int 2612 : mword 21) m n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi20").
     iApply wp_next_off_intro.
@@ -458,7 +458,7 @@ Section ProofMainSecondary.
     pose (P1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x20) : mword 64) 4)]> m).
     assert (Htgtcp : add_vec (mword_of_int (KernelSyms.main + 0x20) : mword 64)
-              (sign_extend' 64 (mword_of_int 2610 : mword 21))
+              (sign_extend' 64 (mword_of_int 2612 : mword 21))
               = (mword_of_int KernelSyms.cpuid : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtcp) in "Hpc".
@@ -576,7 +576,7 @@ Section ProofMainSecondary.
     iPoseProof (mni_3e with "Htext") as "Hi3e".
     (* ---- +0x32 jal kvminithart ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.main + 0x32)) (mword_of_int 1 : mword 5)
-              (mword_of_int 128 : mword 21) m n false
+              (mword_of_int 130 : mword 21) m n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi32").
     iApply wp_next_off_intro.
@@ -584,7 +584,7 @@ Section ProofMainSecondary.
     pose (Q1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x32) : mword 64) 4)]> m).
     assert (Htgtkh : add_vec (mword_of_int (KernelSyms.main + 0x32) : mword 64)
-              (sign_extend' 64 (mword_of_int 128 : mword 21))
+              (sign_extend' 64 (mword_of_int 130 : mword 21))
               = (mword_of_int KernelSyms.kvminithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkh) in "Hpc".
@@ -598,7 +598,7 @@ Section ProofMainSecondary.
     iEval (rewrite Hretkh) in "Hpc".
     (* ---- +0x36 jal trapinithart ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.main + 0x36)) (mword_of_int 1 : mword 5)
-              (mword_of_int 5490 : mword 21) mkh n false
+              (mword_of_int 5504 : mword 21) mkh n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi36").
     iApply wp_next_off_intro.
@@ -606,7 +606,7 @@ Section ProofMainSecondary.
     pose (Q2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x36) : mword 64) 4)]> mkh).
     assert (Htgtth : add_vec (mword_of_int (KernelSyms.main + 0x36) : mword 64)
-              (sign_extend' 64 (mword_of_int 5490 : mword 21))
+              (sign_extend' 64 (mword_of_int 5504 : mword 21))
               = (mword_of_int KernelSyms.trapinithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtth) in "Hpc".
@@ -633,7 +633,7 @@ Section ProofMainSecondary.
     iModIntro.
     (* ---- +0x3a jal plicinithart ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.main + 0x3a)) (mword_of_int 1 : mword 5)
-              (mword_of_int 17888 : mword 21) mth n false
+              (mword_of_int 17904 : mword 21) mth n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3a").
     iApply wp_next_off_intro.
@@ -641,7 +641,7 @@ Section ProofMainSecondary.
     pose (Q3 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x3a) : mword 64) 4)]> mth).
     assert (Htgtph : add_vec (mword_of_int (KernelSyms.main + 0x3a) : mword 64)
-              (sign_extend' 64 (mword_of_int 17888 : mword 21))
+              (sign_extend' 64 (mword_of_int 17904 : mword 21))
               = (mword_of_int KernelSyms.plicinithart : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtph) in "Hpc".
@@ -660,7 +660,7 @@ Section ProofMainSecondary.
     iEval (rewrite Hretph) in "Hpc".
     (* ---- +0x3e jal scheduler : main's exit; scheduler never returns ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.main + 0x3e)) (mword_of_int 1 : mword 5)
-              (mword_of_int 3774 : mword 21) mph n false
+              (mword_of_int 3784 : mword 21) mph n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3e").
     iApply wp_next_off_intro.
@@ -668,7 +668,7 @@ Section ProofMainSecondary.
     pose (Q4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.main + 0x3e) : mword 64) 4)]> mph).
     assert (Htgtsc : add_vec (mword_of_int (KernelSyms.main + 0x3e) : mword 64)
-              (sign_extend' 64 (mword_of_int 3774 : mword 21))
+              (sign_extend' 64 (mword_of_int 3784 : mword 21))
               = (mword_of_int KernelSyms.scheduler : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".

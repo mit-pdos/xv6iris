@@ -53,17 +53,17 @@ Section CodeYield.
   Proof. mk_rvc (KernelSyms.yield + 0x8) (mword_of_int 0x1000 : mword 16)
     (mword_of_int (KernelSyms.yield + 0x8) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_1000 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma ydi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0xa) : mword 64) false (JAL (mword_of_int 2095648 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.yield + 0xa) (mword_of_int 0xa21ff0ef : mword 32)
-    (mword_of_int (KernelSyms.yield + 0xa) : mword 64) (JAL (mword_of_int 2095648 : mword 21, Regidx (mword_of_int 1))) kd_a21ff0ef. Qed.
+  Lemma ydi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0xa) : mword 64) false (JAL (mword_of_int 2095640 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.yield + 0xa) (mword_of_int 0xa19ff0ef : mword 32)
+    (mword_of_int (KernelSyms.yield + 0xa) : mword 64) (JAL (mword_of_int 2095640 : mword 21, Regidx (mword_of_int 1))) kd_a19ff0ef. Qed.
 
   Lemma ydi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0xe) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.yield + 0xe) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.yield + 0xe) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma ydi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x10) : mword 64) false (JAL (mword_of_int 2092318 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.yield + 0x10) (mword_of_int 0xd1ffe0ef : mword 32)
-    (mword_of_int (KernelSyms.yield + 0x10) : mword 64) (JAL (mword_of_int 2092318 : mword 21, Regidx (mword_of_int 1))) kd_d1ffe0ef. Qed.
+  Lemma ydi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x10) : mword 64) false (JAL (mword_of_int 2092308 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.yield + 0x10) (mword_of_int 0xd15fe0ef : mword 32)
+    (mword_of_int (KernelSyms.yield + 0x10) : mword 64) (JAL (mword_of_int 2092308 : mword 21, Regidx (mword_of_int 1))) kd_d15fe0ef. Qed.
 
   Lemma ydi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x14) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 3 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.yield + 0x14) (mword_of_int 0x478d : mword 16)
@@ -81,9 +81,9 @@ Section CodeYield.
   Proof. mk_rvc (KernelSyms.yield + 0x1c) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.yield + 0x1c) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma ydi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) false (JAL (mword_of_int 2092440 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.yield + 0x1e) (mword_of_int 0xd99fe0ef : mword 32)
-    (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) (JAL (mword_of_int 2092440 : mword 21, Regidx (mword_of_int 1))) kd_d99fe0ef. Qed.
+  Lemma ydi_1e : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) false (JAL (mword_of_int 2092430 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.yield + 0x1e) (mword_of_int 0xd8ffe0ef : mword 32)
+    (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) (JAL (mword_of_int 2092430 : mword 21, Regidx (mword_of_int 1))) kd_d8ffe0ef. Qed.
 
   Lemma ydi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.yield + 0x22) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.yield + 0x22) (mword_of_int 0x60e2 : mword 16)

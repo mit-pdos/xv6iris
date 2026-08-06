@@ -802,12 +802,12 @@ Section ProofWalk.
     assert (Hpp76 : add_vec_int (mword_of_int (KernelSyms.walk + 0x72) : mword 64) 4 = mword_of_int (KernelSyms.walk + 0x76)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp76) in "Hpc".
     (* +0x76 jal kalloc *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.walk + 0x76)) (mword_of_int 1 : mword 5) (mword_of_int 2095964 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.walk + 0x76)) (mword_of_int 1 : mword 5) (mword_of_int 2095962 : mword 21)
               Mf (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi76 [-]").
     iIntros (CIDa2 Hsa2) "Hcg Hpc".
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.walk + 0x76) : mword 64) 4)]> Mf).
-    assert (Htgtk : add_vec (mword_of_int (KernelSyms.walk + 0x76) : mword 64) (sign_extend' 64 (mword_of_int 2095964 : mword 21)) = mword_of_int KernelSyms.kalloc)
+    assert (Htgtk : add_vec (mword_of_int (KernelSyms.walk + 0x76) : mword 64) (sign_extend' 64 (mword_of_int 2095962 : mword 21)) = mword_of_int KernelSyms.kalloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
     (* ---- kalloc() through the env bundle ---- *)
@@ -940,12 +940,12 @@ Section ProofWalk.
     assert (Hpp82 : add_vec_int (mword_of_int (KernelSyms.walk + 0x80) : mword 64) 2 = mword_of_int (KernelSyms.walk + 0x82)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp82) in "Hpc".
     (* +0x82 jal memset *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.walk + 0x82)) (mword_of_int 1 : mword 5) (mword_of_int 2096362 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.walk + 0x82)) (mword_of_int 1 : mword 5) (mword_of_int 2096360 : mword 21)
               N3 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi82 [-]").
     iIntros (CIDa8 Hsa8) "Hcg Hpc".
     set (N4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.walk + 0x82) : mword 64) 4)]> N3).
-    assert (Htgtm : add_vec (mword_of_int (KernelSyms.walk + 0x82) : mword 64) (sign_extend' 64 (mword_of_int 2096362 : mword 21)) = mword_of_int KernelSyms.memset)
+    assert (Htgtm : add_vec (mword_of_int (KernelSyms.walk + 0x82) : mword 64) (sign_extend' 64 (mword_of_int 2096360 : mword 21)) = mword_of_int KernelSyms.memset)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtm) in "Hpc".
     (* memset(p, 0, 4096) keeping the zero bytes *)

@@ -1651,7 +1651,7 @@ Section VdrwdP4.
     iEval (rewrite Hp172) in "Hpc".
     (* ---- +0x172  fence rw,rw ---- *)
     iApply (wp_fence_gen_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x172) : mword 64)
-              (mword_of_int 0) (mword_of_int 3) (mword_of_int 3)
+              (mword_of_int 0) (mword_of_int 15) (mword_of_int 15)
               (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) N5 av false
               with "Hcg Hpc Hi172 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1764,7 +1764,7 @@ Section VdrwdP4.
     iEval (rewrite Hp182) in "Hpc".
     (* ---- +0x182  fence rw,rw ---- *)
     iApply (wp_fence_gen_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64)
-              (mword_of_int 0) (mword_of_int 3) (mword_of_int 3)
+              (mword_of_int 0) (mword_of_int 15) (mword_of_int 15)
               (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) N8 av false
               with "Hcg Hpc Hi182 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.

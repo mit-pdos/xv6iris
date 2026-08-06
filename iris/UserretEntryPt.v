@@ -72,11 +72,11 @@ Section UserretEntryPt.
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     tlb_inv_pt kroot -∗
     pt_frame (upt_tree_spec uroot tfp um) -∗
-    pc_is (uva 0x9c) -∗
+    pc_is (uva 0xa0) -∗
     gpr_file m -∗
-    instr (upa 0x9c) false ai_sfence -∗
-    instr (upa 0xa0) false ai_csrw -∗
-    instr (upa 0xa4) false ai_sfence -∗
+    instr (upa 0xa0) false ai_sfence -∗
+    instr (upa 0xa4) false ai_csrw -∗
+    instr (upa 0xa8) false ai_sfence -∗
     ( hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ{ dq } Supervisor -∗
       mstatus ↦ᵣ{ dq } mstatus0 -∗
@@ -85,7 +85,7 @@ Section UserretEntryPt.
       menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       utlb_inv_pt uroot tfp um -∗
       kpt_frame kroot -∗
-      pc_is (uva 0xa8) -∗
+      pc_is (uva 0xac) -∗
       gpr_file m -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -97,14 +97,14 @@ Section UserretEntryPt.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    assert (Hva01 : add_vec_int (uva 0x9c) 4 = uva 0xa0)
+    assert (Hva01 : add_vec_int (uva 0xa0) 4 = uva 0xa4)
       by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hva02 : add_vec_int (uva 0xa0) 4 = uva 0xa4)
+    assert (Hva02 : add_vec_int (uva 0xa4) 4 = uva 0xa8)
       by (apply bv_eq; vm_compute; reflexivity).
-    assert (Hva03 : add_vec_int (uva 0xa4) 4 = uva 0xa8)
+    assert (Hva03 : add_vec_int (uva 0xa8) 4 = uva 0xac)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ============ STEP 1: sfence.vma under the kernel invariant ======== *)
-    iApply (wp_instr_ktramp_pt kroot Φ (uva 0x9c) (upa 0x9c) false ai_sfence
+    iApply (wp_instr_ktramp_pt kroot Φ (uva 0xa0) (upa 0xa0) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -124,8 +124,8 @@ Section UserretEntryPt.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv1.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms1.
-    iMod (reg_update _ nextPC _ (uva 0xa0) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc1 := set_reg σ1 nextPC (uva 0xa0)).
+    iMod (reg_update _ nextPC _ (uva 0xa4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc1 := set_reg σ1 nextPC (uva 0xa4)).
     assert (Lpriv1p : register_lookup cur_privilege s_pc1.(sregs) = Supervisor)
       by (unfold s_pc1; tmig; exact Lpriv1).
     assert (Lms1p : register_lookup mstatus s_pc1.(sregs) = mstatus0)
@@ -148,12 +148,12 @@ Section UserretEntryPt.
     iSplitL "Hreg Hmem".
     { unfold s_pc1; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
-    assert (Lnpc1 : register_lookup nextPC (set_reg s_pc1 tlb tlbz1).(sregs) = uva 0xa0).
+    assert (Lnpc1 : register_lookup nextPC (set_reg s_pc1 tlb tlbz1).(sregs) = uva 0xa4).
     { unfold s_pc1; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc1) in "Hpc".
     iNext.
     (* ============ STEP 2: csrw satp,a0 -- ENTER the window ============= *)
-    iApply (wp_instr_ktramp_pt kroot Φ (uva 0xa0) (upa 0xa0) false ai_csrw
+    iApply (wp_instr_ktramp_pt kroot Φ (uva 0xa4) (upa 0xa4) false ai_csrw
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -174,8 +174,8 @@ Section UserretEntryPt.
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv2.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms2.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa2.
-    iMod (reg_update _ nextPC _ (uva 0xa4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc2 := set_reg σ2 nextPC (uva 0xa4)).
+    iMod (reg_update _ nextPC _ (uva 0xa8) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc2 := set_reg σ2 nextPC (uva 0xa8)).
     assert (Lpriv2p : register_lookup cur_privilege s_pc2.(sregs) = Supervisor)
       by (unfold s_pc2; tmig; exact Lpriv2).
     assert (Lms2p : register_lookup mstatus s_pc2.(sregs) = mstatus0)
@@ -216,7 +216,7 @@ Section UserretEntryPt.
     iSplitL "Hreg Hmem".
     { unfold s_pc2; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
-    assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp usatp).(sregs) = uva 0xa4).
+    assert (Lnpc2 : register_lookup nextPC (set_reg s_pc2 satp usatp).(sregs) = uva 0xa8).
     { unfold s_pc2; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc2) in "Hpc".
     iNext.
@@ -224,7 +224,7 @@ Section UserretEntryPt.
     iApply (wp_instr_pt2_tramp uroot (kpt_tree_spec_gen kroot M2) (upt_tree_spec uroot tfp um)
               (kpt_pt2_tramp_spec_gen kroot M2 HMtramp) (upt_pt2_tramp_spec uroot tfp um Hwf)
               (upt_pt2_base uroot tfp um)
-              Φ (uva 0xa4) (upa 0xa4) false ai_sfence
+              Φ (uva 0xa8) (upa 0xa8) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -243,8 +243,8 @@ Section UserretEntryPt.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid_dq with "Hreg Hpriv") as %Lpriv3.
     iDestruct (reg_valid_dq with "Hreg Hms") as %Lms3.
-    iMod (reg_update _ nextPC _ (uva 0xa8) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc3 := set_reg σ3 nextPC (uva 0xa8)).
+    iMod (reg_update _ nextPC _ (uva 0xac) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc3 := set_reg σ3 nextPC (uva 0xac)).
     assert (Lpriv3p : register_lookup cur_privilege s_pc3.(sregs) = Supervisor)
       by (unfold s_pc3; tmig; exact Lpriv3).
     assert (Lms3p : register_lookup mstatus s_pc3.(sregs) = mstatus0)
@@ -268,7 +268,7 @@ Section UserretEntryPt.
     iSplitL "Hreg Hmem".
     { unfold s_pc3; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs Hpc".
-    assert (Lnpc3 : register_lookup nextPC (set_reg s_pc3 tlb tlbz3).(sregs) = uva 0xa8).
+    assert (Lnpc3 : register_lookup nextPC (set_reg s_pc3 tlb tlbz3).(sregs) = uva 0xac).
     { unfold s_pc3; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc3) in "Hpc".
     iNext.

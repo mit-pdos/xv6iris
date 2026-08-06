@@ -472,7 +472,7 @@ Section ProofAcquire.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspB2. }
     iPoseProof (aqi_24 with "Htext") as "Hi24".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcb8 : mword 21) B8 (av - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcba : mword 21) B8 (av - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi24 [-]").

@@ -567,7 +567,7 @@ Section ProofFetchstr.
       rewrite /M3 upd_ne; [| reg_neq]. rewrite /M2 upd_ne; [| reg_neq]. exact HM1sp. }
     (* ---- +0x14: jal ra,myproc ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.fetchstr + 0x14))
-              Rra (mword_of_int 2093356 : mword 21) M5 (av - 6)%nat b
+              Rra (mword_of_int 2093344 : mword 21) M5 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi14 [-]").
     iIntros (CID11 Hk11) "Hcg Hpc".
@@ -576,7 +576,7 @@ Section ProofFetchstr.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x14) : mword 64) 4)]> M5) with M6.
     assert (Hjmp : add_vec (mword_of_int (KernelSyms.fetchstr + 0x14) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2093356 : mword 21)) = mword_of_int KernelSyms.myproc)
+                     (sign_extend' 64 (mword_of_int 2093344 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HM6ra : M6 !!! Regidx Rra
@@ -685,7 +685,7 @@ Section ProofFetchstr.
     iEval (rewrite Hpp20) in "Hpc".
     (* ---- +0x20: jal ra,copyinstr ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.fetchstr + 0x20))
-              Rra (mword_of_int 2092260 : mword 21) A4 (av - 6)%nat b
+              Rra (mword_of_int 2092248 : mword 21) A4 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi20 [-]").
     iIntros (CID17 Hk17) "Hcg Hpc".
@@ -694,7 +694,7 @@ Section ProofFetchstr.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x20) : mword 64) 4)]> A4) with A5.
     assert (Hjcis : add_vec (mword_of_int (KernelSyms.fetchstr + 0x20) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2092260 : mword 21)) = mword_of_int KernelSyms.copyinstr)
+                      (sign_extend' 64 (mword_of_int 2092248 : mword 21)) = mword_of_int KernelSyms.copyinstr)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjcis) in "Hpc".
     assert (HA5ra : A5 !!! Regidx Rra
@@ -796,7 +796,7 @@ Section ProofFetchstr.
         rewrite /B1 upd_ne; [| congruence]. apply Hthrr; assumption. }
       (* ---- +0x2a: jal ra,strlen ---- *)
       iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.fetchstr + 0x2a))
-                Rra (mword_of_int 2090596 : mword 21) B1 (av - 6)%nat b
+                Rra (mword_of_int 2090582 : mword 21) B1 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi2a [-]").
       iIntros (CID21 Hk21) "Hcg Hpc".
@@ -805,7 +805,7 @@ Section ProofFetchstr.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.fetchstr + 0x2a) : mword 64) 4)]> B1) with B2.
       assert (Hjsl : add_vec (mword_of_int (KernelSyms.fetchstr + 0x2a) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2090596 : mword 21)) = mword_of_int KernelSyms.strlen)
+                       (sign_extend' 64 (mword_of_int 2090582 : mword 21)) = mword_of_int KernelSyms.strlen)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjsl) in "Hpc".
       assert (HB2ra : B2 !!! Regidx Rra

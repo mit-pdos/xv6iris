@@ -744,7 +744,7 @@ Section ProofCopyout.
         iPoseProof (coi_48 with "Htext") as "Hi48".
         iPoseProof (coi_4c with "Htext") as "Hi4c".
         iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.copyout + 0x3e)) Rra
-                  (mword_of_int 2094790 : mword 21) U4 (K - 12)%nat b
+                  (mword_of_int 2094788 : mword 21) U4 (K - 12)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi3e [-]").
@@ -752,7 +752,7 @@ Section ProofCopyout.
         set (U5 := <[Regidx Rra := regval_into_reg
                       (add_vec_int (mword_of_int (KernelSyms.copyout + 0x3e) : mword 64) 4)]> U4).
         assert (Htgtmv : add_vec (mword_of_int (KernelSyms.copyout + 0x3e) : mword 64)
-                           (sign_extend' 64 (mword_of_int 2094790 : mword 21))
+                           (sign_extend' 64 (mword_of_int 2094788 : mword 21))
                          = mword_of_int KernelSyms.memmove)
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgtmv) in "Hpc".

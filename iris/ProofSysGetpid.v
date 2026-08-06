@@ -165,13 +165,13 @@ Section ProofSysGetpid.
     iEval (rewrite Hpp08) in "Hpc".
     change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1) with M2.
     (* ---- +0x08: jal ra,myproc ---- *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_getpid + 0x08)) (mword_of_int 1 : mword 5) (mword_of_int 2093072 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_getpid + 0x08)) (mword_of_int 1 : mword 5) (mword_of_int 2093060 : mword 21)
               M2 (av - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi08 [-]").
     iIntros (CID5 Hs5) "Hcg Hpc".
     set (Bj := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_getpid + 0x08) : mword 64) 4)]> M2).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_getpid + 0x08) : mword 64) 4)]> M2) with Bj.
-    assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_getpid + 0x08) : mword 64) (sign_extend' 64 (mword_of_int 2093072 : mword 21)) = mword_of_int KernelSyms.myproc)
+    assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_getpid + 0x08) : mword 64) (sign_extend' 64 (mword_of_int 2093060 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HBjra : Bj !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sys_getpid + 0x08) : mword 64) 4) by (rewrite /Bj upd_eq; reflexivity).

@@ -937,7 +937,7 @@ Section ProofUartintr.
           (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0x7fc : mword 12)))]> T1) with T2.
       iEval (rewrite P66) in "Hpc".
       (* +0x66 jal ra,wakeup *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uartintr + 0x66)) Rra (mword_of_int 5406 : mword 21)
+      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uartintr + 0x66)) Rra (mword_of_int 5416 : mword 21)
                 T2 (av - 4)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi66 [-]").
       iApply wp_next_off_intro.
@@ -945,7 +945,7 @@ Section ProofUartintr.
       set (T3 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x66) : mword 64) 4)]> T2).
       change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x66) : mword 64) 4)]> T2) with T3.
       assert (Hjwk : add_vec (mword_of_int (KernelSyms.uartintr + 0x66) : mword 64)
-                       (sign_extend' 64 (mword_of_int 5406 : mword 21)) = mword_of_int KernelSyms.wakeup) by pcw.
+                       (sign_extend' 64 (mword_of_int 5416 : mword 21)) = mword_of_int KernelSyms.wakeup) by pcw.
       iEval (rewrite Hjwk) in "Hpc".
       assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.uartintr + 0x66) : mword 64) 4)
         by (rewrite /T3 upd_eq; reflexivity).

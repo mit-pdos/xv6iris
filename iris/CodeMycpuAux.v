@@ -91,7 +91,7 @@ Definition mycpu_ret (tp0 : mword 64) : mword 64 :=
     (add_vec
        (add_vec (add_vec_int (mword_of_int KernelSyms.mycpu : mword 64) 14)
                 (auipc_off (mword_of_int 0x11 : mword 20)))
-       (sign_extend' 64 (mword_of_int 0xa86 : mword 12)))
+       (sign_extend' 64 (mword_of_int 0xa84 : mword 12)))
     (mycpu_a5 tp0).
 
 (* ---------------------------------------------------------------------- *)

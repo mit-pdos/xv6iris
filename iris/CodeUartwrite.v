@@ -153,9 +153,9 @@ Section CodeUartwrite.
   Proof. mk_rvc (KernelSyms.uartwrite + 0x50) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.uartwrite + 0x50) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma uwi_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x52) : mword 64) false (JAL (mword_of_int 5592 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uartwrite + 0x52) (mword_of_int 0x5d8010ef : mword 32)
-    (mword_of_int (KernelSyms.uartwrite + 0x52) : mword 64) (JAL (mword_of_int 5592 : mword 21, Regidx (mword_of_int 1))) kd_5d8010ef. Qed.
+  Lemma uwi_52 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x52) : mword 64) false (JAL (mword_of_int 5602 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uartwrite + 0x52) (mword_of_int 0x5e2010ef : mword 32)
+    (mword_of_int (KernelSyms.uartwrite + 0x52) : mword 64) (JAL (mword_of_int 5602 : mword 21, Regidx (mword_of_int 1))) kd_5e2010ef. Qed.
 
   Lemma uwi_56 : kernel_text -∗ instr (mword_of_int (KernelSyms.uartwrite + 0x56) : mword 64) true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_rvc (KernelSyms.uartwrite + 0x56) (mword_of_int 0x409c : mword 16)

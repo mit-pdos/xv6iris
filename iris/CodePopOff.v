@@ -49,9 +49,9 @@ Section CodePopOff.
   Proof. mk_rvc (KernelSyms.pop_off + 0x6) (mword_of_int 0x0800 : mword 16)
     (mword_of_int (KernelSyms.pop_off + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma ppi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x8) : mword 64) false (JAL (mword_of_int 3220 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.pop_off + 0x8) (mword_of_int 0x495000ef : mword 32)
-    (mword_of_int (KernelSyms.pop_off + 0x8) : mword 64) (JAL (mword_of_int 3220 : mword 21, Regidx (mword_of_int 1))) kd_495000ef. Qed.
+  Lemma ppi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0x8) : mword 64) false (JAL (mword_of_int 3222 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.pop_off + 0x8) (mword_of_int 0x497000ef : mword 32)
+    (mword_of_int (KernelSyms.pop_off + 0x8) : mword 64) (JAL (mword_of_int 3222 : mword 21, Regidx (mword_of_int 1))) kd_497000ef. Qed.
 
   Lemma ppi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.pop_off + 0xc) : mword 64) false (CSRReg (mword_of_int 256 : mword 12, zreg, Regidx (mword_of_int 15), CSRRS)).
   Proof. mk_base (KernelSyms.pop_off + 0xc) (mword_of_int 0x100027f3 : mword 32)

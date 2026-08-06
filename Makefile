@@ -55,7 +55,7 @@ USER_DIR   := $(XV6_DIR)/user
 # addresses out from under every proof that names one (a few commits either
 # way already move most of them).  Verified: a kernel built here reproduces
 # kernel-rocq/*.v byte for byte and symbol for symbol.
-XV6_REV ?= 59db7e2ea922cb1cf18e328b5b80f5264b0f755b
+XV6_REV ?= 9dd28f5e3526197b65a58306ce90248647c77777
 
 KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.v
 

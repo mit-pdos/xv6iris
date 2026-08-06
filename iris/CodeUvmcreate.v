@@ -53,9 +53,9 @@ Section CodeUvmcreate.
   Proof. mk_rvc (KernelSyms.uvmcreate + 0x8) (mword_of_int 0x1000 : mword 16)
     (mword_of_int (KernelSyms.uvmcreate + 0x8) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_1000 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma uvci_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcreate + 0xa) : mword 64) false (JAL (mword_of_int 2095436 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcreate + 0xa) (mword_of_int 0x94dff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcreate + 0xa) : mword 64) (JAL (mword_of_int 2095436 : mword 21, Regidx (mword_of_int 1))) kd_94dff0ef. Qed.
+  Lemma uvci_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcreate + 0xa) : mword 64) false (JAL (mword_of_int 2095434 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcreate + 0xa) (mword_of_int 0x94bff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcreate + 0xa) : mword 64) (JAL (mword_of_int 2095434 : mword 21, Regidx (mword_of_int 1))) kd_94bff0ef. Qed.
 
   Lemma uvci_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcreate + 0xe) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)).
   Proof. mk_rvc (KernelSyms.uvmcreate + 0xe) (mword_of_int 0x84aa : mword 16)
@@ -73,9 +73,9 @@ Section CodeUvmcreate.
   Proof. mk_rvc (KernelSyms.uvmcreate + 0x14) (mword_of_int 0x4581 : mword 16)
     (mword_of_int (KernelSyms.uvmcreate + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 11), ADDI)) kd_4581 exec_execute_C_LI. Qed.
 
-  Lemma uvci_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) false (JAL (mword_of_int 2095834 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcreate + 0x16) (mword_of_int 0xadbff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) (JAL (mword_of_int 2095834 : mword 21, Regidx (mword_of_int 1))) kd_adbff0ef. Qed.
+  Lemma uvci_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) false (JAL (mword_of_int 2095832 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcreate + 0x16) (mword_of_int 0xad9ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) (JAL (mword_of_int 2095832 : mword 21, Regidx (mword_of_int 1))) kd_ad9ff0ef. Qed.
 
   Lemma uvci_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcreate + 0x1a) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.uvmcreate + 0x1a) (mword_of_int 0x8526 : mword 16)

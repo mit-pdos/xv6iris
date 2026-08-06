@@ -272,7 +272,7 @@ Section ProofHolding.
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
     iPoseProof (his_16 with "Htext") as "Hi16".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2e : mword 21) S4 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi16 [-]").
@@ -631,7 +631,7 @@ Section ProofHolding.
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
     iPoseProof (his_16 with "Htext") as "Hi16".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2e : mword 21) S4 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi16 [-]").

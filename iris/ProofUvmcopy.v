@@ -1117,14 +1117,14 @@ Section ProofUvmcopy.
     iEval (rewrite Hp40) in "Hpc".
     (* --- +0x40 jal ra,kalloc --- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uvmcopy + 0x40)) Rra
-              (mword_of_int 2094826 : mword 21) B2 (K - 10)%nat b
+              (mword_of_int 2094824 : mword 21) B2 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi40 [-]").
     iIntros (CIDl11 Hsl11) "Hcg Hpc".
     set (B3 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) 4)]> B2).
     assert (Htgtka : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094826 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094824 : mword 21))
                      = mword_of_int KernelSyms.kalloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtka) in "Hpc".
@@ -1279,14 +1279,14 @@ Section ProofUvmcopy.
     iEval (rewrite Hp50) in "Hpc".
     (* --- +0x50 jal ra,memmove --- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uvmcopy + 0x50)) Rra
-              (mword_of_int 2095316 : mword 21) C4 (K - 10)%nat b
+              (mword_of_int 2095314 : mword 21) C4 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi50 [-]").
     iIntros (CIDl18 Hsl18) "Hcg Hpc".
     set (C5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) 4)]> C4).
     assert (Htgtmm : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2095316 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2095314 : mword 21))
                      = mword_of_int KernelSyms.memmove)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtmm) in "Hpc".
@@ -1607,14 +1607,14 @@ Section ProofUvmcopy.
     iEval (rewrite Hp68) in "Hpc".
     (* --- +0x68 jal ra,kfree --- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uvmcopy + 0x68)) Rra
-              (mword_of_int 2094554 : mword 21) F1 (K - 10)%nat b
+              (mword_of_int 2094552 : mword 21) F1 (K - 10)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi68 [-]").
     iIntros (CIDl29 Hsl29) "Hcg Hpc".
     set (F2 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) 4)]> F1).
     assert (Htgtkf : add_vec (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094554 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094552 : mword 21))
                      = mword_of_int KernelSyms.kfree)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkf) in "Hpc".

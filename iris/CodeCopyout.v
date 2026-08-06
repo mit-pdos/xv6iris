@@ -145,9 +145,9 @@ Section CodeCopyout.
   Proof. mk_rvc (KernelSyms.copyout + 0x3c) (mword_of_int 0x954e : mword 16)
     (mword_of_int (KernelSyms.copyout + 0x3c) : mword 64) (RTYPE (Regidx (mword_of_int 19), Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADD)) kd_954e exec_execute_C_ADD. Qed.
 
-  Lemma coi_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x3e) : mword 64) false (JAL (mword_of_int 2094790 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.copyout + 0x3e) (mword_of_int 0xec6ff0ef : mword 32)
-    (mword_of_int (KernelSyms.copyout + 0x3e) : mword 64) (JAL (mword_of_int 2094790 : mword 21, Regidx (mword_of_int 1))) kd_ec6ff0ef. Qed.
+  Lemma coi_3e : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x3e) : mword 64) false (JAL (mword_of_int 2094788 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.copyout + 0x3e) (mword_of_int 0xec4ff0ef : mword 32)
+    (mword_of_int (KernelSyms.copyout + 0x3e) : mword 64) (JAL (mword_of_int 2094788 : mword 21, Regidx (mword_of_int 1))) kd_ec4ff0ef. Qed.
 
   Lemma coi_42 : kernel_text -∗ instr (mword_of_int (KernelSyms.copyout + 0x42) : mword 64) false (RTYPE (Regidx (mword_of_int 18), Regidx (mword_of_int 21), Regidx (mword_of_int 21), SUB)).
   Proof. mk_base (KernelSyms.copyout + 0x42) (mword_of_int 0x412a8ab3 : mword 32)

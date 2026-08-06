@@ -37,21 +37,21 @@ Import Defs.
 (* ===================================================================== *)
 
 (* addi a1,a1,-450  -- a1 := &"time"  (the decoder's positive residue: 4096-450) *)
-Lemma tdb_e3e58593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xe3e58593 : mword 32)) s
-  = Some (ITYPE (mword_of_int 3646 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
+Lemma tdb_e3058593 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xe3058593 : mword 32)) s
+  = Some (ITYPE (mword_of_int 3632 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
 (* addi a0,a0,-666  -- a0 := &tickslock  (4096-666) *)
-Lemma tdb_d6650513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xd6650513 : mword 32)) s
-  = Some (ITYPE (mword_of_int 3430 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
+Lemma tdb_d5850513 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xd5850513 : mword 32)) s
+  = Some (ITYPE (mword_of_int 3416 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
 (* jal ra,initlock  (backwards: 2^21 - 6290) *)
-Lemma tdb_f6efe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
-  exec (ext_decode (mword_of_int 0xf6efe0ef : mword 32)) s
-  = Some (JAL (mword_of_int 2090862 : mword 21, Regidx (mword_of_int 1)), s).
+Lemma tdb_f60fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xf60fe0ef : mword 32)) s
+  = Some (JAL (mword_of_int 2090848 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Section CodeTrapinitAux.
@@ -78,21 +78,21 @@ Section CodeTrapinitAux.
   Proof. mk_base (KernelSyms.trapinit + 0x08)%Z (mword_of_int 0x00005597 : mword 32)
     (mword_of_int (KernelSyms.trapinit + 0x08) : mword 64) (UTYPE (mword_of_int 5 : mword 20, Regidx (mword_of_int 11), AUIPC)) bdec_00005597. Qed.
 
-  Lemma tri_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x0c) : mword 64) false (ITYPE (mword_of_int 3646 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.trapinit + 0x0c)%Z (mword_of_int 0xe3e58593 : mword 32)
-    (mword_of_int (KernelSyms.trapinit + 0x0c) : mword 64) (ITYPE (mword_of_int 3646 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) tdb_e3e58593. Qed.
+  Lemma tri_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x0c) : mword 64) false (ITYPE (mword_of_int 3632 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.trapinit + 0x0c)%Z (mword_of_int 0xe3058593 : mword 32)
+    (mword_of_int (KernelSyms.trapinit + 0x0c) : mword 64) (ITYPE (mword_of_int 3632 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) tdb_e3058593. Qed.
 
   Lemma tri_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x10) : mword 64) false (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.trapinit + 0x10)%Z (mword_of_int 0x00016517 : mword 32)
     (mword_of_int (KernelSyms.trapinit + 0x10) : mword 64) (UTYPE (mword_of_int 22 : mword 20, Regidx (mword_of_int 10), AUIPC)) bdec_00016517. Qed.
 
-  Lemma tri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x14) : mword 64) false (ITYPE (mword_of_int 3430 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.trapinit + 0x14)%Z (mword_of_int 0xd6650513 : mword 32)
-    (mword_of_int (KernelSyms.trapinit + 0x14) : mword 64) (ITYPE (mword_of_int 3430 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) tdb_d6650513. Qed.
+  Lemma tri_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x14) : mword 64) false (ITYPE (mword_of_int 3416 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.trapinit + 0x14)%Z (mword_of_int 0xd5850513 : mword 32)
+    (mword_of_int (KernelSyms.trapinit + 0x14) : mword 64) (ITYPE (mword_of_int 3416 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) tdb_d5850513. Qed.
 
-  Lemma tri_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x18) : mword 64) false (JAL (mword_of_int 2090862 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.trapinit + 0x18)%Z (mword_of_int 0xf6efe0ef : mword 32)
-    (mword_of_int (KernelSyms.trapinit + 0x18) : mword 64) (JAL (mword_of_int 2090862 : mword 21, Regidx (mword_of_int 1))) tdb_f6efe0ef. Qed.
+  Lemma tri_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x18) : mword 64) false (JAL (mword_of_int 2090848 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.trapinit + 0x18)%Z (mword_of_int 0xf60fe0ef : mword 32)
+    (mword_of_int (KernelSyms.trapinit + 0x18) : mword 64) (JAL (mword_of_int 2090848 : mword 21, Regidx (mword_of_int 1))) tdb_f60fe0ef. Qed.
 
   Lemma tri_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinit + 0x1c) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.trapinit + 0x1c)%Z (mword_of_int 0x60a2 : mword 16)
@@ -115,7 +115,7 @@ Section CodeTrapinitAux.
      know about trapinit's code. *)
   Lemma tri_code :
     kernel_text -∗ ilw_code KernelSyms.trapinit (mword_of_int 5) (mword_of_int 22)
-                            (mword_of_int 3646) (mword_of_int 3430) (mword_of_int 2090862).
+                            (mword_of_int 3632) (mword_of_int 3416) (mword_of_int 2090848).
   Proof.
     iIntros "#Ht". rewrite /ilw_code.
     iSplitR; [iApply (tri_00 with "Ht")|].

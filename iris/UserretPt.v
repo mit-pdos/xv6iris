@@ -905,8 +905,8 @@ Section WpUaluUsretPt.
   Lemma wp_usret_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64) :
-    let va := uva 0x11c in
-    let pa := upa 0x11c in
+    let va := uva 0x120 in
+    let pa := upa 0x120 in
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->

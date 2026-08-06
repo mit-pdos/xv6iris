@@ -149,6 +149,43 @@ Section WpSconfCtl.
     iPureIntro. done.
   Qed.
 
+  Lemma wp_fencei_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (imm : mword 12) (rs rd : regidx)
+      (m : regfile) (n : nat) (b : bool) :
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗
+    instr pc false (FENCEI (imm, rs, rd)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf m n b Φ pc false (FENCEI (imm, rs, rd))
+              with "Hcg Hpc Hinstr").
+    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
+    iModIntro. iExists s_pc.
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      apply (exec_execute_FENCEI_S imm rs rd s_pc). }
+    iSplitL "Hreg Hmem". { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
+      by (unfold s_pc; rewrite register_lookup_set; reflexivity).
+    iEval (rewrite Lnpc) in "Hpc'".
+    iAssert sconf with "[Hpriv Hmsx Hmiex Hmenv]" as "Hsc".
+    { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".
+      iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
+    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. done.
+  Qed.
+
   (* the rw,w instance -- [release]'s [__sync_lock_release] barrier.  A
      restatement of the generic leaf (WRAPPER RECIPE), so the existing call
      sites do not change. *)

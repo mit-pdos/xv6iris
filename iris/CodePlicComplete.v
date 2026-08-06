@@ -57,9 +57,9 @@ Section CodePlicComplete.
   Proof. mk_rvc (KernelSyms.plic_complete + 0xa) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.plic_complete + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma pci_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) false (JAL (mword_of_int 2081752 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.plic_complete + 0xc) (mword_of_int 0xbd8fc0ef : mword 32)
-    (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) (JAL (mword_of_int 2081752 : mword 21, Regidx (mword_of_int 1))) kd_bd8fc0ef. Qed.
+  Lemma pci_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) false (JAL (mword_of_int 2081738 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.plic_complete + 0xc) (mword_of_int 0xbcafc0ef : mword 32)
+    (mword_of_int (KernelSyms.plic_complete + 0xc) : mword 64) (JAL (mword_of_int 2081738 : mword 21, Regidx (mword_of_int 1))) kd_bcafc0ef. Qed.
 
   Lemma pci_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.plic_complete + 0x10) : mword 64) false (SHIFTIWOP (mword_of_int 13 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 15), SLLIW)).
   Proof. mk_base (KernelSyms.plic_complete + 0x10) (mword_of_int 0x00d5179b : mword 32)

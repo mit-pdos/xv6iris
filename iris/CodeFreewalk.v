@@ -85,13 +85,13 @@ Section CodeFreewalk.
   Proof. mk_base (KernelSyms.freewalk + 0x18) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.freewalk + 0x18) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma fwi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x1c) : mword 64) false (ITYPE (mword_of_int 3498 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.freewalk + 0x1c) (mword_of_int 0xdaa50513 : mword 32)
-    (mword_of_int (KernelSyms.freewalk + 0x1c) : mword 64) (ITYPE (mword_of_int 3498 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_daa50513. Qed.
+  Lemma fwi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x1c) : mword 64) false (ITYPE (mword_of_int 3496 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.freewalk + 0x1c) (mword_of_int 0xda850513 : mword 32)
+    (mword_of_int (KernelSyms.freewalk + 0x1c) : mword 64) (ITYPE (mword_of_int 3496 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_da850513. Qed.
 
-  Lemma fwi_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x20) : mword 64) false (JAL (mword_of_int 2094224 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.freewalk + 0x20) (mword_of_int 0xc90ff0ef : mword 32)
-    (mword_of_int (KernelSyms.freewalk + 0x20) : mword 64) (JAL (mword_of_int 2094224 : mword 21, Regidx (mword_of_int 1))) kd_c90ff0ef. Qed.
+  Lemma fwi_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x20) : mword 64) false (JAL (mword_of_int 2094222 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.freewalk + 0x20) (mword_of_int 0xc8eff0ef : mword 32)
+    (mword_of_int (KernelSyms.freewalk + 0x20) : mword 64) (JAL (mword_of_int 2094222 : mword 21, Regidx (mword_of_int 1))) kd_c8eff0ef. Qed.
 
   Lemma fwi_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x24) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 8 : mword 6), Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
   Proof. mk_rvc (KernelSyms.freewalk + 0x24) (mword_of_int 0x04a1 : mword 16)
@@ -145,9 +145,9 @@ Section CodeFreewalk.
   Proof. mk_rvc (KernelSyms.freewalk + 0x48) (mword_of_int 0x854e : mword 16)
     (mword_of_int (KernelSyms.freewalk + 0x48) : mword 64) (RTYPE (Regidx (mword_of_int 19), zreg, Regidx (mword_of_int 10), ADD)) kd_854e exec_execute_C_MV. Qed.
 
-  Lemma fwi_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x4a) : mword 64) false (JAL (mword_of_int 2094726 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.freewalk + 0x4a) (mword_of_int 0xe86ff0ef : mword 32)
-    (mword_of_int (KernelSyms.freewalk + 0x4a) : mword 64) (JAL (mword_of_int 2094726 : mword 21, Regidx (mword_of_int 1))) kd_e86ff0ef. Qed.
+  Lemma fwi_4a : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x4a) : mword 64) false (JAL (mword_of_int 2094724 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.freewalk + 0x4a) (mword_of_int 0xe84ff0ef : mword 32)
+    (mword_of_int (KernelSyms.freewalk + 0x4a) : mword 64) (JAL (mword_of_int 2094724 : mword 21, Regidx (mword_of_int 1))) kd_e84ff0ef. Qed.
 
   Lemma fwi_4e : kernel_text -∗ instr (mword_of_int (KernelSyms.freewalk + 0x4e) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 5 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.freewalk + 0x4e) (mword_of_int 0x70a2 : mword 16)

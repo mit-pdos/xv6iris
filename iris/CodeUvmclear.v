@@ -93,12 +93,12 @@ Section CodeUvmclear.
   Proof. mk_base (KernelSyms.uvmclear + 0x1e) (mword_of_int 0x00006517 : mword 32)
     (mword_of_int (KernelSyms.uvmclear + 0x1e) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00006517. Qed.
 
-  Lemma ucli_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) false (ITYPE (mword_of_int 3212 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.uvmclear + 0x22) (mword_of_int 0xc8c50513 : mword 32)
-    (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) (ITYPE (mword_of_int 3212 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c8c50513. Qed.
+  Lemma ucli_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) false (ITYPE (mword_of_int 3210 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.uvmclear + 0x22) (mword_of_int 0xc8a50513 : mword 32)
+    (mword_of_int (KernelSyms.uvmclear + 0x22) : mword 64) (ITYPE (mword_of_int 3210 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_c8a50513. Qed.
 
-  Lemma ucli_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) false (JAL (mword_of_int 2093922 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmclear + 0x26) (mword_of_int 0xb62ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) (JAL (mword_of_int 2093922 : mword 21, Regidx (mword_of_int 1))) kd_b62ff0ef. Qed.
+  Lemma ucli_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) false (JAL (mword_of_int 2093920 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmclear + 0x26) (mword_of_int 0xb60ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmclear + 0x26) : mword 64) (JAL (mword_of_int 2093920 : mword 21, Regidx (mword_of_int 1))) kd_b60ff0ef. Qed.
 
 End CodeUvmclear.

@@ -227,7 +227,7 @@ Section YieldPostSched.
     iEval (rewrite Hpc1e) in "Hpc".
     (* +0x1e: jal release *)
     iPoseProof (ydi_1e with "Htext") as "Hi1e".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2092440 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2092430 : mword 21)
               D0 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1e [-]").
@@ -235,7 +235,7 @@ Section YieldPostSched.
     iIntros "Hcg Hpc".
     set (D1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) 4)]> D0).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) 4)]> D0) with D1.
-    assert (Hpcrl : add_vec (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 2092440 : mword 21))
+    assert (Hpcrl : add_vec (mword_of_int (KernelSyms.yield + 0x1e) : mword 64) (sign_extend' 64 (mword_of_int 2092430 : mword 21))
                     = mword_of_int KernelSyms.release) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcrl) in "Hpc".
     (* ------------------------------------------------------------------ *)
@@ -525,14 +525,14 @@ Section ProofYield.
     (* +0x0a: jal myproc -> a0 = proc_addr j; noff/intena/cur_proc round.  *)
     (* ------------------------------------------------------------------ *)
     iPoseProof (ydi_0a with "Htext") as "Hi0a".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095648 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095640 : mword 21)
               A1 (av - 4)%nat true
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0a [-]").
     iIntros (CID6 Hs6) "Hcg Hpc".
     set (A2 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) 4)]> A1).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) 4)]> A1) with A2.
-    assert (Hpcmp : add_vec (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095648 : mword 21))
+    assert (Hpcmp : add_vec (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095640 : mword 21))
                     = mword_of_int KernelSyms.myproc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcmp) in "Hpc".
     assert (HA2ra : A2 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.yield + 0x0a) : mword 64) 4)
@@ -563,14 +563,14 @@ Section ProofYield.
     iEval (rewrite Hpc10) in "Hpc".
     (* +0x10: jal acquire *)
     iPoseProof (ydi_10 with "Htext") as "Hi10".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x10)) (mword_of_int 1 : mword 5) (mword_of_int 2092318 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x10)) (mword_of_int 1 : mword 5) (mword_of_int 2092308 : mword 21)
               B0 (av - 4)%nat true
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi10 [-]").
     iIntros (CID9 Hs9) "Hcg Hpc".
     set (B1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x10) : mword 64) 4)]> B0).
     change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.yield + 0x10) : mword 64) 4)]> B0) with B1.
-    assert (Hpcaq : add_vec (mword_of_int (KernelSyms.yield + 0x10) : mword 64) (sign_extend' 64 (mword_of_int 2092318 : mword 21))
+    assert (Hpcaq : add_vec (mword_of_int (KernelSyms.yield + 0x10) : mword 64) (sign_extend' 64 (mword_of_int 2092308 : mword 21))
                     = mword_of_int KernelSyms.acquire) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcaq) in "Hpc".
     (* ------------------------------------------------------------------ *)
