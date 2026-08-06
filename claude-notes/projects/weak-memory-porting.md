@@ -301,13 +301,59 @@ a leaf:
    `WeakEffSkel.wP_eff_of_window` turns a window plus the per-`tick` run fact
    into `wP_eff` in one `apply`.
 
-**STILL MISSING, and it is shared, not per-leaf** (`WeakEffSkel.v` §6b): the
-fetch's own `exec_eff` reduction (a syntactic replay of `exec_fetch_done` and
-the chain under it — no semantic argument can replace it, see §4 note 9), and
-the `tick_clock` mirror that turns `riscv_step false` into the `∀ tick` shape.
-Until both land, a leaf can build the step's trace but not close `wP_eff`.
+3. **BOTH SHARED PIECES ARE NOW LANDED** (batch 0b): the fetch's own
+   `exec_eff` reduction (`iris/WeakFetchEff.v` §2–§4, over
+   `iris/WeakPmpEff.v`) and the `tick_clock` mirror
+   (`iris/WeakTickEff.v`, joined by `WeakFetchEff` §7). **A leaf now closes
+   `wP_eff` — see §2g for the recipe.** Two boundaries to know:
+   - **only the 4-aligned `F_Base` fetch arm is mirrored.** A compressed or
+     2-aligned instruction has no `wP_eff` route yet (the split fetch emits
+     TWO 2-byte reads, so it also needs a 3-element `wcert_*`).
+   - **the fetch's trace element is `WEread (AkInfo false false false) pc 4`**
+     (`WeakFetchEff.wak_plain`) — rv64d emits `AK_explicit`/`AV_plain`, not
+     `AK_ifetch`, so the fetch is an ordinary view-raising read.
 
 ---
+
+## 2g. THE COMPLETED RECIPE: what a batch-2 leaf writes, in order
+
+Landed at batch 0b/1. Five moves; nothing else about an instruction enters.
+
+1. **The certificate.** `wcert_load_base4` / `wcert_store_base4` /
+   `wcert_amo_aq_base4` (`WeakFetchEff` §9a) are `WeakCert`'s three, stated
+   at the concrete fetch element this tree produces. ONE `exact`. The `P`
+   they name is `wP_eff (Some cid) ([WEread wak_plain pc 4] ++ es_x)`, and
+   `[a] ++ [b]` IS `[a; b]`, so it is the recipe's conclusion on the nose —
+   **no adapter, no `app` lemma, no peeling.**
+2. **The `execute`'s `exec_eff` fact.** Batch 1's per-shape lemma
+   (`WeakLeafEff8.exec_eff_execute_LOAD_8_gpr`,
+   `WeakLeafEff8s.exec_eff_execute_STORE_8_gpr`, …), instantiated TWICE: once
+   at `wflat_st σ` for the funnel's SC obligation, once at
+   `MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ)` for the certificate.
+   Every such lemma is state-generic, so the second instantiation is free
+   except for its memory premises, which come from the same
+   `wpt*_flat` / `wkernel_text_flat` facts through
+   `WeakCert.wmem_restrict_lookup`.
+3. **The decode fact costs ONE extra `vm_compute`.** Use
+   `WeakFetchEff.decode_bridge_eff D dst` (or `exec_eff_decode_bridge`)
+   exactly where the SC leaf uses `WpDecodeBridge.decode_bridge D dst`; the
+   only new obligation is `goodb0 D (ext_decode w) dst = true`, discharged
+   by `vm_compute; reflexivity` like its `goodb` sibling. **Do not restate
+   decode lemmas at `exec_eff`.**
+4. **The window and `wP_eff`.** `WeakFetchEff.wP_eff_of_leaf_base`, fed the
+   window's three obligations (`pa_z a ≠ 0` from `addr_is_ram`;
+   `pinned_read` from `WeakFunnel.winstr_pinned` for the text and
+   `wpt4_pinned`/`wpt8_pinned` for the data), the M-mode config tower (the
+   SAME facts `wwp_instr` already collects), the four text bytes in the
+   CONFINED memory, the decode of (3) and the `execute` fact of (2).
+   Its window binder is spelled `(W : _)` for the instance-trap reason in §4
+   below; keep it that way at every call site.
+5. **The WP.** `WeakFunnel.wwp_instr` with that `P` and the shape's `Q`, and
+   §2b's four moves for the Iris half.
+
+**What is NOT free and is the whole per-leaf cost:** the window `W` and the
+second instantiation of the shape lemma at the restricted memory. Everything
+else above is an `apply` or an `exact`.
 
 ## 3. What needs thought: the racy sites, and only those
 
@@ -419,6 +465,15 @@ Every one of these type-checks and is wrong or vacuous.
    `try (…; by tac)` in such a file (write `; tac; reflexivity`), and `mword`
    must be spelled `SailStdpp.Values.mword` (the instance-leak rule in the
    durable notes).
+11a. **A `gset Arch.pa` BINDER IS AN INSTANCE TRAP IN ANY FILE THAT IMPORTS
+   `SailStdpp.Base`** — and the mirror files must import it (`'b"1"`, `Ok`,
+   `generic_eq` all live there).  A binder spelled `(W : gset Arch.pa)` then
+   elaborates against `Countable_mword` while `WeakCert.wmem_restrict` uses
+   `bv_countable`; the two print IDENTICALLY and every application fails with
+   an unreadable type mismatch.  Write **`(W : _)`** and let
+   `wmem_restrict σ W` pin it.  A `Section Context` cannot do this (it will
+   not accept a hole), which is why `wP_eff_of_leaf_base` is one `Lemma` with
+   a commented premise list rather than a Section — keep it that way.
 11. **A domain-growth argument can never exclude a VALUE-PRESERVING write.**
    This is why the fetch needs a syntactic `exec_eff` mirror and cannot be
    detected: running it at the confined memory and observing
@@ -433,15 +488,18 @@ Every one of these type-checks and is wrong or vacuous.
 0a. **DONE** — `iris/WeakEffSkel.v` (834 lines / 3.9 s): `execR_eff` plus its
    rewriting kit, the two `run_hart_active` progress mirrors, the step
    assembly and the certificate join (§2f).
-0b. **THE FETCH's `exec_eff` reduction and the `tick_clock` mirror**, and
-   nothing else, next.  ≈ 250–350 lines for the 4-aligned `F_Base` arm plus
-   ≈ 25 for the tick; it is the last irreducible model work, and nothing
-   downstream can be closed before it.
-1. **The memory `execute` mirrors, by SHAPE not by call site.**  The shapes,
-   enumerated from the SC library rather than guessed, are in
-   [`weak-memory.md`](weak-memory.md)'s batch-1 table: ≈ 5 (LOAD/STORE at 4
-   and 8, AMOSWAP 4), 30–60 lines each, of which the width-4 M-mode LOAD /
-   STORE and the M-mode AMOSWAP need their SC lemma written too.  One batch.
+0b. **DONE** — the fetch's `exec_eff` reduction (`iris/WeakFetchEff.v` §2–§4
+   over `iris/WeakPmpEff.v`), the `tick_clock` mirror
+   (`iris/WeakTickEff.v`), and `wP_eff_of_leaf_base` (§2g). 1867 lines /
+   9.8 s, vs the 250–350 + 25 estimate — **price the transitive cone a chain
+   NAMES, not the chain in front of you.** 4-aligned `F_Base` arm only.
+1. **The memory `execute` mirrors, by SHAPE not by call site.**  LOAD 8 and
+   STORE 8 are **DONE** (`iris/WeakLeafEff8.v`, `iris/WeakLeafEff8s.v`, ≈ 700
+   lines each — not the 30–60 estimated, for the same transitive-cone
+   reason).  LOAD 4 / STORE 4 / AMOSWAP 4 additionally need their SC lemma
+   written (the M-mode library has width 8 only, and only S-/U-flavoured
+   AMO chains exist).  Widths 1 and 2 are batch-6 territory: recorded, not
+   built.
 2. The M-mode leaf libraries through `WeakFunnel.wwp_instr` (§2d) —
    `WpMmodeLoad`, `WpMmodeStore`, the `WpMmodeLeaf*` family.  Their config
    tower and decode facts transfer as-is.

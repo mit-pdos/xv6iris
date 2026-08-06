@@ -1209,6 +1209,137 @@ are DONE; items 3 (the fetch) and 4 (the per-shape `execute` mirrors, = batch
   `; tac; reflexivity`), and `mword` must be spelled
   `SailStdpp.Values.mword` (the durable notes' instance-leak rule).
 
+### What M4 BATCH 0b established (read before batch 2)
+
+Batch 0b is **DONE**: `iris/WeakPmpEff.v` (358 lines / 2.3 s),
+`iris/WeakTickEff.v` (397 / 2.2 s) and `iris/WeakFetchEff.v` (1112 / 5.3 s).
+`WeakEffSkel` §6b's two missing facts are both landed, and so is the recipe
+they unlock.
+
+- **THE FETCH'S TRACE IS ONE ELEMENT, AND THE MODEL DECIDES WHICH.**
+  `WeakFetchEff.wak_plain = AkInfo false false false`: rv64d emits
+  `AK_explicit {| variety := AV_plain; strength := AS_normal |}` for an
+  instruction fetch — **not `AK_ifetch`** — so the fetch is an ORDINARY weak
+  read that RAISES VIEWS (`ak_coh = false`), not a coherent one. The design
+  doc's "instruction fetch is declared coherent" is about the *intended*
+  model; the *generated* one does not say so, and every `WeakCert`
+  certificate quantifies over the fetch's `akinfo`, which is why nothing
+  breaks. Do not "fix" the certificates to pin `AK_ifetch`.
+- **WHICH FETCH ARMS SHIPPED: the 4-aligned `F_Base` one, and only it.**
+  That is every 4-aligned 32-bit instruction — the funnel's main case. The
+  other three arms of `WeakFunnel.exec_fetch_flat` (2-aligned `F_Base`,
+  `F_RVC` at 4 and at 2) go through `exec_fetch_F_Base_2` /
+  `exec_fetch_RVC_4` / `exec_fetch_RVC_2` and each emits a DIFFERENT trace
+  (the split fetch emits TWO 2-byte reads, so a leaf at that alignment needs
+  a 3-element certificate that does not exist yet). A compressed or
+  2-aligned leaf therefore cannot close `wP_eff` today;
+  `WeakFetchEff` §4's comment states the boundary rather than hiding it.
+  Cost to add them: ≈ 150 lines for the two `F_RVC` arms (same chain at
+  width 2, `exec_read_ram_plain_2` already exists), ≈ 200 for the split
+  `F_Base` **plus** a new `wcert_*` family at a 3-element trace.
+- **THE ACTUAL SIZE: 1112 lines for the 4-aligned arm, vs the 250–350
+  estimate.** The estimate counted only the chain
+  `exec_fetch_done → … → exec_read_ram_plain_4`; that part came in at ≈ 250
+  as predicted (§2–§4 of the file). What it did NOT count is everything the
+  chain *names*: the PMP cone had to be mirrored whole (358 lines, its own
+  file), the interrupt gate `getPendingSet`/`currentlyEnabled Ext_S` cone
+  (≈ 175), the `tick_clock` cone (397, its own file), and the register-only
+  prefix (`translateAddr`, `pmaCheck`, `within_*`, `currentlyEnabled
+  Ext_Ziccif`, ≈ 130). **Rule: when pricing a mirror, price the TRANSITIVE
+  cone of named lemmas, not the script in front of you.**
+- **THE DECODE FACTS TRANSFER FOR FREE, AND THIS IS THE FINDING THAT CHANGES
+  BATCH 2.** `WeakEffSkel.exec_eff_riscv_step_base` wants
+  `exec_eff (ext_decode w) s = Some (i, s, [])` while the decode library
+  states the `exec` form — and the empty-memory detector cannot produce `[]`
+  (zero-width residue). Restating the ~1220 per-word decode lemmas looked
+  like the price. **It is not owed.** `WpDecodeBridge.goodb` is ALREADY a
+  syntactic witness that a run performs no memory outcome — a fixpoint over
+  the monad along the path the state resolves, `vm_compute`d at a concrete
+  reference state (`dstateM`/`dstateS`) by every decode call site through
+  `WpDecodeBridge.decode_bridge`. Its one gap is the `Barrier` arm, which
+  `goodb` accepts (a barrier is read-only) but which emits a `WEbar`.
+  `WeakFetchEff.goodb0` closes that arm; `goodb0_goodb` shows it is strictly
+  stronger, so nothing already proved is lost; and
+  `WeakFetchEff.exec_eff_decode_bridge` is `decode_state_bridge`'s twin with
+  the EMPTY trace. **A leaf's decode obligation at `exec_eff` is therefore
+  the same `apply` and the same two `vm_compute`s the SC leaf already does,
+  plus one more `vm_compute`** (`Ltac decode_bridge_eff`). Generalise the
+  lesson: *before mirroring a register-only cone, look for an existing
+  syntactic read-frame witness over it* — `goodb` was written for a
+  completely different purpose (the concrete-state decode bridge) and turned
+  out to be exactly the certificate the trace argument needed.
+- **`wP_eff_of_leaf_base` IS THE BATCH-2 RECIPE, AND IT PEELS NOTHING.**
+  Premises: the window's three obligations; the M-mode config tower (the
+  SAME register facts `WeakFunnel.wwp_instr` already collects); (a) the four
+  text bytes IN THE CONFINED MEMORY at a 4-aligned pc; (b) the decode, in
+  the shape the decode library states it (`agree_on` + `goodb0` +
+  `exec (ext_decode w) dst = Some (i, dst)`); (c) the `execute`'s own
+  `exec_eff` fact quantified over the `minstret_increment` flag, with its
+  hart-state/flag frame and `dom (mem s_exec) ⊆ W`. Conclusion:
+  `wP_eff (Some cid) ([WEread wak_plain pc 4] ++ es_x) σ`. The end-to-end
+  check (`WeakFetchEff` §9) is TWO `exact`s: `wcert_load_base4` is
+  `WeakCert.wcert_load` at `akf := wak_plain, pf := pc, nf := 4`, and
+  `wP_load_of_leaf_base` is §8 at `es_x := [WEread akl ea 4]` — `[a] ++ [b]`
+  IS `[a; b]`, so the certificate's `P` and the recipe's conclusion are the
+  same term with no adapter. **Zero hand-peeling: confirmed.**
+- **A `gset Arch.pa` BINDER IN A FILE THAT IMPORTS `SailStdpp.Base` IS THE
+  INSTANCE TRAP** (durable notes, binder position). `WeakFetchEff` must
+  import `Base` (`'b"1"` notation, `Ok`, `generic_eq`), so
+  `wP_eff_of_leaf_base`'s window is spelled `(W : _)` and let
+  `wmem_restrict σ W` pin the type. A `Section Context` cannot do that (it
+  will not accept a hole), which is why the recipe is one `Lemma` with a
+  commented premise list rather than a Section.
+- **THE `Print Assumptions` FOOTPRINT GREW BY ONE, AND IT IS PRE-EXISTING.**
+  `wP_eff_of_leaf_base` rests on the 5 rv64d platform axioms **plus
+  `functional_extensionality_dep`** — inherited from `MinstretInv`'s
+  regstate helpers (`register_set_bv64_id` / `_overwrite` update a *function*
+  field), i.e. exactly the SC `exec_tick_clock`'s assumption set. Not a
+  regression; anything that reaches the clock tick has always carried it.
+  Sub-lemmas below the fetch carry FEWER than five (the LOAD-8 execute
+  carries two; the PMP cone is closed under the global context) — the five
+  arrive with `riscv_step`.
+
+### What M4 BATCH 1 established (read before batch 2)
+
+- **THE REPLAY RATE ON A TRACE-CARRYING SCRIPT IS ≈ 1.1×, NOT 0.7×.**
+  Measured: LOAD 8 **1.14×** (263 → 299 SC proof lines), STORE 8 **1.12×**
+  (286 → 319), the PMP cone **1.05×**, the tick cone **1.03×**. Batch 0's
+  0.65× was measured on the two `run_hart_active` mirrors, where SC runs of
+  `cbn match` collapse into trace-carrying equations; that does not
+  generalise. The +10 % is structural: a trace-carrying bind must use the
+  CONCATENATING form (`exec_eff_bind_Some` / `execR_eff_liftR_cat`), which
+  leaves a `match` plus an `es ++ []` residue, so each lemma on the
+  trace-carrying path costs one extra line. Every register-only lemma OFF
+  that path replays at exactly 1.00× by name substitution.
+  **Revised rule: mirrored SCRIPT ≈ 1.1×, mirrored INTERPRETER ≈ 4×.**
+- **Two call-site rules for the mirror kit**, both learned by paying:
+  - **prefer `WeakEff.exec_eff_bind_Some` over `exec_eff_bind_cons` for the
+    ONE memory-touching bind.** `_bind_cons` pins the continuation through
+    its second premise and then fails to match whenever the continuation is
+    not literally `returnM` (it is usually `fun res => returnM (Ok res)`);
+    `_bind_Some` reads `f` off the goal, exactly as SC `exec_bind_Some` does.
+  - **`read_ram`'s mirror is the one script that is NOT a name swap.** The
+    SC pins the read's value with a `run`-fact and then only has to show
+    `exec ≠ None` (`discriminate`); the eff goal is a real equation, so the
+    two interpreters must be peeled in LOCKSTEP (`pose proof` the SC lemma,
+    run the same rewrites in `H |- *`, `destruct` the shared `read_bytes`
+    scrutinee, close by `injection`; `congruence` fails on the `cast_N`
+    dependency). Also: `cbn [Interface.ReadReq.pa]` alone leaves
+    `Mem_read_request_pa {| … |}` unreduced, after which a `destruct` of the
+    `read_bytes` scrutinee silently matches nothing — add
+    `ConcurrencyInterfaceTypes.Mem_read_request_pa` / `_access_kind` to the
+    `cbn` list, or grab the scrutinee from the goal with `match goal`.
+- **THE DATA ACCESS KINDS ARE PLAIN.** Both the 8-byte load and the 8-byte
+  store carry `classify … = AkInfo false false false` (rv64d's
+  `Read_plain` / `Write_plain` arms). `ak_coh = false` is what
+  `wcert_load`'s premise wants, so a plain load/store leaf discharges it by
+  `reflexivity`.
+- **DECOUPLING BY `exec_eff` PREMISE WORKS AND SHOULD BE THE HOUSE STYLE FOR
+  PARALLEL MIRROR WORK.** Each shape file takes `pmpCheck` and the three
+  `within_*` gates in their `exec_eff` form as hypotheses instead of proving
+  them, exactly as the SC originals take the `exec` forms. Four agents built
+  four files concurrently with no shared edit and no adapter at the seam.
+
 ## M4 — the sweep
 
 **Batches and their prices** (from M4-prep's measurements; the ORDER is
@@ -1220,9 +1351,9 @@ numbers come from; the prices below replace M4-prep's).
 | # | batch | size | note |
 |---|---|---|---|
 | 0a | `execR_eff` + kit, the two `run_hart_active` progress mirrors, the step assembly, the certificate join | **DONE — 834 lines / 3.9 s** (`iris/WeakEffSkel.v`) | vs the 400–600 estimate for the whole of batch 0; the interpreter mirror is 3.8× its SC source, the script mirrors 0.65× |
-| 0b | the FETCH's `exec_eff` reduction + the `tick_clock` mirror | **250–350 lines** (4-aligned `F_Base` arm) + ≈ 25; ×2 if all four `exec_fetch_flat` arms are wanted | the last irreducible model work; nothing downstream closes before it |
-| 1 | the memory `execute` mirrors, by SHAPE | **≈ 6 shapes × 30–60 lines** (revised from 9 × 40–60) | see the shape enumeration below |
-| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | 30–55 lines per load/ALU leaf, 60–90 per store/AMO leaf, ON TOP of the SC leaf | of which 20–40 is the certificate's window; the trace join is now free (batch-0 block) |
+| 0b | the FETCH's `exec_eff` reduction + the `tick_clock` mirror + `wP_eff_of_leaf_base` | **DONE — 1867 lines / 9.8 s** (`WeakPmpEff.v` 358, `WeakTickEff.v` 397, `WeakFetchEff.v` 1112) | vs the 250–350 + 25 estimate; the gap is the TRANSITIVE cone (PMP, the interrupt gate, the clock) that the chain merely *names*. 4-aligned `F_Base` arm only |
+| 1 | the memory `execute` mirrors, by SHAPE | LOAD 8 / STORE 8 **DONE — 691 + 698 lines**; LOAD 4 / STORE 4 / AMOSWAP 4 need their SC lemma written first | vs the 30–60-lines-per-shape estimate: a shape is ≈ 700 lines, because the whole `vmem_read`/`vmem_write` cone below the `execute` must be mirrored too (same transitive-cone lesson as 0b) |
+| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | 30–55 lines per load/ALU leaf, 60–90 per store/AMO leaf, ON TOP of the SC leaf | of which 20–40 is the certificate's window; the trace join AND the decode fact are now free (batch-0b block) |
 | 3 | `WpLock` clients | ≈ 0 | the interface is unchanged; `iris/WeakWord8.v` covers `cpu`/`name` |
 | 4 | the straight-line M-mode function proofs | batched by subagent | the config tower and every decode fact transfer verbatim |
 | 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | small, then a cone | the racy-load rule is landed; the escrow is not |
@@ -1240,8 +1371,8 @@ fact**:
 
 | shape | SC lemma (M-mode) | trace | note |
 |---|---|---|---|
-| LOAD 8 | `WpMmodeLeafBase.exec_execute_LOAD_8_gpr` (+ `_chk`) | `[WEread akl ea 8]` | `ld`; the `wwp_ld8` leaf of `WeakWord8` consumes it |
-| STORE 8 | `WpMmodeLeafBase.exec_execute_STORE_8_gpr` (+ `_chk`) | `[WEwrite akw ea 8 v]` | `sd` |
+| LOAD 8 | `WpMmodeLeafBase.exec_execute_LOAD_8_gpr` (+ `_chk`) | `[WEread akl ea 8]` | **DONE** — `iris/WeakLeafEff8.v`, 691 lines. `ld`; the `wwp_ld8` leaf of `WeakWord8` consumes it. The `_chk` variants were NOT mirrored (nothing needs them yet) |
+| STORE 8 | `WpMmodeLeafBase.exec_execute_STORE_8_gpr` (+ `_chk`) | `[WEwrite akw ea 8 v]` | **DONE** — `iris/WeakLeafEff8s.v`, 698 lines. `sd`. `_chk` not mirrored |
 | LOAD 4 | reached through `exec_execute_C_LW` / `_C_LDSP` → `ExecuteAs (LOAD … 4)`; the width-4 M-mode `LOAD` lemma does NOT exist yet and is part of this batch | `[WEread akl ea 4]` | `lw`, and the spinlock's spin re-read |
 | STORE 4 | ditto via `exec_execute_C_SW` / `_C_SDSP` | `[WEwrite akw ea 4 v]` | `sw`, the release and the `started` setter |
 | AMOSWAP 4 | only `WpAmo`'s S-flavoured chain and `WpSmodePtLock.exec_execute_AMOSWAP_4_gpr_S_walk_pt` exist; the M-mode one is part of this batch | `[WEread aka ea 4; WEwrite akw ea 4 v]` | THE lock instruction; note the two effects are adjacent, which is what `wcert_amo_aq_gen` assumes |
