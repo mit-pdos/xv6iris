@@ -226,17 +226,19 @@ Local Lemma pte_piv_split (f : mword 8) (e : mword 10) :
           (orb (andb (eq_vec (_get_PTE_Flags_R f) ('b"0"))
                   (andb (eq_vec (_get_PTE_Flags_W f) ('b"1"))
                      (eq_vec (_get_PTE_Flags_X f) ('b"1"))))
+          (orb (andb (not (page_based_mem_type_forwards_matches (_get_PTE_Ext_PBMT e))) false)
+          (andb true
           (orb (andb (pte_is_non_leaf f)
                   (orb (eq_vec (_get_PTE_Flags_A f) ('b"1"))
                      (orb (eq_vec (_get_PTE_Flags_D f) ('b"1"))
                         (orb (eq_vec (_get_PTE_Flags_U f) ('b"1"))
                              (neq_vec e (zeros' 10))))))
-          (orb (andb (neq_vec (_get_PTE_Ext_N e) ('b"0")) true)
+          (orb (andb (neq_vec (_get_PTE_Ext_N e) (zeros' 1)) true)
           (orb (andb (neq_vec (_get_PTE_Ext_PBMT e) (zeros' 2))
                   (orb true (not (page_based_mem_type_forwards_matches
                                     (_get_PTE_Ext_PBMT e)))))
           (orb (andb (neq_vec (_get_PTE_Ext_RSW_60t59b e) (zeros' 2)) true)
-               (neq_vec (_get_PTE_Ext_reserved e) (zeros' 5)))))))), pte_s0).
+               (neq_vec (_get_PTE_Ext_reserved e) (zeros' 5)))))))))), pte_s0).
 Proof.
   unfold pte_is_invalid.
   eapply exec_or_v; [ apply exec_returnM | ].
@@ -245,6 +247,11 @@ Proof.
         eapply exec_and_v; [ apply exec_returnM |
           eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] ] ] | ].
   eapply exec_or_v; [ apply exec_returnM | ].
+  (* the new Svpbmt disjunct *)
+  eapply exec_or_v;
+    [ eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] | ].
+  (* ...and the reserved-bits group, now gated on pte_reserved_bits_must_be_zero *)
+  eapply exec_and_v; [ apply exec_returnM | ].
   eapply exec_or_v; [ apply exec_returnM | ].
   eapply exec_or_v;
     [ eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] | ].
@@ -264,7 +271,9 @@ Proof.
   pose proof (pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0))
                 (ext_bits_of_PTE w)) as Hex.
   specialize (Hv pte_s0). rewrite Hex in Hv. injection Hv as Hb.
-  do 6 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
+  (* the disjunction gained the Svpbmt arm, and the reserved-bit group is now
+     under an [andb pte_reserved_bits_must_be_zero] *)
+  do 7 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
   apply orb_false_iff in Hb. destruct Hb as [Hrsw Hres].
   rewrite andb_true_r in Hrsw.
   unfold neq_vec in Hrsw. unfold neq_vec in Hres.
@@ -333,7 +342,8 @@ Proof.
   pose proof (pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0))
                 (ext_bits_of_PTE w)) as Hex.
   specialize (Hv pte_s0). rewrite Hex in Hv. injection Hv as Hb.
-  do 3 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
+  (* one more leading disjunct now (the Svpbmt arm) before the non-leaf one *)
+  do 4 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
   apply orb_false_iff in Hb; destruct Hb as [Hb _].
   unfold pte_ptr in Hp. rewrite Hp in Hb. rewrite andb_true_l in Hb.
   do 3 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).

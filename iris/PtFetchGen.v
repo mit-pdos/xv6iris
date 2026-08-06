@@ -55,7 +55,7 @@ Proof.
     cbv iota beta.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s1)).
     cbv iota beta.
-    assert (Hmrdstep1 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4 false false false) : Defs.monadR (FetchBytes_Result 4) _ (result (mword (8 * 4)) ExceptionType)) s1 = Some (inr (Ok w), s1)).
+    assert (Hmrdstep1 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4 false false false) : Defs.monadR (FetchBytes_Result 4) _ (result (mword (8 * 4)) (physaddr * ExceptionType))) s1 = Some (inr (Ok w), s1)).
     { rewrite execR_liftR. rewrite (exec_mem_read_fetch_4_S PBMT_PMA pa region w s1 iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv). cbn match. reflexivity. }
     rewrite (execR_bind_Some _ _ _ _ _ Hmrdstep1).
     cbv iota beta. rewrite autocast_mword_id.
@@ -138,7 +138,7 @@ Proof.
     cbv iota beta.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s1)).
     cbv iota beta.
-    assert (Hmrdstep2 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4 false false false) : Defs.monadR (FetchBytes_Result 4) _ (result (mword (8 * 4)) ExceptionType)) s1 = Some (inr (Ok w), s1)).
+    assert (Hmrdstep2 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 4 false false false) : Defs.monadR (FetchBytes_Result 4) _ (result (mword (8 * 4)) (physaddr * ExceptionType))) s1 = Some (inr (Ok w), s1)).
     { rewrite execR_liftR. rewrite (exec_mem_read_fetch_4_S PBMT_PMA pa region w s1 iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv). cbn match. reflexivity. }
     rewrite (execR_bind_Some _ _ _ _ _ Hmrdstep2).
     cbv iota beta. rewrite autocast_mword_id.
@@ -223,7 +223,7 @@ Proof.
     cbv iota beta.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s1)).
     cbv iota beta.
-    assert (Hmrdstep3 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2 false false false) : Defs.monadR (FetchBytes_Result 2) _ (result (mword (8 * 2)) ExceptionType)) s1 = Some (inr (Ok h), s1)).
+    assert (Hmrdstep3 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2 false false false) : Defs.monadR (FetchBytes_Result 2) _ (result (mword (8 * 2)) (physaddr * ExceptionType))) s1 = Some (inr (Ok h), s1)).
     { rewrite execR_liftR. rewrite (exec_mem_read_fetch_2_S PBMT_PMA pa region h s1 iHA iHord iHrange iHX iHmatch iHalign iHexec iHc iHsig iHh iHdev iHbytes iHpriv). cbn match. reflexivity. }
     rewrite (execR_bind_Some _ _ _ _ _ Hmrdstep3).
     cbv iota beta. rewrite autocast_mword_id_16.
@@ -344,7 +344,7 @@ Proof.
     cbv iota beta.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s1)).
     cbv iota beta.
-    assert (Hmrdstep4 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2 false false false) : Defs.monadR (FetchBytes_Result 2) _ (result (mword (8 * 2)) ExceptionType)) s1 = Some (inr (Ok ilo), s1)).
+    assert (Hmrdstep4 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pa) 2 false false false) : Defs.monadR (FetchBytes_Result 2) _ (result (mword (8 * 2)) (physaddr * ExceptionType))) s1 = Some (inr (Ok ilo), s1)).
     { rewrite execR_liftR. rewrite (exec_mem_read_fetch_2_S PBMT_PMA pa regl ilo s1 iHAL iHordL iHrangeL iHXL iHmatchL iHalignL iHexecL iHcL iHsigL iHhL iHdevL iHbytesL iHprivL). cbn match. reflexivity. }
     rewrite (execR_bind_Some _ _ _ _ _ Hmrdstep4).
     cbv iota beta. rewrite autocast_mword_id_16.
@@ -363,7 +363,7 @@ Proof.
     cbv iota beta.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pah, PBMT_PMA) s2)).
     cbv iota beta.
-    assert (Hmrdstep5 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pah) 2 false false false) : Defs.monadR (FetchBytes_Result 2) _ (result (mword (8 * 2)) ExceptionType)) s2 = Some (inr (Ok ihi), s2)).
+    assert (Hmrdstep5 : execR (Defs.liftR (mem_read (InstructionFetch tt) PBMT_PMA (Physaddr pah) 2 false false false) : Defs.monadR (FetchBytes_Result 2) _ (result (mword (8 * 2)) (physaddr * ExceptionType))) s2 = Some (inr (Ok ihi), s2)).
     { rewrite execR_liftR. rewrite (exec_mem_read_fetch_2_S PBMT_PMA pah regh ihi s2 iHAH iHordH iHrangeH iHXH iHmatchH iHalignH iHexecH iHcH iHsigH iHhH iHdevH iHbytesH iHprivH). cbn match. reflexivity. }
     rewrite (execR_bind_Some _ _ _ _ _ Hmrdstep5).
     cbv iota beta. rewrite autocast_mword_id_16.

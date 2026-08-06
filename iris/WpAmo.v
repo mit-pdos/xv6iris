@@ -582,8 +582,13 @@ Proof.
   rewrite Hpriv. rewrite Hms.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_amo_S m true false s Hmprv)).
   unfold mem_write_value_priv_meta.
-  rewrite Halign. cbn [orb andb negb Riscv.rv64d.not].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_checked_mem_write_ram_amo_4_S pbmt addr region data s HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev)).
+  (* con = true, so the (rl || con) && misaligned guard is live -- and this is
+     the aligned case, so it is false *)
+  (* the (rl || con) && misaligned guard is already false here (this is the
+     aligned case), so what is left is the checked write and the callback *)
+  rewrite (exec_bind_Some _ _ _ _ _
+             (exec_checked_mem_write_ram_amo_4_S pbmt addr region data s
+                HA Hord Hrange HR HW Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev)).
   cbn match. unfold mem_write_callback. apply exec_returnm.
 Qed.
 
