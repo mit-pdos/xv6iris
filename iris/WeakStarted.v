@@ -122,7 +122,7 @@ Section weak_started.
       release: the payload is deposited at the store's own timestamp and the
       escrow's elements are retargeted at the message the step appended. *)
   Lemma wstarted_set (a : Arch.pa) P (tid : option nat) (σ σ' : wmstate) :
-    wstore_eff tid a lock_one σ σ' ->
+    wQ_store tid a lock_one σ σ' ->
     ws_bounded (wm_ws σ) (length (wm_log σ)) ->
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wstarted_body a P -∗
@@ -170,7 +170,7 @@ Section weak_started.
       [WeakInstr.wwp_fence_scl]. *)
   Lemma wstarted_deliver P (σ : wmstate) (ws' : wstate) (t : nat) :
     (t <= w_vrOld (wm_ws σ))%nat ->
-    wQ_fence Barrier_RISCV_rw_rw σ ws' ->
+    wV_fence Barrier_RISCV_rw_rw σ ws' ->
     monPred_at P (view_scl t) ⊢ vwp_hold P ws'.
   Proof. intros Ht HQ. by apply (wwp_fence_scl P σ ws' t). Qed.
 
@@ -181,7 +181,7 @@ Section weak_started.
   Lemma wstarted_reader (a : Arch.pa) P `{!Persistent P}
       (σf : wmstate) (ws' : wstate) (t : nat) (v : bv 32) :
     (t <= w_vrOld (wm_ws σf))%nat ->
-    wQ_fence Barrier_RISCV_rw_rw σf ws' ->
+    wV_fence Barrier_RISCV_rw_rw σf ws' ->
     v <> lock_zero ->
     wstarted_at a P t v ⊢ wstarted_at a P t v ∗ vwp_hold P ws'.
   Proof.

@@ -446,11 +446,11 @@ Require Import WeakInstr.
     [wQ_fence], [wQ_store]); a plain load or an ALU instruction takes
     [wQ_none] and then the certificate is UNCONDITIONAL. *)
 Lemma wstep_cert_conf (cid : nat) (pc : SailStdpp.Values.mword 64)
-    (Q : wmstate -> wstate -> Prop) :
+    (Q : wmstate -> wmstate -> Prop) :
   (forall (s : wmstate) (tick : bool),
      register_lookup PC (wm_regs s) = pc -> wP_conf s ->
      forall χ s' χ', wexec (Some cid) (riscv_step tick) χ s = Some (tt, s', χ') ->
-       Q s (wm_ws s')) ->
+       Q s s') ->
   wstep_cert cid pc wP_conf Q.
 Proof.
   intros HQ s tick Hpc Hacc Htext HP. split.
@@ -466,12 +466,12 @@ Proof. apply wstep_cert_conf. intros. exact I. Qed.
     predicate into the certificate: anything that IMPLIES the confined witness
     certifies the step ([WeakInstr.wstep_cert_mono] is contravariant in [P]). *)
 Lemma wstep_cert_of_conf (cid : nat) (pc : SailStdpp.Values.mword 64)
-    (P : wmstate -> Prop) (Q : wmstate -> wstate -> Prop) :
+    (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) :
   (forall s, P s -> wP_conf s) ->
   (forall (s : wmstate) (tick : bool),
      register_lookup PC (wm_regs s) = pc -> P s ->
      forall χ s' χ', wexec (Some cid) (riscv_step tick) χ s = Some (tt, s', χ') ->
-       Q s (wm_ws s')) ->
+       Q s s') ->
   wstep_cert cid pc P Q.
 Proof.
   intros HP HQ s tick Hpc Hacc Htext HPs. split.

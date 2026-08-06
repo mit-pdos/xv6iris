@@ -48,7 +48,7 @@
 
     [wacquire_core] and [wrelease_core] are stated over the step's PRE- and
     POST-state ([σ], [σ']) with the instruction's weak-memory effect
-    ([wamo_eff] / [wstore_eff]) as a premise, i.e. at exactly the altitude
+    ([wQ_amo_aq] / [wQ_store]) as a premise, i.e. at exactly the altitude
     [WeakInstr.wp_winstr] hands a leaf.  See the note at the end of the file:
     that premise is strictly MORE than [WeakInstr.wstep_cert]'s [Q] can
     currently say, and the gap is a real finding about [wstep_cert]'s shape,
@@ -92,27 +92,8 @@ Proof. rewrite /lock_one /lock_zero. intros H. apply bv_eq in H. done. Qed.
     and what it did to the hart's index.  They are the weak-memory content of
     [sw] and of [amoswap.w.aq]; everything else about the step (registers,
     devices, the flat memory) is [WeakInstr.wstep_post]'s business and does
-    not appear here. *)
-
-(** A 4-byte STORE of [v] to [ea]: one message at the log's fresh top, and
-    the hart's own floor covers it afterwards. *)
-Definition wstore_eff (tid : option nat) (ea : Arch.pa) (v : bv 32)
-    (σ σ' : wmstate) : Prop :=
-  wm_img σ' = wm_img σ ∧
-  wm_log σ' = (wm_log σ ++ [wwrite_msg tid ea 4 v])%list ∧
-  ws_le (wm_ws σ) (wm_ws σ') ∧
-  (∀ j : nat, (j < 4)%nat →
-     (S (length (wm_log σ)) ≤ flr (ws_view (wm_ws σ')) (acc_addr ea j))%nat).
-
-(** [amoswap.w.aq] writing [v]: the same store effect, PLUS the acquire's
-    index gain — the scalar floor covers the timestamp the read half took,
-    which is the latest write to the word ([ak_latest]). *)
-Definition wamo_eff (tid : option nat) (ea : Arch.pa) (v : bv 32)
-    (σ σ' : wmstate) : Prop :=
-  wstore_eff tid ea v σ σ' ∧ wQ_amo_aq ea σ (wm_ws σ').
-
-Lemma wamo_eff_store tid ea v σ σ' : wamo_eff tid ea v σ σ' → wstore_eff tid ea v σ σ'.
-Proof. by intros [? _]. Qed.
+    not appear here.  They are [WeakInstr]'s [wQ_store] / [wQ_amo_aq] — the
+    certificate-level effects, i.e. exactly what [wstep_cert]'s [Q] carries. *)
 
 (* ====================================================================== *)
 (** ** 2. The lock *)
@@ -240,7 +221,7 @@ Section weak_lock.
 
   Lemma wacquire_core (γ : gname) (lk : Arch.pa) R (i : CPU) (tid : option nat)
       (σ σ' : wmstate) :
-    wlog_wf (wm_log σ) → acc_wf lk 4 → wamo_eff tid lk lock_one σ σ' →
+    wlog_wf (wm_log σ) → acc_wf lk 4 → wQ_amo_aq tid lk lock_one σ σ' →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk R -∗
     ∃ v : bv 32,
@@ -297,7 +278,7 @@ Section weak_lock.
 
   Lemma wrelease_core (γ : gname) (lk : Arch.pa) R (i : CPU) (tid : option nat)
       (σ σ' : wmstate) :
-    wstore_eff tid lk lock_zero σ σ' →
+    wQ_store tid lk lock_zero σ σ' →
     ws_bounded (wm_ws σ) (length (wm_log σ)) →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlock_inv γ lk R -∗
@@ -326,28 +307,20 @@ Section weak_lock.
 End weak_lock.
 
 (* ======================================================================
-   WHAT THE TWO CORES ASKED OF [wstep_cert], AND WHY IT IS A FINDING.
-
-   [WeakInstr.wstep_cert cid pc P Q] carries the instruction's weak-memory
-   effect as [Q : wmstate -> wstate -> Prop] — the successor's VIEWS only.
-   Both cores above need more than that, and the reason is not the views:
+   WHY [wstep_cert]'s [Q] IS OVER THE SUCCESSOR *STATE* (M3b's finding, fixed
+   at M3c).
 
      THE INVARIANT OWNS THE LOCK WORD'S LATEST-WRITE ELEMENTS, AND ANY STEP
      THAT WRITES THOSE BYTES INVALIDATES THEM.  Re-establishing
      [wmstate_interp σ'] after a store therefore requires RETARGETING the
      elements at the message the step appended — so the certificate must say
-     WHICH message that was ([wstore_eff]'s second conjunct,
+     WHICH message that was ([wQ_store]'s second conjunct,
      [wm_log σ' = wm_log σ ++ [wwrite_msg tid ea 4 v]]), and that is a
-     statement about [wm_log σ'], which [Q]'s type cannot express.
+     statement about [wm_log σ'], which a [wstate] cannot express.
 
    [WeakInstr.wstep_post] does not close the gap either: it says only
-   [∃ l, wm_log σ' = wm_log σ ++ l].  A store leaf built on [wp_winstr] as it
-   stands is therefore unprovable — not because of any weak-memory subtlety,
-   but because the ghost map of latest writes cannot be updated blind.
-
-   THE FIX IS ONE TYPE: [Q : wmstate -> wmstate -> Prop] (the successor STATE,
-   not its views), after which [wQ_store] / [wQ_amo_aq] are strengthened to
-   [wstore_eff] / [wamo_eff] above and [wp_winstr]'s proof is unchanged apart
-   from passing [σ'] instead of [wm_ws σ'].  Recorded in the project notes as
-   M3b's correction to M3a's interface; the two cores here are stated at the
-   post-fix shape so that the change is a substitution, not a re-proof. *)
+   [∃ l, wm_log σ' = wm_log σ ++ l].  A store leaf built on a [Q] over views
+   alone is therefore unprovable — not because of any weak-memory subtlety,
+   but because the ghost map of latest writes cannot be updated blind.  Hence
+   [Q : wmstate -> wmstate -> Prop], with the view-level content factored out
+   as [WeakInstr.wV_store] / [wV_amo_aq] / [wV_fence] / [wV_load]. *)

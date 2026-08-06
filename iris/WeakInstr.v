@@ -376,10 +376,17 @@ End text.
     [fence rw,rw] really did raise the hart's index to the acquire frontier,
     that an acquire-AMO really did take the read timestamp into the scalar
     floor.  Those are facts about the same walk, so they ride in the same
-    certificate as its second component [Q]. *)
+    certificate as its second component [Q].
+
+    THE TYPE OF [Q] IS THE SUCCESSOR *STATE*, NOT ITS VIEWS (M3b's correction,
+    landed at M3c).  A store leaf has to retarget the latest-write elements of
+    the bytes it wrote, so it must be able to say WHICH message the step
+    appended — a statement about [wm_log σ'], which a [wstate] cannot express.
+    The view-level predicates the leaf lemmas of §5 consume are spelled [wV_*];
+    the certificate-level ones are the [wQ_*] built on top of them. *)
 
 Definition wstep_cert (cid : nat) (pc : SailStdpp.Values.mword 64)
-    (P : wmstate → Prop) (Q : wmstate → wstate → Prop) : Prop :=
+    (P : wmstate → Prop) (Q : wmstate → wmstate → Prop) : Prop :=
   ∀ (σ : wmstate) (tick : bool),
     register_lookup PC (wm_regs σ) = pc →
     acc_wf pc 4 →
@@ -388,17 +395,17 @@ Definition wstep_cert (cid : nat) (pc : SailStdpp.Values.mword 64)
     wstep_ok (Some cid) (riscv_step tick) σ ∧
     (∀ χ σ' χ',
        wexec (Some cid) (riscv_step tick) χ σ = Some (tt, σ', χ') →
-       Q σ (wm_ws σ')).
+       Q σ σ').
 
 (** The certificate is contravariant in [P] and covariant in [Q]. *)
-Lemma wstep_cert_mono cid pc (P P' : wmstate → Prop) (Q Q' : wmstate → wstate → Prop) :
-  (∀ σ, P' σ → P σ) → (∀ σ ws, Q σ ws → Q' σ ws) →
+Lemma wstep_cert_mono cid pc (P P' : wmstate → Prop) (Q Q' : wmstate → wmstate → Prop) :
+  (∀ σ, P' σ → P σ) → (∀ σ σ', Q σ σ' → Q' σ σ') →
   wstep_cert cid pc P Q → wstep_cert cid pc P' Q'.
 Proof.
   intros HP HQ Hc σ tick Hpc Hwf Htext HP'.
   destruct (Hc σ tick Hpc Hwf Htext (HP σ HP')) as [Hok Hq].
   split; [exact Hok|]. intros χ σ' χ' Hex.
-  exact (HQ σ (wm_ws σ') (Hq χ σ' χ' Hex)).
+  exact (HQ σ σ' (Hq χ σ' χ' Hex)).
 Qed.
 
 (* ====================================================================== *)
@@ -441,7 +448,7 @@ Section rule.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_winstr Φ (pc : SailStdpp.Values.mword 64)
-      (P : wmstate → Prop) (Q : wmstate → wstate → Prop) :
+      (P : wmstate → Prop) (Q : wmstate → wmstate → Prop) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     wstep_cert (fin_to_nat cpu_id) pc P Q →
@@ -454,7 +461,7 @@ Section rule.
          ⌜exec (riscv_step true) (wflat_st σ) = Some (tt, t1)⌝ ∗
          ▷ (∀ (tick : bool) (σ' : wmstate),
               ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
-              ⌜Q σ (wm_ws σ')⌝
+              ⌜Q σ σ'⌝
               ={∅,⊤}=∗ wmstate_interp σ' ∗
                        WP (Loop : expr weak_riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr weak_riscv_lang) {{ Φ }}.
@@ -472,7 +479,7 @@ Section rule.
               wstep_ok (Some (fin_to_nat cpu_id)) (riscv_step tick) σ ∧
               (∀ χ σ' χ',
                  wexec (Some (fin_to_nat cpu_id)) (riscv_step tick) χ σ
-                 = Some (tt, σ', χ') → Q σ (wm_ws σ')))
+                 = Some (tt, σ', χ') → Q σ σ'))
       by (intros tick; exact (Hcert σ tick Hpc Haccpc Htext HP)).
     iModIntro.
     iSplitR.
@@ -522,15 +529,57 @@ Definition wP_load (ea : Arch.pa) : wmstate → Prop :=
 Definition wP_mem (ea : Arch.pa) : wmstate → Prop := λ _, acc_wf ea 4.
 Definition wP_none : wmstate → Prop := λ _, True.
 
-Definition wQ_none : wmstate → wstate → Prop := λ _ _, True.
-Definition wQ_fence (b : barrier_kind) : wmstate → wstate → Prop :=
+(** *** The VIEW-level effects ([wV_*]) — what the leaf lemmas of §5 consume.
+    Each says what the instruction did to the hart's index, as a relation
+    between the pre-STATE (whose log length is the store's timestamp) and the
+    post-state's [wstate]. *)
+
+Definition wV_fence (b : barrier_kind) : wmstate → wstate → Prop :=
   λ σ ws', ws_le (barrier_post (wm_ws σ) b) ws'.
-Definition wQ_store (ea : Arch.pa) : wmstate → wstate → Prop :=
+Definition wV_store (ea : Arch.pa) : wmstate → wstate → Prop :=
   λ σ ws', ∀ j : nat, (j < 4)%nat →
      (S (length (wm_log σ)) ≤ flr (ws_view ws') (acc_addr ea j))%nat.
-Definition wQ_amo_aq (ea : Arch.pa) : wmstate → wstate → Prop :=
+Definition wV_amo_aq (ea : Arch.pa) : wmstate → wstate → Prop :=
   λ σ ws', ∀ j : nat, (j < 4)%nat →
      view_scl (latest_ts (wm_log σ) (acc_addr ea j)) ⊑ ws_view ws'.
+Definition wV_load (ea : Arch.pa) : wmstate → wstate → Prop :=
+  λ σ ws', ∀ j : nat, (j < 4)%nat →
+     view_byte (acc_addr ea j) (latest_ts (wm_log σ) (acc_addr ea j)) ⊑ ws_view ws'.
+
+(** *** The CERTIFICATE-level effects ([wQ_*]) — what [wstep_cert] carries.
+    Over the successor STATE, so that a store's [Q] can name the message the
+    step appended: without that identity the latest-write elements of the
+    written bytes cannot be retargeted and [wmstate_interp σ'] is unprovable
+    (M3b's finding; the two lock cores are stated at this shape). *)
+
+Definition wQ_none : wmstate → wmstate → Prop := λ _ _, True.
+
+Definition wQ_fence (b : barrier_kind) : wmstate → wmstate → Prop :=
+  λ σ σ', wV_fence b σ (wm_ws σ').
+
+Definition wQ_load (ea : Arch.pa) : wmstate → wmstate → Prop :=
+  λ σ σ', wm_img σ' = wm_img σ ∧ wm_log σ' = wm_log σ ∧ wV_load ea σ (wm_ws σ').
+
+(** A 4-byte STORE of [v] to [ea]: ONE message at the log's fresh top, and the
+    hart's own floor covers it afterwards. *)
+Definition wQ_store (tid : option nat) (ea : Arch.pa) (v : bv 32)
+    : wmstate → wmstate → Prop :=
+  λ σ σ',
+    wm_img σ' = wm_img σ ∧
+    wm_log σ' = (wm_log σ ++ [wwrite_msg tid ea 4 v])%list ∧
+    ws_le (wm_ws σ) (wm_ws σ') ∧
+    wV_store ea σ (wm_ws σ').
+
+(** [amoswap.w.aq] writing [v]: the same store effect, PLUS the acquire's index
+    gain — the scalar floor covers the timestamp the read half took, which is
+    the latest write to the word ([ak_latest]). *)
+Definition wQ_amo_aq (tid : option nat) (ea : Arch.pa) (v : bv 32)
+    : wmstate → wmstate → Prop :=
+  λ σ σ', wQ_store tid ea v σ σ' ∧ wV_amo_aq ea σ (wm_ws σ').
+
+Lemma wQ_amo_aq_store tid ea v σ σ' :
+  wQ_amo_aq tid ea v σ σ' → wQ_store tid ea v σ σ'.
+Proof. by intros [? _]. Qed.
 
 Section leaves.
   Context `{!riscvGS Σ, !weakGS Σ}.
@@ -577,7 +626,7 @@ Section leaves.
       wrap-freedom ([wP_mem]).  Its weak-memory content is entirely on the
       OUTPUT side, and it is a TIMESTAMP: the message lands at
       [S (length (wm_log σ))] — visible to the caller, because [σ] is — and
-      [wQ_store] says the hart's own index covers it afterwards.
+      [wV_store] says the hart's own index covers it afterwards.
 
       THE RELEASE DEPOSIT is the composition M3b's [release] needs: by
       [WeakMem.ws_bounded] (a conjunct of [wmstate_interp]) the releaser's
@@ -594,7 +643,7 @@ Section leaves.
       after the store the hart's floor at every byte of the word covers the
       store's timestamp. *)
   Lemma wwp_sw4_post (σ : wmstate) (ws' : wstate) ea :
-    wQ_store ea σ ws' →
+    wV_store ea σ ws' →
     ∀ j : nat, (j < 4)%nat →
       view_byte (acc_addr ea j) (S (length (wm_log σ))) ⊑ ws_view ws'.
   Proof. intros HQ j Hj. apply view_byte_le. by apply HQ. Qed.
@@ -632,7 +681,7 @@ Section leaves.
       (ea : Arch.pa) (dq : dfrac) (t : nat) (w : bv 32) :
     wlog_wf (wm_log σ) →
     acc_wf ea 4 →
-    wQ_amo_aq ea σ ws' →
+    wV_amo_aq ea σ ws' →
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wlat4 ea dq t w -∗
     monPred_at R (view_scl t) -∗
@@ -686,13 +735,13 @@ Section leaves.
   (** *** 5d. [fence pred,succ]
 
       No data access at all, so the peel obligation is [wP_none].  The
-      content is [wQ_fence]: the hart's index really did move to what
+      content is [wV_fence]: the hart's index really did move to what
       [WeakInterp.barrier_post] says, and for a succ-R fence with pred-RW
       that is exactly [WeakFence.acq_view] — so a [∇]-held assertion
       ([WeakFence.vwp_acq]) becomes an ordinary held one.  The two kinds the
       kernel uses instantiate directly. *)
   Lemma wwp_fence_deliver R (σ : wmstate) (ws' : wstate) :
-    wQ_fence Barrier_RISCV_rw_rw σ ws' →
+    wV_fence Barrier_RISCV_rw_rw σ ws' →
     vwp_acq R (wm_ws σ) ⊢ vwp_hold R ws'.
   Proof.
     intros HQ. rewrite /vwp_acq /vwp_hold. apply monPred_mono.
@@ -703,7 +752,7 @@ Section leaves.
       has already read — the [started]/MP shape, and the reader half of a
       fence-mediated handoff. *)
   Lemma wwp_fence_scl R (σ : wmstate) (ws' : wstate) (t : nat) :
-    wQ_fence Barrier_RISCV_rw_rw σ ws' →
+    wV_fence Barrier_RISCV_rw_rw σ ws' →
     (t ≤ w_vrOld (wm_ws σ))%nat →
     monPred_at R (view_scl t) ⊢ vwp_hold R ws'.
   Proof.
@@ -717,7 +766,7 @@ Section leaves.
       view content beyond [ws_le]; the release's real content is
       [wwp_release_deposit] above.  Stated so the kind instantiates. *)
   Lemma wwp_fence_rw_w R (σ : wmstate) (ws' : wstate) :
-    wQ_fence Barrier_RISCV_rw_w σ ws' →
+    wV_fence Barrier_RISCV_rw_w σ ws' →
     vwp_hold R (wm_ws σ) ⊢ vwp_hold R ws'.
   Proof.
     intros HQ. apply vwp_hold_mono. etrans; [apply barrier_post_le|exact HQ].
@@ -744,7 +793,7 @@ Section smoke.
     ws_bounded (wm_ws σ0) (length (wm_log σ0)) →
     wstep_post σ0 σ1 t0 →
     (S (length (wm_log σ0)) ≤ w_vrOld (wm_ws σ1))%nat →
-    wQ_fence Barrier_RISCV_rw_rw σ1 ws2 →
+    wV_fence Barrier_RISCV_rw_rw σ1 ws2 →
     vwp_hold R (wm_ws σ0) ⊢ vwp_hold R ws2.
   Proof.
     intros Hb Hp Hrd HQ.
@@ -759,7 +808,7 @@ Section smoke.
       (ea la : Arch.pa) (dq : dfrac) (t : nat) (w lw : bv 32) :
     wlog_wf (wm_log σ0) →
     acc_wf ea 4 →
-    wQ_amo_aq ea σ0 (wm_ws σ1) →
+    wV_amo_aq ea σ0 (wm_ws σ1) →
     wstep_post σ1 σ2 t1 →
     (wlat_interp (wm_img σ0) (wm_log σ0) : iProp Σ) -∗
     wlat4 ea dq t w -∗
