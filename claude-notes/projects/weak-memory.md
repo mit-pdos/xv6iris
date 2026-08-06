@@ -868,7 +868,7 @@ Validate the operational design before anything depends on it.
   `wmstate_interp_split` (no WP) is closed under the global context.
   `weak_system_adequacy`'s footprint is byte-identical to M3b's.
 
-## M4-prep — the five M3c readiness items — **DONE** (item (iv) see below)
+## M4-prep — the five M3c readiness items — **DONE** (one cut, below)
 
 Branch `weak-memory`.  Five NEW files, nothing existing touched:
 
@@ -877,7 +877,7 @@ Branch `weak-memory`.  Five NEW files, nothing existing touched:
 | (i) the weak per-instruction FUNNEL | `iris/WeakFunnel.v` | 807 / 8.1 s |
 | (ii) the `exec_eff` toolkit | `iris/WeakEff.v` | 809 / 3.0 s |
 | (iii) the BRANCH leaf + the real-shape acquire loop | `iris/WeakBranch.v` | 252 / 2.3 s |
-| (iv) the RACY-LOAD rule | `iris/WeakRacy.v` | see the block below |
+| (iv) the RACY-LOAD rule | `iris/WeakRacy.v` | 994 / 3.4 s |
 | (v) the `↦w₈` tower | `iris/WeakWord8.v` | 752 / 20.6 s |
 
 Full `make -f CoqMakefile -j16` green; `proof_coverage.py --check`,
@@ -1008,6 +1008,43 @@ all clean.  No `Admitted`/`admit`/new `Axiom`.
   `wwp_acquire_loop_real` and `wwp_branch_step_cert` carry exactly the 5
   platform axioms.
 
+- **THE RACY-LOAD RULE IS `WeakRacy.wp_wracy_load`, AND ITS ∀-ORACLE SURFACE
+  IS ONE BINDER.**  `wstep_ok_racy` generalises `WeakBridge.wstep_ok` at one
+  designated window: a RAM read DISJOINT from it keeps `wstep_ok`'s arm
+  (pinned, canonical successor), a read of EXACTLY the window drops pinnedness
+  and quantifies over every admissible timestamp list, and partial overlap is
+  `False`.  `exec_of_wrun_racy` is then "for the run that happened there EXISTS
+  an admissible `w` such that the SC correspondence holds at the flat memory
+  PATCHED at the window with `w`" — reads outside the window still agree
+  because the patch only touches the window, and writes are disjoint from it so
+  the patch commutes.  **The caller's PRE-step obligation is its ordinary
+  `exec` fact about `wflat_st σ`** (reducibility is built at the canonical,
+  hence pinned, value, where the patch is the identity); only the continuation
+  sees `∀ w, ⌜wadm σ rak ra rn w⌝ -∗ …`, and for a one-shot flag
+  `wadm_two_valued`/`wadm_started_lw4` collapse that to `w = 0 ∨ w = 1`.
+  Three things to know before using it: (a) a RAM WRITE BEFORE the racy read is
+  forbidden by a phase bit — transporting admissibility back across an
+  intervening write needs "the appended messages do not write the window"
+  reasoning, whereas without one the pre-racy states differ only in VIEWS and
+  the transport is ten lines (an `lw`'s trace is `[fetch; data read]`, so
+  nothing is lost, and writes AFTER the racy read are supported); (b) the
+  bridge needs "the window is readable at all" for its `Ret` case — a run that
+  never takes the racy read must still exhibit SOME admissible `w`, and the
+  canonical one is it; (c) disjointness is stated ARITHMETICALLY on `pa_z`,
+  never as `gset` disjointness (`set_solver` does not terminate on a
+  `gset Arch.pa`).
+- **THE ONE CUT: `wwp_started_wait`, AND IT IS BLOCKED ON THE ESCROW, NOT ON
+  THE RULE.**  The collapse needs `WeakStarted.wstarted_oneshot`, which
+  `wstarted_at` does not carry — latest-write ELEMENTS pin the latest message,
+  not the absence of an earlier non-clear one — and which, being a statement
+  about the whole log, cannot be a persistent pure fact: it has to become a
+  conjunct of the escrow INVARIANT with a preservation step
+  (`wstarted_oneshot_app` is that argument's byte-level half).  That is a
+  change to `WeakStarted.v` and is the first thing to do before
+  `ProofMainSecondary`.  Also open: `WeakCert`'s confinement machinery does not
+  yet produce a `wstep_ok_racy`, so `WeakRacy.wracy_cert` is a per-instruction
+  premise the way `wstep_cert` was before `WeakCert`.
+
 ### WHAT M4 STILL OWES (the shared `exec_eff` skeleton)
 
 The one thing M4-prep did NOT build, and the only remaining model work:
@@ -1032,6 +1069,24 @@ Total ≈ 400–600 lines of shared skeleton plus ≈ 450 of per-shape mirrors, 
 the measured replay rate of ≈ 1.05× the SC script's lines.
 
 ## M4 — the sweep
+
+**Batches and their prices** (from M4-prep's measurements; the ORDER is
+[`weak-memory-porting.md`](weak-memory-porting.md) §5).
+
+| # | batch | size | note |
+|---|---|---|---|
+| 0 | the shared `exec_eff` skeleton (`execR_eff` + its rewriting lemmas, the two `run_hart_active` progress mirrors, the fetch) | ≈ 400–600 lines | the ONLY remaining model work; nothing downstream closes before it |
+| 1 | the memory `execute` mirrors, by SHAPE: LOAD/STORE at 1/2/4/8 + AMO | ≈ 9 × 40–60 lines | replay at the measured 1.05× |
+| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | 30–55 lines per load/ALU leaf, 60–90 per store/AMO leaf, ON TOP of the SC leaf | of which 20–40 is the certificate's window |
+| 3 | `WpLock` clients | ≈ 0 | the interface is unchanged; `iris/WeakWord8.v` covers `cpu`/`name` |
+| 4 | the straight-line M-mode function proofs | batched by subagent | the config tower and every decode fact transfer verbatim |
+| 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | small, then a cone | the racy-load rule is landed; the escrow is not |
+| 6 | the sconf tier | **design first** | blocked on the page-table-walk items above |
+| 7 | the virtio cone | M5 | |
+
+Batches 0 and 1 are one agent each and must be serial; 2 and 4 parallelise
+freely (each file is independent through the funnel).  Batch 6 must NOT be
+scheduled before its design item is resolved.
 
 - [ ] File-by-file port of the leaf libraries, then function proofs
       (subagents, batched; `lemma_diff.py`/`spec_vacuity.py` per batch).
