@@ -558,9 +558,11 @@ End wP_eff_half.
     [WeakVProp.vwp_hold_mono] with no further work.  Everything else is the
     SC statement.
 
-    The [D]/[dst] decode-bridge premises are quantified over the register
-    file rather than stated at one, because [WeakFunnel.wwp_cb] does not hand
-    the leaf the config register VALUES at [σ] (see the report). *)
+    The [D]/[dst] decode-bridge premise is still quantified over the register
+    file — a leaf's statement cannot mention [σ], which [WeakFunnel.wwp_cb]
+    quantifies over — but INSTANTIATING it is now three [exact]s off
+    [WeakFunnel.wcfg_regs], the config reads the funnel hands over, instead
+    of a second [mmode_config] half and nine [reg_valid_dq]s. *)
 
 Section leaf.
   Context `{!riscvGS Σ, !weakGS Σ}.
@@ -637,57 +639,25 @@ Section leaf.
     { iDestruct "Hbs" as "(_ & _ & _ & Hbw)".
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
-    (* half the config to the funnel, half kept to read the registers at σ *)
-    iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
-    iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iDestruct "Hmm_k" as "(#Hhw & #Hminv & Hhs_k & Hpriv_k & Hmst_k)".
-    iDestruct "Hmst_k" as (ms0) "(Hms_k & %HmIE & %HMPRV & %HSXL & %HKF)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
-        %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np &
-        %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    (* THE WHOLE config goes to the funnel: it hands the reads back. *)
     iApply (wwp_instr Φ pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
-              pmpcfg0 (dq := DfracOwn (q/2))
+              pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  ([WEread wak_plain pc 4] ++ [WEread wak_plain ea 8]))
               (wQ_load_w 8 ea) Hgid Haccpc (pmp_all_off_allows_all _ Hpmp)
               (wcert_load8_base4 (fin_to_nat cpu_id) pc wak_plain ea eq_refl)
-              with "Hmm_wp Hpmpc_wp Hpc [] ").
+              with "Hmm Hpmpc Hpc [] ").
     { iApply (winstr_intro pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
                 (F_Base w) eq_refl eq_refl Hdecf with "Hbs"). }
-    rewrite /wwp_cb. iIntros (σ b) "%Lpc0 Hlat Hreg Hnorg".
+    rewrite /wwp_cb. iIntros (σ b) "%Lpc0 %Hcfg Hlat Hreg Hnorg".
     iDestruct "Hnorg" as "(%Hbnd & %Hwf & Hdev & Hlogauth & Hwsauth)".
     iDestruct (hart_ws_agree cpu_id (wm_ws σ) ws with "Hwsauth Hhws") as %->.
-    (* every config register, read off the KEPT half, at [wm_regs σ] *)
-    iDestruct (reg_valid_dq with "Hreg Hpriv_k")  as %Lpriv_a.
-    iDestruct (reg_valid_dq with "Hreg Hms_k")    as %Lms_a.
-    iDestruct (reg_valid_dq with "Hreg Hpmpc_k")  as %Lpmpc_a.
-    iDestruct (reg_valid_dq with "Hreg Hmisa")    as %Lmisa_a.
-    iDestruct (reg_valid_dq with "Hreg Hmseccfg") as %Lsec_a.
-    iDestruct (reg_valid_dq with "Hreg Hpma")     as %Lpma_a.
-    iDestruct (reg_valid_dq with "Hreg Hhtif")    as %Lhtif_a.
-    iDestruct (reg_valid_dq with "Hreg Help")     as %Lelp_a.
-    iDestruct (reg_valid_dq with "Hreg Hhs_k")    as %Lhart_a.
-    iDestruct (reg_valid    with "Hreg Hrs1c")    as %Lrs1_a.
-    pose proof (eq_trans (eq_sym (reg_at_flat cur_privilege σ b eq_refl))
-                  Lpriv_a)  as Lpriv.
-    pose proof (eq_trans (eq_sym (reg_at_flat mstatus σ b eq_refl))
-                  Lms_a)    as Lms.
-    pose proof (eq_trans (eq_sym (reg_at_flat pmpcfg_n σ b eq_refl))
-                  Lpmpc_a)  as Lpmpc.
-    pose proof (eq_trans (eq_sym (reg_at_flat misa σ b eq_refl))
-                  Lmisa_a)  as Lmisa.
-    pose proof (eq_trans (eq_sym (reg_at_flat mseccfg σ b eq_refl))
-                  Lsec_a)   as Lsec.
-    pose proof (eq_trans (eq_sym (reg_at_flat pma_regions σ b eq_refl))
-                  Lpma_a)   as Lpma.
-    pose proof (eq_trans (eq_sym (reg_at_flat htif_tohost_base σ b eq_refl))
-                  Lhtif_a)  as Lhtif.
-    pose proof (eq_trans (eq_sym (reg_at_flat elp σ b eq_refl))
-                  Lelp_a)   as Lelp.
-    pose proof (eq_trans (eq_sym (reg_at_flat hart_state σ b eq_refl))
-                  Lhart_a)  as Lhart.
+    (* the config, as the funnel read it -- no second [mmode_config] half,
+       no [reg_valid_dq], no transport past the [minstret_increment] write *)
+    destruct Hcfg as (Lpriv & Lhart & Lmisa & Lsec & Lpmpc & Lpma & Lhtif &
+                      LmisaS & LmIE & Lmprv & Lpmm & Lelp).
+    (* the ONE register the funnel does not read: this instruction's base *)
+    iDestruct (reg_valid with "Hreg Hrs1c") as %Lrs1_a.
     pose proof (eq_trans (eq_sym (reg_at_flat
                   (R_bitvector_64 (gpr_of_Z (uint rs1))) σ b eq_refl))
                   Lrs1_a)   as Lrs1.
@@ -699,22 +669,19 @@ Section leaf.
     (* the agreement, at [σ]'s registers *)
     assert (Hag_σ : forall r, D r = true ->
               register_lookup r (wm_regs σ) = register_lookup r dst.(sregs)).
-    { apply Hagree; [exact Lpriv | by rewrite Lmisa | by rewrite Lsec]. }
+    { apply Hagree; [exact Lpriv | exact Lmisa | exact Lsec]. }
     (* ---- the certificate's precondition (§2d) ---- *)
     iDestruct (wP_eff_ld8 (fin_to_nat cpu_id) σ pc w rs1 rd imm ea v dqv D dst
-                 Hwf Lpc0 Lpriv ltac:(rewrite Lpmpc; exact Hpmp) ltac:(by rewrite Lpma)
-                 Lhtif Lhart ltac:(by rewrite Lmisa) ltac:(by rewrite Lms)
-                 ltac:(by rewrite Lms) ltac:(by rewrite Lsec)
-                 ltac:(by rewrite Lelp) Hal4 HnotRVC Hrd Hea_σ Hram8
+                 Hwf Lpc0 Lpriv ltac:(rewrite Lpmpc; exact Hpmp) Lpma
+                 Lhtif Lhart LmisaS LmIE Lmprv Lpmm Lelp Hal4 HnotRVC Hrd Hea_σ Hram8
                  Hag_σ HDmi Hgood Hdec with "Hlat Hbs Hpt") as %HP.
     (* ---- the flat facts: the data doubleword ---- *)
     iDestruct (wwp_ld8 σ ea dqv v Hwf with "Hlat Hpt") as %[_ Hflat8].
     iDestruct (wpt8_align with "Hpt") as %Halea.
     (* ---- the run, at the FLAT state: the SC [execute] fact ---- *)
     pose proof (exec_eff_ld8_at (wflat_st σ) b pc rs1 rd imm ea v Hrd Lpriv
-                  ltac:(by rewrite Lms) ltac:(by rewrite Lsec)
-                  ltac:(rewrite Lpmpc; exact Hpmp) ltac:(by rewrite Lpma) Lhtif Hea_σ Halea
-                  Hram8 Hflat8) as Hexf.
+                  Lmprv Lpmm ltac:(rewrite Lpmpc; exact Hpmp) Lpma Lhtif Hea_σ
+                  Halea Hram8 Hflat8) as Hexf.
     (* ---- the two register writes the [execute] performs ---- *)
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc")
       as "[Hreg Hnpc]".
@@ -750,15 +717,9 @@ Section leaf.
     { rewrite /wmstate_norg. iSplitR; [by iPureIntro|].
       iSplitR; [by iPureIntro|].
       rewrite Hdevs Hdevt HQl. iFrame. }
-    (* recombine the two config halves, exactly as the SC leaf does *)
-    iAssert (mmode_config (DfracOwn (q/2)))%I
-      with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".
-    { iFrame "Hhw Hminv Hhs_k Hpriv_k". iExists ms0. iFrame "Hms_k".
-      iPureIntro. exact (conj HmIE (conj HMPRV (conj HSXL HKF))). }
-    iDestruct (mmode_config_combine with "Hmm' Hmm_k'") as "Hmm''".
-    iCombine "Hpmpc' Hpmpc_k" as "Hpmpc''".
+    (* the config comes back WHOLE from the funnel: nothing to recombine *)
     iApply ("Hcont" $! (wm_ws σ') with
-              "[%] Hmm'' Hpmpc'' [$Hpc' $Hnpc] Hrs1c Hrdc Hhws [Hpt]").
+              "[%] Hmm' Hpmpc' [$Hpc' $Hnpc] Hrs1c Hrdc Hhws [Hpt]").
     - exact Hwsle.
     - iApply (wwp_ld8_carry σ σ' t ea dqv v with "Hpt").
       split_and!; [exact Hregs|exact Hdevs|exact Hmems|exact Himgs
@@ -770,30 +731,47 @@ End leaf.
 (* ====================================================================== *)
 (** ** 4. WHAT THIS COST
 
-    THE PRICE, in CODE lines (comments and the import block excluded);
-    the SC leaf this is measured against, [WpMmodeLoad.wp_ld_gpr], is 128:
+    THE PRICE, in CODE lines (comments and blank lines excluded, statements
+    included).  The SC leaf this is measured against, [WpMmodeLoad.wp_ld_gpr],
+    is 152 by the same count (the batch-2 report quoted 128 for it):
 
-      §1  the width-generic certificate + two instances ..........   37
-      §2a the window ............................................   25
-      §2b its three obligations .................................   40
-      §2c the [execute] lemma at a generic [s0] .................   137
-      §2d the [wP_eff] half .....................................  102
-      §3b the WP composition proper .............................  185
-                                                                  ----
-                                                          total    552
+                                                    batch 2   now
+      §1  the width-generic certificate + instances     37      37
+      §2a the window .............................      25      25
+      §2b its three obligations ..................      40      40
+      §2c the [execute] lemma at a generic [s0] ..     137     137
+      §2d the [wP_eff] half ......................     102     102
+      §3a the SECOND replay, for the device frame     116       0
+      §3b the WP composition proper ..............     191     142
+                                                     ----    ----
+                                              total   648     509
+
+    THE UNIT PRICE OF A LEAF IS 472 — the 509 less §1's 37, which is paid
+    ONCE for the whole plain-load family — i.e. **3.1× the SC leaf**.  Two
+    seam fixes took it there from 611 (= 648 − 37, i.e. 4.0×):
+
+      - the device frame.  §3a was a 116-line SECOND replay of the whole
+        [riscv_step] at the FLAT state whose only purpose was to learn
+        [mdev t]; [WeakFunnel.wwp_cb] now hands it over as
+        [⌜mdev t = mdev s_exec⌝] and the leaf spends two lines.
+      - the config reads.  [wwp_cb] now also hands over
+        [⌜WeakFunnel.wcfg_regs σ pmpcfg0⌝] — everything the funnel read off
+        the [mmode_config] bundle it was given.  So this file no longer
+        splits [mmode_config] in half, no longer keeps the second half to
+        [reg_valid_dq] nine registers at [σ], no longer transports those nine
+        past the [minstret_increment] pre-write, and no longer recombines the
+        halves for the continuation: 43 lines, and the funnel takes the WHOLE
+        [mmode_config (DfracOwn q)] and gives it back.  What is left of the
+        register reads is the ONE the funnel cannot know: this instruction's
+        base register.
 
     §2a+§2b+§2d = 167 is the price the porting guide predicted (the window
     plus ONE re-instantiation of the leaf's own SC library lemma at the
-    confined memory).  §1 (37) is paid once for the whole plain-load family,
-    not per leaf.  §2c (137) is the SC leaf's own execute-fact block hoisted
-    to an arbitrary [s0 : mstate] so that BOTH instantiations — confined and
-    flat — are the same lemma applied twice; ~50 of it is work the SC leaf
-    already does inline.
-
-    WHAT USED TO BE HERE AND IS NOT: a 116-line SECOND replay of the whole
-    [riscv_step] at the FLAT state, whose only purpose was to learn [mdev t]
-    for the device frame.  [WeakFunnel.wwp_cb] now hands that over
-    ([⌜mdev t = mdev s_exec⌝]); see the note there.
+    confined memory).  §2c (137) is the SC leaf's own execute-fact block
+    hoisted to an arbitrary [s0 : mstate] so that BOTH instantiations —
+    confined and flat — are the same lemma applied twice; ~50 of it is work
+    the SC leaf already does inline.  So the genuinely NEW work in a leaf is
+    §2a+§2b+§2d+§3b = 309 lines, and half of that is the WP composition.
 
     ONE SMALLER SEAM, worth recording:
 

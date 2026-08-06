@@ -461,6 +461,52 @@ End winstr.
     the funnel is that IT owns the register bookkeeping.  [wmstate_norg] is
     what is left, and it is what the leaf carries across the step. *)
 
+(** THE FUNNEL'S REGISTER READS, PACKAGED — everything [wwp_instr] takes off
+    the [mmode_config] / [hw_config] bundle it is handed, restated at [σ]'s
+    OWN register file.
+
+    Handing this to the callback is what spares every leaf a SECOND
+    [mmode_config] split and nine [reg_valid_dq]s plus their transports past
+    the [minstret_increment] pre-write (≈ 40 lines, measured on the [ld]
+    leaf), and it is what lets a leaf discharge the decode bridge's
+    [agree_on D] premise AT [σ]: the premise itself still has to be stated
+    ∀-over-register-files in the leaf's own statement (the leaf is stated
+    before [σ] exists — [wwp_cb] quantifies over it), but instantiating it is
+    now three [exact]s off this record rather than three register reads.
+
+    The list is exactly what [WeakFetchEff.wP_eff_of_leaf_base] and a leaf's
+    [execute] lemma consume; [misa] and [mseccfg] are pinned to their WHOLE
+    values because that is what the concrete-state decode bridge compares
+    (durable notes: a read-frame/agreement bridge is whole-value by
+    construction). *)
+Definition wcfg_regs (σ : wmstate) (pmpcfg0 : type_of_register pmpcfg_n)
+    : Prop :=
+  register_lookup cur_privilege (wm_regs σ) = Machine
+  /\ register_lookup hart_state (wm_regs σ) = HART_ACTIVE tt
+  /\ register_lookup misa (wm_regs σ) = MISA_C
+  /\ register_lookup mseccfg (wm_regs σ) = mword_of_int 0
+  /\ register_lookup pmpcfg_n (wm_regs σ) = pmpcfg0
+  /\ pma_allows_all (register_lookup pma_regions (wm_regs σ))
+  /\ register_lookup htif_tohost_base (wm_regs σ) = None
+  /\ eq_vec (_get_Misa_S (register_lookup misa (wm_regs σ))) ('b"1") = true
+  /\ eq_vec (_get_Mstatus_MIE (register_lookup mstatus (wm_regs σ))) ('b"1")
+       = false
+  /\ eq_vec (_get_Mstatus_MPRV (register_lookup mstatus (wm_regs σ))) ('b"1")
+       = false
+  /\ pmm_mode_backwards
+       (_get_Seccfg_PMM (register_lookup mseccfg (wm_regs σ))) = PMM_Disabled
+  /\ eq_vec (register_lookup elp (wm_regs σ))
+       (landing_pad_bits_backwards LP_EXPECTED) = false.
+
+(** The decode bridge's config precondition, at the flat state — the M-mode
+    arm of [RiscvFetchExec.cfg_ok], read straight off the record. *)
+Lemma wcfg_regs_cfg_ok σ pmpcfg0 :
+  wcfg_regs σ pmpcfg0 -> cfg_ok (wflat_st σ).
+Proof.
+  intros (Hpriv & _ & _ & Hsec & _). left. rewrite wflat_st_regs.
+  exact (conj Hpriv Hsec).
+Qed.
+
 Section funnel.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -514,7 +560,10 @@ Section funnel.
           state, so this costs the caller nothing);
         - what is handed over instead of [mstate_interp σ] is the SPLIT weak
           interpretation: the latest-write authority, the (already-updated)
-          registers, and [wmstate_norg];
+          registers, and [wmstate_norg] — plus [⌜wcfg_regs σ pmpcfg0⌝], the
+          config reads the funnel has just done, so the leaf need not do them
+          again (and need not keep a second half of [mmode_config] to do them
+          with);
         - the continuation runs after the step, at a successor [σ'] described
           by [WeakInstr.wstep_post] over the SC successor [t], and gives back
           the config bundle, the stepped PC, and the weak conjuncts at [σ'].
@@ -538,6 +587,7 @@ Section funnel.
       (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) : iProp Σ :=
     (∀ (σ : wmstate) (b : bool),
        ⌜register_lookup PC (wm_regs σ) = pc⌝ -∗
+       ⌜wcfg_regs σ pmpcfg0⌝ -∗
        wlat_interp (wm_img σ) (wm_log σ) -∗
        reg_interp (sregs (set_reg (wflat_st σ) (R_bool minstret_increment) b)) -∗
        wmstate_norg σ
@@ -607,6 +657,14 @@ Section funnel.
     iDestruct (reg_valid_dq with "Hreg Hmstatus")  as %Lmstatus.
     iDestruct (reg_valid_dq with "Hreg Help")      as %Lelp.
     iDestruct (reg_valid_dq with "Hreg Hhs")       as %Lhs.
+    (* the same reads, packaged for the leaf *)
+    assert (Hcfg : wcfg_regs σ pmpcfg0).
+    { rewrite /wcfg_regs Lpriv Lhs Lmisa Lmseccfg Lpmpc Lpma Lhtif Lmstatus
+              Lelp.
+      split_and!;
+        [ reflexivity | reflexivity | exact Hmisa_val0 | exact Hmseccfg_val0
+        | reflexivity | exact Hpma_all | reflexivity | exact HmisaS
+        | exact HmIE | exact HMPRV | exact Hseccfg1 | exact Help_np ]. }
     (* the two facts the weak fetch needs, off the text elements *)
     iDestruct (winstr_flat σ pc r Hwf with "Hlat Hb") as %Hfok.
     iDestruct (winstr_pinned σ pc r Hwf with "Hlat Hb") as %Hpin.
@@ -681,8 +739,8 @@ Section funnel.
                         [ exact Lpriv_a
                         | rewrite Lmseccfg_a; exact Hmseccfg_val0 ])).
     (* ---- the leaf's obligation ---- *)
-    iMod ("H" $! σ b with "[%] Hlat Hreg Hnorg") as "(%HP & Hcb)";
-      [exact Lpc|].
+    iMod ("H" $! σ b with "[%] [%] Hlat Hreg Hnorg") as "(%HP & Hcb)";
+      [exact Lpc | exact Hcfg |].
     iDestruct "Hcb" as (s_exec) "(%Hexec & Hreg & Hcont)".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs_e.
     iDestruct (reg_valid    with "Hreg Hmi") as %Lmi_e.
