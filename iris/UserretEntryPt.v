@@ -27,6 +27,7 @@ Require Import RiscvLang RiscvPtsto RiscvFetchExec.
 Require Import MinstretInv InstrBytes.
 Require Import RegFile.
 Require Import WpGpr WpGprCsrwB.
+Require Import WpSmodePtCtl.
 Require Import SmodePte PtTree.
 Require Import KMap KptExecMap.
 Require Import KptTree UptTree.
@@ -72,8 +73,9 @@ Section UserretEntryPt.
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     tlb_inv_pt kroot -∗
     pt_frame (upt_tree_spec uroot tfp um) -∗
-    pc_is (uva 0xa0) -∗
+    pc_is (uva 0x9c) -∗
     gpr_file m -∗
+    instr (upa 0x9c) false ai_fencei -∗
     instr (upa 0xa0) false ai_sfence -∗
     instr (upa 0xa4) false ai_csrw -∗
     instr (upa 0xa8) false ai_sfence -∗
@@ -92,17 +94,56 @@ Section UserretEntryPt.
   Proof.
     intros HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwf Ha0 HuMode Huasid Huppn.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv #Hclaim Hktlb Hufr [Hpc Hnpc]
-             Hfmap Hi1 Hi2 Hi3 Hcont".
+             Hfmap Hi0 Hi1 Hi2 Hi3 Hcont".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
+    assert (Hva00 : add_vec_int (uva 0x9c) 4 = uva 0xa0)
+      by (apply bv_eq; vm_compute; reflexivity).
     assert (Hva01 : add_vec_int (uva 0xa0) 4 = uva 0xa4)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hva02 : add_vec_int (uva 0xa4) 4 = uva 0xa8)
       by (apply bv_eq; vm_compute; reflexivity).
     assert (Hva03 : add_vec_int (uva 0xa8) 4 = uva 0xac)
       by (apply bv_eq; vm_compute; reflexivity).
+    (* ===== STEP 0: fence.i -- flush the icache after the text swap.
+       Unlike the sfence below this touches no architectural state: the
+       Sail model retires it as the identity, so there is no TLB cell to
+       re-seal and no privilege side condition to discharge. ============ *)
+    iApply (wp_instr_ktramp_pt kroot Φ (uva 0x9c) (upa 0x9c) false ai_fencei
+              mstatus0 mie_v mdv0 menvcfg0 dq
+              HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              ltac:(intro; vm_compute; reflexivity)
+              with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv [$Hclaim $Hktlb] Hpc Hi0").
+    iIntros (σ0 Hpceq0) "Hpriv Hms Hmie Hmdl Hmenv Hktlb Hsi".
+    iDestruct "Hktlb" as "[_ Hktlb]".
+    iDestruct "Hsi" as "[Hreg Hmem]".
+    iMod (reg_update _ nextPC _ (uva 0xa0) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc0 := set_reg σ0 nextPC (uva 0xa0)).
+    iModIntro.
+    iExists s_pc0.
+    iSplitR.
+    { iPureIntro. rewrite Hpceq0. rewrite Hva00. fold s_pc0.
+      change ai_fencei with (FENCEI (zeros' 12, zreg, zreg)).
+      exact (exec_execute_FENCEI_S _ _ _ s_pc0). }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc0; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hmem". }
+    iIntros "Hhs Hpc".
+    assert (Lnpc0 : register_lookup nextPC s_pc0.(sregs) = uva 0xa0).
+    { unfold s_pc0; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc0) in "Hpc".
+    iNext.
     (* ============ STEP 1: sfence.vma under the kernel invariant ======== *)
     iApply (wp_instr_ktramp_pt kroot Φ (uva 0xa0) (upa 0xa0) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
