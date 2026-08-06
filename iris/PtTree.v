@@ -1831,8 +1831,12 @@ Section PtHit.
     rewrite uwe_pte.
     rewrite autocast_id.
     rewrite (exec_bind_Some _ _ _ _ _ (Hchk s)). cbn match.
-    match goal with |- context[update_and_write_pte ?a ?wd ?pv ?ac] =>
-      assert (Hu : exec (update_and_write_pte a wd pv ac) s = Some (Ok None, s)) end.
+    (* [update_and_write_pte] takes the whole tablewalk context now -- including
+       the entry's LEVEL, recovered from its levelMask by [tlb_get_level] -- and
+       returns the ext_ptw alongside.  The no-write case is still one step. *)
+    match goal with |- context[update_and_write_pte ?w ?vp ?a ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hu : exec (update_and_write_pte w vp a pv lv ac pr mx ds e) s
+                   = Some (Ok (None, tt), s)) end.
     { unfold update_and_write_pte.
       match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
         change w with 64 end.

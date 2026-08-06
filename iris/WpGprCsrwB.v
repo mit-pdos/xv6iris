@@ -565,6 +565,27 @@ Proof.
   apply (exec_is_stimecmp_accessible_M s HS).
 Qed.
 
+(* PORT PENDING (claude-notes/projects/sail-model-bump.md).  Writing stimecmp now
+   REFRESHES THE TIMER-PENDING BITS: the CSR write runs [clint_dispatch false]
+   between the register write and the read-back, setting mip.MTIP from
+   (mtimecmp <=u mtime) and -- under Sstc with menvcfg.STCE -- mip.STIP from
+   (stimecmp <=u mtime).  So the post-state gains an mip write and this contract
+   has to become existential in that value:
+
+     exists p, exec (write_CSR csr_stimecmp v) s
+               = Some (Ok …, set_reg (set_reg s stimecmp …) mip p)
+
+   [MinstretInv.exec_clint_dispatch_false] already proves exactly that shape for
+   the clock tick, and mip lives in the value-agnostic [clock_inv], so the WP
+   consumers (WpSconfTimer, and through it timerinit/clockintr) can re-establish
+   the invariant with whatever value comes out.  THE OBSTACLE IS MECHANICAL: by
+   the time the CSR-clause peel reaches the dispatch, the goal has [clint_dispatch]
+   INLINED into a raw monad-bind fixpoint (`Interface.Next (RegRead mip …)`), so
+   neither `rewrite` nor `erewrite` can fold it back, and `Opaque clint_dispatch`
+   does not prevent it.  Find which step over-reduces (probe the goal after each
+   of `skip_csr_false_clauses`, the `replace g with true`, and the `cbn match`)
+   and hold the continuation opaque across it -- the `set (NN := …)` trick the
+   store proofs use for the same reason. *)
 Lemma exec_write_CSR_stimecmp (v : mword 64) s :
   exec (write_CSR csr_stimecmp v) s
     = Some (Ok (subrange_vec_dec (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v) (Z.sub xlen 1) 0),
