@@ -48,7 +48,6 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 
-Notation VF := KernelSyms.vmfault.
 
 Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

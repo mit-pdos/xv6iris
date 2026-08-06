@@ -29,7 +29,6 @@ Require Import CalleeSaved.
 Require Import IntrDefs.
 From Kernel Require KernelSyms.
 
-Notation TIH := KernelSyms.trapinithart.
 
 (* trapinithart(): install kernelvec as the S-mode trap vector.  See the
    header.  [tv0] is the arbitrary word the cell held on entry.

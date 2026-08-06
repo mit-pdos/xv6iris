@@ -73,7 +73,6 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation PFT := KernelSyms.proc_freepagetable.
 
 Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

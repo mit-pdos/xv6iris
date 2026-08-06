@@ -24,7 +24,6 @@ Require Import CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
-Notation KF := KernelSyms.kfree.
 
 Definition wp_kfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=

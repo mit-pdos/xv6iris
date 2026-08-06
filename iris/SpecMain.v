@@ -154,7 +154,6 @@ Require Import WpLock FileInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 
-Notation MN := KernelSyms.main.
 
 (* main's stack budget: its own 16-byte / 2-slot frame over its deepest
    callee.  kvminit wants 50, printk 38, kinit 22, virtio_disk_init

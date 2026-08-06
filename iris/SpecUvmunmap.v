@@ -71,7 +71,6 @@ Require Import BarePt.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation UU := KernelSyms.uvmunmap.
 
 Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

@@ -50,7 +50,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation PLICINIT := KernelSyms.plicinit.
 
 (* the two PLIC interrupt-source ids xv6 raises to priority 1,
    [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)

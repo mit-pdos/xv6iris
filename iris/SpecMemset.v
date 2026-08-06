@@ -24,7 +24,6 @@ Require Import IntrDefs.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation MS := KernelSyms.memset.
 
 (* memset(p, cval, len): fills [len] bytes at base [p] with [cval]'s low byte.
    [len] need only fit in 32 bits (the C source truncates the count to

@@ -59,7 +59,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation PLICINITHART := KernelSyms.plicinithart.
 
 (* the S-context enable word xv6 writes: (1 << UART0_IRQ) | (1 << VIRTIO0_IRQ)
    = (1 << 10) | (1 << 1) = 1026 -- exactly the kernel's permitted set. *)

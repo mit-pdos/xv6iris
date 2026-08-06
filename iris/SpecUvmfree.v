@@ -65,7 +65,6 @@ Require Import BarePt.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation UF := KernelSyms.uvmfree.
 
 Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

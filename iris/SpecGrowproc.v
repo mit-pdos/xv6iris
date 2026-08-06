@@ -83,7 +83,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation GP := KernelSyms.growproc.
 
 (* growproc's own frame is 4 slots; uvmalloc wants 42 below it (mappages 32,
    kalloc 14, uvmdealloc 26) and myproc 10, so 42 covers every call. *)

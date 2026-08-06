@@ -22,7 +22,6 @@ Require Import PtTree.
 Require Import PtBuild KvmSpec.
 From Kernel Require KernelSyms.
 
-Notation MP := KernelSyms.mappages.
 
 Definition wp_mappages_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=

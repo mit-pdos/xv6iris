@@ -49,7 +49,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation PLIC_CLAIM := KernelSyms.plic_claim.
 
 (* the ids a claim can return, as the 64-bit words [lw] leaves in a0 *)
 Definition plic_claim_a0_ok (v : mword 64) : Prop :=

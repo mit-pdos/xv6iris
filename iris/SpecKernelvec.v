@@ -36,7 +36,6 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
-Notation KV := KernelSyms.kernelvec.
 
 (* the kernelvec trap-vector facts (Direct mode, base = itself) -- feed
    [intr_inv_alloc] when the handler is kernelvec. *)

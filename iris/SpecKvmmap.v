@@ -23,7 +23,6 @@ Require Import PtBuild KvmSpec.
 Require Import Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 
-Notation KM := KernelSyms.kvmmap.
 
 Definition wp_kvmmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (npages : nat) (perm : Z) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=

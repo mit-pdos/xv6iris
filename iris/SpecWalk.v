@@ -27,7 +27,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation WK := KernelSyms.walk.
 
 Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=

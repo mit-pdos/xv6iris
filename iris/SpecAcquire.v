@@ -32,7 +32,6 @@ Require Import SpecPanic.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation AQ := KernelSyms.acquire.
 
 (* The generic form, over [lock_openable] (WpLock.v): the right to TOUCH the
    lock is the resource [Tc], presented on the way in and handed back on the

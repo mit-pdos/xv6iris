@@ -751,7 +751,7 @@ Section BootAlloc.
      CPU.  Proved here, with an empty proofmode context, the same rewrite is
      free; the call site becomes one first-order [iApply].  Same family as the
      [wp_next_off] -> [wp_next_off_intro] rule in claude-notes/optimization.md:
-     never leave a big-op/BI identity to a setoid rewrite inside a large goal. *)
+     never leave a big-op/KernelSyms.binit identity to a setoid rewrite inside a large goal. *)
   Lemma boot_hart_pre_combine (g : gstate) :
     ([∗ list] c ∈ enum CPU, boot_reg_res (CID := c) (g.(gregs) c)) -∗
     ([∗ list] c ∈ enum CPU, hart_strans c) -∗

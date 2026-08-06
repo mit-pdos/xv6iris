@@ -92,7 +92,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 
-Notation ALP := KernelSyms.allocproc.
 
 (* The pages allocproc consumes: the trapframe page, plus the three
    proc_pagetable builds (root + the l1/l0 pair the TRAMPOLINE walk needs;

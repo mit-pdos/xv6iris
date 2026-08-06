@@ -67,7 +67,6 @@ Require Import PtFree.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation FW := KernelSyms.freewalk.
 
 Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

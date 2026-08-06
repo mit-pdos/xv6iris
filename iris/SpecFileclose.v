@@ -81,7 +81,6 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Notation FC := KernelSyms.fileclose.
 
 (* fileclose's own frame is 8 slots (addi sp,sp,-64: ra, s0..s3 saved), and
    acquire/release want 10 below that.  PROVISIONAL: the last-reference arm

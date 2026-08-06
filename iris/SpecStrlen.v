@@ -45,7 +45,6 @@ From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation SL := KernelSyms.strlen.
 
 Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile)

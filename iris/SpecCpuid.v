@@ -32,7 +32,6 @@ From Kernel Require KernelSyms.
 Require Import RiscvExtras.
 Import Defs.
 
-Notation CPUID := KernelSyms.cpuid.
 
 (* the [int]-truncated hart id returned by cpuid: sign-extend tp's low 32. *)
 Definition cpuid_ret (tp : mword 64) : mword 64 :=

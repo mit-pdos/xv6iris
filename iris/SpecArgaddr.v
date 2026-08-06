@@ -50,7 +50,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation AA := KernelSyms.argaddr.
 
 (* 4 slots for argaddr's own frame, 14 for argraw's -- argint's number,
    since the two functions have identical frames. *)

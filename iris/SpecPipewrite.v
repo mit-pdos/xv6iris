@@ -72,7 +72,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation PW := KernelSyms.pipewrite.
 
 (* pipewrite's own frame is 14 slots; the deepest callee is copyin at 50
    (walkaddr 10 / vmfault 38 / memmove 2); sleep wants 22, wakeup 18,

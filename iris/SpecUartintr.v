@@ -62,7 +62,6 @@ Require Import DiskPtsto WpUart.
 Require Import UartTxInv.
 From Kernel Require KernelSyms.
 
-Notation UI := KernelSyms.uartintr.
 
 (* uartintr's own frame is 4 slots; the deepest callee is consoleintr at 32
    (wakeup wants 18, acquire and release 10). *)

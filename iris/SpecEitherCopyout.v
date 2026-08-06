@@ -80,7 +80,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation ECO := KernelSyms.either_copyout.
 
 (* either_copyout's own frame is 6 slots; copyout wants 50 below it
    (walkaddr 10, vmfault 38, walk 8, memmove 2) and myproc 10, so 50 covers

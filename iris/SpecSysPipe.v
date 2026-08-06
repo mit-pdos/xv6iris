@@ -116,7 +116,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation SPI := KernelSyms.sys_pipe.
 
 (* sys_pipe's own frame is 8 slots (c.addi16sp sp,-64).  Below it: copyout
    wants 50, pipealloc 24, argaddr 18, fileclose 18, fdalloc 14, myproc 10 --

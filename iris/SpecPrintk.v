@@ -65,7 +65,6 @@ Require Import IntrDefs.
 Require Import PrintkFmt.
 From Kernel Require KernelSyms.
 
-Notation PK := KernelSyms.printk.
 
 (* ---------------------------------------------------------------------- *)
 (* The caller's description of one vararg (see (2) above).                 *)

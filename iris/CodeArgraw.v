@@ -23,7 +23,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
-Local Notation AR := KernelSyms.argraw.
 
 Notation ar_ra := (mword_of_int 1 : mword 5).
 Notation ar_s1 := (mword_of_int 9 : mword 5).
@@ -45,90 +44,90 @@ match k with 0%nat => 0x2a | 1%nat => 0x38 | 2%nat => 0x3e
 Definition ar_cj_imm (k : nat) : Z :=
 match k with 1%nat => 2041 | 2%nat => 2038 | 3%nat => 2035
            | 4%nat => 2032 | _ => 2029 end.
-Notation ARI o t d := (kernel_text -∗ instr (mword_of_int (AR + o) : mword 64) t d).
+Notation ARI o t d := (kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + o) : mword 64) t d).
 (* every arm: c.ld a5,88(a0)  -- p->trapframe *)
 Lemma ardec_ld_tf s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x6d3c : mword 16)) s = Some (C_LD (mword_of_int 11, Cregidx (mword_of_int 2), Cregidx (mword_of_int 7)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ari_28 : ARI 0x28 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
-Proof. mk_rvc (AR + 0x28)%Z (mword_of_int 0x6d3c : mword 16)
-  (mword_of_int (AR + 0x28) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x28)%Z (mword_of_int 0x6d3c : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x28) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
 Lemma ari_36 : ARI 0x36 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
-Proof. mk_rvc (AR + 0x36)%Z (mword_of_int 0x6d3c : mword 16)
-  (mword_of_int (AR + 0x36) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x36)%Z (mword_of_int 0x6d3c : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x36) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
 Lemma ari_3c : ARI 0x3c true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
-Proof. mk_rvc (AR + 0x3c)%Z (mword_of_int 0x6d3c : mword 16)
-  (mword_of_int (AR + 0x3c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x3c)%Z (mword_of_int 0x6d3c : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x3c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
 Lemma ari_42 : ARI 0x42 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
-Proof. mk_rvc (AR + 0x42)%Z (mword_of_int 0x6d3c : mword 16)
-  (mword_of_int (AR + 0x42) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x42)%Z (mword_of_int 0x6d3c : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x42) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
 Lemma ari_48 : ARI 0x48 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
-Proof. mk_rvc (AR + 0x48)%Z (mword_of_int 0x6d3c : mword 16)
-  (mword_of_int (AR + 0x48) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x48)%Z (mword_of_int 0x6d3c : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x48) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
 Lemma ari_4e : ARI 0x4e true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
-Proof. mk_rvc (AR + 0x4e)%Z (mword_of_int 0x6d3c : mword 16)
-  (mword_of_int (AR + 0x4e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x4e)%Z (mword_of_int 0x6d3c : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x4e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)) ardec_ld_tf exec_execute_C_LD. Qed.
 (* case 0: c.ld a0,112(a5)  -- tf->a0 *)
 Lemma ardec_ld_a0 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x7ba8 : mword 16)) s = Some (C_LD (mword_of_int 14, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ari_2a : ARI 0x2a true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 14 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
-Proof. mk_rvc (AR + 0x2a)%Z (mword_of_int 0x7ba8 : mword 16)
-  (mword_of_int (AR + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 14 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a0 exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x2a)%Z (mword_of_int 0x7ba8 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 14 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a0 exec_execute_C_LD. Qed.
 (* case 1: c.ld a0,120(a5)  -- tf->a1 *)
 Lemma ardec_ld_a1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x7fa8 : mword 16)) s = Some (C_LD (mword_of_int 15, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ari_38 : ARI 0x38 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 15 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
-Proof. mk_rvc (AR + 0x38)%Z (mword_of_int 0x7fa8 : mword 16)
-  (mword_of_int (AR + 0x38) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 15 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a1 exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x38)%Z (mword_of_int 0x7fa8 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x38) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 15 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a1 exec_execute_C_LD. Qed.
 (* case 2: c.ld a0,128(a5)  -- tf->a2 *)
 Lemma ardec_ld_a2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x63c8 : mword 16)) s = Some (C_LD (mword_of_int 16, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ari_3e : ARI 0x3e true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 16 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
-Proof. mk_rvc (AR + 0x3e)%Z (mword_of_int 0x63c8 : mword 16)
-  (mword_of_int (AR + 0x3e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 16 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a2 exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x3e)%Z (mword_of_int 0x63c8 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x3e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 16 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a2 exec_execute_C_LD. Qed.
 (* case 3: c.ld a0,136(a5)  -- tf->a3 *)
 Lemma ardec_ld_a3 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x67c8 : mword 16)) s = Some (C_LD (mword_of_int 17, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ari_44 : ARI 0x44 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 17 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
-Proof. mk_rvc (AR + 0x44)%Z (mword_of_int 0x67c8 : mword 16)
-  (mword_of_int (AR + 0x44) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 17 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a3 exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x44)%Z (mword_of_int 0x67c8 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x44) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 17 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a3 exec_execute_C_LD. Qed.
 (* case 4: c.ld a0,144(a5)  -- tf->a4 *)
 Lemma ardec_ld_a4 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x6bc8 : mword 16)) s = Some (C_LD (mword_of_int 18, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ari_4a : ARI 0x4a true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 18 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
-Proof. mk_rvc (AR + 0x4a)%Z (mword_of_int 0x6bc8 : mword 16)
-  (mword_of_int (AR + 0x4a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 18 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a4 exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x4a)%Z (mword_of_int 0x6bc8 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x4a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 18 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a4 exec_execute_C_LD. Qed.
 (* case 5: c.ld a0,152(a5)  -- tf->a5 *)
 Lemma ardec_ld_a5 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x6fc8 : mword 16)) s = Some (C_LD (mword_of_int 19, Cregidx (mword_of_int 7), Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ari_50 : ARI 0x50 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 19 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
-Proof. mk_rvc (AR + 0x50)%Z (mword_of_int 0x6fc8 : mword 16)
-  (mword_of_int (AR + 0x50) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 19 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a5 exec_execute_C_LD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x50)%Z (mword_of_int 0x6fc8 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x50) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 19 : mword 5) ('b"000")), creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)) ardec_ld_a5 exec_execute_C_LD. Qed.
 Lemma ari_3a : ARI 0x3a true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)).
-Proof. mk_rvc (AR + 0x3a)%Z (mword_of_int 0xbfcd : mword 16)
-  (mword_of_int (AR + 0x3a) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)) cdec_bfcd exec_execute_C_J. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x3a)%Z (mword_of_int 0xbfcd : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x3a) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)) cdec_bfcd exec_execute_C_J. Qed.
 (* case 2 tail: c.j +0x2c *)
 Lemma ardec_cj2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xb7f5 : mword 16)) s = Some (C_J (mword_of_int 2038 : mword 11), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 Lemma ari_40 : ARI 0x40 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2038 : mword 11) ('b"0")), zreg)).
-Proof. mk_rvc (AR + 0x40)%Z (mword_of_int 0xb7f5 : mword 16)
-  (mword_of_int (AR + 0x40) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2038 : mword 11) ('b"0")), zreg)) ardec_cj2 exec_execute_C_J. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x40)%Z (mword_of_int 0xb7f5 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x40) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2038 : mword 11) ('b"0")), zreg)) ardec_cj2 exec_execute_C_J. Qed.
 Lemma ari_46 : ARI 0x46 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0")), zreg)).
-Proof. mk_rvc (AR + 0x46)%Z (mword_of_int 0xb7dd : mword 16)
-  (mword_of_int (AR + 0x46) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0")), zreg)) cdec_b7dd exec_execute_C_J. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x46)%Z (mword_of_int 0xb7dd : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x46) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0")), zreg)) cdec_b7dd exec_execute_C_J. Qed.
 Lemma ari_4c : ARI 0x4c true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")), zreg)).
-Proof. mk_rvc (AR + 0x4c)%Z (mword_of_int 0xb7c5 : mword 16)
-  (mword_of_int (AR + 0x4c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")), zreg)) cdec_b7c5 exec_execute_C_J. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x4c)%Z (mword_of_int 0xb7c5 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x4c) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2032 : mword 11) ('b"0")), zreg)) cdec_b7c5 exec_execute_C_J. Qed.
 Lemma ari_52 : ARI 0x52 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)).
-Proof. mk_rvc (AR + 0x52)%Z (mword_of_int 0xbfe9 : mword 16)
-  (mword_of_int (AR + 0x52) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)) cdec_bfe9 exec_execute_C_J. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x52)%Z (mword_of_int 0xbfe9 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x52) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2029 : mword 11) ('b"0")), zreg)) cdec_bfe9 exec_execute_C_J. Qed.
 
 
 (* +0x10  c.li a5,5 *)
@@ -170,7 +169,7 @@ Proof. decode_bridge_ms. Qed.
 (* branch re-typechecks the dependently-typed Sail bitvector context.  *)
 (* ================================================================== *)
 Lemma ar_i_tf (k : nat) : (k < NARG)%nat ->
-  kernel_text -∗ instr (mword_of_int (AR + ar_case_off k) : mword 64) true
+  kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + ar_case_off k) : mword 64) true
     (LOAD (zero_extend' 12 (concat_vec (mword_of_int 11 : mword 5) ('b"000")),
            creg2reg_idx (Cregidx (mword_of_int 2)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 8)).
 Proof.
@@ -178,7 +177,7 @@ Proof.
     [ exact ari_28 | exact ari_36 | exact ari_3c | exact ari_42 | exact ari_48 | exact ari_4e ].
 Qed.
 Lemma ar_i_ld (k : nat) : (k < NARG)%nat ->
-  kernel_text -∗ instr (mword_of_int (AR + ar_ld_off k) : mword 64) true
+  kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + ar_ld_off k) : mword 64) true
     (LOAD (zero_extend' 12 (concat_vec (mword_of_int (14 + Z.of_nat k) : mword 5) ('b"000")),
            creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 2)), false, 8)).
 Proof.
@@ -187,7 +186,7 @@ Proof.
     [ exact ari_2a | exact ari_38 | exact ari_3e | exact ari_44 | exact ari_4a | exact ari_50 ].
 Qed.
 Lemma ar_i_cj (k : nat) : (1 <= k < NARG)%nat ->
-  kernel_text -∗ instr (mword_of_int (AR + ar_ld_off k + 2) : mword 64) true
+  kernel_text -∗ instr (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2) : mword 64) true
     (JAL (sign_extend' 21 (concat_vec (mword_of_int (ar_cj_imm k) : mword 11) ('b"0")), zreg)).
 Proof.
   intro Hk. unfold NARG in Hk. destruct k as [|[|[|[|[|[|k']]]]]]; try lia;
@@ -196,67 +195,67 @@ Proof.
 Qed.
 
 Lemma ari_00 : ARI 0x00 true (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-Proof. mk_rvc (AR + 0x00)%Z (mword_of_int 0x1101 : mword 16)
-  (mword_of_int (AR + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1101 exec_execute_C_ADDI. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x00)%Z (mword_of_int 0x1101 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 32 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1101 exec_execute_C_ADDI. Qed.
 Lemma ari_02 : ARI 0x02 true (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
-Proof. mk_rvc (AR + 0x02)%Z (mword_of_int 0xec06 : mword 16)
-  (mword_of_int (AR + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_ec06 exec_execute_C_SDSP. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x02)%Z (mword_of_int 0xec06 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_ec06 exec_execute_C_SDSP. Qed.
 Lemma ari_04 : ARI 0x04 true (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
-Proof. mk_rvc (AR + 0x04)%Z (mword_of_int 0xe822 : mword 16)
-  (mword_of_int (AR + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e822 exec_execute_C_SDSP. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x04)%Z (mword_of_int 0xe822 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e822 exec_execute_C_SDSP. Qed.
 Lemma ari_06 : ARI 0x06 true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)).
-Proof. mk_rvc (AR + 0x06)%Z (mword_of_int 0xe426 : mword 16)
-  (mword_of_int (AR + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) cdec_e426 exec_execute_C_SDSP. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x06)%Z (mword_of_int 0xe426 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x06) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 9), sp, 8)) cdec_e426 exec_execute_C_SDSP. Qed.
 Lemma ari_08 : ARI 0x08 true (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
-Proof. mk_rvc (AR + 0x08)%Z (mword_of_int 0x1000 : mword 16)
-  (mword_of_int (AR + 0x08) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_1000 exec_execute_C_ADDI4SPN. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x08)%Z (mword_of_int 0x1000 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x08) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_1000 exec_execute_C_ADDI4SPN. Qed.
 Lemma ari_0a : ARI 0x0a true (RTYPE (Regidx ar_a0, zreg, Regidx ar_s1, ADD)).
-Proof. mk_rvc (AR + 0x0a)%Z (mword_of_int 0x84aa : mword 16)
-  (mword_of_int (AR + 0x0a) : mword 64) (RTYPE (Regidx ar_a0, zreg, Regidx ar_s1, ADD)) cdec_84aa exec_execute_C_MV. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x0a)%Z (mword_of_int 0x84aa : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x0a) : mword 64) (RTYPE (Regidx ar_a0, zreg, Regidx ar_s1, ADD)) cdec_84aa exec_execute_C_MV. Qed.
 Lemma ari_0c : ARI 0x0c false (JAL (mword_of_int 2093534 : mword 21, Regidx ar_ra)).
-Proof. mk_base (AR + 0x0c)%Z (mword_of_int 0x9deff0ef : mword 32)
-  (mword_of_int (AR + 0x0c) : mword 64) (JAL (mword_of_int 2093534 : mword 21, Regidx ar_ra)) ardec_jal_myproc. Qed.
+Proof. mk_base (KernelSyms.argraw + 0x0c)%Z (mword_of_int 0x9deff0ef : mword 32)
+  (mword_of_int (KernelSyms.argraw + 0x0c) : mword 64) (JAL (mword_of_int 2093534 : mword 21, Regidx ar_ra)) ardec_jal_myproc. Qed.
 Lemma ari_10 : ARI 0x10 true (ITYPE (sign_extend' 12 (mword_of_int 5 : mword 6), zreg, Regidx ar_a5, ADDI)).
-Proof. mk_rvc (AR + 0x10)%Z (mword_of_int 0x4795 : mword 16)
-  (mword_of_int (AR + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 5 : mword 6), zreg, Regidx ar_a5, ADDI)) ardec_li_a5_5 exec_execute_C_LI. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x10)%Z (mword_of_int 0x4795 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x10) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 5 : mword 6), zreg, Regidx ar_a5, ADDI)) ardec_li_a5_5 exec_execute_C_LI. Qed.
 Lemma ari_12 : ARI 0x12 false (BTYPE (mword_of_int 66 : mword 13, Regidx ar_s1, Regidx ar_a5, BLTU)).
-Proof. mk_base (AR + 0x12)%Z (mword_of_int 0x0497e163 : mword 32)
-  (mword_of_int (AR + 0x12) : mword 64) (BTYPE (mword_of_int 66 : mword 13, Regidx ar_s1, Regidx ar_a5, BLTU)) ardec_bltu. Qed.
+Proof. mk_base (KernelSyms.argraw + 0x12)%Z (mword_of_int 0x0497e163 : mword 32)
+  (mword_of_int (KernelSyms.argraw + 0x12) : mword 64) (BTYPE (mword_of_int 66 : mword 13, Regidx ar_s1, Regidx ar_a5, BLTU)) ardec_bltu. Qed.
 Lemma ari_16 : ARI 0x16 true (SHIFTIOP (mword_of_int 2 : mword 6, Regidx ar_s1, Regidx ar_s1, SLLI)).
-Proof. mk_rvc (AR + 0x16)%Z (mword_of_int 0x048a : mword 16)
-  (mword_of_int (AR + 0x16) : mword 64) (SHIFTIOP (mword_of_int 2 : mword 6, Regidx ar_s1, Regidx ar_s1, SLLI)) ardec_slli_s1 exec_execute_C_SLLI. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x16)%Z (mword_of_int 0x048a : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x16) : mword 64) (SHIFTIOP (mword_of_int 2 : mword 6, Regidx ar_s1, Regidx ar_s1, SLLI)) ardec_slli_s1 exec_execute_C_SLLI. Qed.
 Lemma ari_18 : ARI 0x18 false (UTYPE (mword_of_int 0x5 : mword 20, Regidx ar_a4, AUIPC)).
-Proof. mk_base (AR + 0x18)%Z (mword_of_int 0x00005717 : mword 32)
-  (mword_of_int (AR + 0x18) : mword 64) (UTYPE (mword_of_int 0x5 : mword 20, Regidx ar_a4, AUIPC)) ardec_auipc_a4. Qed.
+Proof. mk_base (KernelSyms.argraw + 0x18)%Z (mword_of_int 0x00005717 : mword 32)
+  (mword_of_int (KernelSyms.argraw + 0x18) : mword 64) (UTYPE (mword_of_int 0x5 : mword 20, Regidx ar_a4, AUIPC)) ardec_auipc_a4. Qed.
 Lemma ari_1c : ARI 0x1c false (ITYPE (mword_of_int 38 : mword 12, Regidx ar_a4, Regidx ar_a4, ADDI)).
-Proof. mk_base (AR + 0x1c)%Z (mword_of_int 0x02670713 : mword 32)
-  (mword_of_int (AR + 0x1c) : mword 64) (ITYPE (mword_of_int 38 : mword 12, Regidx ar_a4, Regidx ar_a4, ADDI)) ardec_addi_a4. Qed.
+Proof. mk_base (KernelSyms.argraw + 0x1c)%Z (mword_of_int 0x02670713 : mword 32)
+  (mword_of_int (KernelSyms.argraw + 0x1c) : mword 64) (ITYPE (mword_of_int 38 : mword 12, Regidx ar_a4, Regidx ar_a4, ADDI)) ardec_addi_a4. Qed.
 Lemma ari_20 : ARI 0x20 true (RTYPE (Regidx ar_a4, Regidx ar_s1, Regidx ar_s1, ADD)).
-Proof. mk_rvc (AR + 0x20)%Z (mword_of_int 0x94ba : mword 16)
-  (mword_of_int (AR + 0x20) : mword 64) (RTYPE (Regidx ar_a4, Regidx ar_s1, Regidx ar_s1, ADD)) ardec_add_s1_a4 exec_execute_C_ADD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x20)%Z (mword_of_int 0x94ba : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x20) : mword 64) (RTYPE (Regidx ar_a4, Regidx ar_s1, Regidx ar_s1, ADD)) ardec_add_s1_a4 exec_execute_C_ADD. Qed.
 Lemma ari_22 : ARI 0x22 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)).
-Proof. mk_rvc (AR + 0x22)%Z (mword_of_int 0x409c : mword 16)
-  (mword_of_int (AR + 0x22) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) cdec_409c exec_execute_C_LW. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x22)%Z (mword_of_int 0x409c : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x22) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"00")), creg2reg_idx (Cregidx (mword_of_int 1)), creg2reg_idx (Cregidx (mword_of_int 7)), false, 4)) cdec_409c exec_execute_C_LW. Qed.
 Lemma ari_24 : ARI 0x24 true (RTYPE (Regidx ar_a4, Regidx ar_a5, Regidx ar_a5, ADD)).
-Proof. mk_rvc (AR + 0x24)%Z (mword_of_int 0x97ba : mword 16)
-  (mword_of_int (AR + 0x24) : mword 64) (RTYPE (Regidx ar_a4, Regidx ar_a5, Regidx ar_a5, ADD)) cdec_97ba exec_execute_C_ADD. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x24)%Z (mword_of_int 0x97ba : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x24) : mword 64) (RTYPE (Regidx ar_a4, Regidx ar_a5, Regidx ar_a5, ADD)) cdec_97ba exec_execute_C_ADD. Qed.
 Lemma ari_26 : ARI 0x26 true (JALR (zeros' 12, Regidx ar_a5, zreg)).
-Proof. mk_rvc (AR + 0x26)%Z (mword_of_int 0x8782 : mword 16)
-  (mword_of_int (AR + 0x26) : mword 64) (JALR (zeros' 12, Regidx ar_a5, zreg)) ardec_jr_a5 exec_execute_C_JR. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x26)%Z (mword_of_int 0x8782 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x26) : mword 64) (JALR (zeros' 12, Regidx ar_a5, zreg)) ardec_jr_a5 exec_execute_C_JR. Qed.
 Lemma ari_2c : ARI 0x2c true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-Proof. mk_rvc (AR + 0x2c)%Z (mword_of_int 0x60e2 : mword 16)
-  (mword_of_int (AR + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60e2 exec_execute_C_LDSP. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x2c)%Z (mword_of_int 0x60e2 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60e2 exec_execute_C_LDSP. Qed.
 Lemma ari_2e : ARI 0x2e true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-Proof. mk_rvc (AR + 0x2e)%Z (mword_of_int 0x6442 : mword 16)
-  (mword_of_int (AR + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6442 exec_execute_C_LDSP. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x2e)%Z (mword_of_int 0x6442 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x2e) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 2 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6442 exec_execute_C_LDSP. Qed.
 Lemma ari_30 : ARI 0x30 true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)).
-Proof. mk_rvc (AR + 0x30)%Z (mword_of_int 0x64a2 : mword 16)
-  (mword_of_int (AR + 0x30) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) cdec_64a2 exec_execute_C_LDSP. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x30)%Z (mword_of_int 0x64a2 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x30) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 9), false, 8)) cdec_64a2 exec_execute_C_LDSP. Qed.
 Lemma ari_32 : ARI 0x32 true (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)).
-Proof. mk_rvc (AR + 0x32)%Z (mword_of_int 0x6105 : mword 16)
-  (mword_of_int (AR + 0x32) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)) cdec_6105 exec_execute_C_ADDI16SP. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x32)%Z (mword_of_int 0x6105 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x32) : mword 64) (ITYPE (caddi16sp_imm (mword_of_int 2 : mword 6), sp, sp, ADDI)) cdec_6105 exec_execute_C_ADDI16SP. Qed.
 Lemma ari_34 : ARI 0x34 true (JALR (zeros' 12, Regidx ar_ra, zreg)).
-Proof. mk_rvc (AR + 0x34)%Z (mword_of_int 0x8082 : mword 16)
-  (mword_of_int (AR + 0x34) : mword 64) (JALR (zeros' 12, Regidx ar_ra, zreg)) cdec_8082 exec_execute_C_JR. Qed.
+Proof. mk_rvc (KernelSyms.argraw + 0x34)%Z (mword_of_int 0x8082 : mword 16)
+  (mword_of_int (KernelSyms.argraw + 0x34) : mword 64) (JALR (zeros' 12, Regidx ar_ra, zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End CodeArgraw.

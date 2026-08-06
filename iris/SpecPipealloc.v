@@ -71,7 +71,6 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Notation PA := KernelSyms.pipealloc.
 
 (* The address of the string literal "pipe" that pipealloc passes to initlock.
    It sits in .rodata past etext with no ELF symbol of its own, so it is spelled

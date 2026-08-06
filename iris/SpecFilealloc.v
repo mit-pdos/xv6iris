@@ -46,7 +46,6 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Notation FA := KernelSyms.filealloc.
 
 Section SpecFilealloc.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.

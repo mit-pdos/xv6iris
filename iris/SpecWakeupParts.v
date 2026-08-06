@@ -21,7 +21,6 @@ Require Import IntrDefs.
 Require Import CodeWakeup.
 From Kernel Require KernelSyms.
 
-Notation WK := KernelSyms.wakeup.
 
 (* myproc is PROVEN (SpecMyproc.v / ProofMyproc.v / LinkMyproc.v), and wakeup
    threads the [cur_proc] resource so it can use [wp_myproc_sconf] directly

@@ -69,7 +69,6 @@ From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation CIS := KernelSyms.copyinstr.
 
 (* copyinstr's answer, keyed by the returned a0.  The 0 arm is what makes the
    function usable; the -1 arm deliberately says nothing (see the header). *)

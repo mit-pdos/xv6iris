@@ -51,7 +51,6 @@ Require Import WpUart.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
-Notation CI := KernelSyms.consoleinit.
 
 (* The address of the string literal "cons" that consoleinit passes as
    initlock's [name] argument.  It is the first word of .rodata, at [etext]

@@ -63,7 +63,6 @@ Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
-Notation UART_INIT := KernelSyms.uartinit.
 
 (* NOTE: there is deliberately no [uartinit_post] naming the concrete UART state
    the seven writes produce.  The state lives inside [uart_inv], the contract

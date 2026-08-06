@@ -104,7 +104,6 @@ Local Open Scope Z_scope.
    printable (claude-notes/durable-notes.md) *)
 Set Printing Depth 40.
 
-Notation IT := KernelSyms.install_trans.
 
 (* ===================================================================== *)
 (*  Pure arithmetic, all over plain [Z]/[nat] so no solver ever runs      *)
@@ -232,7 +231,7 @@ Qed.
 
 (* the pre-frame load's own relocation: &log.lh.n off the +0x00 auipc *)
 Lemma it_reloc_lhn :
-  add_vec (add_vec (mword_of_int (IT + 0x00) : mword 64)
+  add_vec (add_vec (mword_of_int (KernelSyms.install_trans + 0x00) : mword 64)
                    (auipc_off (mword_of_int 31 : mword 20)))
           (sign_extend' 64 (mword_of_int 2232 : mword 12)) = lh_n_pa.
 Proof.
@@ -242,7 +241,7 @@ Qed.
 
 (* s5's initial value: &log.lh.block[0] *)
 Lemma it_reloc_blk0 :
-  add_vec (add_vec (mword_of_int (IT + 0x26) : mword 64)
+  add_vec (add_vec (mword_of_int (KernelSyms.install_trans + 0x26) : mword 64)
                    (auipc_off (mword_of_int 31 : mword 20)))
           (sign_extend' 64 (mword_of_int 2198 : mword 12)) = lh_block 0.
 Proof.
@@ -252,7 +251,7 @@ Qed.
 
 (* s4's value: &log *)
 Lemma it_reloc_log :
-  add_vec (add_vec (mword_of_int (IT + 0x38) : mword 64)
+  add_vec (add_vec (mword_of_int (KernelSyms.install_trans + 0x38) : mword 64)
                    (auipc_off (mword_of_int 31 : mword 20)))
           (sign_extend' 64 (mword_of_int 2132 : mword 12)) = log_addr.
 Proof. rewrite /log_addr. apply bv_eq; vm_compute; reflexivity. Qed.
@@ -787,7 +786,7 @@ Section InstallTransBlocks.
     M !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64) ->
     sie_cap_gpr M (K - 10)%nat eb (proc_addr j) -∗
     kernel_text -∗
-    pc_is (mword_of_int (IT + 0xb2) : mword 64) -∗
+    pc_is (mword_of_int (KernelSyms.install_trans + 0xb2) : mword 64) -∗
     it_frame m -∗
     cpu_own 0 eb (proc_addr j) C eb -∗
     own_ctx (p_context (proc_addr j)) -∗
@@ -871,7 +870,7 @@ Section InstallTransBlocks.
     iEval (rewrite -Hb7) in "Hf7".   iEval (rewrite -Hb8) in "Hf8".
     iEval (rewrite -Hb9) in "Hf9".   iEval (rewrite -Hb10) in "Hf10".
     (* ===== +0xb2 : ld ra,72(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xb2)) (mword_of_int 9 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xb2)) (mword_of_int 9 : mword 6) Rra
               M (K - 10)%nat (m !!! Regidx Rra : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib2 Hf1 [-]").
@@ -879,12 +878,12 @@ Section InstallTransBlocks.
     set (P1 := <[Regidx Rra := regval_into_reg (m !!! Regidx Rra : mword 64)]> M).
     assert (HP1sp : P1 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P1 upd_ne; [reflexivity | vm_compute; discriminate]).
-    assert (Hppb4 : add_vec_int (mword_of_int (IT + 0xb2) : mword 64) 2
-                    = mword_of_int (IT + 0xb4))
+    assert (Hppb4 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xb2) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xb4))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb4) in "Hpc".
     (* ===== +0xb4 : ld s0,64(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xb4)) (mword_of_int 8 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xb4)) (mword_of_int 8 : mword 6) Rs0
               P1 (K - 10)%nat (m !!! Regidx Rs0 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib4 [Hf2] [-]").
@@ -893,12 +892,12 @@ Section InstallTransBlocks.
     set (P2 := <[Regidx Rs0 := regval_into_reg (m !!! Regidx Rs0 : mword 64)]> P1).
     assert (HP2sp : P2 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P2 upd_ne; [exact HP1sp | vm_compute; discriminate]).
-    assert (Hppb6 : add_vec_int (mword_of_int (IT + 0xb4) : mword 64) 2
-                    = mword_of_int (IT + 0xb6))
+    assert (Hppb6 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xb4) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xb6))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb6) in "Hpc".
     (* ===== +0xb6 : ld s1,56(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xb6)) (mword_of_int 7 : mword 6) Rs1
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xb6)) (mword_of_int 7 : mword 6) Rs1
               P2 (K - 10)%nat (m !!! Regidx Rs1 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib6 [Hf3] [-]").
@@ -907,12 +906,12 @@ Section InstallTransBlocks.
     set (P3 := <[Regidx Rs1 := regval_into_reg (m !!! Regidx Rs1 : mword 64)]> P2).
     assert (HP3sp : P3 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P3 upd_ne; [exact HP2sp | vm_compute; discriminate]).
-    assert (Hppb8 : add_vec_int (mword_of_int (IT + 0xb6) : mword 64) 2
-                    = mword_of_int (IT + 0xb8))
+    assert (Hppb8 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xb6) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xb8))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppb8) in "Hpc".
     (* ===== +0xb8 : ld s2,48(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xb8)) (mword_of_int 6 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xb8)) (mword_of_int 6 : mword 6) Rs2
               P3 (K - 10)%nat (m !!! Regidx Rs2 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib8 [Hf4] [-]").
@@ -921,12 +920,12 @@ Section InstallTransBlocks.
     set (P4 := <[Regidx Rs2 := regval_into_reg (m !!! Regidx Rs2 : mword 64)]> P3).
     assert (HP4sp : P4 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P4 upd_ne; [exact HP3sp | vm_compute; discriminate]).
-    assert (Hppba : add_vec_int (mword_of_int (IT + 0xb8) : mword 64) 2
-                    = mword_of_int (IT + 0xba))
+    assert (Hppba : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xb8) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xba))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppba) in "Hpc".
     (* ===== +0xba : ld s3,40(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xba)) (mword_of_int 5 : mword 6) Rs3
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xba)) (mword_of_int 5 : mword 6) Rs3
               P4 (K - 10)%nat (m !!! Regidx Rs3 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hiba [Hf5] [-]").
@@ -935,12 +934,12 @@ Section InstallTransBlocks.
     set (P5 := <[Regidx Rs3 := regval_into_reg (m !!! Regidx Rs3 : mword 64)]> P4).
     assert (HP5sp : P5 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P5 upd_ne; [exact HP4sp | vm_compute; discriminate]).
-    assert (Hppbc : add_vec_int (mword_of_int (IT + 0xba) : mword 64) 2
-                    = mword_of_int (IT + 0xbc))
+    assert (Hppbc : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xba) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xbc))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppbc) in "Hpc".
     (* ===== +0xbc : ld s4,32(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xbc)) (mword_of_int 4 : mword 6) Rs4
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xbc)) (mword_of_int 4 : mword 6) Rs4
               P5 (K - 10)%nat (m !!! Regidx Rs4 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hibc [Hf6] [-]").
@@ -949,12 +948,12 @@ Section InstallTransBlocks.
     set (P6 := <[Regidx Rs4 := regval_into_reg (m !!! Regidx Rs4 : mword 64)]> P5).
     assert (HP6sp : P6 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P6 upd_ne; [exact HP5sp | vm_compute; discriminate]).
-    assert (Hppbe : add_vec_int (mword_of_int (IT + 0xbc) : mword 64) 2
-                    = mword_of_int (IT + 0xbe))
+    assert (Hppbe : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xbc) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xbe))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppbe) in "Hpc".
     (* ===== +0xbe : ld s5,24(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xbe)) (mword_of_int 3 : mword 6) Rs5
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xbe)) (mword_of_int 3 : mword 6) Rs5
               P6 (K - 10)%nat (m !!! Regidx Rs5 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hibe [Hf7] [-]").
@@ -963,12 +962,12 @@ Section InstallTransBlocks.
     set (P7 := <[Regidx Rs5 := regval_into_reg (m !!! Regidx Rs5 : mword 64)]> P6).
     assert (HP7sp : P7 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P7 upd_ne; [exact HP6sp | vm_compute; discriminate]).
-    assert (Hppc0 : add_vec_int (mword_of_int (IT + 0xbe) : mword 64) 2
-                    = mword_of_int (IT + 0xc0))
+    assert (Hppc0 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xbe) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xc0))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppc0) in "Hpc".
     (* ===== +0xc0 : ld s6,16(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xc0)) (mword_of_int 2 : mword 6) Rs6
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xc0)) (mword_of_int 2 : mword 6) Rs6
               P7 (K - 10)%nat (m !!! Regidx Rs6 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hic0 [Hf8] [-]").
@@ -977,12 +976,12 @@ Section InstallTransBlocks.
     set (P8 := <[Regidx Rs6 := regval_into_reg (m !!! Regidx Rs6 : mword 64)]> P7).
     assert (HP8sp : P8 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P8 upd_ne; [exact HP7sp | vm_compute; discriminate]).
-    assert (Hppc2 : add_vec_int (mword_of_int (IT + 0xc0) : mword 64) 2
-                    = mword_of_int (IT + 0xc2))
+    assert (Hppc2 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xc0) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xc2))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppc2) in "Hpc".
     (* ===== +0xc2 : ld s7,8(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xc2)) (mword_of_int 1 : mword 6) Rs7
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xc2)) (mword_of_int 1 : mword 6) Rs7
               P8 (K - 10)%nat (m !!! Regidx Rs7 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hic2 [Hf9] [-]").
@@ -991,12 +990,12 @@ Section InstallTransBlocks.
     set (P9 := <[Regidx Rs7 := regval_into_reg (m !!! Regidx Rs7 : mword 64)]> P8).
     assert (HP9sp : P9 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P9 upd_ne; [exact HP8sp | vm_compute; discriminate]).
-    assert (Hppc4 : add_vec_int (mword_of_int (IT + 0xc2) : mword 64) 2
-                    = mword_of_int (IT + 0xc4))
+    assert (Hppc4 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xc2) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xc4))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppc4) in "Hpc".
     (* ===== +0xc4 : ld s8,0(sp) ===== *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0xc4)) (mword_of_int 0 : mword 6) Rs8
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xc4)) (mword_of_int 0 : mword 6) Rs8
               P9 (K - 10)%nat (m !!! Regidx Rs8 : mword 64) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hic4 [Hf10] [-]").
@@ -1005,8 +1004,8 @@ Section InstallTransBlocks.
     set (P10 := <[Regidx Rs8 := regval_into_reg (m !!! Regidx Rs8 : mword 64)]> P9).
     assert (HP10sp : P10 !!! Regidx csp_rs1 = (M !!! Regidx csp_rs1 : mword 64))
       by (rewrite /P10 upd_ne; [exact HP9sp | vm_compute; discriminate]).
-    assert (Hppc6 : add_vec_int (mword_of_int (IT + 0xc4) : mword 64) 2
-                    = mword_of_int (IT + 0xc6))
+    assert (Hppc6 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xc4) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xc6))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppc6) in "Hpc".
     (* ===== +0xc6 : c.addi16sp sp,80 -- the pop ===== *)
@@ -1033,7 +1032,7 @@ Section InstallTransBlocks.
       iSplitL "Hf10"; [iEval (rewrite -Hb10 -HP9sp); iExists _; iExact "Hf10"|].
       done. }
     iEval (rewrite -Hwv) in "Hstk".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (IT + 0xc6)) (mword_of_int 5 : mword 6)
+    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xc6)) (mword_of_int 5 : mword 6)
               P10 (K - 10)%nat 10 eb Hpop with "Hcg Hpc Hic6 Hstk [-]").
     iIntros (CID11 Hs11') "Hcg Hpc".
     assert (Hnk : ((K - 10) + 10)%nat = K) by (unfold K_install_trans in HK; lia).
@@ -1044,8 +1043,8 @@ Section InstallTransBlocks.
     change (<[Regidx csp_rs1 := regval_into_reg
       (add_vec (P10 !!! Regidx csp_rs1 : mword 64)
          (sign_extend' 64 (caddi16sp_imm (mword_of_int 5 : mword 6))))]> P10) with P11.
-    assert (Hppc8 : add_vec_int (mword_of_int (IT + 0xc6) : mword 64) 2
-                    = mword_of_int (IT + 0xc8))
+    assert (Hppc8 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xc6) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xc8))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppc8) in "Hpc".
     (* ===== +0xc8 : c.ret ===== *)
@@ -1061,7 +1060,7 @@ Section InstallTransBlocks.
       rewrite /P3 upd_ne; [| vm_compute; discriminate].
       rewrite /P2 upd_ne; [| vm_compute; discriminate].
       rewrite /P1 upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (IT + 0xc8)) Rra P11 K eb
+    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xc8)) Rra P11 K eb
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hic8 [-]").
     iIntros (CID12 Hs12) "Hcg Hpc".
     assert (Hretf : ret_pc (rget P11 Rra) = ret_pc (m !!! Regidx Rra : mword 64)).
@@ -1221,7 +1220,7 @@ Section InstallTransBlocks.
     sie_cap_gpr M (K - 10)%nat eb (proc_addr j) -∗
     cpu_own 0 eb (proc_addr j) C eb -∗
     kernel_text -∗
-    pc_is (mword_of_int (IT + 0x6c) : mword 64) -∗
+    pc_is (mword_of_int (KernelSyms.install_trans + 0x6c) : mword 64) -∗
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_frozen logstart dev -∗
@@ -1325,12 +1324,12 @@ Section InstallTransBlocks.
     (* ===== +0x6c bnez s6 : NOT taken (recovering = 0) ===== *)
     assert (Hnz6c : neq_vec (rget M Rs6) (zero_reg : mword 64) = false).
     { rgne. rewrite HMs6. vm_compute. reflexivity. }
-    iApply (wp_bnez_x0_fall_s_sconf Φ (mword_of_int (IT + 0x6c))
+    iApply (wp_bnez_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x6c))
               (mword_of_int 8154 : mword 13) Rs6 M (K - 10)%nat eb
               ltac:(vm_compute; discriminate) Hnz6c with "Hcg Hpc Hi6c [-]").
     iIntros (CIDa1 Hsa1) "Hcg Hpc".
-    assert (Hpp70 : add_vec_int (mword_of_int (IT + 0x6c) : mword 64) 4
-                    = mword_of_int (IT + 0x70))
+    assert (Hpp70 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x6c) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x70))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp70) in "Hpc".
     (* ===== +0x70 lw a1,24(s4) : a1 := log.start ===== *)
@@ -1338,7 +1337,7 @@ Section InstallTransBlocks.
                       = l_start).
     { rgne. rewrite HMs4. exact it_addr_start. }
     iEval (rewrite -Hastart) in "Hstc".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x70)) Ra1 Rs4 (mword_of_int 24 : mword 12)
+    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x70)) Ra1 Rs4 (mword_of_int 24 : mword 12)
               M (K - 10)%nat (mword_of_int logstart : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi70 Hstc [-]").
@@ -1351,8 +1350,8 @@ Section InstallTransBlocks.
     assert (HA1regs : it_lregs m A1 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact Hregs]).
     pose proof HA1regs as (_ & HA1s3 & HA1s4 & HA1s5 & HA1s6 & HA1s7 & _ & _ & _).
-    assert (Hpp74 : add_vec_int (mword_of_int (IT + 0x70) : mword 64) 4
-                    = mword_of_int (IT + 0x74))
+    assert (Hpp74 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x70) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x74))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp74) in "Hpc".
     (* ===== +0x74 addw a1,a1,s3 : a1 := log.start + tail ===== *)
@@ -1362,7 +1361,7 @@ Section InstallTransBlocks.
                     = (mword_of_int (logstart + Z.of_nat t) : mword 64)).
     { rgne. rgne. rewrite HA1a1 HA1s3.
       apply it_addw; [exact Har3 | exact Har2 | exact Har5]. }
-    iApply (wp_addw4_s_sconf Φ (mword_of_int (IT + 0x74)) Ra1 Ra1 Rs3 A1 (K - 10)%nat eb
+    iApply (wp_addw4_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x74)) Ra1 Ra1 Rs3 A1 (K - 10)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi74 [-]").
     iIntros (CIDa3 Hsa3) "Hcg Hpc".
     iEval (rewrite Hwv74) in "Hcg".
@@ -1372,8 +1371,8 @@ Section InstallTransBlocks.
       by (rewrite /A2 upd_eq; reflexivity).
     assert (HA2regs : it_lregs m A2 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HA1regs]).
-    assert (Hpp78 : add_vec_int (mword_of_int (IT + 0x74) : mword 64) 4
-                    = mword_of_int (IT + 0x78))
+    assert (Hpp78 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x74) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x78))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp78) in "Hpc".
     (* ===== +0x78 c.addiw a1,a1,1 : a1 := the log slot's block number ===== *)
@@ -1382,7 +1381,7 @@ Section InstallTransBlocks.
                          (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) 31 0)
                     = (mword_of_int (logstart + Z.of_nat t + 1) : mword 64)).
     { rgne. rewrite HA2a1. apply it_addiw; [exact Har4 | exact Har6]. }
-    iApply (wp_caddiw_s_sconf Φ (mword_of_int (IT + 0x78)) Ra1 (mword_of_int 1 : mword 6)
+    iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x78)) Ra1 (mword_of_int 1 : mword 6)
               A2 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi78 [-]").
     iIntros (CIDa4 Hsa4) "Hcg Hpc".
@@ -1395,8 +1394,8 @@ Section InstallTransBlocks.
     assert (HA3regs : it_lregs m A3 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HA2regs]).
     pose proof HA3regs as (_ & _ & HA3s4 & HA3s5 & _ & _ & _ & _ & _).
-    assert (Hpp7a : add_vec_int (mword_of_int (IT + 0x78) : mword 64) 2
-                    = mword_of_int (IT + 0x7a))
+    assert (Hpp7a : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x78) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0x7a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp7a) in "Hpc".
     (* ===== +0x7a lw a0,36(s4) : a0 := log.dev ===== *)
@@ -1404,7 +1403,7 @@ Section InstallTransBlocks.
                     = l_dev).
     { rgne. rewrite HA3s4. exact it_addr_dev. }
     iEval (rewrite -Hadev) in "Hdevc".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x7a)) Ra0 Rs4 (mword_of_int 36 : mword 12)
+    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x7a)) Ra0 Rs4 (mword_of_int 36 : mword 12)
               A3 (K - 10)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi7a Hdevc [-]").
@@ -1417,18 +1416,18 @@ Section InstallTransBlocks.
       by (rewrite /A4 upd_ne; [exact HA3a1 | vm_compute; discriminate]).
     assert (HA4regs : it_lregs m A4 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HA3regs]).
-    assert (Hpp7e : add_vec_int (mword_of_int (IT + 0x7a) : mword 64) 4
-                    = mword_of_int (IT + 0x7e))
+    assert (Hpp7e : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x7a) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x7e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp7e) in "Hpc".
     (* ===== +0x7e jal ra,bread : lbuf = bread(dev, log slot) ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0x7e)) Rra (mword_of_int 2093100 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x7e)) Rra (mword_of_int 2093100 : mword 21)
               A4 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi7e [-]").
     iIntros (CIDa6 Hsa6) "Hcg Hpc".
     set (A5 := <[Regidx Rra := regval_into_reg
-                  (add_vec_int (mword_of_int (IT + 0x7e) : mword 64) 4)]> A4).
-    assert (Htgt7e : add_vec (mword_of_int (IT + 0x7e) : mword 64)
+                  (add_vec_int (mword_of_int (KernelSyms.install_trans + 0x7e) : mword 64) 4)]> A4).
+    assert (Htgt7e : add_vec (mword_of_int (KernelSyms.install_trans + 0x7e) : mword 64)
                        (sign_extend' 64 (mword_of_int 2093100 : mword 21))
                      = mword_of_int KernelSyms.bread)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1438,7 +1437,7 @@ Section InstallTransBlocks.
     assert (HA5a1 : A5 !!! Regidx Ra1 = sign_extend' 64 bnol)
       by (rewrite /A5 upd_ne; [exact HA4a1 | vm_compute; discriminate]).
     assert (HA5ra : A5 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (IT + 0x7e) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KernelSyms.install_trans + 0x7e) : mword 64) 4)
       by (rewrite /A5; apply upd_eq).
     assert (HA5regs : it_lregs m A5 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HA4regs]).
@@ -1454,7 +1453,7 @@ Section InstallTransBlocks.
                     Hdev Hgeo Hdlock Hu1 [-]").
     iIntros (CIDb1 Hsb1 mf1 k1 bs1 bsd1 d1) "%Hpair1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hlk1".
     destruct Hpair1 as [Hcs1 Hmf1a0].
-    assert (Hpc82 : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0x82)).
+    assert (Hpc82 : ret_pc (A5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x82)).
     { rewrite HA5ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc82) in "Hpc".
     assert (Hmf1regs : it_lregs m mf1 t) by exact (it_lregs_cs m A5 mf1 t Hcs1 HA5regs).
@@ -1464,7 +1463,7 @@ Section InstallTransBlocks.
     iDestruct "Hlk1" as "(%Hk1 & %Hcv1 & %Hdv1 & Hslk1 & Hspid1 & Hvld1 & Hbdev1 & Hbuf1 & Hdsk1 & Hpay1)".
     iDestruct (it_pay_bs with "Hfblog Hpay1") as %Hbs1. subst bs1.
     (* ===== +0x82 c.mv s2,a0 : s2 := lbuf ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0x82)) Rs2 Ra0
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x82)) Rs2 Ra0
               mf1 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi82 [-]").
     iIntros (CIDa7 Hsa7) "Hcg Hpc".
@@ -1476,8 +1475,8 @@ Section InstallTransBlocks.
     assert (HA6regs : it_lregs m A6 t)
       by (apply it_lregs_upd_s2; exact Hmf1regs).
     pose proof HA6regs as (_ & _ & HA6s4 & HA6s5 & _ & _ & _ & _ & _).
-    assert (Hpp84 : add_vec_int (mword_of_int (IT + 0x82) : mword 64) 2
-                    = mword_of_int (IT + 0x84))
+    assert (Hpp84 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x82) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0x84))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp84) in "Hpc".
     (* ===== +0x84 lw a1,0(s5) : a1 := log.lh.block[tail] ===== *)
@@ -1485,7 +1484,7 @@ Section InstallTransBlocks.
                     = lh_block t).
     { rgne. rewrite HA6s5. exact (it_cursor_at t). }
     iEval (rewrite -Hacur) in "Hblk".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x84)) Ra1 Rs5 (mword_of_int 0 : mword 12)
+    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x84)) Ra1 Rs5 (mword_of_int 0 : mword 12)
               A6 (K - 10)%nat w eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi84 Hblk [-]").
@@ -1499,8 +1498,8 @@ Section InstallTransBlocks.
     assert (HA7regs : it_lregs m A7 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HA6regs]).
     pose proof HA7regs as (_ & _ & HA7s4 & _ & _ & _ & _ & _ & _).
-    assert (Hpp88 : add_vec_int (mword_of_int (IT + 0x84) : mword 64) 4
-                    = mword_of_int (IT + 0x88))
+    assert (Hpp88 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x84) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x88))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp88) in "Hpc".
     (* ===== +0x88 lw a0,36(s4) : a0 := log.dev ===== *)
@@ -1508,7 +1507,7 @@ Section InstallTransBlocks.
                      = l_dev).
     { rgne. rewrite HA7s4. exact it_addr_dev. }
     iEval (rewrite -Hadev2) in "Hdevc".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x88)) Ra0 Rs4 (mword_of_int 36 : mword 12)
+    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x88)) Ra0 Rs4 (mword_of_int 36 : mword 12)
               A7 (K - 10)%nat dev eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi88 Hdevc [-]").
@@ -1523,18 +1522,18 @@ Section InstallTransBlocks.
       by (rewrite /A8 upd_ne; [exact HA7s2 | vm_compute; discriminate]).
     assert (HA8regs : it_lregs m A8 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HA7regs]).
-    assert (Hpp8c : add_vec_int (mword_of_int (IT + 0x88) : mword 64) 4
-                    = mword_of_int (IT + 0x8c))
+    assert (Hpp8c : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x88) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x8c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp8c) in "Hpc".
     (* ===== +0x8c jal ra,bread : dbuf = bread(dev, W[tail]) ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0x8c)) Rra (mword_of_int 2093086 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x8c)) Rra (mword_of_int 2093086 : mword 21)
               A8 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8c [-]").
     iIntros (CIDa10 Hsa10) "Hcg Hpc".
     set (A9 := <[Regidx Rra := regval_into_reg
-                  (add_vec_int (mword_of_int (IT + 0x8c) : mword 64) 4)]> A8).
-    assert (Htgt8c : add_vec (mword_of_int (IT + 0x8c) : mword 64)
+                  (add_vec_int (mword_of_int (KernelSyms.install_trans + 0x8c) : mword 64) 4)]> A8).
+    assert (Htgt8c : add_vec (mword_of_int (KernelSyms.install_trans + 0x8c) : mword 64)
                        (sign_extend' 64 (mword_of_int 2093086 : mword 21))
                      = mword_of_int KernelSyms.bread)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1546,7 +1545,7 @@ Section InstallTransBlocks.
     assert (HA9s2 : A9 !!! Regidx Rs2 = bnode k1)
       by (rewrite /A9 upd_ne; [exact HA8s2 | vm_compute; discriminate]).
     assert (HA9ra : A9 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (IT + 0x8c) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KernelSyms.install_trans + 0x8c) : mword 64) 4)
       by (rewrite /A9; apply upd_eq).
     assert (HA9regs : it_lregs m A9 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HA8regs]).
@@ -1562,7 +1561,7 @@ Section InstallTransBlocks.
                     Hdev Hgeo Hdlock Hu2 [-]").
     iIntros (CIDb2 Hsb2 mf2 k2 bs2 bsd2 d2) "%Hpair2 Hcg Hcnt Hpc Hoctx Hpark Hppid Hlk2".
     destruct Hpair2 as [Hcs2 Hmf2a0].
-    assert (Hpc90 : ret_pc (A9 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0x90)).
+    assert (Hpc90 : ret_pc (A9 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x90)).
     { rewrite HA9ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc90) in "Hpc".
     assert (Hmf2regs : it_lregs m mf2 t) by exact (it_lregs_cs m A9 mf2 t Hcs2 HA9regs).
@@ -1579,7 +1578,7 @@ Section InstallTransBlocks.
       injection Hlw2 as Hlw3. exact Hlw3. }
     subst bs2.
     (* ===== +0x90 c.mv s1,a0 : s1 := dbuf ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0x90)) Rs1 Ra0
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x90)) Rs1 Ra0
               mf2 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi90 [-]").
     iIntros (CIDa11 Hsa11) "Hcg Hpc".
@@ -1594,12 +1593,12 @@ Section InstallTransBlocks.
       by (rewrite /B1 upd_ne; [exact Hmf2a0 | vm_compute; discriminate]).
     assert (HB1regs : it_lregs m B1 t) by (apply it_lregs_upd_s1; exact Hmf2regs).
     pose proof HB1regs as (_ & _ & _ & _ & _ & HB1s7 & _ & _ & _).
-    assert (Hpp92 : add_vec_int (mword_of_int (IT + 0x90) : mword 64) 2
-                    = mword_of_int (IT + 0x92))
+    assert (Hpp92 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x90) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0x92))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp92) in "Hpc".
     (* ===== +0x92 c.mv a2,s7 : a2 := BSIZE ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0x92)) Ra2 Rs7
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x92)) Ra2 Rs7
               B1 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi92 [-]").
     iIntros (CIDa12 Hsa12) "Hcg Hpc".
@@ -1617,12 +1616,12 @@ Section InstallTransBlocks.
       by (rewrite /B2 upd_ne; [exact HB1a0 | vm_compute; discriminate]).
     assert (HB2regs : it_lregs m B2 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB1regs]).
-    assert (Hpp94 : add_vec_int (mword_of_int (IT + 0x92) : mword 64) 2
-                    = mword_of_int (IT + 0x94))
+    assert (Hpp94 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x92) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0x94))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp94) in "Hpc".
     (* ===== +0x94 addi a1,s2,88 : a1 := lbuf->data ===== *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (IT + 0x94)) Ra1 Rs2
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x94)) Ra1 Rs2
               (mword_of_int 88 : mword 12) B2 (K - 10)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi94 [-]").
     iIntros (CIDa13 Hsa13) "Hcg Hpc".
@@ -1640,12 +1639,12 @@ Section InstallTransBlocks.
       by (rewrite /B3 upd_ne; [exact HB2a0 | vm_compute; discriminate]).
     assert (HB3regs : it_lregs m B3 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB2regs]).
-    assert (Hpp98 : add_vec_int (mword_of_int (IT + 0x94) : mword 64) 4
-                    = mword_of_int (IT + 0x98))
+    assert (Hpp98 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x94) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x98))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp98) in "Hpc".
     (* ===== +0x98 addi a0,a0,88 : a0 := dbuf->data ===== *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (IT + 0x98)) Ra0 Ra0
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x98)) Ra0 Ra0
               (mword_of_int 88 : mword 12) B3 (K - 10)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi98 [-]").
     iIntros (CIDa14 Hsa14) "Hcg Hpc".
@@ -1663,18 +1662,18 @@ Section InstallTransBlocks.
       by (rewrite /B4 upd_ne; [exact HB3s1 | vm_compute; discriminate]).
     assert (HB4regs : it_lregs m B4 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB3regs]).
-    assert (Hpp9c : add_vec_int (mword_of_int (IT + 0x98) : mword 64) 4
-                    = mword_of_int (IT + 0x9c))
+    assert (Hpp9c : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x98) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x9c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp9c) in "Hpc".
     (* ===== +0x9c jal ra,memmove ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0x9c)) Rra (mword_of_int 2085376 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x9c)) Rra (mword_of_int 2085376 : mword 21)
               B4 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi9c [-]").
     iIntros (CIDa15 Hsa15) "Hcg Hpc".
     set (B5 := <[Regidx Rra := regval_into_reg
-                  (add_vec_int (mword_of_int (IT + 0x9c) : mword 64) 4)]> B4).
-    assert (Htgt9c : add_vec (mword_of_int (IT + 0x9c) : mword 64)
+                  (add_vec_int (mword_of_int (KernelSyms.install_trans + 0x9c) : mword 64) 4)]> B4).
+    assert (Htgt9c : add_vec (mword_of_int (KernelSyms.install_trans + 0x9c) : mword 64)
                        (sign_extend' 64 (mword_of_int 2085376 : mword 21))
                      = mword_of_int KernelSyms.memmove)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1688,7 +1687,7 @@ Section InstallTransBlocks.
     assert (HB5s1 : B5 !!! Regidx Rs1 = bnode k2)
       by (rewrite /B5 upd_ne; [exact HB4s1 | vm_compute; discriminate]).
     assert (HB5ra : B5 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (IT + 0x9c) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KernelSyms.install_trans + 0x9c) : mword 64) 4)
       by (rewrite /B5; apply upd_eq).
     assert (HB5regs : it_lregs m B5 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB4regs]).
@@ -1709,14 +1708,14 @@ Section InstallTransBlocks.
     iEval (rewrite HB5a0) in "Hdata2".
     iDestruct (it_data_back (b_data (bpa k1)) (Lw t) 1024%nat Hlen1 with "Hdata1") as "Hdata1".
     iDestruct (it_data_back (b_data (bpa k2)) (Lw t) 1024%nat Hlen2 with "Hdata2") as "Hdata2".
-    assert (Hpca0 : ret_pc (B5 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0xa0)).
+    assert (Hpca0 : ret_pc (B5 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0xa0)).
     { rewrite HB5ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpca0) in "Hpc".
     assert (Hmf3regs : it_lregs m mf3 t) by exact (it_lregs_cs m B5 mf3 t Hcs3 HB5regs).
     assert (Hmf3s1 : mf3 !!! Regidx Rs1 = bnode k2).
     { rewrite (callee_saved_lookup Hcs3 Rs1 ltac:(vm_compute; reflexivity)). exact HB5s1. }
     (* ===== +0xa0 c.mv a0,s1 : a0 := dbuf ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0xa0)) Ra0 Rs1
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xa0)) Ra0 Rs1
               mf3 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hia0 [-]").
     iIntros (CIDa17 Hsa17) "Hcg Hpc".
@@ -1729,18 +1728,18 @@ Section InstallTransBlocks.
       by (rewrite /B6 upd_ne; [exact Hmf3s1 | vm_compute; discriminate]).
     assert (HB6regs : it_lregs m B6 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact Hmf3regs]).
-    assert (Hppa2 : add_vec_int (mword_of_int (IT + 0xa0) : mword 64) 2
-                    = mword_of_int (IT + 0xa2))
+    assert (Hppa2 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xa0) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xa2))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppa2) in "Hpc".
     (* ===== +0xa2 jal ra,bwrite : the home block's disk cell moves ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0xa2)) Rra (mword_of_int 2093278 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xa2)) Rra (mword_of_int 2093278 : mword 21)
               B6 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hia2 [-]").
     iIntros (CIDa18 Hsa18) "Hcg Hpc".
     set (B7 := <[Regidx Rra := regval_into_reg
-                  (add_vec_int (mword_of_int (IT + 0xa2) : mword 64) 4)]> B6).
-    assert (Htgta2 : add_vec (mword_of_int (IT + 0xa2) : mword 64)
+                  (add_vec_int (mword_of_int (KernelSyms.install_trans + 0xa2) : mword 64) 4)]> B6).
+    assert (Htgta2 : add_vec (mword_of_int (KernelSyms.install_trans + 0xa2) : mword 64)
                        (sign_extend' 64 (mword_of_int 2093278 : mword 21))
                      = mword_of_int KernelSyms.bwrite)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1750,7 +1749,7 @@ Section InstallTransBlocks.
     assert (HB7s1 : B7 !!! Regidx Rs1 = bnode k2)
       by (rewrite /B7 upd_ne; [exact HB6s1 | vm_compute; discriminate]).
     assert (HB7ra : B7 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (IT + 0xa2) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KernelSyms.install_trans + 0xa2) : mword 64) 4)
       by (rewrite /B7; apply upd_eq).
     assert (HB7regs : it_lregs m B7 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB6regs]).
@@ -1780,7 +1779,7 @@ Section InstallTransBlocks.
     { iApply ("Hperm" $! t w (Lw t) with "[%] [%] HR");
         [exact Hw | exact Hlen2]. }
     iIntros (CIDb3 Hsb3 mf4) "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold HR".
-    assert (Hpca6 : ret_pc (B7 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0xa6)).
+    assert (Hpca6 : ret_pc (B7 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0xa6)).
     { rewrite HB7ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpca6) in "Hpc".
     assert (Hmf4regs : it_lregs m mf4 t) by exact (it_lregs_cs m B7 mf4 t Hcs4 HB7regs).
@@ -1796,16 +1795,16 @@ Section InstallTransBlocks.
     (* ===== +0xa6 bnez s6 : NOT taken, so bunpin runs ===== *)
     assert (Hnza6 : neq_vec (rget mf4 Rs6) (zero_reg : mword 64) = false).
     { rgne. rewrite Hmf4s6. vm_compute. reflexivity. }
-    iApply (wp_bnez_x0_fall_s_sconf Φ (mword_of_int (IT + 0xa6))
+    iApply (wp_bnez_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xa6))
               (mword_of_int 8110 : mword 13) Rs6 mf4 (K - 10)%nat eb
               ltac:(vm_compute; discriminate) Hnza6 with "Hcg Hpc Hia6 [-]").
     iIntros (CIDa19 Hsa19) "Hcg Hpc".
-    assert (Hppaa : add_vec_int (mword_of_int (IT + 0xa6) : mword 64) 4
-                    = mword_of_int (IT + 0xaa))
+    assert (Hppaa : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xa6) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0xaa))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppaa) in "Hpc".
     (* ===== +0xaa c.mv a0,s1 ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0xaa)) Ra0 Rs1
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xaa)) Ra0 Rs1
               mf4 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hiaa [-]").
     iIntros (CIDa20 Hsa20) "Hcg Hpc".
@@ -1818,18 +1817,18 @@ Section InstallTransBlocks.
       by (rewrite /B8 upd_ne; [exact Hmf4s1 | vm_compute; discriminate]).
     assert (HB8regs : it_lregs m B8 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact Hmf4regs]).
-    assert (Hppac : add_vec_int (mword_of_int (IT + 0xaa) : mword 64) 2
-                    = mword_of_int (IT + 0xac))
+    assert (Hppac : add_vec_int (mword_of_int (KernelSyms.install_trans + 0xaa) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0xac))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hppac) in "Hpc".
     (* ===== +0xac jal ra,bunpin : the freed pin unit comes back ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0xac)) Rra (mword_of_int 2093502 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xac)) Rra (mword_of_int 2093502 : mword 21)
               B8 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiac [-]").
     iIntros (CIDa21 Hsa21) "Hcg Hpc".
     set (B9 := <[Regidx Rra := regval_into_reg
-                  (add_vec_int (mword_of_int (IT + 0xac) : mword 64) 4)]> B8).
-    assert (Htgtac : add_vec (mword_of_int (IT + 0xac) : mword 64)
+                  (add_vec_int (mword_of_int (KernelSyms.install_trans + 0xac) : mword 64) 4)]> B8).
+    assert (Htgtac : add_vec (mword_of_int (KernelSyms.install_trans + 0xac) : mword 64)
                        (sign_extend' 64 (mword_of_int 2093502 : mword 21))
                      = mword_of_int KernelSyms.bunpin)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1839,7 +1838,7 @@ Section InstallTransBlocks.
     assert (HB9s1 : B9 !!! Regidx Rs1 = bnode k2)
       by (rewrite /B9 upd_ne; [exact HB8s1 | vm_compute; discriminate]).
     assert (HB9ra : B9 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (IT + 0xac) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KernelSyms.install_trans + 0xac) : mword 64) 4)
       by (rewrite /B9; apply upd_eq).
     assert (HB9regs : it_lregs m B9 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB8regs]).
@@ -1851,7 +1850,7 @@ Section InstallTransBlocks.
               (it_Kbunpin K HK) it_noff0 Hk2 HB9a0
               with "Hcg Hcnt Htext Hpc Hbio Hpanic Hbref [-]").
     iIntros (CIDb4 Hsb4 mf5) "Hcg Hcnt Hpc %Hcs5 Hu3".
-    assert (Hpcb0 : ret_pc (B9 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0xb0)).
+    assert (Hpcb0 : ret_pc (B9 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0xb0)).
     { rewrite HB9ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpcb0) in "Hpc".
     assert (Hmf5regs : it_lregs m mf5 t) by exact (it_lregs_cs m B9 mf5 t Hcs5 HB9regs).
@@ -1870,19 +1869,19 @@ Section InstallTransBlocks.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       exact HB2s2. }
     (* ===== +0xb0 c.j -> +0x54 ===== *)
-    iApply (wp_cj_s_sconf Φ (mword_of_int (IT + 0xb0))
+    iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xb0))
               (sign_extend' 21 (concat_vec (mword_of_int 2002 : mword 11) ('b"0")))
               mf5 (K - 10)%nat eb ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hib0 [-]").
     iIntros (CIDa22 Hsa22). iApply bi.later_intro. iIntros "Hcg Hpc".
-    assert (Htgtb0 : add_vec (mword_of_int (IT + 0xb0) : mword 64)
+    assert (Htgtb0 : add_vec (mword_of_int (KernelSyms.install_trans + 0xb0) : mword 64)
                        (sign_extend' 64 (sign_extend' 21
                           (concat_vec (mword_of_int 2002 : mword 11) ('b"0"))))
-                     = mword_of_int (IT + 0x54))
+                     = mword_of_int (KernelSyms.install_trans + 0x54))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtb0) in "Hpc".
     (* ===== +0x54 c.mv a0,s2 ; +0x56 jal brelse(lbuf) ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0x54)) Ra0 Rs2
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x54)) Ra0 Rs2
               mf5 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi54 [-]").
     iIntros (CIDa23 Hsa23) "Hcg Hpc".
@@ -1895,17 +1894,17 @@ Section InstallTransBlocks.
       by (rewrite /B10 upd_ne; [exact Hmf5s1 | vm_compute; discriminate]).
     assert (HB10regs : it_lregs m B10 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact Hmf5regs]).
-    assert (Hpp56 : add_vec_int (mword_of_int (IT + 0x54) : mword 64) 2
-                    = mword_of_int (IT + 0x56))
+    assert (Hpp56 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x54) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0x56))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp56) in "Hpc".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0x56)) Rra (mword_of_int 2093404 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x56)) Rra (mword_of_int 2093404 : mword 21)
               B10 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi56 [-]").
     iIntros (CIDa24 Hsa24) "Hcg Hpc".
     set (B11 := <[Regidx Rra := regval_into_reg
-                   (add_vec_int (mword_of_int (IT + 0x56) : mword 64) 4)]> B10).
-    assert (Htgt56 : add_vec (mword_of_int (IT + 0x56) : mword 64)
+                   (add_vec_int (mword_of_int (KernelSyms.install_trans + 0x56) : mword 64) 4)]> B10).
+    assert (Htgt56 : add_vec (mword_of_int (KernelSyms.install_trans + 0x56) : mword 64)
                        (sign_extend' 64 (mword_of_int 2093404 : mword 21))
                      = mword_of_int KernelSyms.brelse)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1915,7 +1914,7 @@ Section InstallTransBlocks.
     assert (HB11s1 : B11 !!! Regidx Rs1 = bnode k2)
       by (rewrite /B11 upd_ne; [exact HB10s1 | vm_compute; discriminate]).
     assert (HB11ra : B11 !!! Regidx Rra
-                     = add_vec_int (mword_of_int (IT + 0x56) : mword 64) 4)
+                     = add_vec_int (mword_of_int (KernelSyms.install_trans + 0x56) : mword 64) 4)
       by (rewrite /B11; apply upd_eq).
     assert (HB11regs : it_lregs m B11 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB10regs]).
@@ -1936,14 +1935,14 @@ Section InstallTransBlocks.
               (it_Kbrelse K HK) Hk1 HB11a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk1 [-]").
     iIntros (CIDb5 Hsb5 mf6) "%Hcs6 Hcg Hcnt Hpc Hppid Hu4".
-    assert (Hpc5a : ret_pc (B11 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0x5a)).
+    assert (Hpc5a : ret_pc (B11 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x5a)).
     { rewrite HB11ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc5a) in "Hpc".
     assert (Hmf6regs : it_lregs m mf6 t) by exact (it_lregs_cs m B11 mf6 t Hcs6 HB11regs).
     assert (Hmf6s1 : mf6 !!! Regidx Rs1 = bnode k2).
     { rewrite (callee_saved_lookup Hcs6 Rs1 ltac:(vm_compute; reflexivity)). exact HB11s1. }
     (* ===== +0x5a c.mv a0,s1 ; +0x5c jal brelse(dbuf) ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0x5a)) Ra0 Rs1
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x5a)) Ra0 Rs1
               mf6 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5a [-]").
     iIntros (CIDa25 Hsa25) "Hcg Hpc".
@@ -1954,17 +1953,17 @@ Section InstallTransBlocks.
     { rewrite /B12 upd_eq add_vec_zero_l. exact Hmf6s1. }
     assert (HB12regs : it_lregs m B12 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact Hmf6regs]).
-    assert (Hpp5c : add_vec_int (mword_of_int (IT + 0x5a) : mword 64) 2
-                    = mword_of_int (IT + 0x5c))
+    assert (Hpp5c : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x5a) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0x5c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp5c) in "Hpc".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0x5c)) Rra (mword_of_int 2093398 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x5c)) Rra (mword_of_int 2093398 : mword 21)
               B12 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5c [-]").
     iIntros (CIDa26 Hsa26) "Hcg Hpc".
     set (B13 := <[Regidx Rra := regval_into_reg
-                   (add_vec_int (mword_of_int (IT + 0x5c) : mword 64) 4)]> B12).
-    assert (Htgt5c : add_vec (mword_of_int (IT + 0x5c) : mword 64)
+                   (add_vec_int (mword_of_int (KernelSyms.install_trans + 0x5c) : mword 64) 4)]> B12).
+    assert (Htgt5c : add_vec (mword_of_int (KernelSyms.install_trans + 0x5c) : mword 64)
                        (sign_extend' 64 (mword_of_int 2093398 : mword 21))
                      = mword_of_int KernelSyms.brelse)
       by (apply bv_eq; vm_compute; reflexivity).
@@ -1972,7 +1971,7 @@ Section InstallTransBlocks.
     assert (HB13a0 : B13 !!! Regidx Ra0 = bnode k2)
       by (rewrite /B13 upd_ne; [exact HB12a0 | vm_compute; discriminate]).
     assert (HB13ra : B13 !!! Regidx Rra
-                     = add_vec_int (mword_of_int (IT + 0x5c) : mword 64) 4)
+                     = add_vec_int (mword_of_int (KernelSyms.install_trans + 0x5c) : mword 64) 4)
       by (rewrite /B13; apply upd_eq).
     assert (HB13regs : it_lregs m B13 t)
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB12regs]).
@@ -1992,7 +1991,7 @@ Section InstallTransBlocks.
               (it_Kbrelse K HK) Hk2 HB13a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk2 [-]").
     iIntros (CIDb6 Hsb6 mf7) "%Hcs7 Hcg Hcnt Hpc Hppid Hu5".
-    assert (Hpc60 : ret_pc (B13 !!! Regidx Rra : mword 64) = mword_of_int (IT + 0x60)).
+    assert (Hpc60 : ret_pc (B13 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.install_trans + 0x60)).
     { rewrite HB13ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc60) in "Hpc".
     assert (Hmf7regs : it_lregs m mf7 t) by exact (it_lregs_cs m B13 mf7 t Hcs7 HB13regs).
@@ -2020,15 +2019,15 @@ Section InstallTransBlocks.
     { rgne. rewrite Hmf7s3.
       rewrite (it_addiw (Z.of_nat t) Har2 (it_t1_small t n Ht Hn30)).
       exact (it_succ_moi t). }
-    iApply (wp_caddiw_s_sconf Φ (mword_of_int (IT + 0x60)) Rs3 (mword_of_int 1 : mword 6)
+    iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x60)) Rs3 (mword_of_int 1 : mword 6)
               mf7 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi60 [-]").
     iIntros (CIDa27 Hsa27) "Hcg Hpc".
     iEval (rewrite Hwv60) in "Hcg".
     set (B14 := <[Regidx Rs3 := regval_into_reg
                    (mword_of_int (Z.of_nat (S t)) : mword 64)]> mf7).
-    assert (Hpp62 : add_vec_int (mword_of_int (IT + 0x60) : mword 64) 2
-                    = mword_of_int (IT + 0x62))
+    assert (Hpp62 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x60) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0x62))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp62) in "Hpc".
     assert (Hwv62 : add_vec (rget B14 Rs5)
@@ -2036,7 +2035,7 @@ Section InstallTransBlocks.
                     = (lh_block (S t) : mword 64)).
     { rgne. rewrite /B14 upd_ne; [| vm_compute; discriminate].
       rewrite Hmf7s5. exact (it_cursor_step t). }
-    iApply (wp_caddi_s_sconf Φ (mword_of_int (IT + 0x62)) Rs5 (mword_of_int 4 : mword 6)
+    iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x62)) Rs5 (mword_of_int 4 : mword 6)
               B14 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi62 [-]").
     iIntros (CIDa28 Hsa28) "Hcg Hpc".
@@ -2063,8 +2062,8 @@ Section InstallTransBlocks.
         rewrite /B14 upd_ne; [exact Hmf7s11 | vm_compute; discriminate]. }
     pose proof HB15regs as (HB15sp & HB15s3 & HB15s4 & HB15s5 & HB15s6 & HB15s7 &
                             HB15s9 & HB15s10 & HB15s11).
-    assert (Hpp64 : add_vec_int (mword_of_int (IT + 0x62) : mword 64) 2
-                    = mword_of_int (IT + 0x64))
+    assert (Hpp64 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x62) : mword 64) 2
+                    = mword_of_int (KernelSyms.install_trans + 0x64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp64) in "Hpc".
     (* ===== +0x64 lw a5,44(s4) : reload log.lh.n ===== *)
@@ -2072,7 +2071,7 @@ Section InstallTransBlocks.
                     = lh_n_pa).
     { rgne. rewrite HB15s4. exact it_addr_lhn. }
     iEval (rewrite -Halhn) in "Hncell".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x64)) Ra5 Rs4 (mword_of_int 44 : mword 12)
+    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x64)) Ra5 Rs4 (mword_of_int 44 : mword 12)
               B15 (K - 10)%nat (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi64 Hncell [-]").
@@ -2085,8 +2084,8 @@ Section InstallTransBlocks.
     assert (HB16regs : it_lregs m B16 (S t))
       by (apply it_lregs_upd; [vm_compute; reflexivity | exact HB15regs]).
     pose proof HB16regs as (HB16sp & HB16s3 & _ & _ & _ & _ & HB16s9 & HB16s10 & HB16s11).
-    assert (Hpp68 : add_vec_int (mword_of_int (IT + 0x64) : mword 64) 4
-                    = mword_of_int (IT + 0x68))
+    assert (Hpp68 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x64) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x68))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp68) in "Hpc".
     (* ===== +0x68 bge s3,a5 : the loop's exit test ===== *)
@@ -2096,15 +2095,15 @@ Section InstallTransBlocks.
       apply it_geb_s; [ exact (it_St_small t n Ht Hn30) | exact (it_n_small n Hn30) ]. }
     destruct (decide (S t = n)) as [Hend | Hmore].
     + (* ---- the last entry: take the exit into the epilogue ---- *)
-      iApply (wp_bge_taken_s_sconf Φ (mword_of_int (IT + 0x68)) (mword_of_int 74 : mword 13)
+      iApply (wp_bge_taken_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x68)) (mword_of_int 74 : mword 13)
                 Ra5 Rs3 B16 (K - 10)%nat eb
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hgeq; exact (it_geb_eq t n Hend))
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi68 [-]").
       iNext. iIntros (CIDa30 Hsa30) "Hcg Hpc".
-      assert (Htgtb2 : add_vec (mword_of_int (IT + 0x68) : mword 64)
+      assert (Htgtb2 : add_vec (mword_of_int (KernelSyms.install_trans + 0x68) : mword 64)
                          (sign_extend' 64 (mword_of_int 74 : mword 13))
-                       = mword_of_int (IT + 0xb2))
+                       = mword_of_int (KernelSyms.install_trans + 0xb2))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtb2) in "Hpc".
       rewrite Hend.
@@ -2120,14 +2119,14 @@ Section InstallTransBlocks.
       rewrite /it_out (it_len_eq W n HnW).
       iFrame "Hncell Hblks HauthL HauthD Hdone Hslots".
     + (* ---- another entry: back to +0x6c ---- *)
-      iApply (wp_bge_fall_s_sconf Φ (mword_of_int (IT + 0x68)) (mword_of_int 74 : mword 13)
+      iApply (wp_bge_fall_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x68)) (mword_of_int 74 : mword 13)
                 Ra5 Rs3 B16 (K - 10)%nat eb
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hgeq; exact (it_geb_ne t n Ht Hmore))
                 with "Hcg Hpc Hi68 [-]").
       iIntros (CIDa30 Hsa30) "Hcg Hpc".
-      assert (Hpp6c : add_vec_int (mword_of_int (IT + 0x68) : mword 64) 4
-                      = mword_of_int (IT + 0x6c))
+      assert (Hpp6c : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x68) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x6c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp6c) in "Hpc".
       iDestruct (cpu_own_transport CIDb6 CIDa30 0%nat eb (proc_addr j) C eb
@@ -2188,7 +2187,7 @@ Section ProofInstallTrans.
     iIntros (CID1 Hs1) "Hcg Hpc".
     set (R1 := <[Regidx Ra5 := regval_into_reg
                   (add_vec (pcE : mword 64) (auipc_off (mword_of_int 31 : mword 20)))]> m).
-    assert (Hpp04 : add_vec_int (pcE : mword 64) 4 = mword_of_int (IT + 0x04))
+    assert (Hpp04 : add_vec_int (pcE : mword 64) 4 = mword_of_int (KernelSyms.install_trans + 0x04))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ===== +0x04 lw a5,-1864(a5) : a5 := log.lh.n ===== *)
@@ -2196,7 +2195,7 @@ Section ProofInstallTrans.
                   = lh_n_pa).
     { rgne. rewrite /R1 upd_eq. exact it_reloc_lhn. }
     iEval (rewrite -Hna) in "Hncell".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x04)) Ra5 Ra5
+    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x04)) Ra5 Ra5
               (mword_of_int 2232 : mword 12) R1 K
               (mword_of_int (Z.of_nat n) : mword 32) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -2207,8 +2206,8 @@ Section ProofInstallTrans.
                   (sign_extend' 64 (mword_of_int (Z.of_nat n) : mword 32))]> R1).
     assert (HR2a5 : R2 !!! Regidx Ra5 = (mword_of_int (Z.of_nat n) : mword 64))
       by (rewrite /R2 upd_eq; apply it_sext32; exact (it_n_small n Hn30)).
-    assert (Hpp08 : add_vec_int (mword_of_int (IT + 0x04) : mword 64) 4
-                    = mword_of_int (IT + 0x08))
+    assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x04) : mword 64) 4
+                    = mword_of_int (KernelSyms.install_trans + 0x08))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     (* the register threading across the two a5 writes *)
@@ -2231,18 +2230,18 @@ Section ProofInstallTrans.
       assert (Hge : zopz0zKzJ_s (zero_reg : mword 64) (rget R2 Ra5) = true).
       { rgne. rewrite HR2a5 (it_geb_s0 (Z.of_nat n) (it_n_small n Hn30)) Hn0.
         reflexivity. }
-      iApply (wp_bge_x0_taken_s_sconf Φ (mword_of_int (IT + 0x08))
+      iApply (wp_bge_x0_taken_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x08))
                 (mword_of_int 194 : mword 13) Ra5 R2 K eb
                 ltac:(vm_compute; discriminate) Hge
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi08 [-]").
       iNext. iIntros (CID3 Hs3) "Hcg Hpc".
-      assert (Htgtca : add_vec (mword_of_int (IT + 0x08) : mword 64)
+      assert (Htgtca : add_vec (mword_of_int (KernelSyms.install_trans + 0x08) : mword 64)
                          (sign_extend' 64 (mword_of_int 194 : mword 13))
-                       = mword_of_int (IT + 0xca))
+                       = mword_of_int (KernelSyms.install_trans + 0xca))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtca) in "Hpc".
-      iApply (wp_cret_s_sconf Φ (mword_of_int (IT + 0xca)) Rra R2 K eb
+      iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0xca)) Rra R2 K eb
                 ltac:(vm_compute; discriminate) with "Hcg Hpc Hica [-]").
       iIntros (CID4 Hs4) "Hcg Hpc".
       assert (Hretf : ret_pc (rget R2 Rra) = ret_tgt).
@@ -2267,13 +2266,13 @@ Section ProofInstallTrans.
       assert (Hge : zopz0zKzJ_s (zero_reg : mword 64) (rget R2 Ra5) = false).
       { rgne. rewrite HR2a5 (it_geb_s0 (Z.of_nat n) (it_n_small n Hn30)).
         exact (it_geb_pos n Hnp). }
-      iApply (wp_bge_x0_fall_s_sconf Φ (mword_of_int (IT + 0x08))
+      iApply (wp_bge_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x08))
                 (mword_of_int 194 : mword 13) Ra5 R2 K eb
                 ltac:(vm_compute; discriminate) Hge
                 with "Hcg Hpc Hi08 [-]").
       iIntros (CID3 Hs3) "Hcg Hpc".
-      assert (Hpp0c : add_vec_int (mword_of_int (IT + 0x08) : mword 64) 4
-                      = mword_of_int (IT + 0x0c))
+      assert (Hpp0c : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x08) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x0c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp0c) in "Hpc".
       iPoseProof (iti_0c with "Htext") as "Hi0c".
@@ -2304,7 +2303,7 @@ Section ProofInstallTrans.
                       = pa_stk (R2 !!! Regidx csp_rs1 : mword 64) 10).
       { unfold pa_stk, add_vec_int. apply f_equal.
         apply bv_eq; vm_compute; reflexivity. }
-      iApply (wp_caddi16sp_push_s_sconf Φ (mword_of_int (IT + 0x0c))
+      iApply (wp_caddi16sp_push_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x0c))
                 (mword_of_int 59 : mword 6) R2 K 10 eb
                 ltac:(unfold K_install_trans in HK; lia) Hpush
                 with "Hcg Hpc Hi0c [-]").
@@ -2335,13 +2334,13 @@ Section ProofInstallTrans.
       assert (HQ1r1 : Q1 !!! Regidx Rra = (m !!! Regidx Rra : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2ra). }
       iEval (rewrite -Hb1) in "Hf1".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x0e)) (mword_of_int 9 : mword 6) Rra
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x0e)) (mword_of_int 9 : mword 6) Rra
                 Q1 (K - 10)%nat v1 eb with "Hcg Hpc Hi0e Hf1 [-]").
       iIntros (CIDp1 Hsp1) "Hcg Hpc Hf1".
       iEval (rgne) in "Hf1".
       iEval (rewrite Hb1 HQ1r1) in "Hf1".
-      assert (Hpp10 : add_vec_int (mword_of_int (IT + 0x0e) : mword 64) 2
-                      = mword_of_int (IT + 0x10))
+      assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x0e) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x10))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp10) in "Hpc".
       assert (Hb2 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2352,13 +2351,13 @@ Section ProofInstallTrans.
       assert (HQ1r2 : Q1 !!! Regidx Rs0 = (m !!! Regidx Rs0 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs0 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb2) in "Hf2".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x10)) (mword_of_int 8 : mword 6) Rs0
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x10)) (mword_of_int 8 : mword 6) Rs0
                 Q1 (K - 10)%nat v2 eb with "Hcg Hpc Hi10 Hf2 [-]").
       iIntros (CIDp2 Hsp2) "Hcg Hpc Hf2".
       iEval (rgne) in "Hf2".
       iEval (rewrite Hb2 HQ1r2) in "Hf2".
-      assert (Hpp12 : add_vec_int (mword_of_int (IT + 0x10) : mword 64) 2
-                      = mword_of_int (IT + 0x12))
+      assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x10) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x12))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp12) in "Hpc".
       assert (Hb3 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2369,13 +2368,13 @@ Section ProofInstallTrans.
       assert (HQ1r3 : Q1 !!! Regidx Rs1 = (m !!! Regidx Rs1 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs1 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb3) in "Hf3".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x12)) (mword_of_int 7 : mword 6) Rs1
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x12)) (mword_of_int 7 : mword 6) Rs1
                 Q1 (K - 10)%nat v3 eb with "Hcg Hpc Hi12 Hf3 [-]").
       iIntros (CIDp3 Hsp3) "Hcg Hpc Hf3".
       iEval (rgne) in "Hf3".
       iEval (rewrite Hb3 HQ1r3) in "Hf3".
-      assert (Hpp14 : add_vec_int (mword_of_int (IT + 0x12) : mword 64) 2
-                      = mword_of_int (IT + 0x14))
+      assert (Hpp14 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x12) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x14))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp14) in "Hpc".
       assert (Hb4 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2386,13 +2385,13 @@ Section ProofInstallTrans.
       assert (HQ1r4 : Q1 !!! Regidx Rs2 = (m !!! Regidx Rs2 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs2 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb4) in "Hf4".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x14)) (mword_of_int 6 : mword 6) Rs2
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x14)) (mword_of_int 6 : mword 6) Rs2
                 Q1 (K - 10)%nat v4 eb with "Hcg Hpc Hi14 Hf4 [-]").
       iIntros (CIDp4 Hsp4) "Hcg Hpc Hf4".
       iEval (rgne) in "Hf4".
       iEval (rewrite Hb4 HQ1r4) in "Hf4".
-      assert (Hpp16 : add_vec_int (mword_of_int (IT + 0x14) : mword 64) 2
-                      = mword_of_int (IT + 0x16))
+      assert (Hpp16 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x14) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x16))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp16) in "Hpc".
       assert (Hb5 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2403,13 +2402,13 @@ Section ProofInstallTrans.
       assert (HQ1r5 : Q1 !!! Regidx Rs3 = (m !!! Regidx Rs3 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs3 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb5) in "Hf5".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x16)) (mword_of_int 5 : mword 6) Rs3
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x16)) (mword_of_int 5 : mword 6) Rs3
                 Q1 (K - 10)%nat v5 eb with "Hcg Hpc Hi16 Hf5 [-]").
       iIntros (CIDp5 Hsp5) "Hcg Hpc Hf5".
       iEval (rgne) in "Hf5".
       iEval (rewrite Hb5 HQ1r5) in "Hf5".
-      assert (Hpp18 : add_vec_int (mword_of_int (IT + 0x16) : mword 64) 2
-                      = mword_of_int (IT + 0x18))
+      assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x16) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x18))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp18) in "Hpc".
       assert (Hb6 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2420,13 +2419,13 @@ Section ProofInstallTrans.
       assert (HQ1r6 : Q1 !!! Regidx Rs4 = (m !!! Regidx Rs4 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs4 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb6) in "Hf6".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x18)) (mword_of_int 4 : mword 6) Rs4
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x18)) (mword_of_int 4 : mword 6) Rs4
                 Q1 (K - 10)%nat v6 eb with "Hcg Hpc Hi18 Hf6 [-]").
       iIntros (CIDp6 Hsp6) "Hcg Hpc Hf6".
       iEval (rgne) in "Hf6".
       iEval (rewrite Hb6 HQ1r6) in "Hf6".
-      assert (Hpp1a : add_vec_int (mword_of_int (IT + 0x18) : mword 64) 2
-                      = mword_of_int (IT + 0x1a))
+      assert (Hpp1a : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x18) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x1a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1a) in "Hpc".
       assert (Hb7 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2437,13 +2436,13 @@ Section ProofInstallTrans.
       assert (HQ1r7 : Q1 !!! Regidx Rs5 = (m !!! Regidx Rs5 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs5 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb7) in "Hf7".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x1a)) (mword_of_int 3 : mword 6) Rs5
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x1a)) (mword_of_int 3 : mword 6) Rs5
                 Q1 (K - 10)%nat v7 eb with "Hcg Hpc Hi1a Hf7 [-]").
       iIntros (CIDp7 Hsp7) "Hcg Hpc Hf7".
       iEval (rgne) in "Hf7".
       iEval (rewrite Hb7 HQ1r7) in "Hf7".
-      assert (Hpp1c : add_vec_int (mword_of_int (IT + 0x1a) : mword 64) 2
-                      = mword_of_int (IT + 0x1c))
+      assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x1a) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x1c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1c) in "Hpc".
       assert (Hb8 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2454,13 +2453,13 @@ Section ProofInstallTrans.
       assert (HQ1r8 : Q1 !!! Regidx Rs6 = (m !!! Regidx Rs6 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs6 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb8) in "Hf8".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x1c)) (mword_of_int 2 : mword 6) Rs6
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x1c)) (mword_of_int 2 : mword 6) Rs6
                 Q1 (K - 10)%nat v8 eb with "Hcg Hpc Hi1c Hf8 [-]").
       iIntros (CIDp8 Hsp8) "Hcg Hpc Hf8".
       iEval (rgne) in "Hf8".
       iEval (rewrite Hb8 HQ1r8) in "Hf8".
-      assert (Hpp1e : add_vec_int (mword_of_int (IT + 0x1c) : mword 64) 2
-                      = mword_of_int (IT + 0x1e))
+      assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x1c) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x1e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp1e) in "Hpc".
       assert (Hb9 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2471,13 +2470,13 @@ Section ProofInstallTrans.
       assert (HQ1r9 : Q1 !!! Regidx Rs7 = (m !!! Regidx Rs7 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs7 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb9) in "Hf9".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x1e)) (mword_of_int 1 : mword 6) Rs7
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x1e)) (mword_of_int 1 : mword 6) Rs7
                 Q1 (K - 10)%nat v9 eb with "Hcg Hpc Hi1e Hf9 [-]").
       iIntros (CIDp9 Hsp9) "Hcg Hpc Hf9".
       iEval (rgne) in "Hf9".
       iEval (rewrite Hb9 HQ1r9) in "Hf9".
-      assert (Hpp20 : add_vec_int (mword_of_int (IT + 0x1e) : mword 64) 2
-                      = mword_of_int (IT + 0x20))
+      assert (Hpp20 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x1e) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x20))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp20) in "Hpc".
       assert (Hb10 : add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
@@ -2488,19 +2487,19 @@ Section ProofInstallTrans.
       assert (HQ1r10 : Q1 !!! Regidx Rs8 = (m !!! Regidx Rs8 : mword 64)).
       { rewrite /Q1 upd_ne; [| vm_compute; discriminate]. exact (HR2thr Rs8 ltac:(vm_compute; reflexivity)). }
       iEval (rewrite -Hb10) in "Hf10".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x20)) (mword_of_int 0 : mword 6) Rs8
+      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x20)) (mword_of_int 0 : mword 6) Rs8
                 Q1 (K - 10)%nat v10 eb with "Hcg Hpc Hi20 Hf10 [-]").
       iIntros (CIDp10 Hsp10) "Hcg Hpc Hf10".
       iEval (rgne) in "Hf10".
       iEval (rewrite Hb10 HQ1r10) in "Hf10".
-      assert (Hpp22 : add_vec_int (mword_of_int (IT + 0x20) : mword 64) 2
-                      = mword_of_int (IT + 0x22))
+      assert (Hpp22 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x20) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x22))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp22) in "Hpc".
       iAssert (it_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hf8 Hf9 Hf10]" as "Hframe".
       { rewrite /it_frame. iFrame. }
       (* ===== +0x22 c.addi4spn s0,sp,80 ===== *)
-      iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (IT + 0x22)) (Cregidx (mword_of_int 0))
+      iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x22)) (Cregidx (mword_of_int 0))
                 (mword_of_int 20 : mword 8) Rs0 Q1 (K - 10)%nat eb
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rdok) with "Hcg Hpc Hi22 [-]").
@@ -2508,12 +2507,12 @@ Section ProofInstallTrans.
       set (Q2 := <[Regidx Rs0 := regval_into_reg
                     (add_vec (Q1 !!! Regidx csp_rs1 : mword 64)
                        (sign_extend' 64 (caddi4spn_imm (mword_of_int 20 : mword 8))))]> Q1).
-      assert (Hpp24 : add_vec_int (mword_of_int (IT + 0x22) : mword 64) 2
-                      = mword_of_int (IT + 0x24))
+      assert (Hpp24 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x22) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x24))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp24) in "Hpc".
       (* ===== +0x24 c.mv s6,a0 : s6 := recovering = 0 ===== *)
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0x24)) Rs6 Ra0
+      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x24)) Rs6 Ra0
                 Q2 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi24 [-]").
       iIntros (CIDq3 Hsq3) "Hcg Hpc".
@@ -2525,23 +2524,23 @@ Section ProofInstallTrans.
         rewrite /Q2 upd_ne; [| vm_compute; discriminate].
         rewrite /Q1 upd_ne; [| vm_compute; discriminate].
         rewrite HR2a0. exact Ha0. }
-      assert (Hpp26 : add_vec_int (mword_of_int (IT + 0x24) : mword 64) 2
-                      = mword_of_int (IT + 0x26))
+      assert (Hpp26 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x24) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x26))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp26) in "Hpc".
       (* ===== +0x26 / +0x2a : s5 := &log.lh.block[0] ===== *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (IT + 0x26)) Rs5 (mword_of_int 31 : mword 20)
+      iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x26)) Rs5 (mword_of_int 31 : mword 20)
                 Q3 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi26 [-]").
       iIntros (CIDq4 Hsq4) "Hcg Hpc".
       set (Q4 := <[Regidx Rs5 := regval_into_reg
-                    (add_vec (mword_of_int (IT + 0x26) : mword 64)
+                    (add_vec (mword_of_int (KernelSyms.install_trans + 0x26) : mword 64)
                        (auipc_off (mword_of_int 31 : mword 20)))]> Q3).
-      assert (Hpp2a : add_vec_int (mword_of_int (IT + 0x26) : mword 64) 4
-                      = mword_of_int (IT + 0x2a))
+      assert (Hpp2a : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x26) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x2a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2a) in "Hpc".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (IT + 0x2a)) Rs5 Rs5
+      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x2a)) Rs5 Rs5
                 (mword_of_int 2198 : mword 12) Q4 (K - 10)%nat eb
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2a [-]").
@@ -2552,35 +2551,35 @@ Section ProofInstallTrans.
                        (sign_extend' 64 (mword_of_int 2198 : mword 12)))]> Q4).
       assert (HQ5s5 : Q5 !!! Regidx Rs5 = (lh_block 0 : mword 64)).
       { rewrite /Q5 upd_eq /Q4 upd_eq. exact it_reloc_blk0. }
-      assert (Hpp2e : add_vec_int (mword_of_int (IT + 0x2a) : mword 64) 4
-                      = mword_of_int (IT + 0x2e))
+      assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x2a) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x2e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2e) in "Hpc".
       (* ===== +0x2e c.li s3,0 ===== *)
-      iApply (wp_cli_s_sconf Φ (mword_of_int (IT + 0x2e)) Rs3 (mword_of_int 0 : mword 6)
+      iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x2e)) Rs3 (mword_of_int 0 : mword 6)
                 (mword_of_int (Z.of_nat 0) : mword 64) Q5 (K - 10)%nat eb
                 ltac:(vm_compute; discriminate) ltac:(rdok) it_li0
                 with "Hcg Hpc Hi2e [-]").
       iIntros (CIDq6 Hsq6) "Hcg Hpc".
       set (Q6 := <[Regidx Rs3 := regval_into_reg
                     (mword_of_int (Z.of_nat 0) : mword 64)]> Q5).
-      assert (Hpp30 : add_vec_int (mword_of_int (IT + 0x2e) : mword 64) 2
-                      = mword_of_int (IT + 0x30))
+      assert (Hpp30 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x2e) : mword 64) 2
+                      = mword_of_int (KernelSyms.install_trans + 0x30))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp30) in "Hpc".
       (* ===== +0x30 / +0x34 : s8 := the printk format string ===== *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (IT + 0x30)) Rs8 (mword_of_int 4 : mword 20)
+      iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x30)) Rs8 (mword_of_int 4 : mword 20)
                 Q6 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi30 [-]").
       iIntros (CIDq7 Hsq7) "Hcg Hpc".
       set (Q7 := <[Regidx Rs8 := regval_into_reg
-                    (add_vec (mword_of_int (IT + 0x30) : mword 64)
+                    (add_vec (mword_of_int (KernelSyms.install_trans + 0x30) : mword 64)
                        (auipc_off (mword_of_int 4 : mword 20)))]> Q6).
-      assert (Hpp34 : add_vec_int (mword_of_int (IT + 0x30) : mword 64) 4
-                      = mword_of_int (IT + 0x34))
+      assert (Hpp34 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x30) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x34))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp34) in "Hpc".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (IT + 0x34)) Rs8 Rs8
+      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x34)) Rs8 Rs8
                 (mword_of_int 2588 : mword 12) Q7 (K - 10)%nat eb
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi34 [-]").
@@ -2589,23 +2588,23 @@ Section ProofInstallTrans.
       set (Q8 := <[Regidx Rs8 := regval_into_reg
                     (add_vec (Q7 !!! Regidx Rs8 : mword 64)
                        (sign_extend' 64 (mword_of_int 2588 : mword 12)))]> Q7).
-      assert (Hpp38 : add_vec_int (mword_of_int (IT + 0x34) : mword 64) 4
-                      = mword_of_int (IT + 0x38))
+      assert (Hpp38 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x34) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x38))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
       (* ===== +0x38 / +0x3c : s4 := &log ===== *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (IT + 0x38)) Rs4 (mword_of_int 31 : mword 20)
+      iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x38)) Rs4 (mword_of_int 31 : mword 20)
                 Q8 (K - 10)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 [-]").
       iIntros (CIDq9 Hsq9) "Hcg Hpc".
       set (Q9 := <[Regidx Rs4 := regval_into_reg
-                    (add_vec (mword_of_int (IT + 0x38) : mword 64)
+                    (add_vec (mword_of_int (KernelSyms.install_trans + 0x38) : mword 64)
                        (auipc_off (mword_of_int 31 : mword 20)))]> Q8).
-      assert (Hpp3c : add_vec_int (mword_of_int (IT + 0x38) : mword 64) 4
-                      = mword_of_int (IT + 0x3c))
+      assert (Hpp3c : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x38) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x3c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3c) in "Hpc".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (IT + 0x3c)) Rs4 Rs4
+      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x3c)) Rs4 Rs4
                 (mword_of_int 2132 : mword 12) Q9 (K - 10)%nat eb
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3c [-]").
@@ -2616,31 +2615,31 @@ Section ProofInstallTrans.
                         (sign_extend' 64 (mword_of_int 2132 : mword 12)))]> Q9).
       assert (HQ10s4 : Q10 !!! Regidx Rs4 = log_addr).
       { rewrite /Q10 upd_eq /Q9 upd_eq. exact it_reloc_log. }
-      assert (Hpp40 : add_vec_int (mword_of_int (IT + 0x3c) : mword 64) 4
-                      = mword_of_int (IT + 0x40))
+      assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x3c) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x40))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp40) in "Hpc".
       (* ===== +0x40 li s7,1024 ===== *)
-      iApply (wp_li4_s_sconf Φ (mword_of_int (IT + 0x40)) Rs7 (mword_of_int 1024 : mword 12)
+      iApply (wp_li4_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x40)) Rs7 (mword_of_int 1024 : mword 12)
                 (mword_of_int 1024 : mword 64) Q10 (K - 10)%nat eb
                 ltac:(vm_compute; discriminate) ltac:(rdok) it_li1024
                 with "Hcg Hpc Hi40 [-]").
       iIntros (CIDq11 Hsq11) "Hcg Hpc".
       set (Q11 := <[Regidx Rs7 := regval_into_reg (mword_of_int 1024 : mword 64)]> Q10).
-      assert (Hpp44 : add_vec_int (mword_of_int (IT + 0x40) : mword 64) 4
-                      = mword_of_int (IT + 0x44))
+      assert (Hpp44 : add_vec_int (mword_of_int (KernelSyms.install_trans + 0x40) : mword 64) 4
+                      = mword_of_int (KernelSyms.install_trans + 0x44))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp44) in "Hpc".
       (* ===== +0x44 c.j -> +0x6c : into the loop ===== *)
-      iApply (wp_cj_s_sconf Φ (mword_of_int (IT + 0x44))
+      iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.install_trans + 0x44))
                 (sign_extend' 21 (concat_vec (mword_of_int 20 : mword 11) ('b"0")))
                 Q11 (K - 10)%nat eb ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi44 [-]").
       iIntros (CIDq12 Hsq12). iApply bi.later_intro. iIntros "Hcg Hpc".
-      assert (Htgt6c : add_vec (mword_of_int (IT + 0x44) : mword 64)
+      assert (Htgt6c : add_vec (mword_of_int (KernelSyms.install_trans + 0x44) : mword 64)
                          (sign_extend' 64 (sign_extend' 21
                             (concat_vec (mword_of_int 20 : mword 11) ('b"0"))))
-                       = mword_of_int (IT + 0x6c))
+                       = mword_of_int (KernelSyms.install_trans + 0x6c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt6c) in "Hpc".
       (* the loop's register invariant at tail = 0 *)

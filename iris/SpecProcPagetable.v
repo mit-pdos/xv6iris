@@ -24,7 +24,6 @@ Require Import PtBuild KvmSpec.
 Require Import ProcPt.
 From Kernel Require KernelSyms.
 
-Notation PPGT := KernelSyms.proc_pagetable.
 
 (* [p->trapframe] -- the only field of the process this function reads -- is
    [ProcGeom.p_trapframe] (proc.h offset 88; the [ld a3,88(s2)] at

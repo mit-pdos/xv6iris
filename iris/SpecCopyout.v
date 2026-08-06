@@ -63,7 +63,6 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation CPO := KernelSyms.copyout.
 
 Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

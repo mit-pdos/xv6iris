@@ -47,7 +47,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 
-Notation ALPID := KernelSyms.allocpid.
 
 (* the two globals allocpid touches *)
 Definition alp_pid_lock : mword 64 := mword_of_int KernelSyms.pid_lock.

@@ -27,7 +27,6 @@ From iris.base_logic.lib Require Import invariants.
 Local Open Scope Z_scope.
 Import Defs.
 
-Notation TIH := KernelSyms.trapinithart.
 
 (* ===================================================================== *)
 (* Fresh decode templates (bit patterns unique to trapinithart).          *)
@@ -56,50 +55,50 @@ Section CodeTrapinithart.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- prologue: 16-byte frame, saves ra/s0 (shared cdec_* decodes) ---- *)
-  Lemma tii_00 : kernel_text -∗ instr (mword_of_int (TIH + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-  Proof. mk_rvc (TIH + 0x00)%Z (mword_of_int 0x1141 : mword 16)
-    (mword_of_int (TIH + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1141 exec_execute_C_ADDI. Qed.
+  Lemma tii_00 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x00) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+  Proof. mk_rvc (KernelSyms.trapinithart + 0x00)%Z (mword_of_int 0x1141 : mword 16)
+    (mword_of_int (KernelSyms.trapinithart + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1141 exec_execute_C_ADDI. Qed.
 
-  Lemma tii_02 : kernel_text -∗ instr (mword_of_int (TIH + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
-  Proof. mk_rvc (TIH + 0x02)%Z (mword_of_int 0xe406 : mword 16)
-    (mword_of_int (TIH + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_e406 exec_execute_C_SDSP. Qed.
+  Lemma tii_02 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x02) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
+  Proof. mk_rvc (KernelSyms.trapinithart + 0x02)%Z (mword_of_int 0xe406 : mword 16)
+    (mword_of_int (KernelSyms.trapinithart + 0x02) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_e406 exec_execute_C_SDSP. Qed.
 
-  Lemma tii_04 : kernel_text -∗ instr (mword_of_int (TIH + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
-  Proof. mk_rvc (TIH + 0x04)%Z (mword_of_int 0xe022 : mword 16)
-    (mword_of_int (TIH + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e022 exec_execute_C_SDSP. Qed.
+  Lemma tii_04 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x04) : mword 64) true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
+  Proof. mk_rvc (KernelSyms.trapinithart + 0x04)%Z (mword_of_int 0xe022 : mword 16)
+    (mword_of_int (KernelSyms.trapinithart + 0x04) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e022 exec_execute_C_SDSP. Qed.
 
-  Lemma tii_06 : kernel_text -∗ instr (mword_of_int (TIH + 0x06) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
-  Proof. mk_rvc (TIH + 0x06)%Z (mword_of_int 0x0800 : mword 16)
-    (mword_of_int (TIH + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_0800 exec_execute_C_ADDI4SPN. Qed.
+  Lemma tii_06 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x06) : mword 64) true (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
+  Proof. mk_rvc (KernelSyms.trapinithart + 0x06)%Z (mword_of_int 0x0800 : mword 16)
+    (mword_of_int (KernelSyms.trapinithart + 0x06) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_0800 exec_execute_C_ADDI4SPN. Qed.
 
   (* ---- the body: a5 := &kernelvec ; csrw stvec,a5 ---- *)
-  Lemma tii_08 : kernel_text -∗ instr (mword_of_int (TIH + 0x08) : mword 64) false (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 15), AUIPC)).
-  Proof. mk_base (TIH + 0x08)%Z (mword_of_int 0x00003797 : mword 32)
-    (mword_of_int (TIH + 0x08) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 15), AUIPC)) tidec_auipc_a5. Qed.
+  Lemma tii_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x08) : mword 64) false (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 15), AUIPC)).
+  Proof. mk_base (KernelSyms.trapinithart + 0x08)%Z (mword_of_int 0x00003797 : mword 32)
+    (mword_of_int (KernelSyms.trapinithart + 0x08) : mword 64) (UTYPE (mword_of_int 3 : mword 20, Regidx (mword_of_int 15), AUIPC)) tidec_auipc_a5. Qed.
 
-  Lemma tii_0c : kernel_text -∗ instr (mword_of_int (TIH + 0x0c) : mword 64) false (ITYPE (mword_of_int 0xff2 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_base (TIH + 0x0c)%Z (mword_of_int 0xff278793 : mword 32)
-    (mword_of_int (TIH + 0x0c) : mword 64) (ITYPE (mword_of_int 0xff2 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) tidec_addi_a5. Qed.
+  Lemma tii_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x0c) : mword 64) false (ITYPE (mword_of_int 0xff2 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)).
+  Proof. mk_base (KernelSyms.trapinithart + 0x0c)%Z (mword_of_int 0xff278793 : mword 32)
+    (mword_of_int (KernelSyms.trapinithart + 0x0c) : mword 64) (ITYPE (mword_of_int 0xff2 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADDI)) tidec_addi_a5. Qed.
 
-  Lemma tii_10 : kernel_text -∗ instr (mword_of_int (TIH + 0x10) : mword 64) false (CSRReg (csr_stvec, Regidx (mword_of_int 15), zreg, CSRRW)).
-  Proof. mk_base (TIH + 0x10)%Z (mword_of_int 0x10579073 : mword 32)
-    (mword_of_int (TIH + 0x10) : mword 64) (CSRReg (csr_stvec, Regidx (mword_of_int 15), zreg, CSRRW)) tidec_csrw_stvec. Qed.
+  Lemma tii_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x10) : mword 64) false (CSRReg (csr_stvec, Regidx (mword_of_int 15), zreg, CSRRW)).
+  Proof. mk_base (KernelSyms.trapinithart + 0x10)%Z (mword_of_int 0x10579073 : mword 32)
+    (mword_of_int (KernelSyms.trapinithart + 0x10) : mword 64) (CSRReg (csr_stvec, Regidx (mword_of_int 15), zreg, CSRRW)) tidec_csrw_stvec. Qed.
 
   (* ---- epilogue: restore ra/s0, frame pop, ret (shared cdec_* words) ---- *)
-  Lemma tii_14 : kernel_text -∗ instr (mword_of_int (TIH + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc (TIH + 0x14)%Z (mword_of_int 0x60a2 : mword 16)
-    (mword_of_int (TIH + 0x14) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60a2 exec_execute_C_LDSP. Qed.
+  Lemma tii_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x14) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
+  Proof. mk_rvc (KernelSyms.trapinithart + 0x14)%Z (mword_of_int 0x60a2 : mword 16)
+    (mword_of_int (KernelSyms.trapinithart + 0x14) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60a2 exec_execute_C_LDSP. Qed.
 
-  Lemma tii_16 : kernel_text -∗ instr (mword_of_int (TIH + 0x16) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc (TIH + 0x16)%Z (mword_of_int 0x6402 : mword 16)
-    (mword_of_int (TIH + 0x16) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6402 exec_execute_C_LDSP. Qed.
+  Lemma tii_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x16) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
+  Proof. mk_rvc (KernelSyms.trapinithart + 0x16)%Z (mword_of_int 0x6402 : mword 16)
+    (mword_of_int (KernelSyms.trapinithart + 0x16) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6402 exec_execute_C_LDSP. Qed.
 
-  Lemma tii_18 : kernel_text -∗ instr (mword_of_int (TIH + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-  Proof. mk_rvc (TIH + 0x18)%Z (mword_of_int 0x0141 : mword 16)
-    (mword_of_int (TIH + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_0141 exec_execute_C_ADDI. Qed.
+  Lemma tii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x18) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+  Proof. mk_rvc (KernelSyms.trapinithart + 0x18)%Z (mword_of_int 0x0141 : mword 16)
+    (mword_of_int (KernelSyms.trapinithart + 0x18) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_0141 exec_execute_C_ADDI. Qed.
 
-  Lemma tii_1a : kernel_text -∗ instr (mword_of_int (TIH + 0x1a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (TIH + 0x1a)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (TIH + 0x1a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
+  Lemma tii_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.trapinithart + 0x1a) : mword 64) true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
+  Proof. mk_rvc (KernelSyms.trapinithart + 0x1a)%Z (mword_of_int 0x8082 : mword 16)
+    (mword_of_int (KernelSyms.trapinithart + 0x1a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
 End CodeTrapinithart.

@@ -82,7 +82,6 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
-Notation DI := KernelSyms.devintr.
 
 (* ===================================================================== *)
 (* The two causes devintr recognises.                                     *)

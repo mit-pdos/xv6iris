@@ -23,7 +23,6 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
-Notation FR := KernelSyms.freerange.
 
 Definition PGSIZEv : mword 64 := mword_of_int 4096.
 Definition negPGSIZEv : mword 64 := mword_of_int (-4096).   (* the ~0xfff page mask *)

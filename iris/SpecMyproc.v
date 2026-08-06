@@ -28,7 +28,6 @@ Require Import CpuOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation MP := KernelSyms.myproc.
 
 (* myproc() does its OWN push_off/pop_off around the [tp]-read inside
    mycpu() (only ITS interior runs at [b = false]):

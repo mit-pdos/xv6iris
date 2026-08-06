@@ -44,7 +44,6 @@ Require Import CpuOwn.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Notation FD := KernelSyms.filedup.
 
 (* ------------------------------------------------------------------ *)
 (*  The one thing filedup will rest on -- NOT stated as an axiom         *)

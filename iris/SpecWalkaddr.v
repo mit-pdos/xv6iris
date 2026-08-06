@@ -56,7 +56,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation WA := KernelSyms.walkaddr.
 
 Definition wp_walkaddr_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)

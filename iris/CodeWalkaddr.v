@@ -116,115 +116,114 @@ Section WalkaddrInstrs.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Notation WA := KernelSyms.walkaddr.
 
   Local Notation WAP off rvc ast :=
-    (kernel_text -∗ instr (mword_of_int (WA + off) : mword 64) rvc ast).
+    (kernel_text -∗ instr (mword_of_int (KernelSyms.walkaddr + off) : mword 64) rvc ast).
 
   (* --- the MAXVA test and the early 0-return ------------------------- *)
 
   Lemma wai_00 : WAP 0x00 true (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
-  Proof. mk_rvc (WA + 0x00)%Z (mword_of_int 0x57fd : mword 16)
-    (mword_of_int (WA + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)) cdec_57fd exec_execute_C_LI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x00)%Z (mword_of_int 0x57fd : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x00) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 63 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)) cdec_57fd exec_execute_C_LI. Qed.
 
   Lemma wai_02 : WAP 0x02 true (SHIFTIOP (mword_of_int 26 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).
-  Proof. mk_rvc (WA + 0x02)%Z (mword_of_int 0x83e9 : mword 16)
-    (mword_of_int (WA + 0x02) : mword 64) (SHIFTIOP (mword_of_int 26 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) cdec_83e9 exec_execute_C_SRLI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x02)%Z (mword_of_int 0x83e9 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x02) : mword 64) (SHIFTIOP (mword_of_int 26 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) cdec_83e9 exec_execute_C_SRLI. Qed.
 
   Lemma wai_04 : WAP 0x04 false (BTYPE (mword_of_int 8 : mword 13, Regidx (mword_of_int 11), Regidx (mword_of_int 15), BGEU)).
-  Proof. mk_base (WA + 0x04)%Z (mword_of_int 0x00b7f463 : mword 32)
-    (mword_of_int (WA + 0x04) : mword 64) (BTYPE (mword_of_int 8 : mword 13, Regidx (mword_of_int 11), Regidx (mword_of_int 15), BGEU)) wadb_00b7f463. Qed.
+  Proof. mk_base (KernelSyms.walkaddr + 0x04)%Z (mword_of_int 0x00b7f463 : mword 32)
+    (mword_of_int (KernelSyms.walkaddr + 0x04) : mword 64) (BTYPE (mword_of_int 8 : mword 13, Regidx (mword_of_int 11), Regidx (mword_of_int 15), BGEU)) wadb_00b7f463. Qed.
 
   Lemma wai_08 : WAP 0x08 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_rvc (WA + 0x08)%Z (mword_of_int 0x4501 : mword 16)
-    (mword_of_int (WA + 0x08) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4501 exec_execute_C_LI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x08)%Z (mword_of_int 0x4501 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x08) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4501 exec_execute_C_LI. Qed.
 
   Lemma wai_0a : WAP 0x0a true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (WA + 0x0a)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (WA + 0x0a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x0a)%Z (mword_of_int 0x8082 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x0a) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* --- prologue: the 16-byte ra/s0 frame ----------------------------- *)
 
   Lemma wai_0c : WAP 0x0c true (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-  Proof. mk_rvc (WA + 0x0c)%Z (mword_of_int 0x1141 : mword 16)
-    (mword_of_int (WA + 0x0c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1141 exec_execute_C_ADDI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x0c)%Z (mword_of_int 0x1141 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x0c) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 48 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_1141 exec_execute_C_ADDI. Qed.
 
   Lemma wai_0e : WAP 0x0e true (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)).
-  Proof. mk_rvc (WA + 0x0e)%Z (mword_of_int 0xe406 : mword 16)
-    (mword_of_int (WA + 0x0e) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_e406 exec_execute_C_SDSP. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x0e)%Z (mword_of_int 0xe406 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x0e) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), Regidx (mword_of_int 1), sp, 8)) cdec_e406 exec_execute_C_SDSP. Qed.
 
   Lemma wai_10 : WAP 0x10 true (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)).
-  Proof. mk_rvc (WA + 0x10)%Z (mword_of_int 0xe022 : mword 16)
-    (mword_of_int (WA + 0x10) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e022 exec_execute_C_SDSP. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x10)%Z (mword_of_int 0xe022 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x10) : mword 64) (STORE (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), Regidx (mword_of_int 8), sp, 8)) cdec_e022 exec_execute_C_SDSP. Qed.
 
   Lemma wai_12 : WAP 0x12 true (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)).
-  Proof. mk_rvc (WA + 0x12)%Z (mword_of_int 0x0800 : mword 16)
-    (mword_of_int (WA + 0x12) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_0800 exec_execute_C_ADDI4SPN. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x12)%Z (mword_of_int 0x0800 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x12) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) cdec_0800 exec_execute_C_ADDI4SPN. Qed.
 
   (* --- walk(pagetable, va, 0) and the pte test ----------------------- *)
 
   Lemma wai_14 : WAP 0x14 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)).
-  Proof. mk_rvc (WA + 0x14)%Z (mword_of_int 0x4601 : mword 16)
-    (mword_of_int (WA + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x14)%Z (mword_of_int 0x4601 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x14) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 12), ADDI)) cdec_4601 exec_execute_C_LI. Qed.
 
   Lemma wai_16 : WAP 0x16 false (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (WA + 0x16)%Z (mword_of_int 0xf51ff0ef : mword 32)
-    (mword_of_int (WA + 0x16) : mword 64) (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1))) bdec_f51ff0ef. Qed.
+  Proof. mk_base (KernelSyms.walkaddr + 0x16)%Z (mword_of_int 0xf51ff0ef : mword 32)
+    (mword_of_int (KernelSyms.walkaddr + 0x16) : mword 64) (JAL (mword_of_int 2096976 : mword 21, Regidx (mword_of_int 1))) bdec_f51ff0ef. Qed.
 
   Lemma wai_1a : WAP 0x1a true (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)).
-  Proof. mk_rvc (WA + 0x1a)%Z (mword_of_int 0xc901 : mword 16)
-    (mword_of_int (WA + 0x1a) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_c901 exec_execute_C_BEQZ. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x1a)%Z (mword_of_int 0xc901 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x1a) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 8 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 2)), BEQ)) cdec_c901 exec_execute_C_BEQZ. Qed.
 
   Lemma wai_1c : WAP 0x1c true (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)).
-  Proof. mk_rvc (WA + 0x1c)%Z (mword_of_int 0x611c : mword 16)
-    (mword_of_int (WA + 0x1c) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)) cdec_611c cexec_611c. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x1c)%Z (mword_of_int 0x611c : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x1c) : mword 64) (LOAD (mword_of_int 0 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 15), false, 8)) cdec_611c cexec_611c. Qed.
 
   Lemma wai_1e : WAP 0x1e false (ITYPE (mword_of_int 17 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 13), ANDI)).
-  Proof. mk_base (WA + 0x1e)%Z (mword_of_int 0x0117f693 : mword 32)
-    (mword_of_int (WA + 0x1e) : mword 64) (ITYPE (mword_of_int 17 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 13), ANDI)) wadb_0117f693. Qed.
+  Proof. mk_base (KernelSyms.walkaddr + 0x1e)%Z (mword_of_int 0x0117f693 : mword 32)
+    (mword_of_int (KernelSyms.walkaddr + 0x1e) : mword 64) (ITYPE (mword_of_int 17 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 13), ANDI)) wadb_0117f693. Qed.
 
   Lemma wai_22 : WAP 0x22 true (ITYPE (sign_extend' 12 (mword_of_int 17 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_rvc (WA + 0x22)%Z (mword_of_int 0x4745 : mword 16)
-    (mword_of_int (WA + 0x22) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 17 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)) wadc_4745 exec_execute_C_LI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x22)%Z (mword_of_int 0x4745 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x22) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 17 : mword 6), zreg, Regidx (mword_of_int 14), ADDI)) wadc_4745 exec_execute_C_LI. Qed.
 
   Lemma wai_24 : WAP 0x24 true (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_rvc (WA + 0x24)%Z (mword_of_int 0x4501 : mword 16)
-    (mword_of_int (WA + 0x24) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4501 exec_execute_C_LI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x24)%Z (mword_of_int 0x4501 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x24) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 0 : mword 6), zreg, Regidx (mword_of_int 10), ADDI)) cdec_4501 exec_execute_C_LI. Qed.
 
   Lemma wai_26 : WAP 0x26 false (BTYPE (mword_of_int 12 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 13), BEQ)).
-  Proof. mk_base (WA + 0x26)%Z (mword_of_int 0x00e68663 : mword 32)
-    (mword_of_int (WA + 0x26) : mword 64) (BTYPE (mword_of_int 12 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 13), BEQ)) wadb_00e68663. Qed.
+  Proof. mk_base (KernelSyms.walkaddr + 0x26)%Z (mword_of_int 0x00e68663 : mword 32)
+    (mword_of_int (KernelSyms.walkaddr + 0x26) : mword 64) (BTYPE (mword_of_int 12 : mword 13, Regidx (mword_of_int 14), Regidx (mword_of_int 13), BEQ)) wadb_00e68663. Qed.
 
   (* --- the common epilogue, joined by all three in-frame exits -------- *)
 
   Lemma wai_2a : WAP 0x2a true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
-  Proof. mk_rvc (WA + 0x2a)%Z (mword_of_int 0x60a2 : mword 16)
-    (mword_of_int (WA + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60a2 exec_execute_C_LDSP. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x2a)%Z (mword_of_int 0x60a2 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x2a) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 1 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)) cdec_60a2 exec_execute_C_LDSP. Qed.
 
   Lemma wai_2c : WAP 0x2c true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)).
-  Proof. mk_rvc (WA + 0x2c)%Z (mword_of_int 0x6402 : mword 16)
-    (mword_of_int (WA + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6402 exec_execute_C_LDSP. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x2c)%Z (mword_of_int 0x6402 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x2c) : mword 64) (LOAD (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 6) ('b"000")), sp, Regidx (mword_of_int 8), false, 8)) cdec_6402 exec_execute_C_LDSP. Qed.
 
   Lemma wai_2e : WAP 0x2e true (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)).
-  Proof. mk_rvc (WA + 0x2e)%Z (mword_of_int 0x0141 : mword 16)
-    (mword_of_int (WA + 0x2e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_0141 exec_execute_C_ADDI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x2e)%Z (mword_of_int 0x0141 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x2e) : mword 64) (ITYPE (sign_extend' 12 (mword_of_int 16 : mword 6), Regidx csp_rs1, Regidx csp_rs1, ADDI)) cdec_0141 exec_execute_C_ADDI. Qed.
 
   Lemma wai_30 : WAP 0x30 true (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)).
-  Proof. mk_rvc (WA + 0x30)%Z (mword_of_int 0x8082 : mword 16)
-    (mword_of_int (WA + 0x30) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x30)%Z (mword_of_int 0x8082 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x30) : mword 64) (JALR (zeros' 12, Regidx (mword_of_int 1), zreg)) cdec_8082 exec_execute_C_JR. Qed.
 
   (* --- PTE2PA of the pte word, and the jump back to the epilogue ------ *)
 
   Lemma wai_32 : WAP 0x32 true (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).
-  Proof. mk_rvc (WA + 0x32)%Z (mword_of_int 0x83a9 : mword 16)
-    (mword_of_int (WA + 0x32) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) cdec_83a9 exec_execute_C_SRLI. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x32)%Z (mword_of_int 0x83a9 : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x32) : mword 64) (SHIFTIOP (mword_of_int 10 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)) cdec_83a9 exec_execute_C_SRLI. Qed.
 
   Lemma wai_34 : WAP 0x34 false (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)).
-  Proof. mk_base (WA + 0x34)%Z (mword_of_int 0x00c79513 : mword 32)
-    (mword_of_int (WA + 0x34) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)) bdec_00c79513. Qed.
+  Proof. mk_base (KernelSyms.walkaddr + 0x34)%Z (mword_of_int 0x00c79513 : mword 32)
+    (mword_of_int (KernelSyms.walkaddr + 0x34) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 15), Regidx (mword_of_int 10), SLLI)) bdec_00c79513. Qed.
 
   Lemma wai_38 : WAP 0x38 true (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)).
-  Proof. mk_rvc (WA + 0x38)%Z (mword_of_int 0xbfcd : mword 16)
-    (mword_of_int (WA + 0x38) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)) cdec_bfcd exec_execute_C_J. Qed.
+  Proof. mk_rvc (KernelSyms.walkaddr + 0x38)%Z (mword_of_int 0xbfcd : mword 16)
+    (mword_of_int (KernelSyms.walkaddr + 0x38) : mword 64) (JAL (sign_extend' 21 (concat_vec (mword_of_int 2041 : mword 11) ('b"0")), zreg)) cdec_bfcd exec_execute_C_J. Qed.
 
 End WalkaddrInstrs.

@@ -27,10 +27,9 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation ISL := KernelSyms.initsleeplock.
 
 (* the "sleep lock" string literal in rodata (the auipc/addi pair at
-   ISL+0x10 resolves here); the caller extracts the persistent [↦ₛ□] from
+   KernelSyms.initsleeplock+0x10 resolves here); the caller extracts the persistent [↦ₛ□] from
    [kernel_data] via [kernel_data_string]. *)
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007548.
 

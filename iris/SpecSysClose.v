@@ -66,7 +66,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation SCL := KernelSyms.sys_close.
 
 (* sys_close's own frame is 4 slots (addi sp,sp,-32); below it argfd wants
    24, fileclose 18 and myproc 10. *)

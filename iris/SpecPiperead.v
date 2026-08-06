@@ -53,7 +53,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation PR := KernelSyms.piperead.
 
 (* piperead's own frame is 12 slots; the deepest callee is copyout at 50
    (walkaddr 10 / walk 8 / vmfault 38 / memmove 2); sleep wants 22,

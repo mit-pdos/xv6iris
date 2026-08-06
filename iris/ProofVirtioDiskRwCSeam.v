@@ -81,7 +81,6 @@ Section ProofVirtioDiskRwCSeam.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Notation VRW := KernelSyms.virtio_disk_rw.
 
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
@@ -117,7 +116,7 @@ Section ProofVirtioDiskRwCSeam.
        sie_cap_gpr M (K - 12)%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs_pay 0 eb -∗
-       pc_is (mword_of_int (VRW + 0x162) : mword 64) -∗
+       pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) -∗
        own_ctx (p_context (proc_addr j)) -∗
        park_hlf j true -∗
        locked γk cpu_id -∗

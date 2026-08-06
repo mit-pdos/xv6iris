@@ -24,7 +24,6 @@ Require Import CpuOwn.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
-Notation AK := KernelSyms.kalloc.
 
 Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=

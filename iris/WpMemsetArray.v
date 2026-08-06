@@ -209,7 +209,7 @@ Section WpMemsetArray.
     iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc".
     change (<[Regidx a4_idx := regval_into_reg wval_add]> m5) with m6.
     (* pc at pcE+20 = memset+0x14 = loop top *)
-    assert (Hpc1 : add_vec_int pcE 20 = mword_of_int (MS + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpc1 : add_vec_int pcE 20 = mword_of_int (KernelSyms.memset + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1) in "Hpc".
     (* loop-entry facts on m6 *)
     assert (Hcur : m6 !!! Regidx a5_idx = ms_addr p 0).
@@ -245,7 +245,7 @@ Section WpMemsetArray.
     iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hcg Hpc Hbuf".
     set (m7 := <[Regidx a5_idx := regval_into_reg (ms_addr p len)]> m6).
     change (<[Regidx a5_idx := regval_into_reg (ms_addr p len)]> m6) with m7.
-    assert (Hpc2 : add_vec_int (add_vec_int (mword_of_int (MS + 0x14) : mword 64) 6) 4 = (mword_of_int (MS + 0x1e) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Hpc2 : add_vec_int (add_vec_int (mword_of_int (KernelSyms.memset + 0x14) : mword 64) 6) 4 = (mword_of_int (KernelSyms.memset + 0x1e) : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2) in "Hpc".
     (* --- SUFFIX: 0x1e..0x24 --- *)
     assert (Hsuf_sp : m7 !!! Regidx csp_rs1 = sp').

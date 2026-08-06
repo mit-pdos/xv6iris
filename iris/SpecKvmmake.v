@@ -22,7 +22,6 @@ Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
 
-Notation KVMMK := KernelSyms.kvmmake.
 
 (* kvmmake(): kalloc a fresh root page, memset it, run the six kvmmap regions
    (UART/VIRTIO/PLIC RW, text RX, data RW, trampoline RX) then proc_mapstacks.
