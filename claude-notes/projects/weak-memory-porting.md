@@ -49,6 +49,8 @@ These are search-and-replace with a type check, in the order you hit them.
 | `instr`/decode facts over `exec … σ` | the SAME facts over `WeakBridge.wflat_st σ` | `wflat_st σ := MState (wm_regs σ) (wflat (wm_img σ) (wm_log σ)) (wm_dev σ)` — registers and devices are literally the same objects |
 | `σ.(mem) !! pa_add ea j = Some b` | `wflat (wm_img σ) (wm_log σ) !! pa_add ea j = Some b` | produced by `wpt4_flat` / `wkernel_text_flat` / `wlat_flat_lookup`, with NO view hypothesis |
 | `iProp Σ` (a spec's resources) | `vProp Σ` (`WeakVProp`) | only for assertions about mutable RAM; everything else stays an `iProp` and is embedded `⎡·⎤` |
+| `instr pc is_rvc i` | `WeakFunnel.winstr pc is_rvc i` | the DECODE half transfers verbatim (it is a pure fact about an arbitrary `mstate`); the byte half becomes timestamp-0 `wlat_pointsto` text elements — and the footprint is always FOUR bytes, even for a compressed instruction |
+| `InstrBytes.wp_instr` | `WeakFunnel.wwp_instr` | see §2d; same premises, one extra `set_reg` on the caller's execute fact, two fewer register obligations |
 
 **The register/CSR/config tower does not move at all.**  `hw_config`,
 `mmode_config`, the sconf bundles, `kmap_static_claims`, `pc_is`, `↦ᵣ`, all
@@ -59,8 +61,12 @@ because `wmstate_interp σ` contains `reg_interp (wm_regs σ)` and
 `wm_regs σ = sregs (wflat_st σ)`.  The only non-transferring lemmas are the
 ones that consume `RiscvPtsto.mstate_interp` AS A BUNDLE
 (`fetch_from_instr_bytes`, `instr_lift`, `dispatchInterrupt_none_from_regs`,
-`state_interp_reg_dq`, `wp_instr`) — each is a mechanical restatement with
-the memory hypothesis taken as the pure fact `WeakInstr` §1 produces.
+`state_interp_reg_dq`, `wp_instr`) — and **all five are done, in
+`iris/WeakFunnel.v` (§2d)**.  The one worth knowing about is the fetch:
+restated over pure register lookups and pure byte/`addr_is_ram` facts
+(`WeakFunnel.exec_fetch_flat`) it has NO Iris in it at all, and the
+`kmap_static`/`text_ident_phys` VA→PA machinery disappears because weak
+addresses are already physical.
 
 ---
 
@@ -190,6 +196,77 @@ internalising before the sweep:
 
 ---
 
+## 2d. THE FUNNEL: what a leaf hands `WeakFunnel.wwp_instr` (M4-prep)
+
+`WeakInstr.wp_winstr` owes the WHOLE `exec (riscv_step tick) (wflat_st σ)` —
+fetch, decode, wrapper and all — while an SC leaf owes ONE `execute` fact.
+`wwp_instr` is the bridge, for the **M-mode tier**; port a leaf by keeping its
+statement and changing four things.
+
+1. **`instr` becomes `winstr`.**  Build it with
+   `winstr_bytes_of_text` (from `WeakInstr.wkernel_text`, plus the per-byte
+   lookups and `addr_is_ram`, both `vm_compute`-discharged) and `winstr_intro`
+   with the file's EXISTING decode fact — unchanged, because `winstr`'s decode
+   field is that fact, as a plain `Prop` over an arbitrary `mstate`.  4–8 lines.
+   Text pinnedness is free (`winstr_pinned`: text is unwritten this era).
+2. **The execute fact moves by ONE `set_reg`.**  It is now instantiated at
+   `set_reg (wflat_st σ) (R_bool minstret_increment) b`, with `b` chosen by the
+   funnel and handed to the callback: `wp_winstr` demands the `exec` fact at
+   the state the WEAK machine holds, so the wrapper's `minstret_increment`
+   pre-write is INSIDE the run.  Every SC execute lemma is state-generic, so
+   this costs nothing.  **Do NOT** also supply `hart_state`/`minstret_increment`
+   facts about `s_exec`: unlike the SC funnel, the weak one holds those cells
+   itself.
+3. **The registers go through `reg_interp`, not `mstate_interp`.**  The
+   callback receives `reg_interp (sregs …)` and returns `reg_interp (sregs
+   s_exec)`; the seam for the weak-memory conjuncts is
+   `WeakFunnel.wmstate_norg` (`WeakAcquire.wmstate_rest` minus the registers).
+   The post-step continuation is parameterised by the SC successor `t`, because
+   `wstep_post`'s memory/device conjuncts are stated against it.
+4. **The certificate is the only irreducible part**, and it is §2/§2c: the
+   window `W` plus the same SC library lemma re-instantiated at
+   `WeakCert.wmem_restrict σ W`.
+
+Measured budget on top of the SC leaf: **~30–55 lines for a register-only or
+load leaf, ~60–90 for a store/AMO leaf**, of which 20–40 is the window.
+
+**THE sconf TIER IS NOT PORTED.**  Its fetch (`SmodeCorePt.tlb_inv_pt_fetch`)
+opens the kpt tree invariant, walks the page table and may write A/D bits back;
+what it needs is listed in [`weak-memory.md`](weak-memory.md)'s M4-prep block.
+Do not start an S-mode leaf batch before that is designed.
+
+---
+
+## 2e. `exec_eff` FACTS ARE MOSTLY FREE — use the empty-memory detector
+
+`WeakEff` is the toolkit for the certificate's `wP_eff` obligation, and the
+rule of thumb is short:
+
+- **A memory-free run costs ONE `apply`.**  `WeakEff.exec_eff_quiet_of_empty`:
+  instantiate your existing SC lemma at `MState rs ∅ d`; if it still succeeds
+  with an empty final domain then the run performed no RAM access (a read of an
+  absent byte returns `None`; a write GROWS the domain), and it therefore runs
+  identically at any memory with a QUIET trace.  The decoder, every
+  register-only `execute`, `pmpCheck`, `translateAddr`, `within_clint` and
+  `currentlyEnabled` all fall to this.
+- **A memory-touching run is a REPLAY, not a re-proof.**
+  `WeakEff.exec_eff_bind_nil` / `_bind0_nil` are drop-in replacements for
+  `RiscvExec.exec_bind_Some` / `exec_bind0_Some`; `_bind_Some` / `_bind_cons`
+  carry the trace.  Measured on the whole `try_step` wrapper
+  (`exec_eff_riscv_step_hart_active`): 65 SC lines → 68, 45 s of wall time.
+- **Do not pin the fetch's trace element by element.**
+  `WeakEff.wcert_store_gen` / `_load_gen` / `_amo_aq_gen` / `_fence_gen` allow
+  ARBITRARY WRITE-FREE traces around the instruction's own access.
+- **A branch/jump/ALU instruction's `Q` is `WeakEff.wQ_pure` (or `wQ_quiet`),
+  NOT `wQ_none`** — see `iris/WeakBranch.v`'s header for why `wQ_none` cannot
+  re-establish `wlat_interp`.
+- **The zero-width residue is real and is documented.**  A zero-width access is
+  invisible to `exec`, so the detector gives `quiet_trace` (which tolerates it)
+  rather than `nowrite_trace` (which does not).  A syntactic bind-peel gives
+  `nowrite` outright, since those arms are not in the program.
+
+---
+
 ## 3. What needs thought: the racy sites, and only those
 
 A function that OWNS its memory — directly or through a lock — ports
@@ -293,27 +370,30 @@ Every one of these type-checks and is wrong or vacuous.
 
 ---
 
-## 5. Order of the sweep
+## 5. Order of the sweep (revised after M4-prep)
 
-0. **the `Q`-half machinery for the sync instructions FIRST** (§2c): until an
-   `amoswap.w.aq` / `sw` / `fence` at a concrete pc has its certificate `Q`,
-   the composed acquire/release of `iris/WeakAcquire.v` still carry it as a
-   premise, and nothing downstream can be closed. It is also the only item on
-   this list whose cost is a model peel rather than a restatement, so it
-   decides the sweep's schedule.
-1. the leaf libraries' MEMORY arms (`Wp*Load`, `Wp*Store`, `WpSconfMem`) —
-   each is one `wpt4_flat` + one `wstep_cert` per instruction shape;
-   everything else in them is the config tower and transfers as-is;
-2. **the BRANCH leaves** (`bnez`/`j`), which the spin loops' retry edge is
-   currently abstracted over — they carry no memory content at all
-   (`Q = wQ_none`, certificate unconditional), so they are the cheapest real
-   instructions in the tree and they turn `wwp_acquire_loop`'s premise into a
-   proof;
-3. `WpLock` clients — nothing to do beyond the `iProp`→`vProp` altitude
-   change of `R`, since the interface is unchanged;
-4. the straight-line function proofs, batched by subagent;
-5. the RACY-LOAD RULE (§3), then `StartedInv` consumers
-   (`ProofMainSecondary`), then the virtio cone (M5).
+0. **THE SHARED `exec_eff` SKELETON, and nothing else, first.**  `execR_eff`
+   plus its rewriting lemmas, the two `run_hart_active` progress mirrors, and
+   the fetch (`exec_eff_fetch_done` / `_fetch_bytes_4` / `_mem_read_fetch`).
+   ≈ 400–600 lines, ONE batch, and it is the only remaining model work: after
+   it, every non-memory part of a step is free (§2e) and every certificate's
+   `wP_eff` is within reach.  Nothing downstream can be closed before it.
+1. **The memory `execute` mirrors, by SHAPE not by call site**: LOAD/STORE at
+   widths 1/2/4/8 and the AMO, ≈ 9 shapes × 40–60 lines.  One batch.
+2. The M-mode leaf libraries through `WeakFunnel.wwp_instr` (§2d) —
+   `WpMmodeLoad`, `WpMmodeStore`, the `WpMmodeLeaf*` family.  Their config
+   tower and decode facts transfer as-is.
+3. `WpLock` clients — nothing to do beyond the `iProp`→`vProp` altitude change
+   of `R`, since the interface is unchanged; the `↦w₈` tower
+   (`iris/WeakWord8.v`) now covers the lock's `cpu`/`name` fields.
+4. The straight-line M-mode function proofs, batched by subagent.
+5. `StartedInv` consumers (`ProofMainSecondary`) on the racy-load rule (§3).
+6. **The sconf tier** — blocked on the page-table-walk design (§2d); do NOT
+   schedule an S-mode batch before it.
+7. The virtio cone (M5).
+
+The BRANCH leaves are no longer on this list: `iris/WeakBranch.v` landed them,
+and `wwp_acquire_loop_real` is the acquire loop with the retry edge proved.
 
 `tools/lemma_diff.py` after every batch: the characteristic failure of a
 sweep is not a red build, it is a file that compiles because something was
