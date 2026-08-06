@@ -191,17 +191,20 @@ Qed.
    [bv_unsigned]s, where [bitvector.tactics]' zify hook makes [lia] answer
    "Cannot find witness" (claude-notes/durable-notes.md).  Stated here, they
    are closed facts the call sites pass by name. *)
-Lemma ap_K4 (K : nat) : (44 <= K)%nat -> (4 <= K)%nat.
+Lemma ap_K4 (K : nat) : (48 <= K)%nat -> (4 <= K)%nat.
 Proof. lia. Qed.
-Lemma ap_K2 (K : nat) : (44 <= K)%nat -> (2 <= K - 4)%nat.
+Lemma ap_K2 (K : nat) : (48 <= K)%nat -> (2 <= K - 4)%nat.
 Proof. lia. Qed.
-Lemma ap_K10 (K : nat) : (44 <= K)%nat -> (10 <= K - 4)%nat.
+Lemma ap_K10 (K : nat) : (48 <= K)%nat -> (10 <= K - 4)%nat.
 Proof. lia. Qed.
-Lemma ap_K14 (K : nat) : (44 <= K)%nat -> (14 <= K - 4)%nat.
+Lemma ap_K14 (K : nat) : (48 <= K)%nat -> (14 <= K - 4)%nat.
 Proof. lia. Qed.
-Lemma ap_K36 (K : nat) : (44 <= K)%nat -> (40 <= K - 4)%nat.
+Lemma ap_K36 (K : nat) : (48 <= K)%nat -> (40 <= K - 4)%nat.
 Proof. lia. Qed.
-Lemma ap_Kback (K : nat) : (44 <= K)%nat -> ((K - 4) + 4)%nat = K.
+(* freeproc's, in the two error tails -- the deepest callee now *)
+Lemma ap_K44 (K : nat) : (48 <= K)%nat -> (44 <= K - 4)%nat.
+Proof. lia. Qed.
+Lemma ap_Kback (K : nat) : (48 <= K)%nat -> ((K - 4) + 4)%nat = K.
 Proof. lia. Qed.
 Lemma ap_lvl1 (lvl : nat) : (Z.of_nat lvl + 2 < 2 ^ 31)%Z -> (Z.of_nat lvl + 1 < 2 ^ 31)%Z.
 Proof. lia. Qed.
@@ -1366,7 +1369,8 @@ Section ProofAllocproc.
         iApply ("Hcont" $! Mf with "[%] Hpcf [-]").
         { exact Hcsf. }
         iEval (rewrite Ha0f).
-        rewrite /allocproc_post. iRight.
+        (* the post is now THREE-way; the found arm is the middle one *)
+        rewrite /allocproc_post. iRight. iLeft.
         iExists k, γl, ch, pidn, (upd_pt V (upt_desc (pt_base t) tfp) tfws),
                 (pt_base t), tfp, ks, rest, (S (pt_nodes t)).
         iSplitR.

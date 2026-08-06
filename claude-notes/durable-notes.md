@@ -266,6 +266,13 @@ per-lemma roll-up is the tool; two findings generalise:
   mismatch) to the front took every use to milliseconds.  Same total work,
   same proof, one reordering.  The rule of thumb: `exact`/`assumption` fail
   cheaply, `rewrite ... in H` and `congruence` do not.
+- **A proof obligation that cannot be discharged may be telling you the CODE
+  is wrong.**  freeproc's `p->parent = 0` could not be proved because the
+  cell is owned by nothing -- and the reason it is owned by nothing is that
+  xv6 writes it there without `wait_lock`, which its own proc.h says is
+  required.  The fix was upstream, not a new ownership story.  Ask "is this
+  a bug?" BEFORE designing a bundle to hold the resource; modelling a bug
+  makes it permanent in the spec.
 - **`congruence` is not free in a whole-function context.**  Seconds per
   call once the context is a hundred hypotheses deep.  Where the
   contradiction is known, pass the hypothesis in by name and `exact` it.

@@ -741,15 +741,62 @@ the evidence for every offset. This file is only the worklist.
            premise: use the `*Core` functor recipe from durable-notes and
            seal ONE proof against TWO `Module Type`s — the counted contract
            userinit wants and the steady-state one kfork wants.
-      3. **`SpecFreeproc.v` + `LinkFreeproc.v`** in the assumed-callee shape
-         (`Module Type` + `Axiom` in the link).  At allocproc's two call sites
-         `p->pagetable` is always 0,
-         so freeproc never reaches `proc_freepagetable` -- but do not
-         specialise the contract to that; state freeproc honestly and let
-         allocproc's sites instantiate it.
-      4. **allocproc's two tails** -- ten instructions, mostly words the
-         function already decodes (`c.mv a0,s1`, `c.mv s1,s2`, two `jal`s,
-         a `c.j` back to the shared epilogue at +0x78).
+      3. [x] **`SpecFreeproc.v` + `ProofFreeproc.v` + `LinkFreeproc.v` --
+         DONE (2026-08-06), and PROVEN rather than assumed.**  The
+         assumed-callee shape was never needed: `proc_freepagetable` had
+         already landed, and upstream `4e524ed` removed the one write that
+         blocked it.
+
+         **The write was `p->parent = 0`, and it was an xv6 BUG.**  `freeproc`
+         is reached from `allocproc`'s error paths holding only `p->lock`,
+         while proc.h says `wait_lock` must be held to touch `parent`.  The
+         proof obligation is what surfaced it (`BootCarveMain.v:1031`: the
+         cell "is claimed by no bundle and is dropped with the padding", so
+         the store could not be proved at all).  It was fixed upstream --
+         the zeroing moved into `kwait`, which holds `wait_lock` -- rather
+         than by inventing an owner.  *Durable lesson: when a proof
+         obligation forces an awkward ownership choice, ask whether the CODE
+         is wrong before designing around it.*
+
+         **The contract could NOT be `proc_dormant _ ZOMBIE -> proc_dormant _
+         UNUSED`.**  allocproc's second tail arrives with a LIVE trapframe
+         page and NO page table, and `proc_dormant`'s address-space disjunct
+         is keyed on `st` and moves BOTH cells together.  So the two slots
+         are independently optional (`fp_pt` / `fp_tf`), and the contract's
+         case split IS the runtime branch.  The post is still
+         `proc_held _ UNUSED 0 ∗ proc_dormant _ UNUSED`.
+
+         **Pinned at `b = false`, and that is forced.**  The post hands back
+         `proc_held`, which names the hart the lock is held on, but
+         `wp_next`'s hart equality holds only under `b = false ∨ p =
+         zero_reg`.  At a generic `b` the returned block would be about a
+         possibly different cpu.  Callers hold p->lock, so they have `false`.
+
+         **A REAL GAP, recorded not papered over:** `fp_pt`'s `Some` arm
+         carries `um_below sz um`, `uint sz + 4096 <= uvm_maxsz` and
+         `page_valid (page_base root)`.  `proc_dormant` at ZOMBIE carries
+         NONE of the three (only `uint (pv_sz V) <= uvm_maxsz`).  So the
+         bridge **kwait** will need does not exist yet, and writing it means
+         strengthening proc_dormant's ZOMBIE arm.  It costs allocproc
+         nothing -- both of its tails run at `opt = None`, where the arm is
+         vacuous.
+      4. **allocproc's two tails** -- ten instructions each, all already
+         decoded (`CodeAllocproc.v` is GENERATED now, so `api_86`..`api_a4`
+         exist).  Each is `mv a0,s1; jal freeproc; mv a0,s1; jal release;
+         mv s1,s2; j +0x78` -- and note `s2` holds the failed callee's `a0`,
+         i.e. 0, which is how the compiler gets the return value.
+         **Groundwork LANDED (2026-08-06):** `allocproc_post`'s third arm,
+         `wp_allocproc_core_body` / `ALLOCPROC_GEN`, and the budget bump
+         44 -> 48 (freeproc needs 44 below allocproc's own 4-slot frame).
+         `ProofAllocproc.v` still compiles unchanged apart from the `ap_K*`
+         bounds and one `iRight` -> `iRight; iLeft` (the post is three-way
+         now).  What is LEFT is the two tails themselves plus the
+         Core/counted-seal split.
+         *One bridge to expect:* `proc_dormant_unused` hands back
+         `proc_ofiles γf pa (pv_ofile V)`, but freeproc's `fp_rest` wants
+         `ofile_cells` + the `fd_slot` units (the shape `proc_dormant`
+         itself holds).  At all-null descriptors that converse is easy, but
+         it does not exist yet.
       5. **The spec's third arm.** Keep ONE spec, generic in `on`, and give
          `allocproc_post` an out-of-memory disjunct carrying
          `⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝` -- which

@@ -164,7 +164,25 @@ Definition allocproc_post
        sie_cap_gpr mr K false pme ∗
        cpu_own (S lvl) eb pme C false ∗
        trap_csrs_pay lvl eb ∗
-       kalloc_env γa (avail_sub on nc)))%I.
+       kalloc_env γa (avail_sub on nc))
+  ∨ (* --- a FAILURE TAIL ran: the slot was taken and then given back.  a0
+        is 0 and every lock is released, exactly as in the first arm, but
+        two things differ and both matter.
+
+        The COUNT IS GONE.  The tails call freeproc, whose callees (kfree,
+        proc_freepagetable) are stated only at [kalloc_env _ None], so the
+        environment has been resealed and no caller can ever count again.
+        That is why this cannot be folded into the first arm.
+
+        And the arm records WHY it was reached: the allocator ran dry after
+        [n <= K_allocproc] pages.  A COUNTED caller refutes the whole arm
+        from its own [K_allocproc < nb]; an uncounted one (kfork) handles
+        it.  Carrying the witness is what lets ONE proof serve both. --- *)
+    (⌜ rv = (zero_reg : mword 64) ⌝ ∗
+     ⌜ exists n : nat, (n <= K_allocproc)%nat /\ avail_zero (avail_sub on n) ⌝ ∗
+     sie_cap_gpr mr K b pme ∗
+     cpu_own lvl eb pme C b ∗
+     kalloc_env γa None))%I.
 
 Definition wp_allocproc_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -173,8 +191,9 @@ Definition wp_allocproc_sconf_body
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (* 4 slots for this frame, 36 for proc_pagetable's (the deepest callee) *)
-  (44 <= K)%nat ->
+  (* 4 slots for this frame, 44 for freeproc's -- the deepest callee now
+     that the error tails are live code (proc_pagetable needs 40) *)
+  (48 <= K)%nat ->
   (* the proc lock is HELD across kalloc / proc_pagetable, so their own
      push_off sees [S lvl] and needs one more slot of headroom than usual *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
@@ -194,6 +213,45 @@ Definition wp_allocproc_sconf_body
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
+
+(* THE GENERAL CONTRACT.  Identical to the one below except that it drops the
+   counted premise: everything allocproc actually does is here, and the third
+   arm of [allocproc_post] is what makes an uncounted run STATABLE.  kfork
+   calls allocproc with no page budget, and there the two freeproc tails are
+   LIVE code. *)
+Definition wp_allocproc_core_body
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+    (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (48 <= K)%nat ->
+  (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+  sie_cap_gpr m K b pme -∗
+  cpu_own lvl eb pme C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  procs_inv Φ γs -∗
+  is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
+  kalloc_env γa on -∗
+  wp_next b pme (fun (CID : CpuId) =>
+    ∀ (mr : regfile),
+      ⌜ callee_saved m mr ⌝ -∗
+      pc_is ret_tgt -∗
+      allocproc_post γa γf γs lvl eb pme C on b mr K
+        (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type ALLOCPROC_GEN.
+  Parameter wp_allocproc_core :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+      (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_allocproc_core_body γa γp γf Φ γs m lvl K eb pme C on b.
+End ALLOCPROC_GEN.
 
 Module Type ALLOCPROC.
   Parameter wp_allocproc_sconf :
