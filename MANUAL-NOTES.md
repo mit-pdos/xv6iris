@@ -55,7 +55,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - bug: freeproc did not hold wait_lock when zeroing out p->parent
 - bug: fence.i missing when jumping to userspace code
 - bug: missing fence iorw,iorw in virtio disk driver
-- RVWMO doesn't cover icache behavior, Sail model doesn't include icache either
+- RVWMO doesn't cover icache behavior, Sail model doesn't include icache either; also no precise model of MMIO/DMA
 
 Big things that still need to be done/explored:
 
