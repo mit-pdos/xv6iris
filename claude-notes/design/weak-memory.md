@@ -1,10 +1,12 @@
 # Design: weak memory (RVWMO)
 
-STATUS (2026-08): M0–M2 are LANDED on branch `weak-memory` (the promise-free
+STATUS (2026-08): M0–M3 are LANDED on branch `weak-memory` (the promise-free
 machine + litmus suite, the weak interpreter/language/base logic with a
 closed adequacy skeleton, the vProp surface with the split axiom, the
-pinned-fragment transfer bridge, fence/AMO rules). M3 (vertical slice) is
-next. The staged worklist with per-stage established-facts blocks is
+pinned-fragment transfer bridge, fence/AMO rules, the instruction-leaf layer,
+and the vertical slice: the step certificate, the spinlock and the `started`
+escrow). M4 (the sweep) is next; its recipe is
+[`projects/weak-memory-porting.md`](../projects/weak-memory-porting.md). The staged worklist with per-stage established-facts blocks is
 [`projects/weak-memory.md`](../projects/weak-memory.md); where a landed
 stage corrected a decision below, the correction is noted inline at that
 decision.
@@ -495,6 +497,22 @@ this tractable:
   accesses (lock words, `started`, virtio ring) drop to the weak arm and get
   new leaves — which is exactly the design's intended split. Port no leaf by
   hand that the bridge can carry.
+- **The step CERTIFICATE is the sweep's second force multiplier — LANDED at
+  M3b as `iris/WeakCert.v`.** The per-instruction obligation the bridge does
+  NOT discharge is the structural one — "which bytes does this step touch",
+  i.e. `WeakBridge.wstep_ok` over the whole `riscv_step` — and M3a estimated
+  it at the size of the model walk `exec_riscv_step_hart_active` /
+  `exec_hart_active_progress` do, per instruction. It is instead ONE
+  instruction-independent theorem: run the SC interpreter on a memory
+  RESTRICTED to the instruction's window, and since `exec`'s read arm fails on
+  an absent byte, every read is inside the window by construction (writes by
+  the final memory's domain; `Choose` is impossible because `exec` is stuck
+  there). Per instruction the cost drops to re-instantiating the leaf's OWN
+  SC lemma at the restricted state. What the certificate cannot give is the
+  instruction's weak-memory EFFECT (`.aq` raising the scalar floor, the fence
+  moving the index, the store's message identity) — `exec` ignores access
+  kinds and barriers, so that stays a per-instruction ISA obligation, and only
+  the three sync instructions have one.
 - Build the new tree in parallel namespaces first (M0–M3 touch no existing
   file), validate the interfaces on a vertical slice (spinlock + one client
   cone + the started handoff), THEN sweep.

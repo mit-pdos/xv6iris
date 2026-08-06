@@ -191,8 +191,16 @@ are working on that effort — the relevant `projects/` file.
   (start/main + the sync/exit ecall stubs).
 - **[`weak-memory.md`](projects/weak-memory.md)** — the weak-memory effort's
   staged worklist (M0 model spike → base logic → vProp surface → vertical
-  slice → sweep → devices → the LB robustness theorem). Nothing landed;
-  design in [`design/weak-memory.md`](design/weak-memory.md).
+  slice → sweep → devices → the LB robustness theorem), with a
+  what-this-stage-established block per landed stage. M0–M3 are landed on
+  branch `weak-memory`; design in
+  [`design/weak-memory.md`](design/weak-memory.md).
+- **[`weak-memory-porting.md`](projects/weak-memory-porting.md)** — the
+  per-file recipe for the M4 sweep, written from the M3b slice: the mechanical
+  spellings (`↦ₘ`→`↦w`, `instr`→`wkernel_text`, exec-facts over `wflat_st`),
+  the `wstep_cert` skeleton (run the SC interpreter on a memory restricted to
+  the instruction's window — no model walking), the racy sites that need
+  thought, and the failure modes that compile.
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
   driver: uartwrite, uartintr and uartgetc, all proven (uart.c 4/4). The
   `tx_lock` invariant (`UartTxInv.v`) whose implication "`tx_busy == 0` ⟹

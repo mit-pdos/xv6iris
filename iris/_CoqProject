@@ -754,3 +754,7 @@ WeakVProp.v
 WeakBridge.v
 WeakFence.v
 WeakInstr.v
+WeakStore.v
+WeakCert.v
+WeakLock.v
+WeakStarted.v

@@ -5,8 +5,11 @@ Branch: `weak-memory`. Landed: M0 (`iris/WeakMem.v`, `iris/WeakLitmus.v`),
 M1a (`iris/WeakInterp.v` + fwd-bank wire-in), M1b (`iris/WeakLang.v`),
 M1c (`iris/WeakGhost.v`, `iris/WeakExec.v`, `iris/WeakAdequacy.v`),
 M2a (`iris/WeakView.v`, `iris/WeakVProp.v`),
-M2b (`iris/WeakBridge.v`, `iris/WeakFence.v`, + `ws_bounded`).
-Next: M3.
+M2b (`iris/WeakBridge.v`, `iris/WeakFence.v`, + `ws_bounded`),
+M3a (`iris/WeakInstr.v`), M3b (`iris/WeakStore.v`, `iris/WeakCert.v`,
+`iris/WeakLock.v`, `iris/WeakStarted.v`).
+Next: M4 — and read
+[`weak-memory-porting.md`](weak-memory-porting.md) first.
 
 ## M0 — model spike (no Iris)
 
@@ -434,14 +437,17 @@ Validate the operational design before anything depends on it.
       instruction rule `wp_winstr`, the four leaves' P/Q pairs and their
       resource-side lemmas (load, store/release-deposit, the amoswap acquire
       in its INVARIANT form, fence), and two leaf-composition smoke tests.
-- [ ] `WpLock.v` rework: objective `lock_inv` with `@V R` deposit;
-      acquire/release re-proven; `locked` token unchanged.
+- [x] **M3b — the vertical slice** (`WeakStore.v` 435 / `WeakCert.v` 505 /
+      `WeakLock.v` 353 / `WeakStarted.v` 194 lines; 6.7 / 3.1 / 3.3 / 1.9 s):
+      DONE, with cuts (see the block below).  The `↦w₄` store-window update,
+      the `wstep_cert` discharge (as a SINGLE instruction-independent
+      theorem — see below), the lock library core (objective `wlock_inv`,
+      `wis_lock`, `wlocked`, acquire/release cores) and the started escrow.
 - [ ] One lock-client cone re-proven unchanged-in-statement (candidate:
-      kinit/kfree — small, pure lock+memory).
-- [ ] `StartedInv.v` escrow → view-transferring form; ProofMainSecondary's
-      spin+fence path over the new leaves.
-- [ ] Porting guide written from what the slice taught (the
-      explicit-cpuid-porting-guide precedent).
+      kinit/kfree — small, pure lock+memory).  NOT done: it needs the leaf
+      layer's memory arms, i.e. M4's first batch.
+- [x] Porting guide written from what the slice taught:
+      [`weak-memory-porting.md`](weak-memory-porting.md).
 
 ### What M3a established (read before M3b)
 
@@ -596,6 +602,124 @@ Validate the operational design before anything depends on it.
   on the writer and `wwp_fence_scl` on the reader
   (`WeakMem.load_post_vrOld_nofwd` supplies the `t ≤ w_vrOld` premise);
   (f) every register/config resource is unchanged in statement.
+
+### What M3b established (read before M4)
+
+- **Inventory**: four NEW files, nothing existing touched.
+  `iris/WeakStore.v` 435 lines / 6.7 s (the `↦w₄`/`wlat4` store-window
+  update), `iris/WeakCert.v` 505 / 3.1 (the step certificate),
+  `iris/WeakLock.v` 353 / 3.3 (the lock), `iris/WeakStarted.v` 194 / 1.9 (the
+  handoff).  Full build green; `proof_coverage.py --check`, `lemma_diff.py`,
+  `spec_vacuity.py` clean.  **Axiom footprint**: `wstep_ok_confined`,
+  `wacquire_core`, `wrelease_core`, `wlat4_store`, `wpt4_store` and every
+  other lemma that does not mention `riscv_step` are **closed under the
+  global context**; only `wstep_cert_conf`/`_none` (which do) carry the 5
+  rv64d platform axioms.  `weak_system_adequacy`'s footprint is unchanged.
+
+- **THE `wstep_cert` PEEL DOES NOT HAVE TO BE WALKED, AND THIS IS THE M4
+  PRICING DATUM.**  M3a estimated the per-instruction peel at the size of
+  `exec_riscv_step_hart_active` + `exec_hart_active_progress_base_gen` + the
+  three `exec_fetch_*` mirrors, plus an `execR`-level analogue — i.e. a
+  four-figure line count of model walking, per instruction.  That is wrong.
+  `WeakBridge.wstep_ok`'s content is entirely "WHICH BYTES does this step
+  touch", and `RiscvExec.exec`'s RAM read arm RETURNS `None` on a byte the
+  memory map does not contain.  So **run the SC interpreter on a memory
+  RESTRICTED to the instruction's window** and every read of the run is
+  inside that window by construction; writes are confined by the domain of
+  the FINAL memory (`exec_dom_mono`: memory only grows along a run); the
+  restriction agrees with the real memory, so the confined run IS the real
+  run; and a `Choose` is impossible because `exec` is stuck there — which
+  discharges the `wexec_covers` half of the merge for free.
+  `WeakCert.wstep_ok_confined` is that theorem (one induction, the shape of
+  `WeakBridge.exec_of_wexec_pinned`), and `wstep_cert_conf_none` is it
+  packaged: **for EVERY instruction at every pc, the `wstep_ok` half of the
+  certificate holds under one predicate, `wP_conf`.**  Shared skeleton: 505
+  lines / 3.1 s, ONCE.  Per-instruction marginal cost: the window `W` (the
+  text word + the data word), plus the leaf's OWN SC library lemma
+  instantiated at a SECOND state whose memory is `wmem_restrict σ W` —
+  ~20–40 lines, no model reduction, no `vm_compute`, nothing new about the
+  instruction.  Wrap-freedom (`acc_wf`) comes from the window for free
+  (`acc_wf_window`: a wrapping range passes through address 0, and RAM does
+  not contain it).
+
+- **WHAT THE CERTIFICATE STILL CANNOT GIVE, and why it is not a shortcut.**
+  `wstep_cert`'s second component `Q` — the instruction's WEAK-MEMORY EFFECT
+  (the `.aq` raised the scalar floor; the fence moved the index; the store
+  appended THIS message) — is invisible to `exec`, which ignores access kinds
+  and barriers entirely.  No semantic argument over `exec` can produce it, so
+  it stays a per-instruction ISA obligation of the same nature as a decode
+  fact — but only the three sync instructions have one worth stating, and a
+  plain load or ALU instruction takes `wQ_none`, where the certificate is
+  UNCONDITIONAL.
+
+- **CORRECTION TO M3a'S INTERFACE: `wstep_cert`'s `Q` must be
+  `wmstate -> wmstate -> Prop`, not `wmstate -> wstate -> Prop`.**  Found by
+  the release core, and it is not about views at all: the lock invariant OWNS
+  the lock word's latest-write ELEMENTS, and any step that writes those bytes
+  invalidates them, so re-establishing `wmstate_interp σ'` requires
+  RETARGETING them at the message the step appended — i.e. the certificate
+  must say WHICH message that was, which is a statement about `wm_log σ'`.
+  `wstep_post` says only `∃ l, wm_log σ' = wm_log σ ++ l`, so a STORE leaf
+  built on `wp_winstr` as it stands is unprovable.  The fix is one type, after
+  which `wQ_store`/`wQ_amo_aq` become `WeakLock.wstore_eff`/`wamo_eff` and
+  `wp_winstr`'s proof is unchanged apart from passing `σ'` instead of
+  `wm_ws σ'`.  The M3b cores are stated at the post-fix shape, so landing it
+  is a substitution, not a re-proof.
+
+- **THE LOCK, AS LANDED.**  The invariant is kept ENTIRELY AT THE `iProp`
+  ALTITUDE (the Cosmo pattern) and the `vProp` surface appears only in the
+  payload:
+
+      wlock_inv γ lk R := ∃ st t v, wlat4 lk (DfracOwn 1) t v ∗ lock_auth γ st ∗
+                            ( ⌜st = None⌝ ∗ ⌜v = 0⌝ ∗ lock_frag γ None ∗
+                              monPred_at R (view_scl t)
+                            | ⌜st ≠ None⌝ ∗ ⌜v ≠ 0⌝ )
+      wis_lock γ lk R := ⎡inv wlockN (wlock_inv γ lk R)⎤   (persistent AND objective)
+      wlocked γ i     := ⎡WpLock.locked γ i⎤               (today's token, verbatim)
+
+  Objectivity is free three times over: `wlat4` is an `iProp` (M3a),
+  `monPred_at R V` is objective by construction for ANY `vProp` `R`, and the
+  ghost state is `WpLock`'s own `excl_auth` — so `lockG`, `lock_state`,
+  `lock_auth/frag` and all four transition lemmas are REUSED, not cloned, and
+  a client's holder token is unchanged in statement.  **The number that links
+  the two halves is the timestamp**: the payload is frozen at `view_scl t`
+  with `t` the timestamp `wlat4` carries, the releaser deposits at the
+  timestamp its own store takes (`wwp_release_deposit`, resting on
+  `ws_bounded`), and the acquirer's `amoswap.w.aq` reads THAT timestamp and
+  gains `view_scl t ⊑ ws_view` — so the thaw is one `monPred_mono` and no
+  view ever crosses the invariant boundary.
+  Kept: the lock WORD, the ghost layer, the holder token, the transfer of
+  `R`.  Deferred (M4 bookkeeping, no design content): the `lk->cpu` and
+  `lock_name` fields, both 8-byte cells needing the `↦w₈` tower M2b cut — so
+  `lock_state` only ever takes `None` and `Some (i, true)` here, and the
+  intermediate state is passed through by composing `WpLock`'s own two
+  transitions.
+
+- **THE CONTENDED ARM OF THE ACQUIRE IS NOT A NO-OP ON THE WEAK STATE.**
+  `amoswap` writes 1 back even when it read 1, so the invariant's elements are
+  retargeted at the new message in BOTH arms — which is why the bundle is held
+  at FULL fraction in the invariant and why `WeakStore.wlat4_store_gen` is
+  needed on the acquire path and not only on the release path.
+
+- **THE STARTED ESCROW NEEDED ONE THING THE SC VERSION DID NOT.**  The writer
+  is structurally identical to the release (deposit at the store's own
+  timestamp, retarget the elements) and the reader is `wwp_fence_scl` over
+  `load_post_vrOld_nofwd`.  But a PLAIN load may read a stale message, so "I
+  read a nonzero flag" does not identify WHICH message was read; the escrow
+  therefore carries `wstarted_oneshot` (every non-clear write to the byte is
+  the setter's message, the era image holding the flag clear), which is
+  preserved by every append that does not write the byte —
+  `wstarted_oneshot_app`.  The payload is persistent, as today, and for the
+  same reason (up to NCPU−1 readers take a copy).
+
+- **CUTS**, from the bottom as instructed: (i) the spin-loop composition (the
+  iLöb over `wp_winstr`) — the single-step cores are the floor and they
+  landed; (ii) the WP-level composition of the cores THROUGH `wp_winstr` (they
+  are stated at the `σ`/`σ'` altitude `wp_winstr` hands a leaf, and the `Q`
+  type correction above must land first); (iii) the lock's `cpu`/`name`
+  fields; (iv) the certificate's `Q` half for the four concrete instructions
+  (the `wstep_ok` half is discharged for ALL instructions at once, which is
+  the part that was estimated as expensive).
 
 ## M4 — the sweep
 
