@@ -191,7 +191,7 @@ Section WeakHart.
   Proof.
     iIntros (Hgid) "H".
     iApply (wp_lift_step (Λ := weak_riscv_lang)); first done.
-    iIntros (g ns κ κs nt) "(%Hpin & %Hbnd & Hgr & Hdev & Hlog & Hlat & Hws)".
+    iIntros (g ns κ κs nt) "(%Hpin & %Hbnd & %Hwf & Hgr & Hdev & Hlog & Hlat & Hws)".
     destruct Hpin as [Hpow Hgen].
     assert (Hlive : wthread_live g gen_id) by (split; [exact Hpow|by rewrite Hgid]).
     iDestruct (gregs_interp_acc with "Hgr") as "[Hri Hclose]".
@@ -200,6 +200,7 @@ Section WeakHart.
       as "(%Hred & Hk)".
     { rewrite /wmstate_interp /whart_view /=.
       iSplitR; [iPureIntro; exact (Hbnd cpu_id)|].
+      iSplitR; [iPureIntro; exact Hwf|].
       iFrame "Hri Hdev Hlog Hlat Hwsc". }
     iModIntro. iSplitR.
     { iPureIntro. destruct Hred as (χ & σ0 & χ' & Hex).
@@ -222,7 +223,7 @@ Section WeakHart.
       rewrite whart_view_log in Hlext. rewrite Hlext length_app. lia. }
     iIntros "_".
     iMod ("Hk" $! tick s' with "[//]")
-      as "((%Hbnd' & Hri' & Hdev' & Hlog' & Hlat' & Hwsc') & HWP)".
+      as "((%Hbnd' & %Hwf' & Hri' & Hdev' & Hlog' & Hlat' & Hwsc') & HWP)".
     assert (Hbnd2 : ∀ c : CPU,
               ws_bounded (wgws (whart_write g cpu_id s') c)
                          (length (wglog (whart_write g cpu_id s')))).
@@ -238,6 +239,7 @@ Section WeakHart.
     rewrite /weak_state_interp /=.
     iSplitR; [by iPureIntro; split|].
     iSplitR; [iPureIntro; exact Hbnd2|].
+    iSplitR; [iPureIntro; rewrite whart_write_log; exact Hwf'|].
     iFrame "Hgr' Hdev' Hlog' Hlat' Hws'".
   Qed.
 

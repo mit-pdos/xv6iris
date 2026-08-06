@@ -421,6 +421,7 @@ Section resources.
   Definition weak_state_interp (g : wgstate) : iProp Σ :=
     (⌜wgen_pin g⌝ ∗
      ⌜∀ c : CPU, ws_bounded (wgws g c) (length (wglog g))⌝ ∗
+     ⌜wlog_wf (wglog g)⌝ ∗
      gregs_interp (wgregs g) ∗
      dev_interp (wgdev g) ∗
      wlog_auth (wglog g) ∗
@@ -435,6 +436,7 @@ Section resources.
       the lifting rule hands out and takes back at the successor state. *)
   Definition wmstate_interp `{CpuId} (σ : wmstate) : iProp Σ :=
     (⌜ws_bounded σ.(wm_ws) (length σ.(wm_log))⌝ ∗
+     ⌜wlog_wf σ.(wm_log)⌝ ∗
      reg_interp σ.(wm_regs) ∗
      dev_interp σ.(wm_dev) ∗
      wlog_auth σ.(wm_log) ∗

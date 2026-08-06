@@ -426,6 +426,14 @@ Validate the operational design before anything depends on it.
 
 ## M3 — vertical slice (the interface test)
 
+- [x] **M3a — the weak instruction-leaf layer** (`iris/WeakInstr.v` 800 lines /
+      9.1 s; + the two M2b-queued cleanups): DONE, with cuts (see the block
+      below).  Scope delivered: the merged peel `wstep_ok`, `wlog_wf` in both
+      state interpretations, the flat-lookup resource bridge, `↦w₄`,
+      `wkernel_text`, the per-instruction step CERTIFICATE `wstep_cert`, the
+      instruction rule `wp_winstr`, the four leaves' P/Q pairs and their
+      resource-side lemmas (load, store/release-deposit, the amoswap acquire
+      in its INVARIANT form, fence), and two leaf-composition smoke tests.
 - [ ] `WpLock.v` rework: objective `lock_inv` with `@V R` deposit;
       acquire/release re-proven; `locked` token unchanged.
 - [ ] One lock-client cone re-proven unchanged-in-statement (candidate:
@@ -434,6 +442,160 @@ Validate the operational design before anything depends on it.
       spin+fence path over the new leaves.
 - [ ] Porting guide written from what the slice taught (the
       explicit-cpuid-porting-guide precedent).
+
+### What M3a established (read before M3b)
+
+- **Inventory**: `iris/WeakInstr.v` (new, ~800 lines / 9.1 s);
+  `WeakBridge.v` +150 (§11, the merged peel); `WeakGhost.v` +2,
+  `WeakExec.v` +3, `WeakAdequacy.v` +2 (all `wlog_wf`).  Full build green.
+  `proof_coverage.py --check`, `lemma_diff.py`, `spec_vacuity.py` all clean.
+  **Axiom footprint**: everything that does not mention `riscv_step` —
+  `wexec_leaf_agree`, `wwp_lw4`, `wwp_amoswap_w_aq_inv`, `wwp_fence_deliver`,
+  `wwp_release_deposit`, all the bridges — is **closed under the global
+  context**; `wp_winstr` carries exactly the 5 rv64d platform axioms, and
+  `weak_system_adequacy`'s footprint is byte-identical to M2b's.
+
+- **THE PEEL IS MERGED, AND THE MERGE IS ALSO A WEAKENING.**
+  `WeakBridge.wstep_ok` = `pinned_exec` with the `Choose` arm turned from
+  `True` into `False`.  It is strictly WEAKER than `pinned_exec ∧
+  mchoice_free`: `mchoice_free`'s memory arms quantify over EVERY possible
+  read result, whereas on the pinned fragment `wread_pinned_ts` forces the
+  run's timestamps to the canonical ones, so choice-freedom is only needed
+  along the successors `wstep_ok` already speaks about
+  (`wrun_wexec_wstep_ok`).  ONE lemma consumes it:
+  `wexec_leaf_agree tid m s x0 t0 : wstep_ok → wlog_wf → exec m (wflat_st s) =
+  Some (x0,t0) → wexec_covers ∧ reducibility ∧ (∀ oracle, value/regs/dev/flat
+  agreement ∧ `wlog_wf` of the successor)`.
+
+- **`wlog_wf` IS NOW A STATE-INTERPRETATION CONJUNCT**, third in
+  `weak_state_interp` (after `wgen_pin`, `ws_bounded` — the device rules
+  destruct only the first and were unaffected) and second in
+  `wmstate_interp`.  Unlike `ws_bounded` its preservation is NOT a theorem
+  about `wrun` (a wrapping write is genuinely not `wflat`-describable), so it
+  is passed OUT to the caller and taken back from the caller's re-established
+  interpretation — which a leaf discharges from its own peel via
+  `wexec_leaf_agree`.  Only `wp_wrun_step` needed touching (+3 lines).
+
+- **THE CONFIG-TOWER VERDICT: REUSABLE AS-IS, and nothing had to move.**
+  `hw_config`, `mmode_config`, the sconf bundles and `kmap_static_claims` are
+  conjunctions of REGISTER points-to, pure facts and ghost state — `iProp`s
+  over `riscvGS`, which the weak side carries unchanged — and
+  `wmstate_interp σ` contains `reg_interp (wm_regs σ)` with
+  `wm_regs σ = sregs (wflat_st σ)`, so `reg_valid`/`reg_valid_dq`/`reg_update`
+  apply verbatim and the exec-facts they feed are facts about a state whose
+  registers ARE the weak hart's.  Embedded into `vProp` they are objective by
+  `embed_objective`: no view plumbing anywhere.  The ONLY non-transferring
+  lemmas are the ones that consume `RiscvPtsto.mstate_interp` AS A BUNDLE
+  (`fetch_from_instr_bytes`, `instr_lift`, `dispatchInterrupt_none_from_regs`,
+  `state_interp_reg_dq`, `wp_instr`), because that bundle contains
+  `gen_heap_interp`; each is a mechanical restatement with the memory
+  hypothesis taken as the pure fact §1 of `WeakInstr.v` produces.
+
+- **THE RESOURCE→FLAT BRIDGE IS ONE LINE OF CONTENT**: a `γlat` element says
+  its byte's LATEST write is `(t,v)` and `WeakLang.wflat_latest` says the flat
+  projection holds the latest write, so an element AT ANY TIMESTAMP determines
+  the flat byte — `wlat_flat_lookup`, with no hypothesis about the reader's
+  views.  Corollaries: `wpt_flat_lookup` (owned), `wpt_img_flat_lookup_gen`
+  (also returns `latest_ts = t`), `wpt4_flat`.  This is what makes the whole
+  fetch/decode side a statement about `wflat_st`.
+
+- **`wkernel_text bs := [∗ map] a↦b ∈ bs, wlat_pointsto (pa_z a) □ 0 b`** —
+  an `iProp`, i.e. objective and unconditionally shareable; `wkernel_text_v`
+  is the `wpt_img`-spelled `vProp` twin and `wkernel_text_at` identifies them
+  at any `ws`.  `wkernel_text_flat` gives the two facts a fetch reduction
+  takes (the flat byte, and `latest_ts = 0`), and `wkernel_text_pinned` turns
+  a window of text into the `pinned_read` obligation for free.
+
+- **`↦w₄` (`wpt4 a dq w`)**: 4-alignment ∗ `acc_wf a 4` (wrap-freedom —
+  carried IN the bundle, because it is what lets `acc_wf_byte` convert between
+  the log's `Z` key `acc_addr a j` and the flat map's `pa_add a j` wherever
+  the bundle is) ∗ four explicit `↦w` bytes at `acc_addr a j`.  Deliberately
+  NOT a `big_sepL`: the four-fold `∗` makes every extraction a `destruct j as
+  [|[|[|[|]]]]` and dodges the `big_sepL`/`monPred_at` elaboration traps.
+  With `wpt4_split`/`wpt4_agree`/`wpt4_flat`/`wpt4_pinned`/`wpt4_mono`.
+
+- **THE INSTRUCTION RULE, AND THE ONE THING THAT DID NOT TRANSFER.**
+  `wp_winstr Φ pc P Q` takes `gen_id = 0`, `acc_wf pc 4`, a
+  `wstep_cert (fin_to_nat cpu_id) pc P Q`, and a callback that — given
+  `wmstate_interp σ` — returns `PC = pc`, the text-pinnedness of the four
+  fetch bytes, `P σ`, and the SAME `exec` facts today's
+  `wp_exec_step_decode_execute_inv` takes but **over `WeakBridge.wflat_st σ`**
+  (both tick values), plus a continuation over `(tick, σ')` receiving
+  `wstep_post σ σ'` and `Q σ (wm_ws σ')`.  `wstep_post` is the successor
+  contract: registers/devices/flat memory are the SC ones, the image is
+  unchanged, the log only grew, **`ws_le (wm_ws σ) (wm_ws σ')`** (this is what
+  `vwp_hold_mono` consumes, so every untouched resource crosses for free), and
+  `wlog_wf`/`ws_bounded` are re-established.
+  **THE GAP, and it is the honest one:** `wstep_ok` for the WHOLE
+  `riscv_step tick` is a STRUCTURAL peel of `try_step`/`run_hart_active`/
+  `fetch`/decode/`execute` — the same walk `RiscvExec.exec_riscv_step_hart_active`
+  and `RiscvFetchExec.exec_hart_active_progress` do for `exec`, and of the same
+  size (it needs an `execR`-level analogue and mirrors of the three
+  `exec_fetch_*` reductions).  There is no way around it: pinnedness is
+  per-ADDRESS, so the read footprint must be identified structurally, and no
+  state-level condition weaker than "my view covers the whole log" implies it.
+  It is therefore PACKAGED as a per-instruction pure obligation of the same
+  nature as a decode fact — `wstep_cert cid pc P Q` — whose hypotheses (`PC =
+  pc`, text unwritten, `P σ`) the resource-side lemmas discharge, and whose
+  second component `Q` also carries the instruction's WEAK-MEMORY EFFECT (that
+  the fence really moved the index, that the acquire really took the read
+  timestamp).  **Building the certificates for concrete instructions is the
+  first task of M3b or an M3a follow-up**; `wstep_cert_mono` is the
+  contravariant/covariant weakening.
+
+- **THE FOUR LEAVES**, as `P`/`Q` pairs plus their resource-side lemmas:
+  - `lw`/`ld` (4-byte): `wP_load ea = acc_wf ea 4 ∧ ∀ j<4, pinned_read σ
+    (acc_addr ea j)`, `Q = wQ_none`.  `wwp_lw4` : from `wlat_interp` and
+    `vwp_hold (wpt4 ea dq w) (wm_ws σ)` — `⌜wP_load ea σ ∧ ∀ j<4, wflat … !!
+    pa_add ea j = Some (nth_byte w j)⌝`, i.e. the peel obligation AND the
+    premise `exec_execute_LOAD_*` takes, verbatim.  `wwp_lw4_carry` frames the
+    word across the step.
+  - `sw`/`sd`: `wP_mem ea = acc_wf ea 4` (a store has no read to pin),
+    `wQ_store ea σ ws' = ∀ j<4, S (length (wm_log σ)) ≤ flr (ws_view ws')
+    (acc_addr ea j)`.  **The store's timestamp is `S (length (wm_log σ))` and
+    it is visible to the caller because `σ` is** — no `Q` needed to expose it.
+    `wwp_release_deposit R σ : ws_bounded (wm_ws σ) (length (wm_log σ)) →
+    vwp_hold R (wm_ws σ) ⊢ monPred_at R (view_scl (S (length (wm_log σ))))` is
+    the composition `release` needs (the objective payload for the invariant);
+    `wwp_sw4_post` is the byte-view form.
+  - `amoswap.w.aq`, INVARIANT FORM — `wwp_amoswap_w_aq_inv R σ ws' ea dq t w`:
+    `wlog_wf → acc_wf ea 4 → wQ_amo_aq ea σ ws' → wlat_interp -∗ wlat4 ea dq t w
+    -∗ monPred_at R (view_scl t) -∗ ⌜wP_mem ea σ⌝ ∗ ⌜∀ j<4, wflat … !! pa_add ea
+    j = Some (nth_byte w j)⌝ ∗ ⌜view_scl t ⊑ ws_view ws'⌝ ∗ vwp_hold R ws'`.
+    `wlat4` is a bare four-element bundle of `wlat_pointsto`, i.e. an `iProp`,
+    i.e. OBJECTIVE — so it lives in the lock invariant, and the rule fires off
+    it with NO ownership and NO view hypothesis about the acquirer (the read
+    half is `ak_latest`, whose admissibility condition IS `WeakMem.latest`).
+    The `⌜…⌝`s are the peel obligation and the SC premise; the last conjunct
+    is the THAW of whatever the releaser deposited at `view_scl t`.
+  - `fence`: `wP_none`, `wQ_fence b σ ws' = ws_le (barrier_post (wm_ws σ) b)
+    ws'`.  `wwp_fence_deliver` : `vwp_acq R (wm_ws σ) ⊢ vwp_hold R ws'` for
+    `rw,rw`; `wwp_fence_scl` : an assertion deposited at a scalar view the
+    hart has READ (`t ≤ w_vrOld`) is delivered; `wwp_fence_rw_w` for the
+    release kind (promise-free, it carries no read-side content — the
+    writer's content is `wwp_release_deposit`).  The two kernel kinds
+    instantiate directly; full `barrier_kind` genericity was CUT.
+
+- **CUTS**, from the bottom as instructed (the amoswap invariant form was
+  never at risk): (i) the `↦w₄` UPDATE across a store — a 4-byte message needs
+  `WeakGhost.wlat_agree_store` generalised from one byte to a window, which is
+  ~40 lines of `<[…]>`-chain bookkeeping and is the first thing to add;
+  (ii) the fence leaf's full kind-genericity; (iii) the smoke test is at the
+  LEAF-COMPOSITION altitude (`wwp_smoke_sw_fence` = release-deposit then
+  fence, `wwp_smoke_amo_lw` = acquire-thaw then carry) rather than a literal
+  double `wp_winstr` application; (iv) `wstep_cert`'s discharge (above).
+
+- **WHAT M3b CONSUMES.** Re-proving `acquire`/`release` needs: (a) a
+  `wstep_cert` per instruction of the two functions — the outstanding work;
+  (b) the lock invariant holds `∃ t v, wlat4 lk □/frac t v ∗ R @@ view_scl t`,
+  which is objective because `wlat4` is an `iProp` and `@@` is objective by
+  construction; (c) `acquire` = `wwp_amoswap_w_aq_inv` (thaws `R` at the
+  acquirer's index) + `wwp_lw4` for the spin re-read; (d) `release` =
+  `wwp_release_deposit` at `S (length (wm_log σ))` (the store's timestamp),
+  put back into the invariant; (e) the `started` handoff = `wwp_release_deposit`
+  on the writer and `wwp_fence_scl` on the reader
+  (`WeakMem.load_post_vrOld_nofwd` supplies the `t ≤ w_vrOld` premise);
+  (f) every register/config resource is unchanged in statement.
 
 ## M4 — the sweep
 

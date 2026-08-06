@@ -753,3 +753,4 @@ WeakView.v
 WeakVProp.v
 WeakBridge.v
 WeakFence.v
+WeakInstr.v

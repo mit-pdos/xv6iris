@@ -684,3 +684,178 @@ Proof.
   apply (wexec_pinned_agree tid _ s _ t' Hp Hwf).
   exact (exec_execute_ITYPE_ADDI imm rs1 rd a (wflat_st s) t' Ha Hw).
 Qed.
+
+(* ====================================================================== *)
+(** ** 11. THE MERGED PEEL: [wstep_ok] (M3a, item 1)
+
+    M2b left a leaf with TWO obligations over the same peeled instruction:
+    [pinned_exec] (this file, §5 — the per-access side conditions of the
+    transfer) and [WeakExec.mchoice_free] (the sufficient condition for
+    [WeakExec.wexec_covers]).  Doing the same peel twice is pure overhead,
+    and it is also more than necessary: [mchoice_free] demands
+    choice-freedom of the continuation at EVERY possible read result,
+    whereas on the PINNED fragment every admissible read returns the
+    canonical one.  So the two merge into a single predicate — [pinned_exec]
+    with the [Choose] arm turned from [True] into [False] — which is
+    strictly WEAKER than their conjunction and still delivers everything.
+
+    A leaf's obligation is now exactly ONE peel, and
+    [wexec_leaf_agree] is the one lemma it applies: reducibility, the
+    ∀-oracle agreement, the [wexec_covers] premise of
+    [WeakExec.wp_wexec_step], and the [wlog_wf] of the successor, all off
+    that single predicate plus the [exec] fact the SC library already
+    supplies. *)
+Require Import WeakExec.
+
+Fixpoint wstep_ok (tid : option nat) {X} (m : M X) (s : wmstate) {struct m}
+    : Prop :=
+  match m with
+  | Interface.Ret _ => True
+  | Interface.Next oc k =>
+      (match oc in Interface.outcome _ T return (T -> M X) -> Prop with
+       | Interface.RegRead r _ =>
+           fun k => wstep_ok tid (k (register_lookup r s.(wm_regs))) s
+       | Interface.RegWrite r _ v => fun k => wstep_ok tid (k tt) (wset_reg s r v)
+       | Interface.MemRead n req =>
+           fun k =>
+             if dev_addr (Interface.ReadReq.pa req) then
+               forall w d',
+                 dev_read s.(wm_dev) (Interface.ReadReq.pa req) n = Some (w, d') ->
+                 wstep_ok tid (k (inl (w, None))) (wset_dev s d')
+             else
+               acc_wf (Interface.ReadReq.pa req) n /\
+               (ak_pins (classify (Interface.ReadReq.access_kind req)) = false ->
+                  forall j, (j < N.to_nat n)%nat ->
+                    pinned_read s (acc_addr (Interface.ReadReq.pa req) j)) /\
+               (forall w,
+                  wread_bytes s (classify (Interface.ReadReq.access_kind req))
+                    (Interface.ReadReq.pa req) n
+                    (coh_ts s (Interface.ReadReq.pa req) n) = Some w ->
+                  wstep_ok tid (k (inl (w, None)))
+                    (wread_post s (classify (Interface.ReadReq.access_kind req))
+                       (Interface.ReadReq.pa req)
+                       (coh_ts s (Interface.ReadReq.pa req) n)))
+       | Interface.MemWrite n req =>
+           fun k =>
+             if dev_addr (Interface.WriteReq.pa req) then
+               forall d',
+                 dev_write s.(wm_dev) (Interface.WriteReq.pa req) n
+                           (Interface.WriteReq.value req) = Some d' ->
+                 wstep_ok tid (k (inl None)) (wset_dev s d')
+             else
+               acc_wf (Interface.WriteReq.pa req) n /\
+               wstep_ok tid (k (inl None))
+                 (wwrite_post tid s
+                    (classify (Interface.WriteReq.access_kind req))
+                    (Interface.WriteReq.pa req) n (Interface.WriteReq.value req))
+       | Interface.Barrier b =>
+           fun k => wstep_ok tid (k tt) (wset_ws s (barrier_post s.(wm_ws) b))
+       | Interface.InstrAnnounce _   => fun k => wstep_ok tid (k tt) s
+       | Interface.BranchAnnounce _ _=> fun k => wstep_ok tid (k tt) s
+       | Interface.CacheOp _         => fun k => wstep_ok tid (k tt) s
+       | Interface.TlbOp _           => fun k => wstep_ok tid (k tt) s
+       | Interface.TakeException _   => fun k => wstep_ok tid (k tt) s
+       | Interface.ReturnException _ => fun k => wstep_ok tid (k tt) s
+       | Interface.TranslationStart _=> fun k => wstep_ok tid (k tt) s
+       | Interface.TranslationEnd _  => fun k => wstep_ok tid (k tt) s
+       | Interface.CycleCount        => fun k => wstep_ok tid (k tt) s
+       | Interface.Message _         => fun k => wstep_ok tid (k tt) s
+       | Interface.GetCycleCount     => fun k => wstep_ok tid (k 0%Z) s
+       (* THE ONLY ARM THAT DIFFERS FROM [pinned_exec]: a [Choose] is what
+          breaks the [wrun] -> [wexec] bridge, so it is ruled out here. *)
+       | Interface.Choose _          => fun _ => False
+       (* GenericFail / Discard / ExtraOutcome: both interpreters are stuck,
+          so there is nothing to require *)
+       | _ => fun _ => True
+       end) k
+  end.
+
+(** The merged predicate implies the transfer's side conditions ... *)
+Lemma wstep_ok_pinned tid {X} (m : M X) :
+  forall s, wstep_ok tid m s -> pinned_exec tid m s.
+Proof.
+  induction m as [y|T oc k IH]; intros s Hok; [exact I|].
+  destruct oc; simpl in Hok |- *; try exact I;
+    try (exact (IH _ _ Hok)).
+  - (* MemRead *)
+    destruct (dev_addr _).
+    + intros w d' Hd. exact (IH _ _ (Hok w d' Hd)).
+    + destruct Hok as (Hacc & Hpin & Hk).
+      split_and!; [exact Hacc|exact Hpin|]. intros w Hw. exact (IH _ _ (Hk w Hw)).
+  - (* MemWrite *)
+    destruct (dev_addr _).
+    + intros d' Hd. exact (IH _ _ (Hok d' Hd)).
+    + destruct Hok as (Hacc & Hp). split; [exact Hacc|exact (IH _ _ Hp)].
+Qed.
+
+(** ... and, on its own, the [wrun] -> [wexec] bridge.  This is the second
+    half of the merge, and the reason the merged predicate does not have to
+    carry [mchoice_free]'s ∀-over-read-results: at a pinned read the run
+    CANNOT have used any timestamps but the canonical ones
+    ([wread_pinned_ts]), so the canonical successor — the only one
+    [wstep_ok] speaks about — is the one the run took. *)
+Lemma wrun_wexec_wstep_ok tid {X} (m : M X) :
+  forall s, wstep_ok tid m s ->
+  forall x s', wrun tid m s x s' ->
+    exists χ χ', wexec tid m χ s = Some (x, s', χ').
+Proof.
+  induction m as [y|T oc k IH]; intros s Hok x s' Hrun.
+  - destruct Hrun as [-> ->]. by exists [], [].
+  - destruct oc; simpl in Hok, Hrun;
+      try (exact (IH _ _ Hok _ _ Hrun));
+      try (exfalso; exact Hrun);
+      try (exfalso; exact Hok).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr; [|exfalso; exact Hrun].
+        destruct (IH _ _ (Hok w0 d' eq_refl) _ _ Hrun) as (χ & χ' & Hex).
+        exists χ, χ'. simpl. rewrite Hd Hdr. exact Hex.
+      * destruct Hrun as (w & ts & Hokr & Hrun).
+        destruct Hok as (Hacc & Hpin & Hk).
+        pose proof (wread_pinned_ts _ _ _ _ _ _ Hpin Hokr) as Hts.
+        rewrite Hts in Hokr, Hrun.
+        pose proof (wread_bytes_complete _ _ _ _ _ _ Hokr) as Hrb.
+        destruct (IH _ _ (Hk w Hrb) _ _ Hrun) as (χ & χ' & Hex).
+        lazymatch goal with
+        | Hpin0 : ak_pins ?ak0 = false -> _ |- _ => destruct (ak_coh ak0) eqn:Hcoh
+        end.
+        -- exists χ, χ'. simpl. rewrite Hd Hcoh Hrb. exact Hex.
+        -- lazymatch type of Hrb with
+           | wread_bytes _ _ _ _ ?ts0 = _ => exists (ts0 :: χ), χ'
+           end.
+           simpl. rewrite Hd Hcoh Hrb. exact Hex.
+    + (* MemWrite *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
+        destruct (IH _ _ (Hok d' eq_refl) _ _ Hrun) as (χ & χ' & Hex).
+        exists χ, χ'. simpl. rewrite Hd Hdw. exact Hex.
+      * destruct Hok as (Hacc & Hok).
+        destruct (IH _ _ Hok _ _ Hrun) as (χ & χ' & Hex).
+        exists χ, χ'. simpl. rewrite Hd. exact Hex.
+Qed.
+
+Lemma wstep_ok_covers tid {X} (m : M X) s :
+  wstep_ok tid m s -> wexec_covers tid m s.
+Proof. intros Hok x s' Hrun. by eapply wrun_wexec_wstep_ok. Qed.
+
+(** THE ONE LEMMA A LEAF APPLIES.  One peel in, everything
+    [WeakExec.wp_wexec_step] asks for out. *)
+Lemma wexec_leaf_agree tid {X} (m : M X) s x0 t0 :
+  wstep_ok tid m s -> wlog_wf (wm_log s) ->
+  exec m (wflat_st s) = Some (x0, t0) ->
+  wexec_covers tid m s /\
+  (exists χ s0 χ', wexec tid m χ s = Some (x0, s0, χ')) /\
+  (forall χ x s' χ', wexec tid m χ s = Some (x, s', χ') ->
+     x = x0 /\ wm_regs s' = sregs t0 /\ wm_dev s' = mdev t0 /\
+     wflat (wm_img s') (wm_log s') = mem t0 /\ wlog_wf (wm_log s')).
+Proof.
+  intros Hok Hwf Hex.
+  pose proof (wstep_ok_pinned tid m s Hok) as Hp.
+  destruct (wexec_pinned_agree tid m s x0 t0 Hp Hwf Hex) as [Hred Hag].
+  split_and!.
+  - by apply wstep_ok_covers.
+  - exact Hred.
+  - intros χ x s' χ' Hw.
+    destruct (Hag χ x s' χ' Hw) as (? & ? & ? & ?). split_and!; try done.
+    exact (wexec_pinned_wlog_wf tid m s Hp Hwf χ x s' χ' Hw).
+Qed.
