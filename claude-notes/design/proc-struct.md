@@ -721,12 +721,19 @@ symbolic fd, and factoring a branch join) are in
   separate resource keyed by that pointer value; the current tree's user-mode
   work assumes one fixed trapframe at `TRAMPOLINE - PGSIZE`, so per-proc
   trapframe pages are a seam, not a solved problem.
-- **`wait_lock` itself has no resource yet, only its contents.**
-  `WaitInv.parents_own` is what a holder is handed; nothing yet ties it to an
-  `is_lock`, so a caller's obligation to be holding the lock is not represented.
-  `reparent` does not need it (it takes no lock), but `kexit`/`kwait` do — they
-  acquire it — and that is where `wait_res` becomes a lock invariant and the
-  documented ordering `wait_lock` -> `p->lock` has to be stated.
+- **`wait_lock` IS a lock now, and `kwait` is where the ordering shows up.**
+  `SpecKwait.v` takes `is_lock γw wait_lock_addr "wait_lock" wait_res` as a
+  premise, so `WaitInv.wait_res` is the lock invariant and a caller's
+  obligation to be holding the lock is represented by the `locked` token.
+  kwait holds wait_lock across its whole scan and takes each candidate
+  child's `p->lock` *inside* it, which is the documented order; nothing in
+  the resources enforces it, but nothing in the proof can invert it either,
+  because the child's lock is acquired from `procs_inv` while wait_lock's
+  contents are already out.  `reparent` still takes the cells rather than
+  the lock (it acquires nothing), and `kexit` will want both.
+  `wait_lock_addr` lives in `SpecProcinit.v` — procinit is what initialises
+  the lock — which is why `SpecKwait.v` requires that file; moving the
+  constant into `WaitInv.v` with a `Require Export` would be tidier.
 - **`procdump` is unprovable as written** (unlocked reads of `name` and `pid`
   on arbitrary procs). Making `name` persistent-after-`allocproc` would fix
   the `name` half but not `pid`; the honest answer is to leave `procdump`

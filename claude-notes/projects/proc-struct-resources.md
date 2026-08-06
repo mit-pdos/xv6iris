@@ -416,6 +416,109 @@ the evidence for every offset. This file is only the worklist.
       coherence obligation is `um_below_mono`.  Account in
       [`../completed/growproc.md`](../completed/growproc.md).
 
+- [ ] **S10 — `kwait` (xv6's `wait`).  SIX of its SEVEN blocks are proven;
+      the outer loop, the prologue, `LinkKwait` and `sys_wait` remain.**
+      `SpecKwait.v` (the contract) and `ProofKwait.v` are landed and green.
+      This is the function that reclaims a ZOMBIE child, and it is the first
+      one that holds TWO locks at once.
+
+      **What landed with it, and is reusable on its own:**
+
+      * **`WaitInv.wait_res` is wait_lock's invariant.** The parent table is
+        `WaitInv.parents_own` (that file is the other agent's; see
+        `SpecReparent.v` for the cells-level consumer).  kwait is the LOCK's
+        first consumer: `is_lock γw wait_lock_addr "wait_lock" wait_res` is a
+        premise of its contract, `parents_own_read` licenses the
+        `ld a5,56(s1)` on every slot of the scan, and `parents_own_acc` is
+        what the `sd x0,56(s1)` that disowns the child runs on.
+        `wait_lock_addr` still lives in `SpecProcinit.v` (procinit is what
+        initialises the lock); moving it into `WaitInv.v` would be tidier and
+        costs one `Require Export`.
+      * **THE ZOMBIE BRIDGE, which SpecFreeproc.v used to record as a gap.**
+        `SpecFreeproc.fp_of_dormant_zombie` turns a child's
+        `ProcInv.proc_dormant _ ZOMBIE` — out of its own lock through
+        `SchedCtx.proc_slots`' `inv_dormant` guard — into freeproc's
+        precondition, with NO side condition.  It closed from three sides,
+        and none of them was "add a premise":
+        - the `uint sz + 4096 <= uvm_maxsz` premise relaxed to
+          `uint sz <= uvm_maxsz` through `SpecUvmfree` →
+          `SpecProcFreepagetable` → `SpecFreeproc`.  The old form was
+          undischargeable by any holder of a live `p->sz` (growproc lets it
+          reach TRAPFRAME exactly) and `uvm_maxsz` is page-aligned, so the
+          rounding still fits.  `ProofUvmfree`'s two arithmetic lemmas were
+          restated; the rounding step goes through `Z.div_lt_upper_bound` at
+          the STRICT bound, because the non-strict one is false at
+          `sz = uvm_maxsz`.
+        - `ProcPtOwn.proc_pt_root_valid` reads the root page's `page_valid`
+          off the tree's own node claim (via `upt_tree_spec`'s
+          `pt_base t = ud_root P`) instead of demanding it of the caller.
+          `ProofFreeproc` refutes its `c.beqz` that way now.
+        - `ProcInv.proc_dormant`'s ZOMBIE arm gained `um_below` — the one
+          fact genuinely about the process that no resource implies.  Free:
+          no landed proof produces a ZOMBIE, and kexit reduces a live
+          `proc_priv`, which has the same conjunct.
+
+      **The blocks, bottom up (all six green):** `kw_epilogue` (+0x78),
+      `kw_exit_wait` (+0xe8), `kw_exit_both` (+0x90), `kw_reap` (+0x5c —
+      the parent store, freeproc, both releases), `kw_found` (+0x40 — the
+      pid read and the optional copyout of the child's `xstate`), `kw_scan`
+      (+0xae/+0xa6/+0xaa — the bounded fuel loop).
+
+      **What is LEFT, and what the attempt learned.**
+
+      1. `kw_round` — the outer loop (+0xdc..+0xe6 and the +0xca..+0xd8
+         tail: the havekids test, `killed`, `sleep`).  It is an `iLöb`, and
+         **the step that pays for the later is the `c.j` at +0xe6**: its
+         leaf hands the continuation out under a `▷`, and the `iNext` there
+         strips the IH's later as well — which is what lets the back edge
+         after `sleep` (a plain fall-through, with no branch to strip a
+         later at) apply it.  Structure it the way `ProofSysPause` does:
+         a `Definition kw_round_stmt`, a separately-`Qed`'d
+         `kw_round_body` taking `▷ kw_round_stmt`, and the `iLöb` in a
+         two-line `iAssert`.
+      2. `kw_scan`'s +0xca continuation must take the FUNCTION-exit
+         continuation as its own argument (the version in the tree already
+         does).  The two exits are the same linear resource and the scan can
+         leave either way, so whichever branch runs has to be handed it.
+      3. The prologue (+0x00..+0x3e), `LinkKwait.v` (every callee is linked
+         — myproc / acquire / release / copyout / freeproc / killed / sleep
+         — so kwait can be linked as soon as the proof closes), and then
+         `sys_wait` over ARGADDR + KWAIT (thirteen instructions).
+
+      **THE OPEN OBSTACLE, recorded so the next attempt does not re-pay it.**
+      Applying `kw_scan` from the round fails with
+      *"iSpecialize: cannot instantiate `sie_cap_gpr Mx (K-10) false ?p`
+      with `sie_cap_gpr Mx (K-10) false pme`"* — the leaf/section variable
+      `p` stays an EVAR through the specialization, and `iSpecialize` will
+      not unify evars in the hypothesis type.  `iExact` closes the very same
+      pair (it goes up to conversion), `iFrame` does not.  So the fix is
+      almost certainly to pin `p` explicitly at the application rather than
+      to let it be inferred — either by giving the block lemmas `p` as an
+      EXPLICIT leading argument, or by `iSpecialize`-ing the resources one
+      at a time with `[H]` + `iExact`.  Diagnose it with the smallest
+      possible instance first; do NOT chase it inside the 250-line round
+      body as this attempt did.
+
+      **Four gotchas the six landed blocks paid for, all instances of rules
+      already in durable-notes:**
+
+      * an inline `ltac:(lia)` for a stack budget answers *"Cannot find
+        witness"* under the zify hook — the budgets are named `kw_K*`
+        lemmas;
+      * a `release` at level >= 1 must be closed with `wp_next_off_intro`,
+        NOT `iIntros (CID ...)`: its exit index is `false`, so the hart is
+        pinned, and introducing a fresh CID makes the `locked` token you are
+        still holding be about the wrong hart at the NEXT release;
+      * `proc_pub` is re-bundled per ARM, not before the branch — the
+        copyout arm needs `p_xstate` out until copyout hands it back;
+      * the register-invariant moves must be NAMED lemmas
+        (`kw_scan_regs_cs` / `_ncs` / `_s1`), not inline
+        `rewrite (callee_saved_lookup H _ ltac:(...))`: the `_` leaves the
+        register argument an evar when the spliced tactic runs, which is
+        durable-notes' diverging-`ltac`-in-argument-position trap.  It looks
+        exactly like a slow file; `coqc -time` pins it to the sentence AFTER
+        the last one printed.
+
 - [ ] **S4 — the next syscalls.** `sys_read` / `sys_write` / `sys_fstat` are
       the other `argfd` callers and are cheap once `argfd` itself is linked
       — but note they pass a NULL out-parameter (`sys_read` passes `pf = 0`), which
