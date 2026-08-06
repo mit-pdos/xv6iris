@@ -99,13 +99,9 @@ change that produced it.
 ## Write the checker for a refactor's SILENT failure mode, before the sweep
 
 If a change has a way of going wrong that still compiles, that way WILL be
-taken, and no build will tell you. Two checkers exist because of exactly that,
-and both are cheap enough to run on every touched file:
+taken, and no build will tell you. A checker exists because of exactly that,
+and it is cheap enough to run on every touched file:
 
-- **`tools/spec_vacuity.py`** — an unparenthesised `∀` inside a wand chain
-  extends maximally in `bi_scope`, swallows the trailing `WP`, and leaves a
-  contract that is trivially provable. It compiles, and a `Module Type` seal
-  accepts it.
 - **`tools/lemma_diff.py [--ref REF]`** — reports top-level declarations that
   VANISHED relative to a git ref, plus `Admitted`/`admit`/`Abort` and any new
   `Axiom`/`Parameter`/`Hypothesis`. A sweep's characteristic failure is not a
