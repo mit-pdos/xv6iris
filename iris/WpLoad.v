@@ -38,15 +38,6 @@ Qed.
 (* Leaf 5: split_misaligned vaddr 8 = (1,8) for an 8-aligned vaddr;         *)
 (* misaligned_order 1 = (0,0,step).                                         *)
 (* ---------------------------------------------------------------------- *)
-Lemma exec_split_misaligned_aligned (vaddr : virtaddr) s :
-  is_aligned_vaddr vaddr 8 = true ->
-  exec (split_misaligned vaddr 8) s = Some ((1, 8), s).
-Proof.
-  intro H. unfold split_misaligned. rewrite H. cbn [orb]. apply exec_returnm.
-Qed.
-
-Lemma misaligned_order_1 : misaligned_order 1 = (0, 0, if sys_misaligned_order_decreasing then -1 else 1).
-Proof. unfold misaligned_order. destruct sys_misaligned_order_decreasing; reflexivity. Qed.
 
 (* ====================================================================== *)
 (* 8-byte data-load memory path -- doubleword analogues of the 4-byte      *)
@@ -133,24 +124,51 @@ Lemma exec_checked_mem_read_ram_load (pbmt : page_based_mem_type) (addr : mword 
        s = Some (Ok (w, default_meta), s).
 Proof.
   intros Hpmp Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes.
-  unfold checked_mem_read.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_machine_none _ _ _ s Hpmp)).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_load addr pbmt region s Hmatch Halign Hread)).
-      cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s))).
-  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-  rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (Read_plain, s))).
+  assert (Hcp : exec (check_pma_with_pmp_priority (Load Data) pbmt Machine
+                        (Physaddr addr) 8 false) s = Some (Ok pma_ok_aligned, s)).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_load addr pbmt region s Hmatch Halign Hread)).
+    cbn match. apply exec_returnM. }
+  assert (Hmmio : exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s)).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  unfold checked_mem_read. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)). cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (read_kind_of_flags false false false) s = Some (Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hdev Hbytes)).
-  apply exec_returnM.
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+  { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    rewrite avi0_mul8.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_pmpCheck_machine_none _ _ _ s Hpmp)). cbn beta.
+    cbn match.
+    match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+      assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+      rewrite execR_liftR. rewrite Hmmio. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+      assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                    = Some (inr w, s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hdev Hbytes)).
+      cbn beta match. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+    rewrite autocast_id. rewrite usvd_zeros_full_64.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite autocast_id. rewrite execR_returnR. reflexivity.
 Qed.
 
 (* mem_read for Load Data in Machine mode, width 8 (needs MPRV=0). *)
@@ -249,6 +267,14 @@ Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hdev : dev_addr pa = false.
 Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
+(* PORT PENDING (claude-notes/projects/sail-model-bump.md): the vmem level no
+   longer splits with [split_misaligned] on the virtual address -- [vmem_read_addr]
+   is now a straight-line body that splits on PAGE boundaries
+   ([split_on_page_boundary]) and reads through [translate_and_read_value], and
+   [do_split_access] is false here because Machine-mode translation is Bare.  What
+   is missing is the intra-page fact: an 8-aligned address's 8 bytes lie in one
+   page, so [split_on_page_boundary] answers (8, 0) rather than taking the
+   boundary arm (whose [assert_exp'] would otherwise have to be discharged). *)
 Let data2 : mword (8*1*8) :=
   update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v.
 

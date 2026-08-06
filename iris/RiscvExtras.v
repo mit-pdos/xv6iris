@@ -1157,9 +1157,12 @@ Ltac pma_ok_peel Hmatch Hfield Hmag Halign :=
   rewrite execR_bind; rewrite execR_returnR; cbn match beta;
   lazymatch goal with
   | |- context[Defs.assert_exp' _ _] =>
+      (* the assert-bind is itself the LEFT operand of the canAccess bind, so
+         [execR_liftR_seq] has nothing to match until [execR_bind] exposes it *)
       cbn [Riscv.rv64d.not negb];
+      rewrite execR_bind;
       rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ _)); cbn beta;
-      rewrite execR_bind; rewrite execR_returnR; cbn match beta
+      rewrite execR_returnR; cbn match beta
   | _ =>
       rewrite execR_bind; rewrite execR_returnR; cbn match beta
   end;
@@ -1191,3 +1194,72 @@ Proof. reflexivity. Qed.
 (* One split means offset 0 only, ascending. *)
 Lemma misaligned_order_1 : misaligned_order 1 = (0, 0, 1).
 Proof. vm_compute. reflexivity. Qed.
+
+(* A FULL-WIDTH [update_subrange_vec_dec] over zeros is the value itself --
+   which is what [checked_mem_read]'s split loop leaves in its accumulator on
+   the (always taken, since every access here is aligned) one-split path.  The
+   per-width [data2_id_*] copies scattered through the WP files are instances.
+
+   IT CANNOT BE STATED WIDTH-GENERICALLY as it stands: the value argument's
+   type is [mword (hi - lo + 1)], i.e. [mword (n - 1 - (0 - 1))], which is
+   convertible to [mword n] only once the arithmetic computes -- so a symbolic
+   width needs an [autocast] the statement would then have to carry.  Hence a
+   tactic plus per-width instances; every width the tree reads or writes is
+   closed except the [k]-generic access lemmas in [MemAccessGen] /
+   [UserMemAccess], which will want the cast-carrying form. *)
+Ltac usvd_zeros_full_tac :=
+  apply bv_eq; unfold update_subrange_vec_dec; rewrite autocast_id;
+  unfold to_word_idx, to_word; rewrite MachineWord.MachineWord.cast_idx_refl;
+  unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice;
+  erewrite bv_concat_unsigned by (cbn; lia);
+  erewrite bv_concat_unsigned by (cbn; lia);
+  rewrite !bv_unsigned_N_0;
+  rewrite Z.shiftl_0_l; rewrite Z.shiftl_0_r; rewrite Z.lor_0_r; rewrite Z.lor_0_l;
+  reflexivity.
+
+Lemma usvd_zeros_full_8 (v : mword 8) :
+  update_subrange_vec_dec (zeros' (8 * 1 * 1)) (8 * (0 + 1) * 1 - 1) (8 * 0 * 1) v = v.
+Proof. usvd_zeros_full_tac. Qed.
+
+Lemma usvd_zeros_full_16 (v : mword 16) :
+  update_subrange_vec_dec (zeros' (8 * 1 * 2)) (8 * (0 + 1) * 2 - 1) (8 * 0 * 2) v = v.
+Proof. usvd_zeros_full_tac. Qed.
+
+Lemma usvd_zeros_full_32 (v : mword 32) :
+  update_subrange_vec_dec (zeros' (8 * 1 * 4)) (8 * (0 + 1) * 4 - 1) (8 * 0 * 4) v = v.
+Proof. usvd_zeros_full_tac. Qed.
+
+Lemma usvd_zeros_full_64 (v : mword 64) :
+  update_subrange_vec_dec (zeros' (8 * 1 * 8)) (8 * (0 + 1) * 8 - 1) (8 * 0 * 8) v = v.
+Proof. usvd_zeros_full_tac. Qed.
+
+(* The same identity in NUMERAL form, which is the shape the vmem-level
+   [update_subrange_vec_dec (zeros' (8 * width)) (8 * access_width - 1) 0 …]
+   normalises to.  [rewrite] is syntactic, so a proof reaches these by
+   [change]-ing the arithmetic first ([change (8 * 1 * 8) with 64], …); the
+   loop-shaped instances above are the ones [checked_mem_read] wants. *)
+Lemma usvd_zeros8 (v : mword 8) : update_subrange_vec_dec (zeros' 8) 7 0 v = v.
+Proof. usvd_zeros_full_tac. Qed.
+
+Lemma usvd_zeros16 (v : mword 16) : update_subrange_vec_dec (zeros' 16) 15 0 v = v.
+Proof. usvd_zeros_full_tac. Qed.
+
+Lemma usvd_zeros32 (v : mword 32) : update_subrange_vec_dec (zeros' 32) 31 0 v = v.
+Proof. usvd_zeros_full_tac. Qed.
+
+Lemma usvd_zeros64 (v : mword 64) : update_subrange_vec_dec (zeros' 64) 63 0 v = v.
+Proof. usvd_zeros_full_tac. Qed.
+
+(* An access that does not cross a page boundary is not split at the vmem
+   level: [split_on_page_boundary] answers (width, 0), so
+   [vmem_read_addr]/[vmem_write_addr]'s [do_split_access] is false. *)
+Lemma exec_split_on_page_boundary_intra {n : Z} (addr : mword n) (width : Z) s :
+  eq_vec (and_vec addr (update_subrange_vec_dec ((ones n) : bits n) (pagesize_bits - 1) 0
+                          (zeros' (12 - 1 - (0 - 1)))))
+         (and_vec (sub_vec_int (add_vec_int addr width) 1)
+                  (update_subrange_vec_dec ((ones n) : bits n) (pagesize_bits - 1) 0
+                     (zeros' (12 - 1 - (0 - 1))))) = true ->
+  exec (split_on_page_boundary addr width) s = Some ((width, 0), s).
+Proof.
+  intro Hin. unfold split_on_page_boundary. rewrite Hin. apply exec_returnm.
+Qed.

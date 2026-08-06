@@ -86,8 +86,9 @@ own, so it shows up as a false hit in 162 files.
    granule/splittability (it used to be called on the VIRTUAL address, in
    `vmem_read_addr`), then a `untilMT` loop doing a per-split `pmpCheck`,
    `within_mmio_readable`, `read_ram`/`mmio_read` and a
-   `update_subrange_vec_dec` into the accumulator. **NOT DONE — this is the
-   next piece of work, and the keystone; see below.**
+   `update_subrange_vec_dec` into the accumulator. **DONE for `checked_mem_read`
+   at widths 4 and 2 (`RiscvFetchExec`) and 8 (`WpLoad`) — the peel is written
+   out below; NOT DONE for the rest, nor for `checked_mem_write` anywhere.**
 6. **`MemoryOpResult`'s `Err` carries the address**: `Err (paddr, e)`. Only the
    fault arms care (`UserMemClassify`, `UserMemArms`, the `translationException`
    users). **NOT DONE.**
@@ -140,6 +141,62 @@ reductions), which is below every consumer.
 - **`execR_untilMT_1`** — moved down from `WpLoad.v` into `RiscvFetchExec.v`
   (right after `execR_bind_Some`/`execR_returnR_fwd`, which it needs), because
   the fetch path's `checked_mem_read` needs the one-iteration unrolling too.
+
+## The `checked_mem_read` peel, DONE at widths 4 and 2 (RiscvFetchExec.v)
+
+`RiscvFetchExec.exec_checked_mem_read_ram{,_2}` are ported and compile; copy
+their shape. The walk, with the three traps that cost time:
+
+```coq
+(* 1. the PMA/PMP decision.  check_pma_with_pmp_priority runs pmaCheck first and
+      pmpCheck only to PRIORITISE the exception on failure, so on the success
+      path it IS the ported pmaCheck lemma. *)
+assert (Hcp : exec (check_pma_with_pmp_priority acc pbmt priv (Physaddr addr) W res) s
+              = Some (Ok pma_ok_aligned, s)).
+{ unfold check_pma_with_pmp_priority.
+  rewrite (exec_bind_Some _ _ _ _ _ (<the ported pmaCheck lemma>)).
+  cbn match. apply exec_returnM. }
+unfold checked_mem_read. rewrite exec_catch_early_return.
+rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr W 0 s)). cbn beta.
+rewrite misaligned_order_1. cbn zeta.
+rewrite (execR_liftR_seq _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (<rk>, s))).
+2:{ unfold read_kind_of_flags. apply exec_returnM. }
+cbn beta.
+(* 2. one loop iteration, at offset 0 *)
+match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+  assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+{ eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+  change (bits_of_physaddr (Physaddr addr)) with addr.
+  rewrite avi0_mulW.                       (* the split offset 0 * W *)
+  rewrite (execR_liftR_seq _ _ _ _ _ (<the pmpCheck lemma>)). cbn beta. cbn match.
+  ...
+  rewrite autocast_id. rewrite usvd_zeros_full_<8*W>.
+  apply execR_returnR_fwd. }
+rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+rewrite autocast_id. rewrite execR_returnR. reflexivity.
+```
+
+- **`rewrite (execR_liftR_seq …)` only fires when `execR (bind (liftR m) k)` is
+  ITSELF a subterm of the goal.** Both the pmpCheck arm (a `bind0` seq into
+  `within_mmio_readable`) and the RAM read (an inner `bind` that drops the meta)
+  sit UNDER another `bind`, so the rewrite reports "does not match any subterm"
+  on a goal that visibly contains the term. Fix: `assert` the inner
+  `execR (…) = Some (inr v, s)` — grabbing the term from the goal with
+  `match goal with |- context[…] => assert … end` rather than transcribing it —
+  and then `rewrite (execR_bind_Some _ _ _ _ _ H)`. `execR_bind0` + `execR_liftR`
+  discharge the `bind0` one.
+- **The outer `catch_early_return` wrapper is a `match`, not a `returnR`.** The
+  last step is `rewrite execR_returnR; reflexivity`, not
+  `apply execR_returnR_fwd` — the latter fails with an unreadable "Unable to
+  unify … with match execR (returnR …) s with …".
+- **The accumulator identity is `usvd_zeros_full_<n>`** (`RiscvExtras.v`), and
+  it needs `rewrite autocast_id` first. There is a width-generic proof TACTIC
+  (`usvd_zeros_full_tac`) but the statement cannot be made width-generic as it
+  stands — see the comment there.
 
 ## The keystone still to build
 
@@ -235,18 +292,23 @@ Independent of the above, and the reason for the bump:
 `coq-sail-stdpp` 0.20.1 — the checkout asks for a newer `sail` than the one
 installed here, and the regen script passes the version it has and says so).
 
-`make proofs` fails at **`RiscvFetchExec.v`**, in
-`exec_checked_mem_read_ram` — i.e. at item 5 above, the keystone. Ported and
-compiling so far: `RiscvLang.v`, `RiscvTryStep.v`, `RiscvExtras.v` (+ the new
-vocabulary), `KptPt.v`, `KptTree.v`, `SRegime.v`, `UserPtTree.v`,
-`RiscvFetchExec.v`'s two `pmaCheck` lemmas, and the 13 `pmaCheck` lemmas listed
-in item 4 (`MemAccessGen`, `PtTreeAdue`, `WpLoad`, `WpUart`, `WpPlicExec`,
-`WpMmodeLeafBase`, `WpSmodePtMem`). The access-type arity fix is done in 6 of
-11 files.
+`make -f CoqMakefile -j32 -k` in `iris/` builds **366 of the 802 files** and
+stops on **FIVE root failures**; everything else is blocked behind them, not
+broken:
+
+| file | what it needs |
+|---|---|
+| `WpLoad.v` | the vmem level: `split_on_page_boundary` + `translate_and_read_value` (its `checked_mem_read`/`pmaCheck` chain IS ported — copy that) |
+| `CommonWalk.v` | the fork delta: `_rec_pt_walk`'s new shape + `check_leaf_pte` |
+| `WpGprCsrrB.v`, `WpGprCsrwA.v`, `WpGprCsrwB.v` | the CSR layer (`is_CSR_accessible`, `write_CSR`, the `legalize_*` masks) |
+
+There are no `Admitted`s: `WpLoad.exec_vmem_read_addr_8` is left in its OLD form
+behind a `PORT PENDING` comment, so the build points at it rather than a proof
+being silently assumed.
 
 **Work the build, not the greps.** The grep counts overstate the damage badly
 (370 `is_aligned_paddr` hits are all unaffected; the 46 `translateAddr` files
 mostly just mention it in a statement). What actually decides the work is which
 lemmas STEP THROUGH a changed body, and that is what a `make -f CoqMakefile
--j32 -k` tells you. The build is serialized on the bottom layer — one failing
-low file blocks hundreds — so expect one root cause per round.
+-j32 -k` tells you. Expect the failing set to stay small and to move DOWN the
+tree one layer at a time; a single low file blocks hundreds.

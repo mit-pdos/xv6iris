@@ -571,6 +571,12 @@ Qed.
 (* checked_mem_read = Ok (w, meta), exec version.                          *)
 (* ---------------------------------------------------------------------- *)
 
+Local Lemma avi0_mul4 (a : mword 64) : add_vec_int a (0 * 4) = a.
+Proof. change (0 * 4)%Z with 0%Z. apply avi0. Qed.
+
+Local Lemma avi0_mul2 (a : mword 64) : add_vec_int a (0 * 2) = a.
+Proof. change (0 * 2)%Z with 0%Z. apply avi0. Qed.
+
 Lemma exec_checked_mem_read_ram (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 32) s :
   (forall i, pmpLocked (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) i) = false) ->
@@ -588,26 +594,57 @@ Lemma exec_checked_mem_read_ram (pbmt : page_based_mem_type) (addr : mword 64)
        s = Some (Ok (w, default_meta), s).
 Proof.
   intros Hpmp Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes.
-  unfold checked_mem_read.
-  (* phys_access_check = None *)
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_machine_unlocked_ifetch4 addr s Hpmp Halign)).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram addr pbmt region s Hmatch Halign Hexec)).
-      cbn match. apply exec_returnM. }
+  (* the PMA/PMP decision, with the PMA answer prioritised on failure *)
+  assert (Hcp : exec (check_pma_with_pmp_priority (InstructionFetch tt) pbmt Machine
+                        (Physaddr addr) 4 false) s = Some (Ok pma_ok_aligned, s)).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram addr pbmt region s Hmatch Halign Hexec)).
+    cbn match. apply exec_returnM. }
   (* within_mmio_readable = false *)
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s))).
-  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-  rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (Read_plain, s))).
+  assert (Hmmio : exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s)).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  unfold checked_mem_read. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 4 0 s)). cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (read_kind_of_flags false false false) s = Some (Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_4 addr w s Hdev Hbytes)).
-  apply exec_returnM.
+  cbn beta.
+  (* the split loop: ONE iteration at offset 0 (see RiscvExtras' pma_ok_aligned) *)
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+  { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    rewrite avi0_mul4.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (exec_pmpCheck_machine_unlocked_ifetch4 addr s Hpmp Halign)). cbn beta.
+    cbn match.
+    (* the pmpCheck arm is a [bind0] seq into within_mmio_readable *)
+    match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+      assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+      rewrite execR_liftR. rewrite Hmmio. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+    (* the RAM read, whose own bind returns just the data (the meta is dropped) *)
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+      assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                    = Some (inr w, s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_4 addr w s Hdev Hbytes)).
+      cbn beta match. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+    rewrite autocast_id. rewrite usvd_zeros_full_32.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite autocast_id. rewrite execR_returnR. reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -1172,24 +1209,52 @@ Lemma exec_checked_mem_read_ram_2 (pbmt : page_based_mem_type) (addr : mword 64)
        s = Some (Ok (w, default_meta), s).
 Proof.
   intros Hpmp Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes.
-  unfold checked_mem_read.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_machine_unlocked_ifetch2 addr s Hpmp Halign)).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_2 addr pbmt region s Hmatch Halign Hexec)).
-      cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (within_mmio_readable (Physaddr addr) 2) s = Some (false, s))).
-  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-  rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (Read_plain, s))).
+  assert (Hcp : exec (check_pma_with_pmp_priority (InstructionFetch tt) pbmt Machine
+                        (Physaddr addr) 2 false) s = Some (Ok pma_ok_aligned, s)).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_2 addr pbmt region s Hmatch Halign Hexec)).
+    cbn match. apply exec_returnM. }
+  assert (Hmmio : exec (within_mmio_readable (Physaddr addr) 2) s = Some (false, s)).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  unfold checked_mem_read. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 2 0 s)). cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (read_kind_of_flags false false false) s = Some (Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_2 addr w s Hdev Hbytes)).
-  apply exec_returnM.
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+  { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    rewrite avi0_mul2.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (exec_pmpCheck_machine_unlocked_ifetch2 addr s Hpmp Halign)). cbn beta.
+    cbn match.
+    match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+      assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+      rewrite execR_liftR. rewrite Hmmio. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+      assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                    = Some (inr w, s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_2 addr w s Hdev Hbytes)).
+      cbn beta match. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+    rewrite autocast_id. rewrite usvd_zeros_full_16.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite autocast_id. rewrite execR_returnR. reflexivity.
 Qed.
 
 Lemma exec_mem_read_fetch_2 (pbmt : page_based_mem_type) (addr : mword 64)
