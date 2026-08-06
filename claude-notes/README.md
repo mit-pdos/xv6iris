@@ -20,6 +20,14 @@ are working on that effort — the relevant `projects/` file.
 - **[`optimization.md`](optimization.md)** — proof performance rules: the
   performance pitfalls and the tactics/patterns that fix them (apply proactively
   when writing new proofs).
+- **[`kernel-defects.md`](kernel-defects.md)** — bugs found in the xv6 SOURCE
+  by the verification, as opposed to gaps in the proofs. An entry there means
+  the C code is wrong and the stuck proof is the symptom. Currently one open
+  defect (D1: `writei` releases a partially-modified buffer without logging
+  it, so the buffer cache can diverge from the committed state), plus a list
+  of near-misses and provably dead code so the same ground is not re-covered.
+  Read the note at the top before proposing to fix any of them: the image is
+  pinned by `XV6_REV`, so editing `xv6-riscv/` moves every symbol address.
 
 ### `design/` — how each part of the project is built
 
@@ -65,6 +73,17 @@ are working on that effort — the relevant `projects/` file.
   retires bread's mystery disjunct), the revised bread/bwrite/brelse
   contracts, the `log_res` invariant and begin_op/end_op/log_write specs,
   and the stage-4 `P_fs` plan with its two recorded open forks.
+- **[`fs-inode.md`](design/fs-inode.md)** — the inode layer: `struct
+  inode`'s geometry read off `bmap`'s own instructions (and the
+  sleeplock alignment hole that puts `addrs` at +80, not +76), the pure
+  `blkmap` model with `bm_slot` unifying the coverage and injectivity
+  clauses, the two resources (`inode_map` for the map, `inode_blocks` for
+  the data) and why `balloc`'s fresh block is DEPOSITED rather than
+  returned, `BlockWords.v`'s word-in-a-block vocabulary, and the
+  SPEND-AT-MOST budget rule — why any function above the log that does not
+  take `log.lock` can only promise to spend at most N units, never exactly N.
+- **[`virtio-driver.md`](design/virtio-driver.md)** — the virtio driver's
+  own design notes.
 - **[`file-table.md`](design/file-table.md)** — the open-file table: `struct
   file`'s geometry, the reference-count algebra (`auth (gmap nat (frac *
   positive))`) that ties `f->ref` to fractional ownership of the immutable
@@ -116,6 +135,16 @@ are working on that effort — the relevant `projects/` file.
   the on-disk header only by having written it, so closing the gap needs
   read-data-indexed permits). Design in
   [`design/fs-log.md`](design/fs-log.md).
+- **[`fs-inode.md`](projects/fs-inode.md)** — the inode layer above the
+  block layer, heading for `writei`/`readi`. Stage 1 (the layer under
+  `bmap`) has LANDED: `BlockWords.v`, `InodeInv.v`, the assumed
+  `SpecBalloc.v`, `SpecBmap.v`, and `CodeBmap.v`'s 70 instruction facts —
+  definitions and contracts only, so fs.c is still 1/24. Next is
+  `ProofBmap.v`/`LinkBmap.v` (the `s4`-saved-only-on-the-indirect-path
+  quirk is the thing to plan for), then `iupdate`, then `writei`. Keeps the
+  deferred bitmap-invariant question that `balloc` waits on, and the owed
+  decode-word dedup sweep. Design in
+  [`design/fs-inode.md`](design/fs-inode.md).
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone

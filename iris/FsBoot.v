@@ -330,7 +330,8 @@ Section FsBoot.
       ghost_map_auth (fs_L γfs) 1 (fs_L0 dk cov) ∗
       ghost_map_auth (fs_dirty γfs) 1 (fs_D0 dk cov) ∗
       ([∗ set] b ∈ cov, b ↪[fs_dirty γfs]{#(1/2)} false) ∗
-      ([∗ set] b ∈ cov, fsblock γfs b (fs_blocks dk b)).
+      ([∗ set] b ∈ cov, fsblock γfs b (fs_blocks dk b)) ∗
+      ([∗ set] b ∈ cov, blk_own γfs b).
   Proof.
     iIntros (Hcov) "Hm".
     iDestruct (fs_boot_carve γv dk ndisk cov Hcov with "Hm") as "Hblk".
@@ -342,14 +343,16 @@ Section FsBoot.
     iEval (rewrite big_sepS_sep) in "Hpm".
     iDestruct "Hpm" as "[Hfsb Hpm]".
     iEval (rewrite big_sepS_sep) in "Hpm".
-    iDestruct "Hpm" as "[Hmc Hdty]".
+    iDestruct "Hpm" as "[Hmc Hpm]".
+    iEval (rewrite big_sepS_sep) in "Hpm".
+    iDestruct "Hpm" as "[Hdty Hown]".
     iModIntro. iExists γfs.
     iSplitL "Hblk Hmc".
     { iDestruct (big_sepS_sep_2 with "Hblk Hmc") as "H".
       iApply (big_sepS_mono with "H"). intros b Hb.
       iIntros "[Hd Hc]". rewrite /pool_blk /fs_view. cbn [bv_gd bv_clean].
       iExists (fs_blocks dk b). iFrame "Hd Hc". }
-    rewrite /fs_D0. iFrame "HaL HaD Hdty Hfsb".
+    rewrite /fs_D0. iFrame "HaL HaD Hdty Hfsb Hown".
   Qed.
 
 (* ====================================================================== *)
@@ -423,20 +426,25 @@ Section FsBoot.
       ([∗ list] i ∈ seq 0 LOGBLOCKS,
          ∃ bs : list (bv 8), fsblock γfs (log_slot_bno logstart i) bs) ∗
       ([∗ set] b ∈ cov ∖ log_region_set logstart,
-         fsblock γfs b (fs_blocks dk b)).
+         fsblock γfs b (fs_blocks dk b)) ∗
+      (* the exclusive per-block tokens, whole and undivided: the log
+         region's own blocks are owned by the log layer, everything else by
+         whoever the (future) bitmap invariant hands them to.  Purely
+         additive -- a consumer that ignores it is unaffected. *)
+      ([∗ set] b ∈ cov, blk_own γfs b).
   Proof.
     iIntros (Hcov Hgeom) "Hlkw #Hnm Hcpu Hfresh Hbufs Hlru Hm".
     assert (Hnc0 : (0 : Z) ∉ cov) by (exact (fs_cov_in_0 cov ndisk Hcov)).
     destruct Hgeom as [Hcovok Hsub].
     iMod (fs_boot_ghosts γv dk ndisk cov dev E Hcov with "Hm")
-      as (γfs) "(Hpool & HaL & HaD & Hdty & Hfsb)".
+      as (γfs) "(Hpool & HaL & HaD & Hdty & Hfsb & Hown)".
     iMod (bio_init (fs_view γfs γv dev cov) E Hnc0
             with "Hlkw Hnm Hcpu Hfresh Hbufs Hlru Hpool") as (bn) "[Hctx Hsl]".
     iModIntro. iExists bn, γfs.
     iDestruct (big_sepS_split_sub _ cov (log_region_set logstart) Hsub
                  with "Hfsb") as "[Hlog Hrest]".
     iDestruct (fs_log_region_split with "Hlog") as "[Hhdr Hslots]".
-    iFrame "Hctx Hsl HaL HaD Hdty Hhdr Hslots Hrest".
+    iFrame "Hctx Hsl HaL HaD Hdty Hhdr Hslots Hrest Hown".
   Qed.
 
 End FsBoot.

@@ -1,0 +1,284 @@
+# Project: the inode layer — bmap, then iupdate, then writei/readi
+
+Design: [`../design/fs-inode.md`](../design/fs-inode.md) — read it first.
+This file is the worklist.
+
+## Status (2026-08-06)
+
+**Stages 1 and 2 are COMPLETE. `bmap` is proven and linked** — fs.c is
+2/24 (`iinit`, `bmap`), 280/3332 bytes, and bmap carries the `!` caveat for
+the still-assumed `balloc`. `proof_coverage.py --check` rc=0,
+`spec_vacuity.py` clean, `lemma_diff.py` clean.
+
+What is in the tree:
+
+- **`BlockWords.v`** — `ind_bytes` + its laws (lookup / insert / length) and
+  `ind_bytes_replicate` (the all-zero entry list is the all-zero byte image,
+  which is what an install of a freshly `bzero`ed indirect block needs).
+  Proofmode-free, ssreflect-free.
+- **`InodeInv.v`** — the geometry, the pure `blkmap` model + `blkmap_wf`
+  (five conjuncts), the two resources `inode_map` / `inode_blocks` with the
+  `blk_own` tokens attached, their accessors, `inode_fresh{,_at}` (the
+  freshness the install sites need) and `blkmap_wf_slot_upd` + the three
+  `bm_slot_insert_*` readings — ONE general "replace slot p" law that all
+  three of bmap's stores go through.
+- **`SpecBalloc.v`** — ASSUMED contract, `K_balloc = 50`; its success arm
+  returns `blk_own γfs blk`, and that token IS the freshness claim.
+- **`SpecBmap.v`** — `Module Type BMAP`, `K_bmap = 56`; threads
+  `inode_blocks` in and out with the deposit disjunction.
+- **`CodeBmap.v`** — all 70 instruction facts + 40 decode words.
+- **`ProofBmapParts.v`** — bmap's vocabulary (445 lines, 4.2 s).
+- **`ProofBmap.v`** — the chain (2752 lines, 55 s isolated; the two biggest
+  sentences are `Qed`s at 5.2 s and 2.8 s, nothing else above 0.6 s).
+- **`LinkBalloc.v`** (the single `Axiom`) and **`LinkBmap.v`**.
+
+`Print Assumptions Bmap.wp_bmap_sconf` is `LinkBalloc.Balloc.wp_balloc_sconf`
+plus exactly the six the whole tree carries (the five rv64d platform hooks
+and `functional_extensionality_dep`) — i.e. identical to `bread`'s footprint
+plus the one deliberate assumption.
+
+### How the proof is cut, and why
+
+Four lemmas, entered strictly left to right:
+
+| lemma | range | what it is |
+|---|---|---|
+| `bm_epilogue` | +0x8a..+0x98 | THE JOIN — a0 := s1, pop, ret, discharge the contract |
+| `bm_release` | +0x82..+0x88 | brelse, restore s4; THREE of the five arms end here |
+| `bm_indirect_tail` | +0x62..+0x80, +0x9a..+0xb0 | bread, read `a[bn]`, allocate-and-log |
+| `wp_bmap_sconf` | +0x00..+0x60 | prologue, direct arm, indirect head |
+
+**The `s4` quirk turned out to be free**, and the reason is worth keeping:
+because `c.ldsp s4,0(sp)` sits at +0x88 — one instruction BEFORE the join —
+every arm reaches +0x8a with s4 already at its entry value. So the epilogue
+takes the FULL `bm_thr5` (which covers s4) plus frame slot 0 held as an
+ANONYMOUS word (`bm_frame`), and only the interior lemmas, where s4 is
+genuinely live, carry the weaker `bm_thr6` and the pinned-slot `bm_frame4`.
+No per-arm `callee_saved` duplication was needed beyond that one premise.
+
+**The dead panic arm** was refuted as planned: `bltu a5,a4` at +0x44 with
+a5 = 255 and a4 = `mword_of_int (bn-12)`, bounded by `fbn < MAXFILE`.
+
+### SpecBmap was STRENGTHENED for writei (2026-08-06)
+
+Two clauses, both free at every arm of bmap's own proof and both needed by
+any caller that wants to carry "the blocks I did not write are the blocks
+that were there" across the call:
+
+- the deposit disjunct gained its zero side condition —
+  `data' = data \/ (bv_unsigned (blkmap_get bm fbn) = 0 /\ data' = <[fbn := zeros]> data)`.
+  Without it the contract permits a bmap that OVERWRITES an already
+  allocated block with zeroes.
+- a new clause **bmap never un-allocates** —
+  `forall i < MAXFILE, bv_unsigned (blkmap_get bm i) <> 0 -> blkmap_get bm' i = blkmap_get bm i`.
+  Without it a failing bmap may claim it dropped a mapping, and
+  `blk_holes_zero` is then unrecoverable.
+
+Both discharge from facts the arms already had (`Hdz` on the direct arm,
+`Hagr`+`Hgetq`+`Hentz` on the indirect one).  `Print Assumptions
+Bmap.wp_bmap_sconf` is unchanged.
+
+### Gotchas this proof paid for (both already cost an hour)
+
+- **`destruct (decide P)` can silently miss the `decide` in the goal.** The
+  goal's `Decision` instance (from unfolding `ind_blk` under `cbn`) and a
+  freshly elaborated `decide P` are different terms, so the `destruct`
+  succeeds, splits, and leaves the goal's `if decide … then … else …`
+  UNTOUCHED — the first branch closes by `exfalso` and the second then fails
+  a trivial `iExact` with "does not match goal". **Use stdpp's
+  `case_decide`**, which destructs whatever `decide` is actually there.
+- **`rewrite H` where `H : x = f x` cannot be used on a proofmode
+  hypothesis** — the motive's `?b@{x:=…}` cannot be instantiated. That is
+  what every "present `log_op γ n` as `log_op γ (2 + u)` for balloc" step
+  looks like. Fix: `remember` the RESIDUAL first (`remember (nI - 3)%nat as
+  w`) and state the equation as `nI = 2 + S w`, so the right-hand side
+  mentions only the opaque `w`. Choosing the residual so that the NEXT
+  callee's premise (`log_op γ (S w)` for log_write) matches on the nose
+  removes the second rewrite entirely.
+- A `bv 32` from the pure model does not elaborate against `mword ?n`:
+  ascribe (`bm_ind bmI : mword 32`) at every `sign_extend'` / `uint`.
+
+## Stage 3 — iupdate, then writei/readi
+
+- [x] **`iupdate` — DONE, and it carries NO caveat**: all four callees
+      (bread, memmove, log_write, brelse) are proven, so it is the first
+      fs.c function resting on nothing assumed. `Print Assumptions
+      Iupdate.wp_iupdate_sconf` is exactly the tree's standing six.
+      Files: `DinodeEnc.v` (the on-disk record + its encoding, iris-free,
+      the `BlockWords.v` counterpart one level up), the `inode_meta` /
+      `inode_addrs_buf` additions to `InodeInv.v`, `WpSconfSrliw.v`,
+      `SpecIupdate.v`, `ProofIupdateParts.v`, `ProofIupdate.v`,
+      `LinkIupdate.v`.  `K_iupdate = 44` (4 frame slots + bread's 40).
+
+      ### What iupdate paid for (all recur)
+
+      - **`srliw` had no S-mode leaf.** `slliw` is in `WpSconfAlu.v` and
+        `srli`/`srai` are the 64-bit `SHIFTIOP` forms, but the W right
+        shift was absent from both.  It is added in a NEW file
+        `WpSconfSrliw.v` rather than in `WpMmodeShiftiop.v` +
+        `WpSconfAlu.v` where the two halves belong, because editing either
+        invalidates the whole downstream `.vo` tree.  **Merging it back is
+        owed on a build that can afford a full rebuild.**
+      - **State every law of a byte-encoding file with LITERALS, never with
+        the named constant.** `DinodeEnc`'s laws were first written with
+        `DISIZE`/`IPB`; a consumer's offsets come out of the instruction
+        stream as `64 * k`, and `rewrite` against a folded `DISIZE * k`
+        does not match.  `IPB`/`DISIZE` are kept as documentation only.
+      - **A `bv 16`/`bv 32` field out of a pure record does not elaborate
+        against `mword ?n`** — the `bm_ind bmI : mword 32` trap again, now
+        at 16 bits: ascribe `(di_type dn : mword 16)` at every leaf value
+        argument AND inside every `sign_extend' 64 (...)`.
+      - **`cpu_own_transport`'s source CID is where the resource CAME BACK,
+        not the lemma's entry CID.** After a callee returns, `cpu_own` is
+        at the callee's post CID; transporting from the entry CID fails
+        with the unhelpful *"iSpecialize: cannot instantiate (cpu_own … -∗
+        cpu_own …) with (cpu_own …)"*.
+      - **`ByteBuf` splits produce NESTED bases and NESTED naming offsets.**
+        A six-way split of a 64-byte record (`ProofIupdateParts.dislot_split`)
+        needs a `bb_reanchor` (`pa_add (pa_add a 4) 2 = pa_add a 6`, plus the
+        pointwise `f (4 + (2 + j)) = f (6 + j)`) between every two
+        `bb_split3`s.  Use `bb_split3` and not `bb_split`: it takes the
+        length sum as a PREMISE, so no `2 + 60` has to match `62`
+        syntactically.
+      - **The two-directional `dislot_acc_gen` is the shape to copy** for
+        any "borrow a fixed-layout record out of a block and put it back at
+        a new value": one accessor over an ABSTRACT naming function with a
+        pointwise reading premise, out at `d` and back at any `d'`.  It
+        keeps the block-level offset arithmetic (`diblk_bytes_*`) entirely
+        out of the Iris proof.
+- [~] `writei` — **SPECIFIED AND PARTLY PROVEN; BLOCKED ON A REAL DEFECT
+      IN THE CODE.**  Files: `SpecWritei.v` (the contract),
+      `ProofWriteiParts.v` (the vocabulary), `ProofWritei.v` (the last
+      three of five blocks, +0x0b6..+0x0e6, UNSEALED — there is no
+      `LinkWritei.v` and writei is not counted proven).
+
+      ### THE BLOCKER: brelse of a modified, unlogged buffer
+
+      This is a defect in the xv6 SOURCE, not a proof gap. It is written up
+      for the kernel-side reader — reachability, observable consequence,
+      scope, and what a fix would cost — as **D1** in
+      [`../kernel-defects.md`](../kernel-defects.md). What follows here is
+      the proof-side detail.
+
+      DECIDED 2026-08-06: stop at the write-up. writei stays specified,
+      partly proven and UNLINKED. The three ways out below were all
+      considered and none taken — in particular the cheap one (premise
+      `user = false`, which would make writei provable for the in-kernel
+      callers and unblock the directory layer) is still available and is
+      the natural first move if this is picked up again.
+
+      The `either_copyin == -1` break at +0x064 -> +0x0b0 does
+
+          brelse(bp);  break;
+
+      with **no log_write**.  By then `copyin` may already have memmove'd a
+      PREFIX of the user bytes into `bp->data` — it walks the source page by
+      page and returns −1 on the first page it cannot reach, having copied
+      every earlier one — so the buffer's bytes are no longer the block's
+      logical content.  `SpecBrelse` takes `bio_locked`, i.e.
+      `bio_held … bs bs bsd d`: the traveling bytes MUST equal the payload's
+      logical content, and re-indexing that payload is
+      `FsBlocks.fsblock_update`, which needs `ghost_map_auth (fs_L γ)` — the
+      log lock's authority, reachable only through `log_write`.  **The arm
+      cannot be discharged, and it is not dead**: `either_copyin_post`'s
+      user arm gives `r = 0 ∨ r = −1` with the destination existential on
+      both outcomes (the kernel arm always returns 0, so the arm is dead
+      there).
+
+      It is not a modelling artefact.  A buffer released with unlogged
+      modifications stays in the bcache holding bytes that were never
+      committed: a later `readi` of that block returns them, `commit()` does
+      not write them, and eviction or a crash silently reverts them.  That
+      is exactly the inconsistency `bio_locked` exists to exclude.
+
+      Three ways out, all the orchestrator's call:
+      1. **Model the anomaly** — let a buffer be released with unlogged
+         modifications.  Costly: the escrow would have to park bytes
+         DECOUPLED from the logical content, so `bread` could no longer
+         promise "the bytes ARE the block's logical content", which every FS
+         proof above it consumes.
+      2. **Premise `user = false`** — the arm is dead on the kernel arm, so
+         writei is fully provable for `consolewrite`-shaped callers.  Cheap,
+         but it abandons the ghost-flag threading and does not serve
+         `filewrite`.
+      3. **Give copyin a "fully-mapped ⇒ succeeds" arm** and make writei
+         require it.  Sound, but `filewrite` cannot discharge it — not
+         knowing whether the user buffer is mapped is why copyin returns −1
+         at all.
+
+      ### What IS proved, and what the rest would look like
+
+      `wi_ret` (+0xd6..+0xe6, the pop and the contract), `wi_join`
+      (+0xcc..+0xd4, iupdate and `a0 := tot`) and `wi_size` (+0xb6..+0xcc,
+      the size test, the store and the five conditional restores on BOTH
+      arms) are proven, `Qed`-clean, no admits.  Together they are every
+      path the loop's three exits feed.  The remaining `wi_loop` (fuel
+      induction at +0x82 with the body at +0x4c) and the prologue are
+      designed but not written; the design that survived contact is in
+      `SpecWritei.v`'s header and in the four notes below.
+
+      ### Findings that stand regardless
+
+      - **EVERY callee-saved register is saved**, so writei needs NO
+        register-threading invariant at all — `callee_saved m mf` falls out
+        of the thirteen restores plus the `addi sp,sp,112`.  What replaces
+        it is the frame in three strengths (`wi_fr7` / `wi_fr8` /
+        `wi_fr13`), and bmap's s4 lesson applies verbatim at five registers.
+      - **The postcondition's "byte written" must be an EXISTENTIAL.**  On
+        the user arm the source bytes are user memory, about which the
+        kernel may assume nothing (`∃ dst_new` in `either_copyin_post`), so
+        the range clause is `∃ wrote : nat -> bv 8` plus a tie
+        `user = false -> wrote i = src_bytes i`.  A contract naming the
+        source bytes unconditionally is unprovable.
+      - **`blk_holes_zero` (a hole reads as zeros) is forced.**
+        `inode_blocks` leaves `data i` unconstrained at an unallocated `i`
+        and bmap deposits a fresh block at `replicate BSIZE 0`, so without
+        that normalisation "the bytes outside my range are the bytes that
+        were there" is FALSE the moment writei extends the file.  It is
+        threaded in and back out; it belongs next to `inode_blocks` in
+        `InodeInv.v` and is parked in `SpecWritei.v` only because editing
+        that file invalidates the whole bmap/iupdate cone.  **Merge-back
+        owed.**
+      - **The iteration bound and the budget DO work.**
+        `wi_blocks off n := (off mod BSIZE + n + BSIZE - 1) / BSIZE` and
+        `wi_cost off n := 6 * wi_blocks off n + 1`; the decrease
+        (`ProofWriteiParts.wi_blocks_step`) is exactly one block per
+        iteration that fills to the boundary, and the final iteration
+        (which does not) needs no decrease because the loop exits.  The
+        bound is LOOSE, though: 6 per block is bmap's worst case, where
+        xv6's own filewrite accounting assumes 2, so `filewrite` will not be
+        able to discharge `wi_cost off n <= ncount` at MAXOPBLOCKS.
+        Tightening it needs an arm-aware bmap budget, not a change to
+        writei.
+- [ ] `readi` — blocked on the same question only if `either_copyout` can
+      fail after a partial write; it can, but readi's failure arm brelses a
+      buffer it never modified, so readi is unaffected.
+
+## Deferred: proving balloc
+
+`balloc` stays an assumed contract until someone designs the **bitmap
+invariant**: which agent holds a free block's `fsblock` half while it is
+free, and the tie between bit `b` of the bitmap block and that half being
+in the pool. `FsBoot.v` already mints one half per covered block at boot,
+so the material exists. Stating `balloc` needed none of this, which is why
+it was worth assuming first — the shape of bmap's proof does not depend on
+it.
+
+## Follow-up found in passing (not this project's)
+
+**A decode-word dedup sweep is owed.** Cataloguing bmap turned up base
+words with private copies in several `Code<F>.v` files that belong in
+`KernelBaseDecode.v` / `KernelRvcDecode.v`:
+
+- `0x00004517` (`auipc a0,0x4`) — now **three** copies: `CodeEndOp.v`,
+  `CodeBread.v`, `CodeBmap.v`
+- `0xc33ff0ef` (`jal bread`) — `CodePipealloc.v`, `CodeBmap.v`
+- `0xed1ff0ef` (`jal balloc`) — `CodeInitlog.v`, `CodeBmap.v`
+- compressed: `0x4384`, `0x873e`, `0x89be`, `0x97ae`
+
+Not fixed in place, and correctly so: a `Code<F>.v` may not import another,
+and editing the shared catalogues invalidates the whole downstream `.vo`
+tree — it is a sweep of its own. The recipe is in
+[`../completed/either-copy.md`](../completed/either-copy.md) ("grep the
+STATEMENT rather than the word; diff every `*_<off>` fact against HEAD
+afterwards").

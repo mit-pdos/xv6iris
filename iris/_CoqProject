@@ -469,6 +469,9 @@ ProofBinit.v
 LinkBinit.v
 BioInv.v
 FsBlocks.v
+BlockWords.v
+DinodeEnc.v
+WpSconfSrliw.v
 CodeWriteHead.v
 CodeInstallTrans.v
 CodeInitlog.v
@@ -522,6 +525,18 @@ CodeIinit.v
 SpecIinit.v
 ProofIinit.v
 LinkIinit.v
+InodeInv.v
+SpecBalloc.v
+SpecBmap.v
+CodeBmap.v
+LinkBalloc.v
+ProofBmapParts.v
+ProofBmap.v
+LinkBmap.v
+SpecIupdate.v
+ProofIupdateParts.v
+ProofIupdate.v
+LinkIupdate.v
 TicksInv.v
 CodeSysUptime.v
 SpecSysUptime.v
@@ -790,3 +805,8 @@ SpecSysKill.v
 CodeSysKill.v
 ProofSysKill.v
 LinkSysKill.v
+CodeIupdate.v
+CodeWritei.v
+SpecWritei.v
+ProofWriteiParts.v
+ProofWritei.v
