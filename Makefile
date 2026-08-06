@@ -11,6 +11,8 @@
 #   make kernel-rocq  compile kernel-rocq/ (regenerating its .v if the ELF changed)
 #   make user-rocq  compile user-rocq/ (the dumped user programs, e.g. _sync)
 #   make dump-force force a re-dump of every image, even if the ELF is unchanged
+#   make check-decode   check iris/'s decode layer against the tracked dump
+#   make update-decode  rewrite the decode layer's stale words/immediates
 #   make clean      remove Coq build artifacts (.vo/.glob/CoqMakefile)
 #   make distclean  also `make clean` the xv6 tree
 #
@@ -41,6 +43,7 @@ UDUMP := user-rocq
 IRIS  := iris
 
 DUMPER     := tools/dump_elf.py
+DECODER    := tools/gen_decode.py
 XV6_DIR    := xv6-riscv
 XV6_URL    ?= https://github.com/mit-pdos/xv6-riscv
 KERNEL_ELF := $(XV6_DIR)/kernel/kernel
@@ -62,7 +65,7 @@ KDUMP_SRCS := $(KDUMP)/KernelInstrs.v $(KDUMP)/KernelData.v $(KDUMP)/KernelSyms.
 USER_DUMPS ?= sync:Sync
 
 .PHONY: all proofs model kernel user dump dump-force kernel-rocq user-rocq \
-        xv6-rev-check clean clean-proofs distclean model-gen
+        xv6-rev-check check-decode update-decode clean clean-proofs distclean model-gen
 
 all: proofs
 
@@ -144,6 +147,25 @@ user-rocq: $(UDUMP_SRCS) $(UDUMP)/CoqMakefile
 	$(RUN) $(MAKE) -C $(UDUMP) -f CoqMakefile -j$(JOBS)
 
 dump: kernel-rocq user-rocq
+
+# ---- 3a. Keep the iris/ decode layer in step with the image ----
+#
+# Every [mk_rvc]/[mk_base] site states an encoding word and a decoded
+# immediate; both are properties of the IMAGE, and both move when the kernel
+# is relaid out -- including in functions whose own source did not change, via
+# re-encoded call targets and linker relaxation.  (The pc's themselves are
+# symbol-relative, [KernelSyms.bpin + 0x14], and survive a relayout untouched.)
+#
+#   make check-decode    compare every site against kernel-rocq/; silence = agree
+#   make update-decode   rewrite the stale literals in place
+#
+# update-decode refuses any site where the INSTRUCTION changed rather than just
+# its immediate, and lists them: those are real code changes and their proofs
+# need a human.  Always run check-decode after a dump-force.
+check-decode:
+	$(PYTHON) $(DECODER) --iris $(IRIS) --kernel-rocq $(KDUMP)
+update-decode:
+	$(PYTHON) $(DECODER) --iris $(IRIS) --kernel-rocq $(KDUMP) --update
 
 # Re-dump every image from the ELFs currently in xv6-riscv/, even if make
 # thinks the .v are up to date.  Check `git diff kernel-rocq/` afterwards: a

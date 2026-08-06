@@ -53,6 +53,49 @@
   - **A dead `Require` costs a DAG edge, not CPU.** A `Require` of a file none of whose names are used is worth ~0.5 s of load (measured isolated); delete such lines to keep the dependency graph honest — but do not expect a CPU win, and check whether the edge was on a tail before claiming a wall win.
   - **A whole-function proof file (`Proof<Function>.v`) must contain only the function's body/chunk/whole-function WPs — never a single-instruction leaf WP.** Base ALU leaves go in `WpSconfAlu.v` (e.g. `wp_lui_s_sconf`, `wp_andi_s_sconf`); call-site-specialized **device-access** leaves (one MMIO instruction, geometry pre-discharged) go in a leaf **functor over the device module** — e.g. `WpSconfUartAccess.v`'s `UartAccessProof (Uart : UART)` holding `wp_uart_lsr_read_s_sconf` / `wp_uart_thr_write_s_sconf`, which a function proof instantiates with `Module UAcc := UartAccessProof Uart.`. Don't clone a leaf locally when a more general one already exists at the right altitude (the general `wp_andi_s_sconf` is wval-parametric; pass `_` + `eq_refl`).
 
+## Two literals in every decode site are the IMAGE's, not the proof's
+
+A `mk_rvc` / `mk_base` site states three things about an instruction: its
+address, its encoding word, and its decoded AST. The **address is
+symbol-relative** (`KernelSyms.bpin + 0x14`, via the file's own `Notation BP :=
+KernelSyms.bpin`) and therefore survives a relayout untouched — which is why an
+xv6 update that moves 150 of 223 symbols costs the decode layer nothing on that
+axis. The other two are properties of the image and do move:
+
+- the **encoding word** (`mword_of_int 0xf33fd0ef : mword 32`), and
+- the **pc-relative immediate** inside the AST — a JAL/branch offset, the
+  low-12 of an `auipc`+`addi` pair, the hi-20 of the `auipc`.
+
+Both change in functions **whose own source did not change at all**, for two
+reasons that are easy to forget: a call whose target moved re-encodes (the
+resolved address is identical, the immediate is not — `addi a0,a0,-1682 #
+0x80012348` becomes `addi a0,a0,-1696 # 0x80012348`), and **linker relaxation
+resizes call sequences**, so a function can even change *size* with no source
+change (`sys_pipe` shrank 4 bytes across one upstream bump). Measured on the
+Aug-2026 bump: 145 of 188 functions drifted this way, 1682 instruction slots,
+against only 9 functions with a genuine instruction change.
+
+**`tools/gen_decode.py` derives both literals from the tracked dump instead of
+by hand** (`make check-decode` / `make update-decode`):
+
+- `--check` resolves every site's address through the file's `Notation`
+  aliases, reads the bytes at it out of `kernel-rocq/KernelInstrs.v`, and
+  compares both the stated word and the decoded immediate. On a tree that is
+  known good it validates the tool; after a `dump-force` it *is* the worklist.
+  Run it after every re-dump.
+- `--update` rewrites the stale words, immediates and word-keyed decode-lemma
+  names (`bdec_<word>`, `cdec_<word>`), renaming a shared lemma in place only
+  when every referrer moved off it together and adding a new one beside it
+  otherwise.
+- It **refuses any site where the instruction itself changed** rather than just
+  its immediate, and lists those: they are real code changes and their proofs
+  need a human. That guard is the whole safety story — the rewrite is only ever
+  an immediate refresh, never a semantic edit.
+
+The compressed jumps (`c.j`, `c.beqz`/`c.bnez`) carry relocated immediates too
+and are handled; every other compressed displacement is a stack or struct
+offset that no relayout moves.
+
 ## Specific-vs-generic leaf lemmas
 
 - The generic gpr-write **engine** (`wp_gpr_write_s_config*`, in `WpSmodeLeafBase.v`) takes an arbitrary `instr` + an `exec (execute i)` obligation. It is *internal plumbing* — call it only from within family-file specific lemmas, never from a higher-level function proof.

@@ -110,7 +110,8 @@ Definition st_va5_40 (ms : mword 64) : mword 64 :=
 (* the legalized mstatus after idx 41 *)
 Definition st_ms1 (ms : mword 64) : mword 64 := mstatus_legalized ms (st_va5_40 ms).
 
-Definition st_a42v : mword 64 := mword_of_int 0x80001078.  (* auipc a5,1 *)
+(* the value the [auipc a5,0x1] at [start + 0x20] computes: its own pc + 0x1000 *)
+Definition st_a42v : mword 64 := mword_of_int (KernelSyms.start + 0x1020).
 Definition st_main : mword 64 := mword_of_int (KernelSyms.main).  (* <main> *)
 Definition st_ffff : mword 64 := mword_of_int 0xffff.      (* medeleg/mideleg wval *)
 Definition st_pmpw : mword 64 := mword_of_int 0x3fffffffffffff. (* pmpaddr0 wval *)
