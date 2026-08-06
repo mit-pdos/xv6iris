@@ -8,20 +8,26 @@
     [lock_state] can only take two of its three values.  This file supplies
     it.
 
+    WHERE THE WIDTH-GENERIC PIECES LIVE.  M4-prep discovered them here; they
+    have since MOVED DOWN to the files whose width-4 statements they
+    generalise, so that both widths are instances of one statement rather than
+    the 8 being an instance of something stated inside the 8's own file:
+
+      - [WeakStore.winsw] / [winsw_lookup_in] / [winsw_lookup_out] /
+        [wlat_agree_store_w] — the [n]-fold window insert and the store
+        window's pure part at every width.  §4 below is its [n := 8]
+        instance; [WeakStore.wins4] is the [n := 4] one.
+      - [WeakInstr.wpt_byte_flat_pin] / [wlat_byte_flat_gen] — the one-byte
+        flat/pinned bridges.  Every eight-fold lemma below is eight one-line
+        applications of one of these, and so are [WeakInstr.wpt4_flat_pin]
+        and [WeakLock.wlat4_flat_gen].
+      - [WeakInstr.wP_load_w] / [wP_mem_w] / [wV_store_w] / [wV_amo_aq_w] /
+        [wV_load_w] / [wQ_load_w] / [wQ_store_w] / [wQ_amo_aq_w] — the whole
+        [P]/[V]/[Q] family.  §5 below names the [n := 8] instances; the
+        [_w_4] lemmas here check the width-4 ones are the [n := 4] instances.
+
     ===================== WHAT IS IN HERE =====================
 
-      §1  THE WIDTH-GENERIC WINDOW INSERT.  [winsw] is the [n]-fold insert
-          [WeakStore.wins4] is the width-4 instance of, with its two lookup
-          lemmas proved ONCE by induction, and [wlat_agree_store_w] is the
-          width-generic [WeakStore.wlat_agree_store4] over it — the store
-          window's pure part at every width at once.  (The framing lemma
-          underneath, [WeakStore.wlat_agree_store_win], was already
-          window-generic; only its INSTANCE was width-4.)
-      §1b THE PER-BYTE BRIDGES, also width-generic: [wpt_byte_flat_pin] and
-          [wlat_byte_flat_gen] are the one-byte guts that [wpt4_flat] /
-          [wpt4_pinned] / [WeakLock.wlat4_flat_gen] each open-code four times
-          at a fixed width.  Every eight-fold lemma below is eight one-line
-          applications of one of these.
       §2  [wlat8] — the bare objective element bundle (the [wlat4] twin), and
           [wpt8] / [↦w₈] — the owned eight-byte points-to, carrying
           8-alignment and wrap-freedom exactly as [wpt4] carries them.
@@ -36,10 +42,7 @@
       §5  THE LEAVES: [wP_load8] / [wP_mem8] and the load-side [wwp_ld8] /
           [wwp_ld8_carry]; the store-side [wV_store8] / [wQ_store8] /
           [wwp_sw8_post]; and the acquire-shaped [wwp_amoswap_d_aq_inv], the
-          eight-byte twin of [WeakInstr.wwp_amoswap_w_aq_inv].  The [wP]/[wV]/
-          [wQ] families are stated WIDTH-GENERICALLY ([wP_load_w] & co.) with
-          the width-8 names as instances; [wP_load_w_4] & co. check that the
-          width-4 ones in [WeakInstr] are the [n := 4] instances.
+          eight-byte twin of [WeakInstr.wwp_amoswap_w_aq_inv].
 
     NOTHING HERE MENTIONS [riscv_step], so the whole file is expected to be
     closed under the global context (§6). *)
@@ -67,116 +70,6 @@ Require Import WeakStore.
 Require Import RiscvLang RiscvPtsto.
 
 Local Open Scope Z_scope.
-
-(* ====================================================================== *)
-(** ** 1. The window insert, at every width at once
-
-    [winsw a T v n mm] is [mm] with the [n] bytes of [v] at [a] retargeted at
-    timestamp [T] — byte 0 innermost, i.e. the shape [n] successive
-    [ghost_map_update]s in index order leave behind.  [WeakStore.wins4] is
-    [winsw … 4] (see [wins8_winsw] for the width-8 identification). *)
-
-Fixpoint winsw (a : Arch.pa) (T : nat) {m : N} (v : bv m) (n : nat)
-    (mm : gmap Z (nat * bv 8)) : gmap Z (nat * bv 8) :=
-  match n with
-  | O => mm
-  | S k => <[acc_addr a k := (T, nth_byte v k)]> (winsw a T v k mm)
-  end.
-
-Lemma winsw_lookup_in (a : Arch.pa) (T : nat) {m : N} (v : bv m) (n : nat)
-    (mm : gmap Z (nat * bv 8)) (j : nat) :
-  (j < n)%nat -> winsw a T v n mm !! acc_addr a j = Some (T, nth_byte v j).
-Proof.
-  revert j. induction n as [|k IH]; intros j Hj; [exfalso; lia|]. simpl.
-  destruct (decide (j = k)) as [->|Hne].
-  - by rewrite lookup_insert.
-  - rewrite lookup_insert_ne; [apply IH; lia|rewrite /acc_addr; lia].
-Qed.
-
-Lemma winsw_lookup_out (a : Arch.pa) (T : nat) {m : N} (v : bv m) (n : nat)
-    (mm : gmap Z (nat * bv 8)) (z : Z) :
-  (forall j : nat, (j < n)%nat -> acc_addr a j <> z) ->
-  winsw a T v n mm !! z = mm !! z.
-Proof.
-  induction n as [|k IH]; intros Hne; [reflexivity|]. simpl.
-  rewrite lookup_insert_ne; [apply IH; intros j Hj; apply Hne; lia
-                            |apply Hne; lia].
-Qed.
-
-(** THE WINDOW UPDATE, pure part, at every width: appending a width-[n]
-    store's message and retargeting the [n] elements at the fresh top keeps
-    the latest-write map accurate.  [WeakStore.wlat_agree_store4] is the
-    [n := 4] instance. *)
-Lemma wlat_agree_store_w img log (tid : option nat) (a : Arch.pa) (n : N)
-    {m : N} (v : bv m) (mm : gmap Z (nat * bv 8)) :
-  wlat_agree img log mm ->
-  wlat_agree img (log ++ [wwrite_msg tid a n v])
-             (winsw a (S (length log)) v (N.to_nat n) mm).
-Proof.
-  intros Hag.
-  apply (wlat_agree_store_win img log _
-           (fun z => pa_z a <= z < pa_z a + Z.of_N n) mm).
-  - intros z Hz. by apply (wwrite_msg_win_none tid a n v z).
-  - intros z tv Hz Hlk.
-    assert (Hex : exists j : nat, (j < N.to_nat n)%nat /\ z = acc_addr a j).
-    { exists (Z.to_nat (z - pa_z a)). rewrite /acc_addr. split; lia. }
-    destruct Hex as (j & Hj & ->).
-    rewrite (winsw_lookup_in a (S (length log)) v (N.to_nat n) mm j Hj) in Hlk.
-    simplify_eq/=. split; [reflexivity|].
-    by apply (wwrite_msg_byte tid a n v j).
-  - intros z Hz. apply winsw_lookup_out. intros j Hj Heq.
-    apply Hz. rewrite -Heq /acc_addr. lia.
-  - exact Hag.
-Qed.
-
-(* ====================================================================== *)
-(** ** 1b. The per-byte bridges, width-generic
-
-    The one-byte content of the whole flat/pinned side.  Both are stated at
-    the log's own key [acc_addr a j] (which is what a bundle carries) and
-    convert to the [Arch.pa]-keyed flat map through [acc_wf_byte] — the
-    conversion [acc_wf] exists to make available. *)
-
-Section byte_bridges.
-  Context `{!riscvGS Σ, !weakGS Σ}.
-
-  (** An OWNED byte of an access window: what the flat projection holds
-      there, and that it is pinned for this hart. *)
-  Lemma wpt_byte_flat_pin (σ : wmstate) (a : Arch.pa) (n : N) (dq : dfrac)
-      (b : bv 8) (j : nat) :
-    wlog_wf (wm_log σ) -> acc_wf a n -> (j < N.to_nat n)%nat ->
-    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
-    vwp_hold (acc_addr a j ↦w{dq} b) (wm_ws σ) -∗
-    ⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b /\
-     pinned_read σ (acc_addr a j)⌝.
-  Proof.
-    intros Hwf Hacc Hj. iIntros "Hi Hpt".
-    iDestruct (wpt_pinned_read σ (acc_addr a j) dq b with "Hi Hpt") as %Hpin.
-    iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b⌝)%I as %Hfl.
-    { iApply (wpt_flat_lookup σ (pa_add a j) dq b Hwf with "Hi [Hpt]").
-      rewrite (acc_wf_byte a n j Hacc Hj). iExact "Hpt". }
-    iPureIntro. by split.
-  Qed.
-
-  (** A BARE ELEMENT of an access window (no receipt, no view): the same flat
-      fact, plus the identification of the element's timestamp with the
-      byte's [latest_ts] — which is what makes an [ak_latest] read return
-      exactly this element's value. *)
-  Lemma wlat_byte_flat_gen (σ : wmstate) (a : Arch.pa) (n : N) (dq : dfrac)
-      (t : nat) (b : bv 8) (j : nat) :
-    wlog_wf (wm_log σ) -> acc_wf a n -> (j < N.to_nat n)%nat ->
-    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
-    wlat_pointsto (acc_addr a j) dq t b -∗
-    ⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b /\
-     latest_ts (wm_log σ) (acc_addr a j) = t⌝.
-  Proof.
-    intros Hwf Hacc Hj. iIntros "Hi He".
-    rewrite -(acc_wf_byte a n j Hacc Hj).
-    iApply (wpt_img_flat_lookup_gen σ (pa_add a j) dq t b Hwf with "Hi [He]").
-    rewrite (acc_wf_byte a n j Hacc Hj). iExact "He".
-  Qed.
-
-End byte_bridges.
 
 (* ====================================================================== *)
 (** ** 2. The two eight-byte bundles *)
@@ -431,14 +324,7 @@ Notation "a ↦w₈{ dq } w" := (wpt8 a dq w)
 
 Definition wins8 (a : Arch.pa) (T : nat) (v : bv 64)
     (mm : gmap Z (nat * bv 8)) : gmap Z (nat * bv 8) :=
-  <[acc_addr a 7 := (T, nth_byte v 7)]>
-  (<[acc_addr a 6 := (T, nth_byte v 6)]>
-  (<[acc_addr a 5 := (T, nth_byte v 5)]>
-  (<[acc_addr a 4 := (T, nth_byte v 4)]>
-  (<[acc_addr a 3 := (T, nth_byte v 3)]>
-  (<[acc_addr a 2 := (T, nth_byte v 2)]>
-  (<[acc_addr a 1 := (T, nth_byte v 1)]>
-  (<[acc_addr a 0 := (T, nth_byte v 0)]> mm))))))).
+  winsw a T v 8 mm.
 
 Lemma wins8_winsw (a : Arch.pa) T (v : bv 64) mm :
   wins8 a T v mm = winsw a T v (N.to_nat 8) mm.
@@ -588,30 +474,10 @@ End store8.
     [n := 4] instances, i.e. that nothing is lost by the generalization (the
     same sanity check [WeakStore.wlat_agree_store_win_singleton] makes). *)
 
-Definition wP_load_w (n : N) (ea : Arch.pa) : wmstate -> Prop :=
-  fun σ => acc_wf ea n /\
-           forall j : nat, (j < N.to_nat n)%nat -> pinned_read σ (acc_addr ea j).
-Definition wP_mem_w (n : N) (ea : Arch.pa) : wmstate -> Prop :=
-  fun _ => acc_wf ea n.
-Definition wV_store_w (n : N) (ea : Arch.pa) : wmstate -> wstate -> Prop :=
-  fun σ ws' => forall j : nat, (j < N.to_nat n)%nat ->
-     (S (length (wm_log σ)) <= flr (ws_view ws') (acc_addr ea j))%nat.
-Definition wV_amo_aq_w (n : N) (ea : Arch.pa) : wmstate -> wstate -> Prop :=
-  fun σ ws' => forall j : nat, (j < N.to_nat n)%nat ->
-     view_scl (latest_ts (wm_log σ) (acc_addr ea j)) ⊑ ws_view ws'.
-Definition wQ_store_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
-    (v : bv m) : wmstate -> wmstate -> Prop :=
-  fun σ σ' =>
-    wm_img σ' = wm_img σ /\
-    wm_log σ' = (wm_log σ ++ [wwrite_msg tid ea n v])%list /\
-    ws_le (wm_ws σ) (wm_ws σ') /\
-    wV_store_w n ea σ (wm_ws σ').
-Definition wQ_amo_aq_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
-    (v : bv m) : wmstate -> wmstate -> Prop :=
-  fun σ σ' => wQ_store_w n tid ea v σ σ' /\ wV_amo_aq_w n ea σ (wm_ws σ').
-
 (** THE SUBSUMPTION CHECKS: [WeakInstr]'s width-4 families are the [n := 4]
-    instances, on the nose. *)
+    instances of its own width-generic [_w] family, on the nose.  Kept as
+    regression checks after the generalization landed (M4-prep found the
+    identifications; they are now definitional). *)
 Lemma wP_load_w_4 ea : wP_load_w 4 ea = wP_load ea.
 Proof. reflexivity. Qed.
 Lemma wP_mem_w_4 ea : wP_mem_w 4 ea = wP_mem ea.
@@ -619,6 +485,10 @@ Proof. reflexivity. Qed.
 Lemma wV_store_w_4 ea : wV_store_w 4 ea = wV_store ea.
 Proof. reflexivity. Qed.
 Lemma wV_amo_aq_w_4 ea : wV_amo_aq_w 4 ea = wV_amo_aq ea.
+Proof. reflexivity. Qed.
+Lemma wV_load_w_4 ea : wV_load_w 4 ea = wV_load ea.
+Proof. reflexivity. Qed.
+Lemma wQ_load_w_4 ea : wQ_load_w 4 ea = wQ_load ea.
 Proof. reflexivity. Qed.
 Lemma wQ_store_w_4 tid ea (v : bv 32) : wQ_store_w 4 tid ea v = wQ_store tid ea v.
 Proof. reflexivity. Qed.

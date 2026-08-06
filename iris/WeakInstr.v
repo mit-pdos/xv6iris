@@ -150,6 +150,61 @@ Section flat_bridge.
 End flat_bridge.
 
 (* ====================================================================== *)
+(** ** 1a'. THE PER-BYTE BRIDGES, WIDTH-GENERIC
+
+    The one-byte content of the whole flat/pinned side, stated once for an
+    access of ANY width [n].  Every width-[k] bundle lemma below ([wpt4_flat],
+    [wpt4_pinned], [WeakLock.wlat4_flat_gen], [wwp_amoswap_w_aq_inv]'s inner
+    block, and the whole [WeakWord8] tower) is [k] applications of one of
+    these and nothing else.
+
+    Both are stated at the log's own key [WeakInterp.acc_addr a j] (which is
+    what a bundle carries) and convert to the [Arch.pa]-keyed flat map through
+    [WeakBridge.acc_wf_byte] — the conversion [acc_wf] exists to make
+    available. *)
+
+Section byte_bridges.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+
+  (** An OWNED byte of an access window: what the flat projection holds
+      there, and that it is pinned for this hart. *)
+  Lemma wpt_byte_flat_pin (σ : wmstate) (a : Arch.pa) (n : N) (dq : dfrac)
+      (b : bv 8) (j : nat) :
+    wlog_wf (wm_log σ) → acc_wf a n → (j < N.to_nat n)%nat →
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    vwp_hold (acc_addr a j ↦w{dq} b) (wm_ws σ) -∗
+    ⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b ∧
+     pinned_read σ (acc_addr a j)⌝.
+  Proof.
+    intros Hwf Hacc Hj. iIntros "Hi Hpt".
+    iDestruct (wpt_pinned_read σ (acc_addr a j) dq b with "Hi Hpt") as %Hpin.
+    iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b⌝)%I as %Hfl.
+    { iApply (wpt_flat_lookup σ (pa_add a j) dq b Hwf with "Hi [Hpt]").
+      rewrite (acc_wf_byte a n j Hacc Hj). iExact "Hpt". }
+    iPureIntro. by split.
+  Qed.
+
+  (** A BARE ELEMENT of an access window (no receipt, no view): the same flat
+      fact, plus the identification of the element's timestamp with the byte's
+      [latest_ts] — which is what makes an [ak_latest] read return exactly this
+      element's value. *)
+  Lemma wlat_byte_flat_gen (σ : wmstate) (a : Arch.pa) (n : N) (dq : dfrac)
+      (t : nat) (b : bv 8) (j : nat) :
+    wlog_wf (wm_log σ) → acc_wf a n → (j < N.to_nat n)%nat →
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    wlat_pointsto (acc_addr a j) dq t b -∗
+    ⌜wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some b ∧
+     latest_ts (wm_log σ) (acc_addr a j) = t⌝.
+  Proof.
+    intros Hwf Hacc Hj. iIntros "Hi He".
+    rewrite -(acc_wf_byte a n j Hacc Hj).
+    iApply (wpt_img_flat_lookup_gen σ (pa_add a j) dq t b Hwf with "Hi [He]").
+    rewrite (acc_wf_byte a n j Hacc Hj). iExact "He".
+  Qed.
+
+End byte_bridges.
+
+(* ====================================================================== *)
 (** ** 1b. [↦w₄] — the four-byte bundle
 
     M2b's cut item 3, in the minimal form M3a needs: four consecutive weak
@@ -208,6 +263,31 @@ Section word4.
     destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
   Qed.
 
+  (** THE FLAT + PINNED FACTS over the window, in one pass — four
+      applications of §1a''s [wpt_byte_flat_pin] and nothing else. *)
+  Lemma wpt4_flat_pin (σ : wmstate) (a : Arch.pa) (dq : dfrac) (w : bv 32) :
+    wlog_wf (wm_log σ) →
+    (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
+    vwp_hold (wpt4 a dq w) (wm_ws σ) -∗
+    ⌜acc_wf a 4 ∧
+     ∀ j : nat, (j < 4)%nat →
+       wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some (nth_byte w j) ∧
+       pinned_read σ (acc_addr a j)⌝.
+  Proof.
+    intros Hwf. rewrite /wpt4 !vwp_hold_sep !vwp_hold_pure.
+    iIntros "Hi (%Hal & %Hacc & H0 & H1 & H2 & H3)".
+    iDestruct (wpt_byte_flat_pin σ a 4 dq (nth_byte w 0) 0 Hwf Hacc
+                 ltac:(lia) with "Hi H0") as %E0.
+    iDestruct (wpt_byte_flat_pin σ a 4 dq (nth_byte w 1) 1 Hwf Hacc
+                 ltac:(lia) with "Hi H1") as %E1.
+    iDestruct (wpt_byte_flat_pin σ a 4 dq (nth_byte w 2) 2 Hwf Hacc
+                 ltac:(lia) with "Hi H2") as %E2.
+    iDestruct (wpt_byte_flat_pin σ a 4 dq (nth_byte w 3) 3 Hwf Hacc
+                 ltac:(lia) with "Hi H3") as %E3.
+    iPureIntro. split; [exact Hacc|]. intros j Hj.
+    destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
+  Qed.
+
   (** WHAT THE FLAT PROJECTION HOLDS over the window — the fact the SC
       execute-lemma of a load wants, verbatim. *)
   Lemma wpt4_flat (σ : wmstate) (a : Arch.pa) (dq : dfrac) (w : bv 32) :
@@ -218,33 +298,22 @@ Section word4.
        wflat (wm_img σ) (wm_log σ) !! pa_add a j = Some (nth_byte w j)⌝.
   Proof.
     intros Hwf. iIntros "Hi Hpt".
-    rewrite /wpt4 /vwp_hold !monPred_at_sep !monPred_at_pure.
-    iDestruct "Hpt" as "(%Hal & %Hacc & H0 & H1 & H2 & H3)".
-    iDestruct (wpt_flat_lookup σ (pa_add a 0) dq (nth_byte w 0) Hwf
-                 with "Hi [H0]") as %E0.
-    { rewrite /vwp_hold (acc_wf_byte a 4 0 Hacc ltac:(lia)). iExact "H0". }
-    iDestruct (wpt_flat_lookup σ (pa_add a 1) dq (nth_byte w 1) Hwf
-                 with "Hi [H1]") as %E1.
-    { rewrite /vwp_hold (acc_wf_byte a 4 1 Hacc ltac:(lia)). iExact "H1". }
-    iDestruct (wpt_flat_lookup σ (pa_add a 2) dq (nth_byte w 2) Hwf
-                 with "Hi [H2]") as %E2.
-    { rewrite /vwp_hold (acc_wf_byte a 4 2 Hacc ltac:(lia)). iExact "H2". }
-    iDestruct (wpt_flat_lookup σ (pa_add a 3) dq (nth_byte w 3) Hwf
-                 with "Hi [H3]") as %E3.
-    { rewrite /vwp_hold (acc_wf_byte a 4 3 Hacc ltac:(lia)). iExact "H3". }
-    iPureIntro. intros j Hj.
-    destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia].
+    iDestruct (wpt4_flat_pin σ a dq w Hwf with "Hi Hpt") as %[_ Hall].
+    iPureIntro. intros j Hj. exact (proj1 (Hall j Hj)).
   Qed.
 
   (** ... and that the window is PINNED for this hart, which is what the
-      weak arm of [wstep_ok]'s read obligation asks for. *)
+      weak arm of [wstep_ok]'s read obligation asks for.  Kept SEPARATE from
+      [wpt4_flat_pin] and free of its [wlog_wf] premise: pinnedness is a
+      statement about views alone ([WeakBridge.wpt_pinned_read] needs no
+      well-formedness), and a leaf that only owes the peel should not have to
+      produce the log's well-formedness to discharge it. *)
   Lemma wpt4_pinned (σ : wmstate) (a : Arch.pa) (dq : dfrac) (w : bv 32) :
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     vwp_hold (wpt4 a dq w) (wm_ws σ) -∗
     ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr a j)⌝.
   Proof.
-    iIntros "Hi Hpt".
-    rewrite /wpt4 /vwp_hold !monPred_at_sep !monPred_at_pure.
+    iIntros "Hi Hpt". rewrite /wpt4 !vwp_hold_sep !vwp_hold_pure.
     iDestruct "Hpt" as "(%Hal & %Hacc & H0 & H1 & H2 & H3)".
     iDestruct (wpt_pinned_read σ (acc_addr a 0) dq (nth_byte w 0)
                  with "Hi H0") as %E0.
@@ -522,11 +591,23 @@ End rule.
     discharge [P] and consume [Q].  Everything except the MEMORY ARM is
     already carried by §4 (registers, devices and the flat memory come out of
     [wstep_post]; the config tower is objective and untouched), so what is
-    left here is exactly the weak-memory content of each instruction. *)
+    left here is exactly the weak-memory content of each instruction.
 
-Definition wP_load (ea : Arch.pa) : wmstate → Prop :=
-  λ σ, acc_wf ea 4 ∧ ∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr ea j).
-Definition wP_mem (ea : Arch.pa) : wmstate → Prop := λ _, acc_wf ea 4.
+    THE WHOLE FAMILY IS WIDTH-GENERIC.  Nothing in any of these predicates is
+    about the number 4 beyond the width of the access, so each is stated over
+    an arbitrary [n : N] — the [_w] names below are the PRIMARY statements —
+    and the width-4 names every consumer already uses are their [n := 4]
+    instances, on the nose (each definition below is a delta step, so a
+    [rewrite /wQ_store] still works; it now takes one more [/wQ_store_w] to
+    reach the body).  [WeakWord8] supplies the [n := 8] instances the same
+    way.  This is the M4-prep finding acted on: generalise before the sweep
+    doubles the call sites, not after. *)
+
+Definition wP_load_w (n : N) (ea : Arch.pa) : wmstate → Prop :=
+  λ σ, acc_wf ea n ∧
+       ∀ j : nat, (j < N.to_nat n)%nat → pinned_read σ (acc_addr ea j).
+Definition wP_mem_w (n : N) (ea : Arch.pa) : wmstate → Prop :=
+  λ _, acc_wf ea n.
 Definition wP_none : wmstate → Prop := λ _, True.
 
 (** *** The VIEW-level effects ([wV_*]) — what the leaf lemmas of §5 consume.
@@ -536,14 +617,14 @@ Definition wP_none : wmstate → Prop := λ _, True.
 
 Definition wV_fence (b : barrier_kind) : wmstate → wstate → Prop :=
   λ σ ws', ws_le (barrier_post (wm_ws σ) b) ws'.
-Definition wV_store (ea : Arch.pa) : wmstate → wstate → Prop :=
-  λ σ ws', ∀ j : nat, (j < 4)%nat →
+Definition wV_store_w (n : N) (ea : Arch.pa) : wmstate → wstate → Prop :=
+  λ σ ws', ∀ j : nat, (j < N.to_nat n)%nat →
      (S (length (wm_log σ)) ≤ flr (ws_view ws') (acc_addr ea j))%nat.
-Definition wV_amo_aq (ea : Arch.pa) : wmstate → wstate → Prop :=
-  λ σ ws', ∀ j : nat, (j < 4)%nat →
+Definition wV_amo_aq_w (n : N) (ea : Arch.pa) : wmstate → wstate → Prop :=
+  λ σ ws', ∀ j : nat, (j < N.to_nat n)%nat →
      view_scl (latest_ts (wm_log σ) (acc_addr ea j)) ⊑ ws_view ws'.
-Definition wV_load (ea : Arch.pa) : wmstate → wstate → Prop :=
-  λ σ ws', ∀ j : nat, (j < 4)%nat →
+Definition wV_load_w (n : N) (ea : Arch.pa) : wmstate → wstate → Prop :=
+  λ σ ws', ∀ j : nat, (j < N.to_nat n)%nat →
      view_byte (acc_addr ea j) (latest_ts (wm_log σ) (acc_addr ea j)) ⊑ ws_view ws'.
 
 (** *** The CERTIFICATE-level effects ([wQ_*]) — what [wstep_cert] carries.
@@ -557,29 +638,55 @@ Definition wQ_none : wmstate → wmstate → Prop := λ _ _, True.
 Definition wQ_fence (b : barrier_kind) : wmstate → wmstate → Prop :=
   λ σ σ', wV_fence b σ (wm_ws σ').
 
-Definition wQ_load (ea : Arch.pa) : wmstate → wmstate → Prop :=
-  λ σ σ', wm_img σ' = wm_img σ ∧ wm_log σ' = wm_log σ ∧ wV_load ea σ (wm_ws σ').
+Definition wQ_load_w (n : N) (ea : Arch.pa) : wmstate → wmstate → Prop :=
+  λ σ σ', wm_img σ' = wm_img σ ∧ wm_log σ' = wm_log σ ∧
+          wV_load_w n ea σ (wm_ws σ').
 
-(** A 4-byte STORE of [v] to [ea]: ONE message at the log's fresh top, and the
-    hart's own floor covers it afterwards. *)
-Definition wQ_store (tid : option nat) (ea : Arch.pa) (v : bv 32)
-    : wmstate → wmstate → Prop :=
+(** A width-[n] STORE of [v] to [ea]: ONE message at the log's fresh top, and
+    the hart's own floor covers it afterwards.  The stored value's width [m]
+    is left free — the message carries whatever the interpreter was handed. *)
+Definition wQ_store_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
+    (v : bv m) : wmstate → wmstate → Prop :=
   λ σ σ',
     wm_img σ' = wm_img σ ∧
-    wm_log σ' = (wm_log σ ++ [wwrite_msg tid ea 4 v])%list ∧
+    wm_log σ' = (wm_log σ ++ [wwrite_msg tid ea n v])%list ∧
     ws_le (wm_ws σ) (wm_ws σ') ∧
-    wV_store ea σ (wm_ws σ').
+    wV_store_w n ea σ (wm_ws σ').
 
-(** [amoswap.w.aq] writing [v]: the same store effect, PLUS the acquire's index
-    gain — the scalar floor covers the timestamp the read half took, which is
-    the latest write to the word ([ak_latest]). *)
+(** [amoswap] with [.aq] writing [v]: the same store effect, PLUS the
+    acquire's index gain — the scalar floor covers the timestamp the read half
+    took, which is the latest write to the word ([ak_latest]). *)
+Definition wQ_amo_aq_w (n : N) (tid : option nat) (ea : Arch.pa) {m : N}
+    (v : bv m) : wmstate → wmstate → Prop :=
+  λ σ σ', wQ_store_w n tid ea v σ σ' ∧ wV_amo_aq_w n ea σ (wm_ws σ').
+
+(** *** The WIDTH-4 NAMES, as instances.  Every existing call site is
+    unchanged; the only churn is that a proof which unfolded the body with
+    [rewrite /wQ_store] now unfolds [/wQ_store /wQ_store_w]. *)
+
+Definition wP_load (ea : Arch.pa) : wmstate → Prop := wP_load_w 4 ea.
+Definition wP_mem (ea : Arch.pa) : wmstate → Prop := wP_mem_w 4 ea.
+Definition wV_store (ea : Arch.pa) : wmstate → wstate → Prop := wV_store_w 4 ea.
+Definition wV_amo_aq (ea : Arch.pa) : wmstate → wstate → Prop :=
+  wV_amo_aq_w 4 ea.
+Definition wV_load (ea : Arch.pa) : wmstate → wstate → Prop := wV_load_w 4 ea.
+Definition wQ_load (ea : Arch.pa) : wmstate → wmstate → Prop := wQ_load_w 4 ea.
+Definition wQ_store (tid : option nat) (ea : Arch.pa) (v : bv 32)
+    : wmstate → wmstate → Prop := wQ_store_w 4 tid ea v.
 Definition wQ_amo_aq (tid : option nat) (ea : Arch.pa) (v : bv 32)
-    : wmstate → wmstate → Prop :=
-  λ σ σ', wQ_store tid ea v σ σ' ∧ wV_amo_aq ea σ (wm_ws σ').
+    : wmstate → wmstate → Prop := wQ_amo_aq_w 4 tid ea v.
 
 Lemma wQ_amo_aq_store tid ea v σ σ' :
   wQ_amo_aq tid ea v σ σ' → wQ_store tid ea v σ σ'.
 Proof. by intros [? _]. Qed.
+
+Lemma wQ_store_wV tid ea v σ σ' :
+  wQ_store tid ea v σ σ' → wV_store ea σ (wm_ws σ').
+Proof. by intros (_ & _ & _ & ?). Qed.
+
+Lemma wQ_amo_aq_gain tid ea v σ σ' :
+  wQ_amo_aq tid ea v σ σ' → wV_amo_aq ea σ (wm_ws σ').
+Proof. by intros [_ ?]. Qed.
 
 Section leaves.
   Context `{!riscvGS Σ, !weakGS Σ}.
@@ -605,12 +712,11 @@ Section leaves.
         wflat (wm_img σ) (wm_log σ) !! pa_add ea j = Some (nth_byte w j))⌝.
   Proof.
     intros Hwf. iIntros "Hi Hpt".
-    iDestruct (wpt4_flat σ ea dq w Hwf with "Hi Hpt") as %Hflat.
-    iDestruct (wpt4_pinned σ ea dq w with "Hi Hpt") as %Hpin.
-    iAssert (⌜acc_wf ea 4⌝)%I as %Hacc.
-    { rewrite /wpt4 /vwp_hold !monPred_at_sep !monPred_at_pure.
-      by iDestruct "Hpt" as "(_ & % & _)". }
-    iPureIntro. split; [split; [exact Hacc|exact Hpin]|exact Hflat].
+    iDestruct (wpt4_flat_pin σ ea dq w Hwf with "Hi Hpt") as %[Hacc Hall].
+    iPureIntro. split.
+    - rewrite /wP_load /wP_load_w. split; [exact Hacc|].
+      intros j Hj. exact (proj2 (Hall j Hj)).
+    - intros j Hj. exact (proj1 (Hall j Hj)).
   Qed.
 
   (** ... and the frame: the loaded word survives the step. *)
@@ -693,34 +799,19 @@ Section leaves.
   Proof.
     intros Hwf Hacc HQ. iIntros "Hi (H0 & H1 & H2 & H3) HR".
     (* every byte of the word: the element determines the flat byte AND
-       [latest_ts], because an element IS the latest write *)
+       [latest_ts], because an element IS the latest write — four applications
+       of §1a''s [wlat_byte_flat_gen] *)
     iAssert (⌜∀ j : nat, (j < 4)%nat →
                wflat (wm_img σ) (wm_log σ) !! pa_add ea j = Some (nth_byte w j)
                ∧ latest_ts (wm_log σ) (acc_addr ea j) = t⌝)%I as %Hall.
-    { iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add ea 0 = Some (nth_byte w 0)
-                 ∧ latest_ts (wm_log σ) (acc_addr ea 0) = t⌝)%I as %E0.
-      { rewrite -(acc_wf_byte ea 4 0 Hacc ltac:(lia)).
-        iApply (wpt_img_flat_lookup_gen σ (pa_add ea 0) dq t (nth_byte w 0) Hwf
-                  with "Hi [H0]").
-        rewrite (acc_wf_byte ea 4 0 Hacc ltac:(lia)). iExact "H0". }
-      iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add ea 1 = Some (nth_byte w 1)
-                 ∧ latest_ts (wm_log σ) (acc_addr ea 1) = t⌝)%I as %E1.
-      { rewrite -(acc_wf_byte ea 4 1 Hacc ltac:(lia)).
-        iApply (wpt_img_flat_lookup_gen σ (pa_add ea 1) dq t (nth_byte w 1) Hwf
-                  with "Hi [H1]").
-        rewrite (acc_wf_byte ea 4 1 Hacc ltac:(lia)). iExact "H1". }
-      iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add ea 2 = Some (nth_byte w 2)
-                 ∧ latest_ts (wm_log σ) (acc_addr ea 2) = t⌝)%I as %E2.
-      { rewrite -(acc_wf_byte ea 4 2 Hacc ltac:(lia)).
-        iApply (wpt_img_flat_lookup_gen σ (pa_add ea 2) dq t (nth_byte w 2) Hwf
-                  with "Hi [H2]").
-        rewrite (acc_wf_byte ea 4 2 Hacc ltac:(lia)). iExact "H2". }
-      iAssert (⌜wflat (wm_img σ) (wm_log σ) !! pa_add ea 3 = Some (nth_byte w 3)
-                 ∧ latest_ts (wm_log σ) (acc_addr ea 3) = t⌝)%I as %E3.
-      { rewrite -(acc_wf_byte ea 4 3 Hacc ltac:(lia)).
-        iApply (wpt_img_flat_lookup_gen σ (pa_add ea 3) dq t (nth_byte w 3) Hwf
-                  with "Hi [H3]").
-        rewrite (acc_wf_byte ea 4 3 Hacc ltac:(lia)). iExact "H3". }
+    { iDestruct (wlat_byte_flat_gen σ ea 4 dq t (nth_byte w 0) 0 Hwf Hacc
+                   ltac:(lia) with "Hi H0") as %E0.
+      iDestruct (wlat_byte_flat_gen σ ea 4 dq t (nth_byte w 1) 1 Hwf Hacc
+                   ltac:(lia) with "Hi H1") as %E1.
+      iDestruct (wlat_byte_flat_gen σ ea 4 dq t (nth_byte w 2) 2 Hwf Hacc
+                   ltac:(lia) with "Hi H2") as %E2.
+      iDestruct (wlat_byte_flat_gen σ ea 4 dq t (nth_byte w 3) 3 Hwf Hacc
+                   ltac:(lia) with "Hi H3") as %E3.
       iPureIntro. intros j Hj.
       destruct j as [|[|[|[|j]]]]; [exact E0|exact E1|exact E2|exact E3|lia]. }
     assert (Hscl : view_scl t ⊑ ws_view ws').

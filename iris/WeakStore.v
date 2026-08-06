@@ -27,12 +27,17 @@
           store leaves at EVERY byte of its window ([flr_wwrite_post]), which
           is the [flr_store_post] the four-byte post-view side condition
           needs.
-      §3  [wlat4_store] — the bundle update at the iProp altitude, full
+      §3  [winsw] / [wlat_agree_store_w] — THE WINDOW INSERT AT EVERY WIDTH
+          AT ONCE, and the pure window update over it.  [wins4] (§3b) and
+          [WeakWord8.wins8] are its [n := 4] / [n := 8] instances, on the
+          nose; the four- and eight-byte [wlat_agree] lemmas are one [apply]
+          of the generic one each.
+      §4  [wlat4_store] — the bundle update at the iProp altitude, full
           fraction, one four-byte message appended, all four elements
           retargeted at [S (length (wm_log σ))].  THIS is the deliverable the
           lock library consumes: it is what lets a releaser close the lock
           invariant at the value it just stored.
-      §4  [wpt4_store] — the same at the vProp/[vwp_hold] altitude, with the
+      §4b [wpt4_store] — the same at the vProp/[vwp_hold] altitude, with the
           bundle's two pure conjuncts (4-alignment and [acc_wf]) riding along
           unchanged and the post-view discharged from §2.
 
@@ -210,80 +215,108 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** ** 3. The four-byte instance of the window update, pure part
+(** ** 3. THE WINDOW INSERT, AT EVERY WIDTH AT ONCE
+
+    [winsw a T v n mm] is [mm] with the [n] bytes of [v] at [a] retargeted at
+    timestamp [T] — byte 0 innermost, i.e. the shape [n] successive
+    [ghost_map_update]s in index order leave behind.  This is the PRIMARY
+    statement; [wins4] below and [WeakWord8.wins8] are its [n := 4] and
+    [n := 8] instances, on the nose (both identifications are [reflexivity]).
+
+    The width is a [N] on the message side ([WeakInterp.wwrite_msg] takes a
+    [N]) and a [nat] on the insert-chain side, so [winsw] takes the [nat] and
+    §3's [wlat_agree_store_w] converts at [N.to_nat] — the one place the two
+    spellings meet. *)
+
+Fixpoint winsw (a : Arch.pa) (T : nat) {m : N} (v : bv m) (n : nat)
+    (mm : gmap Z (nat * bv 8)) : gmap Z (nat * bv 8) :=
+  match n with
+  | O => mm
+  | S k => <[acc_addr a k := (T, nth_byte v k)]> (winsw a T v k mm)
+  end.
+
+Lemma winsw_lookup_in (a : Arch.pa) (T : nat) {m : N} (v : bv m) (n : nat)
+    (mm : gmap Z (nat * bv 8)) (j : nat) :
+  (j < n)%nat -> winsw a T v n mm !! acc_addr a j = Some (T, nth_byte v j).
+Proof.
+  revert j. induction n as [|k IH]; intros j Hj; [exfalso; lia|]. simpl.
+  destruct (decide (j = k)) as [->|Hne].
+  - by rewrite lookup_insert.
+  - rewrite lookup_insert_ne; [apply IH; lia|rewrite /acc_addr; lia].
+Qed.
+
+Lemma winsw_lookup_out (a : Arch.pa) (T : nat) {m : N} (v : bv m) (n : nat)
+    (mm : gmap Z (nat * bv 8)) (z : Z) :
+  (forall j : nat, (j < n)%nat -> acc_addr a j <> z) ->
+  winsw a T v n mm !! z = mm !! z.
+Proof.
+  induction n as [|k IH]; intros Hne; [reflexivity|]. simpl.
+  rewrite lookup_insert_ne; [apply IH; intros j Hj; apply Hne; lia
+                            |apply Hne; lia].
+Qed.
+
+(** THE WINDOW UPDATE, pure part, at every width: appending a width-[n]
+    store's message and retargeting the [n] elements at the fresh top keeps
+    the latest-write map accurate.  [wlat_agree_store4] and
+    [WeakWord8.wlat_agree_store8] are the [n := 4] / [n := 8] instances. *)
+Lemma wlat_agree_store_w img log (tid : option nat) (a : Arch.pa) (n : N)
+    {m : N} (v : bv m) (mm : gmap Z (nat * bv 8)) :
+  wlat_agree img log mm ->
+  wlat_agree img (log ++ [wwrite_msg tid a n v])
+             (winsw a (S (length log)) v (N.to_nat n) mm).
+Proof.
+  intros Hag.
+  apply (wlat_agree_store_win img log _
+           (fun z => pa_z a <= z < pa_z a + Z.of_N n) mm).
+  - intros z Hz. by apply (wwrite_msg_win_none tid a n v z).
+  - intros z tv Hz Hlk.
+    assert (Hex : exists j : nat, (j < N.to_nat n)%nat /\ z = acc_addr a j).
+    { exists (Z.to_nat (z - pa_z a)). rewrite /acc_addr. split; lia. }
+    destruct Hex as (j & Hj & ->).
+    rewrite (winsw_lookup_in a (S (length log)) v (N.to_nat n) mm j Hj) in Hlk.
+    simplify_eq/=. split; [reflexivity|].
+    by apply (wwrite_msg_byte tid a n v j).
+  - intros z Hz. apply winsw_lookup_out. intros j Hj Heq.
+    apply Hz. rewrite -Heq /acc_addr. lia.
+  - exact Hag.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(** *** 3b. The four-byte instance
 
     [wins4] is the shape four successive [ghost_map_update]s leave behind, in
-    the order §4 performs them (byte 0 first, so its insert is innermost). *)
+    the order §4 performs them (byte 0 first, so its insert is innermost) —
+    and it IS [winsw] at [n := 4], which is where its two lookup lemmas and
+    its [wlat_agree] come from. *)
 
 Definition wins4 (a : Arch.pa) (T : nat) (v : bv 32)
     (mm : gmap Z (nat * bv 8)) : gmap Z (nat * bv 8) :=
-  <[acc_addr a 3 := (T, nth_byte v 3)]>
-  (<[acc_addr a 2 := (T, nth_byte v 2)]>
-  (<[acc_addr a 1 := (T, nth_byte v 1)]>
-  (<[acc_addr a 0 := (T, nth_byte v 0)]> mm))).
+  winsw a T v 4 mm.
+
+Lemma wins4_winsw (a : Arch.pa) T (v : bv 32) mm :
+  wins4 a T v mm = winsw a T v (N.to_nat 4) mm.
+Proof. reflexivity. Qed.
 
 Lemma wins4_lookup_in (a : Arch.pa) T (v : bv 32) mm (j : nat) :
   (j < 4)%nat -> wins4 a T v mm !! acc_addr a j = Some (T, nth_byte v j).
-Proof.
-  intros Hj.
-  assert (H10 : acc_addr a 1 <> acc_addr a 0). { rewrite /acc_addr. lia. }
-  assert (H20 : acc_addr a 2 <> acc_addr a 0). { rewrite /acc_addr. lia. }
-  assert (H30 : acc_addr a 3 <> acc_addr a 0). { rewrite /acc_addr. lia. }
-  assert (H21 : acc_addr a 2 <> acc_addr a 1). { rewrite /acc_addr. lia. }
-  assert (H31 : acc_addr a 3 <> acc_addr a 1). { rewrite /acc_addr. lia. }
-  assert (H32 : acc_addr a 3 <> acc_addr a 2). { rewrite /acc_addr. lia. }
-  rewrite /wins4. destruct j as [|[|[|[|j]]]]; [| | | |lia].
-  - rewrite lookup_insert_ne // lookup_insert_ne // lookup_insert_ne //
-            lookup_insert //.
-  - rewrite lookup_insert_ne // lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert_ne // lookup_insert //.
-  - rewrite lookup_insert //.
-Qed.
+Proof. intros Hj. rewrite wins4_winsw. apply winsw_lookup_in. lia. Qed.
 
 Lemma wins4_lookup_out (a : Arch.pa) T (v : bv 32) mm (z : Z) :
   ¬ (pa_z a <= z < pa_z a + 4) -> wins4 a T v mm !! z = mm !! z.
 Proof.
-  intros Hout.
-  assert (H0 : acc_addr a 0 <> z). { rewrite /acc_addr. lia. }
-  assert (H1 : acc_addr a 1 <> z). { rewrite /acc_addr. lia. }
-  assert (H2 : acc_addr a 2 <> z). { rewrite /acc_addr. lia. }
-  assert (H3 : acc_addr a 3 <> z). { rewrite /acc_addr. lia. }
-  rewrite /wins4 lookup_insert_ne // lookup_insert_ne // lookup_insert_ne //
-          lookup_insert_ne //.
+  intros Hout. rewrite wins4_winsw. apply winsw_lookup_out.
+  intros j Hj. rewrite /acc_addr. lia.
 Qed.
 
-(** THE FOUR-BYTE WINDOW UPDATE, pure: appending the store's message and
-    retargeting the four elements at the fresh top keeps the whole map
-    accurate. *)
+(** THE FOUR-BYTE WINDOW UPDATE, pure: the [n := 4] instance of §3. *)
 Lemma wlat_agree_store4 img log tid (a : Arch.pa) (v : bv 32)
     (mm : gmap Z (nat * bv 8)) :
   wlat_agree img log mm ->
   wlat_agree img (log ++ [wwrite_msg tid a 4 v])
              (wins4 a (S (length log)) v mm).
 Proof.
-  intros Hag.
-  apply (wlat_agree_store_win img log _ (fun z => pa_z a <= z < pa_z a + 4) mm).
-  - intros z Hz. apply (wwrite_msg_win_none tid a 4 v z).
-    change (Z.of_N 4) with 4. exact Hz.
-  - intros z tv Hz Hlk.
-    assert (Hcase : z = acc_addr a 0 \/ z = acc_addr a 1 \/
-                    z = acc_addr a 2 \/ z = acc_addr a 3).
-    { rewrite /acc_addr. lia. }
-    destruct Hcase as [Hz4|[Hz4|[Hz4|Hz4]]]; subst z.
-    + rewrite (wins4_lookup_in a (S (length log)) v mm 0 ltac:(lia)) in Hlk.
-      simplify_eq/=. split; [reflexivity|].
-      apply (wwrite_msg_byte tid a 4 v 0). lia.
-    + rewrite (wins4_lookup_in a (S (length log)) v mm 1 ltac:(lia)) in Hlk.
-      simplify_eq/=. split; [reflexivity|].
-      apply (wwrite_msg_byte tid a 4 v 1). lia.
-    + rewrite (wins4_lookup_in a (S (length log)) v mm 2 ltac:(lia)) in Hlk.
-      simplify_eq/=. split; [reflexivity|].
-      apply (wwrite_msg_byte tid a 4 v 2). lia.
-    + rewrite (wins4_lookup_in a (S (length log)) v mm 3 ltac:(lia)) in Hlk.
-      simplify_eq/=. split; [reflexivity|].
-      apply (wwrite_msg_byte tid a 4 v 3). lia.
-  - intros z Hz. by apply wins4_lookup_out.
-  - exact Hag.
+  intros Hag. rewrite wins4_winsw.
+  by apply (wlat_agree_store_w img log tid a 4 v mm).
 Qed.
 
 (* ====================================================================== *)
