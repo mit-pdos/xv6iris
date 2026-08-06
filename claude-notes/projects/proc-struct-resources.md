@@ -895,6 +895,70 @@ the evidence for every offset. This file is only the worklist.
       error rather than "not found".  Six of the ten files needed the import
       added.
 
+- [x] **`reparent` PROVEN and LINKED** (`WaitInv.v` / `CodeReparent.v` /
+      `SpecReparent.v` / `ProofReparent.v` / `LinkReparent.v`, over WAKEUP).
+      The first consumer of `p->parent`, and so the first function at the
+      **`wait_lock` altitude**: design in
+      [`design/proc-struct.md`](../design/proc-struct.md) §3.  Thirty-four
+      instructions -- a 48-byte ra/s0/s1/s2/s3/s4 frame with every slot used,
+      the proc[] scan, one call.  Structurally it is `wakeup`'s scan with a
+      different body, so `ProofWakeup.v` was the template; what is worth
+      carrying forward is the four things that differ:
+
+      * **THE CONTRACT IS THE PURE MAP, AND THE TWO ARMS OF AN ITERATION MEET
+        AT THE SAME TABLE.**  `WaitInv.rp_upto p ip k` (the reparent map applied
+        to the first `k` slots) is the loop invariant, and BOTH exits from the
+        body reach the shared p++/test tail holding `rp_upto _ _ (S k) ps`:
+        the store arm by `rp_upto_step`, the no-match arm because
+        `rp_slot p ip v = v` there and `list_insert_id` collapses the update.
+        That symmetry is what keeps the tail ONE `wp_next`-wrapped block
+        instead of two.  Look for it in any scan whose body conditionally
+        writes: state the per-slot function first, and the skip arm becomes an
+        instance of the write arm rather than a separate case.
+      * **`proc_addr_inj` WAS STATED ON THE OPEN RANGE, AND EVERY SCAN NEEDS
+        THE CLOSED ONE.**  A proc[] loop exits on `s1 == &proc[NPROC]`, and
+        that equation is worth nothing unless it implies the cursor's INDEX is
+        `NPROC` -- which `proc_addr_inj (i < NPROC) (j < NPROC)` cannot say
+        about `NPROC` itself.  `ProcGeom.proc_addr_inj_le` /
+        `proc_addr_unsigned_le` are the closed-range statements (the array ends
+        far below 2^64, so the premise was never load-bearing); the old names
+        are one-line restatements, so no call site churned.  wakeup and kkill
+        never hit this because their exit continuations do not need to know the
+        index; anything that reports a whole-table postcondition does.
+      * **A FRACTION OF A GLOBAL, HELD ACROSS THE LOOP, IS WHAT MAKES A
+        WHOLE-TABLE POSTCONDITION STATABLE.**  The `ld a0,0(s4)` that reads
+        `initproc` is INSIDE the loop and runs once per reparented child, so
+        `reparent` takes the cell at an arbitrary `dqi` and threads it through
+        the loop invariant.  Owning any fraction rules out a concurrent writer,
+        and that -- not the read itself -- is what lets the spec say every
+        child got the SAME new parent.  A spec that merely quantified the
+        loaded value would have to existentially quantify it per iteration.
+      * **DO NOT IMPORT `VcGen.v` FOR ITS ADDRESS ARITHMETIC.**  The six
+        `pa_stk sp0 j = <frame cell>` bridges every prologue/epilogue needs are
+        written in `ProofWakeupParts.v` with `VcGen.add_vec_off2`, which drags
+        the whole VCgen executor into a whole-function sconf proof for one line
+        of `add_vec` associativity.  `KernelRvcDecode.po_addv_assoc` +
+        `apply f_equal` does the same job at the right altitude, and
+        `KernelRvcDecode.frame_cancel` closes the pop's `pa_stk sp0 n = spF`
+        obligation.  (`ProofWakeupParts.v` still has the old import; it is a
+        cheap cleanup when someone is next in that file.)
+
+      Two smaller notes: `neq_vec` is *definitionally* `negb (eq_vec ..)`, so a
+      `bne` arm is `destruct (eq_vec x y) eqn:H` followed by `unfold neq_vec;
+      rewrite H`.  And a step lemma stated as
+      `<[k := f v]> l = l'` must be specialised FORWARD
+      (`pose proof (rp_upto_step ..) as H; rewrite Hslot in H`), never by
+      `rewrite -Hslot` in the goal -- `ip` occurs inside `rp_upto` too, so the
+      backward rewrite has no unique redex and fails with an unhelpful
+      "Unable to unify".
+
+      Stack budget: `K_reparent = 24` (6 for this frame, 18 for wakeup's).
+      What the contract deliberately does NOT say: anything about `wait_lock`
+      itself (reparent takes no lock; the caller's obligation to hold it lands
+      on `kexit`), and anything about the wakeups -- wakeup's own postcondition
+      is empty because `proc_pub` quantifies the state a SLEEPING->RUNNABLE
+      move changes.
+
 - [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
       shape. Needs an inode model (per-slot fractional auth over `itable`)
       that does not exist yet. Fill it and no caller restates.

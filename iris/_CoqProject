@@ -361,6 +361,8 @@ ProofWakeup.v
 LinkWakeup.v
 CodeReparent.v
 SpecReparent.v
+ProofReparent.v
+LinkReparent.v
 SpecInitlock.v
 ProofInitlock.v
 LinkInitlock.v

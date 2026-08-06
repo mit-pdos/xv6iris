@@ -34,7 +34,7 @@ All offsets corroborated by disassembly (`addi a5,a0,208` + stride 8 × 16 in
 | `killed` | 40 | 4 | `proc_pub` |
 | `xstate` | 44 | 4 | `proc_pub` |
 | `pid` | 48 | 4 | ½ in `proc_pub`, ½ in `proc_priv` |
-| `parent` | 56 | 8 | ❌ (belongs to `wait_lock`) |
+| `parent` | 56 | 8 | `WaitInv.parents_own` (under `wait_lock`) |
 | `kstack` | 64 | 8 | `is_kstack` (persistent) |
 | `sz` | 72 | 8 | `proc_priv` / `proc_dormant` |
 | `pagetable` | 80 | 8 | `proc_priv` / `proc_dormant` |
@@ -85,12 +85,38 @@ fraction** gives agreement for free (`word4_pointsto_agree`). Half stays in the
 lock resource so `kkill()` can always read it; half travels with the running
 process. `allocproc` reunites both halves in the `UNUSED` arm and so may write.
 
-### 3. A different lock — `parent`
+### 3. A different lock — `parent` (`WaitInv.v`, BUILT)
 
 `wait_lock`, not `p->lock`, and it is read/written *across* processes
-(`exit()` reparents its children onto `initproc`). Needs its own global lock
-resource holding all 64 cells; keep it out of `proc_lock_res` entirely, or the
-lock ordering `wait_lock` → `p->lock` becomes unstateable.
+(`exit()` reparents its children onto `initproc`). It has its own global
+resource holding all 64 cells, kept out of `proc_lock_res` entirely — putting
+it there would make the lock ordering `wait_lock` → `p->lock` unstateable,
+because a holder of `wait_lock` would then have to hold every proc lock too.
+
+```coq
+Definition parents_own (ps : list (mword 64)) : iProp Σ :=
+  (⌜length ps = NPROC⌝ ∗ [∗ list] j ↦ v ∈ ps, p_parent (proc_addr j) ↦₈ v)%I.
+Definition wait_res : iProp Σ := (∃ ps, parents_own ps)%I.
+```
+
+`parents_own` is the **contents-out** form — what a function that already holds
+`wait_lock` is handed — and `wait_res` is its existential closure, which is what
+the lock invariant will be once `kexit`/`kwait` need the lock itself. Nothing in
+`WaitInv.v` mentions the lock, deliberately: `reparent`'s contract is about the
+cells, and "caller must hold wait_lock" is discharged one altitude up. The
+length conjunct lives *inside* the resource rather than being a caller premise —
+it is a fact about the table, and a caller handed the block has no other way to
+learn it. The accessors are `parents_own_acc` (borrow slot `j`, return it at a
+possibly different value) and its read-only instance `parents_own_read`, exactly
+the `ProcInv.proc_priv_ofile` / `_ofile_read` pair and for the same reason: a
+scan touches one cell at a time, so nothing ever has to know that two indices
+name different cells.
+
+The pure model of what `reparent` does to the table lives here too: `rp_slot` /
+`rp_map` (every cell equal to the argument becomes `initproc`), plus `rp_upto p
+ip k` — the same map applied to the first `k` slots only, which is a scan's loop
+invariant — and `rp_upto_step`, the one lemma a loop body needs. All three are
+over an arbitrary list, so the induction never has to know how long the table is.
 
 ### 4. Write-once at boot — `kstack`
 
@@ -687,9 +713,12 @@ symbolic fd, and factoring a branch join) are in
   separate resource keyed by that pointer value; the current tree's user-mode
   work assumes one fixed trapframe at `TRAMPOLINE - PGSIZE`, so per-proc
   trapframe pages are a seam, not a solved problem.
-- **`parent` / `wait_lock` is deliberately out of scope here.** It is a
-  different lock with a documented ordering constraint against `p->lock`;
-  it deserves its own note when `wait`/`exit` get attempted.
+- **`wait_lock` itself has no resource yet, only its contents.**
+  `WaitInv.parents_own` is what a holder is handed; nothing yet ties it to an
+  `is_lock`, so a caller's obligation to be holding the lock is not represented.
+  `reparent` does not need it (it takes no lock), but `kexit`/`kwait` do — they
+  acquire it — and that is where `wait_res` becomes a lock invariant and the
+  documented ordering `wait_lock` -> `p->lock` has to be stated.
 - **`procdump` is unprovable as written** (unlocked reads of `name` and `pid`
   on arbitrary procs). Making `name` persistent-after-`allocproc` would fix
   the `name` half but not `pid`; the honest answer is to leave `procdump`

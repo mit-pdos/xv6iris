@@ -324,9 +324,16 @@ Proof.
   rewrite avi_mword. f_equal. rewrite Nat2Z.inj_succ. ring.
 Qed.
 
-(* closed forms as unsigned integers (no wraparound in the array range) *)
-Lemma proc_addr_unsigned (i : nat) :
-  (i < NPROC)%nat ->
+(* closed forms as unsigned integers (no wraparound in the array range).
+
+   THE RANGE IS CLOSED, NOT OPEN.  [&proc[NPROC]] is a real address -- it is
+   the end sentinel every proc[] scan's exit test compares against (wakeup,
+   kkill, allocproc, reparent all load it into a register) -- so the fact has
+   to hold at [i = NPROC] too, and it does: the array ends far below 2^64.
+   [proc_addr_unsigned] below is the open-range restatement, kept so the
+   existing call sites do not churn. *)
+Lemma proc_addr_unsigned_le (i : nat) :
+  (i <= NPROC)%nat ->
   bv_unsigned (proc_addr i) = KernelSyms.proc + proc_size * Z.of_nat i.
 Proof.
   intro Hi. unfold NPROC in Hi.
@@ -336,6 +343,11 @@ Proof.
   apply bv_wrap_small.
   unfold KernelSyms.proc, proc_size. rewrite bv_modulus64. lia.
 Qed.
+
+Lemma proc_addr_unsigned (i : nat) :
+  (i < NPROC)%nat ->
+  bv_unsigned (proc_addr i) = KernelSyms.proc + proc_size * Z.of_nat i.
+Proof. intro Hi. apply proc_addr_unsigned_le. lia. Qed.
 
 Lemma p_context_unsigned (i : nat) :
   (i < NPROC)%nat ->
@@ -350,16 +362,24 @@ Proof.
   unfold KernelSyms.proc, proc_size, context_off. rewrite bv_modulus64. lia.
 Qed.
 
-(* proc addresses are injective on the array range. *)
-Lemma proc_addr_inj (i j : nat) :
-  (i < NPROC)%nat -> (j < NPROC)%nat ->
+(* proc addresses are injective on the array range, END SENTINEL INCLUDED --
+   which is what a scan's exit test needs: "the cursor equals [&proc[NPROC]]"
+   is only worth anything if it implies the cursor's INDEX is [NPROC], and
+   the open-range statement below cannot say that about [NPROC] itself. *)
+Lemma proc_addr_inj_le (i j : nat) :
+  (i <= NPROC)%nat -> (j <= NPROC)%nat ->
   proc_addr i = proc_addr j -> i = j.
 Proof.
   intros Hi Hj Heq.
   apply (f_equal bv_unsigned) in Heq.
-  rewrite (proc_addr_unsigned i Hi) (proc_addr_unsigned j Hj) in Heq.
+  rewrite (proc_addr_unsigned_le i Hi) (proc_addr_unsigned_le j Hj) in Heq.
   unfold proc_size in Heq. lia.
 Qed.
+
+Lemma proc_addr_inj (i j : nat) :
+  (i < NPROC)%nat -> (j < NPROC)%nat ->
+  proc_addr i = proc_addr j -> i = j.
+Proof. intros Hi Hj. apply proc_addr_inj_le; lia. Qed.
 
 (* proc-context addresses are injective on the array range. *)
 Lemma p_context_proc_addr_inj (i j : nat) :
