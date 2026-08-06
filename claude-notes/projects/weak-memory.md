@@ -12,14 +12,17 @@ M3a (`iris/WeakInstr.v`), M3b (`iris/WeakStore.v`, `iris/WeakCert.v`,
 M4-prep (`iris/WeakFunnel.v`, `iris/WeakEff.v`, `iris/WeakBranch.v`,
 `iris/WeakRacy.v`, `iris/WeakWord8.v`),
 the WIDTH GENERALIZATION (`WeakStore.winsw` & co., `WeakInstr`'s `_w`
-family — see the block below), and **M4 batch 0 PARTIAL**
-(`iris/WeakEffSkel.v`: `execR_eff` + its kit, the two `run_hart_active`
-progress mirrors, the step assembly; the FETCH and the `tick_clock` mirror
-are the two remaining pieces).
-**M3 and M4-prep are DONE.**  Next: M4 — read
-[`weak-memory-porting.md`](weak-memory-porting.md) first, then the M4-prep
-established-facts block below, whose closing section says exactly what the
-sweep still owes.
+family — see the block below), **M4 batch 0a** (`iris/WeakEffSkel.v`),
+**batch 0b** (`WeakPmpEff.v`, `WeakTickEff.v`, `WeakFetchEff.v`,
+`WeakFetchRvc.v`), **batch 1** (`WeakLeafEff8.v`, `WeakLeafEff8s.v`,
+`WeakLeafBase4.v`, `WeakLeafAmo4.v`, over the shared
+`WeakLeafEffCommon.v`), and **batch 2's first leaf**
+(`iris/WeakLeafLd8.v`, the `ld`-class 8-byte load, end to end) — whose two
+funnel seams have since been fixed, so its 472-line/3.1× figure IS the
+sweep's unit price.
+**M3 and M4-prep are DONE.**  Next: M4's remaining leaves — read
+[`weak-memory-porting.md`](weak-memory-porting.md) first (§2g is the leaf
+recipe at its post-fix shape), then the batch blocks below.
 
 ## M0 — model spike (no Iris)
 
@@ -1373,16 +1376,20 @@ they unlock.
     synchronising. Harmless — the certificate constrains only the read's
     kind, and the write's `ak_sync` enters only through
     `store_post_run_coh`, which is monotone in it.
-- **THE SHAPE FILES ARE ALREADY DUPLICATING EACH OTHER, AND IT SHOULD BE
-  FIXED BEFORE A THIRD WIDTH LANDS.** `WeakLeafEff8.v`, `WeakLeafEff8s.v` and
-  `WeakLeafBase4.v` each declare `exec_eff_rX_bits_gpr`,
-  `exec_eff_translationMode_M`, `exec_eff_ext_data_get_addr_gpr`,
-  `execR_eff_untilMT_1`, `exec_eff_split_misaligned_aligned` and the local
-  `returnM`/`and_boolM`/`or_boolM` twins. The statements are identical so the
-  shadowing is harmless today, but it is exactly the near-duplicate family
-  the guiding principle says not to keep: **hoist them into a shared
-  `WeakLeafEffCommon.v`** (the width-independent eff leaves plus the §0 kit)
-  when the next shape is written.
+- **THE SHARED `exec_eff` KIT IS `iris/WeakLeafEffCommon.v` (228 lines) —
+  REQUIRE IT, DO NOT COPY IT.** Batch 1's four shape files each declared
+  their own `exec_eff_returnM` / `_and_boolM_nil` / `_or_boolM_nil` /
+  `_MemRead` / `_MemWrite` and their own copies of the width- and
+  access-INDEPENDENT leaves (`exec_eff_rX_bits_gpr`, `_wX_bits_at`,
+  `_wX_bits_gpr`, `_translationMode_M`, `_ext_data_get_addr_gpr`,
+  `execR_eff_untilMT_1`, `_split_misaligned_aligned`) — 40 lemmas of
+  duplication, identical modulo the `wl8_`/`wl8s_`/`wl4_`/`wa4_` prefix, and
+  a fifth shape would have made a fifth copy. All of it now lives in
+  `WeakLeafEffCommon`, which `WeakFetchEff` is routed through as well (it had
+  four of the same lemmas, and `WeakLeafLd8` imports both cones).
+  `split_misaligned` was generalised over the width while moving
+  (`exec_eff_split_misaligned_aligned_w`, with the 8 and 4 spellings as
+  instances, so no call site churned). Net −597/+161 across six files.
 - **WIDTH IS NOT ALWAYS COSMETIC.** At width 8 a STORE's
   `subrange_vec_dec vrs2 63 0` is the whole register (`autocast_subrange_id`
   concludes `= vrs2`); at width 4 it is a genuine truncation, so the stored
@@ -1399,43 +1406,66 @@ they unlock.
   them, exactly as the SC originals take the `exec` forms. Four agents built
   four files concurrently with no shared edit and no adapter at the seam.
 
-### THE BATCH-2 UNIT PRICE, MEASURED (read before batch 2)
+### THE BATCH-2 UNIT PRICE, FINAL (read before batch 2)
 
-`iris/WeakLeafLd8.v` (967 lines / 43.7 s) is the FIRST COMPLETE WEAK LEAF —
-the `ld`-class 8-byte load, from the `↦w₈` resource to
-`WP (Loop) {{ Φ }}` — and it exists to produce this number.
+`iris/WeakLeafLd8.v` is the FIRST COMPLETE WEAK LEAF — the `ld`-class 8-byte
+load, from the `↦w₈` resource to `WP (Loop) {{ Φ }}` — and it exists to
+produce this number. It landed at 967 lines / 43.7 s and, after the two
+funnel seams below were fixed, is 791 lines / 35 s.
 
-- **THE PRICE: ≈ 490 code lines, ≈ 3.8× the SC leaf** (`WpMmodeLoad.wp_ld_gpr`,
-  128 code lines), of which **116 lines are a redundant second replay of the
-  step forced by an interface defect** (below). Fix that and the steady-state
-  price is **≈ 375 lines / ≈ 2.9×**. Breakdown: the width-generic certificate
-  37 (paid once per FAMILY, not per leaf); the window and its three
-  obligations 65 — **exactly the porting guide's predicted 20–40 plus the
-  membership lemmas**; the `wP_eff` half 102; the `execute` lemma restated at
-  a generic state 137 (≈ 50 of which the SC leaf already does inline); the WP
-  composition proper 191.
-- **THE INTERFACE DEFECT, and it should be fixed before batch 2 scales ×50.**
-  `WeakFunnel.wwp_cb`'s continuation must hand back `wmstate_norg σ'`, whose
-  `dev_interp (wm_dev σ')` conjunct needs `wm_dev σ' = wm_dev σ`;
-  `WeakInstr.wstep_post` gives only `wm_dev σ' = mdev t`, and `dev_interp` is
-  an authoritative half that cannot be moved without its fragment. The funnel
-  CONSTRUCTS `t` by register writes and then forgets it, so the leaf's only
-  route is to re-derive the whole `riscv_step` at the FLAT state and identify
-  the two successors by determinism of `exec` — duplicating, premise for
-  premise, what `wP_eff_of_leaf_base` just did at the confined state.
-  **Fix: add `⌜mdev t = wm_dev σ⌝` to `wwp_cb`'s post-step argument list**
-  (or split `dev_interp` out of `wmstate_norg` the way `reg_interp` already
-  was, and let the funnel carry it). Either deletes the 116 lines from this
-  and every later leaf.
-- **THE SECOND, SMALLER SEAM: `wwp_cb` hands the leaf only
-  `⌜register_lookup PC (wm_regs σ) = pc⌝`,** although `wwp_instr` has just
-  read the whole M-mode tower off the bundle it was given. So every leaf
-  re-splits `mmode_config` and re-reads the same nine registers (≈ 25
-  lines/leaf) — and, worse, it is what forces the decode bridge's `agree_on D`
-  premise to be quantified over the register file rather than stated at `σ`,
-  because `σ` is not in scope at the leaf's altitude. Handing the callback
-  `⌜cfg_ok (wflat_st σ)⌝` plus the four pins the decode bridge needs would
-  delete it.
+- **THE FINAL PRICE: 472 code lines per leaf, 3.1× the SC leaf**
+  (`WpMmodeLoad.wp_ld_gpr` = 152 code lines by the same count — comments and
+  blanks excluded, statements included; the batch-2 report quoted 128 for it,
+  on a different count). It was **611 / 4.0×** when batch 2 landed.
+  Breakdown, in the same units:
+
+  | | at batch 2 | now |
+  |---|---|---|
+  | the width-generic certificate (§1) | 37 | 37 (**per FAMILY**, not per leaf) |
+  | the window + its three obligations | 65 | 65 |
+  | the `execute` lemma at a generic `s0` | 137 | 137 |
+  | the `wP_eff` half | 102 | 102 |
+  | the second replay, for the device frame | 116 | **0** |
+  | the WP composition proper | 191 | 142 |
+  | **per-leaf total** (all but the certificate) | **611** | **472** |
+
+  The 65 is **exactly the porting guide's predicted 20–40 plus the membership
+  lemmas**; the 137 is the SC leaf's own execute block hoisted to a generic
+  `s0` (≈ 50 of which the SC leaf does inline). The genuinely new work in a
+  leaf is 309 lines, half of it the WP composition.
+- **SEAM 1, FIXED: the device frame.** `WeakFunnel.wwp_cb`'s continuation
+  must hand back `wmstate_norg σ'`, whose `dev_interp (wm_dev σ')` conjunct
+  needs to know what `wm_dev σ'` IS; `WeakInstr.wstep_post` gives only
+  `wm_dev σ' = mdev t`, and `dev_interp` is an authoritative half that cannot
+  be moved without its fragment. The funnel CONSTRUCTS `t` and then forgot
+  it, so the leaf's only route was to re-derive the whole `riscv_step` at the
+  FLAT state and identify the two successors by determinism of `exec` — 116
+  lines duplicating, premise for premise, what `wP_eff_of_leaf_base` had just
+  done at the confined state. `wwp_cb`'s post-step arguments now include
+  **`⌜mdev t = mdev s_exec⌝`** — two `mdev_set_reg` rewrites in the funnel
+  (it builds `t` out of `s_exec` by register writes only) and two lines at
+  the leaf. **Stated against `mdev s_exec`, not against `wm_dev σ`**: same
+  cost, but it does not bake in "the instruction touches no device", so an
+  MMIO leaf can still use the funnel and update `dev_interp` from its own
+  `execute` fact.
+- **SEAM 2, FIXED: the config reads.** `wwp_cb` used to hand the leaf only
+  `⌜register_lookup PC (wm_regs σ) = pc⌝`, although `wwp_instr` had just read
+  the whole M-mode tower off the bundle it was given — so every leaf split
+  `mmode_config` in half, kept one half to `reg_valid_dq` the same nine
+  registers, transported all nine past the `minstret_increment` pre-write and
+  recombined the halves at the end (43 lines). `wwp_cb` now also hands over
+  **`⌜WeakFunnel.wcfg_regs σ pmpcfg0⌝`**: cur_privilege / hart_state / misa /
+  mseccfg / pmpcfg_n / pma_regions / htif_tohost_base plus the misa.S,
+  mstatus.MIE, mstatus.MPRV, mseccfg.PMM and elp bits, at `wm_regs σ` and in
+  exactly the shape `wP_eff_of_leaf_base` and the `execute` lemmas consume
+  (misa and mseccfg pinned to their WHOLE values, because that is what the
+  concrete-state decode bridge compares). The funnel takes the whole
+  `mmode_config (DfracOwn q)` and gives it back; the only register a leaf
+  reads for itself is its own operand. **What this does NOT fix**, and it is
+  not fixable at this altitude: the decode bridge's `agree_on D` premise is
+  still ∀-over-register-files in a leaf's STATEMENT, because a leaf is stated
+  before `σ` exists (`wwp_cb` quantifies over it). Instantiating it is now
+  three `exact`s off `wcfg_regs`.
 - **TWO CONVENTIONS EVERY LATER LEAF SHOULD FOLLOW**, both established here:
   - **state the leaf's `execute` lemma over an ARBITRARY `s0 : mstate`**, never
     over `MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ)`. That makes the
@@ -1463,8 +1493,8 @@ numbers come from; the prices below replace M4-prep's).
 |---|---|---|---|
 | 0a | `execR_eff` + kit, the two `run_hart_active` progress mirrors, the step assembly, the certificate join | **DONE — 834 lines / 3.9 s** (`iris/WeakEffSkel.v`) | vs the 400–600 estimate for the whole of batch 0; the interpreter mirror is 3.8× its SC source, the script mirrors 0.65× |
 | 0b | the FETCH's `exec_eff` reduction + the `tick_clock` mirror + `wP_eff_of_leaf_base` | **DONE — 2272 lines / 13.1 s** (`WeakPmpEff.v` 358, `WeakTickEff.v` 397, `WeakFetchEff.v` 1112, `WeakFetchRvc.v` 405) | vs the 250–350 + 25 estimate; the gap is the TRANSITIVE cone (PMP, the interrupt gate, the clock) that the chain merely *names*. Both 4-aligned arms (`F_Base` and `F_RVC`); the 2-aligned ones are the remaining gap |
-| 1 | the memory `execute` mirrors, by SHAPE | **DONE — all five shapes, 4082 lines** (`WeakLeafEff8.v` 691, `WeakLeafEff8s.v` 698, `WeakLeafBase4.v` 1456, `WeakLeafAmo4.v` 1237) | vs the 30–60-lines-per-shape estimate: a shape is ≈ 800 lines, because the whole `vmem_read`/`vmem_write` cone below the `execute` must be mirrored too (same transitive-cone lesson as 0b). Three of the five needed their SC lemma written as well |
-| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | **MEASURED: ≈ 490 code lines / 3.8× the SC leaf** (`iris/WeakLeafLd8.v`, the `ld` leaf), falling to **≈ 375 / 2.9×** once the `wwp_cb` device-frame defect is fixed | vs the 30–55 estimate. The window IS 20–40 as predicted and the trace join and decode fact ARE free; what the estimate missed is the 116-line redundant step replay and the ~190-line WP composition. See the unit-price block above |
+| 1 | the memory `execute` mirrors, by SHAPE | **DONE — all five shapes, 3897 lines** (`WeakLeafEff8.v` 557, `WeakLeafEff8s.v` 598, `WeakLeafBase4.v` 1395, `WeakLeafAmo4.v` 1119, + the shared `WeakLeafEffCommon.v` 228) | vs the 30–60-lines-per-shape estimate: a shape is ≈ 800 lines, because the whole `vmem_read`/`vmem_write` cone below the `execute` must be mirrored too (same transitive-cone lesson as 0b). Three of the five needed their SC lemma written as well |
+| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | **MEASURED, both funnel seams fixed: 472 code lines / 3.1× the SC leaf** (`iris/WeakLeafLd8.v`, the `ld` leaf; it was 611 / 4.0× as first written) | vs the 30–55 estimate. The window IS 20–40 as predicted and the trace join and decode fact ARE free; what the estimate missed is the ~140-line WP composition and the 137-line generic-state `execute` block. See the unit-price block above |
 | 3 | `WpLock` clients | ≈ 0 | the interface is unchanged; `iris/WeakWord8.v` covers `cpu`/`name` |
 | 4 | the straight-line M-mode function proofs | batched by subagent | the config tower and every decode fact transfer verbatim |
 | 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | small, then a cone | the racy-load rule is landed; the escrow is not |

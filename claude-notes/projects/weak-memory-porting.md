@@ -223,12 +223,26 @@ statement and changing four things.
    `WeakFunnel.wmstate_norg` (`WeakAcquire.wmstate_rest` minus the registers).
    The post-step continuation is parameterised by the SC successor `t`, because
    `wstep_post`'s memory/device conjuncts are stated against it.
+   **GIVE THE FUNNEL THE WHOLE `mmode_config`, and do not split it.**  The
+   callback is handed `⌜WeakFunnel.wcfg_regs σ pmpcfg0⌝` — the twelve config
+   facts the funnel has just read (cur_privilege / hart_state / misa /
+   mseccfg / pmpcfg_n / pma_regions / htif, plus the misa.S, mstatus.MIE,
+   mstatus.MPRV, mseccfg.PMM and elp bits), all at `wm_regs σ` and in exactly
+   the shape `wP_eff_of_leaf_base` and the `execute` lemmas consume — and the
+   bundle comes back whole for the continuation.  The only register a leaf
+   still reads for itself is the one the funnel cannot know: its own operand
+   (`reg_valid` + `WeakLeafLd8.reg_at_flat`, two lines).
+   **The device frame is handed over too**, as `⌜mdev t = mdev s_exec⌝`;
+   combine it with your `execute`'s own "moved no device" fact (the
+   `ld8_sexec_facts` conjunct) to get `wm_dev σ' = wm_dev σ` for
+   `dev_interp`.  Both arrived after batch 2 measured what their absence
+   cost: 116 + 43 lines per leaf.
 4. **The certificate is the only irreducible part**, and it is §2/§2c: the
    window `W` plus the same SC library lemma re-instantiated at
    `WeakCert.wmem_restrict σ W`.
 
-Measured budget on top of the SC leaf: **~30–55 lines for a register-only or
-load leaf, ~60–90 for a store/AMO leaf**, of which 20–40 is the window.
+Measured budget on top of the SC leaf: see §2g — the whole first leaf is
+**472 code lines / 3.1×**, of which the window is 65.
 
 **THE sconf TIER IS NOT PORTED.**  Its fetch (`SmodeCorePt.tlb_inv_pt_fetch`)
 opens the kpt tree invariant, walks the page table and may write A/D bits back;
@@ -356,32 +370,49 @@ Landed at batch 0b/1. Five moves; nothing else about an instruction enters.
 5. **The WP.** `WeakFunnel.wwp_instr` with that `P` and the shape's `Q`, and
    §2b's four moves for the Iris half.
 
-**MEASURED, on the first complete leaf** (`iris/WeakLeafLd8.v`, the `ld`-class
-8-byte load — read it before writing your second one): **≈ 490 code lines,
-≈ 3.8× the SC leaf**, of which the window and its three obligations are 65
-(the 20–40 predicted, plus the membership lemmas) and **116 are a redundant
-second replay of the step** forced by the `wwp_cb` defect below. Steady-state
-once that is fixed: **≈ 375 / ≈ 2.9×**.
+**THE UNIT PRICE, MEASURED AND THEN FIXED** (`iris/WeakLeafLd8.v`, the
+`ld`-class 8-byte load — read it before writing your second one). Code lines,
+comments and blanks excluded, against the SC leaf `WpMmodeLoad.wp_ld_gpr` at
+152 by the same count:
 
-**TWO SEAMS TO FIX BEFORE THE SWEEP SCALES ×50** (a better abstraction is
-always worth the rework — durable notes, the guiding principle):
+| | at batch 2 | after the two seam fixes |
+|---|---|---|
+| the width-generic certificate (§1) | 37 | 37 — **once per FAMILY** |
+| the window + its 3 obligations (§2a/b) | 65 | 65 |
+| the `execute` lemma at a generic `s0` (§2c) | 137 | 137 |
+| the `wP_eff` half (§2d) | 102 | 102 |
+| the second replay, for the device frame (§3a) | 116 | **0** |
+| the WP composition (§3b) | 191 | 142 |
+| **per-leaf total** (all but the certificate) | **611 / 4.0×** | **472 / 3.1×** |
 
-- **`wwp_cb` makes every leaf replay the step twice.** Its continuation owes
-  `wmstate_norg σ'`, whose `dev_interp (wm_dev σ')` needs
-  `wm_dev σ' = wm_dev σ`; `wstep_post` gives only `wm_dev σ' = mdev t`, and
-  the funnel constructs `t` and forgets it. **Add `⌜mdev t = wm_dev σ⌝` to
-  `wwp_cb`'s post-step arguments** (or split `dev_interp` out of
-  `wmstate_norg`, as `reg_interp` already is) and 116 lines vanish per leaf.
-- **`wwp_cb` hands out only `⌜register_lookup PC (wm_regs σ) = pc⌝`,** so each
-  leaf re-splits `mmode_config` and re-reads nine registers (~25 lines), and
-  the decode bridge's `agree_on D` premise has to be quantified over the
-  register file rather than stated at `σ`. Hand the callback
-  `⌜cfg_ok (wflat_st σ)⌝` plus the decode bridge's four pins instead.
+Of the 472, 137 is the `execute` block hoisted to a generic `s0` (~50 of which
+the SC leaf does inline) and 167 is the window + `wP_eff` half this guide
+predicted; the genuinely new work is 309, half of it the WP composition.
+
+**THE TWO SEAMS ARE FIXED — do not re-derive what the funnel now hands you.**
+`wwp_cb`'s post-step arguments include `⌜mdev t = mdev s_exec⌝` (do NOT replay
+`riscv_step` at the flat state to learn the device frame) and its pre-step
+arguments include `⌜WeakFunnel.wcfg_regs σ pmpcfg0⌝` (do NOT split
+`mmode_config` and re-read the config). See §2d.3.
+
+**ONE THING THE BUNDLE DOES NOT FIX:** the decode bridge's `agree_on D`
+premise is still ∀-over-register-files in a LEAF'S STATEMENT — a leaf is
+stated before `σ` exists, since `wwp_cb` quantifies over it — but
+instantiating it is now three `exact`s off `wcfg_regs` (cur_privilege = Machine,
+misa = MISA_C, mseccfg = 0), not three register reads.
 
 **TWO CONVENTIONS to follow from leaf one:** state the `execute` lemma over an
 ARBITRARY `s0 : mstate` (so confined and flat are the same lemma twice, and
 the `gmap Arch.pa` binder trap never arises), and define any `gset Arch.pa`
 window ABOVE the `SailStdpp.Base` import.
+
+**AND ONE FILE TO ADD TO, NOT COPY FROM: `iris/WeakLeafEffCommon.v`.** The
+`exec_eff` twins of `returnM` / the two boolean connectives / the two bus
+arms, and every width- and access-INDEPENDENT leaf (`split_misaligned` at any
+width, `translationMode Machine`, `rX_bits`/`wX_bits`/`ext_data_get_addr` over
+the GPR file, the one-turn `untilMT`), live there. A new shape file requires
+it; it does not re-declare them. (Batch 1's four shape files each had their
+own copy — 40 lemmas of duplication, retired.)
 
 ## 3. What needs thought: the racy sites, and only those
 
