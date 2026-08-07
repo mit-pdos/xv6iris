@@ -1543,3 +1543,220 @@ Section StraddleWrite.
   Qed.
 
 End StraddleWrite.
+
+(* ===================================================================== *)
+(* §h The [translate_and_*] bridges the straddle composers consume.  The   *)
+(*    Ok ones for the read exist in MemAccessGen; these are the fault arms  *)
+(*    and the store direction, which the page straddle needs and the        *)
+(*    aligned path never did (there the vmem level calls [translateAddr]    *)
+(*    itself).                                                             *)
+(* ===================================================================== *)
+
+Lemma exec_translate_and_read_value_err (width : Z) (va : mword 64)
+    (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (e : ExceptionType) (er : ExecutionResult) s s1 :
+  exec (translateAddr (Virtaddr va) acc) s = Some (Err (e, tt), s1) ->
+  exec (memory_exception (Virtaddr va) e) s1 = Some (er, s1) ->
+  exec (translate_and_read_value (Virtaddr va) width acc aq rl res) s
+    = Some (Err er, s1).
+Proof.
+  intros Htr Hme.
+  unfold translate_and_read_value.
+  rewrite (exec_bind_Some _ _ _ _ _ Htr). cbn match beta.
+  rewrite (exec_bind_Some _ _ _ _ _ Hme). cbn match beta.
+  apply exec_returnM.
+Qed.
+
+Lemma exec_translate_and_write_value_gen (width : Z) (va pa : mword 64)
+    (value : mword (8 * width)) (acc : MemoryAccessType mem_payload)
+    (aq rl res : bool) (pbmt : page_based_mem_type) (b : bool) s s1 s2 :
+  exec (translateAddr (Virtaddr va) acc) s
+    = Some (Ok (Physaddr pa, pbmt, init_ext_ptw), s1) ->
+  exec (mem_write_ea (Physaddr pa) width acc pbmt aq rl res) s1 = Some (Ok tt, s1) ->
+  exec (mem_write_value (Physaddr pa) width value acc pbmt aq rl res) s1
+    = Some (Ok b, s2) ->
+  exec (translate_and_write_value (Virtaddr va) width value acc aq rl res) s
+    = Some (Ok b, s2).
+Proof.
+  intros Htr Hea Hwv.
+  unfold translate_and_write_value.
+  rewrite (exec_bind_Some _ _ _ _ _ Htr). cbn match beta.
+  rewrite (exec_bind_Some _ _ _ _ _ Hea). cbn match beta.
+  rewrite (exec_bind_Some _ _ _ _ _ Hwv). cbn match beta.
+  apply exec_returnM.
+Qed.
+
+Lemma exec_translate_and_write_value_err (width : Z) (va : mword 64)
+    (value : mword (8 * width)) (acc : MemoryAccessType mem_payload)
+    (aq rl res : bool) (e : ExceptionType) (er : ExecutionResult) s s1 :
+  exec (translateAddr (Virtaddr va) acc) s = Some (Err (e, tt), s1) ->
+  exec (memory_exception (Virtaddr va) e) s1 = Some (er, s1) ->
+  exec (translate_and_write_value (Virtaddr va) width value acc aq rl res) s
+    = Some (Err er, s1).
+Proof.
+  intros Htr Hme.
+  unfold translate_and_write_value.
+  rewrite (exec_bind_Some _ _ _ _ _ Htr). cbn match beta.
+  rewrite (exec_bind_Some _ _ _ _ _ Hme). cbn match beta.
+  apply exec_returnM.
+Qed.
+
+(* ===================================================================== *)
+(* §i THE PAGE SPLIT ITSELF, on the straddling side.  The model's           *)
+(*    [nbytes_to_boundary] is [8 - addr[2:0]], not [4096 - addr[11:0]] --   *)
+(*    which agrees with the page distance exactly because an access of at   *)
+(*    most 8 bytes can only cross a page boundary from the last 8 bytes of  *)
+(*    a page.  Both parts are then [in_one_page] by construction, which is  *)
+(*    what lets the per-page composers serve them.                          *)
+(* ===================================================================== *)
+
+Lemma page_num_differs (a : mword 64) (w : Z) :
+  0 < w -> w <= 8 -> ~ in_one_page a w ->
+  Z.shiftr (bv_unsigned a) 12 <> Z.shiftr (bv_wrap 64 (bv_unsigned a + (w - 1))) 12.
+Proof.
+  intros Hw Hw8 Hout. unfold in_one_page in Hout.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
+  rewrite H64 in Hr. destruct Hr as [Hr0 Hr1].
+  assert (Hmod : 0 <= bv_unsigned a mod 4096 < 4096) by (apply Z.mod_pos_bound; lia).
+  assert (Hdm : bv_unsigned a = 4096 * (bv_unsigned a / 4096) + bv_unsigned a mod 4096)
+    by (apply Z.div_mod; lia).
+  assert (Hd0 : Z.shiftr (bv_unsigned a) 12 = bv_unsigned a / 4096)
+    by (apply Z.shiftr_div_pow2; lia).
+  destruct (Z_le_gt_dec (bv_unsigned a + (w - 1)) (2 ^ 64 - 1)) as [Hnw | Hwr].
+  - (* no wrap: the last byte is one page further up *)
+    assert (Hbw : bv_wrap 64 (bv_unsigned a + (w - 1)) = bv_unsigned a + (w - 1))
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    rewrite Hbw.
+    assert (Hd1 : Z.shiftr (bv_unsigned a + (w - 1)) 12 = (bv_unsigned a + (w - 1)) / 4096)
+      by (apply Z.shiftr_div_pow2; lia).
+    rewrite Hd0. rewrite Hd1.
+    assert (Hq : (bv_unsigned a + (w - 1)) / 4096 = bv_unsigned a / 4096 + 1).
+    { assert (He : bv_unsigned a + (w - 1)
+                   = 4096 * (bv_unsigned a / 4096 + 1) + (bv_unsigned a mod 4096 + w - 1 - 4096))
+        by lia.
+      rewrite He. rewrite Z.mul_comm.
+      rewrite Z.div_add_l; [| lia].
+      assert (Hs : (bv_unsigned a mod 4096 + w - 1 - 4096) / 4096 = 0)
+        by (apply Z.div_small; lia).
+      rewrite Hs. lia. }
+    rewrite Hq. lia.
+  - (* wrap: the last byte is at the very bottom of the space *)
+    assert (Hbw : bv_wrap 64 (bv_unsigned a + (w - 1)) = bv_unsigned a + (w - 1) - 2 ^ 64).
+    { unfold bv_wrap. rewrite bv_modulus64. rewrite H64.
+      rewrite <- (Z.mod_add (bv_unsigned a + (w - 1)) (-1) 18446744073709551616); [| lia].
+      apply Z.mod_small. lia. }
+    rewrite Hbw.
+    assert (Hd1 : Z.shiftr (bv_unsigned a + (w - 1) - 2 ^ 64) 12
+                  = (bv_unsigned a + (w - 1) - 2 ^ 64) / 4096)
+      by (apply Z.shiftr_div_pow2; lia).
+    rewrite Hd0. rewrite Hd1.
+    assert (Hlo : (bv_unsigned a + (w - 1) - 2 ^ 64) / 4096 = 0)
+      by (apply Z.div_small; rewrite H64; lia).
+    rewrite Hlo.
+    assert (Hhi : 0 < bv_unsigned a / 4096).
+    { apply Z.div_str_pos. rewrite H64 in Hwr. lia. }
+    lia.
+Qed.
+
+Lemma exec_split_on_page_boundary_straddle (a : mword 64) (w : Z) s :
+  0 < w -> w <= 8 -> ~ in_one_page a w ->
+  exec (split_on_page_boundary a w) s
+    = Some ((4096 - bv_unsigned a mod 4096,
+             w - (4096 - bv_unsigned a mod 4096)), s).
+Proof.
+  intros Hw Hw8 Hout.
+  pose proof Hout as Hout'. unfold in_one_page in Hout'.
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  assert (Hmod : 0 <= bv_unsigned a mod 4096 < 4096) by (apply Z.mod_pos_bound; lia).
+  (* the last 8 bytes of a page: [a mod 8] determines the page distance *)
+  assert (Hm8 : bv_unsigned a mod 4096 mod 8 = bv_unsigned a mod 4096 - 4088).
+  { assert (Hd : (8 | 4088)) by (exists 511; reflexivity).
+    assert (Hlo : 4088 <= bv_unsigned a mod 4096) by lia.
+    rewrite <- (Z.mod_add (bv_unsigned a mod 4096) (-511) 8); [| lia].
+    apply Z.mod_small. lia. }
+  assert (Hm8' : bv_unsigned a mod 8 = bv_unsigned a mod 4096 - 4088).
+  { rewrite <- Hm8. symmetry. apply Z.mod_mod_divide. exists 512; reflexivity. }
+  unfold split_on_page_boundary.
+  assert (Hintra : eq_vec (and_vec a (update_subrange_vec_dec ((ones 64) : bits 64)
+                                        (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1)))))
+                          (and_vec (sub_vec_int (add_vec_int a w) 1)
+                                   (update_subrange_vec_dec ((ones 64) : bits 64)
+                                      (pagesize_bits - 1) 0 (zeros' (12 - 1 - (0 - 1))))) = false).
+  { apply eq_vec_false_iff. intro Heq.
+    apply (f_equal bv_unsigned) in Heq.
+    rewrite !and_vec64_unsigned in Heq. rewrite page_mask64_val in Heq.
+    assert (Hsub : bv_unsigned (sub_vec_int (add_vec_int a w) 1)
+                   = bv_wrap 64 (bv_unsigned a + (w - 1))).
+    { unfold sub_vec_int, add_vec_int.
+      rewrite sub_vec64_unsigned. rewrite add_vec64_unsigned.
+      rewrite !moi64_unsigned.
+      assert (Hww : bv_wrap 64 w = w)
+        by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+      assert (Hw1 : bv_wrap 64 1 = 1)
+        by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+      rewrite Hww. rewrite Hw1. rewrite bv_wrap_sub_idemp_l.
+      f_equal. lia. }
+    rewrite Hsub in Heq.
+    pose proof (bv_wrap_in_range 64 (bv_unsigned a + (w - 1))) as Hbr.
+    unfold bv_modulus in Hbr.
+    change (2 ^ Z.of_N (MachineWord.Z_idx 64)) with (2 ^ 64) in Hbr.
+    rewrite (z_land_pagemask (bv_unsigned a) (proj1 Hr) (proj2 Hr)) in Heq.
+    rewrite (z_land_pagemask _ (proj1 Hbr) (proj2 Hbr)) in Heq.
+    apply (page_num_differs a w Hw Hw8 Hout).
+    (* [Z.shiftl _ 12] is injective: shift the equation back down *)
+    apply (f_equal (fun z => Z.shiftr z 12)) in Heq.
+    rewrite !Z.shiftr_shiftl_l in Heq; [| lia | lia].
+    change (12 - 12)%Z with 0%Z in Heq.
+    rewrite !Z.shiftl_0_r in Heq. exact Heq. }
+  rewrite Hintra. cbn match.
+  assert (Hs3 : uint (subrange_vec_dec a (Z.sub 3 1) 0) = bv_unsigned a mod 8).
+  { rewrite (uint_unsigned_n _).
+    exact (subrange_dec_unsigned_lo0 a 2 8 ltac:(lia) ltac:(vm_compute; reflexivity)). }
+  rewrite Hs3.
+  replace (Z.ltb (pow2 3 - bv_unsigned a mod 8) w) with true.
+  2:{ symmetry. apply Z.ltb_lt. change (pow2 3) with 8. lia. }
+  erewrite exec_bind_Some.
+  2:{ unfold assert_exp'. cbn match. apply exec_returnm. }
+  cbn beta.
+  replace (pow2 3 - bv_unsigned a mod 8) with (4096 - bv_unsigned a mod 4096)
+    by (change (pow2 3) with 8; lia).
+  apply exec_returnm.
+Qed.
+
+(* the two parts' own geometry: both lie in one page, and both are non-empty *)
+Lemma straddle_bounds (a : mword 64) (w : Z) :
+  0 < w -> w <= 8 -> ~ in_one_page a w ->
+  0 < 4096 - bv_unsigned a mod 4096 /\
+  0 < w - (4096 - bv_unsigned a mod 4096) /\
+  4096 - bv_unsigned a mod 4096 <= 8 /\
+  w - (4096 - bv_unsigned a mod 4096) <= 8.
+Proof.
+  intros Hw Hw8 Hout. unfold in_one_page in Hout.
+  pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)). lia.
+Qed.
+
+Lemma straddle_part1_in_page (a : mword 64) (w : Z) :
+  in_one_page a (4096 - bv_unsigned a mod 4096).
+Proof. unfold in_one_page. lia. Qed.
+
+Lemma straddle_part2_in_page (a : mword 64) (w : Z) :
+  0 < w -> w <= 8 -> ~ in_one_page a w ->
+  in_one_page (add_vec_int a (4096 - bv_unsigned a mod 4096))
+              (w - (4096 - bv_unsigned a mod 4096)).
+Proof.
+  intros Hw Hw8 Hout. pose proof Hout as Hout'. unfold in_one_page in Hout' |- *.
+  assert (Hz : bv_unsigned (add_vec_int a (4096 - bv_unsigned a mod 4096)) mod 4096 = 0).
+  { unfold add_vec_int. rewrite add_vec64_unsigned. rewrite moi64_unsigned.
+    rewrite bv_wrap_add_idemp_r. unfold bv_wrap.
+    rewrite (Z.mod_mod_divide _ (bv_modulus 64) 4096);
+      [| rewrite bv_modulus64; exists 4503599627370496; reflexivity].
+    assert (He : bv_unsigned a + (4096 - bv_unsigned a mod 4096)
+                 = 4096 * (bv_unsigned a / 4096 + 1))
+      by (pose proof (Z.div_mod (bv_unsigned a) 4096 ltac:(lia)); lia).
+    rewrite He. rewrite Z.mul_comm. apply Z.mod_mul. lia. }
+  rewrite Hz.
+  pose proof (Z.mod_pos_bound (bv_unsigned a) 4096 ltac:(lia)). lia.
+Qed.
