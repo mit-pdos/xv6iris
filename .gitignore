@@ -14,3 +14,5 @@ CoqMakefile.conf
 /xv6-riscv
 __pycache__
 /sail-riscv
+/aws/
+*.pem
