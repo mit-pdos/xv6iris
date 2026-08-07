@@ -414,8 +414,10 @@ window ABOVE the `SailStdpp.Base` import.
 
 **AND ONE FILE TO ADD TO, NOT COPY FROM: `iris/WeakLeafEffCommon.v`.** The
 `exec_eff` twins of `returnM` / the two boolean connectives / the two bus
-arms, and every width- and access-INDEPENDENT leaf (`split_misaligned` at any
-width, `translationMode Machine`, `rX_bits`/`wX_bits`/`ext_data_get_addr` over
+arms, and every width- and access-INDEPENDENT leaf (`split_misaligned`
+unsplit at the physical address, the page-boundary split, `pma_ok_eff_peel`
+and the mag/assert kit — the whole post-sail-bump pmaCheck walk —
+`translationMode Machine`, `rX_bits`/`wX_bits`/`ext_data_get_addr` over
 the GPR file, the one-turn `untilMT`), live there. A new shape file requires
 it; it does not re-declare them. (Batch 1's four shape files each had their
 own copy — 40 lemmas of duplication, retired.)

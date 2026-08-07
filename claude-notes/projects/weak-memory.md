@@ -24,6 +24,85 @@ sweep's unit price.
 [`weak-memory-porting.md`](weak-memory-porting.md) first (§2g is the leaf
 recipe at its post-fix shape), then the batch blocks below.
 
+## SAIL BUMP CROSSED (2026-08)
+
+The branch is merged with main's sail model bump (fork pin +
+2026-08 upstream; `completed/sail-model-bump.md` is the authority on
+what changed) and the whole weak cone is green against the new model.
+What broke, per file, and the per-pattern fixes — recorded because the
+same seams are where the NEXT model bump will land:
+
+- **`WeakLeafEffCommon`** is where the bump's shared kit lives (one
+  home, as before): `pma_ok_eff_peel` (`RiscvExtras.pma_ok_peel`'s eff
+  twin — every pmaCheck mirror is now 3 lines), the four
+  `exec_eff_is_mag_applicable_*` facts, `exec_eff_mag_pma_check_aligned`,
+  `exec_eff_assert_exp'_true`, `exec_eff_split_misaligned_unsplit`
+  (the split moved to the PHYSICAL address; CannotSplit is the whole
+  aligned story), and `exec_eff_split_on_page_boundary_{intra,aligned,
+  aligned8}` (the vmem level now splits only across a page — the
+  aligned proof is RiscvExtras' copied verbatim; if RiscvExtras ever
+  exposes its `Hintra` eq_vec core as a lemma, collapse the copy).
+- **Shape files** (`WeakLeafEff8`, `WeakLeafEff8s`, `WeakLeafBase4`,
+  `WeakLeafAmo4`, `WeakFetchEff`, `WeakFetch2`): pmaCheck mirrors
+  conclude `Ok pma_ok_aligned`; `checked_mem_*` replay the
+  catch_early_return + physical-split + ONE-iteration `untilMT` walk
+  (`execR_eff_untilMT_1`, `avi0_mul{2,4,8}` Local address normalisers,
+  `usvd_zeros_full_{16,32,64}` / `subrange_full_*` closers, the trace
+  element crossing the loop via `execR_eff_liftR_cat`); the vmem walks
+  lost their untilMT loop (page split → `do_split_access = false` by
+  the and_boolM assert trick → one translate+access); `mem_write_ea`
+  gained the access type, pbmt and six region premises. AMO access
+  type is the 5-tuple `Atomic (AMOSWAP, true, false, Data, Data)` —
+  the instruction's OWN aq/rl, never the mem level's pairs.
+  **The weak lemmas kept their `exec_eff (pmpCheck …)` premises where
+  SC swapped to raw pmpcfg-OFF hypotheses** (avi0 normalises the
+  loop's address back onto the premise), so every public statement
+  stayed byte-identical and NO consumer above the shape tier changed.
+- **`WeakWalkEff`**: `check_leaf_pte` is factored out exactly as the
+  model did (three new eff twins `exec_eff_check_leaf_pte_leaf0` /
+  `_invalid` / `_noperm0`; per-level walks delegate); the walk's
+  non-leaf branch is ONE `and_boolM` guard; `exec_eff_pmaCheck_ram_pte`
+  gained a `res_or_con` binder (the fork removed the PTE arms' asserts
+  — one lemma now serves the plain AND the exclusive read, ready for
+  the update-cone mirror); `update_and_write_pte` heads re-shaped to
+  10 args / `Ok (None, tt)`.
+- **Everything above the shape tier compiled UNCHANGED** — WeakInterp/
+  WeakLang (the interface did not change), the whole M1–M3 stack,
+  WeakFunnel, WeakEffSkel, WeakPmpEff, WeakTickEff, WeakFetchRvc,
+  WeakLeafWin, and the batch-2 leaves Ld8/Sd8/Lw4/Sw4/Amo4Leaf.
+  `WkEntryEff`/`WkEntryNew` needed only import/name fixes (main split
+  `CodeEntry`'s words into `CodeEntryAux` and replaced the hand-kept
+  `decode_*` lemmas with the GENERATED `KernelDecodeNN.kd_<hexword>`
+  table — swap the name, keep the proof). `WeakAdequacy` tracks main's
+  era record (era_mirror_name; fixed class riscvF_mirrorGS +
+  riscv_swap_name).
+- **Axiom baseline** (unchanged in kind, one new REACHABLE member):
+  `wwp_entry` and the leaves rest on `functional_extensionality_dep`
+  plus the sail model's platform axioms — `plat_term_write` and now
+  also the reservation quartet (`load_reservation`/`match_reservation`/
+  `valid_reservation`/`cancel_reservation`) where a vmem read/write
+  cone is in the footprint: the bump routed the res=false arms through
+  them. Checked equal to the SC twins' footprints per file.
+- Merge note: main deleted `tools/spec_vacuity.py` (its default run was
+  not useful); this branch KEEPS it for the `--lemmas` mode the weak
+  worklist's per-batch hygiene uses.
+
+**CAS-update consequences for batch 6**: the model change the batch-6
+block below gated on (`pte-ad-atomic-update`, the walker's atomic
+re-check CAS) is now LANDED via the fork pin — `read_pte_exclusive` /
+`write_pte_conditional` / `check_leaf_pte` are in the tree's model, and
+the SC update cone (PtTreeAdue's read-check-write, the re-check arms)
+is green on main. So the update-cone mirror is UNBLOCKED and should be
+built directly against the landed model, in the REDUCED form the
+batch-6 design block records: the walker's CAS read half is an
+AV_exclusive read → `WeakInterp.classify` already sends it to
+`ak_latest` (zero WeakInterp change, as predicted) → the read is pinned
+BY KIND, so P2/P3 shrink (no patched-memory bridge; the ∀-variant SC
+instantiation rides the `_ad`-generic lemmas) and P4's write-back arm
+is AMO-shaped (`wamo_read_latest` off the invariant-held element, no
+view hypothesis). `WeakWalkEff.exec_eff_pmaCheck_ram_pte` is already
+res_or_con-generic for exactly this.
+
 ## M0 — model spike (no Iris)
 
 Validate the operational design before anything depends on it.
