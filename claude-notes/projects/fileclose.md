@@ -236,7 +236,41 @@ the target equation the lemma already takes as a premise FIRST
 (`ltac:(rewrite Hjt; vm_compute; reflexivity)`). Lifted to
 [`../durable-notes.md`](../durable-notes.md).
 
-## What is LEFT: the capstone
+## The capstone: what is proven
+
+`ProofFileclose.v` is at 815 lines, compiles in **19.5 s**, and has ONE
+`admit` left. Proven:
+
+- the prologue (8-slot push, the three spills, the frame pointer, `s1 := f`,
+  `a0 := &ftable`) and the `jal acquire`;
+- the critical section: the load of `f->ref`, the **dead `blez` panic arm**
+  (`fref_word_spos`, so the panic tail gets no `instr` fact at all), the
+  `c.addiw`, the `c.sw`, and the `bgtz` split;
+- **the whole `--f->ref > 0` fast path**: `file_close_step`, the departing
+  share going home through `file_rest_absorb`, the fd slot coming back out of
+  the slot's own `fd_slots`, the slot closed at the shrunk count, `release`,
+  `fc_epi`, and the postcondition — including `fileclose_env_out_of_env`,
+  which is what lets a path that called nothing still pay the environment
+  back;
+- **the last-reference arm down to the release**: `file_close_last_step` at
+  the closer's `qt` plus `file_rest_join` to reach fraction 1 (done BEFORE
+  the reads, which is what puts every content cell at fraction 1 for both
+  the reads and the stores), the four lazy spills, the four `ff = *f` reads,
+  the two stores that empty the slot, and the slot going back to the table
+  FREE while the payload leaves with the closer — the model's version of
+  "`f->type = FD_NONE` before the release".
+
+What the `admit` covers: the second `release`, and the three-way type
+dispatch (`beq s2,1` → pipeclose; `addiw a5,s2,-2; bgeu a4,a5` → begin_op /
+iput / end_op; else nothing), each landing in `fc_restore4` and then
+`fc_epi`. The one piece of arithmetic still owed is that the `addiw`/`bgeu`
+pair is exactly "type ∈ {FD_INODE, FD_DEVICE}".
+
+It stays out of `iris/` until that admit is gone: `proof_coverage.py --check`
+rejects an `iris/*.v` that `_CoqProject` omits, and listing it would put an
+admit in the build.
+
+## Notes for finishing it
 
 Nothing exotic is expected; the shape is `ProofFiledup.v` (acquire, the dead
 `f->ref < 1` panic arm via `FileInv.fref_word_spos`, the ghost step, release)
