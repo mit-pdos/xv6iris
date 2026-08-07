@@ -418,50 +418,55 @@ goes exactly where `Htr` used to be.
   constructors carry `aq`/`rl` (so `u_acc`-style destructuring patterns need
   `(aq & rl & ->)` / `(op & aq & rl & ->)`).
 
-## Where it stands
+## Where it stands (accurate as of the end of the session)
 
-Green through everything except `UserMemAccess.v` and the user-mode layer
-behind it (`UserMem`, `UserMemClassify`, the user WP files). Nothing is
-admitted anywhere; `tools/lemma_diff.py` is clean on every commit.
+Do not trust file counts from a `-k` build: make does not ATTEMPT anything
+behind a red file, so "N compiled" is not "N green". Check `.vo` timestamps
+against `model-xv6iris/rv64d.vo` before believing a number. (An earlier note in
+this file claimed the user-mode layer was green. It was not -- those `.vo`s
+predate the bump entirely.)
 
-### The misaligned question is ANSWERED (do not re-open it)
+GREEN and verified: the model regeneration; the fork's atomic PTE A/D update in
+BOTH arms (miss and hit, the hit one split because the fork's re-read genuinely
+changes the outcome); the width-generic memory stack and its bitvector kit; the
+S-mode, page-table, device and MMIO layers; stimecmp/clint_dispatch; the
+regime's `sr_tmode`; the whole vmem layer (aligned and misaligned, read and
+write, retire and fault, plain and reserved); WpSconfMem.
 
-An earlier note said restating the misaligned lemmas needed an interface
-decision. It does not -- the model decides it. The bump moved the
-misalignment split OUT of the vmem layer: `vmem_read_addr`/`vmem_write_addr`
-split only across a PAGE boundary, and the MAG/alignment split moved down into
-`checked_mem_read`/`checked_mem_write`, under a SINGLE translation. So an
-in-page access, aligned or not, is one full-width translate-and-access.
+RED: `UserMemArms` (line ~718).
+UNATTEMPTED: `UserMemClassify` (~6400 lines) and the user-mode WP layer behind
+it. Neither has been compiled against the new model even once.
 
-`MemAccessGen.exec_vmem_read_addr_intra` / `exec_vmem_write_addr_intra` carry
-exactly that; the alignment premise is replaced by two weaker ones (the page
-split leaves no next-page bytes; and either the access is aligned OR the
-platform raises no misalignment exception for it -- true for plain load/store,
-false for LR/SC/AMO, which is why those must stay aligned). The aligned lemmas
-are one-line corollaries. `UserMemAccess`'s `exec_vmem_{read,write}_addr_
-misaligned` are instances; the old `data_seq`/`split_body`/`split_loop`
-machinery is deleted because it described N vmem-level translations the model
-no longer performs.
+### The one open QUESTION, and it must be answered first
 
-### What is actually left
+Regenerating the config from the new upstream template changed the platform's
+misaligned-AMO policy:
 
-1. `UserMemAccess.exec_vmem_write_addr_sc` (line ~105). The SC path is now:
-   translate; `assert (res = is_store_conditional access)`; then
-   `if res && not (match_reservation pa)` -> re-check via `phys_access_check`
-   (which returns `Ok plan` now, not `None`) and return `false` WITHOUT
-   writing, else `mem_write_ea` + `mem_write_value`. Both arms survive; the
-   contract needs the `Ok plan` shape, the aq/rl-carrying
-   `StoreConditional (aq, rl, Data)` constructor, and the pre-state
-   privilege/mode premises every vmem lemma now takes.
-2. The two remaining aligned sites in that file (search `split_misaligned`).
-3. `UserMemClassify`: it must now supply ONE full-width `mem_read` /
-   `mem_write_value` where it supplied N chunk facts. That is mechanical given
-   the above -- the chunk sequence lives inside `checked_mem_*` now -- but it
-   is ~2400 lines of consumer and will want an N-iteration `untilMT` lemma
-   (the kit has only `execR_untilMT_1`, the one-iteration case every aligned
-   access takes) for the sub-case where the PMA does not admit the misaligned
-   access whole.
-4. The user-mode WP layer behind `UserMemClassify`: untouched.
+    old template:  "amo": "AccessFault"            (the only value it offered)
+    new template:  "amo": { "None": null }         (upstream added a no-fault
+                                                    case and defaulted to it)
 
-Everything else in this file (the recipe, the traps, the model deltas) is
-current.
+So `plat_misaligned_exception (Atomic ...) false` is now `None`: a misaligned
+AMO no longer traps at the vmem level, it proceeds into `mag_pma_check` and the
+region's atomic-support attributes decide.
+
+That is not a one-lemma problem. `exec_execute_AMO_u_misaligned` is consumed
+TWICE inside `UserMemClassify`, so the choice decides whether the classifier's
+misaligned-AMO branch survives as-is or has to be restructured:
+
+  (a) Restore `"amo": {"Some": "AccessFault"}`.  This development has always
+      modelled a platform that faults there -- the old template offered nothing
+      else -- so upstream's new option is a new degree of freedom, not a
+      correction, and taking their default silently changes the modelled
+      hardware.  Keeps the classifier's structure.  COSTS a model regeneration
+      (`tools/regen_sail_model.sh`) and a full rebuild.
+
+  (b) Accept upstream's default.  Faithful to "take the model from the fork",
+      but the classifier's misaligned-AMO reasoning has to be redone against
+      the PMA path, and it is not obvious the same exception comes out.
+
+Recommendation: (a).  The bump was meant to be about the PTE A/D update, not
+about changing what hardware is being modelled.
+
+Everything else in this file (the recipe, the traps, the model deltas, the
+settled misaligned-access question) is current.

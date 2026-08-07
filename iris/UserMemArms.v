@@ -662,7 +662,8 @@ Proof.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
   rewrite Hal. cbn [Riscv.rv64d.not negb].
   (* translate -> Err e: early_return the memory_exception trap *)
-  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite execR_bind. rewrite execR_bind0. rewrite execR_returnR. cbn match.
+  rewrite execR_liftR. rewrite Htr. cbn match.
   rewrite execR_bind.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception _ pc e User s' Hcp' Hpc')).
   reflexivity.
@@ -712,9 +713,15 @@ Proof.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
   (* misaligned: not false = true -> then branch (memory_exception) *)
   rewrite Hal. cbn [Riscv.rv64d.not negb].
-  cbv [plat_misaligned_access GlobalMisalignedExceptions_amo]. cbn match.
-  rewrite execR_liftR.
-  rewrite (exec_memory_exception _ pc (E_SAMO_Access_Fault tt) User s Hcp Hpc).
+  (* [plat_misaligned_exception] is pure now: for an AMO it is the platform's
+     amo field, which this platform sets to AccessFault *)
+  replace (plat_misaligned_exception (Atomic (op, aq, rl, Data, Data)) false)
+    with (Some AccessFault)
+    by (unfold plat_misaligned_exception; cbn match; vm_compute; reflexivity).
+  cbn match.
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (exec_memory_exception _ pc (E_SAMO_Access_Fault tt) User s Hcp Hpc)).
   reflexivity.
 Qed.
 
