@@ -212,7 +212,23 @@ compiles in **5.5 s**:
   end_op). One lemma over the block's five pcs as literals, per the
   block-lemma recipe.
 
-**The one performance trap, and it cost an hour:** `wp_cj_s_sconf`'s
+`fc_pred_sub` / `fc_storeval_pred` / `fc_pred_reg` / `fc_pred_gtz` /
+`fc_pred_ngtz` are the arithmetic of `c.addiw a5,a5,-1` on a count: the
+`f->ref--` direction of `VcGen.moi32_storeval_succ`. Three forms are needed,
+because the proof consumes all three — the 32-bit word the `c.sw` stores, the
+64-bit register value the `bgtz` then tests, and the `trunc32` the store leaf
+hands back — and the addend is `mword_of_int 63 : mword 6`, i.e. -1 in the
+compressed immediate, so the 32-bit add WRAPS and the result is `z - 1` only
+because `z >= 1`.
+
+`FileInv.fref_tok_lookup` gained two conjuncts the close needed and the dup
+did not: `(qt <= 1)%Qp` (from the authority's own validity) and
+`n <> 1 -> (q < qt)%Qp`. The second is what lets the `n >= 2` arm SUBTRACT —
+`file_close_step` wants `(qt - q)%Qp = Some qr`, and `Qp.sub` is `Some` only
+below. Both are facts the lemma already had in its proof and was throwing
+away.
+
+**The one performance trap, and it cost an hour:****The one performance trap, and it cost an hour:** `wp_cj_s_sconf`'s
 alignment side condition is about the JUMP TARGET, and in a block lemma the
 pc and the immediate are variables — so the reflex `ltac:(vm_compute;
 reflexivity)` normalizes an open bitvector term and never returns. Rewrite

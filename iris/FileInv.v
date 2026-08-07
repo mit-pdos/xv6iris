@@ -624,26 +624,35 @@ Section FileInv.
      sys_open's unlocked initialization and fileclose's [type = FD_NONE]. *)
   Lemma fref_tok_lookup γ M k q :
     ftable_auth γ M -∗ fref_tok γ k q -∗
-    ⌜∃ qt n, M !! k = Some (qt, n) /\
-       (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive)⌝.
+    ⌜∃ qt n, M !! k = Some (qt, n) /\ (qt ≤ 1)%Qp /\
+       (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive) /\
+       (n <> 1%positive -> (q < qt)%Qp)⌝.
   Proof.
     rewrite /ftable_auth /fref_tok. iIntros "Ha Hf".
     iDestruct (fref_own_valid_2 with "Ha Hf")
-      as %[Hincl _]%auth_both_valid_discrete.
+      as %[Hincl Hval]%auth_both_valid_discrete.
     iPureIntro.
     apply singleton_included_l in Hincl as [y [Hy Hle]].
     apply leibniz_equiv in Hy. destruct y as [qt n]. exists qt, n.
     split; [exact Hy|].
+    (* the authority's own validity bounds the OUTSTANDING total, which is
+       what the [n >= 2] close needs before it may subtract from it. *)
+    split.
+    { specialize (Hval k). rewrite Hy in Hval.
+      destruct Hval as [Hvq _]; simpl in Hvq. by apply frac_valid in Hvq. }
     apply Some_included in Hle as [Heq | Hlt].
     - (* the fragment IS the whole entry: same fraction, count 1 *)
       destruct Heq as [Hq Hn]; cbn in Hq, Hn.
-      split; intros _; [exact Hq | by rewrite -Hn].
-    - (* strictly included, so BOTH components strictly grow *)
+      split; [by intros _|]. split; [by intros _; rewrite -Hn|].
+      intros Hne. exfalso. apply Hne. by rewrite -Hn.
+    - (* strictly included, so BOTH components strictly grow -- and the
+         fraction one is what the [n >= 2] close needs to SUBTRACT. *)
       apply pair_included in Hlt as [Hq Hn]; cbn in Hq, Hn.
       apply frac_included in Hq. apply pos_included in Hn.
-      split; intros Hc.
-      + exfalso. rewrite Hc in Hn. lia.
-      + exfalso. rewrite Hc in Hq. by apply (irreflexivity Qp.lt qt).
+      split; [|split].
+      + intros Hc. exfalso. rewrite Hc in Hn. lia.
+      + intros Hc. exfalso. rewrite Hc in Hq. by apply (irreflexivity Qp.lt qt).
+      + by intros _.
   Qed.
 
   (* ------------------------------------------------------------------ *)

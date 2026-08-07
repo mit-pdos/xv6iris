@@ -117,6 +117,77 @@ Qed.
 Lemma fc_frame_back (K : nat) : (8 <= K)%nat -> ((K - 8) + 8)%nat = K.
 Proof. lia. Qed.
 
+(* [c.addiw a5,a5,-1] on a count -- the [f->ref--] direction of
+   [VcGen.moi32_storeval_succ].  The addend is [mword_of_int 63 : mword 6],
+   i.e. -1 in the compressed instruction's 6-bit signed immediate, which
+   widens to the all-ones 32-bit word, so the 32-bit add wraps and the result
+   is [z - 1] exactly when [z >= 1].
+
+   Three forms, because the proof consumes all three: the 32-bit result the
+   [c.sw] stores, the 64-bit register value the [bgtz] then tests, and the
+   [trunc32] the store leaf hands back. *)
+Lemma fc_pred_sub (z : Z) : (1 <= z)%Z -> (z < 2 ^ 31)%Z ->
+  subrange_vec_dec
+     (add_vec (sign_extend' 64 (mword_of_int z : mword 32))
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0
+  = (mword_of_int (z - 1) : mword 32).
+Proof.
+  intros Hz1 Hb.
+  rewrite <- trunc32_subrange. rewrite trunc32_add. rewrite trunc32_sext.
+  assert (HK : trunc32 (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))
+               = (mword_of_int (2 ^ 32 - 1) : mword 32))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite HK.
+  apply bv_eq.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  rewrite (moi32_small z ltac:(change (2^32) with (2*2^31); lia)).
+  rewrite (moi32_small (2 ^ 32 - 1) ltac:(lia)).
+  rewrite moi32_unsigned.
+  assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
+  change (2^31) with 2147483648%Z in Hb.
+  rewrite E32.
+  unfold bv_wrap, bv_modulus. change (Z.of_N (MachineWord.Z_idx 32)) with 32%Z.
+  rewrite E32.
+  rewrite (_ : (z + (4294967296 - 1))%Z = (z - 1 + 1 * 4294967296)%Z); [|lia].
+  rewrite Z.mod_add; [|lia].
+  rewrite !Z.mod_small; lia.
+Qed.
+
+Lemma fc_storeval_pred (z : Z) : (1 <= z)%Z -> (z < 2 ^ 31)%Z ->
+  trunc32 (sign_extend' 64 (subrange_vec_dec
+     (add_vec (sign_extend' 64 (mword_of_int z : mword 32))
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0))
+  = (mword_of_int (z - 1) : mword 32).
+Proof.
+  intros H1 H2. rewrite trunc32_sext. exact (fc_pred_sub z H1 H2).
+Qed.
+
+(* the 64-bit value the [bgtz] at +0x22 tests *)
+Lemma fc_pred_reg (z : Z) : (1 <= z)%Z -> (z < 2 ^ 31)%Z ->
+  sign_extend' 64 (subrange_vec_dec
+     (add_vec (sign_extend' 64 (mword_of_int z : mword 32))
+              (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6)))) 31 0)
+  = sign_extend' 64 (mword_of_int (z - 1) : mword 32).
+Proof. intros H1 H2. by rewrite (fc_pred_sub z H1 H2). Qed.
+
+(* ...and what it decides: the count reaching zero is the ONLY way to fall
+   through to the last-reference arm. *)
+Lemma fc_pred_gtz (z : Z) : (2 <= z)%Z -> (z < 2 ^ 31)%Z ->
+  zopz0zI_s (zero_reg : mword 64)
+    (sign_extend' 64 (mword_of_int (z - 1) : mword 32)) = true.
+Proof.
+  intros H2 Hb. unfold zopz0zI_s. apply Z.ltb_lt.
+  assert (Hz0 : sint (zero_reg : mword 64) = 0%Z) by reflexivity. rewrite Hz0.
+  rewrite sint64_moi32; lia.
+Qed.
+
+Lemma fc_pred_ngtz :
+  zopz0zI_s (zero_reg : mword 64)
+    (sign_extend' 64 (mword_of_int (1 - 1) : mword 32)) = false.
+Proof. vm_compute. reflexivity. Qed.
+
 Section ProofFilecloseParts.
   Context `{!riscvGS Σ, !sieG Σ}.
 
