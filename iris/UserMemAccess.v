@@ -59,59 +59,26 @@ Axiom exec_cancel_reservation :
 
 
 Lemma exec_vmem_read_addr_aligned (width : Z) (va pa : mword 64) (v : mword (8 * width))
-    (acc : MemoryAccessType mem_payload) (aq rl res : bool) (s s' : mstate) :
+    (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (ep : Privilege) (md : SATPMode) (s s' : mstate) :
+  vmem_width width ->
   is_aligned_vaddr (Virtaddr va) width = true ->
-  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) acc) s
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  exec (translateAddr (Virtaddr va) acc) s
     = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
   exec (mem_read acc PBMT_PMA (Physaddr pa) width aq rl res) s' = Some (Ok v, s') ->
   exists dvv : mword (8 * width),
     exec (vmem_read_addr (Virtaddr va) width acc aq rl res) s = Some (Ok dvv, s').
 Proof.
-  intros Halign Htr Hmr.
-  eexists.
-  set (data2 := update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width) (autocast (T := mword) v)
-                : mword (8*1*width)).
-  unfold vmem_read_addr.
-  rewrite exec_catch_early_return.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  assert (Hinner : execR (returnR (result (mword (8 * width)) ExecutionResult) tt >>
-                          liftR (split_misaligned (Virtaddr va) width)) s = Some (inr (1, width), s)).
-  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_g width (Virtaddr va) s Halign). reflexivity. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-  rewrite misaligned_order_1.
-  match goal with
-  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (data2, true, 0), s'))
-  end.
-  { eapply execR_untilMT_1.
-    - reflexivity.
-    - cbn match.
-      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-      rewrite (execR_liftR_seq _ _ _ _ _ Htr).
-      cbn [bits_of_virtaddr] in *. cbn match.
-      match goal with
-      | |- execR (Defs.bind ?mrm ?post) s' = _ =>
-        assert (Hmrm : execR mrm s' = Some (inr data2, s'))
-      end.
-      { rewrite (execR_liftR_seq _ _ _ _ _ Hmr).
-        cbn match.
-        (* the res side effect: load_reservation (res=true) or tt (res=false) *)
-        assert (Hres : execR (if res return Defs.monadR _ _ unit
-                              then liftR (load_reservation (bits_of_physaddr (Physaddr pa)) width)
-                              else returnR (result (mword (8*width)) ExecutionResult) tt) s'
-                       = Some (inr tt, s')).
-        { destruct res.
-          - rewrite execR_liftR. rewrite exec_load_reservation. reflexivity.
-          - apply execR_returnR_fwd. }
-        rewrite (execR_bind0_Some _ _ _ _ Hres).
-        apply execR_returnR_fwd. }
-      rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
-      cbn. apply execR_returnR_fwd.
-    - apply execR_returnR_fwd. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hu).
-  cbn. reflexivity.
+  intros Hw Halign Heff Htm Htr Hmr.
+  exists v.
+  apply (exec_vmem_read_addr_aligned_gen width va pa v acc aq rl res ep md s s'
+           Hw Halign Heff Htm).
+  - exact (exec_translate_and_read_value_gen width va pa acc aq rl res PBMT_PMA v
+             s s' s' Htr Hmr).
+  - intros _. apply exec_load_reservation.
 Qed.
 
 (* the LOAD bundle composer (width 8, res=false): aligned load at a

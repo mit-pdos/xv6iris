@@ -97,6 +97,22 @@ Qed.
    [vmem_read_addr] wraps it in the page split, which an aligned in-page access
    does not take, so the accumulator [zeros'] is overwritten in full and the
    result is the value itself ([usvd_zeros_full_gen]). *)
+Lemma exec_translate_and_read_value_gen (width : Z) (va pa : mword 64)
+    (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (pbmt : page_based_mem_type) (v : mword (8*width)) s s1 s2 :
+  exec (translateAddr (Virtaddr va) acc) s
+    = Some (Ok (Physaddr pa, pbmt, init_ext_ptw), s1) ->
+  exec (mem_read acc pbmt (Physaddr pa) width aq rl res) s1 = Some (Ok v, s2) ->
+  exec (translate_and_read_value (Virtaddr va) width acc aq rl res) s
+    = Some (Ok (Physaddr pa, v), s2).
+Proof.
+  intros Htr Hmr.
+  unfold translate_and_read_value.
+  rewrite (exec_bind_Some _ _ _ _ _ Htr). cbn match beta.
+  rewrite (exec_bind_Some _ _ _ _ _ Hmr). cbn match beta.
+  apply exec_returnM.
+Qed.
+
 Lemma exec_translate_and_read_value_g (width : Z) (va pa : mword 64)
     (pbmt : page_based_mem_type) (v : mword (8*width)) s s1 s2 :
   exec (translateAddr (Virtaddr va) (Load Data)) s
@@ -111,6 +127,66 @@ Proof.
   rewrite (exec_bind_Some _ _ _ _ _ Htr). cbn match beta.
   rewrite (exec_bind_Some _ _ _ _ _ Hmr). cbn match beta.
   apply exec_returnM.
+Qed.
+
+(* The res-GENERIC aligned vmem read: LOAD (res=false) and LR (res=true) both
+   go through it.  On the LR side the model asserts [width = access_width]
+   (trivial once the page split is inert) and then takes the reservation, which
+   is a platform effect the caller supplies. *)
+Lemma exec_vmem_read_addr_aligned_gen (width : Z) (va pa : mword 64)
+    (v : mword (8*width)) (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (ep : Privilege) (md : SATPMode) s s2 :
+  vmem_width width ->
+  is_aligned_vaddr (Virtaddr va) width = true ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  exec (translate_and_read_value (Virtaddr va) width acc aq rl res) s
+    = Some (Ok (Physaddr pa, v), s2) ->
+  (res = true ->
+   exec (load_reservation (bits_of_physaddr (Physaddr pa)) width) s2 = Some (tt, s2)) ->
+  exec (vmem_read_addr (Virtaddr va) width acc aq rl res) s = Some (Ok v, s2).
+Proof.
+  intros Hw Halign Heff Htm Htrv Hlr.
+  assert (Hpos : 0 < width) by (apply vmem_width_pos; exact Hw).
+  unfold vmem_read_addr. rewrite exec_catch_early_return.
+  rewrite Halign. cbn [Riscv.rv64d.not negb].
+  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+  cbn [bits_of_virtaddr]. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_on_page_boundary_aligned va width s Hw Halign)).
+  cbn beta zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Heff). cbn beta.
+  match goal with |- context[Defs.and_boolM ?A ?B] =>
+    assert (Hds : execR (Defs.and_boolM A B) s = Some (inr false, s)) end.
+  { unfold Defs.and_boolM.
+    match goal with |- context[Defs.bind (Defs.bind (Defs.liftR ?m) ?k1) _] =>
+      assert (Hl : execR (Defs.bind (Defs.liftR m) k1) s
+                   = Some (inr (generic_neq md Bare), s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ Htm). cbn beta. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hl). cbn match beta.
+    destruct (generic_neq md Bare); apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hds). cbn match beta zeta.
+  rewrite andb_false_r. cbn match beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (zeros' (8 * width)) s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Htrv). cbn match beta.
+  replace (Z.eqb width width) with true by (symmetry; apply Z.eqb_refl).
+  match goal with |- context[Defs.bind (Defs.bind0 ?IF ?rr) ?k] =>
+    assert (Hif : execR IF s2 = Some (inr tt, s2)) end.
+  { destruct res.
+    - rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s2)). cbn beta.
+      rewrite execR_liftR. rewrite (Hlr eq_refl). reflexivity.
+    - apply execR_returnR_fwd. }
+  match goal with |- context[Defs.bind (Defs.bind0 ?IF ?rr) ?k] =>
+    assert (Hseq : execR (Defs.bind0 IF rr) s2
+                   = Some (inr (update_subrange_vec_dec (zeros' (8 * width))
+                                  (8 * width - 1) 0 (autocast (T := mword) v)), s2)) end.
+  { rewrite (execR_bind0_Some _ _ _ _ Hif). apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta.
+  rewrite (usvd_zeros_full_gen (8 * width) v ltac:(lia)).
+  rewrite andb_false_r. cbn match beta.
+  reflexivity.
 Qed.
 
 Lemma exec_vmem_read_addr_aligned_load (width : Z) (va pa : mword 64)
