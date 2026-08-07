@@ -479,7 +479,12 @@ Definition boot_w64 (z : Z) : SailStdpp.Values.mword 64 :=
    DRAM bank at 0x80000000 (size [ram_hi - ram_lo]) is MainMemory R/W/X with
    AMOCASQ atomics -- so every AMO the decoder can produce is permitted there,
    at every width up to 16 -- and PTE reads/writes, and its range is EXACTLY
-   [RiscvPtsto.addr_is_ram]'s.  BETWEEN AND OUTSIDE THEM THERE ARE HOLES,
+   [RiscvPtsto.addr_is_ram]'s.  It also carries a 16-byte MISALIGNED ATOMICITY
+   GRANULE (the two [..._granule_size_exp] fields = 4, per Zama16b), which the
+   two IOMemory regions do not (= 0, i.e. absent): that granule is what
+   [pmaCheck] consults to decide whether a misaligned access is split, and it
+   is irrelevant to every access these proofs perform, all of which are
+   naturally aligned and therefore never split.  BETWEEN AND OUTSIDE THEM THERE ARE HOLES,
    which is why the tower's obligation is per address class
    ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]) and why an
    all-addresses one could only ever have held of an idealization. *)
@@ -500,7 +505,9 @@ Definition pma_boot_rom_attrs : PMA := {|
   PMA_reservability := RsrvNone;
   PMA_supports_cbo_zero := false;
   PMA_supports_pte_read := false;
-  PMA_supports_pte_write := false |}.
+  PMA_supports_pte_write := false;
+  PMA_misaligned_atomicity_granule_size_exp := 0;
+  PMA_vector_misaligned_atomicity_granule_size_exp := 0 |}.
 
 Definition pma_boot_io_attrs : PMA := {|
   PMA_mem_type := IOMemory;
@@ -519,7 +526,9 @@ Definition pma_boot_io_attrs : PMA := {|
   PMA_reservability := RsrvNone;
   PMA_supports_cbo_zero := false;
   PMA_supports_pte_read := false;
-  PMA_supports_pte_write := false |}.
+  PMA_supports_pte_write := false;
+  PMA_misaligned_atomicity_granule_size_exp := 0;
+  PMA_vector_misaligned_atomicity_granule_size_exp := 0 |}.
 
 Definition pma_boot_ram_attrs : PMA := {|
   PMA_mem_type := MainMemory;
@@ -538,7 +547,9 @@ Definition pma_boot_ram_attrs : PMA := {|
   PMA_reservability := RsrvEventual;
   PMA_supports_cbo_zero := true;
   PMA_supports_pte_read := true;
-  PMA_supports_pte_write := true |}.
+  PMA_supports_pte_write := true;
+  PMA_misaligned_atomicity_granule_size_exp := 4;
+  PMA_vector_misaligned_atomicity_granule_size_exp := 4 |}.
 
 Definition pma_boot : list PMA_Region :=
   [ {| PMA_Region_base := boot_w64 0x1000;

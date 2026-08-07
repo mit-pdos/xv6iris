@@ -11,6 +11,8 @@ Require Import RegFile.
 Require Import InstrBytes.
 Local Open Scope Z_scope.
 Require Import WpGprCsrwCommon.
+Require Import RiscvExtras.   (* satp_ppn_mask_id: the PPN mask is a no-op here *)
+Require Import MinstretInv.   (* exec_clint_dispatch_false: writing stimecmp refreshes mip *)
 
 (* ===================================================================== *)
 (* MONADIC-LEGALIZE REDUCTION LAYER.  Each legalize_* chains             *)
@@ -58,16 +60,22 @@ Proof.
   apply exec_hartSupports_Zicsr.
 Qed.
 
-(* The SYMBOLIC legalized mideleg value (S-mode enabled, Sscofpmf enabled). *)
-Definition mideleg_legalized (o v : mword 64) : mword 64 :=
-  let v := Mk_Minterrupts v in
+(* The SYMBOLIC legalized mideleg value (S-mode enabled, Sscofpmf enabled).
+
+   The written value is now MASKED by the platform's delegatable-interrupt set
+   ([plat_mideleg_delegatable_bits] = 0x2222, i.e. SSI/STI/SEI/LCOFI) before the
+   per-extension gates are applied, instead of being merged into the OLD value
+   with the M-mode bits cleared -- so the old value plays no part any more (the
+   model calls its first parameter [_o]).  With S and Sscofpmf both enabled every
+   gate writes a field back with its own value, so this is the mask plus a tower
+   of identity updates; it is kept in the model's shape rather than simplified,
+   as before. *)
+Definition mideleg_legalized (_o v : mword 64) : mword 64 :=
+  let v := Mk_Minterrupts (and_vec v plat_mideleg_delegatable_bits) in
   _update_Minterrupts_SSI
     (_update_Minterrupts_STI
        (_update_Minterrupts_SEI
-          (_update_Minterrupts_MSI
-             (_update_Minterrupts_MTI
-                (_update_Minterrupts_MEI
-                   (_update_Minterrupts_LCOFI o (_get_Minterrupts_LCOFI v)) ('b"0")) ('b"0")) ('b"0"))
+          (_update_Minterrupts_LCOFI v (_get_Minterrupts_LCOFI v))
           (_get_Minterrupts_SEI v))
        (_get_Minterrupts_STI v))
     (_get_Minterrupts_SSI v).
@@ -324,6 +332,11 @@ Lemma exec_legalize_satp_rv64 (prev value : mword 64) s :
   exec (legalize_satp RV64 prev value) s = Some (satp_legalized prev value, s).
 Proof.
   intro HS. unfold legalize_satp, satp_legalized.
+  (* the PPN mask (min (physaddr_bits - pagesize_bits) 44 = 44 here) writes the
+     field back with its own value, so it drops out and the mode dispatch is on
+     the written value exactly as before *)
+  cbn zeta.
+  rewrite satp_ppn_mask_id.
   destruct (satpMode_of_bits RV64 (_get_Satp64_Mode (Mk_Satp64 value))) as [sv|] eqn:Hm.
   - destruct sv.
     + rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Svbare s HS)). cbn match. apply exec_returnM.
@@ -553,19 +566,53 @@ Proof.
   apply (exec_is_stimecmp_accessible_M s HS).
 Qed.
 
+(* Writing stimecmp REFRESHES THE TIMER-PENDING BITS: the CSR write runs
+   [clint_dispatch false] between the register write and the read-back, setting
+   mip.MTIP from (mtimecmp <=u mtime) and -- under Sstc with menvcfg.STCE --
+   mip.STIP from (stimecmp <=u mtime).  So the post-state gains an mip write and
+   this contract is existential in that value; mip lives in the value-agnostic
+   [clock_inv], so the WP consumers re-establish the invariant with whatever
+   comes out.  [set] holds [clint_dispatch] opaque across the CSR-clause peel:
+   the [cbn match] that resolves the address dispatch would otherwise inline it
+   into a raw monad-bind fixpoint that no [rewrite] can fold back. *)
 Lemma exec_write_CSR_stimecmp (v : mword 64) s :
+  exists mp : mword 64,
   exec (write_CSR csr_stimecmp v) s
     = Some (Ok (subrange_vec_dec (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v) (Z.sub xlen 1) 0),
-            set_reg s stimecmp (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v)).
+            set_reg (set_reg s stimecmp (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v)) mip mp).
 Proof.
-  unfold write_CSR, stimecmp_legalized.
+  destruct (MinstretInv.exec_clint_dispatch_false
+              (set_reg s stimecmp (stimecmp_legalized (register_lookup stimecmp s.(sregs)) v)))
+    as [mp Hcd].
+  exists mp.
+  unfold stimecmp_legalized in Hcd |- *.
+  unfold write_CSR.
+  (* [remember], not [set]: the clause peel's rewrites zeta-expand a let-bound
+     body, and the moment [clint_dispatch] is exposed the surrounding [exec]
+     reduces it into a raw monad-bind fixpoint that no [rewrite] can fold back.
+     A body-less variable cannot be expanded.  (It abstracts [Hcd] too, so
+     [Hcd] below is already stated at [CD].) *)
+  remember (clint_dispatch false) as CD eqn:HCD.
   skip_csr_false_clauses.
   match goal with |- context[if ?g then _ else _] =>
     replace g with true by (vm_compute; reflexivity) end. cbn match.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg stimecmp s)).
   rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg stimecmp _ s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg stimecmp _)).
-  rewrite register_lookup_set.
+  (* the peel left the remaining two binds delta-unfolded into the raw monad
+     fixpoint; [reflexivity] folds them back *)
+  match goal with |- exec ?M ?st = _ =>
+    assert (HM : M = Defs.bind (Defs.bind0 CD (Defs.read_reg stimecmp))
+                       (fun w : mword 64 => returnM (Ok (subrange_vec_dec w (Z.sub xlen 1) 0))))
+      by reflexivity end.
+  rewrite HM.
+  match goal with |- exec (Defs.bind ?A _) ?st = _ =>
+    assert (Hin : exec A st = Some (register_lookup stimecmp st.(sregs), set_reg st mip mp)) end.
+  { rewrite (exec_bind0_Some _ _ _ _ _ Hcd).
+    rewrite (exec_read_reg stimecmp _).
+    rewrite sregs_set_reg.
+    rewrite irrelevant_register_set; [ reflexivity | vm_compute; reflexivity ]. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hin).
+  rewrite sregs_set_reg. rewrite register_lookup_set.
   apply exec_returnM.
 Qed.
 
@@ -580,22 +627,27 @@ Lemma exec_execute_csrw_stimecmp (rs1 : mword 5) s :
   uint rs1 <> 0 ->
   register_lookup cur_privilege s.(sregs) = Machine ->
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exists mp : mword 64,
   exec (execute_CSRReg csr_stimecmp (Regidx rs1) zreg CSRRW) s
     = Some (RETIRE_SUCCESS,
-            set_reg s stimecmp
+            set_reg (set_reg s stimecmp
               (stimecmp_legalized (register_lookup stimecmp s.(sregs))
-                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
+                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))) mip mp).
 Proof.
   intros Hrs1 Hpriv HS.
   replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
     with (if Z.eqb (uint rs1) 0 then zero_reg
           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
     by (replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
+  destruct (exec_write_CSR_stimecmp
+              (if Z.eqb (uint rs1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) s)
+    as [mp Hw].
+  exists mp.
   apply (exec_execute_csrw_gpr csr_stimecmp rs1 s _
            (subrange_vec_dec (stimecmp_legalized (register_lookup stimecmp s.(sregs))
               ((if Z.eqb (uint rs1) 0 then zero_reg
                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))) (Z.sub xlen 1) 0)).
-  
   - exact Hpriv.
   - apply (exec_check_CSR_result_csrw csr_stimecmp s).
     apply exec_check_CSR_csrw;
@@ -606,7 +658,7 @@ Proof.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
-  - apply exec_write_CSR_stimecmp.
+  - exact Hw.
   - apply exec_csr_id_write_callback_stimecmp.
 Qed.
 
@@ -826,24 +878,36 @@ Section WpCsrwGprNewB.
     { rewrite -Lrs1u.
       replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
       reflexivity. }
+    assert (HmisaSp : eq_vec (_get_Misa_S (register_lookup misa s_pc.(sregs))) ('b"1") = true)
+      by (rewrite Lmisap; exact HmisaS).
+    destruct (exec_execute_csrw_stimecmp rs1 s_pc Hrs1 Lprivp HmisaSp) as [mp Hex].
+    rewrite ?Lcsrp Lrs1p in Hex.
+    (* the CSR write runs [clint_dispatch], which refreshes mip -- so this step
+       scribbles a cell that lives in [clock_inv].  Open it, update, close: the
+       invariant is value-agnostic, so any [mp] re-establishes it. *)
+    iPoseProof "Hinv" as "#Hinvc".
+    iDestruct "Hinvc" as "(_ & #Hclk & _)".
+    iInv "Hclk" as ">Hcb" "Hclose".
+    iDestruct "Hcb" as (c0 t0 p0) "(Hc & Ht & Hp)".
     iMod (reg_update _ stimecmp _ (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))
             with "Hreg Hcsr") as "[Hreg Hcsr]".
+    iMod (reg_update _ mip _ mp with "Hreg Hp") as "[Hreg Hp]".
+    iMod ("Hclose" with "[Hc Ht Hp]") as "_".
+    { iNext. iExists c0, t0, mp. iFrame "Hc Ht Hp". }
     iModIntro.
-    iExists (set_reg s_pc stimecmp (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))).
+    iExists (set_reg (set_reg s_pc stimecmp (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))) mip mp).
     iSplitR.
     { iPureIntro. rewrite Hpceq.
       change (execute (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)))
         with (execute_CSRReg csr_stimecmp (Regidx rs1) zreg CSRRW).
-      rewrite (exec_execute_csrw_stimecmp rs1 s_pc Hrs1 Lprivp
-                 ltac:(rewrite Lmisap; exact HmisaS)).
-      rewrite ?Lcsrp Lrs1p. reflexivity. }
+      exact Hex. }
     iSplitL "Hreg Hmem".
     { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hmm' Hpmpc' Hpc'".
     assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc stimecmp (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))).(sregs)
+             (set_reg (set_reg s_pc stimecmp (stimecmp_legalized stimecmp0 (m !!! Regidx rs1))) mip mp).(sregs)
              = add_vec_int pc 4).
-    { unfold s_pc. tmig. rewrite register_lookup_set. reflexivity. }
+    { unfold s_pc. tmig. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (mmode_config (DfracOwn (q/2)))%I
       with "[Hhs_k Hpriv_k Hms_k]" as "Hmm_k'".

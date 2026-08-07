@@ -244,7 +244,7 @@ Proof.
   - split_and!;
       [ reflexivity | reflexivity | reflexivity
       | intros op k Hk; exact (amocasq_allows_atomic op k Hk)
-      | reflexivity | reflexivity ].
+      | reflexivity | reflexivity | reflexivity | reflexivity ].
 Qed.
 
 Lemma pma_allows_io_pma_boot : pma_allows_io pma_boot.

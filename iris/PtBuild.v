@@ -662,7 +662,26 @@ Proof.
   rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)) in Hv.
   match type of Hv with (if ?c then _ else _) = _ => destruct c end;
     [discriminate Hv |].
-  (* disjunct 4: nonleaf & (A|D|U|ext<>0) -- the payload *)
+  (* disjunct 4 (NEW upstream): a PBMT encoding the platform does not know,
+     gated on Svpbmt.  [dstateM] is concrete, so the probe just computes. *)
+  match type of Hv with
+  | exec (or_boolM ?ac _) _ = _ =>
+      assert (HAC4 : exists d4 : bool, exec ac dstateM = Some (d4, dstateM))
+  end.
+  { rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)).
+    match goal with |- exists _, (if ?c then _ else _) = _ => destruct c end;
+      [| eexists; reflexivity].
+    eexists. vm_compute. reflexivity. }
+  destruct HAC4 as (d4 & HAC4).
+  rewrite (exec_or_boolM_Some _ _ _ _ _ HAC4) in Hv.
+  destruct d4; [discriminate Hv |].
+  (* disjunct 5 (NEW upstream): the remaining checks moved UNDER a
+     [pte_reserved_bits_must_be_zero] gate, which this privileged-ISA version
+     sets; the nonleaf payload is its first arm. *)
+  rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)) in Hv.
+  match type of Hv with (if ?c then _ else _) = _ => destruct c eqn:Eprb end;
+    [| vm_compute in Eprb; discriminate Eprb ].
+  (* the payload: nonleaf & (A|D|U|ext<>0) *)
   rewrite (exec_or_boolM_Some _ _ _ _ _ (exec_returnM _ dstateM)) in Hv.
   match type of Hv with (if ?c then _ else _) = _ => destruct c eqn:E3 end;
     [discriminate Hv |].

@@ -569,7 +569,7 @@ Section ProofScheduler.
               (mword_of_int 0 : mword 5) Ra4 (mword_of_int 48 : mword 12)
               A7 (av - 10)%nat (rget A7 (mword_of_int 0 : mword 5))
               (cpu_proc_half cpu_id zero_reg) (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
-              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
               with "Hcg Hpc Hi2a [Hproc] [-]").
@@ -1198,7 +1198,7 @@ Section ProofScheduler.
                   M2 (av - 10)%nat (rget M2 Rs1)
                   (cpu_proc_half cpu_id (proc_addr jj) ∗ park_hlf jj false)
                   (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
-                  ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
+                  ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity)
                   ltac:(vm_compute; reflexivity)
                   exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
                   with "Hcg Hpc Hi68 [Hproc Hpark] [-]").
@@ -1347,7 +1347,7 @@ Section ProofScheduler.
                   m' (av - 10)%nat (rget m' (mword_of_int 0 : mword 5))
                   (cpu_proc_half cpu_id zero_reg ∗ park_full jj false)
                   (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
-                  ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
+                  ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity)
                   ltac:(vm_compute; reflexivity)
                   exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
                   with "Hcg Hpc Hi76 [Hproc Hpark] [-]").

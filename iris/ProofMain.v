@@ -1352,7 +1352,7 @@ Section ProofMain.
               (mword_of_int 0 : mword 12) S3 n
               (trunc32 (rget S3 (mword_of_int 14 : mword 5))) True%I
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_write_ram_plain_4
               (store_ext_4 (rget S3 (mword_of_int 14 : mword 5)))
               ltac:(solve_ndisj) with "Hcg Hpc Hib0 [HP]").

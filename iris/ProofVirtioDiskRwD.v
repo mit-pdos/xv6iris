@@ -647,7 +647,7 @@ Section VdrwdLeaves.
               (fun w => zero_extend' 64 w)
               (fun w => (⌜w = wrap16 np⌝ ∗ ⌜(nr <= np)%nat⌝ ∗ disk_pub γd np)%I)
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
-              ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdsp
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub] [Hcont]").
@@ -725,7 +725,7 @@ Section VdrwdLeaves.
               (wrap16 (S np) : SailStdpp.Values.mword 16)
               (disk_pub γd (S np) ∗ disk_receipt γd np sl pin)%I
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false
-              ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2
               ltac:(rewrite (store_ext_2 (rget m rs2)); exact Hsv)

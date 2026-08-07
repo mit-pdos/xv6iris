@@ -190,13 +190,14 @@ are working on that effort — the relevant `projects/` file.
   [`proc-struct-resources.md`](projects/proc-struct-resources.md), not here.
 - **[`fileclose.md`](projects/fileclose.md)** — `fileclose`, the single
   unproven callee behind THREE unlinked proved functions (sys_pipe,
-  sys_close, kexit). The payload link it needed has LANDED — a `file_ref`
-  now carries the pipe end / inode reference it names, so the last closer
-  has a whole `pipe_ref` to hand `pipeclose` — as has `CodeFileclose.v`.
-  What is left is the contract's second half (a TYPE-INDEXED callee
-  environment, so pipealloc and sys_pipe are not made to own a file system),
-  the 18→68 stack-constant ripple, the four callers, and the proof. Design
-  in [`design/file-table.md`](design/file-table.md).
+  sys_close, kexit). Everything below it has LANDED: the payload link (a
+  `file_ref` now carries the pipe end / inode reference it names, so the
+  last closer has a whole `pipe_ref` to hand `pipeclose`),
+  `CodeFileclose.v`, the CONTRACT — a TYPE-INDEXED callee environment, so
+  pipealloc is not made to own a file system — and all four callers ported
+  onto it, including the `ProcInv.proc_priv_pid_ofile` accessor kexit's loop
+  needed. What is left is `ProofFileclose.v` and the four `Link` files.
+  Design in [`design/file-table.md`](design/file-table.md).
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a
@@ -268,6 +269,24 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`sail-model-bump.md`](completed/sail-model-bump.md)** — the sail-riscv
+  model bump: the model now comes from the `zeldovich/sail-riscv` FORK (pinned
+  by `SAIL_RISCV_REV`), whose delta is the ATOMIC PTE A/D-bit update, and whose
+  tip carried 58 upstream commits along with it. The headline finding: the bump
+  moved the misaligned split in TWO directions at once — `vmem_*_addr` now
+  splits only across a PAGE boundary (at most two ways, one translation each)
+  while the MAG/alignment split moved DOWN into `checked_mem_*`, under a single
+  translation and with no fault of its own — so the iris-level work is per PAGE,
+  not per chunk. Keeps the peel recipes and their traps, the physical split kit
+  (`MemAccessGen`'s N-chunk loops and width-generic RAM leaves, `UserMemMis`'s
+  chunk-plan derivation), the two platform conjuncts `pma_allows_all` had to
+  gain (misaligned-exceptions None, reservability ≠ RsrvNone) and why, and FOUR
+  findings worth reading before any interface sweep of this kind: a 30-minute
+  "hang" that was a mis-stated `∀`-premise (and that `coqc -time` localises in
+  two minutes); why pinning a platform field beat threading a disjunction
+  through five altitudes; how a WEAKENED upstream `assert` made a dead branch
+  live (the shadow-stack PTE, and the `forall s` argument that kills it again);
+  and `pmaCheck`'s Atomic arm compiling to a match on the op.
 - **[`explicit-cpuid.md`](completed/explicit-cpuid.md)** — the ambient `CpuId`
   removed from every WP statement, so a step's continuation is about the hart
   execution RESUMES on rather than the one it started on. `wp_next` and its two

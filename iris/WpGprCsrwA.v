@@ -806,8 +806,9 @@ Proof.
                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))).
   
   - exact Hpriv.
-  - apply (exec_check_CSR_result_csrw_U csr_menvcfg s HU);
-      [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq | vm_compute; reflexivity ].
+  - apply (exec_check_CSR_result_csrw_U_and csr_menvcfg xenvcfg_csrs_are_defined s HU);
+      [ vm_compute; reflexivity | vm_compute; reflexivity | csr_dispatch_eq
+      | vm_compute; reflexivity | vm_compute; reflexivity ].
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.

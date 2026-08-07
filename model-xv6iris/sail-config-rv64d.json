@@ -3,8 +3,8 @@
 // `make model-gen` (see root README.md "Regenerating the Sail model").
 //
 // This is sail-riscv's own config/config.json.in, fully resolved for the
-// rv64d_v256_e64 build (the @CMAKE@ placeholders substituted) with exactly
-// THREE changes from upstream's default (each marked "xv6iris" inline):
+// rv64d_v256_e64 build, with exactly FOUR changes from upstream's default
+// (each marked "xv6iris" inline):
 //   1. `platform.simple_interrupt_generator.supported` := false  (see below)
 //   2. `extensions.B.supported`                        := false  (see below)
 //   3. `extensions.V.support_level`                    := "Disabled", together
@@ -13,11 +13,24 @@
 //      Zvknhb Zvksed Zvksh Zvkt) -- see "Why disable B and V" below: the
 //      model's OWN `config_is_valid` rejects the config otherwise, since each
 //      of those requires Zve*, and Zve* comes from V's support_level.
-// Everything else is unmodified sail-riscv default config. To refresh this
-// file after a sail-riscv upstream bump, regenerate the default
-// build/config/rv64d_v256_e64.json via cmake (see the root README) and
-// re-apply those three edits -- diff against the new file to catch any
-// other upstream default changes.
+//   4. the RAM region's `size` := 0x8000000 (128 MiB), matching xv6's PHYSTOP.
+// Everything else is unmodified sail-riscv default config.
+//
+// To refresh this file after a sail-riscv upstream bump: resolve the new
+// `config/config.json.in` (cmake's `configure_file` substitution) with the
+// rv64d_v256_e64 values that `config/CMakeLists.txt` computes --
+//
+//   CONFIG__BASE__XLEN 64   CONFIG_XLEN_IS_32 false   CONFIG_XLEN_IS_64 true
+//   CONFIG__V__VLEN_EXP 8   CONFIG_ELEN_IS_32 false   CONFIG_ELEN_IS_64 true
+//   CONFIG__V__ELEN_EXP 6   CONFIG__V__SUPPORT Full   CONFIG__PHYSADDR__BITS 56
+//   CONFIG_MIDELEG_DELEGATABLE_BITS_VALUE 0x0000_0000_0000_2222
+//   (any placeholder cmake leaves undefined resolves to the empty string)
+//
+// -- then re-apply the four edits above, and diff against the previous file to
+// catch every other upstream default change. Two of the fields are load-bearing
+// for the proofs and worth re-reading on every bump: `memory.physaddr_bits`
+// (56 upstream, which is what `legalize_satp`'s PPN mask and `pmpaddr`'s
+// legalization width are derived from) and `memory.misaligned.exceptions`.
 //
 // Why disable B and V: the proofs are about the xv6 kernel, which is compiled
 // rv64gc -- it contains no bit-manipulation and no vector instructions, and
@@ -147,6 +160,33 @@
         "base_alignment": 2
       }
     },
+    "medeleg": {
+      // A bit set to 1 in this value specifies that the corresponding
+      // bit of `medeleg` can be set to 1. It represents the subset of
+      // delegatable traps of the implementation. Bits should not be
+      // set for traps that cannot be delegated as per the
+      // specification, and delegation of reserved traps is not
+      // supported.  This value is ignored when the `medeleg` CSR does
+      // not exist.
+      "delegatable_bits": {
+        "len": 64,
+        "value": "0x0000_0000_000c_b3FF"
+      }
+    },
+    "mideleg": {
+      // A bit set to 1 in this value specifies that the corresponding
+      // bit of `mideleg` can be set to 1. It represents the subset of
+      // delegatable interrupts of the implementation. Bits should not
+      // be set for interrupts that cannot be delegated as per the
+      // specification, and delegation of reserved interrupts is not
+      // supported. Bits set for interrupts designated for platform
+      // use are ignored. This value is ignored when the `mideleg` CSR
+      // does not exist.
+      "delegatable_bits": {
+        "len": "xlen",
+        "value": "0x0000_0000_0000_2222"
+      }
+    },
     // These settings control whether the specified exceptions
     // cause information to be written into the appropriate
     // `xtval` registers.
@@ -206,12 +246,25 @@
       "fs_legal_states": "ExtContext_FourState",
       "vs_legal_states": "ExtContext_FourState"
     },
-    // Set the ISA manual version to use. Isa_Latest is always the latest that
-    // the Sail model supports. Other values include Isa_20240411, Isa_20211203, etc.
-    // See isa_version.sail for the complete list and the behaviours it affects.
-    "isa_version": "Isa_Latest"
+    // Set the version of the privileged ISA. `"Privileged_ISA_1_13"`
+    // is the latest that the Sail model supports.  The other
+    // supported value for this field is:
+    // - `"Privileged_ISA_1_12"`
+    // - `"Privileged_ISA_1_11"`
+    // Note that currently, not all functionality for these versions
+    // is available currently, and not all versions of the privileged
+    // ISA can be specified.
+    "privileged_isa_version": "Privileged_ISA_1_13"
   },
   "memory": {
+    // This specifies the number of implemented physical address bits.
+    // This is less than or equal to: 32 for RV32 without Sv32, 34 for
+    // RV32 with Sv32, and 64 for RV64. Architectural bits higher than
+    // `physaddr_bits` in physical addresses are effectively read-only zero.
+    // This is required to be 13 or higher to avoid representing empty
+    // bitvectors in the model and since it is unlikely real implementations
+    // will have lower values.
+    "physaddr_bits": 56,
     "pmp": {
       "grain": 0,
       // This specifies the number of PMP entries present.
@@ -234,7 +287,7 @@
       // it will have a higher priority than memory-protection faults arising from
       // that access if it were allowed to proceed.
       "exceptions": {
-        // A misaligned scalar or vector load/store can either proceed
+        // A misaligned scalar or vector load/store, or an AMO, can either proceed
         // without a fault (use `{"None" : null}`), or raise an access fault
         // (use `{"Some": "AccessFault"}`) or a misaligned exception
         // (use `{"Some": "AlignmentException"}`).
@@ -248,32 +301,49 @@
         "vector": {
           "None": null
         },
+        // Similarly, a misaligned AMO can be configured with the same
+        // option values.
+        //
+        // DEVIATION from the upstream template, which defaults this to
+        // {"None": null}.  The template this project was originally generated
+        // from offered no such option -- a misaligned AMO always faulted -- so
+        // that is the platform this development models, and the proofs
+        // (UserMemArms/UserMemClassify's misaligned-AMO arms) are sound about
+        // it.  Taking upstream's new default would change the modelled
+        // hardware, not just the model.
+        "amo": {
+          "Some": "AccessFault"
+        },
         // A misaligned LR/SC currently always faults, and this field can specify
         // whether it generates an access fault (use `"AccessFault"`)
         // or a misaligned exception (use `"AlignmentException"`).
-        "lrsc": "AccessFault",
-        // Similarly, a misaligned AMO currently always faults, and this field
-        // can specify either `"AccessFault"` or `"AlignmentException"`.
-        "amo": "AccessFault"
+        "lrsc": "AccessFault"
       },
-      // If a misaligned access was specified to have no fault in `exceptions` above, the
-      // fields below specify how it is handled.
+      // If multiple memory operations are needed (e.g. when an access
+      // straddles a page boundary), this controls whether they are
+      // done in increasing or decreasing address order. This is
+      // architecturally observable because some store operations may
+      // succeed, and even for loads the resulting `xtval` may depend
+      // on this setting.
+      "order_decreasing": false,
+      // If a misaligned access was specified to have no fault in
+      // `exceptions` above, the PMAs for the access, including the
+      // optional Misaligned Atomicity Granule (MAG) PMA, specify how
+      // it is handled.  If no MAG PMA is specified, or the MAG does
+      // not apply to the access, the `default_allowed_within_exp`
+      // value below specifies this handling.
       //
       // Memory accesses that span multiple naturally aligned
-      // 2^allowed_within_exp sized regions will be split into multiple
-      // memory operations. 0 means all misaligned accesses will be split.
-      // The maximum value is 12 (one page).
-      "allowed_within_exp": 0,
-      // If the access gets split due to `allowed_within_exp` then the size
-      // of the operations will be one byte if `byte_by_byte` is set, otherwise
-      // they will be the maximum size possible based on the alignment. For
-      // example a 4-byte access to address 0x2 will use two 2-byte operations.
-      "byte_by_byte": false,
-      // If multiple memory operations are needed, this controls whether they
-      // are done in increasing or decreasing address order. This is architecturally
-      // observable because some store operations may succeed, and even for
-      // loads the resulting `xtval` may depend on this setting.
-      "order_decreasing": false
+      // 2^default_allowed_within_exp sized regions will be split into
+      // multiple memory operations. 0 means all misaligned accesses
+      // will be split.  The maximum value is 12 (one page).
+      "default_allowed_within_exp": 0,
+      // If the access gets split due to `default_allowed_within_exp`
+      // then the size of the operations will be one byte if
+      // `byte_by_byte` is set, otherwise they will be the maximum
+      // size possible based on the alignment. For example a 4-byte
+      // access to address 0x2 will use two 2-byte operations.
+      "byte_by_byte": false
     },
     // Address to write DTB to (if provided). This must be in a suitable memory
     // region (see `memory.regions`).
@@ -285,6 +355,10 @@
     // are required to be aligned to 4K (page) boundaries.  To specify
     // the `misaligned` PMA attribute for a region, see the comments for
     // `memory.misaligned.exceptions` above.
+    // The optional misaligned atomicity granule (MAG) can be specified as a
+    // power of 2, upto a maximum of a page size (i.e. 12). For
+    // Zama16b, for e.g., the specified value should be 4. A value of
+    // 0 indicates that the MAG attribute is not present.
     "regions": [
       // ROM
       {
@@ -315,6 +389,8 @@
             "amo": "AccessFault"
           },
           "atomic_support": "AMONone",
+          "misaligned_atomicity_granule_size_exp": 0,
+          "vector_misaligned_atomicity_granule_size_exp": 0,
           "reservability": "RsrvNone",
           "supports_cbo_zero": false,
           "supports_pte_read": false,
@@ -351,6 +427,8 @@
             "amo": "AccessFault"
           },
           "atomic_support": "AMONone",
+          "misaligned_atomicity_granule_size_exp": 0,
+          "vector_misaligned_atomicity_granule_size_exp": 0,
           "reservability": "RsrvNone",
           "supports_cbo_zero": false,
           "supports_pte_read": false,
@@ -390,6 +468,8 @@
             "amo": "AccessFault"
           },
           "atomic_support": "AMOCASQ",
+          "misaligned_atomicity_granule_size_exp": 4,
+          "vector_misaligned_atomicity_granule_size_exp": 4,
           "reservability": "RsrvEventual",
           "supports_cbo_zero": true,
           "supports_pte_read": true,
@@ -470,7 +550,17 @@
       "supported": true
     },
     "F": {
-      "supported": true
+      "supported": true,
+      // When to set mstatus[FS] and mstatus[SD] to 1, as a result of fflags
+      // being set. There are three options:
+      //
+      // - Fflags_Dirty_Precise: Only set FS/SD when absolutely required, because
+      //                         fflags has actually changed value.
+      // - Fflags_Dirty_Flag: Set FS/SD when the instruction sets a flag, even
+      //                      if that flag is already set.
+      // - Fflags_Dirty_Instruction: Set FS/SD when we execute an instruction that
+      //                             might set a flag, even if it actually doesn't.
+      "fflags_dirty_policy": "Fflags_Dirty_Precise"
     },
     "D": {
       "supported": true
@@ -616,6 +706,14 @@
     },
     "Zalrsc": {
       "supported": false
+    },
+    // This extension just asserts that each memory region has a MAG
+    // PMA of 16 bytes.  If you enable this you also need to ensure
+    // `misaligned_atomicity_granule_size_exp` for each coherent and
+    // cacheable main memory region is 4, otherwise you will get a
+    // config validation error.
+    "Zama16b": {
+      "supported": true
     },
     "Zawrs": {
       "supported": true,

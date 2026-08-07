@@ -128,22 +128,28 @@ change (`sys_pipe` shrank 4 bytes across one upstream bump). Measured on the
 Aug-2026 bump: 145 of 188 functions drifted this way, 1682 instruction slots,
 against only 9 functions with a genuine instruction change.
 
-**`tools/gen_decode.py` derives both literals from the tracked dump instead of
-by hand** (`make check-decode` / `make update-decode`):
+**`tools/gen_code.py` GENERATES the whole layer from the tracked dump instead of
+stating it by hand** (`make gen-code`, or `make check-decode` to regenerate and
+fail if anything moved):
 
-- `--check` resolves every site's address through the file's `Notation`
-  aliases, reads the bytes at it out of `kernel-rocq/KernelInstrs.v`, and
-  compares both the stated word and the decoded immediate. On a tree that is
-  known good it validates the tool; after a `dump-force` it *is* the worklist.
-  Run it after every re-dump.
-- `--update` rewrites the stale words, immediates and word-keyed decode-lemma
-  names (`bdec_<word>`, `cdec_<word>`), renaming a shared lemma in place only
-  when every referrer moved off it together and adding a new one beside it
-  otherwise.
-- It **refuses any site where the instruction itself changed** rather than just
-  its immediate, and lists those: they are real code changes and their proofs
-  need a human. That guard is the whole safety story — the rewrite is only ever
-  an immediate refresh, never a semantic edit.
+- The inputs are `kernel-rocq/KernelSyms.v` (addresses),
+  `kernel-rocq/KernelInstrs.v` (bytes), `tools/riscv_ast.py` (a decoder, so the
+  AST is computed rather than transcribed) and `tools/code_manifest.json` (the
+  file/prefix/width layout: which functions land in which `Code<F>.v` under
+  which lemma-name prefix). Nothing parses an existing proof.
+- The outputs are `iris/KernelDecode*.v` — one `kd_<hex>` decode fact per
+  DISTINCT instruction word the covered functions contain, plus the `ke_<hex>`
+  leaf-form expansions for the compressed load/store/ANDI/OR forms — and one
+  `iris/Code<F>.v` per covered function, holding its `kernel_text -∗ instr <sym
+  + off> <rvc> <ast>` facts named `<prefix><off>`.
+- **The check is `git diff iris/` after a regeneration.** A function whose
+  immediates merely re-encoded shows up as changed word literals and needs
+  nothing else; a function whose INSTRUCTION changed shows up as a changed
+  `ast`, and its proof needs a human. A word the decoder cannot decode is a
+  reported error naming the address, never a silent omission.
+- Adding a function to the layer means adding its manifest row, not writing a
+  `Code<F>.v` — and a hand-edit of a generated file is lost on the next
+  regeneration.
 
 The compressed jumps (`c.j`, `c.beqz`/`c.bnez`) carry relocated immediates too
 and are handled; every other compressed displacement is a stack or struct

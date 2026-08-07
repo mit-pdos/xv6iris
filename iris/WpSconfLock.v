@@ -109,7 +109,7 @@ Section WpSconfLock.
     iApply (wp_load_s_sconf_au 4 true false Φ pc rd rs1 imm m n
               (fun w => sign_extend' 64 w) (fun _ => Tc)
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [HTc] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) Tc with "[%] [] HTc")
@@ -163,7 +163,7 @@ Section WpSconfLock.
               (fun w => sign_extend' 64 w)
               (fun w => (⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝ ∗ locked γl h0)%I)
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Htok] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked γl h0) with "[%] [] Htok")
@@ -234,7 +234,7 @@ Section WpSconfLock.
               (trunc32 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5)))
               Out
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (tp_pin m !!! Regidx (mword_of_int 0 : mword 5)))
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Htok HRes Hfin] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) (locked_pre γl cpu_id) with "[%] [] Htok")
@@ -289,7 +289,7 @@ Section WpSconfLock.
     iApply (wp_load_s_sconf_au 8 cmp false Φ pc rd rs1 imm m n
               (fun w => w) (fun c => (⌜phi c⌝ ∗ T)%I)
               (⊤ ∖ ↑minstretN ∖ ↑lockN) b
-              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 data2_ext_8 Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [HT] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
@@ -420,7 +420,7 @@ Section WpSconfLock.
     iIntros "Hcg Hpc Hinstr #Hlock HT Hcont".
     iApply (wp_store_s_sconf_au 8 cmp Φ pc rs2 rs1 imm m n
               (rget m rs2) T' (⊤ ∖ ↑minstretN ∖ ↑lockN) b
-              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [HT] [Hcont]").
     { iMod ("Hlock" $! (⊤ ∖ ↑minstretN) T with "[%] [] HT")
@@ -631,23 +631,23 @@ Section WpSconfLock.
                                  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                                 (zeros' 64)) (xlen - 0 - 1) 0) = pa)
       by (rewrite Hea_pc subrange_id sign_extend'_id; reflexivity).
-    iDestruct (sr_transform strans_regime (Atomic (AMOSWAP, Data, Data))
+    iDestruct (sr_transform strans_regime (Atomic (AMOSWAP, true, false, Data, Data))
                  (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                           (zeros' 64))
-                 s_pc (or_intror (or_intror (or_intror eq_refl))) Lpriv_pc LSXL_pc
-                 (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) s_pc
+                 s_pc (or_intror (or_intror (or_intror (ex_intro _ true (ex_intro _ false eq_refl))))) Lpriv_pc LSXL_pc
+                 (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) true false s_pc
                     ltac:(rewrite Lms_pc; exact HMPRV))
-                 (exec_get_pmlen_amo_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
+                 (exec_get_pmlen_amo_S true false s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    unshelve iMod (sr_absorb strans_regime (Atomic (AMOSWAP, Data, Data)) pa (pa_of ppn pa) ppn KP_rw s_pc _
-            (or_intror (or_intror (or_intror eq_refl))) eq_refl
+    unshelve iMod (sr_absorb strans_regime (Atomic (AMOSWAP, true, false, Data, Data)) pa (pa_of ppn pa) ppn KP_rw s_pc _
+            (or_intror (or_intror (or_intror (ex_intro _ true (ex_intro _ false eq_refl))))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
-            (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) s_pc
+            (exec_effectivePrivilege_amo_S (register_lookup mstatus s_pc.(sregs)) true false s_pc
                ltac:(rewrite Lms_pc; exact HMPRV))
-            (exec_is_shadow_stack_amo s_pc)
+            (exec_is_shadow_stack_amo true false s_pc)
             Lpma_pc' Hid _ with "Hk Hreg Hmem Htr")
       as (s_tr) "(%Htr0 & %Hmdevtr & %Hshtr & %Hgr & Hreg & Hmem & Htr)"; [solve_ndisj |].
     destruct Hgr as (HA0 & Hord0 & HX & HW & HR & Hcov).
@@ -686,7 +686,7 @@ Section WpSconfLock.
     pose proof (within_sig_false (pa_of ppn pa) 4 s_tr (addr_is_ram_not_in_sig _ Hram0) ltac:(lia)) as Hws.
     pose proof (within_htif_false (pa_of ppn pa) 4 s_tr Lhtif_tr) as Hwhr.
     pose proof (within_htif_writable_false (pa_of ppn pa) 4 s_tr Lhtif_tr) as Hwhw.
-    assert (Htr_pc : exec (translateAddr (Virtaddr pa) (Atomic (AMOSWAP, Data, Data))) s_pc
+    assert (Htr_pc : exec (translateAddr (Virtaddr pa) (Atomic (AMOSWAP, true, false, Data, Data))) s_pc
                      = Some (Ok (Physaddr (pa_of ppn pa), PBMT_PMA, init_ext_ptw), s_tr)).
     { exact Htr0. }
     pose (s_x := set_reg (MState s_tr.(sregs) (write_bytes s_tr.(mem) (pa_of ppn pa) 4 (amoswap_stored (rget m rs2))) s_tr.(mdev))

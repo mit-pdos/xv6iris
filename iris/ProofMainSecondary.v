@@ -331,7 +331,7 @@ Section ProofMainSecondary.
               (fun v => sign_extend' 64 v)
               (fun v => (▷ (⌜v = started_clear⌝ ∨ main_deposit γd γv Φ))%I)
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 data2_ext_4
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(solve_ndisj) with "Hcg Hpc Hi16 []").

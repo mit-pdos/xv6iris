@@ -123,14 +123,6 @@ Lemma exec_getPendingSet_S_reduce (s : mstate)
              else None), s).
 Proof.
   intros HES Hmip Hmeip Hseip Hmie Hmdl Hms Hmm.
-  assert (Hguard : exec (or_boolM (currentlyEnabled Ext_S)
-                     (bind (read_reg mideleg)
-                        (fun w1 : mword 64 => returnM (eq_vec w1 (zeros' 64))))) s
-                   = Some (true, s)).
-  { rewrite (exec_or_boolM_Some _ _ _ _ _ HES). reflexivity. }
-  assert (Hae : exec (Defs.assert_exp' true "sys/sys_control.sail:107.58-107.59") s
-                = Some (eq_refl, s)).
-  { unfold assert_exp'. cbn match. apply exec_returnm. }
   assert (HmIEt : exec (or_boolM
             (and_boolM (returnM (generic_eq Supervisor Machine))
                (bind (read_reg mstatus)
@@ -164,15 +156,15 @@ Proof.
     destruct (eq_vec (_get_Mstatus_SIE ms_v) ('b"1")).
     - reflexivity.
     - change (generic_eq Supervisor User) with false. apply exec_returnm. }
+  (* [getPendingSet] reads mideleg only under [currentlyEnabled Ext_S] now, and
+     reads mie twice; the guard and its assert are gone. *)
   unfold getPendingSet.
-  rewrite (exec_bind_Some _ _ _ _ _ Hguard).
-  rewrite (exec_bind_Some _ _ _ _ _ Hae).
+  rewrite (exec_bind_Some _ _ _ _ _ HES). cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
   rewrite (exec_bind_Some _ _ _ _ _
             (exec_read_mip_reduce s mip_v meip seip HES Hmip Hmeip Hseip)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mie s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mie s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mideleg s)).
   rewrite (exec_bind_Some _ _ _ _ _ HmIEt).
   rewrite (exec_bind_Some _ _ _ _ _ HsIE).
   rewrite Hmie Hmdl Hmm.

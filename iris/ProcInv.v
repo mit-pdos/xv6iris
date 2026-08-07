@@ -917,6 +917,36 @@ Section ProcInv.
     iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
   Qed.
 
+  (* Borrow one fd slot AND the pid quarter at once.  A closer of a
+     descriptor needs both simultaneously -- the reference to give fileclose,
+     and the pid cell fileclose's file-system arm threads down to bread's
+     acquiresleep -- and neither of the one-at-a-time accessors can be open
+     while the other is, since each swallows the whole block.  kexit's fd loop
+     is the consumer. *)
+  Lemma proc_priv_pid_ofile (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (fd : nat) (v : mword 64) :
+    pv_ofile V !! fd = Some v ->
+    proc_priv γf pa pid V -∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗ ofile_slot γf pa fd v ∗
+    (∀ v', p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ ofile_slot γf pa fd v' -∗
+           proc_priv γf pa pid (upd_ofile V fd v')).
+  Proof.
+    iIntros (Hfd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) [%Hlen Ho]]".
+    assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
+    rewrite Hq word4_pointsto_frac_split.
+    iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
+    iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
+    iIntros (v') "Hq1 Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
+    rewrite /proc_priv /proc_priv_core /proc_ofiles.
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR "Ho".
+    { iSplitR; [iPureIntro; exact Hszb|].
+      iSplitR; [iPureIntro; exact Hbel|].
+      rewrite Hq word4_pointsto_frac_split.
+      iFrame "Hq1 Hq2 Hf Hpt Htfp Hc". }
+    iFrame "Ho". iPureIntro. rewrite length_insert. exact Hlen.
+  Qed.
+
   (* ---- the two ends of a LOAN, at the block's altitude ----
      What a syscall that must carry one of its own descriptors' references in
      a register actually does: take the block apart, lend the payload, and keep

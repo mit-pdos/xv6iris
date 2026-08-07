@@ -162,11 +162,12 @@ Lemma exec_execute_csrw_stimecmp_S (rs1 : mword 5) s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   eq_vec (_get_Counteren_TM (register_lookup mcounteren s.(sregs))) ('b"1") = true ->
   eq_vec (_get_MEnvcfg_STCE (register_lookup menvcfg s.(sregs))) ('b"1") = true ->
+  exists mp : mword 64,
   exec (execute (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW))) s
     = Some (RETIRE_SUCCESS,
-            set_reg s stimecmp
+            set_reg (set_reg s stimecmp
               (stimecmp_legalized (register_lookup stimecmp s.(sregs))
-                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
+                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))) mip mp).
 Proof.
   intros Hrs1 Hpriv HS HTM HSTCE.
   change (execute (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)))
@@ -176,6 +177,11 @@ Proof.
           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
     by (replace (Z.eqb (uint rs1) 0) with false
           by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
+  destruct (WpGprCsrwB.exec_write_CSR_stimecmp
+              (if Z.eqb (uint rs1) 0 then zero_reg
+               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)) s)
+    as [mp Hw].
+  exists mp.
   apply (exec_execute_csrw_gpr_p Supervisor csr_stimecmp rs1 s _
            (subrange_vec_dec
               (stimecmp_legalized (register_lookup stimecmp s.(sregs))
@@ -187,7 +193,7 @@ Proof.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
   - vm_compute; reflexivity.
-  - apply exec_write_CSR_stimecmp.
+  - exact Hw.
   - apply exec_csr_id_write_callback_stimecmp.
 Qed.
 
@@ -305,6 +311,13 @@ Section WpSconfTimer.
     iMod (inv_acc (⊤ ∖ ↑minstretN) timerN with "Hsinv") as "[Hbody Hclose]";
       [solve_ndisj|].
     iDestruct "Hbody" as (sc0) ">Hstc".
+    (* the CSR write runs [clint_dispatch], which refreshes mip; mip lives in
+       [clock_inv], value-agnostically, so open it here and re-seal it below *)
+    iPoseProof "Hminv" as "#Hminvc".
+    iDestruct "Hminvc" as "(_ & #Hclk & _)".
+    iMod (inv_acc (⊤ ∖ ↑minstretN ∖ ↑timerN) clockN with "Hclk") as "[Hcbody Hcloseclk]";
+      [solve_ndisj|].
+    iDestruct "Hcbody" as (c0 t0 p0) ">(Hc & Ht & Hp)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hmenv") as %Lmenv.
     iDestruct (reg_valid    with "Hreg Hstc")  as %Lstc.
@@ -334,26 +347,30 @@ Section WpSconfTimer.
     { rewrite /rget rf_lookup -Lva.
       replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
       reflexivity. }
+    destruct (exec_execute_csrw_stimecmp_S rs1 s_pc Hrs1 Lpriv_spc
+                ltac:(rewrite Lmisa_spc; exact HmisaS)
+                ltac:(rewrite Lmcen_spc; exact HTM)
+                ltac:(rewrite Lmenv_spc Hmenvval; vm_compute; reflexivity))
+      as [mp Hex].
+    rewrite Lstc_spc Lrs1 in Hex.
     iMod (reg_update _ stimecmp _ (stimecmp_legalized sc0 (rget m rs1))
             with "Hreg Hstc") as "[Hreg Hstc]".
+    iMod (reg_update _ mip _ mp with "Hreg Hp") as "[Hreg Hp]".
+    iMod ("Hcloseclk" with "[Hc Ht Hp]") as "_".
+    { iNext. iExists c0, t0, mp. iFrame "Hc Ht Hp". }
     iMod ("Hclose" with "[Hstc]") as "_".
     { iNext. iApply (stimecmp_free_intro with "Hstc"). }
     iModIntro.
-    iExists (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))).
+    iExists (set_reg (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))) mip mp).
     iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc.
-      rewrite (exec_execute_csrw_stimecmp_S rs1 s_pc Hrs1 Lpriv_spc
-                 ltac:(rewrite Lmisa_spc; exact HmisaS)
-                 ltac:(rewrite Lmcen_spc; exact HTM)
-                 ltac:(rewrite Lmenv_spc Hmenvval; vm_compute; reflexivity)).
-      rewrite Lstc_spc Lrs1. reflexivity. }
+    { iPureIntro. rewrite Hpceq. fold s_pc. exact Hex. }
     iSplitL "Hreg Hmem".
     { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
     assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))).(sregs)
+             (set_reg (set_reg s_pc stimecmp (stimecmp_legalized sc0 (rget m rs1))) mip mp).(sregs)
              = add_vec_int pc 4).
-    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    { unfold s_pc; cbn [sregs]. tmig. tmig. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iDestruct (sie_cap_gpr_join with "Hhs' [Hpriv Hmsx Hmiex Hmenv] Hcap Hfile") as "Hcg".
     { iFrame "Hhw Hminv Hpriv Hmsx Hmiex".

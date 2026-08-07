@@ -50,9 +50,15 @@ Proof.
   - assert (H : check_CSR_priv csr_menvcfg Machine = returnM true) by (vm_compute; reflexivity).
     rewrite H. apply exec_returnm.
   - vm_compute; reflexivity.
-  - assert (Hacceq : is_CSR_accessible csr_menvcfg Machine CSRRead = currentlyEnabled Ext_U)
+  - (* menvcfg's gate is now Ext_U AND the xenvcfg-CSRs-exist config predicate *)
+    assert (Hacceq : is_CSR_accessible csr_menvcfg Machine CSRRead
+                     = Defs.and_boolM ((currentlyEnabled Ext_U) : M bool)
+                                      (returnM xenvcfg_csrs_are_defined))
       by csr_dispatch_eq.
-    rewrite Hacceq. apply (exec_currentlyEnabled_U s HU).
+    rewrite Hacceq.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_currentlyEnabled_U s HU)). cbn match.
+    replace xenvcfg_csrs_are_defined with true by (vm_compute; reflexivity).
+    apply exec_returnm.
   - assert (H : stateen_allows_CSR_access csr_menvcfg Machine CSRRead = returnM true)
       by (vm_compute; reflexivity).
     rewrite H. apply exec_returnm.

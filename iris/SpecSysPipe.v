@@ -111,6 +111,14 @@ Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import PipeInv.
 Require Import SpecFdalloc.
+Require Import SchedCtx.
+Require Import WpUart.
+Require Import DiskPtsto DiskInv.
+Require Import BioInv.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import SpecIput.
+Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -118,9 +126,10 @@ Local Open Scope Z_scope.
 
 
 (* sys_pipe's own frame is 8 slots (c.addi16sp sp,-64).  Below it: copyout
-   wants 50, pipealloc 24, argaddr 18, fileclose 18, fdalloc 14, myproc 10 --
-   so copyout sets the bound. *)
-Definition sys_pipe_stack : nat := 58%nat.
+   wants 74, fileclose 68, copyout 50, argaddr 18, fdalloc 14, myproc 10 --
+   so pipealloc sets the bound, and what makes pipealloc the deepest is the
+   fileclose on its own error path. *)
+Definition sys_pipe_stack : nat := 82%nat.
 
 Section SpecSysPipe.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
@@ -151,8 +160,10 @@ Section SpecSysPipe.
 End SpecSysPipe.
 
 Definition wp_sys_pipe_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
+    (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
   (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
@@ -183,6 +194,15 @@ Definition wp_sys_pipe_sconf_body
   (* the syscall's own allowance -- two references may be live in locals
      before they reach descriptors.  Both come back. *)
   fd_slot -∗ fd_slot -∗
+  (* THE CLOSING ENVIRONMENT.  sys_pipe closes files it took back out of the
+     fd table, and [ProcInv.ofile_slot] quantifies their contents -- so, like
+     sys_close, it carries both of fileclose's bundles and hands over
+     whichever the type selects ([SpecFileclose.fileclose_env_frame]).  That
+     it only ever closes pipes is true and unusable: the knowledge of what a
+     descriptor names is going to be per-[ofile] ghost state, not something
+     recoverable from the file table. *)
+  fileclose_pipe_env Φ fn on 0%nat -∗
+  fileclose_fs_env Φ fn 0%nat eb p -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -192,14 +212,20 @@ Definition wp_sys_pipe_sconf_body
       pc_is ret_tgt -∗
       sys_pipe_post γf p pid (upd_upt V P')
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      (* the environment back; the page count has moved if either close was
+         the pipe's last end *)
+      (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
+      fileclose_fs_env Φ fn 0%nat eb p -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
+      (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
-      wp_sys_pipe_sconf_body γa Φ γfl γf m av eb p C v pid V b.
+      wp_sys_pipe_sconf_body γa Φ γfl γf fn on m av eb p C v pid V b.
 End SYSPIPE.

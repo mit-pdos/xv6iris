@@ -166,6 +166,7 @@ Proof.
     by (apply kmap_class_rw; right; exact Hdevvpn).
   iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
   pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
+  iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
   unshelve iMod (sr_absorb strans_regime (Store Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
           (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc _
           (or_intror (or_intror (or_introl eq_refl))) eq_refl Hcanon ltac:(reflexivity)
@@ -196,7 +197,8 @@ Proof.
   { rewrite (exec_execute_STORE_4_gpr_S_walk_dev rs2 rs1 imm region_st s_pc s_tr d'
                Htea
                ltac:(rewrite !Lva; exact Halign)
-               ltac:(cbn [bits_of_virtaddr]; rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Htr0)
+               md0 Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
+               ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Htr0)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
                HA1 Hord1
                ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; apply plic_pmp_match4; [exact Hrange | exact Hcov1])
@@ -284,9 +286,8 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
     (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
-  let ldval := fun (v : bv 32) =>
-        (extend_value is_unsigned
-           (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) v) : mword 64) in
+  (* the vmem level hands back the value itself now, not the split accumulator *)
+  let ldval := fun (v : mword (8*4)) => (extend_value is_unsigned v : mword 64) in
   (plic_base <= uint a8 < plic_base + plic_size)%Z ->
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
@@ -369,6 +370,7 @@ Proof.
     by (apply kmap_class_rw; right; exact Hdevvpn).
   iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
   pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
+  iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
   unshelve iMod (sr_absorb strans_regime (Load Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
           (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc _
           (or_intror (or_introl eq_refl)) I Hcanon ltac:(reflexivity)
@@ -402,7 +404,8 @@ Proof.
     apply (exec_execute_LOAD_4_gpr_S_walk_dev rs1 rd imm is_unsigned v d' region_ld s_pc s_tr
              Hrd Htea
              ltac:(rewrite !Lva; exact Halign)
-             ltac:(cbn [bits_of_virtaddr]; rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Htr0)
+             md0 Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
+             ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; exact Htr0)
              Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
              HA1 Hord1
              ltac:(rewrite !Lva; change (0 * 4)%Z with 0%Z; rewrite !avi0 zero_extend'_id; apply plic_pmp_match4; [exact Hrange | exact Hcov1])
