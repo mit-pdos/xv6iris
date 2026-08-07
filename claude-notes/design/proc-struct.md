@@ -585,7 +585,11 @@ the block, so a syscall could not hold its allowance and still pass
   and its updaters, `proc_fields`, `pname_cells`, `ofile_cells`, `ofile_slot`
   (+ `ofile_slot_null` / `ofile_slot_file`), `proc_ofiles`, `cwd_ref`,
   **`proc_priv`**, its projections (`proc_priv_pid`, `proc_priv_ofile`,
-  `proc_priv_ofile_read`, `proc_priv_pid_agree`), **`proc_dormant`** +
+  `proc_priv_ofile_read`, `proc_priv_pid_agree`, `proc_priv_cwd`, and
+  `proc_priv_cwd_pid` — the cwd cell, its `cwd_ref` and the pid quarter
+  handed out TOGETHER, because each single accessor swallows the whole block
+  and kexit needs both at once: `begin_op`/`iput`/`end_op` each want the pid
+  cell, and the cwd cell has to stay out across all three), **`proc_dormant`** +
   `proc_dormant_to_priv`, and `is_kstack`.  Plus, from allocproc: the one
   producer `proc_priv_intro` (+ `upd_pt`), `tf_page_of_page_own` (kalloc's
   page IS a trapframe page), the `ctx_cells` ⇄ byte-buffer accessor

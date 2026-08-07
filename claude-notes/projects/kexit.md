@@ -10,14 +10,31 @@ protocol this extends).
 
 ## Status
 
-**The contract and the protocol it needed are LANDED; the whole-function proof
-is NOT written.** What compiles today:
+**kexit IS PROVEN — `ProofKexit.v` declares no `Axiom` and contains no
+`admit` — but it is NOT LINKED, and cannot be until `fileclose` has a
+proof.** (What the *cone* will assume once linked is what its callees
+assume: iput via `LinkIput.v`, plus panic. The proof file itself adds
+nothing.) `proof_coverage.py`
+therefore still prints `~ kexit … assumed`: its rule is "proven once a
+`Link*.v` instantiates the functor sealed by its `Module Type`", and
+`LinkFileclose.v` does not exist. This is the same state `sys_pipe` is in,
+for the same one missing callee — see
+[`sys-pipe.md`](sys-pipe.md). Nothing about kexit is left to do; the next
+move on this cone is file.c's `fileclose` (194 bytes, no `CodeFileclose.v`
+yet), after which **one** `LinkKexit.v` closes both.
 
-- `SpecKexit.v` — the contract (below). No `Proof`/`Link` file yet, so
-  `proof_coverage.py` still reports kexit as untouched, and that is honest.
+What compiles today:
+
+- `SpecKexit.v` — the contract (below).
+- `ProofKexit.v` — the whole function, a functor over MYPROC / FILECLOSE /
+  BEGIN_OP / IPUT / END_OP / ACQUIRE / REPARENT / WAKEUP / RELEASE / SCHED,
+  sealed by `KEXIT`. Four block lemmas (`kx_prologue`, `kx_loop`, `kx_park`,
+  `kx_rest`) and the capstone; see "the proof, as it landed" below.
 - `SpecIput.v` / `LinkIput.v` — iput ASSUMED, the sanctioned pattern
   (balloc / writei / fileclose). One `Axiom`, isolated so that proving iput
   later replaces exactly one file.
+- `ProcInv.proc_priv_cwd_pid`, which the proof forced — see below.
+
 - **The ZOMBIE park**, which is the part that could not be worked around: see
   the next section. `ProcGeom.park_ok`, `SchedCtx.park_pay` /
   `proc_slots_park_gen` / `proc_ctx_cells`, `ProcInv.proc_dormant_noctx` /
@@ -29,6 +46,14 @@ is NOT written.** What compiles today:
   `ProcGeom.p_ofile_end` / `p_ofile_end_inj` (the ofile scan's exit test),
   and the `p_state_sext` / `p_xstate_sext` / `p_cwd_sext` displacement
   bridges for the base-encoded stores kexit is the first to use.
+
+**kwait is a different matter, and its worklist is elsewhere:**
+[`proc-struct-resources.md`](proc-struct-resources.md) item **S10**.  Six of
+`ProofKwait.v`'s seven blocks are green; `kw_round` (the outer `iLöb`), the
+prologue and `wp_kwait_sconf` are not, so there is no `LinkKwait.v` either —
+and that one is blocked on nothing external, all seven of kwait's callees
+being proven and linked.  S10 also records the obstacle the outer loop is
+stuck on, so do not re-derive it here.
 
 ## The one thing that was not expressible: parking at ZOMBIE
 
@@ -107,7 +132,7 @@ arm ran. With no inode model in the tree, anything more would be invented
 vocabulary in a contract nobody can yet check — and the one thing an assumed
 contract must not do is claim more than the code delivers.
 
-## What remains: `ProofKexit.v`
+## The proof, as it landed
 
 The instruction map, read off the image (`kexit` @ `0x8000201c`, 166 bytes,
 fifty instructions). The frame is six slots and its prologue is
@@ -129,31 +154,59 @@ only the register the argument is parked in differs (`s4`, not `s2`).
 | `+0x8a..+0x96` | `release(&wait_lock)` / `sched()` |
 | `+0x9a..+0xa2` | `panic("zombie exit")` |
 
-Four things to plan for:
+`ProofKexit.v` is four block lemmas plus the capstone, in the ProofKwait
+shape (one `Qed` per block, so each releases its own proof term):
+`kx_prologue` (`+0x00..+0x10`, fixed `CID` — no call in it), `kx_loop`
+(`+0x3e`/`+0x38`), `kx_park` (`+0x60..+0xa2`), `kx_rest` (`+0x4c..+0x5c`,
+which ends by applying `kx_park`), and `wp_kexit_sconf` (prologue, myproc,
+the initproc test, and the loop with `kx_rest` as its exit continuation).
+Budget: `K_kexit = 66` and the prologue spends 6, so every callee sees
+exactly `60 = K_iput`, the deepest of them.
+
+Six things it turned on:
 
 1. **The loop is HART-GENERIC.** It runs at level 0 with `eb = true`, so the
    `jal fileclose` may trap and resume the thread on another hart: the loop
-   statement needs its own `CID` binder and the `wp_next_chain` /
-   `cpu_next_transport` bookkeeping every b-generic call site uses
-   (`ProofSysDup.v` is the compact worked example; `ProofReparent.v`'s scan is
-   the same shape one level up).
+   statement carries its own `CID0` binder and every crossing goes through
+   `wp_next_chain` / `cpu_own_transport`, exactly as `ProofReparent.rp_loop`
+   does. Below the first `acquire`, by contrast, the lock is HELD and the
+   index is the literal `false`, so leaves *and callees* collapse through
+   `wp_next_off_intro` — reparent's and wakeup's whole calls included.
 2. **The loop's exit test is an ADDRESS comparison, not a counter** — unlike
    fdalloc's. `p_ofile_end` (`&p->ofile[NOFILE]` IS `&p->cwd`) and
-   `p_ofile_end_inj` are already proven for it; the induction is downward on
-   `NOFILE - fd` with the invariant "`pv_ofile V !! i = Some 0` for every
-   `i < fd`".
+   `p_ofile_end_inj` do it; the induction is downward on `NOFILE - fd` with
+   the invariant `kx_nulled fd V` ("`pv_ofile V !! i = Some 0` for every
+   `i < fd`"), and `kx_nulled_all` turns the `fd = NOFILE` case into the
+   `replicate NOFILE 0` the ZOMBIE park wants.
 3. **Each iteration is a conservation step, not a loss.** The descriptor's
    `file_ref` goes to fileclose, which returns exactly one `fd_slot`, which is
    what the emptied `ofile_slot` owns (`ProcInv.ofile_slot_null`). The
-   `beqz`-taken arm skips a slot that is already null and owns its unit
-   already.
+   `beqz`-taken arm skips a slot that is already null, owns its unit already,
+   and puts the slot back unchanged (`ProcInv.upd_ofile_id`).
 4. **The park is yield's, with two differences**: the state constant, and the
-   `park_pay` argument — `proc_priv_to_dormant_zombie` (plus the `FDSPARE`
-   allowance) is the whole of it, and it is a repackaging with no side
-   condition. Everything else — `scheds_take` before the `jal sched`, the
-   `cpu_own` slot emptied with `cpu_own_ctx_take`, the trap-CSR accounting
-   across the two acquires and the interior release — is `ProofYield.v`
-   verbatim. The post-sched continuation is discharged by `panic_wp_any`.
+   `park_pay` argument — `SpecKexit.kexit_park_pay` (i.e.
+   `proc_priv_to_dormant_zombie` plus the `FDSPARE` allowance) is the whole of
+   it, and it is a repackaging with no side condition. Everything else —
+   `scheds_take` before the `jal sched`, the `cpu_own` slot emptied with a
+   local copy of yield's `cpu_own_ctx_take`, the trap-CSR accounting across
+   the two acquires and the interior release — is `ProofYield.v` verbatim.
+   The post-sched continuation is discharged by `panic_wp_any`.
+5. **NO EPILOGUE MEANS THE FRAME IS EXISTENTIAL.** Nothing ever reloads the
+   six saved registers and nothing ever pops the six stack slots, so
+   `kx_frame spF` quantifies the saved values away instead of naming them
+   (reparent's `rp_frame` has to name all six because its epilogue restores
+   them). That in turn means the frame does not have to be threaded through
+   the loop at all: it is captured in the exit-continuation closure the
+   caller builds with `[-]`, and is finally dropped into `panic_wp_any` with
+   everything else. Same for `own_ctx` and `park_hlf` — the whole difference
+   between this park and yield's is that the resume never happens.
+6. **`ProcInv.proc_priv_cwd_pid` had to exist.** `begin_op`, `iput` and
+   `end_op` each take `p_pid pj ↦₄{dq} _`, and the cwd cell has to stay out
+   across all three — it is read at `+0x50` and cleared at `+0x5c`, and
+   `+0x5c` is the FIRST moment `cwd_ref` can be re-supplied
+   (`ProcInv.cwd_ref_null`). `proc_priv_cwd` and `proc_priv_pid` each swallow
+   the whole block, so they do not nest; the conjunction of the two is a
+   lemma, proved once, next to them. sys_chdir will want the same pair.
 
 ## The boot gap this leaves
 

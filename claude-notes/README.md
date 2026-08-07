@@ -164,17 +164,23 @@ are working on that effort — the relevant `projects/` file.
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
 - **[`kexit.md`](projects/kexit.md)** — `kexit()`, the process-lifetime cone's
-  other half (kwait reclaims a zombie; kexit makes one). The CONTRACT and the
-  protocol change it needed are landed, the whole-function proof is not.
-  The change is the interesting part: parking at ZOMBIE is a different kind
-  of park, because a zombie's private block cannot ride the parked closure —
-  wait()/freeproc, running on another process, must find the user page table
-  in `p->lock`. So the crossing carries the block MINUS its context cells
-  (`ProcInv.proc_dormant_noctx`) and the reclaiming scheduler puts the two
-  back together (`SchedCtx.park_pay` / `proc_slots_park_gen`), FORGETTING the
-  zombie's record down to its cells rather than claiming it resumable. Also:
+  other half (kwait reclaims a zombie; kexit makes one). **PROVEN** —
+  `ProofKexit.v`, no `Axiom` and no `admit` of its own — **but NOT LINKED**, and it
+  cannot be until file.c's `fileclose` has a proof, which is the same single
+  callee `sys_pipe` waits on; until then `proof_coverage.py` prints it
+  `assumed`. The protocol change it needed is the interesting part: parking
+  at ZOMBIE is a different kind of park, because a zombie's private block
+  cannot ride the parked closure — wait()/freeproc, running on another
+  process, must find the user page table in `p->lock`. So the crossing
+  carries the block MINUS its context cells (`ProcInv.proc_dormant_noctx`)
+  and the reclaiming scheduler puts the two back together
+  (`SchedCtx.park_pay` / `proc_slots_park_gen`), FORGETTING the zombie's
+  record down to its cells rather than claiming it resumable. Also:
   `SpecIput.v` (assumed, one isolated axiom), the diverging-contract shape,
-  and a phase map for the proof that remains.
+  why having no epilogue makes the frame existential and keeps it out of the
+  loop, and `ProcInv.proc_priv_cwd_pid` (the accessor the three FS calls
+  forced). kwait's own worklist is item S10 of
+  [`proc-struct-resources.md`](projects/proc-struct-resources.md), not here.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a

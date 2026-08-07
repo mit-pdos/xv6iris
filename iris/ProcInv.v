@@ -712,6 +712,47 @@ Section ProcInv.
     iExact "Hc".
   Qed.
 
+  (* THE WORKING DIRECTORY AND THE PID QUARTER TOGETHER, because kexit needs
+     both AT ONCE and neither single accessor will do: [begin_op], [iput] and
+     [end_op] each take [p_pid pa ↦₄{dq} _] (bread's acquiresleep records it),
+     while the cwd cell has to stay out across all three -- from the
+     [ld a0,336(s3)] that reads the pointer iput destroys to the
+     [sd x0,336(s3)] that clears it, which is the first moment [cwd_ref] can
+     be re-supplied ([cwd_ref_null]).  Each of [proc_priv_cwd] and
+     [proc_priv_pid] consumes the whole block, so they do not nest; this is
+     their conjunction, proved once.  sys_chdir wants the same pair. *)
+  Lemma proc_priv_cwd_pid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    p_cwd pa ↦₈ pv_cwd V ∗ cwd_ref (pv_cwd V) ∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
+    (∀ v' : mword 64,
+       p_cwd pa ↦₈ v' -∗ cwd_ref v' -∗ p_pid pa ↦₄{DfracOwn (1/4)} pid -∗
+       proc_priv γf pa pid (upd_cwd V v')).
+  Proof.
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
+    rewrite Hq word4_pointsto_frac_split.
+    iDestruct "Hpid" as "[Hq1 Hq2]".
+    iSplitL "Hcwd"; [iExact "Hcwd"|].
+    (* [cwd_ref] is [emp] today, so [iFrame] cannot MATCH the normalised
+       hypothesis against the goal's folded [cwd_ref _] -- see
+       [proc_priv_cwd]. *)
+    iSplitL "Hc"; [iExact "Hc"|].
+    iSplitL "Hq1"; [iExact "Hq1"|].
+    iIntros (v') "Hcwd Hc Hq1".
+    rewrite /proc_priv /proc_priv_core /proc_fields.
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR "Ho"; [| iExact "Ho"].
+    iSplitR; [done|]. iSplitR; [done|].
+    rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iSplitL "Hpt"; [iExact "Hpt"|].
+    iSplitL "Htfp"; [iExact "Htfp"|].
+    iExact "Hc".
+  Qed.
+
   (* "no working directory" owes no reference.  A LEMMA rather than a
      [rewrite /cwd_ref] at the call site, because it is exactly the fact the
      real predicate will have to keep: a null [p->cwd] names no inode. *)
