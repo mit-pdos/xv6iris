@@ -381,6 +381,33 @@ Three mechanical substitutions, ~95 LR/SC sites and ~46 AMO sites:
    `mem_read` result is `Err (paddr, e)`, not `Err e`. Only the LR/SC/AMO
    denial arms state one, so this rides along with (2).
 
+Three more per-lemma details, each of which costs a compile to discover:
+
+- **`u_acc`'s LR/SC/AMO arms QUANTIFY aq/rl** now, so a witness is
+  `or_intror (… (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl))))`, not a
+  bare `or_introl eq_refl`. 12 sites; a textual substitution does them.
+- **`mem_read_priv_meta` no longer guards on alignment** — it only dispatches
+  on the `(aq, rl, res)` triple. So the `rewrite Halign; cbn [not negb orb
+  andb]` that opened every `exec_mem_read_*` wrapper goes away, and what is
+  left is `destruct aq; [destruct rl|]; cbn match`. (None of the three triples
+  the LR flags can form is one of the two unimplemented ones:
+  `andb false rl` is `false`, so `(false, true, true)` is unreachable.)
+- **The `_disj` composers need the vmem level's THREE shared moves** (see
+  "Two more model deltas" and the `md Hcps Hmprvs Htm Htr` recipe): the vmem
+  level resolves the effective privilege AND its translation mode before the
+  access, so `exec_vmem_read_addr_lr_disj` and its siblings grow a `md`
+  parameter and an `exec (translationMode …)` premise. A section that already
+  carries `Hcp`/`Hmprv`/`HSXL` should DERIVE it rather than grow hypotheses.
+
+The bulk substitutions that are already applied to `UserMemClassify.v`:
+`LoadReserved Data` → `LoadReserved (aq, rl, Data)` (43 sites),
+`StoreConditional Data` → `StoreConditional (aq, rl, Data)` (46), and the
+`u_acc` witnesses (12).  Every LR/SC lemma in the file is already
+`(aq rl : bool)`-parameterized, which is what makes them safe as textual
+substitutions.  DONE and green: `exec_checked_mem_read_lr_g4`/`_g8` and
+`exec_mem_read_lr_g4`/`_g8` -- the build now stops in `LRComposersG`
+(`user_pt_vmem_read_addr_lr_g4`, ~line 3032).
+
 Everything else those lemmas need already exists:
 `exec_pmpCheck_user_grant_lr` / `_sc` (already aq/rl-generic in
 `UserMemAccess`), `exec_read_ram_resv_kinds_1/2/4/8/16` (in the file),

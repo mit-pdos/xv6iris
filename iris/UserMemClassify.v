@@ -2681,36 +2681,81 @@ Lemma exec_checked_mem_read_lr_g4 (aq rl : bool) (pbmt : page_based_mem_type) (a
   exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s) ->
   dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (checked_mem_read (LoadReserved Data) pbmt User (Physaddr addr) 4 aq (andb aq rl) true false) s
+  exec (checked_mem_read (LoadReserved (aq, rl, Data)) pbmt User (Physaddr addr) 4
+          aq (andb aq rl) true false) s
     = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-             then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s).
+             then Ok (w, default_meta)
+             else Err (Physaddr addr, E_Load_Access_Fault tt)), s).
 Proof.
   intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes.
-  unfold checked_mem_read.
-  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
-  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 4 true) s = Some (None, s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 4 s HA Hord Hrange HR)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 4 addr pbmt region s Hmatch Halign Hread)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
+  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability)
+              RsrvNone) eqn:Hr.
+  - (* the region is reservable: the LR retires *)
+    assert (Hcp : exec (check_pma_with_pmp_priority (LoadReserved (aq, rl, Data)) pbmt User
+                          (Physaddr addr) 4 true) s = Some (Ok pma_ok_aligned, s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmaCheck_ram_lr_ok 4 addr pbmt region aq rl s Hmatch Halign
+                    ltac:(rewrite Hread; rewrite Hr; reflexivity))).
+      cbn match. apply exec_returnM. }
     assert (Hrk : exists rk, exec (read_kind_of_flags aq (andb aq rl) true) s = Some (rk, s) /\
-                    (rk = rv64d_types.Read_RISCV_reserved \/ rk = rv64d_types.Read_RISCV_reserved_acquire \/ rk = rv64d_types.Read_RISCV_reserved_strong_acquire)).
+                    (rk = rv64d_types.Read_RISCV_reserved \/
+                     rk = rv64d_types.Read_RISCV_reserved_acquire \/
+                     rk = rv64d_types.Read_RISCV_reserved_strong_acquire)).
     { destruct aq; [ destruct rl |]; unfold read_kind_of_flags; cbn match;
         eexists; (split; [ apply exec_returnM | tauto ]). }
     destruct Hrk as (rk & Hrke & Hrkv).
-    rewrite (exec_bind_Some _ _ _ _ _ Hrke).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resv_kinds_4 rk addr w s Hrkv Hdev Hbytes)).
-    apply exec_returnM.
-  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 4 true) s
-                   = Some (Some (E_Load_Access_Fault tt), s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 4 s HA Hord Hrange HR)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 4 addr pbmt region s Hmatch Halign Hread)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    cbn match. apply exec_returnM.
+    unfold checked_mem_read. rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+    rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+    rewrite pma_ok_aligned_splittable. rewrite pma_ok_aligned_granule.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 4 0 s)). cbn beta.
+    rewrite misaligned_order_1. cbn zeta.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hrke). cbn beta.
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+    { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr addr)) with addr.
+      assert (Havi : add_vec_int addr (0 * 4) = addr)
+        by (change (0 * 4)%Z with 0%Z; apply avi0).
+      rewrite Havi.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                 (exec_pmpCheck_user_grant_lr aq rl addr 4 s HA Hord Hrange HR)).
+      cbn beta. cbn match.
+      match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+        assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+      { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+        rewrite execR_liftR. rewrite Hmmio. reflexivity. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+      match goal with
+        |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk0 ?pa ?wd ?mt)) ?k1) _] =>
+        assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk0 pa wd mt)) k1) s
+                      = Some (inr w, s)) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _
+                   (exec_read_ram_resv_kinds_4 rk addr w s Hrkv Hdev Hbytes)).
+        cbn beta match. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+      rewrite autocast_id. rewrite usvd_zeros_full_32.
+      apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+    rewrite autocast_id. rewrite execR_returnR. reflexivity.
+  - (* the region is not reservable: pmaCheck denies, pmpCheck grants, so the
+       PMA exception is the one that survives the priority rule *)
+    assert (Hcp : exec (check_pma_with_pmp_priority (LoadReserved (aq, rl, Data)) pbmt User
+                          (Physaddr addr) 4 true) s
+                  = Some (Err (E_Load_Access_Fault tt), s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmaCheck_ram_lr_deny 4 addr pbmt region aq rl s Hmatch
+                    ltac:(rewrite Hread; rewrite Hr; reflexivity))).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmpCheck_user_grant_lr aq rl addr 4 s HA Hord Hrange HR)).
+      cbn match. apply exec_returnM. }
+    unfold checked_mem_read. rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+    rewrite execR_bind. rewrite execR_early_ret. cbn match. reflexivity.
 Qed.
 
 Lemma exec_checked_mem_read_lr_g8 (aq rl : bool) (pbmt : page_based_mem_type) (addr : mword 64)
@@ -2728,36 +2773,81 @@ Lemma exec_checked_mem_read_lr_g8 (aq rl : bool) (pbmt : page_based_mem_type) (a
   exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s) ->
   dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (checked_mem_read (LoadReserved Data) pbmt User (Physaddr addr) 8 aq (andb aq rl) true false) s
+  exec (checked_mem_read (LoadReserved (aq, rl, Data)) pbmt User (Physaddr addr) 8
+          aq (andb aq rl) true false) s
     = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-             then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s).
+             then Ok (w, default_meta)
+             else Err (Physaddr addr, E_Load_Access_Fault tt)), s).
 Proof.
   intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes.
-  unfold checked_mem_read.
-  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
-  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 8 true) s = Some (None, s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 8 s HA Hord Hrange HR)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 8 addr pbmt region s Hmatch Halign Hread)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    rewrite (exec_bind_Some _ _ _ _ _ Hmmio).
+  destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability)
+              RsrvNone) eqn:Hr.
+  - (* the region is reservable: the LR retires *)
+    assert (Hcp : exec (check_pma_with_pmp_priority (LoadReserved (aq, rl, Data)) pbmt User
+                          (Physaddr addr) 8 true) s = Some (Ok pma_ok_aligned, s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmaCheck_ram_lr_ok 8 addr pbmt region aq rl s Hmatch Halign
+                    ltac:(rewrite Hread; rewrite Hr; reflexivity))).
+      cbn match. apply exec_returnM. }
     assert (Hrk : exists rk, exec (read_kind_of_flags aq (andb aq rl) true) s = Some (rk, s) /\
-                    (rk = rv64d_types.Read_RISCV_reserved \/ rk = rv64d_types.Read_RISCV_reserved_acquire \/ rk = rv64d_types.Read_RISCV_reserved_strong_acquire)).
+                    (rk = rv64d_types.Read_RISCV_reserved \/
+                     rk = rv64d_types.Read_RISCV_reserved_acquire \/
+                     rk = rv64d_types.Read_RISCV_reserved_strong_acquire)).
     { destruct aq; [ destruct rl |]; unfold read_kind_of_flags; cbn match;
         eexists; (split; [ apply exec_returnM | tauto ]). }
     destruct Hrk as (rk & Hrke & Hrkv).
-    rewrite (exec_bind_Some _ _ _ _ _ Hrke).
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resv_kinds_8 rk addr w s Hrkv Hdev Hbytes)).
-    apply exec_returnM.
-  - assert (Hpac : exec (phys_access_check (LoadReserved Data) pbmt User (Physaddr addr) 8 true) s
-                   = Some (Some (E_Load_Access_Fault tt), s)).
-    { unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr addr 8 s HA Hord Hrange HR)).
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_g 8 addr pbmt region s Hmatch Halign Hread)).
-      rewrite Hr. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ Hpac).
-    cbn match. apply exec_returnM.
+    unfold checked_mem_read. rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+    rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+    rewrite pma_ok_aligned_splittable. rewrite pma_ok_aligned_granule.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)). cbn beta.
+    rewrite misaligned_order_1. cbn zeta.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hrke). cbn beta.
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+      assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+    { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr addr)) with addr.
+      assert (Havi : add_vec_int addr (0 * 8) = addr)
+        by (change (0 * 8)%Z with 0%Z; apply avi0).
+      rewrite Havi.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                 (exec_pmpCheck_user_grant_lr aq rl addr 8 s HA Hord Hrange HR)).
+      cbn beta. cbn match.
+      match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+        assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+      { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+        rewrite execR_liftR. rewrite Hmmio. reflexivity. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+      match goal with
+        |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk0 ?pa ?wd ?mt)) ?k1) _] =>
+        assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk0 pa wd mt)) k1) s
+                      = Some (inr w, s)) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _
+                   (exec_read_ram_resv_kinds_8 rk addr w s Hrkv Hdev Hbytes)).
+        cbn beta match. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+      rewrite autocast_id. rewrite usvd_zeros_full_64.
+      apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+    rewrite autocast_id. rewrite execR_returnR. reflexivity.
+  - (* the region is not reservable: pmaCheck denies, pmpCheck grants, so the
+       PMA exception is the one that survives the priority rule *)
+    assert (Hcp : exec (check_pma_with_pmp_priority (LoadReserved (aq, rl, Data)) pbmt User
+                          (Physaddr addr) 8 true) s
+                  = Some (Err (E_Load_Access_Fault tt), s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmaCheck_ram_lr_deny 8 addr pbmt region aq rl s Hmatch
+                    ltac:(rewrite Hread; rewrite Hr; reflexivity))).
+      cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmpCheck_user_grant_lr aq rl addr 8 s HA Hord Hrange HR)).
+      cbn match. apply exec_returnM. }
+    unfold checked_mem_read. rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+    rewrite execR_bind. rewrite execR_early_ret. cbn match. reflexivity.
 Qed.
 
 Lemma exec_mem_read_lr_g4 (aq rl : bool) (pbmt : page_based_mem_type) (addr : mword 64)
@@ -2777,24 +2867,26 @@ Lemma exec_mem_read_lr_g4 (aq rl : bool) (pbmt : page_based_mem_type) (addr : mw
   (forall j : nat, (N.of_nat j < 4)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (mem_read (LoadReserved Data) pbmt (Physaddr addr) 4 aq (andb aq rl) true) s
+  exec (mem_read (LoadReserved (aq, rl, Data)) pbmt (Physaddr addr) 4 aq (andb aq rl) true) s
     = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-             then Ok w else Err (E_Load_Access_Fault tt)), s).
+             then Ok w else Err (Physaddr addr, E_Load_Access_Fault tt)), s).
 Proof.
   intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes Hmprv Hpriv.
   unfold mem_read.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (LoadReserved Data) _ _ s Hmprv)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (LoadReserved (aq, rl, Data)) _ _ s Hmprv)).
   rewrite Hpriv. unfold mem_read_priv.
   assert (Hcmr := exec_checked_mem_read_lr_g4 aq rl pbmt addr region w s HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes).
-  assert (Hmrpm : exec (mem_read_priv_meta (LoadReserved Data) pbmt User (Physaddr addr) 4 aq (andb aq rl) true false) s
+  assert (Hmrpm : exec (mem_read_priv_meta (LoadReserved (aq, rl, Data)) pbmt User (Physaddr addr) 4 aq (andb aq rl) true false) s
                  = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-                          then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s)).
+                          then Ok (w, default_meta) else Err (Physaddr addr, E_Load_Access_Fault tt)), s)).
+  (* [mem_read_priv_meta] no longer guards on alignment: it only dispatches on
+     the (aq, rl, res) triple, and none of the three the LR flags can form is
+     one of the two unimplemented ones. *)
   { unfold mem_read_priv_meta.
-    destruct aq; [ destruct rl |];
-      (rewrite Halign; cbn [Riscv.rv64d.not negb orb andb]; cbn match;
-       rewrite (exec_bind_Some _ _ _ _ _ Hcmr);
+    destruct aq; [ destruct rl |]; cbn match;
+      (rewrite (exec_bind_Some _ _ _ _ _ Hcmr);
        destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone);
        cbn match; apply exec_returnM). }
   rewrite (exec_bind_Some _ _ _ _ _ Hmrpm).
@@ -2819,24 +2911,26 @@ Lemma exec_mem_read_lr_g8 (aq rl : bool) (pbmt : page_based_mem_type) (addr : mw
   (forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (mem_read (LoadReserved Data) pbmt (Physaddr addr) 8 aq (andb aq rl) true) s
+  exec (mem_read (LoadReserved (aq, rl, Data)) pbmt (Physaddr addr) 8 aq (andb aq rl) true) s
     = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-             then Ok w else Err (E_Load_Access_Fault tt)), s).
+             then Ok w else Err (Physaddr addr, E_Load_Access_Fault tt)), s).
 Proof.
   intros HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes Hmprv Hpriv.
   unfold mem_read.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (LoadReserved Data) _ _ s Hmprv)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (LoadReserved (aq, rl, Data)) _ _ s Hmprv)).
   rewrite Hpriv. unfold mem_read_priv.
   assert (Hcmr := exec_checked_mem_read_lr_g8 aq rl pbmt addr region w s HA Hord Hrange HR Hmatch Halign Hread Hmmio Hdev Hbytes).
-  assert (Hmrpm : exec (mem_read_priv_meta (LoadReserved Data) pbmt User (Physaddr addr) 8 aq (andb aq rl) true false) s
+  assert (Hmrpm : exec (mem_read_priv_meta (LoadReserved (aq, rl, Data)) pbmt User (Physaddr addr) 8 aq (andb aq rl) true false) s
                  = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
-                          then Ok (w, default_meta) else Err (E_Load_Access_Fault tt)), s)).
+                          then Ok (w, default_meta) else Err (Physaddr addr, E_Load_Access_Fault tt)), s)).
+  (* [mem_read_priv_meta] no longer guards on alignment: it only dispatches on
+     the (aq, rl, res) triple, and none of the three the LR flags can form is
+     one of the two unimplemented ones. *)
   { unfold mem_read_priv_meta.
-    destruct aq; [ destruct rl |];
-      (rewrite Halign; cbn [Riscv.rv64d.not negb orb andb]; cbn match;
-       rewrite (exec_bind_Some _ _ _ _ _ Hcmr);
+    destruct aq; [ destruct rl |]; cbn match;
+      (rewrite (exec_bind_Some _ _ _ _ _ Hcmr);
        destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone);
        cbn match; apply exec_returnM). }
   rewrite (exec_bind_Some _ _ _ _ _ Hmrpm).
@@ -2853,7 +2947,7 @@ Section LRComposersG.
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
       (w va : mword 64) (σ : mstate) :
     um !! svpn_of va = Some w ->
-    uleaf_ok (LoadReserved Data) w ->
+    uleaf_ok (LoadReserved (aq, rl, Data)) w ->
     udata_cov um data ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -2869,9 +2963,9 @@ Section LRComposersG.
     utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
     ∃ σ' : mstate,
       ⌜(exists dvv : mword 32,
-          exec (vmem_read_addr (Virtaddr va) 4 (LoadReserved Data) aq (andb aq rl) true) σ
+          exec (vmem_read_addr (Virtaddr va) 4 (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) σ
             = Some (Ok dvv, σ'))
-       \/ exec (vmem_read_addr (Virtaddr va) 4 (LoadReserved Data) aq (andb aq rl) true) σ
+       \/ exec (vmem_read_addr (Virtaddr va) 4 (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) σ
             = Some (Err (Trap (User, make_sync_exception (E_Load_Access_Fault tt) va,
                                register_lookup PC σ.(sregs))), σ')⌝ ∗
       ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
@@ -2884,13 +2978,13 @@ Section LRComposersG.
     iIntros "Hri Hgh Hinv Hdata".
     iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (LoadReserved Data) uroot tfp um w va
+    iMod (utlb_inv_pt_translateAddr_u (LoadReserved (aq, rl, Data)) uroot tfp um w va
             (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
             Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_mprv0 (LoadReserved Data)
+            (exec_effectivePrivilege_mprv0 (LoadReserved (aq, rl, Data))
                (register_lookup mstatus σ.(sregs)) User σ Hmprv)
-            (exec_is_shadow_stack_u_acc (LoadReserved Data) σ
-               (or_intror (or_intror (or_intror (or_introl eq_refl))))) Hall
+            (exec_is_shadow_stack_u_acc (LoadReserved (aq, rl, Data)) σ
+               (or_intror (or_intror (or_intror (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl))))))) Hall
             with "Hri Hgh Hinv")
       as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
     assert (Tr : forall r : register, register_beq r tlb = false ->
@@ -2930,7 +3024,7 @@ Section LRComposersG.
              Hmmio (addr_is_ram_not_dev _ Hram0) Hbytes
              (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
              (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))).
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4))) (LoadReserved Data)) σ
+    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4))) (LoadReserved (aq, rl, Data))) σ
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ')).
     { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4)) with (add_vec_int va (0 * 4)).
       rewrite avi0. exact Htr. }
@@ -2959,7 +3053,7 @@ Section LRComposersG.
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
       (w va : mword 64) (σ : mstate) :
     um !! svpn_of va = Some w ->
-    uleaf_ok (LoadReserved Data) w ->
+    uleaf_ok (LoadReserved (aq, rl, Data)) w ->
     udata_cov um data ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -2975,9 +3069,9 @@ Section LRComposersG.
     utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
     ∃ σ' : mstate,
       ⌜(exists dvv : mword 64,
-          exec (vmem_read_addr (Virtaddr va) 8 (LoadReserved Data) aq (andb aq rl) true) σ
+          exec (vmem_read_addr (Virtaddr va) 8 (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) σ
             = Some (Ok dvv, σ'))
-       \/ exec (vmem_read_addr (Virtaddr va) 8 (LoadReserved Data) aq (andb aq rl) true) σ
+       \/ exec (vmem_read_addr (Virtaddr va) 8 (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) σ
             = Some (Err (Trap (User, make_sync_exception (E_Load_Access_Fault tt) va,
                                register_lookup PC σ.(sregs))), σ')⌝ ∗
       ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
@@ -2990,13 +3084,13 @@ Section LRComposersG.
     iIntros "Hri Hgh Hinv Hdata".
     iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (LoadReserved Data) uroot tfp um w va
+    iMod (utlb_inv_pt_translateAddr_u (LoadReserved (aq, rl, Data)) uroot tfp um w va
             (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
             Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_mprv0 (LoadReserved Data)
+            (exec_effectivePrivilege_mprv0 (LoadReserved (aq, rl, Data))
                (register_lookup mstatus σ.(sregs)) User σ Hmprv)
-            (exec_is_shadow_stack_u_acc (LoadReserved Data) σ
-               (or_intror (or_intror (or_intror (or_introl eq_refl))))) Hall
+            (exec_is_shadow_stack_u_acc (LoadReserved (aq, rl, Data)) σ
+               (or_intror (or_intror (or_intror (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl))))))) Hall
             with "Hri Hgh Hinv")
       as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
     assert (Tr : forall r : register, register_beq r tlb = false ->
@@ -3036,7 +3130,7 @@ Section LRComposersG.
              Hmmio (addr_is_ram_not_dev _ Hram0) Hbytes
              (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
              (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))).
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8))) (LoadReserved Data)) σ
+    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8))) (LoadReserved (aq, rl, Data))) σ
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ')).
     { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8)) with (add_vec_int va (0 * 8)).
       rewrite avi0. exact Htr. }
@@ -3070,7 +3164,7 @@ Section LRFaultComposer.
 
   Lemma user_pt_vmem_read_addr_lr_err (aq rl : bool) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pc : mword 64) (width : Z) (σ : mstate) :
-    u_fault_flavor (LoadReserved Data) tfp um va ->
+    u_fault_flavor (LoadReserved (aq, rl, Data)) tfp um va ->
     is_aligned_vaddr (Virtaddr va) width = true ->
     register_lookup PC σ.(sregs) = pc ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -3079,24 +3173,24 @@ Section LRFaultComposer.
     eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1") = false ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um -∗
-    ⌜exec (vmem_read_addr (Virtaddr va) width (LoadReserved Data) aq (andb aq rl) true) σ
+    ⌜exec (vmem_read_addr (Virtaddr va) width (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) σ
       = Some (Err (Trap (User, make_sync_exception (E_Load_Page_Fault tt) va, pc)), σ)⌝.
   Proof.
     intros Hflavor Halign Lpc Lhtif Lcp LSXL Lmprv Lpma.
     iIntros "Hri Hgh Hinv".
-    iDestruct (utlb_inv_pt_translateAddr_u_fault (LoadReserved Data) uroot tfp um va
+    iDestruct (utlb_inv_pt_translateAddr_u_fault (LoadReserved (aq, rl, Data)) uroot tfp um va
                  (E_Load_Page_Fault tt) σ Hflavor Lhtif Lcp LSXL
-                 (exec_effectivePrivilege_mprv0 (LoadReserved Data)
+                 (exec_effectivePrivilege_mprv0 (LoadReserved (aq, rl, Data))
                     (register_lookup mstatus σ.(sregs)) User σ Lmprv)
-                 (exec_is_shadow_stack_u_acc (LoadReserved Data) σ
-                    (or_intror (or_intror (or_intror (or_introl eq_refl)))))
+                 (exec_is_shadow_stack_u_acc (LoadReserved (aq, rl, Data)) σ
+                    (or_intror (or_intror (or_intror (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl)))))))
                  Lpma
                  ltac:(unfold translationException; cbn match; apply exec_returnm)
                  ltac:(unfold translationException; cbn match; apply exec_returnm)
                  ltac:(unfold translationException; cbn match; apply exec_returnm)
                  with "Hri Hgh Hinv") as %Htr.
     iPureIntro.
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (LoadReserved Data)) σ
+    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (LoadReserved (aq, rl, Data))) σ
                    = Some (Err (E_Load_Page_Fault tt, tt), σ)).
     { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))
         with (add_vec_int va (0 * width)).
@@ -3107,7 +3201,7 @@ Section LRFaultComposer.
        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))
        : result (mword (8 * width)) ExecutionResult), σ)).
     { exact (exec_vmem_read_addr_translate_err width va pc (E_Load_Page_Fault tt)
-               (LoadReserved Data) aq (andb aq rl) true User σ σ Halign Htr' Lcp Lpc). }
+               (LoadReserved (aq, rl, Data)) aq (andb aq rl) true User σ σ Halign Htr' Lcp Lpc). }
     rewrite Hva. reflexivity.
   Qed.
 
@@ -3118,7 +3212,7 @@ Lemma exec_execute_LOADRES_u_ok_rd0 (aq rl : bool) (rs1 rd : mword 5) (width : Z
     (data : mword (8 * width)) (s s' : mstate) :
   (width <=? xlen_bytes) = true ->
   uint rd = 0 ->
-  exec (vmem_read (Regidx rs1) (zeros' 64) width (LoadReserved Data) aq (andb aq rl) true) s
+  exec (vmem_read (Regidx rs1) (zeros' 64) width (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) s
     = Some (Ok data, s') ->
   exec (execute (LOADRES (aq, rl, Regidx rs1, width, Regidx rd))) s = Some (RETIRE_SUCCESS, s').
 Proof.
@@ -3147,7 +3241,7 @@ Section LREngine.
           (um0 : gmap (mword 27) (mword 64)) (data0 : gset Arch.pa)
           (w0 va0 : mword 64) (σ0 : mstate),
           um0 !! svpn_of va0 = Some w0 ->
-          uleaf_ok (LoadReserved Data) w0 ->
+          uleaf_ok (LoadReserved (aq, rl, Data)) w0 ->
           udata_cov um0 data0 ->
           is_aligned_vaddr (Virtaddr va0) k = true ->
           neq_vec (bits_of_virtaddr (Virtaddr va0))
@@ -3163,9 +3257,9 @@ Section LREngine.
           utlb_inv_pt uroot0 tfp0 um0 -∗ udata_own data0 ==∗
           ∃ σ0' : mstate,
             ⌜(exists dvv : mword (8 * k),
-                exec (vmem_read_addr (Virtaddr va0) k (LoadReserved Data) aq0 (andb aq0 rl0) true) σ0
+                exec (vmem_read_addr (Virtaddr va0) k (LoadReserved (aq, rl, Data)) aq0 (andb aq0 rl0) true) σ0
                   = Some (Ok dvv, σ0'))
-             \/ exec (vmem_read_addr (Virtaddr va0) k (LoadReserved Data) aq0 (andb aq0 rl0) true) σ0
+             \/ exec (vmem_read_addr (Virtaddr va0) k (LoadReserved (aq, rl, Data)) aq0 (andb aq0 rl0) true) σ0
                   = Some (Err (Trap (User, make_sync_exception (E_Load_Access_Fault tt) va0,
                                      register_lookup PC σ0.(sregs))), σ0')⌝ ∗
             ⌜σ0'.(mdev) = σ0.(mdev)⌝ ∗
@@ -3180,13 +3274,13 @@ Section LREngine.
     reg_interp s.(sregs) -∗ gen_heap_interp s.(mem) -∗
     utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
     (∃ (dvv : mword (8 * k)) (σ' : mstate),
-        ⌜exec (vmem_read_addr (Virtaddr va) k (LoadReserved Data) aq (andb aq rl) true) s = Some (Ok dvv, σ')⌝ ∗
+        ⌜exec (vmem_read_addr (Virtaddr va) k (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) s = Some (Ok dvv, σ')⌝ ∗
         ⌜σ'.(mdev) = s.(mdev)⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) σ'.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
         ⌜register_lookup nextPC σ'.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
         reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um ∗ udata_own data)
     ∨ (∃ (σ' : mstate) (e : ExceptionType) (xv pcx : mword 64),
-        ⌜exec (vmem_read_addr (Virtaddr va) k (LoadReserved Data) aq (andb aq rl) true) s
+        ⌜exec (vmem_read_addr (Virtaddr va) k (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) s
            = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), σ')⌝ ∗
         ⌜user_exc e = true⌝ ∗ ⌜σ'.(mdev) = s.(mdev)⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) σ'.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
@@ -3197,8 +3291,8 @@ Section LREngine.
     pose proof Hcfg as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & HMPRV & Hpma).
     iIntros "Hreg Hgh Hutlb Hudata".
     destruct (is_aligned_vaddr (Virtaddr va) k) eqn:Hal.
-    - destruct (data_classify (LoadReserved Data) tfp um va
-                  (or_intror (or_intror (or_intror (or_introl eq_refl)))) Hwf)
+    - destruct (data_classify (LoadReserved (aq, rl, Data)) tfp um va
+                  (or_intror (or_intror (or_intror (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl)))))) Hwf)
         as [ (w & Hum & Hok & Hcanon) | Hfault ].
       + iMod (Hlr_ok aq rl uroot tfp um data w va s
                 Hum Hok Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL HMPRV Hpma
@@ -3240,7 +3334,7 @@ Section LRExecEngine.
           (um0 : gmap (mword 27) (mword 64)) (data0 : gset Arch.pa)
           (w0 va0 : mword 64) (σ0 : mstate),
           um0 !! svpn_of va0 = Some w0 ->
-          uleaf_ok (LoadReserved Data) w0 ->
+          uleaf_ok (LoadReserved (aq, rl, Data)) w0 ->
           udata_cov um0 data0 ->
           is_aligned_vaddr (Virtaddr va0) k = true ->
           neq_vec (bits_of_virtaddr (Virtaddr va0))
@@ -3256,9 +3350,9 @@ Section LRExecEngine.
           utlb_inv_pt uroot0 tfp0 um0 -∗ udata_own data0 ==∗
           ∃ σ0' : mstate,
             ⌜(exists dvv : mword (8 * k),
-                exec (vmem_read_addr (Virtaddr va0) k (LoadReserved Data) aq0 (andb aq0 rl0) true) σ0
+                exec (vmem_read_addr (Virtaddr va0) k (LoadReserved (aq, rl, Data)) aq0 (andb aq0 rl0) true) σ0
                   = Some (Ok dvv, σ0'))
-             \/ exec (vmem_read_addr (Virtaddr va0) k (LoadReserved Data) aq0 (andb aq0 rl0) true) σ0
+             \/ exec (vmem_read_addr (Virtaddr va0) k (LoadReserved (aq, rl, Data)) aq0 (andb aq0 rl0) true) σ0
                   = Some (Err (Trap (User, make_sync_exception (E_Load_Access_Fault tt) va0,
                                      register_lookup PC σ0.(sregs))), σ0')⌝ ∗
             ⌜σ0'.(mdev) = σ0.(mdev)⌝ ∗
@@ -3294,9 +3388,9 @@ Section LRExecEngine.
     pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
-    assert (Hpml : exec (get_pmlen (LoadReserved Data) User) s = Some (0, s)).
+    assert (Hpml : exec (get_pmlen (LoadReserved (aq, rl, Data)) User) s = Some (0, s)).
     { apply exec_get_pmlen_u; try assumption; try (vm_compute; reflexivity). }
-    pose proof (exec_effectivePrivilege_mprv0 (LoadReserved Data)
+    pose proof (exec_effectivePrivilege_mprv0 (LoadReserved (aq, rl, Data))
                   (register_lookup mstatus s.(sregs)) User s HMPRV) as Heff.
     set (va := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                         else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
@@ -3308,8 +3402,8 @@ Section LRExecEngine.
             (register_lookup PC s.(sregs)) s Hcfg eq_refl with "Hreg Hgh Hutlb Hudata")
       as "[HOk | HErr]".
     - iDestruct "HOk" as (dvv sig') "(%Hvr & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-      assert (Hvread : exec (vmem_read (Regidx rs1) (zeros' 64) k (LoadReserved Data) aq (andb aq rl) true) s = Some (Ok dvv, sig')).
-      { apply (exec_vmem_read_u rs1 (zeros' 64) k (LoadReserved Data) aq (andb aq rl) true Sv39 (Ok dvv) s sig' Lcp Heff Hpml Htm).
+      assert (Hvread : exec (vmem_read (Regidx rs1) (zeros' 64) k (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) s = Some (Ok dvv, sig')).
+      { apply (exec_vmem_read_u rs1 (zeros' 64) k (LoadReserved (aq, rl, Data)) aq (andb aq rl) true Sv39 (Ok dvv) s sig' Lcp Heff Hpml Htm).
         fold va. exact Hvr. }
       destruct (Z.eqb (uint rd) 0) eqn:Hrd0.
       + (* rd = 0: no write *)
@@ -3341,8 +3435,8 @@ Section LRExecEngine.
         { unfold s_x; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
         iFrame "Hgpr". iFrame "Hutlb Hudata". iPureIntro; split; assumption.
     - iDestruct "HErr" as (sig' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-      assert (Hvread : exec (vmem_read (Regidx rs1) (zeros' 64) k (LoadReserved Data) aq (andb aq rl) true) s = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), sig')).
-      { apply (exec_vmem_read_u rs1 (zeros' 64) k (LoadReserved Data) aq (andb aq rl) true Sv39 (Err _) s sig' Lcp Heff Hpml Htm).
+      assert (Hvread : exec (vmem_read (Regidx rs1) (zeros' 64) k (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) s = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), sig')).
+      { apply (exec_vmem_read_u rs1 (zeros' 64) k (LoadReserved (aq, rl, Data)) aq (andb aq rl) true Sv39 (Err _) s sig' Lcp Heff Hpml Htm).
         fold va. exact Herr. }
       pose proof (exec_execute_LOADRES_u_err aq rl rs1 rd k (rv64d_types.Trap (User, make_sync_exception e xv, pcx)) s sig' Hkle Hvread) as Hexec.
       iModIntro. iRight. iExists e, xv, pcx, sig'.
@@ -3468,7 +3562,7 @@ Lemma exec_checked_mem_write_sc_g4 (aq rl : bool) (pbmt : page_based_mem_type) (
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
   exec (within_mmio_writable (Physaddr addr) 4) s = Some (false, s) ->
   dev_addr addr = false ->
-  exec (checked_mem_write (Physaddr addr) 4 data (StoreConditional Data) pbmt User tt (andb aq rl) rl true) s
+  exec (checked_mem_write (Physaddr addr) 4 data (StoreConditional (aq, rl, Data)) pbmt User tt (andb aq rl) rl true) s
     = Some (if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
             then (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev))
             else (Err (E_SAMO_Access_Fault tt), s)).
@@ -3476,7 +3570,7 @@ Proof.
   intros HA Hord Hrange HW Hmatch Halign Hwrite Hmmio Hdev.
   unfold checked_mem_write.
   destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
-  - assert (Hpac : exec (phys_access_check (StoreConditional Data) pbmt User (Physaddr addr) 4 true) s = Some (None, s)).
+  - assert (Hpac : exec (phys_access_check (StoreConditional (aq, rl, Data)) pbmt User (Physaddr addr) 4 true) s = Some (None, s)).
     { unfold phys_access_check.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_sc addr 4 s HA Hord Hrange HW)).
       rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_sc_g 4 addr pbmt region s Hmatch Halign Hwrite)).
@@ -3491,7 +3585,7 @@ Proof.
     rewrite (exec_bind_Some _ _ _ _ _ Hwke).
     rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_cond_kinds_4 wk addr data s Hwkv Hdev)).
     apply exec_returnM.
-  - assert (Hpac : exec (phys_access_check (StoreConditional Data) pbmt User (Physaddr addr) 4 true) s
+  - assert (Hpac : exec (phys_access_check (StoreConditional (aq, rl, Data)) pbmt User (Physaddr addr) 4 true) s
                    = Some (Some (E_SAMO_Access_Fault tt), s)).
     { unfold phys_access_check.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_sc addr 4 s HA Hord Hrange HW)).
@@ -3515,7 +3609,7 @@ Lemma exec_checked_mem_write_sc_g8 (aq rl : bool) (pbmt : page_based_mem_type) (
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
   exec (within_mmio_writable (Physaddr addr) 8) s = Some (false, s) ->
   dev_addr addr = false ->
-  exec (checked_mem_write (Physaddr addr) 8 data (StoreConditional Data) pbmt User tt (andb aq rl) rl true) s
+  exec (checked_mem_write (Physaddr addr) 8 data (StoreConditional (aq, rl, Data)) pbmt User tt (andb aq rl) rl true) s
     = Some (if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
             then (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 8 data) s.(mdev))
             else (Err (E_SAMO_Access_Fault tt), s)).
@@ -3523,7 +3617,7 @@ Proof.
   intros HA Hord Hrange HW Hmatch Halign Hwrite Hmmio Hdev.
   unfold checked_mem_write.
   destruct (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone) eqn:Hr.
-  - assert (Hpac : exec (phys_access_check (StoreConditional Data) pbmt User (Physaddr addr) 8 true) s = Some (None, s)).
+  - assert (Hpac : exec (phys_access_check (StoreConditional (aq, rl, Data)) pbmt User (Physaddr addr) 8 true) s = Some (None, s)).
     { unfold phys_access_check.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_sc addr 8 s HA Hord Hrange HW)).
       rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_sc_g 8 addr pbmt region s Hmatch Halign Hwrite)).
@@ -3538,7 +3632,7 @@ Proof.
     rewrite (exec_bind_Some _ _ _ _ _ Hwke).
     rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_cond_kinds_8 wk addr data s Hwkv Hdev)).
     apply exec_returnM.
-  - assert (Hpac : exec (phys_access_check (StoreConditional Data) pbmt User (Physaddr addr) 8 true) s
+  - assert (Hpac : exec (phys_access_check (StoreConditional (aq, rl, Data)) pbmt User (Physaddr addr) 8 true) s
                    = Some (Some (E_SAMO_Access_Fault tt), s)).
     { unfold phys_access_check.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_sc addr 8 s HA Hord Hrange HW)).
@@ -3564,7 +3658,7 @@ Lemma exec_mem_write_value_sc_g4 (aq rl : bool) (pbmt : page_based_mem_type) (ad
   dev_addr addr = false ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (mem_write_value (Physaddr addr) 4 data (StoreConditional Data) pbmt (andb aq rl) rl true) s
+  exec (mem_write_value (Physaddr addr) 4 data (StoreConditional (aq, rl, Data)) pbmt (andb aq rl) rl true) s
     = Some (if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
             then (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev))
             else (Err (E_SAMO_Access_Fault tt), s)).
@@ -3573,7 +3667,7 @@ Proof.
   unfold mem_write_value, mem_write_value_meta.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (StoreConditional Data) _ _ s Hmprv)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (StoreConditional (aq, rl, Data)) _ _ s Hmprv)).
   rewrite Hpriv. unfold mem_write_value_priv_meta.
   assert (Hcmw := exec_checked_mem_write_sc_g4 aq rl pbmt addr region data s HA Hord Hrange HW Hmatch Halign Hwrite Hmmio Hdev).
   destruct aq; destruct rl;
@@ -3599,7 +3693,7 @@ Lemma exec_mem_write_value_sc_g8 (aq rl : bool) (pbmt : page_based_mem_type) (ad
   dev_addr addr = false ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (mem_write_value (Physaddr addr) 8 data (StoreConditional Data) pbmt (andb aq rl) rl true) s
+  exec (mem_write_value (Physaddr addr) 8 data (StoreConditional (aq, rl, Data)) pbmt (andb aq rl) rl true) s
     = Some (if generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability) RsrvNone
             then (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 8 data) s.(mdev))
             else (Err (E_SAMO_Access_Fault tt), s)).
@@ -3608,7 +3702,7 @@ Proof.
   unfold mem_write_value, mem_write_value_meta.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
   rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (StoreConditional Data) _ _ s Hmprv)).
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_mprv0 (StoreConditional (aq, rl, Data)) _ _ s Hmprv)).
   rewrite Hpriv. unfold mem_write_value_priv_meta.
   assert (Hcmw := exec_checked_mem_write_sc_g8 aq rl pbmt addr region data s HA Hord Hrange HW Hmatch Halign Hwrite Hmmio Hdev).
   destruct aq; destruct rl;
@@ -3629,7 +3723,7 @@ Section SCComposersG.
     let wv := autocast (T := mword) (subrange_vec_dec dat (8*(0+1)*4-1) (8*0*4))
               : mword 32 in
     um !! svpn_of va = Some w ->
-    uleaf_ok (StoreConditional Data) w ->
+    uleaf_ok (StoreConditional (aq, rl, Data)) w ->
     udata_cov um data ->
     is_aligned_vaddr (Virtaddr va) 4 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -3645,9 +3739,9 @@ Section SCComposersG.
     utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
     ∃ σ'' : mstate,
       ⌜(exists b : bool,
-          exec (vmem_write_addr (Virtaddr va) 4 dat (StoreConditional Data) (andb aq rl) rl true) σ
+          exec (vmem_write_addr (Virtaddr va) 4 dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) σ
             = Some (Ok b, σ''))
-       \/ exec (vmem_write_addr (Virtaddr va) 4 dat (StoreConditional Data) (andb aq rl) rl true) σ
+       \/ exec (vmem_write_addr (Virtaddr va) 4 dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) σ
             = Some (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) va,
                                register_lookup PC σ.(sregs))), σ'')⌝ ∗
       ⌜σ''.(mdev) = σ.(mdev)⌝ ∗
@@ -3660,13 +3754,13 @@ Section SCComposersG.
     iIntros "Hri Hgh Hinv Hdata".
     iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (StoreConditional Data) uroot tfp um w va
+    iMod (utlb_inv_pt_translateAddr_u (StoreConditional (aq, rl, Data)) uroot tfp um w va
             (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
             Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_mprv0 (StoreConditional Data)
+            (exec_effectivePrivilege_mprv0 (StoreConditional (aq, rl, Data))
                (register_lookup mstatus σ.(sregs)) User σ Hmprv)
-            (exec_is_shadow_stack_u_acc (StoreConditional Data) σ
-               (or_intror (or_intror (or_intror (or_intror (or_introl eq_refl)))))) Hall
+            (exec_is_shadow_stack_u_acc (StoreConditional (aq, rl, Data)) σ
+               (or_intror (or_intror (or_intror (or_intror (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl)))))))) Hall
             with "Hri Hgh Hinv")
       as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
     assert (Tr : forall r : register, register_beq r tlb = false ->
@@ -3707,7 +3801,7 @@ Section SCComposersG.
              (proj1 Hwrb) Hmmiow (addr_is_ram_not_dev _ Hram0)
              (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
              (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))).
-    assert (Hpac : exec (phys_access_check (StoreConditional Data) PBMT_PMA User (Physaddr pa) 4 true) σ'
+    assert (Hpac : exec (phys_access_check (StoreConditional (aq, rl, Data)) PBMT_PMA User (Physaddr pa) 4 true) σ'
                    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone
                             then None else Some (E_SAMO_Access_Fault tt)), σ')).
     { unfold phys_access_check.
@@ -3720,7 +3814,7 @@ Section SCComposersG.
                  (pa_aligned_div _ va 4 ltac:(lia) ltac:(exists 1024; reflexivity) Hal) (proj1 Hwrb))).
       destruct (generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone);
         cbn match; apply exec_returnM. }
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4))) (StoreConditional Data)) σ
+    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4))) (StoreConditional (aq, rl, Data))) σ
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ')).
     { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4)) with (add_vec_int va (0 * 4)).
       rewrite avi0. exact Htr. }
@@ -3773,7 +3867,7 @@ Section SCComposersG8.
     let wv := autocast (T := mword) (subrange_vec_dec dat (8*(0+1)*8-1) (8*0*8))
               : mword 64 in
     um !! svpn_of va = Some w ->
-    uleaf_ok (StoreConditional Data) w ->
+    uleaf_ok (StoreConditional (aq, rl, Data)) w ->
     udata_cov um data ->
     is_aligned_vaddr (Virtaddr va) 8 = true ->
     neq_vec (bits_of_virtaddr (Virtaddr va))
@@ -3789,9 +3883,9 @@ Section SCComposersG8.
     utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
     ∃ σ'' : mstate,
       ⌜(exists b : bool,
-          exec (vmem_write_addr (Virtaddr va) 8 dat (StoreConditional Data) (andb aq rl) rl true) σ
+          exec (vmem_write_addr (Virtaddr va) 8 dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) σ
             = Some (Ok b, σ''))
-       \/ exec (vmem_write_addr (Virtaddr va) 8 dat (StoreConditional Data) (andb aq rl) rl true) σ
+       \/ exec (vmem_write_addr (Virtaddr va) 8 dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) σ
             = Some (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) va,
                                register_lookup PC σ.(sregs))), σ'')⌝ ∗
       ⌜σ''.(mdev) = σ.(mdev)⌝ ∗
@@ -3804,13 +3898,13 @@ Section SCComposersG8.
     iIntros "Hri Hgh Hinv Hdata".
     iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
-    iMod (utlb_inv_pt_translateAddr_u (StoreConditional Data) uroot tfp um w va
+    iMod (utlb_inv_pt_translateAddr_u (StoreConditional (aq, rl, Data)) uroot tfp um w va
             (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
             Hmisa Hmenv Hhtif Hcp HSXL
-            (exec_effectivePrivilege_mprv0 (StoreConditional Data)
+            (exec_effectivePrivilege_mprv0 (StoreConditional (aq, rl, Data))
                (register_lookup mstatus σ.(sregs)) User σ Hmprv)
-            (exec_is_shadow_stack_u_acc (StoreConditional Data) σ
-               (or_intror (or_intror (or_intror (or_intror (or_introl eq_refl)))))) Hall
+            (exec_is_shadow_stack_u_acc (StoreConditional (aq, rl, Data)) σ
+               (or_intror (or_intror (or_intror (or_intror (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl)))))))) Hall
             with "Hri Hgh Hinv")
       as (σ') "(%Htr & %Hmdev & %Hsregs & Hri & Hgh & Hinv)".
     assert (Tr : forall r : register, register_beq r tlb = false ->
@@ -3851,7 +3945,7 @@ Section SCComposersG8.
              (proj1 Hwrb) Hmmiow (addr_is_ram_not_dev _ Hram0)
              (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
              (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))).
-    assert (Hpac : exec (phys_access_check (StoreConditional Data) PBMT_PMA User (Physaddr pa) 8 true) σ'
+    assert (Hpac : exec (phys_access_check (StoreConditional (aq, rl, Data)) PBMT_PMA User (Physaddr pa) 8 true) σ'
                    = Some ((if generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone
                             then None else Some (E_SAMO_Access_Fault tt)), σ')).
     { unfold phys_access_check.
@@ -3864,7 +3958,7 @@ Section SCComposersG8.
                  (pa_aligned_div _ va 8 ltac:(lia) ltac:(exists 512; reflexivity) Hal) (proj1 Hwrb))).
       destruct (generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone);
         cbn match; apply exec_returnM. }
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8))) (StoreConditional Data)) σ
+    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8))) (StoreConditional (aq, rl, Data))) σ
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ')).
     { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8)) with (add_vec_int va (0 * 8)).
       rewrite avi0. exact Htr. }
@@ -3914,7 +4008,7 @@ Section SCFaultComposer.
   Lemma user_pt_vmem_write_addr_sc_err (aq rl : bool) (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pc : mword 64) (width : Z)
       (dat : mword (8 * width)) (σ : mstate) :
-    u_fault_flavor (StoreConditional Data) tfp um va ->
+    u_fault_flavor (StoreConditional (aq, rl, Data)) tfp um va ->
     is_aligned_vaddr (Virtaddr va) width = true ->
     register_lookup PC σ.(sregs) = pc ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -3923,24 +4017,24 @@ Section SCFaultComposer.
     eq_vec (_get_Mstatus_MPRV (register_lookup mstatus σ.(sregs))) ('b"1") = false ->
     pma_allows_all (register_lookup pma_regions σ.(sregs)) ->
     reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um -∗
-    ⌜exec (vmem_write_addr (Virtaddr va) width dat (StoreConditional Data) (andb aq rl) rl true) σ
+    ⌜exec (vmem_write_addr (Virtaddr va) width dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) σ
       = Some (Err (Trap (User, make_sync_exception (E_SAMO_Page_Fault tt) va, pc)), σ)⌝.
   Proof.
     intros Hflavor Halign Lpc Lhtif Lcp LSXL Lmprv Lpma.
     iIntros "Hri Hgh Hinv".
-    iDestruct (utlb_inv_pt_translateAddr_u_fault (StoreConditional Data) uroot tfp um va
+    iDestruct (utlb_inv_pt_translateAddr_u_fault (StoreConditional (aq, rl, Data)) uroot tfp um va
                  (E_SAMO_Page_Fault tt) σ Hflavor Lhtif Lcp LSXL
-                 (exec_effectivePrivilege_mprv0 (StoreConditional Data)
+                 (exec_effectivePrivilege_mprv0 (StoreConditional (aq, rl, Data))
                     (register_lookup mstatus σ.(sregs)) User σ Lmprv)
-                 (exec_is_shadow_stack_u_acc (StoreConditional Data) σ
-                    (or_intror (or_intror (or_intror (or_intror (or_introl eq_refl))))))
+                 (exec_is_shadow_stack_u_acc (StoreConditional (aq, rl, Data)) σ
+                    (or_intror (or_intror (or_intror (or_intror (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl))))))))
                  Lpma
                  ltac:(unfold translationException; cbn match; apply exec_returnm)
                  ltac:(unfold translationException; cbn match; apply exec_returnm)
                  ltac:(unfold translationException; cbn match; apply exec_returnm)
                  with "Hri Hgh Hinv") as %Htr.
     iPureIntro.
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (StoreConditional Data)) σ
+    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (StoreConditional (aq, rl, Data))) σ
                    = Some (Err (E_SAMO_Page_Fault tt, tt), σ)).
     { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))
         with (add_vec_int va (0 * width)).
@@ -3951,7 +4045,7 @@ Section SCFaultComposer.
        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))
        : result bool ExecutionResult), σ)).
     { exact (exec_vmem_write_addr_translate_err width va pc (E_SAMO_Page_Fault tt)
-               dat (StoreConditional Data) (andb aq rl) rl true User σ σ Halign Htr' Lcp Lpc). }
+               dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true User σ σ Halign Htr' Lcp Lpc). }
     rewrite Hva. reflexivity.
   Qed.
 
@@ -3967,7 +4061,7 @@ Lemma exec_execute_STORECON_u_ok_rd0 (aq rl : bool) (rs2 rs1 rd : mword 5) (widt
              (if Z.eqb (uint rs2) 0 then zero_reg
               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
              (Z.sub (Z.mul width 8) 1) 0))
-          (StoreConditional Data) (andb aq rl) rl true) s = Some (Ok b, s') ->
+          (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s = Some (Ok b, s') ->
   exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
     = Some (RETIRE_SUCCESS, s').
 Proof.
@@ -4002,7 +4096,7 @@ Section SCEngine.
       (um0 : gmap (mword 27) (mword 64)) (data0 : gset Arch.pa)
       (w0 va0 : mword 64) (dat0 : mword (8 * k)) (σ0 : mstate),
       um0 !! svpn_of va0 = Some w0 ->
-      uleaf_ok (StoreConditional Data) w0 ->
+      uleaf_ok (StoreConditional (aq, rl, Data)) w0 ->
       udata_cov um0 data0 ->
       is_aligned_vaddr (Virtaddr va0) k = true ->
       neq_vec (bits_of_virtaddr (Virtaddr va0))
@@ -4018,9 +4112,9 @@ Section SCEngine.
       utlb_inv_pt uroot0 tfp0 um0 -∗ udata_own data0 ==∗
       ∃ σ0'' : mstate,
         ⌜(exists b : bool,
-            exec (vmem_write_addr (Virtaddr va0) k dat0 (StoreConditional Data) (andb aq0 rl0) rl0 true) σ0
+            exec (vmem_write_addr (Virtaddr va0) k dat0 (StoreConditional (aq, rl, Data)) (andb aq0 rl0) rl0 true) σ0
               = Some (Ok b, σ0''))
-         \/ exec (vmem_write_addr (Virtaddr va0) k dat0 (StoreConditional Data) (andb aq0 rl0) rl0 true) σ0
+         \/ exec (vmem_write_addr (Virtaddr va0) k dat0 (StoreConditional (aq, rl, Data)) (andb aq0 rl0) rl0 true) σ0
               = Some (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) va0,
                                  register_lookup PC σ0.(sregs))), σ0'')⌝ ∗
         ⌜σ0''.(mdev) = σ0.(mdev)⌝ ∗
@@ -4038,13 +4132,13 @@ Section SCEngine.
     reg_interp s.(sregs) -∗ gen_heap_interp s.(mem) -∗
     utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
     (∃ (b : bool) (σ' : mstate),
-        ⌜exec (vmem_write_addr (Virtaddr va) k dat (StoreConditional Data) (andb aq rl) rl true) s = Some (Ok b, σ')⌝ ∗
+        ⌜exec (vmem_write_addr (Virtaddr va) k dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s = Some (Ok b, σ')⌝ ∗
         ⌜σ'.(mdev) = s.(mdev)⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) σ'.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
         ⌜register_lookup nextPC σ'.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
         reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um ∗ udata_own data)
     ∨ (∃ (σ' : mstate) (e : ExceptionType) (xv pcx : mword 64),
-        ⌜exec (vmem_write_addr (Virtaddr va) k dat (StoreConditional Data) (andb aq rl) rl true) s
+        ⌜exec (vmem_write_addr (Virtaddr va) k dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s
            = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), σ')⌝ ∗
         ⌜user_exc e = true⌝ ∗ ⌜σ'.(mdev) = s.(mdev)⌝ ∗
         ⌜register_lookup (R_bool minstret_increment) σ'.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
@@ -4055,8 +4149,8 @@ Section SCEngine.
     pose proof Hcfg as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & HMPRV & Hpma).
     iIntros "Hreg Hgh Hutlb Hudata".
     destruct (is_aligned_vaddr (Virtaddr va) k) eqn:Hal.
-    - destruct (data_classify (StoreConditional Data) tfp um va
-                  (or_intror (or_intror (or_intror (or_intror (or_introl eq_refl))))) Hwf)
+    - destruct (data_classify (StoreConditional (aq, rl, Data)) tfp um va
+                  (or_intror (or_intror (or_intror (or_intror (or_introl (ex_intro _ aq (ex_intro _ rl eq_refl))))))) Hwf)
         as [ (w & Hum & Hok & Hcanon) | Hfault ].
       + iMod (Hsc_ok aq rl uroot tfp um data w va dat s
                 Hum Hok Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL HMPRV Hpma
@@ -4115,9 +4209,9 @@ Section SCEngine.
     pose proof Hmsok as (HSXL & HMPRV & HMXR & HFS & HVS & HTVM & HTSR).
     iDestruct (utlb_inv_pt_translationMode_U pt.(ud_root) pt.(ud_tfp) pt.(ud_um) s HSXL with "Hreg Hutlb")
       as "(%Htm & Hreg & Hutlb)".
-    assert (Hpml : exec (get_pmlen (StoreConditional Data) User) s = Some (0, s)).
+    assert (Hpml : exec (get_pmlen (StoreConditional (aq, rl, Data)) User) s = Some (0, s)).
     { apply exec_get_pmlen_u; try assumption; try (vm_compute; reflexivity). }
-    pose proof (exec_effectivePrivilege_mprv0 (StoreConditional Data)
+    pose proof (exec_effectivePrivilege_mprv0 (StoreConditional (aq, rl, Data))
                   (register_lookup mstatus s.(sregs)) User s HMPRV) as Heff.
     set (va := add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                         else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
@@ -4133,8 +4227,8 @@ Section SCEngine.
             (register_lookup PC s.(sregs)) dat s Hcfg eq_refl with "Hreg Hgh Hutlb Hudata")
       as "[HOk | HErr]".
     - iDestruct "HOk" as (b sig') "(%Hvw & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-      assert (Hvwrite : exec (vmem_write (Regidx rs1) (zeros' 64) k dat (StoreConditional Data) (andb aq rl) rl true) s = Some (Ok b, sig')).
-      { apply (exec_vmem_write_u rs1 (zeros' 64) k dat (StoreConditional Data) (andb aq rl) rl true Sv39 (Ok b) s sig' Lcp Heff Hpml Htm).
+      assert (Hvwrite : exec (vmem_write (Regidx rs1) (zeros' 64) k dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s = Some (Ok b, sig')).
+      { apply (exec_vmem_write_u rs1 (zeros' 64) k dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true Sv39 (Ok b) s sig' Lcp Heff Hpml Htm).
         fold va. exact Hvw. }
       destruct (Z.eqb (uint rd) 0) eqn:Hrd0.
       + apply Z.eqb_eq in Hrd0.
@@ -4170,8 +4264,8 @@ Section SCEngine.
         { unfold s_x; rewrite ?sregs_set_reg ?mem_set_reg ?mdev_set_reg. iFrame "Hreg Hgh". rewrite Hmdev. iFrame "Hdev". }
         iFrame "Hgpr". iFrame "Hutlb Hudata". iPureIntro; split; assumption.
     - iDestruct "HErr" as (sig' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-      assert (Hvwrite : exec (vmem_write (Regidx rs1) (zeros' 64) k dat (StoreConditional Data) (andb aq rl) rl true) s = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), sig')).
-      { apply (exec_vmem_write_u rs1 (zeros' 64) k dat (StoreConditional Data) (andb aq rl) rl true Sv39 (Err _) s sig' Lcp Heff Hpml Htm).
+      assert (Hvwrite : exec (vmem_write (Regidx rs1) (zeros' 64) k dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pcx)), sig')).
+      { apply (exec_vmem_write_u rs1 (zeros' 64) k dat (StoreConditional (aq, rl, Data)) (andb aq rl) rl true Sv39 (Err _) s sig' Lcp Heff Hpml Htm).
         fold va. exact Herr. }
       pose proof (exec_execute_STORECON_u_err aq rl rs2 rs1 rd k (rv64d_types.Trap (User, make_sync_exception e xv, pcx)) s sig' Hkle) as Hexec0.
       assert (Hexec : exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, k, Regidx rd))) s = Some (rv64d_types.Trap (User, make_sync_exception e xv, pcx), sig')).
