@@ -374,9 +374,16 @@ Three mechanical substitutions, ~95 LR/SC sites and ~46 AMO sites:
    `exec_pmaCheck_ram_sc_ok` / `exec_pmaCheck_ram_sc_deny` — the `_ok` pair is
    `pma_ok_peel` (LR/SC are aligned, so the whole splitting axis is inert), the
    `_deny` pair is the `canAccess` branch `pma_ok_peel` does not do. The AMO
-   pair is the one still to write; its arm gates on
-   `readable && writable && pma_allows_atomic_op`, which `pma_allows_all`
-   already pins for every op and width.
+   one is written up as a PORT PENDING comment in the same file. Its arm gates
+   on `readable && writable && pma_allows_atomic_op`, which `pma_allows_all`
+   already pins for every op and width — but **`pma_ok_peel` does not close
+   it**: the tactic's assert-arm fires (the AMO arm does open with
+   `assert_exp' res_or_con`) and then its
+   `rewrite execR_bind; rewrite (execR_liftR_seq … (exec_assert_exp'_true …))`
+   reports "does not match any subterm", so that arm reaches the assert in a
+   different shape than the LR/SC ones. Print the goal after `pma_ok_peel`'s
+   `cbn match` and adjust; the likely culprit is `pma_allows_atomic_op` needing
+   to be held back from the `cbn`.
 3. **`MemoryOpResult`'s `Err` carries the address.** A `checked_mem_read` /
    `mem_read` result is `Err (paddr, e)`, not `Err e`. Only the LR/SC/AMO
    denial arms state one, so this rides along with (2).

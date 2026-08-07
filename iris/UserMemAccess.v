@@ -390,11 +390,11 @@ Section MisalignedFaults.
   Ltac peel_l := match goal with |- context [execR (Defs.liftR ?m) ?st] => rewrite (execR_liftR m st) end.
 
   Lemma exec_vmem_read_addr_misaligned_lr (va pc : mword 64) (width : Z)
-      (aq rl : bool) (priv : Privilege) (s : mstate) :
+      (aq rl maq mrl : bool) (priv : Privilege) (s : mstate) :
     is_aligned_vaddr (Virtaddr va) width = false ->
     register_lookup cur_privilege s.(sregs) = priv ->
     register_lookup PC s.(sregs) = pc ->
-    exec (vmem_read_addr (Virtaddr va) width (LoadReserved (aq, rl, Data)) aq rl true) s
+    exec (vmem_read_addr (Virtaddr va) width (LoadReserved (aq, rl, Data)) maq mrl true) s
       = Some (Err (Trap (priv, make_sync_exception (E_Load_Access_Fault tt) va, pc)), s).
   Proof.
     intros Hnal Hcp Hpc.
@@ -408,11 +408,11 @@ Section MisalignedFaults.
   Qed.
 
   Lemma exec_vmem_write_addr_misaligned_sc (va pc : mword 64) (width : Z)
-      (dat : mword (8 * width)) (aq rl : bool) (priv : Privilege) (s : mstate) :
+      (dat : mword (8 * width)) (aq rl maq mrl : bool) (priv : Privilege) (s : mstate) :
     is_aligned_vaddr (Virtaddr va) width = false ->
     register_lookup cur_privilege s.(sregs) = priv ->
     register_lookup PC s.(sregs) = pc ->
-    exec (vmem_write_addr (Virtaddr va) width dat (StoreConditional (aq, rl, Data)) aq rl true) s
+    exec (vmem_write_addr (Virtaddr va) width dat (StoreConditional (aq, rl, Data)) maq mrl true) s
       = Some (Err (Trap (priv, make_sync_exception (E_SAMO_Access_Fault tt) va, pc)), s).
   Proof.
     intros Hnal Hcp Hpc.
@@ -1268,3 +1268,24 @@ Proof.
   change (add_vec va (zeros' 64 : mword 64)) with (add_vec_int va 0).
   apply avi0.
 Qed.
+
+(* THE AMO PMA BRICK -- PORT PENDING.  Same shape as the LR/SC pair:
+ *
+ *   Lemma exec_pmaCheck_ram_amo_ok (k : Z) (addr : mword 64) (pbmt) (region)
+ *       (op : amoop) (aq rl : bool) s :
+ *     matching_pma_region … = Some region ->
+ *     is_aligned_paddr (Physaddr addr) k = true ->
+ *     andb readable (andb writable (pma_allows_atomic_op atomic_support op k)) = true ->
+ *     exec (pmaCheck (Physaddr addr) k (Atomic (op, aq, rl, Data, Data)) pbmt true) s
+ *       = Some (Ok pma_ok_aligned, s).
+ *
+ * [pma_allows_all] pins all three conjuncts for every op and width, so the
+ * hypothesis is dischargeable at every call site.  What does NOT work is
+ * closing it with [pma_ok_peel]: the tactic's assert-arm fires (the AMO arm of
+ * [pmaCheck] does open with [assert_exp' res_or_con]) but its
+ * [rewrite execR_bind; rewrite (execR_liftR_seq … (exec_assert_exp'_true …))]
+ * then reports "does not match any subterm", so the AMO arm reaches that point
+ * in a different shape than the LR/SC ones.  Print the goal after
+ * [pma_ok_peel]'s [cbn match] and adjust the arm peel -- most likely
+ * [pma_allows_atomic_op] needs holding back from the [cbn].
+ *)
