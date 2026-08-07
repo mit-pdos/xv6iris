@@ -397,16 +397,35 @@ Three more per-lemma details, each of which costs a compile to discover:
   level resolves the effective privilege AND its translation mode before the
   access, so `exec_vmem_read_addr_lr_disj` and its siblings grow a `md`
   parameter and an `exec (translationMode …)` premise. A section that already
-  carries `Hcp`/`Hmprv`/`HSXL` should DERIVE it rather than grow hypotheses.
+  carries `Hcp`/`Hmprv`/`HSXL` should DERIVE it rather than grow hypotheses —
+  and derive it **before** the translation `iMod`, since `utlb_inv_pt_tmode`
+  wants `reg_interp` at the PRE-translate state.
+- **THE ACCESS TYPE'S aq/rl AND THE MEM LEVEL'S ARE NOT THE SAME PAIR**, and
+  the `_disj` composers used to tie them. `LOADRES` builds
+  `LoadReserved (aq, rl, Data)` and calls `vmem_read` with `aq, aq & rl`;
+  `STORECON` builds `StoreConditional (aq, rl, Data)` and calls `vmem_write`
+  with `aq & rl, rl`. `exec_vmem_read_addr_lr_disj` and the whole
+  `exec_vmem_write_addr_sc*` chain take BOTH pairs now (`aq rl maq mrl`).
+  Tying them would state a fact about an access the model never builds.
 
 The bulk substitutions that are already applied to `UserMemClassify.v`:
 `LoadReserved Data` → `LoadReserved (aq, rl, Data)` (43 sites),
 `StoreConditional Data` → `StoreConditional (aq, rl, Data)` (46), and the
 `u_acc` witnesses (12).  Every LR/SC lemma in the file is already
 `(aq rl : bool)`-parameterized, which is what makes them safe as textual
-substitutions.  DONE and green: `exec_checked_mem_read_lr_g4`/`_g8` and
-`exec_mem_read_lr_g4`/`_g8` -- the build now stops in `LRComposersG`
-(`user_pt_vmem_read_addr_lr_g4`, ~line 3032).
+substitutions.  DONE and green: `exec_checked_mem_read_lr_g4`/`_g8`,
+`exec_mem_read_lr_g4`/`_g8` and `user_pt_vmem_read_addr_lr_g4`/`_g8` -- i.e.
+the whole LR READ stack from the PMA check up to the vmem level.  The build
+now stops in `LRFaultComposer` (~line 3206).  What is left is the LR fault
+composer and engine, then the SC stack (same shape, `Store`/`E_SAMO_*`
+throughout), then the AMO stack (which additionally needs the AMO `pmaCheck`
+brick and the restored misaligned-AMO fault).
+
+**The `_g8` variants are a scripted copy of the `_g4` ones.** Every width-8
+lemma so far has been the width-4 one with a mechanical substitution list
+(`4`→`8`, `1024`→`512` in the divisibility witnesses, `mword 32`→`mword 64`,
+`usvd_zeros_full_32`→`_64`, `exec_read_ram_resv_kinds_4`→`_8`); doing it by
+hand is wasted effort.
 
 Everything else those lemmas need already exists:
 `exec_pmpCheck_user_grant_lr` / `_sc` (already aq/rl-generic in
