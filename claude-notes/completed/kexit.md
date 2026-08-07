@@ -14,6 +14,14 @@ protocol this extends).
 `Axiom` and contain no `admit`; the cone's one assumption is what its callees
 assume, iput via `LinkIput.v`. `proof_coverage.py` prints it `proven`.
 
+**`sys_exit` IS PROVEN AND LINKED TOO** (`SpecSysExit.v` / `CodeSysExit.v` /
+`ProofSysExit.v` / `LinkSysExit.v`, over ARGINT + KEXIT — same axiom
+footprint). Since kexit diverges, sys_exit's proof has no epilogue to prove:
+applying `Kexit.wp_kexit_sconf` after the `jal kexit` discharges the whole
+function, and the dead `li a0,0`/pop/`ret` tail gcc emits (not knowing kexit
+is `noreturn`) is decoded by nobody's proof. Detail in
+[`proc-struct-resources.md`](../projects/proc-struct-resources.md)'s S6.
+
 The callee it waited on, `fileclose`, is proven
 ([`../completed/fileclose.md`](../completed/fileclose.md)). Landing it moved
 one thing here: kexit's fd loop needs the caller's pid cell while it is
