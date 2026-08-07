@@ -75,14 +75,23 @@ carries `fileclose_env_out_of_env` — the check that the FAST path
 postcondition out of the precondition. Keep that lemma: it is what catches a
 bundle stated with a return going the wrong way.
 
-**Known wart, decide before landing.** The parameters of the arm a caller
-does *not* take still have to be NAMED by it (a `bio_names`, a `log_names`,
-…). pipealloc has none of those in scope. Options: `Inhabited` instances on
-the five ghost-name records so a caller passes `inhabitant`; or one
-`Record fclose_names` bundling them with one `Inhabited` instance; or push
-the parameters under an existential inside the bundle, which forces the
-continuation inside the same binder and contorts the spec. The record is
-probably right.
+**The naming wart is solved: one `Record fclose_names`** bundling every
+ghost name and geometry value both arms are indexed by, with an explicit
+`Inhabited` instance (spelled out — `bio_names` has function fields and
+several of these records have no instance of their own). A caller that
+cannot reach either arm passes `inhabitant`. The alternative — flat
+parameters — would make pipealloc *name* a `bio_names` it has never heard
+of; pushing them under an existential forces the continuation inside the
+same binder and contorts the spec.
+
+**The ghost CLASSES do propagate, and that part is unavoidable.** A caller
+that can reach fileclose can reach iput, so `bioG`/`diskGhostG`/`uartGhostG`/
+`fsLogG`/`logG`/`fsCrashG` must be in scope at every call site — including
+pipealloc's, whose *contract* says nothing about a file system. Capacity
+only, no resource: pipealloc's `Module Type` grows six class binders and
+nothing else. There is no way to hide them behind a derived FD_NONE-only
+interface: the derivation's proof needs the classes, and Coq's section
+discharge would put them back into the derived lemma's statement anyway.
 
 ### 2. The stack constant, and its ripple
 
@@ -119,6 +128,48 @@ now, or `lia` cannot see the literal.
   what it gains is the kmem lock and `kalloc_avail`, and the loop invariant
   gains `∃ on, kalloc_avail γka on` because each iteration may or may not
   free a pipe page.
+
+### 3b. THE OPEN DESIGN QUESTION: sys_pipe cannot see the type
+
+Landing the contract was attempted and **backed out** because of this, which
+is worth having written down before the next attempt.
+
+`pipealloc` is fine — `SpecFilealloc`'s post pins `fc_type Cf = FD_NONE`, and
+the two error-path closes are discharged by `fileclose_env_none`. (Its `PF1`
+disjunct and the `T4C` continuation each needed the type conjunct threaded
+through; both edits are small and were verified to compile.)
+
+`sys_pipe` is NOT fine, and the reason is structural. Two of its three error
+tails close a file it has already INSTALLED in a descriptor and then
+re-borrowed: `p->ofile[fd0] = 0` hands back an `ofile_slot`'s payload, and
+that payload is `∃ k q C, cell ↦ fnode k ∗ file_ref γf k q C` — the content
+is existentially quantified, so **the type is not recoverable**, and neither
+`fileclose_pipe_env` nor `fileclose_env_none` can be produced. The proof
+knows the file was FD_PIPE when it went in; the model has forgotten.
+
+Two ways out, and they are not equivalent:
+
+1. **Make sys_pipe own both bundles** and case-split on the type, handing
+   fileclose whichever arm's environment matches. Mechanical, no new algebra
+   — but it makes sys_pipe's contract demand a file system it provably never
+   uses, which is exactly the over-claiming the type-indexing exists to
+   avoid. It is also the *only* option for sys_close and kexit, which close
+   descriptors of genuinely unknown type.
+2. **A PERSISTENT per-slot content (or type) witness.** `SpecSysPipe.v`'s
+   header already flags this as the missing piece for a different reason
+   ("the post can say descriptor `fd0` names ftable slot `k0`, but not that
+   `k0`'s type is FD_PIPE"), so it pays for two things at once. The payload
+   link makes it cheap now: change the payload component from
+   `frac × agree` to `option frac × agree`, so that `(None, to_agree pn)` is
+   a duplicable — hence persistent — fragment extractable from any share.
+   Put the type (or a content snapshot) in `fpnames`, tied to the content by
+   a pure conjunct inside `file_payload`; a caller then keeps the witness
+   across the install and re-borrow and recovers the type by agreement. It
+   also needs `fnode` injectivity, which follows from `acur_unsigned`.
+
+Option 2 for sys_pipe, option 1 for sys_close and kexit, is probably the
+right split — but it is a real design decision and it should be made before
+the contract lands, because it decides how many of the four callers grow.
 
 ### 4. The proof
 
