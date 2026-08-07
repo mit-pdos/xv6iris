@@ -1,12 +1,13 @@
-# fileclose — the last unproven callee of three proved functions
+# fileclose — DONE, and the four Link files it unblocked
 
-`fileclose` is the single function standing between the tree and three `Link`
-files: `sys_pipe`, `sys_close` and `kexit` are all proved and all unlinked
-because their only unproven callee is this one
-([`sys-pipe.md`](sys-pipe.md), [`kexit.md`](kexit.md),
-[`../design/file-table.md`](../design/file-table.md)). One
-`ProofFileclose.v` + `LinkFileclose.v` buys three links and 392 bytes of
-coverage.
+`fileclose` is **proven and linked**.  It was the single function standing
+between the tree and four `Link` files: `pipealloc`, `sys_close`, `sys_pipe`
+and `kexit` were all proved and all unlinked because their one unproven
+callee was this one.  All five now read `proven` in
+`tools/proof_coverage.py`, on the single sanctioned `wp_iput_sconf` axiom
+(`LinkIput.v`) — file.c 4/7, pipe.c 4/4.
+
+Kept for its design record and its gotchas; nothing here is outstanding.
 
 ```c
 void fileclose(struct file *f) {

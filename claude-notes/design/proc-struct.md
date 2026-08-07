@@ -559,7 +559,7 @@ SLEEPING → RUNNABLE identically, with no guard ever opened.
   scheduler reassembles the two (`SchedCtx.proc_slots_park_gen`), forgetting
   the parked record down to its cells: nothing ever resumes a zombie. That is
   the whole of what makes ZOMBIE a different kind of park from RUNNABLE and
-  SLEEPING — see [`../projects/kexit.md`](../projects/kexit.md).
+  SLEEPING — see [`../completed/kexit.md`](../completed/kexit.md).
 - **`wait`/`freeproc`** opens `inv_dormant` on a `ZOMBIE` child, frees the
   trapframe page and pagetable, and closes it again at `UNUSED` — the *same*
   `proc_dormant`, no recasting needed, which is the payoff for not indexing

@@ -838,8 +838,14 @@ CodeIupdate.v
 CodeReadi.v
 CodeWritei.v
 LinkBmapNoalloc.v
+LinkFileclose.v
+LinkKexit.v
+LinkPipealloc.v
 LinkReadi.v
+LinkSysClose.v
+LinkSysPipe.v
 LinkWritei.v
+ProofFileclose.v
 ProofReadi.v
 ProofReadiParts.v
 SpecWritei.v

@@ -10,18 +10,19 @@ protocol this extends).
 
 ## Status
 
-**kexit IS PROVEN — `ProofKexit.v` declares no `Axiom` and contains no
-`admit` — but it is NOT LINKED, and cannot be until `fileclose` has a
-proof.** (What the *cone* will assume once linked is what its callees
-assume: iput via `LinkIput.v`, plus panic. The proof file itself adds
-nothing.) `proof_coverage.py`
-therefore still prints `~ kexit … assumed`: its rule is "proven once a
-`Link*.v` instantiates the functor sealed by its `Module Type`", and
-`LinkFileclose.v` does not exist. This is the same state `sys_pipe` is in,
-for the same one missing callee — see
-[`sys-pipe.md`](sys-pipe.md). Nothing about kexit is left to do; the next
-move on this cone is file.c's `fileclose` (194 bytes, no `CodeFileclose.v`
-yet), after which **one** `LinkKexit.v` closes both.
+**kexit IS PROVEN AND LINKED** — `ProofKexit.v` / `LinkKexit.v` declare no
+`Axiom` and contain no `admit`; the cone's one assumption is what its callees
+assume, iput via `LinkIput.v`. `proof_coverage.py` prints it `proven`.
+
+The callee it waited on, `fileclose`, is proven
+([`../completed/fileclose.md`](../completed/fileclose.md)). Landing it moved
+one thing here: kexit's fd loop needs the caller's pid cell while it is
+walking `proc_priv` descriptor by descriptor, and the two one-at-a-time
+accessors each swallow the whole block — so `ProcInv.proc_priv_pid_ofile`
+lends the pid quarter and one descriptor TOGETHER, and the loop carries
+`SpecFileclose.fileclose_fs_env_nopid` between iterations. The page count
+rides the loop existentially, because closing a descriptor may or may not
+free a pipe's page.
 
 What compiles today:
 

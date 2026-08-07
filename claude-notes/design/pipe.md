@@ -273,7 +273,7 @@ as proven before then. That is honest — the proof rests on the assumed
 ## `sys_pipe`
 
 `sys_pipe` — pipealloc's only caller — is proven
-([`../projects/sys-pipe.md`](../projects/sys-pipe.md)). Two things it settles
+([`../completed/sys-pipe.md`](../completed/sys-pipe.md)). Two things it settles
 that belong here:
 
 - **pipealloc's failure arm now returns both `fd_slot`s.** sys_pipe promises
