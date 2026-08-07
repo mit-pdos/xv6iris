@@ -109,27 +109,169 @@ Proof. intros Hd. cbn [exec_eff]. rewrite Hd. reflexivity. Qed.
 (* ====================================================================== *)
 (** ** 1. THE WIDTH-INDEPENDENT LEAVES *)
 
-(** [split_misaligned] short-circuits on the aligned arm at EVERY width, so
-    the shape files' width-8 and width-4 copies are one lemma.  ([WpLoad]'s
-    SC original is stated at 8 only; the two instances below are what the
-    call sites name.) *)
-Lemma exec_eff_split_misaligned_aligned_w (n : Z) (vaddr : virtaddr) s :
-  is_aligned_vaddr vaddr n = true ->
-  exec_eff (split_misaligned vaddr n) s = Some ((1, n), s, []).
+(** [split_misaligned] moved DOWN to the PHYSICAL address in the sail bump
+    (it used to be the vmem-level split): it now takes the plan's granule
+    and splittability, and [CannotSplit] alone decides the unsplit arm —
+    the address and the granule never enter into it
+    ([RiscvExtras.exec_split_misaligned_unsplit] is the SC original). *)
+Lemma exec_eff_split_misaligned_unsplit (addr : mword 64) (width g : Z) s :
+  exec_eff (split_misaligned (Physaddr addr) width g CannotSplit) s
+  = Some ((1, width), s, []).
 Proof.
-  intro H. unfold split_misaligned. rewrite H. cbn [orb].
-  apply exec_eff_returnM.
+  unfold split_misaligned.
+  change (generic_eq CannotSplit CannotSplit) with true.
+  cbn [orb]. apply exec_eff_returnM.
 Qed.
 
-Lemma exec_eff_split_misaligned_aligned (vaddr : virtaddr) s :
-  is_aligned_vaddr vaddr 8 = true ->
-  exec_eff (split_misaligned vaddr 8) s = Some ((1, 8), s, []).
-Proof. exact (exec_eff_split_misaligned_aligned_w 8 vaddr s). Qed.
+(** ... and the vmem level now splits only across a PAGE boundary
+    ([split_on_page_boundary]); an in-page access yields (width, 0) — one
+    part, nothing beyond the boundary.  Mirrors
+    [RiscvExtras.exec_split_on_page_boundary_intra] (pure, register-free,
+    so the trace is empty). *)
+Lemma exec_eff_split_on_page_boundary_intra {n : Z} (addr : mword n) (width : Z) s :
+  eq_vec (and_vec addr (update_subrange_vec_dec ((ones n) : bits n) (pagesize_bits - 1) 0
+                          (zeros' (12 - 1 - (0 - 1)))))
+         (and_vec (sub_vec_int (add_vec_int addr width) 1)
+                  (update_subrange_vec_dec ((ones n) : bits n) (pagesize_bits - 1) 0
+                     (zeros' (12 - 1 - (0 - 1))))) = true ->
+  exec_eff (split_on_page_boundary addr width) s = Some ((width, 0), s, []).
+Proof.
+  intro Hin. unfold split_on_page_boundary. rewrite Hin. apply exec_eff_returnM.
+Qed.
 
-Lemma exec_eff_split_misaligned_aligned_4 (vaddr : virtaddr) s :
-  is_aligned_vaddr vaddr 4 = true ->
-  exec_eff (split_misaligned vaddr 4) s = Some ((1, 4), s, []).
-Proof. exact (exec_eff_split_misaligned_aligned_w 4 vaddr s). Qed.
+(** ... and the ALIGNED instance every M-mode leaf uses, width-generic.
+    The proof is [RiscvExtras.exec_split_on_page_boundary_aligned]'s,
+    verbatim, with the closing [exec_returnm] step at [exec_eff] — copied
+    rather than hoisted because factoring the [eq_vec] core out of
+    [RiscvExtras] would touch the bottom of the tree for a pure fact only
+    this mirror re-needs.  (If [RiscvExtras] ever exposes the [Hintra]
+    fact, collapse this to one line.) *)
+Lemma exec_eff_split_on_page_boundary_aligned (a : mword 64) (w : Z) s :
+  vmem_width w ->
+  is_aligned_vaddr (Virtaddr a) w = true ->
+  exec_eff (split_on_page_boundary a w) s = Some ((w, 0), s, []).
+Proof.
+  intros Hw Halign.
+  assert (Hpos : 0 < w) by (apply vmem_width_pos; exact Hw).
+  assert (Hle : w <= 8) by (apply vmem_width_le; exact Hw).
+  pose proof (bv_unsigned_in_range _ a) as Hr. unfold bv_modulus in Hr.
+  change (2 ^ Z.of_N (SailStdpp.MachineWord.MachineWord.Z_idx 64)) with (2 ^ 64) in Hr.
+  destruct Hr as [Hr0 Hr1].
+  assert (Hal : bv_unsigned a mod w = 0).
+  { unfold is_aligned_vaddr in Halign. apply Z.eqb_eq in Halign.
+    rewrite uint_unsigned in Halign.
+    assert (Hrm : Z.rem (bv_unsigned a) w = (bv_unsigned a) mod w)
+      by (apply Z.rem_mod_nonneg; [ exact Hr0 | lia ]).
+    rewrite Hrm in Halign. exact Halign. }
+  assert (Hnw : bv_unsigned a + (w - 1) < 2 ^ 64)
+    by (apply z_alignw_room; assumption).
+  assert (Hsub : bv_unsigned (sub_vec_int (add_vec_int a w) 1) = bv_unsigned a + (w - 1)).
+  { unfold sub_vec_int, add_vec_int.
+    rewrite sub_vec64_unsigned. rewrite add_vec64_unsigned.
+    rewrite !moi64_unsigned.
+    assert (Hww : bv_wrap 64 w = w)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    assert (Hw1 : bv_wrap 64 1 = 1)
+      by (apply bv_wrap_small; rewrite bv_modulus64; lia).
+    rewrite Hww. rewrite Hw1.
+    rewrite bv_wrap_sub_idemp_l.
+    assert (Hsimp : bv_unsigned a + w - 1 = bv_unsigned a + (w - 1)) by (clear; lia).
+    rewrite Hsimp.
+    apply bv_wrap_small. rewrite bv_modulus64.
+    assert (H64 : (2:Z) ^ 64 = 18446744073709551616) by (vm_compute; reflexivity).
+    rewrite <- H64. split; [ clear - Hr0 Hpos; lia | exact Hnw ]. }
+  apply exec_eff_split_on_page_boundary_intra.
+  apply eq_vec_true_iff. apply bv_eq.
+  rewrite !and_vec64_unsigned. rewrite page_mask64_val.
+  rewrite Hsub.
+  assert (Hnn : 0 <= bv_unsigned a + (w - 1)) by (clear - Hr0 Hpos; lia).
+  rewrite (z_land_pagemask (bv_unsigned a) Hr0 Hr1).
+  rewrite (z_land_pagemask (bv_unsigned a + (w - 1)) Hnn Hnw).
+  rewrite <- (z_shiftr12_stable_w (bv_unsigned a) w Hr0 Hw Hal). reflexivity.
+Qed.
+
+Lemma exec_eff_split_on_page_boundary_aligned8 (a : mword 64) s :
+  is_aligned_vaddr (Virtaddr a) 8 = true ->
+  exec_eff (split_on_page_boundary a 8) s = Some ((8, 0), s, []).
+Proof.
+  apply exec_eff_split_on_page_boundary_aligned.
+  unfold vmem_width. tauto.
+Qed.
+
+(** *** The [pmaCheck] kit, once — the eff mirror of [RiscvExtras]'s.
+
+    The sail bump made [pmaCheck] answer a PLAN ([result
+    Phys_Mem_Access_Info ExceptionType], an early-return body whose tail
+    runs [mag_pma_check]), so every shape file's [exec_eff_pmaCheck_*]
+    is the same six-step walk [RiscvExtras.pma_ok_peel] does for SC.
+    Everything on the path is register-only (one [pma_regions] read), so
+    every trace is [[]]. *)
+
+Lemma exec_eff_assert_exp'_true (msg : string) s :
+  exec_eff (Defs.assert_exp' true msg) s = Some (eq_refl, s, []).
+Proof. unfold Defs.assert_exp'. cbn match. apply exec_eff_returnM. Qed.
+
+Lemma exec_eff_is_mag_applicable_load_data (width : Z) s :
+  exec_eff (is_mag_applicable_access (Load Data) width) s
+  = Some (Z.leb width xlen_bytes, s, []).
+Proof. apply exec_eff_returnM. Qed.
+
+Lemma exec_eff_is_mag_applicable_store_data (width : Z) s :
+  exec_eff (is_mag_applicable_access (Store Data) width) s
+  = Some (Z.leb width xlen_bytes, s, []).
+Proof. apply exec_eff_returnM. Qed.
+
+Lemma exec_eff_is_mag_applicable_fetch (width : Z) s :
+  exec_eff (is_mag_applicable_access (InstructionFetch tt) width) s
+  = Some (false, s, []).
+Proof. apply exec_eff_returnM. Qed.
+
+Lemma exec_eff_is_mag_applicable_amo (op : amoop) (aq rl : bool) (width : Z) s :
+  exec_eff (is_mag_applicable_access (Atomic (op, aq, rl, Data, Data)) width) s
+  = Some (true, s, []).
+Proof. apply exec_eff_returnM. Qed.
+
+Lemma exec_eff_mag_pma_check_aligned (pma : PMA) (acc : MemoryAccessType mem_payload)
+    (paddr : physaddr) (width : Z) (b : bool) s :
+  exec_eff (is_mag_applicable_access acc width) s = Some (b, s, []) ->
+  is_aligned_paddr paddr width = true ->
+  exec_eff (mag_pma_check pma acc paddr width) s = Some (Ok (CannotSplit, 0), s, []).
+Proof.
+  intros Hma Halign.
+  unfold mag_pma_check.
+  rewrite (exec_eff_bind_nil _ _ _ _ _ Hma).
+  rewrite Halign. cbn [orb]. apply exec_eff_returnM.
+Qed.
+
+(** [RiscvExtras.pma_ok_peel]'s eff twin, same four arguments:
+    [Hmatch] : matching_pma_region … = Some <the destructed region>
+    [Hfield] : the access's PMA permission field = true
+    [Hmag]   : exec_eff (is_mag_applicable_access <acc> <width>) s
+               = Some (_, s, [])
+    [Halign] : is_aligned_paddr <paddr> <width> = true
+    The caller destructs the region first, exactly as in SC. *)
+Ltac pma_ok_eff_peel Hmatch Hfield Hmag Halign :=
+  unfold pmaCheck; rewrite exec_eff_catch_early_return;
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_read_reg pma_regions _)); cbn beta;
+  rewrite Hmatch;
+  cbn [PMA_Region_attributes] in Hfield |- *;
+  cbn match;
+  rewrite execR_eff_bind_eq; rewrite execR_eff_returnR; cbn match beta;
+  lazymatch goal with
+  | |- context[Defs.assert_exp' _ _] =>
+      (* the assert-bind is itself the LEFT operand of the canAccess bind, so
+         [execR_eff_liftR_seq] has nothing to match until [execR_eff_bind_eq]
+         exposes it *)
+      cbn [Riscv.rv64d.not negb];
+      rewrite execR_eff_bind_eq;
+      rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_assert_exp'_true _ _)); cbn beta;
+      rewrite execR_eff_returnR; cbn match beta
+  | _ =>
+      rewrite execR_eff_bind_eq; rewrite execR_eff_returnR; cbn match beta
+  end;
+  rewrite Hfield; cbn [Riscv.rv64d.not negb];
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_mag_pma_check_aligned _ _ _ _ _ _ Hmag Halign));
+  cbn beta; cbn match; rewrite execR_eff_returnR; cbn [app]; reflexivity.
 
 Lemma exec_eff_translationMode_M s :
   exec_eff (translationMode Machine) s = Some (Bare, s, []).

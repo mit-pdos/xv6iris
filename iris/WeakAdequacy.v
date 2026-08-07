@@ -147,10 +147,10 @@ Proof.
   (* ---- assemble the two instances ---- *)
   set (E0 := RiscvEraGS f 1%positive 1%positive γu γp γv 1%positive 1%positive
                (fun _ => 1%positive) (fun _ => 1%positive)
-               (fun _ => 1%positive) 1%positive).
+               (fun _ => 1%positive) 1%positive 1%positive).
   set (HR := RiscvGS Σ
-               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ 1%positive 1%positive _
-                  1%positive _ _ 1%positive (fun _ => True%I))
+               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ 1%positive 1%positive _
+                  1%positive _ _ 1%positive (fun _ => True%I) 1%positive)
                E0).
   set (HW := WeakGS Σ _ γlog γlat γws).
   iDestruct (big_sepL_sep with "Hcpus") as "[Hauths Helems]".
