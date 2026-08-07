@@ -61,7 +61,7 @@ Require Import SmodeCore RegFile HartTp WpNext WpMmodeLeafBase InstrBytes.
 Require Import StackOwn.
 Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr WpAuipc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import WpLock.
 Require Import KallocInv KvmSpec PageGeom.
 (* the shared kernel page table: main's OWN publication assembly spends

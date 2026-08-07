@@ -83,16 +83,13 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import WpLock.
-Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
 Require Import WpSmodeIntr.
-Require Import ByteCursor.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.

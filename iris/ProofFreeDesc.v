@@ -46,7 +46,7 @@ Require Import ProcGeom.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext CpuOwn.
 Require Import FdSlots.
-Require Import KernelRvcDecode WpAuipc.
+Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpSmodeHalf.
 Require Import VirtioModel DiskPtsto DiskInv.

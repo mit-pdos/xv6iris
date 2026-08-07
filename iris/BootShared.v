@@ -27,7 +27,6 @@ Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom SwtchCtx SchedCtx.
 Require Import WpLock KallocInv FileInv FdSlots.
-Require Import WpEntryNew.
 Require Import VirtioProto VirtioModel VirtioQueue DiskPtsto.
 Require Import PlicPlan WpUart WireInv.
 Require Import SpecConsoleinit SpecIinit.

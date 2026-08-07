@@ -26,7 +26,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.

@@ -83,32 +83,26 @@ Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import WpLock.
-Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
-Require Import WpSconfSrliw.
-Require Import WpSmodeIntr.
 Require Import ByteCursor.
-Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SwtchCtx.
 Require Import SchedCtx.
 Require Import WpUart.
-Require Import BufOwn BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import KvmSpec.
+Require Import SpecPanic.
 Require Import ProcPtOwn.
 Require Import FileInv ProcInv.
 Require Import CodeWritei.

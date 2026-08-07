@@ -17,7 +17,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore RegFile WpMmodeLeafBase.
 Require Import HartTp WpNext IntrDefs.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr WpAuipc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr.
 Require Import RiscvExtras.
 Require Import CalleeSaved StackOwn.
 Require Import KernelRvcDecode.

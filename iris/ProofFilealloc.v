@@ -56,7 +56,6 @@ Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import InstrBytes.
-Require Import WpAuipc.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.

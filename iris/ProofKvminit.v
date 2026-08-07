@@ -22,7 +22,7 @@ Require Import SmodeCore RegFile WpMmodeLeafBase.
 Require Import IntrDefs.
 Require Import WpNext.
 Require Import CpuOwn.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
 Require Import KallocInv.

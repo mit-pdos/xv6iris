@@ -55,7 +55,6 @@ Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
-Require Import WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import VirtioModel DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.

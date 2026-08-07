@@ -44,7 +44,6 @@ Require Import WpLock.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import CpuOwn FdSlots.
-Require Import WpAuipc.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpUart.
 Require Import VirtioModel DiskPtsto DiskInv.

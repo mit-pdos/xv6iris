@@ -54,21 +54,17 @@ Require Import KernelText.
 Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import WpAuipc.
 Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
+Require Import BufOwn.
 Require Import WpLock.
-Require Import SleepLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
 Require Import WpSmodeHalf.
 Require Import WpSconfSrliw.
-Require Import WpSmodeIntr.
-Require Import ByteCursor.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -77,7 +73,6 @@ Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.

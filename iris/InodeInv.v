@@ -55,7 +55,6 @@ Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import ByteBuf.
 Require Import DiskPtsto.
-Require Import BioInv.
 Require Import FsBlocks.
 Require Import LogInv.
 Require Import BlockWords.

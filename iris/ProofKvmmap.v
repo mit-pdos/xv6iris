@@ -20,7 +20,6 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import CpuOwn.
 Require Import SpecPanic.
-Require Import WpAuipc.
 Require Import RegFile.
 Require Import WpLock WpMmodeLeafBase.
 Require Import CalleeSaved StackOwn.

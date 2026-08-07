@@ -57,9 +57,8 @@ Require Import WaitInv.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
 Require Import SpecPanic.
-Require Import WpMmodeLeafBase.
 Require Import CalleeSaved.
-Require Import IntrDefs HartTp WpNext.
+Require Import IntrDefs WpNext.
 Require Import CpuOwn.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.

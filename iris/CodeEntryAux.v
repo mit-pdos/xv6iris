@@ -25,18 +25,14 @@ From iris.program_logic Require Import language.
 Require Import SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec WpDecode.
-Require Import WpAuipc.
+Require Import RiscvLang RiscvPtsto WpDecode.
 Require Import RiscvExtras.
-Require Import WpMmodeLeafBase.
 Require Import InstrBytes KernelText.
 From iris.base_logic.lib Require Import invariants.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import WpDecodeBridge.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec WpDecode.
-Require Import WpRvcBridge.
+Require Import RiscvLang RiscvPtsto WpDecode.
 Require Export ExecCommon.
 Require Import CodeEntry.
 Local Open Scope Z_scope.

@@ -115,7 +115,7 @@ Require Import HartTp WpNext.
 Local Strategy opaque [rget].
 Local Strategy opaque [tp_pin].
 Local Strategy opaque [rf_upd].
-Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpAuipc.
+Require Import IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpLock.
 Require Import CalleeSaved StackOwn.
 Require Import KernelDataInv.

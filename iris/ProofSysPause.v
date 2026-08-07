@@ -112,7 +112,6 @@ Require Import StackOwn CalleeSaved.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpAuipc.
 Require Import WpSmodeIntr.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.

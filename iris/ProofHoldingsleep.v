@@ -22,7 +22,6 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import SleepLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import CodeWakeup.
 Require Import CodeSleeplock.
 Require Import IntrDefs.
 Require Import WpNext.
@@ -30,7 +29,6 @@ Require Import CpuOwn.
 Require Import SpecAcquire SpecRelease SpecMyproc.
 Require Import SpecHoldingsleep.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import KernelRvcDecode.
 Import Defs.
 
 Local Open Scope Z_scope.

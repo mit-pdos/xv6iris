@@ -46,7 +46,6 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import WpSmodeWfi.
 Require Import WpLock.
-Require Import WpAuipc.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SwtchCtx.

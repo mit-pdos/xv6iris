@@ -62,7 +62,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
-Require Import CodeTimerinit.
 
 Require Import CodeTimerinitAux.
 Require Import MbootVocab.

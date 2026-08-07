@@ -41,7 +41,7 @@ Require Import CpuOwn.
 Require Import StackOwn CalleeSaved.
 Require Import VcGen.
 Require Import WpLock.
-Require Import KernelRvcDecode WpAuipc.
+Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import CodeSysUptime.
 Require Import TicksInv.

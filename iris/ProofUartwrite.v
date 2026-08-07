@@ -82,7 +82,7 @@ Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import ByteCursor.
-Require Import StackOwn CalleeSaved KernelText WpAuipc.
+Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.

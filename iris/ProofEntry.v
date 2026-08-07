@@ -27,13 +27,10 @@ Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import WpEntryNew WpTimerinit WpStartNew.
-Require Import MbootVocab WpGprMretWp WpGprCsrwA WpGprCsrwB.
+Require Import WpGprMretWp WpGprCsrwA WpGprCsrwB.
 Require Import SpecEntry.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import CodeStart.
-Require Import CodeTimerinit.
-Require Import CodeEntry.
 Require Import CodeEntryAux.
 Require Import CodeStartAux.
 Require Import CodeTimerinitAux.

@@ -102,17 +102,14 @@ From iris.program_logic Require Import language lifting.
 From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExtras.
+Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import SmodeCore.
-Require Import CalleeSaved KernelText.
+Require Import KernelText.
 Require Import IntrDefs.
-Require Import WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import UptTree UserPtTree.
-Require Import ProcPtOwn.
 Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
@@ -120,7 +117,7 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecPanic.

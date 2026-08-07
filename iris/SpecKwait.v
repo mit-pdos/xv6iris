@@ -114,8 +114,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import KallocInv.
 Require Import KvmSpec.
-Require Import PageGeom.
-Require Import UptTree UserPtTree.
+Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import SwtchCtx.
 Require Import FdSlots FileInv.

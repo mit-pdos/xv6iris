@@ -49,7 +49,7 @@ Require Import InstrBytes KernelText.
 Require Import StackOwn CalleeSaved.
 Require Import WpMmodeLeafBase.
 Require Import KernelRvcDecode.
-Require Import VcGen WpAuipc.
+Require Import VcGen.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs WpNext.
 Require Import CpuOwn.

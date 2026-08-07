@@ -30,7 +30,6 @@ Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import SpecUart.
 Require Import WpSmodeUart.
-Require Import CodeUartPutcSync.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 

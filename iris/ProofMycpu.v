@@ -29,7 +29,7 @@ Require Import RegFile WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import HartTp WpNext IntrDefs.
 Require Import StackOwn CalleeSaved.
-Require Import WpAuipc VcGen WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import RiscvExtras.
 Require Import CodeMycpu.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

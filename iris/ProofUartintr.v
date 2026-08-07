@@ -49,12 +49,12 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn CalleeSaved KernelText WpAuipc.
+Require Import StackOwn CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
 Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
-Require Import SpecUart CodeUartPutcSync WpSconfUartAccess WpUartgetc.
+Require Import SpecUart WpSconfUartAccess WpUartgetc.
 Require Import UartTxInv.
 Require Import SpecPanic.
 Require Import SchedCtx.

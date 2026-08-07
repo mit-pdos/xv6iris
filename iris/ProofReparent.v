@@ -36,7 +36,6 @@ Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
-Require Import WpAuipc.
 Require Import CalleeSaved.
 Require Import StackOwn.
 Require Import IntrDefs HartTp WpNext.

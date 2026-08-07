@@ -22,7 +22,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile WpNext.
-Require Import InstrBytes WpMmodeLeafBase WpAuipc.
+Require Import InstrBytes WpMmodeLeafBase.
 Require Import RiscvExtras.
 Require Import SmodeCore.
 Require Import CalleeSaved.

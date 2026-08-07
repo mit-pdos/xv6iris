@@ -36,7 +36,7 @@ Require Import SmodeCore WpMmodeLeafBase.
    (exec_write_CSR_sstatus & co.) is exported from WpPushOffCsr.v --
    relocate those down when the csr leaves get a shared base. *)
 Require Import WpGprCsrrCommon WpGprCsrrB.
-Require Import CodePopOff WpPushOffCsr WpSieFlipBits.
+Require Import WpPushOffCsr WpSieFlipBits.
 Require WpGprCsrwC.
 Require Import StackOwn.
 Require Import HartTp WpNext.

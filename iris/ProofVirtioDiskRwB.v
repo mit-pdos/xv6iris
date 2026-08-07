@@ -41,7 +41,6 @@ Require Import ProcGeom.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
-Require Import WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.

@@ -50,21 +50,19 @@ Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import KernelRvcDecode.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import KallocInv.
 Require Import PageGeom.
 Require Import CpuOwn.
 Require Import ProcGeom.
-Require Import UptTree UserPtTree.
+Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
-Require Import KvmSpec.
-Require Import InstrBytes KernelText.
+Require Import InstrBytes.
 Require Import CodeFreeproc.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import SpecKfree SpecProcFreepagetable.

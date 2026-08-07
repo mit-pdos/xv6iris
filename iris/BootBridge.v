@@ -88,12 +88,9 @@ Require Import RegFile HartTp InstrBytes WpGpr.
 Require Import KMap KptPt.
 Require Import StackOwn.
 Require Import WpMmodeLeafBase.
-Require Import WpGprCsrwA WpGprCsrwB WpGprCsrwC.
-Require Import WpGprMretWp.
 Require Import MbootVocab.
 Require Import SRegime SmodeCore.
 Require Import IntrDefs.
-Require Import MstatusFacts.
 Require Import ProcGeom CpuOwn SchedCtx.
 Require Import SpecMain.
 From Kernel Require KernelSyms.

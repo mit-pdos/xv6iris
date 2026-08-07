@@ -38,7 +38,6 @@ Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs WpSmodeIntr.
 Require Import HartTp WpNext.
-Require Import WpAuipc.
 Require Import WpSconfAlu WpSconfMem.
 Require Import WpSmodeHalf.
 Require Import DiskPtsto DiskInv.

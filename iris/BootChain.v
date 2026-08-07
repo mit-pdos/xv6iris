@@ -46,7 +46,6 @@ Require Import RiscvLang RiscvPtsto MinstretInv.
 Require Import RegFile HartTp InstrBytes WpGpr.
 Require Import KMap KptPt.
 Require Import StackOwn.
-Require Import WpMmodeLeafBase.
 Require Import KernelText KernelDataInv.
 Require Import MbootVocab.
 Require Import MstatusFacts.

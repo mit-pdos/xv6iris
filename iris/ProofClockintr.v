@@ -51,7 +51,7 @@ Require Import WpLock.
 Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext CpuOwn.
-Require Import KernelRvcDecode WpAuipc.
+Require Import KernelRvcDecode.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import TimerCap WpSconfTimer.
 Require Import TicksInv.

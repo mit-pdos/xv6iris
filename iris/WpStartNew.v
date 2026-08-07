@@ -74,7 +74,7 @@ Require Import WpGprCsrwCommon.
 Require Import MstatusFacts.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras WpGpr.
-Require Import WpAuipc WpMmodeShiftiop WpMmodeJal.
+Require Import WpMmodeShiftiop WpMmodeJal.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeUtype.
 Require Import WpMmodeAddiw.
@@ -90,8 +90,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
-Require Import CodeStart.
-Require Import CodeTimerinit.
 
 Require Import CodeStartAux.
 Require Import MbootVocab.
