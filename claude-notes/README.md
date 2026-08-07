@@ -145,22 +145,6 @@ are working on that effort — the relevant `projects/` file.
   deferred bitmap-invariant question that `balloc` waits on, and the owed
   decode-word dedup sweep. Design in
   [`design/fs-inode.md`](design/fs-inode.md).
-- **[`sail-model-bump.md`](projects/sail-model-bump.md)** — the sail-riscv
-  model bump, IN FLIGHT and ONE FILE from green: the model now comes from the
-  `zeldovich/sail-riscv` FORK (pinned by `SAIL_RISCV_REV`), whose delta is the
-  ATOMIC PTE A/D-bit update, and the fork's tip carried 58 upstream commits
-  along with it. `make proofs -k` is green on every `iris/` file except
-  `UserMemClassify.v`, whose MISALIGNED pipeline is still pre-bump. The
-  headline finding, and the thing to read first: the bump moved the misaligned
-  split in TWO directions at once — `vmem_*_addr` now splits only across a PAGE
-  boundary (at most two ways, one translation each) while the MAG/alignment
-  split moved DOWN into `checked_mem_*`, under a single translation and with no
-  fault of its own — so the iris-level work is per PAGE, not per chunk. Keeps
-  the peel recipes and their traps, the physical split kit that is already
-  built (`MemAccessGen`'s N-chunk loops and width-generic RAM leaves,
-  `UserMemMis`'s chunk-plan derivation and the two user-level composers), the
-  one platform conjunct `pma_allows_all` had to gain, and a precise account of
-  the three things still to do.
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone
@@ -285,6 +269,24 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`sail-model-bump.md`](completed/sail-model-bump.md)** — the sail-riscv
+  model bump: the model now comes from the `zeldovich/sail-riscv` FORK (pinned
+  by `SAIL_RISCV_REV`), whose delta is the ATOMIC PTE A/D-bit update, and whose
+  tip carried 58 upstream commits along with it. The headline finding: the bump
+  moved the misaligned split in TWO directions at once — `vmem_*_addr` now
+  splits only across a PAGE boundary (at most two ways, one translation each)
+  while the MAG/alignment split moved DOWN into `checked_mem_*`, under a single
+  translation and with no fault of its own — so the iris-level work is per PAGE,
+  not per chunk. Keeps the peel recipes and their traps, the physical split kit
+  (`MemAccessGen`'s N-chunk loops and width-generic RAM leaves, `UserMemMis`'s
+  chunk-plan derivation), the two platform conjuncts `pma_allows_all` had to
+  gain (misaligned-exceptions None, reservability ≠ RsrvNone) and why, and FOUR
+  findings worth reading before any interface sweep of this kind: a 30-minute
+  "hang" that was a mis-stated `∀`-premise (and that `coqc -time` localises in
+  two minutes); why pinning a platform field beat threading a disjunction
+  through five altitudes; how a WEAKENED upstream `assert` made a dead branch
+  live (the shadow-stack PTE, and the `forall s` argument that kills it again);
+  and `pmaCheck`'s Atomic arm compiling to a match on the op.
 - **[`explicit-cpuid.md`](completed/explicit-cpuid.md)** — the ambient `CpuId`
   removed from every WP statement, so a step's continuation is about the hart
   execution RESUMES on rather than the one it started on. `wp_next` and its two
