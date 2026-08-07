@@ -248,12 +248,17 @@ Section UserMemAccessGeneric.
             Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
             with "Hri Hgh Hinv Hdata")
       as (dv σ') "(%Htr & %Hmr & %Hmdev & %Hsregs & Hri & Hgh & Hinv & Hdata)".
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * k))) (Load Data)) σ
+    assert (Htr' : exec (translateAddr (Virtaddr va) (Load Data)) σ
                    = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw), σ')).
-    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * k)) with (add_vec_int va (0 * k)).
-      rewrite avi0. exact Htr. }
+    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * k)) with (add_vec_int va (0 * k))
+        in Htr.
+      rewrite avi0 in Htr. exact Htr. }
+    iDestruct (utlb_inv_pt_tmode uroot tfp um σ HSXL with "Hri Hinv") as %Htm.
     destruct (exec_vmem_read_addr_aligned k va (u_walk_pa w va) dv (Load Data)
-                false false false σ σ' Hal Htr' Hmr) as (dvv & Hvr).
+                false false false User Sv39 σ σ' Hvw Hal
+                (exec_effectivePrivilege_mprv0 (Load Data) (register_lookup mstatus σ.(sregs))
+                   (register_lookup cur_privilege σ.(sregs)) σ ltac:(cbn; congruence) Hmprv)
+                Htm Htr' Hmr) as (dvv & Hvr).
     iModIntro. iExists dvv, σ'.
     iSplit; [ iPureIntro; exact Hvr | ].
     iSplit; [ iPureIntro; exact Hmdev | ].
