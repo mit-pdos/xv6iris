@@ -176,6 +176,9 @@ Section WpSconfMem.
       (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
       (Ψ : mword (8*width) -> iProp Σ) (Em : coPset) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
+    (* the vmem level splits on a PAGE boundary now, which needs the width to
+       be one of the four the ISA allows there *)
+    vmem_width width ->
     (width | 4096) ->
     uint (to_bits 64 width) = width ->
     (forall (addr : mword 64) (w : mword (8*width)) s,
@@ -210,7 +213,7 @@ Section WpSconfMem.
         WP (Loop : expr riscv_lang) {{ Φ }})) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hext pa Hrd Hrdok HkptEm.
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext pa Hrd Hrdok HkptEm.
     rdok_split Hrdok.
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
@@ -290,6 +293,7 @@ Section WpSconfMem.
                  (exec_get_pmlen_load_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
+    iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
     unshelve iMod (sr_absorb strans_regime (Load Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_introl eq_refl)) I
             (lo_canonical pa Hcan) ltac:(reflexivity)
@@ -342,11 +346,12 @@ Section WpSconfMem.
                               (regval_into_reg (ext v)))).
     { rewrite <- (Hext v).
       pose proof (ram_pmp_match_w (pa_of ppn pa) (vec_access_dec (register_lookup pmpaddr_n s_tr.(sregs)) 0) width Hw0 Huintw Hlo Hfit Hcov) as Hrange_ld.
-      apply (exec_execute_LOAD_w_gpr_S_walk_pt width Hw8 Hread_plain uns rs1 rd imm v region_ld s_pc s_tr (pa_of ppn pa) Hrd
+      apply (exec_execute_LOAD_w_gpr_S_walk_pt width Hw0 Hw8 Hvw Hread_plain uns rs1 rd imm v region_ld s_pc s_tr (pa_of ppn pa) md0 Hrd
                Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign)
-               ltac:(rewrite Lva subrange_id sign_extend'_id avi0_mulw; exact Htr_pc)
+               ltac:(rewrite Lva subrange_id sign_extend'_id; exact Htr_pc)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
+               Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
                HA0 Hord0
                Hrange_ld HR
                ltac:(rewrite Lpma_tr; exact Hmatch_ld0)
@@ -412,6 +417,9 @@ Section WpSconfMem.
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
+    (* the vmem level splits on a PAGE boundary now, which needs the width to
+       be one of the four the ISA allows there *)
+    vmem_width width ->
     (width | 4096) ->
     uint (to_bits 64 width) = width ->
     (forall (addr : mword 64) (w : mword (8*width)) s,
@@ -437,7 +445,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdok.
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_au width c uns Φ pc rd rs1 imm m n
               (fun w => extend_value uns
@@ -458,6 +466,9 @@ Section WpSconfMem.
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
+    (* the vmem level splits on a PAGE boundary now, which needs the width to
+       be one of the four the ISA allows there *)
+    vmem_width width ->
     (width | 4096) ->
     uint (to_bits 64 width) = width ->
     (forall (addr : mword 64) (w : mword (8*width)) s,
@@ -494,6 +505,9 @@ Section WpSconfMem.
       (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
+    (* the vmem level splits on a PAGE boundary now, which needs the width to
+       be one of the four the ISA allows there *)
+    vmem_width width ->
     (width | 4096) ->
     uint (to_bits 64 width) = width ->
     (forall (addr : mword 64) (w : mword (8*width)) s,
@@ -767,7 +781,8 @@ Section WpSconfMem.
   Lemma wp_store_s_sconf_au (width : Z) (c : bool)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (sv : mword (8*width)) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
-    0 < width -> width <= 8 -> (width | 4096) -> uint (to_bits 64 width) = width ->
+    0 < width -> width <= 8 -> vmem_width width ->
+    (width | 4096) -> uint (to_bits 64 width) = width ->
     (forall (addr : mword 64) (data : mword (8*width)) s,
        dev_addr addr = false ->
        exec (write_ram rv64d_types.Write_plain (Physaddr addr) width data tt) s
@@ -793,7 +808,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hwrite_plain Hsv HkptEm pa.
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv HkptEm pa.
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast; lia).
@@ -875,6 +890,7 @@ Section WpSconfMem.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
+    iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
     unshelve iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
@@ -925,11 +941,12 @@ Section WpSconfMem.
                               s_tr.(mdev))).
     {
       pose proof (ram_pmp_match_w (pa_of ppn pa) (vec_access_dec (register_lookup pmpaddr_n s_tr.(sregs)) 0) width Hw0 Huintw Hlo Hfit Hcov) as Hrange_st.
-      pose proof (exec_execute_STORE_w_gpr_S_walk_pt width Hw8 Hwrite_plain rs2 rs1 imm region_st s_pc s_tr (pa_of ppn pa)
+      pose proof (exec_execute_STORE_w_gpr_S_walk_pt width Hw0 Hw8 Hvw Hwrite_plain rs2 rs1 imm region_st s_pc s_tr (pa_of ppn pa)
                Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign)
-               ltac:(rewrite Lva subrange_id sign_extend'_id avi0_mulw; exact Htr_pc)
+               ltac:(rewrite Lva subrange_id sign_extend'_id; exact Htr_pc)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
+               Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
                HA0 Hord0
                Hrange_st HW
                ltac:(rewrite Lpma_tr; exact Hmatch_st0)
@@ -979,7 +996,8 @@ Section WpSconfMem.
   Lemma wp_store_s_sconf_gen (width : Z) (c : bool)
       (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold sv : mword (8*width)) (b : bool) :
-    0 < width -> width <= 8 -> (width | 4096) -> uint (to_bits 64 width) = width ->
+    0 < width -> width <= 8 -> vmem_width width ->
+    (width | 4096) -> uint (to_bits 64 width) = width ->
     (forall (addr : mword 64) (data : mword (8*width)) s,
        dev_addr addr = false ->
        exec (write_ram rv64d_types.Write_plain (Physaddr addr) width data tt) s
@@ -1001,7 +1019,7 @@ Section WpSconfMem.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros Hw0 Hw8 Hwdvd Huintw Hwrite_plain Hsv pa.
+    intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv pa.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_au width c Φ pc rs2 rs1 imm m n sv
               (wordw_pointsto width pa (DfracOwn 1) sv) (⊤ ∖ ↑minstretN) b
@@ -1276,6 +1294,7 @@ Section WpSconfMem.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
+    iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
     unshelve iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
@@ -1502,6 +1521,7 @@ Section WpSconfMem.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
+    iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
     unshelve iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
@@ -1686,6 +1706,7 @@ Section WpSconfMem.
                  (exec_get_pmlen_store_S s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
+    iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
     unshelve iMod (sr_absorb strans_regime (Store Data) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_introl eq_refl))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)

@@ -205,7 +205,7 @@ Lemma exec_execute_LOADRES_u_ok (aq rl : bool) (rs1 rd : mword 5) (width : Z)
     (data : mword (8 * width)) (s s' : mstate) :
   (width <=? xlen_bytes) = true ->
   uint rd <> 0 ->
-  exec (vmem_read (Regidx rs1) (zeros' 64) width (LoadReserved Data) aq (andb aq rl) true) s
+  exec (vmem_read (Regidx rs1) (zeros' 64) width (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) s
     = Some (Ok data, s') ->
   exec (execute (LOADRES (aq, rl, Regidx rs1, width, Regidx rd))) s
     = Some (RETIRE_SUCCESS,
@@ -230,7 +230,7 @@ Qed.
 Lemma exec_execute_LOADRES_u_err (aq rl : bool) (rs1 rd : mword 5) (width : Z)
     (e : ExecutionResult) (s s' : mstate) :
   (width <=? xlen_bytes) = true ->
-  exec (vmem_read (Regidx rs1) (zeros' 64) width (LoadReserved Data) aq (andb aq rl) true) s
+  exec (vmem_read (Regidx rs1) (zeros' 64) width (LoadReserved (aq, rl, Data)) aq (andb aq rl) true) s
     = Some (Err e, s') ->
   exec (execute (LOADRES (aq, rl, Regidx rs1, width, Regidx rd))) s = Some (e, s').
 Proof.
@@ -252,7 +252,7 @@ Lemma exec_execute_STORECON_u_ok (aq rl : bool) (rs2 rs1 rd : mword 5) (width : 
              (if Z.eqb (uint rs2) 0 then zero_reg
               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
              (Z.sub (Z.mul width 8) 1) 0))
-          (StoreConditional Data) (andb aq rl) rl true) s = Some (Ok b, s') ->
+          (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s = Some (Ok b, s') ->
   exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
     = Some (RETIRE_SUCCESS,
             set_reg s' (R_bitvector_64 (gpr_of_Z (uint rd)))
@@ -287,7 +287,7 @@ Lemma exec_execute_STORECON_u_err (aq rl : bool) (rs2 rs1 rd : mword 5) (width :
              (if Z.eqb (uint rs2) 0 then zero_reg
               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s.(sregs))
              (Z.sub (Z.mul width 8) 1) 0))
-          (StoreConditional Data) (andb aq rl) rl true) s = Some (Err e, s') ->
+          (StoreConditional (aq, rl, Data)) (andb aq rl) rl true) s = Some (Err e, s') ->
   exec (execute (STORECON (aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s = Some (e, s').
 Proof.
   intros Hw Hvw.
@@ -350,18 +350,18 @@ Lemma exec_execute_AMO_u_store
   exec (rX_bits (Regidx rd)) s' = Some (rdv, s') ->
   andb (generic_eq op AMOCAS) (neq_vec lc (trunc (Z.mul (__id width) 8) rdv)) = false ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
-  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (effectivePrivilege (Atomic (op, aq, rl, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, aq, rl, Data, Data)) User) s = Some (0, s) ->
   exec (translationMode User) s = Some (md, s) ->
   is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))) width = true ->
   exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
-  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Ok tt, s') ->
-  exec (mem_read (Atomic (op, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Ok loaded, s') ->
-  exec (mem_write_value addr width (sign_extend' (Z.mul 8 (__id width)) result') (Atomic (op, Data, Data)) pbmt (andb aq rl) rl true) s'
+                                         (zeros' 64))) (Atomic (op, aq, rl, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (Atomic (op, aq, rl, Data, Data)) pbmt (andb aq rl) rl true) s' = Some (Ok tt, s') ->
+  exec (mem_read (Atomic (op, aq, rl, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Ok loaded, s') ->
+  exec (mem_write_value addr width (sign_extend' (Z.mul 8 (__id width)) result') (Atomic (op, aq, rl, Data, Data)) pbmt (andb aq rl) rl true) s'
     = Some (Ok true, s'') ->
   exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
     = Some (RETIRE_SUCCESS, wgpr_state rd (sign_extend' 64 lc) s'').
@@ -376,19 +376,19 @@ Proof.
                  = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (execR_liftR_seq _ _ _ _ _ Hass).
   (* gtda -> OK vaddr *)
-  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
                   = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
   { unfold get_transformed_data_addr.
-    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
               = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
     { unfold ext_data_get_addr.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
     rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, aq, rl, Data, Data)) md _ s Hcp Heff Hpml Htm)).
     apply exec_returnM. }
   rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
@@ -455,17 +455,17 @@ Lemma exec_execute_AMO_u_cas_ne
   exec (rX_bits (Regidx rd)) s' = Some (rdv, s') ->
   andb (generic_eq op AMOCAS) (neq_vec lc (trunc (Z.mul (__id width) 8) rdv)) = true ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
-  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (effectivePrivilege (Atomic (op, aq, rl, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, aq, rl, Data, Data)) User) s = Some (0, s) ->
   exec (translationMode User) s = Some (md, s) ->
   is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))) width = true ->
   exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
-  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Ok tt, s') ->
-  exec (mem_read (Atomic (op, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Ok loaded, s') ->
+                                         (zeros' 64))) (Atomic (op, aq, rl, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (Atomic (op, aq, rl, Data, Data)) pbmt (andb aq rl) rl true) s' = Some (Ok tt, s') ->
+  exec (mem_read (Atomic (op, aq, rl, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Ok loaded, s') ->
   exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
     = Some (RETIRE_SUCCESS, wgpr_state rd (sign_extend' 64 lc) s').
 Proof.
@@ -477,19 +477,19 @@ Proof.
   assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
                  = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
                   = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
   { unfold get_transformed_data_addr.
-    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
               = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
     { unfold ext_data_get_addr.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
     rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, aq, rl, Data, Data)) md _ s Hcp Heff Hpml Htm)).
     apply exec_returnM. }
   rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
@@ -540,8 +540,8 @@ Lemma exec_execute_AMO_u_read_err
   (width <=? xlen_bytes) = true ->
   (width <=? Z.mul xlen_bytes 2) = true ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
-  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (effectivePrivilege (Atomic (op, aq, rl, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, aq, rl, Data, Data)) User) s = Some (0, s) ->
   exec (translationMode User) s = Some (md, s) ->
   register_lookup cur_privilege s'.(sregs) = User ->
   register_lookup PC s'.(sregs) = pc ->
@@ -550,9 +550,9 @@ Lemma exec_execute_AMO_u_read_err
                                       (zeros' 64))) width = true ->
   exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
-  exec (mem_write_ea addr width (andb aq rl) rl true) s' = Some (Ok tt, s') ->
-  exec (mem_read (Atomic (op, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Err e, s') ->
+                                         (zeros' 64))) (Atomic (op, aq, rl, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
+  exec (mem_write_ea addr width (Atomic (op, aq, rl, Data, Data)) pbmt (andb aq rl) rl true) s' = Some (Ok tt, s') ->
+  exec (mem_read (Atomic (op, aq, rl, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Err e, s') ->
   exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
     = Some (Trap (User, make_sync_exception e
                     (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
@@ -566,19 +566,19 @@ Proof.
   assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
                  = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
                   = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
   { unfold get_transformed_data_addr.
-    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
               = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
     { unfold ext_data_get_addr.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
     rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, aq, rl, Data, Data)) md _ s Hcp Heff Hpml Htm)).
     apply exec_returnM. }
   rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
@@ -607,8 +607,8 @@ Lemma exec_execute_AMO_u_translate_err
     (e : ExceptionType) (pc : mword 64) (md : SATPMode) (s s' : mstate) :
   (width <=? Z.mul xlen_bytes 2) = true ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
-  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (effectivePrivilege (Atomic (op, aq, rl, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, aq, rl, Data, Data)) User) s = Some (0, s) ->
   exec (translationMode User) s = Some (md, s) ->
   register_lookup cur_privilege s'.(sregs) = User ->
   register_lookup PC s'.(sregs) = pc ->
@@ -617,7 +617,7 @@ Lemma exec_execute_AMO_u_translate_err
                                       (zeros' 64))) width = true ->
   exec (translateAddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
-                                         (zeros' 64))) (Atomic (op, Data, Data))) s = Some (Err (e, tt), s') ->
+                                         (zeros' 64))) (Atomic (op, aq, rl, Data, Data))) s = Some (Err (e, tt), s') ->
   exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
     = Some (Trap (User, make_sync_exception e
                     (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
@@ -631,19 +631,19 @@ Proof.
   assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
                  = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
                   = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
   { unfold get_transformed_data_addr.
-    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
               = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
     { unfold ext_data_get_addr.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
     rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, aq, rl, Data, Data)) md _ s Hcp Heff Hpml Htm)).
     apply exec_returnM. }
   rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
@@ -661,8 +661,8 @@ Lemma exec_execute_AMO_u_misaligned
     (pc : mword 64) (md : SATPMode) (s : mstate) :
   (width <=? Z.mul xlen_bytes 2) = true ->
   register_lookup cur_privilege s.(sregs) = User ->
-  exec (effectivePrivilege (Atomic (op, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
-  exec (get_pmlen (Atomic (op, Data, Data)) User) s = Some (0, s) ->
+  exec (effectivePrivilege (Atomic (op, aq, rl, Data, Data)) (register_lookup mstatus s.(sregs)) User) s = Some (User, s) ->
+  exec (get_pmlen (Atomic (op, aq, rl, Data, Data)) User) s = Some (0, s) ->
   exec (translationMode User) s = Some (md, s) ->
   register_lookup PC s.(sregs) = pc ->
   is_aligned_vaddr (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
@@ -681,19 +681,19 @@ Proof.
   assert (Hass : exec (assert_exp' true "extensions/A/zaamo_insts.sail:73.32-73.33" : M (true = true)) s
                  = Some (@eq_refl bool true, s)) by reflexivity.
   rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+  assert (Hgtda : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
                   = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
   { unfold get_transformed_data_addr.
-    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, Data, Data)) width) s
+    assert (Hedga : exec (ext_data_get_addr (Regidx rs1) (zeros' 64) (Atomic (op, aq, rl, Data, Data)) width) s
               = Some (Ext_DataAddr_OK (Virtaddr (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                        else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                       (zeros' 64))), s)).
     { unfold ext_data_get_addr.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr rs1 s)). apply exec_returnM. }
     rewrite (exec_bind_Some _ _ _ _ _ Hedga). cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, Data, Data)) md _ s Hcp Heff Hpml Htm)).
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_transform_effective_address_u (Atomic (op, aq, rl, Data, Data)) md _ s Hcp Heff Hpml Htm)).
     apply exec_returnM. }
   rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
