@@ -79,15 +79,34 @@
    that fires only on the kernel arm.  A contract that named the source
    bytes unconditionally would be UNPROVABLE.
 
-   HOLES READ AS ZEROS ([blk_holes_zero]).  [inode_blocks] leaves [data i]
-   unconstrained at an UNALLOCATED index [i], and bmap deposits a freshly
-   allocated block into the bundle at [replicate BSIZE 0] -- so without a
-   normalisation of the unallocated indices the clause above is false the
-   moment writei extends the file.  [blk_holes_zero] is that normalisation,
-   threaded in and back out; it is also the xv6 file semantics (a hole reads
-   as zeros) and readi will want it too.  It belongs next to [inode_blocks]
-   in InodeInv.v and is parked here only because editing that file
-   invalidates the whole bmap/iupdate cone.
+   HOLES READ AS ZEROS ([InodeInv.blk_holes_zero]).  [inode_blocks] leaves
+   [data i] unconstrained at an UNALLOCATED index [i], and bmap deposits a
+   freshly allocated block into the bundle at [replicate BSIZE 0] -- so
+   without a normalisation of the unallocated indices the clause above is
+   false the moment writei extends the file.  [blk_holes_zero] is that
+   normalisation, threaded in and back out; it is also the xv6 file semantics
+   (a hole reads as zeros).  It lives next to [inode_blocks] in InodeInv.v,
+   as does the flat view [file_byte] the clause above is stated on.
+
+   ==== COVERAGE IS PRESERVED ===========================================
+
+   [InodeInv.bm_covers bm sz] -- every file block whose first byte is below
+   [sz] is allocated -- is what keeps readi out of the log entirely
+   (SpecReadi.v's header).  writei EXTENDS the file, so a caller that writes
+   and then reads could never re-establish it unless writei promised it: the
+   predicate is therefore a PREMISE at the old size and a POSTCONDITION at
+   the new one.
+
+   It is provable rather than merely desirable because writei allocates every
+   block it writes -- through bmap, BEFORE [tot] is advanced over the chunk --
+   and installs [size' = max(size, off + tot)].  So a block below the new size
+   is either below the OLD size (the premise, carried across each bmap call by
+   [InodeInv.bm_covers_keep], whose hypothesis is exactly the "never
+   un-allocates" clause SpecBmap already carries) or was allocated by the loop
+   itself, which is the loop invariant [bm_covers bmI (off + tot)].  Neither
+   break arm needs a special case: both stop [tot] early, and the DISTURBED
+   REGION below lies at or above [off + tot], hence at or above the new size,
+   where coverage claims nothing.
 
    ==== A SHORT WRITE IS A NORMAL RETURN ================================
 
@@ -191,24 +210,9 @@ Local Open Scope Z_scope.
    log_write 18. *)
 Definition K_writei : nat := 70%nat.
 
-(* ===================================================================== *)
-(*  THE FLAT FILE-BYTE VIEW                                              *)
-(* ===================================================================== *)
-
-Definition file_byte (data : nat -> list (bv 8)) (k : nat) : bv 8 :=
-  data (k `div` BSIZE)%nat !!! (k `mod` BSIZE)%nat.
-
-(* Two [data]s that agree block by block agree byte by byte -- the step
-   every "nothing else moved" argument in the proof takes. *)
-Lemma file_byte_block (data data' : nat -> list (bv 8)) (k : nat) :
-  data' (k `div` BSIZE)%nat = data (k `div` BSIZE)%nat ->
-  file_byte data' k = file_byte data k.
-Proof. intros H. rewrite /file_byte H. reflexivity. Qed.
-
-(* A HOLE READS AS ZEROS.  See the header. *)
-Definition blk_holes_zero (bm : blkmap) (data : nat -> list (bv 8)) : Prop :=
-  forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) = 0 ->
-    data i = replicate BSIZE (bv_0 8).
+(* [file_byte], [file_byte_block] and [blk_holes_zero] live in InodeInv.v,
+   next to [inode_blocks] whose flat view they are.  They were parked here
+   while editing InodeInv.v was too expensive; both are shared with readi. *)
 
 (* ===================================================================== *)
 (*  THE ITERATION BOUND AND THE BUDGET                                    *)
@@ -273,6 +277,9 @@ Definition wp_writei_sconf_body
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->
+  (* EVERY BLOCK BELOW THE FILE'S SIZE IS ALLOCATED.  Threaded in and back
+     out at the NEW size -- see the header. *)
+  bm_covers bm (bv_unsigned (di_size dn)) ->
   (* THE JOINT NUMERIC PREMISE.  [off] and [n] are uints whose SUM stays in
      int range -- not two separate bounds.  It is what makes the
      [addw a5,a3,a4] at +0x022 non-wrapping, and hence what makes the
@@ -358,6 +365,8 @@ Definition wp_writei_sconf_body
       ⌜diblk_wf ds'⌝ -∗
       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
       ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
+      (* COVERAGE IS PRESERVED, AT THE NEW SIZE.  See the header. *)
+      ⌜bm_covers bm' (bv_unsigned (di_size dn'))⌝ -∗
       (* THE DISTURBED REGION: at most one block, immediately after the
          written range, and EMPTY unless a copy failed part-way.  See the
          header. *)

@@ -56,7 +56,6 @@ Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import SpecWritei.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

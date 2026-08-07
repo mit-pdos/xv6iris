@@ -61,7 +61,7 @@
    ==== WHAT COMES BACK, AND WHERE ======================================
 
    The bytes DELIVERED are the file's bytes.  Stated on the flat byte view
-   [SpecWritei.file_byte] -- readi's postcondition is writei's range clause
+   [InodeInv.file_byte] -- readi's postcondition is writei's range clause
    run in the other direction, over the same [inode_blocks] -- and, because
    the destination's untouched tail is equally nameable, with NO existential
    at all: after reading [tot] bytes the destination holds
@@ -141,12 +141,6 @@ Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FileInv ProcInv.
-(* ...for [file_byte] ALONE.  The flat per-byte view of [inode_blocks] is
-   shared by both whole-file operations and is stated once, in writei's spec
-   file; its proper home is next to [inode_blocks] in InodeInv.v and the
-   merge-back is owed there together with [blk_holes_zero]'s (see
-   claude-notes/projects/fs-inode.md).  readi does not call writei. *)
-Require Import SpecWritei.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

@@ -401,6 +401,42 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(*  THE FLAT FILE-BYTE VIEW, AND HOLES READ AS ZEROS                      *)
+(* ===================================================================== *)
+
+(* [inode_blocks γfs bm data] is indexed by file BLOCK, but every whole-file
+   operation is about a byte RANGE that straddles blocks.  Stating an effect
+   per block would force every caller to redo the straddle arithmetic, so the
+   flat view is defined ONCE, here beside [inode_blocks] itself, and both
+   writei's range clause and readi's delivered-bytes clause are stated on it.
+
+   It lives in InodeInv.v rather than in either function's spec file because a
+   Spec file must not depend on another function's Spec: [SpecReadi.v] used to
+   require [SpecWritei.v] for this definition alone, which coupled readi's
+   contract to writei's. *)
+Definition file_byte (data : nat -> list (bv 8)) (k : nat) : bv 8 :=
+  data (k `div` BSIZE)%nat !!! (k `mod` BSIZE)%nat.
+
+(* Two [data]s that agree block by block agree byte by byte -- the step every
+   "nothing else moved" argument takes. *)
+Lemma file_byte_block (data data' : nat -> list (bv 8)) (k : nat) :
+  data' (k `div` BSIZE)%nat = data (k `div` BSIZE)%nat ->
+  file_byte data' k = file_byte data k.
+Proof. intros H. rewrite /file_byte H. reflexivity. Qed.
+
+(* A HOLE READS AS ZEROS.  [inode_blocks] leaves [data i] unconstrained at an
+   UNALLOCATED index [i], and bmap deposits a freshly allocated block into the
+   bundle at [replicate BSIZE 0] -- so without a normalisation of the
+   unallocated indices, "the bytes outside my range are the bytes that were
+   there" is FALSE the moment writei extends the file.  This is that
+   normalisation, and it is also the xv6 file semantics.  It is threaded in
+   and back out by writei; it belongs next to [inode_blocks], which is why it
+   is here rather than in SpecWritei.v. *)
+Definition blk_holes_zero (bm : blkmap) (data : nat -> list (bv 8)) : Prop :=
+  forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) = 0 ->
+    data i = replicate BSIZE (bv_0 8).
+
+(* ===================================================================== *)
 (*  INSTALLING ONE BLOCK: the pure half of what bmap's three stores do    *)
 (*                                                                        *)
 (*  All three of bmap's installs -- [ip->addrs[bn]], [ip->addrs[NDIRECT]] *)

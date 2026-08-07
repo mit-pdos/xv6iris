@@ -395,7 +395,9 @@ registers.
 
 `inode_blocks γfs bm data` is indexed by file BLOCK; writei is about a byte
 RANGE that straddles blocks. Do not state the postcondition block by block
-— define the flat view once,
+— define the flat view once, **in `InodeInv.v` beside `inode_blocks`**
+(together with `blk_holes_zero`; a Spec file must not depend on another
+function's Spec, and both readi and writei state their contracts on it):
 
 ```coq
   file_byte (data : nat -> list (bv 8)) (k : nat) : bv 8
@@ -593,6 +595,10 @@ third arm — it returns 0 and `rd_clamp` is 0 there, so it IS the second arm
 at `tot = 0`. Collapsing them is what lets a caller conclude that a
 *returning* readi read everything there was to read.
 
+`SpecReadi.v` requires only the definitional layer — never `SpecWritei.v`.
+The flat view `file_byte` it states its delivered bytes on lives in
+`InodeInv.v`.
+
 The DELIVERED BYTES need no existential either. writei's `wrote` had to be
 existential because its source was user memory; readi's source is the file,
 which the caller's own `inode_blocks` names. So the destination comes back
@@ -616,12 +622,41 @@ so a larger size would drive bmap past MAXFILE into its out-of-range panic.
 No `log_op`, no `log_ctx`, no `γ : log_names`, and ONE `bslot` (bmap's and
 bread's uses do not overlap).
 
-### Owed, not done here
+### `writei` PRESERVES `bm_covers` (LANDED 2026-08-07)
 
-`writei` should PRESERVE `bm_covers` — it extends the file, so it must
-re-establish the predicate at the new size. That means re-opening writei's
-postcondition, and is deliberately deferred so readi is not blocked behind
-it; recorded in the worklist.
+`writei` takes `bm_covers bm (bv_unsigned (di_size dn))` as a PREMISE and
+returns `bm_covers bm' (bv_unsigned (di_size dn'))` — at the NEW size — so a
+caller may chain a write and a read. Without it `readi`'s own premise is
+unobtainable after any write that extends the file, which would make the two
+contracts unusable together.
+
+It is provable, and cheaply, because the code already does the right thing:
+every block writei writes is allocated by `bmap` BEFORE `tot` advances over
+its chunk, and the size installed is `max(size, off + tot)`. Three pieces:
+
+- **the loop invariant is `bm_covers bmI (off + tot)`** — "every block below
+  the byte offset reached so far is allocated". Its step
+  (`ProofWriteiParts.wi_covers_step`) is one case split: a block below
+  `off + tot` was already covered, and a block between `off + tot` and
+  `off + tot + m` can only be the ONE block just bmapped, because a chunk
+  never crosses a block boundary (`o + m <= BSIZE`). Keep the index
+  arithmetic in an `mword`-free helper (`wi_cov_idx`) — `lia` answers
+  "Cannot find witness" with a `bv_unsigned` merely in context.
+- **the old size rides along unchanged**, carried across each `bmap` call by
+  `bm_covers_keep`, whose hypothesis is exactly the "bmap never
+  un-allocates" clause `SpecBmap` already carries. That clause was added for
+  `blk_holes_zero`; it pays for coverage at no extra cost.
+- **the join takes whichever `wi_dinode` installs**
+  (`ProofWriteiParts.wi_covers_final`): a `case_decide` on the size test,
+  the two coverage facts feeding the two arms.
+
+**Neither break arm needs a special case**, which is worth stating because it
+looks like it should. Both stop `tot` early, and coverage only ever claims
+something strictly below the final size — so the DISTURBED REGION, which
+lies at or above `off + tot` and hence at or above the new size, is never in
+scope. On the copy-failure arm the disturbed block is in fact allocated
+anyway (bmap succeeded before the copy ran), so the claim would have held
+even if it had been in scope.
 
 ## Order of work
 

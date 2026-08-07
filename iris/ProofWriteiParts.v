@@ -20,7 +20,7 @@
        [ByteBuf.bb_split3]/[bb_join3] pattern of the copy loops, at a
        buffer rather than a page.
 
-   (3) THE FLAT FILE VIEW.  [SpecWritei.file_byte] reads a byte out of the
+   (3) THE FLAT FILE VIEW.  [InodeInv.file_byte] reads a byte out of the
        per-block [data]; the two lemmas here say what one spliced block does
        to it, which is the whole content of writei's postcondition.
 
@@ -736,6 +736,88 @@ Proof.
   assert (E2 : (off `mod` BSIZE + rem + BSIZE - 1)%nat
              = ((rem + off `mod` BSIZE - 1) + 1 * BSIZE)%nat) by lia.
   rewrite E1 E2 Nat.div_add; [lia | unfold BSIZE; lia].
+Qed.
+
+(* ===================================================================== *)
+(*  (4b) COVERAGE: writei ALLOCATES AS IT EXTENDS                         *)
+(*                                                                        *)
+(*  readi requires [bm_covers bm (di_size dn)] -- every file block below   *)
+(*  the size is allocated -- so writei must hand it back at the NEW size,  *)
+(*  or a caller that writes and then reads could never re-establish it.    *)
+(*  It is provable because writei allocates (via bmap) every block it      *)
+(*  writes BEFORE advancing [tot], and installs [size' = max(size,         *)
+(*  off + tot)].  Two facts do the work:                                   *)
+(*                                                                        *)
+(*    - [wi_covers_step]: one iteration extends coverage from [off + tot]  *)
+(*      to [off + tot + m], because the chunk never leaves the block bmap  *)
+(*      just allocated;                                                    *)
+(*    - [wi_covers_final]: at the join, coverage at the OLD size (carried  *)
+(*      across every bmap call by [InodeInv.bm_covers_keep]) and coverage  *)
+(*      at [off + tot] (the loop's own invariant) combine into coverage at *)
+(*      whichever of the two [wi_dinode] installs.                          *)
+(*                                                                        *)
+(*  Both break arms are covered without a special case: they stop [tot]    *)
+(*  early, and coverage is only ever claimed strictly below the final      *)
+(*  size, so the disturbed region -- which lies at or above [off + tot] -- *)
+(*  is never in scope.                                                     *)
+(* ===================================================================== *)
+
+(* the index arithmetic of the step, kept [mword]-free so [lia] works
+   (durable-notes: [lia] answers "Cannot find witness" with a [bv_unsigned]
+   merely in context).  A byte offset at or above [off + tot] but below
+   [off + tot + mm] lies in the ONE block [fbn] the iteration just bmapped,
+   because a chunk never crosses a block boundary. *)
+Lemma wi_cov_idx (i fbn o mm off tot : nat) :
+  (fbn * BSIZE + o = off + tot)%nat ->
+  (o + mm <= BSIZE)%nat ->
+  (Z.of_nat i * Z.of_nat BSIZE < Z.of_nat (off + (tot + mm)))%Z ->
+  ~ (Z.of_nat i * Z.of_nat BSIZE < Z.of_nat (off + tot))%Z ->
+  i = fbn.
+Proof.
+  intros Hdm Hmm Hlt Hge.
+  rewrite -Nat2Z.inj_mul in Hlt. apply Nat2Z.inj_lt in Hlt.
+  assert (Hge' : (off + tot <= i * BSIZE)%nat).
+  { destruct (Nat.le_gt_cases (off + tot) (i * BSIZE)) as [H | H]; [exact H |].
+    exfalso. apply Hge. rewrite -Nat2Z.inj_mul. apply Nat2Z.inj_lt. exact H. }
+  pose proof wi_bsize_val as HB.
+  rewrite HB in Hdm Hmm Hge' Hlt. lia.
+Qed.
+
+(* ONE ITERATION.  [fbn] is the block bmap just returned nonzero for, [o] the
+   offset inside it, [mm] the chunk length; [Hkeep] is bmap's own "never
+   un-allocates" clause. *)
+Lemma wi_covers_step (bmI bm2 : blkmap) (off tot fbn o mm : nat) :
+  (fbn * BSIZE + o = off + tot)%nat ->
+  (o + mm <= BSIZE)%nat ->
+  bv_unsigned (blkmap_get bm2 fbn) <> 0 ->
+  (forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bmI i) <> 0 ->
+     blkmap_get bm2 i = blkmap_get bmI i) ->
+  bm_covers bmI (Z.of_nat (off + tot)) ->
+  bm_covers bm2 (Z.of_nat (off + (tot + mm))).
+Proof.
+  intros Hdm Hmm Hnz Hkeep Hcov i Hi Hlt.
+  destruct (Z_lt_le_dec (Z.of_nat i * Z.of_nat BSIZE) (Z.of_nat (off + tot)))
+    as [Hin | Hout].
+  - rewrite (Hkeep i Hi (Hcov i Hi Hin)). exact (Hcov i Hi Hin).
+  - assert (Hnlt : ~ (Z.of_nat i * Z.of_nat BSIZE < Z.of_nat (off + tot))%Z)
+      by (clear -Hout; lia).
+    rewrite (wi_cov_idx i fbn o mm off tot Hdm Hmm Hlt Hnlt). exact Hnz.
+Qed.
+
+(* THE JOIN.  [wi_dinode] installs [max(old size, off + tot)], so coverage at
+   each of the two candidates gives coverage at whichever is chosen. *)
+Lemma wi_covers_final (bm' : blkmap) (dn : dinode) (off tot : nat) :
+  (Z.of_nat (off + tot) < 4294967296)%Z ->
+  bm_covers bm' (bv_unsigned (di_size dn)) ->
+  bm_covers bm' (Z.of_nat (off + tot)) ->
+  bm_covers bm' (bv_unsigned (di_size (wi_dinode dn bm' off tot))).
+Proof.
+  intros Hlt Hcs Hct. rewrite /wi_dinode. cbn [di_size].
+  case_decide as Hd; [| exact Hcs].
+  assert (Hlt32 : (0 <= Z.of_nat (off + tot) < 2 ^ 32)%Z).
+  { split; [apply Nat2Z.is_nonneg |].
+    change (2 ^ 32)%Z with 4294967296%Z. exact Hlt. }
+  rewrite (moi32_small (Z.of_nat (off + tot)) Hlt32). exact Hct.
 Qed.
 
 (* ===================================================================== *)

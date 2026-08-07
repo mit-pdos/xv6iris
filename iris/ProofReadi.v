@@ -113,7 +113,6 @@ Require Import CodeReadi.
 Require Import SpecPanic.
 Require Import SpecBmap SpecBread SpecBrelse SpecEitherCopyout.
 Require Import ProofReadiParts.
-Require Import SpecWritei.
 Require Import SpecReadi.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

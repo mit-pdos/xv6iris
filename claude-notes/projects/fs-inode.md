@@ -34,7 +34,9 @@ What is in the tree:
   `blk_own` tokens attached, their accessors, `inode_fresh{,_at}` (the
   freshness the install sites need) and `blkmap_wf_slot_upd` + the three
   `bm_slot_insert_*` readings — ONE general "replace slot p" law that all
-  three of bmap's stores go through.
+  three of bmap's stores go through.  It also holds the **flat byte view**
+  of `inode_blocks` — `file_byte`, `file_byte_block` and `blk_holes_zero` —
+  which readi and writei both state their contracts on.
 - **`SpecBalloc.v`** — ASSUMED contract, `K_balloc = 50`; its success arm
   returns `blk_own γfs blk`, and that token IS the freshness claim.
   `InodeInv.v` also carries **`bm_covers`** (every file block below the
@@ -297,10 +299,8 @@ Bmap.wp_bmap_sconf` is unchanged.
         and bmap deposits a fresh block at `replicate BSIZE 0`, so without
         that normalisation "the bytes outside my range are the bytes that
         were there" is FALSE the moment writei extends the file.  It is
-        threaded in and back out; it belongs next to `inode_blocks` in
-        `InodeInv.v` and is parked in `SpecWritei.v` only because editing
-        that file invalidates the whole bmap/iupdate cone.  **Merge-back
-        owed.**
+        threaded in and back out, and it lives next to `inode_blocks` in
+        `InodeInv.v` (merged back 2026-08-07, with `file_byte`).
       - **The iteration bound and the budget DO work.**
         `wi_blocks off n := (off mod BSIZE + n + BSIZE - 1) / BSIZE` and
         `wi_cost off n := 6 * wi_blocks off n + 1`; the decrease
@@ -399,21 +399,34 @@ Bmap.wp_bmap_sconf` is unchanged.
         (`Error 137`) in the `Code*.v` band. Use `-j6`; a full rebuild is
         then ~45 min.
 
-      ### Owed
+- [x] **`file_byte` / `blk_holes_zero` merged back into `InodeInv.v`**
+      (2026-08-07), and `SpecReadi.v` no longer requires `SpecWritei.v` —
+      a Spec file must not depend on another function's Spec. The flat
+      per-byte view of `inode_blocks` (plus `file_byte_block`) and the
+      hole normalisation now sit next to `inode_blocks`, where both
+      whole-file operations get them. `ProofReadi.v` /
+      `ProofReadiParts.v` dropped their `SpecWritei` requirement too;
+      `ProofWritei*.v` keep theirs (they are writei's own proof).
+      `lemma_diff.py` reports the three as `GONE from SpecWritei.v` —
+      that is the move, and the tool's contract is that every line it
+      prints is a thing to JUSTIFY, not necessarily a bug. Do not contort
+      a relocation to keep it silent.
 
-      `SpecReadi.v` requires `SpecWritei.v` for ONE definition,
-      `file_byte`. The flat per-byte view of `inode_blocks` belongs next
-      to `inode_blocks` in `InodeInv.v` together with `blk_holes_zero`;
-      the merge-back was not taken here only because moving a definition
-      out of `SpecWritei.v` shows up in `lemma_diff.py` as a `GONE`, and
-      that check had to stay clean. Do both merge-backs in one commit
-      whose lemma_diff output is explained.
-
-- [ ] **`writei` should PRESERVE `bm_covers`.** It extends the file, so it
-      must re-establish the predicate at the new size — needed the moment a
-      caller chains a write and a read. Deliberately deferred (it means
-      re-opening writei's postcondition) so readi was not blocked behind
-      re-proving writei.
+- [x] **`writei` PRESERVES `bm_covers`** (2026-08-07). Premise
+      `bm_covers bm (bv_unsigned (di_size dn))`, postcondition
+      `bm_covers bm' (bv_unsigned (di_size dn'))` — so a caller may chain a
+      write and a read. Design and the three pieces of the argument:
+      `../design/fs-inode.md`, "writei PRESERVES bm_covers". What it cost:
+      one loop invariant (`bm_covers bmI (off + tot)`), two premises on
+      `wi_size` (coverage at the old size and at `off + tot`, joined there
+      by `wi_covers_final`), one clause each on `wi_join` / `wi_ret` /
+      `wi_cont`, and two new lemmas in `ProofWriteiParts.v`
+      (`wi_covers_step` + its `mword`-free index helper `wi_cov_idx`, and
+      `wi_covers_final`). No existing clause was weakened and
+      `Print Assumptions Writei.wp_writei_sconf` is unchanged.
+      **Neither break arm needed a special case** — both stop `tot` early
+      and coverage claims nothing at or above the final size, so the
+      disturbed region is out of scope.
 
 ## Deferred: proving balloc
 

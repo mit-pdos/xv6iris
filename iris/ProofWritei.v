@@ -262,6 +262,7 @@ Section WriteiDefs.
         ⌜diblk_wf ds'⌝ -∗
         ⌜di_addrs dn' = bm_cells bm'⌝ -∗
         ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
+        ⌜bm_covers bm' (bv_unsigned (di_size dn'))⌝ -∗
         ⌜(dist <= BSIZE)%nat⌝ -∗
         ⌜(tot = n)%nat -> dist = 0%nat⌝ -∗
         ⌜forall k : nat,
@@ -346,6 +347,7 @@ Section WriteiRet.
     diblk_wf ds' ->
     di_addrs dn' = bm_cells bm' ->
     bv_unsigned (di_size dn') < 2 ^ 31 ->
+    bm_covers bm' (bv_unsigned (di_size dn')) ->
     (dist <= BSIZE)%nat ->
     ((tot = n)%nat -> dist = 0%nat) ->
     (forall k : nat,
@@ -395,7 +397,7 @@ Section WriteiRet.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
-           Hwf' Hhz' Hdswf' Hadr' Hsz' Hdb Hd0 Hrange Hker Harm Hlo Hhi Hext.
+           Hwf' Hhz' Hdswf' Hadr' Hsz' Hcov' Hdb Hd0 Hrange Hker Harm Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hoctx Hpark Hppid Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hfsb Hsrc Hsl Hop Hcont".
@@ -650,7 +652,7 @@ Section WriteiRet.
     rewrite /wi_cont.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot bm' data' dn' ds' n' wrote dist dstb P'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc
                     Hoctx Hpark Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hfsb
                     Hsrc Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
@@ -659,6 +661,7 @@ Section WriteiRet.
     { exact Hdswf'. }
     { exact Hadr'. }
     { exact Hsz'. }
+    { exact Hcov'. }
     { exact Hdb. }
     { exact Hd0. }
     { exact Hrange. }
@@ -701,6 +704,7 @@ Section WriteiJoin.
     blkmap_wf cov logstart bm' ->
     blk_holes_zero bm' data' ->
     bv_unsigned (di_size dn') < 2 ^ 31 ->
+    bm_covers bm' (bv_unsigned (di_size dn')) ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     wi_sp m M ->
@@ -759,7 +763,7 @@ Section WriteiJoin.
             m K C b -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hdswf Hadr Hwf' Hhz' Hsz'
+    intros HK Hgeom Hist Hicov Hilog Hdswf Hadr Hwf' Hhz' Hsz' Hcov'
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hrange Hker Htotn Hdneq
            Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
@@ -946,7 +950,7 @@ Section WriteiJoin.
               pidv dq dqd dqn dqs j m T3 K C b
               HK HT3sp HT3s1 HT3s3 HT3s8 HT3s9 HT3s10 HT3s11
               Hwf' Hhz' (diblk_wf_insert ds (islot inum) dn' Hdswf Hdwf')
-              Hadr Hsz' Hdb Hd0 Hrange Hker
+              Hadr Hsz' Hcov' Hdb Hd0 Hrange Hker
               ltac:(right; split_and!;
                     [exact HT3a0 | exact Htotn | exact Hdneq | reflexivity])
               Hlo Hhi Hext
@@ -989,6 +993,12 @@ Section WriteiSize.
     diblk_wf ds ->
     blkmap_wf cov logstart bm' ->
     blk_holes_zero bm' data' ->
+    (* COVERAGE, in the two halves the loop leaves it in: at the OLD size
+       (the caller's premise, carried across every bmap call) and at the
+       byte offset the write reached.  [wi_covers_final] joins them at
+       whichever of the two [wi_dinode] installs. *)
+    bm_covers bm' (bv_unsigned (di_size dn)) ->
+    bm_covers bm' (Z.of_nat (off + tot)) ->
     bv_unsigned (di_size dn) < 2 ^ 31 ->
     Z.of_nat (off + tot) < 2 ^ 31 ->
     (j < NPROC)%nat ->
@@ -1044,10 +1054,15 @@ Section WriteiSize.
             m K C b -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hdswf Hwf' Hhz' Hszlt Hofflt
+    intros HK Hgeom Hist Hicov Hilog Hdswf Hwf' Hhz' HcovS HcovT Hszlt Hofflt
            Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hrange Hker Htotn Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     change (2 ^ 31)%Z with 2147483648%Z in Hszlt, Hofflt.
+    (* the coverage the join needs: whichever size [wi_dinode] installs is
+       covered, because both candidates are *)
+    assert (Hcovf : bm_covers bm' (bv_unsigned (di_size (wi_dinode dn bm' off tot))))
+      by exact (ProofWriteiParts.wi_covers_final bm' dn off tot
+                  ltac:(clear -Hofflt; lia) HcovS HcovT).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs #Hscheds
               #Hdevi #Hdgeom #Hdlock Hframe Hoctx Hpark Hppid Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hfsb Hsrc Hsl Hop Hcont".
@@ -1290,6 +1305,7 @@ Section WriteiSize.
                 dist dstb V P' ncount u pidv dq dqd dqn dqs m QB5 K C b
                 HK Hgeom Hist Hicov Hilog Hdswf eq_refl Hwf' Hhz'
                 ltac:(rewrite Hdsz; change (2 ^ 31)%Z with 2147483648%Z; exact Hszlt)
+                Hcovf
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
                 HQB5Rs1 HQB5Rs8 HQB5Rs9 HQB5Rs10 HQB5Rs11
                 Hdb Hd0 Hrange Hker Htotn eq_refl Hlo Hhi Hext
@@ -1491,6 +1507,7 @@ Section WriteiSize.
                 dist dstb V P' ncount u pidv dq dqd dqn dqs m QA5 K C b
                 HK Hgeom Hist Hicov Hilog Hdswf eq_refl Hwf' Hhz'
                 ltac:(change (2 ^ 31)%Z with 2147483648%Z; exact Hszn)
+                Hcovf
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
                 HQA5Rs1 HQA5Rs8 HQA5Rs9 HQA5Rs10 HQA5Rs11
                 Hdb Hd0 Hrange Hker Htotn eq_refl Hlo Hhi Hext
@@ -1566,6 +1583,14 @@ Section WriteiLoop.
     (tot < n)%nat ->
     blkmap_wf cov logstart bmI ->
     blk_holes_zero bmI dataI ->
+    (* COVERAGE, in two halves.  The first is the caller's premise carried
+       across every bmap call by [bm_covers_keep]; the SECOND is the loop's
+       own invariant -- every block below the byte offset reached so far has
+       been allocated, because bmap runs before [tot] advances over its
+       chunk.  Together they give coverage at [max(size, off + tot)], which
+       is the size writei installs. *)
+    bm_covers bmI (bv_unsigned (di_size dn)) ->
+    bm_covers bmI (Z.of_nat (off + tot)) ->
     (forall k : nat,
        file_byte dataI k
        = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
@@ -1630,7 +1655,7 @@ Section WriteiLoop.
     intro W. revert CID0.
     induction W as [| W IH];
       intros CID0 tot bmI dataI wroteI PI nI M
-             Htotlt HwfI HhzI HrangeI HkerI HextI HW1 HW2 HW3 HW4 HW5
+             Htotlt HwfI HhzI HcovSI HcovTI HrangeI HkerI HextI HW1 HW2 HW3 HW4 HW5
              Hsp Hs5 Hs7 Hs4 Hs2 Hs6 Hs3 Hs9 Hs8;
       [ exfalso; pose proof (wi_blocks_pos (off + tot) (n - tot) ltac:(lia)); lia |].
     remember ((off + tot) `div` BSIZE)%nat as fbn eqn:Hfbne.
@@ -1760,6 +1785,12 @@ Section WriteiLoop.
     (* the two invariants, carried across bmap's deposit *)
     assert (Hhz2 : blk_holes_zero bm2 data2)
       by exact (wi_holes_bmap bmI bm2 dataI data2 fbn Hfbnlt Hagr2 Hnoun2 Hdep2 HhzI).
+    (* ...and COVERAGE, both halves, by bmap's own "never un-allocates"
+       clause -- which is exactly [bm_covers_keep]'s hypothesis *)
+    assert (HcovS2 : bm_covers bm2 (bv_unsigned (di_size dn)))
+      by exact (bm_covers_keep bmI bm2 _ Hnoun2 HcovSI).
+    assert (HcovT2 : bm_covers bm2 (Z.of_nat (off + tot)))
+      by exact (bm_covers_keep bmI bm2 _ Hnoun2 HcovTI).
     assert (Hrange2 : forall k : nat,
               file_byte data2 k
               = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
@@ -1810,7 +1841,8 @@ Section WriteiLoop.
                 cov logstart inodestart dev ip inum bm bm2 data data2 dn ds
                 user off n tot src_bytes wroteI 0%nat wroteI V PI ncount uX
                 pidv dq dqd dqn dqs m B1 K C b
-                HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz2 Hszdn ltac:(lia)
+                HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz2 HcovS2 HcovT2
+                Hszdn ltac:(lia)
                 Hj Hgl HB1sp HB1s5 HB1s2 HB1s3 ltac:(lia) ltac:(intros; reflexivity)
                 (wi_range_dist0 data data2 off tot wroteI wroteI Hrange2)
                 HkerI ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) HextI
@@ -2660,6 +2692,12 @@ Section WriteiLoop.
           assert (Hker3 : user = false -> forall i : nat, (i < tot + mm)%nat ->
                             wrote2 i = src_bytes i)
             by exact (wi_ker_step user src_bytes wroteI g tot mm HkerI Hgk).
+          (* COVERAGE, one chunk further on: the chunk never leaves the block
+             bmap just allocated, so every block below the new byte offset is
+             allocated too *)
+          assert (Hcov3 : bm_covers bm2 (Z.of_nat (off + (tot + mm))))
+            by exact (wi_covers_step bmI bm2 off tot fbn o mm Hdm Hmmo Hgetnz
+                        Hnoun2 HcovTI).
           (* ===== +0x7e bgeu s3,s6 : is the write finished? ===== *)
           destruct (Nat.leb_spec n (tot + mm)) as [Hfin | Hmore].
           * (* ---------- finished: leave the loop at +0xbc ---------- *)
@@ -2684,7 +2722,8 @@ Section WriteiLoop.
                       user off n (tot + mm)%nat src_bytes wrote2 0%nat wrote2
                       V P2 ncount uY
                       pidv dq dqd dqn dqs m G3 K C b
-                      HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz3 Hszdn ltac:(lia)
+                      HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz3 HcovS2 Hcov3
+                      Hszdn ltac:(lia)
                       Hj Hgl HG3sp HG3s5 HG3s2 HG3s3
                       ltac:(lia) ltac:(intros; reflexivity)
                       (wi_range_dist0 data _ off (tot + mm)%nat wrote2 wrote2 Hrange3)
@@ -2726,7 +2765,7 @@ Section WriteiLoop.
                          ltac:(wp_next_chain) with "Hcont") as "Hcont".
             iApply (IH CIDc11 (tot + mm)%nat bm2
                       (<[fbn := wi_splice (data2 fbn) o mm g]> data2) wrote2 P2 uX G3
-                      ltac:(lia) Hwf2 Hhz3 Hrange3 Hker3 Hext2
+                      ltac:(lia) Hwf2 Hhz3 HcovS2 Hcov3 Hrange3 Hker3 Hext2
                       ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia)
                       HG3sp HG3s5 HG3s7 HG3s4 HG3s2 HG3s6 HG3s3 HG3s9 HG3s8
                       with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hkenv Hprocs Hscheds
@@ -2892,7 +2931,8 @@ Section WriteiLoop.
                     (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn ds
                     user off n tot src_bytes wroteI mm g V P2 ncount uY
                     pidv dq dqd dqn dqs m mR K C b
-                    HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz3 Hszdn ltac:(lia)
+                    HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz3 HcovS2 HcovT2
+                    Hszdn ltac:(lia)
                     Hj Hgl HRsp HRs5 HRs2 HRs3
                     ltac:(rewrite Hbsz in Hmmo |- *; lia)
                     ltac:(intros Heq; exfalso; lia)
@@ -3046,7 +3086,7 @@ Section WriteiMain.
   Proof.
     cbv beta delta [wp_writei_sconf_body].
     intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hdswf Hadr
-           Hwf Hhz Hsum Hszdn Hj Hgl Ha0 Ha1 Ha3 Ha4 Heb.
+           Hwf Hhz Hcovin Hsum Hszdn Hj Hgl Ha0 Ha1 Ha3 Ha4 Heb.
     subst eb.
     pose proof HK as HK'. unfold K_writei in HK'.
     change (2 ^ 31)%Z with 2147483648%Z in Hsum, Hszdn.
@@ -3168,7 +3208,7 @@ Section WriteiMain.
       iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! X1 0%nat bm data dn ds ncount
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) (pv_upt V)
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc
                       Hoctx Hpark Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hfsb
                       [Hsrc] Hsl Hop").
       { unfold callee_saved. split_and!; lkp. }
@@ -3177,6 +3217,7 @@ Section WriteiMain.
       { exact Hdswf. }
       { exact Hadr. }
       { exact Hszdn. }
+      { exact Hcovin. }
       { unfold BSIZE. lia. }
       { reflexivity. }
       { intro k. rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
@@ -3562,7 +3603,7 @@ Section WriteiMain.
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) V (pv_upt V) ncount ncount
                 pidv dq dqd dqn dqs j m Y1 K C b
                 HK HY1sp ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
-                ltac:(lkp) Hwf Hhz Hdswf Hadr Hszdn
+                ltac:(lkp) Hwf Hhz Hdswf Hadr Hszdn Hcovin
                 ltac:(unfold BSIZE; lia) ltac:(intros; reflexivity)
                 ltac:(intro k; rewrite decide_False; [| lia];
                       rewrite decide_False; [reflexivity | lia])
@@ -3702,7 +3743,7 @@ Section WriteiMain.
                 user off 0%nat 0%nat src_bytes (fun _ => bv_0 8)
                 0%nat (fun _ => bv_0 8) V (pv_upt V) (S unc) unc
                 pidv dq dqd dqn dqs m Z1 K C b
-                HK Hgeom0 Hist Hicov Hilog Hdswf Hadr Hwf Hhz Hszdn Hj Hgl
+                HK Hgeom0 Hist Hicov Hilog Hdswf Hadr Hwf Hhz Hszdn Hcovin Hj Hgl
                 HZ1sp HZ1s5 HZ1s3 ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
                 ltac:(lkp) ltac:(unfold BSIZE; lia) ltac:(intros; reflexivity)
                 ltac:(intro k; rewrite decide_False; [| lia];
@@ -3902,7 +3943,9 @@ Section WriteiMain.
               pidv dq dqd dqn dqs m K C b
               HK Hgeom0 Hist Hicov Hilog Hdswf Hszdn Hofflt Hnlt Hrng Ha1 Hj Hgl
               (wi_blocks off n) 0%nat bm data (fun _ => bv_0 8) (pv_upt V) ncount U3
-              ltac:(lia) Hwf Hhz
+              ltac:(lia) Hwf Hhz Hcovin
+              ltac:(apply (bm_covers_mono bm (bv_unsigned (di_size dn)) _ Hcovin);
+                    rewrite Nat.add_0_r; exact Hbig)
               ltac:(intro k; rewrite decide_False; [reflexivity | lia])
               ltac:(intros _ i Hi; exfalso; lia) ltac:(apply uptd_ext_refl)
               ltac:(replace (off + 0)%nat with off by lia;
