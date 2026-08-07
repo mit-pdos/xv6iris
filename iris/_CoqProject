@@ -867,6 +867,8 @@ ProofIunlock.v
 LinkIunlock.v
 SpecSafestrcpy.v
 CodeSafestrcpy.v
+ProofSafestrcpy.v
+LinkSafestrcpy.v
 SpecIdup.v
 LinkIdup.v
 SpecForkretPark.v
