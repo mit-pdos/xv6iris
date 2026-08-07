@@ -318,6 +318,12 @@
   2
  ],
  [
+  "CodeKfork.v",
+  "kfork",
+  "kfk_",
+  3
+ ],
+ [
   "CodeKilled.v",
   "killed",
   "kli_",
@@ -525,6 +531,12 @@
   "CodeReparent.v",
   "reparent",
   "rpi_",
+  2
+ ],
+ [
+  "CodeSafestrcpy.v",
+  "safestrcpy",
+  "sscp_",
   2
  ],
  [
