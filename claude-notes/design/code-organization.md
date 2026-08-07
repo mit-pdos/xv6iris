@@ -161,6 +161,19 @@ Two invariants of `tools/gen_code.py` and its `tools/code_manifest.json`:
   computed from every group; deriving them from a restricted set would rewrite
   all sixteen with one function's handful of words. The same shape applies to
   anything else the generator keys globally.
+- **A generated file's imports are derived from its own body, not a fixed
+  header** (`COMMON_IMPORTS` / `CODE_IMPORTS` / `SHARD_IMPORTS` /
+  `NAME_IMPORTS` + `code_imports` in the generator). A `Code<F>.v` therefore
+  names the `KernelDecode<NN>` shards holding *its* words rather than the
+  `KernelDecode` facade — which is also what keeps a re-dump that lands in one
+  shard off everyone else's dependency list — and conditional imports
+  (`ExecCommon` for a MUL, the two decode-bridge tactic files) appear only in
+  the files that use them. Nothing excludes generated files from the nightly
+  dead-import sweep, so exactness here is what keeps the sweep from rewriting
+  the generator's output; if a sweep commit ever touches a generated file,
+  fix the import table rather than the sweep. Note that the four
+  `Code*Aux.v` files are hand-written and are legitimately in the sweep's
+  scope.
 
 ## Specific-vs-generic leaf lemmas
 

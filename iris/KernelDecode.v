@@ -5,7 +5,8 @@
    every Code<F>.v waits behind -- and a word is assigned by its own
    value, so a re-dump rewrites only the shards it actually touches.
 
-   Consumers Require Import KernelDecode and see all of them.        *)
+   The generated Code<F>.v files name the shards they use directly;
+   this is for hand-written consumers, which see all of them.       *)
 Require Export KernelDecode00.
 Require Export KernelDecode01.
 Require Export KernelDecode02.
