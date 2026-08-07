@@ -41,8 +41,8 @@ Local Open Scope Z_scope.
 (* ===================================================================== *)
 
 (* the value the [lbu] leaf writes back for a read byte [b] *)
-Definition lsr_ldval_of (b : bv 8) : mword 64 :=
-  extend_value true (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b).
+(* the vmem level hands back the value itself now, not the split accumulator *)
+Definition lsr_ldval_of (b : mword (8*1)) : mword 64 := extend_value true b.
 
 (* THE POLL'S BRANCH TEST: [andi a5,a5,32] then [c.beqz a5].
    True = THRE clear = branch taken = spin again. *)
