@@ -258,13 +258,21 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 Lemma wi_maxfile_bsize : Z.of_nat (MAXFILE * BSIZE) = 274432.
 Proof. rewrite Nat2Z.inj_mul. unfold MAXFILE, BSIZE. vm_compute. reflexivity. Qed.
 
-(* The same fact at [nat], which is where the loop's range bound
-   [off + n <= MAXFILE * BSIZE] lives.  Safe because the numeral notation
-   keeps "274432" as [Nat.of_num_uint 274432] rather than a spelled-out
-   successor chain, so the conversion the [Qed] rechecks is the small
-   [268 * 1024] one. *)
-Lemma wi_maxfile_bsize_nat : (MAXFILE * BSIZE)%nat = 274432%nat.
-Proof. reflexivity. Qed.
+(* Stated with [Z.to_nat 274432] rather than a bare [274432%nat] literal:
+   any route to a bare-nat-literal statement of this fact -- [reflexivity],
+   [vm_compute], [lia] after unfolding [MAXFILE]/[BSIZE] to their [Z] values
+   and back -- still needs the kernel to materialize (or the [abstract-large-
+   number] machinery to unfold) an actual 274432-deep [nat] successor chain
+   somewhere, and that overflows the stack in THIS file's ambient context
+   even though the same reduction succeeds in isolation (the difference is
+   headroom eaten by the surrounding Iris/stdpp imports, not this lemma).
+   Going through [Z.to_nat] and [Nat2Z.id] instead never asks for that
+   chain: both rewrites are symbolic (pattern match on the literal [Z] side,
+   which is a cheap ~19-level [Z.pos] tree either way), so the proof is
+   [O(1)] regardless of context. [lia] resolves [Z.to_nat] of a literal
+   symbolically too, so this is a transparent drop-in for callers. *)
+Lemma wi_maxfile_bsize_nat : (MAXFILE * BSIZE)%nat = Z.to_nat 274432.
+Proof. rewrite <- wi_maxfile_bsize, Nat2Z.id. reflexivity. Qed.
 
 (* the two [c.li]s and the [li s9,1024] *)
 Lemma wi_li_m1 :
