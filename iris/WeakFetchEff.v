@@ -167,20 +167,11 @@ Lemma exec_eff_pmaCheck_ram (addr : SailStdpp.Values.mword 64)
   is_aligned_paddr (Physaddr addr) 4 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_executable) = true ->
   exec_eff (pmaCheck (Physaddr addr) 4 (InstructionFetch tt) pbmt false) s
-    = Some (None, s, []).
+    = Some (Ok pma_ok_aligned, s, []).
 Proof.
   intros Hmatch Halign Hexec.
-  unfold pmaCheck.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hexec |- *.
-  rewrite Halign. cbn [negb].
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM None s)).
-  cbn match beta.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM _ s)).
-  rewrite Hexec. cbn [andb negb].
-  apply exec_eff_returnM.
+  pma_ok_eff_peel Hmatch Hexec (exec_eff_is_mag_applicable_fetch 4 s) Halign.
 Qed.
 
 Lemma exec_eff_hartSupports_Ziccif s :
@@ -253,6 +244,11 @@ Qed.
     [exec_eff] form (it is discharged in §4 from [WeakPmpEff]), and so are the
     three MMIO-range gates — exactly as the SC originals take them. *)
 
+(** [RiscvFetchExec]'s own [Local Lemma avi0_mul4], restated (it is [Local]
+    there, so not importable). *)
+Local Lemma avi0_mul4 (a : SailStdpp.Values.mword 64) : add_vec_int a (0 * 4) = a.
+Proof. change (0 * 4)%Z with 0%Z. apply avi0. Qed.
+
 Lemma exec_eff_checked_mem_read_ram (pbmt : page_based_mem_type)
     (addr : SailStdpp.Values.mword 64) (region : PMA_Region) (w : bv 32) s :
   exec_eff (pmpCheck (Physaddr addr) 4 (InstructionFetch tt) Machine) s
@@ -272,30 +268,62 @@ Lemma exec_eff_checked_mem_read_ram (pbmt : page_based_mem_type)
     = Some (Ok (w, default_meta), s, [WEread wak_plain addr 4]).
 Proof.
   intros Hpmp Hmatch Halign Hexec Hc Hsig Hh Hdev Hbytes.
-  unfold checked_mem_read.
-  (* phys_access_check = None, trace [] *)
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (phys_access_check _ _ _ _ _ _) s = Some (None, s, []))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_eff_bind_nil _ _ _ _ _ Hpmp). cbn match.
-      rewrite (exec_eff_bind_nil _ _ _ _ _
-                (exec_eff_pmaCheck_ram addr pbmt region s Hmatch Halign Hexec)).
-      cbn match. apply exec_eff_returnM. }
+  (* the PMA/PMP decision, with the PMA answer prioritised on failure *)
+  assert (Hcp : exec_eff (check_pma_with_pmp_priority (InstructionFetch tt) pbmt Machine
+                            (Physaddr addr) 4 false) s
+                = Some (Ok pma_ok_aligned, s, [])).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_pmaCheck_ram addr pbmt region s Hmatch Halign Hexec)).
+    cbn match. apply exec_eff_returnM. }
   (* within_mmio_readable = false, trace [] *)
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (within_mmio_readable (Physaddr addr) 4) s
-                 = Some (false, s, []))).
-  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (read_kind_of_flags _ _ _) s = Some (Read_plain, s, []))).
+  assert (Hmmio : exec_eff (within_mmio_readable (Physaddr addr) 4) s
+                  = Some (false, s, [])).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
+  unfold checked_mem_read. rewrite exec_eff_catch_early_return.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_eff_bind_eq. rewrite execR_eff_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _
+             (exec_eff_split_misaligned_unsplit addr 4 0 s)). cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _
+             (_ : exec_eff (read_kind_of_flags false false false) s
+                  = Some (Read_plain, s, []))).
   2:{ unfold read_kind_of_flags. apply exec_eff_returnM. }
-  (* the ONE memory step *)
-  rewrite (exec_eff_bind_Some _ _ _ _ _ _
-            (exec_eff_read_ram_plain_4 addr w s Hdev Hbytes)).
-  rewrite exec_eff_returnM. reflexivity.
+  cbn beta.
+  (* the split loop: ONE iteration at offset 0, and THE trace element *)
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+    assert (Hu : execR_eff (Defs.untilMT vs m c b) s
+                 = Some (inr (w, true, 0), s, [WEread wak_plain addr 4])) end.
+  { eapply execR_eff_untilMT_1; [ reflexivity | | apply execR_eff_returnR ].
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    rewrite avi0_mul4.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hpmp). cbn beta.
+    cbn match.
+    (* the pmpCheck arm is a [bind0] seq into within_mmio_readable *)
+    match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+      assert (Hseq : execR_eff (Defs.bind0 a b) s = Some (inr false, s, [])) end.
+    { rewrite execR_eff_bind0_eq. rewrite execR_eff_returnR. cbn match.
+      rewrite execR_eff_liftR. rewrite Hmmio. reflexivity. }
+    rewrite (execR_eff_bind_nil _ _ _ _ _ Hseq). cbn beta. cbn match.
+    (* the RAM read, whose own bind returns just the data (the meta is dropped) *)
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+      assert (Hrd : execR_eff (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                    = Some (inr w, s, [WEread wak_plain addr 4])) end.
+    { rewrite (execR_eff_liftR_cat _ _ _ _ _ _
+                 (exec_eff_read_ram_plain_4 addr w s Hdev Hbytes)).
+      cbn beta match. rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+    rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hrd). cbn beta zeta.
+    rewrite autocast_id. rewrite usvd_zeros_full_32.
+    rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+  rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite autocast_id. rewrite execR_eff_returnR. cbn [app]. reflexivity.
 Qed.
 
 Lemma exec_eff_mem_read_fetch (pbmt : page_based_mem_type)
@@ -576,16 +604,6 @@ Section ExecPendingEff.
     exec_eff (currentlyEnabled Ext_S) s = Some (true, s, []).
   Proof using HmisaS. rewrite exec_eff_currentlyEnabled_S HmisaS. reflexivity. Qed.
 
-  Lemma exec_eff_guard_true :
-    exec_eff (Defs.or_boolM (currentlyEnabled Ext_S)
-                (Defs.bind (Defs.read_reg mideleg)
-                   (fun w1 : SailStdpp.Values.mword 64 =>
-                      returnM (eq_vec w1 (zeros' 64))))) s
-      = Some (true, s, []).
-  Proof using HmisaS.
-    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ exec_eff_cE_S_true). reflexivity.
-  Qed.
-
   Lemma exec_eff_ext_int_some :
     exists ev, exec_eff (external_interrupts_pending tt) s = Some (ev, s, []).
   Proof using HmisaS.
@@ -657,18 +675,12 @@ Section ExecPendingEff.
     exec_eff (getPendingSet Machine) s = Some (None, s, []).
   Proof using HmisaS HmIE.
     destruct exec_eff_read_mip_some as [mipv Hmip].
-    assert (Hae : exec_eff (Defs.assert_exp' true
-                    "sys/sys_control.sail:107.58-107.59") s
-                  = Some (eq_refl, s, [])).
-    { unfold Defs.assert_exp'. cbn match. apply exec_eff_returnm. }
     unfold getPendingSet.
-    rewrite (exec_eff_bind_nil _ _ _ _ _ exec_eff_guard_true).
-    rewrite (exec_eff_bind_nil _ _ _ _ _ Hae).
+    rewrite (exec_eff_bind_nil _ _ _ _ _ exec_eff_cE_S_true). cbn match.
+    rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg mideleg s)).
     rewrite (exec_eff_bind_nil _ _ _ _ _ Hmip).
     rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg mie s)).
-    rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg mideleg s)).
     rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg mie s)).
-    rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg mideleg s)).
     rewrite (exec_eff_bind_nil _ _ _ _ _ exec_eff_mIE_false).
     rewrite (exec_eff_bind_nil _ _ _ _ _ exec_eff_sIE_false).
     cbn [andb]. apply exec_eff_returnm.
