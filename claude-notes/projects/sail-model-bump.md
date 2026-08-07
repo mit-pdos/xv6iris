@@ -343,18 +343,29 @@ handles either answer, so the granule stays a platform detail. (Proved for
 ### 1. `exec_vmem_write_addr_split2` (the page-straddling STORE)
 
 Written up as a PORT PENDING comment at the end of `UserMemMis.v`, with the
-statement it wants. The one obstacle: the reservation `if` in
-`vmem_write_addr`. Its scrutinee is `andb res (not (match_reservation …))` with
-`res` the literal `false`, so the `if` IS its else branch by CONVERSION — but
-`rewrite` needs the branch syntactically, and every way of exposing it tried so
-far (`cbn [andb]; cbn match`, with the memory leaves `Local Opaque`) reduces
-through `mem_write_ea` into the monad's bind fixpoint and the goal explodes.
-`durable-notes` records the same trap for the aligned store, where the fix was
-to hold the else branch opaque with a `set`; that does **not** apply here
-because the `if` is DEPENDENT (`if … return MR _ bool then … else …`), so the
-Ltac1 pattern `if ?c then ?T else ?E` does not match it. What is wanted is a
-way to name the two branches of a dependent `if` — an Ltac2 `match`, or a small
-`Lemma if_false_dep` stated at the exact motive.
+statement it wants and the peel it wants. The one obstacle is the reservation
+`if` in `vmem_write_addr`: its scrutinee is
+`andb res (not (match_reservation …))` with `res` the literal `false`, so the
+`if` IS its else branch — but by CONVERSION, and `rewrite` needs the branch
+syntactically. Three ways of exposing it were tried and all fail:
+
+- `cbn [andb]; cbn match beta` reduces the `if` but keeps going into the
+  monad's bind fixpoint and the goal explodes;
+- **`Local Opaque` does NOT stop `cbn`** (Opaque governs conversion in
+  `rewrite`/`unfold`, not `cbn`'s delta), and neither does
+  `Local Arguments mem_write_ea : simpl never` — with both in place the
+  exploded head is still `Interface.Next (RegRead mstatus None) …`, so whatever
+  `cbn` unfolds is not the leaf that was protected. **Find that constant first**
+  (raise `Set Printing Depth` and look past the `iMon_bind` fixpoint).
+- the `set`-the-branches trick `durable-notes` records for the ALIGNED store
+  does not apply, because this `if` is DEPENDENT
+  (`if … return MR _ bool then … else …`) and the Ltac1 pattern
+  `if ?c then ?T else ?E` does not match a `return`-annotated match
+  ("No matching clauses for match").
+
+What is wanted is a way to name the two branches of a dependent `if`: an Ltac2
+`match` on `Constr.Unsafe.Case`, or a `Lemma if_false_dep` stated at this exact
+motive and applied with the branches as explicit arguments.
 
 ### 2. The iris straddle composers
 
