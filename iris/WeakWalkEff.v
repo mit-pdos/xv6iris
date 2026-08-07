@@ -31,9 +31,11 @@
     sconf/walk design — plus the fault walks (invalid / no-permission,
     state unchanged).  The A/D WRITE-BACK arm (O3: [update_and_write_pte]'s
     [Some] case, [write_pte], [exec_translate_TLB_{miss,hit}_pt_upd]) is
-    deliberately NOT mirrored: it is about to change under the planned
-    Sail RMW patch (see claude-notes/projects/weak-memory.md, "THE MODEL
-    CHANGE"), while the READ path mirrored here is untouched by it.
+    deliberately NOT mirrored — the fork's atomic PTE A/D CAS has since
+    landed ([read_pte_exclusive] + [write_pte_conditional] inside
+    [update_and_write_pte]), and mirroring it is a separate batch.  Here
+    [update_and_write_pte] is only ever entered at
+    [update_PTE_Bits … = None], where it is one register-only step.
 
     THE HYPOTHESIS SHAPE.  The SC originals take the PTE-word probes as
     ∀-state [exec] facts ([PtTree.pte_valid] & co.).  Those cannot be
@@ -53,9 +55,11 @@
       §3  the S-mode PMP grant + PMA gate for the PTE read
       §4  [exec_eff_read_pte_S] — where the walk's trace element is born —
           and [wpt_read_pte_slot], the [pt_slot_mem]-keyed slot fact
-      §5  Section UserWalkEff — the SUCCESS walk (leaf, l1, full) and the
-          no-update [translate_TLB_miss] (O2)
-      §6  Section UserWalkFaultEff — the fault walks, state unchanged
+      §5  Section UserWalkEff — [exec_eff_check_leaf_pte_leaf0] (the leaf
+          checks the fork factored out of [pt_walk]), the SUCCESS walk
+          (leaf, l1, full) and the no-update [translate_TLB_miss] (O2)
+      §6  Section UserWalkFaultEff — [check_leaf_pte]'s two failure
+          outcomes and the fault walks, state unchanged
       §7  the [translate]-level dispatch + the PtTree §8 mirrors: TLB-hit
           (O1), hit-denied, blocked/denied translate, lookup-blocked
       §8  the [translateAddr] front heads (Ok / Err / non-canonical)
@@ -234,7 +238,7 @@ Lemma exec_eff_is_shadow_stack_u_acc (acc : MemoryAccessType mem_payload) s :
   u_acc acc ->
   exec_eff (is_shadow_stack_access acc) s = Some (false, s, []).
 Proof.
-  intros [-> | [-> | [-> | [-> | [-> | (op & ->)]]]]];
+  intros [-> | [-> | [-> | [(aq & rl & ->) | [(aq & rl & ->) | (op & aq & rl & ->)]]]]];
     unfold is_shadow_stack_access; cbn match; apply exec_eff_returnM.
 Qed.
 
@@ -384,31 +388,30 @@ Qed.
 
 (** The [pmaCheck] of the PTE read: access [Load PageTableEntry], gate
     [PMA_supports_pte_read] (mirrors the inline block of
-    [SmodePte.exec_read_pte_S]). *)
+    [SmodePte.exec_read_pte_S]).  Since the bump [pmaCheck] answers a
+    splitting PLAN in an early-return body; an aligned access's plan is
+    [RiscvExtras.pma_ok_aligned].  The PTE arms carry NO [assert_exp']
+    (the fork dropped [assert(not(res_or_con))] there — which is what
+    makes the exclusive PTE read legal), so [pma_ok_eff_peel] takes its
+    no-assert branch.  [Hmag] is the eff twin of
+    [RiscvExtras.exec_is_mag_applicable_load_pte]. *)
+Lemma exec_eff_is_mag_applicable_load_pte (width : Z) s :
+  exec_eff (is_mag_applicable_access (Load PageTableEntry) width) s
+  = Some (false, s, []).
+Proof. apply exec_eff_returnM. Qed.
+
 Lemma exec_eff_pmaCheck_ram_pte (addr : SailStdpp.Values.mword 64)
-    (region : PMA_Region) s :
+    (region : PMA_Region) (res_or_con : bool) s :
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8
     = Some region ->
   is_aligned_paddr (Physaddr addr) 8 = true ->
   (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
-  exec_eff (pmaCheck (Physaddr addr) 8 (Load PageTableEntry) PBMT_PMA false) s
-  = Some (None, s, []).
+  exec_eff (pmaCheck (Physaddr addr) 8 (Load PageTableEntry) PBMT_PMA res_or_con) s
+  = Some (Ok pma_ok_aligned, s, []).
 Proof.
   intros Hmatch Halign Hread.
-  unfold pmaCheck.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hread |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:105.61-105.62" >>=
-          (fun _ : true = true => returnM (PMA_supports_pte_read (override_PMA rattr PBMT_PMA))))
-    with (returnM (PMA_supports_pte_read (override_PMA rattr PBMT_PMA)) : M bool).
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM _ s)).
-  rewrite Hread. cbn match.
-  apply exec_eff_returnM.
+  pma_ok_eff_peel Hmatch Hread (exec_eff_is_mag_applicable_load_pte 8 s) Halign.
 Qed.
 
 (* ====================================================================== *)
@@ -441,31 +444,59 @@ Lemma exec_eff_read_pte_S (addr : SailStdpp.Values.mword 64)
   = Some (Ok w, s, [WEread wak_plain addr 8]).
 Proof.
   intros HA Hord Hrange HR Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes.
+  assert (Hcp : exec_eff (check_pma_with_pmp_priority (Load PageTableEntry) PBMT_PMA Supervisor
+                            (Physaddr addr) 8 false) s = Some (Ok pma_ok_aligned, s, [])).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_pmaCheck_ram_pte addr region false s Hmatch Halign Hread)).
+    cbn match. apply exec_eff_returnM. }
+  assert (Hmmio : exec_eff (within_mmio_readable (Physaddr addr) 8) s = Some (false, s, [])).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
   assert (Hchk : exec_eff (checked_mem_read (Load PageTableEntry) PBMT_PMA Supervisor
                              (Physaddr addr) 8 false false false false) s
                  = Some (Ok (w, default_meta), s, [WEread wak_plain addr 8])).
-  { unfold checked_mem_read.
-    rewrite (exec_eff_bind_nil _ _ _ _ _
-              (_ : exec_eff (phys_access_check _ _ _ _ _ _) s = Some (None, s, []))).
-    2:{ unfold phys_access_check.
-        rewrite (exec_eff_bind_nil _ _ _ _ _
-                   (exec_eff_pmpCheck_supervisor_grant_load addr 8 s HA Hord Hrange HR)).
-        cbn match.
-        rewrite (exec_eff_bind_nil _ _ _ _ _
-                   (exec_eff_pmaCheck_ram_pte addr region s Hmatch Halign Hread)).
-        cbn match. apply exec_eff_returnM. }
-    rewrite (exec_eff_bind_nil _ _ _ _ _
-              (_ : exec_eff (within_mmio_readable (Physaddr addr) 8) s = Some (false, s, []))).
-    2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-        rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
-        rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
-        rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
-    rewrite (exec_eff_bind_nil _ _ _ _ _
-              (_ : exec_eff (read_kind_of_flags _ _ _) s = Some (rv64d_types.Read_plain, s, []))).
+  { unfold checked_mem_read. rewrite exec_eff_catch_early_return.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+    rewrite execR_eff_bind_eq. rewrite execR_eff_returnR. cbn match beta.
+    rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _
+               (exec_eff_split_misaligned_unsplit addr 8 0 s)). cbn beta.
+    rewrite misaligned_order_1. cbn zeta.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _
+               (_ : exec_eff (read_kind_of_flags false false false) s
+                    = Some (rv64d_types.Read_plain, s, []))).
     2:{ unfold read_kind_of_flags. apply exec_eff_returnM. }
-    rewrite (exec_eff_bind_Some _ _ _ _ _ _
-              (exec_eff_read_ram_plain_8 addr w s Hdev Hbytes)).
-    rewrite exec_eff_returnM. cbn [app]. reflexivity. }
+    cbn beta.
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+      assert (Hu : execR_eff (Defs.untilMT vs m c b) s
+                   = Some (inr (w, true, 0), s, [WEread wak_plain addr 8])) end.
+    { eapply execR_eff_untilMT_1; [ reflexivity | | apply execR_eff_returnR ].
+      rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr addr)) with addr.
+      rewrite avi0_mul8.
+      rewrite (execR_eff_liftR_seq _ _ _ _ _
+                 (exec_eff_pmpCheck_supervisor_grant_load addr 8 s HA Hord Hrange HR)).
+      cbn beta. cbn match.
+      match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+        assert (Hseq : execR_eff (Defs.bind0 a b) s = Some (inr false, s, [])) end.
+      { rewrite execR_eff_bind0_eq. rewrite execR_eff_returnR. cbn match.
+        rewrite execR_eff_liftR. rewrite Hmmio. reflexivity. }
+      rewrite (execR_eff_bind_nil _ _ _ _ _ Hseq). cbn beta. cbn match.
+      match goal with
+        |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pp ?wd ?mt)) ?k1) _] =>
+        assert (Hrd : execR_eff (Defs.bind (Defs.liftR (read_ram rk pp wd mt)) k1) s
+                      = Some (inr w, s, [WEread wak_plain addr 8])) end.
+      { rewrite (execR_eff_liftR_cat _ _ _ _ _ _
+                   (exec_eff_read_ram_plain_8 addr w s Hdev Hbytes)).
+        cbn beta match. rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+      rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hrd). cbn beta zeta.
+      rewrite autocast_id. rewrite usvd_zeros_full_64.
+      rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+    rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hu). cbn beta zeta.
+    rewrite autocast_id. rewrite execR_eff_returnR. cbn [app]. reflexivity. }
   unfold read_pte, mem_read_priv.
   rewrite (exec_eff_bind_Some _ _ _ _ _ _
             (_ : exec_eff (mem_read_priv_meta _ _ _ _ 8 _ _ _ _) s
@@ -527,6 +558,25 @@ Qed.
     [wpt_read_pte_slot]'s singletons the concatenations below are the
     literal three-element list by conversion. *)
 
+(** [CommonWalk]'s [walk_peel_asserts], mirrored: the walk body's shared
+    head (the recursion-limit assert and the xlen assert) peels without
+    ever spelling out the two Sail source positions — which is exactly
+    what broke six copies of this head on the previous model bump.  The
+    body is no longer an early-return block (the leaf arm's escapes moved
+    into [check_leaf_pte]), so the head peels in the PLAIN monad. *)
+Local Ltac walk_eff_peel_asserts lvl st :=
+  cbn [_rec_pt_walk];
+  change (lvl >=? 0) with true;
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_assert_exp'_true _ st)); cbn beta zeta;
+  change ((39 =? 32) || (xlen =? 64)) with true;
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_assert_exp'_true _ st)); cbn beta zeta.
+
+(** ... and the PTE read that follows, once the caller has named the slot
+    address.  This is the ONE trace-carrying step of a walk level, so
+    unlike its SC twin it goes through the concatenating bind. *)
+Local Ltac walk_eff_peel_read Hrd :=
+  rewrite (exec_eff_bind_Some _ _ _ _ _ _ Hrd); cbn match beta zeta.
+
 Section UserWalkEff.
   Context (vpn : SailStdpp.Values.mword 27) (root : SailStdpp.Values.mword 44).
   Context (pte2 pte1 pte0 : SailStdpp.Values.mword 64).
@@ -548,36 +598,23 @@ Section UserWalkEff.
   Hypothesis Hchk0 : wpte_check_ok acc p mxr do_sum pte0.
   Hypothesis H0N : eq_vec (_get_PTE_Ext_N (ext_bits_of_PTE pte0)) ('b"1") = false.
 
-  (* level 0: the leaf, from any reclimit-0 Acc *)
-  Lemma exec_eff_rec_walk_leaf (g : bool) (menvcfg0 : SailStdpp.Values.mword 64)
-        (es0 : list weff) (wfacc : Acc (Zwf 0) 0) s :
+  (** [check_leaf_pte]: Steps 3 and 5–8 of the VATP, which the fork
+      factored OUT of [pt_walk] so the atomic A/D update can re-run them
+      on a freshly read PTE.  Mirrored as its own lemma for the same
+      reason [CommonWalk.exec_check_leaf_pte_leaf0] is: one lemma serves
+      the walk's leaf arm AND the re-check.  Register-only — the empty
+      trace. *)
+  Lemma exec_eff_check_leaf_pte_leaf0 (pa : physaddr)
+        (menvcfg0 : SailStdpp.Values.mword 64) s :
     register_lookup misa s.(sregs) = MISA_C ->
-    exec_eff (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s, es0) ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
-    exec_eff (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte1) 0 g tt 0 wfacc) s
-      = Some (Ok ({| PTW_Output_ppn := autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : SailStdpp.Values.mword 44);
-                     PTW_Output_pte := autocast (T := mword) pte0;
-                     PTW_Output_pteAddr := Physaddr addr0;
-                     PTW_Output_level := 0;
-                     PTW_Output_pbmt := PBMT_PMA;
-                     PTW_Output_global := orb g (u_gbit pte0) |}, tt), s, es0).
+    exec_eff (check_leaf_pte 39 vpn acc p mxr do_sum pte0 pa 0 tt) s
+      = Some (Ok (autocast (T := mword) (PPN_of_PTE pte0), PBMT_PMA, tt), s, []).
   Proof.
-    intros Hmisa Hrd0 Hmenv HPBMTE.
-    destruct wfacc as [a0].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (0 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
-    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
-      replace a with addr0 by reflexivity;
-      replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd0).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (H0i s)).
+    intros Hmisa Hmenv HPBMTE.
+    unfold check_leaf_pte. rewrite exec_eff_catch_early_return.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ (H0i s)). cbv iota beta.
     rewrite H0nl. cbv iota beta.
     change (0 >? 0) with false. cbv iota beta.
     match goal with |- context[Defs.bind0 ?A ?B] =>
@@ -604,6 +641,46 @@ Section UserWalkEff.
     cbn. by rewrite ?app_nil_r.
   Qed.
 
+  (* level 0: the leaf, from any reclimit-0 Acc *)
+  Lemma exec_eff_rec_walk_leaf (g : bool) (menvcfg0 : SailStdpp.Values.mword 64)
+        (es0 : list weff) (wfacc : Acc (Zwf 0) 0) s :
+    register_lookup misa s.(sregs) = MISA_C ->
+    exec_eff (read_pte (Physaddr addr0) 8) s = Some (Ok pte0, s, es0) ->
+    register_lookup menvcfg s.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    exec_eff (_rec_pt_walk 39 vpn acc p mxr do_sum (u_next_base pte1) 0 g tt 0 wfacc) s
+      = Some (Ok ({| PTW_Output_ppn := autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE pte0)) : SailStdpp.Values.mword 44);
+                     PTW_Output_pte := autocast (T := mword) pte0;
+                     PTW_Output_pteAddr := Physaddr addr0;
+                     PTW_Output_level := 0;
+                     PTW_Output_pbmt := PBMT_PMA;
+                     PTW_Output_global := orb g (u_gbit pte0) |}, tt), s, es0).
+  Proof.
+    intros Hmisa Hrd0 Hmenv HPBMTE.
+    destruct wfacc as [a0].
+    walk_eff_peel_asserts 0 s.
+    match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
+      replace a with addr0 by reflexivity;
+      replace wd with 8 by (vm_compute; reflexivity) end.
+    walk_eff_peel_read Hrd0.
+    (* the follow-a-pointer test: valid AND non-leaf AND level > 0.  A leaf
+       fails the second conjunct, so the [check_leaf_pte] arm is taken. *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hnl : exec_eff (Defs.and_boolM A B) s = Some (false, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (H0i s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta.
+      change (0 >? 0) with false. rewrite andb_false_r. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hnl). cbn match beta.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_check_leaf_pte_leaf0 (Physaddr addr0) menvcfg0 s Hmisa Hmenv HPBMTE)).
+    cbn match beta zeta.
+    rewrite exec_eff_returnM. cbn match. by rewrite ?app_nil_r.
+  Qed.
+
   (* level 1: a valid non-leaf step into the leaf, from any reclimit-1 Acc *)
   Lemma exec_eff_rec_walk_l1 (g : bool) (menvcfg0 : SailStdpp.Values.mword 64)
         (es1 es0 : list weff) (wfacc : Acc (Zwf 0) 1) s :
@@ -623,26 +700,26 @@ Section UserWalkEff.
   Proof.
     intros Hmisa Hrd1 Hrd0 Hmenv HPBMTE.
     destruct wfacc as [a1].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (1 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
+    walk_eff_peel_asserts 1 s.
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
       replace a with addr1 by reflexivity;
       replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd1).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (H1i s)).
-    rewrite H1nl. cbv iota beta.
-    change (1 >? 0) with true. cbv iota beta.
-    rewrite execR_eff_liftR.
+    walk_eff_peel_read Hrd1.
+    (* valid AND non-leaf AND level > 0: follow the pointer *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hnl : exec_eff (Defs.and_boolM A B) s = Some (true, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (H1i s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta.
+      rewrite H1nl. change (1 >? 0) with true. cbn [andb]. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hnl). cbn match beta.
     match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (1 - 1)] =>
       change (1 - 1) with 0 end.
     rewrite (exec_eff_rec_walk_leaf _ menvcfg0 es0 _ s Hmisa Hrd0 Hmenv HPBMTE).
-    cbn. by rewrite ?app_nil_r.
+    cbn match. by rewrite ?app_nil_r.
   Qed.
 
   (* level 2 = the full walk: trace [es2 ++ es1 ++ es0] *)
@@ -666,26 +743,26 @@ Section UserWalkEff.
     intros Hmisa Hrd2 Hrd1 Hrd0 Hmenv HPBMTE.
     unfold pt_walk.
     destruct (Defs.Zwf_guarded _) as [a2].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (2 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
+    walk_eff_peel_asserts 2 s.
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
       replace a with addr2 by reflexivity;
       replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd2).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (H2i s)).
-    rewrite H2nl. cbv iota beta.
-    change (2 >? 0) with true. cbv iota beta.
-    rewrite execR_eff_liftR.
+    walk_eff_peel_read Hrd2.
+    (* valid AND non-leaf AND level > 0: follow the pointer *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hnl : exec_eff (Defs.and_boolM A B) s = Some (true, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (H2i s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta.
+      rewrite H2nl. change (2 >? 0) with true. cbn [andb]. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hnl). cbn match beta.
     match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (2 - 1)] =>
       change (2 - 1) with 1 end.
     rewrite (exec_eff_rec_walk_l1 _ menvcfg0 es1 es0 _ s Hmisa Hrd1 Hrd0 Hmenv HPBMTE).
-    cbn. by rewrite ?app_nil_r.
+    cbn match. by rewrite ?app_nil_r.
   Qed.
 
   (* the TLB fill: register-only, empty trace ([u_walk_entry] is
@@ -731,8 +808,13 @@ Section UserWalkEff.
     rewrite (exec_eff_bind_Some _ _ _ _ _ _
                (exec_eff_pt_walk_user menvcfg0 es2 es1 es0 s Hmisa Hrd2 Hrd1 Hrd0 Hmenv HPBMTE)).
     cbn match.
-    match goal with |- context[update_and_write_pte ?a ?wd ?pv ?ac] =>
-      assert (Hupd : exec_eff (update_and_write_pte a wd pv ac) s = Some (Ok None, s, [])) end.
+    (* [update_and_write_pte] takes the whole tablewalk context now (it
+       re-runs the leaf checks on a freshly read PTE when it DOES write),
+       and returns the ext_ptw alongside.  The no-write case is still one
+       step, and still register-only. *)
+    match goal with |- context[update_and_write_pte ?w ?vp ?a ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hupd : exec_eff (update_and_write_pte w vp a pv lv ac pr mx ds e) s
+                     = Some (Ok (None, tt), s, [])) end.
     { unfold update_and_write_pte. rewrite Hnoupd. cbn match. apply exec_eff_returnm. }
     rewrite (exec_eff_bind_nil _ _ _ _ _ Hupd). cbn match.
     rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_add_to_TLB_user asid s)).
@@ -753,6 +835,44 @@ Section UserWalkFaultEff.
   Context (vpn : SailStdpp.Values.mword 27).
   Context (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool).
 
+  (** [check_leaf_pte]'s two failure outcomes ([CommonWalk]'s
+      [exec_check_leaf_pte_invalid] / [_noperm0]), at the empty trace:
+      the leaf checks read no memory. *)
+  Lemma exec_eff_check_leaf_pte_invalid (pte : SailStdpp.Values.mword 64)
+        (pa : physaddr) (lvl : Z) s :
+    wpte_invalid pte ->
+    exec_eff (check_leaf_pte 39 vpn acc p mxr do_sum pte pa lvl tt) s
+      = Some (Err (PTW_Invalid_PTE tt, tt), s, []).
+  Proof.
+    intro Hinv.
+    unfold check_leaf_pte. rewrite exec_eff_catch_early_return.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ (Hinv s)). cbv iota beta.
+    cbn. by rewrite ?app_nil_r.
+  Qed.
+
+  Lemma exec_eff_check_leaf_pte_noperm0 (pte : SailStdpp.Values.mword 64)
+        (pa : physaddr) (f : pte_check_failure) s :
+    wpte_valid pte ->
+    pte_is_non_leaf (Mk_PTE_Flags (subrange_vec_dec pte 7 0)) = false ->
+    wpte_check_denied acc p mxr do_sum f pte ->
+    exec_eff (check_leaf_pte 39 vpn acc p mxr do_sum pte pa 0 tt) s
+      = Some (Err (ext_get_ptw_error f, tt), s, []).
+  Proof.
+    intros Hinv Hnl Hchk.
+    unfold check_leaf_pte. rewrite exec_eff_catch_early_return.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ (Hinv s)). cbv iota beta.
+    rewrite Hnl. cbv iota beta.
+    change (0 >? 0) with false. cbv iota beta.
+    match goal with |- context[Defs.bind0 ?A ?B] =>
+      assert (HAB : execR_eff (Defs.bind0 A B) s
+                    = Some (inr (PTE_Check_Failure (tt, f)), s, [])) end.
+    { rewrite execR_eff_bind0_eq. rewrite execR_eff_returnR. cbn match.
+      rewrite execR_eff_liftR. rewrite (Hchk s). cbn match. reflexivity. }
+    rewrite (execR_eff_bind_nil _ _ _ _ _ HAB).
+    cbv iota beta. cbn match.
+    cbn. by rewrite ?app_nil_r.
+  Qed.
+
   (* level 0: the leaf slot holds an INVALID pte *)
   Lemma exec_eff_rec_walk_leaf_invalid (base : SailStdpp.Values.mword 44)
         (pte : SailStdpp.Values.mword 64) (g : bool) (es0 : list weff)
@@ -765,21 +885,26 @@ Section UserWalkFaultEff.
   Proof.
     intros Hrd Hinv.
     destruct wfacc as [a0].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (0 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
+    walk_eff_peel_asserts 0 s.
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
       replace a with (u_pte_addr base (subrange_vec_dec vpn 8 0)) by reflexivity;
       replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (Hinv s)).
-    cbv iota beta.
-    cbn. by rewrite ?app_nil_r.
+    walk_eff_peel_read Hrd.
+    (* an INVALID pte fails the follow-a-pointer test's first conjunct *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec_eff (Defs.and_boolM A B) s = Some (false, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hab). cbn match beta.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_check_leaf_pte_invalid pte
+                  (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) 0 s Hinv)).
+    cbn match beta zeta.
+    rewrite exec_eff_returnM. cbn match. by rewrite ?app_nil_r.
   Qed.
 
   (* level 0: a valid leaf that FAILS the permission check (e.g. U = 0) *)
@@ -796,28 +921,26 @@ Section UserWalkFaultEff.
   Proof.
     intros Hrd Hinv Hnl Hchk.
     destruct wfacc as [a0].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (0 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
+    walk_eff_peel_asserts 0 s.
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
       replace a with (u_pte_addr base (subrange_vec_dec vpn 8 0)) by reflexivity;
       replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (Hinv s)).
-    rewrite Hnl. cbv iota beta.
-    change (0 >? 0) with false. cbv iota beta.
-    match goal with |- context[Defs.bind0 ?A ?B] =>
-      assert (HAB : execR_eff (Defs.bind0 A B) s = Some (inr (PTE_Check_Failure (tt, f)), s, [])) end.
-    { rewrite execR_eff_bind0_eq. rewrite execR_eff_returnR. cbn match.
-      rewrite execR_eff_liftR. rewrite (Hchk s). cbn match. reflexivity. }
-    rewrite (execR_eff_bind_nil _ _ _ _ _ HAB).
-    cbv iota beta. cbn match.
-    cbn. by rewrite ?app_nil_r.
+    walk_eff_peel_read Hrd.
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec_eff (Defs.and_boolM A B) s = Some (false, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta.
+      rewrite Hnl. cbn [andb]. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hab). cbn match beta.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_check_leaf_pte_noperm0 pte
+                  (Physaddr (u_pte_addr base (subrange_vec_dec vpn 8 0))) f s Hinv Hnl Hchk)).
+    cbn match beta zeta.
+    rewrite exec_eff_returnM. cbn match. by rewrite ?app_nil_r.
   Qed.
 
   (* level 1: the mid slot holds an INVALID pte *)
@@ -832,21 +955,26 @@ Section UserWalkFaultEff.
   Proof.
     intros Hrd Hinv.
     destruct wfacc as [a1].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (1 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
+    walk_eff_peel_asserts 1 s.
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
       replace a with (u_pte_addr base (subrange_vec_dec vpn 17 9)) by reflexivity;
       replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (Hinv s)).
-    cbv iota beta.
-    cbn. by rewrite ?app_nil_r.
+    walk_eff_peel_read Hrd.
+    (* an INVALID pte fails the follow-a-pointer test's first conjunct *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec_eff (Defs.and_boolM A B) s = Some (false, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hab). cbn match beta.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_check_leaf_pte_invalid pte
+                  (Physaddr (u_pte_addr base (subrange_vec_dec vpn 17 9))) 1 s Hinv)).
+    cbn match beta zeta.
+    rewrite exec_eff_returnM. cbn match. by rewrite ?app_nil_r.
   Qed.
 
   (* level 1: a valid non-leaf step whose LEVEL-0 sub-walk returns [r]
@@ -869,26 +997,25 @@ Section UserWalkFaultEff.
   Proof.
     intros Hrd Hinv Hnl Hsub.
     destruct wfacc as [a1].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (1 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
+    walk_eff_peel_asserts 1 s.
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
       replace a with (u_pte_addr base (subrange_vec_dec vpn 17 9)) by reflexivity;
       replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (Hinv s)).
-    rewrite Hnl. cbv iota beta.
-    change (1 >? 0) with true. cbv iota beta.
-    rewrite execR_eff_liftR.
+    walk_eff_peel_read Hrd.
+    (* valid AND non-leaf AND level > 0: follow the pointer *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec_eff (Defs.and_boolM A B) s = Some (true, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta.
+      rewrite Hnl. change (1 >? 0) with true. cbn [andb]. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hab). cbn match beta.
     match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (1 - 1)] =>
       change (1 - 1) with 0 end.
-    rewrite Hsub.
-    cbn. by rewrite ?app_nil_r.
+    rewrite Hsub. cbn match. by rewrite ?app_nil_r.
   Qed.
 
   (* level 2 (= the full [pt_walk]): the root slot holds an INVALID pte *)
@@ -903,21 +1030,26 @@ Section UserWalkFaultEff.
     intros Hrd Hinv.
     unfold pt_walk.
     destruct (Defs.Zwf_guarded _) as [a2].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (2 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
+    walk_eff_peel_asserts 2 s.
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
       replace a with (u_pte_addr root (subrange_vec_dec vpn 26 18)) by reflexivity;
       replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (Hinv s)).
-    cbv iota beta.
-    cbn. by rewrite ?app_nil_r.
+    walk_eff_peel_read Hrd.
+    (* an INVALID pte fails the follow-a-pointer test's first conjunct *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec_eff (Defs.and_boolM A B) s = Some (false, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (false, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hab). cbn match beta.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_check_leaf_pte_invalid pte
+                  (Physaddr (u_pte_addr root (subrange_vec_dec vpn 26 18))) 2 s Hinv)).
+    cbn match beta zeta.
+    rewrite exec_eff_returnM. cbn match. by rewrite ?app_nil_r.
   Qed.
 
   (* level 2: a valid non-leaf step whose LEVEL-1 sub-walk returns [r] *)
@@ -938,26 +1070,25 @@ Section UserWalkFaultEff.
     intros Hrd Hinv Hnl Hsub.
     unfold pt_walk.
     destruct (Defs.Zwf_guarded _) as [a2].
-    cbn [_rec_pt_walk].
-    rewrite exec_eff_catch_early_return.
-    assert (Hae1 : exec_eff (Defs.assert_exp' (2 >=? 0) "recursion limit reached") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae1).
-    assert (Hae2 : exec_eff (Defs.assert_exp' ((39 =? 32) || (xlen =? 64)) "sys/vmem.sail:128.36-128.37") s = Some (eq_refl, s, []))
-      by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae2).
+    walk_eff_peel_asserts 2 s.
     match goal with |- context[read_pte (Physaddr ?a) ?wd] =>
       replace a with (u_pte_addr root (subrange_vec_dec vpn 26 18)) by reflexivity;
       replace wd with 8 by (vm_compute; reflexivity) end.
-    rewrite (execR_eff_liftR_cat _ _ _ _ _ _ Hrd).
-    rewrite (execR_eff_liftR_seq _ _ _ _ _ (Hinv s)).
-    rewrite Hnl. cbv iota beta.
-    change (2 >? 0) with true. cbv iota beta.
-    rewrite execR_eff_liftR.
+    walk_eff_peel_read Hrd.
+    (* valid AND non-leaf AND level > 0: follow the pointer *)
+    match goal with |- context[Defs.and_boolM ?A ?B] =>
+      assert (Hab : exec_eff (Defs.and_boolM A B) s = Some (true, s, [])) end.
+    { unfold Defs.and_boolM.
+      match goal with |- context[Defs.bind (Defs.bind (pte_is_invalid ?a ?b) ?k1) _] =>
+        assert (Hv : exec_eff (Defs.bind (pte_is_invalid a b) k1) s = Some (true, s, [])) end.
+      { rewrite (exec_eff_bind_nil _ _ _ _ _ (Hinv s)). cbn match beta.
+        apply exec_eff_returnM. }
+      rewrite (exec_eff_bind_nil _ _ _ _ _ Hv). cbn match beta.
+      rewrite Hnl. change (2 >? 0) with true. cbn [andb]. apply exec_eff_returnM. }
+    rewrite (exec_eff_bind_nil _ _ _ _ _ Hab). cbn match beta.
     match goal with |- context[_rec_pt_walk ?a ?b ?c ?d ?e ?f ?g0 (2 - 1)] =>
       change (2 - 1) with 1 end.
-    rewrite Hsub.
-    cbn. by rewrite ?app_nil_r.
+    rewrite Hsub. cbn match. by rewrite ?app_nil_r.
   Qed.
 
   (* a faulting walk propagates through translate_TLB_miss unchanged
@@ -1053,8 +1184,12 @@ Section PtHitEff.
     rewrite uwe_pte.
     rewrite autocast_id.
     rewrite (exec_eff_bind_nil _ _ _ _ _ (Hchk s)). cbn match.
-    match goal with |- context[update_and_write_pte ?a ?wd ?pv ?ac] =>
-      assert (Hu : exec_eff (update_and_write_pte a wd pv ac) s = Some (Ok None, s, [])) end.
+    (* [update_and_write_pte] takes the whole tablewalk context now —
+       including the entry's LEVEL, recovered from its levelMask by
+       [tlb_get_level] — and returns the ext_ptw alongside. *)
+    match goal with |- context[update_and_write_pte ?w ?vp ?a ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hu : exec_eff (update_and_write_pte w vp a pv lv ac pr mx ds e) s
+                   = Some (Ok (None, tt), s, [])) end.
     { unfold update_and_write_pte.
       match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
         change w with 64 end.
