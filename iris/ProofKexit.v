@@ -82,6 +82,9 @@ Require Import BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecMyproc SpecAcquire SpecRelease SpecSched.
+Require Import KallocInv.
+Require Import PipeInv.
+Require Import SpecIput.
 Require Import SpecFileclose SpecReparent SpecWakeup.
 Require Import SpecBeginOp SpecEndOp SpecIput.
 Require Import SpecPanic.
@@ -354,15 +357,20 @@ End KexitPro.
 (* carries its own [CID0] binder.                                          *)
 (* ===================================================================== *)
 Section KexitLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+            !kallocG Σ}.
 
   Lemma kx_loop `{GEN : GenId} `{CID0 : CpuId}
-      (Φ : mval -> iProp Σ) (γft γf : gname)
+      (Φ : mval -> iProp Σ) (γft γf : gname) (fn : fclose_names)
       (j : nat) (pid : mword 32) (sv : mword 64)
       (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :
     let pj := proc_addr j in
     (j < NPROC)%nat ->
-    (18 <= av)%nat ->
+    fcn_j fn = j ->
+    fcn_dq fn = DfracOwn (1/4) ->
+    fcn_pid fn = pid ->
+    (fileclose_stack <= av)%nat ->
     kernel_text -∗
     is_ftable γft γf -∗
     panic_wp_any -∗
@@ -376,6 +384,8 @@ Section KexitLoop.
         cpu_own 0 eb pj C b -∗
         pc_is (mword_of_int (KX + 0x4c)) -∗
         proc_priv γf pj pid Vx -∗
+        (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
+        fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     ∀ (fd : nat) (M : regfile) (V : pprivate),
       ⌜(fd < NOFILE)%nat⌝ -∗ ⌜kxl_regs M pj sv fd⌝ -∗ ⌜kx_nulled fd V⌝ -∗
@@ -383,9 +393,11 @@ Section KexitLoop.
       cpu_own 0 eb pj C b -∗
       pc_is (mword_of_int (KX + 0x3e)) -∗
       proc_priv γf pj pid V -∗
+      (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
+      fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    intros pj Hj Hav.
+    intros pj Hj Hfnj Hfndq Hfnpid Hav.
     iIntros "#Htext #Hft #Hpanic Hqexit".
     iAssert (∀ (fuel : nat),
                wp_next (CID0 := CID0) b pj (fun (CID : CpuId) =>
@@ -400,16 +412,20 @@ Section KexitLoop.
                        cpu_own 0 eb pj C b -∗
                        pc_is (mword_of_int (KX + 0x4c)) -∗
                        proc_priv γf pj pid Vx -∗
+                       (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
+                       fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
                        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
                    sie_cap_gpr M av b pj -∗
                    cpu_own 0 eb pj C b -∗
                    pc_is (mword_of_int (KX + 0x3e)) -∗
                    proc_priv γf pj pid V -∗
+                   (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
+                   fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
                    WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-      { iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Hpc Hpriv".
+      { iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Hpc Hpriv Hpenv Hfenv".
         exfalso. lia. }
-      iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Hpc Hpriv".
+      iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Hpc Hpriv Hpenv Hfenv".
       destruct Hregs as (Hs1 & Hs2 & Hs3 & Hs4 & Hdom).
       (* ---- the p++/test tail at +0x38, reached from BOTH arms of the
          [beqz] and from different harts, hence the [wp_next] wrapper. ---- *)
@@ -420,9 +436,11 @@ Section KexitLoop.
                    cpu_own 0 eb pj C b -∗
                    pc_is (mword_of_int (KX + 0x38)) -∗
                    proc_priv γf pj pid Vt -∗
+                   (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
+                   fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
                    WP (Loop : expr riscv_lang) {{ Φ }}))%I
         with "[Hqx]" as "Htail".
-      { iIntros (CIDt Hst Mt Vt) "%Hmt %Hnt Hcg Hown Hpc Hpriv".
+      { iIntros (CIDt Hst Mt Vt) "%Hmt %Hnt Hcg Hown Hpc Hpriv Hpenv Hfenv".
         destruct Hmt as (Ht9 & Ht18 & Ht19 & Ht20 & Htdom).
         iPoseProof (kxi_38 with "Htext") as "Hi38".
         iPoseProof (kxi_3a with "Htext") as "Hi3a".
@@ -480,7 +498,7 @@ Section KexitLoop.
           iDestruct (cpu_own_transport CIDt CIDt2 0 eb pj C b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
           iSpecialize ("Hqx" $! CIDt2 with "[%]"); [wp_next_chain|].
-          iApply ("Hqx" $! Mt38 Vt with "[%] [%] Hcg Hown Hpc Hpriv").
+          iApply ("Hqx" $! Mt38 Vt with "[%] [%] Hcg Hown Hpc Hpriv Hpenv Hfenv").
           * split; [exact HM19|]. split; [exact HM20|]. exact HMdom.
           * apply kx_nulled_all; [exact Hlen | rewrite -HkS; exact Hnt].
         + (* FALL: one more descriptor to look at *)
@@ -506,7 +524,7 @@ Section KexitLoop.
           iDestruct (cpu_own_transport CIDt CIDt2 0 eb pj C b ltac:(wp_next_chain)
                        with "Hown") as "Hown".
           iSpecialize ("IHf" $! CIDt2 with "[%]"); [wp_next_chain|].
-          iApply ("IHf" $! (S fd) Mt38 Vt with "[%] [%] [%] [%] Hqx Hcg Hown Hpc Hpriv").
+          iApply ("IHf" $! (S fd) Mt38 Vt with "[%] [%] [%] [%] Hqx Hcg Hown Hpc Hpriv Hpenv Hfenv").
           * unfold NOFILE in *; lia.
           * exact HkS.
           * split; [exact HM9|]. split; [exact HM18|]. split; [exact HM19|].
@@ -515,7 +533,11 @@ Section KexitLoop.
       (* ================= the body at +0x3e .. +0x4a ================= *)
       iDestruct (proc_priv_ofile_len with "Hpriv") as "%Hlen".
       destruct (lookup_lt_is_Some_2 (pv_ofile V) fd ltac:(rewrite Hlen; exact Hfd)) as [v Hv].
-      iDestruct (proc_priv_ofile γf pj pid V fd v Hv with "Hpriv") as "[Hslot Hback]".
+      (* the pid quarter and the descriptor come out TOGETHER: fileclose's
+         file-system arm threads the pid cell down to bread's acquiresleep,
+         and neither one-at-a-time accessor can be open while the other is. *)
+      iDestruct (proc_priv_pid_ofile γf pj pid V fd v Hv with "Hpriv")
+        as "(Hpidq & Hslot & Hback)".
       iDestruct "Hslot" as "[Hcell Hpay]".
       iPoseProof (kxi_3e with "Htext") as "Hi3e".
       iPoseProof (kxi_40 with "Htext") as "Hi40".
@@ -562,13 +584,13 @@ Section KexitLoop.
                          = mword_of_int (KX + 0x38))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt38) in "Hpc".
-        iDestruct ("Hback" $! v with "[Hcell Hpay]") as "Hpriv".
+        iDestruct ("Hback" $! v with "Hpidq [Hcell Hpay]") as "Hpriv".
         { rewrite /ofile_slot. iSplitL "Hcell"; [iExact "Hcell" | iExact "Hpay"]. }
         iEval (rewrite (upd_ofile_id V fd v Hv)) in "Hpriv".
         iDestruct (cpu_own_transport CIDk CIDm 0 eb pj C b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
         iSpecialize ("Htail" $! CIDm with "[%]"); [wp_next_chain|].
-        iApply ("Htail" $! M3e V with "[%] [%] Hcg Hown Hpc Hpriv").
+        iApply ("Htail" $! M3e V with "[%] [%] Hcg Hown Hpc Hpriv Hpenv Hfenv").
         + split; [exact HM3e_9|]. split; [exact HM3e_18|]. split; [exact HM3e_19|].
           split; [exact HM3e_20|]. intro r; apply rf_to_gmap_dom.
         + apply kx_nulled_skip; [exact Hnul|]. rewrite -Hv0. exact Hv.
@@ -607,10 +629,16 @@ Section KexitLoop.
         { rewrite /M42 upd_ne; [| vm_compute; discriminate]. rewrite HM3e_10. exact Hfn. }
         iDestruct (cpu_own_transport CIDk CIDn 0 eb pj C b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
-        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn) Φ γft γf kf q Cf M42 0 eb pj C av b
-                  ltac:(unfold fileclose_stack; lia) ltac:(lia) HM42a0
-                  with "Hcg Hown Htext Hpc Hft Hpanic Href [-]").
-        iIntros (CIDo Hso mr) "Hcg Hown Hpc %Hcs Hfdslot".
+        iDestruct "Hpenv" as (onk) "Hpenv".
+        iDestruct (fileclose_loop_open Φ fn onk 0%nat eb pj Cf
+                     with "Hpenv Hfenv [Hpidq]") as "[Hfcenv Hfcback]".
+        { rewrite Hfnj Hfndq Hfnpid. iExact "Hpidq". }
+        iApply (Fileclose.wp_fileclose_sconf (CID := CIDn) Φ γft γf kf q Cf fn onk M42 0 eb pj C av b
+                  ltac:(lia) ltac:(lia) HM42a0
+                  with "Hcg Hown Htext Hpc Hft Hpanic Href Hfcenv [-]").
+        iIntros (CIDo Hso mr) "Hcg Hown Hpc %Hcs Hfdslot Hout".
+        iDestruct ("Hfcback" with "Hout") as "(Hpenv & Hfenv & Hpidq)".
+        iEval (rewrite Hfnj Hfndq Hfnpid) in "Hpidq".
         assert (Hpc46 : ret_pc (M42 !!! Regidx (mword_of_int 1 : mword 5))
                         = mword_of_int (KX + 0x46))
           by (rewrite HM42ra; apply bv_eq; vm_compute; reflexivity).
@@ -640,7 +668,7 @@ Section KexitLoop.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp4a) in "Hpc".
         (* the emptied descriptor owns the unit fileclose handed back *)
-        iDestruct ("Hback" $! (zero_reg : mword 64) with "[Hcell Hfdslot]") as "Hpriv".
+        iDestruct ("Hback" $! (zero_reg : mword 64) with "Hpidq [Hcell Hfdslot]") as "Hpriv".
         { rewrite /ofile_slot. iSplitL "Hcell"; [iExact "Hcell"|].
           iLeft. iFrame "Hfdslot". done. }
         (* +0x4a c.j -> +0x38 *)
@@ -659,7 +687,7 @@ Section KexitLoop.
                      with "Hown") as "Hown".
         iSpecialize ("Htail" $! CIDr with "[%]"); [wp_next_chain|].
         iApply ("Htail" $! mr (upd_ofile V fd (zero_reg : mword 64))
-                  with "[%] [%] Hcg Hown Hpc Hpriv").
+                  with "[%] [%] Hcg Hown Hpc Hpriv Hpenv Hfenv").
         + split; [exact Hmr9|]. split; [exact Hmr18|]. split; [exact Hmr19|].
           split; [exact Hmr20|]. intro r; apply rf_to_gmap_dom.
         + apply kx_nulled_close; [exact Hnul|]. rewrite Hlen. exact Hfd. }
@@ -1402,7 +1430,8 @@ End KexitRest.
 (* ===================================================================== *)
 Section ProofKexit.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
+            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+            !kallocG Σ}.
 
   Lemma wp_kexit_sconf `{GEN : GenId} `{CID0 : CpuId}
       (γft γf γw : gname)
@@ -1413,16 +1442,20 @@ Section ProofKexit.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
+      (γkl : gname) (γka : gname * gname)
+      (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate)
     : wp_kexit_sconf_body γft γf γw Φ γs j γl γu γd γk pd pav pu bn γ γfs
-                          cov logstart dev ip dqi m av eb C b pid V.
+                          cov logstart dev ip dqi γkl γka on fn
+                          m av eb C b pid V.
   Proof.
     cbv beta delta [wp_kexit_sconf_body].
-    intros pcE pj Hj Hgl HK Hgeom Heb. subst eb.
+    intros pcE pj Hfn Hj Hgl HK Hgeom Heb. subst eb. subst fn.
     unfold K_kexit in HK.
     iIntros "Hcg Hown #Htext Hpc #Hprocs #Hscheds #Hpanic Hoc Hpark #Hwl #Hft".
-    iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl Hinit Hsp Hpriv".
+    iIntros "#Hkmem Hav0".
+    iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl Hinit Hsp Hpriv".
     assert (Hdom : forall r : regidx, r ∈ dom (rf_to_gmap m))
       by (intro r; apply rf_to_gmap_dom).
     (* ---- prologue ---- *)
@@ -1645,19 +1678,48 @@ Section ProofKexit.
       iDestruct (cpu_own_transport CID2 CID8 0 true pj C b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       (* ---- the fd loop, with [kx_rest] as its exit continuation ---- *)
-      iPoseProof (kx_loop (CID0 := CID8) Φ γft γf j pid
+      (* fileclose's environment, assembled from what kexit already owns.
+         The pid cell is NOT in it: it comes out of [proc_priv] one call at a
+         time ([ProcInv.proc_priv_pid_ofile]), since the block is what the
+         loop is walking. *)
+      iAssert (∃ on', fileclose_pipe_env Φ (MkFCloseNames γs j γl γkl γka γu γd γk
+                        pd pav pu bn γ γfs cov logstart dev pid (DfracOwn (1/4)))
+                        on' 0%nat)%I with "[Hav0]" as "Hpenv".
+      { iExists on. rewrite /fileclose_pipe_env; cbn [fcn_procs fcn_kmem fcn_kalloc].
+        iSplitR.
+        { iPureIntro.
+          assert (E : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
+          rewrite E. lia. }
+        iFrame "Hprocs Hkmem Hav0". }
+      iAssert (fileclose_fs_env_nopid Φ (MkFCloseNames γs j γl γkl γka γu γd γk
+                 pd pav pu bn γ γfs cov logstart dev pid (DfracOwn (1/4)))
+                 0%nat true pj)%I with "[Hbsl Hoc Hpark]" as "Hfenv".
+      { rewrite /fileclose_fs_env_nopid.
+        cbn [fcn_procs fcn_j fcn_plock fcn_uart fcn_disk fcn_dlock fcn_pd fcn_pav
+             fcn_pu fcn_bio fcn_log fcn_fs fcn_cov fcn_logstart fcn_dev].
+        iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|].
+        iSplitR; [iPureIntro; exact Hj|].
+        iSplitR; [iPureIntro; exact Hgl|].
+        iSplitR; [iPureIntro; exact Hgeom|].
+        iFrame "Hprocs Hscheds Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl Hoc Hpark". }
+      iPoseProof (kx_loop (CID0 := CID8) Φ γft γf
+                    (MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
+                       cov logstart dev pid (DfracOwn (1/4))) j pid
                     (m !!! Regidx (mword_of_int 10 : mword 5))
-                    (av - 6)%nat true C b Hj ltac:(lia)
+                    (av - 6)%nat true C b Hj eq_refl eq_refl eq_refl
+                    ltac:(unfold fileclose_stack, K_iput; lia)
                     with "Htext Hft Hpanic") as "Hloop".
-      iSpecialize ("Hloop" with "[Hseam Hgen Hbsl Hinit Hsp Hoc Hpark Hframe]").
-      { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof Hcg Hown Hpc Hpriv".
+      iSpecialize ("Hloop" with "[Hinit Hsp Hframe]").
+      { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof Hcg Hown Hpc Hpriv Hpenv Hfenv".
+        iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+                               _ & _ & _ & Hbsl & Hoc & Hpark)".
         iApply (kx_rest (CID0 := CIDx) Φ γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart dev ip (m !!! Regidx (mword_of_int 10 : mword 5)) dqi
                   Mx (av - 6)%nat true C b pid Vx
                   Hj Hgl eq_refl ltac:(lia) Hgeom Hxregs Hxof
                   with "Hcg Hown Htext Hpc Hprocs Hscheds Hpanic Hoc Hpark Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl Hinit Hsp Hpriv"). }
-      iApply ("Hloop" $! 0%nat A5 V with "[%] [%] [%] Hcg Hown Hpc Hpriv").
+      iApply ("Hloop" $! 0%nat A5 V with "[%] [%] [%] Hcg Hown Hpc Hpriv Hpenv Hfenv").
       + unfold NOFILE. lia.
       + split; [exact HA5s1|]. split; [exact HA5s2|]. split; [exact HA5s3|].
         split; [exact HA5s4|]. intro r; apply rf_to_gmap_dom.

@@ -465,6 +465,33 @@ definition rather than every caller.
     change at all: the names ghost is a component of the existing `γf` and
     `pipeG` became a superclass of `fileG`.
 
+- **WHAT KIND OF THING A DESCRIPTOR NAMES IS NOT AN FTABLE QUESTION, and the
+  file layer must not try to answer it.** A reference borrowed out of
+  `ProcInv.ofile_slot` comes with its `fcontent` existentially quantified, so
+  the holder cannot tell a pipe from an inode file. That knowledge is going to
+  be **per-`ofile` ghost state in `struct proc`** — not a persistent content
+  witness on the ftable authority, which is the tempting and wrong fix (it is
+  cheap to build on top of the payload-names component, which is exactly why
+  it needs refusing in writing). The rule the two sides divide on:
+
+  > The RESOURCE travels with the reference; the FACT travels with the
+  > descriptor.
+
+  The pipe end has to ride inside `file_ref`, because references migrate
+  between processes (`fork`, `filedup`) and whoever closes the last one frees
+  the page. The kind is a thread-local fact about a thread-local array, and it
+  stays true for exactly as long as the descriptor holds its reference: a held
+  reference keeps `ref > 0`, and the type cannot change while `ref > 0` — the
+  same argument that makes the content fields stable.
+
+- **`sys_read` / `sys_write` on a pipe fd are blocked on that ghost state**,
+  and NOT on the payload link. The reference a descriptor hands them does now
+  carry the pipe end, but under the same existential, so `piperead` /
+  `pipewrite` still cannot be given their `pipe_ref`. `fileclose`'s callers
+  want the identical fact for the identical reason
+  ([`../projects/fileclose.md`](../projects/fileclose.md) §3b), so one piece
+  of ghost state settles both.
+
 ## Why `f->ref++` cannot overflow: the fd-slot resource
 
 `filedup` increments `f->ref` with no check, and the invariant needs every

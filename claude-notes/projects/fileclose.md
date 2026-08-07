@@ -29,6 +29,10 @@ epilogue at `+0x8e`.
 
 ## What has LANDED
 
+- **The CONTRACT, and all four callers on it.** `SpecFileclose.v` is the
+  type-indexed environment described below; `ProofPipealloc`, `ProofSysClose`,
+  `ProofSysPipe` and `ProofKexit` are ported and green. What is left is
+  `ProofFileclose.v` itself, and then the four `Link` files.
 - **The payload link.** This was the real blocker and it is done: a
   `file_ref` now carries the pipe end / inode reference it names, so the
   last closer has a WHOLE `pipe_ref` to give `pipeclose` and a whole
@@ -40,9 +44,9 @@ epilogue at `+0x8e`.
 - **`CodeFileclose.v`** — 72 instruction facts, generated (`make gen-code`
   after adding the manifest row).
 
-## What is LEFT, and the design decisions already made
+## THE CONTRACT
 
-### 1. The contract's second half: a TYPE-INDEXED callee environment
+### 1. A TYPE-INDEXED callee environment
 
 The reference half of the contract is unchanged and stable (a reference in,
 one `fd_slot` out, silent about which arm ran). The new half is that
@@ -56,42 +60,49 @@ callers must own the corresponding fabric. What they must own depends on
 | `FD_INODE`/`FD_DEVICE` | begin_op/iput/end_op's: `bio_ctx`, `log_ctx`, `fs_crash_seam`, `gen_cert`, `dev_inv`, `disk_geom`, the virtio lock, `bslots bn 3`, `procs_inv`, `scheds_inv`, `own_ctx`, `park_hlf`, `p_pid`, and the pure `n = 0` / `eb = true` / `p = proc_addr j` / `j < NPROC` / `γs !! j` / `log_geom_ok` | `own_ctx ∗ park_hlf ∗ p_pid ∗ bslots` |
 | `FD_NONE` | nothing | nothing |
 
-**Indexing rather than taking the union is what keeps the cheap callers
-cheap**, and it is not a trick: pipealloc closes files it has just allocated
-and not yet typed (`filealloc`'s post already pins `fc_type Cf = FD_NONE`),
-so it owns no file system and must not be asked for one; sys_pipe closes
-FD_PIPE files and is asked only for the pipe fabric it already has. Only a
-caller closing a descriptor of UNKNOWN type — sys_close, kexit — pays for
-both, which is the truth about closing an arbitrary fd.
+**What the indexing buys TODAY is pipealloc**, and only pipealloc: it closes
+files it has just allocated and not yet typed (`filealloc`'s post already
+pins `fc_type Cf = FD_NONE`), so its branch is `emp` and its contract does
+not have to claim a file system it provably never reaches — nor thread one
+through its three continuation lemmas. Every caller that closes a file out of
+the fd table pays for both branches and case-splits at the call; see 3b. What
+the indexing buys LATER is that those callers get shorter for free once the
+descriptor-side kind ghost lands, with no change to this contract.
 
 The log RESERVATION is deliberately NOT in the environment: begin_op mints
 `log_op γ MAXOPBLOCKS` and end_op retires it, so an operation's budget never
 crosses fileclose's boundary.
 
-A draft of this contract is written; it is **not landed**, because it breaks
-the four callers at once (below) and a red tree helps nobody. The draft
-carries `fileclose_env_out_of_env` — the check that the FAST path
-(`--f->ref > 0`, which returns without touching any of it) can pay the
-postcondition out of the precondition. Keep that lemma: it is what catches a
-bundle stated with a return going the wrong way.
+The contract carries three checks, and each earns its place:
+
+- `fileclose_env_out_of_env` — the FAST path (`--f->ref > 0`, which returns
+  without touching any of it) can pay the postcondition out of the
+  precondition. Catches a bundle stated with a return going the wrong way.
+- `fileclose_pipe_env_reuse` / `fileclose_fs_env_reuse` — everything in each
+  bundle except the consumables is PERSISTENT, so a caller can hand it over
+  and rebuild it. If either stops compiling, a conjunct has stopped being
+  persistent and must be routed back through the corresponding `_out`. (This
+  is what settled the `disk_geom` question: it is persistent.)
+- `fileclose_env_frame` / `fileclose_loop_open` — hand the environment over,
+  get the whole environment back. Every fd-table closer uses one of these,
+  which is why the case analysis appears once in the spec and nowhere in the
+  four proofs.
 
 **The naming wart is solved: one `Record fclose_names`** bundling every
-ghost name and geometry value both arms are indexed by, with an explicit
-`Inhabited` instance (spelled out — `bio_names` has function fields and
-several of these records have no instance of their own). A caller that
-cannot reach either arm passes `inhabitant`. The alternative — flat
-parameters — would make pipealloc *name* a `bio_names` it has never heard
-of; pushing them under an existential forces the continuation inside the
-same binder and contorts the spec.
+ghost name both arms are indexed by, with an explicit `Inhabited` instance
+(spelled out — `bio_names` has function fields and several of these records
+have no instance of their own). A caller that cannot reach either arm passes
+`inhabitant`. The page count `on` is a SEPARATE parameter rather than a
+field, because it is the one thing that moves: a caller closing descriptor
+after descriptor carries it existentially while the rest stays fixed.
 
 **The ghost CLASSES do propagate, and that part is unavoidable.** A caller
 that can reach fileclose can reach iput, so `bioG`/`diskGhostG`/`uartGhostG`/
 `fsLogG`/`logG`/`fsCrashG` must be in scope at every call site — including
 pipealloc's, whose *contract* says nothing about a file system. Capacity
-only, no resource: pipealloc's `Module Type` grows six class binders and
-nothing else. There is no way to hide them behind a derived FD_NONE-only
-interface: the derivation's proof needs the classes, and Coq's section
-discharge would put them back into the derived lemma's statement anyway.
+only, no resource. There is no way to hide them behind a derived
+FD_NONE-only interface: the derivation's proof needs the classes, and Coq's
+section discharge would put them back into the derived lemma's statement.
 
 ### 2. The stack constant, and its ripple
 
@@ -112,66 +123,80 @@ Two of the arithmetic lemmas that discharge these (`ProofSysPipe.sp_bounds`
 and friends) `unfold fileclose_stack; lia` — they must also unfold `K_iput`
 now, or `lia` cannot see the literal.
 
-### 3. The four callers
+### 3. The four callers — ALL PORTED
 
 - **`ProofPipealloc`** — two call sites, both at `fc_type = FD_NONE`, so the
-  environment is `emp`. Only the junk-parameter wart above.
-- **`ProofSysPipe`** — FD_PIPE, so `SpecSysPipe` gains `γs` + `procs_inv`
-  (pipeclose's wakeup needs it) and the `n+2` bound; it already has the kmem
-  lock and `kalloc_avail`. The two call sites are inside the shared
-  `sp_close2` block lemma, so the threading happens once.
-- **`ProofSysClose`** — unknown type: `SpecSysClose` gains BOTH bundles. This
-  is the biggest contract growth in the set, and it is honest — closing an
-  arbitrary descriptor can write the disk.
-- **`ProofKexit`** — unknown type, in a LOOP over NOFILE descriptors. It
-  already carries the whole FS bundle (it calls begin_op/iput/end_op itself);
-  what it gains is the kmem lock and `kalloc_avail`, and the loop invariant
-  gains `∃ on, kalloc_avail γka on` because each iteration may or may not
-  free a pipe page.
+  environment is `emp` (`fileclose_env_none`). Its `PF1` disjunct and the
+  `T4C` continuation each had to grow the type conjunct, which
+  `filealloc_post` supplies and they were dropping.
+- **`ProofSysClose`** — one call site, unknown type: the spec gains both
+  bundles and `fileclose_env_frame` does the case split.
+- **`ProofSysPipe`** — three call sites through the shared `sp_close2` block
+  lemma, which now threads ONE environment through BOTH of its closes (the
+  first may move the page count, so the second runs at an existential `on`).
+  The epilogue `EPI` and the `T7C` tail carry it too, since every exit has to
+  hand it back.
+- **`ProofKexit`** — a LOOP over NOFILE descriptors, and the one that needed
+  a new accessor. `fileclose`'s file-system arm wants the caller's pid cell,
+  which lives INSIDE the `proc_priv` block the loop is walking — and the
+  one-at-a-time accessors each swallow the whole block, so neither can be
+  open while the other is. `ProcInv.proc_priv_pid_ofile` lends the pid
+  quarter and one descriptor together; `fileclose_fs_env_nopid` is the
+  bundle the loop carries, paired with that quarter for the duration of one
+  call. `SpecKexit` also takes `fn` as ONE equation
+  (`fn = MkFCloseNames γs j γl …`) rather than fifteen coherence conjuncts;
+  it `subst`s away in the proof.
 
-### 3b. THE OPEN DESIGN QUESTION: sys_pipe cannot see the type
+### 3b. WHY THE THREE fd-TABLE CLOSERS ALL ARGUE THE SAME WAY
 
-Landing the contract was attempted and **backed out** because of this, which
-is worth having written down before the next attempt.
+`sys_pipe` closes a `struct file` it took out of the fd table, which is
+`sys_close`'s situation exactly, and it discharges its obligation the same
+way: **carry both bundles, and `case_bool_decide` on the type at the call**,
+handing over whichever branch the environment asks for. The other bundle is
+untouched and comes back for free. `kexit` likewise.
 
-`pipealloc` is fine — `SpecFilealloc`'s post pins `fc_type Cf = FD_NONE`, and
-the two error-path closes are discharged by `fileclose_env_none`. (Its `PF1`
-disjunct and the `T4C` continuation each needed the type conjunct threaded
-through; both edits are small and were verified to compile.)
+It is worth recording why this is the answer, because there is a tempting
+wrong turn. `sys_pipe` *knows* the files it closes are pipes — it made them —
+but two of its three error tails close a file it has already INSTALLED in a
+descriptor and then re-borrowed, and `ProcInv.ofile_slot`'s file disjunct is
+`∃ k q C, cell ↦ fnode k ∗ file_ref γf k q C`, so the model has forgotten the
+type by then. The wrong turn is to recover it on the FTABLE side (a
+persistent per-slot content witness, which the payload component could carry
+cheaply). Do not: **the knowledge that a descriptor names a pipe is going to
+be per-`ofile` ghost state in `struct proc`**, not something read back off
+the file table.
 
-`sys_pipe` is NOT fine, and the reason is structural. Two of its three error
-tails close a file it has already INSTALLED in a descriptor and then
-re-borrowed: `p->ofile[fd0] = 0` hands back an `ofile_slot`'s payload, and
-that payload is `∃ k q C, cell ↦ fnode k ∗ file_ref γf k q C` — the content
-is existentially quantified, so **the type is not recoverable**, and neither
-`fileclose_pipe_env` nor `fileclose_env_none` can be produced. The proof
-knows the file was FD_PIPE when it went in; the model has forgotten.
+That split is the right one, and it is worth stating as the rule:
 
-Two ways out, and they are not equivalent:
+> The RESOURCE travels with the reference; the FACT travels with the
+> descriptor.
 
-1. **Make sys_pipe own both bundles** and case-split on the type, handing
-   fileclose whichever arm's environment matches. Mechanical, no new algebra
-   — but it makes sys_pipe's contract demand a file system it provably never
-   uses, which is exactly the over-claiming the type-indexing exists to
-   avoid. It is also the *only* option for sys_close and kexit, which close
-   descriptors of genuinely unknown type.
-2. **A PERSISTENT per-slot content (or type) witness.** `SpecSysPipe.v`'s
-   header already flags this as the missing piece for a different reason
-   ("the post can say descriptor `fd0` names ftable slot `k0`, but not that
-   `k0`'s type is FD_PIPE"), so it pays for two things at once. The payload
-   link makes it cheap now: change the payload component from
-   `frac × agree` to `option frac × agree`, so that `(None, to_agree pn)` is
-   a duplicable — hence persistent — fragment extractable from any share.
-   Put the type (or a content snapshot) in `fpnames`, tied to the content by
-   a pure conjunct inside `file_payload`; a caller then keeps the witness
-   across the install and re-borrow and recovers the type by agreement. It
-   also needs `fnode` injectivity, which follows from `acur_unsigned`.
+The pipe end has to ride inside `file_ref` because references migrate between
+processes (`fork`, `filedup`) and whoever closes the last one frees the page.
+The *kind* of thing a descriptor names is a thread-local fact about a
+thread-local array, and it stays true for exactly as long as the descriptor
+holds its reference: a held reference keeps `ref > 0`, and the type cannot
+change while `ref > 0` — the same argument that makes the content fields
+stable.
 
-Option 2 for sys_pipe, option 1 for sys_close and kexit, is probably the
-right split — but it is a real design decision and it should be made before
-the contract lands, because it decides how many of the four callers grow.
+**The type-indexed environment is the shape that ghost state will want.** The
+case analysis is on `fc_type Cf`, which is precisely what a per-`ofile` kind
+fact discharges, so when it lands a closer that knows its descriptor names a
+pipe drops into the cheap branch automatically and stops needing the file
+system. The contract does not have to be reopened then; the callers just get
+shorter. Collapsing to ONE unconditional environment instead would be a
+simpler spec today and would forfeit that.
 
-### 4. The proof
+**What the loop forces (kexit).** Every NON-PERSISTENT conjunct of the
+environment must reappear in what comes back, or a caller cannot close a
+second descriptor. On the FS side those are `bslots`, `own_ctx`, `park_hlf`
+and the pid cell, and iput/end_op return all four. On the pipe side it is the
+page count, and it comes back CHANGED — pipeclose frees the page only if it
+closed the pipe's last end — so kexit's loop invariant carries it
+existentially. Check `disk_geom` when landing this: if it is not persistent
+it has to be routed back too.
+
+## What is LEFT: the proof
 
 Nothing exotic is expected; the shape is `ProofFiledup.v` (acquire, the dead
 `f->ref < 1` panic arm via `FileInv.fref_word_spos`, the ghost step, release)

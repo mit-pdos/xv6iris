@@ -146,6 +146,7 @@ Record fclose_names := MkFCloseNames {
   fcn_plock    : gname;
   fcn_kmem     : gname;           (* kmem.lock                              *)
   fcn_kalloc   : gname * gname;
+  fcn_avail    : option nat;      (* the free-page count kalloc accounts    *)
   fcn_uart     : uart_names;
   fcn_disk     : disk_names;
   fcn_dlock    : gname;           (* virtio_disk.lock                       *)
@@ -168,7 +169,7 @@ Record fclose_names := MkFCloseNames {
    the caller that passes them -- so any closed term does. *)
 Global Instance fclose_names_inhabited : Inhabited fclose_names :=
   populate (MkFCloseNames
-    [] 0%nat 1%positive 1%positive (1%positive, 1%positive)
+    [] 0%nat 1%positive 1%positive (1%positive, 1%positive) None
     (UartNames 1%positive 1%positive 1%positive 1%positive)
     (DiskNames 1%positive 1%positive 1%positive 1%positive 1%positive
                1%positive 1%positive)
@@ -188,22 +189,19 @@ Section SpecFileclose.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_PIPE arm's environment: pipeclose's ---- *)
-  (* [on] is a PARAMETER rather than a field of [fclose_names], because it is
-     the one thing that moves: a caller closing descriptor after descriptor
-     (kexit) carries it existentially while everything else stays fixed. *)
   Definition fileclose_pipe_env (Φ : mval -> iProp Σ) (fn : fclose_names)
-      (on : option nat) (n : nat) : iProp Σ :=
+      (n : nat) : iProp Σ :=
     (⌜(Z.of_nat n + 2 < 2 ^ 31)%Z⌝ ∗
      procs_inv Φ (fcn_procs fn) ∗
      is_lock (fcn_kmem fn) (mword_of_int KernelSyms.kmem) "kmem"%string
        (kmem_res (fcn_kalloc fn) (mword_of_int (KernelSyms.kmem + 24))) ∗
-     kalloc_avail (fcn_kalloc fn) on)%I.
+     kalloc_avail (fcn_kalloc fn) (fcn_avail fn))%I.
 
   (* the page came back iff this was the pipe's LAST end; the caller cannot
      tell, and does not need to. *)
-  Definition fileclose_pipe_out (fn : fclose_names) (on : option nat) : iProp Σ :=
-    (kalloc_avail (fcn_kalloc fn) on ∨
-     kalloc_avail (fcn_kalloc fn) (avail_inc on))%I.
+  Definition fileclose_pipe_out (fn : fclose_names) : iProp Σ :=
+    (kalloc_avail (fcn_kalloc fn) (fcn_avail fn) ∨
+     kalloc_avail (fcn_kalloc fn) (avail_inc (fcn_avail fn)))%I.
 
   (* ---- the FD_INODE / FD_DEVICE arm's environment: begin_op / iput /
          end_op's, which is the whole file system ---- *)
@@ -228,47 +226,6 @@ Section SpecFileclose.
      park_hlf (fcn_j fn) true ∗
      p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn)%I.
 
-  (* the same bundle WITHOUT the caller's pid cell.  kexit closes every
-     descriptor in a loop while holding [proc_priv], and the pid cell the FS
-     calls want is INSIDE that block -- so its loop carries this, and pairs it
-     with the quarter [ProcInv.proc_priv_pid_ofile] lends for the duration of
-     one call. *)
-  Definition fileclose_fs_env_nopid (Φ : mval -> iProp Σ) (fn : fclose_names)
-      (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (⌜(n = 0)%nat⌝ ∗ ⌜eb = true⌝ ∗ ⌜p = proc_addr (fcn_j fn)⌝ ∗
-     ⌜(fcn_j fn < NPROC)%nat⌝ ∗
-     ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
-     ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
-     procs_inv Φ (fcn_procs fn) ∗ scheds_inv Φ (fcn_procs fn) ∗
-     bio_ctx (fcn_bio fn)
-       (fs_view (fcn_fs fn) (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
-     log_ctx (fcn_log fn) (fcn_bio fn) (fcn_fs fn) (fcn_cov fn)
-       (fcn_logstart fn) (fcn_dev fn) ∗
-     fs_crash_seam (fcn_cov fn) (fcn_logstart fn) ∗ gen_cert ∗
-     dev_inv (fcn_uart fn) (fcn_disk fn) ∗
-     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
-       (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
-     bslots (fcn_bio fn) 3 ∗
-     own_ctx (p_context (proc_addr (fcn_j fn))) ∗
-     park_hlf (fcn_j fn) true)%I.
-
-  Lemma fileclose_fs_env_split_pid Φ fn n eb p :
-    fileclose_fs_env Φ fn n eb p ⊣⊢
-    fileclose_fs_env_nopid Φ fn n eb p ∗
-    p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn.
-  Proof.
-    rewrite /fileclose_fs_env /fileclose_fs_env_nopid. iSplit.
-    - iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
-                Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hctx & Hpark & $)".
-      do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hctx Hpark".
-    - iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
-                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hctx & Hpark) $]".
-      do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hctx Hpark".
-  Qed.
-
   Definition fileclose_fs_out (fn : fclose_names) : iProp Σ :=
     (own_ctx (p_context (proc_addr (fcn_j fn))) ∗
      park_hlf (fcn_j fn) true ∗
@@ -277,19 +234,17 @@ Section SpecFileclose.
 
   (* ---- and the two, selected by the file's type ---- *)
   Definition fileclose_env (Φ : mval -> iProp Σ) (fn : fclose_names)
-      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (Cf : fcontent)
-      : iProp Σ :=
+      (n : nat) (eb : bool) (p : mword 64) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE)
-     then fileclose_pipe_env Φ fn on n
+     then fileclose_pipe_env Φ fn n
      else if bool_decide (fc_type Cf = FD_INODE)
                || bool_decide (fc_type Cf = FD_DEVICE)
      then fileclose_fs_env Φ fn n eb p
      else emp)%I.
 
-  Definition fileclose_env_out (fn : fclose_names) (on : option nat)
-      (Cf : fcontent) : iProp Σ :=
+  Definition fileclose_env_out (fn : fclose_names) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE)
-     then fileclose_pipe_out fn on
+     then fileclose_pipe_out fn
      else if bool_decide (fc_type Cf = FD_INODE)
                || bool_decide (fc_type Cf = FD_DEVICE)
      then fileclose_fs_out fn
@@ -298,8 +253,8 @@ Section SpecFileclose.
   (* A file that is neither a pipe nor an inode costs its closer nothing.
      This is the lemma pipealloc's two error-path calls are discharged by --
      [SpecFilealloc]'s post already pins the type. *)
-  Lemma fileclose_env_none Φ fn on n eb p Cf :
-    fc_type Cf = FD_NONE -> ⊢ fileclose_env Φ fn on n eb p Cf.
+  Lemma fileclose_env_none Φ fn n eb p Cf :
+    fc_type Cf = FD_NONE -> ⊢ fileclose_env Φ fn n eb p Cf.
   Proof.
     intro Ht. rewrite /fileclose_env Ht.
     rewrite bool_decide_eq_false_2; [|by vm_compute].
@@ -308,149 +263,23 @@ Section SpecFileclose.
     done.
   Qed.
 
-  (* EACH BUNDLE ALREADY CONTAINS WHAT IT PROMISES BACK.  Two facts, and both
-     are checks rather than conveniences: they are what catches a bundle
-     stated with one of its returns going the wrong way. *)
-  Lemma fileclose_pipe_env_out Φ fn on n :
-    fileclose_pipe_env Φ fn on n -∗ fileclose_pipe_out fn on.
-  Proof.
-    rewrite /fileclose_pipe_env /fileclose_pipe_out.
-    iIntros "(_ & _ & _ & Hav)". by iLeft.
-  Qed.
-
-  Lemma fileclose_fs_env_out Φ fn n eb p :
-    fileclose_fs_env Φ fn n eb p -∗ fileclose_fs_out fn.
-  Proof.
-    rewrite /fileclose_fs_env /fileclose_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              Hbs & Hctx & Hpark & Hpid)".
-    iFrame.
-  Qed.
-
   (* THE FAST PATH'S OBLIGATION, checked here rather than discovered in the
      proof: when [--f->ref > 0] fileclose returns without touching any of it,
      so the environment must already contain everything the postcondition
-     promises. *)
-  Lemma fileclose_env_out_of_env Φ fn on n eb p Cf :
-    fileclose_env Φ fn on n eb p Cf -∗ fileclose_env_out fn on Cf.
+     promises.  It does, in every arm -- which is also the check that the two
+     bundles were not stated with a return going the wrong way. *)
+  Lemma fileclose_env_out_of_env Φ fn n eb p Cf :
+    fileclose_env Φ fn n eb p Cf -∗ fileclose_env_out fn Cf.
   Proof.
     rewrite /fileclose_env /fileclose_env_out.
     case_bool_decide; [|case_match].
-    - iApply fileclose_pipe_env_out.
-    - iApply fileclose_fs_env_out.
+    - rewrite /fileclose_pipe_env /fileclose_pipe_out.
+      iIntros "(_ & _ & _ & Hav)". by iLeft.
+    - rewrite /fileclose_fs_env /fileclose_fs_out.
+      iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+                Hbs & Hctx & Hpark & Hpid)".
+      iFrame.
     - by iIntros "_".
-  Qed.
-
-  (* ---- CLOSING MORE THAN ONE DESCRIPTOR ----
-
-     kexit walks the whole fd table, so its loop has to carry the environment
-     round.  Everything in both bundles except the four consumables and the
-     page count is persistent, so the round trip is a persistent wand: hand
-     the bundle over, and rebuild it from what comes back.  The page count
-     comes back CHANGED -- pipeclose frees the page only if it closed the
-     pipe's last end -- which is why the pipe bundle is rebuilt under an
-     existential, and hence why [on] is a parameter and not a field.
-
-     If either of these ever stops compiling, a conjunct of the environment
-     has stopped being persistent and must be routed back through the
-     corresponding [_out] instead. *)
-  Lemma fileclose_pipe_env_reuse Φ fn on n :
-    fileclose_pipe_env Φ fn on n -∗
-    fileclose_pipe_env Φ fn on n ∗
-    □ (fileclose_pipe_out fn on -∗ ∃ on', fileclose_pipe_env Φ fn on' n).
-  Proof.
-    rewrite /fileclose_pipe_env /fileclose_pipe_out.
-    iIntros "(%Hb & #Hpi & #Hlk & Hav)".
-    iSplitL "Hav".
-    { iSplitR; [iPureIntro; exact Hb|]. iFrame "Hpi Hlk Hav". }
-    iModIntro. iIntros "[H|H]".
-    - iExists on. iSplitR; [iPureIntro; exact Hb|]. iFrame "Hpi Hlk H".
-    - iExists (avail_inc on). iSplitR; [iPureIntro; exact Hb|]. iFrame "Hpi Hlk H".
-  Qed.
-
-  Lemma fileclose_fs_env_reuse Φ fn n eb p :
-    fileclose_fs_env Φ fn n eb p -∗
-    fileclose_fs_env Φ fn n eb p ∗
-    □ (fileclose_fs_out fn -∗ fileclose_fs_env Φ fn n eb p).
-  Proof.
-    rewrite /fileclose_fs_env /fileclose_fs_out.
-    iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & #Hpr & #Hsc & #Hbio & #Hlog &
-              #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & Hctx & Hpark & Hpid)".
-    iSplitL "Hbs Hctx Hpark Hpid".
-    { do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hctx Hpark Hpid". }
-    iModIntro. iIntros "(Hctx & Hpark & Hpid & Hbs)".
-    do 6 (iSplitR; [iPureIntro; assumption|]).
-    iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hctx Hpark Hpid".
-  Qed.
-
-  (* ---- WHAT A CLOSER OF AN ARBITRARY DESCRIPTOR DOES ----
-
-     A caller that took its [struct file] out of the fd table -- sys_close,
-     kexit, sys_pipe -- cannot see the type: [ProcInv.ofile_slot] quantifies
-     the [fcontent] existentially, and that knowledge is going to arrive as
-     per-[ofile] ghost state in [struct proc] rather than off the ftable.  So
-     it carries BOTH bundles, hands over whichever the environment asks for,
-     and keeps the other untouched.  This is that move, proved once: the
-     environment out, and a wand that puts both bundles back together from
-     whatever came back.
-
-     (Only pipealloc escapes it, because [filealloc] pins its files untyped;
-     it uses [fileclose_env_none] instead.) *)
-  Lemma fileclose_env_split Φ fn on n eb p Cf :
-    fileclose_pipe_env Φ fn on n -∗ fileclose_fs_env Φ fn n eb p -∗
-    fileclose_env Φ fn on n eb p Cf ∗
-    (fileclose_env_out fn on Cf -∗
-       fileclose_pipe_out fn on ∗ fileclose_fs_out fn).
-  Proof.
-    rewrite /fileclose_env /fileclose_env_out.
-    case_bool_decide; [|case_match].
-    - iIntros "Hp Hf". iFrame "Hp". iIntros "$".
-      by iApply fileclose_fs_env_out.
-    - iIntros "Hp Hf". iFrame "Hf". iIntros "$".
-      by iApply fileclose_pipe_env_out.
-    - iIntros "Hp Hf". iSplitR; [done|]. iIntros "_".
-      iDestruct (fileclose_pipe_env_out with "Hp") as "$".
-      by iApply fileclose_fs_env_out.
-  Qed.
-
-  (* ...and the form every fd-table closer actually uses: hand over the
-     environment, get the WHOLE environment back.  The page count has moved
-     if the descriptor held a pipe's last end, so the pipe bundle returns
-     under an existential -- which is exactly what lets a caller close a
-     second descriptor, and hence what kexit's loop runs on. *)
-  Lemma fileclose_env_frame Φ fn on n eb p Cf :
-    fileclose_pipe_env Φ fn on n -∗ fileclose_fs_env Φ fn n eb p -∗
-    fileclose_env Φ fn on n eb p Cf ∗
-    (fileclose_env_out fn on Cf -∗
-       (∃ on', fileclose_pipe_env Φ fn on' n) ∗ fileclose_fs_env Φ fn n eb p).
-  Proof.
-    iIntros "Hp Hf".
-    iDestruct (fileclose_pipe_env_reuse with "Hp") as "[Hp #Hpre]".
-    iDestruct (fileclose_fs_env_reuse with "Hf") as "[Hf #Hfre]".
-    iDestruct (fileclose_env_split Φ fn on n eb p Cf with "Hp Hf") as "[$ Hback]".
-    iIntros "Hout". iDestruct ("Hback" with "Hout") as "[Hpo Hfo]".
-    iSplitL "Hpo"; [by iApply "Hpre" | by iApply "Hfre"].
-  Qed.
-
-  (* WHAT A LOOP OVER DESCRIPTORS CARRIES.  The pid quarter is lent per
-     iteration out of [proc_priv]; everything else goes round. *)
-  Lemma fileclose_loop_open Φ fn on n eb p Cf :
-    fileclose_pipe_env Φ fn on n -∗
-    fileclose_fs_env_nopid Φ fn n eb p -∗
-    p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn -∗
-    fileclose_env Φ fn on n eb p Cf ∗
-    (fileclose_env_out fn on Cf -∗
-       (∃ on', fileclose_pipe_env Φ fn on' n) ∗
-       fileclose_fs_env_nopid Φ fn n eb p ∗
-       p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn).
-  Proof.
-    iIntros "Hp Hf Hpid".
-    iDestruct (fileclose_fs_env_split_pid with "[Hf Hpid]") as "Hf";
-      [iFrame "Hf Hpid"|].
-    iDestruct (fileclose_env_frame Φ fn on n eb p Cf with "Hp Hf") as "[$ Hback]".
-    iIntros "Hout". iDestruct ("Hback" with "Hout") as "[$ Hf]".
-    by iApply fileclose_fs_env_split_pid.
   Qed.
 
 End SpecFileclose.
@@ -461,7 +290,7 @@ Definition wp_fileclose_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γfl γf : gname)            (* ftable.lock, ftable  *)
     (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
-    (fn : fclose_names) (on : option nat)             (* the arms' ghosts     *)
+    (fn : fclose_names)                               (* the arms' ghosts     *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileclose in
@@ -478,7 +307,7 @@ Definition wp_fileclose_sconf_body
   is_ftable γfl γf -∗
   panic_wp_any -∗
   file_ref γf k q Cf -∗
-  fileclose_env Φ fn on n eb p Cf -∗
+  fileclose_env Φ fn n eb p Cf -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
@@ -486,7 +315,7 @@ Definition wp_fileclose_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     fd_slot -∗
-    fileclose_env_out fn on Cf -∗
+    fileclose_env_out fn Cf -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -498,8 +327,8 @@ Module Type FILECLOSE.
       `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ) (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
-      (fn : fclose_names) (on : option nat)
+      (fn : fclose_names)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
-      wp_fileclose_sconf_body Φ γfl γf k q Cf fn on m n eb p C K b.
+      wp_fileclose_sconf_body Φ γfl γf k q Cf fn m n eb p C K b.
 End FILECLOSE.

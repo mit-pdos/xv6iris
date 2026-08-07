@@ -54,7 +54,12 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn.
-Require Import SpecFilealloc SpecKalloc SpecInitlock SpecFileclose.
+Require Import WpUart.
+Require Import DiskPtsto DiskInv.
+Require Import BioInv.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import SpecFilealloc SpecKalloc SpecInitlock SpecIput SpecFileclose.
 Require Import SpecPipealloc.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -68,7 +73,8 @@ Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
                       (Initlock : INITLOCK) (Fileclose : FILECLOSE) : PIPEALLOC.
 
 Section ProofPipealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ,
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -464,9 +470,15 @@ Section ProofPipealloc.
        we still hold -- and the fileclose that consumes it hands the unit
        back.  Either way the tail leaves with one unit for THIS end, which is
        what lets the epilogue pay [pipealloc_post]'s two. *)
+    (* The TYPE conjunct is what the fileclose in the tail needs: the file
+       was allocated and not yet typed, so [fileclose_env] is [emp] for it
+       ([SpecFileclose.fileclose_env_none]) and this error path owes no file
+       system.  It comes straight out of [filealloc_post] and would simply be
+       dropped here without this clause. *)
     set (PF1 := ((pf1 ↦₈ (zero_reg : mword 64) ∗ fd_slot)
                  ∨ (∃ (k1 : nat) (Cf1 : fcontent),
-                      ⌜(k1 < NFILE)%nat⌝ ∗ pf1 ↦₈ fnode k1 ∗ file_ref γf k1 1 Cf1))%I).
+                      ⌜(k1 < NFILE)%nat /\ fc_type Cf1 = FD_NONE⌝ ∗
+                      pf1 ↦₈ fnode k1 ∗ file_ref γf k1 1 Cf1))%I).
     set (T8 := (wp_next (CID0 := CID) b p (fun (CIDt : CpuId) =>
         ∀ (Mt : regfile),
         ⌜ Mt !!! Regidx csp_rs1 = spr
@@ -488,7 +500,10 @@ Section ProofPipealloc.
         WP (Loop : expr riscv_lang) {{ Φ }}))%I).
     set (T4C := (wp_next (CID0 := CID) b p (fun (CIDu : CpuId) =>
         ∀ (Mt : regfile) (k0 : nat) (Cf0 : fcontent),
-        ⌜ Mt !!! Regidx csp_rs1 = spr
+        (* the TYPE conjunct is the fileclose at +0xa4's: an untyped file
+           costs its closer nothing (SpecFileclose.fileclose_env_none) *)
+        ⌜ fc_type Cf0 = FD_NONE
+          /\ Mt !!! Regidx csp_rs1 = spr
           /\ Mt !!! Regidx Rs4 = pf1
           /\ Mt !!! Regidx Ra0 = fnode k0
           /\ (forall c : mword 5, is_cs_idx c = true ->
@@ -517,13 +532,14 @@ Section ProofPipealloc.
       iAssert (∃ x : mword 64, pf1 ↦₈ x ∗
                  (⌜x = (zero_reg : mword 64)⌝ ∗ fd_slot
                   ∨ ∃ (k1 : nat) (Cf1 : fcontent),
-                      ⌜(k1 < NFILE)%nat /\ x = fnode k1⌝ ∗ file_ref γf k1 1 Cf1))%I
+                      ⌜(k1 < NFILE)%nat /\ x = fnode k1 /\ fc_type Cf1 = FD_NONE⌝ ∗
+                      file_ref γf k1 1 Cf1))%I
         with "[Hcell1]" as (x) "[Hcell1 Hx]".
       { rewrite /PF1. iDestruct "Hcell1" as "[[H Hu]|H]".
         - iExists (zero_reg : mword 64). iFrame "H". iLeft. by iFrame "Hu".
-        - iDestruct "H" as (k1 Cf1) "(%Hk1 & Hc & Href)".
+        - iDestruct "H" as (k1 Cf1) "([%Hk1 %Hk1ty] & Hc & Href)".
           iExists (fnode k1). iFrame "Hc". iRight. iExists k1, Cf1. iFrame "Href".
-          iPureIntro. split; [exact Hk1 | reflexivity]. }
+          iPureIntro. split; [exact Hk1|]. split; [reflexivity | exact Hk1ty]. }
       (* +0xa8 ld a5,0(s4) *)
       assert (Ha8ad : pf1 = add_vec (Mt !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 0 : mword 12))).
       { rewrite Hts4. symmetry. apply addv_sext0. }
@@ -591,7 +607,7 @@ Section ProofPipealloc.
         iDestruct "Hcell0" as (w) "Hc0". iExists w, x. iFrame "Hc0 Hcell1".
       - (* *f1 holds a live file: close it too *)
         iDestruct "Hx" as (k1 Cf1) "[%Hk1x Href1]".
-        destruct Hk1x as [Hk1 Hxf].
+        destruct Hk1x as (Hk1 & Hxf & Hk1ty).
         iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0xae)) (mword_of_int 5 : mword 8)
                   (Cregidx (mword_of_int 7)) Ra5 U2 (K - 6)%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -640,13 +656,14 @@ Section ProofPipealloc.
           by (rewrite /U4; apply upd_eq).
         iDestruct (cpu_own_transport CIDt CIDt5 n eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Fileclose.wp_fileclose_sconf Φ γfl γf k1 1%Qp Cf1 U4 n eb p C (K - 6)%nat b
-                  ltac:(unfold fileclose_stack; lia) Hnoffpos HU4a0
-                  with "Hcg Hcnt Htext Hpc Hftab Hpanic Href1 [-]").
+        iApply (Fileclose.wp_fileclose_sconf Φ γfl γf k1 1%Qp Cf1 inhabitant on U4 n eb p C (K - 6)%nat b
+                  ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HU4a0
+                  with "Hcg Hcnt Htext Hpc Hftab Hpanic Href1 [] [-]").
+        { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk1ty). }
         (* fileclose hands back the unit the reference was holding: it is
            the WRITE end's, and together with [Hunit0] it pays the two
            [pipealloc_post]'s failure arm promises. *)
-        iIntros (CIDt6 Hst6 mr) "Hcg Hcnt Hpc %Hfcpins Hunit1".
+        iIntros (CIDt6 Hst6 mr) "Hcg Hcnt Hpc %Hfcpins Hunit1 _".
         assert (Hpcb6 : ret_pc (U4 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xb6))
           by (rewrite HU4ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpcb6) in "Hpc".
@@ -683,7 +700,7 @@ Section ProofPipealloc.
     { iSplit; [iDestruct "HK1" as "[$ _]"|].
       iSplit; [iDestruct "HK1" as "[_ $]"|].
       iDestruct "HK1" as "[_ Ht8]". rewrite /T4C.
-      iIntros (CIDu Hbu Mt k0 Cf0) "(%Htsp & %Hts4 & %Hta0 & %Htthr) Hcg Hpc Hcnt Href0 Hslots Hcell0 Hcell1 Hav".
+      iIntros (CIDu Hbu Mt k0 Cf0) "(%Hk0ty & %Htsp & %Hts4 & %Hta0 & %Htthr) Hcg Hpc Hcnt Href0 Hslots Hcell0 Hcell1 Hav".
       (* +0xa4 jal ra,fileclose *)
       iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0xa4)) Rra (mword_of_int 0x1ffc40 : mword 21)
                 Mt (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -706,11 +723,15 @@ Section ProofPipealloc.
         by (rewrite /V1; apply upd_eq).
       iDestruct (cpu_own_transport CIDu CIDu1 n eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Fileclose.wp_fileclose_sconf Φ γfl γf k0 1%Qp Cf0 V1 n eb p C (K - 6)%nat b
-                ltac:(unfold fileclose_stack; lia) Hnoffpos HV1a0
-                with "Hcg Hcnt Htext Hpc Hftab Hpanic Href0 [-]").
+      iApply (Fileclose.wp_fileclose_sconf Φ γfl γf k0 1%Qp Cf0 inhabitant on V1 n eb p C (K - 6)%nat b
+                ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HV1a0
+                with "Hcg Hcnt Htext Hpc Hftab Hpanic Href0 [] [-]").
+      (* an untyped file costs its closer nothing -- no pipe, no inode, so no
+         file system.  [inhabitant] above is the ghost bundle the arms this
+         file cannot take would have been indexed by. *)
+      { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk0ty). }
       (* the READ end's unit, banked for T8 *)
-      iIntros (CIDu2 Hsu2 mr) "Hcg Hcnt Hpc %Hfcpins Hunit0".
+      iIntros (CIDu2 Hsu2 mr) "Hcg Hcnt Hpc %Hfcpins Hunit0 _".
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xa8))
         by (rewrite HV1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpca8) in "Hpc".
@@ -958,7 +979,8 @@ Section ProofPipealloc.
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Ht4" $! CID20 with "[%]"); [wp_next_chain|].
       iApply ("Ht4" $! B1 k0 Cf0 with "[%] Hcg Hpc Hcnt Href0 [Hr16 Hr8] [Hc0] [Hc1 Hslotb'] Hav").
-      { split; [exact HB1sp|]. split; [exact HB1s4|]. split; [exact HB1a0 | exact HB1thr]. }
+      { split; [exact Hk0ty|]. split; [exact HB1sp|]. split; [exact HB1s4|].
+        split; [exact HB1a0 | exact HB1thr]. }
       { iExists u16, u8. iFrame "Hr16 Hr8". }
       { iExists (fnode k0). iExact "Hc0". }
       { rewrite /PF1. iLeft. iFrame "Hc1 Hslotb'". } }
@@ -1164,10 +1186,12 @@ Section ProofPipealloc.
                    with "Hcnt") as "Hcnt".
       iSpecialize ("Ht4" $! CID27 with "[%]"); [wp_next_chain|].
       iApply ("Ht4" $! C2 k0 Cf0 with "[%] Hcg Hpc Hcnt Href0 [Hr16 Hr8] [Hc0] [Hc1 Href1] Hav").
-      { split; [exact HC2sp|]. split; [exact HC2s4|]. split; [exact HC2a0 | exact HC2thr]. }
+      { split; [exact Hk0ty|]. split; [exact HC2sp|]. split; [exact HC2s4|].
+        split; [exact HC2a0 | exact HC2thr]. }
       { iExists (mD !!! Regidx Rs2), u8. iFrame "Hr16 Hr8". }
       { iExists (fnode k0). iExact "Hc0". }
-      { rewrite /PF1. iRight. iExists k1, Cf1. iFrame "Hc1 Href1". iPureIntro. exact Hk1lt. } }
+      { rewrite /PF1. iRight. iExists k1, Cf1. iFrame "Hc1 Href1".
+        iPureIntro. split; [exact Hk1lt | exact Hk1ty]. } }
 
     (* ================================================================= *)
     (*  SUCCESS: a page.  Build the pipe, then wire the two files to it.  *)

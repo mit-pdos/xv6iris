@@ -114,6 +114,10 @@ Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
+Require Import KallocInv.
+Require Import PipeInv.
+Require Import SpecIput.
+Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
@@ -127,13 +131,14 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* kexit's own six frame slots, plus the deepest callee below it: iput (60);
-   end_op wants 58, reparent 24, sched 16, fileclose 18. *)
-Definition K_kexit : nat := 66%nat.
+(* kexit's own six frame slots, plus the deepest callee below it: fileclose
+   (68 -- a descriptor may name an inode file, so its own arm reaches iput);
+   iput wants 60, end_op 58, reparent 24, sched 16. *)
+Definition K_kexit : nat := 74%nat.
 
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
     (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
@@ -143,10 +148,18 @@ Definition wp_kexit_sconf_body
     (γ : log_names) (γfs : fs_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
+    (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
+    (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
     (pid : mword 32) (V : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kexit in
   let pj := proc_addr j in
+  (* [fn] is not an extra degree of freedom: it is exactly kexit's own ghosts,
+     bundled the way fileclose's environment is indexed.  One equation rather
+     than fifteen coherence conjuncts, and it computes away in the proof.  The
+     pid fraction is the quarter [ProcInv.proc_priv_pid_ofile] lends. *)
+  fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
+         cov logstart dev pid (DfracOwn (1/4)) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_kexit <= av)%nat ->
@@ -169,6 +182,12 @@ Definition wp_kexit_sconf_body
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
   is_ftable γft γf -∗
+  (* ...and closing one can free a pipe's page, so kexit owns kalloc's side
+     too.  The count comes back MOVED -- a descriptor may have held a pipe's
+     last end -- which is why the loop carries it existentially. *)
+  is_lock γkl (mword_of_int KernelSyms.kmem) "kmem"%string
+    (kmem_res γka (mword_of_int (KernelSyms.kmem + 24))) -∗
+  kalloc_avail γka on -∗
   (* the file system, for [begin_op(); iput(p->cwd); end_op();] *)
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
@@ -219,7 +238,7 @@ End KexitSeals.
 Module Type KEXIT.
   Parameter wp_kexit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
@@ -229,8 +248,11 @@ Module Type KEXIT.
       (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
+      (γkl : gname) (γka : gname * gname)
+      (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate),
       wp_kexit_sconf_body γft γf γw Φ γs j γl γu γd γk pd pav pu bn γ γfs
-                          cov logstart dev ip dqi m av eb C b pid V.
+                          cov logstart dev ip dqi γkl γka on fn
+                          m av eb C b pid V.
 End KEXIT.
