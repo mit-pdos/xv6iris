@@ -929,7 +929,7 @@ Lemma pma_allows_all_pte_write (pmar0 : list PMA_Region) :
   pma_allows_all pmar0 -> pma_allows_pte_write pmar0.
 Proof.
   intros H a Hram.
-  destruct (pma_all_ram H a 8 Hram) as (r & Hm & _ & _ & _ & _ & _ & Hpw).
+  destruct (pma_all_ram H a 8 Hram) as (r & Hm & _ & _ & _ & _ & _ & Hpw & _).
   exists r. split; [exact Hm | exact Hpw].
 Qed.
 

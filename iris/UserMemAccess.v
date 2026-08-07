@@ -447,66 +447,6 @@ End MisalignedFaults.
 (*     composes [N] iterations by induction.                              *)
 (* ===================================================================== *)
 
-Lemma execR_untilMT'_last {R Vars} (limit : Z) (vars vars' : Vars)
-   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars)
-   s s' (acc : Acc (Zwf 0) limit) :
-  (limit >= 0)%Z ->
-  execR (body vars) s = Some (inr vars', s') ->
-  execR (cond vars') s' = Some (inr true, s') ->
-  execR (Defs.untilMT' limit vars cond body acc) s = Some (inr vars', s').
-Proof.
-  intros Hlim Hb Hc. destruct acc as [acc_fn]. cbn [Defs.untilMT'].
-  destruct (Z_ge_dec limit 0) as [Hge|Hge]; [| lia].
-  rewrite (execR_bind_Some _ _ _ _ _ Hb).
-  rewrite (execR_bind_Some _ _ _ _ _ Hc). cbn match. apply execR_returnR_fwd.
-Qed.
-
-Lemma execR_untilMT'_step {R Vars} (limit : Z) (vars vars' : Vars)
-   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars)
-   s s' (acc : Acc (Zwf 0) limit) :
-  (limit >= 0)%Z ->
-  execR (body vars) s = Some (inr vars', s') ->
-  execR (cond vars') s' = Some (inr false, s') ->
-  exists acc' : Acc (Zwf 0) (limit-1),
-    execR (Defs.untilMT' limit vars cond body acc) s
-    = execR (Defs.untilMT' (limit-1) vars' cond body acc') s'.
-Proof.
-  intros Hlim Hb Hc. destruct acc as [acc_fn]. cbn [Defs.untilMT'].
-  destruct (Z_ge_dec limit 0) as [Hge|Hge]; [| lia].
-  rewrite (execR_bind_Some _ _ _ _ _ Hb).
-  rewrite (execR_bind_Some _ _ _ _ _ Hc). cbn match. eexists. reflexivity.
-Qed.
-
-Lemma execR_untilMT'_chain {R Vars}
-   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars) :
-   forall (N : nat) (v : nat -> Vars) (st : nat -> mstate) (limit0 : Z) (acc : Acc (Zwf 0) limit0),
-   (1 <= N)%nat ->
-   (limit0 >= Z.of_nat N - 1)%Z ->
-   (forall k, (k < N)%nat -> execR (body (v k)) (st k) = Some (inr (v (S k)), st (S k))) ->
-   (forall k, (S k < N)%nat -> execR (cond (v (S k))) (st (S k)) = Some (inr false, st (S k))) ->
-   execR (cond (v N)) (st N) = Some (inr true, st N) ->
-   execR (Defs.untilMT' limit0 (v 0%nat) cond body acc) (st 0%nat) = Some (inr (v N), st N).
-Proof.
-  intros N. induction N as [|N' IH]; [ lia | ].
-  intros v st limit0 acc HN Hlim Hbody Hcondf Hcondt.
-  destruct (Nat.eq_dec N' 0) as [->|Hn0].
-  - apply (execR_untilMT'_last limit0 (v 0%nat) (v 1%nat) cond body (st 0%nat) (st 1%nat) acc).
-    + lia.
-    + apply (Hbody 0%nat). lia.
-    + apply Hcondt.
-  - edestruct (execR_untilMT'_step limit0 (v 0%nat) (v 1%nat) cond body (st 0%nat) (st 1%nat) acc)
-      as [acc' Hstep].
-    + lia.
-    + apply (Hbody 0%nat). lia.
-    + apply (Hcondf 0%nat). lia.
-    + rewrite Hstep.
-      apply (IH (fun k => v (S k)) (fun k => st (S k)) (limit0 - 1) acc').
-      * lia.
-      * lia.
-      * intros k Hk. apply (Hbody (S k)). lia.
-      * intros k Hk. apply (Hcondf (S k)). lia.
-      * apply Hcondt.
-Qed.
 
 (* ===================================================================== *)
 (* §4b The MISALIGNED plain-LOAD split reduction, generic in the chunk    *)
@@ -519,8 +459,6 @@ Qed.
 (*     res=false: the split fires only for plain load/store, never LR.    *)
 (* ===================================================================== *)
 
-Lemma misaligned_order_split (n : Z) : misaligned_order n = (0, n - 1, 1).
-Proof. reflexivity. Qed.
 
 Lemma plat_misaligned_loadstore_none (acc : MemoryAccessType mem_payload) :
   is_amo_access acc = false -> is_vector_access acc = false ->

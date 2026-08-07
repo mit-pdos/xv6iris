@@ -118,7 +118,17 @@ Definition pma_class_grants (c : pma_class) (r : PMA_Region) : Prop :=
            (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_atomic_support) op n
          = true) /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_read) = true /\
-      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_write) = true
+      (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_supports_pte_write) = true /\
+      (* THE MISALIGNED CONJUNCT.  A misaligned plain load/store is NOT a fault
+         on this platform: the region's own [PMAMisalignedExceptions_load_store]
+         is [None], so [mag_pma_check] always answers a PLAN (one operation if
+         the access fits in the region's Misaligned Atomicity Granule, a split
+         otherwise) rather than an exception.  Without it a misaligned user load
+         would have to be classified as an access fault, which is false of the
+         machine -- and the whole misaligned pipeline in UserMemClassify rests on
+         this one field.  Nothing here pins the GRANULE: the split derivation
+         handles either answer, so the granule stays a platform detail. *)
+      ((override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_misaligned_exceptions)).(PMAMisalignedExceptions_load_store) = None
   | PmaIo =>
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_readable) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_writable) = true

@@ -59,8 +59,7 @@ Import Defs.
    all three ids the plan admits are small and positive. *)
 Lemma pq_a0_of_claim (v : bv 32) :
   plic_claim_ret_ok v ->
-  plic_claim_a0_ok (extend_value false
-    (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) v) : mword 64).
+  plic_claim_a0_ok (extend_value (n := 8*4) false v : mword 64).
 Proof.
   intros [-> | [-> | ->]]; unfold plic_claim_a0_ok;
     [ left | right; left | right; right ]; apply bv_eq; vm_compute; reflexivity.
@@ -272,8 +271,7 @@ Section ProofPlicClaim.
     iIntros "Hcg Hpc".
     assert (Hpp18 : add_vec_int (mword_of_int (KernelSyms.plic_claim + 0x16) : mword 64) 2 = mword_of_int (KernelSyms.plic_claim + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp18) in "Hpc".
-    set (cval := (extend_value false
-                    (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) cv) : mword 64)).
+    set (cval := (extend_value (n := 8*4) false cv : mword 64)).
     set (N5 := <[Regidx a0_idx := regval_into_reg cval]> N4).
     set (N6 := <[Regidx ra_idx := regval_into_reg ra0]> N5).
     set (N7 := <[Regidx s0_idx := regval_into_reg s00]> N6).
