@@ -557,13 +557,15 @@ Lemma exec_execute_AMO_u_read_err
                                          (zeros' 64))) (Atomic (op, aq, rl, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
   exec (mem_write_ea addr width (Atomic (op, aq, rl, Data, Data)) pbmt (andb aq rl) rl true) s' = Some (Ok tt, s') ->
   exec (mem_read (Atomic (op, aq, rl, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Err (addr, e), s') ->
+  (* the fault is AT the access base, which is what the model asserts here *)
+  generic_eq addr addr = true ->
   exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
     = Some (Trap (User, make_sync_exception e
                     (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                              (zeros' 64)), pc), s').
 Proof.
-  intros Hw Hw2 Hcp Heff Hpml Htm Hcp' Hpc' Hal Htr Hea Hrdm.
+  intros Hw Hw2 Hcp Heff Hpml Htm Hcp' Hpc' Hal Htr Hea Hrdm Hgeq.
   change (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd)))
     with (execute_AMO op aq rl (Regidx rs2) (Regidx rs1) width (Regidx rd)).
   unfold execute_AMO. rewrite exec_catch_early_return. rewrite Hw2.
@@ -601,7 +603,14 @@ Proof.
   (* mem_read -> Err e: early_return the memory_exception trap *)
   rewrite execR_bind.
   rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
-  rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception _ pc e User s' Hcp' Hpc')).
+  assert (Hae : execR (Defs.liftR (assert_exp (generic_eq addr addr)
+                         "extensions/A/zaamo_insts.sail:110.31-110.32")
+                       : Defs.monadR ExecutionResult exception unit) s'
+                = Some (inr tt, s'))
+    by (rewrite execR_liftR; unfold assert_exp; rewrite Hgeq; reflexivity).
+  rewrite execR_bind. rewrite (execR_bind0_Some _ _ _ _ Hae).
+  rewrite execR_liftR.
+  rewrite (exec_memory_exception _ pc e User s' Hcp' Hpc'). cbn match.
   reflexivity.
 Qed.
 
