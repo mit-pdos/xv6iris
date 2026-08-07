@@ -188,6 +188,28 @@ Lemma fc_pred_ngtz :
     (sign_extend' 64 (mword_of_int (1 - 1) : mword 32)) = false.
 Proof. vm_compute. reflexivity. Qed.
 
+(* ---- the type dispatch at +0x54/+0x56 ----
+   [c.li a5,1] then [beq s2,a5]: s2 holds the SIGN-EXTENDED [ff.type], so the
+   comparison is at 64 bits and the arm is FD_PIPE's exactly when the 32-bit
+   field is.  Sign extension is injective, and [trunc32] is its inverse. *)
+Lemma fc_li1_val :
+  add_vec (zero_reg : mword 64)
+    (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))
+  = (mword_of_int 1 : mword 64).
+Proof. apply bv_eq; vm_compute; reflexivity. Qed.
+
+Lemma fc_ty_eq1 (w : mword 32) :
+  eq_vec (sign_extend' 64 w) (mword_of_int 1 : mword 64)
+  = eq_vec w (mword_of_int 1 : mword 32).
+Proof.
+  destruct (eq_vec w (mword_of_int 1 : mword 32)) eqn:Hw.
+  - apply eq_vec_true_iff in Hw. rewrite Hw. vm_compute. reflexivity.
+  - apply eq_vec_false_iff. intro Hc.
+    apply (f_equal trunc32) in Hc.
+    rewrite trunc32_sext trunc32_mword_of_int in Hc.
+    apply eq_vec_false_iff in Hw. exact (Hw Hc).
+Qed.
+
 Section ProofFilecloseParts.
   Context `{!riscvGS Σ, !sieG Σ}.
 
