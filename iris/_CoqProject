@@ -773,6 +773,7 @@ LinkFreeproc.v
 SpecKwait.v
 CodeKwait.v
 ProofKwait.v
+LinkKwait.v
 SpecIput.v
 LinkIput.v
 SpecKexit.v

@@ -416,11 +416,16 @@ the evidence for every offset. This file is only the worklist.
       coherence obligation is `um_below_mono`.  Account in
       [`../completed/growproc.md`](../completed/growproc.md).
 
-- [ ] **S10 — `kwait` (xv6's `wait`).  SIX of its SEVEN blocks are proven;
-      the outer loop, the prologue, `LinkKwait` and `sys_wait` remain.**
-      `SpecKwait.v` (the contract) and `ProofKwait.v` are landed and green.
-      This is the function that reclaims a ZOMBIE child, and it is the first
-      one that holds TWO locks at once.
+- [x] **S10 — `kwait` (xv6's `wait`) is PROVEN and LINKED**, over ACQUIRE /
+      RELEASE / MYPROC / KILLED / SLEEP / COPYOUT / FREEPROC, with no `Axiom`
+      and no `admit` of its own: `Print Assumptions Kwait.wp_kwait_sconf` is
+      the 5 `rv64d.*` platform axioms + funext and nothing else.
+      `SpecKwait.v` / `CodeKwait.v` / `ProofKwait.v` / `LinkKwait.v`.
+      This is the function that reclaims a ZOMBIE child, it is the first one
+      that holds TWO locks at once, and it is the first UNBOUNDED loop that
+      parks (an `iLöb` with a `sleep` inside it).
+      **`sys_wait` (thirteen instructions over ARGADDR + KWAIT) is what is
+      left of this cone**; sysproc.c is 5/8.
 
       **What landed with it, and is reusable on its own:**
 
@@ -458,48 +463,85 @@ the evidence for every offset. This file is only the worklist.
           no landed proof produces a ZOMBIE, and kexit reduces a live
           `proc_priv`, which has the same conjunct.
 
-      **The blocks, bottom up (all six green):** `kw_epilogue` (+0x78),
-      `kw_exit_wait` (+0xe8), `kw_exit_both` (+0x90), `kw_reap` (+0x5c —
-      the parent store, freeproc, both releases), `kw_found` (+0x40 — the
-      pid read and the optional copyout of the child's `xstate`), `kw_scan`
-      (+0xae/+0xa6/+0xaa — the bounded fuel loop).
+      **The blocks, bottom up:** `kw_epilogue` (+0x78), `kw_exit_wait`
+      (+0xe8), `kw_exit_both` (+0x90), `kw_reap` (+0x5c — the parent store,
+      freeproc, both releases), `kw_found` (+0x40 — the pid read and the
+      optional copyout of the child's `xstate`), `kw_scan`
+      (+0xae/+0xa6/+0xaa — the bounded fuel loop), `kw_exit_neg` (the outer
+      loop's two −1 tails), `kw_round_tail` (+0xca..+0xd8 — the havekids
+      test, `killed`, `sleep`), `kw_round_body` (+0xdc..+0xe6), and the
+      prologue + `iLöb` in `wp_kwait_sconf`.
 
-      **What is LEFT, and what the attempt learned.**
+      **THE TWO-EXIT / FRAME SHAPE.  This is the reusable part** — any loop
+      that both RETURNS from inside and falls out of the bottom has it.
 
-      1. `kw_round` — the outer loop (+0xdc..+0xe6 and the +0xca..+0xd8
-         tail: the havekids test, `killed`, `sleep`).  It is an `iLöb`, and
-         **the step that pays for the later is the `c.j` at +0xe6**: its
-         leaf hands the continuation out under a `▷`, and the `iNext` there
-         strips the IH's later as well — which is what lets the back edge
-         after `sleep` (a plain fall-through, with no branch to strip a
-         later at) apply it.  Structure it the way `ProofSysPause` does:
-         a `Definition kw_round_stmt`, a separately-`Qed`'d
-         `kw_round_body` taking `▷ kw_round_stmt`, and the `iLöb` in a
-         two-line `iAssert`.
-      2. `kw_scan`'s +0xca continuation must take the FUNCTION-exit
-         continuation as its own argument (the version in the tree already
-         does).  The two exits are the same linear resource and the scan can
-         leave either way, so whichever branch runs has to be handed it.
-      3. The prologue (+0x00..+0x3e), `LinkKwait.v` (every callee is linked
-         — myproc / acquire / release / copyout / freeproc / killed / sleep
-         — so kwait can be linked as soon as the proof closes), and then
-         `sys_wait` over ARGADDR + KWAIT (thirteen instructions).
+      * **The function exit is ONE linear resource, so the inner loop takes
+        it as a premise and HANDS IT BACK to its own exit.** `kw_scan`
+        receives `kw_exit_fn` (the caller's continuation, named once as a
+        `Definition` so the four places that spell it agree) and its +0xca
+        continuation takes a `kw_exit_fn` as its LAST argument.  Splitting
+        it into two closures instead is unsound-by-typing: whichever arm
+        does not run would have to drop one.
+      * **What the exit still wants back rides through as an ABSTRACT FRAME
+        `R`, never packaged into the closure.** kwait's running-thread
+        bundle (`own_ctx` + `park_hlf`, `kw_rt`) is untouched from the
+        prologue to the exit, but the loop's foot needs it for `sleep` — so
+        a closure that had swallowed it could not give it back.  `kw_scan`
+        threads `R` from entry to both exits and knows nothing else about
+        it; the found arm cashes it in with a five-line
+        `iAssert`, which is also what keeps `kw_found`'s statement
+        unchanged.
+      * **A carried continuation is anchored at the LOOP TURN's hart, not at
+        the function's entry hart.** `wp_next` can only be re-anchored
+        FORWARD (`kw_next_reanchor`), and `sleep` returns on an arbitrary
+        hart, so `kw_round`'s premise is `kw_exit_fn CID …` under its own
+        `∀ CID` — sleep's own crossing hypothesis is then exactly the
+        re-anchoring fact for the back edge.  Anchoring it at `CID0` (which
+        is right for a straight-line join, e.g. `sp_tail`) makes the back
+        edge unprovable.
+      * **The `c.j` at +0xe6 is what pays for the IH's later**: its leaf
+        hands the continuation out under a `▷`, and that `iNext` strips the
+        IH's later as well — which is what lets the back edge after `sleep`
+        (a plain fall-through, with no branch of its own) apply it.
+      * `iLöb` in a two-line `iAssert` over a `Definition kw_round`, with a
+        separately-`Qed`'d body lemma taking `▷ kw_round`, exactly as
+        `ProofSysPause` does.
 
-      **THE OPEN OBSTACLE, recorded so the next attempt does not re-pay it.**
-      Applying `kw_scan` from the round fails with
-      *"iSpecialize: cannot instantiate `sie_cap_gpr Mx (K-10) false ?p`
-      with `sie_cap_gpr Mx (K-10) false pme`"* — the leaf/section variable
-      `p` stays an EVAR through the specialization, and `iSpecialize` will
-      not unify evars in the hypothesis type.  `iExact` closes the very same
-      pair (it goes up to conversion), `iFrame` does not.  So the fix is
-      almost certainly to pin `p` explicitly at the application rather than
-      to let it be inferred — either by giving the block lemmas `p` as an
-      EXPLICIT leading argument, or by `iSpecialize`-ing the resources one
-      at a time with `[H]` + `iExact`.  Diagnose it with the smallest
-      possible instance first; do NOT chase it inside the 250-line round
-      body as this attempt did.
+      **Three hart-plumbing rules the assembly turned up.**
 
-      **Four gotchas the six landed blocks paid for, all instances of rules
+      * **`cpu_own` is the one bundle no leaf re-anchors.** Every other
+        resource comes back inside the leaf's `wp_next` lambda and is
+        therefore about the resuming hart automatically; `cpu_own` just sits
+        in the context at the hart it was handed in at, and the ambient
+        `CpuId` instance has moved by the time the next callee wants it.
+        The symptom is *"iSpecialize: cannot instantiate … with (cpu_own 0
+        eb pj C eb)"* on two terms that PRINT IDENTICALLY.  Transport it
+        (`cpu_own_transport … ltac:(wp_next_chain)`) at each call that
+        consumes it — twice in kwait's prologue, before myproc and before
+        acquire.
+      * **`wp_next_chain` cannot bridge a chain stated at `eb` with a goal
+        stated at the literal `true`.** Its `specialize` needs the premises
+        to match syntactically, and it fails with the goalless *"No
+        applicable tactic"*.  A parking loop mixes the two by construction
+        (its own crossing index is the literal `true`; every prologue leaf's
+        is `eb`), so keep the one-step bridges as named lemmas —
+        `kw_chain_eb` / `kw_chain_true` — and `apply` one before
+        `wp_next_chain`.
+      * **Do NOT `subst eb`** in any body that runs `iNext` over `cpu_own`
+        (durable-notes / `sp_post_sleep_body`): with `eb` literal
+        `intr_count`'s `if eb` reduces and the `iNext` descends into
+        `intr_handler_avail`.  kwait pins `b = eb` instead (`cpu_own_eb_agree`
+        at level 0 with an enabled base) and leaves `eb` abstract everywhere.
+
+      **The earlier attempt's "open obstacle" — the evar in
+      `sie_cap_gpr Mx (K-10) false ?p` — does not arise** when the scan is
+      applied as `iDestruct (kw_scan (CID0 := CIDy) Φ γs γa γf γw mm pme addr
+      K eb C pid V R HK Hlen with "…") as "Hscan"` and then
+      `iApply ("Hscan" $! …)`: every binder is given explicitly, so nothing
+      is left for `iSpecialize` to infer.  Prefer that two-step form for any
+      lemma whose conclusion is a `∀`-headed wand chain.
+
+      **Four gotchas the blocks paid for, all instances of rules
       already in durable-notes:**
 
       * an inline `ltac:(lia)` for a stack budget answers *"Cannot find

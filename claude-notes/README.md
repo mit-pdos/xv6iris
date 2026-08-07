@@ -149,8 +149,15 @@ are working on that effort — the relevant `projects/` file.
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone
   (`killed`/`setkilled`/`kkill`/`sys_kill`), `sys_getpid`, `sys_close`,
-  `sys_pause`, `fetchaddr`, `fdalloc`) and what is next (the remaining
-  syscalls, and `cwd_ref`). Keeps the measured account of why
+  `sys_pause`, `fetchaddr`, `fdalloc`, **`kwait`**) and what is next (the
+  remaining syscalls — `sys_wait` first — and `cwd_ref`). `kwait` is the
+  entry to read before writing any loop that can RETURN from inside itself:
+  the function exit is one linear resource the inner loop takes as a premise
+  and hands back to its own exit, what the exit still wants back rides
+  through as an abstract frame rather than inside a closure, a parking
+  loop's carried continuation is anchored at the TURN's hart (a `wp_next`
+  re-anchors only forward), and `cpu_own` is the one bundle no leaf
+  re-anchors. Keeps the measured account of why
   `argraw`'s six-arm proof cost 74 GB, sys_pause's path-dependent-frame
   recipe, — from fetchaddr, the first function spanning the `proc_priv`
   and bare-cell tiers — the `proc_priv_copy` accessor and the x0-as-source
