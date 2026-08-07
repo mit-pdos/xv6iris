@@ -197,6 +197,11 @@ Lemma kd_f45e s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_SDSP (mword_of_int 5, Regidx (mword_of_int 23)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_f765 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xf765 : mword 16)) s
+  = Some (C_BNEZ (mword_of_int 244, Cregidx (mword_of_int 6)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_00010517 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00010517 : mword 32) : M instruction) s
   = Some (UTYPE (mword_of_int 16 : mword 20, Regidx (mword_of_int 10), AUIPC), s).

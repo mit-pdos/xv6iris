@@ -390,6 +390,12 @@
   2
  ],
  [
+  "CodeStrncpy.v",
+  "strncpy",
+  "sncp_",
+  2
+ ],
+ [
   "CodeMemmove.v",
   "memmove",
   "minstr_mm_",

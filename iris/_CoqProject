@@ -869,6 +869,10 @@ SpecSafestrcpy.v
 CodeSafestrcpy.v
 ProofSafestrcpy.v
 LinkSafestrcpy.v
+SpecStrncpy.v
+CodeStrncpy.v
+ProofStrncpy.v
+LinkStrncpy.v
 SpecIdup.v
 LinkIdup.v
 SpecForkretPark.v

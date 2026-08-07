@@ -362,6 +362,11 @@ Lemma kd_40200713 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (ITYPE (mword_of_int 1026 : mword 12, zreg, Regidx (mword_of_int 14), ADDI), s).
 Proof. decode_bridge_ms. Qed.
 
+Lemma kd_40e786bb s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x40e786bb : mword 32) : M instruction) s
+  = Some (RTYPEW (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 13), SUBW), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_412984b3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x412984b3 : mword 32) : M instruction) s
   = Some (RTYPE (Regidx (mword_of_int 18), Regidx (mword_of_int 19), Regidx (mword_of_int 9), SUB), s).

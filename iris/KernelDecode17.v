@@ -92,6 +92,11 @@ Lemma kd_97c2 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_ADD (Regidx (mword_of_int 15), Regidx (mword_of_int 16)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_9fb1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x9fb1 : mword 16)) s
+  = Some (C_ADDW (Cregidx (mword_of_int 7), Cregidx (mword_of_int 4)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_c505 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xc505 : mword 16)) s
   = Some (C_BEQZ (mword_of_int 20, Cregidx (mword_of_int 2)), s).
