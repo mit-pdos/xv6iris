@@ -120,6 +120,7 @@ Context `{GEN : GenId} `{CID : CpuId}.
     by (apply kmap_class_rw; right; exact Hdevvpn).
   iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
   pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
+  iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
   unshelve iMod (sr_absorb strans_regime (Store Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
           (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc _
           (or_intror (or_intror (or_introl eq_refl))) eq_refl Hcanon ltac:(reflexivity)
@@ -152,7 +153,8 @@ Context `{GEN : GenId} `{CID : CpuId}.
   { rewrite (exec_execute_STORE_1_gpr_S_walk_dev_pt rs2 rs1 imm region_st s_pc s_tr d'
                Htea
                ltac:(unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity)
-               ltac:(cbn [bits_of_virtaddr]; rewrite !Lva Hpa; change (0 * 1)%Z with 0%Z; rewrite avi0; exact Htr_uart)
+               md0 Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
+               ltac:(rewrite !Lva Hpa; exact Htr_uart)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
                HA1 Hord1
                ltac:(rewrite !Lva Hpa; apply uart_pmp_match1; [exact Hoff | exact Hcov1])
@@ -290,6 +292,7 @@ Qed.
     by (apply kmap_class_rw; right; exact Hdevvpn).
   iDestruct (kmap_static_claims_at (svpn_of a8) KP_rw Hdevstatic with "Hkmapb") as "#Hclaim".
   pose proof (static_canon_lo a8 KP_rw Hdevstatic Hcanon) as Ha8lt.
+  iDestruct (sr_tmode strans_regime s_pc LSXL_pc with "Hreg Htr") as %(md0 & Htm_pc).
   unshelve iMod (sr_absorb strans_regime (Load Data) a8 (pa_of (kpt_leaf_ppn (svpn_of a8)) a8)
           (kpt_leaf_ppn (svpn_of a8)) KP_rw s_pc _
           (or_intror (or_introl eq_refl)) I Hcanon ltac:(reflexivity)
@@ -323,7 +326,8 @@ Qed.
     apply (exec_execute_LOAD_1_gpr_S_walk_dev rs1 rd imm is_unsigned bt d' region_ld s_pc s_tr
              Hrd Htea
              ltac:(unfold is_aligned_vaddr; rewrite Z.rem_1_r; reflexivity)
-             ltac:(cbn [bits_of_virtaddr]; rewrite !Lva Hpa; change (0 * 1)%Z with 0%Z; rewrite avi0; exact Htr_uart)
+             md0 Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
+             ltac:(rewrite !Lva Hpa; exact Htr_uart)
              Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
              HA1 Hord1
              ltac:(rewrite !Lva Hpa; apply uart_pmp_match1; [exact Hoff | exact Hcov1])
