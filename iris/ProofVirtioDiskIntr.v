@@ -88,10 +88,9 @@ Lemma vg_064 : vt_geom (mword_of_int 0x10001064). Proof. vgeom. Qed.
 
 
 (* the width-4 load's post value, collapsed to a plain sign-extension *)
-Lemma vt_ldval (w : mword 32) :
-  extend_value false (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) w)
-  = sign_extend' 64 w.
-Proof. rewrite <- (data2_ext_4 w). rewrite autocast_id. reflexivity. Qed.
+Lemma vt_ldval (w : mword (8*4)) :
+  extend_value false w = sign_extend' 64 w.
+Proof. exact (data2_ext_4 w). Qed.
 
 Section VtLeaves.
   Context `{!riscvGS Σ, !sieG Σ}.
@@ -1107,7 +1106,7 @@ Section VtDevRam.
                           ⌜(nr <= nc)%nat /\ (nc <= np)%nat⌝ ∗
                           disk_done_lb γd nc ∗ disk_pub γd np)%I)
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
-              ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 data2_ext_2_unsigned Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub] [Hcont]").
     { (* ---- the atomic update: open dev_inv, run the accessor ---- *)
@@ -1216,7 +1215,7 @@ Section VtDevRam.
                             (if vs_is_out sl then emp
                              else phys_list (vr_buf (vs_req sl)) bs)))%I)
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hpub Hrcpt] [Hcont]").
     { iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".

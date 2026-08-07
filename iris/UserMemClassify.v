@@ -42,102 +42,50 @@ Import Defs.
 (* ===================================================================== *)
 
 Lemma exec_vmem_read_addr_translate_err (width : Z) (va pc : mword 64) (e : ExceptionType)
-    (acc : MemoryAccessType mem_payload) (aq rl res : bool) (priv : Privilege) (s s' : mstate) :
+    (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (ep : Privilege) (md : SATPMode) (priv : Privilege) (s s' : mstate) :
+  vmem_width width ->
   is_aligned_vaddr (Virtaddr va) width = true ->
-  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) acc) s
-    = Some (Err (e, tt), s') ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  exec (translateAddr (Virtaddr va) acc) s = Some (Err (e, tt), s') ->
   register_lookup cur_privilege s'.(sregs) = priv ->
   register_lookup PC s'.(sregs) = pc ->
   exec (vmem_read_addr (Virtaddr va) width acc aq rl res) s
-    = Some (Err (Trap (priv, make_sync_exception e
-                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc)), s').
+    = Some (Err (Trap (priv, make_sync_exception e va, pc)), s').
 Proof.
-  intros Halign Htr Hcp Hpc.
-  unfold vmem_read_addr.
-  rewrite exec_catch_early_return.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  assert (Hinner : execR (returnR (result (mword (8 * width)) ExecutionResult) tt >>
-                          liftR (split_misaligned (Virtaddr va) width)) s = Some (inr (1, width), s)).
-  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_g width (Virtaddr va) s Halign). reflexivity. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-  rewrite (misaligned_order_split 1).
-  match goal with
-  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-    assert (Hu : execR (Defs.untilMT vs m c b) s
-                 = Some (inl (Err (Trap (priv, make_sync_exception e
-                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s'))
-  end.
-  { unfold Defs.untilMT. destruct (Defs.Zwf_guarded _) as [accf]. cbn [Defs.untilMT'].
-    destruct (Z_ge_dec _ 0) as [Hge|Hge]; [| cbn in Hge; exfalso; lia ].
-    match goal with |- context [ Defs.bind ?bd ?k ] =>
-      assert (Hbody : execR bd s = Some (inl (Err (Trap (priv, make_sync_exception e
-                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s')) end.
-    { cbn match.
-      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-      rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
-      match goal with |- execR (Defs.bind ?mm ?post) s' = _ =>
-        assert (Hmrm : execR mm s' = Some (inl (Err (Trap (priv, make_sync_exception e
-                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s')) end.
-      { match goal with
-        | |- context [ memory_exception (Virtaddr ?vv) e ] =>
-          rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception vv pc e priv s' Hcp Hpc))
-        end. cbn match.
-        rewrite execR_bind0. rewrite execR_early_ret. reflexivity. }
-      rewrite execR_bind. rewrite Hmrm. reflexivity. }
-    rewrite execR_bind. rewrite Hbody. reflexivity. }
-  rewrite execR_bind. rewrite Hu. reflexivity.
+  intros Hw Halign Heff Htm Htr Hcp Hpc.
+  apply (exec_vmem_read_addr_intra_err width va _ acc aq rl res ep md s s'
+           (vmem_width_pos _ Hw)
+           (exec_split_on_page_boundary_aligned va width s Hw Halign)
+           (or_introl Halign) Heff Htm).
+  unfold translate_and_read_value.
+  rewrite (exec_bind_Some _ _ _ _ _ Htr). cbn match beta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_memory_exception va pc e priv s' Hcp Hpc)).
+  cbn match. apply exec_returnM.
 Qed.
 
 Lemma exec_vmem_write_addr_translate_err (width : Z) (va pc : mword 64) (e : ExceptionType)
-    (data : mword (8 * width)) (acc : MemoryAccessType mem_payload) (aq rl res : bool)
-    (priv : Privilege) (s s' : mstate) :
+    (data : mword (8*width)) (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (ep : Privilege) (md : SATPMode) (priv : Privilege) (s s' : mstate) :
+  vmem_width width ->
   is_aligned_vaddr (Virtaddr va) width = true ->
-  exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) acc) s
-    = Some (Err (e, tt), s') ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  exec (translateAddr (Virtaddr va) acc) s = Some (Err (e, tt), s') ->
   register_lookup cur_privilege s'.(sregs) = priv ->
   register_lookup PC s'.(sregs) = pc ->
   exec (vmem_write_addr (Virtaddr va) width data acc aq rl res) s
-    = Some (Err (Trap (priv, make_sync_exception e
-                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc)), s').
+    = Some (Err (Trap (priv, make_sync_exception e va, pc)), s').
 Proof.
-  intros Halign Htr Hcp Hpc.
-  unfold vmem_write_addr.
-  rewrite exec_catch_early_return.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  assert (Hinner : execR (returnR (result bool ExecutionResult) tt >>
-                          liftR (split_misaligned (Virtaddr va) width)) s = Some (inr (1, width), s)).
-  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned_g width (Virtaddr va) s Halign). reflexivity. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-  rewrite (misaligned_order_split 1).
-  match goal with
-  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-    assert (Hu : execR (Defs.untilMT vs m c b) s
-                 = Some (inl (Err (Trap (priv, make_sync_exception e
-                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s'))
-  end.
-  { unfold Defs.untilMT. destruct (Defs.Zwf_guarded _) as [accf]. cbn [Defs.untilMT'].
-    destruct (Z_ge_dec _ 0) as [Hge|Hge]; [| cbn in Hge; exfalso; lia ].
-    match goal with |- context [ Defs.bind ?bd ?k ] =>
-      assert (Hbody : execR bd s = Some (inl (Err (Trap (priv, make_sync_exception e
-                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s')) end.
-    { cbn match.
-      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-      rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
-      match goal with |- execR (Defs.bind ?mm ?post) s' = _ =>
-        assert (Hmrm : execR mm s' = Some (inl (Err (Trap (priv, make_sync_exception e
-                        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))), s')) end.
-      { match goal with
-        | |- context [ memory_exception (Virtaddr ?vv) e ] =>
-          rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception vv pc e priv s' Hcp Hpc))
-        end. cbn match.
-        rewrite execR_bind0. rewrite execR_early_ret. reflexivity. }
-      rewrite execR_bind. rewrite Hmrm. reflexivity. }
-    rewrite execR_bind. rewrite Hbody. reflexivity. }
-  rewrite execR_bind. rewrite Hu. reflexivity.
+  intros Hw Halign Heff Htm Htr Hcp Hpc.
+  exact (exec_vmem_write_addr_intra_terr width va data acc aq rl res e _ ep md s s'
+           (vmem_width_pos _ Hw)
+           (exec_split_on_page_boundary_aligned va width s Hw Halign)
+           (or_introl Halign) Heff Htm Htr
+           (exec_memory_exception va pc e priv s' Hcp Hpc)).
 Qed.
 
 (* ===================================================================== *)
@@ -159,6 +107,7 @@ Section DataFaultComposers.
   Lemma user_pt_vmem_read_addr_load_err (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pc : mword 64) (width : Z) (σ : mstate) :
     u_fault_flavor (Load Data) tfp um va ->
+    vmem_width width ->
     is_aligned_vaddr (Virtaddr va) width = true ->
     register_lookup PC σ.(sregs) = pc ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -170,8 +119,9 @@ Section DataFaultComposers.
     ⌜exec (vmem_read_addr (Virtaddr va) width (Load Data) false false false) σ
       = Some (Err (Trap (User, make_sync_exception (E_Load_Page_Fault tt) va, pc)), σ)⌝.
   Proof.
-    intros Hflavor Halign Lpc Lhtif Lcp LSXL Lmprv Lpma.
+    intros Hflavor Hvw Halign Lpc Lhtif Lcp LSXL Lmprv Lpma.
     iIntros "Hri Hgh Hinv".
+    iDestruct (utlb_inv_pt_tmode uroot tfp um σ LSXL with "Hri Hinv") as %Htm.
     iDestruct (utlb_inv_pt_translateAddr_u_fault (Load Data) uroot tfp um va
                  (E_Load_Page_Fault tt) σ Hflavor Lhtif Lcp LSXL
                  (exec_effectivePrivilege_mprv0 (Load Data)
@@ -183,25 +133,17 @@ Section DataFaultComposers.
                  ltac:(unfold translationException; cbn match; apply exec_returnm)
                  with "Hri Hgh Hinv") as %Htr.
     iPureIntro.
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (Load Data)) σ
-                   = Some (Err (E_Load_Page_Fault tt, tt), σ)).
-    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))
-        with (add_vec_int va (0 * width)).
-      rewrite avi0. exact Htr. }
-    assert (Hva : add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width) = va).
-    { change (bits_of_virtaddr (Virtaddr va)) with va. apply avi0. }
-    transitivity (Some ((Err (Trap (User, make_sync_exception (E_Load_Page_Fault tt)
-       (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))
-       : result (mword (8 * width)) ExecutionResult), σ)).
-    { exact (exec_vmem_read_addr_translate_err width va pc (E_Load_Page_Fault tt)
-               (Load Data) false false false User σ σ Halign Htr' Lcp Lpc). }
-    rewrite Hva. reflexivity.
+    exact (exec_vmem_read_addr_translate_err width va pc (E_Load_Page_Fault tt)
+             (Load Data) false false false User Sv39 User σ σ Hvw Halign
+             ltac:(rewrite Lcp; apply exec_effectivePrivilege_mprv0; exact Lmprv)
+             Htm Htr Lcp Lpc).
   Qed.
 
   Lemma user_pt_vmem_write_addr_store_err (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (va pc : mword 64) (width : Z)
       (data : mword (8 * width)) (σ : mstate) :
     u_fault_flavor (Store Data) tfp um va ->
+    vmem_width width ->
     is_aligned_vaddr (Virtaddr va) width = true ->
     register_lookup PC σ.(sregs) = pc ->
     register_lookup htif_tohost_base σ.(sregs) = None ->
@@ -213,8 +155,9 @@ Section DataFaultComposers.
     ⌜exec (vmem_write_addr (Virtaddr va) width data (Store Data) false false false) σ
       = Some (Err (Trap (User, make_sync_exception (E_SAMO_Page_Fault tt) va, pc)), σ)⌝.
   Proof.
-    intros Hflavor Halign Lpc Lhtif Lcp LSXL Lmprv Lpma.
+    intros Hflavor Hvw Halign Lpc Lhtif Lcp LSXL Lmprv Lpma.
     iIntros "Hri Hgh Hinv".
+    iDestruct (utlb_inv_pt_tmode uroot tfp um σ LSXL with "Hri Hinv") as %Htm.
     iDestruct (utlb_inv_pt_translateAddr_u_fault (Store Data) uroot tfp um va
                  (E_SAMO_Page_Fault tt) σ Hflavor Lhtif Lcp LSXL
                  (exec_effectivePrivilege_mprv0 (Store Data)
@@ -227,19 +170,10 @@ Section DataFaultComposers.
                  ltac:(unfold translationException; cbn match; apply exec_returnm)
                  with "Hri Hgh Hinv") as %Htr.
     iPureIntro.
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))) (Store Data)) σ
-                   = Some (Err (E_SAMO_Page_Fault tt, tt), σ)).
-    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width))
-        with (add_vec_int va (0 * width)).
-      rewrite avi0. exact Htr. }
-    assert (Hva : add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width) = va).
-    { change (bits_of_virtaddr (Virtaddr va)) with va. apply avi0. }
-    transitivity (Some ((Err (Trap (User, make_sync_exception (E_SAMO_Page_Fault tt)
-       (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * width)), pc))
-       : result bool ExecutionResult), σ)).
-    { exact (exec_vmem_write_addr_translate_err width va pc (E_SAMO_Page_Fault tt)
-               data (Store Data) false false false User σ σ Halign Htr' Lcp Lpc). }
-    rewrite Hva. reflexivity.
+    exact (exec_vmem_write_addr_translate_err width va pc (E_SAMO_Page_Fault tt)
+             data (Store Data) false false false User Sv39 User σ σ Hvw Halign
+             ltac:(rewrite Lcp; apply exec_effectivePrivilege_mprv0; exact Lmprv)
+             Htm Htr Lcp Lpc).
   Qed.
 
 End DataFaultComposers.
@@ -406,6 +340,7 @@ Section AlignedClassify.
   Context (k : Z).
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
+  Context (Hkvw : vmem_width k).
   Context (Hread_plain : forall (addr : mword 64) (w : mword (8 * k)) s,
       dev_addr addr = false ->
       (forall j : nat, (N.of_nat j < Z.to_N k)%N ->
@@ -449,7 +384,7 @@ Section AlignedClassify.
     iIntros "Hri Hgh Hinv Hdata".
     destruct (data_classify (Load Data) tfp um va (or_intror (or_introl eq_refl)) Hwf)
       as [ (w & Hum & Hok & Hcanon) | Hfault ].
-    - iMod (user_pt_vmem_read_addr_load k Hk Hk8 Hkdvd Huintk Hread_plain
+    - iMod (user_pt_vmem_read_addr_load k Hk Hk8 Hkdvd Huintk Hkvw Hread_plain
               uroot tfp um data w va σ
               Hum Hok Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
               with "Hri Hgh Hinv Hdata")
@@ -457,7 +392,7 @@ Section AlignedClassify.
       iModIntro. iLeft. iExists dvv, σ'. iFrame "Hri Hgh Hinv Hdata".
       iPureIntro. split; [exact Hvr | split; [exact Hmdev | exact Hsregs]].
     - iDestruct (user_pt_vmem_read_addr_load_err uroot tfp um va pc k σ
-                   Hfault Hal Lpc Hhtif Hcp HSXL Hmprv Hall with "Hri Hgh Hinv") as %Herr.
+                   Hfault Hkvw Hal Lpc Hhtif Hcp HSXL Hmprv Hall with "Hri Hgh Hinv") as %Herr.
       iModIntro. iRight. iFrame "Hri Hgh Hinv Hdata". iPureIntro. exact Herr.
   Qed.
 
@@ -498,7 +433,7 @@ Section AlignedClassify.
     destruct (data_classify (Store Data) tfp um va
                 (or_intror (or_intror (or_introl eq_refl))) Hwf)
       as [ (w & Hum & Hok & Hcanon) | Hfault ].
-    - iMod (user_pt_vmem_write_addr_store k Hk Hk8 Hkdvd Huintk Hwrite_plain
+    - iMod (user_pt_vmem_write_addr_store k Hk Hk8 Hkdvd Huintk Hkvw Hwrite_plain
               uroot tfp um data w va dat σ
               Hum Hok Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
               with "Hri Hgh Hinv Hdata")
@@ -506,7 +441,7 @@ Section AlignedClassify.
       iModIntro. iLeft. iExists w, σ'. iFrame "Hri Hgh Hinv Hdata".
       iPureIntro. split; [exact Hvw | split; [exact Hmdev | exact Hsregs]].
     - iDestruct (user_pt_vmem_write_addr_store_err uroot tfp um va pc k dat σ
-                   Hfault Hal Lpc Hhtif Hcp HSXL Hmprv Hall with "Hri Hgh Hinv") as %Herr.
+                   Hfault Hkvw Hal Lpc Hhtif Hcp HSXL Hmprv Hall with "Hri Hgh Hinv") as %Herr.
       iModIntro. iRight. iFrame "Hri Hgh Hinv Hdata". iPureIntro. exact Herr.
   Qed.
 
@@ -519,11 +454,11 @@ Section AlignedClassifyInstances.
 
   Definition user_pt_vmem_read_addr_load_classify_1 :=
     user_pt_vmem_read_addr_load_classify 1 ltac:(lia) ltac:(lia)
-      ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity) exec_read_ram_plain_1.
+      ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity) ltac:(unfold vmem_width; lia) exec_read_ram_plain_1.
 
   Definition user_pt_vmem_write_addr_store_classify_1 :=
     user_pt_vmem_write_addr_store_classify 1 ltac:(lia) ltac:(lia)
-      ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity) exec_write_ram_plain_1.
+      ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity) ltac:(unfold vmem_width; lia) exec_write_ram_plain_1.
 
 End AlignedClassifyInstances.
 
@@ -5327,6 +5262,7 @@ Section AmoGeneric.
   Context (k : Z).
   Context (Hk : 0 < k) (Hk16 : k <= 16) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
+  Context (Hkvw : vmem_width k).
   Context (Hread_resv : forall (rk : rv64d_types.read_kind) (addr : mword 64) (w : mword (8 * k)) s,
       (rk = rv64d_types.Read_RISCV_reserved \/ rk = rv64d_types.Read_RISCV_reserved_acquire \/ rk = rv64d_types.Read_RISCV_reserved_strong_acquire) ->
       dev_addr addr = false ->

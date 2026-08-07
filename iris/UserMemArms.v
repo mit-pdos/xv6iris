@@ -719,7 +719,7 @@ Proof.
     with (Some AccessFault)
     by (unfold plat_misaligned_exception; cbn match; vm_compute; reflexivity).
   cbn match.
-  rewrite execR_bind.
+  rewrite execR_bind. rewrite execR_bind0.
   rewrite (execR_liftR_seq _ _ _ _ _
              (exec_memory_exception _ pc (E_SAMO_Access_Fault tt) User s Hcp Hpc)).
   reflexivity.

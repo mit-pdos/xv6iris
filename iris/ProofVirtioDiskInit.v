@@ -540,10 +540,9 @@ Section VdiLeaves.
     iApply ("Hcont" with "Hcg Hpc Hpub Hcfg").
   Qed.
 
-  Lemma vdi_ldval (w : mword 32) :
-    extend_value false (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) w)
-    = sign_extend' 64 w.
-  Proof. rewrite <- (data2_ext_4 w). rewrite autocast_id. reflexivity. Qed.
+  Lemma vdi_ldval (w : mword (8*4)) :
+    extend_value false w = sign_extend' 64 w.
+  Proof. exact (data2_ext_4 w). Qed.
 
   (* -- a read whose value is determined by the tracked configuration -- *)
   Lemma wp_vdi_lw (γv : disk_names) (Φ : mval -> iProp Σ)
