@@ -885,3 +885,12 @@ WeakUpdEff.v
 WeakFunnelCfg.v
 WeakLeafCsrw.v
 WeakVariant.v
+WeakLeafRegOnly.v
+WeakLeafCsrw2.v
+WeakLeafCsrw3.v
+WeakLeafStimecmp.v
+WeakLeafPmpcfg0.v
+WeakLeafMret.v
+WeakPmpTorEff.v
+WeakLeafTor.v
+WeakLeafCsrrTime.v

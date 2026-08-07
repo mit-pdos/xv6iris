@@ -1740,34 +1740,93 @@ Recipe findings:
 - Kernel-text seam: `wkb_covers` (Z-keyed dump → pa-keyed weak image)
   + per-word `vm_compute` byte facts — cheap (~5 s section).
 
-**start()/timerinit() seams** (three named; seam 1 now CLOSED):
-1. **DONE — `iris/WeakFunnelCfg.v`** (`wwp_cb_config`/`wwp_instr_config`,
-   ~280 code lines, first-compile green) + the smoke-test leaf
-   `iris/WeakLeafCsrw.v` (`wwp_csrw_mstatus_leaf`; ~430 of its lines are
-   the one-time trace-`[]` csrw-cone mirror, whose `doCSR`/
-   `execute_CSRReg` spine is CSR-GENERIC — each further csrw owes only
-   its own `write_CSR` mirror). Interface delta from `wwp_instr`: the
-   funnel takes unbundled `hw_config` + FULL `hart_state`/
-   `cur_privilege`/`mstatus ms0`/`pmpcfg_n` cells (+ pure `MIE ms0 = 0`
-   and `MPRV ms0 = 0` — the latter because `wcfg_regs` carries the MPRV
-   bit; free for callers, `mmode_config` pins it); the callback gets
-   `wcfg_regs` + the whole-value mstatus pin + the three surrendered
-   cells at full ownership; continuation hands back only `hart_state` +
-   stepped PC; certificate interface and both batch-2 seams unchanged.
-   Baseline footprints (funext + 5 platform axioms); the csrw execute
-   mirror is CLOSED. Hoist when the second csrw leaf lands: the eff
-   enablement chain (WeakLeafCsrw §1) + `nowrite_read1`/`win0_absurd` →
-   `WeakLeafEffCommon`. A future MRET-shaped funnel change should start
-   from the recorded wwp_instr→wwp_instr_config diff (4 touch points).
-2. timerinit's stack accesses are c.sdsp/c.ldsp under the WRITTEN TOR
-   PMP entry — all five weak leaves demand `pmp_all_off`; a TOR-PMP
-   variant of the ld8/sd8 leaves is a missing leaf shape.
-3. `csrr time` opens `clock_inv` via its SC engine; the weak callback's
-   mask admits it but the seam is undesigned. (The
-   stimecmp/menvcfg/mcounteren csrw's are NOT blocked.)
-Until then the composed `SpecEntry`/`ProofEntry`/`LinkEntry` cone
-cannot land; `wwp_entry` is a plain lemma exactly as SC's `wp_entry`
-is.
+**start()/timerinit() seams — ALL THREE CLOSED (2026-08), plus the
+mechanical leaf batch.** What landed, and the findings that outlive it:
+
+1. **`iris/WeakFunnelCfg.v`** (`wwp_cb_config`/`wwp_instr_config`) + the
+   smoke-test leaf `iris/WeakLeafCsrw.v` (`wwp_csrw_mstatus_leaf`; its
+   `doCSR`/`execute_CSRReg` spine §1f is CSR-GENERIC). Interface delta
+   from `wwp_instr`: the funnel takes unbundled `hw_config` + FULL
+   `hart_state`/`cur_privilege`/`mstatus ms0`/`pmpcfg_n` cells (+ pure
+   `MIE ms0 = 0` and `MPRV ms0 = 0`); the callback gets `wcfg_regs` +
+   the whole-value mstatus pin + the three surrendered cells at full
+   ownership; continuation hands back only `hart_state` + stepped PC.
+   The sanctioned hoists are DONE: the eff enablement chain +
+   `nowrite_read1`/`win0_absurd` live in `WeakLeafEffCommon` §2/§3.
+2. **Seam 2 CLOSED — `iris/WeakPmpTorEff.v` + `iris/WeakLeafTor.v`**:
+   the exec_eff mirror of the SC pmpCheck-TOR grant machinery
+   (`exec_eff_pmpCheck_machine_tor0`, CLOSED; pure `pmp_tor0_grants`/
+   `pmpRangeMatch_full` reused from WpMmodeLeafBase) and the width-8
+   COMPRESSED load/store leaves under the written TOR entry
+   (`wwp_ld8_tor_rvc_leaf`/`wwp_sd8_tor_rvc_leaf`). Premise delta vs
+   the pmp_all_off leaves, exactly: execute mirrors swap
+   `pmp_all_off (lookup pmpcfg_n s0)` for `pmp_tor0_grants
+   (lookup pmpcfg_n s0) (lookup pmpaddr_n s0) ea 8` (+ one
+   `leaf_peel pmpaddr_n`, + the nextPC pre-write generalized to `npc`);
+   leaves swap `pmp_all_off pmpcfg0` for `pmp_allows_all pmpcfg0`
+   (fetch) AND `pmp_tor0_grants pmpcfg0 pmpaddrs ea 8` (data), plus
+   `pmpaddr_n ↦{q}` threaded unchanged. Window kit NOT forked.
+3. **Seam 3 DISSOLVED — `iris/WeakLeafCsrrTime.v`**: the SC csrr-time
+   leaf never opens `clock_inv` (mtime is read off the abstract step
+   state; the continuation is ∀-quantified over the read value), and
+   the weak twin is the same shape — `wwp_csrr_time_leaf` binds
+   `tv := subrange (lookup mtime (wm_regs σ))` and opens nothing. The
+   REAL clock_inv seam is **csrw stimecmp** (its write runs
+   `clint_dispatch` and scribbles mip): `iris/WeakLeafStimecmp.v`
+   shows the callback mask admits it cleanly — `iInv clockN` inside the
+   `|={⊤∖↑minstretN,∅}=>` goal, both reg_updates, close, THEN
+   `fupd_mask_intro`. No design fork anywhere.
+
+**THE ALIGNMENT AXIS IS KILLED, once, in `iris/WeakLeafRegOnly.v`**:
+start/timerinit fetch the same instruction shapes at BOTH pc alignments,
+so every register-only leaf takes `al4 : bool` (premises
+`is_aligned_vaddr pc 2 = true` + `is_aligned_vaddr pc 4 = al4`) and
+rides `regonly_es al4 pc` / `wcert_regonly` / `wP_eff_of_leaf_regonly`
+(the union of the `_base`/`_base2` recipes; `misa.C` required
+unconditionally — free from `wcfg_regs`). The F_RVC member is
+`WeakLeafTor.wP_eff_of_leaf_rvc` (union of `_rvc4`/`_rvc2`, fetch
+element `WEread wak_plain pc (if al4 then 4 else 2)`). RegOnly also
+holds the csr-generic CSR-WRITE check kit and `csrw_sexec_facts_r`.
+
+**THE LEAF BATCH (all first-compile green, one Opus subagent each;
+every leaf = funext + the 5 platform axioms, every execute mirror
+closed):** `WeakLeafCsrw2.v` (2015: medeleg — THE per-CSR TEMPLATE —
+mideleg, mepc, mcounteren, menvcfg), `WeakLeafCsrw3.v` (1322: satp,
+sie, pmpaddr0), `WeakLeafStimecmp.v` (575), `WeakLeafPmpcfg0.v` (469,
+config funnel), `WeakLeafMret.v` (663, config funnel, mirror replays
+the whole SC ExecMRET Section; elp write absorbed value-preservingly
+by `reg_interp_set_same`), `WeakLeafCsrrTime.v` (561, incl. the
+csr-generic csrr spine `exec_eff_csrr_read_step_p`), `WeakLeafTor.v`
+(1019). Unit price confirmed at the batch-2 rate: a register-only csrw
+leaf ≈ 150–260 code lines + its write_CSR mirror.
+
+**Interface findings to remember:**
+- `wcfg_regs` does NOT carry mstatus.SXL: a leaf whose legalizer reads
+  it (satp; any future one) keeps a half of `mmode_config` across the
+  funnel call (dq := q/2) exactly as the SC leaf does — external
+  interface unchanged. Nor does it pin the WHOLE mstatus value: a
+  future csrr-mstatus leaf should ride `wwp_instr_config` (whose
+  callback pins `ms0`) even though it writes nothing.
+- Pending small hoists for the next `WeakLeafEffCommon` touch (each
+  currently a justified local copy): the Sstc pair
+  (WeakLeafStimecmp; WeakTickEff's are Local), `exec_eff_set_next_pc`
+  (WeakLeafMret; WkEntryEff's drags the _entry text cone),
+  `exec_eff_architecture_Supervisor_sxl` (WeakLeafCsrw3 vs
+  WeakWalkEff's), and the csrr spine/check kit (WeakLeafCsrrTime →
+  WeakLeafRegOnly §3).
+
+**What remains for `wwp_start`/`wwp_timerinit` — NOTHING STRUCTURAL.**
+Every remaining leaf is register-only at a demonstrated recipe: the ALU
+leaves (addi ×14, lui ×4, auipc, and, or ×3, ori ×2, slli ×2, srli,
+addiw, add ×2 — hoist per-shape via the regonly kit instead of paying
+the WkEntryNew inline price), the jumps (jal, c.jr — `jal_sexec_facts`
+exists), the remaining csrr's (mstatus/sie/menvcfg/mcounteren/mhartid —
+csrr-time is the template; mstatus via the config funnel per the SXL
+note), and the two prologue c.sdsp stores under pmp_all_off (the
+WeakLeafTor leaves minus the TOR premise — same recipe). Then the two
+whole-function chains themselves and the composed
+`SpecEntry`/`ProofEntry`/`LinkEntry` cone (until those land,
+`wwp_entry` stays a plain lemma exactly as SC's `wp_entry` is).
 
 ## M4 — the sweep
 
@@ -1918,9 +1977,23 @@ bits — the kernel gets fixed, per the virtio precedent.)
 
 **STAGING** (P-stages are new base machinery, serial; then the sweep
 stages parallelize):
-- **P1** (WeakMem/WeakInterp/WeakGhost): value-pinned-byte lemma, the
-  variant lattice + byte-0 stability, multi-window `wstep_ok_racy`
-  generalization, the value-closure predicate + preservation.
+- **P1 — DONE in reduced form** (`iris/WeakVariant.v`, 939 lines /
+  2.7 s, 63 statements, **every main lemma CLOSED — not even funext**):
+  byte-stability (`pte_variant_mix` — any per-byte mixture of variant
+  messages assembles to a variant), the value-pinned-byte collapse
+  (`wbyte_ok_pinned_val*` — unanimity + cover ⇒ SC), the closure
+  `wlog_variants` (+ `_writeback` CAS preservation), bit-monotonicity
+  under the fresh-derived discipline (`wbyte_fresh_derived_mono`;
+  `update_PTE_Bits_fires_latest` — the write-back EVENT is decided by
+  the latest word alone), and the capstone `wadm_pte_ad_le_latest`.
+  For P4: **hold the leaf window as `WeakWord8.wlat8`** (it already
+  exists WITH the store/retarget kit — `wlat8_store_gen`); this file
+  supplies `wlat8_win_latest`/`wlat8_variant` bridges. The cover
+  premise's canonical spelling is at `w_vrNew` — ONE receipt shape
+  serves plain walk reads AND the CAS exclusive read. The multi-window
+  `wstep_ok_racy` generalization was NOT needed (the reduced design:
+  the CAS read is pinned by kind; the plain leaf read collapses via
+  `wadm_variant`).
 - **P2** (WeakCert): racy confinement — the symbolic-patch confined run
   producing `wstep_ok_racy` (the recorded missing piece).
 - **P3** (WeakBridge/WeakRacy): exec-modulo-variants with the confined
