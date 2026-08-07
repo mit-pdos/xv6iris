@@ -461,9 +461,18 @@ Validate the operational design before anything depends on it.
       the `wstep_cert` Q-type fix, the WP-level composition of the lock
       (acquire + spin loop + release), the `started` setter, and a
       two-instruction smoke test.  See "What M3c established" below.
-- [ ] One lock-client cone re-proven unchanged-in-statement (candidate:
-      kinit/kfree — small, pure lock+memory).  NOT done: it needs the leaf
-      layer's memory arms, i.e. M4's first batch.
+- [ ] One lock-client cone re-proven unchanged-in-statement. **TARGET
+      CORRECTED (2026-08 tier audit)**: the original candidate kinit/kfree
+      is at the SCONF (S-mode) tier — 42 distinct `wp_*_s_sconf` leaves,
+      every instruction through `WpSmodeIntr.wp_instr_s_sconf`, whose fetch
+      IS the page-table walk; it consumes ZERO M-mode leaves, so batch 2
+      does not unblock it. Its specs thread `sie_cap_gpr`, which smuggles
+      `stack_own` (a mechanical `↦w₈` respell) and `strans_inv`, whose KPT
+      arm names `tlb_res_pt` — whose weak twin is batch-6 P4. The kinit
+      cone is therefore the VALIDATION CAPSTONE OF BATCH 6c, not an M4
+      item. The correct vertical slice for the M-mode stack is the
+      `_entry`→`start` boot cone (`WpEntryNew.v` — the sole SC consumer of
+      the M-mode memory leaves; straight-line M-mode, module-shaped).
 - [x] Porting guide written from what the slice taught:
       [`weak-memory-porting.md`](weak-memory-porting.md); refined at M3c with
       the composition/mask pattern (§2b), the `Q`-half recipe (§2c) and the
@@ -1481,6 +1490,194 @@ funnel seams below were fixed, is 791 lines / 35 s.
   exact statement. `wcert_store` / `wcert_amo_aq` are still width-4-only;
   generalise them the same way when the first `sd`/`amoswap.d` leaf needs it.
 
+### THE SECOND LEAF: sd (batch 2; read with the unit-price block)
+
+`iris/WeakLeafSd8.v` (465 code lines, **433 per-leaf** after the 32-line
+per-family width-generic certificate; 20.5 s single-file; green on the
+FIRST compile — the leaf recipe is deterministic now). The first
+STORE-class leaf: `wcert_store_w` (+ `wcert_store_w_4` subsumption,
+`wcert_store8_base4`), `exec_eff_sd8_at` at an arbitrary `s0`,
+`wP_eff_sd8`, and the leaf `wwp_sd8_leaf` — `ea ↦w₈{1} vold` in,
+`ea ↦w₈{1} rs2v` at `ws'` + `monPred_at R (view_scl T)` out
+(`T = S (length (wm_log σ))`, the `wwp_release_deposit` surface). FULL
+fraction is forced (the element retarget is a `ghost_map_update`).
+Cheaper than `ld` because the WINDOW KIT IS ACCESS-AGNOSTIC and was
+imported from `WeakLeafLd8` (+16 lines for `wsd8_window_wdom`, the
+write-domain confinement) and a store's execute has no data-byte
+lookups. Corrections & follow-ups:
+- **Axiom phrasing correction**: WP-altitude leaf lemmas carry the 5
+  platform axioms **+ funext** (via `MinstretInv`'s cone) — true of
+  `ld` too, verified byte-identical; `wcert_*` carries the bare 5.
+- **Store/AMO-class successor is an `MState` LITERAL, not a `set_reg`
+  tower** — state register facts at the tower only (`sd8_regs_facts`),
+  consume by `exact`/`eq_trans` (conversion sees through
+  `sregs (MState …)`); `iEval (cbn [sregs])` BEFORE any ssr rewrite of
+  the funnel's PC hand-back.
+- **The store Q-half is a fixed 4-move WP block** (reusable in §2g):
+  `wpt8_at_elems` → `wlat8_store_prim` (retarget at `wQ_store8`'s
+  message) → `WeakGhost.wlog_update` (the log AUTHORITY must grow —
+  loads never touch it, every store leaf must) → `wlat8_wpt8` with
+  `wQ_store8`'s `wV` conjunct as the floor.
+- Hoist follow-ups (do when the third 8-byte leaf lands): the window
+  kit → a shared `WeakLeafWin8.v`; `exec_eff_within_htif_w_false` (the
+  `_writable` twin `WeakFetchEff` lacks) → `WeakFetchEff` §1; a generic
+  `write_bytes_dom_sub` next to `WeakCert.write_bytes_dom`.
+- `wcert_amo_aq` remains width-4-only; generalize with the first
+  `amoswap.d` leaf.
+
+### LEAVES 3–4: lw/lwu and sw (batch 2)
+
+`iris/WeakLeafLw4.v` (439 code lines / 26.7 s; ONE parametric leaf
+`wwp_lw4_leaf` covers `lw` AND `lwu` — the sign flag `u` free, as the
+Base4 mirror leaves it) and `iris/WeakLeafSw4.v` (406 / 29.9 s;
+`wwp_sw4_leaf`, stored value = the truncation, full fraction, the
+release-deposit surface intact). Both green on the FIRST compile —
+four-for-four; the leaf recipe is deterministic. Corrections:
+- **A width-4 leaf has NO certificate section**: width 4 is `WeakCert`'s
+  native width — `wcert_load_base4`/`wcert_store_base4` (WeakFetchEff)
+  ARE the certificates on the nose; even `wcert_*_w` at n:=4 is not
+  needed. That is where ~33–60 lines of the 472/433 price vanish.
+- **The window kit is WIDTH-shaped, not access-shaped**: the 8-byte kit
+  does not fit width 4 (a 4+4 clone lives in `WeakLeafLw4`, reused by
+  `WeakLeafSw4`). Three copies of the family now exist — the
+  width-parameterized hoist (`WeakLeafWin.v`) is DUE.
+- `ld8_sexec_facts`/`sd8_regs_facts` ARE width-independent — reuse them.
+- **`lw`'s value spelling**: `extend_value u (v : mword 32)` — the
+  ascription is mandatory (`bv 32` vs `mword ?n` unification trap);
+  `extend_value` is NOT identity at width 4; the bridge is
+  `rewrite (data2_id_4 v)`, not `sign_extend'_id` (the width-8 move).
+- **`sw`'s truncation as a TIE PREMISE**: `subrange_vec_dec rs2v 31 0 =
+  vw` with `vw : bv 32` a binder, so trace/message/`↦w₄` rebuild all
+  speak `vw`; goal-side `rewrite -Hvw -Hdata -Hpa` then `apply` (the
+  `31` vs `(4*8-1)` gap is absorbed by conversion).
+- `lemma_diff.py` must be passed the filenames EXPLICITLY for untracked
+  files (bare invocation reports "no *.v differs from HEAD").
+- Still-owed hoists: `exec_eff_within_htif_w_false` → `WeakFetchEff` §1
+  (reused width-generically from Sd8); `write_bytes_dom_sub` generic.
+
+### THE FIFTH LEAF: amoswap.w.aq (batch 2 COMPLETE)
+
+`iris/WeakLeafAmo4Leaf.v` (1161 code lines / 35.2 s; green first
+compile — five for five). ≈685 per-leaf-comparable + ~400 one-time
+(the pin-refined certificate chain §1 + a 102-line run-assembly clone,
+both hoistable). `wwp_amo4_acq_leaf` concludes `wacq_cb … (wP_eff_pin
+…)` — i.e. it IS `WeakBranch.wwp_acquire_loop_real`'s attempt premise
+DEFINITIONALLY; `wwp_amo4_acquire_loop` is the slot-in check with both
+certificates discharged by `eq_refl` kind checks. The lock invariant is
+NOT opened by the leaf (`wwp_acquire_swap` opens it and runs
+`wacquire_core`), so the store Q-half block never appears here.
+Axioms: bare 5 for the certificates/loop; 5+funext at WP altitude.
+
+**THE HEADLINE CORRECTION — `WeakCert.wP_eff`'s whole-window pinnedness
+is UNPROVABLE for the AMO leaf** (and the porting-guide §2.3 / WeakCert
+§6 comment claiming an AMO data word "needs no pinnedness" is wrong
+about the implementation): `wP_conf`/`wP_eff` demand `pinned_read` on
+ALL of W, but a contended acquirer's index need not cover the lock
+word. Both real consumers of pinnedness (`wstep_ok`'s read arm,
+`WeakBridge.wread_pinned_ts`) only need it where `ak_pins ak = false`,
+so the fix is TRACE-KEYED pinnedness: `trace_pin s es` (pin only the
+reads whose kind doesn't self-pin) + `wstep_eff_confined_pin` (a
+mechanical clone of the ~190-line induction) + `wP_eff_pin` /
+`wstep_cert_eff_pin` / `wcert_amo_aq_pin`. **This is also exactly the
+premise shape batch 6 wants** (walker RMW reads self-pin by kind;
+translation reads get the variant treatment).
+
+**CONSOLIDATION HOISTS: DONE** (2026-08-06, solo pass).  Raw-line deltas:
+the five leaves 4087 → 3125 (−962; the amo file alone 1461 → 875), the
+new shared `WeakLeafWin.v` +275, `WeakCert` +274 (absorbed the pin chain
++ its docs), `WeakFetchEff` +140 (the split + pin packaging + the two
+hoisted §1/§9a lemmas) — **net −273** across the whole set, with every
+duplicate retired.  Where things landed:
+1. `trace_pin` + `wstep_eff_confined_pin` are `WeakCert` §5a/5b — THE
+   confinement premise/theorem; `wP_eff_pin`/`wstep_cert_eff_pin`/
+   `wP_eff_pin_of_window`/`wcert_amo_aq_pin` in §7/§8f.  The
+   whole-window `wP_eff` form SURVIVES as the every-read-pinned instance
+   (`exec_eff_reads_dom` + `confined_trace_pin` + `wP_eff_pin_of_eff`;
+   `wstep_eff_confined`/`wstep_cert_eff` unchanged in statement), so the
+   four owned-data leaves and WeakEff/WeakBranch/WeakAcquire kept
+   compiling untouched.  The amo file's §1 pin chain, §2 window kit and
+   §4a/§4b run-assembly clone are gone.
+2. `WeakFetchEff` §8 = `exec_eff_step_of_leaf_base` (the pinnedness-free
+   ∀-tick run assembly) + `wP_eff_of_leaf_base` (unchanged statement,
+   now 5-line packaging) + `wP_eff_pin_of_leaf_base` (the pin variant —
+   packaging only, no clone).
+3. `iris/WeakLeafWin.v` (NEW, ~290 lines): `wwin pc ea n` (4 text + n
+   data bytes) with membership/inv/nonzero/pinned/conf-text/conf-data/
+   wdom lemmas, `addr_is_ram_pa_z_nz`, `set_lookup_ne`, the shared
+   `leaf_peel` Ltac, `reg_at_flat`, `load_sexec_facts`/
+   `store_regs_facts` (renamed from `ld8_sexec_facts`/`sd8_regs_facts`),
+   `wpt8_align`/`wpt4_align`.  All five leaves instantiate it; no leaf
+   imports another leaf anymore.  Widths are `N`; `N.to_nat 8` vs
+   `8%nat` premise gaps close by conversion (`exact` accepts them).
+4. `exec_eff_within_htif_w_false` is `WeakFetchEff` §1 (next to its
+   `_readable` twin); `write_bytes_dom_sub` sits next to
+   `WeakCert.write_bytes_dom` and `wwin_wdom` is its instance.
+5. The unused `HP` argument is dropped from `wstep_cert_eff` (the pin
+   precedent held: no Q-arithmetic used it); the ten `wcert_*` call
+   sites just dropped one intro.
+Other durable findings: an invariant-form leaf CANNOT use the funnel
+(`wacq_cb` sits on `wp_winstr` directly so the lock library can open
+`wlockN` around it; the leaf replays the funnel wrapper by hand —
+`minstret_inv` opens at `⊤∖↑wlockN`, `clock_inv` inside the
+▷-continuation; neither funnel seam arises — the ~250-line excess is
+this replay, and it is FORCED); AMO-class register facts =
+`amo4_sexec_facts` (peel rd write, `cbn [sregs]` the MState literal,
+peel the tower).
+
+### THE FIRST FUNCTION PORT: _entry (batch 4's vertical slice)
+
+`iris/WkEntryEff.v` (492 code lines / 8.5 s — seven state-generic
+trace-`[]` exec_eff mirrors incl. an `execR_eff` `jump_to`, + the
+chain's static facts) and `iris/WkEntryNew.v` (1581 / 52.6 s —
+`wwp_ld8_leaf_same`, `jal_sexec_facts`, and `wwp_entry`: the whole
+8-instruction `_entry` chain as ONE Qed). Statement = SC `wp_entry`
+under exactly the porting-table swaps (`kernel_text`→`wkernel_text` +
+`wkb_covers`; `↦ₚ₈`→`hart_ws` + `vwp_hold (wpt8 …)`; continuation binds
+`ws'` with `ws_le`); `m_*` output defs REUSED, not restated. Footprint
+byte-identical to SC. First consumer of all four fetch-alignment arms.
+**Total 2073 ≈ 9.8× the SC proof file**; per-instruction funnel blocks
+150–220 lines inline — the argument for hoisting per-shape REGISTER-ONLY
+weak leaf lemmas (weak `wp_addi_gpr`-style) before any bigger sweep.
+Recipe findings:
+- **Register-only instructions: the empty-memory detector (§2e) is
+  UNUSABLE at the funnel altitude** (the fetch-arm premise fixes one
+  `es_x` for all `b`; the detector's trace is existential per state).
+  The syntactic trace-`[]` mirror is mandatory and cheap (10–40
+  lines/execute; ~70 for CSRR). Then `wcert_nowrite` at the fetch-only
+  trace + `wQ_pure`. Also: `wcert_quiet` cannot certify ANY real
+  instruction (fetch reads are width 2/4, `quiet_trace` needs width-0).
+- **PERF: `iApply fupd_mask_intro; [set_solver|]` is a hidden 14 s
+  (leaf) / 199 s (whole-function) sink — use `apply empty_subseteq`.**
+  The batch-2 leaves should be patched (it is most of their compile
+  time). Also recorded in optimization.md.
+- **Leaf cell-shape gap**: separate rs1/rd cells cannot express
+  rd = rs1 (`ld sp,(sp)`); `wwp_ld8_leaf_same` is the worked fix —
+  future leaves should take `gpr_file` or ship the same-register
+  variant.
+- Chain threading: per instruction `hart_ws_agree` pins the view,
+  `wpt8_mono` carries owned words, `ws_le` accumulates transitively;
+  PC returns as `lookup nextPC s_exec` (`load_sexec_facts` 5th
+  conjunct; `jal_sexec_facts` for jumps — nextPC written twice).
+- Kernel-text seam: `wkb_covers` (Z-keyed dump → pa-keyed weak image)
+  + per-word `vm_compute` byte facts — cheap (~5 s section).
+
+**start()/timerinit() BLOCKED on three named seams** (reported, not
+weakened):
+1. `csrw mstatus`/`csrw pmpcfg0`/`MRET` leaves sit on
+   `InstrBytes.wp_instr_config`, which SURFACES the config cells;
+   `wwp_instr` holds them inside `mmode_config` and cannot. Needed
+   ONCE: a `wwp_instr_config` funnel variant (~230 lines), then those
+   leaves port like the csrr block.
+2. timerinit's stack accesses are c.sdsp/c.ldsp under the WRITTEN TOR
+   PMP entry — all five weak leaves demand `pmp_all_off`; a TOR-PMP
+   variant of the ld8/sd8 leaves is a missing leaf shape.
+3. `csrr time` opens `clock_inv` via its SC engine; the weak callback's
+   mask admits it but the seam is undesigned. (The
+   stimecmp/menvcfg/mcounteren csrw's are NOT blocked.)
+Until then the composed `SpecEntry`/`ProofEntry`/`LinkEntry` cone
+cannot land; `wwp_entry` is a plain lemma exactly as SC's `wp_entry`
+is.
+
 ## M4 — the sweep
 
 **Batches and their prices** (from M4-prep's measurements; the ORDER is
@@ -1492,14 +1689,349 @@ numbers come from; the prices below replace M4-prep's).
 | # | batch | size | note |
 |---|---|---|---|
 | 0a | `execR_eff` + kit, the two `run_hart_active` progress mirrors, the step assembly, the certificate join | **DONE — 834 lines / 3.9 s** (`iris/WeakEffSkel.v`) | vs the 400–600 estimate for the whole of batch 0; the interpreter mirror is 3.8× its SC source, the script mirrors 0.65× |
-| 0b | the FETCH's `exec_eff` reduction + the `tick_clock` mirror + `wP_eff_of_leaf_base` | **DONE — 2272 lines / 13.1 s** (`WeakPmpEff.v` 358, `WeakTickEff.v` 397, `WeakFetchEff.v` 1112, `WeakFetchRvc.v` 405) | vs the 250–350 + 25 estimate; the gap is the TRANSITIVE cone (PMP, the interrupt gate, the clock) that the chain merely *names*. Both 4-aligned arms (`F_Base` and `F_RVC`); the 2-aligned ones are the remaining gap |
+| 0b | the FETCH's `exec_eff` reduction + the `tick_clock` mirror + `wP_eff_of_leaf_base` | **DONE — 2272 lines / 13.1 s** (`WeakPmpEff.v` 358, `WeakTickEff.v` 397, `WeakFetchEff.v` 1112, `WeakFetchRvc.v` 405) **+ the 2-aligned arms: DONE** (`iris/WeakFetch2.v`, 853 code lines / 8.9 s — see the block below) | vs the 250–350 + 25 estimate; the gap is the TRANSITIVE cone (PMP, the interrupt gate, the clock) that the chain merely *names*. All four alignment arms now exist |
 | 1 | the memory `execute` mirrors, by SHAPE | **DONE — all five shapes, 3897 lines** (`WeakLeafEff8.v` 557, `WeakLeafEff8s.v` 598, `WeakLeafBase4.v` 1395, `WeakLeafAmo4.v` 1119, + the shared `WeakLeafEffCommon.v` 228) | vs the 30–60-lines-per-shape estimate: a shape is ≈ 800 lines, because the whole `vmem_read`/`vmem_write` cone below the `execute` must be mirrored too (same transitive-cone lesson as 0b). Three of the five needed their SC lemma written as well |
-| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | **MEASURED, both funnel seams fixed: 472 code lines / 3.1× the SC leaf** (`iris/WeakLeafLd8.v`, the `ld` leaf; it was 611 / 4.0× as first written) | vs the 30–55 estimate. The window IS 20–40 as predicted and the trace join and decode fact ARE free; what the estimate missed is the ~140-line WP composition and the 137-line generic-state `execute` block. See the unit-price block above |
-| 3 | `WpLock` clients | ≈ 0 | the interface is unchanged; `iris/WeakWord8.v` covers `cpu`/`name` |
-| 4 | the straight-line M-mode function proofs | batched by subagent | the config tower and every decode fact transfer verbatim |
+| 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | **COMPLETE — all five leaves**: `ld` 472 (`WeakLeafLd8.v`), `sd` 433 (`WeakLeafSd8.v`), `lw`/`lwu` 439 (`WeakLeafLw4.v`, one parametric leaf), `sw` 406 (`WeakLeafSw4.v`), `amoswap.w.aq` ≈685/leaf + ~400 one-time (`WeakLeafAmo4Leaf.v` — the invariant-form lock leaf, slots under `wwp_acquire_loop_real` DEFINITIONALLY). All five green on the FIRST compile. See the per-leaf blocks + "THE FIFTH LEAF" | consolidation hoists DONE (see the fifth-leaf block); batch 3 opens |
+| 3 | `WpLock` clients | ≈ 0 — **but the payoff is GATED ON 6c** (2026-08 tier audit): the kernel's real acquire/release are SCONF functions (`wp_amoswap_lockopen_s_sconf` & co.); the M3b/M3c lock library validated the SHAPE at M-mode altitude, not the kernel's lock code. The tier-agnostic halves (`wlock_inv`/`wis_lock`/`wlocked`, `wacquire_core`/`wrelease_core`) transfer now | `iris/WeakWord8.v` covers `cpu`/`name` |
+| 4 | the straight-line M-mode function proofs | **THE VERTICAL SLICE IS IN: `wwp_entry`** (`iris/WkEntryNew.v` + `WkEntryEff.v` — the whole 8-instruction `_entry` chain, one Qed, statement = the SC statement under the porting-table swaps, footprint byte-identical to SC `wp_entry`; first consumer of all FOUR fetch-alignment arms). **Price: 2073 lines ≈ 9.8× the SC proof file** — see "THE FIRST FUNCTION PORT" block; the ~150–220-per-register-only-instruction inline cost is the argument for hoisting weak register-leaf lemmas before any bigger sweep. `start`/`timerinit` BLOCKED on three named seams (same block) | the M-mode tier is ONLY the boot path (tier audit); everything else = batch 6c. `sie_cap_gpr`-threading specs do NOT transfer (contain `stack_own` → `↦w₈` respell, `strans_inv` → P4) |
 | 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | small, then a cone | the racy-load rule is landed; the escrow is not |
-| 6 | the sconf tier | **design first** | blocked on the page-table-walk items above |
+| 6 | the sconf tier | **DESIGNED (block below); no decision pending** | see "BATCH 6 — THE sconf/WALK DESIGN" |
 | 7 | the virtio cone | M5 | |
+
+### BATCH 6 — THE sconf/WALK DESIGN (2026-08; DECIDED: faithful, no kernel patch)
+
+**THE FACTS THAT SHAPE THE DESIGN.** The kernel table is built A/D-CLEAR
+(kvmmake's `mappages` writes `perm|V` — 0x0B text / 0x07 data/dev,
+`KvmMap.v` header) and this build is Svadu (`menvcfg.ADUE=1`), so the
+hardware walker WRITES the found leaf PTE back on an access that needs
+bits: the first fetch/load of a page appends an A write-back, the first
+store an A|D one — lazily, forever, from ANY hart (kinit's freerange
+pre-touches free RAM on hart 0, but text-A, bss-D, per-hart PLIC pages and
+kstacks get theirs post-`started`, cross-hart). So PTE leaf words are
+genuinely RACY weak memory, and M4-prep's option (b) "prove the walk
+write-free" is unavailable. **DECIDED (2026-08, user): we do NOT preset
+A/D in kvmmap — the C source stays faithful; the weak tier handles PT
+walks over weak-memory writes for real.** (An A/D-preset patch was
+evaluated and rejected: `completed/kpt-share.md` had already declined it
+for SC, and the point of the weak effort is to verify the kernel as it
+is. If a SYNCHRONIZATION bug surfaces — a missing fence, not missing A/D
+bits — the kernel gets fixed, per the virtio precedent.)
+
+**THE THREE STRUCTURAL FACTS THAT MAKE THE FAITHFUL DESIGN TRACTABLE.**
+
+1. **Only LEAF words are racy.** `update_PTE_Bits` rewrites exactly the
+   level-0 leaf the walk found (A/D/U in a NON-leaf PTE is
+   reserved-invalid — the same fact that made `kpt_lb`'s leaf-only
+   canonicalisation sound), and nothing else ever stores to PT pages. The
+   level-2/1 pointer words are kvminit-written, single-message → PINNED
+   through the per-hart receipt (below). Racy surface per translation:
+   ONE 8-byte window (the leaf), so 2–3 windows per instruction (fetch
+   leaf, data leaf, +1 on a straddling fetch).
+2. **The variant lattice is BYTE-STABLE.** Every message to a leaf window
+   is `pte_set_ad w0 a d` of the canonical leaf, and A/D are bits 6/7 —
+   both in BYTE 0 of the little-endian word. So bytes 1–7 are
+   VALUE-IDENTICAL across all messages (a per-byte weak read mixture
+   still assembles to a variant), and byte 0 ranges over the reachable
+   variant bytes ((a₀,d₀) initial, (1,0), (1,1) — (0,1) is unreachable,
+   `update_PTE_Bits` always sets A). Seven of the eight bytes are
+   "value-pinned" — every admissible read returns THE value, a pure lemma
+   away from behaving SC — and one byte carries a small finite case.
+   **The latest variant is NOT monotone — write-backs can supersede each
+   other backwards** (found 2026-08, user question): the walker's
+   write-back is a PLAIN read at the hart's own view followed by a PLAIN
+   store, and stores append at `S (length log)` unconditionally. So hart
+   A's store-walk can append (1,1), and hart B — whose view does not
+   cover it — can then read the (0,0) original on a load-walk and append
+   (1,0) ABOVE it in coherence order: the D bit regresses at the top of
+   the log. Note real hardware cannot do this: the privileged spec
+   requires the A/D update to be ATOMIC w.r.t. other PTE accesses (an
+   atomic check-and-set at the coherence point), so our plain-read+store
+   model is strictly WEAKER than the architecture on this axis — the
+   sound direction, and BENIGN for the kernel table: no software reads
+   A/D, `check_PTE_permission` ignores them, a regressed variant at worst
+   triggers another write-back, and every invariant here is stated at
+   "∃ variant" with no order on the lattice (do NOT state one). WHERE IT
+   STOPS BEING BENIGN — record for the USER cone: once SOFTWARE writes
+   PTEs concurrently with walkers (uvmunmap zeroing an entry while
+   another hart's stale walker holds an old variant), the model's plain
+   write-back can RESURRECT the unmapped PTE — a behavior the
+   architecture's atomic re-check ("valid and grants sufficient
+   permissions", re-checked at the write) forbids. The user-cone design
+   must either model the walker update as the architecture's atomic
+   check-and-set (an `ak_latest`-style RMW at the interpreter seam) or
+   declare the gap; deciding that is a user-cone prerequisite, NOT a
+   batch-6 item.
+3. **The SC tier's interfaces are already A/D-CLOSED.** Translation
+   results (pa, `check_PTE_permission`) are variant-independent
+   (`pte_set_ad_ppn`, checks ignore A/D); the ONLY register the read
+   variant reaches is the tlb cell, and `tlb_ok_pt` / `tlb_res_pt`
+   already quantify A/D existentially (entries as "SOME variant of the
+   tree's leaf"). GPRs, data memory, control flow, devices never see the
+   variant. So NO ported S-mode spec statement changes — the
+   nondeterminism lives exactly where the SC design already refused to
+   pin it.
+
+**THE DESIGN.**
+
+- **`wkpt_inv`** (namespace invariant, all conjuncts objective iProps),
+  mirroring `kpt_inv` with `ptree_own` split by role:
+  the level-2/1 pointer words as kvminit-timestamped `wlat_pointsto`
+  elements; per leaf vpn `∃ ts a d, wlat8 (leaf addr) 1 ts
+  (pte_set_ad (canonical leaf) a d)` (EXCLUSIVE — a write-back retargets
+  it at the appended message, the lock-release shape; this is why
+  `wstep_cert`'s Q carries the message identity); `kmap_auth M` +
+  `kpt_lb t` + the spec facts as today; and the **VALUE-CLOSURE conjunct**
+  `⌜every log message at a leaf window writes a variant⌝` — a
+  whole-log fact, so (the `wstarted_oneshot` lesson) it MUST be an
+  invariant conjunct with a per-step preservation lemma, and it is what
+  collapses `wadm` at the windows: byte 0 ∈ variant bytes, bytes 1–7 =
+  the canonical bytes.
+- **The receipt** `⊒ V_kpt` (`View 0` at the kvminit bytes' timestamps) —
+  persistent, subjective, per-hart, NEVER in an invariant. Hart 0 from
+  its own writes; secondaries through the `started` handoff
+  (`release_fence_transfer`; `T_kpt ≤ t_started` by program order). It
+  pins the pointer-word reads AND excludes pre-kvminit garbage at leaf
+  windows (readable's coherence clause: a view covering kvminit's write
+  bars the era-initial value), so every admissible leaf read is a VALID
+  variant. **This is the fence-sufficiency statement for the kernel
+  table: the existing started handshake is ENOUGH; no kernel change is
+  needed for batch 6.** (The analogous question for USER tables —
+  fork/exec building tables cross-hart under the proc-lock chains — is
+  user-cone work; surface concrete fence obligations there when reached.)
+- **The bridge tier: exec-modulo-variants.** Generalize `WeakRacy`'s
+  one-window scheme to the walk shape: reads pinned everywhere except
+  designated windows Wᵢ with per-byte value collapse (fact 2), plus a
+  WRITE confined to the same windows with a variant value (the racy rule
+  already tolerates writes after the racy read; the transport across the
+  intervening write-back and the multi-window join are the new lemmas).
+  The correspondence: every admissible run ≡ SC `exec` at `wflat_st σ`
+  PATCHED at the windows with some variant choice, landing ≈_ad-related
+  to the canonical successor (≈_ad: equal but for A/D variants at leaf
+  windows + tlb entries). Reducibility witnesses at the latest-read
+  oracle (reading the latest message is always admissible).
+- **The certificate: racy confinement.** Extend `wstep_ok_confined` to
+  produce `wstep_ok_racy` (the recorded gap): run the SC interpreter at
+  the RESTRICTED memory patched SYMBOLICALLY at the windows (∀ a d — the
+  existing `_ad`-generic translate/execute lemmas are exactly the
+  symbolic instantiation, so no 4^windows enumeration), reads outside
+  windows confined as today, writes confined to the windows by the final
+  domain + value-closure of `update_PTE_Bits`.
+- **The absorption theorem** mirrors `tlb_res_pt_translateAddr_at` with
+  `gen_heap_interp` swapped for `wlat_interp`: open `wkpt_inv`
+  (mask-carrying, the `sr_absorb` call form), pointer words via
+  `wlat_flat_lookup` + receipt, leaf windows via the closure conjunct's
+  `wadm` collapse; on the write-back arm retarget the leaf element at
+  the step's appended message (from Q) and re-close — `kpt_lb` survives
+  by `ptree_canon_set_leaf` exactly as in SC, and the closure conjunct
+  extends by "the write-back wrote a variant".
+
+**STAGING** (P-stages are new base machinery, serial; then the sweep
+stages parallelize):
+- **P1** (WeakMem/WeakInterp/WeakGhost): value-pinned-byte lemma, the
+  variant lattice + byte-0 stability, multi-window `wstep_ok_racy`
+  generalization, the value-closure predicate + preservation.
+- **P2** (WeakCert): racy confinement — the symbolic-patch confined run
+  producing `wstep_ok_racy` (the recorded missing piece).
+- **P3** (WeakBridge/WeakRacy): exec-modulo-variants with the confined
+  write; transport across the intervening write-back; multi-window join.
+- **P4**: `wkpt_inv` + the weak absorption theorem + the Q plumbing for
+  the write-back message.
+- **6a**: the S-mode fetch chain at the flat state (`tlb_inv_pt_fetch`'s
+  pure/wlat restatement over the absorption theorem) + the translate/walk
+  `exec_eff` cone. **THE WALK READ-CONE MIRROR IS DONE**
+  (`iris/WeakWalkEff.v`, 1186 code lines / 26 s; 45 top-level, all
+  `acc`/`p`-parametric; the update/write-back cone deliberately EXCLUDED
+  pending the Sail patch): the `wpte_*` eff predicate twins (∀-state SC
+  predicates do NOT transport — state the eff walk at empty-trace
+  `wpte_*` hypotheses and project back; 6b's `kperm_variant_*` twins
+  should be stated at `wpte_*` directly), `exec_eff_read_pte_S` (trace
+  `[WEread wak_plain addr 8]` — a PTE read is plain, view-raising),
+  `wpt_read_pte_slot` (closed under the global context), the per-level
+  ∀-Acc success walk (trace-generic `es2++es1++es0` premises — the
+  3-element certificate join is free BY CONVERSION), the fault walks
+  split per stop-depth `_l2/_l1/_l0` + the SC-shaped disjunctive
+  wrapper (exact traces vs existential — exact-trace consumers use the
+  split), `exec_eff_translate_TLB_hit_pt` (O1, literal empty trace —
+  the quiet detector was deliberately NOT used: certificates need exact
+  traces), and the `translateAddr` heads (O1/O2, `update_PTE_Bits =
+  None` premise). **Pricing: 1.15× the SC spans (≈1.03× pure replay) —
+  far below the 0b/1 ~800-per-shape figure because the walk's
+  transitive cone was already paid for** (WeakLeafEff8's plain-8 read,
+  the WeakFetchEff/WeakLeafEffCommon gate twins, WeakEffSkel's kit);
+  the only new interpreter-adjacent work was the Supervisor PMP grant +
+  PTE-PMA gate (~70 lines). Axioms: one platform axiom
+  (`plat_term_write`) on the heads. The two 2-ALIGNED fetch arms are
+  also DONE (`iris/WeakFetch2.v` — the 0b-gap block; the straddling jal
+  at 0x80000ffe is real S-mode code). REMAINING in 6a: the S-mode
+  fetch-chain restatement (needs P4's absorption shape) and, post-Sail-
+  patch, the update-cone mirror.
+- **6b**: the S-mode leaf `execute` shapes (`_S_walk_pt` towers, widths
+  1/2/4/8 + AMO) at exec_eff — batch-1-sized.
+- **6c**: the weak S-funnel `wwp_instr_s` (wcfg_regs/device-frame seams
+  applied from day one) + leaves at the batch-2 recipe, plus the racy
+  continuation (which the absorption theorem hides from specs).
+  Pricing datum (2026-08 tier audit): the kinit/kfree cone ALONE uses
+  42 distinct sconf leaves (≈15–25k lines at the batch-2 unit prices),
+  of which SIX are invariant-form (`wp_amoswap_lockopen`,
+  `wp_csd_lkcpu_lockopen`, `wp_holding_lockinv{,_locked}`,
+  `wp_sd_zero_lkcpu_lockopen`, `wp_sw_zero_lockfin`) — each pays the
+  fifth-leaf ~250-line funnel-replay premium. kfree's `jal memset`
+  pulls in `wp_memset_sconf`. The kinit cone is 6c's VALIDATION
+  CAPSTONE (see the corrected M3 item).
+The sconf/sie_cap/intr_count config tower transfers VERBATIM (M3a
+verdict) — batch 6's content is the walk, not the config. OUT of scope:
+the satp-switch window / user tables (user cone; note the write-back-
+into-previous-table-via-cached-pteAddr hazard recorded in kpt-share
+returns there).
+
+**THE MODEL CHANGE (2026-08; DECIDED IN DIRECTION: faithful-only — the
+user rejected any NEW over-strengthening, so the earlier
+"walker-reads-ak_latest" proposal is DEAD; what follows is the faithful
+sketch).** Constraint: change the Sail model only toward the real
+RISC-V privileged spec of PT accesses.
+
+*What the spec requires* (verify exact clause wording against the
+ratified text at implementation time — flagged below):
+(1) implicit PT reads are weakly ordered — ordered by SFENCE.VMA only,
+not by FENCE; they may be stale and speculative; (2) Svadu A/D updates
+are an ATOMIC read-modify-write that atomically RE-CHECKS the PTE it
+reads (valid + sufficient permissions) before setting bits — D-updates
+exact, A-updates may be speculative; (3) the update appears in gmo no
+later than the explicit access it enables.
+
+*The Sail sketch* — confined to `update_and_write_pte` (sys/vmem.sail;
+both call sites, TLB-miss and TLB-hit, funnel through it; `read_pte`
+and `_rec_pt_walk` are UNTOUCHED — translation reads stay weak):
+```
+match update_PTE_Bits(pte_stale, access) with
+| None   => Ok(None)                          (* unchanged *)
+| Some _ =>                                    (* update indicated *)
+  if not Svadu_on => Err(PTW_PTE_Needs_Update) (* Svade arm, unchanged *)
+  fresh := pte_rmw_read(pteAddr, w)            (* AV_exclusive read *)
+  if not (valid fresh ∧ check_PTE_permission access fresh ∧ leaf ok)
+    => Err(recheck_failed)                     (* fault; see TODO *)
+  match update_PTE_Bits(fresh, access) with
+  | None        => Ok(Some fresh)              (* fresh has the bits *)
+  | Some fresh' => pte_rmw_write(pteAddr, w, fresh'); Ok(Some fresh')
+```
+`pte_rmw_read/_write` build interface requests directly with
+`AK_explicit {AV_exclusive, AS_normal}` (the AMO kinds) below the
+existing PMP/PMA `supports_pte_{read,write}` gates — no new interface
+types, no `read_kind`/`write_kind` enum changes, no LR/SC reservation
+contact, NO `Choose` anywhere (preserves the choice-free fragment).
+Intra-instruction the read→write pair is atomic (one language step) —
+together with AV_exclusive's read-latest semantics this IS the spec's
+atomic check-and-set.
+
+*Fidelity ledger*: the RMW is what the spec MANDATES — no new
+strengthening. Two PRE-EXISTING strengthenings remain, unchanged, and
+must be documented: walk-read staleness bounded by hart views + TLB
+(spec allows staler, sfence-only bounds) and no speculation.
+**SPEC-TEXT TODO RESOLVED (2026-08, ratified text verified)**: the
+update is a COMPARE-AND-SWAP — VATP step 7: "Compare pte to the value
+of the PTE at address a + va.vpn[i] × PTESIZE. If the values match,
+set pte.a to 1 and, if the original memory access is a store, also set
+pte.d to 1. If the comparison fails, return to step 2" — i.e. FAILED
+compare = RETRY (redo the PTE read + tablewalk checks), never a
+spurious fault; faults come only from the re-checked tablewalk checks
+themselves (per the original access type) or PMA/PMP on the PTE store.
+Svadu additionally: "must atomically perform all tablewalk checks for
+that leaf PTE as part of, and before, conditionally updating the PTE
+value" — which makes the loop-free ATOMIC-RECHECK formulation (fresh
+exclusive read → redo leaf checks on fresh → write fresh|bits if still
+needed) observationally EQUAL to the literal CAS loop, and that is the
+implemented shape (terminating, no Choose). Note the conflict arm is
+REACHABLE under weak execution even on the kernel table (walked
+variant (0,0) vs current (1,1) mismatch) — it must resolve to
+use-the-fresh-value, NEVER a fault, or the kernel becomes unprovable.
+Also confirmed: "The PTE update must appear in the global memory order
+before the memory access that caused the PTE update" — free in the
+operational model (same instruction step, program order). QEMU's
+target/riscv implements the CAS loop (reference-implementation
+precedent). **THE PATCH IS COMMITTED: `ffb7621` on branch
+`pte-ad-atomic-update`** in /shared/xv6rocq/sail-riscv (parent
+eb31a74 = master; not pushed; sail 0.20.1 at
+/root/.opam/default/bin/sail). Validated: baseline regen
+byte-identical (properly, via `cmp` on a pristine worktree — NOTE the
+regen script's coqc compile-check step can NEVER pass in this
+environment, coq-sail-stdpp is not installed; ignore that failure),
+typecheck clean (no new warnings), 20/20 upstream ctest incl. both
+stale-TLB tests, patched-rv64d diff machine-verified CONFINED to the
+vmem cone (398+/318− after renumber normalization; rv64d_types
+unchanged). ONE deliberate sequentially-visible difference: the
+TLB-HIT A/D update re-checks the in-memory PTE and faults instead of
+writing the stale TLB copy back (per the spec's CAS). Landing the
+regenerated model into xv6iris is a SEPARATE, still-pending step —
+the tree is on the baseline model; when it lands, the SC update-cone
+rework (PtTreeAdue/`exec_update_and_write_pte_needs_update`/O3 arms +
+the new `check_leaf_pte` factoring) begins.
+
+*Semantic payoff*: every PT write becomes FRESH-derived ⟹ the leaf
+word's message sequence is BIT-MONOTONE ⟹ (with the fresh-has-bits
+skip arm) whether a write-back occurs is a function of the gmo-latest
+value alone — the write-back EVENT is deterministic given the
+invariant, and lost updates and resurrection are both impossible. The
+stale translation read's residue: which internal path ran (an extra
+RMW read event) and the A/D bits cached in the TLB — both already
+existential in `tlb_ok_pt`.
+
+*Blast radius*: Sail — one function + two helpers; regen via
+`tools/regen_sail_model.sh` (needs sail 0.20.1 + sail-riscv checkout —
+not on this machine). SC side — `CommonWalk`'s walk lemmas untouched;
+rework confined to the update cone (`exec_update_and_write_pte_needs_update`,
+PtTreeAdue's `exec_write_pte_ram` → RMW-pair lemmas,
+`exec_translate_TLB_{miss,hit}_pt_upd`, the O3 arms of
+`ptree_translateAddr_cases`/absorption) + one new impossible arm
+(re-check failure, discharged from the invariant's validity facts).
+`RiscvExec.exec` is KIND-BLIND, so SC behavior at one memory is
+unchanged (fresh = stale there). Weak side — ZERO WeakInterp change:
+AV_exclusive already classifies as `ak_latest`. Litmus — add the
+two-hart A/D lost-update regression (must be unobservable) and a
+resurrection regression.
+
+*Consequence for this batch*: P1 SHRINKS to the variant/value-closure
+core (still needed — stale translation reads are real and faithful);
+P2/P3 SHRINK a lot (no patched-memory bridge: the ∀-variant SC
+instantiation rides the existing `_ad`-generic lemmas; confinement
+gains one maybe-RMW window whose write value is latest-derived); P4's
+write-back arm becomes AMO-SHAPED (`wamo_read_latest` — fires off the
+invariant-held element with no view hypothesis). The full racy-window
+design above remains recorded for reference, but the expectation is
+the reduced form.
+
+**GATES**: the Sail patch + regen (environment: sail toolchain +
+sail-riscv checkout) precede P1–P4's final statements; 6a/6b are
+design-independent and can proceed now. Batch 2's store leaves and
+batch 5's escrow are needed only for the boot MINT of `wkpt_inv`.
+
+### THE 2-ALIGNED FETCH ARMS (batch-0b gap, CLOSED 2026-08)
+
+`iris/WeakFetch2.v` (853 code lines / 8.9 s; green on the FIRST compile —
+the fetch-mirroring recipe is now deterministic): the width-2 memory
+chain (`exec_eff_fetch_bytes_2` generalized over the fetched address, so
+ONE lemma serves both chunks), the two arms `exec_eff_fetch_RVC_2` /
+`exec_eff_fetch_F_Base_2` (traces `[WEread wak_plain pc 2]` and the
+two-chunk `[…pc 2; …(pc+2) 2]`), the `fetch_flat_ok` wrappers, the
+recipes `wP_eff_of_leaf_base2`/`_rvc2`, and the certificate instances
+(`wcert_{load,store,amo_aq,fence}_base2`, `_rvc2`). Axiom footprints
+byte-identical to the 4-aligned originals. Findings worth keeping:
+- **The 3-element certificate family cost ~50 lines of one-liners, not
+  the priced ≈120**: `WeakEff.wcert_*_gen` at `post := []` concludes
+  `pre ++ [e]` on the nose, so the split-fetch certificates are pure
+  instances; the only new proof content is `nowrite_fetch2`.
+- **misa.C enters BOTH 2-aligned recipes**, not just RVC — the
+  misaligned-pc guard probes `Ext_Zca` even for a 32-bit instruction, so
+  `wP_eff_of_leaf_base2` has one config premise more than `_base`
+  (already inside `wcfg_regs`' misa pin — funnel-fed leaves get it free).
+- Trace-join mechanics: two `execR_eff_liftR_cat`s → one `cbn match`
+  collapses all nested matches; `rewrite Hconcat` BEFORE the final
+  `cbn [app]`; no `app_nil_r` at the fetch altitude.
+- `rewrite !fetch_pa_id` (with `!`) in the base2 flat wrapper — two
+  distinct instances; the base4 single-rewrite pattern silently leaves
+  the second address unrewritten.
+- Cost datum: 853 code lines vs the ≈200 estimate, but ~300 is recipe
+  STATEMENT transcription; genuinely new proof content ≈400 lines at the
+  established ≈1.1× mirroring rate.
 
 ### BATCH 1's SHAPES, ENUMERATED FROM THE ACTUAL SC LIBRARY
 

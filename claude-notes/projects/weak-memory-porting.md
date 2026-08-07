@@ -93,11 +93,17 @@ Per instruction, the whole obligation is `WeakCert.wP_conf σ`:
    word — with `∀ a ∈ W, pa_z a ≠ 0` (RAM is above 0x80000000; this is what
    gives `acc_wf` for free, via `WeakCert.acc_wf_window`: a wrapping range
    passes through address 0);
-3. `∀ a ∈ W, pinned_read σ (pa_z a)` — `WeakInstr.wkernel_text_pinned` for
-   the text half (never written this era ⇒ free) and `wpt4_pinned` for an
-   OWNED data word.  An AMO's data word needs no pinnedness (its read half is
-   `ak_latest`) but must still be listed in `W`, because the WRITE's footprint
-   is confined by `W` too;
+3. pinnedness — `WeakInstr.wkernel_text_pinned` for the text half (never
+   written this era ⇒ free) and `wpt4_pinned` for an OWNED data word.  THE
+   EXACT ACCOUNTING IS TRACE-KEYED (`WeakCert.trace_pin`): pinnedness is
+   needed precisely for the reads whose kind does NOT self-pin
+   (`ak_pins ak = false`); a self-pinning read — `ak_coh` (fetch/walker) or
+   `ak_latest` (an AMO's read half) — is exempt.  The whole-window form
+   `∀ a ∈ W, pinned_read σ (pa_z a)` (what `wP_conf`/`wP_eff` demand)
+   over-approximates: right for owned-data leaves, UNPROVABLE for a contended
+   AMO — such a leaf uses `WeakCert.wP_eff_pin` and pins only the fetch.
+   Either way an AMO's data word must still be listed in `W`, because the
+   WRITE's footprint is confined by `W` too;
 4. `∀ tick, ∃ t', exec (riscv_step tick) (MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ)) = Some (tt, t') ∧ dom (mem t') ⊆ W`
    — **your own SC library lemma, instantiated at a second state.**  Its
    register/config premises are literally the same terms; its memory premises

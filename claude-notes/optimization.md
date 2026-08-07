@@ -526,3 +526,13 @@ subterm matching" on a term you can see. Restate the fact you want at the `u_*`
 spelling in one line closed by `exact` (conversion does the work), then rewrite
 with the restatement. Same reflex for any Pt4kWalk fact reached from the `u_*`
 side.
+
+## `iApply fupd_mask_intro; [set_solver|]` on an empty-mask goal is a hidden time sink
+
+Measured on the weak-memory tier (2026-08): 14 s in a single leaf proof and
+199 s in a whole-function proof (`WkEntryNew.wwp_entry`) — most of those
+files' compile time. The `set_solver` is solving `∅ ⊆ E` the slow way; use
+`iApply fupd_mask_intro; [apply empty_subseteq|]` instead. Reflex: any
+`set_solver` discharging a mask side-goal of the shape `∅ ⊆ _` should be
+`apply empty_subseteq`. (The batch-2 weak leaves still carry the slow
+spelling — patch on next touch.)
