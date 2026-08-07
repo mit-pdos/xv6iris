@@ -594,6 +594,12 @@
   2
  ],
  [
+  "CodeSysExit.v",
+  "sys_exit",
+  "se_",
+  2
+ ],
+ [
   "CodeSysGetpid.v",
   "sys_getpid",
   "sg_",

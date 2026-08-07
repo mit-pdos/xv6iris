@@ -1122,14 +1122,35 @@ the evidence for every offset. This file is only the worklist.
       matching pair — sys_chdir's move as well as kexit's) and
       `SpecIput.v`'s precondition.
 
-- [ ] **S6 — `kexit`.** CONTRACT LANDED, PROOF NOT WRITTEN — its own file,
-      [`kexit.md`](../completed/kexit.md). What it forced into this layer: parking at
-      ZOMBIE is a different kind of park (the private block cannot ride a
-      closure that never resumes), so `SchedCtx.park_pay` /
+- [x] **S6 — `kexit` PROVEN AND LINKED**, and with it **`sys_exit`** — its own
+      file, [`kexit.md`](../completed/kexit.md). What it forced into this
+      layer: parking at ZOMBIE is a different kind of park (the private block
+      cannot ride a closure that never resumes), so `SchedCtx.park_pay` /
       `proc_slots_park_gen` / `ProcInv.proc_dormant_noctx` now carry it across
       the crossing and the reclaiming scheduler reassembles it.
       `ProcInv.proc_priv_to_dormant_zombie` is the producer of a ZOMBIE block
       and the mirror of kwait's `SpecFreeproc.fp_of_dormant_zombie` consumer.
+
+      **`sys_exit` PROVEN AND LINKED** (`SpecSysExit.v` / `CodeSysExit.v` /
+      `ProofSysExit.v` / `LinkSysExit.v`, over ARGINT + KEXIT;
+      `proof_coverage` reads it `proven`; `Print Assumptions
+      SysExit.wp_sys_exit_sconf` is the 5 `rv64d.*` platform axioms + funext
+      + the one sanctioned `Iput` axiom kexit's cone already rested on —
+      sys_exit adds no axiom of its own).  It is `sys_wait`'s shape (the
+      syscall argument is borrowed out of `proc_priv` via `ProcInv.proc_priv_tf`
+      for the `argint` call and handed back whole before the second callee),
+      with one simplification `sys_wait` does not get: **kexit DIVERGES, so
+      there is no epilogue to prove at all.** gcc does not know `kexit` is
+      `noreturn` and still emits a dead `li a0,0`/pop/`ret` tail after the
+      `jal kexit`, but kexit's own contract has no continuation — its
+      conclusion IS `WP Loop {{Φ}}` — so applying it discharges sys_exit's
+      goal outright; the dead tail is decoded by nobody's proof, and
+      sys_exit's own frame slots are simply framed away into the call rather
+      than rejoined. The other simplification: kexit's contract takes no
+      `status` argument at all (nothing downstream of `p->xstate` is
+      observable from inside its diverging body), so the only thing sys_exit
+      needs from argint is that argument 0 EXISTS in the trapframe — the
+      loaded value itself is never named in the postcondition.
 
 ## The unlinked chain: `fileclose` is the only blocker
 

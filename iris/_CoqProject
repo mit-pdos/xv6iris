@@ -787,6 +787,10 @@ SpecSysWait.v
 CodeSysWait.v
 ProofSysWait.v
 LinkSysWait.v
+SpecSysExit.v
+CodeSysExit.v
+ProofSysExit.v
+LinkSysExit.v
 SpecAllocproc.v
 CodeAllocproc.v
 ProofAllocproc.v
