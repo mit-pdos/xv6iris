@@ -192,6 +192,12 @@
   2
  ],
  [
+  "CodeFileclose.v",
+  "fileclose",
+  "fci_",
+  2
+ ],
+ [
   "CodeFiledup.v",
   "filedup",
   "fdi_",

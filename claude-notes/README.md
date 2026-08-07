@@ -188,6 +188,15 @@ are working on that effort — the relevant `projects/` file.
   loop, and `ProcInv.proc_priv_cwd_pid` (the accessor the three FS calls
   forced). kwait's own worklist is item S10 of
   [`proc-struct-resources.md`](projects/proc-struct-resources.md), not here.
+- **[`fileclose.md`](projects/fileclose.md)** — `fileclose`, the single
+  unproven callee behind THREE unlinked proved functions (sys_pipe,
+  sys_close, kexit). The payload link it needed has LANDED — a `file_ref`
+  now carries the pipe end / inode reference it names, so the last closer
+  has a whole `pipe_ref` to hand `pipeclose` — as has `CodeFileclose.v`.
+  What is left is the contract's second half (a TYPE-INDEXED callee
+  environment, so pipealloc and sys_pipe are not made to own a file system),
+  the 18→68 stack-constant ripple, the four callers, and the proof. Design
+  in [`design/file-table.md`](design/file-table.md).
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a

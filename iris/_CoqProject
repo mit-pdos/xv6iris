@@ -467,6 +467,7 @@ CodeFiledup.v
 SpecFiledup.v
 ProofFiledup.v
 LinkFiledup.v
+CodeFileclose.v
 SpecFileclose.v
 LinkFilealloc.v
 PageFields.v

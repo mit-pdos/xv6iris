@@ -543,14 +543,14 @@ Section ProofFilealloc.
                 Mi !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mi (K - 4)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x42)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I).
     set (Cfull := (∀ (Mf : regfile),
         ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
              Mf !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mf (K - 4)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x32)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I).
     iAssert (∀ (fuel j : nat) (M : regfile),
         ⌜ (NFILE - j <= fuel)%nat ⌝ -∗
@@ -561,7 +561,7 @@ Section ProofFilealloc.
                 M !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr M (K - 4)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x26)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         (* the two exits are conjoined, NOT separated: exactly one is taken,
            so they must SHARE the ambient resources (lock token, cpu_own,
            the authority, the epilogue) rather than split them. *)
@@ -572,7 +572,7 @@ Section ProofFilealloc.
         iIntros (j M) "%Hfuel %Hj (%Hcurs1 & %Ha4 & %Hthr) Hcg Hpc Hslots Hexit".
       { exfalso. lia. }
       (* --- +0x26 c.lw a5,4(s1) : read this entry's ref field --- *)
-      iDestruct (ftable_slots_acc Mg j ltac:(lia) with "Hslots") as "[Hslot Hback]".
+      iDestruct (ftable_slots_acc γf Mg j ltac:(lia) with "Hslots") as "[Hslot Hback]".
       assert (Hpa : add_vec (rget M Rs1) (sign_extend' 64 (mword_of_int 4 : mword 12))
                     = a_fref j).
       { rewrite (rget_ne M Rs1 ltac:(vm_compute; discriminate)) Hcurs1. reflexivity. }
@@ -732,10 +732,10 @@ Section ProofFilealloc.
       iPoseProof (fai_46 with "Htext") as "Hi46".
       iPoseProof (fai_4a with "Htext") as "Hi4a".
       iPoseProof (fai_4e with "Htext") as "Hi4e".
-      iDestruct (ftable_slots_acc Mg i ltac:(lia) with "Hslots") as "[Hslot Hback]".
+      iDestruct (ftable_slots_acc γf Mg i ltac:(lia) with "Hslots") as "[Hslot Hback]".
       iEval (rewrite /fslot HMgi) in "Hslot".
       iDestruct "Hslot" as "[Hcell Hfree]".
-      iDestruct "Hfree" as (Cf) "[%HCtype Hfields]".
+      iDestruct "Hfree" as (Cf) "(%HCtype & Hfields & Hfpay)".
       (* +0x42 c.li a5,1 *)
       iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x42)) Ra5 (mword_of_int 1 : mword 6)
                 (mword_of_int 1 : mword 64) Mi (K - 4)%nat false
@@ -763,7 +763,7 @@ Section ProofFilealloc.
         rewrite /F1 upd_eq. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hstv) in "Hcell".
       (* the ghost step: the slot enters the authority at (1,1) *)
-      iMod (file_alloc_step γf Mg i Cf HMgi with "Hauth Hfields") as "[Hauth Href]".
+      iMod (file_alloc_step γf Mg i Cf HMgi with "Hauth Hfields Hfpay") as "[Hauth Href]".
       iDestruct ("Hback" $! (<[i := (1%Qp, 1%positive)]> Mg) with "[%] [Hcell Hfdslot]") as "Hslots".
       { intros k Hk. rewrite lookup_insert_ne; [reflexivity | regne]. }
       { rewrite /fslot lookup_insert. rewrite file_rest_full.

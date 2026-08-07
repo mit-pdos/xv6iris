@@ -182,6 +182,11 @@ Lemma kd_f052 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_SDSP (mword_of_int 4, Regidx (mword_of_int 20)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_0004a223 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0004a223 : mword 32) : M instruction) s
+  = Some (STORE (mword_of_int 4 : mword 12, zreg, Regidx (mword_of_int 9), 4), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_0007891b s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x0007891b : mword 32) : M instruction) s
   = Some (ADDIW (mword_of_int 0 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 18)), s).

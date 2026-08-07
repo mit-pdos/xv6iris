@@ -365,7 +365,7 @@ Module SysPipeProof (Myproc : MYPROC) (Argaddr : ARGADDR) (Pipealloc : PIPEALLOC
   : SYSPIPE.
 
 Section ProofSysPipe.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register indices, named once *)
@@ -1321,17 +1321,15 @@ Section ProofSysPipe.
       iLeft. iSplitR; [done|]. iExact "Hpriv". }
     (* ============ pipealloc succeeded ================================= *)
     iDestruct "Hsucc" as "(%Hr0 & _ & Hpipe)".
-    iDestruct "Hpipe" as (γl γp pi k0 k1 Cf0 Cf1)
-      "(%Hklt & %Hpf0 & %Hpf1 & Hb6 & Hb7 & #Hispipe & Href0 & Hpr0 & Href1 & Hpr1)".
+    iDestruct "Hpipe" as (pi k0 k1 Cf0 Cf1)
+      "(%Hklt & %Hpf0 & %Hpf1 & Hb6 & Hb7 & Href0 & Href1)".
     destruct Hklt as [Hk0lt Hk1lt].
-    (* THE ONE DELIBERATE DROP.  [FileInv.file_ref] is stage 1: it carries no
-       [file_payload] yet, so the two pipe-end references pipealloc hands back
-       have nowhere to go once the files enter the fd table.  They are dropped
-       here (the logic is affine): a leak of the pipe's page, not a soundness
-       hole, and it disappears the moment [file_payload] lands -- pipealloc
-       will then fold the ends INTO the two [file_ref]s and this proof will
-       not mention them at all.  See design/file-table.md. *)
-    iClear "Hpr0 Hpr1".
+    (* Nothing about the pipe appears from here on, and that is the point:
+       each end rides INSIDE its file's [FileInv.file_ref] as the payload
+       [pipe_file] pins, so installing a descriptor installs the reference to
+       the pipe with it.  (Before the payload link this proof had to DROP the
+       two ends here -- affine, so it typechecked, and it meant sys_pipe's
+       descriptors were not connected to the pipe in the model.) *)
     assert (HW1a0' : W1 !!! Regidx Ra0 = (zero_reg : mword 64))
       by (rewrite HW1a0; exact Hr0).
     iApply (wp_blt_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.sys_pipe + 0x28))

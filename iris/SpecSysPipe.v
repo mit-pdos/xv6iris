@@ -151,15 +151,16 @@ Section SpecSysPipe.
 End SpecSysPipe.
 
 Definition wp_sys_pipe_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
-  (* [pipeG] does not appear below: sys_pipe's CONTRACT says nothing about
-     pipes, since the two references it creates end up inside [proc_priv]'s
-     existentials.  It is here because the PROOF needs it -- [pipealloc]'s
-     postcondition names [PipeInv.is_pipe] -- and because any caller able to
-     instantiate PIPEALLOC has it anyway. *)
+  (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
+     naming both would put TWO instance paths to [inG Σ fracR] in scope --
+     they print identically and do not unify, so a [pipe_ref] built through
+     one does not close a goal stated through the other.  Nothing about pipes
+     appears below in any case: the two references sys_pipe creates end up
+     inside [proc_priv]'s existentials, as each file's payload. *)
   let pcE : mword 64 := mword_of_int KernelSyms.sys_pipe in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (* sys_pipe reads syscall argument 0 -- the user address of the two-int
@@ -196,7 +197,7 @@ Definition wp_sys_pipe_sconf_body
 
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),

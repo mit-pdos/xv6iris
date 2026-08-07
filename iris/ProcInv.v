@@ -525,8 +525,14 @@ Section ProcInv.
   (* [cwd]: there is no inode model in the tree yet, so the "cwd names a
      live inode" clause is [emp] for now -- deliberately a hole with the
      shape of [ofile_slot]'s, so it can be filled without restating any
-     caller.  See the "holes" section of design/proc-struct.md. *)
-  Definition cwd_ref (v : mword 64) : iProp Σ := emp%I.
+     caller.  See the "holes" section of design/proc-struct.md.
+
+     It is the WHOLE of [FileInv.inode_ref], the same placeholder a
+     FD_INODE / FD_DEVICE [file_ref] carries fractionally as its payload:
+     p->cwd holds a reference outright, and the last [fileclose] of an inode
+     file recovers fraction 1 of one and hands it to [iput] -- which is why
+     the two must be the same predicate rather than two holes. *)
+  Definition cwd_ref (v : mword 64) : iProp Σ := inode_ref v 1.
 
   (* [p->sz] NEVER EXCEEDS MAXVA.  This is a real invariant of a live
      process -- exec and growproc are the only writers and both bound the

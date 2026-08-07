@@ -299,7 +299,7 @@ Section ProofFiledup.
     iDestruct "Href" as "[Hrtok Hrfields]".
     iDestruct (fref_tok_lookup with "Hauth Hrtok") as %(qt & cnt & HMk & _ & _).
     assert (Hk : (k < NFILE)%nat) by (apply Hdom; rewrite HMk; eauto).
-    iDestruct (ftable_slots_acc Mg k Hk with "Hslots") as "[Hslot Hback]".
+    iDestruct (ftable_slots_acc γf Mg k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /fslot HMk) in "Hslot".
     iDestruct "Hslot" as "(%Hcnt & Hcell & Hrest & Hfd)".
     (* the fd-slot conservation law: the caller's slot plus the ones the table
