@@ -58,6 +58,7 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks.
 Require Import LogInv.
+Require Import FsCrash.   (* [BSIZE]: the block size [bm_covers] divides by *)
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -287,6 +288,23 @@ Proof.
   lia.
 Qed.
 
+(* An ALLOCATED indirect ENTRY forces the indirect BLOCK to exist.  This is
+   the "no indirect block => no entries" conjunct read backwards, and it is
+   what saves a no-allocation caller from having to carry a second premise:
+   [bv_unsigned (blkmap_get bm i) <> 0] at an indirect index ALREADY says
+   [bm_ind bm <> 0], so bmap's no-alloc contract needs only the one. *)
+Lemma blkmap_wf_ind_nz cov ls bm (i : nat) :
+  blkmap_wf cov ls bm -> (NDIRECT <= i)%nat -> (i < MAXFILE)%nat ->
+  bv_unsigned (blkmap_get bm i) <> 0 -> bv_unsigned (bm_ind bm) <> 0.
+Proof.
+  intros Hwf Hge Hlt Hnz Hiz.
+  apply Hnz. unfold blkmap_get.
+  case_decide; [lia|].
+  rewrite (blkmap_wf_no_ind cov ls bm Hwf Hiz).
+  rewrite lookup_total_replicate_2; [reflexivity|].
+  unfold MAXFILE, NDIRECT, NINDIRECT in *; lia.
+Qed.
+
 (* ---- reading blkmap_get off the two components ------------------------ *)
 
 Lemma blkmap_get_dir (bm : blkmap) (i : nat) :
@@ -299,6 +317,87 @@ Lemma blkmap_get_ent (bm : blkmap) (i : nat) :
   (NDIRECT <= i)%nat -> blkmap_get bm i = bm_ent bm !!! (i - NDIRECT)%nat.
 Proof.
   intros Hi. unfold blkmap_get. destruct (decide ((i < NDIRECT)%nat)); [lia|reflexivity].
+Qed.
+
+(* ===================================================================== *)
+(*  THE COVERAGE INVARIANT: every file block below the SIZE is allocated  *)
+(* ===================================================================== *)
+
+(* [bm_covers bm sz] is the missing fact that makes a READ never allocate.
+   readi runs OUTSIDE a transaction (fileread has no begin_op/end_op), so an
+   allocating bmap would hit panic("log_write outside of trans"); it never
+   happens because writei allocates as it extends, but nothing in the block
+   map itself said so.  This is that statement, and the whole point is that
+   it is preserved by everything below (see [bm_covers_keep]) and consumed
+   by exactly one lemma ([bm_covers_off]).
+
+   The bound is stated on the BYTE offset of the block's first byte, which
+   is the shape both producers and consumers have: a file of size [sz]
+   occupies file blocks 0 .. (sz-1)/BSIZE, i.e. exactly those [i] with
+   [i * BSIZE < sz].  Design: claude-notes/design/fs-inode.md, "readi, and
+   why it forced a no-alloc bmap". *)
+Definition bm_covers (bm : blkmap) (sz : Z) : Prop :=
+  forall i : nat, (i < MAXFILE)%nat -> Z.of_nat i * Z.of_nat BSIZE < sz ->
+    bv_unsigned (blkmap_get bm i) <> 0.
+
+(* the direct reading: the block-index form the design doc states *)
+Lemma bm_covers_get (bm : blkmap) (sz : Z) (i : nat) :
+  bm_covers bm sz -> (i < MAXFILE)%nat ->
+  Z.of_nat i * Z.of_nat BSIZE < sz ->
+  bv_unsigned (blkmap_get bm i) <> 0.
+Proof. intros Hc Hi Hlt. exact (Hc i Hi Hlt). Qed.
+
+(* THE FORM readi ACTUALLY USES.  Its loop holds a byte offset [o] with
+   [off <= o < off + n <= size] and calls bmap at [o / BSIZE]; both the
+   index bound and the nonzero conclusion come out in one step.  Keeping the
+   division inside this lemma is what stops every caller from re-deriving
+   [o / BSIZE * BSIZE <= o]. *)
+Lemma bm_covers_off (bm : blkmap) (sz o : Z) :
+  bm_covers bm sz -> 0 <= o -> o < sz ->
+  o < Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  (Z.to_nat (o / Z.of_nat BSIZE) < MAXFILE)%nat
+  /\ bv_unsigned (blkmap_get bm (Z.to_nat (o / Z.of_nat BSIZE))) <> 0.
+Proof.
+  intros Hc Ho0 Hosz Homax.
+  assert (HB : Z.of_nat BSIZE = 1024) by (vm_compute; reflexivity).
+  assert (Hdiv0 : 0 <= o / Z.of_nat BSIZE)
+    by (apply Z.div_pos; [exact Ho0 | rewrite HB; lia]).
+  assert (Hdivlt : o / Z.of_nat BSIZE < Z.of_nat MAXFILE).
+  { apply Z.div_lt_upper_bound;
+      [rewrite HB; lia | rewrite Z.mul_comm; exact Homax]. }
+  assert (Hidx : (Z.to_nat (o / Z.of_nat BSIZE) < MAXFILE)%nat)
+    by (unfold MAXFILE in *; lia).
+  split; [exact Hidx|].
+  apply (Hc _ Hidx).
+  rewrite (Z2Nat.id _ Hdiv0).
+  assert (Hle : o / Z.of_nat BSIZE * Z.of_nat BSIZE <= o).
+  { rewrite Z.mul_comm. apply Z.mul_div_le. rewrite HB; lia. }
+  lia.
+Qed.
+
+(* the file only ever gets SHORTER at a reader: readi clamps n to the size *)
+Lemma bm_covers_mono (bm : blkmap) (sz sz' : Z) :
+  bm_covers bm sz -> sz' <= sz -> bm_covers bm sz'.
+Proof. intros Hc Hle i Hi Hlt. exact (Hc i Hi ltac:(lia)). Qed.
+
+Lemma bm_covers_nonpos (bm : blkmap) (sz : Z) : sz <= 0 -> bm_covers bm sz.
+Proof.
+  intros Hsz i Hi Hlt. exfalso.
+  assert (0 <= Z.of_nat i * Z.of_nat BSIZE)
+    by (apply Z.mul_nonneg_nonneg; apply Nat2Z.is_nonneg).
+  lia.
+Qed.
+
+(* COVERAGE SURVIVES ANY MAP CHANGE THAT NEVER UN-ALLOCATES -- which is
+   precisely the clause bmap's own postcondition already carries, so a
+   caller can thread [bm_covers] straight across a bmap call. *)
+Lemma bm_covers_keep (bm bm' : blkmap) (sz : Z) :
+  (forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) <> 0 ->
+     blkmap_get bm' i = blkmap_get bm i) ->
+  bm_covers bm sz -> bm_covers bm' sz.
+Proof.
+  intros Hkeep Hc i Hi Hlt.
+  rewrite (Hkeep i Hi (Hc i Hi Hlt)). exact (Hc i Hi Hlt).
 Qed.
 
 (* ===================================================================== *)

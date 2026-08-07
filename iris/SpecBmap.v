@@ -280,3 +280,132 @@ Module Type BMAP.
       wp_bmap_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart dev ip bm data fbn n pidv dq dqd m K eb C b.
 End BMAP.
+
+(* ===================================================================== *)
+(*  bmap FOR A CALLER THAT CANNOT ALLOCATE                                *)
+(* ===================================================================== *)
+
+(* readi calls bmap, and bmap allocates when the slot is zero -- which calls
+   log_write.  But fileread does NOT wrap readi in a transaction, so an
+   allocating read would hit panic("log_write outside of trans").  It never
+   happens because every block below a file's size is allocated
+   ([InodeInv.bm_covers] is that statement), and under the single premise
+
+       bv_unsigned (blkmap_get bm fbn) <> 0
+
+   ALL THREE of bmap's allocation sites are dead:
+
+   - the direct slot test at +0x26 and the indirect ENTRY test at +0x80 are
+     decided by the premise itself;
+   - the indirect-BLOCK test at +0x4c is decided by the premise TOO, and
+     that is why this contract needs no second hypothesis about bm_ind:
+     [blkmap_wf]'s "no indirect block => no entries" conjunct read backwards
+     ([InodeInv.blkmap_wf_ind_nz]) turns "the entry at an indirect index is
+     nonzero" into "the indirect block exists".
+
+   So the contract drops EVERYTHING the allocation arms needed:
+
+   - no [log_op] and no budget premise -- bmap performs no [log_write], so
+     there is no reservation to spend and none to hand back;
+   - no [log_ctx], and hence no [γ : log_names] at all;
+   - [bslot bn] rather than [bslots bn 3].  The three were bread's one held
+     across balloc's two; with balloc dead only bread's own unit remains,
+     and brelse returns it.
+
+   ...and the postcondition is correspondingly exact rather than
+   existential: the map and the file's data come back UNCHANGED, and a0 is
+   [blkmap_get bm fbn].  It is the same 70 instructions and the same proof
+   body as [BMAP] -- see ProofBmap.v's [BmapCore], which is parameterised
+   by whether the allocation arms are live and is where BOTH contracts come
+   from.  Precedent for two contracts over one function: SpecWalk.v's
+   [WALK] / [WALK_NOALLOC]. *)
+Definition wp_bmap_noalloc_sconf_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (Φ : mval -> iProp Σ)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γfs : fs_names)
+    (cov : gset Z) (logstart : Z) (dev : mword 32)
+    (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
+    (pidv : mword 32) (dq dqd : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.bmap in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  let bnw : mword 32 := mword_of_int (Z.of_nat fbn) in
+  (K_bmap <= K)%nat ->
+  log_geom_ok cov logstart ->
+  (* KILLS THE PANIC ARM *)
+  (fbn < MAXFILE)%nat ->
+  blkmap_wf cov logstart bm ->
+  (* THE NO-ALLOC PREMISE, and the only one this contract adds *)
+  bv_unsigned (blkmap_get bm fbn) <> 0 ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
+  m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bnw ->
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  i_dev ip ↦₄{dqd} dev -∗
+  inode_map γfs ip bm -∗
+  inode_blocks γfs bm data -∗
+  p_pid pj ↦₄{dq} pidv -∗
+  (* the running-thread bundle: bmap still SLEEPS, in bread *)
+  procs_inv Φ γs -∗
+  scheds_inv Φ γs -∗
+  own_ctx (p_context pj) -∗
+  park_hlf j true -∗
+  (* the disk fabric *)
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  (* ONE slot unit: the interior bread's, handed back by brelse *)
+  bslot bn -∗
+  wp_next b pj (fun (CID : CpuId) =>
+  ∀ (mf : regfile),
+      ⌜callee_saved m mf⌝ -∗
+      (* the block the map already named, and nothing else happened *)
+      ⌜mf !!! Regidx (mword_of_int 10 : mword 5)
+         = sign_extend' 64 (blkmap_get bm fbn : mword 32)⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      own_ctx (p_context pj) -∗
+      park_hlf j true -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      i_dev ip ↦₄{dqd} dev -∗
+      inode_map γfs ip bm -∗
+      inode_blocks γfs bm data -∗
+      bslot bn -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
+Module Type BMAP_NOALLOC.
+  Parameter wp_bmap_noalloc_sconf :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (Φ : mval -> iProp Σ)
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
+      (pidv : mword 32) (dq dqd : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_bmap_noalloc_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
+                                 cov logstart dev ip bm data fbn pidv dq dqd
+                                 m K eb C b.
+End BMAP_NOALLOC.

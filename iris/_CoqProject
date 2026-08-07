@@ -319,6 +319,7 @@ ByteBuf.v
 WpHoldingInv.v
 CodePopOff.v
 CodePopOffAux.v
+CodeReadi.v
 CodeRelease.v
 CodeKalloc.v
 WpMemsetPage.v
@@ -533,6 +534,7 @@ LinkBalloc.v
 ProofBmapParts.v
 ProofBmap.v
 LinkBmap.v
+LinkBmapNoalloc.v
 SpecIupdate.v
 ProofIupdateParts.v
 ProofIupdate.v

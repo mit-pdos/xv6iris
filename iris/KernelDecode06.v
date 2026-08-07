@@ -576,6 +576,11 @@ Lemma kd_da5ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   = Some (JAL (mword_of_int 2096548 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
+Lemma kd_e32ff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xe32ff0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2094642 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
 Lemma kd_e35fe0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xe35fe0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2092596 : mword 21, Regidx (mword_of_int 1)), s).
