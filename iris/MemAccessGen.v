@@ -240,6 +240,55 @@ Proof.
   reflexivity.
 Qed.
 
+(* ...and its FAULT complement: the read faults, the loop raises the exception
+   and early-returns, so the whole vmem read is that Err.  Same two premises
+   in place of alignment. *)
+Lemma exec_vmem_read_addr_intra_err (width : Z) (va : mword 64)
+    (er : ExecutionResult) (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (ep : Privilege) (md : SATPMode) s s2 :
+  0 < width ->
+  exec (split_on_page_boundary va width) s = Some ((width, 0), s) ->
+  (is_aligned_vaddr (Virtaddr va) width = true \/
+   plat_misaligned_exception acc res = None) ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  exec (translate_and_read_value (Virtaddr va) width acc aq rl res) s
+    = Some (Err er, s2) ->
+  exec (vmem_read_addr (Virtaddr va) width acc aq rl res) s = Some (Err er, s2).
+Proof.
+  intros Hpos Hsplit Hguard Heff Htm Htrv.
+  unfold vmem_read_addr. rewrite exec_catch_early_return.
+  match goal with |- context[Defs.bind0 ?G ?k] =>
+    assert (Hg : execR G s = Some (inr tt, s)) end.
+  { destruct (is_aligned_vaddr (Virtaddr va) width) eqn:E.
+    - cbn [Riscv.rv64d.not negb]. apply execR_returnR_fwd.
+    - cbn [Riscv.rv64d.not negb].
+      destruct Hguard as [Hal | Hmis]; [ rewrite Hal in E; discriminate |].
+      rewrite Hmis. apply execR_returnR_fwd. }
+  rewrite (execR_bind0_Some _ _ _ _ Hg).
+  cbn [bits_of_virtaddr]. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hsplit).
+  cbn beta zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Heff). cbn beta.
+  match goal with |- context[Defs.and_boolM ?A ?B] =>
+    assert (Hds : execR (Defs.and_boolM A B) s = Some (inr false, s)) end.
+  { unfold Defs.and_boolM.
+    match goal with |- context[Defs.bind (Defs.bind (Defs.liftR ?m) ?k1) _] =>
+      assert (Hl : execR (Defs.bind (Defs.liftR m) k1) s
+                   = Some (inr (generic_neq md Bare), s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ Htm). cbn beta. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hl). cbn match beta.
+    destruct (generic_neq md Bare); apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hds). cbn match beta zeta.
+  rewrite andb_false_r. cbn match beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (zeros' (8 * width)) s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Htrv). cbn match beta.
+  reflexivity.
+Qed.
+
 (* The res-GENERIC aligned vmem read: LOAD (res=false) and LR (res=true) both
    go through it.  On the LR side the model asserts [width = access_width]
    (trivial once the page split is inert) and then takes the reservation, which
