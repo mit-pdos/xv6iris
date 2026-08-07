@@ -417,3 +417,42 @@ goes exactly where `Htr` used to be.
   read, and the `Atomic`/`LoadReserved`/`StoreConditional` access-type
   constructors carry `aq`/`rl` (so `u_acc`-style destructuring patterns need
   `(aq & rl & ->)` / `(op & aq & rl & ->)`).
+
+## Where it stands (end of the Aug 6 session)
+
+`make proofs -k` now stops at exactly THREE files; everything before them is
+green and committed.
+
+1. **`WpSmodePtMem.v`** -- three more S-mode pt towers (read-4, write-4,
+   write-1) plus its `Local` copies of `exec_split_misaligned_aligned_{1,4}`
+   and `exec_mem_write_ea_{1,4}`. PURELY MECHANICAL: delete the local copies
+   (both concepts are gone -- see the WpSmodeUart commit) and apply the recipe
+   in the section above, exactly as `WpSmodePtLeaves` and `WpSmodePtUart` were
+   done. Budget: one sitting.
+
+2. **`WpSconfUartAccess.v`** -- almost certainly the same `ldval` /
+   value-shape ripple `SpecUart` needed. Check first, it may be five lines.
+
+3. **`UserMemAccess.v`** -- THE REAL REMAINING WORK, and it is not a ripple.
+   This file is where MISALIGNED user accesses are proved, and misalignment is
+   the one place the upstream bump genuinely re-architected:
+
+     - the MAG/alignment split moved DOWN into `checked_mem_read`/`_write`
+       (that is the `untilMT` loop this port has been threading everywhere),
+     - the vmem level's own split is now a PAGE-BOUNDARY split, a different
+       axis with a different plan value,
+
+   so `exec_vmem_read_addr_misaligned_split` /
+   `exec_vmem_write_addr_misaligned_split` (Sections `MisalignedSplitRead` /
+   `MisalignedSplitWrite`) are not "port the same proof" -- the two-chunk
+   structure they encode has moved a layer down and the vmem level only splits
+   when an access CROSSES A PAGE. Read the new `vmem_read_addr` (rv64d.v
+   ~24637) before touching them: the split arms are guarded by
+   `do_split_access = (translation not Bare) && next_page_bytes > 0`, which
+   this development's aligned accesses make FALSE -- but the misaligned lemmas
+   here exist precisely to describe the other case.
+
+   Everything downstream of `UserMemAccess` (the user-mode WP layer) is
+   blocked on it and has not been looked at.
+
+The aligned path is done and proved; what is left is the misaligned one.
