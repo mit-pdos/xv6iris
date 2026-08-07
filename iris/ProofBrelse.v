@@ -179,7 +179,7 @@ Section ProofBrelse.
     iApply (wp_store_s_sconf_au (CID := CID0) (p := pme) 8 true Φ pc rs2 csp_rs1
               (zero_extend' 12 (concat_vec uimm ('b"000"))) m0 av
               (rget m0 rs2) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget (CID := CID0) m0 rs2)) HkptEm
               with "Hcg Hpc Hinstr [HAU] Hcont").

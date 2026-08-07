@@ -99,7 +99,7 @@ Section BreadEscrowLeaves.
     iIntros "Hcg Hpc Hinstr HAU Hcont".
     iApply (wp_load_s_sconf_au 4 cmp false Φ pc rd rs1 imm m av
               (fun w => sign_extend' 64 w) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
               with "Hcg Hpc Hinstr HAU Hcont").
@@ -129,7 +129,7 @@ Section BreadEscrowLeaves.
     iIntros "Hcg Hpc Hinstr HAU Hcont".
     iApply (wp_store_s_sconf_au 4 cmp Φ pc rs2 rs1 imm m av
               (trunc32 (rget m rs2)) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm
               with "Hcg Hpc Hinstr HAU Hcont").
