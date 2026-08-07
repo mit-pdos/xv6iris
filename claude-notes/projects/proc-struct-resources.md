@@ -1123,7 +1123,7 @@ the evidence for every offset. This file is only the worklist.
       `SpecIput.v`'s precondition.
 
 - [ ] **S6 — `kexit`.** CONTRACT LANDED, PROOF NOT WRITTEN — its own file,
-      [`kexit.md`](kexit.md). What it forced into this layer: parking at
+      [`kexit.md`](../completed/kexit.md). What it forced into this layer: parking at
       ZOMBIE is a different kind of park (the private block cannot ride a
       closure that never resumes), so `SchedCtx.park_pay` /
       `proc_slots_park_gen` / `ProcInv.proc_dormant_noctx` now carry it across

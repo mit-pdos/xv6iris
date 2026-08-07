@@ -472,6 +472,8 @@ LinkFiledup.v
 CodeFileclose.v
 SpecFileclose.v
 ProofFilecloseParts.v
+ProofFileclose.v
+LinkFileclose.v
 LinkFilealloc.v
 PageFields.v
 PipeInv.v
@@ -839,3 +841,7 @@ CodeWritei.v
 SpecWritei.v
 ProofWriteiParts.v
 ProofWritei.v
+LinkPipealloc.v
+LinkSysClose.v
+LinkSysPipe.v
+LinkKexit.v

@@ -489,7 +489,7 @@ definition rather than every caller.
   carry the pipe end, but under the same existential, so `piperead` /
   `pipewrite` still cannot be given their `pipe_ref`. `fileclose`'s callers
   want the identical fact for the identical reason
-  ([`../projects/fileclose.md`](../projects/fileclose.md) §3b), so one piece
+  ([`../completed/fileclose.md`](../completed/fileclose.md) §3b), so one piece
   of ghost state settles both.
 
 ## Why `f->ref++` cannot overflow: the fd-slot resource
@@ -575,19 +575,17 @@ references, and its supply has no principled source.)
   makes two successive calls compose without re-deriving anything. That pure
   layer is what `sys_pipe`'s postcondition is stated over.
 - **`sys_pipe` is the worked example of the whole model at once** and is
-  proven: [`../projects/sys-pipe.md`](../projects/sys-pipe.md).
+  proven: [`../completed/sys-pipe.md`](../completed/sys-pipe.md).
  **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
-- **The next function is `fileclose`**, and everything under it is now in
-  place: its ghost steps (`file_close_step` / `file_close_last_step` /
-  `file_rest_absorb` / `file_rest_join`) are proved, the payload link is
-  built, its four last-arm callees (`pipeclose`, `begin_op`, `iput`,
-  `end_op`) all have specs, and `CodeFileclose.v` has its 72 instruction
-  facts. What is left is the CONTRACT'S SECOND HALF and the proof — see
-  [`../projects/fileclose.md`](../projects/fileclose.md). Because it is
-  unproven there is no `LinkFileclose.v`, hence no `LinkSysClose.v`,
-  `LinkSysPipe.v` or `LinkKexit.v` either: three proved functions are
-  unlinked behind this one.
+- **`fileclose` is PROVEN and LINKED**, and with it the four functions that
+  were waiting on it (pipealloc, sys_close, sys_pipe, kexit). Its ghost steps
+  are `file_close_step` / `file_close_last_step` plus the two fraction laws
+  `file_rest_absorb` / `file_rest_join`; its contract's second half — the
+  callee environment, indexed by the file's TYPE so that pipealloc is not
+  made to own a file system — is written up in
+  [`../completed/fileclose.md`](../completed/fileclose.md). The only
+  assumption in the cone is the fs-side `wp_iput_sconf`.
 - **Every failure arm returns its `fd_slot`s, and that is load-bearing.**
   `filealloc`'s failure arm (the scan found no free entry, so no reference was
   created) hands its unit straight back, and `pipealloc`'s failure disjunct
@@ -596,7 +594,7 @@ references, and its supply has no principled source.)
   banked, or `*f1` names a live file whose reference we hold"). Without this
   `sys_pipe` could not promise its whole allowance back on all four exits, and
   the `+4` supply would drain; see
-  [`../projects/sys-pipe.md`](../projects/sys-pipe.md) for the balance sheet.
+  [`../completed/sys-pipe.md`](../completed/sys-pipe.md) for the balance sheet.
   **When a new allocator gets a failure arm, ask where its unit went.**
 - **`sys_close` is the worked example of a descriptor giving up its
   reference** (`ProofSysClose.v`): `ProcInv.proc_priv_ofile` borrows the

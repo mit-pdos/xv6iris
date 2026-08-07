@@ -1,9 +1,11 @@
 # sys_pipe — the syscall where the file/proc model has to balance
 
-`sys_pipe` is **proven** (`ProofSysPipe.v`, axiom-free, `Qed`), over the
-contracts of myproc / argaddr / pipealloc / fdalloc / fileclose / copyout. It
-is not *linked*, and cannot be until `fileclose` has a proof — the one callee
-that lacks one; see "What is left" below.
+`sys_pipe` is **proven and LINKED** (`ProofSysPipe.v` / `LinkSysPipe.v`), over
+the contracts of myproc / argaddr / pipealloc / fdalloc / fileclose / copyout.
+The one callee that used to lack a proof, `fileclose`, has one now
+([`../completed/fileclose.md`](../completed/fileclose.md)); the cone's only
+assumption is the fs-side `wp_iput_sconf`, which fileclose's inode arm
+reaches.
 
 Rocq: `SpecSysPipe.v` (contract), `CodeSysPipe.v` (71 instruction facts),
 `ProofSysPipe.v` (the functor). Supporting specs written for it:
@@ -123,19 +125,20 @@ They are lifted into [`../durable-notes.md`](../durable-notes.md) and
 
 ## What is left
 
-- **`fileclose` is the only missing callee.** It has a spec
-  (`SpecFileclose.v`) and no proof, so there is no `LinkSysPipe.v` and
-  `tools/proof_coverage.py` reports sys_pipe as *assumed*, which is honest.
-  **It now blocks two functions, not one**: `kexit` is proven and unlinked for
-  exactly the same reason ([`kexit.md`](kexit.md)), so one `ProofFileclose.v`
-  + `LinkFileclose.v` buys two `Link` files and 392 bytes of coverage. There
-  is no `CodeFileclose.v` yet either (`make gen-code` makes it); fileclose is
-  194 bytes @ `0x80004070`.
-  Everything else sys_pipe calls is proven and linked, argaddr
-  (`ProofArgaddr.v`, argint's proof with `c.sd` for `c.sw`) and fdalloc
-  (`ProofFdalloc.v`, the indexed `fd_frees_from` loop invariant — the
-  "`p_ofile` loop lemmas" item of
-  [`proc-struct-resources.md`](proc-struct-resources.md)) included.
-- `sys_pipe_stack` is 58 (8 slots of its own over copyout's 50); it will move
-  if `fileclose_stack` grows past 50 when pipeclose/begin_op/iput/end_op get
-  specs.
+Nothing on sys_pipe itself. The two things this file used to flag as blocked
+are both settled:
+
+- **`fileclose` is proven and linked**, so `LinkSysPipe.v` exists
+  ([`../completed/fileclose.md`](../completed/fileclose.md)).
+- **The two pipe-end references are no longer dropped.** `file_ref` carries
+  its payload now, so pipealloc folds the ends INTO the two references and
+  this proof does not mention them: a descriptor sys_pipe creates really does
+  own its end of the pipe in the model.
+
+What did change in the contract: sys_pipe now carries fileclose's closing
+environment (both bundles) and case-splits at the call, because a file taken
+back out of a descriptor has an existentially-quantified `fcontent` and the
+type is not recoverable. That knowledge is going to be per-`ofile` ghost
+state in `struct proc`; see
+[`../design/file-table.md`](../design/file-table.md)'s open items.
+

@@ -170,34 +170,6 @@ are working on that effort — the relevant `projects/` file.
   worklist spells out the exact chain that makes it work in `kfork`'s
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
-- **[`kexit.md`](projects/kexit.md)** — `kexit()`, the process-lifetime cone's
-  other half (kwait reclaims a zombie; kexit makes one). **PROVEN** —
-  `ProofKexit.v`, no `Axiom` and no `admit` of its own — **but NOT LINKED**, and it
-  cannot be until file.c's `fileclose` has a proof, which is the same single
-  callee `sys_pipe` waits on; until then `proof_coverage.py` prints it
-  `assumed`. The protocol change it needed is the interesting part: parking
-  at ZOMBIE is a different kind of park, because a zombie's private block
-  cannot ride the parked closure — wait()/freeproc, running on another
-  process, must find the user page table in `p->lock`. So the crossing
-  carries the block MINUS its context cells (`ProcInv.proc_dormant_noctx`)
-  and the reclaiming scheduler puts the two back together
-  (`SchedCtx.park_pay` / `proc_slots_park_gen`), FORGETTING the zombie's
-  record down to its cells rather than claiming it resumable. Also:
-  `SpecIput.v` (assumed, one isolated axiom), the diverging-contract shape,
-  why having no epilogue makes the frame existential and keeps it out of the
-  loop, and `ProcInv.proc_priv_cwd_pid` (the accessor the three FS calls
-  forced). kwait's own worklist is item S10 of
-  [`proc-struct-resources.md`](projects/proc-struct-resources.md), not here.
-- **[`fileclose.md`](projects/fileclose.md)** — `fileclose`, the single
-  unproven callee behind THREE unlinked proved functions (sys_pipe,
-  sys_close, kexit). Everything below it has LANDED: the payload link (a
-  `file_ref` now carries the pipe end / inode reference it names, so the
-  last closer has a whole `pipe_ref` to hand `pipeclose`),
-  `CodeFileclose.v`, the CONTRACT — a TYPE-INDEXED callee environment, so
-  pipealloc is not made to own a file system — and all four callers ported
-  onto it, including the `ProcInv.proc_priv_pid_ofile` accessor kexit's loop
-  needed. What is left is `ProofFileclose.v` and the four `Link` files.
-  Design in [`design/file-table.md`](design/file-table.md).
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a
@@ -237,14 +209,6 @@ are working on that effort — the relevant `projects/` file.
   and the loop-assembly architecture (one-turn lemma at 0x86 with its two
   futures as an `∧`-conjunction). Only the general (non-panic) path remains,
   blocked on uartputc_sync's.
-- **[`sys-pipe.md`](projects/sys-pipe.md)** — sys_pipe, PROVEN (unlinked): the
-  syscall where the file/proc model has to balance — two `fd_slot`s in, two out
-  on all four exits, which is what forced filealloc's and pipealloc's failure
-  arms to start returning their units. Keeps `SpecFdalloc.v`'s `fd_frees` pure
-  layer (what makes two successive fdalloc calls compose), the two
-  shared-block lemmas, what the contract deliberately does not say, and the one
-  thing standing between sys_pipe and a `LinkSysPipe.v`: `fileclose`, its only
-  callee without a proof.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability (the sie-cap analog
   carrying the kernel's interrupt + syscall trap services as assumed
@@ -340,6 +304,36 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`fileclose.md`](completed/fileclose.md)** — `fileclose`, PROVEN and
+  LINKED, and with it the four functions that were waiting on it: pipealloc,
+  sys_close, sys_pipe and kexit are all linked now too. Keeps the payload
+  link's design (a `file_ref` carries the pipe end / inode reference it
+  names, so the last closer has a whole `pipe_ref` to hand `pipeclose`), the
+  TYPE-INDEXED callee environment that keeps pipealloc from being made to
+  own a file system, the `ProcInv.proc_priv_pid_ofile` accessor kexit's loop
+  needed, and two gotchas worth reading before any block lemma with a branch
+  in it: `vm_compute` on a jump target that is still open does not come back,
+  and a lazily-spilled callee-saved register makes `callee_saved` a PREMISE
+  of the epilogue rather than a consequence of its loads. Design in
+  [`design/file-table.md`](design/file-table.md).
+- **[`kexit.md`](completed/kexit.md)** — `kexit()`, the process-lifetime
+  cone's other half, PROVEN and LINKED. Keeps the protocol change it needed:
+  parking at ZOMBIE is a different kind of park, because a zombie's private
+  block cannot ride the parked closure — wait()/freeproc, running on another
+  process, must find the user page table in `p->lock` — so the crossing
+  carries the block MINUS its context cells and the reclaiming scheduler puts
+  the two back together, FORGETTING the zombie's record down to its cells
+  rather than claiming it resumable. Also `SpecIput.v` (the cone's one
+  assumption), the diverging-contract shape, why having no epilogue keeps the
+  frame out of the loop, and the `proc_priv_pid_ofile` accessor its fd loop
+  needed once fileclose's file-system arm wanted a pid cell out of the very
+  block the loop walks.
+- **[`sys-pipe.md`](completed/sys-pipe.md)** — sys_pipe, PROVEN and LINKED:
+  the syscall where the file/proc model has to balance — two `fd_slot`s in,
+  two out on all four exits, which is what forced filealloc's and pipealloc's
+  failure arms to start returning their units. Keeps `SpecFdalloc.v`'s
+  `fd_frees` pure layer (what makes two successive fdalloc calls compose), the
+  two shared-block lemmas, and what the contract deliberately does not say.
 - **[`bio.md`](completed/bio.md)** — the buffer cache: the settled ownership
   design (the per-buffer content ESCROW — a namespace invariant with a
   parked arm and a checked-out arm — over a sleeplock that protects only a

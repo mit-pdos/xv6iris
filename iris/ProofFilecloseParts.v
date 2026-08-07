@@ -210,6 +210,119 @@ Proof.
     apply eq_vec_false_iff in Hw. exact (Hw Hc).
 Qed.
 
+(* ---- the INODE test at +0x5a/+0x5e/+0x60 ----
+   [addiw a5,s2,-2 ; c.li a4,1 ; bgeu a4,a5] is "type - 2 <=u 1", i.e. ONE
+   unsigned comparison for the two-value range {FD_INODE, FD_DEVICE}.  It has
+   to hold for an ARBITRARY 32-bit type field, not just the four enum values:
+   the [addiw] wraps, so a field at or above 2^31 sign-extends NEGATIVE and
+   must still land on the right side of the comparison.  The route that keeps
+   that honest is to go through the 32-bit result, where the wrap is just
+   [+ (2^32 - 2)], and to bound the sign extension separately. *)
+Lemma fc_addiw_m2 (w : mword 32) :
+  subrange_vec_dec (add_vec (sign_extend' 64 w)
+       (sign_extend' 64 (mword_of_int 4094 : mword 12))) 31 0
+  = add_vec w (mword_of_int (2 ^ 32 - 2) : mword 32).
+Proof.
+  rewrite <- trunc32_subrange. rewrite trunc32_add. rewrite trunc32_sext.
+  assert (HK : trunc32 (sign_extend' 64 (mword_of_int 4094 : mword 12))
+               = (mword_of_int (2 ^ 32 - 2) : mword 32))
+    by (apply bv_eq; vm_compute; reflexivity).
+  by rewrite HK.
+Qed.
+
+Lemma fc_addm2_val (w : mword 32) (z : Z) : (0 <= z < 2)%Z ->
+  add_vec w (mword_of_int (2 ^ 32 - 2) : mword 32) = (mword_of_int z : mword 32) ->
+  w = (mword_of_int (z + 2) : mword 32).
+Proof.
+  intros Hz Heq.
+  assert (E32 : (2 ^ 32 = 4294967296)%Z) by (vm_compute; reflexivity).
+  apply (f_equal bv_unsigned) in Heq.
+  revert Heq.
+  unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+    SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+  rewrite bv_add_unsigned.
+  rewrite (moi32_small (2 ^ 32 - 2) ltac:(lia)).
+  rewrite (moi32_small z ltac:(lia)).
+  unfold bv_wrap, bv_modulus. change (Z.of_N (MachineWord.Z_idx 32)) with 32%Z.
+  intro Heq.
+  pose proof (bv_unsigned_in_range _ w) as Hwr.
+  unfold bv_modulus in Hwr. change (Z.of_N (MachineWord.Z_idx 32)) with 32%Z in Hwr.
+  apply bv_eq. rewrite (moi32_small (z + 2) ltac:(lia)).
+  rewrite E32 in Heq, Hwr.
+  (* [uint w + 2^32 - 2 = z] mod 2^32, with both sides in range *)
+  destruct (Z.le_gt_cases 2 (bv_unsigned w)) as [Hge|Hlt].
+  - rewrite (_ : (bv_unsigned w + (4294967296 - 2))%Z
+                 = (bv_unsigned w - 2 + 1 * 4294967296)%Z) in Heq; [|lia].
+    rewrite Z.mod_add in Heq; [|lia].
+    rewrite Z.mod_small in Heq; lia.
+  - rewrite Z.mod_small in Heq; lia.
+Qed.
+
+Lemma fc_sext_small (X : mword 32) :
+  (uint (sign_extend' 64 X) <= 1)%Z ->
+  X = (mword_of_int 0 : mword 32) \/ X = (mword_of_int 1 : mword 32).
+Proof.
+  intro Hle.
+  rewrite (uint_unsigned (sign_extend' 64 X : mword 64)) in Hle.
+  pose proof (bv_unsigned_in_range _ (sign_extend' 64 X : mword 64)) as Hr.
+  unfold bv_modulus in Hr.
+  assert (Hv : bv_unsigned (sign_extend' 64 X : mword 64) = 0%Z
+               \/ bv_unsigned (sign_extend' 64 X : mword 64) = 1%Z)
+    by (clear -Hle Hr; lia).
+  assert (Hx : (sign_extend' 64 X : mword 64) = (mword_of_int 0 : mword 64)
+               \/ (sign_extend' 64 X : mword 64) = (mword_of_int 1 : mword 64)).
+  { destruct Hv as [Hv|Hv]; [left|right]; apply bv_eq; rewrite Hv;
+      by vm_compute. }
+  destruct Hx as [Hx|Hx]; [left|right];
+    apply (f_equal trunc32) in Hx; rewrite trunc32_sext in Hx;
+    rewrite Hx; by rewrite trunc32_mword_of_int.
+Qed.
+
+Lemma fc_ty_inode_iff (w : mword 32) :
+  zopz0zKzJ_u (mword_of_int 1 : mword 64)
+    (sign_extend' 64 (subrange_vec_dec
+       (add_vec (sign_extend' 64 w)
+                (sign_extend' 64 (mword_of_int 4094 : mword 12))) 31 0))
+  = true
+  <-> (w = (mword_of_int 2 : mword 32) \/ w = (mword_of_int 3 : mword 32)).
+Proof.
+  rewrite fc_addiw_m2. split.
+  - unfold zopz0zKzJ_u. rewrite Z.geb_le. intro Hle.
+    assert (Hu1 : uint (mword_of_int 1 : mword 64) = 1%Z) by (by vm_compute).
+    rewrite Hu1 in Hle.
+    destruct (fc_sext_small _ Hle) as [Hx|Hx].
+    + left. exact (fc_addm2_val w 0 ltac:(lia) Hx).
+    + right. exact (fc_addm2_val w 1 ltac:(lia) Hx).
+  - intros [-> | ->]; by vm_compute.
+Qed.
+
+(* ---- pipeclose's [writable] argument ----
+   a1 is [ff.writable] zero-extended, and pipeclose's contract reads the END
+   off exactly its being nonzero -- which is [FileInv.fc_wbool]. *)
+Lemma fc_wbool_arg (v : mword 8) :
+  eq_vec (add_vec (zero_reg : mword 64) (zero_extend' 64 v)) (zero_reg : mword 64)
+  = negb (negb (eq_vec v (mword_of_int 0 : mword 8))).
+Proof.
+  rewrite negb_involutive. rewrite add_vec_zero_l.
+  assert (Hinj : eq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64) = true
+                 -> v = (mword_of_int 0 : mword 8)).
+  { intro Hc. apply eq_vec_true_iff in Hc.
+    apply (f_equal bv_unsigned) in Hc.
+    cbv [zero_extend' Operators_mwords.zero_extend Operators_mwords.extz_vec
+         to_word get_word MachineWord.MachineWord.zero_extend] in Hc.
+    rewrite bv_zero_extend_unsigned in Hc.
+    assert (Hz : bv_unsigned (zero_reg : mword 64) = 0%Z) by (by vm_compute).
+    rewrite Hz in Hc. apply bv_eq. rewrite Hc.
+    all: by vm_compute. }
+  destruct (eq_vec (zero_extend' 64 v : mword 64) (zero_reg : mword 64)) eqn:HL;
+    destruct (eq_vec v (mword_of_int 0 : mword 8)) eqn:HR;
+    [ reflexivity
+    | exfalso; apply eq_vec_false_iff in HR; exact (HR (Hinj eq_refl))
+    | exfalso; apply eq_vec_true_iff in HR; rewrite HR in HL;
+      vm_compute in HL; discriminate
+    | reflexivity ].
+Qed.
+
 Section ProofFilecloseParts.
   Context `{!riscvGS Σ, !sieG Σ}.
 
