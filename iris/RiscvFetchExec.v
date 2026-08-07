@@ -128,7 +128,18 @@ Definition pma_class_grants (c : pma_class) (r : PMA_Region) : Prop :=
          machine -- and the whole misaligned pipeline in UserMemClassify rests on
          this one field.  Nothing here pins the GRANULE: the split derivation
          handles either answer, so the granule stays a platform detail. *)
-      ((override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_misaligned_exceptions)).(PMAMisalignedExceptions_load_store) = None
+      ((override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_misaligned_exceptions)).(PMAMisalignedExceptions_load_store) = None /\
+      (* THE RESERVABILITY CONJUNCT.  DRAM supports LR/SC on this platform
+         ([RsrvEventual]), and this is the field [pmaCheck]'s LoadReserved /
+         StoreConditional / (via [mem_write_ea]) atomic arms gate on.  Without
+         it an SC to an owned RAM page would have to be classified as an access
+         fault, which is false of the machine -- and, worse, the [vmem_write_addr]
+         reservation-HIT path runs [mem_write_ea] BEFORE [mem_write_value], so a
+         composer that cannot rule the denial out cannot even state the write.
+         Stated as the [generic_neq … RsrvNone] the model itself computes, so a
+         call site rewrites with it rather than case-splitting. *)
+      generic_neq (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_reservability)
+        RsrvNone = true
   | PmaIo =>
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_readable) = true /\
       (override_PMA (PMA_Region_attributes r) PBMT_PMA).(PMA_writable) = true

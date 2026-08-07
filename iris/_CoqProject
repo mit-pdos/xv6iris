@@ -187,6 +187,7 @@ UserCsr.v
 UserTotalU.v
 UserActiveClass.v
 UserMemClassify.v
+UserMemClassifyAmo.v
 SpecUser.v
 ProofUser.v
 UserKernelBridge.v

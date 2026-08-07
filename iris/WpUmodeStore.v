@@ -225,6 +225,11 @@ Section UmodeStoreMem.
     ∃ sig2 : mstate,
       ⌜exec (translateAddr (Virtaddr va) (Store Data)) sigma
         = Some (Ok (Physaddr (u_walk_pa w_st va), PBMT_PMA, init_ext_ptw), sig2)⌝ ∗
+      (* the bump made [vmem_write_addr] announce the store before performing
+         it, and the announcement runs its own PMA/PMP check -- so the composer
+         has to hand the announcement back too *)
+      ⌜exec (mem_write_ea (Physaddr (u_walk_pa w_st va)) 8 (Store Data)
+               PBMT_PMA false false false) sig2 = Some (Ok tt, sig2)⌝ ∗
       ⌜exec (mem_write_value (Physaddr (u_walk_pa w_st va)) 8 v (Store Data)
                PBMT_PMA false false false) sig2
         = Some (Ok true,
@@ -270,25 +275,26 @@ Section UmodeStoreMem.
     set (pa := u_walk_pa w_st va) in *.
     assert (Hram0' : addr_is_ram pa)
       by (rewrite <- (pa_add_0 pa); exact Hram0).
+    (* the region and the PMP range, shared by the announcement and the store *)
+    destruct (pma_all_ram (ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+               : pma_allows_all (register_lookup pma_regions sig2.(sregs))) pa 8
+              (pma_access_ram _ _ _ Hram0' Hram7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl))
+      as (region & Hpmam & _ & _ & Hwrb).
+    pose proof (addr_is_ram_not_in_clint _ Hram0') as Hnc_c.
+    pose proof (addr_is_ram_not_in_sig _ Hram0') as Hnc_s.
+    assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+              (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sig2.(sregs)) 0)) 4)
+              (uint pa) (uint (to_bits 64 8)) = PMP_Match).
+    { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
+      exact (ram_fetch_pmp pa _ 8 7 ltac:(lia) ltac:(lia)
+               ltac:(vm_compute; reflexivity) ltac:(reflexivity)
+               Hram0' Hram7 Hcovp). }
     (* the physical write fact at [sig2] *)
     assert (Hwr : exec (mem_write_value (Physaddr pa) 8 v (Store Data)
                           PBMT_PMA false false false) sig2
                   = Some (Ok true,
                           MState sig2.(sregs) (write_bytes sig2.(mem) pa 8 v) sig2.(mdev))).
-    { destruct (pma_all_ram (ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
-                 : pma_allows_all (register_lookup pma_regions sig2.(sregs))) pa 8
-                (pma_access_ram _ _ _ Hram0' Hram7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl))
-        as (region & Hpmam & _ & _ & Hwrb).
-      pose proof (addr_is_ram_not_in_clint _ Hram0') as Hnc_c.
-      pose proof (addr_is_ram_not_in_sig _ Hram0') as Hnc_s.
-      assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
-                (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sig2.(sregs)) 0)) 4)
-                (uint pa) (uint (to_bits 64 8)) = PMP_Match).
-      { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
-        exact (ram_fetch_pmp pa _ 8 7 ltac:(lia) ltac:(lia)
-                 ltac:(vm_compute; reflexivity) ltac:(reflexivity)
-                 Hram0' Hram7 Hcovp). }
-      exact (exec_mem_write_value_U 8 exec_write_ram_plain_8 PBMT_PMA pa region v sig2
+    { exact (exec_mem_write_value_U 8 ltac:(lia) exec_write_ram_plain_8 PBMT_PMA pa region v sig2
                (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
                (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
                Hrange
@@ -304,12 +310,35 @@ Section UmodeStoreMem.
                (addr_is_ram_not_dev _ Hram0')
                (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
                (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
+    (* ...and the effective-address announcement, at the same facts *)
+    assert (Hea : exec (mem_write_ea (Physaddr pa) 8 (Store Data) PBMT_PMA false false false) sig2
+                  = Some (Ok tt, sig2)).
+    { assert (Heff' : exec (effectivePrivilege (Store Data)
+                              (register_lookup mstatus sig2.(sregs))
+                              (register_lookup cur_privilege sig2.(sregs))) sig2
+                      = Some (User, sig2)).
+      { rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)). rewrite Hcp.
+        apply exec_effectivePrivilege_mprv0.
+        rewrite (Tr mstatus ltac:(vm_compute; reflexivity)). exact Hmprv. }
+      refine (exec_mem_write_ea_g 8 pa (Store Data) PBMT_PMA User sig2 Heff' _ _).
+      - unfold check_pma_with_pmp_priority.
+        rewrite (exec_bind_Some _ _ _ _ _
+                   (exec_pmaCheck_ram_store_g 8 pa PBMT_PMA region sig2 Hpmam
+                      (pa_aligned_div _ va 8 ltac:(lia) ltac:(exists 512; reflexivity) Hal)
+                      (proj1 Hwrb))).
+        cbn match. apply exec_returnm.
+      - exact (exec_pmpCheck_user_grant_store pa 8 sig2
+                 (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
+                 (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
+                 Hrange
+                 (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))). }
     (* the ghost half *)
     iMod (umem_store8_ghost pt (uint va) v pa M sig2.(mem)
             (fun j Hj => uva_pa_window pt w_st va j Hl (Hnc j Hj)) HMb
             with "Hgh HM") as "[Hgh HM]".
     iModIntro. iExists sig2.
     iSplit; [ iPureIntro; exact Htr | ].
+    iSplit; [ iPureIntro; exact Hea | ].
     iSplit; [ iPureIntro; exact Hwr | ].
     iSplit; [ iPureIntro; exact Hmdev | ].
     iSplit; [ iPureIntro; exact Tr | ].
@@ -338,23 +367,25 @@ Proof.
 Qed.
 
 (* the aligned width-8 [vmem_write_addr] with the chunk cast collapsed *)
-Lemma uvmem_write_addr_8 (va pa : mword 64) (dat : mword 64) (s s2 : mstate) :
+Lemma uvmem_write_addr_8 (va pa : mword 64) (dat : mword 64)
+    (ep : Privilege) (md : SATPMode) (s s2 : mstate) :
   is_aligned_vaddr (Virtaddr va) 8 = true ->
+  exec (effectivePrivilege (Store Data) (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
   exec (translateAddr (Virtaddr va) (Store Data)) s
     = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s2) ->
+  exec (mem_write_ea (Physaddr pa) 8 (Store Data) PBMT_PMA false false false) s2
+    = Some (Ok tt, s2) ->
   exec (mem_write_value (Physaddr pa) 8 dat (Store Data) PBMT_PMA false false false) s2
     = Some (Ok true, MState s2.(sregs) (write_bytes s2.(mem) pa 8 dat) s2.(mdev)) ->
   exec (vmem_write_addr (Virtaddr va) 8 dat (Store Data) false false false) s
     = Some (Ok true, MState s2.(sregs) (write_bytes s2.(mem) pa 8 dat) s2.(mdev)).
 Proof.
-  intros Hal Htr Hwv.
-  assert (Htr' : exec (translateAddr
-                    (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8)))
-                    (Store Data)) s
-                 = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s2)).
-  { cbn [bits_of_virtaddr]. first [ rewrite avi0_mul8 | rewrite avi0 ]. exact Htr. }
-  pose proof (exec_vmem_write_addr_aligned_store 8 va pa dat s s2 Hal Htr'
-                (exec_mem_write_ea_g 8 pa s2)) as H.
+  intros Hal Heff Htm Htr Hea Hwv.
+  pose proof (exec_vmem_write_addr_aligned_store 8 va pa dat ep md s s2
+                (MState s2.(sregs) (write_bytes s2.(mem) pa 8 dat) s2.(mdev))
+                ltac:(unfold vmem_width; lia) Hal Heff Htm Htr Hea) as H.
   cbv zeta in H.
   rewrite (ucast_store8_b dat) in H.
   exact (H Hwv).
@@ -376,19 +407,22 @@ Lemma exec_execute_STORE_8_u_walk (rs2 rs1 : mword 5) (imm : mword 12)
   is_aligned_vaddr (Virtaddr (add_vec base (sign_extend' 64 imm))) 8 = true ->
   exec (translateAddr (Virtaddr (add_vec base (sign_extend' 64 imm))) (Store Data)) s
     = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s2) ->
+  exec (mem_write_ea (Physaddr pa) 8 (Store Data) PBMT_PMA false false false) s2
+    = Some (Ok tt, s2) ->
   exec (mem_write_value (Physaddr pa) 8 v (Store Data) PBMT_PMA false false false) s2
     = Some (Ok true, MState s2.(sregs) (write_bytes s2.(mem) pa 8 v) s2.(mdev)) ->
   exec (execute (STORE (imm, Regidx rs2, Regidx rs1, 8))) s
     = Some (RETIRE_SUCCESS,
             MState s2.(sregs) (write_bytes s2.(mem) pa 8 v) s2.(mdev)).
 Proof.
-  intros Hcp Heff Hpml Htm Hbase Hv Hal Htr Hwv.
+  intros Hcp Heff Hpml Htm Hbase Hv Hal Htr Hea Hwv.
   apply (exec_execute_STORE_u_ok imm rs2 rs1 8 true s _ eq_refl).
   rewrite Hv. rewrite (ucast_store8_a v).
   apply (exec_vmem_write_u rs1 (sign_extend' 64 imm) 8 v (Store Data)
            false false false md (Ok true) s _ Hcp Heff Hpml Htm).
   rewrite Hbase.
-  exact (uvmem_write_addr_8 (add_vec base (sign_extend' 64 imm)) pa v s s2 Hal Htr Hwv).
+  exact (uvmem_write_addr_8 (add_vec base (sign_extend' 64 imm)) pa v User md s s2 Hal
+           (ltac:(rewrite Hcp; exact Heff)) Htm Htr Hea Hwv).
 Qed.
 
 (* ===================================================================== *)
@@ -573,7 +607,7 @@ Section WpUmodeStore.
     iMod (umem_store_8 pt M w_st tgt wval s_pc
             Hl Hchk Hcanon Hpg Hal HMb Lmisap Lmenvp Lhtifp Lprivp HSXLp Hmprvp Lpmap
             with "Hreg Hmem Hutlb Humem")
-      as (sig2) "(%Htr & %Hwv & %Hmdev2 & %Tr2 & Hreg & Hmem & Hutlb & Humem)".
+      as (sig2) "(%Htr & %Hea & %Hwv & %Hmdev2 & %Tr2 & Hreg & Hmem & Hutlb & Humem)".
     (* the execute, value-precise *)
     assert (Hbase : (if Z.eqb (uint csp_rs1) 0 then zero_reg
                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint csp_rs1)))
@@ -599,6 +633,7 @@ Section WpUmodeStore.
                Htm Hbase Hvv);
         [ rewrite <- Htgt; exact Hal
         | rewrite <- Htgt; exact Htr
+        | exact Hea
         | exact Hwv ]. }
     pose proof (Hprog _ Hex) as Hha.
     (* re-assemble the post state and hand it to the tick/bump tail *)

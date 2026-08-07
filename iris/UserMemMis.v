@@ -627,7 +627,7 @@ Section MisPhys.
     destruct (pma_all_ram Hall pa W
                 (pma_access_ram_at pa W (Z.to_nat W - 1)%nat ltac:(lia) Hr0 HrL
                    (pma_width_le W 8 Hpos Hle eq_refl)))
-      as (region & Hpmam & _ & Hrd & _ & _ & _ & _ & Hmisx).
+      as (region & Hpmam & _ & Hrd & _ & _ & _ & _ & Hmisx & _).
     destruct (exec_pmaCheck_ram_load_plan W pa PBMT_PMA region s Hpmam Hrd Hmisx)
       as (plan & Hpma).
     assert (Hcpp : exec (check_pma_with_pmp_priority (Load Data) PBMT_PMA User
@@ -693,7 +693,7 @@ Section MisPhys.
     destruct (pma_all_ram Hall pa W
                 (pma_access_ram_at pa W (Z.to_nat W - 1)%nat ltac:(lia) Hr0 HrL
                    (pma_width_le W 8 Hpos Hle eq_refl)))
-      as (region & Hpmam & _ & _ & Hwr & _ & _ & _ & Hmisx).
+      as (region & Hpmam & _ & _ & Hwr & _ & _ & _ & Hmisx & _).
     destruct (exec_pmaCheck_ram_store_plan W pa PBMT_PMA region s Hpmam Hwr Hmisx)
       as (plan & Hpma).
     assert (Hcpp : exec (check_pma_with_pmp_priority (Store Data) PBMT_PMA User
@@ -793,7 +793,7 @@ Section MisPhys.
     destruct (pma_all_ram Hall pa W
                 (pma_access_ram_at pa W (Z.to_nat W - 1)%nat ltac:(lia) Hr0 HrL
                    (pma_width_le W 8 Hpos Hle eq_refl)))
-      as (region & Hpmam & _ & _ & Hwr & _ & _ & _ & Hmisx).
+      as (region & Hpmam & _ & _ & Hwr & _ & _ & _ & Hmisx & _).
     destruct (exec_pmaCheck_ram_store_plan W pa PBMT_PMA region s Hpmam Hwr Hmisx)
       as (plan & Hpma).
     assert (Hcpp : exec (check_pma_with_pmp_priority (Store Data) PBMT_PMA User
