@@ -24,10 +24,15 @@ Import Defs.
    needs no fact about the translation mode, only that the effective privilege
    and its translation mode are DEFINED at [s] (the and_boolM evaluates its left
    operand before short-circuiting on the right). *)
-Lemma exec_vmem_write_addr_aligned_store (width : Z) (va pa : mword 64) (dat : mword (8*width))
+(* THE VMEM WRITE, aligned or not -- the store counterpart of
+   [exec_vmem_read_addr_intra], and the same two premises replace the
+   alignment requirement. *)
+Lemma exec_vmem_write_addr_intra (width : Z) (va pa : mword 64) (dat : mword (8*width))
     (ep : Privilege) (md : SATPMode) (s s' sfin : mstate) :
-  vmem_width width ->
-  is_aligned_vaddr (Virtaddr va) width = true ->
+  0 < width ->
+  exec (split_on_page_boundary va width) s = Some ((width, 0), s) ->
+  (is_aligned_vaddr (Virtaddr va) width = true \/
+   plat_misaligned_exception (Store Data) false = None) ->
   exec (effectivePrivilege (Store Data) (register_lookup mstatus s.(sregs))
           (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
   exec (translationMode ep) s = Some (md, s) ->
@@ -42,14 +47,20 @@ Lemma exec_vmem_write_addr_aligned_store (width : Z) (va pa : mword 64) (dat : m
   exec (vmem_write_addr (Virtaddr va) width dat (Store Data) false false false) s
     = Some (Ok true, sfin).
 Proof.
-  intros Hw Halign Heff Htm Htr Hea Hwv.
+  intros Hpos Hsplit Hguard Heff Htm Htr Hea Hwv.
   set (sw := sfin).
   unfold vmem_write_addr.
   rewrite exec_catch_early_return.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+  match goal with |- context[Defs.bind0 ?G ?k] =>
+    assert (Hg : execR G s = Some (inr tt, s)) end.
+  { destruct (is_aligned_vaddr (Virtaddr va) width) eqn:E.
+    - cbn [Riscv.rv64d.not negb]. apply execR_returnR_fwd.
+    - cbn [Riscv.rv64d.not negb].
+      destruct Hguard as [Hal | Hmis]; [ rewrite Hal in E; discriminate |].
+      rewrite Hmis. apply execR_returnR_fwd. }
+  rewrite (execR_bind0_Some _ _ _ _ Hg).
   cbn [bits_of_virtaddr]. cbn zeta.
-  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_on_page_boundary_aligned va width s Hw Halign)).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hsplit).
   cbn beta zeta.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
@@ -92,6 +103,31 @@ Proof.
   cbn. reflexivity.
 Qed.
 
+Lemma exec_vmem_write_addr_aligned_store (width : Z) (va pa : mword 64) (dat : mword (8*width))
+    (ep : Privilege) (md : SATPMode) (s s' sfin : mstate) :
+  vmem_width width ->
+  is_aligned_vaddr (Virtaddr va) width = true ->
+  exec (effectivePrivilege (Store Data) (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  exec (translateAddr (Virtaddr (bits_of_virtaddr (Virtaddr va))) (Store Data)) s
+    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
+  exec (mem_write_ea (Physaddr pa) width (Store Data) PBMT_PMA false false false) s'
+    = Some (Ok tt, s') ->
+  exec (mem_write_value (Physaddr pa) width
+          (autocast (T := mword) (subrange_vec_dec dat (8*width-1) 0))
+          (Store Data) PBMT_PMA false false false) s'
+    = Some (Ok true, sfin) ->
+  exec (vmem_write_addr (Virtaddr va) width dat (Store Data) false false false) s
+    = Some (Ok true, sfin).
+Proof.
+  intros Hw Halign Heff Htm Htr Hea Hwv.
+  apply (exec_vmem_write_addr_intra width va pa dat ep md s s' sfin
+           (vmem_width_pos _ Hw)
+           (exec_split_on_page_boundary_aligned va width s Hw Halign)
+           (or_introl Halign) Heff Htm Htr Hea Hwv).
+Qed.
+
 (* The READ counterpart of [exec_vmem_write_addr_aligned_store], and the brick
    it is built from.  [translate_and_read_value] is just translate-then-read;
    [vmem_read_addr] wraps it in the page split, which an aligned in-page access
@@ -129,15 +165,25 @@ Proof.
   apply exec_returnM.
 Qed.
 
-(* The res-GENERIC aligned vmem read: LOAD (res=false) and LR (res=true) both
-   go through it.  On the LR side the model asserts [width = access_width]
-   (trivial once the page split is inert) and then takes the reservation, which
-   is a platform effect the caller supplies. *)
-Lemma exec_vmem_read_addr_aligned_gen (width : Z) (va pa : mword 64)
+(* THE VMEM READ, aligned or not.  The bump moved the misalignment split OUT
+   of this layer: [vmem_read_addr] splits only across a PAGE boundary, and the
+   MAG/alignment split moved down into [checked_mem_read].  So an IN-PAGE
+   access -- aligned or misaligned -- performs exactly ONE
+   [translate_and_read_value] of the full width, and this one lemma covers
+   both.  The two premises that replace the old alignment requirement:
+
+     [Hsplit]  the page split leaves no next-page bytes (the access is
+               within one page), and
+     [Hguard]  either the access IS aligned, or the platform raises no
+               misalignment exception for it (true for plain load/store,
+               false for LR/SC/AMO -- which is why those stay aligned). *)
+Lemma exec_vmem_read_addr_intra (width : Z) (va pa : mword 64)
     (v : mword (8*width)) (acc : MemoryAccessType mem_payload) (aq rl res : bool)
     (ep : Privilege) (md : SATPMode) s s2 :
-  vmem_width width ->
-  is_aligned_vaddr (Virtaddr va) width = true ->
+  0 < width ->
+  exec (split_on_page_boundary va width) s = Some ((width, 0), s) ->
+  (is_aligned_vaddr (Virtaddr va) width = true \/
+   plat_misaligned_exception acc res = None) ->
   exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
           (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
   exec (translationMode ep) s = Some (md, s) ->
@@ -147,13 +193,18 @@ Lemma exec_vmem_read_addr_aligned_gen (width : Z) (va pa : mword 64)
    exec (load_reservation (bits_of_physaddr (Physaddr pa)) width) s2 = Some (tt, s2)) ->
   exec (vmem_read_addr (Virtaddr va) width acc aq rl res) s = Some (Ok v, s2).
 Proof.
-  intros Hw Halign Heff Htm Htrv Hlr.
-  assert (Hpos : 0 < width) by (apply vmem_width_pos; exact Hw).
+  intros Hpos Hsplit Hguard Heff Htm Htrv Hlr.
   unfold vmem_read_addr. rewrite exec_catch_early_return.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+  match goal with |- context[Defs.bind0 ?G ?k] =>
+    assert (Hg : execR G s = Some (inr tt, s)) end.
+  { destruct (is_aligned_vaddr (Virtaddr va) width) eqn:E.
+    - cbn [Riscv.rv64d.not negb]. apply execR_returnR_fwd.
+    - cbn [Riscv.rv64d.not negb].
+      destruct Hguard as [Hal | Hmis]; [ rewrite Hal in E; discriminate |].
+      rewrite Hmis. apply execR_returnR_fwd. }
+  rewrite (execR_bind0_Some _ _ _ _ Hg).
   cbn [bits_of_virtaddr]. cbn zeta.
-  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_on_page_boundary_aligned va width s Hw Halign)).
+  rewrite (execR_liftR_seq _ _ _ _ _ Hsplit).
   cbn beta zeta.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
@@ -187,6 +238,31 @@ Proof.
   rewrite (usvd_zeros_full_gen (8 * width) v ltac:(lia)).
   rewrite andb_false_r. cbn match beta.
   reflexivity.
+Qed.
+
+(* The res-GENERIC aligned vmem read: LOAD (res=false) and LR (res=true) both
+   go through it.  On the LR side the model asserts [width = access_width]
+   (trivial once the page split is inert) and then takes the reservation, which
+   is a platform effect the caller supplies. *)
+Lemma exec_vmem_read_addr_aligned_gen (width : Z) (va pa : mword 64)
+    (v : mword (8*width)) (acc : MemoryAccessType mem_payload) (aq rl res : bool)
+    (ep : Privilege) (md : SATPMode) s s2 :
+  vmem_width width ->
+  is_aligned_vaddr (Virtaddr va) width = true ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  exec (translate_and_read_value (Virtaddr va) width acc aq rl res) s
+    = Some (Ok (Physaddr pa, v), s2) ->
+  (res = true ->
+   exec (load_reservation (bits_of_physaddr (Physaddr pa)) width) s2 = Some (tt, s2)) ->
+  exec (vmem_read_addr (Virtaddr va) width acc aq rl res) s = Some (Ok v, s2).
+Proof.
+  intros Hw Halign Heff Htm Htrv Hlr.
+  apply (exec_vmem_read_addr_intra width va pa v acc aq rl res ep md s s2
+           (vmem_width_pos _ Hw)
+           (exec_split_on_page_boundary_aligned va width s Hw Halign)
+           (or_introl Halign) Heff Htm Htrv Hlr).
 Qed.
 
 Lemma exec_vmem_read_addr_aligned_load (width : Z) (va pa : mword 64)
