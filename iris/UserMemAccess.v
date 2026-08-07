@@ -258,8 +258,7 @@ Section UserMemAccessGeneric.
     { exact Htr. }
     destruct (exec_vmem_read_addr_aligned k va (u_walk_pa w va) dv (Load Data)
                 false false false User Sv39 σ σ' Hkvw Hal
-                (exec_effectivePrivilege_mprv0 (Load Data) (register_lookup mstatus σ.(sregs))
-                   (register_lookup cur_privilege σ.(sregs)) σ ltac:(cbn; congruence) Hmprv)
+                ltac:(rewrite Hcp; apply exec_effectivePrivilege_mprv0; exact Hmprv)
                 Htm Htr' Hmr) as (dvv & Hvr).
     iModIntro. iExists dvv, σ'.
     iSplit; [ iPureIntro; exact Hvr | ].
@@ -300,17 +299,20 @@ Section UserMemAccessGeneric.
   Proof.
     intros wv Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
     iIntros "Hri Hgh Hinv Hdata".
+    iDestruct (utlb_inv_pt_tmode uroot tfp um σ HSXL with "Hri Hinv") as %Htm.
     iMod (user_pt_store_data_g k Hk Hk8 Hkdvd Huintk Hwrite_plain
             uroot tfp um data w va wv σ
             Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
             with "Hri Hgh Hinv Hdata")
-      as (σ') "(%Htr & %Hwv & %Hmdev & %Hsregs & Hri & Hgh & Hinv & Hdata)".
+      as (σ') "(%Htr & %Hwv & %Hea & %Hmdev & %Hsregs & Hri & Hgh & Hinv & Hdata)".
     iModIntro. iExists σ'.
     iSplit; [ iPureIntro | ].
-    { apply (exec_vmem_write_addr_aligned_store k va (u_walk_pa w va) dat σ σ' Hal).
-      - change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * k)) with (add_vec_int va (0 * k)).
-        rewrite avi0. exact Htr.
-      - exact (exec_mem_write_ea_g k (u_walk_pa w va) σ').
+    { apply (exec_vmem_write_addr_aligned_store k va (u_walk_pa w va) dat
+               User Sv39 σ σ' _ Hkvw Hal
+               ltac:(rewrite Hcp; apply exec_effectivePrivilege_mprv0; exact Hmprv)
+               Htm).
+      - exact Htr.
+      - exact Hea.
       - exact Hwv. }
     iSplit; [ iPureIntro; exact Hmdev | ].
     iSplit; [ iPureIntro; exact Hsregs | ].

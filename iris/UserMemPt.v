@@ -666,6 +666,10 @@ Section UserMemPtGeneric.
                  PBMT_PMA false false false) σ'
           = Some (Ok true,
                   MState σ'.(sregs) (write_bytes σ'.(mem) (u_walk_pa w va) (Z.to_N k) v) σ'.(mdev))⌝ ∗
+        (* the effective-address announcement, which the vmem layer now needs
+           separately (mem_write_ea runs the PMA/PMP check itself) *)
+        ⌜exec (mem_write_ea (Physaddr (u_walk_pa w va)) k (Store Data) PBMT_PMA
+                 false false false) σ' = Some (Ok tt, σ')⌝ ∗
         ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
         ⌜(σ'.(sregs) = σ.(sregs) \/
           exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
@@ -728,6 +732,35 @@ Section UserMemPtGeneric.
                  (addr_is_ram_not_dev _ Hram0)
                  (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
                  (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))). }
+      (* the effective-address announcement: same PMA/PMP facts as the write *)
+      assert (Hea : exec (mem_write_ea (Physaddr pa) k (Store Data) PBMT_PMA
+                            false false false) σ' = Some (Ok tt, σ')).
+      { destruct (pma_all_ram (ltac:(rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)); exact Hall)
+                   : pma_allows_all (register_lookup pma_regions σ'.(sregs))) pa k
+                  (pma_access_ram_at pa k (Z.to_nat k - 1) ltac:(clear -Hk; lia)
+                     Hram0 Hram7 (pma_width_le k 8 Hk Hk8 eq_refl)))
+          as (region & Hpmam & _ & _ & Hwrb).
+        assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+                  (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n σ'.(sregs)) 0)) 4)
+                  (uint pa) (uint (to_bits 64 k)) = PMP_Match).
+        { rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)).
+          exact (ram_fetch_pmp pa _ k (Z.to_nat k - 1) Hk Hk8
+                   Huintk ltac:(lia)
+                   Hram0 Hram7 Hcovp). }
+        apply (exec_mem_write_ea_g k pa (Store Data) PBMT_PMA User σ').
+        - rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)). rewrite Hcp.
+          apply exec_effectivePrivilege_mprv0.
+          rewrite (Tr mstatus ltac:(vm_compute; reflexivity)). exact Hmprv.
+        - unfold check_pma_with_pmp_priority.
+          rewrite (exec_bind_Some _ _ _ _ _
+                     (exec_pmaCheck_ram_store_g k pa PBMT_PMA region σ' Hpmam
+                        (pa_aligned_div _ va k Hk Hkdvd Hal) (proj1 Hwrb))).
+          cbn match. apply exec_returnM.
+        - exact (exec_pmpCheck_user_grant_store pa k σ'
+                   (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
+                   (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
+                   Hrange
+                   (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HW))). }
       (* ghost update of the written window *)
       iMod (udata_own_store_g data pa v σ'.(mem)
               (fun j Hj => ltac:(
@@ -738,6 +771,7 @@ Section UserMemPtGeneric.
       iExists σ'.
       iSplit; [ iPureIntro; exact Htr | ].
       iSplit; [ iPureIntro; exact Hwr | ].
+      iSplit; [ iPureIntro; exact Hea | ].
       iSplit; [ iPureIntro; exact Hmdev | ].
       iSplit; [ iPureIntro; exact Hsregs | ].
       iFrame "Hri Hgh Hinv Hdata".
