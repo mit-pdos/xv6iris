@@ -57,7 +57,8 @@ Require Import WeakLeafWin.
 Require Import WeakLeafEff8 WeakLeafLd8.
 Require Import ExecCommon WpDecode WpAuipc WpMmodeJal WpMmodeMul.
 Require Import WpGprCsrrCommon WpGprCsrrA.
-Require Import CodeEntry WpEntryNew KernelText.
+Require Import CodeEntry CodeEntryAux WpEntryNew KernelText.
+Require Import KernelDecode04 KernelDecode07 KernelDecode10 KernelDecode11 KernelDecode12 KernelDecode26 KernelDecode27.
 Require Import WkEntryEff.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
@@ -340,7 +341,7 @@ Section entry.
       as "#Hin0".
     { iApply (winstr_intro pc_e0 false (UTYPE (imm_auipc, Regidx i_auipc, AUIPC))
                 (F_Base w_auipc) lpad_e0 eq_refl
-                (fun t _ _ _ Hm Hc => decode_auipc t Hm Hc) with "Hbs0"). }
+                (fun t _ _ _ Hm Hc => kd_0000a117 t Hm Hc) with "Hbs0"). }
     iApply (wwp_instr Φ pc_e0 false (UTYPE (imm_auipc, Regidx i_auipc, AUIPC))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e0 4])
@@ -505,7 +506,7 @@ Section entry.
               1%Qp pmpcfg0 (m_auipc m !!! Regidx i_ld) pc_e1 D_m dstateM
               (wm_ws σ1')
               Hgid Hpmp Hal4_1 Hrd_1 Hea1 Hram8_1
-              (fun t _ _ _ Hm Hc => decode_ld t Hm Hc)
+              (fun t _ _ _ Hm Hc => kd_20813103 t Hm Hc)
               (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
               D_m_mi good_e1 dec_e1
               with "Hmm Hpmpc Hpc Hnpc Hspc Hbs1 Hhws Hpt").
@@ -541,7 +542,7 @@ Section entry.
                 (F_RVC h_lui) lpad_e2 eq_refl
                 (fun t _ HC _ _ _ =>
                    ex_intro _ (C_LUI (imm_clui, rd_clui))
-                     (conj (decode_C_lui t HC)
+                     (conj (kd_6505 t HC)
                         (conj lpad_i0_e2 (exec_execute_C_LUI imm_clui rd_clui))))
                 with "Hbs2"). }
     iApply (wwp_instr Φ pc_e2 true (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI))
@@ -702,7 +703,7 @@ Section entry.
     { iApply (winstr_intro pc_e3 false
                 (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS))
                 (F_Base w_csrr) lpad_e3 eq_refl
-                (fun t _ _ _ Hm Hc => decode_csrr t Hm Hc) with "Hbs3"). }
+                (fun t _ _ _ Hm Hc => kd_f14025f3 t Hm Hc) with "Hbs3"). }
     iApply (wwp_instr Φ pc_e3 false
               (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS))
               pmpcfg0 (dq := DfracOwn 1)
@@ -879,7 +880,7 @@ Section entry.
                 (F_RVC h_addi) lpad_e4 eq_refl
                 (fun t _ HC _ _ _ =>
                    ex_intro _ (C_ADDI (imm_caddi, rsd_caddi))
-                     (conj (decode_C_ADDI t HC)
+                     (conj (kd_0585 t HC)
                         (conj lpad_i0_e4
                            (exec_execute_C_ADDI imm_caddi rsd_caddi))))
                 with "Hbs4"). }
@@ -1087,7 +1088,7 @@ Section entry.
                 (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1, Regidx i_mul_rd,
                       mulop_mul))
                 (F_Base w_mul) lpad_e5 eq_refl
-                (fun t Hp _ _ Hm _ => decode_mul t Hp (misaM_of_val _ Hm))
+                (fun t _ _ _ Hm Hc => kd_02b50533 t Hm Hc)
                 with "Hbs5"). }
     iApply (wwp_instr Φ pc_e5 false
               (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1, Regidx i_mul_rd,
@@ -1306,7 +1307,7 @@ Section entry.
                 (F_RVC h_add) lpad_e6 eq_refl
                 (fun t _ HC _ _ _ =>
                    ex_intro _ (C_ADD (rsd_cadd, rs2_cadd))
-                     (conj (decode_C_ADD t HC)
+                     (conj (kd_912a t HC)
                         (conj lpad_i0_e6 (exec_execute_C_ADD rsd_cadd rs2_cadd))))
                 with "Hbs6"). }
     iApply (wwp_instr Φ pc_e6 true (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD))
@@ -1527,7 +1528,7 @@ Section entry.
     iAssert (winstr pc_e7 false (JAL (imm_jal, Regidx i_jal))) as "#Hin7".
     { iApply (winstr_intro pc_e7 false (JAL (imm_jal, Regidx i_jal))
                 (F_Base w_jal) lpad_e7 eq_refl
-                (fun t _ _ _ Hm Hc => decode_jal t Hm Hc) with "Hbs7"). }
+                (fun t _ _ _ Hm Hc => kd_042000ef t Hm Hc) with "Hbs7"). }
     iApply (wwp_instr Φ pc_e7 false (JAL (imm_jal, Regidx i_jal))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id))
