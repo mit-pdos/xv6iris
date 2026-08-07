@@ -187,10 +187,9 @@ Section WpSconfMem.
           s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
        exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
          = Some ((w, default_meta), s)) ->
-    (forall v : mword (8*width),
-       extend_value uns
-         (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-           (autocast (T := mword) v)) = ext v) ->
+    (* the vmem level hands back the value itself now, not the split
+       accumulator, so the caller's extension is just [extend_value] *)
+    (forall v : mword (8*width), extend_value uns v = ext v) ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
@@ -428,9 +427,8 @@ Section WpSconfMem.
           s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
        exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
          = Some ((w, default_meta), s)) ->
-    extend_value uns
-      (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-        (autocast (T := mword) v)) = lv ->
+    (* the vmem level hands back the value itself now *)
+    extend_value uns v = lv ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
@@ -448,11 +446,9 @@ Section WpSconfMem.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_au width c uns Φ pc rd rs1 imm m n
-              (fun w => extend_value uns
-                 (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-                    (autocast (T := mword) w)))
+              (fun w => extend_value uns w)
               (fun w => (⌜w = v⌝ ∗ wordw_pointsto width pa dqm v)%I) (⊤ ∖ ↑minstretN) b
-              Hw0 Hw8 Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdok
+              Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdok
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hbytes]").
     { iModIntro. iExists v. iFrame "Hbytes". iIntros "Hb". iModIntro. by iFrame "Hb". }
     iIntros (w CID1 Hs1) "Hcg Hpc [-> Hbw]".
@@ -477,9 +473,7 @@ Section WpSconfMem.
           s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
        exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
          = Some ((w, default_meta), s)) ->
-    extend_value false
-      (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-        (autocast (T := mword) v)) = lv ->
+    extend_value false v = lv ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
@@ -516,9 +510,7 @@ Section WpSconfMem.
           s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
        exec (read_ram rv64d_types.Read_plain (Physaddr addr) width false) s
          = Some ((w, default_meta), s)) ->
-    extend_value true
-      (update_subrange_vec_dec (zeros' (8*1*width)) (8*(0+1)*width-1) (8*0*width)
-        (autocast (T := mword) v)) = lv ->
+    extend_value true v = lv ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
     rd_ok rd ->
@@ -1023,7 +1015,7 @@ Section WpSconfMem.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_au width c Φ pc rs2 rs1 imm m n sv
               (wordw_pointsto width pa (DfracOwn 1) sv) (⊤ ∖ ↑minstretN) b
-              Hw0 Hw8 Hwdvd Huintw Hwrite_plain Hsv
+              Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hbytes]").
     { iModIntro. iExists vold. iFrame "Hbytes". iIntros "Hb". by iModIntro. }
     iIntros (CID1 Hs1) "Hcg Hpc Hbw".

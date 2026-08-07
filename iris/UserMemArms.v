@@ -394,8 +394,17 @@ Proof.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
   (* alignment: is_aligned true -> not true = false -> else branch (translate) *)
   rewrite Hal. cbn [Riscv.rv64d.not negb].
-  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite execR_bind. rewrite execR_bind0. rewrite execR_returnR. cbn match.
+  rewrite execR_liftR. rewrite Htr. cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
+  (* upstream reordered the body: the effective-address announcement and the
+     load now run BEFORE rs2 is read *)
+  (* mem_write_ea addr -> Ok tt *)
+  rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
+  (* mem_read -> Ok loaded (nested bind: outer via execR_bind, inner via liftR_seq) *)
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
+  rewrite execR_returnR_fwd. cbn match.
   (* rX rs2 branch: width <= xlen_bytes -> rX_bits rs2 (nested bind) *)
   rewrite Hw.
   assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
@@ -403,12 +412,6 @@ Proof.
                = Some (inr rs2_val, s')).
   { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
   rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
-  (* mem_write_ea addr -> Ok tt *)
-  rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
-  (* mem_read -> Ok loaded (nested bind: outer via execR_bind, inner via liftR_seq) *)
-  rewrite execR_bind.
-  rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
-  rewrite execR_returnR_fwd. cbn match.
   (* THE CAS GUARD.  [and_boolM] short-circuits for a non-CAS op with no
      register read; for AMOCAS the rd read runs and the comparison decides.
      The [match goal] names the guard's own second argument rather than
@@ -494,7 +497,8 @@ Proof.
   rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
   rewrite Hal. cbn [Riscv.rv64d.not negb].
-  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite execR_bind. rewrite execR_bind0. rewrite execR_returnR. cbn match.
+  rewrite execR_liftR. rewrite Htr. cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
   rewrite Hw.
   assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
@@ -503,11 +507,11 @@ Proof.
                               (if Z.eqb (uint rs2) 0 then zero_reg
                                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s'.(sregs))), s')).
   { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
   rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
   rewrite execR_bind.
   rewrite (execR_liftR_seq _ _ _ _ _ Hrdm). cbn match.
   rewrite execR_returnR_fwd. cbn match.
+  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
   match goal with |- context[and_boolM ?A ?B] =>
     assert (Hab : execR (and_boolM A B) s'
                   = Some (inr (andb (generic_eq op AMOCAS)
@@ -552,7 +556,7 @@ Lemma exec_execute_AMO_u_read_err
                                           else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
                                          (zeros' 64))) (Atomic (op, aq, rl, Data, Data))) s = Some (Ok (addr, pbmt, tt), s') ->
   exec (mem_write_ea addr width (Atomic (op, aq, rl, Data, Data)) pbmt (andb aq rl) rl true) s' = Some (Ok tt, s') ->
-  exec (mem_read (Atomic (op, aq, rl, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Err e, s') ->
+  exec (mem_read (Atomic (op, aq, rl, Data, Data)) pbmt addr width aq (andb aq rl) true) s' = Some (Err (addr, e), s') ->
   exec (execute (AMO (op, aq, rl, Regidx rs2, Regidx rs1, width, Regidx rd))) s
     = Some (Trap (User, make_sync_exception e
                     (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
@@ -583,7 +587,8 @@ Proof.
   rewrite (execR_liftR_seq _ _ _ _ _ Hgtda). cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s)).
   rewrite Hal. cbn [Riscv.rv64d.not negb].
-  rewrite (execR_liftR_seq _ _ _ _ _ Htr). cbn match.
+  rewrite execR_bind. rewrite execR_bind0. rewrite execR_returnR. cbn match.
+  rewrite execR_liftR. rewrite Htr. cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd _ s')).
   rewrite Hw.
   assert (Hrs2 : execR (Defs.bind (Defs.liftR (rX_bits (Regidx rs2)))
@@ -592,7 +597,6 @@ Proof.
                               (if Z.eqb (uint rs2) 0 then zero_reg
                                else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs2))) s'.(sregs))), s')).
   { rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')). apply execR_returnR_fwd. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hrs2).
   rewrite (execR_liftR_seq _ _ _ _ _ Hea). cbn match.
   (* mem_read -> Err e: early_return the memory_exception trap *)
   rewrite execR_bind.
