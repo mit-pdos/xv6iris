@@ -204,6 +204,9 @@ Section UserMemAccessGeneric.
   Context (k : Z).
   Context (Hk : 0 < k) (Hk8 : k <= 8) (Hkdvd : (k | 4096)).
   Context (Huintk : uint (to_bits 64 k) = k).
+  (* the vmem level splits on a PAGE boundary now, which needs the width to be
+     one of the four the ISA allows there *)
+  Context (Hkvw : vmem_width k).
   Context (Hread_plain : forall (addr : mword 64) (w : mword (8 * k)) s,
       dev_addr addr = false ->
       (forall j : nat, (N.of_nat j < Z.to_N k)%N ->
@@ -243,6 +246,8 @@ Section UserMemAccessGeneric.
   Proof.
     intros Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
     iIntros "Hri Hgh Hinv Hdata".
+    (* the mode fact must be taken BEFORE the walk moves the state *)
+    iDestruct (utlb_inv_pt_tmode uroot tfp um σ HSXL with "Hri Hinv") as %Htm.
     iMod (user_pt_load_data_g k Hk Hk8 Hkdvd Huintk Hread_plain
             uroot tfp um data w va σ
             Hl Hchk Hcov Hal Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
@@ -250,12 +255,9 @@ Section UserMemAccessGeneric.
       as (dv σ') "(%Htr & %Hmr & %Hmdev & %Hsregs & Hri & Hgh & Hinv & Hdata)".
     assert (Htr' : exec (translateAddr (Virtaddr va) (Load Data)) σ
                    = Some (Ok (Physaddr (u_walk_pa w va), PBMT_PMA, init_ext_ptw), σ')).
-    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * k)) with (add_vec_int va (0 * k))
-        in Htr.
-      rewrite avi0 in Htr. exact Htr. }
-    iDestruct (utlb_inv_pt_tmode uroot tfp um σ HSXL with "Hri Hinv") as %Htm.
+    { exact Htr. }
     destruct (exec_vmem_read_addr_aligned k va (u_walk_pa w va) dv (Load Data)
-                false false false User Sv39 σ σ' Hvw Hal
+                false false false User Sv39 σ σ' Hkvw Hal
                 (exec_effectivePrivilege_mprv0 (Load Data) (register_lookup mstatus σ.(sregs))
                    (register_lookup cur_privilege σ.(sregs)) σ ltac:(cbn; congruence) Hmprv)
                 Htm Htr' Hmr) as (dvv & Hvr).
