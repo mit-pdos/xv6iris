@@ -2978,6 +2978,7 @@ Section LRComposersG.
     iIntros "Hri Hgh Hinv Hdata".
     iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
+    iDestruct (utlb_inv_pt_tmode uroot tfp um σ HSXL with "Hri Hinv") as %Htm.
     iMod (utlb_inv_pt_translateAddr_u (LoadReserved (aq, rl, Data)) uroot tfp um w va
             (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
             Hmisa Hmenv Hhtif Hcp HSXL
@@ -3024,13 +3025,15 @@ Section LRComposersG.
              Hmmio (addr_is_ram_not_dev _ Hram0) Hbytes
              (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
              (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))).
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4))) (LoadReserved (aq, rl, Data))) σ
-                   = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ')).
-    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4)) with (add_vec_int va (0 * 4)).
-      rewrite avi0. exact Htr. }
     destruct (exec_vmem_read_addr_lr_disj 4 va pa (register_lookup PC σ'.(sregs)) dv
-                aq (andb aq rl) User (generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone)
-                σ σ' Hal Htr' Hmr
+                aq rl aq (andb aq rl) User Sv39 User
+                (generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone)
+                σ σ'
+                ltac:(unfold vmem_width; lia)
+                Hal
+                (ltac:(rewrite Hcp; apply exec_effectivePrivilege_mprv0; exact Hmprv))
+                Htm Htr Hmr
+                (offset_virtaddr_by_self va pa)
                 (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
                 eq_refl)
       as [Hret | Hflt].
@@ -3041,9 +3044,7 @@ Section LRComposersG.
       iFrame "Hri Hgh Hinv Hdata".
     - iModIntro. iExists σ'.
       iSplit; [ iPureIntro; right | ].
-      { rewrite (Tr PC ltac:(vm_compute; reflexivity)) in Hflt.
-        change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 4)) with (add_vec_int va (0 * 4)) in Hflt.
-        rewrite avi0 in Hflt. exact Hflt. }
+      { rewrite (Tr PC ltac:(vm_compute; reflexivity)) in Hflt. exact Hflt. }
       iSplit; [ iPureIntro; exact Hmdev | ].
       iSplit; [ iPureIntro; exact Hsregs | ].
       iFrame "Hri Hgh Hinv Hdata".
@@ -3084,6 +3085,7 @@ Section LRComposersG.
     iIntros "Hri Hgh Hinv Hdata".
     iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
       as %(HA & Hord & HX & HR & HW & Hcovp).
+    iDestruct (utlb_inv_pt_tmode uroot tfp um σ HSXL with "Hri Hinv") as %Htm.
     iMod (utlb_inv_pt_translateAddr_u (LoadReserved (aq, rl, Data)) uroot tfp um w va
             (u_walk_pa w va) σ Hl Hchk Hcanon eq_refl
             Hmisa Hmenv Hhtif Hcp HSXL
@@ -3130,13 +3132,15 @@ Section LRComposersG.
              Hmmio (addr_is_ram_not_dev _ Hram0) Hbytes
              (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
              (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))).
-    assert (Htr' : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8))) (LoadReserved (aq, rl, Data))) σ
-                   = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), σ')).
-    { change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8)) with (add_vec_int va (0 * 8)).
-      rewrite avi0. exact Htr. }
     destruct (exec_vmem_read_addr_lr_disj 8 va pa (register_lookup PC σ'.(sregs)) dv
-                aq (andb aq rl) User (generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone)
-                σ σ' Hal Htr' Hmr
+                aq rl aq (andb aq rl) User Sv39 User
+                (generic_neq (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_reservability) RsrvNone)
+                σ σ'
+                ltac:(unfold vmem_width; lia)
+                Hal
+                (ltac:(rewrite Hcp; apply exec_effectivePrivilege_mprv0; exact Hmprv))
+                Htm Htr Hmr
+                (offset_virtaddr_by_self va pa)
                 (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
                 eq_refl)
       as [Hret | Hflt].
@@ -3147,9 +3151,7 @@ Section LRComposersG.
       iFrame "Hri Hgh Hinv Hdata".
     - iModIntro. iExists σ'.
       iSplit; [ iPureIntro; right | ].
-      { rewrite (Tr PC ltac:(vm_compute; reflexivity)) in Hflt.
-        change (add_vec_int (bits_of_virtaddr (Virtaddr va)) (0 * 8)) with (add_vec_int va (0 * 8)) in Hflt.
-        rewrite avi0 in Hflt. exact Hflt. }
+      { rewrite (Tr PC ltac:(vm_compute; reflexivity)) in Hflt. exact Hflt. }
       iSplit; [ iPureIntro; exact Hmdev | ].
       iSplit; [ iPureIntro; exact Hsregs | ].
       iFrame "Hri Hgh Hinv Hdata".

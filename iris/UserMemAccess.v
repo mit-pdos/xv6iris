@@ -103,7 +103,7 @@ Qed.
 (* ===================================================================== *)
 
 Lemma exec_vmem_write_addr_sc (width : Z) (va pa : mword 64) (dat : mword (8*width))
-    (aq rl : bool) (ep ep' : Privilege) (md : SATPMode) (plan : Phys_Mem_Access_Info)
+    (aq rl maq mrl : bool) (ep ep' : Privilege) (md : SATPMode) (plan : Phys_Mem_Access_Info)
     (s s' : mstate) :
   let acc := StoreConditional (aq, rl, Data) in
   let wv := autocast (T := mword) (subrange_vec_dec dat (8*width-1) 0)
@@ -116,8 +116,8 @@ Lemma exec_vmem_write_addr_sc (width : Z) (va pa : mword 64) (dat : mword (8*wid
   exec (translateAddr (Virtaddr (bits_of_virtaddr (Virtaddr va))) acc) s
     = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
   (* success (match_reservation = true): ea + write with the SC flags *)
-  exec (mem_write_ea (Physaddr pa) width acc PBMT_PMA aq rl true) s' = Some (Ok tt, s') ->
-  exec (mem_write_value (Physaddr pa) width wv acc PBMT_PMA aq rl true) s'
+  exec (mem_write_ea (Physaddr pa) width acc PBMT_PMA maq mrl true) s' = Some (Ok tt, s') ->
+  exec (mem_write_value (Physaddr pa) width wv acc PBMT_PMA maq mrl true) s'
     = Some (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)) ->
   (* fail (match_reservation = false): the access is still CHECKED -- and the
      check now answers with a splitting plan, not with [None] -- and no write
@@ -126,7 +126,7 @@ Lemma exec_vmem_write_addr_sc (width : Z) (va pa : mword 64) (dat : mword (8*wid
           (register_lookup cur_privilege s'.(sregs))) s' = Some (ep', s') ->
   exec (phys_access_check acc PBMT_PMA ep' (Physaddr pa) width true) s'
     = Some (Ok plan, s') ->
-  exec (vmem_write_addr (Virtaddr va) width dat acc aq rl true) s
+  exec (vmem_write_addr (Virtaddr va) width dat acc maq mrl true) s
     = Some (Ok (match_reservation (bits_of_physaddr (Physaddr pa))),
             if match_reservation (bits_of_physaddr (Physaddr pa))
             then MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)
@@ -784,8 +784,12 @@ Qed.
 (*    and §5f (fault); res=true, aq/rl-generic.                            *)
 (* ===================================================================== *)
 
+(* THE ACCESS TYPE'S aq/rl AND THE MEM LEVEL'S ARE NOT THE SAME PAIR.  [LOADRES]
+   builds [LoadReserved (aq, rl, Data)] and then calls [vmem_read] with
+   [aq, aq & rl]; tying the two together would state a fact about an access the
+   model never builds.  So this takes both. *)
 Lemma exec_vmem_read_addr_lr_disj (width : Z) (va pa pc : mword 64) (w : mword (8 * width))
-    (aq rl : bool) (ep : Privilege) (md : SATPMode) (priv : Privilege) (resv : bool)
+    (aq rl maq mrl : bool) (ep : Privilege) (md : SATPMode) (priv : Privilege) (resv : bool)
     (s s' : mstate) :
   vmem_width width ->
   is_aligned_vaddr (Virtaddr va) width = true ->
@@ -794,23 +798,23 @@ Lemma exec_vmem_read_addr_lr_disj (width : Z) (va pa pc : mword 64) (w : mword (
   exec (translationMode ep) s = Some (md, s) ->
   exec (translateAddr (Virtaddr va) (LoadReserved (aq, rl, Data))) s
     = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s') ->
-  exec (mem_read (LoadReserved (aq, rl, Data)) PBMT_PMA (Physaddr pa) width aq rl true) s'
+  exec (mem_read (LoadReserved (aq, rl, Data)) PBMT_PMA (Physaddr pa) width maq mrl true) s'
     = Some ((if resv then Ok w else Err (Physaddr pa, E_Load_Access_Fault tt)), s') ->
   offset_virtaddr_by (Virtaddr va) (Physaddr pa) (Physaddr pa) = Virtaddr va ->
   register_lookup cur_privilege s'.(sregs) = priv ->
   register_lookup PC s'.(sregs) = pc ->
   (exists dvv : mword (8 * width),
-     exec (vmem_read_addr (Virtaddr va) width (LoadReserved (aq, rl, Data)) aq rl true) s
+     exec (vmem_read_addr (Virtaddr va) width (LoadReserved (aq, rl, Data)) maq mrl true) s
        = Some (Ok dvv, s'))
-  \/ exec (vmem_read_addr (Virtaddr va) width (LoadReserved (aq, rl, Data)) aq rl true) s
+  \/ exec (vmem_read_addr (Virtaddr va) width (LoadReserved (aq, rl, Data)) maq mrl true) s
        = Some (Err (Trap (priv, make_sync_exception (E_Load_Access_Fault tt) va, pc)), s').
 Proof.
   intros Hw Halign Heff Htm Htr Hmr Hoff Hcp Hpc.
   destruct resv.
   - left. exact (exec_vmem_read_addr_aligned width va pa w (LoadReserved (aq, rl, Data))
-                   aq rl true ep md s s' Hw Halign Heff Htm Htr Hmr).
+                   maq mrl true ep md s s' Hw Halign Heff Htm Htr Hmr).
   - right. exact (exec_vmem_read_addr_aligned_err width va pa pa pc (E_Load_Access_Fault tt)
-                    (LoadReserved (aq, rl, Data)) aq rl true ep md priv s s'
+                    (LoadReserved (aq, rl, Data)) maq mrl true ep md priv s s'
                     Hw Halign Heff Htm Htr Hmr Hoff Hcp Hpc).
 Qed.
 
@@ -849,7 +853,7 @@ Qed.
 (* ===================================================================== *)
 
 Lemma exec_vmem_write_addr_sc_fault (width : Z) (va pa epa pc : mword 64)
-    (dat : mword (8*width)) (aq rl : bool) (ep ep' : Privilege) (md : SATPMode)
+    (dat : mword (8*width)) (aq rl maq mrl : bool) (ep ep' : Privilege) (md : SATPMode)
     (s s' : mstate) :
   let acc := StoreConditional (aq, rl, Data) in
   let wv := autocast (T := mword) (subrange_vec_dec dat (8*width-1) 0)
@@ -864,8 +868,8 @@ Lemma exec_vmem_write_addr_sc_fault (width : Z) (va pa epa pc : mword 64)
   register_lookup cur_privilege s'.(sregs) = User ->
   register_lookup PC s'.(sregs) = pc ->
   (* mr = true: the ea lands, the write faults *)
-  exec (mem_write_ea (Physaddr pa) width acc PBMT_PMA aq rl true) s' = Some (Ok tt, s') ->
-  exec (mem_write_value (Physaddr pa) width wv acc PBMT_PMA aq rl true) s'
+  exec (mem_write_ea (Physaddr pa) width acc PBMT_PMA maq mrl true) s' = Some (Ok tt, s') ->
+  exec (mem_write_value (Physaddr pa) width wv acc PBMT_PMA maq mrl true) s'
     = Some (Err (Physaddr epa, E_SAMO_Access_Fault tt), s') ->
   (* mr = false: the re-check denies *)
   exec (effectivePrivilege acc (register_lookup mstatus s'.(sregs))
@@ -873,7 +877,7 @@ Lemma exec_vmem_write_addr_sc_fault (width : Z) (va pa epa pc : mword 64)
   exec (phys_access_check acc PBMT_PMA ep' (Physaddr pa) width true) s'
     = Some (Err (E_SAMO_Access_Fault tt), s') ->
   offset_virtaddr_by (Virtaddr va) (Physaddr pa) (Physaddr epa) = Virtaddr va ->
-  exec (vmem_write_addr (Virtaddr va) width dat acc aq rl true) s
+  exec (vmem_write_addr (Virtaddr va) width dat acc maq mrl true) s
     = Some (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) va, pc)), s').
 Proof.
   intros acc wv Hw Halign Heff Htm Htr Hcp Hpc Hea Hwv Heff' Hpac Hoff.
@@ -941,7 +945,7 @@ Qed.
 (* ===================================================================== *)
 
 Lemma exec_vmem_write_addr_sc_disj (width : Z) (va pa pc : mword 64) (dat : mword (8*width))
-    (aq rl : bool) (ep ep' : Privilege) (md : SATPMode) (plan : Phys_Mem_Access_Info)
+    (aq rl maq mrl : bool) (ep ep' : Privilege) (md : SATPMode) (plan : Phys_Mem_Access_Info)
     (resv : bool) (s s' : mstate) :
   let acc := StoreConditional (aq, rl, Data) in
   let wv := autocast (T := mword) (subrange_vec_dec dat (8*width-1) 0)
@@ -956,8 +960,8 @@ Lemma exec_vmem_write_addr_sc_disj (width : Z) (va pa pc : mword 64) (dat : mwor
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false ->
   register_lookup cur_privilege s'.(sregs) = User ->
   register_lookup PC s'.(sregs) = pc ->
-  exec (mem_write_ea (Physaddr pa) width acc PBMT_PMA aq rl true) s' = Some (Ok tt, s') ->
-  exec (mem_write_value (Physaddr pa) width wv acc PBMT_PMA aq rl true) s'
+  exec (mem_write_ea (Physaddr pa) width acc PBMT_PMA maq mrl true) s' = Some (Ok tt, s') ->
+  exec (mem_write_value (Physaddr pa) width wv acc PBMT_PMA maq mrl true) s'
     = Some (if resv
             then (Ok true, MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev))
             else (Err (Physaddr pa, E_SAMO_Access_Fault tt), s')) ->
@@ -966,19 +970,19 @@ Lemma exec_vmem_write_addr_sc_disj (width : Z) (va pa pc : mword 64) (dat : mwor
   exec (phys_access_check acc PBMT_PMA ep' (Physaddr pa) width true) s'
     = Some ((if resv then Ok plan else Err (E_SAMO_Access_Fault tt)), s') ->
   offset_virtaddr_by (Virtaddr va) (Physaddr pa) (Physaddr pa) = Virtaddr va ->
-  (exec (vmem_write_addr (Virtaddr va) width dat acc aq rl true) s
+  (exec (vmem_write_addr (Virtaddr va) width dat acc maq mrl true) s
      = Some (Ok (match_reservation (bits_of_physaddr (Physaddr pa))),
              if match_reservation (bits_of_physaddr (Physaddr pa))
              then MState s'.(sregs) (write_bytes s'.(mem) pa (Z.to_N width) wv) s'.(mdev)
              else s'))
-  \/ exec (vmem_write_addr (Virtaddr va) width dat acc aq rl true) s
+  \/ exec (vmem_write_addr (Virtaddr va) width dat acc maq mrl true) s
        = Some (Err (Trap (User, make_sync_exception (E_SAMO_Access_Fault tt) va, pc)), s').
 Proof.
   intros acc wv Hw Halign Heff Htm Htr Hmprv Hcp Hpc Hea Hwv Heff' Hpac Hoff.
   destruct resv; cbn match in Hwv, Hpac.
-  - left. exact (exec_vmem_write_addr_sc width va pa dat aq rl ep ep' md plan s s'
+  - left. exact (exec_vmem_write_addr_sc width va pa dat aq rl maq mrl ep ep' md plan s s'
                    Hw Halign Heff Htm Htr Hea Hwv Heff' Hpac).
-  - right. exact (exec_vmem_write_addr_sc_fault width va pa pa pc dat aq rl ep ep' md s s'
+  - right. exact (exec_vmem_write_addr_sc_fault width va pa pa pc dat aq rl maq mrl ep ep' md s s'
                     Hw Halign Heff Htm Htr Hcp Hpc Hea Hwv Heff' Hpac Hoff).
 Qed.
 
@@ -1243,4 +1247,24 @@ Proof.
                   = Some (E_SAMO_Access_Fault tt, s))).
   2:{ unfold accessFaultFromAccessType. cbn match. apply exec_returnM. }
   cbn beta. rewrite execR_returnR. reflexivity.
+Qed.
+
+(* the exception vaddr an access-fault at the access's OWN base reports is the
+   access's own vaddr: [offset_virtaddr_by] adds the paddr difference, which is
+   zero.  (The bump gave [MemoryOpResult]'s [Err] an address, and this is what
+   the vmem level does with it.) *)
+Lemma offset_virtaddr_by_self (va pa : mword 64) :
+  offset_virtaddr_by (Virtaddr va) (Physaddr pa) (Physaddr pa) = Virtaddr va.
+Proof.
+  unfold offset_virtaddr_by.
+  assert (Hz : sub_vec pa pa = (zeros' 64 : mword 64)).
+  { apply bv_eq. rewrite sub_vec64_unsigned. rewrite Z.sub_diag.
+    change (bv_unsigned (zeros' 64 : mword 64)) with 0.
+    apply bv_wrap_small. rewrite bv_modulus64. lia. }
+  rewrite Hz.
+  assert (Hs : subrange_vec_dec (zeros' 64 : mword 64) (Z.sub xlen 1) 0 = (zeros' 64 : mword 64))
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite Hs. f_equal.
+  change (add_vec va (zeros' 64 : mword 64)) with (add_vec_int va 0).
+  apply avi0.
 Qed.
