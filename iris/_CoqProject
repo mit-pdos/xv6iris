@@ -881,3 +881,6 @@ WeakLeafAmo4Leaf.v
 WeakWalkEff.v
 WkEntryEff.v
 WkEntryNew.v
+WeakUpdEff.v
+WeakFunnelCfg.v
+WeakLeafCsrw.v

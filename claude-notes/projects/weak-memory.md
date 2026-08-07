@@ -1740,13 +1740,25 @@ Recipe findings:
 - Kernel-text seam: `wkb_covers` (Z-keyed dump → pa-keyed weak image)
   + per-word `vm_compute` byte facts — cheap (~5 s section).
 
-**start()/timerinit() BLOCKED on three named seams** (reported, not
-weakened):
-1. `csrw mstatus`/`csrw pmpcfg0`/`MRET` leaves sit on
-   `InstrBytes.wp_instr_config`, which SURFACES the config cells;
-   `wwp_instr` holds them inside `mmode_config` and cannot. Needed
-   ONCE: a `wwp_instr_config` funnel variant (~230 lines), then those
-   leaves port like the csrr block.
+**start()/timerinit() seams** (three named; seam 1 now CLOSED):
+1. **DONE — `iris/WeakFunnelCfg.v`** (`wwp_cb_config`/`wwp_instr_config`,
+   ~280 code lines, first-compile green) + the smoke-test leaf
+   `iris/WeakLeafCsrw.v` (`wwp_csrw_mstatus_leaf`; ~430 of its lines are
+   the one-time trace-`[]` csrw-cone mirror, whose `doCSR`/
+   `execute_CSRReg` spine is CSR-GENERIC — each further csrw owes only
+   its own `write_CSR` mirror). Interface delta from `wwp_instr`: the
+   funnel takes unbundled `hw_config` + FULL `hart_state`/
+   `cur_privilege`/`mstatus ms0`/`pmpcfg_n` cells (+ pure `MIE ms0 = 0`
+   and `MPRV ms0 = 0` — the latter because `wcfg_regs` carries the MPRV
+   bit; free for callers, `mmode_config` pins it); the callback gets
+   `wcfg_regs` + the whole-value mstatus pin + the three surrendered
+   cells at full ownership; continuation hands back only `hart_state` +
+   stepped PC; certificate interface and both batch-2 seams unchanged.
+   Baseline footprints (funext + 5 platform axioms); the csrw execute
+   mirror is CLOSED. Hoist when the second csrw leaf lands: the eff
+   enablement chain (WeakLeafCsrw §1) + `nowrite_read1`/`win0_absurd` →
+   `WeakLeafEffCommon`. A future MRET-shaped funnel change should start
+   from the recorded wwp_instr→wwp_instr_config diff (4 touch points).
 2. timerinit's stack accesses are c.sdsp/c.ldsp under the WRITTEN TOR
    PMP entry — all five weak leaves demand `pmp_all_off`; a TOR-PMP
    variant of the ld8/sd8 leaves is a missing leaf shape.
@@ -1941,9 +1953,31 @@ stages parallelize):
   PTE-PMA gate (~70 lines). Axioms: one platform axiom
   (`plat_term_write`) on the heads. The two 2-ALIGNED fetch arms are
   also DONE (`iris/WeakFetch2.v` — the 0b-gap block; the straddling jal
-  at 0x80000ffe is real S-mode code). REMAINING in 6a: the S-mode
-  fetch-chain restatement (needs P4's absorption shape) and, post-Sail-
-  patch, the update-cone mirror.
+  at 0x80000ffe is real S-mode code). **THE UPDATE-CONE MIRROR IS DONE**
+  (`iris/WeakUpdEff.v`, 875 code lines / 8.0 s; strict-replay ratio
+  1.04×): the exclusive-kind RAM steps, the PTE-store gates, both CAS
+  halves, the `update_and_write_pte` outcome arms as STANDALONE lemmas
+  (SC proves them inline), the TLB-miss/hit/refresh heads, the composed
+  translateAddr head, and the certificates `wcert_ptw_upd_{gen,pin}`
+  concluding `wQ_store_w 8`. Facts to know:
+  (a) **the LANDED model is the atomic-recheck formulation, not the
+  maintainer's `PTE_AD_*`/whole-value-compare design** — no hit-Stale
+  re-walk fallback: a HIT whose fresh word fails the re-check FAULTS
+  (dead arm on the kernel table — variants always pass — but if
+  upstream later lands the re-walk fallback, `_hit_upd` gains an arm);
+  (b) the Unchanged arm does NOT read (returns before the Svadu gate;
+  trace `[]` — rides `wcert_nowrite`);
+  (c) the CAS read is `Read_RISCV_reserved` → `AkInfo false true false`
+  — LATEST but NOT sync (no acquire gain, none needed; the pair is
+  `trace_pin`-EXEMPT, admissibility IS `WeakMem.latest`, no view
+  hypothesis anywhere — the reduced design confirmed);
+  (d) the reservation quartet enters via the generic `riscv_step`
+  certificate cone, NOT the exclusive kinds (the interpreter routes by
+  address, ignores the kind; `res` only reaches pmaCheck, whose PTE
+  arms are assert-free);
+  (e) hoist at next consolidation: `wcert_ptw_upd_*` → WeakEff
+  §6/WeakCert §8f. REMAINING in 6a: only the S-mode fetch-chain
+  restatement (needs P4's absorption shape).
 - **6b**: the S-mode leaf `execute` shapes (`_S_walk_pt` towers, widths
   1/2/4/8 + AMO) at exec_eff — batch-1-sized.
 - **6c**: the weak S-funnel `wwp_instr_s` (wcfg_regs/device-frame seams
