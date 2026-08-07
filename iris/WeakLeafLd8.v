@@ -36,12 +36,12 @@
         (the regression check [WeakWord8.wP_load_w_4] & co. make), plus the
         width-8 instance at the concrete fetch element.
 
-    §2  THE WINDOW AND THE [wP_eff] HALF.  [wld8_window pc ea] is the text
-        word plus the data doubleword; [wld8_window_pc] / [_ea] /
-        [_nonzero] discharge the three window obligations
-        [wP_eff_of_leaf_base] asks for, and [wP_eff_ld8] feeds it the
-        [execute] fact RE-INSTANTIATED AT THE CONFINED MEMORY.  That second
-        instantiation of the same library lemma — at
+    §2  THE WINDOW AND THE [wP_eff] HALF.  The window is the SHARED kit's
+        [WeakLeafWin.wwin pc ea 8] (text word + data doubleword;
+        [wwin_nonzero]/[wwin_pinned]/[wwin_conf_*] discharge the window
+        obligations [wP_eff_of_leaf_base] asks for), and [wP_eff_ld8] feeds
+        it the [execute] fact RE-INSTANTIATED AT THE CONFINED MEMORY.  That
+        second instantiation of the same library lemma — at
         [WeakCert.wmem_restrict σ W] rather than [WeakBridge.wflat_st σ] —
         is the whole per-instruction cost (porting guide §2).
 
@@ -82,6 +82,9 @@ Require Import WeakFunnel WpDecodeBridge.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import RegFile WpGpr WpMmodeLeafBase.
+(* The shared window kit + register helpers ([wwin], [set_lookup_ne],
+   [leaf_peel], [load_sexec_facts], [reg_at_flat], [wpt8_align]). *)
+Require Import WeakLeafWin.
 
 Local Open Scope Z_scope.
 
@@ -101,7 +104,7 @@ Lemma wcert_load_w (n : N) (cid : nat) (pc : SailStdpp.Values.mword 64)
   wstep_cert cid pc
     (wP_eff (Some cid) [WEread akf pf nf; WEread akl ea n]) (wQ_load_w n ea).
 Proof.
-  intros Hcoh. apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  intros Hcoh. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   rewrite weffs_cons2 !weff_apply_read in Hl Hws.
   rewrite (coh_ts_log (wread_post s akf pf (coh_ts s pf nf)) s ea n
              (wread_post_log s akf pf (coh_ts s pf nf))) in Hl Hws.
@@ -142,110 +145,18 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
-(** ** 2. THE WINDOW AND THE [wP_eff] HALF *)
+(** ** 2. THE WINDOW AND THE [wP_eff] HALF
 
-(** *** 2a. The window: the instruction's text word plus its data doubleword. *)
+    *** 2a/2b. The window and its obligations are the SHARED kit's
+    ([WeakLeafWin]): [wwin pc ea 8] — the instruction's text word plus its
+    data doubleword — with [wwin_nonzero] / [wwin_pinned] / [wwin_conf_text]
+    / [wwin_conf_data] discharging the window obligations
+    [WeakFetchEff.wP_eff_of_leaf_base] asks for. *)
 
-Definition wld8_window (pc ea : Arch.pa) : gset Arch.pa :=
-  list_to_set ((pa_add pc <$> seq 0 4) ++ (pa_add ea <$> seq 0 8)).
-
-(** THE THREE MEMBERSHIP FACTS.  [set_solver] on a [gset Arch.pa] does not
-    terminate (durable notes), so every one of these is discharged
-    algebraically — [elem_of_list_to_set], [elem_of_app],
-    [elem_of_list_fmap], [elem_of_seq] — and none of them mentions a
-    decision procedure. *)
-
-Lemma wld8_window_text (pc ea : Arch.pa) (j : nat) :
-  (j < 4)%nat -> pa_add pc j ∈ wld8_window pc ea.
-Proof.
-  intros Hj. rewrite /wld8_window elem_of_list_to_set elem_of_app. left.
-  apply elem_of_list_fmap. exists j. split; [reflexivity|].
-  apply elem_of_seq. lia.
-Qed.
-
-Lemma wld8_window_data (pc ea : Arch.pa) (j : nat) :
-  (j < 8)%nat -> pa_add ea j ∈ wld8_window pc ea.
-Proof.
-  intros Hj. rewrite /wld8_window elem_of_list_to_set elem_of_app. right.
-  apply elem_of_list_fmap. exists j. split; [reflexivity|].
-  apply elem_of_seq. lia.
-Qed.
-
-Lemma wld8_window_inv (pc ea : Arch.pa) (a : Arch.pa) :
-  a ∈ wld8_window pc ea ->
-  (exists j : nat, (j < 4)%nat /\ a = pa_add pc j) \/
-  (exists j : nat, (j < 8)%nat /\ a = pa_add ea j).
-Proof.
-  rewrite /wld8_window elem_of_list_to_set elem_of_app.
-  intros [H|H]; apply elem_of_list_fmap in H as (j & -> & Hj%elem_of_seq);
-    [left|right]; exists j; (split; [lia|reflexivity]).
-Qed.
-
-(** *** 2b. The three window obligations of [WeakFetchEff.wP_eff_of_leaf_base].
-
-    (i) NONZERO.  RAM starts at [RiscvPtsto.ram_base = 0x80000000], and
-    [pa_z] IS [uint], so this is one [lia] over [addr_is_ram]. *)
-
-Lemma addr_is_ram_pa_z_nz (a : Arch.pa) : addr_is_ram a -> pa_z a <> 0.
-Proof. unfold addr_is_ram, ram_base, pa_z. lia. Qed.
-
-Lemma wld8_window_nonzero (pc ea : Arch.pa) :
-  (forall j : nat, (j < 4)%nat -> addr_is_ram (pa_add pc j)) ->
-  (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
-  forall a, a ∈ wld8_window pc ea -> pa_z a <> 0.
-Proof.
-  intros Hpc Hea a [(j & Hj & ->)|(j & Hj & ->)]%wld8_window_inv;
-    apply addr_is_ram_pa_z_nz; [exact (Hpc j Hj) | exact (Hea j Hj)].
-Qed.
-
-(** (ii) PINNEDNESS.  Free for the four text bytes ([WeakFunnel.winstr_pinned]:
-    text is unwritten this era) and owned for the eight data bytes
-    ([WeakWord8.wpt8_pinned]).  Both produce the fact at [acc_addr], which
-    [WeakBridge.acc_wf_byte] identifies with [pa_z (pa_add …)]. *)
-
-Lemma wld8_window_pinned (σ : wmstate) (pc ea : Arch.pa) :
-  acc_wf pc 4 -> acc_wf ea 8 ->
-  (forall j : nat, (j < 4)%nat -> pinned_read σ (acc_addr pc j)) ->
-  (forall j : nat, (j < 8)%nat -> pinned_read σ (acc_addr ea j)) ->
-  forall a, a ∈ wld8_window pc ea -> pinned_read σ (pa_z a).
-Proof.
-  intros Hwpc Hwea Hpc Hea a [(j & Hj & ->)|(j & Hj & ->)]%wld8_window_inv.
-  - rewrite (acc_wf_byte pc 4 j Hwpc ltac:(lia)). exact (Hpc j Hj).
-  - rewrite (acc_wf_byte ea 8 j Hwea ltac:(lia)). exact (Hea j Hj).
-Qed.
-
-(** (iii) THE TWO "byte is in the confined map" FAMILIES — one
-    [wmem_restrict_lookup] per byte, over the flat facts
-    [WeakFunnel.winstr_flat] (text) and [WeakWord8.wwp_ld8] (data) already
-    hand out. *)
-
-Lemma wld8_window_conf_text (σ : wmstate) (pc ea : Arch.pa)
-    (w : SailStdpp.Values.mword 32) :
-  (forall j : nat, (j < 4)%nat ->
-     wflat (wm_img σ) (wm_log σ) !! pa_add pc j = Some (nth_byte w j)) ->
-  forall j : nat, (j < 4)%nat ->
-    wmem_restrict σ (wld8_window pc ea) !! pa_add pc j = Some (nth_byte w j).
-Proof.
-  intros H j Hj.
-  exact (wmem_restrict_lookup σ _ _ _ (wld8_window_text pc ea j Hj) (H j Hj)).
-Qed.
-
-Lemma wld8_window_conf_data (σ : wmstate) (pc ea : Arch.pa) (v : bv 64) :
-  (forall j : nat, (j < 8)%nat ->
-     wflat (wm_img σ) (wm_log σ) !! pa_add ea j = Some (nth_byte v j)) ->
-  forall j : nat, (j < 8)%nat ->
-    wmem_restrict σ (wld8_window pc ea) !! pa_add ea j = Some (nth_byte v j).
-Proof.
-  intros H j Hj.
-  exact (wmem_restrict_lookup σ _ _ _ (wld8_window_data pc ea j Hj) (H j Hj)).
-Qed.
-
-(** FROM HERE ON [SailStdpp.Values] IS IMPORTED — for the ['b"…"] literal
-    notation, which the model's register premises are stated with.  The
-    import is placed HERE, after §2a, because it also re-exports a SECOND
-    [Countable Arch.pa] instance: every [gset Arch.pa] this file writes is
-    above this line, elaborated against the instance [WeakCert.wmem_restrict]
-    uses (durable notes, the binder-position instance trap). *)
+(** [SailStdpp.Values] is imported for the ['b"…"] literal notation the
+    model's register premises are stated with.  Every [gset Arch.pa] this
+    cone writes lives in [WeakLeafWin], above ITS [Values] import (durable
+    notes, the binder-position instance trap). *)
 Import SailStdpp.Values.
 
 (** *** 2c. THE SECOND INSTANTIATION — the whole per-instruction cost.
@@ -254,24 +165,9 @@ Import SailStdpp.Values.
     [MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ)] with the funnel's two
     pre-writes ([minstret_increment := b] and [nextPC := pc+4]) on top.  The
     SC/eff execute lemmas are state-generic, so nothing is re-proved here:
-    what this costs is the register peels that move each config fact past the
-    two pre-writes, and the [wmem_restrict_lookup] of the eight data bytes.
-    [W] is [(W : _)] for the instance-trap reason above. *)
-
-Lemma set_lookup_ne (r r' : register) (s : mstate) (x : type_of_register r') :
-  register_beq r r' = false ->
-  register_lookup r (sregs (set_reg s r' x)) = register_lookup r (sregs s).
-Proof. intros H. rewrite sregs_set_reg. by apply irrelevant_register_set. Qed.
-
-(** The register [r] is passed EXPLICITLY, never left as an [_]: the
-    [ltac:(reg_ne)] hole is elaborated before the enclosing application is
-    unified with the goal, so with [r] an evar [reg_ne] "solves" the side
-    condition by picking a lemma that INSTANTIATES [r] to something else
-    entirely (durable notes: a tactic in an argument position whose expected
-    type is still an evar). *)
-Local Ltac ld8_peel r :=
-  rewrite (set_lookup_ne r nextPC _ _ ltac:(reg_ne))
-          (set_lookup_ne r (R_bool minstret_increment) _ _ ltac:(reg_ne)).
+    what this costs is the register peels ([WeakLeafWin.leaf_peel]) that move
+    each config fact past the two pre-writes, and the [wmem_restrict_lookup]
+    of the eight data bytes. *)
 
 Lemma exec_eff_ld8_at (s0 : mstate) (b : bool)
     (pc : SailStdpp.Values.mword 64) (rs1 rd : mword 5) (imm : mword 12)
@@ -313,21 +209,21 @@ Proof.
                     nextPC (add_vec_int pc 4)).
   (* every config register, moved past the funnel's two pre-writes *)
   assert (Lpriv_s : register_lookup cur_privilege s.(sregs) = Machine)
-    by (unfold s; ld8_peel cur_privilege; exact Lpriv).
+    by (unfold s; leaf_peel cur_privilege; exact Lpriv).
   assert (Lms_s : register_lookup mstatus s.(sregs)
                   = register_lookup mstatus s0.(sregs))
-    by (unfold s; ld8_peel mstatus; reflexivity).
+    by (unfold s; leaf_peel mstatus; reflexivity).
   assert (Lsec_s : register_lookup mseccfg s.(sregs)
                    = register_lookup mseccfg s0.(sregs))
-    by (unfold s; ld8_peel mseccfg; reflexivity).
+    by (unfold s; leaf_peel mseccfg; reflexivity).
   assert (Lpmpc_s : register_lookup pmpcfg_n s.(sregs)
                     = register_lookup pmpcfg_n s0.(sregs))
-    by (unfold s; ld8_peel pmpcfg_n; reflexivity).
+    by (unfold s; leaf_peel pmpcfg_n; reflexivity).
   assert (Lpma_s : register_lookup pma_regions s.(sregs)
                    = register_lookup pma_regions s0.(sregs))
-    by (unfold s; ld8_peel pma_regions; reflexivity).
+    by (unfold s; leaf_peel pma_regions; reflexivity).
   assert (Lhtif_s : register_lookup htif_tohost_base s.(sregs) = None)
-    by (unfold s; ld8_peel htif_tohost_base; exact Lhtif).
+    by (unfold s; leaf_peel htif_tohost_base; exact Lhtif).
   (* the base register, and the two identity bridges the model's [Let]s need *)
   assert (Hbase : (if Z.eqb (uint rs1) 0 then zero_reg
                    else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1)))
@@ -336,7 +232,7 @@ Proof.
                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1)))
                             s0.(sregs))).
   { destruct (Z.eqb (uint rs1) 0) eqn:Ez; [reflexivity|].
-    unfold s; ld8_peel (R_bitvector_64 (gpr_of_Z (uint rs1))); reflexivity. }
+    unfold s; leaf_peel (R_bitvector_64 (gpr_of_Z (uint rs1))); reflexivity. }
   assert (Ha8 : zero_extend' 64 (subrange_vec_dec
             (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                       else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1)))
@@ -377,40 +273,8 @@ Proof.
     exact (Hbytes j ltac:(lia)).
 Qed.
 
-(** The three bookkeeping facts about the [execute]'s successor that
-    [wP_eff_of_leaf_base] (and [WeakEffSkel.exec_eff_riscv_step_base]) ask for
-    alongside the run: the hart is still active, the [minstret_increment] flag
-    survived, and the run moved neither the memory nor the devices. *)
-Lemma ld8_sexec_facts (s0 : mstate) (b : bool)
-    (npc : SailStdpp.Values.mword 64) (rd : mword 5)
-    (x : SailStdpp.Values.mword 64) :
-  let s_exec :=
-    set_reg (set_reg (set_reg s0 (R_bool minstret_increment) b) nextPC npc)
-      (R_bitvector_64 (gpr_of_Z (uint rd))) x in
-  register_lookup hart_state (sregs s_exec)
-    = register_lookup hart_state s0.(sregs)
-  /\ register_lookup (R_bool minstret_increment) (sregs s_exec) = b
-  /\ mem s_exec = s0.(mem)
-  /\ mdev s_exec = s0.(mdev)
-  /\ register_lookup nextPC (sregs s_exec) = npc.
-Proof.
-  cbn zeta. split_and!.
-  - rewrite (set_lookup_ne hart_state (R_bitvector_64 (gpr_of_Z (uint rd)))
-               _ _ ltac:(reg_ne)).
-    by rewrite (set_lookup_ne hart_state nextPC _ _ ltac:(reg_ne))
-               (set_lookup_ne hart_state (R_bool minstret_increment)
-                  _ _ ltac:(reg_ne)).
-  - rewrite (set_lookup_ne (R_bool minstret_increment)
-               (R_bitvector_64 (gpr_of_Z (uint rd))) _ _ ltac:(reg_ne)).
-    rewrite (set_lookup_ne (R_bool minstret_increment) nextPC
-               _ _ ltac:(reg_ne)).
-    rewrite sregs_set_reg. apply register_lookup_set.
-  - by rewrite !mem_set_reg.
-  - by rewrite !mdev_set_reg.
-  - rewrite (set_lookup_ne nextPC (R_bitvector_64 (gpr_of_Z (uint rd)))
-               _ _ ltac:(reg_ne)).
-    rewrite sregs_set_reg. apply register_lookup_set.
-Qed.
+(** The successor's bookkeeping facts are [WeakLeafWin.load_sexec_facts]
+    (width-independent, shared with the other load-class leaves). *)
 
 (** *** 2d. THE [wP_eff] HALF, as a standalone lemma over the resources.
 
@@ -423,12 +287,6 @@ Qed.
 
 Section wP_eff_half.
   Context `{!riscvGS Σ, !weakGS Σ}.
-
-  Lemma wpt8_align (ea : Arch.pa) (dq : dfrac) (v : bv 64) (ws : wstate) :
-    vwp_hold (wpt8 ea dq v) ws ⊢ ⌜is_aligned_paddr (Physaddr ea) 8 = true⌝.
-  Proof.
-    rewrite /wpt8 !vwp_hold_sep !vwp_hold_pure. by iIntros "(%H & _)".
-  Qed.
 
   Lemma wP_eff_ld8 (cid : nat) (σ : wmstate)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
@@ -487,12 +345,12 @@ Section wP_eff_half.
     iDestruct (wpt8_align with "Hpt") as %Halea.
     iPureIntro.
     destruct Hfok as (Hal2 & Hrampc & w' & [Hww _] & Htext). subst w'.
-    apply (wP_eff_of_leaf_base cid σ (wld8_window pc ea) pc w
+    apply (wP_eff_of_leaf_base cid σ (wwin pc ea 8) pc w
              (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
              [WEread wak_plain ea 8] D dst).
     - exact Hwf.
-    - exact (wld8_window_nonzero pc ea Hrampc Hram8).
-    - exact (wld8_window_pinned σ pc ea Haccpc Haccea Hpinpc Hpinea).
+    - exact (wwin_nonzero pc ea 8 Hrampc Hram8).
+    - exact (wwin_pinned σ pc ea 8 Haccpc Haccea Hpinpc Hpinea).
     - exact Lpc.
     - exact Lpriv.
     - exact (pmp_all_off_allows_all _ Lpmp).
@@ -504,7 +362,7 @@ Section wP_eff_half.
     - exact Lelp.
     - exact Hal4.
     - exact Hrampc.
-    - exact (wld8_window_conf_text σ pc ea w Htext).
+    - exact (wwin_conf_text σ pc ea 8 w Htext).
     - exact HnotRVC.
     - exact Hagree.
     - exact HDmi.
@@ -513,19 +371,19 @@ Section wP_eff_half.
     - reflexivity.
     - intro b. eexists. split_and!.
       + exact (exec_eff_ld8_at
-                 (MState (wm_regs σ) (wmem_restrict σ (wld8_window pc ea))
+                 (MState (wm_regs σ) (wmem_restrict σ (wwin pc ea 8))
                     (wm_dev σ)) b pc rs1 rd imm ea v
                  Hrd Lpriv Lmprv Lpmm Lpmp Lpma Lhtif Hea Halea Hram8
-                 (wld8_window_conf_data σ pc ea v Hflat8)).
-      + rewrite (proj1 (ld8_sexec_facts
-                   (MState (wm_regs σ) (wmem_restrict σ (wld8_window pc ea))
+                 (wwin_conf_data σ pc ea 8 v Hflat8)).
+      + rewrite (proj1 (load_sexec_facts
+                   (MState (wm_regs σ) (wmem_restrict σ (wwin pc ea 8))
                       (wm_dev σ)) b (add_vec_int pc 4) rd (regval_into_reg v))).
         exact Lhart.
-      + exact (proj1 (proj2 (ld8_sexec_facts
-                   (MState (wm_regs σ) (wmem_restrict σ (wld8_window pc ea))
+      + exact (proj1 (proj2 (load_sexec_facts
+                   (MState (wm_regs σ) (wmem_restrict σ (wwin pc ea 8))
                       (wm_dev σ)) b (add_vec_int pc 4) rd (regval_into_reg v)))).
-      + rewrite (proj1 (proj2 (proj2 (ld8_sexec_facts
-                   (MState (wm_regs σ) (wmem_restrict σ (wld8_window pc ea))
+      + rewrite (proj1 (proj2 (proj2 (load_sexec_facts
+                   (MState (wm_regs σ) (wmem_restrict σ (wwin pc ea 8))
                       (wm_dev σ)) b (add_vec_int pc 4) rd (regval_into_reg v))))).
         apply wmem_restrict_dom.
   Qed.
@@ -538,7 +396,7 @@ End wP_eff_half.
     The device frame — [wmstate_norg σ']'s [dev_interp (wm_dev σ')] conjunct,
     which needs [wm_dev σ' = wm_dev σ] while [WeakInstr.wstep_post] gives only
     [wm_dev σ' = mdev t] — is handed over by the funnel as
-    [⌜mdev t = mdev s_exec⌝], and [ld8_sexec_facts] says the [execute]'s own
+    [⌜mdev t = mdev s_exec⌝], and [load_sexec_facts] says the [execute]'s own
     successor moved no device.  Two lines.  (Before that argument was added to
     [WeakFunnel.wwp_cb] the leaf had to replay the entire [riscv_step] a
     second time at the FLAT state and identify the two successors by
@@ -568,15 +426,6 @@ Section leaf.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Implicit Types Φ : mval -> iProp Σ.
-
-  (** A register read at [σ], through the funnel's [minstret_increment]
-      pre-write.  [sregs (wflat_st σ)] IS [wm_regs σ] by conversion. *)
-  Lemma reg_at_flat (r : register) (σ : wmstate) (b : bool) :
-    register_beq r (R_bool minstret_increment) = false ->
-    register_lookup r
-      (sregs (set_reg (wflat_st σ) (R_bool minstret_increment) b))
-      = register_lookup r (wm_regs σ).
-  Proof. intros H. exact (set_mi_lookup r (wflat_st σ) b H). Qed.
 
   Lemma wwp_ld8_leaf Φ
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
@@ -701,7 +550,7 @@ Section leaf.
        [execute]'s, and the [execute] moved none at all *)
     assert (Hdevt : mdev t = wm_dev σ).
     { rewrite Hdevt0 -(wflat_st_dev σ).
-      exact (proj1 (proj2 (proj2 (proj2 (ld8_sexec_facts (wflat_st σ) b
+      exact (proj1 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st σ) b
                 (add_vec_int pc 4) rd (regval_into_reg v)))))). }
     destruct Hpost as (Hregs & Hdevs & Hmems & Himgs & Hlogs & Hwsle & Hwf' & Hbnd').
     destruct HQ as (HQi & HQl & HQv).
@@ -710,7 +559,7 @@ Section leaf.
             with "Hwsauth Hhws") as "[Hwsauth Hhws]".
     iMod "Hclose" as "_". iModIntro.
     (* the PC the funnel hands back IS [pc+4] *)
-    iEval (rewrite (proj2 (proj2 (proj2 (proj2 (ld8_sexec_facts (wflat_st σ) b
+    iEval (rewrite (proj2 (proj2 (proj2 (proj2 (load_sexec_facts (wflat_st σ) b
              (add_vec_int pc 4) rd (regval_into_reg v))))))) in "Hpc'".
     iSplitL "Hlat"; [by rewrite HQi HQl|].
     iSplitL "Hdev Hlogauth Hwsauth".
@@ -732,53 +581,26 @@ End leaf.
 (** ** 4. WHAT THIS COST
 
     THE PRICE, in CODE lines (comments and blank lines excluded, statements
-    included).  The SC leaf this is measured against, [WpMmodeLoad.wp_ld_gpr],
-    is 152 by the same count (the batch-2 report quoted 128 for it):
+    included), after the two funnel-seam fixes AND the batch-2 consolidation
+    (the window kit, the register helpers and [wpt8_align] hoisted to
+    [WeakLeafWin]; [addr_is_ram_pa_z_nz] there too).  The SC leaf this is
+    measured against, [WpMmodeLoad.wp_ld_gpr], is 152 by the same count:
 
-                                                    batch 2   now
-      §1  the width-generic certificate + instances     37      37
-      §2a the window .............................      25      25
-      §2b its three obligations ..................      40      40
-      §2c the [execute] lemma at a generic [s0] ..     137     137
-      §2d the [wP_eff] half ......................     102     102
-      §3a the SECOND replay, for the device frame     116       0
-      §3b the WP composition proper ..............     191     142
-                                                     ----    ----
-                                              total   648     509
+      §1  the width-generic certificate + instances     37  (per FAMILY)
+      §2c the [execute] lemma at a generic [s0] ..     137
+      §2d the [wP_eff] half ......................     102
+      §3  the WP composition proper ..............     142
 
-    THE UNIT PRICE OF A LEAF IS 472 — the 509 less §1's 37, which is paid
-    ONCE for the whole plain-load family — i.e. **3.1× the SC leaf**.  Two
-    seam fixes took it there from 611 (= 648 − 37, i.e. 4.0×):
-
-      - the device frame.  §3a was a 116-line SECOND replay of the whole
-        [riscv_step] at the FLAT state whose only purpose was to learn
-        [mdev t]; [WeakFunnel.wwp_cb] now hands it over as
-        [⌜mdev t = mdev s_exec⌝] and the leaf spends two lines.
-      - the config reads.  [wwp_cb] now also hands over
-        [⌜WeakFunnel.wcfg_regs σ pmpcfg0⌝] — everything the funnel read off
-        the [mmode_config] bundle it was given.  So this file no longer
-        splits [mmode_config] in half, no longer keeps the second half to
-        [reg_valid_dq] nine registers at [σ], no longer transports those nine
-        past the [minstret_increment] pre-write, and no longer recombines the
-        halves for the continuation: 43 lines, and the funnel takes the WHOLE
-        [mmode_config (DfracOwn q)] and gives it back.  What is left of the
-        register reads is the ONE the funnel cannot know: this instruction's
-        base register.
-
-    §2a+§2b+§2d = 167 is the price the porting guide predicted (the window
-    plus ONE re-instantiation of the leaf's own SC library lemma at the
-    confined memory).  §2c (137) is the SC leaf's own execute-fact block
-    hoisted to an arbitrary [s0 : mstate] so that BOTH instantiations —
-    confined and flat — are the same lemma applied twice; ~50 of it is work
-    the SC leaf already does inline.  So the genuinely NEW work in a leaf is
-    §2a+§2b+§2d+§3b = 309 lines, and half of that is the WP composition.
+    plus the leaf's share of the ONE shared window kit.  The definitive
+    price history (648 → 509 → this) lives in
+    [claude-notes/projects/weak-memory.md], "THE BATCH-2 UNIT PRICE, FINAL".
 
     ONE SMALLER SEAM, worth recording:
 
     - [WeakFetchEff.wP_eff_of_leaf_base] takes the [execute]'s [exec_eff]
       fact at a state written out as [MState (wm_regs σ) (wmem_restrict σ W)
       (wm_dev σ)].  Stating the leaf's own execute lemma over an ARBITRARY
-      [s0 : mstate] (as [exec_eff_ld8_at] below does) is what makes the two
+      [s0 : mstate] (as [exec_eff_ld8_at] above does) is what makes the two
       instantiations — confined and flat — literally the same lemma applied
       twice, and it also dodges the [gmap Arch.pa] binder-instance trap
       outright.  Recommend that shape for every leaf of the sweep. *)

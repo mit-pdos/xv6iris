@@ -773,5 +773,14 @@ WeakLeafEff8.v
 WeakLeafEff8s.v
 WeakLeafBase4.v
 WeakLeafAmo4.v
+WeakLeafWin.v
 WeakLeafLd8.v
 WeakFetchRvc.v
+WeakFetch2.v
+WeakLeafSd8.v
+WeakLeafLw4.v
+WeakLeafSw4.v
+WeakLeafAmo4Leaf.v
+WeakWalkEff.v
+WkEntryEff.v
+WkEntryNew.v

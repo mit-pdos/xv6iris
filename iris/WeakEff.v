@@ -394,7 +394,7 @@ Definition wQ_quiet : wmstate -> wmstate -> Prop :=
 Lemma wcert_quiet (cid : nat) (pc : SailStdpp.Values.mword 64) (es : list weff) :
   quiet_trace es -> wstep_cert cid pc (wP_eff (Some cid) es) wQ_quiet.
 Proof.
-  intros Hq. apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  intros Hq. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   rewrite /wQ_quiet. split_and!.
   - exact Hi.
   - destruct (weffs_quiet_log (Some cid) s es Hq) as (l & Hl' & Hql).
@@ -513,7 +513,7 @@ Qed.
 Lemma wcert_nowrite (cid : nat) (pc : SailStdpp.Values.mword 64) (es : list weff) :
   nowrite_trace es -> wstep_cert cid pc (wP_eff (Some cid) es) wQ_pure.
 Proof.
-  intros Hnw. apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  intros Hnw. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   rewrite /wQ_pure. split_and!.
   - exact Hi.
   - rewrite Hl. exact (weffs_nowrite_log (Some cid) s es Hnw).
@@ -532,7 +532,7 @@ Lemma wcert_fence_gen (cid : nat) (pc : SailStdpp.Values.mword 64)
   wstep_cert cid pc
     (wP_eff (Some cid) (pre ++ WEbar b :: post)) (wQ_fence b).
 Proof.
-  intros Hpre Hpost. apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  intros Hpre Hpost. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   rewrite /wQ_fence /wV_fence Hws weffs_app weffs_cons weff_apply_bar.
   etrans; [apply barrier_post_mono, weffs_ws_le|].
   etrans; [|apply (weffs_ws_le (Some cid) _ post)].
@@ -548,7 +548,7 @@ Lemma wcert_store_gen (cid : nat) (pc : SailStdpp.Values.mword 64)
     (wP_eff (Some cid) (pre ++ WEwrite akw ea 4 v :: post))
     (wQ_store (Some cid) ea v).
 Proof.
-  intros Hpre Hpost. apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  intros Hpre Hpost. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   assert (Hle : ws_le (wm_ws s) (wm_ws s')) by (rewrite Hws; apply weffs_ws_le).
   set (s1 := weffs (Some cid) s pre).
   assert (Hl1 : wm_log s1 = wm_log s)
@@ -583,7 +583,7 @@ Lemma wcert_load_gen (cid : nat) (pc : SailStdpp.Values.mword 64)
   wstep_cert cid pc
     (wP_eff (Some cid) (pre ++ WEread akl ea 4 :: post)) (wQ_load ea).
 Proof.
-  intros Hcoh Hpre Hpost. apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  intros Hcoh Hpre Hpost. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   set (s1 := weffs (Some cid) s pre).
   assert (Hl1 : wm_log s1 = wm_log s)
     by exact (weffs_nowrite_log (Some cid) s pre Hpre).
@@ -627,7 +627,7 @@ Lemma wcert_amo_aq_gen (cid : nat) (pc : SailStdpp.Values.mword 64)
     (wQ_amo_aq (Some cid) ea v).
 Proof.
   intros Hcoh Hsync Hpre Hpost. apply wstep_cert_eff.
-  intros s s' HP Hi Hl Hws.
+  intros s s' Hi Hl Hws.
   assert (Hle : ws_le (wm_ws s) (wm_ws s')) by (rewrite Hws; apply weffs_ws_le).
   set (s1 := weffs (Some cid) s pre).
   assert (Hl1 : wm_log s1 = wm_log s)

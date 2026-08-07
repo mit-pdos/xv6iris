@@ -115,6 +115,16 @@ Proof.
   rewrite Hn. cbn match. apply exec_eff_returnm.
 Qed.
 
+(** ... and its WRITE twin, the gate every store/AMO leaf probes. *)
+Lemma exec_eff_within_htif_w_false (a : Arch.pa) (w : Z) s :
+  register_lookup htif_tohost_base s.(sregs) = None ->
+  exec_eff (within_htif_writable (Physaddr a) w) s = Some (false, s, []).
+Proof.
+  intro Hn. unfold within_htif_writable.
+  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg htif_tohost_base s)).
+  rewrite Hn. cbn match. apply exec_eff_returnm.
+Qed.
+
 Lemma exec_eff_effectivePrivilege_fetch (m : SailStdpp.Values.mword 64)
     (p : Privilege) s :
   exec_eff (effectivePrivilege (InstructionFetch tt) m p) s = Some (p, s, []).
@@ -868,21 +878,23 @@ Proof.
   apply Zrem_divides. exists (2 * k)%Z. lia.
 Qed.
 
-(** THE STATEMENT.  [W] is written [(W : _)] deliberately: this file imports
-    [SailStdpp.Base], which leaks a SECOND [Countable Arch.pa] instance, and a
-    binder spelled [gset Arch.pa] here elaborates against it — the two print
-    identically and every application then fails (durable notes, the
-    binder-position instance trap).  Letting [wmem_restrict]'s own argument
-    pin the type is the fix. *)
-Lemma wP_eff_of_leaf_base
-    (cid : nat) (σ : wmstate) (W : _)
+(** THE RUN-ASSEMBLY HALF, standalone: everything below is pinnedness-FREE —
+    the wrapper, the fetch, the decode bridge and the tick assembled into the
+    [∀ tick] run fact.  [wP_eff_of_leaf_base] (whole-window pinnedness) and
+    [wP_eff_pin_of_leaf_base] (trace-keyed pinnedness, the invariant-form AMO
+    leaf's shape) are this plus their window packaging — so a pin-form leaf
+    costs its packaging lines, not a clone of the assembly.
+
+    [W] is written [(W : _)] deliberately: this file imports [SailStdpp.Base],
+    which leaks a SECOND [Countable Arch.pa] instance, and a binder spelled
+    [gset Arch.pa] here elaborates against it — the two print identically and
+    every application then fails (durable notes, the binder-position instance
+    trap).  Letting [wmem_restrict]'s own argument pin the type is the fix. *)
+Lemma exec_eff_step_of_leaf_base
+    (σ : wmstate) (W : _)
     (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
     (i : instruction) (es_x : list weff)
     (D : register -> bool) (dst : mstate) :
-  (* --- the window (porting guide §2, items 1-3) --- *)
-  wlog_wf (wm_log σ) ->
-  (forall a, a ∈ W -> pa_z a <> 0) ->
-  (forall a, a ∈ W -> pinned_read σ (pa_z a)) ->
   (* --- the M-mode config tower: the SAME facts [wwp_instr] collects --- *)
   register_lookup PC (wm_regs σ) = pc ->
   register_lookup cur_privilege (wm_regs σ) = Machine ->
@@ -918,13 +930,16 @@ Lemma wP_eff_of_leaf_base
      /\ register_lookup hart_state (sregs s_exec) = HART_ACTIVE tt
      /\ register_lookup (R_bool minstret_increment) (sregs s_exec) = b
      /\ dom (mem s_exec) ⊆ W) ->
-  (* --- the certificate's whole obligation --- *)
-  wP_eff (Some cid) ([WEread wak_plain pc 4] ++ es_x) σ.
+  (* --- the per-tick run fact --- *)
+  forall tick : bool, exists t' : mstate,
+    exec_eff (riscv_step tick)
+      (MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ))
+      = Some (tt, t', ([WEread wak_plain pc 4] ++ es_x)%list) /\
+    dom (mem t') ⊆ W.
 Proof.
-  intros Hwf HW0 HWp Lpc Lpriv Lpmp Lpma Lhtif Lhart LmisaS LmIE Lelp
+  intros Lpc Lpriv Lpmp Lpma Lhtif Lhart LmisaS LmIE Lelp
          Hal Hram Htext HnotRVC Hagree HDmi Hgood Hdec Hnlpad Hexec.
   set (sconf := MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ)).
-  apply (wP_eff_of_window cid _ σ W Hwf HW0 HWp).
   intros tick.
   (* the funnel's own choice of the [minstret_increment] flag *)
   destruct (exec_eff_should_inc_minstret_Some
@@ -991,6 +1006,116 @@ Proof.
   rewrite Hmt'. destruct b; cbn [mem set_reg]; exact Hdom.
 Qed.
 
+(** THE WHOLE-WINDOW PACKAGING — the recipe every owned-data leaf applies.
+    Statement unchanged from when this lemma carried the assembly inline. *)
+Lemma wP_eff_of_leaf_base
+    (cid : nat) (σ : wmstate) (W : _)
+    (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
+    (i : instruction) (es_x : list weff)
+    (D : register -> bool) (dst : mstate) :
+  (* --- the window (porting guide §2, items 1-3) --- *)
+  wlog_wf (wm_log σ) ->
+  (forall a, a ∈ W -> pa_z a <> 0) ->
+  (forall a, a ∈ W -> pinned_read σ (pa_z a)) ->
+  (* --- the M-mode config tower: the SAME facts [wwp_instr] collects --- *)
+  register_lookup PC (wm_regs σ) = pc ->
+  register_lookup cur_privilege (wm_regs σ) = Machine ->
+  pmp_allows_all (register_lookup pmpcfg_n (wm_regs σ)) ->
+  pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
+  register_lookup htif_tohost_base (wm_regs σ) = None ->
+  register_lookup hart_state (wm_regs σ) = HART_ACTIVE tt ->
+  eq_vec (_get_Misa_S (register_lookup misa (wm_regs σ))) ('b"1") = true ->
+  eq_vec (_get_Mstatus_MIE (register_lookup mstatus (wm_regs σ))) ('b"1")
+    = false ->
+  eq_vec (register_lookup elp (wm_regs σ))
+         (landing_pad_bits_backwards LP_EXPECTED) = false ->
+  (* --- (a) the text word, IN THE CONFINED MEMORY, at a 4-aligned pc --- *)
+  is_aligned_vaddr (Virtaddr pc) 4 = true ->
+  (forall j : nat, (j < 4)%nat -> addr_is_ram (pa_add pc j)) ->
+  (forall j : nat, (j < 4)%nat ->
+     wmem_restrict σ W !! pa_add pc j = Some (nth_byte w j)) ->
+  isRVC (subrange_vec_dec w 15 0) = false ->
+  (* --- (b) the DECODE, exactly as the decode library states it --- *)
+  (forall r, D r = true ->
+     register_lookup r (wm_regs σ) = register_lookup r dst.(sregs)) ->
+  D (R_bool minstret_increment) = false ->
+  goodb0 D (ext_decode w) dst = true ->
+  exec (ext_decode w) dst = Some (i, dst) ->
+  is_lpad_instruction i = false ->
+  (* --- (c) the [execute]'s own [exec_eff] fact, and its register frame --- *)
+  (forall b : bool, exists s_exec : mstate,
+     exec_eff (execute i)
+       (set_reg (set_reg (MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ))
+                   (R_bool minstret_increment) b)
+                nextPC (add_vec_int pc 4))
+       = Some (RETIRE_SUCCESS, s_exec, es_x)
+     /\ register_lookup hart_state (sregs s_exec) = HART_ACTIVE tt
+     /\ register_lookup (R_bool minstret_increment) (sregs s_exec) = b
+     /\ dom (mem s_exec) ⊆ W) ->
+  (* --- the certificate's whole obligation --- *)
+  wP_eff (Some cid) ([WEread wak_plain pc 4] ++ es_x) σ.
+Proof.
+  intros Hwf HW0 HWp Lpc Lpriv Lpmp Lpma Lhtif Lhart LmisaS LmIE Lelp
+         Hal Hram Htext HnotRVC Hagree HDmi Hgood Hdec Hnlpad Hexec.
+  apply (wP_eff_of_window cid _ σ W Hwf HW0 HWp).
+  exact (exec_eff_step_of_leaf_base σ W pc w i es_x D dst
+           Lpc Lpriv Lpmp Lpma Lhtif Lhart LmisaS LmIE Lelp
+           Hal Hram Htext HnotRVC Hagree HDmi Hgood Hdec Hnlpad Hexec).
+Qed.
+
+(** THE PIN PACKAGING — the same split with §5a's TRACE-KEYED pinnedness in
+    place of the whole-window premise.  This is the shape an invariant-form
+    leaf (the AMO) produces: it owns nothing at its data word, so it can pin
+    only the reads that do not self-pin (for the AMO: the fetch alone). *)
+Lemma wP_eff_pin_of_leaf_base
+    (cid : nat) (σ : wmstate) (W : _)
+    (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
+    (i : instruction) (es_x : list weff)
+    (D : register -> bool) (dst : mstate) :
+  wlog_wf (wm_log σ) ->
+  (forall a, a ∈ W -> pa_z a <> 0) ->
+  trace_pin σ ([WEread wak_plain pc 4] ++ es_x) ->
+  register_lookup PC (wm_regs σ) = pc ->
+  register_lookup cur_privilege (wm_regs σ) = Machine ->
+  pmp_allows_all (register_lookup pmpcfg_n (wm_regs σ)) ->
+  pma_allows_all (register_lookup pma_regions (wm_regs σ)) ->
+  register_lookup htif_tohost_base (wm_regs σ) = None ->
+  register_lookup hart_state (wm_regs σ) = HART_ACTIVE tt ->
+  eq_vec (_get_Misa_S (register_lookup misa (wm_regs σ))) ('b"1") = true ->
+  eq_vec (_get_Mstatus_MIE (register_lookup mstatus (wm_regs σ))) ('b"1")
+    = false ->
+  eq_vec (register_lookup elp (wm_regs σ))
+         (landing_pad_bits_backwards LP_EXPECTED) = false ->
+  is_aligned_vaddr (Virtaddr pc) 4 = true ->
+  (forall j : nat, (j < 4)%nat -> addr_is_ram (pa_add pc j)) ->
+  (forall j : nat, (j < 4)%nat ->
+     wmem_restrict σ W !! pa_add pc j = Some (nth_byte w j)) ->
+  isRVC (subrange_vec_dec w 15 0) = false ->
+  (forall r, D r = true ->
+     register_lookup r (wm_regs σ) = register_lookup r dst.(sregs)) ->
+  D (R_bool minstret_increment) = false ->
+  goodb0 D (ext_decode w) dst = true ->
+  exec (ext_decode w) dst = Some (i, dst) ->
+  is_lpad_instruction i = false ->
+  (forall b : bool, exists s_exec : mstate,
+     exec_eff (execute i)
+       (set_reg (set_reg (MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ))
+                   (R_bool minstret_increment) b)
+                nextPC (add_vec_int pc 4))
+       = Some (RETIRE_SUCCESS, s_exec, es_x)
+     /\ register_lookup hart_state (sregs s_exec) = HART_ACTIVE tt
+     /\ register_lookup (R_bool minstret_increment) (sregs s_exec) = b
+     /\ dom (mem s_exec) ⊆ W) ->
+  wP_eff_pin (Some cid) ([WEread wak_plain pc 4] ++ es_x) σ.
+Proof.
+  intros Hwf HW0 HWp Lpc Lpriv Lpmp Lpma Lhtif Lhart LmisaS LmIE Lelp
+         Hal Hram Htext HnotRVC Hagree HDmi Hgood Hdec Hnlpad Hexec.
+  apply (wP_eff_pin_of_window cid _ σ W Hwf HW0 HWp).
+  exact (exec_eff_step_of_leaf_base σ W pc w i es_x D dst
+           Lpc Lpriv Lpmp Lpma Lhtif Lhart LmisaS LmIE Lelp
+           Hal Hram Htext HnotRVC Hagree HDmi Hgood Hdec Hnlpad Hexec).
+Qed.
+
 (* ====================================================================== *)
 (** ** 9. THE END-TO-END CHECK: a [WeakCert] certificate re-derived through
         the recipe, with ZERO hand-peeling
@@ -1029,6 +1154,21 @@ Lemma wcert_amo_aq_base4 (cid : nat) (pc : SailStdpp.Values.mword 64)
 Proof.
   intros Hcoh Hsync.
   exact (wcert_amo_aq cid pc wak_plain pc 4 aka akw ea v Hcoh Hsync).
+Qed.
+
+(** ... and the PIN form at the same fetch element — what the invariant-form
+    lock leaf's slot-in check consumes ([[a] ++ [b; c]] IS [[a; b; c]], so one
+    [exact]). *)
+Lemma wcert_amo_aq_pin_base4 (cid : nat) (pc : SailStdpp.Values.mword 64)
+    (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
+  ak_coh aka = false -> ak_sync aka = true ->
+  wstep_cert cid pc
+    (wP_eff_pin (Some cid)
+       ([WEread wak_plain pc 4] ++ [WEread aka ea 4; WEwrite akw ea 4 v]))
+    (wQ_amo_aq (Some cid) ea v).
+Proof.
+  intros Hcoh Hsync.
+  exact (wcert_amo_aq_pin cid pc wak_plain pc 4 aka akw ea v Hcoh Hsync).
 Qed.
 
 (** *** 9b. …and the recipe at the same [es], for the LOAD shape.

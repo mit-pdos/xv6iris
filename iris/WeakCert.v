@@ -128,6 +128,26 @@ Proof.
   intros [->|Hin]%elem_of_cons; simpl; rewrite dom_insert; set_solver.
 Qed.
 
+(** ... and the SUBSET form: a write whose base map and footprint both live in
+    [X] stays inside [X].  This is the shape every store/AMO leaf's
+    write-domain confinement ([dom (mem s_exec) ⊆ W]) instantiates — the
+    per-leaf [w*_window_wdom] lemmas are one [apply] of this. *)
+Lemma write_bytes_dom_sub {wd : N} (mm : gmap Arch.pa (bv 8)) pa n (v : bv wd)
+    (X : gset Arch.pa) :
+  dom mm ⊆ X ->
+  (forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j ∈ X) ->
+  dom (write_bytes mm pa n v) ⊆ X.
+Proof.
+  rewrite /write_bytes => Hbase Hin.
+  assert (Hin' : forall j : nat, j ∈ seq 0 (N.to_nat n) -> pa_add pa j ∈ X)
+    by (intros j Hj%elem_of_seq; apply Hin; lia).
+  revert Hin'. induction (seq 0 (N.to_nat n)) as [|j l IH]; intros Hin';
+    simpl; [exact Hbase|].
+  rewrite dom_insert_L. apply union_least.
+  - intros z ->%elem_of_singleton. apply Hin', elem_of_cons. by left.
+  - apply IH. intros k Hk. apply Hin', elem_of_cons. by right.
+Qed.
+
 (** MEMORY ONLY GROWS along an [exec] run — so a write's footprint is inside
     the FINAL memory's domain, which is the confinement handle for the write
     arm (a write, unlike a read, cannot fail and so confines nothing itself). *)
@@ -560,38 +580,83 @@ Qed.
 (* ====================================================================== *)
 (** ** 5. THE CONFINED-EXEC CERTIFICATE
 
-    Read the premises as: the window [W] is pinned for this hart and does not
-    contain the null address; the confined map [mm] lives in the window and
-    agrees with the real memory; the SC interpreter RUNS TO COMPLETION on it;
-    and it never writes outside the window.  Conclusion: the whole step's peel.
+    *** 5a. [trace_pin] — pinnedness, keyed on the TRACE.
+
+    THE PRIMARY CONFINEMENT PREMISE.  "Every read of the trace whose access
+    kind does not itself force the latest value has its footprint pinned for
+    this hart."  This is exactly what the two consumers of pinnedness —
+    [wstep_ok]'s read arm and [WeakBridge.wread_pinned_ts] — ask for, premise
+    for premise: both take it under [ak_pins ak = false], so a SELF-PINNING
+    read ([ak_coh]: fetch/walker; [ak_latest]: an AMO's read half) is exempt.
+    The historical whole-window form ("[pinned_read] on ALL of [W]") is an
+    over-approximation that is right for the owned-data leaves but UNPROVABLE
+    for a contended AMO — the lock word is in the window (the WRITE's
+    footprint is confined by it) while the acquirer's index need not cover
+    its latest write.  It survives below (§5c) as the every-read-pinned
+    INSTANCE of the pin theorem. *)
+
+Definition trace_pin (s : wmstate) (es : list weff) : Prop :=
+  forall (ak : akinfo) (pa : Arch.pa) (n : N),
+    WEread ak pa n ∈ es -> ak_pins ak = false ->
+    forall j : nat, (j < N.to_nat n)%nat -> pinned_read s (acc_addr pa j).
+
+(** The three transports the induction needs — each is the corresponding
+    [pinned_read] transport, pointwise. *)
+Lemma trace_pin_mono (s s' : wmstate) (es : list weff) :
+  wm_log s' = wm_log s -> ws_le (wm_ws s) (wm_ws s') ->
+  trace_pin s es -> trace_pin s' es.
+Proof.
+  intros Hl Hle Hp ak pa n Hin Hnp j Hj.
+  exact (pinned_read_mono s s' _ Hl Hle (Hp ak pa n Hin Hnp j Hj)).
+Qed.
+
+Lemma trace_pin_write (tid : option nat) (s : wmstate) (ak0 : akinfo)
+    (pa0 : Arch.pa) (n0 : N) (v : bv (8 * n0)) (es : list weff) :
+  trace_pin s es -> trace_pin (wwrite_post tid s ak0 pa0 n0 v) es.
+Proof.
+  intros Hp ak pa n Hin Hnp j Hj.
+  exact (pinned_read_write tid s ak0 pa0 n0 v _ (Hp ak pa n Hin Hnp j Hj)).
+Qed.
+
+Lemma trace_pin_tail (s : wmstate) (e : weff) (es : list weff) :
+  trace_pin s (e :: es) -> trace_pin s es.
+Proof.
+  intros Hp ak pa n Hin. apply (Hp ak pa n). apply elem_of_cons. by right.
+Qed.
+
+(** *** 5b. THE CONFINED-RUN INDUCTION, under [trace_pin] — THE theorem.
+
+    Read the premises as: the window [W] does not contain the null address;
+    every non-self-pinning read of the trace is pinned for this hart; the
+    confined map [mm] lives in the window and agrees with the real memory;
+    the (instrumented) SC interpreter RUNS TO COMPLETION on it; and it never
+    writes outside the window.  Conclusion: the whole step's peel, plus the
+    weak successor's log and views as the fold of §4's trace.
 
     The induction is [WeakBridge]'s own ([exec_of_wexec_pinned]'s shape) with
     the confined map threaded alongside the weak state; the three arms that do
     any work are:
       - RAM read: [read_bytes mm] returned [Some], so the footprint is inside
-        [dom mm ⊆ W], which gives [acc_wf] and pinnedness; and the canonical
-        weak read returns the same word ([wread_bytes_read_bytes] plus
-        [read_bytes_mono]), so the two runs stay in lockstep;
+        [dom mm ⊆ W], which gives [acc_wf]; pinnedness — needed only under
+        [ak_pins = false] — comes off the trace's HEAD element; and the
+        canonical weak read returns the same word ([wread_bytes_read_bytes]
+        plus [read_bytes_mono]), so the two runs stay in lockstep;
       - RAM write: the footprint is inside the FINAL memory's domain
         ([exec_dom_mono]), hence in [W], which gives [acc_wf];
       - [Choose]: [exec] is stuck there, so the [False] arm — i.e. the whole
         [wexec_covers] side of the merge — is discharged by the [exec] fact
         itself.
 
-    [wstep_eff_confined] is that induction with the WEAK run threaded
-    alongside, so the same walk also delivers the successor's log and views as
-    the fold of §4's trace.  The non-memory arms are where [weffs_congr]
-    earns its keep: they change the state (a register, a device) in a way the
-    fold cannot see, so the IH's answer transports back verbatim.  The old
-    [wstep_ok_confined] is then the first projection, re-derived below at an
-    UNCHANGED statement. *)
+    The non-memory arms are where [weffs_congr] earns its keep: they change
+    the state (a register, a device) in a way the fold cannot see, so the
+    IH's answer transports back verbatim. *)
 
-Lemma wstep_eff_confined (tid : option nat) {X} (m : M X) :
+Lemma wstep_eff_confined_pin (tid : option nat) {X} (m : M X) :
   forall (s : wmstate) (mm : gmap Arch.pa (bv 8)) (W : gset Arch.pa)
          (x : X) (t' : mstate) (es : list weff),
     wlog_wf (wm_log s) ->
     (forall a, a ∈ W -> pa_z a <> 0) ->
-    (forall a, a ∈ W -> pinned_read s (pa_z a)) ->
+    trace_pin s es ->
     dom mm ⊆ W ->
     mm ⊆ wflat (wm_img s) (wm_log s) ->
     dom (mem t') ⊆ W ->
@@ -604,17 +669,16 @@ Lemma wstep_eff_confined (tid : option nat) {X} (m : M X) :
        wm_ws s' = wm_ws (weffs tid s es)).
 Proof.
   induction m as [y|T oc k IH];
-    intros s mm W x t' es Hwf HW0 HWp Hdom Hsub Hdom' Hex.
+    intros s mm W x t' es Hwf HW0 Hpes Hdom Hsub Hdom' Hex.
   - simpl in Hex. injection Hex as <- <- <-.
     split; [exact I|]. intros χ y0 s' χ' Hw.
     simpl in Hw. injection Hw as <- <- <-. by split_and!.
   - pose proof (exec_eff_exec _ _ _ _ _ Hex) as Hexc.
     destruct oc; simpl in Hex, Hexc |- *; try discriminate;
-      try (exact (IH _ s mm W x t' es Hwf HW0 HWp Hdom Hsub Hdom' Hex)).
+      try (exact (IH _ s mm W x t' es Hwf HW0 Hpes Hdom Hsub Hdom' Hex)).
     + (* RegWrite: the fold cannot see a register *)
-      assert (Hp2 : forall a, a ∈ W -> pinned_read (wset_reg s reg regval) (pa_z a)).
-      { intros a Ha. apply (pinned_read_mono s _ (pa_z a));
-          [reflexivity|reflexivity|by apply HWp]. }
+      assert (Hp2 : trace_pin (wset_reg s reg regval) es)
+        by (apply (trace_pin_mono s); [reflexivity|reflexivity|exact Hpes]).
       destruct (IH tt (wset_reg s reg regval) mm W x t' es Hwf HW0 Hp2
                   Hdom Hsub Hdom' Hex) as [Hok Hag].
       split; [exact Hok|]. intros χ y s' χ' Hw.
@@ -624,9 +688,8 @@ Proof.
       destruct (dev_addr _) eqn:Hd.
       * (* device: no effect emitted *)
         destruct (dev_read _ _ _) as [[w0 d0]|] eqn:Hdr; [|discriminate].
-        assert (Hp2 : forall a, a ∈ W -> pinned_read (wset_dev s d0) (pa_z a)).
-        { intros a Ha. apply (pinned_read_mono s _ (pa_z a));
-            [reflexivity|reflexivity|by apply HWp]. }
+        assert (Hp2 : trace_pin (wset_dev s d0) es)
+          by (apply (trace_pin_mono s); [reflexivity|reflexivity|exact Hpes]).
         destruct (IH _ (wset_dev s d0) mm W x t' es Hwf HW0 Hp2
                     Hdom Hsub Hdom' Hex) as [Hok Hag].
         split.
@@ -644,9 +707,16 @@ Proof.
           by (intros j Hj; apply Hdom, (read_bytes_dom mm _ _ w0 Hrb j Hj)).
         assert (Hacc : acc_wf (Interface.ReadReq.pa t) n)
           by (apply (acc_wf_window W); [exact HW0|exact Hin]).
-        assert (Hpinf : forall j : nat, (j < N.to_nat n)%nat ->
-                  pinned_read s (acc_addr (Interface.ReadReq.pa t) j)).
-        { intros j Hj. rewrite -(acc_wf_byte _ _ j Hacc Hj). by apply HWp, Hin. }
+        (* THE PIN REFINEMENT: pinnedness of THIS read's footprint, exactly
+           under [ak_pins = false] — off the trace's head element *)
+        assert (Hpinf : ak_pins (classify (Interface.ReadReq.access_kind t))
+                          = false ->
+                  forall j : nat, (j < N.to_nat n)%nat ->
+                    pinned_read s (acc_addr (Interface.ReadReq.pa t) j)).
+        { intros Hnp j Hj.
+          apply (Hpes (classify (Interface.ReadReq.access_kind t))
+                   (Interface.ReadReq.pa t) n);
+            [apply elem_of_cons; by left|exact Hnp|exact Hj]. }
         (* the canonical weak read IS the confined one *)
         assert (Hwrb : wread_bytes s (classify (Interface.ReadReq.access_kind t))
                          (Interface.ReadReq.pa t) n
@@ -655,13 +725,14 @@ Proof.
                      (classify (Interface.ReadReq.access_kind t))
                      (Interface.ReadReq.pa t) n Hwf Hacc).
           exact (read_bytes_mono mm _ _ _ w0 Hsub Hrb). }
-        assert (Hp2 : forall a, a ∈ W ->
-                  pinned_read (wread_post s
-                                 (classify (Interface.ReadReq.access_kind t))
-                                 (Interface.ReadReq.pa t)
-                                 (coh_ts s (Interface.ReadReq.pa t) n)) (pa_z a)).
-        { intros a Ha. apply (pinned_read_mono s _ (pa_z a));
-            [by rewrite wread_post_log|apply wread_post_ws_le|by apply HWp]. }
+        assert (Hp2 : trace_pin
+                        (wread_post s
+                           (classify (Interface.ReadReq.access_kind t))
+                           (Interface.ReadReq.pa t)
+                           (coh_ts s (Interface.ReadReq.pa t) n)) es0).
+        { apply (trace_pin_mono s);
+            [by rewrite wread_post_log|apply wread_post_ws_le
+            |exact (trace_pin_tail s _ es0 Hpes)]. }
         assert (Hsub2 : mm ⊆
                   wflat (wm_img (wread_post s
                                    (classify (Interface.ReadReq.access_kind t))
@@ -688,7 +759,7 @@ Proof.
         split.
         -- split_and!.
            ++ exact Hacc.
-           ++ intros _ j Hj. exact (Hpinf j Hj).
+           ++ exact Hpinf.
            ++ intros w Hw. rewrite Hwrb in Hw. injection Hw as <-. exact Hok.
         -- intros χ y s' χ' Hw.
            destruct (ak_coh (classify (Interface.ReadReq.access_kind t))) eqn:Hcoh.
@@ -703,7 +774,7 @@ Proof.
               { apply (wread_pinned_ts s
                          (classify (Interface.ReadReq.access_kind t))
                          (Interface.ReadReq.pa t) n ts w);
-                  [intros _ j Hj; exact (Hpinf j Hj)
+                  [exact Hpinf
                   |exact (wread_bytes_spec _ _ _ _ _ _ Hrb2)]. }
               rewrite Hts in Hrb2. rewrite Hwrb in Hrb2. injection Hrb2 as <-.
               rewrite Hts in Hw.
@@ -712,9 +783,8 @@ Proof.
     + (* MemWrite *)
       destruct (dev_addr _) eqn:Hd.
       * destruct (dev_write _ _ _ _) as [d0|] eqn:Hdw; [|discriminate].
-        assert (Hp2 : forall a, a ∈ W -> pinned_read (wset_dev s d0) (pa_z a)).
-        { intros a Ha. apply (pinned_read_mono s _ (pa_z a));
-            [reflexivity|reflexivity|by apply HWp]. }
+        assert (Hp2 : trace_pin (wset_dev s d0) es)
+          by (apply (trace_pin_mono s); [reflexivity|reflexivity|exact Hpes]).
         destruct (IH _ (wset_dev s d0) mm W x t' es Hwf HW0 Hp2
                     Hdom Hsub Hdom' Hex) as [Hok Hag].
         split.
@@ -735,12 +805,12 @@ Proof.
           apply (exec_dom_mono _ _ _ _ Hexc). simpl. by apply write_bytes_dom. }
         assert (Hacc : acc_wf (Interface.WriteReq.pa t) n)
           by (apply (acc_wf_window W); [exact HW0|exact Hin]).
-        assert (Hp2 : forall a, a ∈ W ->
-                  pinned_read (wwrite_post tid s
-                                 (classify (Interface.WriteReq.access_kind t))
-                                 (Interface.WriteReq.pa t) n
-                                 (Interface.WriteReq.value t)) (pa_z a))
-          by (intros a Ha; by apply pinned_read_write, HWp).
+        assert (Hp2 : trace_pin
+                        (wwrite_post tid s
+                           (classify (Interface.WriteReq.access_kind t))
+                           (Interface.WriteReq.pa t) n
+                           (Interface.WriteReq.value t)) es0)
+          by (apply trace_pin_write; exact (trace_pin_tail s _ es0 Hpes)).
         assert (Hdom2 : dom (write_bytes mm (Interface.WriteReq.pa t) n
                                (Interface.WriteReq.value t)) ⊆ W)
           by (etrans; [apply (exec_dom_mono _ _ _ _ Hexc)|exact Hdom']).
@@ -769,14 +839,100 @@ Proof.
       destruct (exec_eff (k tt) (MState (wm_regs s) mm (wm_dev s)))
         as [[[x0 t0] es0]|] eqn:Hee; [|discriminate].
       injection Hex as <- <- <-.
-      assert (Hp2 : forall a, a ∈ W ->
-                pinned_read (wset_ws s (barrier_post (wm_ws s) b)) (pa_z a)).
-      { intros a Ha. apply (pinned_read_mono s _ (pa_z a));
-          [reflexivity|apply barrier_post_le|by apply HWp]. }
+      assert (Hp2 : trace_pin (wset_ws s (barrier_post (wm_ws s) b)) es0).
+      { apply (trace_pin_mono s);
+          [reflexivity|apply barrier_post_le
+          |exact (trace_pin_tail s _ es0 Hpes)]. }
       destruct (IH tt (wset_ws s (barrier_post (wm_ws s) b)) mm W x0 t0 es0
                   Hwf HW0 Hp2 Hdom Hsub Hdom' Hee) as [Hok Hag].
       split; [exact Hok|]. intros χ y s' χ' Hw.
       destruct (Hag χ y s' χ' Hw) as (Hi & Hl & Hws). by split_and!.
+Qed.
+
+(** *** 5c. The whole-window form, as the EVERY-READ-PINNED instance.
+
+    Whole-window pinnedness implies [trace_pin]: every read the confined run
+    records has its footprint inside the final memory's domain (reads look up
+    the current map, which only grows — the read twin of [exec_dom_mono]),
+    hence inside [W], where everything is pinned. *)
+
+Lemma exec_eff_reads_dom {X} (m : M X) :
+  forall (s : mstate) (x : X) (s' : mstate) (es : list weff),
+    exec_eff m s = Some (x, s', es) ->
+    forall (ak : akinfo) (pa : Arch.pa) (n : N),
+      WEread ak pa n ∈ es ->
+      forall j : nat, (j < N.to_nat n)%nat -> pa_add pa j ∈ dom (mem s').
+Proof.
+  induction m as [y|T oc k IH]; intros s x s' es Hex ak pa n Hin j Hj.
+  - simpl in Hex. injection Hex as <- <- <-. by apply elem_of_nil in Hin.
+  - destruct oc; simpl in Hex; try discriminate;
+      try (exact (IH _ _ _ _ _ Hex ak pa n Hin j Hj)).
+    + (* MemRead *)
+      destruct (dev_addr _).
+      * destruct (dev_read _ _ _) as [[w0 d']|]; [|discriminate].
+        exact (IH _ _ _ _ _ Hex ak pa n Hin j Hj).
+      * destruct (read_bytes _ _ _) as [w0|] eqn:Hrb; [|discriminate].
+        destruct (exec_eff _ _) as [[[x1 u1] es1]|] eqn:Hee; [|discriminate].
+        injection Hex as <- <- <-.
+        apply elem_of_cons in Hin as [He|Hin].
+        -- injection He as -> -> ->.
+           apply (exec_dom_mono _ _ _ _ (exec_eff_exec _ _ _ _ _ Hee)).
+           exact (read_bytes_dom _ _ _ _ Hrb j Hj).
+        -- exact (IH _ _ _ _ _ Hee ak pa n Hin j Hj).
+    + (* MemWrite *)
+      destruct (dev_addr _).
+      * destruct (dev_write _ _ _ _) as [d'|]; [|discriminate].
+        exact (IH _ _ _ _ _ Hex ak pa n Hin j Hj).
+      * destruct (exec_eff _ _) as [[[x1 u1] es1]|] eqn:Hee; [|discriminate].
+        injection Hex as <- <- <-.
+        apply elem_of_cons in Hin as [He|Hin]; [discriminate He|].
+        exact (IH _ _ _ _ _ Hee ak pa n Hin j Hj).
+    + (* Barrier *)
+      destruct (exec_eff _ _) as [[[x1 u1] es1]|] eqn:Hee; [|discriminate].
+      injection Hex as <- <- <-.
+      apply elem_of_cons in Hin as [He|Hin]; [discriminate He|].
+      exact (IH _ _ _ _ _ Hee ak pa n Hin j Hj).
+Qed.
+
+Lemma confined_trace_pin {X} (m : M X) (s : wmstate)
+    (mm : gmap Arch.pa (bv 8)) (W : gset Arch.pa) (x : X) (t' : mstate)
+    (es : list weff) :
+  (forall a, a ∈ W -> pa_z a <> 0) ->
+  (forall a, a ∈ W -> pinned_read s (pa_z a)) ->
+  dom (mem t') ⊆ W ->
+  exec_eff m (MState (wm_regs s) mm (wm_dev s)) = Some (x, t', es) ->
+  trace_pin s es.
+Proof.
+  intros HW0 HWp Hdom' Hex ak pa n Hin _ j Hj.
+  assert (Hin' : forall j0 : nat, (j0 < N.to_nat n)%nat -> pa_add pa j0 ∈ W)
+    by (intros j0 Hj0; apply Hdom',
+          (exec_eff_reads_dom m _ _ _ _ Hex ak pa n Hin j0 Hj0)).
+  assert (Hacc : acc_wf pa n)
+    by (apply (acc_wf_window W); [exact HW0|exact Hin']).
+  rewrite -(acc_wf_byte pa n j Hacc Hj). exact (HWp _ (Hin' j Hj)).
+Qed.
+
+Lemma wstep_eff_confined (tid : option nat) {X} (m : M X) :
+  forall (s : wmstate) (mm : gmap Arch.pa (bv 8)) (W : gset Arch.pa)
+         (x : X) (t' : mstate) (es : list weff),
+    wlog_wf (wm_log s) ->
+    (forall a, a ∈ W -> pa_z a <> 0) ->
+    (forall a, a ∈ W -> pinned_read s (pa_z a)) ->
+    dom mm ⊆ W ->
+    mm ⊆ wflat (wm_img s) (wm_log s) ->
+    dom (mem t') ⊆ W ->
+    exec_eff m (MState (wm_regs s) mm (wm_dev s)) = Some (x, t', es) ->
+    wstep_ok tid m s /\
+    (forall χ (y : X) (s' : wmstate) (χ' : list (list nat)),
+       wexec tid m χ s = Some (y, s', χ') ->
+       wm_img s' = wm_img s /\
+       wm_log s' = wm_log (weffs tid s es) /\
+       wm_ws s' = wm_ws (weffs tid s es)).
+Proof.
+  intros s mm W x t' es Hwf HW0 HWp Hdom Hsub Hdom' Hex.
+  exact (wstep_eff_confined_pin tid m s mm W x t' es Hwf HW0
+           (confined_trace_pin m s mm W x t' es HW0 HWp Hdom' Hex)
+           Hdom Hsub Hdom' Hex).
 Qed.
 
 (** The peel alone, at M3b's statement — everything downstream still sees
@@ -911,10 +1067,15 @@ Qed.
          instruction's text word and its data word, both above 0x80000000;
      (c) [pinned_read σ] on [W]      — [WeakInstr.wkernel_text_pinned] for the
          text half (unwritten this era, free) and [wpt4_pinned] for the data
-         half (owned), or NOTHING for an AMO's data word (the read half is
-         [ak_latest], and [wstep_ok] asks for no pinnedness there — but the
-         window must still be listed, since a WRITE's footprint is confined by
-         the window too);
+         half (owned).  THE EXACT ACCOUNTING IS TRACE-KEYED (§5a): pinnedness
+         is needed precisely where [ak_pins ak = false]; a self-pinning read
+         — [ak_coh] (fetch/walker) or [ak_latest] (an AMO's read half) — is
+         exempt.  This whole-window form demands it of ALL of [W], which is
+         right for the owned-data leaves but UNPROVABLE for a contended AMO
+         (the acquirer's index need not cover the lock word's latest write):
+         such a leaf uses [wP_eff_pin] (§7) instead.  Either way an AMO's
+         data word must still be LISTED in [W], since a WRITE's footprint is
+         confined by the window too;
      (d) [exec (riscv_step tick) (MState (wm_regs σ) (wmem_restrict σ W)
          (wm_dev σ)) = Some (tt, t')] with [dom (mem t') ⊆ W] — the leaf's own
          SC library lemma, instantiated at a SECOND state whose memory is the
@@ -929,15 +1090,74 @@ Qed.
 (* ====================================================================== *)
 (** ** 7. A CERTIFICATE WHOSE [Q] COMES FROM THE TRACE
 
-    [wstep_conf] (§6) asks for an [exec] fact; [wstep_conf_eff] asks for the
-    INSTRUMENTED one, at a FIXED trace [es].  That is the whole difference,
-    and it costs the leaf nothing: the same SC library lemma, run through
-    [exec_eff] instead of [exec], names the same window and the same final
-    memory — it additionally pins the (two- or three-element) list of memory
-    effects the instruction performs, which is exactly the data [Q] is about.
+    [wstep_conf] (§6) asks for an [exec] fact; [wstep_conf_eff_pin] asks for
+    the INSTRUMENTED one, at a FIXED trace [es].  That is the whole
+    difference, and it costs the leaf nothing: the same SC library lemma, run
+    through [exec_eff] instead of [exec], names the same window and the same
+    final memory — it additionally pins the (two- or three-element) list of
+    memory effects the instruction performs, which is exactly the data [Q] is
+    about.
 
-    [wstep_cert_eff] then reduces a certificate to a statement about that
-    concrete list: no [wexec], no oracle, no monad. *)
+    THE PRIMARY FORM IS THE PIN ONE: its pinnedness premise is §5a's
+    trace-keyed [trace_pin], so it serves the invariant-form AMO leaf as well
+    as the owned-data leaves.  The historical whole-window [wP_eff] survives
+    below as the every-read-pinned instance ([wP_eff_pin_of_eff]), and its
+    certificate rule [wstep_cert_eff] is unchanged in statement — both reduce
+    a certificate to a statement about the concrete effect list: no [wexec],
+    no oracle, no monad. *)
+
+Definition wstep_conf_eff_pin (tid : option nat) (es : list weff)
+    (s : wmstate) : Prop :=
+  exists W : gset Arch.pa,
+    (forall a, a ∈ W -> pa_z a <> 0) /\
+    trace_pin s es /\
+    (forall tick : bool, exists t' : mstate,
+       exec_eff (riscv_step tick)
+         (MState (wm_regs s) (wmem_restrict s W) (wm_dev s)) = Some (tt, t', es) /\
+       dom (mem t') ⊆ W).
+
+Definition wP_eff_pin (tid : option nat) (es : list weff) : wmstate -> Prop :=
+  fun s => wlog_wf (wm_log s) /\ wstep_conf_eff_pin tid es s.
+
+(** The pin obligation, as an [apply]-able rule ([WeakEffSkel.wP_eff_of_window]'s
+    twin). *)
+Lemma wP_eff_pin_of_window (cid : nat) (es : list weff) (σ : wmstate)
+    (W : gset Arch.pa) :
+  wlog_wf (wm_log σ) ->
+  (forall a, a ∈ W -> pa_z a <> 0) ->
+  trace_pin σ es ->
+  (forall tick : bool, exists t' : mstate,
+     exec_eff (riscv_step tick)
+       (MState (wm_regs σ) (wmem_restrict σ W) (wm_dev σ)) = Some (tt, t', es) /\
+     dom (mem t') ⊆ W) ->
+  wP_eff_pin (Some cid) es σ.
+Proof.
+  intros Hwf HW0 HWp Hrun. split; [exact Hwf|].
+  exists W. split_and!; [exact HW0|exact HWp|exact Hrun].
+Qed.
+
+Lemma wstep_cert_eff_pin (cid : nat) (pc : SailStdpp.Values.mword 64)
+    (es : list weff) (Q : wmstate -> wmstate -> Prop) :
+  (forall s s' : wmstate,
+     wm_img s' = wm_img s ->
+     wm_log s' = wm_log (weffs (Some cid) s es) ->
+     wm_ws s' = wm_ws (weffs (Some cid) s es) ->
+     Q s s') ->
+  wstep_cert cid pc (wP_eff_pin (Some cid) es) Q.
+Proof.
+  intros HQ s tick Hpc Hacc Htext HP.
+  pose proof HP as (Hwf & W & HW0 & HWp & Hex).
+  destruct (Hex tick) as (t' & Ht' & Hdom').
+  destruct (wstep_eff_confined_pin (Some cid) (riscv_step tick) s
+              (wmem_restrict s W) W tt t' es Hwf HW0 HWp
+              (wmem_restrict_dom s W) (wmem_restrict_sub s W) Hdom' Ht')
+    as [Hok Hag].
+  split; [exact Hok|].
+  intros χ s' χ' Hw. destruct (Hag χ tt s' χ' Hw) as (Hi & Hl & Hws).
+  exact (HQ s s' Hi Hl Hws).
+Qed.
+
+(** THE WHOLE-WINDOW FORM — what every owned-data leaf produces. *)
 
 Definition wstep_conf_eff (tid : option nat) (es : list weff) (s : wmstate)
     : Prop :=
@@ -962,10 +1182,19 @@ Proof.
   exists t'. split; [exact (exec_eff_exec _ _ _ _ _ Ht')|exact Hdom'].
 Qed.
 
+(** ... and it is the every-read-pinned INSTANCE of the pin form (§5c's
+    conversion, off any one tick's run). *)
+Lemma wP_eff_pin_of_eff tid es s : wP_eff tid es s -> wP_eff_pin tid es s.
+Proof.
+  intros (Hwf & W & HW0 & HWp & Hex). split; [exact Hwf|].
+  exists W. split_and!; [exact HW0| |exact Hex].
+  destruct (Hex false) as (t' & Ht' & Hdom').
+  exact (confined_trace_pin _ s _ W tt t' es HW0 HWp Hdom' Ht').
+Qed.
+
 Lemma wstep_cert_eff (cid : nat) (pc : SailStdpp.Values.mword 64)
     (es : list weff) (Q : wmstate -> wmstate -> Prop) :
   (forall s s' : wmstate,
-     wP_eff (Some cid) es s ->
      wm_img s' = wm_img s ->
      wm_log s' = wm_log (weffs (Some cid) s es) ->
      wm_ws s' = wm_ws (weffs (Some cid) s es) ->
@@ -981,7 +1210,7 @@ Proof.
     as [Hok Hag].
   split; [exact Hok|].
   intros χ s' χ' Hw. destruct (Hag χ tt s' χ' Hw) as (Hi & Hl & Hws).
-  exact (HQ s s' HP Hi Hl Hws).
+  exact (HQ s s' Hi Hl Hws).
 Qed.
 
 (* ====================================================================== *)
@@ -1067,7 +1296,7 @@ Lemma wcert_fence (cid : nat) (pc : SailStdpp.Values.mword 64)
   wstep_cert cid pc
     (wP_eff (Some cid) [WEread akf pf nf; WEbar b]) (wQ_fence b).
 Proof.
-  apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  apply wstep_cert_eff. intros s s' Hi Hl Hws.
   rewrite /wQ_fence /wV_fence Hws weffs_cons2 weff_apply_read weff_apply_bar
           wm_ws_wset_ws.
   apply barrier_post_mono, wread_post_ws_le.
@@ -1082,7 +1311,7 @@ Lemma wcert_store (cid : nat) (pc : SailStdpp.Values.mword 64)
     (wP_eff (Some cid) [WEread akf pf nf; WEwrite akw ea 4 v])
     (wQ_store (Some cid) ea v).
 Proof.
-  apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  apply wstep_cert_eff. intros s s' Hi Hl Hws.
   assert (Hle : ws_le (wm_ws s) (wm_ws s')) by (rewrite Hws; apply weffs_ws_le).
   rewrite weffs_cons2 weff_apply_read weff_apply_write in Hl Hws.
   rewrite wwrite_post_log wread_post_log in Hl.
@@ -1105,7 +1334,7 @@ Lemma wcert_amo_aq (cid : nat) (pc : SailStdpp.Values.mword 64)
     (wP_eff (Some cid) [WEread akf pf nf; WEread aka ea 4; WEwrite akw ea 4 v])
     (wQ_amo_aq (Some cid) ea v).
 Proof.
-  intros Hcoh Hsync. apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  intros Hcoh Hsync. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   assert (Hle : ws_le (wm_ws s) (wm_ws s')) by (rewrite Hws; apply weffs_ws_le).
   rewrite weffs_cons3 !weff_apply_read weff_apply_write in Hl Hws.
   (* the fetch left the log alone, so the AMO's read is at [coh_ts s] *)
@@ -1142,7 +1371,7 @@ Lemma wcert_load (cid : nat) (pc : SailStdpp.Values.mword 64)
   wstep_cert cid pc
     (wP_eff (Some cid) [WEread akf pf nf; WEread akl ea 4]) (wQ_load ea).
 Proof.
-  intros Hcoh. apply wstep_cert_eff. intros s s' HP Hi Hl Hws.
+  intros Hcoh. apply wstep_cert_eff. intros s s' Hi Hl Hws.
   rewrite weffs_cons2 !weff_apply_read in Hl Hws.
   rewrite (coh_ts_log (wread_post s akf pf (coh_ts s pf nf)) s ea 4
              (wread_post_log s akf pf (coh_ts s pf nf))) in Hl Hws.
@@ -1157,4 +1386,49 @@ Proof.
            (pa_z ea) (coh_ts s ea 4) j).
   - intros w a t. apply load_byte_gain.
   - rewrite coh_ts_length. exact Hj.
+Qed.
+
+(** *** 8f. [amoswap.w.aq], PIN FORM — the certificate the invariant-form
+    lock leaf consumes.  §8d's view arithmetic, verbatim, over
+    [wstep_cert_eff_pin]: the arithmetic never used the [P], and the
+    trace-keyed premise is the only [P] a contended acquirer can discharge
+    (the fetch is the sole non-self-pinning read of the trace).
+    Width-4-only, like §8d: this IS the width-4 instruction (generalize with
+    the first [amoswap.d] leaf, per the notes). *)
+
+Lemma wcert_amo_aq_pin (cid : nat) (pc : SailStdpp.Values.mword 64)
+    (akf : akinfo) (pf : Arch.pa) (nf : N)
+    (aka akw : akinfo) (ea : Arch.pa) (v : bv 32) :
+  ak_coh aka = false -> ak_sync aka = true ->
+  wstep_cert cid pc
+    (wP_eff_pin (Some cid) [WEread akf pf nf; WEread aka ea 4; WEwrite akw ea 4 v])
+    (wQ_amo_aq (Some cid) ea v).
+Proof.
+  intros Hcoh Hsync. apply wstep_cert_eff_pin. intros s s' Hi Hl Hws.
+  assert (Hle : ws_le (wm_ws s) (wm_ws s')) by (rewrite Hws; apply weffs_ws_le).
+  rewrite weffs_cons3 !weff_apply_read weff_apply_write in Hl Hws.
+  (* the fetch left the log alone, so the AMO's read is at [coh_ts s] *)
+  rewrite (coh_ts_log (wread_post s akf pf (coh_ts s pf nf)) s ea 4
+             (wread_post_log s akf pf (coh_ts s pf nf))) in Hl Hws.
+  rewrite wwrite_post_log !wread_post_log in Hl.
+  rewrite wwrite_post_ws !wread_post_log in Hws.
+  rewrite (wread_post_ws_weak (wread_post s akf pf (coh_ts s pf nf)) aka ea
+             (coh_ts s ea 4) Hcoh) Hsync in Hws.
+  rewrite /wQ_amo_aq /wQ_amo_aq_w. split.
+  - rewrite /wQ_store_w /wV_store_w. split_and!; [exact Hi|exact Hl|exact Hle|].
+    intros j Hj. rewrite Hws flr_ws_view /acc_addr.
+    etrans; [|apply Nat.le_max_r].
+    apply (store_post_run_coh
+             (load_post_run (wm_ws (wread_post s akf pf (coh_ts s pf nf)))
+                true (pa_z ea) (coh_ts s ea 4))
+             (ak_sync akw) (pa_z ea) (N.to_nat 4) (S (length (wm_log s))) j).
+    exact Hj.
+  - rewrite /wV_amo_aq_w. intros j Hj. rewrite Hws.
+    rewrite -(coh_ts_lookup s ea 4 j Hj).
+    etrans; [|apply ws_view_mono, store_post_run_le].
+    apply (load_post_run_gain (fun _ t => view_scl t)
+             (wm_ws (wread_post s akf pf (coh_ts s pf nf))) true (pa_z ea)
+             (coh_ts s ea 4) j).
+    + intros w a t. apply amo_acq_gain.
+    + rewrite coh_ts_length. exact Hj.
 Qed.
