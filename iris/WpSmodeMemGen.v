@@ -553,7 +553,7 @@ Proof.
   { rewrite (subrange_full_gen_cast (8 * width) dat ltac:(lia)).
     exact (exec_mem_write_value_w_S PBMT_PMA pa region dat (register_lookup mstatus s'.(sregs)) s'
              HA Hord Hrange HW Hmatch Hpalign Hwrite Hc Hsig Hh Hdev eq_refl Hmprv Hcp). }
-  exact (exec_vmem_write_addr_aligned_store width a pa dat Supervisor md s s'
+  exact (exec_vmem_write_addr_aligned_store width a pa dat Supervisor md s s' _
            Hvw Halign Heff Htm Htr Hea Hwv).
 Qed.
 End SWwSwalkPt.
