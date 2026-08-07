@@ -1141,3 +1141,106 @@ Proof.
     [ rewrite pm_transform_PA_0 | rewrite pm_transform_VA_0 ];
     apply exec_returnM.
 Qed.
+
+(* ===================================================================== *)
+(* §5b THE LR/SC PMA BRICKS, restated for the bump.  [pmaCheck] answers a   *)
+(*     PLAN now, and the LR/SC arms are the ones that gate on               *)
+(*     [PMA_reservability]: on a user-mapped, aligned, R/W address the       *)
+(*     access either RETIRES (reservability set -- the plan is the aligned   *)
+(*     one, since the whole splitting axis is inert for an aligned access)   *)
+(*     or takes an ACCESS FAULT (reservability = RsrvNone).  The access      *)
+(*     type carries the instruction's aq/rl now; nothing in the PMA path     *)
+(*     inspects them, so these are generic in both.                          *)
+(* ===================================================================== *)
+
+Lemma exec_pmaCheck_ram_lr_ok (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) (aq rl : bool) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  andb (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable)
+       (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability)
+          RsrvNone) = true ->
+  exec (pmaCheck (Physaddr addr) k (LoadReserved (aq, rl, Data)) pbmt true) s
+    = Some (Ok pma_ok_aligned, s).
+Proof.
+  intros Hmatch Hfield Halign.
+  destruct region as [rbase rsize rattr rdtree].
+  pma_ok_peel Hmatch Halign (exec_is_mag_applicable_lr aq rl k s) Hfield.
+Qed.
+
+Lemma exec_pmaCheck_ram_sc_ok (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) (aq rl : bool) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
+  is_aligned_paddr (Physaddr addr) k = true ->
+  andb (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable)
+       (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability)
+          RsrvNone) = true ->
+  exec (pmaCheck (Physaddr addr) k (StoreConditional (aq, rl, Data)) pbmt true) s
+    = Some (Ok pma_ok_aligned, s).
+Proof.
+  intros Hmatch Hfield Halign.
+  destruct region as [rbase rsize rattr rdtree].
+  pma_ok_peel Hmatch Halign (exec_is_mag_applicable_sc aq rl k s) Hfield.
+Qed.
+
+(* ...and the DENIAL arm: reservability = RsrvNone, so [pmaCheck] answers the
+   access fault its access type maps to.  (This is the peel [pma_ok_peel] does
+   not do -- it takes the [canAccess] branch instead of the [mag_pma_check]
+   one.) *)
+Lemma exec_pmaCheck_ram_lr_deny (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) (aq rl : bool) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
+  andb (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable)
+       (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability)
+          RsrvNone) = false ->
+  exec (pmaCheck (Physaddr addr) k (LoadReserved (aq, rl, Data)) pbmt true) s
+    = Some (Err (E_Load_Access_Fault tt), s).
+Proof.
+  intros Hmatch Hfield.
+  destruct region as [rbase rsize rattr rdtree].
+  unfold pmaCheck. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pma_regions _)). cbn beta.
+  rewrite Hmatch.
+  cbn [PMA_Region_attributes] in Hfield |- *.
+  cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  cbn [Riscv.rv64d.not negb].
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ _)). cbn beta.
+  rewrite execR_returnR. cbn match beta.
+  rewrite Hfield. cbn [Riscv.rv64d.not negb]. cbn match zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (accessFaultFromAccessType (LoadReserved (aq, rl, Data))) s
+                  = Some (E_Load_Access_Fault tt, s))).
+  2:{ unfold accessFaultFromAccessType. cbn match. apply exec_returnM. }
+  cbn beta. rewrite execR_returnR. reflexivity.
+Qed.
+
+Lemma exec_pmaCheck_ram_sc_deny (k : Z) (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) (aq rl : bool) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) k = Some region ->
+  andb (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable)
+       (generic_neq (override_PMA (PMA_Region_attributes region) pbmt).(PMA_reservability)
+          RsrvNone) = false ->
+  exec (pmaCheck (Physaddr addr) k (StoreConditional (aq, rl, Data)) pbmt true) s
+    = Some (Err (E_SAMO_Access_Fault tt), s).
+Proof.
+  intros Hmatch Hfield.
+  destruct region as [rbase rsize rattr rdtree].
+  unfold pmaCheck. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg pma_regions _)). cbn beta.
+  rewrite Hmatch.
+  cbn [PMA_Region_attributes] in Hfield |- *.
+  cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  cbn [Riscv.rv64d.not negb].
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ _)). cbn beta.
+  rewrite execR_returnR. cbn match beta.
+  rewrite Hfield. cbn [Riscv.rv64d.not negb]. cbn match zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (accessFaultFromAccessType (StoreConditional (aq, rl, Data))) s
+                  = Some (E_SAMO_Access_Fault tt, s))).
+  2:{ unfold accessFaultFromAccessType. cbn match. apply exec_returnM. }
+  cbn beta. rewrite execR_returnR. reflexivity.
+Qed.

@@ -244,10 +244,12 @@ green. Kept because the shapes below are what those proofs now look like.
 
 ## Where it stands (this is the current section — read it first)
 
-`make proofs -k` is green on **every file but one**: `UserMemClassify.v`, whose
-MISALIGNED pipeline (§6–§13) is still written against the pre-bump model. Do
-not trust a `-k` build's compile count as a green count — make does not attempt
-anything behind a red file; check `.vo` timestamps against
+`make proofs -k` is green on **every file but one**: `UserMemClassify.v`. Its
+MISALIGNED pipeline is DONE — `mem_read_total` and `mem_write_total` compile
+with their statements unchanged — and what it now stops on is a different and
+purely mechanical axis, the LR/SC/AMO sections' pre-bump interfaces (see "WHAT
+IS LEFT"). Do not trust a `-k` build's compile count as a green count — make
+does not attempt anything behind a red file; check `.vo` timestamps against
 `model-xv6iris/rv64d.vo`.
 
 `ProofPlicClaim` is fixed (the a0 value is `extend_value false cv` now, not the
@@ -309,6 +311,14 @@ handles either answer, so the granule stays a platform detail. (Proved for
 `pma_boot` in `BootConfig`; the only call site that had to change was
 `PtTreeAdue`'s `pma_all_ram` destructuring, which needed one more `& _`.)
 
+### `UserMemAccess.v` — the LR/SC PMA bricks
+
+`exec_pmaCheck_ram_lr_ok` / `_deny` and `exec_pmaCheck_ram_sc_ok` / `_deny`:
+[pmaCheck] answers a PLAN now, and on an aligned LR/SC the plan is
+[pma_ok_aligned] when the region is reservable and an ACCESS FAULT when it is
+not.  The `_ok` pair is [pma_ok_peel]; the `_deny` pair is the [canAccess]
+branch [pma_ok_peel] does not do.
+
 ### `UserMemMis.v` (new) — the misaligned user access
 
 - `split_misaligned_phys_derive` — the chunk plan, **generic in the width over
@@ -340,74 +350,62 @@ handles either answer, so the granule stays a platform detail. (Proved for
 
 ## WHAT IS LEFT
 
-### 1. `exec_vmem_write_addr_split2` (the page-straddling STORE)
+ONE axis, in ONE file: `UserMemClassify.v`'s LR/SC/AMO sections still name the
+PRE-BUMP interfaces. The misaligned pipeline above them is done and
+`mem_read_total` / `mem_write_total` compile; the build now stops at the first
+LR lemma (`exec_checked_mem_read_lr_g4`, ~line 2684).
 
-Written up as a PORT PENDING comment at the end of `UserMemMis.v`, with the
-statement it wants and the peel it wants. The one obstacle is the reservation
-`if` in `vmem_write_addr`: its scrutinee is
-`andb res (not (match_reservation …))` with `res` the literal `false`, so the
-`if` IS its else branch — but by CONVERSION, and `rewrite` needs the branch
-syntactically. Three ways of exposing it were tried and all fail:
+Three mechanical substitutions, ~95 LR/SC sites and ~46 AMO sites:
 
-- `cbn [andb]; cbn match beta` reduces the `if` but keeps going into the
-  monad's bind fixpoint and the goal explodes;
-- **`Local Opaque` does NOT stop `cbn`** (Opaque governs conversion in
-  `rewrite`/`unfold`, not `cbn`'s delta), and neither does
-  `Local Arguments mem_write_ea : simpl never` — with both in place the
-  exploded head is still `Interface.Next (RegRead mstatus None) …`, so whatever
-  `cbn` unfolds is not the leaf that was protected. **Find that constant first**
-  (raise `Set Printing Depth` and look past the `iMon_bind` fixpoint).
-- the `set`-the-branches trick `durable-notes` records for the ALIGNED store
-  does not apply, because this `if` is DEPENDENT
-  (`if … return MR _ bool then … else …`) and the Ltac1 pattern
-  `if ?c then ?T else ?E` does not match a `return`-annotated match
-  ("No matching clauses for match").
+1. **The access type carries the instruction's aq/rl.** `LoadReserved Data` →
+   `LoadReserved (aq, rl, Data)`, `StoreConditional Data` →
+   `StoreConditional (aq, rl, Data)`, `Atomic (op, Data, Data)` →
+   `Atomic (op, aq, rl, Data, Data)`. Nothing in the PMA/PMP path inspects
+   them, so every lemma is generic in both — the sections already carry
+   `aq rl : bool`. Get the annotations from the model, never by guessing:
+   `LOADRES` builds `LoadReserved(aq, rl, Data)` and calls `vmem_read` with
+   `aq, aq & rl`; `STORECON` builds `StoreConditional(aq, rl, Data)` and calls
+   `vmem_write` with `aq & rl, rl`.
+2. **`pmaCheck` answers a PLAN.** `phys_access_check` is no longer what the
+   memory chain calls — `check_pma_with_pmp_priority` is, and it is `pmaCheck`
+   first with `pmpCheck` only to PRIORITISE the exception on failure. The four
+   bricks are BUILT and green in `UserMemAccess.v`:
+   `exec_pmaCheck_ram_lr_ok` / `exec_pmaCheck_ram_lr_deny` /
+   `exec_pmaCheck_ram_sc_ok` / `exec_pmaCheck_ram_sc_deny` — the `_ok` pair is
+   `pma_ok_peel` (LR/SC are aligned, so the whole splitting axis is inert), the
+   `_deny` pair is the `canAccess` branch `pma_ok_peel` does not do. The AMO
+   pair is the one still to write; its arm gates on
+   `readable && writable && pma_allows_atomic_op`, which `pma_allows_all`
+   already pins for every op and width.
+3. **`MemoryOpResult`'s `Err` carries the address.** A `checked_mem_read` /
+   `mem_read` result is `Err (paddr, e)`, not `Err e`. Only the LR/SC/AMO
+   denial arms state one, so this rides along with (2).
 
-What is wanted is a way to name the two branches of a dependent `if`: an Ltac2
-`match` on `Constr.Unsafe.Case`, or a `Lemma if_false_dep` stated at this exact
-motive and applied with the branches as explicit arguments.
+Everything else those lemmas need already exists:
+`exec_pmpCheck_user_grant_lr` / `_sc` (already aq/rl-generic in
+`UserMemAccess`), `exec_read_ram_resv_kinds_1/2/4/8/16` (in the file),
+`RiscvFetchExec.execR_untilMT_1` and `RiscvExtras.usvd_zeros_full_*` for the
+one-iteration split loop.
 
-### 2. The iris straddle composers
-
-`user_pt_load_data_mis` / `user_pt_store_data_mis` cover ONE page. The
-straddling case classifies TWO: `data_classify` at `va` and at
-`va + in_page_bytes`, four outcomes (ok/ok, ok/fault, fault/-, and the fault
-flavour). Both parts are `in_one_page` by construction, and both are at widths
-in [1..7] — which is exactly why the composers above were generalized off
-`W ∈ {2,4,8}`.
-
-Also needed: the straddle side of `split_on_page_boundary`, i.e.
-`~ in_one_page va W -> exec (split_on_page_boundary va W) s = Some ((p, q), s)`
-with `p = 4096 - (uint va mod 4096)`, `q = W - p`. The model computes
-`nbytes_to_boundary = 8 - uint(addr[2:0])`, which agrees with the page distance
-for `W <= 8` because a page-crossing access has `uint va mod 4096 >= 4096 - W`.
-
-### 3. `UserMemClassify.v` §6–§13, restated
-
-This is the last file. The pieces that must go, and what replaces them:
-
-| gone | why | replacement |
-|---|---|---|
-| `SplitFaultRead` / `SplitFaultWrite` (§6/§7) | the vmem level no longer runs an N-chunk loop with a per-chunk fault | nothing — the fault is per PAGE now, and `MemAccessGen.exec_vmem_{read,write}_addr_intra_err` / the straddle `_err` lemmas cover it |
-| `MisReadClassify.read_classify_fold` (§8) and `MisWriteClassify.write_classify_fold` (§13) | they fold `data_classify` over N chunks | ONE `data_classify` per page (two at most) |
-| `split_misaligned_derive` (§11) | `split_misaligned` is 4-ary and physical now | `UserMemMis.split_misaligned_phys_derive`, already applied INSIDE the composers — the classifier never sees it |
-| `MisReadTotal.mem_read_misaligned_total` (§10) / `MemWriteTot.mem_write_misaligned_total` | per-chunk state sequence `sst`/`sstS` | a single `σ -> σ'` (read) or `σ -> σ' -> wchain` (store) |
-
-`mem_read_total` / `mem_write_total` and everything above them
-(`mem_exec_load_k`, `mem_exec_store_k`, the compressed arms) keep their
-statements unchanged — only the misaligned branch of their proofs moves. The
-misaligned branch becomes:
+The per-lemma shape, after the bricks:
 
 ```coq
-- (* misaligned *)
-  destruct (in_one_page_dec va k) as [Hin | Hout].
-  + (* one page: data_classify once, then user_pt_{load,store}_data_mis *)
-  + (* two pages: data_classify twice, then the straddle composer *)
+  destruct (generic_neq … RsrvNone) eqn:Hr.
+  - assert (Hcp : exec (check_pma_with_pmp_priority (LoadReserved (aq,rl,Data))
+                          pbmt User (Physaddr addr) k true) s
+                  = Some (Ok pma_ok_aligned, s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_ok … )).
+      cbn match. apply exec_returnM. }
+    (* …then the one-iteration untilMT peel, with the RESERVED read kind *)
+  - assert (Hcp : exec (check_pma_with_pmp_priority … ) s
+                  = Some (Err (E_Load_Access_Fault tt), s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_lr_deny … )). cbn match.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_user_grant_lr … )).
+      cbn match. apply exec_returnM. }
+    (* …then [checked_mem_read]'s early return, which is [Err (paddr, e)] *)
 ```
-
-`pow2_le8` moved to `UserMemMis.v` (with a `pow2_le8'` for `b <= 8`); the
-classifier no longer dispatches on the chunk width at all, because the chunk
-widths now live entirely inside the pure layer.
 
 ## The recipe, in one place (unchanged, still current)
 
