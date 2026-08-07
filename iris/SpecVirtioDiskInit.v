@@ -102,7 +102,6 @@ Require Import RegFile HartTp.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
-Notation VIRTIO_DISK_INIT := KernelSyms.virtio_disk_init.
 
 (* the [struct disk] fields this function touches (kernel/virtio_disk.c):
      +0x000 desc      the descriptor table page

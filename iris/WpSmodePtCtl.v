@@ -137,6 +137,23 @@ Proof.
   apply exec_returnM.
 Qed.
 
+(* [fence.i] is state-preserving unconditionally: [execute_FENCEI] is a single
+   [sail_barrier] (a no-op in the functional interpreter) and a [returnM].  It
+   needs no privilege or menvcfg hypothesis at all -- unlike [FENCE], whose
+   FIOM dispatch does.  (The User-mode twin is
+   [UserExecFacts.exec_execute_FENCEI_U]; re-proved here rather than imported,
+   so an S-mode WP file does not depend on the user-execution layer.) *)
+Lemma exec_execute_FENCEI_S (imm : mword 12) (rs rd : regidx) s :
+  exec (execute (FENCEI (imm, rs, rd))) s = Some (RETIRE_SUCCESS, s).
+Proof.
+  destruct rs as [i1]; destruct rd as [ird].
+  change (execute (FENCEI (imm, Regidx i1, Regidx ird)))
+    with (execute_FENCEI imm (Regidx i1) (Regidx ird)).
+  unfold execute_FENCEI.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_sail_barrier _ s)).
+  apply exec_returnM.
+Qed.
+
 Section WpSmodePtCtl.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

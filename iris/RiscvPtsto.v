@@ -100,6 +100,26 @@ Definition kptR : cmra := csumR (exclR unitO) (agreeR (leibnizO ptree)).
    exactly it: the pre-split field names are preserved verbatim as
    definitions below the class, so no statement anywhere changes. *)
 
+(* THE FS LOG-REGION MIRROR's VALUE (claude-notes/design/fs-log.md stage 4
+   phase C2b/D1).  Defined HERE, not in the FS layer, because the era record
+   below needs its gname and the fixed class below needs its [ghost_varG]:
+   both sit under every FS file.  It carries no FS CONSTANT (the geometry --
+   which block is the header, how many slots there are -- lives entirely in
+   [FsCrash.log_mirror_ok], above [SystemAdequacy]); it is just the shape of
+   the picture the WAL's writes hand each other:
+
+     - [lm_hdr]  : the ON-DISK header's [hdr_dec] reading, which is what
+       "the log is clean" / "the log holds (n, W)" are statements about;
+     - [lm_slots]: the ON-DISK log slots' contents, which is what
+       "the slots hold the logged values" is a statement about.
+
+   Both are recorded as READINGS rather than as bytes, because that is the
+   lightest thing that serves all three WAL write kinds. *)
+Record log_mirror := MkLogMirror {
+  lm_hdr   : nat * list Z;
+  lm_slots : nat -> list (bv 8);
+}.
+
 Record riscvEraGS := RiscvEraGS {
   (* one register-map ghost name PER hart.  A [ghost_map] element on
      [cpu_reg_name c] owns a register of hart [c].  The function is total (every
@@ -201,6 +221,20 @@ Record riscvEraGS := RiscvEraGS {
      it is the unique source of the [ghost_mapG Σ Z (bv 8)] instance in a
      [riscvGS] context, and a second one could not interact with it. *)
   era_disk_name : gname;
+  (* THE FS LOG-REGION MIRROR (claude-notes/design/fs-log.md stage 4 phase
+     C2b/D1): this era's [ghost_var] over the physical log region's picture,
+     split 1/2 - 1/2 between the log layer ([LogInv]'s batch/lock resource)
+     and [P_fs]'s CHECKED-OUT arm.  It is what carries the WAL's physical
+     phase ACROSS bwrite calls -- "the on-disk header is clean", "the log
+     slots hold the logged values", "the header is the (n, W) I just wrote"
+     -- none of which any single call site can re-derive at its own call.
+
+     PER-ERA for exactly the reason [era_disk_name] is: the log layer's half
+     dies with the era, and a FIXED gname's stranded half could never be
+     re-paired at the next boot.  Identification of the arm's gname with the
+     AMBIENT era's is by the swap counter ([riscv_swap_name] below), squeezed
+     against the started-generations auth the DMA completion threads in. *)
+  era_mirror_name : gname;
 }.
 
 Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
@@ -222,6 +256,8 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
   riscvF_parkGS :: ghost_varG Σ bool;
+  (* the FS log-region mirror's typing (the NAME is per-era, above) *)
+  riscvF_mirrorGS :: ghost_varG Σ log_mirror;
   (* the byte memory's PRE-class: the era layer stores only the two heap
      GNAMES (a [gen_heapGS] bundle would drag Σ into the era record, and
      the era record must be Σ-FREE so it can be a [ghost_map] VALUE in
@@ -288,6 +324,15 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
      Still an ARBITRARY predicate, and still nothing between here and the
      device thread names it. *)
   riscv_crash_pred : (Z -> bv 8) -> iProp Σ;
+  (* THE SWAP COUNTER (phase C2b/D1): a mono-nat whose FULL auth lives inside
+     [P_fs]'s checked-out arm and whose value is the generation currently in
+     custody of the FS record.  FIXED-layer, and the auth never strands
+     because it lives in a fixed-layer INVARIANT rather than era-side; an era
+     keeps only a persistent lower bound (its swap receipt).  Together with
+     the started-generations auth the completion threads in, the two bounds
+     SQUEEZE the arm's generation onto the ambient one, which is what
+     identifies the arm's mirror gname. *)
+  riscv_swap_name : gname;
 }.
 
 Class riscvGS (Σ : gFunctors) := RiscvGS {
@@ -330,6 +375,8 @@ Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
    [RiscvExec.wp_disk_step] hands the disk thread.  The seam equation the
    driver carries is [dn_img γd = disk_img_name]. *)
 Definition disk_img_name `{!riscvGS Σ} : gname := era_disk_name riscv_eraGS.
+(* the AMBIENT era's log-region mirror gname *)
+Definition mirror_name `{!riscvGS Σ} : gname := era_mirror_name riscv_eraGS.
 
 (* The generation counter's three faces (claude-notes/design/crash.md).
    [gen_auth] rides in [state_interp] pinned to [gstate.(ggen)]; the lower
@@ -353,6 +400,51 @@ Definition start_auth `{!riscvFixedGS Σ} (n : nat) : iProp Σ :=
   mono_nat_auth_own riscv_start_name 1 n.
 Definition gen_started `{!riscvFixedGS Σ} (gen : nat) : iProp Σ :=
   mono_nat_lb_own riscv_start_name (S gen).
+
+(* THE SWAP COUNTER's two faces (phase C2b/D1).  [swap_auth g] rides inside
+   [P_fs]'s checked-out arm at the generation in custody; [swap_lb g] is the
+   persistent SWAP RECEIPT an era keeps after its [initlog] took custody, and
+   is what a WAL write's fupd curries to prove the arm is still its own. *)
+Definition swap_auth `{!riscvFixedGS Σ} (g : nat) : iProp Σ :=
+  mono_nat_auth_own riscv_swap_name 1 g.
+Definition swap_lb `{!riscvFixedGS Σ} (g : nat) : iProp Σ :=
+  mono_nat_lb_own riscv_swap_name g.
+
+Global Instance swap_lb_persistent `{!riscvFixedGS Σ} g : Persistent (swap_lb g).
+Proof. rewrite /swap_lb. apply _. Qed.
+
+(* THE SQUEEZE, as two lemmas so no FS-layer proof touches [mono_nat]:
+   the era's receipt bounds the arm's generation from BELOW, the started
+   counter the completion threads in bounds it from ABOVE, and together they
+   pin it to the ambient generation. *)
+Lemma swap_lb_le `{!riscvFixedGS Σ} (g g'' : nat) :
+  swap_auth g'' -∗ swap_lb g -∗ ⌜(g <= g'')%nat⌝.
+Proof.
+  rewrite /swap_auth /swap_lb. iIntros "Ha Hl".
+  iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
+Qed.
+
+Lemma gen_started_le `{!riscvFixedGS Σ} (g'' n : nat) :
+  start_auth n -∗ gen_started g'' -∗ ⌜(S g'' <= n)%nat⌝.
+Proof.
+  rewrite /start_auth /gen_started. iIntros "Ha Hl".
+  iDestruct (mono_nat_lb_own_valid with "Ha Hl") as %[_ Hle]. done.
+Qed.
+
+Lemma swap_auth_update `{!riscvFixedGS Σ} (g'' g : nat) :
+  (g'' <= g)%nat -> swap_auth g'' ==∗ swap_auth g ∗ swap_lb g.
+Proof.
+  intros Hle. rewrite /swap_auth /swap_lb. iIntros "Ha".
+  iMod (mono_nat_own_update g with "Ha") as "[Ha #Hlb]"; [lia|].
+  iModIntro. iFrame "Ha Hlb".
+Qed.
+
+Lemma swap_auth_alloc `{!riscvFixedGS Σ} (g : nat) :
+  swap_auth g -∗ swap_auth g ∗ swap_lb g.
+Proof.
+  rewrite /swap_auth /swap_lb. iIntros "Ha".
+  iDestruct (mono_nat_lb_own_get with "Ha") as "#Hlb". iFrame "Ha Hlb".
+Qed.
 
 (* THE DISK IMAGE TIE (claude-notes/design/crash.md, design/fs-log.md): era
    [E]'s image auth, pinned to the state's own [v_disk].  It is a conjunct of
@@ -439,10 +531,66 @@ Proof. rewrite /crash_inv. apply _. Qed.
    "if the disk still looks like X" guard, no mask annotation (a basic update
    goes through at whatever mask [wp_disk_loop] holds while [crashN],
    [PermInv.permN] and [diskN] are all open). *)
-Definition disk_write_permit `{!riscvFixedGS Σ} (w : disk_wr) (Q : iProp Σ)
-    : iProp Σ :=
-  (∀ dk : Z -> bv 8,
-     ▷ riscv_crash_pred dk ==∗ ▷ riscv_crash_pred (wr_apply w dk) ∗ Q)%I.
+Definition disk_write_permit `{!riscvFixedGS Σ} (gd : nat) (w : disk_wr)
+    (Q : iProp Σ) : iProp Σ :=
+  (∀ (dk : Z -> bv 8) (n : nat),
+     start_auth n -∗ ⌜n = (gd + 1)%nat⌝ -∗
+     ▷ riscv_crash_pred dk ={∅}=∗
+       ▷ riscv_crash_pred (wr_apply w dk) ∗ start_auth n ∗ Q)%I.
+
+(* WHY A MASK-[∅] FUPD AND NOT A BASIC UPDATE.  A client whose crash
+   predicate is TIMELESS -- [FsCrash.P_fs_any] is, every conjunct of it is a
+   [ghost_map]/[mono_nat]/[own] over a discrete cmra -- has to STRIP the [▷]
+   this type hands it before it can update the record's ghosts, and a basic
+   update cannot do that: [◇] is not absorbed by [|==>] (there is no
+   [▷ |==> P ⊢ |==> ▷ P] in Iris either).  A fupd at ANY mask absorbs [◇], so
+   [∅] is the right choice: it is the weakest thing to PROVE (no invariant is
+   open inside it -- a crash permit never opens one, it is handed the
+   predicate directly), and the consumer runs it under whatever mask it holds
+   via [fupd_mask_subseteq].  Nothing else about the seam changes. *)
+
+(* WHY THE PERMIT NAMES ITS AUTHOR'S GENERATION [gd] (phase C2b/D1).  A crash
+   permit is a STATELESS view shift: it runs at the DMA completion with only
+   what its author curried at enqueue.  But the facts a WAL write's fupd needs
+   about the PHYSICAL log region are chain facts -- established by the
+   PREVIOUS writes -- so they have to be read out of a mirror the ERA holds a
+   half of, and the crash predicate's own half of that mirror sits under an
+   EXISTENTIAL (the mirror gname is per-era, because a fixed one could never
+   be re-paired after a crash).  Matching the two halves therefore needs the
+   fupd to know that the recorded custodian IS the ambient era.
+
+   THE AUTHOR'S OWN GENERATION IS THE ONLY WORKABLE INDEX, and an earlier
+   draft that quantified over the CONSUMER's generation instead
+   ([∀ g E, era_registered g E -∗ …]) is UNPROVABLE at every real call site:
+   everything a client can curry is at ITS [gen_id] -- [swap_lb (S gen_id)]
+   and the mirror half at [era_mirror_name riscv_eraGS] -- while the squeeze
+   would need both at the supplied [g].  The gap is exactly [g = gen_id], and
+   it has no source: the registry is a plain [ghost_map nat riscvEraGS] with
+   no injectivity (the base rules never need any -- [RiscvExec] identifies
+   [E = riscv_eraGS] only in the [ggen = gen_id] case and parks a stale thread
+   with [wp_dead]), and a [mono_nat] lower bound cannot be raised.  Nor MAY it
+   be derivable: a stale era's permit must fail, or the crash predicate is
+   unsound.
+
+   So the freshness certificate comes from the completion, against the
+   author's own [gd]: the completion threads in [state_interp]'s
+   started-generations auth with the live-era arithmetic [n = gd + 1] and
+   takes it back.  The client instantiates
+   [FsCrash.fs_arm_acc] at [(gen_id, riscv_eraGS)] and the squeeze closes:
+   its own [swap_lb (S gen_id)] gives [S gen_id <= c] from below, the arm's
+   [gen_started g''] against that auth gives [g'' <= gen_id] from above, so
+   [c = S gen_id] and [g'' = gen_id] -- and [era_registered] agreement AT THE
+   SHARED KEY then gives [E'' = riscv_eraGS].
+
+   WHAT MAKES THE CONSUMPTION SIDE WORK is era-locality, not per-request data:
+   [PermInv.perm_inv] is indexed by the SAME [gd], so every permit in an era's
+   channel is at that era's generation by construction, and [wp_disk_loop]
+   holds the channel at its own [gen_id].  A dead era's channel is simply
+   never opened again -- its device loop corpse-steps -- so its permits die
+   unconsumed, which is exactly the soundness story.
+
+   The IDENTITY permit ignores both remaining arguments, so a read's permit is
+   still free at an ARBITRARY crash predicate. *)
 
 (* THE IDENTITY PERMIT, and why it is still free.  A request that moves no
    disk byte carries [w = None], and [wr_apply None] is the identity ON THE
@@ -450,35 +598,24 @@ Definition disk_write_permit `{!riscvFixedGS Σ} (w : disk_wr) (Q : iProp Σ)
    same and the permit is provable for an ARBITRARY client predicate.  Every
    READ deposits this, which is what keeps the whole read stack (bread and
    everything above it) textually unchanged by the C2a reshape. *)
-Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} :
-  ⊢ disk_write_permit None True.
+Lemma disk_write_permit_trivial `{!riscvFixedGS Σ} (gd : nat) :
+  ⊢ disk_write_permit gd None True.
 Proof.
-  rewrite /disk_write_permit. iIntros (dk) "HP". iModIntro.
-  rewrite wr_apply_none. iFrame "HP".
+  rewrite /disk_write_permit. iIntros (dk n) "Hs _ HP". iModIntro.
+  rewrite wr_apply_none. iFrame "HP Hs".
 Qed.
 
 (* A REAL WRITE'S PERMIT IS NOT FREE, and that is the honest content of the
    reshape: the completion moves the crash predicate's index, so somebody has
-   to say what the predicate does under that move.  A system that promises
-   NOTHING about durability -- [Pc := fun _ => True], which is what both
-   adequacy theorems still instantiate -- satisfies the pure side condition
-   below, and then even a write's permit costs nothing.
-
-   This is the PHASE C2a BRIDGE: the three WAL write kinds
-   (write_head / install_trans / end_op, plus initlog which calls two of
-   them) carry [crash_pred_indifferent] as a pure premise until their real
-   fupds land in C2b, at which point the premise is DELETED rather than
-   discharged.  It is deliberately a [Prop] and not a resource, so nothing
-   has to be threaded through any wand chain. *)
-Definition crash_pred_indifferent `{!riscvFixedGS Σ} : Prop :=
-  forall dk dk' : Z -> bv 8, ⊢ (riscv_crash_pred dk -∗ riscv_crash_pred dk')%I.
-
-Lemma disk_write_permit_indifferent `{!riscvFixedGS Σ} (w : disk_wr) :
-  crash_pred_indifferent -> ⊢ disk_write_permit w True.
-Proof.
-  intros Hind. rewrite /disk_write_permit. iIntros (dk) "HP". iModIntro.
-  iSplitL "HP"; [| done]. iNext. iApply (Hind dk (wr_apply w dk) with "HP").
-Qed.
+   to say what the predicate does under that move.  There is therefore NO
+   [Pc]-generic write permit, and no bridge lemma either: the four WAL write
+   kinds each prove their own fupd against the FS's own crash predicate
+   ([FsCrash.fs_logfill_permit] / [_commit_permit] / [_install_permit] /
+   [_clear_permit], phase C2b/D1 stage 4).  The earlier placeholder premise
+   [crash_pred_indifferent], which said the system promises nothing about
+   durability, was DELETED when those landed rather than discharged: it is
+   FALSE at the real [P_fs], so keeping it would have made every WAL
+   contract vacuous. *)
 
 (* [reg_name] is the register-map ghost name of the AMBIENT hart [cpu_id].  It is
    what every [r ↦ᵣ v] / [reg_interp] / [reg_valid] / [reg_update] silently talks

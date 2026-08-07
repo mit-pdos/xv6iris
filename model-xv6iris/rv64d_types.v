@@ -15,68 +15,6 @@ Open Scope Z.
 
 Definition bit : Type := mword 1.
 
-Inductive IsaVersion := Isa_20191213 | Isa_Draft_20211102 | Isa_20211203 | Isa_20240411 | Isa_Latest.
-Definition num_of_IsaVersion (arg_ : IsaVersion) : Z :=
-   match arg_ with
-   | Isa_20191213 => 0
-   | Isa_Draft_20211102 => 1
-   | Isa_20211203 => 2
-   | Isa_20240411 => 3
-   | Isa_Latest => 4
-   end.
-
-Definition IsaVersion_of_num (arg_ : Z) (*(0 <=? arg_) && (arg_ <=? 4)*) : IsaVersion :=
-   let l__0 := arg_ in
-   if Z.eqb (l__0) (0) then Isa_20191213
-   else if Z.eqb (l__0) (1) then Isa_Draft_20211102
-   else if Z.eqb (l__0) (2) then Isa_20211203
-   else if Z.eqb (l__0) (3) then Isa_20240411
-   else Isa_Latest.
-
-Lemma IsaVersion_num_of_roundtrip (x : IsaVersion) : IsaVersion_of_num (num_of_IsaVersion x) = x.
-  destruct x; reflexivity.
-Qed.
-Lemma num_of_IsaVersion_injective (x y : IsaVersion) : num_of_IsaVersion x = num_of_IsaVersion y -> x = y.
-  intro.
-  rewrite <- (IsaVersion_num_of_roundtrip x).
-  rewrite <- (IsaVersion_num_of_roundtrip y).
-  congruence.
-Qed.
-Definition IsaVersion_eq_dec (x y : IsaVersion) : {x = y} + {x <> y}.
-  refine (match Z.eq_dec (num_of_IsaVersion x) (num_of_IsaVersion y) with
-  | left e => left (num_of_IsaVersion_injective x y e)
-  | right ne => right _
-  end).
-  congruence.
-Defined.
-Definition IsaVersion_beq (x y : IsaVersion) : bool :=
-  Z.eqb (num_of_IsaVersion x) (num_of_IsaVersion y).
-Lemma IsaVersion_beq_iff x y : IsaVersion_beq x y = true <-> x = y.
-  unfold IsaVersion_beq.
-  rewrite Z.eqb_eq.
-  split; [apply num_of_IsaVersion_injective | congruence].
-Qed.
-Lemma IsaVersion_beq_refl x : IsaVersion_beq x x = true.
-apply IsaVersion_beq_iff; reflexivity.
-Qed.
-#[export]
-Instance Decidable_eq_IsaVersion : EqDecision IsaVersion := IsaVersion_eq_dec.
-#[export]
-Instance Countable_IsaVersion : Countable IsaVersion.
-refine {|
-  encode x := encode (num_of_IsaVersion x);
-  decode x := z ← decode x; mret (IsaVersion_of_num z);
-|}.
-abstract (
-  intro s; rewrite decode_encode;
-  simpl;
-  rewrite IsaVersion_num_of_roundtrip;
-  reflexivity).
-Defined.
-#[export]
-Instance dummy_IsaVersion : Inhabited IsaVersion := { inhabitant := Isa_20191213 }.
-
-
 Inductive AtomicSupport :=
   | AMONone | AMOSwap | AMOLogical | AMOArithmetic | AMOCASW | AMOCASD | AMOCASQ.
 Definition num_of_AtomicSupport (arg_ : AtomicSupport) : Z :=
@@ -142,6 +80,69 @@ abstract (
 Defined.
 #[export]
 Instance dummy_AtomicSupport : Inhabited AtomicSupport := { inhabitant := AMONone }.
+
+
+Inductive Privileged_ISA_Version := Privileged_ISA_1_11 | Privileged_ISA_1_12 | Privileged_ISA_1_13.
+Definition num_of_Privileged_ISA_Version (arg_ : Privileged_ISA_Version) : Z :=
+   match arg_ with
+   | Privileged_ISA_1_11 => 0
+   | Privileged_ISA_1_12 => 1
+   | Privileged_ISA_1_13 => 2
+   end.
+
+Definition Privileged_ISA_Version_of_num (arg_ : Z) (*(0 <=? arg_) && (arg_ <=? 2)*)
+: Privileged_ISA_Version :=
+   let l__0 := arg_ in
+   if Z.eqb (l__0) (0) then Privileged_ISA_1_11
+   else if Z.eqb (l__0) (1) then Privileged_ISA_1_12
+   else Privileged_ISA_1_13.
+
+Lemma Privileged_ISA_Version_num_of_roundtrip (x : Privileged_ISA_Version) : Privileged_ISA_Version_of_num (num_of_Privileged_ISA_Version x) = x.
+  destruct x; reflexivity.
+Qed.
+Lemma num_of_Privileged_ISA_Version_injective (x y : Privileged_ISA_Version) : num_of_Privileged_ISA_Version x = num_of_Privileged_ISA_Version y -> x = y.
+  intro.
+  rewrite <- (Privileged_ISA_Version_num_of_roundtrip x).
+  rewrite <- (Privileged_ISA_Version_num_of_roundtrip y).
+  congruence.
+Qed.
+Definition Privileged_ISA_Version_eq_dec (x y : Privileged_ISA_Version) : {x = y} + {x <> y}.
+  refine (match Z.eq_dec (num_of_Privileged_ISA_Version x) (num_of_Privileged_ISA_Version y) with
+  | left e => left (num_of_Privileged_ISA_Version_injective x y e)
+  | right ne => right _
+  end).
+  congruence.
+Defined.
+Definition Privileged_ISA_Version_beq (x y : Privileged_ISA_Version) : bool :=
+  Z.eqb (num_of_Privileged_ISA_Version x) (num_of_Privileged_ISA_Version y).
+Lemma Privileged_ISA_Version_beq_iff x y : Privileged_ISA_Version_beq x y = true <-> x = y.
+  unfold Privileged_ISA_Version_beq.
+  rewrite Z.eqb_eq.
+  split; [apply num_of_Privileged_ISA_Version_injective | congruence].
+Qed.
+Lemma Privileged_ISA_Version_beq_refl x : Privileged_ISA_Version_beq x x = true.
+apply Privileged_ISA_Version_beq_iff; reflexivity.
+Qed.
+#[export]
+Instance Decidable_eq_Privileged_ISA_Version : EqDecision Privileged_ISA_Version :=
+  Privileged_ISA_Version_eq_dec.
+#[export]
+Instance Countable_Privileged_ISA_Version : Countable Privileged_ISA_Version.
+refine {|
+  encode x := encode (num_of_Privileged_ISA_Version x);
+  decode x := z ← decode x; mret (Privileged_ISA_Version_of_num z);
+|}.
+abstract (
+  intro s; rewrite decode_encode;
+  simpl;
+  rewrite Privileged_ISA_Version_num_of_roundtrip;
+  reflexivity).
+Defined.
+#[export]
+Instance dummy_Privileged_ISA_Version : Inhabited Privileged_ISA_Version := {
+  inhabitant :=
+    Privileged_ISA_1_11
+}.
 
 
 Inductive vector_support := Disabled | Integer | Float_single | Float_double | Full.
@@ -889,6 +890,9 @@ Instance dummy_PointerMaskingMode : Inhabited PointerMaskingMode := { inhabitant
 Definition xlen : Z := 64.
 #[export] Hint Unfold xlen : sail.
 
+Definition physaddr_bits : Z := 56.
+#[export] Hint Unfold physaddr_bits : sail.
+
 Definition log2_xlen : Z := ((if xlen =? 32 then 5 else 6)).
 #[export] Hint Unfold log2_xlen : sail.
 
@@ -1384,9 +1388,9 @@ Instance dummy_cacheop : Inhabited (cacheop) := { inhabitant := CB_manage inhabi
 Inductive MemoryAccessType {a : Type} :=
 | Load : a -> MemoryAccessType
 | Store : a -> MemoryAccessType
-| LoadReserved : a -> MemoryAccessType
-| StoreConditional : a -> MemoryAccessType
-| Atomic : (amoop * a * a) -> MemoryAccessType
+| LoadReserved : (bool * bool * a) -> MemoryAccessType
+| StoreConditional : (bool * bool * a) -> MemoryAccessType
+| Atomic : (amoop * bool * bool * a * a) -> MemoryAccessType
 | InstructionFetch : unit -> MemoryAccessType
 | CacheAccess : cacheop -> MemoryAccessType.
 Arguments MemoryAccessType : clear implicits.
@@ -3119,6 +3123,7 @@ Inductive extension :=
   | Ext_Zabha
   | Ext_Zacas
   | Ext_Zalrsc
+  | Ext_Zama16b
   | Ext_Zawrs
   | Ext_Za64rs
   | Ext_Za128rs
@@ -3218,7 +3223,269 @@ Inductive extension :=
 Scheme Equality for extension.
 #[export]
 Instance Decidable_eq_extension : EqDecision extension := extension_eq_dec.
-
+#[export]
+Instance Countable_extension : Countable extension.
+refine {|
+  encode x := match x with
+  | Ext_M => 1
+  | Ext_A => 2
+  | Ext_F => 3
+  | Ext_D => 4
+  | Ext_B => 5
+  | Ext_V => 6
+  | Ext_S => 7
+  | Ext_U => 8
+  | Ext_H => 9
+  | Ext_Zibi => 10
+  | Ext_Zic64b => 11
+  | Ext_Zicbom => 12
+  | Ext_Zicbop => 13
+  | Ext_Zicboz => 14
+  | Ext_Zicfilp => 15
+  | Ext_Zicfiss => 16
+  | Ext_Zicntr => 17
+  | Ext_Zicond => 18
+  | Ext_Zicsr => 19
+  | Ext_Zifencei => 20
+  | Ext_Zihintntl => 21
+  | Ext_Zihintpause => 22
+  | Ext_Zihpm => 23
+  | Ext_Zimop => 24
+  | Ext_Zmmul => 25
+  | Ext_Zaamo => 26
+  | Ext_Zabha => 27
+  | Ext_Zacas => 28
+  | Ext_Zalrsc => 29
+  | Ext_Zama16b => 30
+  | Ext_Zawrs => 31
+  | Ext_Za64rs => 32
+  | Ext_Za128rs => 33
+  | Ext_Zfa => 34
+  | Ext_Zfbfmin => 35
+  | Ext_Zfh => 36
+  | Ext_Zfhmin => 37
+  | Ext_Zfinx => 38
+  | Ext_Zdinx => 39
+  | Ext_Zca => 40
+  | Ext_Zcb => 41
+  | Ext_Zcd => 42
+  | Ext_Zcf => 43
+  | Ext_Zcmop => 44
+  | Ext_C => 45
+  | Ext_Zba => 46
+  | Ext_Zbb => 47
+  | Ext_Zbc => 48
+  | Ext_Zbkb => 49
+  | Ext_Zbkc => 50
+  | Ext_Zbkx => 51
+  | Ext_Zbs => 52
+  | Ext_Ziccamoa => 53
+  | Ext_Ziccamoc => 54
+  | Ext_Ziccif => 55
+  | Ext_Zicclsm => 56
+  | Ext_Ziccrse => 57
+  | Ext_Zknd => 58
+  | Ext_Zkne => 59
+  | Ext_Zknh => 60
+  | Ext_Zkr => 61
+  | Ext_Zksed => 62
+  | Ext_Zksh => 63
+  | Ext_Zkt => 64
+  | Ext_Zhinx => 65
+  | Ext_Zhinxmin => 66
+  | Ext_Zvl32b => 67
+  | Ext_Zvl64b => 68
+  | Ext_Zvl128b => 69
+  | Ext_Zvl256b => 70
+  | Ext_Zvl512b => 71
+  | Ext_Zvl1024b => 72
+  | Ext_Zve32f => 73
+  | Ext_Zve32x => 74
+  | Ext_Zve64d => 75
+  | Ext_Zve64f => 76
+  | Ext_Zve64x => 77
+  | Ext_Zvabd => 78
+  | Ext_Zvfbfmin => 79
+  | Ext_Zvfbfwma => 80
+  | Ext_Zvfh => 81
+  | Ext_Zvfhmin => 82
+  | Ext_Zvbb => 83
+  | Ext_Zvbc => 84
+  | Ext_Zvkb => 85
+  | Ext_Zvkg => 86
+  | Ext_Zvkned => 87
+  | Ext_Zvknha => 88
+  | Ext_Zvknhb => 89
+  | Ext_Zvksed => 90
+  | Ext_Zvksh => 91
+  | Ext_Zvkt => 92
+  | Ext_Zvkn => 93
+  | Ext_Zvknc => 94
+  | Ext_Zvkng => 95
+  | Ext_Zvks => 96
+  | Ext_Zvksc => 97
+  | Ext_Zvksg => 98
+  | Ext_Ssccptr => 99
+  | Ext_Sscofpmf => 100
+  | Ext_Sscounterenw => 101
+  | Ext_Ssnpm => 102
+  | Ext_Ssstateen => 103
+  | Ext_Sstc => 104
+  | Ext_Sstvala => 105
+  | Ext_Sstvecd => 106
+  | Ext_Ssu64xl => 107
+  | Ext_Svbare => 108
+  | Ext_Sv32 => 109
+  | Ext_Sv39 => 110
+  | Ext_Sv48 => 111
+  | Ext_Sv57 => 112
+  | Ext_Svade => 113
+  | Ext_Svadu => 114
+  | Ext_Svinval => 115
+  | Ext_Svnapot => 116
+  | Ext_Svpbmt => 117
+  | Ext_Svrsw60t59b => 118
+  | Ext_Svvptc => 119
+  | Ext_Smcntrpmf => 120
+  | Ext_Smmpm => 121
+  | Ext_Smnpm => 122
+  | Ext_Smstateen => 123
+  | Ext_Ssqosid => 124
+  | Ext_Sspm => 125
+  | Ext_Supm => 126
+  end%positive;
+  decode x := match x with
+  | 1 => Some Ext_M
+  | 2 => Some Ext_A
+  | 3 => Some Ext_F
+  | 4 => Some Ext_D
+  | 5 => Some Ext_B
+  | 6 => Some Ext_V
+  | 7 => Some Ext_S
+  | 8 => Some Ext_U
+  | 9 => Some Ext_H
+  | 10 => Some Ext_Zibi
+  | 11 => Some Ext_Zic64b
+  | 12 => Some Ext_Zicbom
+  | 13 => Some Ext_Zicbop
+  | 14 => Some Ext_Zicboz
+  | 15 => Some Ext_Zicfilp
+  | 16 => Some Ext_Zicfiss
+  | 17 => Some Ext_Zicntr
+  | 18 => Some Ext_Zicond
+  | 19 => Some Ext_Zicsr
+  | 20 => Some Ext_Zifencei
+  | 21 => Some Ext_Zihintntl
+  | 22 => Some Ext_Zihintpause
+  | 23 => Some Ext_Zihpm
+  | 24 => Some Ext_Zimop
+  | 25 => Some Ext_Zmmul
+  | 26 => Some Ext_Zaamo
+  | 27 => Some Ext_Zabha
+  | 28 => Some Ext_Zacas
+  | 29 => Some Ext_Zalrsc
+  | 30 => Some Ext_Zama16b
+  | 31 => Some Ext_Zawrs
+  | 32 => Some Ext_Za64rs
+  | 33 => Some Ext_Za128rs
+  | 34 => Some Ext_Zfa
+  | 35 => Some Ext_Zfbfmin
+  | 36 => Some Ext_Zfh
+  | 37 => Some Ext_Zfhmin
+  | 38 => Some Ext_Zfinx
+  | 39 => Some Ext_Zdinx
+  | 40 => Some Ext_Zca
+  | 41 => Some Ext_Zcb
+  | 42 => Some Ext_Zcd
+  | 43 => Some Ext_Zcf
+  | 44 => Some Ext_Zcmop
+  | 45 => Some Ext_C
+  | 46 => Some Ext_Zba
+  | 47 => Some Ext_Zbb
+  | 48 => Some Ext_Zbc
+  | 49 => Some Ext_Zbkb
+  | 50 => Some Ext_Zbkc
+  | 51 => Some Ext_Zbkx
+  | 52 => Some Ext_Zbs
+  | 53 => Some Ext_Ziccamoa
+  | 54 => Some Ext_Ziccamoc
+  | 55 => Some Ext_Ziccif
+  | 56 => Some Ext_Zicclsm
+  | 57 => Some Ext_Ziccrse
+  | 58 => Some Ext_Zknd
+  | 59 => Some Ext_Zkne
+  | 60 => Some Ext_Zknh
+  | 61 => Some Ext_Zkr
+  | 62 => Some Ext_Zksed
+  | 63 => Some Ext_Zksh
+  | 64 => Some Ext_Zkt
+  | 65 => Some Ext_Zhinx
+  | 66 => Some Ext_Zhinxmin
+  | 67 => Some Ext_Zvl32b
+  | 68 => Some Ext_Zvl64b
+  | 69 => Some Ext_Zvl128b
+  | 70 => Some Ext_Zvl256b
+  | 71 => Some Ext_Zvl512b
+  | 72 => Some Ext_Zvl1024b
+  | 73 => Some Ext_Zve32f
+  | 74 => Some Ext_Zve32x
+  | 75 => Some Ext_Zve64d
+  | 76 => Some Ext_Zve64f
+  | 77 => Some Ext_Zve64x
+  | 78 => Some Ext_Zvabd
+  | 79 => Some Ext_Zvfbfmin
+  | 80 => Some Ext_Zvfbfwma
+  | 81 => Some Ext_Zvfh
+  | 82 => Some Ext_Zvfhmin
+  | 83 => Some Ext_Zvbb
+  | 84 => Some Ext_Zvbc
+  | 85 => Some Ext_Zvkb
+  | 86 => Some Ext_Zvkg
+  | 87 => Some Ext_Zvkned
+  | 88 => Some Ext_Zvknha
+  | 89 => Some Ext_Zvknhb
+  | 90 => Some Ext_Zvksed
+  | 91 => Some Ext_Zvksh
+  | 92 => Some Ext_Zvkt
+  | 93 => Some Ext_Zvkn
+  | 94 => Some Ext_Zvknc
+  | 95 => Some Ext_Zvkng
+  | 96 => Some Ext_Zvks
+  | 97 => Some Ext_Zvksc
+  | 98 => Some Ext_Zvksg
+  | 99 => Some Ext_Ssccptr
+  | 100 => Some Ext_Sscofpmf
+  | 101 => Some Ext_Sscounterenw
+  | 102 => Some Ext_Ssnpm
+  | 103 => Some Ext_Ssstateen
+  | 104 => Some Ext_Sstc
+  | 105 => Some Ext_Sstvala
+  | 106 => Some Ext_Sstvecd
+  | 107 => Some Ext_Ssu64xl
+  | 108 => Some Ext_Svbare
+  | 109 => Some Ext_Sv32
+  | 110 => Some Ext_Sv39
+  | 111 => Some Ext_Sv48
+  | 112 => Some Ext_Sv57
+  | 113 => Some Ext_Svade
+  | 114 => Some Ext_Svadu
+  | 115 => Some Ext_Svinval
+  | 116 => Some Ext_Svnapot
+  | 117 => Some Ext_Svpbmt
+  | 118 => Some Ext_Svrsw60t59b
+  | 119 => Some Ext_Svvptc
+  | 120 => Some Ext_Smcntrpmf
+  | 121 => Some Ext_Smmpm
+  | 122 => Some Ext_Smnpm
+  | 123 => Some Ext_Smstateen
+  | 124 => Some Ext_Ssqosid
+  | 125 => Some Ext_Sspm
+  | 126 => Some Ext_Supm
+  | _ => None
+  end%positive;
+|}.
+abstract (intro x; destruct x; reflexivity).
+Defined.
 #[export]
 Instance dummy_extension : Inhabited extension := { inhabitant := Ext_M }.
 
@@ -3678,6 +3945,8 @@ Defined.
 Instance dummy_Reservability : Inhabited Reservability := { inhabitant := RsrvNone }.
 
 
+Definition mag_size_exp : Type := Z.
+
 Record PMA := {
   PMA_mem_type : MemoryRegionType;
   PMA_cacheable : bool;
@@ -3693,12 +3962,14 @@ Record PMA := {
   PMA_supports_cbo_zero : bool;
   PMA_supports_pte_read : bool;
   PMA_supports_pte_write : bool;
+  PMA_misaligned_atomicity_granule_size_exp : mag_size_exp;
+  PMA_vector_misaligned_atomicity_granule_size_exp : mag_size_exp;
 }.
 Arguments PMA : clear implicits.
 #[export]
 Instance Decidable_eq_PMA : EqDecision PMA.
-   intros [x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13].
-   intros [y0 y1 y2 y3 y4 y5 y6 y7 y8 y9 y10 y11 y12 y13].
+   intros [x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15].
+   intros [y0 y1 y2 y3 y4 y5 y6 y7 y8 y9 y10 y11 y12 y13 y14 y15].
   cmp_record_field x0 y0.
   cmp_record_field x1 y1.
   cmp_record_field x2 y2.
@@ -3713,63 +3984,71 @@ Instance Decidable_eq_PMA : EqDecision PMA.
   cmp_record_field x11 y11.
   cmp_record_field x12 y12.
   cmp_record_field x13 y13.
+  cmp_record_field x14 y14.
+  cmp_record_field x15 y15.
 left; subst; reflexivity.
 Defined.
 #[export]
 Instance Countable_PMA : Countable PMA.
 refine {|
-  encode x := encode (PMA_mem_type x, PMA_cacheable x, PMA_coherent x, PMA_executable x, PMA_readable x, PMA_writable x, PMA_read_idempotent x, PMA_write_idempotent x, PMA_misaligned_exceptions x, PMA_atomic_support x, PMA_reservability x, PMA_supports_cbo_zero x, PMA_supports_pte_read x, PMA_supports_pte_write x);
-  decode x := '(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13) ← decode x;
-              mret (Build_PMA x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13)
+  encode x := encode (PMA_mem_type x, PMA_cacheable x, PMA_coherent x, PMA_executable x, PMA_readable x, PMA_writable x, PMA_read_idempotent x, PMA_write_idempotent x, PMA_misaligned_exceptions x, PMA_atomic_support x, PMA_reservability x, PMA_supports_cbo_zero x, PMA_supports_pte_read x, PMA_supports_pte_write x, PMA_misaligned_atomicity_granule_size_exp x, PMA_vector_misaligned_atomicity_granule_size_exp x);
+  decode x := '(x0, x1, x2, x3, x4, x5, x6, x7, x8, x9, x10, x11, x12, x13, x14, x15) ← decode x;
+              mret (Build_PMA x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15)
 |}.
 abstract (
-  intros [x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13];
+  intros [x0 x1 x2 x3 x4 x5 x6 x7 x8 x9 x10 x11 x12 x13 x14 x15];
   rewrite decode_encode;
   reflexivity).
 Defined.
 
 Notation "{[ r 'with' 'PMA_mem_type' := e ]}" :=
-  match r with Build_PMA _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA e f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA e f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_cacheable' := e ]}" :=
-  match r with Build_PMA (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 e f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 e f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_coherent' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 e f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 e f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_executable' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 e f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 e f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_readable' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 e f5 f6 f7 f8 f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 e f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_writable' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 f4 e f6 f7 f8 f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 e f6 f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_read_idempotent' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) _ (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 e f7 f8 f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) _ (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 e f7 f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_write_idempotent' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) _ (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 e f8 f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) _ (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 e f8 f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_misaligned_exceptions' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) _ (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 e f9 f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) _ (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 e f9 f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_atomic_support' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) _ (_ as f10) (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 e f10 f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) _ (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 e f10 f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_reservability' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) _ (_ as f11) (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 e f11 f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) _ (_ as f11) (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 e f11 f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_supports_cbo_zero' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) _ (_ as f12) (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 e f12 f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) _ (_ as f12) (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 e f12 f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_supports_pte_read' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) _ (_ as f13) =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 e f13 end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) _ (_ as f13) (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 e f13 f14 f15 end (at level 1).
 Notation "{[ r 'with' 'PMA_supports_pte_write' := e ]}" :=
-  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) _ =>
-    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 e end (at level 1).
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) _ (_ as f14) (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 e f14 f15 end (at level 1).
+Notation "{[ r 'with' 'PMA_misaligned_atomicity_granule_size_exp' := e ]}" :=
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) _ (_ as f15) =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 e f15 end (at level 1).
+Notation "{[ r 'with' 'PMA_vector_misaligned_atomicity_granule_size_exp' := e ]}" :=
+  match r with Build_PMA (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) (_ as f8) (_ as f9) (_ as f10) (_ as f11) (_ as f12) (_ as f13) (_ as f14) _ =>
+    Build_PMA f0 f1 f2 f3 f4 f5 f6 f7 f8 f9 f10 f11 f12 f13 f14 e end (at level 1).
 #[export]
 Instance dummy_PMA : Inhabited (PMA) := {
   inhabitant := {|
@@ -3786,7 +4065,9 @@ Instance dummy_PMA : Inhabited (PMA) := {
     PMA_reservability := inhabitant;
     PMA_supports_cbo_zero := inhabitant;
     PMA_supports_pte_read := inhabitant;
-    PMA_supports_pte_write := inhabitant
+    PMA_supports_pte_write := inhabitant;
+    PMA_misaligned_atomicity_granule_size_exp := inhabitant;
+    PMA_vector_misaligned_atomicity_granule_size_exp := inhabitant
 |} }.
 
 
@@ -3980,8 +4261,8 @@ Instance dummy_WaitReason : Inhabited WaitReason := { inhabitant := WAIT_WFI }.
 Record GlobalMisalignedExceptions := {
   GlobalMisalignedExceptions_load_store : option misaligned_exception;
   GlobalMisalignedExceptions_vector : option misaligned_exception;
+  GlobalMisalignedExceptions_amo : option misaligned_exception;
   GlobalMisalignedExceptions_lrsc : misaligned_exception;
-  GlobalMisalignedExceptions_amo : misaligned_exception;
 }.
 Arguments GlobalMisalignedExceptions : clear implicits.
 #[export]
@@ -3997,7 +4278,7 @@ Defined.
 #[export]
 Instance Countable_GlobalMisalignedExceptions : Countable GlobalMisalignedExceptions.
 refine {|
-  encode x := encode (GlobalMisalignedExceptions_load_store x, GlobalMisalignedExceptions_vector x, GlobalMisalignedExceptions_lrsc x, GlobalMisalignedExceptions_amo x);
+  encode x := encode (GlobalMisalignedExceptions_load_store x, GlobalMisalignedExceptions_vector x, GlobalMisalignedExceptions_amo x, GlobalMisalignedExceptions_lrsc x);
   decode x := '(x0, x1, x2, x3) ← decode x;
               mret (Build_GlobalMisalignedExceptions x0 x1 x2 x3)
 |}.
@@ -4013,10 +4294,10 @@ Notation "{[ r 'with' 'GlobalMisalignedExceptions_load_store' := e ]}" :=
 Notation "{[ r 'with' 'GlobalMisalignedExceptions_vector' := e ]}" :=
   match r with Build_GlobalMisalignedExceptions (_ as f0) _ (_ as f2) (_ as f3) =>
     Build_GlobalMisalignedExceptions f0 e f2 f3 end (at level 1).
-Notation "{[ r 'with' 'GlobalMisalignedExceptions_lrsc' := e ]}" :=
+Notation "{[ r 'with' 'GlobalMisalignedExceptions_amo' := e ]}" :=
   match r with Build_GlobalMisalignedExceptions (_ as f0) (_ as f1) _ (_ as f3) =>
     Build_GlobalMisalignedExceptions f0 f1 e f3 end (at level 1).
-Notation "{[ r 'with' 'GlobalMisalignedExceptions_amo' := e ]}" :=
+Notation "{[ r 'with' 'GlobalMisalignedExceptions_lrsc' := e ]}" :=
   match r with Build_GlobalMisalignedExceptions (_ as f0) (_ as f1) (_ as f2) _ =>
     Build_GlobalMisalignedExceptions f0 f1 f2 e end (at level 1).
 #[export]
@@ -4024,8 +4305,8 @@ Instance dummy_GlobalMisalignedExceptions : Inhabited (GlobalMisalignedException
   inhabitant := {|
     GlobalMisalignedExceptions_load_store := inhabitant;
     GlobalMisalignedExceptions_vector := inhabitant;
-    GlobalMisalignedExceptions_lrsc := inhabitant;
-    GlobalMisalignedExceptions_amo := inhabitant
+    GlobalMisalignedExceptions_amo := inhabitant;
+    GlobalMisalignedExceptions_lrsc := inhabitant
 |} }.
 
 
@@ -4439,6 +4720,67 @@ Instance dummy_OOBVstartReservedBehavior : Inhabited OOBVstartReservedBehavior :
 }.
 
 
+Inductive FflagsDirtyPolicy := Fflags_Dirty_Precise | Fflags_Dirty_Flag | Fflags_Dirty_Instruction.
+Definition num_of_FflagsDirtyPolicy (arg_ : FflagsDirtyPolicy) : Z :=
+   match arg_ with
+   | Fflags_Dirty_Precise => 0
+   | Fflags_Dirty_Flag => 1
+   | Fflags_Dirty_Instruction => 2
+   end.
+
+Definition FflagsDirtyPolicy_of_num (arg_ : Z) (*(0 <=? arg_) && (arg_ <=? 2)*) : FflagsDirtyPolicy :=
+   let l__0 := arg_ in
+   if Z.eqb (l__0) (0) then Fflags_Dirty_Precise
+   else if Z.eqb (l__0) (1) then Fflags_Dirty_Flag
+   else Fflags_Dirty_Instruction.
+
+Lemma FflagsDirtyPolicy_num_of_roundtrip (x : FflagsDirtyPolicy) : FflagsDirtyPolicy_of_num (num_of_FflagsDirtyPolicy x) = x.
+  destruct x; reflexivity.
+Qed.
+Lemma num_of_FflagsDirtyPolicy_injective (x y : FflagsDirtyPolicy) : num_of_FflagsDirtyPolicy x = num_of_FflagsDirtyPolicy y -> x = y.
+  intro.
+  rewrite <- (FflagsDirtyPolicy_num_of_roundtrip x).
+  rewrite <- (FflagsDirtyPolicy_num_of_roundtrip y).
+  congruence.
+Qed.
+Definition FflagsDirtyPolicy_eq_dec (x y : FflagsDirtyPolicy) : {x = y} + {x <> y}.
+  refine (match Z.eq_dec (num_of_FflagsDirtyPolicy x) (num_of_FflagsDirtyPolicy y) with
+  | left e => left (num_of_FflagsDirtyPolicy_injective x y e)
+  | right ne => right _
+  end).
+  congruence.
+Defined.
+Definition FflagsDirtyPolicy_beq (x y : FflagsDirtyPolicy) : bool :=
+  Z.eqb (num_of_FflagsDirtyPolicy x) (num_of_FflagsDirtyPolicy y).
+Lemma FflagsDirtyPolicy_beq_iff x y : FflagsDirtyPolicy_beq x y = true <-> x = y.
+  unfold FflagsDirtyPolicy_beq.
+  rewrite Z.eqb_eq.
+  split; [apply num_of_FflagsDirtyPolicy_injective | congruence].
+Qed.
+Lemma FflagsDirtyPolicy_beq_refl x : FflagsDirtyPolicy_beq x x = true.
+apply FflagsDirtyPolicy_beq_iff; reflexivity.
+Qed.
+#[export]
+Instance Decidable_eq_FflagsDirtyPolicy : EqDecision FflagsDirtyPolicy := FflagsDirtyPolicy_eq_dec.
+#[export]
+Instance Countable_FflagsDirtyPolicy : Countable FflagsDirtyPolicy.
+refine {|
+  encode x := encode (num_of_FflagsDirtyPolicy x);
+  decode x := z ← decode x; mret (FflagsDirtyPolicy_of_num z);
+|}.
+abstract (
+  intro s; rewrite decode_encode;
+  simpl;
+  rewrite FflagsDirtyPolicy_num_of_roundtrip;
+  reflexivity).
+Defined.
+#[export]
+Instance dummy_FflagsDirtyPolicy : Inhabited FflagsDirtyPolicy := {
+  inhabitant :=
+    Fflags_Dirty_Precise
+}.
+
+
 Definition exc_code : Type := bits 6.
 
 Definition ext_ptw : Type := unit.
@@ -4540,6 +4882,12 @@ Instance dummy_CSRAccessType : Inhabited CSRAccessType := { inhabitant := CSRRea
 
 Definition is_mem_width (w : Z) : bool := member_Z_list w [1; 2; 4; 8].
 #[export] Hint Unfold is_mem_width : sail.
+
+Definition max_mem_width_bytes_exp : Z := 3.
+#[export] Hint Unfold max_mem_width_bytes_exp : sail.
+
+Definition max_mem_width_bytes : Z := (2 ^ 3).
+#[export] Hint Unfold max_mem_width_bytes : sail.
 
 Inductive SWCheckCodes := LANDING_PAD_FAULT.
 Definition num_of_SWCheckCodes (arg_ : SWCheckCodes) : Z :=
@@ -10914,9 +11262,107 @@ Instance dummy_CSRCheckResult : Inhabited (CSRCheckResult) := {
   inhabitant := CSR_Check_OK inhabitant
 }.
 
-Definition MemoryOpResult (a : Type) : Type := result a ExceptionType.
+Definition MemoryOpResult (a : Type) : Type := result a ((physaddr * ExceptionType)).
 
 Definition htif_cmd : Type := mword 64.
+
+Inductive Splittability := CanSplit | CannotSplit.
+Definition num_of_Splittability (arg_ : Splittability) : Z :=
+   match arg_ with | CanSplit => 0 | CannotSplit => 1 end.
+
+Definition Splittability_of_num (arg_ : Z) (*(0 <=? arg_) && (arg_ <=? 1)*) : Splittability :=
+   let l__0 := arg_ in
+   if Z.eqb (l__0) (0) then CanSplit
+   else CannotSplit.
+
+Lemma Splittability_num_of_roundtrip (x : Splittability) : Splittability_of_num (num_of_Splittability x) = x.
+  destruct x; reflexivity.
+Qed.
+Lemma num_of_Splittability_injective (x y : Splittability) : num_of_Splittability x = num_of_Splittability y -> x = y.
+  intro.
+  rewrite <- (Splittability_num_of_roundtrip x).
+  rewrite <- (Splittability_num_of_roundtrip y).
+  congruence.
+Qed.
+Definition Splittability_eq_dec (x y : Splittability) : {x = y} + {x <> y}.
+  refine (match Z.eq_dec (num_of_Splittability x) (num_of_Splittability y) with
+  | left e => left (num_of_Splittability_injective x y e)
+  | right ne => right _
+  end).
+  congruence.
+Defined.
+Definition Splittability_beq (x y : Splittability) : bool :=
+  Z.eqb (num_of_Splittability x) (num_of_Splittability y).
+Lemma Splittability_beq_iff x y : Splittability_beq x y = true <-> x = y.
+  unfold Splittability_beq.
+  rewrite Z.eqb_eq.
+  split; [apply num_of_Splittability_injective | congruence].
+Qed.
+Lemma Splittability_beq_refl x : Splittability_beq x x = true.
+apply Splittability_beq_iff; reflexivity.
+Qed.
+#[export]
+Instance Decidable_eq_Splittability : EqDecision Splittability := Splittability_eq_dec.
+#[export]
+Instance Countable_Splittability : Countable Splittability.
+refine {|
+  encode x := encode (num_of_Splittability x);
+  decode x := z ← decode x; mret (Splittability_of_num z);
+|}.
+abstract (
+  intro s; rewrite decode_encode;
+  simpl;
+  rewrite Splittability_num_of_roundtrip;
+  reflexivity).
+Defined.
+#[export]
+Instance dummy_Splittability : Inhabited Splittability := { inhabitant := CanSplit }.
+
+
+Definition valid_misaligned_order (n : Z) (first : Z) (last : Z) (step : Z) : bool :=
+  (first =? 0) && ((last =? (n - 1)) && (step =? 1)) ||
+    (first =? (n - 1)) && ((last =? 0) && (step =? ((- 1)))).
+#[export] Hint Unfold valid_misaligned_order : sail.
+
+Record Phys_Mem_Access_Info := {
+  Phys_Mem_Access_Info_splittable : Splittability;
+  Phys_Mem_Access_Info_granule_size_exp : mag_size_exp;
+}.
+Arguments Phys_Mem_Access_Info : clear implicits.
+#[export]
+Instance Decidable_eq_Phys_Mem_Access_Info : EqDecision Phys_Mem_Access_Info.
+   intros [x0 x1].
+   intros [y0 y1].
+  cmp_record_field x0 y0.
+  cmp_record_field x1 y1.
+left; subst; reflexivity.
+Defined.
+#[export]
+Instance Countable_Phys_Mem_Access_Info : Countable Phys_Mem_Access_Info.
+refine {|
+  encode x := encode (Phys_Mem_Access_Info_splittable x, Phys_Mem_Access_Info_granule_size_exp x);
+  decode x := '(x0, x1) ← decode x;
+              mret (Build_Phys_Mem_Access_Info x0 x1)
+|}.
+abstract (
+  intros [x0 x1];
+  rewrite decode_encode;
+  reflexivity).
+Defined.
+
+Notation "{[ r 'with' 'Phys_Mem_Access_Info_splittable' := e ]}" :=
+  match r with Build_Phys_Mem_Access_Info _ (_ as f1) =>
+    Build_Phys_Mem_Access_Info e f1 end (at level 1).
+Notation "{[ r 'with' 'Phys_Mem_Access_Info_granule_size_exp' := e ]}" :=
+  match r with Build_Phys_Mem_Access_Info (_ as f0) _ =>
+    Build_Phys_Mem_Access_Info f0 e end (at level 1).
+#[export]
+Instance dummy_Phys_Mem_Access_Info : Inhabited (Phys_Mem_Access_Info) := {
+  inhabitant := {|
+    Phys_Mem_Access_Info_splittable := inhabitant;
+    Phys_Mem_Access_Info_granule_size_exp := inhabitant
+|} }.
+
 
 Definition pte_flags_bits : Type := bits 8.
 
@@ -11207,11 +11653,6 @@ Instance dummy_ExecutionResult : Inhabited (ExecutionResult) := {
   inhabitant := Retire_Success inhabitant
 }.
 
-Definition valid_misaligned_order (n : Z) (first : Z) (last : Z) (step : Z) : bool :=
-  (first =? 0) && ((last =? (n - 1)) && (step =? 1)) ||
-    (first =? (n - 1)) && ((last =? 0) && (step =? ((- 1)))).
-#[export] Hint Unfold valid_misaligned_order : sail.
-
 Definition Srmcfg : Type := mword 64.
 
 Definition HpmEvent : Type := mword 64.
@@ -11486,6 +11927,7 @@ Instance Countable_Step : Countable Step := {|
 Instance dummy_Step : Inhabited (Step) := { inhabitant := Step_Pending_Interrupt inhabitant }.
 
 Record pma_check_opts := {
+  pma_check_opts_zama16b : bool;
   pma_check_opts_ziccamoa : bool;
   pma_check_opts_ziccamoc : bool;
   pma_check_opts_ziccif : bool;
@@ -11497,8 +11939,8 @@ Record pma_check_opts := {
 Arguments pma_check_opts : clear implicits.
 #[export]
 Instance Decidable_eq_pma_check_opts : EqDecision pma_check_opts.
-   intros [x0 x1 x2 x3 x4 x5 x6].
-   intros [y0 y1 y2 y3 y4 y5 y6].
+   intros [x0 x1 x2 x3 x4 x5 x6 x7].
+   intros [y0 y1 y2 y3 y4 y5 y6 y7].
   cmp_record_field x0 y0.
   cmp_record_field x1 y1.
   cmp_record_field x2 y2.
@@ -11506,45 +11948,50 @@ Instance Decidable_eq_pma_check_opts : EqDecision pma_check_opts.
   cmp_record_field x4 y4.
   cmp_record_field x5 y5.
   cmp_record_field x6 y6.
+  cmp_record_field x7 y7.
 left; subst; reflexivity.
 Defined.
 #[export]
 Instance Countable_pma_check_opts : Countable pma_check_opts.
 refine {|
-  encode x := encode (pma_check_opts_ziccamoa x, pma_check_opts_ziccamoc x, pma_check_opts_ziccif x, pma_check_opts_zicclsm x, pma_check_opts_ziccrse x, pma_check_opts_ssccptr x, pma_check_opts_svadu x);
-  decode x := '(x0, x1, x2, x3, x4, x5, x6) ← decode x;
-              mret (Build_pma_check_opts x0 x1 x2 x3 x4 x5 x6)
+  encode x := encode (pma_check_opts_zama16b x, pma_check_opts_ziccamoa x, pma_check_opts_ziccamoc x, pma_check_opts_ziccif x, pma_check_opts_zicclsm x, pma_check_opts_ziccrse x, pma_check_opts_ssccptr x, pma_check_opts_svadu x);
+  decode x := '(x0, x1, x2, x3, x4, x5, x6, x7) ← decode x;
+              mret (Build_pma_check_opts x0 x1 x2 x3 x4 x5 x6 x7)
 |}.
 abstract (
-  intros [x0 x1 x2 x3 x4 x5 x6];
+  intros [x0 x1 x2 x3 x4 x5 x6 x7];
   rewrite decode_encode;
   reflexivity).
 Defined.
 
+Notation "{[ r 'with' 'pma_check_opts_zama16b' := e ]}" :=
+  match r with Build_pma_check_opts _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) =>
+    Build_pma_check_opts e f1 f2 f3 f4 f5 f6 f7 end (at level 1).
 Notation "{[ r 'with' 'pma_check_opts_ziccamoa' := e ]}" :=
-  match r with Build_pma_check_opts _ (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) =>
-    Build_pma_check_opts e f1 f2 f3 f4 f5 f6 end (at level 1).
+  match r with Build_pma_check_opts (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) =>
+    Build_pma_check_opts f0 e f2 f3 f4 f5 f6 f7 end (at level 1).
 Notation "{[ r 'with' 'pma_check_opts_ziccamoc' := e ]}" :=
-  match r with Build_pma_check_opts (_ as f0) _ (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) =>
-    Build_pma_check_opts f0 e f2 f3 f4 f5 f6 end (at level 1).
+  match r with Build_pma_check_opts (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) (_ as f6) (_ as f7) =>
+    Build_pma_check_opts f0 f1 e f3 f4 f5 f6 f7 end (at level 1).
 Notation "{[ r 'with' 'pma_check_opts_ziccif' := e ]}" :=
-  match r with Build_pma_check_opts (_ as f0) (_ as f1) _ (_ as f3) (_ as f4) (_ as f5) (_ as f6) =>
-    Build_pma_check_opts f0 f1 e f3 f4 f5 f6 end (at level 1).
+  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) (_ as f6) (_ as f7) =>
+    Build_pma_check_opts f0 f1 f2 e f4 f5 f6 f7 end (at level 1).
 Notation "{[ r 'with' 'pma_check_opts_zicclsm' := e ]}" :=
-  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) _ (_ as f4) (_ as f5) (_ as f6) =>
-    Build_pma_check_opts f0 f1 f2 e f4 f5 f6 end (at level 1).
+  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) (_ as f6) (_ as f7) =>
+    Build_pma_check_opts f0 f1 f2 f3 e f5 f6 f7 end (at level 1).
 Notation "{[ r 'with' 'pma_check_opts_ziccrse' := e ]}" :=
-  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) _ (_ as f5) (_ as f6) =>
-    Build_pma_check_opts f0 f1 f2 f3 e f5 f6 end (at level 1).
+  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ (_ as f6) (_ as f7) =>
+    Build_pma_check_opts f0 f1 f2 f3 f4 e f6 f7 end (at level 1).
 Notation "{[ r 'with' 'pma_check_opts_ssccptr' := e ]}" :=
-  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) _ (_ as f6) =>
-    Build_pma_check_opts f0 f1 f2 f3 f4 e f6 end (at level 1).
+  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) _ (_ as f7) =>
+    Build_pma_check_opts f0 f1 f2 f3 f4 f5 e f7 end (at level 1).
 Notation "{[ r 'with' 'pma_check_opts_svadu' := e ]}" :=
-  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) _ =>
-    Build_pma_check_opts f0 f1 f2 f3 f4 f5 e end (at level 1).
+  match r with Build_pma_check_opts (_ as f0) (_ as f1) (_ as f2) (_ as f3) (_ as f4) (_ as f5) (_ as f6) _ =>
+    Build_pma_check_opts f0 f1 f2 f3 f4 f5 f6 e end (at level 1).
 #[export]
 Instance dummy_pma_check_opts : Inhabited (pma_check_opts) := {
   inhabitant := {|
+    pma_check_opts_zama16b := inhabitant;
     pma_check_opts_ziccamoa := inhabitant;
     pma_check_opts_ziccamoc := inhabitant;
     pma_check_opts_ziccif := inhabitant;
@@ -11613,6 +12060,8 @@ Definition zero_extend' {n : Z} (m : Z) (v : mword n) (*n >=? 0*) (*m >=? 0*) (*
 
 Definition physaddrbits_zero_extend (xs : mword ((if 64 =? 32 then 34 else 64))) : mword 64 :=
    zero_extend' (64) (xs).
+
+
 
 
 

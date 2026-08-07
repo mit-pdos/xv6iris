@@ -48,7 +48,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation AI := KernelSyms.argint.
 
 (* the [c.sw]'s narrowing IS C's (int) conversion of argraw's uint64 result;
    [RiscvExtras.trunc32] is the model's own name for it, so use that rather

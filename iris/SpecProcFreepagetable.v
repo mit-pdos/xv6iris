@@ -62,20 +62,17 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import KallocInv.
-Require Import KptExecMap TrampPt.
 Require Import KvmSpec.
-Require Import UptTree UserPtTree.
+Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import PtFree BarePt.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation PFT := KernelSyms.proc_freepagetable.
 
 Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
@@ -91,8 +88,10 @@ Definition wp_proc_freepagetable_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, 
   (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
   (* the pagetable argument is the table [proc_pt P] describes *)
   mm !!! Regidx (mword_of_int 10) = page_base P.(ud_root) ->
-  (* the size stays inside the user region, so PGROUNDUP does not wrap *)
-  (uint sz + 4096 <= uvm_maxsz)%Z ->
+  (* the size stays inside the user region, so PGROUNDUP does not wrap.  This
+     is EXACTLY [ProcInv.proc_priv]'s own size bound -- see SpecUvmfree.v for
+     why the [+ 4096] form it used to have was undischargeable. *)
+  (uint sz <= uvm_maxsz)%Z ->
   (* ...and the table maps nothing at or above it.  See the header: this is
      [ProcInv.proc_priv]'s [p->sz] invariant, not a new obligation. *)
   um_below sz P.(ud_um) ->

@@ -19,7 +19,6 @@ Require Import IntrDefs.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
-Notation MS := KernelSyms.memset.
 
 Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (cval : mword 64) (b : bool) (pcur : mword 64) :=

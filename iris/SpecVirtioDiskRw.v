@@ -144,7 +144,8 @@ Definition wp_virtio_disk_rw_sconf_body
      published slot ([VirtioQueue.vs_wr]).  A caller with no durability
      obligation instantiates the pair trivially and its statement is
      unchanged in meaning. *)
-  disk_write_permit (if wr then Some (1024 * uint bno, bs_buf)%Z else None) Q -∗
+  disk_write_permit gen_id
+    (if wr then Some (1024 * uint bno, bs_buf)%Z else None) Q -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗

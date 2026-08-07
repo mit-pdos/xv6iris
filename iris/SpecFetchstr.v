@@ -70,7 +70,6 @@ From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation FS := KernelSyms.fetchstr.
 
 (* fetchstr's own frame is 6 slots; below it sit myproc's 10, copyinstr's 20
    (its own 10 plus walkaddr's 10) and strlen's 2, so 20 covers every call. *)

@@ -120,7 +120,7 @@ template for milestones 1–4.
    `gpow = true` baked). Tree stays green with no statement changes.
    Touches RiscvPtsto/RiscvExec — bottom of tree, so every iteration is a
    full rebuild: validate with `make -f CoqMakefile -j16 -k`, run
-   `tools/lemma_diff.py` and `tools/spec_vacuity.py` on touched files.
+   `tools/lemma_diff.py` on touched files.
 2. **Language + the GenId sweep** — **STAGE 2a LANDED (green, checkers
    clean, baseline 5 axioms)**: the four loop expressions carry an INERT
    generation index (`LoopE gen cpu`, …; no `prim_step` arm reads it, so
@@ -221,7 +221,7 @@ deallocated), and `virtio_proto` — which rides in the per-era
 `disk_inv` — used to own `∃ dmap, ghost_map_auth (dn_img γ) 1 dmap ∗
 ⌜disk_view dmap (v_disk v)⌝`.
 
-**LANDED (M5a — 658 files green, `spec_vacuity` clean, `lemma_diff`
+**LANDED (M5a — 658 files green, `lemma_diff`
 reporting only the deliberate `disk_view` move, `Print Assumptions
 riscv_power_adequacy` still exactly the 5 `rv64d.*` axioms):**
 
@@ -859,7 +859,7 @@ confirm insertions only; a single deletion means image drift and the regen
 must be reverted, not committed.
 
 **VERIFICATION (complete):** the full `-k` rebuild the regen forces came
-back green -- 674 files, zero errors -- and `lemma_diff` / `spec_vacuity` /
+back green -- 674 files, zero errors -- and `lemma_diff` /
 `proof_coverage --check` are clean, with `Print Assumptions` on BOTH
 `riscv_power_adequacy` and `riscv_device_adequacy` still exactly the 5
 `rv64d.*` axioms.

@@ -71,7 +71,6 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation UA := KernelSyms.uvmalloc.
 
 Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

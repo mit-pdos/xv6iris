@@ -35,10 +35,10 @@ Section ExecAmoGS4walkPt.
   Let storeval : mword 32 :=
     sign_extend' (Z.mul 8 (__id 4)) (trunc (Z.mul (__id 4) 8) vrs2).
   Hypothesis Hrd : uint rd <> 0.
-  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, Data, Data))) s
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, true, false, Data, Data))) s
                     = Some (Virtaddr ea, s).
   Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 4 = true.
-  Hypothesis Htr : exec (translateAddr (Virtaddr a8) (Atomic (AMOSWAP, Data, Data))) s
+  Hypothesis Htr : exec (translateAddr (Virtaddr a8) (Atomic (AMOSWAP, true, false, Data, Data))) s
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
   Hypothesis Hcp' : register_lookup cur_privilege s'.(sregs) = Supervisor.
   Hypothesis Hmprv' : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false.
@@ -77,10 +77,10 @@ Section ExecAmoGS4walkPt.
       by (unfold assert_exp'; cbn match; apply exec_returnm).
     rewrite (execR_liftR_seq _ _ _ _ _ Hae).
     assert (Ha8ea : a8 = ea) by (unfold a8; rewrite subrange_id; apply sign_extend'_id).
-    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (AMOSWAP, Data, Data)) 4) s
+    assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64) (Atomic (AMOSWAP, true, false, Data, Data)) 4) s
                    = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
     { unfold get_transformed_data_addr.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 (zeros' 64) (Atomic (AMOSWAP, Data, Data)) 4 s)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_ext_data_get_addr_gpr rs1 (zeros' 64) (Atomic (AMOSWAP, true, false, Data, Data)) 4 s)).
       cbn match.
       rewrite (exec_bind_Some _ _ _ _ _ Htea).
       rewrite Ha8ea. apply exec_returnM. }
@@ -92,12 +92,11 @@ Section ExecAmoGS4walkPt.
     cbn match.
     rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s')).
     cbn beta match.
-    replace (Z.leb 4 xlen_bytes) with true by (vm_compute; reflexivity).
-    cbv iota.
-    rewrite execR_bind.
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')).
-    cbn beta. rewrite execR_returnR. cbn match.
-    rewrite (execR_liftR_seq _ _ _ _ _ (exec_mem_write_ea_amo_4 pa s' Hpalign)).
+    (* upstream reordered the body: the effective-address announcement and the
+       load now run BEFORE rs2 is read *)
+    rewrite (execR_liftR_seq _ _ _ _ _
+              (exec_mem_write_ea_amo_4 PBMT_PMA pa region (register_lookup mstatus s'.(sregs)) s'
+                 HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo eq_refl Hmprv' Hcp')).
     cbn match.
     rewrite execR_bind.
     rewrite (execR_liftR_seq _ _ _ _ _
@@ -105,6 +104,11 @@ Section ExecAmoGS4walkPt.
                  HA Hord Hrange HR HW Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhr Hdev
                  (fun j Hj => Hbytes j Hj) eq_refl Hmprv' Hcp')).
     cbn match. rewrite execR_returnR. cbn match.
+    replace (Z.leb 4 xlen_bytes) with true by (vm_compute; reflexivity).
+    cbv iota.
+    rewrite execR_bind.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s')).
+    cbn beta. rewrite execR_returnR. cbn match.
     cbn zeta. cbn match.
     replace (generic_eq AMOSWAP AMOCAS) with false by (vm_compute; reflexivity).
     unfold and_boolM.

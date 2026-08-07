@@ -40,7 +40,6 @@ Require Import DevModel DiskPtsto WpUart.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import SpecUart.
-Require Import CodeUartPutcSync.
 Require Import WpSconfAlu WpSconfBtype.
 Require Import WpSconfUartAccess.
 Local Open Scope Z_scope.

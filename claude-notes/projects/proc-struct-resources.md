@@ -194,6 +194,74 @@ the evidence for every offset. This file is only the worklist.
       with all four slots used (no gap); `p` parks in s1 across acquire and the
       value in s2 across release. `panic_wp` is threaded because the reworked
       `acquire` takes it.
+
+- [x] **`setkilled`, `kkill` and `sys_kill` PROVEN and LINKED** — with
+      `killed`, the whole `p->killed` cone. `SpecSetkilled` / `CodeSetkilled`
+      / `ProofSetkilled` / `LinkSetkilled` and `SpecKkill` / `CodeKkill` /
+      `ProofKkill` / `LinkKkill` over ACQUIRE + RELEASE; `SpecSysKill` /
+      `CodeSysKill` / `ProofSysKill` / `LinkSysKill` over ARGINT + KKILL.
+      **9 s / 23 s (1.1 GB) / 8 s**; all three axiom-clean (Sail primitives +
+      funext, nothing else), `proof_coverage` reads them `proven`. This is
+      the payoff for S1's FLAT invariant row: `kkill` writes `p->killed`,
+      reads `p->pid` and moves `p->state` on procs it does not own, and it
+      reaches every one of them at the TOP LEVEL of `proc_lock_res` — no
+      `proc_slots` guard is opened anywhere in the cone. What to reuse:
+
+      * **A `void` function whose whole effect is invisible.** `proc_pub`
+        quantifies `killed` existentially, so setkilled's postcondition is
+        EMPTY *and* the stored value never has to be computed — the
+        reassembly is `iExists _, xs, pid`. That is the right shape, not a
+        gap: the only reader is `killed()`, which any hart may call on any
+        proc, so no fraction of the cell can travel with the running thread
+        (`design/proc-struct.md`, discipline 1).
+      * **kkill IS wakeup's scan with a different test**, and it reuses
+        `SchedCtx.proc_lock_res_wakeup` verbatim for SLEEPING → RUNNABLE —
+        the lemma's comment always said it would. `ProofWakeup.v` is the
+        template to copy for any further proc[] walk: bounded fuel
+        induction, `wp_next b` loop invariant anchored at the lemma's own
+        `CID0`, and the acquire→release stretch at the literal `false`.
+      * **`kk_cs_rest`: ONE predicate for the callee-saved registers a
+        function neither saves nor uses** (here s4..s11), rather than
+        wakeup's eight explicit equalities. It composes through a call with
+        `callee_saved_lookup` and is cashed in at the epilogue for the eight
+        matching conjuncts of the final `callee_saved`. **The trap, and it
+        compiles-adjacent:** sp/s0/s1/s2/s3 all have `is_cs_idx = true`, so
+        the "insert at a non-callee-saved register" update lemma does NOT
+        apply to them — you need one update lemma per excluded index
+        (`kk_cs_rest_sp` / `_s0` / `_s1` / `_s2` / `_s3`, each one line,
+        `congruence` against the predicate's own premise). Getting it wrong
+        surfaces as a bare *"Unable to unify false with true"* far from the
+        cause.
+      * **Capture the frame in the EXIT continuation, don't thread it
+        through the loop.** kkill's scan never touches its own frame, so the
+        six saved cells and the caller's continuation are captured inside
+        the `iAssert`ed epilogue block, which is then handed to the loop as
+        its exit. wakeup threads a `wk_frame` through every iteration; there
+        is no need.
+      * **Build a shared block AFTER the case split that owns its
+        resources.** kkill's release-and-return-0 block at +0x4a has two
+        entries (both arms of the SLEEPING test) so it must be an
+        `iAssert` — but it consumes the exit continuation, which the
+        *no-match* path still needs for its own release and back edge. So
+        it is built inside the pid-match arm, not before the split.
+      * **`stack_own_slots` hands the cells at `pa_stk sp0 k`, and a slot
+        never passed to a leaf STAYS in that form.** Padding slots (kkill's
+        slot 0, setkilled's slot 0) must therefore be framed back with a
+        bare `iExact`, with no address rewrite — the rewrite every *used*
+        slot needs is exactly what breaks an unused one.
+      * `stk_fp_32` was the missing 32-byte member of `KernelRvcDecode`'s
+        `stk_fp_*` family (sys_kill's `addi s0,sp,32`); `cdec_d49c` /
+        `cexec_d49c` (`c.sw a5,40(s1)`, the `p->killed = 1` store) went into
+        `KernelRvcDecode` too, shared by setkilled and kkill.
+      * Stack budgets: setkilled `14 <= av`, kkill `16 <= av` (6 slots + 10
+        for acquire/release), sys_kill `22 <= av` (4 + argint's 18).
+      * **What the contracts deliberately do NOT say.** kkill returns 0 or
+        -1 and nothing relates that to the argument: `proc_pub` quantifies
+        every slot's pid and no resource in the tree ties a pid to a slot,
+        so a sharper postcondition would need a pid→slot ghost map that no
+        consumer wants. sys_kill hands the value straight to user space.
+        Same honesty as `killed`'s and sys_pause's return values.
+
 - [x] **S3b — `sys_pause` PROVEN and LINKED** (`CodeSysPause.v` /
       `ProofSysPause.v` / `LinkSysPause.v`, over ARGINT / ACQUIRE / RELEASE /
       MYPROC / KILLED / SLEEP; **42 s / 1.4 GB**, axiom-clean, `proof_coverage`
@@ -347,6 +415,161 @@ the evidence for every offset. This file is only the worklist.
       INEQUALITY: it raises `p->sz` and maps nothing, so its entire
       coherence obligation is `um_below_mono`.  Account in
       [`../completed/growproc.md`](../completed/growproc.md).
+
+- [x] **S10 — `kwait` (xv6's `wait`) is PROVEN and LINKED**, over ACQUIRE /
+      RELEASE / MYPROC / KILLED / SLEEP / COPYOUT / FREEPROC, with no `Axiom`
+      and no `admit` of its own: `Print Assumptions Kwait.wp_kwait_sconf` is
+      the 5 `rv64d.*` platform axioms + funext and nothing else.
+      `SpecKwait.v` / `CodeKwait.v` / `ProofKwait.v` / `LinkKwait.v`.
+      This is the function that reclaims a ZOMBIE child, it is the first one
+      that holds TWO locks at once, and it is the first UNBOUNDED loop that
+      parks (an `iLöb` with a `sleep` inside it).
+      **`sys_wait` is PROVEN and LINKED too** (`SpecSysWait.v` /
+      `ProofSysWait.v` / `LinkSysWait.v`, over ARGADDR + KWAIT, same axiom
+      footprint), so this cone is closed; sysproc.c is 6/8.  It is
+      `sys_kill`'s shape byte for byte and its proof is `ProofSysKill.v`'s
+      with two differences worth knowing: its `uint64 p` local is a WHOLE
+      frame slot (no `word_pointsto_split4`/join pair, unlike an `int`
+      local), and **the trapframe fraction argaddr wants is BORROWED OUT OF
+      `proc_priv`** (`ProcInv.proc_priv_tf`) for the duration of the call
+      rather than passed alongside it, because the second callee wants the
+      whole block back — which is why the contract names the argument as
+      `pv_tf V !! tf_arg_idx 0 = Some v0`, sys_sbrk's spelling, rather than
+      taking a free `ws` the way sys_kill's does.
+
+      **What landed with it, and is reusable on its own:**
+
+      * **`WaitInv.wait_res` is wait_lock's invariant.** The parent table is
+        `WaitInv.parents_own` (that file is the other agent's; see
+        `SpecReparent.v` for the cells-level consumer).  kwait is the LOCK's
+        first consumer: `is_lock γw wait_lock_addr "wait_lock" wait_res` is a
+        premise of its contract, `parents_own_read` licenses the
+        `ld a5,56(s1)` on every slot of the scan, and `parents_own_acc` is
+        what the `sd x0,56(s1)` that disowns the child runs on.
+        `wait_lock_addr` still lives in `SpecProcinit.v` (procinit is what
+        initialises the lock); moving it into `WaitInv.v` would be tidier and
+        costs one `Require Export`.
+      * **THE ZOMBIE BRIDGE, which SpecFreeproc.v used to record as a gap.**
+        `SpecFreeproc.fp_of_dormant_zombie` turns a child's
+        `ProcInv.proc_dormant _ ZOMBIE` — out of its own lock through
+        `SchedCtx.proc_slots`' `inv_dormant` guard — into freeproc's
+        precondition, with NO side condition.  It closed from three sides,
+        and none of them was "add a premise":
+        - the `uint sz + 4096 <= uvm_maxsz` premise relaxed to
+          `uint sz <= uvm_maxsz` through `SpecUvmfree` →
+          `SpecProcFreepagetable` → `SpecFreeproc`.  The old form was
+          undischargeable by any holder of a live `p->sz` (growproc lets it
+          reach TRAPFRAME exactly) and `uvm_maxsz` is page-aligned, so the
+          rounding still fits.  `ProofUvmfree`'s two arithmetic lemmas were
+          restated; the rounding step goes through `Z.div_lt_upper_bound` at
+          the STRICT bound, because the non-strict one is false at
+          `sz = uvm_maxsz`.
+        - `ProcPtOwn.proc_pt_root_valid` reads the root page's `page_valid`
+          off the tree's own node claim (via `upt_tree_spec`'s
+          `pt_base t = ud_root P`) instead of demanding it of the caller.
+          `ProofFreeproc` refutes its `c.beqz` that way now.
+        - `ProcInv.proc_dormant`'s ZOMBIE arm gained `um_below` — the one
+          fact genuinely about the process that no resource implies.  Free:
+          no landed proof produces a ZOMBIE, and kexit reduces a live
+          `proc_priv`, which has the same conjunct.
+
+      **The blocks, bottom up:** `kw_epilogue` (+0x78), `kw_exit_wait`
+      (+0xe8), `kw_exit_both` (+0x90), `kw_reap` (+0x5c — the parent store,
+      freeproc, both releases), `kw_found` (+0x40 — the pid read and the
+      optional copyout of the child's `xstate`), `kw_scan`
+      (+0xae/+0xa6/+0xaa — the bounded fuel loop), `kw_exit_neg` (the outer
+      loop's two −1 tails), `kw_round_tail` (+0xca..+0xd8 — the havekids
+      test, `killed`, `sleep`), `kw_round_body` (+0xdc..+0xe6), and the
+      prologue + `iLöb` in `wp_kwait_sconf`.
+
+      **THE TWO-EXIT / FRAME SHAPE.  This is the reusable part** — any loop
+      that both RETURNS from inside and falls out of the bottom has it.
+
+      * **The function exit is ONE linear resource, so the inner loop takes
+        it as a premise and HANDS IT BACK to its own exit.** `kw_scan`
+        receives `kw_exit_fn` (the caller's continuation, named once as a
+        `Definition` so the four places that spell it agree) and its +0xca
+        continuation takes a `kw_exit_fn` as its LAST argument.  Splitting
+        it into two closures instead is unsound-by-typing: whichever arm
+        does not run would have to drop one.
+      * **What the exit still wants back rides through as an ABSTRACT FRAME
+        `R`, never packaged into the closure.** kwait's running-thread
+        bundle (`own_ctx` + `park_hlf`, `kw_rt`) is untouched from the
+        prologue to the exit, but the loop's foot needs it for `sleep` — so
+        a closure that had swallowed it could not give it back.  `kw_scan`
+        threads `R` from entry to both exits and knows nothing else about
+        it; the found arm cashes it in with a five-line
+        `iAssert`, which is also what keeps `kw_found`'s statement
+        unchanged.
+      * **A carried continuation is anchored at the LOOP TURN's hart, not at
+        the function's entry hart.** `wp_next` can only be re-anchored
+        FORWARD (`kw_next_reanchor`), and `sleep` returns on an arbitrary
+        hart, so `kw_round`'s premise is `kw_exit_fn CID …` under its own
+        `∀ CID` — sleep's own crossing hypothesis is then exactly the
+        re-anchoring fact for the back edge.  Anchoring it at `CID0` (which
+        is right for a straight-line join, e.g. `sp_tail`) makes the back
+        edge unprovable.
+      * **The `c.j` at +0xe6 is what pays for the IH's later**: its leaf
+        hands the continuation out under a `▷`, and that `iNext` strips the
+        IH's later as well — which is what lets the back edge after `sleep`
+        (a plain fall-through, with no branch of its own) apply it.
+      * `iLöb` in a two-line `iAssert` over a `Definition kw_round`, with a
+        separately-`Qed`'d body lemma taking `▷ kw_round`, exactly as
+        `ProofSysPause` does.
+
+      **Three hart-plumbing rules the assembly turned up.**
+
+      * **`cpu_own` is the one bundle no leaf re-anchors.** Every other
+        resource comes back inside the leaf's `wp_next` lambda and is
+        therefore about the resuming hart automatically; `cpu_own` just sits
+        in the context at the hart it was handed in at, and the ambient
+        `CpuId` instance has moved by the time the next callee wants it.
+        The symptom is *"iSpecialize: cannot instantiate … with (cpu_own 0
+        eb pj C eb)"* on two terms that PRINT IDENTICALLY.  Transport it
+        (`cpu_own_transport … ltac:(wp_next_chain)`) at each call that
+        consumes it — twice in kwait's prologue, before myproc and before
+        acquire.
+      * **`wp_next_chain` cannot bridge a chain stated at `eb` with a goal
+        stated at the literal `true`.** Its `specialize` needs the premises
+        to match syntactically, and it fails with the goalless *"No
+        applicable tactic"*.  A parking loop mixes the two by construction
+        (its own crossing index is the literal `true`; every prologue leaf's
+        is `eb`), so keep the one-step bridges as named lemmas —
+        `kw_chain_eb` / `kw_chain_true` — and `apply` one before
+        `wp_next_chain`.
+      * **Do NOT `subst eb`** in any body that runs `iNext` over `cpu_own`
+        (durable-notes / `sp_post_sleep_body`): with `eb` literal
+        `intr_count`'s `if eb` reduces and the `iNext` descends into
+        `intr_handler_avail`.  kwait pins `b = eb` instead (`cpu_own_eb_agree`
+        at level 0 with an enabled base) and leaves `eb` abstract everywhere.
+
+      **The earlier attempt's "open obstacle" — the evar in
+      `sie_cap_gpr Mx (K-10) false ?p` — does not arise** when the scan is
+      applied as `iDestruct (kw_scan (CID0 := CIDy) Φ γs γa γf γw mm pme addr
+      K eb C pid V R HK Hlen with "…") as "Hscan"` and then
+      `iApply ("Hscan" $! …)`: every binder is given explicitly, so nothing
+      is left for `iSpecialize` to infer.  Prefer that two-step form for any
+      lemma whose conclusion is a `∀`-headed wand chain.
+
+      **Four gotchas the blocks paid for, all instances of rules
+      already in durable-notes:**
+
+      * an inline `ltac:(lia)` for a stack budget answers *"Cannot find
+        witness"* under the zify hook — the budgets are named `kw_K*`
+        lemmas;
+      * a `release` at level >= 1 must be closed with `wp_next_off_intro`,
+        NOT `iIntros (CID ...)`: its exit index is `false`, so the hart is
+        pinned, and introducing a fresh CID makes the `locked` token you are
+        still holding be about the wrong hart at the NEXT release;
+      * `proc_pub` is re-bundled per ARM, not before the branch — the
+        copyout arm needs `p_xstate` out until copyout hands it back;
+      * the register-invariant moves must be NAMED lemmas
+        (`kw_scan_regs_cs` / `_ncs` / `_s1`), not inline
+        `rewrite (callee_saved_lookup H _ ltac:(...))`: the `_` leaves the
+        register argument an evar when the spliced tactic runs, which is
+        durable-notes' diverging-`ltac`-in-argument-position trap.  It looks
+        exactly like a slow file; `coqc -time` pins it to the sentence AFTER
+        the last one printed.
 
 - [ ] **S4 — the next syscalls.** `sys_read` / `sys_write` / `sys_fstat` are
       the other `argfd` callers and are cheap once `argfd` itself is linked
@@ -563,7 +786,8 @@ the evidence for every offset. This file is only the worklist.
       * The two `freeproc` tails (+0x86 / +0x96) are NOT decoded: under the
         counted premise both `c.beqz`s fall through.  See the next item.
 
-- [ ] **S7 — `allocproc` in the UNCOUNTED regime (what `kfork` needs).**
+- [x] **S7 — `allocproc` in the UNCOUNTED regime (what `kfork` needs) --
+      DONE (2026-08-06).**
       `kfork` calls allocproc with no page budget (`on = None`, kalloc may
       fail), and there the two `freeproc` tails are LIVE.  The chain is
       exact, and every link below it is already proven:
@@ -598,7 +822,7 @@ the evidence for every offset. This file is only the worklist.
          `vm_compute; discriminate`-style `reg_neq`: the register is a
          VARIABLE there, so each `upd_ne` side goal has to go to
          `congruence` against explicitly-derived `r <> <literal>` facts.
-      2. **`proc_pagetable` uncounted** -- it has only TWO tails to prove,
+      2. [x] **`proc_pagetable` uncounted -- DONE.**  It has only TWO tails to prove,
          not three: the `beqz a0` after `uvmcreate` (+0x14) jumps straight
          to the shared epilogue at +0x4c with `s1 = 0`, so that arm is free.
          What is left is the two `bltz a0` mappages arms — +0x5a
@@ -673,16 +897,115 @@ the evidence for every offset. This file is only the worklist.
            premise: use the `*Core` functor recipe from durable-notes and
            seal ONE proof against TWO `Module Type`s — the counted contract
            userinit wants and the steady-state one kfork wants.
-      3. **`SpecFreeproc.v` + `LinkFreeproc.v`** in the assumed-callee shape
-         (`Module Type` + `Axiom` in the link).  At allocproc's two call sites
-         `p->pagetable` is always 0,
-         so freeproc never reaches `proc_freepagetable` -- but do not
-         specialise the contract to that; state freeproc honestly and let
-         allocproc's sites instantiate it.
-      4. **allocproc's two tails** -- ten instructions, mostly words the
-         function already decodes (`c.mv a0,s1`, `c.mv s1,s2`, two `jal`s,
-         a `c.j` back to the shared epilogue at +0x78).
-      5. **The spec's third arm.** Keep ONE spec, generic in `on`, and give
+      3. [x] **`SpecFreeproc.v` + `ProofFreeproc.v` + `LinkFreeproc.v` --
+         DONE (2026-08-06), and PROVEN rather than assumed.**  The
+         assumed-callee shape was never needed: `proc_freepagetable` had
+         already landed, and upstream `4e524ed` removed the one write that
+         blocked it.
+
+         **The write was `p->parent = 0`, and it was an xv6 BUG.**  `freeproc`
+         is reached from `allocproc`'s error paths holding only `p->lock`,
+         while proc.h says `wait_lock` must be held to touch `parent`.  The
+         proof obligation is what surfaced it (`BootCarveMain.v:1031`: the
+         cell "is claimed by no bundle and is dropped with the padding", so
+         the store could not be proved at all).  It was fixed upstream --
+         the zeroing moved into `kwait`, which holds `wait_lock` -- rather
+         than by inventing an owner.  *Durable lesson: when a proof
+         obligation forces an awkward ownership choice, ask whether the CODE
+         is wrong before designing around it.*
+
+         **The contract could NOT be `proc_dormant _ ZOMBIE -> proc_dormant _
+         UNUSED`.**  allocproc's second tail arrives with a LIVE trapframe
+         page and NO page table, and `proc_dormant`'s address-space disjunct
+         is keyed on `st` and moves BOTH cells together.  So the two slots
+         are independently optional (`fp_pt` / `fp_tf`), and the contract's
+         case split IS the runtime branch.  The post is still
+         `proc_held _ UNUSED 0 ∗ proc_dormant _ UNUSED`.
+
+         **Pinned at `b = false`, and that is forced.**  The post hands back
+         `proc_held`, which names the hart the lock is held on, but
+         `wp_next`'s hart equality holds only under `b = false ∨ p =
+         zero_reg`.  At a generic `b` the returned block would be about a
+         possibly different cpu.  Callers hold p->lock, so they have `false`.
+
+         **A REAL GAP, recorded not papered over:** `fp_pt`'s `Some` arm
+         carries `um_below sz um`, `uint sz + 4096 <= uvm_maxsz` and
+         `page_valid (page_base root)`.  `proc_dormant` at ZOMBIE carries
+         NONE of the three (only `uint (pv_sz V) <= uvm_maxsz`).  So the
+         bridge **kwait** will need does not exist yet, and writing it means
+         strengthening proc_dormant's ZOMBIE arm.  It costs allocproc
+         nothing -- both of its tails run at `opt = None`, where the arm is
+         vacuous.
+      4. [x] **allocproc's two tails -- DONE.**  Six instructions each, all already
+         decoded (`CodeAllocproc.v` is GENERATED now, so `api_86`..`api_a4`
+         exist).  Each is `mv a0,s1; jal freeproc; mv a0,s1; jal release;
+         mv s1,s2; j +0x78` -- and note `s2` holds the failed callee's `a0`,
+         i.e. 0, which is how the compiler gets the return value.
+         **Groundwork LANDED (2026-08-06):** `allocproc_post`'s third arm,
+         `wp_allocproc_core_body` / `ALLOCPROC_GEN`, and the budget bump
+         44 -> 48 (freeproc needs 44 below allocproc's own 4-slot frame).
+         `ProofAllocproc.v` still compiles unchanged apart from the `ap_K*`
+         bounds and one `iRight` -> `iRight; iLeft` (the post is three-way
+         now).  What is LEFT is the two tails themselves plus the
+         Core/counted-seal split.
+         **The two bridges are LANDED (2026-08-06):**
+         `ProcInv.proc_ofiles_null_split` (`proc_ofiles` at all-null back
+         into `ofile_cells` + the `fd_slot` units, which is what `fp_rest`
+         wants) and `SchedCtx.proc_slots_unused_intro` (the converse of
+         `proc_slots_unused`, for rebuilding the lock resource after
+         freeproc's `proc_dormant _ UNUSED`).
+
+         **DONE (2026-08-06): both tails are proved and allocproc is
+         complete on every path.**  The four steps below are the record of
+         what it actually took; nothing is left.
+
+         1. [x] **`+0x4a` kalloc generic.**  The `destruct nb as [| nb']` and
+            the `kalloc_post_success` read are gone; the site calls at `on`
+            and destructs the raw `kalloc_post` disjunction.  *Where to
+            split matters:* +0x46 (`c.mv s2,a0`) and +0x48 (`c.sd a0,88(s1)`)
+            move the returned word WITHOUT branching on it, so `Hkpost` is
+            carried whole past both and destructed only at the `c.beqz`.
+            Splitting at the call site instead would have duplicated those
+            two instructions into the tail for nothing.
+         2. [x] **`+0x56` proc_pagetable generic.**  Now
+            `PPT.wp_proc_pagetable_core` at `avail_dec on`, with `PPT :
+            PROC_PAGETABLE_GEN`.  Same trick: +0x52/+0x54 run before the
+            `ppt_post` destruct, so `HF7a0` is stated as `F7 !!! a0 = mpt !!!
+            a0` (the value, uninspected) and each arm rewrites it afterwards.
+            The budget re-association is `ap_sub_dec : avail_sub (avail_dec
+            on) n = avail_sub on (S n)` -- used in BOTH directions, forward
+            for tail 2's witness and backward for the success arm's
+            `kalloc_env`.
+         3. [x] **The two tail bodies, written twice** -- see the WRONG/right
+            note above; that call held up.  ~180 lines each.  *Three things
+            that were not obvious:*
+            - `kalloc_env γa None` is **persistent**, so tail 1 can `iMod`
+              the seal into `#Henv`, hand it to freeproc, and still have one
+              for `allocproc_post`'s third arm.  Tail 2 does not seal at all:
+              proc_pagetable already did on its way out.
+            - `zero` has three spellings on these paths and they are NOT
+              interconvertible: kalloc reports failure as `nullp`,
+              proc_pagetable as `mword_of_int 0`, and `c.beqz` tests against
+              `zero_reg`.  `ap_null_eqz` / `ap_zero_eqz` / `ap_zero_of_int`
+              exist only to bridge them; without the third, `HF7s2`'s
+              `exact` fails with `mword_of_int 0` vs `zero_reg` AFTER
+              `upd_eq` has already stripped nothing (`upd_eq` leaves
+              `regval_into_reg`, which IS convertible -- the mismatch is
+              entirely in the zero).
+            - the park receipt rejoins here.  The found arm keeps BOTH
+              halves (`Hparka` into `proc_held`, `Hparkb` for the caller);
+              a tail gives `Hparka` to freeproc, gets it back in the
+              returned `proc_held`, and `park_split` + `park_at_full_intro`
+              put the whole receipt back into the lock, which is what
+              `proc_slots_unused_intro` needs.
+         4. [x] **Seal.**  `AllocprocCore : ALLOCPROC_GEN` (the whole
+            instruction-level proof) plus `AllocprocSeal (Core :
+            ALLOCPROC_GEN) : ALLOCPROC`, thirty lines whose only content is
+            `ap_refute_dry`.  `LinkAllocproc` applies the Core ONCE and seals
+            it, exporting `AllocprocGen` (for kfork) and `Allocproc` (for
+            userinit) -- applying the functor twice would re-elaborate the
+            big proof for nothing.
+      5. [x] **The spec's third arm -- DONE.** Keep ONE spec, generic in `on`, and give
          `allocproc_post` an out-of-memory disjunct carrying
          `⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝` -- which
          a COUNTED caller (userinit) refutes from its own `K_allocproc < nb`
@@ -727,9 +1050,86 @@ the evidence for every offset. This file is only the worklist.
       error rather than "not found".  Six of the ten files needed the import
       added.
 
+- [x] **`reparent` PROVEN and LINKED** (`WaitInv.v` / `CodeReparent.v` /
+      `SpecReparent.v` / `ProofReparent.v` / `LinkReparent.v`, over WAKEUP).
+      The first consumer of `p->parent`, and so the first function at the
+      **`wait_lock` altitude**: design in
+      [`design/proc-struct.md`](../design/proc-struct.md) §3.  Thirty-four
+      instructions -- a 48-byte ra/s0/s1/s2/s3/s4 frame with every slot used,
+      the proc[] scan, one call.  Structurally it is `wakeup`'s scan with a
+      different body, so `ProofWakeup.v` was the template; what is worth
+      carrying forward is the four things that differ:
+
+      * **THE CONTRACT IS THE PURE MAP, AND THE TWO ARMS OF AN ITERATION MEET
+        AT THE SAME TABLE.**  `WaitInv.rp_upto p ip k` (the reparent map applied
+        to the first `k` slots) is the loop invariant, and BOTH exits from the
+        body reach the shared p++/test tail holding `rp_upto _ _ (S k) ps`:
+        the store arm by `rp_upto_step`, the no-match arm because
+        `rp_slot p ip v = v` there and `list_insert_id` collapses the update.
+        That symmetry is what keeps the tail ONE `wp_next`-wrapped block
+        instead of two.  Look for it in any scan whose body conditionally
+        writes: state the per-slot function first, and the skip arm becomes an
+        instance of the write arm rather than a separate case.
+      * **`proc_addr_inj` WAS STATED ON THE OPEN RANGE, AND EVERY SCAN NEEDS
+        THE CLOSED ONE.**  A proc[] loop exits on `s1 == &proc[NPROC]`, and
+        that equation is worth nothing unless it implies the cursor's INDEX is
+        `NPROC` -- which `proc_addr_inj (i < NPROC) (j < NPROC)` cannot say
+        about `NPROC` itself.  `ProcGeom.proc_addr_inj_le` /
+        `proc_addr_unsigned_le` are the closed-range statements (the array ends
+        far below 2^64, so the premise was never load-bearing); the old names
+        are one-line restatements, so no call site churned.  wakeup and kkill
+        never hit this because their exit continuations do not need to know the
+        index; anything that reports a whole-table postcondition does.
+      * **A FRACTION OF A GLOBAL, HELD ACROSS THE LOOP, IS WHAT MAKES A
+        WHOLE-TABLE POSTCONDITION STATABLE.**  The `ld a0,0(s4)` that reads
+        `initproc` is INSIDE the loop and runs once per reparented child, so
+        `reparent` takes the cell at an arbitrary `dqi` and threads it through
+        the loop invariant.  Owning any fraction rules out a concurrent writer,
+        and that -- not the read itself -- is what lets the spec say every
+        child got the SAME new parent.  A spec that merely quantified the
+        loaded value would have to existentially quantify it per iteration.
+      * **DO NOT IMPORT `VcGen.v` FOR ITS ADDRESS ARITHMETIC.**  The six
+        `pa_stk sp0 j = <frame cell>` bridges every prologue/epilogue needs are
+        written in `ProofWakeupParts.v` with `VcGen.add_vec_off2`, which drags
+        the whole VCgen executor into a whole-function sconf proof for one line
+        of `add_vec` associativity.  `KernelRvcDecode.po_addv_assoc` +
+        `apply f_equal` does the same job at the right altitude, and
+        `KernelRvcDecode.frame_cancel` closes the pop's `pa_stk sp0 n = spF`
+        obligation.  (`ProofWakeupParts.v` still has the old import; it is a
+        cheap cleanup when someone is next in that file.)
+
+      Two smaller notes: `neq_vec` is *definitionally* `negb (eq_vec ..)`, so a
+      `bne` arm is `destruct (eq_vec x y) eqn:H` followed by `unfold neq_vec;
+      rewrite H`.  And a step lemma stated as
+      `<[k := f v]> l = l'` must be specialised FORWARD
+      (`pose proof (rp_upto_step ..) as H; rewrite Hslot in H`), never by
+      `rewrite -Hslot` in the goal -- `ip` occurs inside `rp_upto` too, so the
+      backward rewrite has no unique redex and fails with an unhelpful
+      "Unable to unify".
+
+      Stack budget: `K_reparent = 24` (6 for this frame, 18 for wakeup's).
+      What the contract deliberately does NOT say: anything about `wait_lock`
+      itself (reparent takes no lock; the caller's obligation to hold it lands
+      on `kexit`), and anything about the wakeups -- wakeup's own postcondition
+      is empty because `proc_pub` quantifies the state a SLEEPING->RUNNABLE
+      move changes.
+
 - [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
       shape. Needs an inode model (per-slot fractional auth over `itable`)
-      that does not exist yet. Fill it and no caller restates.
+      that does not exist yet. Fill it and no caller restates. Two consumers
+      are now written against it and neither will need restating:
+      `ProcInv.proc_priv_cwd` (borrow the cell AND the reference, put back a
+      matching pair — sys_chdir's move as well as kexit's) and
+      `SpecIput.v`'s precondition.
+
+- [ ] **S6 — `kexit`.** CONTRACT LANDED, PROOF NOT WRITTEN — its own file,
+      [`kexit.md`](kexit.md). What it forced into this layer: parking at
+      ZOMBIE is a different kind of park (the private block cannot ride a
+      closure that never resumes), so `SchedCtx.park_pay` /
+      `proc_slots_park_gen` / `ProcInv.proc_dormant_noctx` now carry it across
+      the crossing and the reclaiming scheduler reassembles it.
+      `ProcInv.proc_priv_to_dormant_zombie` is the producer of a ZOMBIE block
+      and the mirror of kwait's `SpecFreeproc.fp_of_dormant_zombie` consumer.
 
 ## The unlinked chain: `fileclose` is the only blocker
 

@@ -20,7 +20,6 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
-Notation FI := KernelSyms.fileinit.
 
 (* The address of the string literal "ftable" that fileinit passes as initlock's
    [name] argument.  It sits in .rodata just past etext and has no ELF symbol of

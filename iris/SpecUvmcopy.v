@@ -94,7 +94,6 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation UC := KernelSyms.uvmcopy.
 
 Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

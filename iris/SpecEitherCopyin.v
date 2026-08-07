@@ -60,7 +60,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation ECI := KernelSyms.either_copyin.
 
 (* 6 own slots + the 50 copyin wants below it (myproc's 10 and memmove's 2
    both fit inside that). *)

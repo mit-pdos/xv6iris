@@ -60,7 +60,6 @@ From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation AS := KernelSyms.argstr.
 
 (* 4 slots for argstr's own frame; fetchstr's 26 dominates argraw's 14. *)
 Definition argstr_stack : nat := 30%nat.

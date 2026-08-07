@@ -21,7 +21,6 @@ Require Import IntrDefs.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
-Notation UPS := KernelSyms.uartputc_sync.
 
 Definition wp_uartputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat) (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) (b : bool) (p : mword 64) :=

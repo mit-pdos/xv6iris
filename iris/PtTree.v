@@ -226,17 +226,19 @@ Local Lemma pte_piv_split (f : mword 8) (e : mword 10) :
           (orb (andb (eq_vec (_get_PTE_Flags_R f) ('b"0"))
                   (andb (eq_vec (_get_PTE_Flags_W f) ('b"1"))
                      (eq_vec (_get_PTE_Flags_X f) ('b"1"))))
+          (orb (andb (not (page_based_mem_type_forwards_matches (_get_PTE_Ext_PBMT e))) false)
+          (andb true
           (orb (andb (pte_is_non_leaf f)
                   (orb (eq_vec (_get_PTE_Flags_A f) ('b"1"))
                      (orb (eq_vec (_get_PTE_Flags_D f) ('b"1"))
                         (orb (eq_vec (_get_PTE_Flags_U f) ('b"1"))
                              (neq_vec e (zeros' 10))))))
-          (orb (andb (neq_vec (_get_PTE_Ext_N e) ('b"0")) true)
+          (orb (andb (neq_vec (_get_PTE_Ext_N e) (zeros' 1)) true)
           (orb (andb (neq_vec (_get_PTE_Ext_PBMT e) (zeros' 2))
                   (orb true (not (page_based_mem_type_forwards_matches
                                     (_get_PTE_Ext_PBMT e)))))
           (orb (andb (neq_vec (_get_PTE_Ext_RSW_60t59b e) (zeros' 2)) true)
-               (neq_vec (_get_PTE_Ext_reserved e) (zeros' 5)))))))), pte_s0).
+               (neq_vec (_get_PTE_Ext_reserved e) (zeros' 5)))))))))), pte_s0).
 Proof.
   unfold pte_is_invalid.
   eapply exec_or_v; [ apply exec_returnM | ].
@@ -245,6 +247,11 @@ Proof.
         eapply exec_and_v; [ apply exec_returnM |
           eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] ] ] | ].
   eapply exec_or_v; [ apply exec_returnM | ].
+  (* the new Svpbmt disjunct *)
+  eapply exec_or_v;
+    [ eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] | ].
+  (* ...and the reserved-bits group, now gated on pte_reserved_bits_must_be_zero *)
+  eapply exec_and_v; [ apply exec_returnM | ].
   eapply exec_or_v; [ apply exec_returnM | ].
   eapply exec_or_v;
     [ eapply exec_and_v; [ apply exec_returnM | vm_compute; reflexivity ] | ].
@@ -264,7 +271,9 @@ Proof.
   pose proof (pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0))
                 (ext_bits_of_PTE w)) as Hex.
   specialize (Hv pte_s0). rewrite Hex in Hv. injection Hv as Hb.
-  do 6 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
+  (* the disjunction gained the Svpbmt arm, and the reserved-bit group is now
+     under an [andb pte_reserved_bits_must_be_zero] *)
+  do 7 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
   apply orb_false_iff in Hb. destruct Hb as [Hrsw Hres].
   rewrite andb_true_r in Hrsw.
   unfold neq_vec in Hrsw. unfold neq_vec in Hres.
@@ -333,7 +342,8 @@ Proof.
   pose proof (pte_piv_split (Mk_PTE_Flags (subrange_vec_dec w 7 0))
                 (ext_bits_of_PTE w)) as Hex.
   specialize (Hv pte_s0). rewrite Hex in Hv. injection Hv as Hb.
-  do 3 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
+  (* one more leading disjunct now (the Svpbmt arm) before the non-leaf one *)
+  do 4 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
   apply orb_false_iff in Hb; destruct Hb as [Hb _].
   unfold pte_ptr in Hp. rewrite Hp in Hb. rewrite andb_true_l in Hb.
   do 3 (apply orb_false_iff in Hb; destruct Hb as [_ Hb]).
@@ -1716,6 +1726,45 @@ Proof.
   - exact Hbytes.
 Qed.
 
+(* The same slot read, but EXCLUSIVE: the fork's atomic A/D update re-reads the
+   PTE with a reservation before writing it back.  It needs exactly the same
+   facts (the reservation is invisible to this interpreter's memory, and the
+   [res] flag only reaches [pmaCheck], which an aligned in-RAM access passes
+   either way), so this is [pt_read_pte_slot] with the exclusive brick. *)
+Lemma pt_read_pte_exclusive_slot (sg : mstate) (a w : mword 64) (region : PMA_Region) :
+  pt_slot_mem sg a w ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) = false ->
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (register_lookup pmpcfg_n sg.(sregs)) 0)) ('b"1") = true ->
+  (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0) * 4)%Z ->
+  matching_pma_region (register_lookup pma_regions sg.(sregs)) (Physaddr a) 8 = Some region ->
+  (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_read) = true ->
+  register_lookup htif_tohost_base sg.(sregs) = None ->
+  exec (read_pte_exclusive (Physaddr a) 8) sg = Some (Ok w, sg).
+Proof.
+  intros (Hbytes & Hram & Hram7 & Halign) HA Hord HR Hcov Hmatch Hpma Hhtif.
+  assert (Hnw : (uint a + Z.of_nat 7 < 18446744073709551616)%Z).
+  { destruct Hram as [_ Hh]. unfold ram_base, ram_size in Hh.
+    change (Z.of_nat 7) with 7. lia. }
+  assert (Hfit : (uint a + 8 <= ram_base + ram_size)%Z).
+  { pose proof (uint_pa_add a 7 Hnw) as Heq.
+    destruct Hram7 as [_ Hhi7]. rewrite Heq in Hhi7.
+    change (Z.of_nat 7) with 7 in Hhi7.
+    unfold ram_base, ram_size in *. lia. }
+  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+            (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n sg.(sregs)) 0)) 4)
+            (uint a) (uint (to_bits 64 8)) = PMP_Match).
+  { apply (ram_pmp_match_w a _ 8); [lia | vm_compute; reflexivity | | exact Hfit | exact Hcov].
+    destruct Hram as [Hlo _]. exact Hlo. }
+  apply (exec_read_pte_exclusive_S a region w sg HA Hord Hrange HR Hmatch Halign Hpma).
+  - apply within_clint_false; [apply addr_is_ram_not_in_clint; exact Hram | lia].
+  - apply within_sig_false; [apply addr_is_ram_not_in_sig; exact Hram | lia].
+  - apply within_htif_false. exact Hhtif.
+  - apply addr_is_ram_not_dev. exact Hram.
+  - exact Hbytes.
+Qed.
+
 (* ---- §8b the stored-entry bridges for [u_walk_entry] (abstract leaf).  *)
 
 Lemma uwe_pte (vpn : mword 27) (p2 p1 q0 : mword 64) (asid : mword 16) :
@@ -1821,8 +1870,12 @@ Section PtHit.
     rewrite uwe_pte.
     rewrite autocast_id.
     rewrite (exec_bind_Some _ _ _ _ _ (Hchk s)). cbn match.
-    match goal with |- context[update_and_write_pte ?a ?wd ?pv ?ac] =>
-      assert (Hu : exec (update_and_write_pte a wd pv ac) s = Some (Ok None, s)) end.
+    (* [update_and_write_pte] takes the whole tablewalk context now -- including
+       the entry's LEVEL, recovered from its levelMask by [tlb_get_level] -- and
+       returns the ext_ptw alongside.  The no-write case is still one step. *)
+    match goal with |- context[update_and_write_pte ?w ?vp ?a ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hu : exec (update_and_write_pte w vp a pv lv ac pr mx ds e) s
+                   = Some (Ok (None, tt), s)) end.
     { unfold update_and_write_pte.
       match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
         change w with 64 end.

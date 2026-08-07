@@ -329,10 +329,68 @@ threads `pf_thr` through its three calls (where it works, because each step
 is short and the intermediate maps are named). That file is the model, not
 this one's existing tail.
 
-The `Some nb` arithmetic currently inlined at `Hav1`/`Hav2`/`Hav3`
-(`ProofProcPagetable.v:312`, `:450`, `:583`) disappears when `on` goes
-generic — the rewrites become no-ops on a symbolic `avail_sub` — so step 2
-should make the file shorter, not longer.
+## DONE (2026-08-05): `proc_pagetable` is `on`-generic, all four exits proved
+
+The plan above was carried out, in four commits that each left the tree
+green. Two things in it were wrong or incomplete; both are recorded below,
+because the next function with error tails (`allocproc`) will hit them.
+
+**1. `ppt_thr`, and the two ways to get it wrong.** The incremental shape
+works, but only with two refinements the `pf_thr` model did not need:
+
+- *Peel ONE INSERT AT A TIME* (`ppt_thr_ins` + the `thr_peel` tactic).
+  `ProofProcFreepagetable.v` gets away with `rewrite /B5 … /B0; repeat
+  (rewrite upd_ne; [| thr_side Hc])` because its written values are simple.
+  Here they are not: `N5`'s value is `add_vec (N4 !!! Regidx 11) …`, so once
+  the whole tower is unfolded the value CONTAINS a lookup, `rewrite upd_ne`
+  picks that redex, and the side goal is about two CONCRETE indices —
+  which `thr_side` (built to discharge a *symbolic* `c`) cannot close.
+- *In `thr_side`, the four `exact`s must come BEFORE the `vm_compute`
+  branch.* This is worth 42 seconds. With `rewrite Hx2 in Hc; vm_compute in
+  Hc; discriminate` leading, every write to one of the four frame registers
+  pays for that branch's FAILURE, and the cost of a failed tactic grows with
+  the proof term: ~1.3 s per write in the prologue, ~10 s per write in the
+  epilogue. Leading with the `exact`s (which fail on a type mismatch,
+  instantly) takes every peel in the function to milliseconds. Also: a bare
+  `subst` in `thr_side` does not work here — it tries to expand the
+  `set`-bound register maps and fails with *"N8 is used in hypothesis
+  HN8a3"*. Push the index equation into `Hc` by `rewrite` instead.
+
+**2. The stack bound goes UP, 36 → 40, and that ripples.** uvmfree needs 36
+below `proc_pagetable`'s own 4-slot frame. It is charged even though the
+counted contract makes the tails unreachable: *a stack budget is a property
+of the code, not of the path a caller proves it takes.* `allocproc`, the
+only caller, went 40 → 44 (`SpecAllocproc.v`, and the `ap_K*` lemmas). Any
+function that gains error tails should expect this.
+
+**What the file looks like now.** `SpecProcPagetable.v` has `ppt_post on tfp
+rv` (the four-way join's payload, indexed by the return value) and
+`wp_proc_pagetable_core_body` / `PROC_PAGETABLE_GEN`. `ProofProcPagetable.v`
+has `ProcPagetableCore : PROC_PAGETABLE_GEN` (`on`-generic, ~1330 lines) and
+`ProcPagetableProof : PROC_PAGETABLE` (the counted seal, ~30 lines: destruct
+`ppt_post`, kill the failure arm with `ppt_fail_refute`). `LinkProcPagetable.v`
+exports both `ProcPagetable` and `ProcPagetableGen`. Both are axiom-clean.
+
+**The failure arm's `avail_zero (avail_sub on n)` witness is what makes the
+two-seal trick work**, exactly as predicted — but note the SECOND thing the
+arm has to carry, which was not predicted: `kalloc_env γa None`. The tails
+call uvmfree, uvmfree exists only at `None`, so the tails reseal
+(`KvmSpec.kalloc_env_seal`, generalized here from `Some n` to an arbitrary
+`on`). A caller who takes the failure arm can never count again. That is a
+real constraint on `allocproc`'s tails, not an artifact.
+
+**The three exits, and which bridge each needed.**
+
+| exit | code | bridge |
+|---|---|---|
+| uvmcreate null | none — the `beqz` at +0x14 lands on +0x4c, s1 already 0 | — |
+| TRAMPOLINE run failed | +0x5a: `uvmfree(pt, 0)` | `BarePt.uptg_of_rep0_empty` |
+| TRAPFRAME run failed | +0x66: `uvmunmap(pt, TRAMPOLINE, 1, 0)` then `uvmfree(pt, 0)` | `uptg_of_rep0_tramp` → `UVMUNMAP_FIXED` → `upt_fixed_tramp_del_tramp` |
+
+The third row is the second consumer of the fixed-leaf axis (the first being
+`proc_freepagetable`), and the reason it exists: that `uvmunmap` clears a
+FIXED leaf and leaves behind something that is no longer a well-formed user
+page table, which is precisely what `UVMUNMAP` cannot state.
 
 ## Worklist
 

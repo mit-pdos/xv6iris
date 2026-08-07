@@ -17,15 +17,19 @@ Require Import RegFile WpNext.
 Require Import WpLock.
 Require Import WpMmodeLeafBase.
 Require Import IntrDefs.
-Require Import IntrDefs.
-Require Import CodeWakeup.
 From Kernel Require KernelSyms.
-
-Notation WK := KernelSyms.wakeup.
+Require Import ProcGeom.
 
 (* myproc is PROVEN (SpecMyproc.v / ProofMyproc.v / LinkMyproc.v), and wakeup
    threads the [cur_proc] resource so it can use [wp_myproc_sconf] directly
    (SpecWakeup.v).  There is no myproc axiom. *)
+
+(* wakeup's own 7-entry register-save frame, at spF+8..spF+56 (written by the
+   [c.sdsp] prologue, read back by the epilogue).  Cell addresses are given in
+   the [c.sdsp] leaf's own form [add_vec spF (sign_extend' 64 (csdsp_imm u))],
+   so the prologue's and the epilogue's cells unify without arithmetic. *)
+Definition wk_fcell (spF : mword 64) (u : Z) : mword 64 :=
+  add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
 Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64) :=

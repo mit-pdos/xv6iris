@@ -62,7 +62,6 @@ Require Import ProcPtOwn.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation CPI := KernelSyms.copyin.
 
 Definition wp_copyin_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)

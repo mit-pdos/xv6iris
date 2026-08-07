@@ -46,7 +46,6 @@ Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation SW := KernelSyms.swtch.
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)

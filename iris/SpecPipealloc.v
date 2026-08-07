@@ -26,9 +26,14 @@
    pipealloc is the sole constructor of a pipe, and it is where the two halves
    of the model meet: the two exclusive [file_ref]s filealloc hands back (which
    is what licenses the eight unlocked stores into the two [struct file]s), and
-   the fresh page kalloc hands back, which becomes the pipe.  What comes out is
-   one [is_pipe] and its TWO end references, one per file -- exactly the pairing
-   the caller (sys_pipe) then installs as each file's FD_PIPE payload.
+   the fresh page kalloc hands back, which becomes the pipe.  It is also where
+   a file's PAYLOAD is PUBLISHED: the [sd] that writes [f->pipe] is the moment
+   the file starts owning one end, and pipealloc installs the pipe's ghost
+   names in the slot's payload-names field ([FileInv.fpay_tok_update]) as it
+   does so -- legal with no lock in hand precisely because it holds the only
+   reference.  So the two ends do NOT come out separately: each is inside its
+   own [file_ref], which is what makes the caller's descriptors mean
+   something, and what hands the last [fileclose] a whole end to close.
 
    Two things worth reading off the disassembly rather than the C:
 
@@ -68,10 +73,14 @@ Require Import WpNext.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
+Require Import WpUart.
+Require Import DiskPtsto DiskInv.
+Require Import BioInv.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-Notation PA := KernelSyms.pipealloc.
 
 (* The address of the string literal "pipe" that pipealloc passes to initlock.
    It sits in .rodata past etext with no ELF symbol of its own, so it is spelled
@@ -79,7 +88,7 @@ Notation PA := KernelSyms.pipealloc.
 Definition pipe_name_str : Z := 0x80007598%Z.
 
 Section SpecPipealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ}.
 
   (* the four content fields pipealloc writes into each [struct file]: it makes
      the [w = false] file the READ end and the [w = true] file the WRITE end,
@@ -111,25 +120,25 @@ Section SpecPipealloc.
      kalloc_avail γk on ∗ fd_slot ∗ fd_slot ∗
      (∃ w0 w1 : mword 64, pf0 ↦₈ w0 ∗ pf1 ↦₈ w1)
      ∨
-     (* SUCCESS (a0 = 0): a live pipe, plus the two files naming it.  Each
-        [file_ref] is EXCLUSIVE (fraction 1) -- pipealloc's own unlocked stores
-        are what proves that legal, and the caller inherits the same right (it
-        must, since sys_pipe still has to install them in its fd table). *)
+     (* SUCCESS (a0 = 0): the two files, each owning one end of a live pipe.
+        Each [file_ref] is EXCLUSIVE (fraction 1) -- pipealloc's own unlocked
+        stores are what proves that legal, and the caller inherits the same
+        right (it must, since sys_pipe still has to install them in its fd
+        table).  The pipe itself is not a separate conjunct: [pipe_file]
+        pins each file's type and pipe pointer, and [FileInv.file_payload]
+        reads the end off exactly those fields. *)
      ⌜r = (zero_reg : mword 64)⌝ ∗
      kalloc_avail γk (avail_dec on) ∗
-     (∃ (γl : gname) (γp : pipe_names) (pi : mword 64)
-        (k0 k1 : nat) (C0 C1 : fcontent),
+     (∃ (pi : mword 64) (k0 k1 : nat) (C0 C1 : fcontent),
         ⌜(k0 < NFILE)%nat /\ (k1 < NFILE)%nat⌝ ∗
         ⌜pipe_file pi false C0⌝ ∗ ⌜pipe_file pi true C1⌝ ∗
         pf0 ↦₈ fnode k0 ∗ pf1 ↦₈ fnode k1 ∗
-        is_pipe γl γp pi ∗
-        file_ref γf k0 1 C0 ∗ pipe_ref γp false 1 ∗
-        file_ref γf k1 1 C1 ∗ pipe_ref γp true 1))%I.
+        file_ref γf k0 1 C0 ∗ file_ref γf k1 1 C1))%I.
 
 End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
@@ -144,8 +153,8 @@ Definition wp_pipealloc_sconf_body
   let pf1 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* pipealloc's own frame is 6 slots (c.addi16sp sp,-48); of its four callees
-     fileclose is the deepest, wanting [fileclose_stack] = 18 below that. *)
-  (24 <= K)%nat ->
+     fileclose is the deepest, wanting [fileclose_stack] = 68 below that. *)
+  (74 <= K)%nat ->
   fl = mword_of_int (KernelSyms.kmem + 24) ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
   sie_cap_gpr m K b p -∗
@@ -176,9 +185,17 @@ Definition wp_pipealloc_sconf_body
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
+(* The FS ghost CLASSES appear in the interface below although nothing in
+   pipealloc's contract mentions the file system.  They are there because
+   pipealloc calls fileclose, whose inode arm calls iput -- capacity only, no
+   resource: the untyped files pipealloc closes make [fileclose_env] [emp]
+   (SpecFileclose.fileclose_env_none), so the CONTRACT is unchanged.  There is
+   no way to hide them behind a derived FD_NONE-only interface: the
+   derivation's proof needs them and section discharge puts them back into the
+   derived lemma's statement. *)
 Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)

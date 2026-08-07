@@ -20,6 +20,14 @@ are working on that effort — the relevant `projects/` file.
 - **[`optimization.md`](optimization.md)** — proof performance rules: the
   performance pitfalls and the tactics/patterns that fix them (apply proactively
   when writing new proofs).
+- **[`kernel-defects.md`](kernel-defects.md)** — bugs found in the xv6 SOURCE
+  by the verification, as opposed to gaps in the proofs. An entry there means
+  the C code is wrong and the stuck proof is the symptom. Currently one open
+  defect (D1: `writei` releases a partially-modified buffer without logging
+  it, so the buffer cache can diverge from the committed state), plus a list
+  of near-misses and provably dead code so the same ground is not re-covered.
+  Read the note at the top before proposing to fix any of them: the image is
+  pinned by `XV6_REV`, so editing `xv6-riscv/` moves every symbol address.
 
 ### `design/` — how each part of the project is built
 
@@ -65,6 +73,17 @@ are working on that effort — the relevant `projects/` file.
   retires bread's mystery disjunct), the revised bread/bwrite/brelse
   contracts, the `log_res` invariant and begin_op/end_op/log_write specs,
   and the stage-4 `P_fs` plan with its two recorded open forks.
+- **[`fs-inode.md`](design/fs-inode.md)** — the inode layer: `struct
+  inode`'s geometry read off `bmap`'s own instructions (and the
+  sleeplock alignment hole that puts `addrs` at +80, not +76), the pure
+  `blkmap` model with `bm_slot` unifying the coverage and injectivity
+  clauses, the two resources (`inode_map` for the map, `inode_blocks` for
+  the data) and why `balloc`'s fresh block is DEPOSITED rather than
+  returned, `BlockWords.v`'s word-in-a-block vocabulary, and the
+  SPEND-AT-MOST budget rule — why any function above the log that does not
+  take `log.lock` can only promise to spend at most N units, never exactly N.
+- **[`virtio-driver.md`](design/virtio-driver.md)** — the virtio driver's
+  own design notes.
 - **[`file-table.md`](design/file-table.md)** — the open-file table: `struct
   file`'s geometry, the reference-count algebra (`auth (gmap nat (frac *
   positive))`) that ties `f->ref` to fractional ownership of the immutable
@@ -113,17 +132,39 @@ are working on that effort — the relevant `projects/` file.
   `BootShared` → `SystemAdequacy`). Remaining is future work only: the FS
   instantiation of `P_fs`/`Pc` (the theorem passes `True` today) and the
   torn-write knob. Design in [`design/crash.md`](design/crash.md).
-- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer: the staged
-  worklist for [`design/fs-log.md`](design/fs-log.md) — stage 1 the
-  Ψ-parametric bio rework (escrow arms, uncached pool in `bcache_res`, the
-  five revised specs re-proven), stage 2 `LogInv.v` + the log.c specs,
-  stage 3 their proofs, stage 4 the `P_fs` crash instantiation (gated on
-  the design doc's two open forks). Nothing landed yet.
+- **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
+  crash instantiation) only; stages 1–3 are finished and archived in
+  [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).
+  log.c is 6/7 proven, `xv6_fs_adequacy` carries `P_fs` in the crash slot,
+  and all four steady-state WAL writes prove real durability fupds. Left:
+  initlog's real (n > 0) recovery spec, sys_sync, and the boot composition —
+  plus the phase-D2 finding that caps what recovery can CLAIM (an era learns
+  the on-disk header only by having written it, so closing the gap needs
+  read-data-indexed permits). Design in
+  [`design/fs-log.md`](design/fs-log.md).
+- **[`fs-inode.md`](projects/fs-inode.md)** — the inode layer above the
+  block layer, heading for `writei`/`readi`. Stage 1 (the layer under
+  `bmap`) has LANDED: `BlockWords.v`, `InodeInv.v`, the assumed
+  `SpecBalloc.v`, `SpecBmap.v`, and `CodeBmap.v`'s 70 instruction facts —
+  definitions and contracts only, so fs.c is still 1/24. Next is
+  `ProofBmap.v`/`LinkBmap.v` (the `s4`-saved-only-on-the-indirect-path
+  quirk is the thing to plan for), then `iupdate`, then `writei`. Keeps the
+  deferred bitmap-invariant question that `balloc` waits on, and the owed
+  decode-word dedup sweep. Design in
+  [`design/fs-inode.md`](design/fs-inode.md).
 - **[`proc-struct-resources.md`](projects/proc-struct-resources.md)** — the
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
-  `argraw`/`argint`/`argaddr`, `argfd`, `killed`, `sys_getpid`, `sys_close`,
-  `sys_pause`, `fetchaddr`, `fdalloc`) and what is next (the remaining
-  syscalls, and `cwd_ref`). Keeps the measured account of why
+  `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone
+  (`killed`/`setkilled`/`kkill`/`sys_kill`), `sys_getpid`, `sys_close`,
+  `sys_pause`, `fetchaddr`, `fdalloc`, **`kwait` + `sys_wait`**) and what is
+  next (the remaining syscalls, and `cwd_ref`). `kwait` is the
+  entry to read before writing any loop that can RETURN from inside itself:
+  the function exit is one linear resource the inner loop takes as a premise
+  and hands back to its own exit, what the exit still wants back rides
+  through as an abstract frame rather than inside a closure, a parking
+  loop's carried continuation is anchored at the TURN's hart (a `wp_next`
+  re-anchors only forward), and `cpu_own` is the one bundle no leaf
+  re-anchors. Keeps the measured account of why
   `argraw`'s six-arm proof cost 74 GB, sys_pause's path-dependent-frame
   recipe, — from fetchaddr, the first function spanning the `proc_priv`
   and bare-cell tiers — the `proc_priv_copy` accessor and the x0-as-source
@@ -136,6 +177,34 @@ are working on that effort — the relevant `projects/` file.
   worklist spells out the exact chain that makes it work in `kfork`'s
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
+- **[`kexit.md`](projects/kexit.md)** — `kexit()`, the process-lifetime cone's
+  other half (kwait reclaims a zombie; kexit makes one). **PROVEN** —
+  `ProofKexit.v`, no `Axiom` and no `admit` of its own — **but NOT LINKED**, and it
+  cannot be until file.c's `fileclose` has a proof, which is the same single
+  callee `sys_pipe` waits on; until then `proof_coverage.py` prints it
+  `assumed`. The protocol change it needed is the interesting part: parking
+  at ZOMBIE is a different kind of park, because a zombie's private block
+  cannot ride the parked closure — wait()/freeproc, running on another
+  process, must find the user page table in `p->lock`. So the crossing
+  carries the block MINUS its context cells (`ProcInv.proc_dormant_noctx`)
+  and the reclaiming scheduler puts the two back together
+  (`SchedCtx.park_pay` / `proc_slots_park_gen`), FORGETTING the zombie's
+  record down to its cells rather than claiming it resumable. Also:
+  `SpecIput.v` (assumed, one isolated axiom), the diverging-contract shape,
+  why having no epilogue makes the frame existential and keeps it out of the
+  loop, and `ProcInv.proc_priv_cwd_pid` (the accessor the three FS calls
+  forced). kwait's own worklist is item S10 of
+  [`proc-struct-resources.md`](projects/proc-struct-resources.md), not here.
+- **[`fileclose.md`](projects/fileclose.md)** — `fileclose`, the single
+  unproven callee behind THREE unlinked proved functions (sys_pipe,
+  sys_close, kexit). Everything below it has LANDED: the payload link (a
+  `file_ref` now carries the pipe end / inode reference it names, so the
+  last closer has a whole `pipe_ref` to hand `pipeclose`),
+  `CodeFileclose.v`, the CONTRACT — a TYPE-INDEXED callee environment, so
+  pipealloc is not made to own a file system — and all four callers ported
+  onto it, including the `ProcInv.proc_priv_pid_ofile` accessor kexit's loop
+  needed. What is left is `ProofFileclose.v` and the four `Link` files.
+  Design in [`design/file-table.md`](design/file-table.md).
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a
@@ -219,6 +288,24 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`sail-model-bump.md`](completed/sail-model-bump.md)** — the sail-riscv
+  model bump: the model now comes from the `zeldovich/sail-riscv` FORK (pinned
+  by `SAIL_RISCV_REV`), whose delta is the ATOMIC PTE A/D-bit update, and whose
+  tip carried 58 upstream commits along with it. The headline finding: the bump
+  moved the misaligned split in TWO directions at once — `vmem_*_addr` now
+  splits only across a PAGE boundary (at most two ways, one translation each)
+  while the MAG/alignment split moved DOWN into `checked_mem_*`, under a single
+  translation and with no fault of its own — so the iris-level work is per PAGE,
+  not per chunk. Keeps the peel recipes and their traps, the physical split kit
+  (`MemAccessGen`'s N-chunk loops and width-generic RAM leaves, `UserMemMis`'s
+  chunk-plan derivation), the two platform conjuncts `pma_allows_all` had to
+  gain (misaligned-exceptions None, reservability ≠ RsrvNone) and why, and FOUR
+  findings worth reading before any interface sweep of this kind: a 30-minute
+  "hang" that was a mis-stated `∀`-premise (and that `coqc -time` localises in
+  two minutes); why pinning a platform field beat threading a disjunction
+  through five altitudes; how a WEAKENED upstream `assert` made a dead branch
+  live (the shadow-stack PTE, and the `forall s` argument that kills it again);
+  and `pmaCheck`'s Atomic arm compiling to a match on the op.
 - **[`explicit-cpuid.md`](completed/explicit-cpuid.md)** — the ambient `CpuId`
   removed from every WP statement, so a step's continuation is about the hart
   execution RESUMES on rather than the one it started on. `wp_next` and its two
@@ -280,6 +367,14 @@ their durable design notes, gotchas, and reusable recipes.
   provable), why the two obvious models fail, `BufOwn.v`'s ½-blockno
   `buf_own`, the five function contracts, and the worklist (binit was
   already proven; bget is inlined into bread).
+- **[`fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md)** — stages
+  1–3 of the FS block layer: the Ψ-parametric bio rework (the three escrow
+  arms, the uncached pool, the three interface facts the re-proofs turned up,
+  and `ProofBreadParts.v`'s reusable vocabulary), `LogInv.v` + the six log.c
+  specs (the reservation LEDGER and why a flat counter is not inductive; the
+  batch's slot pool), and their whole-function proofs. Stage 4 (the crash
+  instantiation) is still in flight — see
+  [`projects/fs-log.md`](projects/fs-log.md).
 - **[`virtio-disk.md`](completed/virtio-disk.md)** — the virtio disk device,
   end to end: the machine side (`VirtioModel.v`/`WpVirtio.v`, the DMA lease,
   `wp_dev_loop`), the whole driver side (`virtio_disk_init`/`_rw`/`_intr` +

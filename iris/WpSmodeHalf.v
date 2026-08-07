@@ -71,36 +71,12 @@ Section WpSmodeHalf.
      one-chunk [update_subrange_vec_dec] is the identity, so the register
      gets the sign- resp. zero-extension of the loaded halfword. *)
   Lemma data2_ext_2 (v : mword 16) :
-    extend_value false
-      (update_subrange_vec_dec (zeros' (8*1*2)) (8*(0+1)*2-1) (8*0*2)
-         (autocast (T := mword) v)) = sign_extend' 64 v.
-  Proof.
-    unfold extend_value. rewrite autocast_id. f_equal.
-    apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
-    erewrite bv_concat_unsigned by (cbn; lia).
-    erewrite bv_concat_unsigned by (cbn; lia).
-    rewrite !bv_unsigned_N_0.
-    rewrite Z.shiftl_0_l. rewrite Z.shiftl_0_r. rewrite Z.lor_0_r. rewrite Z.lor_0_l.
-    reflexivity.
-  Qed.
+    extend_value false v = sign_extend' 64 v.
+  Proof. unfold extend_value. reflexivity. Qed.
 
   Lemma data2_ext_2_unsigned (v : mword 16) :
-    extend_value true
-      (update_subrange_vec_dec (zeros' (8*1*2)) (8*(0+1)*2-1) (8*0*2)
-         (autocast (T := mword) v)) = zero_extend' 64 v.
-  Proof.
-    unfold extend_value. rewrite autocast_id. f_equal.
-    apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
-    erewrite bv_concat_unsigned by (cbn; lia).
-    erewrite bv_concat_unsigned by (cbn; lia).
-    rewrite !bv_unsigned_N_0.
-    rewrite Z.shiftl_0_l. rewrite Z.shiftl_0_r. rewrite Z.lor_0_r. rewrite Z.lor_0_l.
-    reflexivity.
-  Qed.
+    extend_value true v = zero_extend' 64 v.
+  Proof. unfold extend_value. reflexivity. Qed.
 
   (* the store twin: the model's chunk-extraction of an already-truncated
      halfword is the identity ([WpSconfMem.autocast_subrange32_id] at 16). *)
@@ -118,10 +94,8 @@ Section WpSmodeHalf.
   Qed.
 
   Lemma store_ext_2 (r : mword 64) :
-    autocast (T := mword)
-      (subrange_vec_dec (autocast (T := mword) (subrange_vec_dec r (2*8-1) 0) : mword (8*2))
-         (8*(0+1)*2-1) (8*0*2)) = trunc16 r.
-  Proof. unfold trunc16. apply autocast_subrange16_id. Qed.
+    (autocast (T := mword) (subrange_vec_dec r (2*8-1) 0) : mword (8*2)) = trunc16 r.
+  Proof. unfold trunc16. reflexivity. Qed.
 
   (* ------------------------------------------------------------------- *)
   (* §2  The leaves: lhu / lh / sh.                                       *)
@@ -151,7 +125,7 @@ Section WpSmodeHalf.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen_u 2 false true Φ pc rd rs1 imm m n v (zero_extend' 64 v) b
-              ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2_unsigned v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -174,7 +148,7 @@ Section WpSmodeHalf.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen_u 2 false false Φ pc rd rs1 imm m n v (sign_extend' 64 v) b
-              ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -199,7 +173,7 @@ Section WpSmodeHalf.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 2 false Φ pc rs2 rs1 imm m n vold (trunc16 (rget m rs2)) b
-              ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2 (store_ext_2 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.

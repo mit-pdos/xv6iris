@@ -67,7 +67,6 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 Import Defs.
 
-Notation UT := KernelSyms.usertrap.
 
 (* the mstatus facts usertrap's return guarantees: exactly userret's
    premises (the sret decodes to User and does not trap) plus the FS/VS

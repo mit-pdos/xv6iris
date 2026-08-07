@@ -64,7 +64,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation CI := KernelSyms.clockintr.
 
 Section SpecClockintr.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
@@ -91,7 +90,7 @@ End SpecClockintr.
    convenience, and the contract was b-GENERIC until the explicit-CPUID sweep
    made them checkable.
 
-   (1) clockintr CALLS cpuid(), at CI+0x08, and does not bracket the call in
+   (1) clockintr CALLS cpuid(), at KernelSyms.clockintr+0x08, and does not bracket the call in
    its own push_off/pop_off.  cpuid() is stated at [b = false] because it
    reads tp mid-body (see the porting guide), so the constraint propagates UP
    the call graph: a caller that invokes cpuid() unbracketed inherits it.

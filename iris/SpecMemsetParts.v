@@ -22,7 +22,6 @@ Require Import WpMemsetS.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation MS := KernelSyms.memset.
 
 (* HEAD (memset+0x00..+0x06): the 2-slot frame alloc (c.addi sp,-16, a push
    trading 2 off the avail count), the two c.sdsp saves into the freed frame

@@ -94,23 +94,23 @@ Lemma exec_pmaCheck_ram_wpte (addr : mword 64) (pbmt : page_based_mem_type)
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
   is_aligned_paddr (Physaddr addr) 8 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_supports_pte_write) = true ->
-  exec (pmaCheck (Physaddr addr) 8 (Store PageTableEntry) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) 8 (Store PageTableEntry) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Halign Hwrite.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hwrite |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:108.61-108.62" >>=
-          (fun _ : true = true => returnM (PMA_supports_pte_write (override_PMA rattr pbmt))))
-    with (returnM (PMA_supports_pte_write (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hwrite. cbn match.
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hwrite (exec_is_mag_applicable_store_pte 8 s) Halign.
+Qed.
+
+Lemma exec_pmaCheck_ram_wpte_con (addr : mword 64) (pbmt : page_based_mem_type)
+    (region : PMA_Region) s :
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 8 = Some region ->
+  is_aligned_paddr (Physaddr addr) 8 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_supports_pte_write) = true ->
+  exec (pmaCheck (Physaddr addr) 8 (Store PageTableEntry) pbmt true) s = Some (Ok pma_ok_aligned, s).
+Proof.
+  intros Hmatch Halign Hwrite.
+  destruct region as [rbase rsize rattr rdtree].
+  pma_ok_peel Hmatch Hwrite (exec_is_mag_applicable_store_pte 8 s) Halign.
 Qed.
 
 (* the full PTE write to a RAM slot: memory gains the 8 bytes, registers
@@ -150,32 +150,149 @@ Proof.
   assert (Hchk : exec (checked_mem_write (Physaddr a) 8 (w' : mword 64) (Store PageTableEntry)
                         PBMT_PMA Supervisor tt false false false) s
                  = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) a 8 w') s.(mdev))).
-  { unfold checked_mem_write.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-    2:{ unfold phys_access_check.
-        rewrite (exec_bind_Some _ _ _ _ _
-                   (exec_pmpCheck_supervisor_grant_wpte a 8 s HA Hord Hrange HW)).
-        cbn match.
-        rewrite (exec_bind_Some _ _ _ _ _
-                   (exec_pmaCheck_ram_wpte a PBMT_PMA region s Hmatch Halign Hwr)).
-        cbn match. apply exec_returnM. }
-    cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (within_mmio_writable (Physaddr a) 8) s = Some (false, s))).
-    2:{ unfold within_mmio_writable. cbn [get_config_rvfi].
-        rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-        rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-        rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-    cbn match.
-    rewrite (exec_bind_Some _ _ _ _ _
-              (_ : exec (write_kind_of_flags false false false) s
-                   = Some (rv64d_types.Write_plain, s))).
+  { assert (Hcp : exec (check_pma_with_pmp_priority (Store PageTableEntry) PBMT_PMA
+                          Supervisor (Physaddr a) 8 false) s = Some (Ok pma_ok_aligned, s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmaCheck_ram_wpte a PBMT_PMA region s Hmatch Halign Hwr)).
+      cbn match. apply exec_returnM. }
+    assert (Hmmio : exec (within_mmio_writable (Physaddr a) 8) s = Some (false, s)).
+    { unfold within_mmio_writable. cbn [get_config_rvfi].
+      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+    set (sw := MState s.(sregs) (write_bytes s.(mem) a 8 w') s.(mdev)).
+    unfold checked_mem_write. rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+    rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+    rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit a 8 0 s)). cbn beta.
+    rewrite misaligned_order_1. cbn zeta.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (_ : exec (write_kind_of_flags false false false) s
+                    = Some (rv64d_types.Write_plain, s))).
     2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
-    rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_plain_8 a w' s Hdev)).
-    apply exec_returnM. }
+    cbn beta.
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?b) _] =>
+      assert (Hu : execR (Defs.untilMT vs m0 c b) s = Some (inr (true, 0, true), sw)) end.
+    { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr a)) with a.
+      rewrite avi0_mul8.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                 (exec_pmpCheck_supervisor_grant_wpte a 8 s HA Hord Hrange HW)).
+      cbn beta. cbn match.
+      rewrite execR_bind0. rewrite execR_returnR. cbn match zeta.
+      rewrite (execR_liftR_seq _ _ _ _ _ Hmmio). cbn beta. cbn match.
+      rewrite autocast_id.
+      change (8 * (0 + 1) * 8 - 1) with 63. change (8 * 0 * 8) with 0.
+      rewrite subrange_full_64.
+      match goal with
+        |- context[Defs.bind (Defs.bind (Defs.liftR (write_ram ?wk ?pa ?wd ?dt ?mt)) ?k1) _] =>
+        assert (Hwr2 : execR (Defs.bind (Defs.liftR (write_ram wk pa wd dt mt)) k1) s
+                       = Some (inr true, sw)) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _ (exec_write_ram_plain_8 a w' s Hdev)).
+        cbn beta. cbn [andb]. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hwr2). cbn beta zeta.
+      apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+    rewrite execR_returnR. reflexivity. }
   unfold write_pte, mem_write_value_priv, mem_write_value_priv_meta.
   cbn [orb andb].
+  rewrite (exec_bind_Some _ _ _ _ _ Hchk).
+  cbn match. unfold mem_write_callback. apply exec_returnM.
+Qed.
+
+(* The CONDITIONAL PTE write: the write half of the fork's atomic A/D update.
+   Same memory effect as the plain one -- the interpreter routes by address and
+   ignores the access kind -- but it goes through the [con = true] path, so
+   [mem_write_value_priv_meta]'s (rl || con) alignment guard is live (and false
+   here, the PTE being 8-aligned) and the PTE arm of [pmaCheck] must not assert
+   against res_or_con, which is exactly the fork's mem.sail change. *)
+Lemma exec_write_pte_conditional_ram (a : mword 64) (w' : mword 64) (region : PMA_Region) s :
+  addr_is_ram a -> addr_is_ram (pa_add a 7) ->
+  is_aligned_paddr (Physaddr a) 8 = true ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) = false ->
+  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) ('b"1") = true ->
+  (ram_base + ram_size <= uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0) * 4)%Z ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr a) 8 = Some region ->
+  (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_supports_pte_write) = true ->
+  register_lookup htif_tohost_base s.(sregs) = None ->
+  exec (write_pte_conditional (Physaddr a) 8 (w' : mword 64)) s
+  = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) a 8 w') s.(mdev)).
+Proof.
+  intros Hram Hram7 Halign HA Hord HW Hcov Hmatch Hwr Hhtif.
+  assert (Hnw : (uint a + Z.of_nat 7 < 18446744073709551616)%Z).
+  { destruct Hram as [_ Hh]. unfold ram_base, ram_size in Hh.
+    change (Z.of_nat 7) with 7. lia. }
+  assert (Hfit : (uint a + 8 <= ram_base + ram_size)%Z).
+  { pose proof (uint_pa_add a 7 Hnw) as Heq.
+    destruct Hram7 as [_ Hhi7]. rewrite Heq in Hhi7.
+    change (Z.of_nat 7) with 7 in Hhi7.
+    unfold ram_base, ram_size in *. lia. }
+  assert (Hrange : pmpRangeMatch (Z.mul (uint (zeros' 64 : mword 64)) 4)
+            (Z.mul (uint (vec_access_dec (register_lookup pmpaddr_n s.(sregs)) 0)) 4)
+            (uint a) (uint (to_bits 64 8)) = PMP_Match).
+  { apply (ram_pmp_match_w a _ 8); [lia | vm_compute; reflexivity | | exact Hfit | exact Hcov].
+    destruct Hram as [Hlo _]. exact Hlo. }
+  pose proof (within_clint_false a 8 s (addr_is_ram_not_in_clint _ Hram) ltac:(lia)) as Hc.
+  pose proof (within_sig_false a 8 s (addr_is_ram_not_in_sig _ Hram) ltac:(lia)) as Hsig.
+  pose proof (within_htif_writable_false a 8 s Hhtif) as Hh.
+  pose proof (addr_is_ram_not_dev _ Hram) as Hdev.
+  assert (Hchk : exec (checked_mem_write (Physaddr a) 8 (w' : mword 64) (Store PageTableEntry)
+                        PBMT_PMA Supervisor tt false false true) s
+                 = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) a 8 w') s.(mdev))).
+  { assert (Hcp : exec (check_pma_with_pmp_priority (Store PageTableEntry) PBMT_PMA
+                          Supervisor (Physaddr a) 8 true) s = Some (Ok pma_ok_aligned, s)).
+    { unfold check_pma_with_pmp_priority.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_pmaCheck_ram_wpte_con a PBMT_PMA region s Hmatch Halign Hwr)).
+      cbn match. apply exec_returnM. }
+    assert (Hmmio : exec (within_mmio_writable (Physaddr a) 8) s = Some (false, s)).
+    { unfold within_mmio_writable. cbn [get_config_rvfi].
+      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+    set (sw := MState s.(sregs) (write_bytes s.(mem) a 8 w') s.(mdev)).
+    unfold checked_mem_write. rewrite exec_catch_early_return.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+    rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+    rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit a 8 0 s)). cbn beta.
+    rewrite misaligned_order_1. cbn zeta.
+    rewrite (execR_liftR_seq _ _ _ _ _
+               (_ : exec (write_kind_of_flags false false true) s
+                    = Some (rv64d_types.Write_RISCV_conditional, s))).
+    2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
+    cbn beta.
+    match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?b) _] =>
+      assert (Hu : execR (Defs.untilMT vs m0 c b) s = Some (inr (true, 0, true), sw)) end.
+    { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+      rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+      change (bits_of_physaddr (Physaddr a)) with a.
+      rewrite avi0_mul8.
+      rewrite (execR_liftR_seq _ _ _ _ _
+                 (exec_pmpCheck_supervisor_grant_wpte a 8 s HA Hord Hrange HW)).
+      cbn beta. cbn match.
+      rewrite execR_bind0. rewrite execR_returnR. cbn match zeta.
+      rewrite (execR_liftR_seq _ _ _ _ _ Hmmio). cbn beta. cbn match.
+      rewrite autocast_id.
+      change (8 * (0 + 1) * 8 - 1) with 63. change (8 * 0 * 8) with 0.
+      rewrite subrange_full_64.
+      match goal with
+        |- context[Defs.bind (Defs.bind (Defs.liftR (write_ram ?wk ?pa ?wd ?dt ?mt)) ?k1) _] =>
+        assert (Hwr2 : execR (Defs.bind (Defs.liftR (write_ram wk pa wd dt mt)) k1) s
+                       = Some (inr true, sw)) end.
+      { rewrite (execR_liftR_seq _ _ _ _ _ (exec_write_ram_cond_8 a w' s Hdev)).
+        cbn beta. cbn [andb]. apply execR_returnR_fwd. }
+      rewrite (execR_bind_Some _ _ _ _ _ Hwr2). cbn beta zeta.
+      apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+    rewrite execR_returnR. reflexivity. }
+  unfold write_pte_conditional, mem_write_value_priv, mem_write_value_priv_meta.
+  cbn [orb andb Riscv.rv64d.not negb].
   rewrite (exec_bind_Some _ _ _ _ _ Hchk).
   cbn match. unfold mem_write_callback. apply exec_returnM.
 Qed.
@@ -255,11 +372,14 @@ Section PtUpd.
       = Some (Ok p1, s) ->
     exec (read_pte (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8) s
       = Some (Ok p0, s) ->
+    (* the fork's atomic update re-reads the PTE exclusively before writing *)
+    exec (read_pte_exclusive (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok p0, s) ->
     register_lookup misa s.(sregs) = MISA_C ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
     eq_vec (_get_MEnvcfg_ADUE menvcfg0) ('b"1") = true ->
-    exec (write_pte (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8
+    exec (write_pte_conditional (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0))) 8
             (p0' : mword 64)) s
       = Some (Ok true, sw) ->
     sw.(sregs) = s.(sregs) ->
@@ -270,7 +390,7 @@ Section PtUpd.
                               (Some (u_walk_entry vpn p2 p1 p0' asid)))).
   Proof.
     intros Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hnap Hchk Hupd
-           Hrd2 Hrd1 Hrd0 Hmisa Hmenv HPBMTE HADUE Hwrite Hswregs.
+           Hrd2 Hrd1 Hrd0 Hrdx Hmisa Hmenv HPBMTE HADUE Hwrite Hswregs.
     unfold translate_TLB_miss. cbn zeta.
     match goal with |- context[pt_walk 39 _ _ _ _ _ _ ?l false ?e] =>
       change l with 2 end.
@@ -279,8 +399,17 @@ Section PtUpd.
                   Hv2 Hn2 Hv1 Hn1 Hv0 Hl0 Hchk Hnap menvcfg0 s
                   Hmisa Hrd2 Hrd1 Hrd0 Hmenv HPBMTE)).
     cbn match. cbn zeta.
-    match goal with |- context[update_and_write_pte ?aa ?wd ?pv ?ac] =>
-      assert (Hu : exec (update_and_write_pte aa wd pv ac) s = Some (Ok (Some p0'), sw)) end.
+    (* THE FORK'S CHANGE, in full: the A/D update is an atomic read-check-write.
+       After the Svadu/ADUE gate it re-reads the PTE with an EXCLUSIVE read,
+       re-runs the tablewalk checks on the freshly read value ([check_leaf_pte],
+       the same lemma the walk's leaf arm uses), recomputes the A/D bits on that
+       value, and writes it back with a CONDITIONAL write.  Sequentially the
+       re-read returns what the walk read, so every step agrees with the old
+       single-write model -- which is exactly the observation that makes this
+       change conservative for these proofs. *)
+    match goal with |- context[update_and_write_pte ?w ?vp ?aa ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hu : exec (update_and_write_pte w vp aa pv lv ac pr mx ds e) s
+                   = Some (Ok (Some p0', tt), sw)) end.
     { unfold update_and_write_pte.
       match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
         assert (Hupd' : @update_PTE_Bits w pv ac = Some p0') by exact Hupd end.
@@ -301,9 +430,22 @@ Section PtUpd.
         rewrite (exec_bind_Some _ _ _ _ _ Hand).
         cbn match. apply exec_returnm. }
       rewrite (exec_bind_Some _ _ _ _ _ Hgate).
+      cbn match zeta.
+      (* the exclusive re-read returns the value the walk read *)
+      rewrite (exec_bind_Some _ _ _ _ _ Hrdx).
+      cbn match beta.
+      rewrite autocast_id.
+      (* the re-check succeeds, on the same hypotheses the walk's leaf arm used *)
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_check_leaf_pte_leaf0 vpn p0 acc p mxr do_sum Hv0 Hl0 Hchk Hnap
+                    (Physaddr (u_pte_addr (u_next_base p1) (subrange_vec_dec vpn 8 0)))
+                    menvcfg0 s Hmisa Hmenv HPBMTE)).
+      cbn match beta.
+      rewrite Hupd'.
       cbn match.
-      match goal with |- context[Defs.bind (write_pte ?aa' ?wd' ?pv') ?k] =>
-        assert (Hwrite' : exec (write_pte aa' wd' pv') s = Some (Ok true, sw))
+      rewrite autocast_id.
+      match goal with |- context[Defs.bind (write_pte_conditional ?aa' ?wd' ?pv') ?k] =>
+        assert (Hwrite' : exec (write_pte_conditional aa' wd' pv') s = Some (Ok true, sw))
           by exact Hwrite end.
       rewrite (exec_bind_Some _ _ _ _ _ Hwrite').
       cbn match. apply exec_returnm. }
@@ -350,38 +492,66 @@ Qed.
 Section PtUpdHit.
   Context (acc : MemoryAccessType mem_payload) (p : Privilege) (mxr do_sum : bool).
 
-  Lemma exec_translate_TLB_hit_pt_upd (vpn : mword 27) (q2 q1 q0 q0' : mword 64)
+  (* THE FORK'S CHANGE ON THE HIT PATH, and it is not cosmetic here.  The
+     cached word [q0] and the word in MEMORY [m0] agree only up to A/D (that is
+     exactly what the TLB invariant promises).  The old model recomputed the
+     A/D update on the CACHED word; the fork re-reads the PTE and recomputes on
+     the MEMORY word, so the value written back -- and installed in the TLB --
+     is derived from [m0], not from [q0].  The two lemmas below are the two
+     ways that lands:
+
+       [_upd]      [update_PTE_Bits m0] is [Some m0']: memory is written and
+                   the entry is refreshed with [m0'];
+       [_refresh]  [update_PTE_Bits m0] is [None] -- memory ALREADY has the
+                   bits the cached copy lacks -- so nothing is written and the
+                   entry is merely refreshed with [m0].
+
+     The gate is still the cached word ([Hgate]): [update_and_write_pte] tests
+     it before doing anything.  The returned PPN is the cached entry's either
+     way, which is why both outcomes are invariant-absorbable. *)
+  Lemma exec_translate_TLB_hit_pt_upd (vpn : mword 27) (q2 q1 q0 q0g m0 m0' : mword 64)
         (menvcfg0 : mword 64) (asid : mword 16) (idx : Z) (sw : mstate) s :
     pte_check_ok acc p mxr do_sum q0 ->
-    update_PTE_Bits (q0 : mword 64) acc = Some q0' ->
+    update_PTE_Bits (q0 : mword 64) acc = Some q0g ->
     pte_pbmt0 q0 ->
     register_lookup menvcfg s.(sregs) = menvcfg0 ->
     eq_vec (_get_MEnvcfg_ADUE menvcfg0) ('b"1") = true ->
-    exec (write_pte (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))) 8
-            (q0' : mword 64)) s
+    (* the exclusive re-read, and the tablewalk checks re-run on ITS value *)
+    exec (read_pte_exclusive (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok m0, s) ->
+    pte_valid m0 -> pte_leaf m0 -> pte_no_napot m0 ->
+    pte_check_ok acc p mxr do_sum m0 ->
+    register_lookup misa s.(sregs) = MISA_C ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    (* the memory word is an A/D variant of the cached one: the TLB invariant *)
+    (exists a2 d2 : mword 1, m0 = pte_set_ad q0 a2 d2) ->
+    update_PTE_Bits (m0 : mword 64) acc = Some m0' ->
+    exec (write_pte_conditional (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))) 8
+            (m0' : mword 64)) s
       = Some (Ok true, sw) ->
     sw.(sregs) = s.(sregs) ->
     exec (translate_TLB_hit 39 asid vpn acc p mxr do_sum tt idx
             (u_walk_entry vpn q2 q1 q0 asid)) s
     = Some (Ok (autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (q0 : mword 64))) : mword 44), PBMT_PMA, tt),
             set_reg sw tlb (vec_update_dec (register_lookup tlb s.(sregs)) idx
-                              (Some (u_walk_entry vpn q2 q1 q0' asid)))).
+                              (Some (u_walk_entry vpn q2 q1 m0' asid)))).
   Proof.
-    intros Hchk Hupd Hpb Hmenv HADUE Hwrite Hswregs.
+    intros Hchk Hgate Hpb Hmenv HADUE Hrdx Hv0 Hl0 Hnap Hchkm Hmisa HPBMTE Hvar Hupd Hwrite Hswregs.
     unfold translate_TLB_hit. cbn zeta.
     match goal with |- context[tlb_get_pte ?sz ?e] => change sz with 8 end.
     rewrite uwe_pte.
     rewrite autocast_id.
     rewrite (exec_bind_Some _ _ _ _ _ (Hchk s)). cbn match.
-    match goal with |- context[update_and_write_pte ?aa ?wd ?pv ?ac] =>
-      assert (Hu : exec (update_and_write_pte aa wd pv ac) s = Some (Ok (Some q0'), sw)) end.
+    match goal with |- context[update_and_write_pte ?w ?vp ?aa ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hu : exec (update_and_write_pte w vp aa pv lv ac pr mx ds e) s
+                   = Some (Ok (Some m0', tt), sw)) end.
     { unfold update_and_write_pte.
       match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
-        assert (Hupd' : @update_PTE_Bits w pv ac = Some q0') by exact Hupd end.
-      rewrite Hupd'.
+        assert (Hgate' : @update_PTE_Bits w pv ac = Some q0g) by exact Hgate end.
+      rewrite Hgate'.
       cbn match.
       match goal with |- context[Defs.bind (or_boolM ?A ?B) ?k] =>
-        assert (Hgate : exec (or_boolM A B) s = Some (true, s)) end.
+        assert (Hgt : exec (or_boolM A B) s = Some (true, s)) end.
       { match goal with |- exec (or_boolM ?A ?B) s = _ =>
           assert (Hand : exec A s = Some (true, s)) end.
         { unfold and_boolM.
@@ -394,10 +564,20 @@ Section PtUpdHit.
         unfold or_boolM.
         rewrite (exec_bind_Some _ _ _ _ _ Hand).
         cbn match. apply exec_returnm. }
-      rewrite (exec_bind_Some _ _ _ _ _ Hgate).
-      cbn match.
-      match goal with |- context[Defs.bind (write_pte ?aa' ?wd' ?pv') ?k] =>
-        assert (Hwrite' : exec (write_pte aa' wd' pv') s = Some (Ok true, sw))
+      rewrite (exec_bind_Some _ _ _ _ _ Hgt).
+      cbn match zeta.
+      rewrite (exec_bind_Some _ _ _ _ _ Hrdx). cbn match beta.
+      rewrite autocast_id.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_check_leaf_pte_leaf0 vpn m0 acc p mxr do_sum Hv0 Hl0 Hchkm Hnap
+                    (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)))
+                    menvcfg0 s Hmisa Hmenv HPBMTE)).
+      cbn match beta.
+      match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
+        assert (Hupd' : @update_PTE_Bits w pv ac = Some m0') by exact Hupd end.
+      rewrite Hupd'. cbn match. rewrite autocast_id.
+      match goal with |- context[Defs.bind (write_pte_conditional ?aa' ?wd' ?pv') ?k] =>
+        assert (Hwrite' : exec (write_pte_conditional aa' wd' pv') s = Some (Ok true, sw))
           by exact Hwrite end.
       rewrite (exec_bind_Some _ _ _ _ _ Hwrite').
       cbn match. apply exec_returnm. }
@@ -413,14 +593,105 @@ Section PtUpdHit.
       rewrite (exec_bind_Some _ _ _ _ _ (exec_write_reg tlb _ sw)).
       apply exec_returnm. }
     rewrite (exec_bind_Some _ _ _ _ _ Hwt).
+    (* [m0'] is an A/D variant OF THE CACHED WORD, so the entry's PPN and G
+       fields (which [tlb_set_pte] keeps) still agree with it *)
+    destruct Hvar as (a2 & d2 & Hm0).
     destruct (update_PTE_Bits_set_ad _ _ _ Hupd) as (a & d & Hq).
+    assert (Hqc : m0' = pte_set_ad q0 a d)
+      by (rewrite Hq; rewrite Hm0; apply pte_set_ad_absorb).
     rewrite (exec_bind_Some _ _ _ _ _ (uwe_pbmt vpn q2 q1 q0 asid _ Hpb)).
     rewrite uwe_ppn.
     rewrite exec_returnm.
     rewrite Hswregs.
     match goal with |- context[tlb_set_pte ?en ?pv] =>
-      assert (Hent : tlb_set_pte (n := 8) en pv = u_walk_entry vpn q2 q1 q0' asid)
-        by exact (tlb_set_pte_uwe vpn q2 q1 q0 q0' asid a d Hq) end.
+      assert (Hent : tlb_set_pte (n := 8) en pv = u_walk_entry vpn q2 q1 m0' asid)
+        by exact (tlb_set_pte_uwe vpn q2 q1 q0 m0' asid a d Hqc) end.
+    rewrite Hent.
+    reflexivity.
+  Qed.
+
+  (* the re-read found the bits already set: no write, the entry is refreshed *)
+  Lemma exec_translate_TLB_hit_pt_refresh (vpn : mword 27) (q2 q1 q0 q0g m0 : mword 64)
+        (menvcfg0 : mword 64) (asid : mword 16) (idx : Z) s :
+    pte_check_ok acc p mxr do_sum q0 ->
+    update_PTE_Bits (q0 : mword 64) acc = Some q0g ->
+    pte_pbmt0 q0 ->
+    register_lookup menvcfg s.(sregs) = menvcfg0 ->
+    eq_vec (_get_MEnvcfg_ADUE menvcfg0) ('b"1") = true ->
+    exec (read_pte_exclusive (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0))) 8) s
+      = Some (Ok m0, s) ->
+    pte_valid m0 -> pte_leaf m0 -> pte_no_napot m0 ->
+    pte_check_ok acc p mxr do_sum m0 ->
+    register_lookup misa s.(sregs) = MISA_C ->
+    eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ->
+    (exists a2 d2 : mword 1, m0 = pte_set_ad q0 a2 d2) ->
+    update_PTE_Bits (m0 : mword 64) acc = None ->
+    exec (translate_TLB_hit 39 asid vpn acc p mxr do_sum tt idx
+            (u_walk_entry vpn q2 q1 q0 asid)) s
+    = Some (Ok (autocast (T := mword) ((autocast (T := mword) (PPN_of_PTE (q0 : mword 64))) : mword 44), PBMT_PMA, tt),
+            set_reg s tlb (vec_update_dec (register_lookup tlb s.(sregs)) idx
+                             (Some (u_walk_entry vpn q2 q1 m0 asid)))).
+  Proof.
+    intros Hchk Hgate Hpb Hmenv HADUE Hrdx Hv0 Hl0 Hnap Hchkm Hmisa HPBMTE Hvar Hupd.
+    unfold translate_TLB_hit. cbn zeta.
+    match goal with |- context[tlb_get_pte ?sz ?e] => change sz with 8 end.
+    rewrite uwe_pte.
+    rewrite autocast_id.
+    rewrite (exec_bind_Some _ _ _ _ _ (Hchk s)). cbn match.
+    match goal with |- context[update_and_write_pte ?w ?vp ?aa ?pv ?lv ?ac ?pr ?mx ?ds ?e] =>
+      assert (Hu : exec (update_and_write_pte w vp aa pv lv ac pr mx ds e) s
+                   = Some (Ok (Some m0, tt), s)) end.
+    { unfold update_and_write_pte.
+      match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
+        assert (Hgate' : @update_PTE_Bits w pv ac = Some q0g) by exact Hgate end.
+      rewrite Hgate'.
+      cbn match.
+      match goal with |- context[Defs.bind (or_boolM ?A ?B) ?k] =>
+        assert (Hgt : exec (or_boolM A B) s = Some (true, s)) end.
+      { match goal with |- exec (or_boolM ?A ?B) s = _ =>
+          assert (Hand : exec A s = Some (true, s)) end.
+        { unfold and_boolM.
+          rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Svadu s)).
+          cbn match.
+          rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg menvcfg s)).
+          cbn beta.
+          rewrite Hmenv. rewrite HADUE.
+          apply exec_returnm. }
+        unfold or_boolM.
+        rewrite (exec_bind_Some _ _ _ _ _ Hand).
+        cbn match. apply exec_returnm. }
+      rewrite (exec_bind_Some _ _ _ _ _ Hgt).
+      cbn match zeta.
+      rewrite (exec_bind_Some _ _ _ _ _ Hrdx). cbn match beta.
+      rewrite autocast_id.
+      rewrite (exec_bind_Some _ _ _ _ _
+                 (exec_check_leaf_pte_leaf0 vpn m0 acc p mxr do_sum Hv0 Hl0 Hchkm Hnap
+                    (Physaddr (u_pte_addr (u_next_base q1) (subrange_vec_dec vpn 8 0)))
+                    menvcfg0 s Hmisa Hmenv HPBMTE)).
+      cbn match beta.
+      match goal with |- context[@update_PTE_Bits ?w ?pv ?ac] =>
+        assert (Hupd' : @update_PTE_Bits w pv ac = None) by exact Hupd end.
+      rewrite Hupd'. cbn match. rewrite ?autocast_id.
+      apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hu).
+    cbn match.
+    match goal with |- context[write_TLB ?ix ?en] =>
+      assert (Hwt : exec (write_TLB ix en) s
+                    = Some (tt, set_reg s tlb
+                                  (vec_update_dec (register_lookup tlb s.(sregs)) ix
+                                     (Some en)))) end.
+    { unfold write_TLB.
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg tlb s)).
+      rewrite (exec_bind_Some _ _ _ _ _ (exec_write_reg tlb _ s)).
+      apply exec_returnm. }
+    rewrite (exec_bind_Some _ _ _ _ _ Hwt).
+    destruct Hvar as (a2 & d2 & Hm0).
+    rewrite (exec_bind_Some _ _ _ _ _ (uwe_pbmt vpn q2 q1 q0 asid _ Hpb)).
+    rewrite uwe_ppn.
+    rewrite exec_returnm.
+    match goal with |- context[tlb_set_pte ?en ?pv] =>
+      assert (Hent : tlb_set_pte (n := 8) en pv = u_walk_entry vpn q2 q1 m0 asid)
+        by exact (tlb_set_pte_uwe vpn q2 q1 q0 m0 asid a2 d2 Hm0) end.
     rewrite Hent.
     reflexivity.
   Qed.
@@ -658,7 +929,7 @@ Lemma pma_allows_all_pte_write (pmar0 : list PMA_Region) :
   pma_allows_all pmar0 -> pma_allows_pte_write pmar0.
 Proof.
   intros H a Hram.
-  destruct (pma_all_ram H a 8 Hram) as (r & Hm & _ & _ & _ & _ & _ & Hpw).
+  destruct (pma_all_ram H a 8 Hram) as (r & Hm & _ & _ & _ & _ & _ & Hpw & _).
   exists r. split; [exact Hm | exact Hpw].
 Qed.
 

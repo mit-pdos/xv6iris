@@ -21,7 +21,6 @@ Require Import RegFile.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
-Notation IL := KernelSyms.initlock.
 
 Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (m : regfile) (vlock : bv 32) (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64) :=

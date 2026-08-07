@@ -76,8 +76,9 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
+Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -89,7 +90,7 @@ Definition K_end_op : nat := 58%nat.
 
 Definition wp_end_op_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -106,16 +107,6 @@ Definition wp_end_op_sconf_body
   let pj := proc_addr j in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_end_op <= K)%nat ->
-  (* PHASE C2a BRIDGE (claude-notes/design/fs-log.md stage 4; DELETED in
-     C2b, not discharged).  The crash predicate is INDEXED by the disk image,
-     so this function's interior [bwrite] can no longer mint a free identity
-     permit: a write MOVES the index.  Until this WAL write kind's real
-     durability fupd lands, the contract carries the pure side condition that
-     the system promises nothing about durability -- which is exactly what
-     [Pc := fun _ => True] satisfies, and what both adequacy theorems still
-     instantiate.  It is a [Prop], so it threads as an ordinary premise and
-     costs no wand-chain plumbing. *)
-  crash_pred_indifferent ->
   (* the covered range's block-number bounds (bread's 2^31 arithmetic
      premise, and 0 is never a client block) and the fact that the log's own
      storage is covered -- the commit path breads the header and every log
@@ -130,6 +121,16 @@ Definition wp_end_op_sconf_body
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
+  (* THE CRASH SEAM (phase C2b/D1 stage 4): the persistent identification of
+     the machine layer's crash predicate with THIS file system's [P_fs].  It
+     is what lets the commit path's four writes -- the log fills, the commit
+     header, the installs and the clear -- carry REAL durability fupds
+     ([FsCrash.fs_logfill_permit] and its three siblings).  The era
+     certificate beside it is what identifies the crash record's checked-out
+     arm as THIS era's; the swap receipt the same squeeze needs rides
+     [log_ctx] already. *)
+  fs_crash_seam cov logstart -∗
+  gen_cert -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
@@ -159,7 +160,7 @@ Definition wp_end_op_sconf_body
 Module Type END_OP.
   Parameter wp_end_op_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)

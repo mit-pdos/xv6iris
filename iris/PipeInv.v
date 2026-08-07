@@ -604,19 +604,21 @@ Section PipeInv.
     lock_openable γl pi (pipe_res γp pi) (pipe_dead γl γp).
   Proof. iIntros "H". iApply lock_openable_of_dead. by iApply is_pipe_inv. Qed.
 
-  (* ---- what a [struct file] of type FD_PIPE carries ----
+  (* ---- what a [struct file] of type FD_PIPE carries, ADDRESS-KEYED ----
 
-     FileInv's [file_payload]: the pipe itself (persistent) plus the share of
-     the end that the file's [writable] flag selects.  Keyed by the pipe's
-     ADDRESS, since that is all [fcontent] records.
+     The pipe itself (persistent) plus the share of the end that the file's
+     [writable] flag selects, with the ghost names quantified away -- keyed by
+     the pipe's ADDRESS, since that is all [fcontent] records.
 
-     CAVEAT for fileclose: two [pipe_held] shares of the same address cannot be
-     recombined without knowing they name the same [γp].  Every share of one
-     ftable slot's payload descends from a single split, so this never bites
-     within a slot; if it ever does (a fraction parked in [file_rest] and
-     recombined across holders), the fix is to pin the identity -- either an
-     [agree] component on the ftable authority's per-slot entry, or a global
-     address-keyed pipe registry. *)
+     THIS IS NOT WHAT [FileInv.file_payload] USES, and the reason is the
+     caveat this comment used to record as future work: two shares of one
+     address cannot be RECOMBINED without knowing they name the same [γp], and
+     recombining them is exactly what the last fileclose does when it takes
+     [file_rest]'s parked fraction back.  FileInv pins the identity instead --
+     a per-slot frac-times-agree names field, split by the same fractions as
+     the content cells -- and [file_payload] is stated at the NAMED [γp].
+     [pipe_held] is kept as the address-keyed form for anything that only ever
+     needs to SPLIT (nothing does today). *)
   Definition pipe_held (pi : mword 64) (w : bool) (q : Qp) : iProp Σ :=
     (∃ (γl : gname) (γp : pipe_names), is_pipe γl γp pi ∗ pipe_ref γp w q)%I.
 

@@ -87,6 +87,7 @@ Section UserretAllPt.
              Htf_va0f
              Hcont".
     (* the 38 instruction resources, from the persistent kernel text *)
+    iPoseProof (ui_fencei with "Hkt") as "Hi_fencei".
     iPoseProof (ui_sfence1 with "Hkt") as "Hi_sfence1".
     iPoseProof (ui_csrw with "Hkt") as "Hi_csrw".
     iPoseProof (ui_sfence2 with "Hkt") as "Hi_sfence2".
@@ -130,10 +131,10 @@ Section UserretAllPt.
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwf Ha0 HuMode Huasid Huppn
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hktlb Hufr
-                    Hpc Hfile Hi_sfence1 Hi_csrw Hi_sfence2").
+                    Hpc Hfile Hi_fencei Hi_sfence1 Hi_csrw Hi_sfence2").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hkfr Hpc Hfile".
-    (* ---- lui @ 0xa8 ---- *)
-    iApply (wp_ualu_pt uroot tfp um Φ 0xa8 false ai_lui m
+    (* ---- lui @ 0xac ---- *)
+    iApply (wp_ualu_pt uroot tfp um Φ 0xac false ai_lui m
               usatp
               (mword_of_int 33554432 : mword 64)
               (fun _ : mstate => luival (mword_of_int 0x2000))
@@ -155,15 +156,15 @@ Section UserretAllPt.
               ltac:(intros _; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_lui").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
-    assert (Hpcx_0xa8 : add_vec_int (uva 0xa8) (if false then 2 else 4) = uva 0xac)
+    assert (Hpcx_0xac : add_vec_int (uva 0xac) (if false then 2 else 4) = uva 0xb0)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xa8) in "Hpc".
+    iEval (rewrite Hpcx_0xac) in "Hpc".
     assert (Ha0_addiw : <[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m
                       !!! Regidx (mword_of_int 10)
                     = regval_into_reg (mword_of_int 33554432 : mword 64))
       by (apply upd_eq).
-    (* ---- addiw @ 0xac ---- *)
-    iApply (wp_ualu_pt uroot tfp um Φ 0xac true ai_addiw (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m)
+    (* ---- addiw @ 0xb0 ---- *)
+    iApply (wp_ualu_pt uroot tfp um Φ 0xb0 true ai_addiw (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m)
               (regval_into_reg (mword_of_int 33554432 : mword 64))
               (mword_of_int 33554431 : mword 64)
               (gpr_addiw_val (mword_of_int 10) (sign_extend' 12 (mword_of_int 63 : mword 6)))
@@ -188,15 +189,15 @@ Section UserretAllPt.
               ltac:(intros _; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_addiw").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
-    assert (Hpcx_0xac : add_vec_int (uva 0xac) (if true then 2 else 4) = uva 0xae)
+    assert (Hpcx_0xb0 : add_vec_int (uva 0xb0) (if true then 2 else 4) = uva 0xb2)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xac) in "Hpc".
+    iEval (rewrite Hpcx_0xb0) in "Hpc".
     assert (Ha0_slli : <[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m)
                       !!! Regidx (mword_of_int 10)
                     = regval_into_reg (mword_of_int 33554431 : mword 64))
       by (apply upd_eq).
-    (* ---- slli @ 0xae ---- *)
-    iApply (wp_ualu_pt uroot tfp um Φ 0xae true ai_slli (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m))
+    (* ---- slli @ 0xb2 ---- *)
+    iApply (wp_ualu_pt uroot tfp um Φ 0xb2 true ai_slli (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> m))
               (regval_into_reg (mword_of_int 33554431 : mword 64))
               (mword_of_int TRAPFRAME : mword 64)
               (gpr_slli_val (mword_of_int 10) (mword_of_int 13))
@@ -221,9 +222,9 @@ Section UserretAllPt.
               ltac:(intro Hf; vm_compute in Hf; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_slli").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
-    assert (Hpcx_0xae : add_vec_int (uva 0xae) (if true then 2 else 4) = uva 0xb0)
+    assert (Hpcx_0xb2 : add_vec_int (uva 0xb2) (if true then 2 else 4) = uva 0xb4)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xae) in "Hpc".
+    iEval (rewrite Hpcx_0xb2) in "Hpc".
     (* collapse the three a0 writes: a0 = TRAPFRAME *)
     iEval (rewrite upd_upd) in "Hfile".
     iEval (rewrite upd_upd) in "Hfile".
@@ -233,8 +234,8 @@ Section UserretAllPt.
     set (M0 := <[Regidx (mword_of_int 10) := mword_of_int TRAPFRAME]> m).
     assert (Ha0_0 : M0 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME)
       by (unfold M0; apply upd_eq).
-    (* ---- ld x1, 40(a0) @ 0xb0 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xb0 40 (mword_of_int 1) false M0 vra
+    (* ---- ld x1, 40(a0) @ 0xb4 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xb4 40 (mword_of_int 1) false M0 vra
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -257,15 +258,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vra Htf_vra").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vra".
-    assert (Hpcx_0xb0 : add_vec_int (uva 0xb0) (if false then 2 else 4) = uva 0xb4)
+    assert (Hpcx_0xb4 : add_vec_int (uva 0xb4) (if false then 2 else 4) = uva 0xb8)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xb0) in "Hpc".
+    iEval (rewrite Hpcx_0xb4) in "Hpc".
     set (M1 := <[Regidx (mword_of_int 1) := regval_into_reg vra]> M0).
     assert (Ha0_1 : M1 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M1. rewrite upd_ne; [exact Ha0_0 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x2, 48(a0) @ 0xb4 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xb4 48 (mword_of_int 2) false M1 vsp
+    (* ---- ld x2, 48(a0) @ 0xb8 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xb8 48 (mword_of_int 2) false M1 vsp
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -288,15 +289,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vsp Htf_vsp").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vsp".
-    assert (Hpcx_0xb4 : add_vec_int (uva 0xb4) (if false then 2 else 4) = uva 0xb8)
+    assert (Hpcx_0xb8 : add_vec_int (uva 0xb8) (if false then 2 else 4) = uva 0xbc)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xb4) in "Hpc".
+    iEval (rewrite Hpcx_0xb8) in "Hpc".
     set (M2 := <[Regidx (mword_of_int 2) := regval_into_reg vsp]> M1).
     assert (Ha0_2 : M2 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M2. rewrite upd_ne; [exact Ha0_1 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x3, 56(a0) @ 0xb8 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xb8 56 (mword_of_int 3) false M2 vgp
+    (* ---- ld x3, 56(a0) @ 0xbc ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xbc 56 (mword_of_int 3) false M2 vgp
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -319,15 +320,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vgp Htf_vgp").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vgp".
-    assert (Hpcx_0xb8 : add_vec_int (uva 0xb8) (if false then 2 else 4) = uva 0xbc)
+    assert (Hpcx_0xbc : add_vec_int (uva 0xbc) (if false then 2 else 4) = uva 0xc0)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xb8) in "Hpc".
+    iEval (rewrite Hpcx_0xbc) in "Hpc".
     set (M3 := <[Regidx (mword_of_int 3) := regval_into_reg vgp]> M2).
     assert (Ha0_3 : M3 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M3. rewrite upd_ne; [exact Ha0_2 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x4, 64(a0) @ 0xbc ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xbc 64 (mword_of_int 4) false M3 vtp
+    (* ---- ld x4, 64(a0) @ 0xc0 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xc0 64 (mword_of_int 4) false M3 vtp
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -350,15 +351,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vtp Htf_vtp").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vtp".
-    assert (Hpcx_0xbc : add_vec_int (uva 0xbc) (if false then 2 else 4) = uva 0xc0)
+    assert (Hpcx_0xc0 : add_vec_int (uva 0xc0) (if false then 2 else 4) = uva 0xc4)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xbc) in "Hpc".
+    iEval (rewrite Hpcx_0xc0) in "Hpc".
     set (M4 := <[Regidx (mword_of_int 4) := regval_into_reg vtp]> M3).
     assert (Ha0_4 : M4 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M4. rewrite upd_ne; [exact Ha0_3 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x5, 72(a0) @ 0xc0 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xc0 72 (mword_of_int 5) false M4 vt0
+    (* ---- ld x5, 72(a0) @ 0xc4 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xc4 72 (mword_of_int 5) false M4 vt0
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -381,15 +382,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vt0 Htf_vt0").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vt0".
-    assert (Hpcx_0xc0 : add_vec_int (uva 0xc0) (if false then 2 else 4) = uva 0xc4)
+    assert (Hpcx_0xc4 : add_vec_int (uva 0xc4) (if false then 2 else 4) = uva 0xc8)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xc0) in "Hpc".
+    iEval (rewrite Hpcx_0xc4) in "Hpc".
     set (M5 := <[Regidx (mword_of_int 5) := regval_into_reg vt0]> M4).
     assert (Ha0_5 : M5 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M5. rewrite upd_ne; [exact Ha0_4 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x6, 80(a0) @ 0xc4 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xc4 80 (mword_of_int 6) false M5 vt1
+    (* ---- ld x6, 80(a0) @ 0xc8 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xc8 80 (mword_of_int 6) false M5 vt1
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -412,15 +413,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vt1 Htf_vt1").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vt1".
-    assert (Hpcx_0xc4 : add_vec_int (uva 0xc4) (if false then 2 else 4) = uva 0xc8)
+    assert (Hpcx_0xc8 : add_vec_int (uva 0xc8) (if false then 2 else 4) = uva 0xcc)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xc4) in "Hpc".
+    iEval (rewrite Hpcx_0xc8) in "Hpc".
     set (M6 := <[Regidx (mword_of_int 6) := regval_into_reg vt1]> M5).
     assert (Ha0_6 : M6 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M6. rewrite upd_ne; [exact Ha0_5 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x7, 88(a0) @ 0xc8 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xc8 88 (mword_of_int 7) false M6 vt2
+    (* ---- ld x7, 88(a0) @ 0xcc ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xcc 88 (mword_of_int 7) false M6 vt2
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -443,16 +444,16 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vt2 Htf_vt2").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vt2".
-    assert (Hpcx_0xc8 : add_vec_int (uva 0xc8) (if false then 2 else 4) = uva 0xcc)
+    assert (Hpcx_0xcc : add_vec_int (uva 0xcc) (if false then 2 else 4) = uva 0xd0)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xc8) in "Hpc".
+    iEval (rewrite Hpcx_0xcc) in "Hpc".
     set (M7 := <[Regidx (mword_of_int 7) := regval_into_reg vt2]> M6).
     assert (Ha0_7 : M7 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M7. rewrite upd_ne; [exact Ha0_6 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x8, 96(a0) @ 0xcc ---- *)
+    (* ---- ld x8, 96(a0) @ 0xd0 ---- *)
     iEval (change (ai_cld_tgt 0 12) with (ai_ld 8 96)) in "Hi_vs0".
-    iApply (wp_uld_pt uroot tfp um Φ 0xcc 96 (mword_of_int 8) true M7 vs0
+    iApply (wp_uld_pt uroot tfp um Φ 0xd0 96 (mword_of_int 8) true M7 vs0
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -475,16 +476,16 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs0 Htf_vs0").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs0".
-    assert (Hpcx_0xcc : add_vec_int (uva 0xcc) (if true then 2 else 4) = uva 0xce)
+    assert (Hpcx_0xd0 : add_vec_int (uva 0xd0) (if true then 2 else 4) = uva 0xd2)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xcc) in "Hpc".
+    iEval (rewrite Hpcx_0xd0) in "Hpc".
     set (M8 := <[Regidx (mword_of_int 8) := regval_into_reg vs0]> M7).
     assert (Ha0_8 : M8 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M8. rewrite upd_ne; [exact Ha0_7 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x9, 104(a0) @ 0xce ---- *)
+    (* ---- ld x9, 104(a0) @ 0xd2 ---- *)
     iEval (change (ai_cld_tgt 1 13) with (ai_ld 9 104)) in "Hi_vs1".
-    iApply (wp_uld_pt uroot tfp um Φ 0xce 104 (mword_of_int 9) true M8 vs1
+    iApply (wp_uld_pt uroot tfp um Φ 0xd2 104 (mword_of_int 9) true M8 vs1
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -507,16 +508,16 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs1 Htf_vs1").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs1".
-    assert (Hpcx_0xce : add_vec_int (uva 0xce) (if true then 2 else 4) = uva 0xd0)
+    assert (Hpcx_0xd2 : add_vec_int (uva 0xd2) (if true then 2 else 4) = uva 0xd4)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xce) in "Hpc".
+    iEval (rewrite Hpcx_0xd2) in "Hpc".
     set (M9 := <[Regidx (mword_of_int 9) := regval_into_reg vs1]> M8).
     assert (Ha0_9 : M9 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M9. rewrite upd_ne; [exact Ha0_8 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x11, 120(a0) @ 0xd0 ---- *)
+    (* ---- ld x11, 120(a0) @ 0xd4 ---- *)
     iEval (change (ai_cld_tgt 3 15) with (ai_ld 11 120)) in "Hi_va1".
-    iApply (wp_uld_pt uroot tfp um Φ 0xd0 120 (mword_of_int 11) true M9 va1
+    iApply (wp_uld_pt uroot tfp um Φ 0xd4 120 (mword_of_int 11) true M9 va1
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -539,16 +540,16 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_va1 Htf_va1").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_va1".
-    assert (Hpcx_0xd0 : add_vec_int (uva 0xd0) (if true then 2 else 4) = uva 0xd2)
+    assert (Hpcx_0xd4 : add_vec_int (uva 0xd4) (if true then 2 else 4) = uva 0xd6)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xd0) in "Hpc".
+    iEval (rewrite Hpcx_0xd4) in "Hpc".
     set (M10 := <[Regidx (mword_of_int 11) := regval_into_reg va1]> M9).
     assert (Ha0_10 : M10 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M10. rewrite upd_ne; [exact Ha0_9 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x12, 128(a0) @ 0xd2 ---- *)
+    (* ---- ld x12, 128(a0) @ 0xd6 ---- *)
     iEval (change (ai_cld_tgt 4 16) with (ai_ld 12 128)) in "Hi_va2".
-    iApply (wp_uld_pt uroot tfp um Φ 0xd2 128 (mword_of_int 12) true M10 va2
+    iApply (wp_uld_pt uroot tfp um Φ 0xd6 128 (mword_of_int 12) true M10 va2
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -571,16 +572,16 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_va2 Htf_va2").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_va2".
-    assert (Hpcx_0xd2 : add_vec_int (uva 0xd2) (if true then 2 else 4) = uva 0xd4)
+    assert (Hpcx_0xd6 : add_vec_int (uva 0xd6) (if true then 2 else 4) = uva 0xd8)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xd2) in "Hpc".
+    iEval (rewrite Hpcx_0xd6) in "Hpc".
     set (M11 := <[Regidx (mword_of_int 12) := regval_into_reg va2]> M10).
     assert (Ha0_11 : M11 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M11. rewrite upd_ne; [exact Ha0_10 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x13, 136(a0) @ 0xd4 ---- *)
+    (* ---- ld x13, 136(a0) @ 0xd8 ---- *)
     iEval (change (ai_cld_tgt 5 17) with (ai_ld 13 136)) in "Hi_va3".
-    iApply (wp_uld_pt uroot tfp um Φ 0xd4 136 (mword_of_int 13) true M11 va3
+    iApply (wp_uld_pt uroot tfp um Φ 0xd8 136 (mword_of_int 13) true M11 va3
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -603,16 +604,16 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_va3 Htf_va3").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_va3".
-    assert (Hpcx_0xd4 : add_vec_int (uva 0xd4) (if true then 2 else 4) = uva 0xd6)
+    assert (Hpcx_0xd8 : add_vec_int (uva 0xd8) (if true then 2 else 4) = uva 0xda)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xd4) in "Hpc".
+    iEval (rewrite Hpcx_0xd8) in "Hpc".
     set (M12 := <[Regidx (mword_of_int 13) := regval_into_reg va3]> M11).
     assert (Ha0_12 : M12 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M12. rewrite upd_ne; [exact Ha0_11 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x14, 144(a0) @ 0xd6 ---- *)
+    (* ---- ld x14, 144(a0) @ 0xda ---- *)
     iEval (change (ai_cld_tgt 6 18) with (ai_ld 14 144)) in "Hi_va4".
-    iApply (wp_uld_pt uroot tfp um Φ 0xd6 144 (mword_of_int 14) true M12 va4
+    iApply (wp_uld_pt uroot tfp um Φ 0xda 144 (mword_of_int 14) true M12 va4
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -635,16 +636,16 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_va4 Htf_va4").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_va4".
-    assert (Hpcx_0xd6 : add_vec_int (uva 0xd6) (if true then 2 else 4) = uva 0xd8)
+    assert (Hpcx_0xda : add_vec_int (uva 0xda) (if true then 2 else 4) = uva 0xdc)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xd6) in "Hpc".
+    iEval (rewrite Hpcx_0xda) in "Hpc".
     set (M13 := <[Regidx (mword_of_int 14) := regval_into_reg va4]> M12).
     assert (Ha0_13 : M13 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M13. rewrite upd_ne; [exact Ha0_12 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x15, 152(a0) @ 0xd8 ---- *)
+    (* ---- ld x15, 152(a0) @ 0xdc ---- *)
     iEval (change (ai_cld_tgt 7 19) with (ai_ld 15 152)) in "Hi_va5".
-    iApply (wp_uld_pt uroot tfp um Φ 0xd8 152 (mword_of_int 15) true M13 va5
+    iApply (wp_uld_pt uroot tfp um Φ 0xdc 152 (mword_of_int 15) true M13 va5
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -667,15 +668,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_va5 Htf_va5").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_va5".
-    assert (Hpcx_0xd8 : add_vec_int (uva 0xd8) (if true then 2 else 4) = uva 0xda)
+    assert (Hpcx_0xdc : add_vec_int (uva 0xdc) (if true then 2 else 4) = uva 0xde)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xd8) in "Hpc".
+    iEval (rewrite Hpcx_0xdc) in "Hpc".
     set (M14 := <[Regidx (mword_of_int 15) := regval_into_reg va5]> M13).
     assert (Ha0_14 : M14 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M14. rewrite upd_ne; [exact Ha0_13 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x16, 160(a0) @ 0xda ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xda 160 (mword_of_int 16) false M14 va6
+    (* ---- ld x16, 160(a0) @ 0xde ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xde 160 (mword_of_int 16) false M14 va6
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -698,15 +699,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_va6 Htf_va6").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_va6".
-    assert (Hpcx_0xda : add_vec_int (uva 0xda) (if false then 2 else 4) = uva 0xde)
+    assert (Hpcx_0xde : add_vec_int (uva 0xde) (if false then 2 else 4) = uva 0xe2)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xda) in "Hpc".
+    iEval (rewrite Hpcx_0xde) in "Hpc".
     set (M15 := <[Regidx (mword_of_int 16) := regval_into_reg va6]> M14).
     assert (Ha0_15 : M15 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M15. rewrite upd_ne; [exact Ha0_14 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x17, 168(a0) @ 0xde ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xde 168 (mword_of_int 17) false M15 va7
+    (* ---- ld x17, 168(a0) @ 0xe2 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xe2 168 (mword_of_int 17) false M15 va7
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -729,15 +730,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_va7 Htf_va7").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_va7".
-    assert (Hpcx_0xde : add_vec_int (uva 0xde) (if false then 2 else 4) = uva 0xe2)
+    assert (Hpcx_0xe2 : add_vec_int (uva 0xe2) (if false then 2 else 4) = uva 0xe6)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xde) in "Hpc".
+    iEval (rewrite Hpcx_0xe2) in "Hpc".
     set (M16 := <[Regidx (mword_of_int 17) := regval_into_reg va7]> M15).
     assert (Ha0_16 : M16 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M16. rewrite upd_ne; [exact Ha0_15 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x18, 176(a0) @ 0xe2 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xe2 176 (mword_of_int 18) false M16 vs2
+    (* ---- ld x18, 176(a0) @ 0xe6 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xe6 176 (mword_of_int 18) false M16 vs2
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -760,15 +761,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs2 Htf_vs2").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs2".
-    assert (Hpcx_0xe2 : add_vec_int (uva 0xe2) (if false then 2 else 4) = uva 0xe6)
+    assert (Hpcx_0xe6 : add_vec_int (uva 0xe6) (if false then 2 else 4) = uva 0xea)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xe2) in "Hpc".
+    iEval (rewrite Hpcx_0xe6) in "Hpc".
     set (M17 := <[Regidx (mword_of_int 18) := regval_into_reg vs2]> M16).
     assert (Ha0_17 : M17 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M17. rewrite upd_ne; [exact Ha0_16 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x19, 184(a0) @ 0xe6 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xe6 184 (mword_of_int 19) false M17 vs3
+    (* ---- ld x19, 184(a0) @ 0xea ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xea 184 (mword_of_int 19) false M17 vs3
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -791,15 +792,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs3 Htf_vs3").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs3".
-    assert (Hpcx_0xe6 : add_vec_int (uva 0xe6) (if false then 2 else 4) = uva 0xea)
+    assert (Hpcx_0xea : add_vec_int (uva 0xea) (if false then 2 else 4) = uva 0xee)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xe6) in "Hpc".
+    iEval (rewrite Hpcx_0xea) in "Hpc".
     set (M18 := <[Regidx (mword_of_int 19) := regval_into_reg vs3]> M17).
     assert (Ha0_18 : M18 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M18. rewrite upd_ne; [exact Ha0_17 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x20, 192(a0) @ 0xea ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xea 192 (mword_of_int 20) false M18 vs4
+    (* ---- ld x20, 192(a0) @ 0xee ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xee 192 (mword_of_int 20) false M18 vs4
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -822,15 +823,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs4 Htf_vs4").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs4".
-    assert (Hpcx_0xea : add_vec_int (uva 0xea) (if false then 2 else 4) = uva 0xee)
+    assert (Hpcx_0xee : add_vec_int (uva 0xee) (if false then 2 else 4) = uva 0xf2)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xea) in "Hpc".
+    iEval (rewrite Hpcx_0xee) in "Hpc".
     set (M19 := <[Regidx (mword_of_int 20) := regval_into_reg vs4]> M18).
     assert (Ha0_19 : M19 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M19. rewrite upd_ne; [exact Ha0_18 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x21, 200(a0) @ 0xee ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xee 200 (mword_of_int 21) false M19 vs5
+    (* ---- ld x21, 200(a0) @ 0xf2 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xf2 200 (mword_of_int 21) false M19 vs5
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -853,15 +854,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs5 Htf_vs5").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs5".
-    assert (Hpcx_0xee : add_vec_int (uva 0xee) (if false then 2 else 4) = uva 0xf2)
+    assert (Hpcx_0xf2 : add_vec_int (uva 0xf2) (if false then 2 else 4) = uva 0xf6)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xee) in "Hpc".
+    iEval (rewrite Hpcx_0xf2) in "Hpc".
     set (M20 := <[Regidx (mword_of_int 21) := regval_into_reg vs5]> M19).
     assert (Ha0_20 : M20 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M20. rewrite upd_ne; [exact Ha0_19 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x22, 208(a0) @ 0xf2 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xf2 208 (mword_of_int 22) false M20 vs6
+    (* ---- ld x22, 208(a0) @ 0xf6 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xf6 208 (mword_of_int 22) false M20 vs6
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -884,15 +885,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs6 Htf_vs6").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs6".
-    assert (Hpcx_0xf2 : add_vec_int (uva 0xf2) (if false then 2 else 4) = uva 0xf6)
+    assert (Hpcx_0xf6 : add_vec_int (uva 0xf6) (if false then 2 else 4) = uva 0xfa)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xf2) in "Hpc".
+    iEval (rewrite Hpcx_0xf6) in "Hpc".
     set (M21 := <[Regidx (mword_of_int 22) := regval_into_reg vs6]> M20).
     assert (Ha0_21 : M21 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M21. rewrite upd_ne; [exact Ha0_20 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x23, 216(a0) @ 0xf6 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xf6 216 (mword_of_int 23) false M21 vs7
+    (* ---- ld x23, 216(a0) @ 0xfa ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xfa 216 (mword_of_int 23) false M21 vs7
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -915,15 +916,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs7 Htf_vs7").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs7".
-    assert (Hpcx_0xf6 : add_vec_int (uva 0xf6) (if false then 2 else 4) = uva 0xfa)
+    assert (Hpcx_0xfa : add_vec_int (uva 0xfa) (if false then 2 else 4) = uva 0xfe)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xf6) in "Hpc".
+    iEval (rewrite Hpcx_0xfa) in "Hpc".
     set (M22 := <[Regidx (mword_of_int 23) := regval_into_reg vs7]> M21).
     assert (Ha0_22 : M22 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M22. rewrite upd_ne; [exact Ha0_21 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x24, 224(a0) @ 0xfa ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xfa 224 (mword_of_int 24) false M22 vs8
+    (* ---- ld x24, 224(a0) @ 0xfe ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0xfe 224 (mword_of_int 24) false M22 vs8
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -946,15 +947,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs8 Htf_vs8").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs8".
-    assert (Hpcx_0xfa : add_vec_int (uva 0xfa) (if false then 2 else 4) = uva 0xfe)
+    assert (Hpcx_0xfe : add_vec_int (uva 0xfe) (if false then 2 else 4) = uva 0x102)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xfa) in "Hpc".
+    iEval (rewrite Hpcx_0xfe) in "Hpc".
     set (M23 := <[Regidx (mword_of_int 24) := regval_into_reg vs8]> M22).
     assert (Ha0_23 : M23 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M23. rewrite upd_ne; [exact Ha0_22 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x25, 232(a0) @ 0xfe ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0xfe 232 (mword_of_int 25) false M23 vs9
+    (* ---- ld x25, 232(a0) @ 0x102 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0x102 232 (mword_of_int 25) false M23 vs9
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -977,15 +978,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs9 Htf_vs9").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs9".
-    assert (Hpcx_0xfe : add_vec_int (uva 0xfe) (if false then 2 else 4) = uva 0x102)
+    assert (Hpcx_0x102 : add_vec_int (uva 0x102) (if false then 2 else 4) = uva 0x106)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0xfe) in "Hpc".
+    iEval (rewrite Hpcx_0x102) in "Hpc".
     set (M24 := <[Regidx (mword_of_int 25) := regval_into_reg vs9]> M23).
     assert (Ha0_24 : M24 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M24. rewrite upd_ne; [exact Ha0_23 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x26, 240(a0) @ 0x102 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0x102 240 (mword_of_int 26) false M24 vs10
+    (* ---- ld x26, 240(a0) @ 0x106 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0x106 240 (mword_of_int 26) false M24 vs10
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1008,15 +1009,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs10 Htf_vs10").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs10".
-    assert (Hpcx_0x102 : add_vec_int (uva 0x102) (if false then 2 else 4) = uva 0x106)
+    assert (Hpcx_0x106 : add_vec_int (uva 0x106) (if false then 2 else 4) = uva 0x10a)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0x102) in "Hpc".
+    iEval (rewrite Hpcx_0x106) in "Hpc".
     set (M25 := <[Regidx (mword_of_int 26) := regval_into_reg vs10]> M24).
     assert (Ha0_25 : M25 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M25. rewrite upd_ne; [exact Ha0_24 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x27, 248(a0) @ 0x106 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0x106 248 (mword_of_int 27) false M25 vs11
+    (* ---- ld x27, 248(a0) @ 0x10a ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0x10a 248 (mword_of_int 27) false M25 vs11
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1039,15 +1040,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vs11 Htf_vs11").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vs11".
-    assert (Hpcx_0x106 : add_vec_int (uva 0x106) (if false then 2 else 4) = uva 0x10a)
+    assert (Hpcx_0x10a : add_vec_int (uva 0x10a) (if false then 2 else 4) = uva 0x10e)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0x106) in "Hpc".
+    iEval (rewrite Hpcx_0x10a) in "Hpc".
     set (M26 := <[Regidx (mword_of_int 27) := regval_into_reg vs11]> M25).
     assert (Ha0_26 : M26 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M26. rewrite upd_ne; [exact Ha0_25 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x28, 256(a0) @ 0x10a ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0x10a 256 (mword_of_int 28) false M26 vt3
+    (* ---- ld x28, 256(a0) @ 0x10e ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0x10e 256 (mword_of_int 28) false M26 vt3
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1070,15 +1071,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vt3 Htf_vt3").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vt3".
-    assert (Hpcx_0x10a : add_vec_int (uva 0x10a) (if false then 2 else 4) = uva 0x10e)
+    assert (Hpcx_0x10e : add_vec_int (uva 0x10e) (if false then 2 else 4) = uva 0x112)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0x10a) in "Hpc".
+    iEval (rewrite Hpcx_0x10e) in "Hpc".
     set (M27 := <[Regidx (mword_of_int 28) := regval_into_reg vt3]> M26).
     assert (Ha0_27 : M27 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M27. rewrite upd_ne; [exact Ha0_26 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x29, 264(a0) @ 0x10e ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0x10e 264 (mword_of_int 29) false M27 vt4
+    (* ---- ld x29, 264(a0) @ 0x112 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0x112 264 (mword_of_int 29) false M27 vt4
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1101,15 +1102,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vt4 Htf_vt4").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vt4".
-    assert (Hpcx_0x10e : add_vec_int (uva 0x10e) (if false then 2 else 4) = uva 0x112)
+    assert (Hpcx_0x112 : add_vec_int (uva 0x112) (if false then 2 else 4) = uva 0x116)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0x10e) in "Hpc".
+    iEval (rewrite Hpcx_0x112) in "Hpc".
     set (M28 := <[Regidx (mword_of_int 29) := regval_into_reg vt4]> M27).
     assert (Ha0_28 : M28 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M28. rewrite upd_ne; [exact Ha0_27 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x30, 272(a0) @ 0x112 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0x112 272 (mword_of_int 30) false M28 vt5
+    (* ---- ld x30, 272(a0) @ 0x116 ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0x116 272 (mword_of_int 30) false M28 vt5
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1132,15 +1133,15 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vt5 Htf_vt5").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vt5".
-    assert (Hpcx_0x112 : add_vec_int (uva 0x112) (if false then 2 else 4) = uva 0x116)
+    assert (Hpcx_0x116 : add_vec_int (uva 0x116) (if false then 2 else 4) = uva 0x11a)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0x112) in "Hpc".
+    iEval (rewrite Hpcx_0x116) in "Hpc".
     set (M29 := <[Regidx (mword_of_int 30) := regval_into_reg vt5]> M28).
     assert (Ha0_29 : M29 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M29. rewrite upd_ne; [exact Ha0_28 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x31, 280(a0) @ 0x116 ---- *)
-    iApply (wp_uld_pt uroot tfp um Φ 0x116 280 (mword_of_int 31) false M29 vt6
+    (* ---- ld x31, 280(a0) @ 0x11a ---- *)
+    iApply (wp_uld_pt uroot tfp um Φ 0x11a 280 (mword_of_int 31) false M29 vt6
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1163,16 +1164,16 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_vt6 Htf_vt6").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_vt6".
-    assert (Hpcx_0x116 : add_vec_int (uva 0x116) (if false then 2 else 4) = uva 0x11a)
+    assert (Hpcx_0x11a : add_vec_int (uva 0x11a) (if false then 2 else 4) = uva 0x11e)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0x116) in "Hpc".
+    iEval (rewrite Hpcx_0x11a) in "Hpc".
     set (M30 := <[Regidx (mword_of_int 31) := regval_into_reg vt6]> M29).
     assert (Ha0_30 : M30 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M30. rewrite upd_ne; [exact Ha0_29 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
-    (* ---- ld x10, 112(a0) @ 0x11a ---- *)
+    (* ---- ld x10, 112(a0) @ 0x11e ---- *)
     iEval (change (ai_cld_tgt 2 14) with (ai_ld 10 112)) in "Hi_va0f".
-    iApply (wp_uld_pt uroot tfp um Φ 0x11a 112 (mword_of_int 10) true M30 va0f
+    iApply (wp_uld_pt uroot tfp um Φ 0x11e 112 (mword_of_int 10) true M30 va0f
               mstatus0 mie_v mdv0 menvcfg0
               ltac:(vm_compute; lia)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1195,11 +1196,11 @@ Section UserretAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_va0f Htf_va0f").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf_va0f".
-    assert (Hpcx_0x11a : add_vec_int (uva 0x11a) (if true then 2 else 4) = uva 0x11c)
+    assert (Hpcx_0x11e : add_vec_int (uva 0x11e) (if true then 2 else 4) = uva 0x120)
       by (apply bv_eq; vm_compute; reflexivity).
-    iEval (rewrite Hpcx_0x11a) in "Hpc".
+    iEval (rewrite Hpcx_0x11e) in "Hpc".
     set (M31 := <[Regidx (mword_of_int 10) := regval_into_reg va0f]> M30).
-    (* ---- sret @ 0x11c ---- *)
+    (* ---- sret @ 0x120 ---- *)
     iApply (wp_usret_pt uroot tfp um Φ M31
               mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsenvval0 HTSR Hsup

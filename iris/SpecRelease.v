@@ -41,7 +41,6 @@ Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation RL := KernelSyms.release.
 
 (* The generic form.  release opens the lock invariant at four instructions
    and presents, at each, the very token it is already holding -- [locked] for

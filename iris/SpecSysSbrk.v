@@ -79,7 +79,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation SB := KernelSyms.sys_sbrk.
 
 (* sys_sbrk's own frame is 6 slots; growproc wants 46 below it, argint 18
    and myproc 10, so 46 covers every call. *)

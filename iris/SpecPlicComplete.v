@@ -45,7 +45,6 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation PLIC_COMPLETE := KernelSyms.plic_complete.
 
 (* INTERRUPTS MUST BE DISABLED.  plic_complete's second instruction is an
    unbracketed [jal cpuid] (after [c.mv s1,a0] merely saves the argument) --

@@ -54,7 +54,7 @@ Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import WpLock.
-Require Import RegFile HartTp WpNext.
+Require Import RegFile WpNext.
 Require Import CalleeSaved.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -65,7 +65,6 @@ Require Import BarePt.
 From Kernel Require KernelSyms.
 Import Defs.
 
-Notation UF := KernelSyms.uvmfree.
 
 Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
@@ -88,8 +87,12 @@ Definition wp_uvmfree_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      already had (see ProofUvmdealloc.v's note at its uvmunmap call). *)
   mm !!! Regidx (mword_of_int 10) = page_base uroot ->
   (* the size stays inside the user region, so PGROUNDUP does not wrap and
-     uvmunmap's range premise holds *)
-  (uint sz + 4096 <= uvm_maxsz)%Z ->
+     uvmunmap's range premise holds.  [<=], NOT [+ 4096 <=]: [uvm_maxsz] is
+     page-aligned, so rounding a size that reaches it up to a page boundary
+     stays inside -- and the stronger form is undischargeable by the only
+     caller that has a live process's [p->sz], which growproc lets reach
+     TRAPFRAME exactly. *)
+  (uint sz <= uvm_maxsz)%Z ->
   (* the table maps nothing above PGROUNDUP(sz): see the header *)
   dom um ⊆ vpn_run vpn0 n ->
   sie_cap_gpr mm K b p -∗

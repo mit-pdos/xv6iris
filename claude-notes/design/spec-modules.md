@@ -38,6 +38,33 @@ It requires only the definitional layer — never a `Proof*` proof file. A
 callee's proof-file require becomes that callee's `Spec` file. Spec files
 compile in ~2 s.
 
+**A `Spec<F>.v` must not require a `Code<F>.v` either, its own or anyone
+else's** — not directly and not through a definitional file it requires. A
+`Code` file is the function's machine code (decode templates + `instr` facts,
+see [`code-organization.md`](code-organization.md)); a spec is about what the
+function DOES, so needing a name from a `Code` file always means that name is
+misfiled, and the fix is to move the name down, never to add the require.
+Where "down" is:
+
+- **pure vocabulary the contract is stated over** → the definitional file that
+  owns the subject. `mycpu_a5`/`mycpu_ret` (the closed form of &cpus[tp]) are
+  `struct cpu` geometry and live in `ProcGeom.v` beside `a_cpu_*`; wakeup's
+  frame-cell address `wk_fcell` is part of `SpecWakeupParts`' own statement and
+  lives there.
+- **a generic bv/instruction-encoding identity** → `RiscvExtras.v`
+  (`auipc_off`, `eq_vec_refl`).
+- **something only the proof consumes** → the `Proof<F>.v`.
+
+The check is one line and worth running after any relocation — no Spec file
+may have a `Code*` in its require closure:
+
+```
+grep -l 'Require.*\bCode[A-Z]' iris/*.v      # only Code/Proof/Wp/Link may match
+```
+
+Every Spec file is inside the rule, `SpecEntry.v` included — see the M-mode
+boot section below for the one that took a contract reshape to get there.
+
 **`Proof<F>.v`** — the proof, a *sealed functor* over its callees' interfaces.
 The lemma keeps its original header and concludes with the `_body`:
 
@@ -159,11 +186,53 @@ other one:
   convertible, not syntactically equal, so the proof meets them with
   `iEval (change pcE with pc_e0) in "Hpc"` at the head and
   `iEval (change st_main with pcMain) in "Hpc"` / `… in "Hmepc"` at the tail.
-- **`SpecEntry.v` is the one Spec file not stated over the definitional layer
-  alone.** Its post-state vocabulary (`m_jal`, `entry_ld_ea`, `st_mout`,
-  `st_pmpcfg1`, `ti_deadline`, …) is defined inside the M-mode Wp files, so it
-  requires them. Moving that pure vocabulary into a definitional file is what
-  would decouple it; nothing else depends on that split.
+- **The post-state is QUANTIFIED, not spelled — and that is the general
+  lesson, not a boot quirk.** `wp_entry_boot`'s continuation used to name the
+  exact final machine: `gpr_file (st_mout (m_jal m v_stack0 mhartid_in) sp0
+  ms0 …)` plus each CSR at its computed value. That reads like a strong
+  contract and is actually a leak: `st_mout` is the top of a **27-deep tower
+  of one `Definition` per register write**, over `ti_mout`'s 15 and `m_jal`'s
+  8, indexed by decoded-field constants — so fifty proof-internal definitions
+  and three `Code*.v` files were in the require closure of every Spec file
+  that could reach this one. Meanwhile the sole client
+  (`BootBridge.boot_bridge`) read **two slots** out of that file and then
+  `iExists`-ed it.
+
+  Now the continuation is `∀ Mf msf satpf … pmpaddrf, ⌜seven facts⌝ -∗ …`:
+  sp and tp as equations over `MbootVocab`, `mstatus_kernel_facts` of the
+  FINAL mstatus (both of the sconf tier's mstatus premises are one lemma off
+  it), `menvcfg = MENVCFG_S`, `mie ∧ ¬mideleg = 0`, satp-Bare, and
+  `mb_pmp_open` (the six premises of `SmodeCore.pmp_config_intro` bundled).
+  The tower stays behind `WpStartNew.st_mout_sp` / `st_mout_tp`, and
+  `SpecEntry`'s closure went from ~everything to **27 files, no `Code*.v` and
+  no whole-function proof**. `BootBridge` and `BootChain` got shorter: the
+  bridge now takes abstract values, so it no longer mentions `cms5` /
+  `st_mie1` / `st_mout` at all, and the composition lost its
+  `rewrite Hsp` / `rewrite -Hsp` dance.
+
+  Three moves made it work, all reusable:
+  - **Derive the facts where the values are known.** `boot_csrs_from_kf` used
+    to live in the bridge and be applied by the client; it is now
+    `WpStartNew.st_boot_csr_facts`, applied inside `ProofEntry`, so the
+    contract EXPORTS the facts. That needs the entry machine pinned in three
+    CSRs (`menvcfg0`/`mie0`/`mideleg0` all zero), which became a premise —
+    fine, because the entry mstatus is hidden inside `mmode_config` and a
+    client could never have discharged the old obligation itself.
+  - **A computed address the caller must know is a PARAMETER with a defining
+    premise, not a `let`.** `sp0` is now a binder with
+    `mb_entry_sp v_stack0 mhartid_in = sp0`, so the caller passes its own
+    concrete `mword_of_int (sp_of n)` and every occurrence — stack resource,
+    frame bounds, final sp — is already at it.
+  - **`rewrite -lem` loops on a bare variable.** With the register file a
+    variable `Mf`, `iEval (rewrite -(tp_pin_id _ Htpm)) in "Hfile"` rewrites
+    the `Mf` it just introduced; go through the shrinking direction inside an
+    `iAssert (gpr_file (tp_pin Mf))` instead. This bites whenever a spec is
+    generalized from a compound term to a binder.
+
+  What is left in the interface is `MbootVocab.v`: six definitions
+  (`mb_entry_sp`, `mb_frame`, `mb_ti_ra`/`mb_ti_s0`, `mb_ld_ea`, `mb_tpv`,
+  `mb_pmp_open`), all over `WpDecode.v`/`ExecCommon.v`/`RiscvExtras.v` — the
+  definitional layer, never a `Code*.v` and never a WP.
 
 ## Thin initlock wrappers: one proof, one instance per function
 

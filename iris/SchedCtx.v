@@ -152,6 +152,31 @@ Section SchedCtx.
      park_hlf j false)%I.
 
   (* ------------------------------------------------------------------ *)
+  (* WHAT A PARKING THREAD OWES ITS SLOT BESIDES ITS SAVED CONTEXT.       *)
+  (*                                                                      *)
+  (* At the two resumable parks (RUNNABLE / SLEEPING) the lock's dormant   *)
+  (* guard is [emp] and the answer is nothing: the private block stays     *)
+  (* captured in the parked closure, to be handed back when the process    *)
+  (* is dispatched again.  At the ZOMBIE park there IS no resumption --    *)
+  (* kexit never comes back and the scheduler never dispatches a zombie -- *)
+  (* so the block cannot ride a closure: wait()/freeproc, running on       *)
+  (* ANOTHER process, must find the user page table and the trapframe      *)
+  (* page in the lock.  Hence it crosses here, minus the context cells,    *)
+  (* which are what the swtch is about to write ([ProcInv.proc_dormant_    *)
+  (* noctx]).                                                             *)
+  (* ------------------------------------------------------------------ *)
+  Definition park_pay (pa : mword 64) (st : mword 32) : iProp Σ :=
+    (if inv_dormant st then proc_dormant_noctx pa st else emp)%I.
+
+  Lemma park_pay_live (pa : mword 64) (st : mword 32) :
+    inv_dormant st = false -> ⊢ park_pay pa st.
+  Proof. intros Hd. rewrite /park_pay Hd. auto. Qed.
+
+  Lemma park_pay_needs_ctx (pa : mword 64) (st : mword 32) :
+    needs_ctx st = true -> ⊢ park_pay pa st.
+  Proof. intros Hn. exact (park_pay_live pa st (inv_dormant_of_needs_ctx st Hn)). Qed.
+
+  (* ------------------------------------------------------------------ *)
   (* The chain payload predicate.  The FOURTH argument is the crossing's  *)
   (* c->proc index [p] (the valid_context record's own index, passed      *)
   (* through by the payload slot): both directions of a crossing happen   *)
@@ -190,8 +215,8 @@ Section SchedCtx.
        (⌜c = a_cpu_ctx (cid_word_of h)⌝ ∗ ⌜A' = None⌝ ∗
         ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
           ⌜cret = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
-           γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
-          proc_held h j γl st ch)
+           γs !! j = Some γl /\ park_ok st = true⌝ ∗
+          proc_held h j γl st ch ∗ park_pay (proc_addr j) st)
      ∨ (* c = proc j's context, resumed by THE SCHEDULER [cret] (the
           scheduler's swtch): state already set RUNNING, c->proc = p.  [A']
           is the scheduler's own record, PINNED at [h] -- cpus[h].context
@@ -229,13 +254,14 @@ Section SchedCtx.
      took from its acquire. *)
   Lemma p_sched_to_cpu (i : CPU) (j : nat) (γl : gname)
       (st : mword 32) (ch : mword 64) :
-    (j < NPROC)%nat -> γs !! j = Some γl -> needs_ctx st = true ->
+    (j < NPROC)%nat -> γs !! j = Some γl -> park_ok st = true ->
     trap_csrs (CID := i) -∗
     proc_held i j γl st ch -∗
+    park_pay (proc_addr j) st -∗
     p_sched i None (a_cpu_ctx (cid_word_of i))
       (p_context (proc_addr j)) (cid_word_of i) (proc_addr j).
   Proof.
-    iIntros (Hj Hgl Hst) "Htc Hheld".
+    iIntros (Hj Hgl Hst) "Htc Hheld Hpay".
     iSplit; [done|]. iFrame "Htc". iLeft. iSplit; [done|]. iSplit; [done|].
     iExists j, γl, st, ch. iFrame. done.
   Qed.
@@ -299,8 +325,8 @@ Section SchedCtx.
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = p_context (proc_addr j)⌝ ∗
     ⌜A' = None⌝ ∗ trap_csrs (CID := i) ∗
     ∃ (γl : gname) (st : mword 32) (ch : mword 64),
-      ⌜γs !! j = Some γl /\ needs_ctx st = true⌝ ∗
-      proc_held i j γl st ch.
+      ⌜γs !! j = Some γl /\ park_ok st = true⌝ ∗
+      proc_held i j γl st ch ∗ park_pay (proc_addr j) st.
   Proof.
     iIntros (Hj) "(%Htp & Htc & Hpay)". iSplit; [done|].
     iDestruct "Hpay" as "[(_ & %HA & Hpay) | Hpay]".
@@ -717,6 +743,17 @@ Section SchedCtx.
     iIntros "[_ [$ $]]".
   Qed.
 
+  (* the converse: putting a slot BACK at UNUSED.  freeproc's post is exactly
+     [proc_dormant _ UNUSED], so allocproc's failure tails rebuild the lock
+     resource through this before they release. *)
+  Lemma proc_slots_unused_intro (pa : mword 64) :
+    proc_dormant pa UNUSED -∗ park_at_full pa false -∗ proc_slots pa UNUSED.
+  Proof.
+    rewrite /proc_slots inv_dormant_UNUSED not_running_UNUSED.
+    rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
+    iIntros "Hd Hp". iSplitR; [done|]. iFrame "Hd Hp".
+  Qed.
+
   (* ... and its inverse at USED, where BOTH the context and the dormant
      guards are false and only the receipt is owed. *)
   Lemma proc_slots_used (pa : mword 64) :
@@ -749,6 +786,55 @@ Section SchedCtx.
     rewrite (not_running_of_needs_ctx st Hn).
     rewrite (inv_dormant_of_needs_ctx st Hn).
     iIntros "$ $".
+  Qed.
+
+  (* FORGETTING A PARKED RECORD DOWN TO ITS CELLS.  A [valid_context] owns
+     its fourteen cells outright ([SwtchCtx.valid_context_pre]); dropping the
+     resume wand and the parked stack leaves exactly [own_ctx].  Only the
+     ZOMBIE park does this, and it is the honest move: nothing ever resumes a
+     zombie, so claiming its saved context is resumable would be a promise
+     with no consumer -- and one whose price (a [needs_ctx ZOMBIE] slot) the
+     dormant block would have to pay for by giving up its own cells. *)
+  Lemma proc_ctx_cells (pa : mword 64) : proc_ctx pa -∗ own_ctx (p_context pa).
+  Proof.
+    rewrite /proc_ctx valid_context_unfold /valid_context_pre.
+    iIntros "(%vs & %av & %Hlen & _ & Hcells & _)".
+    iExists vs. by iFrame "Hcells".
+  Qed.
+
+  (* ... under the ▷ the record always arrives beneath.  [own_ctx] is
+     timeless (its cells are), so the step is a bare update. *)
+  (* A FANCY update, not a basic one: stripping a ▷ off a timeless
+     proposition needs an except-0 goal, and [|==>] is not one. *)
+  Lemma proc_ctx_own_ctx (E : coPset) (pa : mword 64) :
+    ▷ proc_ctx pa ={E}=∗ own_ctx (p_context pa).
+  Proof.
+    iIntros "H".
+    iAssert (▷ own_ctx (p_context pa))%I with "[H]" as "H".
+    { iNext. by iApply proc_ctx_cells. }
+    by iMod "H".
+  Qed.
+
+  (* THE RECLAIMING SCHEDULER'S ONE MOVE, at either kind of park: it holds
+     the record its swtch handed back, the rejoined receipt, and whatever the
+     crossing's [park_pay] carried, and that is [proc_slots] at the state the
+     parking thread stored.  Stated once, so the scheduler never cases on the
+     state -- the case analysis lives here. *)
+  Lemma proc_slots_park_gen (E : coPset) (pa : mword 64) (st : mword 32) :
+    park_ok st = true ->
+    ▷ proc_ctx pa -∗ park_at_full pa false -∗ park_pay pa st ={E}=∗ proc_slots pa st.
+  Proof.
+    intros Hst. iIntros "Hctx Hpark Hpay".
+    apply park_ok_cases in Hst as [Hn | ->].
+    - iModIntro. rewrite /proc_slots Hn.
+      rewrite (inv_dormant_of_needs_ctx st Hn) (not_running_of_needs_ctx st Hn).
+      iFrame "Hctx". by iFrame "Hpark".
+    - rewrite /park_pay inv_dormant_ZOMBIE.
+      iMod (proc_ctx_own_ctx E pa with "Hctx") as "Hown".
+      iModIntro. rewrite /proc_slots not_running_ZOMBIE inv_dormant_ZOMBIE.
+      rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
+      iSplitR; [done|]. iSplitR "Hpark"; [| iExact "Hpark"].
+      iEval (rewrite proc_dormant_split). iFrame "Hpay Hown".
   Qed.
 
   (* the global proc-array invariant: an [is_lock] over every proc's

@@ -244,23 +244,11 @@ Lemma exec_pmaCheck_dev_load_1 (pa : Arch.pa) (pbmt : page_based_mem_type)
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 1
     = Some region ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  exec (pmaCheck (Physaddr pa) 1 (Load Data) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr pa) 1 (Load Data) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Hread.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hread |- *.
-  rewrite (is_aligned_paddr_1 pa). cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:103.61-103.62" >>=
-          (fun _ : true = true => returnM (PMA_readable (override_PMA rattr pbmt))))
-    with (returnM (PMA_readable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hread. cbn match.
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hread (exec_is_mag_applicable_load_data 1 s) (is_aligned_paddr_1 pa).
 Qed.
 
 (* pmaCheck for a 1-byte Store Data in a writable device PMA region *)
@@ -269,23 +257,11 @@ Lemma exec_pmaCheck_dev_store_1 (pa : Arch.pa) (pbmt : page_based_mem_type)
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 1
     = Some region ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
-  exec (pmaCheck (Physaddr pa) 1 (Store Data) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr pa) 1 (Store Data) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Hwrite.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hwrite |- *.
-  rewrite (is_aligned_paddr_1 pa). cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  change (assert_exp' true "sys/mem.sail:106.61-106.62" >>=
-          (fun _ : true = true => returnM (PMA_writable (override_PMA rattr pbmt))))
-    with (returnM (PMA_writable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hwrite. cbn match.
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hwrite (exec_is_mag_applicable_store_data 1 s) (is_aligned_paddr_1 pa).
 Qed.
 
 (* ===================================================================== *)
@@ -713,6 +689,14 @@ Section DevLoops.
   Lemma disk_inv_alloc E γd : disk_inv_body γd ={E}=∗ disk_inv γd.
   Proof. iIntros "Hbody". rewrite /disk_inv. by iApply inv_alloc. Qed.
 
+  (* THE PERMIT CHANNEL IS ERA-LOCAL, so the bundle that carries it names the
+     era's generation -- and it names it as the AMBIENT [gen_id], not as an
+     explicit argument, so every client spec in the tree stays textually
+     unchanged (a [GenId] instance is in scope wherever [dev_inv] is, and it
+     is the same one for every thread of an era: they are all spawned at the
+     generation [power_boot_res] is handed out at).  The section's own [GEN]
+     is that instance -- [dev_inv] simply starts using it. *)
+
   (* The device invariant as a client-facing, duplicable proposition: the
      BUNDLE of the three per-device invariants.  Same name and same arguments
      as before the split, so every client spec in the tree is unchanged --
@@ -723,7 +707,7 @@ Section DevLoops.
      client threads [dev_inv] and borrows the fragment by opening the relevant
      half around the access. *)
   Definition dev_inv (γ : uart_names) (γd : disk_names) : iProp Σ :=
-    (uart_inv γ ∗ plic_inv ∗ disk_inv γd ∗ perm_inv (dn_perm γd))%I.
+    (uart_inv γ ∗ plic_inv ∗ disk_inv γd ∗ perm_inv gen_id (dn_perm γd))%I.
 
   Global Instance dev_inv_persistent γ γd : Persistent (dev_inv γ γd).
   Proof. rewrite /dev_inv. apply _. Qed.
@@ -742,7 +726,7 @@ Section DevLoops.
      no client spec statement changed when it landed: every driver proof that
      already threads [dev_inv] can open [permN] to deposit its permit at
      enqueue and to collect its receipt after the wake. *)
-  Lemma dev_inv_perm γ γd : dev_inv γ γd -∗ perm_inv (dn_perm γd).
+  Lemma dev_inv_perm γ γd : dev_inv γ γd -∗ perm_inv gen_id (dn_perm γd).
   Proof. iIntros "(_ & _ & _ & #H)". iExact "H". Qed.
 
   (* ... and the bundle allocation, at the EXISTING signature: the old
@@ -752,7 +736,7 @@ Section DevLoops.
      three timeless per-device invariants are carved out of), and
      [perm_inv_body] is deliberately NOT timeless. *)
   Lemma dev_inv_alloc E γ γd :
-    dev_inv_body γ γd -∗ perm_inv_body (dn_perm γd) ={E}=∗ dev_inv γ γd.
+    dev_inv_body γ γd -∗ perm_inv_body gen_id (dn_perm γd) ={E}=∗ dev_inv γ γd.
   Proof.
     iIntros "Hbody Hperm". rewrite /dev_inv_body.
     iDestruct "Hbody" as (u p v) "(Hu & Hp & Hv & Hg & Hproto & %Hpok & %Hvok)".
@@ -762,7 +746,7 @@ Section DevLoops.
     { iExists p. iFrame "Hp". iPureIntro. exact Hpok. }
     iMod (disk_inv_alloc E γd with "[Hv Hproto]") as "#Hdinv".
     { iExists v. iFrame "Hv Hproto". iPureIntro. exact Hvok. }
-    iMod (perm_inv_alloc E (dn_perm γd) with "Hperm") as "#Hqinv".
+    iMod (perm_inv_alloc E gen_id (dn_perm γd) with "Hperm") as "#Hqinv".
     iModIntro. rewrite /dev_inv. iFrame "Huinv Hpinv Hdinv Hqinv".
   Qed.
 
@@ -897,7 +881,7 @@ Section DevLoops.
        deposited at enqueue re-establishes the crash predicate
        (claude-notes/design/crash.md).  [crashN] is disjoint from [diskN] and
        [plicN], so the two openings compose. *)
-    gen_cert -∗ crash_inv -∗ perm_inv (dn_perm γd) -∗ disk_inv γd -∗
+    gen_cert -∗ crash_inv -∗ perm_inv gen_id (dn_perm γd) -∗ disk_inv γd -∗
     plic_inv -∗
     WP (DiskLoop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -909,7 +893,7 @@ Section DevLoops.
        over because a DMA completion is the one step that moves [v_disk]): the
        latch and stutter arms FRAME it, and the completion arm passes it
        through [virtio_proto_step] (claude-notes/design/crash.md). *)
-    iIntros (gr m d) "(Hgr & Hmem & Hdev & Hdur & Htie)".
+    iIntros (gr m d n Hn) "(Hgr & Hmem & Hdev & Hdur & Htie & Hsa)".
     (* THE PERMIT INVARIANT IS OPENED IN THE FIRST (⊤ -> ∅) LEG, before the
        arm is even known.  It has to be: [perm_inv_body] is NOT timeless (it
        holds the clients' view shifts), so the only [▷]-stripping opportunity
@@ -961,8 +945,20 @@ Section DevLoops.
       iDestruct (disk_tie_agree with "Htie Htie2") as %<-.
       (* THE CLIENT'S VIEW SHIFT, at the image the machine is moving FROM;
          it lands the crash predicate at [wr_apply wr] of it. *)
-      iMod (perm_consume_kq (dn_perm γd) kq wr (v_disk (dvirtio d))
-              with "Hpbody Hpend HP") as "(Hpbody & Hdone & HP)".
+      (* THE LIVE-ERA ARITHMETIC GOES IN WITH THE VIEW SHIFT (phase C2b/D1):
+         [state_interp]'s started-generations auth at [n = gen_id + 1].  The
+         channel is held at THIS thread's [gen_id], so every permit in it was
+         authored by this era and its [⌜n = gd + 1⌝] is exactly the fact
+         [wp_disk_step] already handed us -- which is what lets a client fupd
+         identify the crash record's recorded custodian as ITSELF. *)
+      (* the permit is a mask-[∅] fupd (RiscvPtsto: a timeless client
+         predicate must be able to strip the [▷] this hands it), and we hold
+         three invariants open, so shrink the mask around it and restore. *)
+      iMod (fupd_mask_subseteq ∅) as "Hmclose"; [set_solver|].
+      iMod (perm_consume_kq gen_id (dn_perm γd) kq wr (v_disk (dvirtio d)) n
+              with "Hpbody Hpend Hsa [//] HP")
+        as "(Hpbody & Hdone & Hsa & HP)".
+      iMod "Hmclose" as "_".
       (* THE MECHANICAL TIE UPDATE: both halves, together, to the image the
          device just produced.  It is the completion's own job -- the client
          cannot do it (it holds neither half) and nobody else in the machine
@@ -982,7 +978,7 @@ Section DevLoops.
       iEval (rewrite Himg) in "Hdauth'".
       iSplitL "Hdauth'".
       { iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdv'. }
-      iFrame "Htie".
+      iFrame "Htie Hsa".
       iApply "IH".
     - (* The queue the driver published is MALFORMED, so the device may write
          anything anywhere.  This case is REFUTED, not handled: the lease's
@@ -1017,13 +1013,13 @@ Section DevLoops.
       iSplitL "Hdauth".
       { iExists dmap. iFrame "Hdauth". iPureIntro. exact Hdview. }
       (* a latch moves only the PLIC: the FS tie is FRAMED *)
-      iFrame "Htie".
+      iFrame "Htie Hsa".
       iApply "IH".
     - (* the totality stutter (RiscvLang §3c) *)
       iMod ("Hpclose" with "[Hpbody]") as "_"; [iNext; iExact "Hpbody"|].
       iModIntro. iFrame "Hgr Hmem Hdev".
       iSplitL "Hdur"; [iExact "Hdur"|].
-      iFrame "Htie". iApply "IH".
+      iFrame "Htie Hsa". iApply "IH".
   Qed.
 
   (* ------------------------------------------------------------------ *)

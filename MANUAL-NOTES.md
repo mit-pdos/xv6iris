@@ -52,16 +52,16 @@ Some high-level ideas that might be interesting for some eventual paper:
 - use Sail's reset spec (init_model) to initialize HART on power-on
 - tangentially found bug corresponding to usertests partial_write
 - owning current proc should be separate from owning the FD table: we may look up some FD, pass the struct file to another function, but that function also wants to own current proc (and that double-owns the struct file)
+- bug: freeproc did not hold wait_lock when zeroing out p->parent
+- bug: fence.i missing when jumping to userspace code
+- bug: missing fence iorw,iorw in virtio disk driver
+- RVWMO doesn't cover icache behavior, Sail model doesn't include icache either; also no precise model of MMIO/DMA
+- Sail model represents A/D page table flushes as regular reads/writes, but actual RISC-V spec doc says they should be atomic w.r.t. other PTE accesses.  problem with model: uvmunmap clears PTE entry, another HART writes it back with A|D.  not possible on HW, but Sail allows this.
+- gen_code.py generates CodeF.v, helps with updating proofs after xv6 source changes.
+- promise-free weak memory plan; need soundness proof for LB without promises
 
 Big things that still need to be done/explored:
 
-- weak memory
-  - flat model does instruction re-ordering, which means no sequential stepping through instructions
-  - promising model requires future-write reasoning
-  - DRF-SC is probably not sufficient to cover all kernel code
-  - not clear what the Iris program logic rules should look like for weak memory
-    - https://plv.mpi-sws.org/gps/
-    - https://people.mpi-sws.org/~haidang/publications/thesis.pdf
 - liveness, or at least deadlock avoidance
   - acquire currently calls panic if already holding lock on same CPU
   - lock ordering could solve deadlock and acquire's panic

@@ -171,8 +171,8 @@ allocates the invariant one line after `procs_inv_alloc` chooses γs.
 pj` from premise AND postcondition and gained `scheds_inv Φ γs` (persistent,
 hart-free) plus `park_hlf j true` (hart-free); the edit was byte-uniform in all
 ten. The five proofs (`ProofYield`, `ProofSleep`, `ProofBread`, `ProofBwrite`,
-`ProofAcquiresleep`) and their five `Link*` are green. `spec_vacuity.py` is
-CLEAN, `proof_coverage.py --check` exits 0 with the assumption set UNCHANGED,
+`ProofAcquiresleep`) and their five `Link*` are green.
+`proof_coverage.py --check` exits 0 with the assumption set UNCHANGED,
 and `lemma_diff.py` reports exactly two removals, both the prescribed
 `_notp`-twin collapse (`ProofAcquiresleep.asl_regs_notp`,
 `ProofBread.bd_notp_of`).
@@ -716,7 +716,6 @@ LOGIC, about Rocq/Iris MECHANICS, or about ORCHESTRATION.
     unparenthesised `∀` in a wand chain swallows the trailing `WP` and the
     contract becomes trivially provable. It compiles. The `Module Type` seal
     accepts it. Only symptom is a remote `iIntros` failure in another file.
-    `tools/spec_vacuity.py` exists because of this.
 15. **An `Ltac` defined inside a Section does not survive it**, and an Ltac body
     resolves literal hypothesis names at DEFINITION time.
 16. **The transparent-tower conversion blowup.** One `iApply` took 400 s of a
@@ -811,10 +810,10 @@ flipping function plus one lock consumer would have exposed almost everything.
 
 ### Write the checkers BEFORE the sweep
 
-`tools/spec_vacuity.py`, the lemma-name diff, and the raw-map-read grep were
-each written *after* the bug they detect. All three are cheap, and all three
-catch the characteristic failure of this refactor: **something that typechecks
-and is wrong** (a vacuous contract, a dropped lemma, a wrong-hart read). If a
+The lemma-name diff and the raw-map-read grep were each written *after* the bug
+they detect. Both are cheap, and both catch the characteristic failure of this
+refactor: **something that typechecks and is wrong** (a dropped lemma, a
+wrong-hart read). If a
 refactor has a known silent failure mode, the detector is part of the setup.
 
 ### Enumerate what you are absorbing, before absorbing it

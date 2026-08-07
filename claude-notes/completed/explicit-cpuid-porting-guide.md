@@ -565,15 +565,8 @@ to get one, is remote from the cause: `iIntros "… Hcont"` failing with *"could
 not introduce Hcont, goal is not a wand or implication"* in the PROOF file.
 
 So: **when you remove a wrapper, remove its opening AND its closing paren, and
-keep the `∀` bracketed.** Then run the checker:
-
-```
-cd iris && python3 ../tools/spec_vacuity.py
-```
-
-It scans every `_body` in `Spec*.v`/`Wp*.v` for a `forall` reaching the wand
-chain at paren-depth 0. A `forall` BEFORE the first `-∗` is fine (ordinary Coq
-premises) — the checker knows the difference.
+keep the `∀` bracketed.** A `∀` BEFORE the first depth-0 `-∗` is fine (ordinary
+Coq premises); only one AFTER the separation chain has started is suspect.
 
 ## Discharge gotchas (all found the hard way)
 

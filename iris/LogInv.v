@@ -28,10 +28,11 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth gmap frac.
-From iris.base_logic.lib Require Import ghost_map invariants.
+From iris.base_logic.lib Require Import ghost_map ghost_var invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes.
+Require Import RiscvLang.   (* [GenId]/[gen_id]: [log_ctx]'s swap receipt *)
 Require Import RiscvPtsto.
 Require Import WpLock.
 Require Import DiskPtsto.
@@ -202,6 +203,10 @@ Qed.
 
 Section LogInv.
   Context `{!riscvGS Σ, !lockG Σ, !diskGhostG Σ, !bioG Σ, !fsLogG Σ, !logG Σ}.
+  (* the ambient generation: [log_ctx] carries this era's SWAP RECEIPT, which
+     is what every WAL fupd curries to prove the crash record's arm is its
+     own ([FsCrash.fs_arm_acc]).  Implicit, so no spec statement changes. *)
+  Context `{GEN : GenId}.
 
   (* ---------------------------------------------------------------- *)
   (*  An active operation                                              *)
@@ -215,6 +220,54 @@ Section LogInv.
 
   Global Instance log_op_timeless γ u : Timeless (log_op γ u).
   Proof. apply _. Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (*  The ERA's half of the log-region MIRROR (phase C2b/D1 stage 2)    *)
+  (*                                                                    *)
+  (*  [RiscvPtsto.log_mirror] records what the LOG REGION of the         *)
+  (*  physical disk holds -- the header's decoding and the slots'        *)
+  (*  contents.  The crash record's checked-out arm holds one half       *)
+  (*  ([FsCrash.fs_custody]) and the ERA holds the other, and a WAL       *)
+  (*  write's fupd meets the two: that is the only way a STATELESS view   *)
+  (*  shift can know facts the PREVIOUS writes established ("the on-disk  *)
+  (*  header is clean", "the slots hold the logged values").             *)
+  (*                                                                     *)
+  (*  Which half lives where, and why the value is existential: the era's *)
+  (*  half rides [log_batch], so it is exactly as available as the batch  *)
+  (*  is -- in the lock between commits, checked out by the committer     *)
+  (*  during one.  The BETWEEN-COMMITS form carries the pure conjunct     *)
+  (*  [lm_hdr M = (0, [])]: with the batch in the lock the on-disk header *)
+  (*  is clean, which is what a log-fill fupd reads out of it, and the    *)
+  (*  final [write_head] of a commit (the CLEAR) is what re-establishes   *)
+  (*  it before the batch goes back.  Both forms keep [M] existential so  *)
+  (*  that no statement above this file grows a binder for it.            *)
+  (* ---------------------------------------------------------------- *)
+
+  (* the whole variable, as the era boot bundle mints it: no custody has
+     been taken yet, so both halves are the era's *)
+  Definition log_mirror_full : iProp Σ :=
+    (∃ M : log_mirror, ghost_var mirror_name 1 M)%I.
+
+  (* THE ERA'S HALF AT A RECORDED HEADER PICTURE.  [h] is the ON-DISK
+     header's [FsCrash.hdr_dec] reading, and it is the ONLY field a WAL fupd
+     ever reads out of the mirror: the log-fill kind needs a CLEAN header,
+     the install kind needs the header to be the (n, W) the commit just
+     wrote (which is what tells it the block it is overwriting is a LOGGED
+     one, so recovery re-installs it anyway).  The slot contents are recorded
+     too ([RiscvPtsto.log_mirror]'s second field) but no fupd has to read
+     them -- [FsCrash.fs_recovery_install] does not depend on the value a
+     home write stores.
+     Kept ONE definition, indexed by [h], because the commit and clear kinds
+     move the picture: [log_mirror_clean] is its [(0, [])] instance and
+     [log_batch] therefore reads exactly as before. *)
+  Definition log_mirror_at (h : nat * list Z) : iProp Σ :=
+    (∃ M : log_mirror,
+       ghost_var mirror_name (1/2) M ∗ ⌜lm_hdr M = h⌝)%I.
+
+  Global Instance log_mirror_at_timeless h : Timeless (log_mirror_at h).
+  Proof. rewrite /log_mirror_at. apply _. Qed.
+
+  Definition log_mirror_clean : iProp Σ := log_mirror_at (0%nat, []).
 
   (* ---------------------------------------------------------------- *)
   (*  The batch bundle (checked out wholesale by the committer)        *)
@@ -260,7 +313,9 @@ Section LogInv.
           install_trans's bunpins deposit their freed units back instead
           of end_op dropping them: pool + n = LOGBLOCKS + 2 is
           inductive. *)
-       bslots bn ((LOGBLOCKS - n) + 2)%nat)%I.
+       bslots bn ((LOGBLOCKS - n) + 2)%nat ∗
+       (* THE ERA'S MIRROR HALF, at the between-commits picture *)
+       log_mirror_clean)%I.
 
   (* ---------------------------------------------------------------- *)
   (*  The lock's resource                                              *)
@@ -293,7 +348,14 @@ Section LogInv.
     (is_lock (ln_lk γ) log_addr "log"%string
        (log_res γ bn γfs cov logstart) ∗
      l_dev ↦₄□ dev ∗
-     l_start ↦₄□ (mword_of_int logstart : mword 32))%I.
+     l_start ↦₄□ (mword_of_int logstart : mword 32) ∗
+     (* THE ERA'S SWAP RECEIPT (phase C2b/D1 stage 3).  [initlog]'s swap
+        produced it and every later WAL fupd needs it: it is the LOWER bound
+        that, against the started-generations auth the DMA completion threads
+        in, pins the crash record's arm to THIS era ([FsCrash.fs_arm_acc]'s
+        squeeze).  Persistent, so it rides the context every log function
+        already threads. *)
+     swap_lb (S gen_id))%I.
 
   Global Instance log_ctx_persistent γ bn γfs cov logstart dev :
     Persistent (log_ctx γ bn γfs cov logstart dev).
@@ -317,7 +379,11 @@ Section LogInv.
 
   Lemma log_ctx_frozen γ bn γfs cov logstart dev :
     log_ctx γ bn γfs cov logstart dev -∗ log_frozen logstart dev.
-  Proof. rewrite /log_ctx /log_frozen. iIntros "(_ & $ & $)". Qed.
+  Proof. rewrite /log_ctx /log_frozen. iIntros "(_ & $ & $ & _)". Qed.
+
+  Lemma log_ctx_swap γ bn γfs cov logstart dev :
+    log_ctx γ bn γfs cov logstart dev -∗ swap_lb (S gen_id).
+  Proof. rewrite /log_ctx. iIntros "(_ & _ & _ & $)". Qed.
 
   (* ---------------------------------------------------------------- *)
   (*  The three ledger transitions                                      *)

@@ -62,8 +62,9 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
-Require Import CodeTimerinit.
 
+Require Import CodeTimerinitAux.
+Require Import MbootVocab.
 (* ===================================================================== *)
 (* Symbolic values of the run (functions of the entry state).             *)
 (* ===================================================================== *)
@@ -75,6 +76,34 @@ Definition ti_ea_ra (sp0 : mword 64) : mword 64 :=
   add_vec (ti_sp1 sp0) (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000")))).
 Definition ti_ea_s0 (sp0 : mword 64) : mword 64 :=
   add_vec (ti_sp1 sp0) (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000")))).
+(* The bridges to [MbootVocab]: the three of these the boot CONTRACT names,
+   restated over its own vocabulary so [SpecEntry] does not have to be written
+   in the decoded-immediate spelling ([i9], [u10], [u11]) that only this proof
+   cares about.  Note the contract's argument is start()'s [sp0], so its slot
+   addresses sit at a DOUBLE frame drop -- start()'s, then timerinit's. *)
+Lemma ti_sp1_mb (sp0 : mword 64) : ti_sp1 sp0 = mb_frame sp0.
+Proof.
+  unfold ti_sp1, mb_frame.
+  apply (f_equal (add_vec sp0)). apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma ti_ea_ra_mb (sp0 : mword 64) : ti_ea_ra (ti_sp1 sp0) = mb_ti_ra sp0.
+Proof.
+  unfold ti_ea_ra, mb_ti_ra. rewrite !ti_sp1_mb.
+  apply (f_equal (add_vec (mb_frame (mb_frame sp0)))).
+  apply bv_eq; vm_compute; reflexivity.
+Qed.
+
+Lemma ti_ea_s0_mb (sp0 : mword 64) : ti_ea_s0 (ti_sp1 sp0) = mb_ti_s0 sp0.
+Proof.
+  unfold ti_ea_s0, mb_ti_s0. rewrite !ti_sp1_mb.
+  (* u11 is 0, so the displacement is the identity *)
+  replace (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000"))) : mword 64)
+    with (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
+    by (apply bv_eq; vm_compute; reflexivity).
+  apply addv_sext0.
+Qed.
+
 (* s0 after c.addi4spn (= sp1 + 16 = sp0). *)
 Definition ti_s0v (sp0 : mword 64) : mword 64 :=
   add_vec (ti_sp1 sp0) (sign_extend' 64 (caddi4spn_imm nz12)).

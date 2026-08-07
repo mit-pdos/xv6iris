@@ -65,7 +65,6 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
-Require Import StackOwn.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecArgfd SpecFdalloc.
@@ -74,7 +73,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation SDP := KernelSyms.sys_dup.
 
 (* sys_dup's own frame is 6 slots (addi sp,sp,-48); argfd wants 24 below it,
    fdalloc 14 and filedup 14, so argfd sets the bound. *)

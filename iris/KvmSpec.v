@@ -141,6 +141,30 @@ Section KvmSpecs.
     Persistent (kalloc_env γ None).
   Proof. rewrite /kalloc_env. apply _. Qed.
 
+  (* Leave the counted regime for good.  A function whose ERROR TAIL calls a
+     [None]-only callee (proc_pagetable's tails call uvmfree) has to do this:
+     it holds a counted bundle, the callee cannot take one, and the count is
+     of no further use because the tail is about to return failure anyway.
+     Irreversible -- [KallocInv.kalloc_avail_seal] fires the one-shot -- and
+     that is why the counted contract cannot simply be RESTATED at [None]:
+     the caller that gets a resealed bundle back can never count again. *)
+  Lemma kalloc_env_seal_Some (γ : gname) (n : nat) :
+    kalloc_env γ (Some n) ==∗ kalloc_env γ None.
+  Proof.
+    iIntros "(%γk & #Hlk & Hav & #Hp)".
+    iMod (kalloc_avail_seal with "Hav") as "Hav".
+    iModIntro. iExists γk. iFrame "Hlk Hav Hp".
+  Qed.
+
+  (* the form a bundle-GENERIC proof needs: the caller's [on] is a variable,
+     and at [None] the seal has already fired, so this is the identity. *)
+  Lemma kalloc_env_seal (γ : gname) (on : option nat) :
+    kalloc_env γ on ==∗ kalloc_env γ None.
+  Proof.
+    destruct on as [n|]; [apply kalloc_env_seal_Some |].
+    iIntros "H". iModIntro. iExact "H".
+  Qed.
+
   (* ------------------------------------------------------------------- *)
   (* kvmmake() / kvminit().  kvmmake returns (a0) the root of a fresh      *)
   (* table representing exactly [kvm_map]: the six kvmmap regions plus     *)

@@ -19,8 +19,6 @@ Require Import CpuOwn.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation PO := KernelSyms.push_off.
-Notation PP := KernelSyms.pop_off.
 
 (* push_off DISABLES interrupts, so it is entered with them in WHATEVER state
    the caller had ([b] generic): a trap can be taken any time before the

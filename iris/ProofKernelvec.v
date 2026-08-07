@@ -95,7 +95,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (* jal target / link-value arithmetic. *)
 Lemma kv_jal_tgt :
   add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
-          (sign_extend' 64 (mword_of_int 0x1fd244 : mword 21))
+          (sign_extend' 64 (mword_of_int 0x1fd242 : mword 21))
   = (mword_of_int (KernelSyms.kerneltrap) : mword 64).
 Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 
@@ -260,13 +260,13 @@ Definition kv_load_result (m : regfile) (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 
   <[Regidx (mword_of_int 31 : mword 5) := w17]> (<[Regidx (mword_of_int 30 : mword 5) := w16]> (<[Regidx (mword_of_int 29 : mword 5) := w15]> (<[Regidx (mword_of_int 28 : mword 5) := w14]> (<[Regidx (mword_of_int 17 : mword 5) := w13]> (<[Regidx (mword_of_int 16 : mword 5) := w12]> (<[Regidx (mword_of_int 15 : mword 5) := w11]> (<[Regidx (mword_of_int 14 : mword 5) := w10]> (<[Regidx (mword_of_int 13 : mword 5) := w9]> (<[Regidx (mword_of_int 12 : mword 5) := w8]> (<[Regidx (mword_of_int 11 : mword 5) := w7]> (<[Regidx (mword_of_int 10 : mword 5) := w6]> (<[Regidx (mword_of_int 7 : mword 5) := w5]> (<[Regidx (mword_of_int 6 : mword 5) := w4]> (<[Regidx (mword_of_int 5 : mword 5) := w3]> (<[Regidx (mword_of_int 3 : mword 5) := w2]> (<[Regidx (mword_of_int 1 : mword 5) := w1]> m)))))))))))))))).
 
 Lemma kv_store_run :
-  vc_block_s (VSt (KV + 0x2) kv_store_regs0 kv_store_heap0 []) kv_store_prog
-  = Some (VSt (KV + 0x24) kv_store_regs0 kv_store_heap1 []).
+  vc_block_s (VSt (KernelSyms.kernelvec + 0x2) kv_store_regs0 kv_store_heap0 []) kv_store_prog
+  = Some (VSt (KernelSyms.kernelvec + 0x24) kv_store_regs0 kv_store_heap1 []).
 Proof. vm_compute. reflexivity. Qed.
 
 Lemma kv_load_run :
-  vc_block_s (VSt (KV + 0x28) kv_load_regs0 kv_store_heap0 []) kv_load_prog
-  = Some (VSt (KV + 0x4a) kv_load_regs1 kv_store_heap0 []).
+  vc_block_s (VSt (KernelSyms.kernelvec + 0x28) kv_load_regs0 kv_store_heap0 []) kv_load_prog
+  = Some (VSt (KernelSyms.kernelvec + 0x4a) kv_load_regs1 kv_store_heap0 []).
 Proof. vm_compute. reflexivity. Qed.
 
 Section KernelvecCore.
@@ -288,81 +288,81 @@ Section KernelvecCore.
   Qed.
 
   Lemma kv_store_instrs :
-    kernel_text -∗ block_instrs_s (KV + 0x2) kv_store_prog.
+    kernel_text -∗ block_instrs_s (KernelSyms.kernelvec + 0x2) kv_store_prog.
   Proof.
     iIntros "#Ht". cbn [block_instrs_s kv_store_prog vop_s_ast].
     iSplitR; [by iApply kv_i2|].
-    replace (KV + 0x2 + 2) with (KV + 0x4) by lia.
+    replace (KernelSyms.kernelvec + 0x2 + 2) with (KernelSyms.kernelvec + 0x4) by lia.
     iSplitR; [by iApply kv_i3|].
-    replace (KV + 0x4 + 2) with (KV + 0x6) by lia.
+    replace (KernelSyms.kernelvec + 0x4 + 2) with (KernelSyms.kernelvec + 0x6) by lia.
     iSplitR; [by iApply kv_i4|].
-    replace (KV + 0x6 + 2) with (KV + 0x8) by lia.
+    replace (KernelSyms.kernelvec + 0x6 + 2) with (KernelSyms.kernelvec + 0x8) by lia.
     iSplitR; [by iApply kv_i5|].
-    replace (KV + 0x8 + 2) with (KV + 0xa) by lia.
+    replace (KernelSyms.kernelvec + 0x8 + 2) with (KernelSyms.kernelvec + 0xa) by lia.
     iSplitR; [by iApply kv_i6|].
-    replace (KV + 0xa + 2) with (KV + 0xc) by lia.
+    replace (KernelSyms.kernelvec + 0xa + 2) with (KernelSyms.kernelvec + 0xc) by lia.
     iSplitR; [by iApply kv_i7|].
-    replace (KV + 0xc + 2) with (KV + 0xe) by lia.
+    replace (KernelSyms.kernelvec + 0xc + 2) with (KernelSyms.kernelvec + 0xe) by lia.
     iSplitR; [by iApply kv_i8|].
-    replace (KV + 0xe + 2) with (KV + 0x10) by lia.
+    replace (KernelSyms.kernelvec + 0xe + 2) with (KernelSyms.kernelvec + 0x10) by lia.
     iSplitR; [by iApply kv_i9|].
-    replace (KV + 0x10 + 2) with (KV + 0x12) by lia.
+    replace (KernelSyms.kernelvec + 0x10 + 2) with (KernelSyms.kernelvec + 0x12) by lia.
     iSplitR; [by iApply kv_i10|].
-    replace (KV + 0x12 + 2) with (KV + 0x14) by lia.
+    replace (KernelSyms.kernelvec + 0x12 + 2) with (KernelSyms.kernelvec + 0x14) by lia.
     iSplitR; [by iApply kv_i11|].
-    replace (KV + 0x14 + 2) with (KV + 0x16) by lia.
+    replace (KernelSyms.kernelvec + 0x14 + 2) with (KernelSyms.kernelvec + 0x16) by lia.
     iSplitR; [by iApply kv_i12|].
-    replace (KV + 0x16 + 2) with (KV + 0x18) by lia.
+    replace (KernelSyms.kernelvec + 0x16 + 2) with (KernelSyms.kernelvec + 0x18) by lia.
     iSplitR; [by iApply kv_i13|].
-    replace (KV + 0x18 + 2) with (KV + 0x1a) by lia.
+    replace (KernelSyms.kernelvec + 0x18 + 2) with (KernelSyms.kernelvec + 0x1a) by lia.
     iSplitR; [by iApply kv_i14|].
-    replace (KV + 0x1a + 2) with (KV + 0x1c) by lia.
+    replace (KernelSyms.kernelvec + 0x1a + 2) with (KernelSyms.kernelvec + 0x1c) by lia.
     iSplitR; [by iApply kv_i15|].
-    replace (KV + 0x1c + 2) with (KV + 0x1e) by lia.
+    replace (KernelSyms.kernelvec + 0x1c + 2) with (KernelSyms.kernelvec + 0x1e) by lia.
     iSplitR; [by iApply kv_i16|].
-    replace (KV + 0x1e + 2) with (KV + 0x20) by lia.
+    replace (KernelSyms.kernelvec + 0x1e + 2) with (KernelSyms.kernelvec + 0x20) by lia.
     iSplitR; [by iApply kv_i17|].
-    replace (KV + 0x20 + 2) with (KV + 0x22) by lia.
+    replace (KernelSyms.kernelvec + 0x20 + 2) with (KernelSyms.kernelvec + 0x22) by lia.
     iSplitR; [by iApply kv_i18|].
     done.
   Qed.
 
   Lemma kv_load_instrs :
-    kernel_text -∗ block_instrs_s (KV + 0x28) kv_load_prog.
+    kernel_text -∗ block_instrs_s (KernelSyms.kernelvec + 0x28) kv_load_prog.
   Proof.
     iIntros "#Ht". cbn [block_instrs_s kv_load_prog vop_s_ast].
     iSplitR; [by iApply kv_i20|].
-    replace (KV + 0x28 + 2) with (KV + 0x2a) by lia.
+    replace (KernelSyms.kernelvec + 0x28 + 2) with (KernelSyms.kernelvec + 0x2a) by lia.
     iSplitR; [by iApply kv_i21|].
-    replace (KV + 0x2a + 2) with (KV + 0x2c) by lia.
+    replace (KernelSyms.kernelvec + 0x2a + 2) with (KernelSyms.kernelvec + 0x2c) by lia.
     iSplitR; [by iApply kv_i22|].
-    replace (KV + 0x2c + 2) with (KV + 0x2e) by lia.
+    replace (KernelSyms.kernelvec + 0x2c + 2) with (KernelSyms.kernelvec + 0x2e) by lia.
     iSplitR; [by iApply kv_i23|].
-    replace (KV + 0x2e + 2) with (KV + 0x30) by lia.
+    replace (KernelSyms.kernelvec + 0x2e + 2) with (KernelSyms.kernelvec + 0x30) by lia.
     iSplitR; [by iApply kv_i24|].
-    replace (KV + 0x30 + 2) with (KV + 0x32) by lia.
+    replace (KernelSyms.kernelvec + 0x30 + 2) with (KernelSyms.kernelvec + 0x32) by lia.
     iSplitR; [by iApply kv_i25|].
-    replace (KV + 0x32 + 2) with (KV + 0x34) by lia.
+    replace (KernelSyms.kernelvec + 0x32 + 2) with (KernelSyms.kernelvec + 0x34) by lia.
     iSplitR; [by iApply kv_i26|].
-    replace (KV + 0x34 + 2) with (KV + 0x36) by lia.
+    replace (KernelSyms.kernelvec + 0x34 + 2) with (KernelSyms.kernelvec + 0x36) by lia.
     iSplitR; [by iApply kv_i27|].
-    replace (KV + 0x36 + 2) with (KV + 0x38) by lia.
+    replace (KernelSyms.kernelvec + 0x36 + 2) with (KernelSyms.kernelvec + 0x38) by lia.
     iSplitR; [by iApply kv_i28|].
-    replace (KV + 0x38 + 2) with (KV + 0x3a) by lia.
+    replace (KernelSyms.kernelvec + 0x38 + 2) with (KernelSyms.kernelvec + 0x3a) by lia.
     iSplitR; [by iApply kv_i29|].
-    replace (KV + 0x3a + 2) with (KV + 0x3c) by lia.
+    replace (KernelSyms.kernelvec + 0x3a + 2) with (KernelSyms.kernelvec + 0x3c) by lia.
     iSplitR; [by iApply kv_i30|].
-    replace (KV + 0x3c + 2) with (KV + 0x3e) by lia.
+    replace (KernelSyms.kernelvec + 0x3c + 2) with (KernelSyms.kernelvec + 0x3e) by lia.
     iSplitR; [by iApply kv_i31|].
-    replace (KV + 0x3e + 2) with (KV + 0x40) by lia.
+    replace (KernelSyms.kernelvec + 0x3e + 2) with (KernelSyms.kernelvec + 0x40) by lia.
     iSplitR; [by iApply kv_i32|].
-    replace (KV + 0x40 + 2) with (KV + 0x42) by lia.
+    replace (KernelSyms.kernelvec + 0x40 + 2) with (KernelSyms.kernelvec + 0x42) by lia.
     iSplitR; [by iApply kv_i33|].
-    replace (KV + 0x42 + 2) with (KV + 0x44) by lia.
+    replace (KernelSyms.kernelvec + 0x42 + 2) with (KernelSyms.kernelvec + 0x44) by lia.
     iSplitR; [by iApply kv_i34|].
-    replace (KV + 0x44 + 2) with (KV + 0x46) by lia.
+    replace (KernelSyms.kernelvec + 0x44 + 2) with (KernelSyms.kernelvec + 0x46) by lia.
     iSplitR; [by iApply kv_i35|].
-    replace (KV + 0x46 + 2) with (KV + 0x48) by lia.
+    replace (KernelSyms.kernelvec + 0x46 + 2) with (KernelSyms.kernelvec + 0x48) by lia.
     iSplitR; [by iApply kv_i36|].
     done.
   Qed.
@@ -383,7 +383,7 @@ Section KernelvecCore.
       {dq : dfrac} :
     smode_config γ dq -∗
     tlb_res_pt root_ppn -∗
-    pc_is (mword_of_int (KV + 0x2)) -∗
+    pc_is (mword_of_int (KernelSyms.kernelvec + 0x2)) -∗
     gpr_file m -∗
     kernel_text -∗
     (m !!! Regidx csp_rs1) ↦₈ vold1 -∗
@@ -405,7 +405,7 @@ Section KernelvecCore.
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈ vold17 -∗
     ( smode_config γ dq -∗
       tlb_res_pt root_ppn -∗
-      pc_is (mword_of_int (KV + 0x24)) -∗
+      pc_is (mword_of_int (KernelSyms.kernelvec + 0x24)) -∗
       gpr_file m -∗
       (m !!! Regidx csp_rs1) ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈ (m !!! Regidx (mword_of_int 3 : mword 5)) -∗
@@ -512,8 +512,8 @@ Section KernelvecCore.
     assert (HVr31 : ρ 31%nat = m !!! Regidx (mword_of_int 31 : mword 5)) by reflexivity.
     iDestruct (kv_store_instrs with "Htext") as "Hbi".
     iApply (wp_vc_block_s root_ppn kv_store_prog Φ
-              (VSt (KV + 0x2) kv_store_regs0 kv_store_heap0 [])
-              (VSt (KV + 0x24) kv_store_regs0 kv_store_heap1 [])
+              (VSt (KernelSyms.kernelvec + 0x2) kv_store_regs0 kv_store_heap0 [])
+              (VSt (KernelSyms.kernelvec + 0x24) kv_store_regs0 kv_store_heap1 [])
               ρ m γ
               (dq:=dq)
  kv_store_run HmS
@@ -548,7 +548,7 @@ Section KernelvecCore.
       {dq : dfrac} :
     smode_config γ dq -∗
     tlb_res_pt root_ppn -∗
-    pc_is (mword_of_int (KV + 0x28)) -∗
+    pc_is (mword_of_int (KernelSyms.kernelvec + 0x28)) -∗
     gpr_file m -∗
     kernel_text -∗
     (m !!! Regidx csp_rs1) ↦₈ w1 -∗
@@ -570,7 +570,7 @@ Section KernelvecCore.
     (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈ w17 -∗
     ( smode_config γ dq -∗
       tlb_res_pt root_ppn -∗
-      pc_is (mword_of_int (KV + 0x4a)) -∗
+      pc_is (mword_of_int (KernelSyms.kernelvec + 0x4a)) -∗
       gpr_file (kv_load_result m w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17) -∗
       (m !!! Regidx csp_rs1) ↦₈ w1 -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 16)) ↦₈ w2 -∗
@@ -643,8 +643,8 @@ Section KernelvecCore.
     assert (HVw17 : ρ 49%nat = (w17 : mword 64)) by reflexivity.
     iDestruct (kv_load_instrs with "Htext") as "Hbi".
     iApply (wp_vc_block_s root_ppn kv_load_prog Φ
-              (VSt (KV + 0x28) kv_load_regs0 kv_store_heap0 [])
-              (VSt (KV + 0x4a) kv_load_regs1 kv_store_heap0 [])
+              (VSt (KernelSyms.kernelvec + 0x28) kv_load_regs0 kv_store_heap0 [])
+              (VSt (KernelSyms.kernelvec + 0x4a) kv_load_regs1 kv_store_heap0 [])
               ρ m γ
               (dq:=dq)
  kv_load_run HmL
@@ -969,9 +969,9 @@ Section KernelvecCore.
     iPoseProof (kv_i19 with "Htext") as "Hi19".
     assert (Hrd19 : uint (mword_of_int 1 : mword 5) <> 0) by (vm_compute; discriminate).
     assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
-                      (sign_extend' 64 (mword_of_int 0x1fd244 : mword 21))) 0) ('b"0") = true)
+                      (sign_extend' 64 (mword_of_int 0x1fd242 : mword 21))) 0) ('b"0") = true)
       by (vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s_zca_pt root_ppn γ Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd244)
+    iApply (wp_jal_gpr_s_zca_pt root_ppn γ Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd242)
               (kv_m1 m) (1/2)%Qp
  Hrd19 Hal19
               with "Hsm Htlbinv Hpc Hfile Hi19").

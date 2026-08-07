@@ -41,7 +41,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 
-Notation BI := KernelSyms.binit.
 
 (* the two string literals binit passes on -- "bcache" to initlock and "buffer"
    to every initsleeplock.  Both sit in .rodata past etext with no ELF symbol of

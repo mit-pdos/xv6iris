@@ -23,7 +23,6 @@ Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
 
-Notation PMS := KernelSyms.proc_mapstacks.
 
 (* proc_mapstacks(kpgtbl=a0): kalloc a page for each of the 64 process kernel
    stacks and kvmmap it at KSTACK(i) (RW, one page).  The stack pas are

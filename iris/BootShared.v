@@ -27,7 +27,6 @@ Require Import SmodeCore.
 Require Import IntrDefs.
 Require Import ProcGeom SwtchCtx SchedCtx.
 Require Import WpLock KallocInv FileInv FdSlots.
-Require Import WpEntryNew.
 Require Import VirtioProto VirtioModel VirtioQueue DiskPtsto.
 Require Import PlicPlan WpUart WireInv.
 Require Import SpecConsoleinit SpecIinit.
@@ -37,6 +36,7 @@ Require Import SpecMain SpecMainSecondary.
 Require Import BootConfig PowerBoot.
 Require Import BootCarve BootCarveMain.
 Require Import BootChain.
+Require Import MbootVocab.
 Require Import RiscvAdequacy.
 Require Import BootReset.   (* the garbage-anchored register clause's bridge *)
 From Kernel Require KernelData.
@@ -732,6 +732,10 @@ Section BootAlloc.
          exists. *)
       disk_img_bytes disk_img_name 0
         (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
+      (* the era's LOG-REGION MIRROR variable, whole (phase C2b/D1 stage 3):
+         [initlog] splits it, keeping one half in [LogInv.log_batch] and
+         handing the other to [FsCrash.P_fs]'s arm at its swap *)
+      ghost_var mirror_name 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
       crash_inv ∗ gen_cert.
   Proof. iIntros "H". iExact "H". Qed.
 
@@ -747,7 +751,7 @@ Section BootAlloc.
      CPU.  Proved here, with an empty proofmode context, the same rewrite is
      free; the call site becomes one first-order [iApply].  Same family as the
      [wp_next_off] -> [wp_next_off_intro] rule in claude-notes/optimization.md:
-     never leave a big-op/BI identity to a setoid rewrite inside a large goal. *)
+     never leave a big-op/KernelSyms.binit identity to a setoid rewrite inside a large goal. *)
   Lemma boot_hart_pre_combine (g : gstate) :
     ([∗ list] c ∈ enum CPU, boot_reg_res (CID := c) (g.(gregs) c)) -∗
     ([∗ list] c ∈ enum CPU, hart_strans c) -∗
@@ -777,7 +781,7 @@ Section BootAlloc.
      pins can be kept back for [wire_inv]. *)
   Lemma boot_hart_pre (h : CPU) (g : gstate) (E : coPset) :
     boot_facts g ->
-    kmap_static_claims -∗ gen_cert -∗ (entry_ld_ea ↦ₚ₈□ v_stack0) -∗
+    kmap_static_claims -∗ gen_cert -∗ (mb_ld_ea ↦ₚ₈□ v_stack0) -∗
     boot_reg_res (CID := h) (g.(gregs) h) -∗
     hart_strans h -∗
     hart_sie h -∗
@@ -842,6 +846,9 @@ Section BootAlloc.
          yet -- it is what the FS layer's block views will be carved out of
          (claude-notes/design/fs-log.md, stage 4). *)
       disk_bytes γv 0 (disk_read (v_disk (g.(gdev).(dvirtio))) 0 ndisk) ∗
+      (* the era's log-region mirror variable, straight through: the FS boot
+         client hands it to [initlog] (its [LogInv.log_mirror_full] premise) *)
+      ghost_var mirror_name 1 (MkLogMirror (0%nat, []) (fun _ => [])) ∗
       (∃ ps : list (mword 64),
          ⌜prun phystop_val s1entry_val ps⌝ ∗
          ⌜(K_kvmmake + 64 + 3 < length ps)%nat⌝ ∗
@@ -856,7 +863,7 @@ Section BootAlloc.
     iIntros "H".
     iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hpark &
-        Huf & Hpf & Hvf & Hdimg & #Hcinv & #Hcert)".
+        Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [img_end] ---- *)
@@ -873,7 +880,7 @@ Section BootAlloc.
     iDestruct (kernel_data_intro g Hmem with "Himg") as "#Hkdata".
     (* ---- [_entry]'s GOT slot: the &stack0 word, at [DfracDiscarded] so all
            eight harts share it ---- *)
-    iDestruct (kernel_data_phys_word entry_got v_stack0 entry_ld_ea
+    iDestruct (kernel_data_phys_word entry_got v_stack0 mb_ld_ea
                  entry_ld_ea_addr ltac:(zlit) ltac:(zlit) ltac:(zeq)
                  entry_got_bytes with "Hcl Hkdata") as "#Hword".
     (* ---- the fd-slot supply (no memory footprint: a pure ghost) ---- *)
@@ -889,7 +896,7 @@ Section BootAlloc.
     assert (Hacceq : uart_acc (g.(gdev).(duart)) = u_out (g.(gdev).(duart)))
       by (rewrite Hu0; reflexivity).
     iEval (rewrite -Hacceq) in "Hlb".
-    iMod (disk_ghosts_alloc (g.(gdev).(dvirtio))
+    iMod (disk_ghosts_alloc gen_id (g.(gdev).(dvirtio))
             ltac:(rewrite Hv0; apply virtio_reset_not_live)
             ltac:(rewrite Hv0; apply virtio_reset_seen)
             ltac:(rewrite Hv0; apply virtio_reset_used_idx))
@@ -967,6 +974,7 @@ Section BootAlloc.
        [disk_img_bytes (dn_img γv)], and [Himg] says that gname is the era's *)
     iSplitL "Hdimg".
     { rewrite /disk_bytes. iEval (rewrite -Himg) in "Hdimg". iExact "Hdimg". }
+    iSplitL "Hmir"; [iExact "Hmir" |].
     iExact "Hpages".
   Qed.
 

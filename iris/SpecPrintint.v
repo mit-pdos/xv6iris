@@ -54,7 +54,6 @@ Require Import DiskPtsto WpUart.
 Require Import IntrDefs.
 From Kernel Require KernelSyms.
 
-Notation PIN := KernelSyms.printint.
 
 Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)

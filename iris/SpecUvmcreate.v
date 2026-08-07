@@ -23,7 +23,6 @@ Require Import PtTree.
 Require Import PtBuild KvmSpec.
 From Kernel Require KernelSyms.
 
-Notation UVMC := KernelSyms.uvmcreate.
 
 (* uvmcreate(): kalloc one page, memset it to zero, return it as an empty
    root page table (a0 = the page's byte address; 0 on allocation failure).

@@ -42,8 +42,9 @@ From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
 From iris.algebra Require Import auth.
 From iris.algebra.lib Require Import mono_list.
-From iris.base_logic.lib Require Import own ghost_var invariants.
+From iris.base_logic.lib Require Import own ghost_var ghost_map mono_nat invariants.
 Require Import RiscvModelBytes.
+Require Import RiscvLang.   (* [GenId]/[gen_id], for the seam section's permit *)
 Require Import VirtioModel.
 Require Import RiscvPtsto.
 Require Import WpLock.
@@ -193,14 +194,30 @@ Qed.
 (* INSTALLING the on-disk log over the home map: entry [i] of the write set
    takes its content from log slot [i].  A [foldr] over the INDEX list
    rather than over [W] itself, because the content's block number
-   ([log_slot_bno logstart i]) is a function of the index. *)
+   ([log_slot_bno logstart i]) is a function of the index.  The step is a
+   NAMED function (not an inline lambda) so that every lemma below unifies
+   against the same head rather than against a fresh beta-redex. *)
+Definition fs_install_step (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
+    (i : nat) (m : gmap Z (list (bv 8))) : gmap Z (list (bv 8)) :=
+  match W !! i with
+  | Some b => <[ b := P (log_slot_bno logstart i) ]> m
+  | None => m
+  end.
+
+Lemma fs_install_step_Some (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
+    (i : nat) (b : Z) (m : gmap Z (list (bv 8))) :
+  W !! i = Some b ->
+  fs_install_step P logstart W i m = <[ b := P (log_slot_bno logstart i) ]> m.
+Proof. rewrite /fs_install_step. by intros ->. Qed.
+
+Lemma fs_install_step_None (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
+    (i : nat) (m : gmap Z (list (bv 8))) :
+  W !! i = None -> fs_install_step P logstart W i m = m.
+Proof. rewrite /fs_install_step. by intros ->. Qed.
+
 Definition fs_install (P : Z -> list (bv 8)) (logstart : Z) (W : list Z)
     (D : gmap Z (list (bv 8))) : gmap Z (list (bv 8)) :=
-  foldr (fun i m =>
-           match W !! i with
-           | Some b => <[ b := P (log_slot_bno logstart i) ]> m
-           | None => m
-           end) D (seq 0 (length W)).
+  foldr (fs_install_step P logstart W) D (seq 0 (length W)).
 
 Lemma fs_install_nil (P : Z -> list (bv 8)) (logstart : Z)
     (D : gmap Z (list (bv 8))) :
@@ -232,6 +249,357 @@ Lemma fs_recovery_clean (P : Z -> list (bv 8)) D cov logstart :
   D = fs_restrict P (fs_home_set cov logstart).
 Proof.
   intros Hn. rewrite /fs_recovery (hdr_dec_zero _ Hn) /= fs_install_nil //.
+Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 1c'. THE LOG-REGION MIRROR's MEANING (phase C2b/D1).                     *)
+(*                                                                          *)
+(* [RiscvPtsto.log_mirror] is the SHAPE; this is what makes a recorded       *)
+(* picture true of a disk.  It is the bridge the three WAL write kinds pass  *)
+(* to each other, and the reason it must exist at all is that a crash permit *)
+(* is a STATELESS view shift: no single [bwrite] can re-derive "the on-disk  *)
+(* header is clean" or "the log slots hold the logged values" -- those are   *)
+(* facts the PREVIOUS writes established.                                    *)
+(* ---------------------------------------------------------------------- *)
+
+Definition log_mirror_ok (M : log_mirror) (P : Z -> list (bv 8)) (ls : Z)
+    : Prop :=
+  lm_hdr M = hdr_dec (P (log_hdr_bno ls)) /\
+  forall i, (i < LOGBLOCKS)%nat -> lm_slots M i = P (log_slot_bno ls i).
+
+(* the mirror of a given disk, as a function -- what a swap installs and what
+   every WAL fupd re-establishes at the post-write image *)
+Definition mirror_of (P : Z -> list (bv 8)) (ls : Z) : log_mirror :=
+  MkLogMirror (hdr_dec (P (log_hdr_bno ls)))
+              (fun i => P (log_slot_bno ls i)).
+
+Lemma mirror_of_ok (P : Z -> list (bv 8)) (ls : Z) :
+  log_mirror_ok (mirror_of P ls) P ls.
+Proof. split; [reflexivity | intros i _; reflexivity]. Qed.
+
+(* ---------------------------------------------------------------------- *)
+(* 1c''. THE PURE CORE OF THE WAL's CRASH ARGUMENT (phase C2b/D1 stage 1).  *)
+(*                                                                          *)
+(* Four write kinds happen to the disk while the log runs, and each one has  *)
+(* to re-establish [fs_recovery] at the POST-write image.  Every one of the  *)
+(* four is proved here, ONCE, as a statement about an abstract post-image    *)
+(* [P'] constrained POINTWISE:                                               *)
+(*    Hhit :  P' <the written block> = <the new content>                     *)
+(*    Hmiss:  forall c, c <> <the written block> -> P' c = P c               *)
+(* and NOTHING else.  That shape is deliberate: at each call site the fupd    *)
+(* has exactly [FsCrash.fs_blocks_write_eq] and [fs_blocks_write_ne] in       *)
+(* hand, which are precisely those two facts about                            *)
+(* [fs_blocks (disk_write dk …)] -- so no functional extensionality is ever    *)
+(* needed to identify the post-image with a closed term.                      *)
+(*                                                                            *)
+(* The geometry premises are explicit for the same reason: the pure layer      *)
+(* must not silently assume that a decoded (junk-tolerant!) header names        *)
+(* in-range slots or home blocks.                                              *)
+(* ---------------------------------------------------------------------- *)
+
+(* --- the log region's geometry, as membership facts --- *)
+
+Lemma log_slot_ne_hdr (ls : Z) (i : nat) :
+  log_slot_bno ls i <> log_hdr_bno ls.
+Proof.
+  rewrite /log_slot_bno /log_hdr_bno.
+  pose proof (Nat2Z.is_nonneg i). lia.
+Qed.
+
+Lemma log_slot_in_region (ls : Z) (i : nat) :
+  (i < LOGBLOCKS)%nat -> log_slot_bno ls i ∈ log_region_set ls.
+Proof.
+  intros Hi. rewrite /log_region_set elem_of_union. left.
+  rewrite elem_of_list_to_set elem_of_list_fmap. exists i.
+  split; [reflexivity|]. apply elem_of_seq. lia.
+Qed.
+
+Lemma log_hdr_in_region (ls : Z) : log_hdr_bno ls ∈ log_region_set ls.
+Proof.
+  rewrite /log_region_set elem_of_union. right. by apply elem_of_singleton.
+Qed.
+
+Lemma log_region_not_home (cov : gset Z) (ls b : Z) :
+  b ∈ log_region_set ls -> b ∉ fs_home_set cov ls.
+Proof.
+  intros Hb Hc. rewrite /fs_home_set elem_of_difference in Hc. tauto.
+Qed.
+
+(* the two disequalities a HOME-block write needs *)
+Lemma home_ne_slot (ls b : Z) (j : nat) :
+  b ∉ log_region_set ls -> (j < LOGBLOCKS)%nat -> b <> log_slot_bno ls j.
+Proof. intros Hb Hj ->. by apply Hb, log_slot_in_region. Qed.
+
+Lemma home_ne_hdr (ls b : Z) :
+  b ∉ log_region_set ls -> b <> log_hdr_bno ls.
+Proof. intros Hb ->. by apply Hb, log_hdr_in_region. Qed.
+
+(* --- [fs_restrict], pointwise --- *)
+
+Lemma fs_restrict_lookup_None (P : Z -> list (bv 8)) (s : gset Z) (b : Z) :
+  b ∉ s -> fs_restrict P s !! b = None.
+Proof.
+  intros Hb. destruct (fs_restrict P s !! b) as [v|] eqn:Hv; [|reflexivity].
+  apply fs_restrict_lookup_Some in Hv as [Hin _]. done.
+Qed.
+
+Lemma fs_restrict_lookup (P : Z -> list (bv 8)) (s : gset Z) (b : Z) :
+  fs_restrict P s !! b = (if decide (b ∈ s) then Some (P b) else None).
+Proof.
+  destruct (decide (b ∈ s)) as [Hb|Hb].
+  - by apply fs_restrict_lookup_Some.
+  - by apply fs_restrict_lookup_None.
+Qed.
+
+Lemma fs_restrict_ext (P P' : Z -> list (bv 8)) (s : gset Z) :
+  (forall b, b ∈ s -> P' b = P b) -> fs_restrict P' s = fs_restrict P s.
+Proof.
+  intros HP. apply map_eq. intros b. rewrite !fs_restrict_lookup.
+  destruct (decide (b ∈ s)) as [Hb|Hb]; [|reflexivity]. by rewrite (HP b Hb).
+Qed.
+
+(* THE MISSING RESTRICT LEMMA the log-fill / commit / clear transitions all
+   need: a write OUTSIDE the restricted set does not move the restriction. *)
+Lemma fs_restrict_upd_out (P P' : Z -> list (bv 8)) (s : gset Z) (b : Z) :
+  b ∉ s -> (forall c, c <> b -> P' c = P c) ->
+  fs_restrict P' s = fs_restrict P s.
+Proof.
+  intros Hb HP. apply fs_restrict_ext. intros c Hc. apply HP.
+  intros ->. done.
+Qed.
+
+(* --- [fs_install], as a LOOKUP characterisation --- *)
+
+Local Lemma fs_install_fold_miss (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) (l : list nat) (b : Z) :
+  b ∉ W -> foldr (fs_install_step P ls W) D l !! b = D !! b.
+Proof.
+  intros Hb. induction l as [|i l IH]; [reflexivity|]. cbn [foldr].
+  destruct (W !! i) as [c|] eqn:Hi.
+  - rewrite (fs_install_step_Some _ _ _ _ _ _ Hi).
+    rewrite lookup_insert_ne; [exact IH|].
+    intros ->. apply Hb. eapply elem_of_list_lookup_2. exact Hi.
+  - rewrite (fs_install_step_None _ _ _ _ _ Hi). exact IH.
+Qed.
+
+Local Lemma fs_install_fold_hit (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) (l : list nat) (i : nat) (b : Z) :
+  NoDup W -> W !! i = Some b -> i ∈ l ->
+  foldr (fs_install_step P ls W) D l !! b = Some (P (log_slot_bno ls i)).
+Proof.
+  intros Hnd Hi. induction l as [|j l IH]; [by rewrite elem_of_nil|].
+  rewrite elem_of_cons. intros [->|Hin]; cbn [foldr].
+  - rewrite (fs_install_step_Some _ _ _ _ _ _ Hi) lookup_insert //.
+  - destruct (W !! j) as [c|] eqn:Hj.
+    + rewrite (fs_install_step_Some _ _ _ _ _ _ Hj).
+      destruct (decide (c = b)) as [->|Hne].
+      * assert (Hji : j = i) by (eapply NoDup_lookup; [exact Hnd|exact Hj|exact Hi]).
+        subst j. rewrite lookup_insert //.
+      * rewrite lookup_insert_ne //. by apply IH.
+    + rewrite (fs_install_step_None _ _ _ _ _ Hj). by apply IH.
+Qed.
+
+(* A block the write set does not name reads through from the home map. *)
+Lemma fs_install_miss (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) (b : Z) :
+  b ∉ W -> fs_install P ls W D !! b = D !! b.
+Proof. intros Hb. by apply fs_install_fold_miss. Qed.
+
+(* A block the write set names at index [i] reads the log's slot [i].  NoDup
+   is what makes "index [i]" well defined -- with a repeated block number the
+   OUTERMOST insert (the smallest index) would win instead. *)
+Lemma fs_install_hit (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) (i : nat) (b : Z) :
+  NoDup W -> W !! i = Some b ->
+  fs_install P ls W D !! b = Some (P (log_slot_bno ls i)).
+Proof.
+  intros Hnd Hi. eapply fs_install_fold_hit; [exact Hnd|exact Hi|].
+  apply elem_of_seq. pose proof (lookup_lt_Some _ _ _ Hi). lia.
+Qed.
+
+(* Installing over a map that ALREADY holds the logged values is a no-op --
+   which is what makes the final header CLEAR preserve the durable state. *)
+Lemma fs_install_idem (P : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) :
+  NoDup W ->
+  (forall i b, W !! i = Some b -> D !! b = Some (P (log_slot_bno ls i))) ->
+  fs_install P ls W D = D.
+Proof.
+  intros Hnd Hall. apply map_eq. intros b.
+  destruct (decide (b ∈ W)) as [Hin|Hout].
+  - apply elem_of_list_lookup_1 in Hin as [i Hi].
+    rewrite (fs_install_hit P ls W D i b Hnd Hi). by rewrite (Hall i b Hi).
+  - by rewrite fs_install_miss.
+Qed.
+
+(* Two congruences.  The first needs no uniqueness (only the slot contents
+   move); the second lets the home map move too, at keys the write set names,
+   and that is where NoDup is unavoidable. *)
+Local Lemma fs_install_fold_extP (P P' : Z -> list (bv 8)) (ls : Z)
+    (W : list Z) (D : gmap Z (list (bv 8))) (l : list nat) :
+  (forall j, j ∈ l -> P' (log_slot_bno ls j) = P (log_slot_bno ls j)) ->
+  foldr (fs_install_step P' ls W) D l = foldr (fs_install_step P ls W) D l.
+Proof.
+  induction l as [|j l IH]; [reflexivity|]. intros Hj.
+  assert (Heq : foldr (fs_install_step P' ls W) D l
+                = foldr (fs_install_step P ls W) D l).
+  { apply IH. intros k Hk. apply Hj. by apply elem_of_list_further. }
+  cbn [foldr]. rewrite Heq.
+  destruct (W !! j) as [b|] eqn:Hb.
+  - rewrite !(fs_install_step_Some _ _ _ _ _ _ Hb).
+    rewrite (Hj j (elem_of_list_here _ _)) //.
+  - rewrite !(fs_install_step_None _ _ _ _ _ Hb) //.
+Qed.
+
+Lemma fs_install_ext_P (P P' : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D : gmap Z (list (bv 8))) :
+  (forall j, (j < length W)%nat -> P' (log_slot_bno ls j) = P (log_slot_bno ls j)) ->
+  fs_install P' ls W D = fs_install P ls W D.
+Proof.
+  intros HP. rewrite /fs_install. apply fs_install_fold_extP.
+  intros j Hj. apply elem_of_seq in Hj. apply HP. lia.
+Qed.
+
+Lemma fs_install_ext (P P' : Z -> list (bv 8)) (ls : Z) (W : list Z)
+    (D D' : gmap Z (list (bv 8))) :
+  NoDup W ->
+  (forall j b, W !! j = Some b ->
+     P' (log_slot_bno ls j) = P (log_slot_bno ls j)) ->
+  (forall k, k ∉ W -> D' !! k = D !! k) ->
+  fs_install P' ls W D' = fs_install P ls W D.
+Proof.
+  intros Hnd HP HD. apply map_eq. intros k.
+  destruct (decide (k ∈ W)) as [Hin|Hout].
+  - apply elem_of_list_lookup_1 in Hin as [j Hj].
+    rewrite (fs_install_hit P' ls W D' j k Hnd Hj)
+            (fs_install_hit P ls W D j k Hnd Hj).
+    by rewrite (HP j k Hj).
+  - rewrite !fs_install_miss //. by apply HD.
+Qed.
+
+(* --- THE FOUR RECOVERY TRANSITIONS --- *)
+
+(* (1) LOG FILL -- write_log's copy of a logged block into slot [i], with the
+   ON-DISK header still clean.  Recovery does not move at all: the slot is
+   not a home block, and at n = 0 nothing reads the slots. *)
+Lemma fs_recovery_logfill (P P' : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) (i : nat) :
+  (i < LOGBLOCKS)%nat ->
+  (forall c, c <> log_slot_bno ls i -> P' c = P c) ->
+  hdr_n (P (log_hdr_bno ls)) = 0 ->
+  fs_recovery P D cov ls ->
+  fs_recovery P' D cov ls.
+Proof.
+  intros Hi Hmiss Hn Hrec.
+  assert (Hhdr : P' (log_hdr_bno ls) = P (log_hdr_bno ls)).
+  { apply Hmiss. apply not_eq_sym, log_slot_ne_hdr. }
+  apply (fs_recovery_clean P' D cov ls); [by rewrite Hhdr|].
+  apply (fs_recovery_clean P D cov ls Hn) in Hrec. rewrite Hrec.
+  symmetry. apply (fs_restrict_upd_out P P' _ (log_slot_bno ls i));
+    [|exact Hmiss].
+  by apply log_region_not_home, log_slot_in_region.
+Qed.
+
+(* (2) COMMIT -- write_head storing a header that decodes to (n, W), n > 0.
+   THE commit point: the durable state jumps, and the new one is computable
+   from the PRE-write image (the header block is neither a home block nor a
+   slot), which is exactly what lets the committer identify it with the
+   batch's logged view. *)
+Lemma fs_recovery_commit (P P' : Z -> list (bv 8)) (cov : gset Z) (ls : Z)
+    (bs : list (bv 8)) :
+  P' (log_hdr_bno ls) = bs ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  fs_recovery P' (fs_install P ls (hdr_dec bs).2
+                    (fs_restrict P (fs_home_set cov ls))) cov ls.
+Proof.
+  intros Hhit Hmiss. rewrite /fs_recovery Hhit.
+  rewrite (fs_restrict_upd_out P P' (fs_home_set cov ls) (log_hdr_bno ls));
+    [|by apply log_region_not_home, log_hdr_in_region|exact Hmiss].
+  rewrite (fs_install_ext_P P P' ls (hdr_dec bs).2) //.
+  intros j _. apply Hmiss, log_slot_ne_hdr.
+Qed.
+
+(* (3) INSTALL -- install_trans writing home block [b] = W[i].  Recovery is
+   UNCHANGED: the home map moves at [b], but the installed picture overwrites
+   [b] with slot [i] anyway, and the slot did not move.  [length W <=
+   LOGBLOCKS] is the geometry bound (a junk-tolerant decode could otherwise
+   name a slot beyond the region, which the home-block write would then be
+   allowed to alias).
+   NOTE THE ABSENT HYPOTHESIS: nothing is assumed about the CONTENT written.
+   Recovery re-installs [b] from slot [i] whatever is there, which is the
+   WAL's whole point -- and it is what lets the install fupd
+   ([fs_install_permit]) run without any picture of the home side of the
+   disk. *)
+Lemma fs_recovery_install (P P' : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) (i : nat) (b : Z) :
+  NoDup (hdr_dec (P (log_hdr_bno ls))).2 ->
+  (length (hdr_dec (P (log_hdr_bno ls))).2 <= LOGBLOCKS)%nat ->
+  (hdr_dec (P (log_hdr_bno ls))).2 !! i = Some b ->
+  b ∉ log_region_set ls ->
+  (forall c, c <> b -> P' c = P c) ->
+  fs_recovery P D cov ls ->
+  fs_recovery P' D cov ls.
+Proof.
+  intros Hnd Hlen Hi Hb Hmiss Hrec.
+  assert (Hhdr : P' (log_hdr_bno ls) = P (log_hdr_bno ls)).
+  { apply Hmiss, not_eq_sym. by apply home_ne_hdr. }
+  rewrite /fs_recovery Hhdr. rewrite /fs_recovery in Hrec. rewrite Hrec.
+  symmetry. apply fs_install_ext; [exact Hnd| |].
+  - intros j c Hj. apply Hmiss.
+    apply not_eq_sym, (home_ne_slot ls b j Hb).
+    pose proof (lookup_lt_Some _ _ _ Hj). lia.
+  - intros k Hk. rewrite !fs_restrict_lookup.
+    destruct (decide (k ∈ fs_home_set cov ls)) as [Hin|Hin]; [|reflexivity].
+    rewrite Hmiss; [reflexivity|]. intros ->. apply Hk.
+    eapply elem_of_list_lookup_2. exact Hi.
+Qed.
+
+(* (4) CLEAR -- write_head storing a header with n = 0 once every logged
+   block has been installed.  Recovery becomes the plain home restriction. *)
+Lemma fs_recovery_clear (P P' : Z -> list (bv 8)) (cov : gset Z) (ls : Z)
+    (bs : list (bv 8)) :
+  P' (log_hdr_bno ls) = bs ->
+  hdr_n bs = 0 ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  fs_recovery P' (fs_restrict P (fs_home_set cov ls)) cov ls.
+Proof.
+  intros Hhit Hn Hmiss.
+  apply (fs_recovery_clean P' _ cov ls); [by rewrite Hhit|].
+  symmetry. apply (fs_restrict_upd_out P P' _ (log_hdr_bno ls)); [|exact Hmiss].
+  by apply log_region_not_home, log_hdr_in_region.
+Qed.
+
+(* …and the form the fupd actually wants: the clear PRESERVES the durable
+   state, given that the installed values are already in the home map.  This
+   is the one place [fs_install_hit]/[fs_install_miss] are load-bearing. *)
+Lemma fs_recovery_clear_keeps (P P' : Z -> list (bv 8))
+    (D : gmap Z (list (bv 8))) (cov : gset Z) (ls : Z) (bs : list (bv 8)) :
+  P' (log_hdr_bno ls) = bs ->
+  hdr_n bs = 0 ->
+  (forall c, c <> log_hdr_bno ls -> P' c = P c) ->
+  NoDup (hdr_dec (P (log_hdr_bno ls))).2 ->
+  (forall j b, (hdr_dec (P (log_hdr_bno ls))).2 !! j = Some b ->
+     fs_restrict P (fs_home_set cov ls) !! b = Some (P (log_slot_bno ls j))) ->
+  fs_recovery P D cov ls ->
+  fs_recovery P' D cov ls.
+Proof.
+  intros Hhit Hn Hmiss Hnd Hinst Hrec.
+  rewrite /fs_recovery in Hrec. rewrite Hrec (fs_install_idem _ _ _ _ Hnd Hinst).
+  by eapply fs_recovery_clear.
+Qed.
+
+(* The mirror is untouched by a write OUTSIDE the log region -- what the
+   install fupd re-establishes its custody with. *)
+Lemma log_mirror_ok_out (M : log_mirror) (P P' : Z -> list (bv 8))
+    (ls b : Z) :
+  b ∉ log_region_set ls ->
+  (forall c, c <> b -> P' c = P c) ->
+  log_mirror_ok M P ls -> log_mirror_ok M P' ls.
+Proof.
+  intros Hb Hmiss [Hhdr Hslots]. split.
+  - rewrite Hhdr Hmiss //. by apply not_eq_sym, home_ne_hdr.
+  - intros i Hi. rewrite (Hslots i Hi) Hmiss //.
+    by apply not_eq_sym, (home_ne_slot ls b i Hb).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -291,10 +659,31 @@ Proof. solve_inG. Qed.
    [P_fs_alloc]'s. *)
 Record fs_crash_names := MkFsCrashNames {
   fcn_hist : gname;   (* the committed history, a mono-list *)
+  (* THE SWAP COUNTER's gname (phase C2b/D1).  Adequacy allocates it and
+     hands the AUTH to the client, so it can only be a parameter here; the
+     seam equation the client carries is [fcn_swap γs = riscv_swap_name],
+     exactly like [VirtioProto]'s [dn_img γ = disk_img_name]. *)
+  fcn_swap : gname;
+  (* The GENERATION REGISTRY and the STARTED counter, likewise as parameters
+     with seam equations ([fcn_reg γs = riscv_registry_name],
+     [fcn_start γs = riscv_start_name]).  They cannot be read off
+     [riscvFixedGS] here: [riscv_crash_pred] is a FIELD of that record and
+     [P_fs] is what instantiates it, so naming the record inside [P_fs] would
+     be circular.  The CLASSES are taken as bare Section constraints below
+     rather than bundled into [fsCrashG], so that resolution picks the SAME
+     Σ slots the fixed record's own fields were built from -- two sibling
+     class fields would be different slots whose resources cannot interact
+     (the trap DiskImg.v's header records). *)
+  fcn_reg   : gname;
+  fcn_start : gname;
 }.
 
 Section fs_crash.
   Context `{!fsCrashG Σ, !lockG Σ}.
+  (* bare constraints, deliberately not [fsCrashG] fields -- see
+     [fs_crash_names] above *)
+  Context `{!ghost_mapG Σ nat riscvEraGS, !mono_natG Σ,
+            !ghost_varG Σ log_mirror}.
 
   (* -------------------------------------------------------------------- *)
   (* 2a. the committed-history mono-list                                   *)
@@ -382,14 +771,167 @@ Section fs_crash.
   (* 3. [P_fs] -- THE CRASH PREDICATE.                                     *)
   (* ==================================================================== *)
 
-  (* The generation arm (design/fs-log.md stage-4 item 3): the record is
-     either AT REST or CHECKED OUT by the era whose one-shot FS boot token
-     sits in it.  In C1 the swap protocol does not exist, so the at-rest arm
-     is [emp] and every allocation lands there; phase D gives the
-     checked-out arm its era binding (and the at-rest arm whatever the swap
-     needs to recognize a stale generation). *)
-  Definition fs_arm : iProp Σ :=
-    (emp ∨ ∃ γg : gname, fs_boot_tok γg)%I.
+  (* ==================================================================== *)
+  (* THE GENERATION ARM (phase C2b/D1): AT REST, or CHECKED OUT by an era.  *)
+  (*                                                                        *)
+  (* The counter [c] is the whole identification mechanism.  [c = 0] is at   *)
+  (* rest (no era has ever taken custody); [c = S g''] means generation      *)
+  (* [g''] holds custody, and the arm then carries that era's registry       *)
+  (* element, its started certificate, and HALF of its log-region mirror --  *)
+  (* the other half being era-side, in the log layer.                        *)
+  (*                                                                        *)
+  (* THE SQUEEZE.  A WAL write's fupd arrives with its own swap receipt      *)
+  (* [swap_lb (S g)] (so [S g <= c], which both refutes the at-rest arm and  *)
+  (* gives [g <= g'']) and, threaded in by the DMA completion, the           *)
+  (* started-generations auth at [g + 1] (so [S g'' <= g + 1], i.e.          *)
+  (* [g'' <= g]).  Hence [g'' = g]; [era_registered] agreement at the shared *)
+  (* key gives [E'' = E]; and the mirror gname is identified, so the two     *)
+  (* halves meet.  Retiring an arm needs NO identification -- only the       *)
+  (* upper bound -- which is why a fresh era can always swap.                *)
+  (* ==================================================================== *)
+
+  (* the registry element and the started certificate, at the PARAMETER
+     gnames.  Both persistent, as their fixed-layer twins are. *)
+  Definition fs_era_reg (γs : fs_crash_names) (g : nat) (E : riscvEraGS)
+      : iProp Σ := (g ↪[fcn_reg γs]□ E)%I.
+  Definition fs_started (γs : fs_crash_names) (g : nat) : iProp Σ :=
+    mono_nat_lb_own (fcn_start γs) (S g).
+
+  Global Instance fs_era_reg_persistent γs g E : Persistent (fs_era_reg γs g E).
+  Proof. rewrite /fs_era_reg. apply _. Qed.
+  Global Instance fs_started_persistent γs g : Persistent (fs_started γs g).
+  Proof. rewrite /fs_started. apply _. Qed.
+
+  Definition fs_custody (γs : fs_crash_names) (ls : Z) (dk : Z -> bv 8)
+      (g'' : nat) : iProp Σ :=
+    (∃ (E'' : riscvEraGS) (M : log_mirror),
+       fs_era_reg γs g'' E'' ∗ fs_started γs g'' ∗
+       ghost_var (era_mirror_name E'') (1/2) M ∗
+       ⌜log_mirror_ok M (fs_blocks dk) ls⌝)%I.
+
+  Definition fs_arm (γs : fs_crash_names) (ls : Z) (dk : Z -> bv 8)
+      : iProp Σ :=
+    (∃ c : nat,
+       mono_nat_auth_own (fcn_swap γs) 1 c ∗
+       (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs ls dk g''))%I.
+
+  (* the at-rest arm, as adequacy mints it *)
+  Lemma fs_arm_at_rest γs ls dk :
+    mono_nat_auth_own (fcn_swap γs) 1 0%nat ⊢ fs_arm γs ls dk.
+  Proof.
+    iIntros "Ha". rewrite /fs_arm. iExists 0%nat. iFrame "Ha". by iLeft.
+  Qed.
+
+  (* the upper bound RETIREMENT needs, and it is all it needs: whatever arm is
+     there, its generation is at most the ambient one.  No identification --
+     which is exactly why a fresh era can always swap, including after a
+     crash that stranded the previous era's mirror half. *)
+  Local Lemma fs_custody_started γs ls dk g'' :
+    fs_custody γs ls dk g'' -∗ fs_started γs g'' ∗ fs_custody γs ls dk g''.
+  Proof.
+    rewrite /fs_custody. iIntros "H".
+    iDestruct "H" as (E M) "(#Hr & #Hs & Hm & %Hok)".
+    iSplitR; [iExact "Hs"|].
+    iExists E, M. iFrame "Hr Hs Hm". iPureIntro. exact Hok.
+  Qed.
+
+  Local Lemma fs_arm_le γs ls dk (g n c : nat) :
+    n = (g + 1)%nat ->
+    mono_nat_auth_own (fcn_start γs) 1 n -∗
+    (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs ls dk g'') -∗
+    ⌜(c <= S g)%nat⌝ ∗ mono_nat_auth_own (fcn_start γs) 1 n ∗
+    (⌜c = 0%nat⌝ ∨ ∃ g'' : nat, ⌜c = S g''⌝ ∗ fs_custody γs ls dk g'').
+  Proof.
+    intros ->. iIntros "Hsa Hd".
+    iDestruct "Hd" as "[%Hc0 | Hc]".
+    { iFrame "Hsa". iSplitR; [iPureIntro; lia|]. by iLeft. }
+    iDestruct "Hc" as (g'') "[%Hc Hcust]".
+    iDestruct (fs_custody_started with "Hcust") as "[#Hst Hcust]".
+    rewrite /fs_started.
+    iDestruct (mono_nat_lb_own_valid with "Hsa Hst") as %[_ Hle].
+    iFrame "Hsa". iSplitR; [iPureIntro; lia|].
+    iRight. iExists g''. iSplitR; [done|]. iExact "Hcust".
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE SWAP: retire whatever arm is there, install THIS era's custody.    *)
+  (* It rides a write fupd (initlog's final write_head), so it takes the    *)
+  (* started auth the completion threaded in and hands it straight back.    *)
+  (* ==================================================================== *)
+  (* TWO IMAGES, and that is what a boot swap needs: the arm comes in at the
+     PRE-write image and goes back out at the POST-write one.  Retirement
+     drops the incoming custody wholesale -- the only thing read out of it is
+     its generation ([fs_custody_started], which does not mention the image) --
+     so nothing about the two has to agree.  The old one-image statement is
+     the [dk = dk'] instance. *)
+  Lemma fs_arm_swap (γs : fs_crash_names) (ls : Z) (dk dk' : Z -> bv 8)
+      (g : nat) (E : riscvEraGS) (n : nat) (M : log_mirror) :
+    n = (g + 1)%nat ->
+    log_mirror_ok M (fs_blocks dk') ls ->
+    fs_era_reg γs g E -∗ fs_started γs g -∗
+    mono_nat_auth_own (fcn_start γs) 1 n -∗
+    ghost_var (era_mirror_name E) (1/2) M -∗
+    fs_arm γs ls dk ==∗
+      fs_arm γs ls dk' ∗ mono_nat_auth_own (fcn_start γs) 1 n ∗
+      mono_nat_lb_own (fcn_swap γs) (S g).
+  Proof.
+    intros Hn Hok. iIntros "#Hreg #Hst Hsa Hmir Harm".
+    rewrite {1}/fs_arm. iDestruct "Harm" as (c) "[Hc Hrest]".
+    iDestruct (fs_arm_le γs ls dk g n c Hn with "Hsa Hrest")
+      as "(%Hle & Hsa & _)".
+    iMod (mono_nat_own_update (S g) with "Hc") as "[Hc #Hlb]"; [lia|].
+    iModIntro. iFrame "Hsa Hlb".
+    rewrite /fs_arm. iExists (S g). iFrame "Hc". iRight.
+    iExists g. iSplitR; [done|].
+    rewrite /fs_custody. iExists E, M. iFrame "Hreg Hst Hmir".
+    iPureIntro. exact Hok.
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE ACCESSOR every WAL write's fupd runs on: the SQUEEZE, then the     *)
+  (* mirror's two halves meet, then the arm re-closes at the POST-write     *)
+  (* image with the updated picture.                                       *)
+  (* ==================================================================== *)
+  Lemma fs_arm_acc (γs : fs_crash_names) (ls : Z) (dk : Z -> bv 8)
+      (g : nat) (E : riscvEraGS) (n : nat) (M0 : log_mirror) :
+    n = (g + 1)%nat ->
+    fs_era_reg γs g E -∗ mono_nat_lb_own (fcn_swap γs) (S g) -∗
+    mono_nat_auth_own (fcn_start γs) 1 n -∗
+    ghost_var (era_mirror_name E) (1/2) M0 -∗
+    fs_arm γs ls dk -∗
+      ⌜log_mirror_ok M0 (fs_blocks dk) ls⌝ ∗
+      mono_nat_auth_own (fcn_start γs) 1 n ∗
+      (∀ (dk' : Z -> bv 8) (M' : log_mirror),
+         ⌜log_mirror_ok M' (fs_blocks dk') ls⌝ ==∗
+           fs_arm γs ls dk' ∗ ghost_var (era_mirror_name E) (1/2) M').
+  Proof.
+    intros Hn. iIntros "#Hreg #Hswlb Hsa Hmir Harm".
+    rewrite {1}/fs_arm. iDestruct "Harm" as (c) "[Hc Hrest]".
+    (* ABOVE: the arm's generation is at most the ambient one *)
+    iDestruct (fs_arm_le γs ls dk g n c Hn with "Hsa Hrest")
+      as "(%Hup & Hsa & Hrest)".
+    (* BELOW: our own swap receipt says it is at least ours *)
+    iDestruct (mono_nat_lb_own_valid with "Hc Hswlb") as %[_ Hlow].
+    (* so the at-rest arm is refuted and the generations coincide *)
+    destruct c as [|c']; [exfalso; lia|].
+    iDestruct "Hrest" as "[%Hc0 | Hc2]"; [discriminate|].
+    iDestruct "Hc2" as (g'') "[%Hceq Hcust]".
+    assert (Hgg : g'' = g) by lia. subst g''.
+    rewrite /fs_custody. iDestruct "Hcust" as (E'' M) "(#Hreg2 & #Hst2 & Hmir2 & %Hok)".
+    (* the registry pins the era record, hence the mirror's gname *)
+    rewrite /fs_era_reg.
+    iDestruct (ghost_map_elem_agree with "Hreg Hreg2") as %<-.
+    iDestruct (ghost_var_agree with "Hmir Hmir2") as %<-.
+    iFrame "Hsa". iSplitR; [iPureIntro; exact Hok|].
+    iIntros (dk' M') "%Hok'".
+    iMod (ghost_var_update_halves M' with "Hmir Hmir2") as "[Hmir Hmir2]".
+    iModIntro. iFrame "Hmir".
+    assert (Hcg : c' = g) by lia. subst c'.
+    rewrite /fs_arm. iExists (S g). iFrame "Hc". iRight.
+    iExists g. iSplitR; [done|].
+    rewrite /fs_custody. iExists E, M'. iFrame "Hreg Hst2 Hmir2".
+    iPureIntro. exact Hok'.
+  Qed.
 
   (* THE CRASH PREDICATE, i.e. the intended value of
      [RiscvPtsto.riscv_crash_pred] (the adequacy [Pc] parameter).  It is a
@@ -410,7 +952,22 @@ Section fs_crash.
     (∃ r : fs_rec,
        fs_hist_auth (fcn_hist γs) (fr_hist r) ∗
        ⌜fs_rec_wf r (fs_blocks dk) cov logstart⌝ ∗
-       fs_arm)%I.
+       fs_arm γs logstart dk)%I.
+
+  (* THE CRASH PREDICATE AS ADEQUACY FIXES IT, at RAW gnames.  Adequacy
+     allocates the swap counter, the generation registry and the started
+     counter inside its own proof, so a client-chosen [Pc] can only name them
+     if they are PASSED to it -- which is what [HPc]'s three arguments are.
+     [γs] stays existential because the history gname is allocated under the
+     update, and the three seam equations are all any WAL fupd needs (they are
+     exactly what [fs_arm_acc] reads).  Stated HERE, in the section that must
+     stay [riscvFixedGS]-free, because this IS the value the fixed record's
+     [riscv_crash_pred] field is built from. *)
+  Definition P_fs_named (γsw γreg γst : gname) (cov : gset Z) (ls : Z)
+      (dk : Z -> bv 8) : iProp Σ :=
+    (∃ γs : fs_crash_names,
+       ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
+       P_fs γs cov ls dk)%I.
 
   (* -------------------------------------------------------------------- *)
   (* 3a. what [P_fs] SAYS                                                   *)
@@ -460,36 +1017,673 @@ Section fs_crash.
      provable from nothing.  The client instantiates
      [Pc := fun dk => ∃ γs, P_fs γs cov logstart dk] and discharges the
      obligation with this lemma. *)
-  Lemma P_fs_alloc (dk0 : Z -> bv 8) (D0 : gmap Z (list (bv 8)))
-      (cov : gset Z) (logstart : Z) :
+  Lemma P_fs_alloc (γsw γreg γst : gname) (dk0 : Z -> bv 8)
+      (D0 : gmap Z (list (bv 8))) (cov : gset Z) (logstart : Z) :
     fs_recovery (fs_blocks dk0) D0 cov logstart ->
-    ⊢ |==> ∃ γs : fs_crash_names,
-        P_fs γs cov logstart dk0 ∗ fs_receipt γs D0.
+    mono_nat_auth_own γsw 1 0%nat ⊢ |==> ∃ γs : fs_crash_names,
+      ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
+      P_fs γs cov logstart dk0 ∗ fs_receipt γs D0.
   Proof.
-    intros Hrec.
+    intros Hrec. iIntros "Hsw".
     iMod (fs_hist_alloc [D0]) as (γh) "[Hauth #Hlb]".
-    iModIntro. iExists (MkFsCrashNames γh).
-    iSplitL "Hauth".
+    iModIntro. iExists (MkFsCrashNames γh γsw γreg γst).
+    iSplitR; [iPureIntro; done|].
+    iSplitL "Hauth Hsw".
     - rewrite /P_fs. iExists (MkFsRec D0 [D0]).
       iFrame "Hauth".
       iSplitR.
       { iPureIntro. rewrite /fs_rec_wf /=. split; [exact Hrec | reflexivity]. }
-      rewrite /fs_arm. by iLeft.
+      iApply fs_arm_at_rest. iExact "Hsw".
     - rewrite /fs_receipt /=. iExists []. iExact "Hlb".
   Qed.
 
   (* The mkfs corollary: a freshly formatted disk has an EMPTY on-disk log,
      so its committed state is just its home blocks and no recovery
      hypothesis has to be assumed at all. *)
-  Lemma P_fs_alloc_clean (dk0 : Z -> bv 8) (cov : gset Z) (logstart : Z) :
+  Lemma P_fs_alloc_clean (γsw γreg γst : gname) (dk0 : Z -> bv 8)
+      (cov : gset Z) (logstart : Z) :
     hdr_n (fs_blocks dk0 (log_hdr_bno logstart)) = 0 ->
-    ⊢ |==> ∃ γs : fs_crash_names,
-        P_fs γs cov logstart dk0 ∗
-        fs_receipt γs (fs_restrict (fs_blocks dk0)
-                         (fs_home_set cov logstart)).
+    mono_nat_auth_own γsw 1 0%nat ⊢ |==> ∃ γs : fs_crash_names,
+      ⌜fcn_swap γs = γsw /\ fcn_reg γs = γreg /\ fcn_start γs = γst⌝ ∗
+      P_fs γs cov logstart dk0 ∗
+      fs_receipt γs (fs_restrict (fs_blocks dk0)
+                       (fs_home_set cov logstart)).
   Proof.
     intros Hn. iApply P_fs_alloc.
     by apply (fs_recovery_clean (fs_blocks dk0) _ cov logstart Hn).
   Qed.
 
 End fs_crash.
+
+(* ====================================================================== *)
+(* 4. THE SEAM: [riscv_crash_pred] AS [P_fs], AND THE BOOT SWAP'S PERMIT.  *)
+(*                                                                        *)
+(* A SEPARATE SECTION, over [riscvGS], and that is forced: [P_fs] above is *)
+(* what INSTANTIATES the fixed layer's [riscv_crash_pred] field, so its    *)
+(* own section must stay [riscvFixedGS]-free -- naming the record inside   *)
+(* the value it is built from is circular.  Everything that RELATES the    *)
+(* two lives here instead, where the record exists.                        *)
+(* ====================================================================== *)
+Section fs_crash_seam.
+  Context `{!riscvGS Σ, !fsCrashG Σ, !lockG Σ}.
+
+  (* The crash predicate the FS client fixes [Pc] at.  [γs] is EXISTENTIAL
+     because adequacy's obligation ([RiscvAdequacy]'s [HPc]) is a
+     build-from-nothing entailment: the history gname is allocated under the
+     update, so it cannot appear in [Pc]'s own arguments.  The three seam
+     equations are what make the record's arm identifiable from outside --
+     they are all a WAL fupd needs, since [fs_arm_acc] reads only
+     [fcn_swap] / [fcn_reg] / [fcn_start]. *)
+  Definition P_fs_any (cov : gset Z) (ls : Z) (dk : Z -> bv 8) : iProp Σ :=
+    P_fs_named riscv_swap_name riscv_registry_name riscv_start_name cov ls dk.
+
+  Global Instance P_fs_any_timeless cov ls dk : Timeless (P_fs_any cov ls dk).
+  Proof.
+    rewrite /P_fs_any /P_fs_named /P_fs /fs_arm /fs_custody /fs_hist_auth.
+    apply _.
+  Qed.
+
+  (* The client's persistent handle on "the crash predicate IS my [P_fs]".
+     Adequacy discharges it by conversion when it instantiates [Pc]; every
+     WAL fupd consumes it to get at the record. *)
+  Definition fs_crash_seam (cov : gset Z) (ls : Z) : iProp Σ :=
+    (□ ∀ dk : Z -> bv 8,
+       (riscv_crash_pred dk -∗ P_fs_any cov ls dk) ∗
+       (P_fs_any cov ls dk -∗ riscv_crash_pred dk))%I.
+
+  Global Instance fs_crash_seam_persistent cov ls :
+    Persistent (fs_crash_seam cov ls).
+  Proof. rewrite /fs_crash_seam. apply _. Qed.
+
+  (* ==================================================================== *)
+  (* THE BOOT SWAP'S PERMIT (phase C2b/D1 stage 3): what [initlog] curries  *)
+  (* into its final [write_head].                                          *)
+  (*                                                                       *)
+  (* THE SWAP RE-BASES THE DURABLE STATE, it does not preserve it -- and    *)
+  (* that is the honest boot semantics, not a weakening.  Every LATER WAL   *)
+  (* fupd learns the PRE-write image's log region out of the custody arm's  *)
+  (* [log_mirror_ok M (fs_blocks dk) ls]; the swap is the one fupd that has  *)
+  (* no custody yet, so it cannot know what the on-disk header said.        *)
+  (* ([initlog]'s clean-image precondition is about the block it READ, and   *)
+  (* no curryable fact ties that to this fupd's universally quantified       *)
+  (* [dk].)  So the record's [fr_D] moves to what the CLEARED disk recovers  *)
+  (* to and the history is EXTENDED by it -- a prefix extension, so every    *)
+  (* receipt handed out before the crash stays valid.                        *)
+  (*                                                                        *)
+  (* The whole mirror VARIABLE goes in (not a half): the swap sets its value *)
+  (* to the post-write picture -- free, [mirror_of_ok] -- splits it there,   *)
+  (* hands one half to the arm and returns the other in [Q].  The clean      *)
+  (* header of the returned half comes from the write ITSELF                 *)
+  (* ([fs_blocks_write_eq] then [hdr_dec_zero]), which is why no fact about  *)
+  (* the pre-image is needed anywhere.                                       *)
+  (* ==================================================================== *)
+  Lemma fs_swap_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_n bs = 0 ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    gen_started gen_id -∗
+    (∃ M0 : log_mirror, ghost_var mirror_name 1 M0) -∗
+    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id)).
+  Proof.
+    intros Hlen Hn0. iIntros "#Hseam #Hreg #Hst Hmir".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    (* the index, in the block view's spelling *)
+    assert (Hidx : (1024 * log_hdr_bno ls)%Z
+                   = (log_hdr_bno ls * Z.of_nat BSIZE)%Z)
+      by (rewrite /BSIZE; lia).
+    cbn [wr_apply fst snd]. rewrite Hidx.
+    set (dk' := disk_write dk (log_hdr_bno ls * Z.of_nat BSIZE)%Z bs).
+    (* the two facts the pure transition wants, straight off the write *)
+    assert (Hhit : fs_blocks dk' (log_hdr_bno ls) = bs)
+      by (apply fs_blocks_write_eq, Hlen).
+    assert (Hmiss : forall c, c <> log_hdr_bno ls -> fs_blocks dk' c = fs_blocks dk c)
+      by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
+    (* through the seam, and the record is timeless *)
+    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
+    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
+      [iNext; by iApply "Hfwd"|].
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    (* THE NEW DURABLE STATE, and the history extension *)
+    set (D' := fs_restrict (fs_blocks dk) (fs_home_set cov ls)).
+    iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
+            with "Hhist") as "Hhist"; [by eexists|].
+    (* the mirror: to the POST image's picture, then split *)
+    iDestruct "Hmir" as (M0) "Hmir".
+    iMod (ghost_var_update (mirror_of (fs_blocks dk') ls) with "Hmir") as "Hmir".
+    iEval (rewrite -Qp.half_half) in "Hmir".
+    iDestruct (ghost_var_split with "Hmir") as "[Hm1 Hm2]".
+    (* the era's certificates, at the record's own gnames *)
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (fs_started γs gen_id) as "#Hst2".
+    { rewrite /fs_started Hstn. iExact "Hst". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iMod (fs_arm_swap γs ls dk dk' gen_id riscv_eraGS n
+            (mirror_of (fs_blocks dk') ls) Hn1 (mirror_of_ok _ _)
+            with "Hreg2 Hst2 Hsa Hm2 Harm") as "(Harm & Hsa & #Hswlb)".
+    iModIntro.
+    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
+    iSplitL "Hhist Harm".
+    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
+      iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. rewrite /fs_rec_wf /=. split.
+      - exact (fs_recovery_clear (fs_blocks dk) (fs_blocks dk') cov ls bs
+                 Hhit Hn0 Hmiss).
+      - rewrite last_snoc. reflexivity. }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iSplitL "Hm1".
+    { rewrite /log_mirror_at. iExists (mirror_of (fs_blocks dk') ls).
+      iFrame "Hm1". iPureIntro.
+      rewrite /mirror_of /= Hhit. exact (hdr_dec_zero bs Hn0). }
+    rewrite /swap_lb -Hsw. iExact "Hswlb".
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE THREE WAL DURABILITY FUPDS (phase C2b/D1 stage 4).                *)
+  (*                                                                       *)
+  (* Each is [fs_swap_permit]'s sibling and runs the same five steps: open  *)
+  (* the seam, strip the (timeless) record inside the [={∅}=∗], run         *)
+  (* [fs_arm_acc] at [(gen_id, riscv_eraGS)] -- which is where the era's    *)
+  (* half of the log-region mirror MEETS the custody arm's, and therefore   *)
+  (* the only place a STATELESS view shift can learn what the previous      *)
+  (* writes put on the disk -- move [fr_D] with the matching pure           *)
+  (* transition, and re-close the arm at the post-write image.              *)
+  (*                                                                        *)
+  (* WHAT EACH ONE READS OUT OF THE MIRROR, and nothing more:                *)
+  (*   log fill : the header is CLEAN, so recovery does not look at the      *)
+  (*              slots at all and the write is invisible to it.             *)
+  (*   commit   : nothing -- the new durable state is COMPUTABLE from the     *)
+  (*              pre-write image, which is what makes the jump provable      *)
+  (*              without knowing anything about the disk.                    *)
+  (*   install  : the header is the [(n, W)] the commit wrote, so the block   *)
+  (*              being overwritten is a LOGGED one and recovery re-installs  *)
+  (*              it from the slot regardless of what is written -- the       *)
+  (*              content of a home write is genuinely irrelevant here        *)
+  (*              ([fs_recovery_install] does not use it).                    *)
+  (* ==================================================================== *)
+
+  (* A durability receipt at the record's own gnames, with [γs] existential
+     for the same reason [P_fs_any] has it: adequacy allocates the history
+     gname under the update, so no client-visible constant can name it. *)
+  Definition fs_receipt_any (D : gmap Z (list (bv 8))) : iProp Σ :=
+    (∃ γs : fs_crash_names,
+       ⌜fcn_swap γs = riscv_swap_name /\ fcn_reg γs = riscv_registry_name /\
+        fcn_start γs = riscv_start_name⌝ ∗ fs_receipt γs D)%I.
+
+  Global Instance fs_receipt_any_persistent D : Persistent (fs_receipt_any D).
+  Proof. rewrite /fs_receipt_any. apply _. Qed.
+
+  (* ---- (1) LOG FILL: write_log copying a logged block into slot [i]. ---- *)
+  Lemma fs_logfill_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (i : nat)
+      (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    (i < LOGBLOCKS)%nat ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_at (0%nat, []) -∗
+    disk_write_permit gen_id (Some ((1024 * log_slot_bno ls i)%Z, bs))
+      (log_mirror_at (0%nat, [])).
+  Proof.
+    intros Hlen Hi. iIntros "#Hseam #Hreg #Hswlb Hmir".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    assert (Hidx : (1024 * log_slot_bno ls i)%Z
+                   = (log_slot_bno ls i * Z.of_nat BSIZE)%Z)
+      by (rewrite /BSIZE; lia).
+    cbn [wr_apply fst snd]. rewrite Hidx.
+    set (dk' := disk_write dk (log_slot_bno ls i * Z.of_nat BSIZE)%Z bs).
+    assert (Hmiss : forall c, c <> log_slot_bno ls i ->
+                      fs_blocks dk' c = fs_blocks dk c)
+      by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
+    (* through the seam; the record is timeless, so the [▷] strips *)
+    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
+    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
+      [iNext; by iApply "Hfwd"|].
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    rewrite /log_mirror_at. iDestruct "Hmir" as (M0) "[Hmir %HM0]".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+    { rewrite Hsw. iExact "Hswlb". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iDestruct (fs_arm_acc γs ls dk gen_id riscv_eraGS n M0 Hn1
+                 with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
+    (* THE ONE FACT READ OUT OF THE MIRROR: the on-disk header is clean *)
+    assert (Hn0 : hdr_n (fs_blocks dk (log_hdr_bno ls)) = 0).
+    { rewrite -hdr_dec_n -(proj1 Hok) HM0 //. }
+    assert (Hhdr' : fs_blocks dk' (log_hdr_bno ls) = fs_blocks dk (log_hdr_bno ls))
+      by (apply Hmiss, not_eq_sym, log_slot_ne_hdr).
+    iMod ("Hclose" $! dk' (mirror_of (fs_blocks dk') ls)
+            with "[%]") as "[Harm Hmir]"; [exact (mirror_of_ok _ _)|].
+    iModIntro.
+    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
+    iSplitL "Hhist Harm".
+    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. destruct Hwf as [Hrec Hlast]. split; [| exact Hlast].
+      exact (fs_recovery_logfill (fs_blocks dk) (fs_blocks dk') (fr_D r) cov ls i
+               Hi Hmiss Hn0 Hrec). }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". iPureIntro.
+    rewrite /mirror_of /= Hhdr' -(proj1 Hok) HM0 //.
+  Qed.
+
+  (* ---- (2) COMMIT: write_head storing a header that decodes to (n, W). ---- *)
+  (* THE commit point.  [Q] carries the mirror half forward at the NEW header
+     picture -- which is what the install fupds then read -- plus a durability
+     receipt.  The receipt cannot NAME its state: the new durable state is
+     [fs_install] over [fs_restrict (fs_blocks dk) …], and the home part of
+     the physical disk is not something the era holds any picture of (the
+     mirror is the LOG REGION's).  Naming it is phase D's sys_sync work, which
+     needs a CURRENT-state witness rather than a mono-list lower bound. *)
+  Lemma fs_commit_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (h : nat * list Z) (nn : nat) (Ws : list Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_dec bs = (nn, Ws) ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_at h -∗
+    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_at (nn, Ws) ∗ (∃ D : gmap Z (list (bv 8)), fs_receipt_any D)).
+  Proof.
+    intros Hlen Hdec. iIntros "#Hseam #Hreg #Hswlb Hmir".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    assert (Hidx : (1024 * log_hdr_bno ls)%Z
+                   = (log_hdr_bno ls * Z.of_nat BSIZE)%Z)
+      by (rewrite /BSIZE; lia).
+    cbn [wr_apply fst snd]. rewrite Hidx.
+    set (dk' := disk_write dk (log_hdr_bno ls * Z.of_nat BSIZE)%Z bs).
+    assert (Hhit : fs_blocks dk' (log_hdr_bno ls) = bs)
+      by (apply fs_blocks_write_eq, Hlen).
+    assert (Hmiss : forall c, c <> log_hdr_bno ls ->
+                      fs_blocks dk' c = fs_blocks dk c)
+      by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
+    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
+    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
+      [iNext; by iApply "Hfwd"|].
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    rewrite /log_mirror_at. iDestruct "Hmir" as (M0) "[Hmir %HM0]".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+    { rewrite Hsw. iExact "Hswlb". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iDestruct (fs_arm_acc γs ls dk gen_id riscv_eraGS n M0 Hn1
+                 with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
+    (* THE NEW DURABLE STATE, computable from the PRE-write image *)
+    set (D' := fs_install (fs_blocks dk) ls (hdr_dec bs).2
+                 (fs_restrict (fs_blocks dk) (fs_home_set cov ls))).
+    iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
+            with "Hhist") as "Hhist"; [by eexists|].
+    iDestruct (fs_hist_snapshot with "Hhist") as "[Hhist #Hlb]".
+    iMod ("Hclose" $! dk' (mirror_of (fs_blocks dk') ls)
+            with "[%]") as "[Harm Hmir]"; [exact (mirror_of_ok _ _)|].
+    iModIntro.
+    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
+    iSplitL "Hhist Harm".
+    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
+      iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. rewrite /fs_rec_wf /=. split.
+      - exact (fs_recovery_commit (fs_blocks dk) (fs_blocks dk') cov ls bs
+                 Hhit Hmiss).
+      - rewrite last_snoc. reflexivity. }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iSplitL "Hmir".
+    { iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". iPureIntro.
+      rewrite /mirror_of /= Hhit Hdec //. }
+    iExists D'. rewrite /fs_receipt_any. iExists γs.
+    iSplitR; [iPureIntro; done|].
+    rewrite /fs_receipt. iExists (fr_hist r). iExact "Hlb".
+  Qed.
+
+  (* ---- (3) INSTALL: install_trans writing home block [b] = W[i]. ---- *)
+  (* Recovery does not move, and the CONTENT written is irrelevant: the
+     decoded header still names [b] at index [i], so recovery overwrites it
+     from slot [i] either way.  That is the WAL's whole point, and it is why
+     this permit needs no picture of the home side of the disk. *)
+  Lemma fs_install_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (nn : nat) (Ws : list Z) (i : nat) (b : Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    NoDup Ws ->
+    (length Ws <= LOGBLOCKS)%nat ->
+    Ws !! i = Some b ->
+    b ∉ log_region_set ls ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    (* THE ONE [▷] AMONG THE FOUR, and it is the install site's shape that
+       forces it: install_trans threads its resource through the loop as the
+       [▷ R] its own [bwrite]s hand back (SpecInstallTrans's generator), and
+       there is no step between the return and the next entry's permit.  The
+       later strips inside the [={∅}=∗] below because the mirror half is
+       timeless -- which is exactly the argument that made the permit a fupd
+       in the first place. *)
+    ▷ log_mirror_at (nn, Ws) -∗
+    disk_write_permit gen_id (Some ((1024 * b)%Z, bs)) (log_mirror_at (nn, Ws)).
+  Proof.
+    intros Hlen Hnd Hwlen Hi Hb. iIntros "#Hseam #Hreg #Hswlb Hmir".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    assert (Hidx : (1024 * b)%Z = (b * Z.of_nat BSIZE)%Z)
+      by (rewrite /BSIZE; lia).
+    cbn [wr_apply fst snd]. rewrite Hidx.
+    set (dk' := disk_write dk (b * Z.of_nat BSIZE)%Z bs).
+    assert (Hhit : fs_blocks dk' b = bs) by (apply fs_blocks_write_eq, Hlen).
+    assert (Hmiss : forall c, c <> b -> fs_blocks dk' c = fs_blocks dk c)
+      by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
+    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
+    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
+      [iNext; by iApply "Hfwd"|].
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    rewrite /log_mirror_at. iMod "Hmir" as (M0) "[Hmir %HM0]".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+    { rewrite Hsw. iExact "Hswlb". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iDestruct (fs_arm_acc γs ls dk gen_id riscv_eraGS n M0 Hn1
+                 with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
+    (* THE FACT READ OUT OF THE MIRROR: the on-disk header IS the (n, W) the
+       commit wrote, so the decoded write set is [Ws] *)
+    assert (Hhdr : hdr_dec (fs_blocks dk (log_hdr_bno ls)) = (nn, Ws))
+      by (rewrite -(proj1 Hok) HM0 //).
+    (* the mirror survives the write UNCHANGED: [b] is not in the log region *)
+    assert (Hok' : log_mirror_ok M0 (fs_blocks dk') ls)
+      by (exact (log_mirror_ok_out M0 (fs_blocks dk) (fs_blocks dk') ls b
+                   Hb Hmiss Hok)).
+    iMod ("Hclose" $! dk' M0 with "[%]") as "[Harm Hmir]"; [exact Hok'|].
+    iModIntro.
+    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
+    iSplitL "Hhist Harm".
+    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists r. iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. destruct Hwf as [Hrec Hlast]. split; [| exact Hlast].
+      apply (fs_recovery_install (fs_blocks dk) (fs_blocks dk') (fr_D r) cov ls
+               i b); rewrite ?Hhdr /=; assumption. }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iExists M0. iFrame "Hmir". iPureIntro. exact HM0.
+  Qed.
+
+  (* ---- (4) CLEAR: write_head storing an n = 0 header at the end of a
+     commit (and at the end of recovery). ---- *)
+  (* THE CLEAR RE-BASES THE DURABLE STATE onto the current home content and
+     EXTENDS the history by it, exactly as [fs_swap_permit] does -- it does
+     not claim to PRESERVE [fr_D].  The preserving form
+     ([fs_recovery_clear_keeps]) needs "every logged home block already holds
+     its slot's content", i.e. a picture of the HOME side of the physical
+     disk, and the era's custody records only the LOG REGION.  Supplying it
+     would mean a home shadow in [log_mirror] (a partial [Z -> option (list
+     (bv 8))] the install fupd extends); that is recorded as the residual of
+     phase C2b/D1 stage 4 and is not built here.  Re-basing is sound in any
+     case -- the record's [fr_D] is what the disk NOW recovers to -- and a
+     receipt handed out before the clear stays valid, since the history only
+     ever grows. *)
+  Lemma fs_clear_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (h : nat * list Z) (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_n bs = 0 ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    swap_lb (S gen_id) -∗
+    log_mirror_at h -∗
+    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_at (0%nat, [])).
+  Proof.
+    intros Hlen Hn0. iIntros "#Hseam #Hreg #Hswlb Hmir".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    assert (Hidx : (1024 * log_hdr_bno ls)%Z
+                   = (log_hdr_bno ls * Z.of_nat BSIZE)%Z)
+      by (rewrite /BSIZE; lia).
+    cbn [wr_apply fst snd]. rewrite Hidx.
+    set (dk' := disk_write dk (log_hdr_bno ls * Z.of_nat BSIZE)%Z bs).
+    assert (Hhit : fs_blocks dk' (log_hdr_bno ls) = bs)
+      by (apply fs_blocks_write_eq, Hlen).
+    assert (Hmiss : forall c, c <> log_hdr_bno ls ->
+                      fs_blocks dk' c = fs_blocks dk c)
+      by (intros c Hc; apply fs_blocks_write_ne; [exact Hlen | exact Hc]).
+    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
+    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
+      [iNext; by iApply "Hfwd"|].
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & %Hwf & Harm)".
+    rewrite /log_mirror_at. iDestruct "Hmir" as (M0) "[Hmir %HM0]".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+    { rewrite Hsw. iExact "Hswlb". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    iDestruct (fs_arm_acc γs ls dk gen_id riscv_eraGS n M0 Hn1
+                 with "Hreg2 Hswlb2 Hsa Hmir Harm") as "(%Hok & Hsa & Hclose)".
+    set (D' := fs_restrict (fs_blocks dk) (fs_home_set cov ls)).
+    iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
+            with "Hhist") as "Hhist"; [by eexists|].
+    iMod ("Hclose" $! dk' (mirror_of (fs_blocks dk') ls)
+            with "[%]") as "[Harm Hmir]"; [exact (mirror_of_ok _ _)|].
+    iModIntro.
+    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
+    iSplitL "Hhist Harm".
+    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
+      iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. rewrite /fs_rec_wf /=. split.
+      - exact (fs_recovery_clear (fs_blocks dk) (fs_blocks dk') cov ls bs
+                 Hhit Hn0 Hmiss).
+      - rewrite last_snoc. reflexivity. }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". iPureIntro.
+    rewrite /mirror_of /= Hhit. exact (hdr_dec_zero bs Hn0).
+  Qed.
+
+  (* ==================================================================== *)
+  (* (5) THE RECOVERY-SIDE PERMIT FAMILY (phase D2).                       *)
+  (*                                                                       *)
+  (* RECOVERY'S WRITES CANNOT CLAIM TO PRESERVE [fr_D], AND THAT IS FORCED  *)
+  (* BY THE SEAM, not by laziness.  install_trans's home writes at boot run  *)
+  (* BEFORE the header write that the boot swap rides, so at each of them    *)
+  (* the era either has no custody yet or has custody taken at an image it   *)
+  (* knows nothing about: a swap installs the mirror at [mirror_of           *)
+  (* (fs_blocks dk) ls] for the fupd's UNIVERSALLY QUANTIFIED [dk], so the   *)
+  (* header picture it records is opaque to the client, and [Q] -- fixed at  *)
+  (* permit-creation time -- cannot name it.  The only way for the era to    *)
+  (* learn the ON-DISK header is to have WRITTEN it (that is what            *)
+  (* [fs_commit_permit] does for the steady state); recovery has only READ   *)
+  (* it, and a read's permit carries no data (its [disk_wr] is [None]).      *)
+  (* Closing that gap means making a READ's [Q] a FUNCTION of the delivered  *)
+  (* bytes -- a machine-layer interface change (saved predicates in          *)
+  (* [PermInv], a read-data equation at the completion in [WpUart]); see     *)
+  (* claude-notes/projects/fs-log.md, phase D2's finding.                    *)
+  (*                                                                        *)
+  (* So the honest recovery-side permit RE-BASES: it takes custody (or keeps *)
+  (* it), sets [fr_D] to whatever the POST-write image recovers to -- always  *)
+  (* possible, since [fs_recovery] is a TOTAL FUNCTION of the image           *)
+  (* ([fs_recovery_total]) -- and EXTENDS the history by it.  Sound, and it   *)
+  (* costs nothing that is cashed later: every receipt handed out before      *)
+  (* stays valid (the history only grows), and the state recovery actually    *)
+  (* leaves behind is pinned by the FINAL header write anyway                 *)
+  (* ([fs_boot_head_permit] below), which is the same clear the steady state  *)
+  (* uses.  What is NOT provable this way is the WAL's completeness claim     *)
+  (* ("the state after recovery IS the last committed one"); that needs the   *)
+  (* read-data interface above.                                              *)
+  (*                                                                        *)
+  (* ONE PERMIT COVERS EVERY RECOVERY WRITE, and it has to: install_trans     *)
+  (* takes its permits as a UNIFORM GENERATOR over the entries               *)
+  (* ([SpecInstallTrans]'s [□ ∀ i w bs', …]), so the first entry -- the one   *)
+  (* that performs the swap -- cannot have a different contract from the      *)
+  (* rest.  [fs_era_custody] is the disjunction that makes it uniform: the    *)
+  (* era holds either the whole mirror variable (no custody taken yet) or its *)
+  (* half plus the swap receipt (custody taken).  [fs_recover_permit]         *)
+  (* consumes and re-establishes it, swapping on first use.                   *)
+  (* ==================================================================== *)
+
+  (* the era's mirror half at an UNRECORDED picture: all a re-basing write
+     needs, and all a swap at an unknown image can hand back *)
+  Definition log_mirror_any : iProp Σ :=
+    (∃ h : nat * list Z, log_mirror_at h)%I.
+
+  Global Instance log_mirror_any_timeless : Timeless log_mirror_any.
+  Proof. rewrite /log_mirror_any /log_mirror_at. apply _. Qed.
+
+  Lemma log_mirror_any_intro (h : nat * list Z) :
+    log_mirror_at h -∗ log_mirror_any.
+  Proof. iIntros "H". rewrite /log_mirror_any. iExists h. iExact "H". Qed.
+
+  (* THE UNIFORM RECOVERY-SIDE RESOURCE: before the swap the era owns the
+     whole mirror variable (the boot mint), after it the half plus the swap
+     receipt.  Timeless, so a permit strips it inside its own [={∅}=∗]. *)
+  Definition fs_era_custody `{GEN : GenId} : iProp Σ :=
+    (log_mirror_full ∨ (log_mirror_any ∗ swap_lb (S gen_id)))%I.
+
+  Global Instance fs_era_custody_timeless `{GEN : GenId} :
+    Timeless fs_era_custody.
+  Proof.
+    rewrite /fs_era_custody /log_mirror_full /log_mirror_any /log_mirror_at.
+    apply _.
+  Qed.
+
+  Lemma fs_era_custody_boot `{GEN : GenId} :
+    log_mirror_full -∗ fs_era_custody.
+  Proof. iIntros "H". rewrite /fs_era_custody. by iLeft. Qed.
+
+  (* ---- (5a) THE RE-BASING WRITE, at ANY write identity. ---- *)
+  Lemma fs_recover_permit `{GEN : GenId} (cov : gset Z) (ls : Z) (w : disk_wr) :
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    gen_started gen_id -∗
+    ▷ fs_era_custody -∗
+    disk_write_permit gen_id w fs_era_custody.
+  Proof.
+    iIntros "#Hseam #Hreg #Hst Hcust".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    set (dk' := wr_apply w dk).
+    (* through the seam; the record is timeless, so the [▷] strips *)
+    iDestruct ("Hseam" $! dk) as "[Hfwd _]".
+    iAssert (▷ P_fs_any cov ls dk)%I with "[HP]" as "HP";
+      [iNext; by iApply "Hfwd"|].
+    iMod "HP". rewrite /P_fs_any /P_fs_named.
+    iDestruct "HP" as (γs) "[%Hseq HPfs]".
+    destruct Hseq as (Hsw & Hrg & Hstn).
+    rewrite {1}/P_fs. iDestruct "HPfs" as (r) "(Hhist & _ & Harm)".
+    iAssert (fs_era_reg γs gen_id riscv_eraGS) as "#Hreg2".
+    { rewrite /fs_era_reg Hrg. iExact "Hreg". }
+    iAssert (mono_nat_auth_own (fcn_start γs) 1 n) with "[Hsa]" as "Hsa".
+    { rewrite Hstn. iExact "Hsa". }
+    (* THE NEW DURABLE STATE: whatever the POST-write image recovers to *)
+    set (D' := fs_install (fs_blocks dk') ls
+                 (hdr_dec (fs_blocks dk' (log_hdr_bno ls))).2
+                 (fs_restrict (fs_blocks dk') (fs_home_set cov ls))).
+    iMod (fs_hist_update (fcn_hist γs) (fr_hist r) (fr_hist r ++ [D'])
+            with "Hhist") as "Hhist"; [by eexists|].
+    (* the arm: SWAP on first use, ACCESS afterwards -- either way it comes
+       back at the post-write image, with this era's custody installed *)
+    iMod "Hcust".
+    iAssert (|==> fs_arm γs ls dk' ∗ mono_nat_auth_own (fcn_start γs) 1 n ∗
+                  log_mirror_any ∗ swap_lb (S gen_id))%I
+      with "[Hcust Hsa Harm]" as ">(Harm & Hsa & Hmir & #Hswlb)".
+    { rewrite /fs_era_custody. iDestruct "Hcust" as "[Hfull | [Hany #Hswlb]]".
+      - (* THE SWAP: retirement needs no identification, so it always goes *)
+        rewrite /log_mirror_full. iDestruct "Hfull" as (M0) "Hmir".
+        iMod (ghost_var_update (mirror_of (fs_blocks dk') ls) with "Hmir")
+          as "Hmir".
+        iEval (rewrite -Qp.half_half) in "Hmir".
+        iDestruct (ghost_var_split with "Hmir") as "[Hm1 Hm2]".
+        iAssert (fs_started γs gen_id) as "#Hst2".
+        { rewrite /fs_started Hstn. iExact "Hst". }
+        iMod (fs_arm_swap γs ls dk dk' gen_id riscv_eraGS n
+                (mirror_of (fs_blocks dk') ls) Hn1 (mirror_of_ok _ _)
+                with "Hreg2 Hst2 Hsa Hm2 Harm") as "(Harm & Hsa & #Hswlb)".
+        iModIntro. iFrame "Harm Hsa".
+        iSplitL "Hm1".
+        { rewrite /log_mirror_any /log_mirror_at.
+          iExists (lm_hdr (mirror_of (fs_blocks dk') ls)).
+          iExists (mirror_of (fs_blocks dk') ls). iFrame "Hm1". done. }
+        rewrite /swap_lb -Hsw. iExact "Hswlb".
+      - (* THE ACCESS: the squeeze, then re-close at the post-write image *)
+        rewrite /log_mirror_any /log_mirror_at.
+        iDestruct "Hany" as (h M0) "[Hmir %HM0]".
+        iAssert (mono_nat_lb_own (fcn_swap γs) (S gen_id)) as "#Hswlb2".
+        { rewrite Hsw. iExact "Hswlb". }
+        iDestruct (fs_arm_acc γs ls dk gen_id riscv_eraGS n M0 Hn1
+                     with "Hreg2 Hswlb2 Hsa Hmir Harm")
+          as "(_ & Hsa & Hclose)".
+        iMod ("Hclose" $! dk' (mirror_of (fs_blocks dk') ls)
+                with "[%]") as "[Harm Hmir]"; [exact (mirror_of_ok _ _)|].
+        iModIntro. iFrame "Harm Hsa Hswlb".
+        iExists (lm_hdr (mirror_of (fs_blocks dk') ls)).
+        iExists (mirror_of (fs_blocks dk') ls). iFrame "Hmir". done. }
+    iModIntro.
+    iDestruct ("Hseam" $! dk') as "[_ Hbwd]".
+    iSplitL "Hhist Harm".
+    { iNext. iApply "Hbwd". rewrite /P_fs_any /P_fs_named. iExists γs.
+      iSplitR; [iPureIntro; done|].
+      rewrite /P_fs. iExists (MkFsRec D' (fr_hist r ++ [D'])).
+      iFrame "Hhist". iSplitR; [| iExact "Harm"].
+      iPureIntro. rewrite /fs_rec_wf /=. split.
+      - rewrite /fs_recovery. reflexivity.
+      - rewrite last_snoc. reflexivity. }
+    iSplitL "Hsa"; [rewrite /start_auth -Hstn; iExact "Hsa"|].
+    rewrite /fs_era_custody. iRight. iFrame "Hmir Hswlb".
+  Qed.
+
+  (* ---- (5b) THE BOOT'S FINAL HEADER WRITE, uniform in whether the era
+     already took custody. ---- *)
+  (* [initlog]'s closing [write_head] writes an n = 0 header whether or not
+     recovery installed anything, so its permit must accept both arms of
+     [fs_era_custody]: at [n = 0] no install ran and the era still holds the
+     whole mirror variable (this IS [fs_swap_permit]); at [n > 0] the first
+     install already swapped and the era holds the half (this is
+     [fs_clear_permit], with the swap receipt merely carried through).  Both
+     land the same [Q], which is what makes [initlog]'s postcondition -- and
+     therefore [log_ctx] -- independent of [n]. *)
+  Lemma fs_boot_head_permit `{GEN : GenId} (cov : gset Z) (ls : Z)
+      (bs : list (bv 8)) :
+    length bs = BSIZE ->
+    hdr_n bs = 0 ->
+    fs_crash_seam cov ls -∗
+    era_registered gen_id riscv_eraGS -∗
+    gen_started gen_id -∗
+    fs_era_custody -∗
+    disk_write_permit gen_id (Some ((1024 * log_hdr_bno ls)%Z, bs))
+      (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id)).
+  Proof.
+    intros Hlen Hn0. iIntros "#Hseam #Hreg #Hst Hcust".
+    rewrite /fs_era_custody. iDestruct "Hcust" as "[Hfull | [Hany #Hswlb]]".
+    { iApply (fs_swap_permit cov ls bs Hlen Hn0 with "Hseam Hreg Hst Hfull"). }
+    rewrite /log_mirror_any. iDestruct "Hany" as (h) "Hmir".
+    iPoseProof (fs_clear_permit cov ls h bs Hlen Hn0
+                  with "Hseam Hreg Hswlb Hmir") as "Hp".
+    rewrite /disk_write_permit. iIntros (dk n) "Hsa %Hn1 HP".
+    iMod ("Hp" $! dk n with "Hsa [%] HP") as "(HP & Hsa & Hmir)";
+      [exact Hn1|].
+    iModIntro. iFrame "HP Hsa Hmir Hswlb".
+  Qed.
+
+End fs_crash_seam.

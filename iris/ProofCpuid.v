@@ -24,7 +24,7 @@
    because the [tp] read happens MID-function: see the comment there.  Every
    leaf is therefore applied at [false], and each [wp_next false] obligation
    collapses with [rewrite wp_next_off] -- the hart never moves, so the proof
-   reads as it did before the explicit-CPUID refactor.  The [c.mv a0,tp] read
+   reads as it did before the explicit-KernelSyms.cpuid refactor.  The [c.mv a0,tp] read
    itself is [rget m2 tp_idx], which is THIS hart's id by [rget_tp] (HartTp.v):
    there is no special tp leaf. *)
 From Stdlib Require Import ZArith Lia List.

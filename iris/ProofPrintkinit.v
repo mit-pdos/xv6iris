@@ -5,7 +5,8 @@
 
    printkinit is a thin initlock wrapper, so it is an INSTANCE of the shape
    proved once in WpInitlockWrapper.v: all this file supplies is printkinit's
-   thirteen instructions (CodePrintkinit.pki_code), the three relocations
+   thirteen instructions (CodePrintkinit.v, bundled as [pkni_code] below), the
+   three relocations
    -- a1 = &"pr" (auipc 0x6 / addi +1982), a0 = &pr (auipc 0x12 / addi -1402),
    and the jal displacement to initlock -- and the "pr" literal itself, read out
    of the kernel's data image. *)
@@ -19,13 +20,42 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelDataInv.
-Require Import SpecInitlock WpInitlockWrapper.
-Require Import CodePrintkinit.
+Require Import SpecInitlock SpecInitlockWrapper WpInitlockWrapper.
+Require Import KernelText CodePrintkinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPrintkinit.
 Local Open Scope Z_scope.
 Import Defs.
+
+Section CodePrintkinitBundle.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* printkinit's thirteen instructions (CodePrintkinit.v), in the
+     thin-initlock-wrapper pattern (SpecInitlockWrapper.v) that its
+     whole-function proof instantiates. *)
+  Lemma pkni_code :
+    kernel_text -∗ ilw_code KernelSyms.printkinit (mword_of_int 6) (mword_of_int 18)
+                            (mword_of_int 1982) (mword_of_int 2694) (mword_of_int 782).
+  Proof.
+    iIntros "#Ht". rewrite /ilw_code.
+    iSplitR; [iApply (pkni_00 with "Ht")|].
+    iSplitR; [iApply (pkni_02 with "Ht")|].
+    iSplitR; [iApply (pkni_04 with "Ht")|].
+    iSplitR; [iApply (pkni_06 with "Ht")|].
+    iSplitR; [iApply (pkni_08 with "Ht")|].
+    iSplitR; [iApply (pkni_0c with "Ht")|].
+    iSplitR; [iApply (pkni_10 with "Ht")|].
+    iSplitR; [iApply (pkni_14 with "Ht")|].
+    iSplitR; [iApply (pkni_18 with "Ht")|].
+    iSplitR; [iApply (pkni_1c with "Ht")|].
+    iSplitR; [iApply (pkni_1e with "Ht")|].
+    iSplitR; [iApply (pkni_20 with "Ht")|].
+    iApply (pkni_22 with "Ht").
+  Qed.
+
+End CodePrintkinitBundle.
 
 Module PrintkinitProof (Initlock : INITLOCK) : PRINTKINIT.
 
@@ -55,7 +85,7 @@ Section ProofPrintkinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl ltac:(unfold text_end, pr_name_str; lia) Hpr
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf Φ m K PK
+    iApply (ILW.wp_initlock_wrapper_sconf Φ m K KernelSyms.printkinit
               (mword_of_int 6) (mword_of_int 18) (mword_of_int 1982) (mword_of_int 2694)
               (mword_of_int 782) lk name "pr"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
@@ -63,7 +93,7 @@ Section ProofPrintkinit.
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Htext [] Hpc Hstr Hlock Hname Hcpu Hcont").
-    iApply (pki_code with "Htext").
+    iApply (pkni_code with "Htext").
   Qed.
 
 End ProofPrintkinit.

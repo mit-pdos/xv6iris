@@ -88,7 +88,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation AFD := KernelSyms.argfd.
 
 (* argfd's own frame is 6 slots (addi sp,sp,-48); argint wants 18 below it
    (4 for itself, 14 for argraw's) and myproc 10, so 24 covers both calls. *)

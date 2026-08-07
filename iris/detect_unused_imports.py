@@ -32,7 +32,8 @@ Method (glob-shortlist + build-confirm)
    whose logical path contributes no non-`lib` reference is a *candidate* unused
    import -- this only NARROWS the set to build-test; it never decides.
 
-   Two rules keep the shortlist honest (each was a large false-positive source):
+   Three rules keep the shortlist honest (each was a large false-positive
+   source):
 
    a. GLOB FRESHNESS.  A missing `.glob` reads as "this file references nothing",
       which flags EVERY import; a `.glob` that does not match its `.v` misses any
@@ -56,6 +57,17 @@ Method (glob-shortlist + build-confirm)
       through the `-R/-Q` load paths and the opam `user-contrib` tree; a module
       whose source cannot be found has an UNKNOWN closure and is conservatively
       never flagged.
+
+   c. TACTICS ARE NOT IN THE GLOB.  Every reference glob records carries a kind
+      -- def, thm, constr, not, inst, ind, ... -- and there is no kind for a
+      tactic: neither `Ltac foo` nor a use of `foo` is written to the glob at
+      all.  A module reached only for a tactic therefore contributes zero
+      references and looks unused, and in a proof tree driven by named tactics
+      that is the LARGEST source of shortlist false positives -- each costing a
+      whole-file compile to disprove.  So an import is also skipped when the
+      file mentions a tactic name the module (or its Export closure) defines;
+      see TacticIndex for why that test is textual and why erring toward
+      "keep" is the safe direction.
 
 3. CONFIRM (`--verify`, correct): for each file, apply ALL candidate edits at once
    (a removal drops its module; a rewrite drops it and adds the imports it
@@ -336,6 +348,102 @@ class ExportGraph:
         return result
 
 
+_COQ_COMMENT = re.compile(r"\(\*|\*\)")
+
+
+def strip_coq_comments(text: str) -> str:
+    """Drop Coq `(* ... *)` comments (nested), keeping offsets irrelevant.
+
+    Only used to decide whether a NAME occurs in a file, so a commented-out
+    mention must not count -- otherwise a stale note about a tactic keeps its
+    module imported forever.
+    """
+    out, depth, pos = [], 0, 0
+    for m in _COQ_COMMENT.finditer(text):
+        if m.group() == "(*":
+            if depth == 0:
+                out.append(text[pos:m.start()])
+            depth += 1
+        elif depth:
+            depth -= 1
+            if depth == 0:
+                pos = m.end()
+    if depth == 0:
+        out.append(text[pos:])
+    return " ".join(out)
+
+
+# `Local Ltac` is file-private, so importing the module does not bring it into
+# scope and its name is no evidence of anything.
+_LTAC_DEF = re.compile(r"^[ \t]*(?:Global[ \t]+)?(?:Ltac2?|Tactic\s+Notation)\b(.*)$",
+                       re.M)
+_LTAC_NAME = re.compile(r"[A-Za-z_][A-Za-z0-9_']*")
+
+
+class TacticIndex:
+    """Tactic names each module makes visible to a file that imports it.
+
+    THE reason the glob shortlist over-reports.  A `.glob` records references by
+    kind -- def, thm, constr, not, inst, ... -- and there is NO kind for a
+    tactic: neither `Ltac foo` nor a use of `foo` is written to the glob at all.
+    So a module a file reaches only for a tactic contributes zero references,
+    looks unused, and is shortlisted -- and the build-confirm then always keeps
+    it.  In a proof tree driven by named tactics that is the bulk of the
+    shortlist, and every one of them costs a full-file compile to disprove.
+
+    The check is textual and deliberately one-directional: a tactic name of the
+    module (or of anything it re-exports) occurring anywhere in the importing
+    file means "keep, do not even build-test".  A name collision between two
+    modules therefore keeps both, and a tactic invoked through some alias this
+    misses is still caught by the build-confirm.  It can only cost a missed
+    removal, never license a wrong one -- the same direction as the rest of the
+    shortlist.
+    """
+
+    def __init__(self, graph: "ExportGraph", maps: list[tuple[str, str]]):
+        self.graph = graph
+        self.maps = maps
+        self._own: dict[str, frozenset[str]] = {}
+        self._vis: dict[str, frozenset[str]] = {}
+
+    def _own_tactics(self, full_path: str) -> frozenset[str]:
+        if full_path in self._own:
+            return self._own[full_path]
+        names: set[str] = set()
+        src = resolve_module_source(full_path, self.maps)
+        if src:
+            try:
+                with open(src, errors="replace") as f:
+                    body = strip_coq_comments(f.read())
+            except OSError:
+                body = ""
+            for m in _LTAC_DEF.finditer(body):
+                rest = m.group(1)
+                # `Tactic Notation "foo" ...` is invoked by its literal tokens;
+                # `Ltac foo ...` by its head identifier.
+                quoted = re.findall(r'"([^"]+)"', rest)
+                if quoted:
+                    for q in quoted:
+                        names.update(_LTAC_NAME.findall(q))
+                else:
+                    head = _LTAC_NAME.search(rest)
+                    if head:
+                        names.add(head.group())
+        self._own[full_path] = frozenset(names)
+        return self._own[full_path]
+
+    def visible(self, full_path: str) -> frozenset[str]:
+        """Tactic names `Require Import full_path` puts in scope."""
+        if full_path in self._vis:
+            return self._vis[full_path]
+        modules, _ = self.graph.closure(full_path)   # cycle-safe already
+        out: set[str] = set()
+        for m in modules:
+            out |= self._own_tactics(m)
+        self._vis[full_path] = frozenset(out)
+        return self._vis[full_path]
+
+
 def coqc_flags(dir_path: str) -> list[str]:
     """The `-R/-Q/-arg` load-path flags from _CoqProject, for direct coqc runs."""
     cp = os.path.join(dir_path, "_CoqProject")
@@ -396,7 +504,10 @@ def is_referenced(full_path: str, used: set[str]) -> bool:
 
 
 def classify_import(full_path: str, used: set[str],
-                    graph: ExportGraph) -> tuple[str, list[str]] | None:
+                    graph: ExportGraph,
+                    tactics: "TacticIndex | None" = None,
+                    tokens: frozenset[str] = frozenset()
+                    ) -> tuple[str, list[str]] | None:
     """How (if at all) `Require Import full_path` is actionable.
 
     Returns None when the import is needed as written, else `(kind, via)`:
@@ -412,12 +523,18 @@ def classify_import(full_path: str, used: set[str],
                             since importing the latter already brings it in.
 
     An unresolvable Export closure yields None (conservative: never flagged).
+
+    `tokens` is the importing file's identifier set: an import whose module (or
+    Export closure) defines a TACTIC named there is needed as written, and the
+    glob cannot see it -- see TacticIndex.
     """
     modules, unknown = graph.closure(full_path)
     if unknown:
         return None
     if is_referenced(full_path, used):
         return None                       # the module itself provides a name
+    if tactics is not None and tactics.visible(full_path) & tokens:
+        return None                       # reached for a tactic, invisible to glob
     via = {m for m in modules if m != full_path and is_referenced(m, used)}
     if not via:
         return ("remove", [])
@@ -492,12 +609,14 @@ def analyze_file(dir_path: str, vfile: str, local_prefix: str,
                  include_export: bool, use_all: bool,
                  graph: ExportGraph,
                  local_only: bool = True,
-                 allow_stale: bool = False) -> FileResult:
+                 allow_stale: bool = False,
+                 tactics: "TacticIndex | None" = None) -> FileResult:
     path = os.path.join(dir_path, vfile)
     with open(path) as f:
         text = f.read()
     glob = os.path.join(dir_path, vfile[:-2] + ".glob")
     used = referenced_libnames(glob)
+    tokens = frozenset(_LTAC_NAME.findall(strip_coq_comments(text)))
 
     res = FileResult(vfile=vfile)
     res.glob_state = glob_status(dir_path, vfile)
@@ -525,7 +644,7 @@ def analyze_file(dir_path: str, vfile: str, local_prefix: str,
             if use_all:
                 res.candidates.append(Candidate(stmt=stmt, token=token, full_path=fp))
                 continue
-            verdict = classify_import(fp, used, graph)
+            verdict = classify_import(fp, used, graph, tactics, tokens)
             if verdict is None:
                 continue
             kind, via = verdict
@@ -1003,7 +1122,9 @@ def main() -> int:
 
     local_prefix = local_prefix_for_dir(dir_path)
     flags = coqc_flags(dir_path)
-    graph = ExportGraph(load_path_mappings(dir_path))
+    maps = load_path_mappings(dir_path)
+    graph = ExportGraph(maps)
+    tactics = TacticIndex(graph, maps)
     if args.files:
         vfiles = sorted(args.files)
     else:
@@ -1030,7 +1151,7 @@ def main() -> int:
         res = analyze_file(dir_path, vf, local_prefix,
                            args.include_export, args.all, graph,
                            local_only=not args.include_external,
-                           allow_stale=args.allow_stale)
+                           allow_stale=args.allow_stale, tactics=tactics)
         results.append(res)
         if args.verify and res.candidates:
             todo.append(res)

@@ -77,6 +77,23 @@ Plus the **cache overlay invariant** tying L to the machine:
     commit the committer owns the auth outright, so L is frozen and
     "log slot i contains L(W[i])" survives from write_log to install_trans
     with no extra ghost.
+- **`γown : ghost_map Z unit`** — the EXCLUSIVE per-block ownership token,
+  `blk_own γ b := b ↪[fs_own γ] tt` (`FsBlocks.v`). `fsblock` cannot play
+  this role: it is a HALF, so two owners each holding a half of one key is
+  perfectly consistent (machine-checked — the two halves `iCombine` into a
+  valid full element, no contradiction). A FULL-fraction element is
+  incompatible with itself, which gives `blk_own_excl` and hence
+  **`blk_own_ne : blk_own γ b1 -∗ blk_own γ b2 -∗ ⌜b1 ≠ b2⌝`** — the fact
+  the inode layer's block-map injectivity (`blkmap_wf`, `fs-inode.md`)
+  rests on. **No auth exists yet, and none is needed**: exclusivity of the
+  elements is an auth-free property. The authority over this map belongs
+  to the bitmap/free-block invariant (`balloc`, still assumed), which is
+  where "block `b`'s token is in the free pool" will be stated;
+  `fs_alloc` therefore drops the auth it allocates and mints one token per
+  covered block into the per-block bundle, and `fs_boot_bundle` hands the
+  whole `[∗ set] b ∈ cov, blk_own γfs b` to the boot client. Note the
+  consequence of having no auth: a dropped token is dropped forever —
+  nothing can re-mint it.
 - **`γdirty : ghost_map Z bool`** — per covered block, is it in the current
   pinned write set (logged-uncommitted-or-uninstalled)? Auth + one ½ in
   `log_res` (the ½ recording W-membership); the other ½ rides with the
@@ -418,10 +435,11 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
      READ's permit stays provable for an ARBITRARY `Pc` and the whole
      read stack (bread and above) is untouched. A WRITE moves the index,
      so no `Pc`-generic proof exists: an earlier claim that the trivial
-     write permit survives the reshape was WRONG. Until the real fupds
-     land, the three WAL write kinds carry the PURE, DELETABLE premise
-     `crash_pred_indifferent` (`∀ dk dk', ⊢ Pc dk -∗ Pc dk'`), which
-     `Pc := fun _ => True` satisfies.
+     write permit survives the reshape was WRONG. Each of the four WAL
+     write kinds therefore proves its OWN fupd against `P_fs`
+     (`FsCrash.fs_logfill_permit` / `_commit_permit` / `_install_permit` /
+     `_clear_permit`); there is no bridge lemma and no `Pc`-generic write
+     permit in the tree.
    - **THE PERMIT'S INDEX IS PINNED TO THE REQUEST BY THE SLOT.** The
      permit-channel token gains the `disk_wr` as part of its ghost-map
      value, and `VirtioProto.slot_pend_res` holds it AT `vs_wr sl` —
@@ -436,10 +454,132 @@ resolution must make the stranded pieces RE-CREATABLE, i.e.:
 4. **Recovery** = initlog's real spec: swap the `P_fs` arm with the
    era's boot token; the recovery writes are tagged install/clear
    transitions; the final record has the header cleared and D unchanged.
+   - **THE SWAP IS A PREREQUISITE FOR THE WRITE FUPDS, NOT A FOLLOW-ON**
+     (found in phase C2b). A crash permit is a STATELESS view shift: it
+     runs at the DMA completion, inside the disk thread, on whatever the
+     caller curried at enqueue. So every fact a WAL write's fupd needs
+     about the PHYSICAL log region — "the on-disk header is clean"
+     (write_log's slot fills), "the physical log slots hold the logged
+     values" (write_head's commit), "the on-disk header is the (n, W) I
+     just wrote" (install_trans's home writes) — has to be knowledge the
+     ERA holds continuously. It cannot live in `P_fs` as a ghost equation
+     against `γL`: `γL` is per-era and dies at a crash while `P_fs` is
+     fixed-layer. It cannot be re-derived at each `bwrite` either: bio
+     owns every covered block's `disk_block` (the log region is inside
+     `cov`), and the pool/escrow arms that DO tie physical to logical
+     (`pool_blk`'s shared `bs`, the clean arm's `⌜bsd = bs⌝`) are parked
+     under `bcache.lock`. The CHECKED-OUT arm is precisely the place for
+     that era-side custody, so recovery's swap has to land first.
    The stage-2 clean-image spec becomes the n = 0 corollary.
+   - **AN ERA LEARNS THE ON-DISK HEADER ONLY BY HAVING WRITTEN IT, AND THAT
+     CAPS WHAT RECOVERY CAN CLAIM** (phase D2). A crash permit is a
+     stateless view shift over a UNIVERSALLY QUANTIFIED image `dk`, and the
+     only channel from the image into client-visible knowledge is the
+     custody arm's `log_mirror_ok M (fs_blocks dk) ls`. A swap installs
+     `M := mirror_of (fs_blocks dk) ls` — true, but at an image the client
+     cannot name, so the picture it hands back is OPAQUE (`Q` is fixed at
+     permit-creation time and cannot mention `dk`). The steady state is
+     fine: `fs_commit_permit` writes the header, so its `Q` names the
+     picture from the BYTES IT WROTE. Recovery only READS the header, and a
+     read's permit carries no data (`disk_wr = option (Z * list (bv 8))` —
+     `None` for a read). Consequences, all forced:
+     - recovery's `install_trans` writes CANNOT be `fs_install_permit`s
+       (which need `Ws !! i = Some b` for the DECODED on-disk header);
+     - they are `FsCrash.fs_recover_permit`s instead — RE-BASING writes,
+       which set `fr_D` to whatever the post-write image recovers to
+       (always available: `fs_recovery` is a total function of the image,
+       `fs_recovery_total`) and extend the history by it. Sound, and
+       nothing later cashes the difference: every earlier receipt stays
+       valid because the history only grows, and the post-recovery state is
+       pinned by the FINAL header write anyway;
+     - what is NOT provable this way is the WAL's COMPLETENESS claim ("what
+       recovery leaves behind IS the last committed state"). Safety —
+       `P_fs` stays well formed across every recovery write, custody is
+       this era's, `log_ctx` comes out — is unaffected.
+     **The fix, when completeness is wanted, is a read-data-indexed permit**:
+     make a READ's `Q` a FUNCTION of the delivered bytes (`Q (disk_read dk
+     off len)`), so the header bread's own permit can hand back
+     `log_mirror_at (hdr_dec bs)` at the bytes `bread` returns. That is a
+     machine-layer interface change of the same size as phase C2b — saved
+     PREDICATES rather than saved props in `PermInv`, a read-data equation
+     at `WpUart`'s completion (the analogue of `vslot_post_wr`), the permit
+     premise on `SpecVirtioDiskRw`/`SpecBread`, and a trivial instance at
+     every existing bread caller. It is the only known way to close the gap:
+     tying a client-held `disk_block` fragment to `dk` instead would need
+     the era image AUTH inside the stateless fupd, and that lives in
+     `state_interp`.
+   - **THE SWAP CANNOT BE A PLAIN GHOST STEP outside a write's permit**, which
+     is why "swap first, then install with full knowledge" is not on the
+     table. Retiring the incumbent arm needs `c <= S gen_id` — "no later era
+     has swapped" — and the only source of that bound is the STARTED-
+     GENERATIONS AUTH (`fs_arm_le` against the arm's `gen_started`). That auth
+     lives in `state_interp` and reaches a client only through
+     `wp_disk_step`'s callback, i.e. only inside a permit's fupd. A client
+     holds `gen_started gen_id`, a LOWER bound, which is the wrong direction.
+     (Opening `crashN` directly would give the record but not the auth.)
+   - **THE RECOVERY-SIDE PERMIT FAMILY IS UNIFORM IN `n`, AND HAS TO BE.**
+     `SpecInstallTrans` takes its per-entry permits as a `□`-generator over
+     one threaded resource, so the entry that performs the swap cannot have
+     a different contract from the rest. `FsCrash.fs_era_custody` is the
+     disjunction that makes it uniform — `log_mirror_full` (the boot mint,
+     no custody taken yet) `∨` `log_mirror_any ∗ swap_lb (S gen_id)`
+     (custody taken, picture unrecorded) — and `fs_recover_permit` consumes
+     and re-establishes it, swapping on first use. `fs_boot_head_permit`
+     closes the boot the same way for initlog's final `write_head`: at
+     `n = 0` no install ran and it IS `fs_swap_permit`; at `n > 0` the first
+     install already swapped and it is `fs_clear_permit` carrying the swap
+     receipt through. Both land `log_mirror_at (0, []) ∗ swap_lb (S gen_id)`,
+     which is what keeps initlog's postcondition — hence `log_ctx` — free of
+     `n`.
 5. **sys_sync** = a persistent receipt: the record carries a fixed
    mono-list of committed D's; commit appends; sys_sync's post is a
    lower-bound receipt that the caller's pre-call writes are durable.
+   - **WHAT A RECEIPT CAN HONESTLY NAME** (phase D2's analysis, not built).
+     `fs_commit_permit`'s `Q` today is `∃ D, fs_receipt_any D` with `D`
+     unnamed, because the new durable state is
+     `fs_install (fs_blocks dk) ls Ws (fs_restrict (fs_blocks dk) home)` and
+     the committer holds no picture of the HOME side of the physical disk.
+     But it does not need one: the only part of `D` a client cares about is
+     the part the batch WROTE, and `fs_install_hit` computes exactly that
+     from the physical LOG SLOTS — which the mirror already records
+     (`log_mirror.lm_slots`, and `log_mirror_ok` pins it to
+     `P (log_slot_bno ls i)` for `i < LOGBLOCKS`). So the minimal addition
+     is to stop throwing that field away at the era side: give
+     `LogInv.log_mirror_at` a second index, a PARTIAL slot record
+     `sl : nat -> option (list (bv 8))`, which `fs_logfill_permit` EXTENDS
+     one slot per write and `fs_commit_permit` READS. `log_mirror_clean` is
+     then its `(0, []) / (fun _ => None)` instance, so `log_batch` — and
+     every statement above `LogInv.v` — is textually unchanged. With it the
+     commit receipt becomes the honest, useful one:
+     `∃ D, fs_receipt_any D ∗ ⌜∀ i b, Ws !! i = Some b -> D !! b = Some (Lw i)⌝`
+     — "the state I committed has MY blocks at MY contents".
+   - **NO RECEIPT ESCAPES TO ANY CALLER TODAY**, which is why sys_sync cannot
+     yet state anything about durability at all: `ProofEndOp` HOLDS the
+     commit's `∃ D, fs_receipt_any D` (it is what `fs_commit_permit`'s `Q`
+     hands back) and drops it, and `SpecEndOp`'s post does not mention it.
+     **And it must NOT simply be exported there**: `do_commit` is decided at
+     run time (only the last op out commits), so an end_op post carrying the
+     receipt would be a DISJUNCTION the caller cannot resolve — i.e. `True`.
+     That is precisely why sys_sync exists, and why the receipt has to be
+     DEPOSITED into `log_res` keyed by the commit counter rather than returned
+     to whoever happened to be last.
+   - **sys_sync ITSELF NEEDS A COMMIT COUNTER, NOT A NEW GHOST FAMILY.** Its
+     loop is `n := ncommit + 1; while (ncommit < n) sleep(&log)`, so the
+     `l_ncommit` cell — today an arbitrary `mword` in `log_res` — has to
+     become a faithful `nat` with a `mono_nat` auth beside it, and the
+     committer (end_op) deposits its receipt into `log_res` as it bumps the
+     counter. sys_sync then reads the counter at entry and returns the
+     receipt of the first commit that follows. Note the barrier's real
+     shape: the fast path (`committing == 0 && outstanding == 0`) returns
+     the LAST commit's receipt, and that is the strong case — nothing is in
+     flight, so the durable state IS the current logical one.
+   - **WHAT sys_sync CANNOT SAY, and why it is not a defect.** "The caller's
+     own writes are durable" is not a log-layer statement: two ops in one
+     batch may write the same block, so a caller's content claim is
+     genuinely stale after another op's `log_write`, and what is durable is
+     the batch's FINAL content. Composing the receipt above with the FS
+     layer's own per-op knowledge is where that gets closed — the same place
+     `Pcontent` lives (item 6).
 6. **FS-level consistency stays parametric** (the record carries raw
    maps; `Pcontent D` and the per-op composable wands remain the future
    fs.c layer's business), and the torn-write knob stays off

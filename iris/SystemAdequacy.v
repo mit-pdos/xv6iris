@@ -44,6 +44,7 @@ Require Import WpUart.
 Require Import BootConfig.
 Require Import BootChain BootShared.
 Require Import RiscvAdequacy.
+Require Import FsCrash.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -121,7 +122,7 @@ Section SystemBoot.
       as (Hfd γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Huart &
-        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hpages)".
+        Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
     iDestruct "Hcfg" as (c0) "[%Hlive Hcfg]".
@@ -192,8 +193,8 @@ Proof.
      theorem still says exactly "never stuck", with the durability slot left
      open. *)
   apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
-           (fun _ : Z -> bv 8 => True%I)
-           ltac:(iModIntro; done) Hgen0 Hpow).
+           (fun (_ _ _ : gname) (_ : Z -> bv 8) => True%I)
+           ltac:(intros γsw γreg γst; iIntros "_"; iModIntro; done) Hgen0 Hpow).
   (* the per-era boot entailment, at the era instance the power thread just
      minted.  [riscv_fixedGS (RiscvGS Σ F HE)] iota-reduces to [F] and
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
@@ -203,11 +204,60 @@ Proof.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
+(* 3b. THE SAME THEOREM WITH THE FILE SYSTEM'S DURABILITY INVARIANT IN     *)
+(*     THE SLOT (phase C2b/D1 stage 5).                                    *)
+(*                                                                        *)
+(* [xv6_power_adequacy] above leaves the crash predicate at [True]: the    *)
+(* machine never gets stuck, and nothing is claimed about what survives a  *)
+(* power cycle.  This one instantiates the slot at [FsCrash.P_fs_named] -- *)
+(* the FS's own record: a committed history whose last element is what the *)
+(* PHYSICAL disk recovers to.  Because [crash_inv] is allocated ONCE into  *)
+(* the fixed layer, that invariant is the same one across every boot, so   *)
+(* the property it carries spans the power cycles the theorem quantifies   *)
+(* over.                                                                   *)
+(*                                                                        *)
+(* THE ONE HYPOTHESIS IS mkfs's: the disk the machine powers on with       *)
+(* recovers to SOME committed state [D0].  It is not vacuous and it is not *)
+(* an assumption about the proof -- [FsCrash.fs_recovery_total] says such a *)
+(* [D0] always exists, and [P_fs_alloc] is what turns it into the record.  *)
+(* Everything else about the FS -- that its own writes maintain the        *)
+(* invariant -- is the WAL fupds' business, carried by the write permits    *)
+(* the log functions take (phase C2b/D1 stage 4).                          *)
+(* ---------------------------------------------------------------------- *)
+
+Theorem xv6_fs_adequacy Σ
+    `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotGpreS Σ,
+      !fsCrashG Σ}
+    (g : gstate) (cov : gset Z) (logstart : Z)
+    (D0 : gmap Z (list (bv 8)))
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
+    (* mkfs's obligation, at the image the machine powers on with *)
+    (Hrec : fs_recovery (fs_blocks (v_disk (g.(gdev).(dvirtio)))) D0
+              cov logstart) :
+  forall t2 g2 e2,
+    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
+    e2 ∈ t2 ->
+    reducible (Λ := riscv_lang) e2 g2.
+Proof.
+  apply (riscv_power_adequacy Σ boot_D NPROC XV6_DISK_BYTES g
+           (fun (γsw γreg γst : gname) (dk : Z -> bv 8) =>
+              P_fs_named γsw γreg γst cov logstart dk)
+           ltac:(intros γsw γreg γst; iIntros "Hsw";
+                 iMod (P_fs_alloc γsw γreg γst _ D0 cov logstart Hrec
+                         with "Hsw") as (γs) "(%Hseq & HP & _)";
+                 iModIntro; rewrite /P_fs_named; iExists γs;
+                 iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
+           Hgen0 Hpow).
+  intros F HE gen g' Hbf.
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ gen g' Hbf).
+Qed.
+
+(* ---------------------------------------------------------------------- *)
 (* 4. ...and at a CONCRETE functor list, so nothing at all is assumed.     *)
 (* ---------------------------------------------------------------------- *)
 
 Definition xv6Σ : gFunctors :=
-  #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ ].
+  #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ; fsCrashΣ ].
 
 Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false) :
@@ -216,3 +266,15 @@ Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     e2 ∈ t2 ->
     reducible (Λ := riscv_lang) e2 g2.
 Proof. apply (xv6_power_adequacy xv6Σ g Hgen0 Hpow). Qed.
+
+(* ...and the FS form at the same concrete functor list. *)
+Corollary xv6_fs_adequacy_xv6Σ (g : gstate) (cov : gset Z) (logstart : Z)
+    (D0 : gmap Z (list (bv 8)))
+    (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
+    (Hrec : fs_recovery (fs_blocks (v_disk (g.(gdev).(dvirtio)))) D0
+              cov logstart) :
+  forall t2 g2 e2,
+    rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
+    e2 ∈ t2 ->
+    reducible (Λ := riscv_lang) e2 g2.
+Proof. apply (xv6_fs_adequacy xv6Σ g cov logstart D0 Hgen0 Hpow Hrec). Qed.

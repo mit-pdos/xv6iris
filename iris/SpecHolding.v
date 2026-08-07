@@ -38,7 +38,6 @@ Require Import WpLock.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
-Notation HD := KernelSyms.holding.
 
 (* INTERRUPTS MUST BE DISABLED at holding() -- it [jal mycpu]s at +0x16, and
    [mycpu]'s own contract (SpecMycpu.v) is stated at the LITERAL [b = false]

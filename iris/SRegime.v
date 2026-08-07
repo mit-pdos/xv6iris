@@ -158,9 +158,12 @@ End TransformFront.
 (* ===================================================================== *)
 
 (* the access classes the S-mode leaves use *)
+(* [Atomic]'s two booleans are the instruction's aq/rl annotations, which
+   nothing in the translation or PMP/PMA path inspects -- so the AMO arm
+   quantifies them rather than pinning one annotation pair. *)
 Definition s_acc_ok (acc : MemoryAccessType mem_payload) : Prop :=
   acc = InstructionFetch tt \/ acc = Load Data \/ acc = Store Data \/
-  acc = Atomic (AMOSWAP, Data, Data).
+  (exists aq rl, acc = Atomic (AMOSWAP, aq, rl, Data, Data)).
 
 (* the PMP grant facts at a state: the kernel TOR entry 0 covering RAM
    with R/W/X (what every post-translate memory access checks) *)
@@ -257,7 +260,18 @@ Section SRegimeDef.
         = Some (Supervisor, σ) ->
       exec (get_pmlen acc Supervisor) σ = Some (0, σ) ->
       ⊢ reg_interp σ.(sregs) -∗ sr_inv -∗
-        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝
+        ⌜ exec (transform_effective_address (Virtaddr ea) acc) σ = Some (Virtaddr ea, σ) ⌝;
+    (* THE TRANSLATION MODE IS DEFINED.  The vmem level now resolves the
+       effective privilege and its translation mode BEFORE the access (it is
+       the page-split test), so every consumer of a vmem-level lemma needs a
+       [translationMode] fact at the PRE-state.  Only the regime knows satp,
+       so only the regime can say it -- and every regime can: satp is Bare or
+       Sv39 here, never the reserved encoding.  The value is existential
+       because nothing downstream cares which. *)
+    sr_tmode : forall (σ : mstate),
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      ⊢ reg_interp σ.(sregs) -∗ sr_inv -∗
+        ⌜ exists md, exec (translationMode Supervisor) σ = Some (md, σ) ⌝
   }.
 
   (* ---- the PMP facts, off any invariant that carries [pmp_config] ---- *)
@@ -361,8 +375,23 @@ Section SRegimeDef.
              (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode)).
   Qed.
 
+  Lemma bare_tmode :
+    forall (σ : mstate),
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      ⊢ reg_interp σ.(sregs) -∗ bare_inv -∗
+        ⌜ exists md, exec (translationMode Supervisor) σ = Some (md, σ) ⌝.
+  Proof.
+    intros σ HSXL.
+    iIntros "Hri Hinv".
+    iDestruct "Hinv" as (satp0) "(Hsatp & %Hmode & Hpmp)".
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iPureIntro. exists Bare.
+    exact (exec_translationMode_S_bare satp0 σ HSXL Hsatpv Hmode).
+  Qed.
+
   Definition bare_regime : s_regime :=
-    SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform.
+    SRegime bare_inv kadm_ident (fun _ _ H => H) bare_absorb bare_transform
+            bare_tmode.
 
 End SRegimeDef.
 
@@ -441,9 +470,24 @@ Section SRegimeShared.
     unfold pmp_grant_facts. tauto.
   Qed.
 
+  Lemma res_tmode (root_ppn : mword 44) :
+    forall (σ : mstate),
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      ⊢ reg_interp σ.(sregs) -∗ tlb_res_pt root_ppn -∗
+        ⌜ exists md, exec (translationMode Supervisor) σ = Some (md, σ) ⌝.
+  Proof.
+    intros σ HSXL.
+    iIntros "Hri Hres".
+    iDestruct (tlb_res_pt_open with "Hres") as (satp0 tlbvec)
+      "(Hsatp & %Hmode & _ & _ & _)".
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iPureIntro. exists Sv39.
+    exact (exec_translationMode_S_sv39 satp0 σ HSXL Hsatpv Hmode).
+  Qed.
+
   Definition kpt_share_regime (root_ppn : mword 44) : s_regime :=
     SRegime (tlb_res_pt root_ppn) (fun _ _ => True) (fun _ _ _ => I)
-            (res_absorb root_ppn) (res_transform root_ppn).
+            (res_absorb root_ppn) (res_transform root_ppn) (res_tmode root_ppn).
 
   Lemma kpt_share_regime_inv (root_ppn : mword 44) :
     sr_inv (kpt_share_regime root_ppn) ⊣⊢ tlb_res_pt root_ppn.

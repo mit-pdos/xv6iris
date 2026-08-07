@@ -38,15 +38,6 @@ Qed.
 (* Leaf 5: split_misaligned vaddr 8 = (1,8) for an 8-aligned vaddr;         *)
 (* misaligned_order 1 = (0,0,step).                                         *)
 (* ---------------------------------------------------------------------- *)
-Lemma exec_split_misaligned_aligned (vaddr : virtaddr) s :
-  is_aligned_vaddr vaddr 8 = true ->
-  exec (split_misaligned vaddr 8) s = Some ((1, 8), s).
-Proof.
-  intro H. unfold split_misaligned. rewrite H. cbn [orb]. apply exec_returnm.
-Qed.
-
-Lemma misaligned_order_1 : misaligned_order 1 = (0, 0, if sys_misaligned_order_decreasing then -1 else 1).
-Proof. unfold misaligned_order. destruct sys_misaligned_order_decreasing; reflexivity. Qed.
 
 (* ====================================================================== *)
 (* 8-byte data-load memory path -- doubleword analogues of the 4-byte      *)
@@ -99,6 +90,33 @@ Proof.
     exact (Hbytes j Hj).
 Qed.
 
+(* the same leaf at the EXCLUSIVE read kind: the fork's atomic A/D update reads
+   the PTE with [read_pte_exclusive].  The interpreter routes by address and
+   ignores the access kind, so the memory effect is identical. *)
+Lemma exec_read_ram_resv_8 (addr : mword 64) (w : bv 64) s :
+  dev_addr addr = false ->
+  (forall j : nat, (N.of_nat j < 8)%N ->
+     s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
+  exec (read_ram rv64d_types.Read_RISCV_reserved (Physaddr addr) 8 false) s = Some ((w, default_meta), s).
+Proof.
+  intros Hdev Hbytes.
+  apply (run_to_exec _ _ _ _ (run_read_ram_plain_8_pin addr w s Hdev Hbytes)).
+  unfold read_ram. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)). cbn beta zeta.
+  unfold Defs.sail_mem_read. cbn beta zeta.
+  unfold Defs.bind. cbn [Interface.iMon_bind].
+  rewrite exec_MemRead; last exact Hdev.
+  cbn [Interface.ReadReq.pa].
+  case_match eqn:Hrb.
+  - cbn [Interface.iMon_bind]. cbn match beta iota. discriminate.
+  - exfalso.
+    refine (read_bytes_ne (mem s) addr (Z.to_N 8) w _ Hrb).
+    intros j Hj.
+    change (RiscvModelBytes.pa_add addr j) with (pa_add addr j).
+    change (RiscvModelBytes.nth_byte w j) with (nth_byte w j).
+    exact (Hbytes j Hj).
+Qed.
+
 (* pmaCheck for Load Data: returns None when the region is readable+aligned. *)
 Lemma exec_pmaCheck_ram_load (addr : mword 64) (pbmt : page_based_mem_type)
     (region : PMA_Region) s :
@@ -106,24 +124,11 @@ Lemma exec_pmaCheck_ram_load (addr : mword 64) (pbmt : page_based_mem_type)
     = Some region ->
   is_aligned_paddr (Physaddr addr) 8 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
-  exec (pmaCheck (Physaddr addr) 8 (Load Data) pbmt false) s = Some (None, s).
+  exec (pmaCheck (Physaddr addr) 8 (Load Data) pbmt false) s = Some (Ok pma_ok_aligned, s).
 Proof.
   intros Hmatch Halign Hread.
-  unfold pmaCheck.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
-  cbn [PMA_Region_attributes] in Hread |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM None s)).
-  cbn match beta.
-  (* Load Data arm: assert_exp' true >>= fun _ => returnM PMA_readable  ≡  returnM PMA_readable *)
-  change (assert_exp' true "sys/mem.sail:103.61-103.62" >>=
-          (fun _ : true = true => returnM (PMA_readable (override_PMA rattr pbmt))))
-    with (returnM (PMA_readable (override_PMA rattr pbmt)) : M bool).
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM _ s)).
-  rewrite Hread. cbn match.
-  apply exec_returnM.
+  pma_ok_peel Hmatch Hread (exec_is_mag_applicable_load_data 8 s) Halign.
 Qed.
 
 (* checked_mem_read for Load Data, width 8. *)
@@ -146,24 +151,51 @@ Lemma exec_checked_mem_read_ram_load (pbmt : page_based_mem_type) (addr : mword 
        s = Some (Ok (w, default_meta), s).
 Proof.
   intros Hpmp Hmatch Halign Hread Hc Hsig Hh Hdev Hbytes.
-  unfold checked_mem_read.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmpCheck_machine_none _ _ _ s Hpmp)).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _ (exec_pmaCheck_ram_load addr pbmt region s Hmatch Halign Hread)).
-      cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s))).
-  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-  rewrite (exec_bind_Some _ _ _ _ _ (_ : exec (read_kind_of_flags _ _ _) s = Some (Read_plain, s))).
+  assert (Hcp : exec (check_pma_with_pmp_priority (Load Data) pbmt Machine
+                        (Physaddr addr) 8 false) s = Some (Ok pma_ok_aligned, s)).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_load addr pbmt region s Hmatch Halign Hread)).
+    cbn match. apply exec_returnM. }
+  assert (Hmmio : exec (within_mmio_readable (Physaddr addr) 8) s = Some (false, s)).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  unfold checked_mem_read. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 8 0 s)). cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (read_kind_of_flags false false false) s = Some (Read_plain, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hdev Hbytes)).
-  apply exec_returnM.
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+  { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    rewrite avi0_mul8.
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_pmpCheck_machine_none _ _ _ s Hpmp)). cbn beta.
+    cbn match.
+    match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+      assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+      rewrite execR_liftR. rewrite Hmmio. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+      assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                    = Some (inr w, s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_plain_8 addr w s Hdev Hbytes)).
+      cbn beta match. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+    rewrite autocast_id. rewrite usvd_zeros_full_64.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite autocast_id. rewrite execR_returnR. reflexivity.
 Qed.
 
 (* mem_read for Load Data in Machine mode, width 8 (needs MPRV=0). *)
@@ -241,22 +273,6 @@ Qed.
 (* The loop's Acc (Zwf 0) recursion is unfolded by destructing Zwf_guarded *)
 (* (same technique as currentlyEnabled), so it is axiom-free.              *)
 (* ====================================================================== *)
-Lemma execR_untilMT_1 {R Vars} (vars vars' : Vars) (measure : Vars -> Z)
-   (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars) s s' :
-  measure vars = 1 ->
-  execR (body vars) s = Some (inr vars', s') ->
-  execR (cond vars') s' = Some (inr true, s') ->
-  execR (Defs.untilMT vars measure cond body) s = Some (inr vars', s').
-Proof.
-  intros Hm Hb Hc. unfold Defs.untilMT.
-  destruct (Defs.Zwf_guarded (measure vars)).
-  cbn [Defs.untilMT'].
-  destruct (Z_ge_dec (measure vars) 0) as [Hge|Hge]; [| exfalso; rewrite Hm in Hge; lia ].
-  rewrite (execR_bind_Some _ _ _ _ _ Hb).
-  rewrite (execR_bind_Some _ _ _ _ _ Hc).
-  cbn match.
-  apply execR_returnR_fwd.
-Qed.
 
 Section S.
 Variable a : mword 64.
@@ -278,50 +294,72 @@ Hypothesis Hh : exec (within_htif_readable (Physaddr pa) 8) s = Some (false, s).
 Hypothesis Hdev : dev_addr pa = false.
 Hypothesis Hbytes : forall j : nat, (N.of_nat j < 8)%N -> s.(mem) !! (pa_add pa j) = Some (nth_byte v j).
 
-Let data2 : mword (8*1*8) :=
-  update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) v.
-
+(* [vmem_read_addr] is a straight-line body now: the vmem level splits on a PAGE
+   boundary rather than on the MAG (that moved down into [checked_mem_read]), and
+   an aligned in-page access takes neither split arm -- [do_split_access] is false
+   because Machine-mode translation is Bare, so [access_width] is the full width
+   and the two [translate_and_read_value] calls the split arms would make are
+   dead.  What survives is one [translate_and_read_value] and one full-width
+   [update_subrange_vec_dec] into the zero accumulator. *)
 Lemma exec_vmem_read_addr_8 :
   exec (vmem_read_addr (Virtaddr a) 8 (Load Data) false false false) s
-    = Some (Ok data2, s).
+    = Some (Ok v, s).
 Proof.
   unfold vmem_read_addr.
   rewrite exec_catch_early_return.
   rewrite Halign. cbn [Riscv.rv64d.not negb].
-  assert (Hinner : execR (returnR (result (mword (8 * 8)) ExecutionResult) tt >>
-                          liftR (split_misaligned (Virtaddr a) 8)) s = Some (inr (1, 8), s)).
-  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-    rewrite execR_liftR. rewrite (exec_split_misaligned_aligned (Virtaddr a) s Halign). reflexivity. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-  rewrite misaligned_order_1.
-  match goal with
-  | |- context [ Defs.bind (Defs.untilMT ?vs ?m ?c ?b) ?post ] =>
-    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (data2, true, 0), s))
-  end.
-  { eapply execR_untilMT_1.
-    - (* measure *) reflexivity.
-    - (* body *)
-      cbn match.
-      assert (Hass : exec (assert_exp' true "loop dummy assert") s = Some (@eq_refl bool true, s)) by reflexivity.
-      rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-      rewrite (execR_liftR_seq _ _ _ _ _
-        (exec_translateAddr_identity_load (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0*8)) s Hpriv Hmprv)).
-      cbn [bits_of_virtaddr]. cbn match.
-      match goal with
-      | |- execR (Defs.bind ?mrm ?post) s = _ =>
-        assert (Hmrm : execR mrm s = Some (inr data2, s))
-      end.
-      { rewrite (execR_liftR_seq _ _ _ _ _
-          (exec_mem_read_load PBMT_PMA pa region v (register_lookup mstatus s.(sregs)) s
-             Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes eq_refl Hmprv Hpriv)).
-        cbn match.
-        rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
-        rewrite autocast_id. apply execR_returnR_fwd. }
-      rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
-      cbn. apply execR_returnR_fwd.
-    - (* cond *) apply execR_returnR_fwd. }
-  rewrite (execR_bind_Some _ _ _ _ _ Hu).
-  cbn. rewrite autocast_id. reflexivity.
+  (* the page split: (8, 0), so nothing is split *)
+  (* the page split: an aligned in-page access is (8, 0), so nothing splits *)
+  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+  cbn [bits_of_virtaddr].
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_on_page_boundary_aligned8 a s Halign)).
+  cbn beta zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite Hpriv.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (exec_effectivePrivilege_load (register_lookup mstatus s.(sregs)) s Hmprv)).
+  cbn beta.
+  (* do_split_access = (translation not Bare) AND (next page bytes > 0): Machine
+     mode with MPRV = 0 translates Bare, so the left conjunct is already false *)
+  match goal with |- context[Defs.and_boolM ?A ?B] =>
+    assert (Hds : execR (Defs.and_boolM A B) s = Some (inr false, s)) end.
+  { unfold Defs.and_boolM.
+    match goal with |- context[Defs.bind (Defs.bind (Defs.liftR ?m) ?k1) _] =>
+      assert (Htm : execR (Defs.bind (Defs.liftR m) k1) s = Some (inr false, s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_M s)). cbn beta.
+      apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Htm). cbn match beta.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hds). cbn match beta zeta.
+  (* neither split arm runs, so the accumulator is still zeros *)
+  rewrite andb_false_r. cbn match beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (zeros' (8 * 8)) s)). cbn beta.
+  (* the single full-width access *)
+  assert (Htrv : exec (translate_and_read_value (Virtaddr a) 8 (Load Data) false false false) s
+                 = Some (Ok (Physaddr pa, v), s)).
+  { unfold translate_and_read_value.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_translateAddr_identity_load a s Hpriv Hmprv)).
+    cbn match beta.
+    (* the translated pa is [zero_extend' 64 a]; the section names it through the
+       (zero) split offset *)
+    assert (Hpa : zero_extend' 64 (bits_of_virtaddr (Virtaddr a)) = pa)
+      by (unfold pa; cbn [bits_of_virtaddr]; rewrite avi0_mul8; reflexivity).
+    rewrite Hpa.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_mem_read_load PBMT_PMA pa region v
+                  (register_lookup mstatus s.(sregs)) s
+                  Hpmp Hmatch Hpalign Hread Hc Hsig Hh Hdev Hbytes eq_refl Hmprv Hpriv)).
+    cbn match beta. apply exec_returnM. }
+  rewrite (execR_liftR_seq _ _ _ _ _ Htrv). cbn match beta.
+  rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s)).
+  cbn beta.
+  (* the accumulator was zeros and the access is full width, so the subrange
+     write is the value itself *)
+  rewrite autocast_id.
+  change (8 * 8 - 1) with 63. change (8 * 8) with 64.
+  rewrite usvd_zeros64.
+  cbn. reflexivity.
 Qed.
 End S.
 

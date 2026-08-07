@@ -541,7 +541,7 @@ Section ProofGrowproc.
       by (rewrite /M3 upd_eq HM2a0; apply add_vec_zero_l).
     (* ---- +0x0e: jal ra,myproc ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x0e))
-              Rra (mword_of_int 2096364 : mword 21) M3 (av - 4)%nat b
+              Rra (mword_of_int 2096356 : mword 21) M3 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0e [-]").
     iIntros (CID8 Hn8) "Hcg Hpc".
@@ -550,7 +550,7 @@ Section ProofGrowproc.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.growproc + 0x0e) : mword 64) 4)]> M3) with M4.
     assert (Hjmp : add_vec (mword_of_int (KernelSyms.growproc + 0x0e) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2096364 : mword 21)) = mword_of_int KernelSyms.myproc)
+                     (sign_extend' 64 (mword_of_int 2096356 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
     assert (HM4ra : M4 !!! Regidx Rra
@@ -617,7 +617,6 @@ Section ProofGrowproc.
     { intros r Hr Ncsp N8 N9 N18.
       rewrite /A1 upd_ne; [| congruence]. apply HthrA; assumption. }
     (* ---- +0x14: c.ld a1,72(a0) -- a1 := p->sz ---- *)
-    iEval (rewrite gpshape_652c) in "Hi14".
     assert (Hszaddr : add_vec (A1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 72 : mword 12)) = p_sz p)
       by (rewrite HA1a0; reflexivity).
     iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x14)) Ra1 Ra0
@@ -900,7 +899,6 @@ Section ProofGrowproc.
       iEval (rewrite Hpp2c) in "Hpc".
       (* ---- +0x2c: c.ld a0,80(a0) -- a0 := p->pagetable ---- *)
       assert (HC1a0 : C1 !!! Regidx Ra0 = p) by (rewrite /C1 upd_ne; [exact HB4a0 | reg_neq]).
-      iEval (rewrite cshape_6928) in "Hi2c".
       assert (Hpta : add_vec (C1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                      = p_pagetable p) by (rewrite HC1a0; reflexivity).
       iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x2c)) Ra0 Ra0
@@ -918,7 +916,7 @@ Section ProofGrowproc.
       iEval (rewrite Hpp2e) in "Hpc".
       (* ---- +0x2e: jal ra,uvmalloc ---- *)
       iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x2e))
-                Rra (mword_of_int 2094740 : mword 21) C2 (av - 4)%nat b
+                Rra (mword_of_int 2094732 : mword 21) C2 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi2e [-]").
       iIntros (CID20 Hn20) "Hcg Hpc".
@@ -927,7 +925,7 @@ Section ProofGrowproc.
       change (<[Regidx Rra := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.growproc + 0x2e) : mword 64) 4)]> C2) with C3.
       assert (Hjmpua : add_vec (mword_of_int (KernelSyms.growproc + 0x2e) : mword 64)
-                         (sign_extend' 64 (mword_of_int 2094740 : mword 21))
+                         (sign_extend' 64 (mword_of_int 2094732 : mword 21))
                        = mword_of_int KernelSyms.uvmalloc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmpua) in "Hpc".
@@ -1254,7 +1252,6 @@ Section ProofGrowproc.
     iEval (rewrite Hpp50) in "Hpc".
     (* ---- +0x50: c.ld a0,80(a0) -- a0 STILL holds p on this path ---- *)
     assert (HE1a0 : E1 !!! Regidx Ra0 = p) by (rewrite /E1 upd_ne; [exact HA2a0 | reg_neq]).
-    iEval (rewrite cshape_6928) in "Hi50".
     assert (Hpta2 : add_vec (E1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 80 : mword 12))
                     = p_pagetable p) by (rewrite HE1a0; reflexivity).
     iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x50)) Ra0 Ra0
@@ -1272,7 +1269,7 @@ Section ProofGrowproc.
     iEval (rewrite Hpp52) in "Hpc".
     (* ---- +0x52: jal ra,uvmdealloc ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.growproc + 0x52))
-              Rra (mword_of_int 2094636 : mword 21) E2 (av - 4)%nat b
+              Rra (mword_of_int 2094628 : mword 21) E2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi52 [-]").
     iIntros (CID16 Hn16) "Hcg Hpc".
@@ -1281,7 +1278,7 @@ Section ProofGrowproc.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.growproc + 0x52) : mword 64) 4)]> E2) with E3.
     assert (Hjmpud : add_vec (mword_of_int (KernelSyms.growproc + 0x52) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2094636 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2094628 : mword 21))
                      = mword_of_int KernelSyms.uvmdealloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmpud) in "Hpc".

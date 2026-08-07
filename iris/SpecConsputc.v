@@ -51,7 +51,6 @@ Require Import DiskPtsto WpUart.
 Require Import IntrDefs WpNext.
 From Kernel Require KernelSyms.
 
-Notation CPC := KernelSyms.consputc.
 
 Definition wp_consputc_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)

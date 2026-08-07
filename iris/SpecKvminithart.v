@@ -68,7 +68,6 @@ Require Import IntrDefs.
 Require Import KptShare.
 From Kernel Require KernelSyms.
 
-Notation KVMIH := KernelSyms.kvminithart.
 
 (* kvminithart(): the Bare->Sv39 kernel-page-table switch.  See the header. *)
 Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}

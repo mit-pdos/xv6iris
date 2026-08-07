@@ -32,7 +32,6 @@ From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
 
-Notation II := KernelSyms.iinit.
 
 (* ------------------------------------------------------------------ *)
 (*  itable geometry (file.h / fs.h, corroborated by the disassembly)    *)

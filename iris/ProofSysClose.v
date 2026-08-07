@@ -47,7 +47,15 @@ Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import SpecMyproc SpecArgfd SpecFileclose.
+Require Import KallocInv.
+Require Import PipeInv.
+Require Import SchedCtx.
+Require Import WpUart.
+Require Import DiskPtsto DiskInv.
+Require Import BioInv.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import SpecMyproc SpecArgfd SpecIput SpecFileclose.
 Require Import SpecSysClose.
 Require Import CodeSysClose.
 From Kernel Require KernelInstrs.
@@ -104,7 +112,8 @@ Qed.
 Module SysCloseProof (Argfd : ARGFD) (Myproc : MYPROC) (Fileclose : FILECLOSE) : SYSCLOSE.
 
 Section ProofSysClose.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the frame's sp is sound: read the bound out of the ambient capability's
@@ -305,9 +314,10 @@ Section ProofSysClose.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_close_sconf (Φ : mval -> iProp Σ) (γl γf : gname)
+      (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_sys_close_sconf_body Φ γl γf m av n eb p C v pid V b.
+    : wp_sys_close_sconf_body Φ γl γf fn on m av n eb p C v pid V b.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav.
@@ -318,7 +328,7 @@ Section ProofSysClose.
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
                   (add_vec (m !!! Regidx csp_rs1)
                      (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))))]> m).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hftab #Hpanic Hpriv Hcont".
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hftab #Hpanic Hpriv Hpenv Hfenv Hcont".
     iPoseProof (sci_00 with "Htext") as "Hi00".
     iPoseProof (sci_02 with "Htext") as "Hi02".
     iPoseProof (sci_04 with "Htext") as "Hi04".
@@ -588,9 +598,13 @@ Section ProofSysClose.
       iIntros (CID12 Hs12 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID9 CID12 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hpriv]"); [exact Hcsf|].
-      rewrite /sys_close_post. iLeft. iFrame "Hpriv". iPureIntro.
-      split; [exact Hmfa0 | exact Hnone].
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hpriv] [Hpenv] [Hfenv]");
+        [exact Hcsf| | |].
+      { rewrite /sys_close_post. iLeft. iFrame "Hpriv". iPureIntro.
+        split; [exact Hmfa0 | exact Hnone]. }
+      (* no fileclose ran on this path, so both bundles are as they came in *)
+      { by iExists on. }
+      { iExact "Hfenv". }
     - (* ================= SUCCESS: fd names a live file ================= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & Hfdcell & Hfcell)".
       iDestruct (ofd_out_elim _ _ Hnzfd with "Hfdcell") as "Hfdcell".
@@ -608,7 +622,7 @@ Section ProofSysClose.
       iEval (rewrite Hpp1c) in "Hpc".
       (* ---- +0x1c: jal ra,myproc ---- *)
       iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_close + 0x1c))
-                (mword_of_int 1 : mword 5) (mword_of_int 2083894 : mword 21) A7 (av - 4)%nat b
+                (mword_of_int 1 : mword 5) (mword_of_int 2083876 : mword 21) A7 (av - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi1c [-]").
       iIntros (CID12 Hs12) "Hcg Hpc".
@@ -617,7 +631,7 @@ Section ProofSysClose.
       change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) 4)]> A7) with B.
       assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2083894 : mword 21)) = mword_of_int KernelSyms.myproc)
+                       (sign_extend' 64 (mword_of_int 2083876 : mword 21)) = mword_of_int KernelSyms.myproc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmp) in "Hpc".
       assert (HBra : B !!! Regidx (mword_of_int 1 : mword 5)
@@ -784,10 +798,16 @@ Section ProofSysClose.
       { rewrite /D upd_ne; [| reg_neq].
         rewrite /C5 upd_eq. exact Hfv. }
       iDestruct (cpu_own_transport CID13 CID20 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-      iApply (Fileclose.wp_fileclose_sconf Φ γl γf k q Cf D n eb p C (av - 4)%nat b
-                ltac:(unfold fileclose_stack; lia) Hn HDa0
-                with "Hcg Hcpu Htext Hpc Hftab Hpanic Href [-]").
-      iIntros (CID21 Hs21 R) "Hcg Hcpu Hpc %HcsR Hfdslot".
+      (* the descriptor's type is not visible here -- [ofile_slot] quantifies
+         the content -- so hand fileclose whichever bundle it asks for and
+         keep the other ([fileclose_env_split]). *)
+      iDestruct (fileclose_env_frame Φ fn on n eb p Cf with "Hpenv Hfenv")
+        as "[Hfcenv Hfcback]".
+      iApply (Fileclose.wp_fileclose_sconf Φ γl γf k q Cf fn on D n eb p C (av - 4)%nat b
+                ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
+                with "Hcg Hcpu Htext Hpc Hftab Hpanic Href Hfcenv [-]").
+      iIntros (CID21 Hs21 R) "Hcg Hcpu Hpc %HcsR Hfdslot Hout".
+      iDestruct ("Hfcback" with "Hout") as "[Hpenv Hfenv]".
       assert (Hpc38 : ret_pc (D !!! Regidx (mword_of_int 1 : mword 5))
                       = mword_of_int (KernelSyms.sys_close + 0x38))
         by (rewrite HDra; apply bv_eq; vm_compute; reflexivity).
@@ -848,7 +868,8 @@ Section ProofSysClose.
       iIntros (CID23 Hs23 mf) "[%Hcsf %Hmfa0] Hcg Hpc".
       iDestruct (cpu_own_transport CID21 CID23 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CID23 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hpriv]"); [exact Hcsf|].
+      iApply ("Hcont" $! mf with "[%] Hcg Hcpu Hpc [Hpriv] Hpenv Hfenv");
+        [exact Hcsf|].
       rewrite /sys_close_post. iRight. iExists fd, fv. iFrame "Hpriv". iPureIntro.
       split; [exact Hmfa0 | exact Hsome].
   Qed.

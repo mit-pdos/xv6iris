@@ -61,7 +61,6 @@ Require Import SpecPanic.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
-Notation UI := KernelSyms.userinit.
 
 (* PROVISIONAL stack budget: 50 is what main() has available below its own
    two-slot frame ([SpecMain.K_main] = 52).  namei's real depth is unknown. *)

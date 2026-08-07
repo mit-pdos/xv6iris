@@ -20,7 +20,6 @@ Require Import WpLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
-Notation PK := KernelSyms.printkinit.
 
 (* The address of the string literal "pr" that printkinit passes as initlock's
    [name] argument.  It sits in .rodata just past etext and has no ELF symbol of

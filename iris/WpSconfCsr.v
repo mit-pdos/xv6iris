@@ -30,12 +30,13 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec.
 Require Import RegFile.
 Require Import MinstretInv InstrBytes WpGpr ExecCommon WpGprCsrwCommon WpGprCsrwB.
 Require Import SmodeCore WpMmodeLeafBase.
-(* exec_execute_csrr_sstatus: the exported copy lives in CodePopOff.v (the
-   WpSmodePtCtl one is Local); the csr-write reduction chain
+(* [exec_execute_csrr_sstatus] is proved below -- it is the read-only csrr of
+   ONE csr at ONE privilege, so it belongs with the S-mode csr leaves that use
+   it (the WpSmodePtCtl copy is Local).  The csr-WRITE reduction chain
    (exec_write_CSR_sstatus & co.) is exported from WpPushOffCsr.v --
-   relocate all of them down when the csr leaves get a shared base. *)
+   relocate those down when the csr leaves get a shared base. *)
 Require Import WpGprCsrrCommon WpGprCsrrB.
-Require Import CodePopOff WpPushOffCsr WpSieFlipBits.
+Require Import WpPushOffCsr WpSieFlipBits.
 Require WpGprCsrwC.
 Require Import StackOwn.
 Require Import HartTp WpNext.
@@ -45,6 +46,62 @@ Import Defs.
 
 (* helper copy (Local in WpSmodePtCtl.v) *)
 Local Definition csr_sstatus : mword 12 := Ox"100".
+
+(* ===================================================================== *)
+(* exec layer: read-only [csrr rd,sstatus] (CSRRS with rs1 = x0, so no     *)
+(* write happens) at Supervisor.  Used by the sstatus read leaf below.     *)
+(* ===================================================================== *)
+
+Lemma exec_csr_id_read_callback_sstatus (d : mword 64) s :
+  exec (csr_id_read_callback csr_sstatus d) s = Some (tt, s).
+Proof.
+  assert (H : csr_id_read_callback csr_sstatus d = returnM tt) by (vm_compute; reflexivity).
+  rewrite H. apply exec_returnM.
+Qed.
+
+Lemma exec_execute_csrr_sstatus (rd : mword 5) (m : mword 64) s :
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  register_lookup mstatus s.(sregs) = m ->
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  uint rd <> 0 ->
+  exec (execute (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (sstatus_read m))).
+Proof.
+  intros Hpriv Hm HS Hrd.
+  change (execute (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS)))
+    with (execute_CSRReg csr_sstatus (Regidx (mword_of_int 0)) (Regidx rd) CSRRS).
+  unfold execute_CSRReg.
+  (* access_type = csr_access_type CSRRS _ true = CSRRead *)
+  replace (generic_eq (Regidx (mword_of_int 0 : mword 5)) zreg) with true
+    by (vm_compute; reflexivity).
+  cbn zeta.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_rX_bits_gpr (mword_of_int 0) s)).
+  unfold doCSR.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_check_CSR_result_sstatus_S s HS)). cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg cur_privilege s)). rewrite Hpriv.
+  unfold ext_check_CSR. cbn match.
+  replace (generic_neq (csr_access_type CSRRS (generic_eq (Regidx rd) zreg) true) CSRWrite)
+    with true by (vm_compute; reflexivity).
+  cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_CSR_sstatus s)). rewrite Hm.
+  replace (eq_vec csr_sstatus (Ox"344")) with false by (vm_compute; reflexivity).
+  replace (eq_vec csr_sstatus (Ox"144")) with false by (vm_compute; reflexivity). cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_returnM (sstatus_read m) s)).
+  replace (generic_eq (csr_access_type CSRRS (generic_eq (Regidx rd) zreg) true) CSRRead)
+    with true by (vm_compute; reflexivity).
+  cbn match.
+  rewrite (exec_bind0_Some _ _ _ _ _ (exec_csr_id_read_callback_sstatus (sstatus_read m) s)).
+  assert (HwX : exec (wX_bits (Regidx rd) (sstatus_read m)) s
+                = Some (tt, set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                              (regval_into_reg (sstatus_read m)))).
+  { rewrite (exec_wX_bits_gpr rd _ s).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    reflexivity. }
+  rewrite (exec_bind0_Some _ _ _ _ _ HwX).
+  apply exec_returnM.
+Qed.
 
 (* ===================================================================== *)
 (* exec layer: [csrr rd,scause] at Supervisor.  The privilege-free pieces  *)

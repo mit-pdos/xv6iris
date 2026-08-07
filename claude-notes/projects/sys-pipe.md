@@ -126,6 +126,11 @@ They are lifted into [`../durable-notes.md`](../durable-notes.md) and
 - **`fileclose` is the only missing callee.** It has a spec
   (`SpecFileclose.v`) and no proof, so there is no `LinkSysPipe.v` and
   `tools/proof_coverage.py` reports sys_pipe as *assumed*, which is honest.
+  **It now blocks two functions, not one**: `kexit` is proven and unlinked for
+  exactly the same reason ([`kexit.md`](kexit.md)), so one `ProofFileclose.v`
+  + `LinkFileclose.v` buys two `Link` files and 392 bytes of coverage. There
+  is no `CodeFileclose.v` yet either (`make gen-code` makes it); fileclose is
+  194 bytes @ `0x80004070`.
   Everything else sys_pipe calls is proven and linked, argaddr
   (`ProofArgaddr.v`, argint's proof with `c.sd` for `c.sw`) and fdalloc
   (`ProofFdalloc.v`, the indexed `fd_frees_from` loop invariant — the

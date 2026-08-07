@@ -99,8 +99,9 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
+Require Import FsCrash.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -118,7 +119,7 @@ Definition log_name_str : Z := 0x800074f8.
 
 Definition wp_initlog_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -141,16 +142,6 @@ Definition wp_initlog_sconf_body
   let c_name := lock_name_field log_addr in
   let c_cpu := lock_cpu log_addr in
   (K_initlog <= K)%nat ->
-  (* PHASE C2a BRIDGE (claude-notes/design/fs-log.md stage 4; DELETED in
-     C2b, not discharged).  The crash predicate is INDEXED by the disk image,
-     so this function's interior [bwrite] can no longer mint a free identity
-     permit: a write MOVES the index.  Until this WAL write kind's real
-     durability fupd lands, the contract carries the pure side condition that
-     the system promises nothing about durability -- which is exactly what
-     [Pc := fun _ => True] satisfies, and what both adequacy theorems still
-     instantiate.  It is a [Prop], so it threads as an ordinary premise and
-     costs no wand-chain plumbing. *)
-  crash_pred_indifferent ->
   (* the covered range's block-number bounds + the log's own storage is
      covered: initlog breads the header and write_head breads it again *)
   log_geom_ok cov logstart ->
@@ -169,6 +160,22 @@ Definition wp_initlog_sconf_body
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   panic_wp_any -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
+  (* THE CRASH SEAM (phase C2b/D1 stage 3): the persistent identification of
+     the machine layer's crash predicate with THIS file system's [P_fs].  It
+     is what lets [initlog]'s final [write_head] carry a REAL durability fupd
+     -- the swap that takes custody of the crash record for this era.  The
+     boot client gets it from the adequacy instantiation. *)
+  fs_crash_seam cov logstart -∗
+  (* the era certificate: the swap installs custody AT [gen_id], and the
+     registry element + started lower bound are exactly what identifies it *)
+  gen_cert -∗
+  (* THE ERA'S LOG-REGION MIRROR VARIABLE (phase C2b/D1 stage 2), whole: no
+     custody of the crash record has been taken yet, so both halves are the
+     era's, and [initlog] is what splits them -- one into [log_batch] (the
+     era's continuing half), one into [P_fs]'s checked-out arm when the swap
+     lands (stage 3).  It comes from the era boot bundle, minted at PowerOn
+     beside the disk image map. *)
+  log_mirror_full -∗
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
@@ -235,7 +242,7 @@ Definition wp_initlog_sconf_body
 Module Type INITLOG.
   Parameter wp_initlog_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)

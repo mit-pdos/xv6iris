@@ -21,9 +21,10 @@ Import Defs.
 
 (* pmaCheck for an aligned RAM AMO with atomic support (res_or_con = true). *)
 
-Lemma exec_effectivePrivilege_amo_nm (op : amoop) (m : mword 64) (pr : Privilege) s :
+Lemma exec_effectivePrivilege_amo_nm (op : amoop) (aq rl : bool) (m : mword 64)
+    (pr : Privilege) s :
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
-  exec (effectivePrivilege (Atomic (op, Data, Data)) m pr) s = Some (pr, s).
+  exec (effectivePrivilege (Atomic (op, aq, rl, Data, Data)) m pr) s = Some (pr, s).
 Proof.
   intro H. unfold effectivePrivilege.
   rewrite H. rewrite andb_false_r. apply exec_returnm.
@@ -39,6 +40,8 @@ Qed.
 
 Section ExecAmoGS4.
   Variable rs2 rs1 rd : mword 5.
+  (* the AMO's aq/rl instruction annotations, which the access type carries *)
+  Variable aq rl : bool.
   Variable region : PMA_Region.
   Variable w : mword 32.
   Variable s : mstate.
@@ -55,10 +58,10 @@ Section ExecAmoGS4.
   Hypothesis Hcp : register_lookup cur_privilege s.(sregs) = p.
   Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
   Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 4 = true.
-  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, Data, Data))) s = Some (Virtaddr a, s).
-  Hypothesis Htr : exec (translateAddr (Virtaddr a) (Atomic (AMOSWAP, Data, Data))) s
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, aq, rl, Data, Data))) s = Some (Virtaddr a, s).
+  Hypothesis Htr : exec (translateAddr (Virtaddr a) (Atomic (AMOSWAP, aq, rl, Data, Data))) s
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s).
-  Hypothesis Hpmp : exec (pmpCheck (Physaddr pa) 4 (Atomic (AMOSWAP, Data, Data)) p) s = Some (None, s).
+  Hypothesis Hpmp : exec (pmpCheck (Physaddr pa) 4 (Atomic (AMOSWAP, aq, rl, Data, Data)) p) s = Some (None, s).
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 4 = Some region.
   Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
   Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true.
@@ -79,6 +82,8 @@ End ExecAmoGS4.
 (* ===================================================================== *)
 Section ExecAmoGS4Walk.
   Variable rs2 rs1 rd : mword 5.
+  (* the AMO's aq/rl instruction annotations, which the access type carries *)
+  Variable aq rl : bool.
   Variable region : PMA_Region.
   Variable w : mword 32.
   Variable s s' : mstate.
@@ -95,10 +100,10 @@ Section ExecAmoGS4Walk.
   Hypothesis Hcp : register_lookup cur_privilege s'.(sregs) = p.
   Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s'.(sregs))) ('b"1") = false.
   Hypothesis Halign : is_aligned_vaddr (Virtaddr a) 4 = true.
-  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, Data, Data))) s = Some (Virtaddr a, s).
-  Hypothesis Htr : exec (translateAddr (Virtaddr a) (Atomic (AMOSWAP, Data, Data))) s
+  Hypothesis Htea : exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, aq, rl, Data, Data))) s = Some (Virtaddr a, s).
+  Hypothesis Htr : exec (translateAddr (Virtaddr a) (Atomic (AMOSWAP, aq, rl, Data, Data))) s
                    = Some (Ok (Physaddr pa, PBMT_PMA, init_ext_ptw), s').
-  Hypothesis Hpmp : exec (pmpCheck (Physaddr pa) 4 (Atomic (AMOSWAP, Data, Data)) p) s' = Some (None, s').
+  Hypothesis Hpmp : exec (pmpCheck (Physaddr pa) 4 (Atomic (AMOSWAP, aq, rl, Data, Data)) p) s' = Some (None, s').
   Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s'.(sregs)) (Physaddr pa) 4 = Some region.
   Hypothesis Hpalign : is_aligned_paddr (Physaddr pa) 4 = true.
   Hypothesis Hread : (override_PMA (PMA_Region_attributes region) PBMT_PMA).(PMA_readable) = true.

@@ -364,8 +364,9 @@ Section WpUsdPt.
     { pose proof (exec_execute_STORE_8_gpr_S_walk_pt rs2 (mword_of_int 10) imm region_st s_pc s_tr tfpa
                Htea
                ltac:(rewrite Hif subrange_id sign_extend'_id Heva; exact Halignd)
-               ltac:(rewrite Hif subrange_id sign_extend'_id Heva;
-                     cbn [bits_of_virtaddr]; rewrite avi0_mul8; exact Htr0)
+               Sv39 Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV)
+               (exec_translationMode_S_sv39 usatp s_pc LSXL_pc Lsatp_pc Hmode)
+               ltac:(rewrite Hif subrange_id sign_extend'_id Heva; exact Htr0)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
                ltac:(rewrite Lpmpc_tr; exact HA0) ltac:(rewrite Lpmpaddr_tr; exact Hord0)
                ltac:(rewrite Lpmpaddr_tr; exact Hrange_st) ltac:(rewrite Lpmpc_tr; exact HW)

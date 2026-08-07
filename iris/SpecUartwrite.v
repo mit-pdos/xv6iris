@@ -71,7 +71,6 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation UW := KernelSyms.uartwrite.
 
 (* uartwrite's own frame is 10 slots; the deepest callee is sleep at 22
    (acquire and release want 10). *)

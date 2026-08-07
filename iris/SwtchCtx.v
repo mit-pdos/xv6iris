@@ -120,6 +120,13 @@ Section SwtchCtx.
   Global Instance ctx_cells_timeless c vs : Timeless (ctx_cells c vs).
   Proof. rewrite /ctx_cells. apply _. Qed.
 
+  (* ... and so is the contents-existential form.  Needed as an INSTANCE
+     rather than derived at the use site: [SchedCtx.proc_ctx_own_ctx] strips
+     the ▷ a parked record always arrives under, and instance search does not
+     unfold [own_ctx] on its own. *)
+  Global Instance own_ctx_timeless pa : Timeless (own_ctx pa).
+  Proof. rewrite /own_ctx. apply _. Qed.
+
   (* -------------------------------------------------------------------- *)
   (* valid_context Phi P A c : the context saved at [c] admits a WP to       *)
   (* run.  It owns c's 14 saved-register cells and its parked stack, and is    *)

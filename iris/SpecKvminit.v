@@ -22,7 +22,6 @@ Require Import PtTree.
 Require Import PtBuild KvmMap KvmSpec.
 From Kernel Require KernelSyms.
 
-Notation KVMI := KernelSyms.kvminit.
 
 (* kvminit(): kvmmake() then store its result into the global
    [kernel_pagetable] cell (an identity 8-byte word at

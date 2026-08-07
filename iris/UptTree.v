@@ -35,6 +35,7 @@ Require Import PtTreeAdue.
 Require Import KptPt.
 Require Import TrampPt.
 Require Import SmodeCore.
+Require Import UserTranslate.
 Require Import KptTree.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
@@ -634,6 +635,25 @@ Section UptTreeInv.
        ⌜ forall pmar0, pma_allows_all pmar0 -> pma_allows_pte_write pmar0 ⌝ ∗
        ptree_own 2 (DfracOwn 1) t ∗
        pmp_config uroot)%I.
+
+  (* THE TRANSLATION MODE IS DEFINED at a state this invariant governs.  The
+     vmem level resolves it before every access (it is the page-split test),
+     and only the invariant knows satp -- the same obligation [SRegime]'s
+     [sr_tmode] discharges for the S-mode regimes. *)
+  Lemma utlb_inv_pt_tmode (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+      (σ : mstate) :
+    _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+    reg_interp σ.(sregs) -∗ utlb_inv_pt uroot tfp um -∗
+    ⌜ exec (translationMode User) σ = Some (Sv39, σ) ⌝.
+  Proof.
+    intros HSXL.
+    iIntros "Hri Hinv".
+    iDestruct "Hinv" as (usatp tlbvec t)
+      "(Hsatp & %Hmode & _ & _ & _ & _ & _ & _ & _ & _ & _)".
+    iDestruct (reg_valid_dq with "Hri Hsatp") as %Hsatpv.
+    iPureIntro.
+    exact (UserTranslate.exec_translationMode_U_sv39 usatp σ HSXL Hsatpv Hmode).
+  Qed.
 
   Lemma utlb_inv_pt_intro (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (usatp : mword 64) (tlbvec : vec (option TLB_Entry) (2 ^ 6)) (t : ptree) :

@@ -34,7 +34,7 @@ All offsets corroborated by disassembly (`addi a5,a0,208` + stride 8 × 16 in
 | `killed` | 40 | 4 | `proc_pub` |
 | `xstate` | 44 | 4 | `proc_pub` |
 | `pid` | 48 | 4 | ½ in `proc_pub`, ½ in `proc_priv` |
-| `parent` | 56 | 8 | ❌ (belongs to `wait_lock`) |
+| `parent` | 56 | 8 | `WaitInv.parents_own` (under `wait_lock`) |
 | `kstack` | 64 | 8 | `is_kstack` (persistent) |
 | `sz` | 72 | 8 | `proc_priv` / `proc_dormant` |
 | `pagetable` | 80 | 8 | `proc_priv` / `proc_dormant` |
@@ -54,17 +54,27 @@ held" group is *not* uniformly private.
 
 ### 1. Lock-protected and genuinely mutable — `state`, `chan`, `killed`, `xstate`
 
-Every core touches these on procs it does not own: `kill()` walks all 64 and
+Every core touches these on procs it does not own: `kkill()` walks all 64 and
 writes `killed`, `wakeup()` walks all 64 and compares `chan`, `scheduler()`
 walks all 64 and reads/writes `state`, `wait()` reads a child's `xstate`.
 Full ownership, always resident in the lock's resource. This is the group
 `proc_lock_res` already covers (`state`, `chan`); `killed` and `xstate` join
 it unchanged.
 
+**`killed` is quantified, and that is the design, not a gap.** `proc_pub`
+holds `p_killed pa ↦₄ kl` under an existential `kl`, so the invariant says
+nothing about the flag's value. The three consumers are all proven and all
+live with it: `killed()` returns a value its contract cannot constrain,
+`setkilled()` has an EMPTY postcondition (and never has to compute the value
+it stores), and `kkill()` reports only *whether it found a matching pid*.
+Making the write visible would mean giving the cell a fraction that travels
+with the running thread — the `pid` discipline below — and no consumer wants
+one, because `killed()` may be called on any proc by any hart.
+
 ### 2. Lock-protected but immutable-while-allocated — `pid`
 
 `allocproc` writes it once under the lock; after that nobody writes it. But it
-is read two ways: by *other* cores under `p->lock` (`kill()`'s scan, `wait()`'s
+is read two ways: by *other* cores under `p->lock` (`kkill()`'s scan, `wait()`'s
 `pp->pid`) and by the owning process with **no lock at all** (`sys_getpid`,
 `acquiresleep`/`holdingsleep` — `jal myproc; lw a5,48(a0)`).
 
@@ -72,15 +82,41 @@ This is precisely `design/file-table.md`'s discipline 2: a
 reference-counted read-share that becomes writable again when the last holder
 goes away. And exactly as there, no ghost algebra is needed — a **points-to
 fraction** gives agreement for free (`word4_pointsto_agree`). Half stays in the
-lock resource so `kill()` can always read it; half travels with the running
+lock resource so `kkill()` can always read it; half travels with the running
 process. `allocproc` reunites both halves in the `UNUSED` arm and so may write.
 
-### 3. A different lock — `parent`
+### 3. A different lock — `parent` (`WaitInv.v`, BUILT)
 
 `wait_lock`, not `p->lock`, and it is read/written *across* processes
-(`exit()` reparents its children onto `initproc`). Needs its own global lock
-resource holding all 64 cells; keep it out of `proc_lock_res` entirely, or the
-lock ordering `wait_lock` → `p->lock` becomes unstateable.
+(`exit()` reparents its children onto `initproc`). It has its own global
+resource holding all 64 cells, kept out of `proc_lock_res` entirely — putting
+it there would make the lock ordering `wait_lock` → `p->lock` unstateable,
+because a holder of `wait_lock` would then have to hold every proc lock too.
+
+```coq
+Definition parents_own (ps : list (mword 64)) : iProp Σ :=
+  (⌜length ps = NPROC⌝ ∗ [∗ list] j ↦ v ∈ ps, p_parent (proc_addr j) ↦₈ v)%I.
+Definition wait_res : iProp Σ := (∃ ps, parents_own ps)%I.
+```
+
+`parents_own` is the **contents-out** form — what a function that already holds
+`wait_lock` is handed — and `wait_res` is its existential closure, which is what
+the lock invariant will be once `kexit`/`kwait` need the lock itself. Nothing in
+`WaitInv.v` mentions the lock, deliberately: `reparent`'s contract is about the
+cells, and "caller must hold wait_lock" is discharged one altitude up. The
+length conjunct lives *inside* the resource rather than being a caller premise —
+it is a fact about the table, and a caller handed the block has no other way to
+learn it. The accessors are `parents_own_acc` (borrow slot `j`, return it at a
+possibly different value) and its read-only instance `parents_own_read`, exactly
+the `ProcInv.proc_priv_ofile` / `_ofile_read` pair and for the same reason: a
+scan touches one cell at a time, so nothing ever has to know that two indices
+name different cells.
+
+The pure model of what `reparent` does to the table lives here too: `rp_slot` /
+`rp_map` (every cell equal to the argument becomes `initproc`), plus `rp_upto p
+ip k` — the same map applied to the first `k` slots only, which is a scan's loop
+invariant — and `rp_upto_step`, the one lemma a loop body needs. All three are
+over an arbitrary list, so the induction never has to know how long the table is.
 
 ### 4. Write-once at boot — `kstack`
 
@@ -448,16 +484,16 @@ With this shape **no caller ever destructs more than one guard**:
 | caller | needs | guards touched |
 |---|---|---|
 | `wakeup` | `state`, `chan` | none |
-| `kill` | `state`, `killed`, `pid` | none |
+| `kkill` | `state`, `killed`, `pid` | none (PROVEN) |
 | `wait` | `xstate`, `pid`, child's pagetable/trapframe | `inv_dormant` only |
 | `scheduler` | `state`, the parked context | `needs_ctx` only |
 | `allocproc` | `state`, `pid`, the free block | `inv_dormant` only |
 | `sleep` / `yield` / `sched` | `state`, `chan`, own context | `needs_ctx` only |
 
-`kill` and `wakeup` — the two functions that walk procs they do not own — reach
+`kkill` and `wakeup` — the two functions that walk procs they do not own — reach
 everything they touch at the top level and never learn the state. And because
 the two `pid` halves are plain points-to fractions,
-`word4_pointsto_agree` tells `kill()` that the pid it reads under the lock is
+`word4_pointsto_agree` tells `kkill()` that the pid it reads under the lock is
 the pid the running thread believes it has. No ghost state.
 
 `procs_inv γ Φ γf γs` is unchanged in shape: 64 `is_lock`s over the new
@@ -512,10 +548,18 @@ SLEEPING → RUNNABLE identically, with no guard ever opened.
   minted by `filedup` and installs it in the child's `ofile_slot`.
 - **scheduler dispatch** needs no change: the resumed thread's `proc_priv`
   comes back out of its own parked closure, not out of `p_sched`.
-- **`exit`** closes every fd (each `ofile_slot` surrenders its `file_ref` to
+- **`kexit`** closes every fd (each `ofile_slot` surrenders its `file_ref` to
   `fileclose`, leaving `⌜v = 0⌝`) and `iput`s `cwd` — which is exactly what
-  reduces its `proc_priv` back down to a `proc_dormant`. It then parks forever
-  at `ZOMBIE`, handing that bundle to the `inv_dormant` guard.
+  reduces its `proc_priv` back down to a `proc_dormant`
+  (`ProcInv.proc_priv_to_dormant_zombie`). It then parks forever at `ZOMBIE`,
+  handing that bundle to the `inv_dormant` guard — but it cannot hand over the
+  bundle's CONTEXT CELLS, which the swtch inside `sched()` is about to write.
+  So the ZOMBIE park hands the block minus its context across the crossing
+  (`ProcInv.proc_dormant_noctx` / `SchedCtx.park_pay`) and the reclaiming
+  scheduler reassembles the two (`SchedCtx.proc_slots_park_gen`), forgetting
+  the parked record down to its cells: nothing ever resumes a zombie. That is
+  the whole of what makes ZOMBIE a different kind of park from RUNNABLE and
+  SLEEPING — see [`../projects/kexit.md`](../projects/kexit.md).
 - **`wait`/`freeproc`** opens `inv_dormant` on a `ZOMBIE` child, frees the
   trapframe page and pagetable, and closes it again at `UNUSED` — the *same*
   `proc_dormant`, no recasting needed, which is the payoff for not indexing
@@ -541,7 +585,11 @@ the block, so a syscall could not hold its allowance and still pass
   and its updaters, `proc_fields`, `pname_cells`, `ofile_cells`, `ofile_slot`
   (+ `ofile_slot_null` / `ofile_slot_file`), `proc_ofiles`, `cwd_ref`,
   **`proc_priv`**, its projections (`proc_priv_pid`, `proc_priv_ofile`,
-  `proc_priv_ofile_read`, `proc_priv_pid_agree`), **`proc_dormant`** +
+  `proc_priv_ofile_read`, `proc_priv_pid_agree`, `proc_priv_cwd`, and
+  `proc_priv_cwd_pid` — the cwd cell, its `cwd_ref` and the pid quarter
+  handed out TOGETHER, because each single accessor swallows the whole block
+  and kexit needs both at once: `begin_op`/`iput`/`end_op` each want the pid
+  cell, and the cwd cell has to stay out across all three), **`proc_dormant`** +
   `proc_dormant_to_priv`, and `is_kstack`.  Plus, from allocproc: the one
   producer `proc_priv_intro` (+ `upd_pt`), `tf_page_of_page_own` (kalloc's
   page IS a trapframe page), the `ctx_cells` ⇄ byte-buffer accessor
@@ -677,9 +725,19 @@ symbolic fd, and factoring a branch join) are in
   separate resource keyed by that pointer value; the current tree's user-mode
   work assumes one fixed trapframe at `TRAMPOLINE - PGSIZE`, so per-proc
   trapframe pages are a seam, not a solved problem.
-- **`parent` / `wait_lock` is deliberately out of scope here.** It is a
-  different lock with a documented ordering constraint against `p->lock`;
-  it deserves its own note when `wait`/`exit` get attempted.
+- **`wait_lock` IS a lock now, and `kwait` is where the ordering shows up.**
+  `SpecKwait.v` takes `is_lock γw wait_lock_addr "wait_lock" wait_res` as a
+  premise, so `WaitInv.wait_res` is the lock invariant and a caller's
+  obligation to be holding the lock is represented by the `locked` token.
+  kwait holds wait_lock across its whole scan and takes each candidate
+  child's `p->lock` *inside* it, which is the documented order; nothing in
+  the resources enforces it, but nothing in the proof can invert it either,
+  because the child's lock is acquired from `procs_inv` while wait_lock's
+  contents are already out.  `reparent` still takes the cells rather than
+  the lock (it acquires nothing), and `kexit` will want both.
+  `wait_lock_addr` lives in `SpecProcinit.v` — procinit is what initialises
+  the lock — which is why `SpecKwait.v` requires that file; moving the
+  constant into `WaitInv.v` with a `Require Export` would be tidier.
 - **`procdump` is unprovable as written** (unlocked reads of `name` and `pid`
   on arbitrary procs). Making `name` persistent-after-`allocproc` would fix
   the `name` half but not `pid`; the honest answer is to leave `procdump`

@@ -45,24 +45,21 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailSt
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang RiscvExtras.
 Require Import SmodeCore.
-Require Import InstrBytes KernelText.
 Require Import WpMmodeLeafBase.
 Require Import RegFile.
 Require Import CalleeSaved StackOwn.
 Require Import IntrDefs WpSmodeIntr.
-Require Import HartTp WpNext.
-Require Import WpSconfVc.
+Require Import WpNext.
 Require Import WpLock.
 Require Import KallocInv.
-Require Import PtTree PtBuild.
+Require Import PtBuild.
 Require Import TrampPt KptExecMap.
 Require Import UptTree UserPtTree.
 Require Import CpuOwn.
-Require Import KvmSpec.
 Require Import ProcPtOwn.
-Require Import PtFree BarePt.
+Require Import BarePt.
 Require Import CodeProcFreepagetable.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import SpecUvmunmap SpecUvmfree.
 Require Import SpecProcFreepagetable.
 Require Import KernelRvcDecode.
@@ -283,43 +280,43 @@ Section ProofProcFreepagetable.
                   = add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000")))).
     { rewrite /spd. unfold sp0, pa_stk, add_vec_int. rewrite pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (PF + 0x02))
+    assert (Hpc02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
     (* +0x02 c.sdsp ra,24(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PF + 0x02)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x02)) (mword_of_int 3 : mword 6) Rra
               A0 (K - 4)%nat vr24 b with "Hcg Hpc Hi02 [Hr24] [-]").
     { iEval (rewrite HA0sp -Hb1). iExact "Hr24". }
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
     iEval (rgne) in "Hr24".
-    assert (Hpc04 : add_vec_int (mword_of_int (PF + 0x02) : mword 64) 2 = mword_of_int (PF + 0x04))
+    assert (Hpc04 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x04))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc04) in "Hpc".
     (* +0x04 c.sdsp s0,16(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PF + 0x04)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x04)) (mword_of_int 2 : mword 6) Rs0
               A0 (K - 4)%nat vr16 b with "Hcg Hpc Hi04 [Hr16] [-]").
     { iEval (rewrite HA0sp -Hb2). iExact "Hr16". }
     iIntros (CID3 Hs3) "Hcg Hpc Hr16".
     iEval (rgne) in "Hr16".
-    assert (Hpc06 : add_vec_int (mword_of_int (PF + 0x04) : mword 64) 2 = mword_of_int (PF + 0x06))
+    assert (Hpc06 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x06))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc06) in "Hpc".
     (* +0x06 c.sdsp s1,8(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PF + 0x06)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x06)) (mword_of_int 1 : mword 6) Rs1
               A0 (K - 4)%nat vr8 b with "Hcg Hpc Hi06 [Hr8] [-]").
     { iEval (rewrite HA0sp -Hb3). iExact "Hr8". }
     iIntros (CID4 Hs4) "Hcg Hpc Hr8".
     iEval (rgne) in "Hr8".
-    assert (Hpc08 : add_vec_int (mword_of_int (PF + 0x06) : mword 64) 2 = mword_of_int (PF + 0x08))
+    assert (Hpc08 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x08))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc08) in "Hpc".
     (* +0x08 c.sdsp s2,0(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (PF + 0x08)) (mword_of_int 0 : mword 6) Rs2
+    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x08)) (mword_of_int 0 : mword 6) Rs2
               A0 (K - 4)%nat vr0 b with "Hcg Hpc Hi08 [Hr0] [-]").
     { iEval (rewrite HA0sp -Hb4). iExact "Hr0". }
     iIntros (CID5 Hs5) "Hcg Hpc Hr0".
     iEval (rgne) in "Hr0".
-    assert (Hpc0a : add_vec_int (mword_of_int (PF + 0x08) : mword 64) 2 = mword_of_int (PF + 0x0a))
+    assert (Hpc0a : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x0a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0a) in "Hpc".
     (* normalize the four saved cells to the epilogue's reload shape *)
@@ -336,7 +333,7 @@ Section ProofProcFreepagetable.
     iEval (rewrite HA0sp HA0s1) in "Hr8".
     iEval (rewrite HA0sp HA0s2) in "Hr0".
     (* +0x0a c.addi4spn s0,sp,32 *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (PF + 0x0a)) (Cregidx (mword_of_int 0))
+    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x0a)) (Cregidx (mword_of_int 0))
               (mword_of_int 8 : mword 8) Rs0 A0 (K - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rdok)
@@ -348,13 +345,13 @@ Section ProofProcFreepagetable.
     change (<[Regidx Rs0 := regval_into_reg
         (add_vec (A0 !!! Regidx csp_rs1)
            (sign_extend' 64 (caddi4spn_imm (mword_of_int 8 : mword 8))))]> A0) with A1.
-    assert (Hpc0c : add_vec_int (mword_of_int (PF + 0x0a) : mword 64) 2 = mword_of_int (PF + 0x0c))
+    assert (Hpc0c : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x0a) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x0c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0c) in "Hpc".
     assert (HA1a0 : A1 !!! Regidx Ra0 = page_base P.(ud_root)).
     { rewrite /A1 upd_ne; [| reg_neq]. rewrite /A0 upd_ne; [| reg_neq]. exact Hroot. }
     (* +0x0c c.mv s1,a0 : s1 := pagetable *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (PF + 0x0c)) Rs1 Ra0 A1 (K - 4)%nat b
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x0c)) Rs1 Ra0 A1 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
@@ -362,14 +359,14 @@ Section ProofProcFreepagetable.
     iEval (rewrite HA1a0 add_vec_zero_l) in "Hcg".
     set (A2 := <[Regidx Rs1 := regval_into_reg (page_base P.(ud_root))]> A1).
     change (<[Regidx Rs1 := regval_into_reg (page_base P.(ud_root))]> A1) with A2.
-    assert (Hpc0e : add_vec_int (mword_of_int (PF + 0x0c) : mword 64) 2 = mword_of_int (PF + 0x0e))
+    assert (Hpc0e : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x0c) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x0e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0e) in "Hpc".
     assert (HA2a1 : A2 !!! Regidx Ra1 = sz).
     { rewrite /A2 upd_ne; [| reg_neq]. rewrite /A1 upd_ne; [| reg_neq].
       rewrite /A0 upd_ne; [| reg_neq]. reflexivity. }
     (* +0x0e c.mv s2,a1 : s2 := sz *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (PF + 0x0e)) Rs2 Ra1 A2 (K - 4)%nat b
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x0e)) Rs2 Ra1 A2 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
@@ -377,7 +374,7 @@ Section ProofProcFreepagetable.
     iEval (rewrite HA2a1 add_vec_zero_l) in "Hcg".
     set (A3 := <[Regidx Rs2 := regval_into_reg sz]> A2).
     change (<[Regidx Rs2 := regval_into_reg sz]> A2) with A3.
-    assert (Hpc10 : add_vec_int (mword_of_int (PF + 0x0e) : mword 64) 2 = mword_of_int (PF + 0x10))
+    assert (Hpc10 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x10))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc10) in "Hpc".
     (* the four facts that survive the whole body *)
@@ -412,39 +409,39 @@ Section ProofProcFreepagetable.
     iPoseProof (pfi_1a with "Htext") as "Hi1a".
     iPoseProof (pfi_1c with "Htext") as "Hi1c".
     (* +0x10 c.li a3,0 : do_free = 0 *)
-    iApply (wp_cli_s_sconf Φ (mword_of_int (PF + 0x10)) Ra3
+    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x10)) Ra3
               (mword_of_int 0 : mword 6) (mword_of_int 0 : mword 64) A3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi10 [-]").
     iIntros (CID9 Hs9) "Hcg Hpc".
     set (B0 := <[Regidx Ra3 := regval_into_reg (mword_of_int 0 : mword 64)]> A3).
-    assert (Hpc12 : add_vec_int (mword_of_int (PF + 0x10) : mword 64) 2 = mword_of_int (PF + 0x12))
+    assert (Hpc12 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x12))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc12) in "Hpc".
     (* +0x12 c.li a2,1 : npages = 1 *)
-    iApply (wp_cli_s_sconf Φ (mword_of_int (PF + 0x12)) Ra2
+    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x12)) Ra2
               (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) B0 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi12 [-]").
     iIntros (CID10 Hs10) "Hcg Hpc".
     set (B1 := <[Regidx Ra2 := regval_into_reg (mword_of_int 1 : mword 64)]> B0).
-    assert (Hpc14 : add_vec_int (mword_of_int (PF + 0x12) : mword 64) 2 = mword_of_int (PF + 0x14))
+    assert (Hpc14 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x12) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x14))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
     (* +0x14 lui a1,0x4000 *)
-    iApply (wp_lui_s_sconf Φ (mword_of_int (PF + 0x14)) Ra1
+    iApply (wp_lui_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x14)) Ra1
               (mword_of_int 16384 : mword 20) (luival (mword_of_int 16384 : mword 20))
               B1 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(reflexivity) with "Hcg Hpc Hi14 [-]").
     iIntros (CID11 Hs11) "Hcg Hpc".
     set (B2 := <[Regidx Ra1 := regval_into_reg (luival (mword_of_int 16384 : mword 20))]> B1).
-    assert (Hpc18 : add_vec_int (mword_of_int (PF + 0x14) : mword 64) 4 = mword_of_int (PF + 0x18))
+    assert (Hpc18 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.proc_freepagetable + 0x18))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc18) in "Hpc".
     (* +0x18 c.addi a1,a1,-1 *)
-    iApply (wp_caddi_s_sconf Φ (mword_of_int (PF + 0x18)) Ra1 (mword_of_int 63 : mword 6)
+    iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x18)) Ra1 (mword_of_int 63 : mword 6)
               B2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [-]").
     iIntros (CID12 Hs12) "Hcg Hpc".
@@ -452,11 +449,11 @@ Section ProofProcFreepagetable.
     set (B3 := <[Regidx Ra1 := regval_into_reg
         (add_vec (B2 !!! Regidx Ra1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))]> B2).
-    assert (Hpc1a : add_vec_int (mword_of_int (PF + 0x18) : mword 64) 2 = mword_of_int (PF + 0x1a))
+    assert (Hpc1a : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x18) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x1a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1a) in "Hpc".
     (* +0x1a c.slli a1,a1,0xc -> a1 = TRAMPOLINE *)
-    iApply (wp_cslli_s_sconf Φ (mword_of_int (PF + 0x1a)) (Regidx Ra1) Ra1
+    iApply (wp_cslli_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x1a)) (Regidx Ra1) Ra1
               (mword_of_int 12 : mword 6) B3 (K - 4)%nat b eq_refl
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi1a [-]").
     iIntros (CID13 Hs13) "Hcg Hpc".
@@ -464,20 +461,20 @@ Section ProofProcFreepagetable.
     set (B4 := <[Regidx Ra1 := regval_into_reg
         (shift_bits_left (B3 !!! Regidx Ra1)
            (subrange_vec_dec (mword_of_int 12 : mword 6) (Z.sub log2_xlen 1) 0))]> B3).
-    assert (Hpc1c : add_vec_int (mword_of_int (PF + 0x1a) : mword 64) 2 = mword_of_int (PF + 0x1c))
+    assert (Hpc1c : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x1c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
     (* +0x1c jal ra,uvmunmap *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (PF + 0x1c)) Rra
-              (mword_of_int 2094928 : mword 21) B4 (K - 4)%nat b
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x1c)) Rra
+              (mword_of_int 2094916 : mword 21) B4 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1c [-]").
     iIntros (CID14 Hs14) "Hcg Hpc".
     set (B5 := <[Regidx Rra := regval_into_reg
-        (add_vec_int (mword_of_int (PF + 0x1c) : mword 64) 4)]> B4).
-    assert (Htgt1 : add_vec (mword_of_int (PF + 0x1c) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2094928 : mword 21))
+        (add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64) 4)]> B4).
+    assert (Htgt1 : add_vec (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64)
+                      (sign_extend' 64 (mword_of_int 2094916 : mword 21))
                     = mword_of_int KernelSyms.uvmunmap)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt1) in "Hpc".
@@ -508,7 +505,7 @@ Section ProofProcFreepagetable.
       repeat (rewrite upd_ne; [| thr_side Hc]).
       first [ reflexivity | apply HA3thr; assumption ]. }
     assert (HB5ra : B5 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (PF + 0x1c) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x1c) : mword 64) 4)
       by (rewrite /B5 upd_eq; reflexivity).
     (* ---- the table, at the fixed-leaf altitude ---- *)
     iDestruct (proc_pt_uptg P with "Hpt") as "Hpt".
@@ -526,7 +523,7 @@ Section ProofProcFreepagetable.
               with "Hcg Hcpu Htext Hpc Hpt Henv [-]").
     iIntros (CID15 Hs15 mr1) "Hcg Hcpu Hpc %Hcs1 Hpt".
     iEval (rewrite (upt_fixed_both_del_tramp P.(ud_tfp))) in "Hpt".
-    assert (Hret20 : ret_pc (B5 !!! Regidx Rra) = mword_of_int (PF + 0x20)).
+    assert (Hret20 : ret_pc (B5 !!! Regidx Rra) = mword_of_int (KernelSyms.proc_freepagetable + 0x20)).
     { rewrite HB5ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret20) in "Hpc".
 
@@ -554,39 +551,39 @@ Section ProofProcFreepagetable.
     { intros c Hc H2 H8 H9 H18.
       rewrite (callee_saved_lookup Hcs1 c Hc). apply HB5thr; assumption. }
     (* +0x20 c.li a3,0 *)
-    iApply (wp_cli_s_sconf Φ (mword_of_int (PF + 0x20)) Ra3
+    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x20)) Ra3
               (mword_of_int 0 : mword 6) (mword_of_int 0 : mword 64) mr1 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi20 [-]").
     iIntros (CID16 Hs16) "Hcg Hpc".
     set (C0 := <[Regidx Ra3 := regval_into_reg (mword_of_int 0 : mword 64)]> mr1).
-    assert (Hpc22 : add_vec_int (mword_of_int (PF + 0x20) : mword 64) 2 = mword_of_int (PF + 0x22))
+    assert (Hpc22 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x20) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x22))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc22) in "Hpc".
     (* +0x22 c.li a2,1 *)
-    iApply (wp_cli_s_sconf Φ (mword_of_int (PF + 0x22)) Ra2
+    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x22)) Ra2
               (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) C0 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc Hi22 [-]").
     iIntros (CID17 Hs17) "Hcg Hpc".
     set (C1 := <[Regidx Ra2 := regval_into_reg (mword_of_int 1 : mword 64)]> C0).
-    assert (Hpc24 : add_vec_int (mword_of_int (PF + 0x22) : mword 64) 2 = mword_of_int (PF + 0x24))
+    assert (Hpc24 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x22) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x24))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc24) in "Hpc".
     (* +0x24 lui a1,0x2000 *)
-    iApply (wp_lui_s_sconf Φ (mword_of_int (PF + 0x24)) Ra1
+    iApply (wp_lui_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x24)) Ra1
               (mword_of_int 8192 : mword 20) (luival (mword_of_int 8192 : mword 20))
               C1 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(reflexivity) with "Hcg Hpc Hi24 [-]").
     iIntros (CID18 Hs18) "Hcg Hpc".
     set (C2 := <[Regidx Ra1 := regval_into_reg (luival (mword_of_int 8192 : mword 20))]> C1).
-    assert (Hpc28 : add_vec_int (mword_of_int (PF + 0x24) : mword 64) 4 = mword_of_int (PF + 0x28))
+    assert (Hpc28 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x24) : mword 64) 4 = mword_of_int (KernelSyms.proc_freepagetable + 0x28))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc28) in "Hpc".
     (* +0x28 c.addi a1,a1,-1 *)
-    iApply (wp_caddi_s_sconf Φ (mword_of_int (PF + 0x28)) Ra1 (mword_of_int 63 : mword 6)
+    iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x28)) Ra1 (mword_of_int 63 : mword 6)
               C2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi28 [-]").
     iIntros (CID19 Hs19) "Hcg Hpc".
@@ -594,11 +591,11 @@ Section ProofProcFreepagetable.
     set (C3 := <[Regidx Ra1 := regval_into_reg
         (add_vec (C2 !!! Regidx Ra1)
            (sign_extend' 64 (sign_extend' 12 (mword_of_int 63 : mword 6))))]> C2).
-    assert (Hpc2a : add_vec_int (mword_of_int (PF + 0x28) : mword 64) 2 = mword_of_int (PF + 0x2a))
+    assert (Hpc2a : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x28) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x2a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* +0x2a c.slli a1,a1,0xd -> a1 = TRAPFRAME *)
-    iApply (wp_cslli_s_sconf Φ (mword_of_int (PF + 0x2a)) (Regidx Ra1) Ra1
+    iApply (wp_cslli_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x2a)) (Regidx Ra1) Ra1
               (mword_of_int 13 : mword 6) C3 (K - 4)%nat b eq_refl
               ltac:(vm_compute; discriminate) ltac:(rdok) with "Hcg Hpc Hi2a [-]").
     iIntros (CID20 Hs20) "Hcg Hpc".
@@ -606,33 +603,33 @@ Section ProofProcFreepagetable.
     set (C4 := <[Regidx Ra1 := regval_into_reg
         (shift_bits_left (C3 !!! Regidx Ra1)
            (subrange_vec_dec (mword_of_int 13 : mword 6) (Z.sub log2_xlen 1) 0))]> C3).
-    assert (Hpc2c : add_vec_int (mword_of_int (PF + 0x2a) : mword 64) 2 = mword_of_int (PF + 0x2c))
+    assert (Hpc2c : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x2a) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x2c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
     assert (HC4s1 : C4 !!! Regidx Rs1 = page_base P.(ud_root)).
     { rewrite /C4 /C3 /C2 /C1 /C0. repeat (rewrite upd_ne; [| reg_neq]). exact Hm1s1. }
     (* +0x2c c.mv a0,s1 *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (PF + 0x2c)) Ra0 Rs1 C4 (K - 4)%nat b
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x2c)) Ra0 Rs1 C4 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2c [-]").
     iIntros (CID21 Hs21) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     iEval (rewrite HC4s1 add_vec_zero_l) in "Hcg".
     set (C5 := <[Regidx Ra0 := regval_into_reg (page_base P.(ud_root))]> C4).
-    assert (Hpc2e : add_vec_int (mword_of_int (PF + 0x2c) : mword 64) 2 = mword_of_int (PF + 0x2e))
+    assert (Hpc2e : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x2c) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x2e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2e) in "Hpc".
     (* +0x2e jal ra,uvmunmap *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (PF + 0x2e)) Rra
-              (mword_of_int 2094910 : mword 21) C5 (K - 4)%nat b
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x2e)) Rra
+              (mword_of_int 2094898 : mword 21) C5 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2e [-]").
     iIntros (CID22 Hs22) "Hcg Hpc".
     set (C6 := <[Regidx Rra := regval_into_reg
-        (add_vec_int (mword_of_int (PF + 0x2e) : mword 64) 4)]> C5).
-    assert (Htgt2 : add_vec (mword_of_int (PF + 0x2e) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2094910 : mword 21))
+        (add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64) 4)]> C5).
+    assert (Htgt2 : add_vec (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64)
+                      (sign_extend' 64 (mword_of_int 2094898 : mword 21))
                     = mword_of_int KernelSyms.uvmunmap)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt2) in "Hpc".
@@ -663,7 +660,7 @@ Section ProofProcFreepagetable.
       repeat (rewrite upd_ne; [| thr_side Hc]).
       first [ reflexivity | apply Hm1thr; assumption ]. }
     assert (HC6ra : C6 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (PF + 0x2e) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x2e) : mword 64) 4)
       by (rewrite /C6 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID15 CID22 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
@@ -681,7 +678,7 @@ Section ProofProcFreepagetable.
     (* the table is BARE now: no trampoline, no trapframe, just the user map *)
     iEval (rewrite (upt_fixed_tf_del_tf P.(ud_tfp)) -/(bare_pt P.(ud_root) P.(ud_um)))
       in "Hpt".
-    assert (Hret32 : ret_pc (C6 !!! Regidx Rra) = mword_of_int (PF + 0x32)).
+    assert (Hret32 : ret_pc (C6 !!! Regidx Rra) = mword_of_int (KernelSyms.proc_freepagetable + 0x32)).
     { rewrite HC6ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret32) in "Hpc".
 
@@ -704,40 +701,40 @@ Section ProofProcFreepagetable.
     { intros c Hc H2 H8 H9 H18.
       rewrite (callee_saved_lookup Hcs2 c Hc). apply HC6thr; assumption. }
     (* +0x32 c.mv a1,s2 : a1 := sz *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (PF + 0x32)) Ra1 Rs2 mr2 (K - 4)%nat b
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x32)) Ra1 Rs2 mr2 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi32 [-]").
     iIntros (CID24 Hs24) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     iEval (rewrite Hm2s2 add_vec_zero_l) in "Hcg".
     set (D0 := <[Regidx Ra1 := regval_into_reg sz]> mr2).
-    assert (Hpc34 : add_vec_int (mword_of_int (PF + 0x32) : mword 64) 2 = mword_of_int (PF + 0x34))
+    assert (Hpc34 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x32) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x34))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc34) in "Hpc".
     assert (HD0s1 : D0 !!! Regidx Rs1 = page_base P.(ud_root))
       by (rewrite /D0 upd_ne; [exact Hm2s1 | reg_neq]).
     (* +0x34 c.mv a0,s1 *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (PF + 0x34)) Ra0 Rs1 D0 (K - 4)%nat b
+    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x34)) Ra0 Rs1 D0 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi34 [-]").
     iIntros (CID25 Hs25) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     iEval (rewrite HD0s1 add_vec_zero_l) in "Hcg".
     set (D1 := <[Regidx Ra0 := regval_into_reg (page_base P.(ud_root))]> D0).
-    assert (Hpc36 : add_vec_int (mword_of_int (PF + 0x34) : mword 64) 2 = mword_of_int (PF + 0x36))
+    assert (Hpc36 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x34) : mword 64) 2 = mword_of_int (KernelSyms.proc_freepagetable + 0x36))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc36) in "Hpc".
     (* +0x36 jal ra,uvmfree *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (PF + 0x36)) Rra
-              (mword_of_int 2095370 : mword 21) D1 (K - 4)%nat b
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x36)) Rra
+              (mword_of_int 2095358 : mword 21) D1 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi36 [-]").
     iIntros (CID26 Hs26) "Hcg Hpc".
     set (D2 := <[Regidx Rra := regval_into_reg
-        (add_vec_int (mword_of_int (PF + 0x36) : mword 64) 4)]> D1).
-    assert (Htgt3 : add_vec (mword_of_int (PF + 0x36) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2095370 : mword 21))
+        (add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64) 4)]> D1).
+    assert (Htgt3 : add_vec (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64)
+                      (sign_extend' 64 (mword_of_int 2095358 : mword 21))
                     = mword_of_int KernelSyms.uvmfree)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgt3) in "Hpc".
@@ -754,7 +751,7 @@ Section ProofProcFreepagetable.
       repeat (rewrite upd_ne; [| thr_side Hc]).
       first [ reflexivity | apply Hm2thr; assumption ]. }
     assert (HD2ra : D2 !!! Regidx Rra
-                    = add_vec_int (mword_of_int (PF + 0x36) : mword 64) 4)
+                    = add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x36) : mword 64) 4)
       by (rewrite /D2 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID23 CID26 ilvl eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
@@ -765,7 +762,7 @@ Section ProofProcFreepagetable.
               ltac:(rewrite HD2a1; exact Hdom)
               with "Hcg Hcpu Htext Hpc Hpt Henv [-]").
     iIntros (CID27 Hs27 mr3) "Hcg Hcpu Hpc %Hcs3".
-    assert (Hret3a : ret_pc (D2 !!! Regidx Rra) = mword_of_int (PF + 0x3a)).
+    assert (Hret3a : ret_pc (D2 !!! Regidx Rra) = mword_of_int (KernelSyms.proc_freepagetable + 0x3a)).
     { rewrite HD2ra. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hret3a) in "Hpc".
 
@@ -785,7 +782,7 @@ Section ProofProcFreepagetable.
     { intros c Hc H2 H8 H9 H18.
       rewrite (callee_saved_lookup Hcs3 c Hc). apply HD2thr; assumption. }
     (* +0x3a c.ldsp ra,24(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (PF + 0x3a)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x3a)) (mword_of_int 3 : mword 6) Rra
               mr3 (K - 4)%nat (mm !!! Regidx Rra) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3a [Hr24] [-]").
@@ -795,12 +792,12 @@ Section ProofProcFreepagetable.
     change (<[Regidx Rra := regval_into_reg (mm !!! Regidx Rra)]> mr3) with E0.
     assert (HE0sp : E0 !!! Regidx csp_rs1 = spd)
       by (rewrite /E0 upd_ne; [exact Hm3sp | reg_neq]).
-    assert (Hpc3c : add_vec_int (mword_of_int (PF + 0x3a) : mword 64) 2
-                    = mword_of_int (PF + 0x3c))
+    assert (Hpc3c : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x3a) : mword 64) 2
+                    = mword_of_int (KernelSyms.proc_freepagetable + 0x3c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc3c) in "Hpc".
     (* +0x3c c.ldsp s0,16(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (PF + 0x3c)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x3c)) (mword_of_int 2 : mword 6) Rs0
               E0 (K - 4)%nat (mm !!! Regidx Rs0) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3c [Hr16] [-]").
@@ -810,12 +807,12 @@ Section ProofProcFreepagetable.
     change (<[Regidx Rs0 := regval_into_reg (mm !!! Regidx Rs0)]> E0) with E1.
     assert (HE1sp : E1 !!! Regidx csp_rs1 = spd)
       by (rewrite /E1 upd_ne; [exact HE0sp | reg_neq]).
-    assert (Hpc3e : add_vec_int (mword_of_int (PF + 0x3c) : mword 64) 2
-                    = mword_of_int (PF + 0x3e))
+    assert (Hpc3e : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x3c) : mword 64) 2
+                    = mword_of_int (KernelSyms.proc_freepagetable + 0x3e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc3e) in "Hpc".
     (* +0x3e c.ldsp s1,8(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (PF + 0x3e)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x3e)) (mword_of_int 1 : mword 6) Rs1
               E1 (K - 4)%nat (mm !!! Regidx Rs1) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3e [Hr8] [-]").
@@ -825,12 +822,12 @@ Section ProofProcFreepagetable.
     change (<[Regidx Rs1 := regval_into_reg (mm !!! Regidx Rs1)]> E1) with E2.
     assert (HE2sp : E2 !!! Regidx csp_rs1 = spd)
       by (rewrite /E2 upd_ne; [exact HE1sp | reg_neq]).
-    assert (Hpc40 : add_vec_int (mword_of_int (PF + 0x3e) : mword 64) 2
-                    = mword_of_int (PF + 0x40))
+    assert (Hpc40 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x3e) : mword 64) 2
+                    = mword_of_int (KernelSyms.proc_freepagetable + 0x40))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc40) in "Hpc".
     (* +0x40 c.ldsp s2,0(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (PF + 0x40)) (mword_of_int 0 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x40)) (mword_of_int 0 : mword 6) Rs2
               E2 (K - 4)%nat (mm !!! Regidx Rs2) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi40 [Hr0] [-]").
@@ -840,8 +837,8 @@ Section ProofProcFreepagetable.
     change (<[Regidx Rs2 := regval_into_reg (mm !!! Regidx Rs2)]> E2) with E3.
     assert (HE3sp : E3 !!! Regidx csp_rs1 = spd)
       by (rewrite /E3 upd_ne; [exact HE2sp | reg_neq]).
-    assert (Hpc42 : add_vec_int (mword_of_int (PF + 0x40) : mword 64) 2
-                    = mword_of_int (PF + 0x42))
+    assert (Hpc42 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x40) : mword 64) 2
+                    = mword_of_int (KernelSyms.proc_freepagetable + 0x42))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc42) in "Hpc".
     (* +0x42 c.addi16sp sp,32 -- the frame pop *)
@@ -871,7 +868,7 @@ Section ProofProcFreepagetable.
       iSplitL "Hr0".  { iExists _. iEval (rewrite Hb4). iExact "Hr0". }
       done. }
     iEval (rewrite -Hwv) in "Hframe4".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (PF + 0x42))
+    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x42))
               (mword_of_int 2 : mword 6) E3 (K - 4)%nat 4 b Hpop
               with "Hcg Hpc Hi42 Hframe4 [-]").
     iIntros (CID32 Hs32) "Hcg Hpc".
@@ -880,8 +877,8 @@ Section ProofProcFreepagetable.
            (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E3) with E4.
     assert (Hnk : ((K - 4) + 4)%nat = K) by lia.
     iEval (rewrite Hnk) in "Hcg".
-    assert (Hpc44 : add_vec_int (mword_of_int (PF + 0x42) : mword 64) 2
-                    = mword_of_int (PF + 0x44))
+    assert (Hpc44 : add_vec_int (mword_of_int (KernelSyms.proc_freepagetable + 0x42) : mword 64) 2
+                    = mword_of_int (KernelSyms.proc_freepagetable + 0x44))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc44) in "Hpc".
     (* +0x44 c.ret *)
@@ -904,7 +901,7 @@ Section ProofProcFreepagetable.
       rewrite /E4 /E3 /E2 /E1 /E0.
       repeat (rewrite upd_ne; [| thr_side Hc]).
       first [ reflexivity | apply Hm3thr; assumption ]. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (PF + 0x44)) Rra E4 K b
+    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.proc_freepagetable + 0x44)) Rra E4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi44 [-]").
     iIntros (CID33 Hs33) "Hcg Hpc".
     iEval (rgne) in "Hpc".

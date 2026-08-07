@@ -246,7 +246,7 @@ Section ProofSwtch.
     assert (Hcsp_t : vregs_den rho swtch_regs1 !!! Regidx csp_rs1
                      = nth 1 new_vs (mword_of_int 0)).
     { rewrite <- Hcallee_new. exact (eq_sym (callee_img_nth1 _ (mword_of_int 0))). }
-    iDestruct (swi_ret with "Ht") as "Hret".
+    iDestruct (swi_68 with "Ht") as "Hret".
     iApply (wp_cret_s_zca_r_later strans_regime Φ
               (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
               (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)

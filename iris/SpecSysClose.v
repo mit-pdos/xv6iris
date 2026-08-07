@@ -61,16 +61,26 @@ Require Import SpecPanic.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecArgfd.
+Require Import KallocInv.
+Require Import PipeInv.
+Require Import SchedCtx.
+Require Import WpUart.
+Require Import DiskPtsto DiskInv.
+Require Import BioInv.
+Require Import FsBlocks LogInv.
+Require Import FsCrash.
+Require Import SpecIput.
+Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
 
-Notation SCL := KernelSyms.sys_close.
 
-(* sys_close's own frame is 4 slots (addi sp,sp,-32); below it argfd wants
-   24, fileclose 18 and myproc 10. *)
-Definition sys_close_stack : nat := 28%nat.
+(* sys_close's own frame is 4 slots (addi sp,sp,-32); below it fileclose
+   wants 68 -- the descriptor may name an inode file, and that arm reaches
+   iput -- argfd 24 and myproc 10. *)
+Definition sys_close_stack : nat := 72%nat.
 
 Section SpecSysClose.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
@@ -88,8 +98,10 @@ Section SpecSysClose.
 
 End SpecSysClose.
 
-Definition wp_sys_close_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl γf : gname)
+Definition wp_sys_close_sconf_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
+    (Φ : mval -> iProp Σ) (γl γf : gname) (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
@@ -106,6 +118,14 @@ Definition wp_sys_close_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   is_ftable γl γf -∗
   panic_wp_any -∗
   proc_priv γf p pid V -∗
+  (* THE CLOSING ENVIRONMENT.  sys_close closes a descriptor of unknown type,
+     so it owns both of fileclose's bundles and hands over whichever the
+     type selects ([SpecFileclose.fileclose_env_split]); the other is
+     untouched and comes straight back.  This is what a syscall that can
+     close ANY [struct file] costs, and there is no honest way to make it
+     smaller: closing an inode file writes the disk and sleeps. *)
+  fileclose_pipe_env Φ fn on n -∗
+  fileclose_fs_env Φ fn n eb p -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
@@ -113,14 +133,20 @@ Definition wp_sys_close_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       sys_close_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
+      (* the whole environment back: the page count may have moved (the
+         descriptor may have held a pipe's last end), which is why the pipe
+         bundle returns under an existential *)
+      (∃ on', fileclose_pipe_env Φ fn on' n) -∗
+      fileclose_fs_env Φ fn n eb p -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl γf : gname)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
+      (Φ : mval -> iProp Σ) (γl γf : gname) (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
-      wp_sys_close_sconf_body Φ γl γf m av n eb p C v pid V b.
+      wp_sys_close_sconf_body Φ γl γf fn on m av n eb p C v pid V b.
 End SYSCLOSE.

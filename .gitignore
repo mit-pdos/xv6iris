@@ -13,3 +13,4 @@ CoqMakefile.conf
 .*.cache
 /xv6-riscv
 __pycache__
+/sail-riscv

@@ -777,9 +777,22 @@ Section IntrDefs.
       iApply (res_transform root_ppn acc ea σ Hacc Hcp HSXL Heff Hpml with "Hri Ht").
   Qed.
 
+  Lemma strans_tmode :
+    forall (σ : mstate),
+      _get_Mstatus_SXL (register_lookup mstatus σ.(sregs)) = 'b"10" ->
+      ⊢ reg_interp σ.(sregs) -∗ strans_inv -∗
+        ⌜ exists md, exec (translationMode Supervisor) σ = Some (md, σ) ⌝.
+  Proof.
+    intros σ HSXL.
+    iIntros "Hri [(_ & Hb & _) | (_ & Hk)]".
+    - iApply (bare_tmode σ HSXL with "Hri Hb").
+    - iDestruct "Hk" as (root_ppn) "Ht".
+      iApply (res_tmode root_ppn σ HSXL with "Hri Ht").
+  Qed.
+
   Definition strans_regime : s_regime :=
     SRegime strans_inv kadm_ident (fun _ _ H => H)
-            strans_absorb strans_transform.
+            strans_absorb strans_transform strans_tmode.
 
   (* [sr_inv strans_regime] is definitionally [strans_inv] -- the bridge the
      leaf/engine call sites use without unfolding the record. *)

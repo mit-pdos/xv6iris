@@ -127,13 +127,12 @@ Definition wp_bwrite_sconf_body
 
      THE PERMIT IS INDEXED BY THIS CALL'S OWN WRITE (phase C2a): bwrite
      always writes, and it writes [bs] at block [bno] -- bytes
-     [1024 * bno ..].  A caller with no durability obligation instantiates
-     [Q := True] with [RiscvPtsto.disk_write_permit_indifferent], whose pure
-     side condition [crash_pred_indifferent] the three log.c call sites carry
-     as a deliberately DELETABLE premise until their real fupds land (phase
-     C2b).  A WRITE's permit is NOT free the way a READ's is, and that is the
-     honest content of the indexed crash predicate. *)
-  disk_write_permit (Some (1024 * uint bno, bs)%Z) Q -∗
+     [1024 * bno ..].  A WRITE's permit is NOT free the way a READ's is, and
+     that is the honest content of the indexed crash predicate: every one of
+     the three log.c call sites supplies a REAL durability fupd
+     ([FsCrash.fs_logfill_permit] and its siblings), and there is no
+     [Pc]-generic way to write a disk block. *)
+  disk_write_permit gen_id (Some (1024 * uint bno, bs)%Z) Q -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
