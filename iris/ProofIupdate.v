@@ -79,7 +79,7 @@ Require Import InodeInv.
 Require Import CodeIupdate.
 Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemmove.
-Require Import ProofIupdateParts.
+Require Import DinodeSlot.
 Require Import SpecIupdate.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

@@ -258,6 +258,12 @@
   2
  ],
  [
+  "CodeIlock.v",
+  "ilock",
+  "ili_",
+  2
+ ],
+ [
   "CodeInitlock.v",
   "initlock",
   "ini_",
@@ -279,6 +285,12 @@
   "CodeIsmapped.v",
   "ismapped",
   "imi_",
+  2
+ ],
+ [
+  "CodeIunlock.v",
+  "iunlock",
+  "iui2_",
   2
  ],
  [

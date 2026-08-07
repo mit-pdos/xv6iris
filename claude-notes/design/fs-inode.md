@@ -668,3 +668,179 @@ even if it had been in scope.
    first per the decode-dedup rule.
 5. `ProofBmap.v` / `LinkBmap.v`.
 6. Then `iupdate`, and `writei` on top of both.
+
+## `ilock` / `iunlock` — the LOAD, and the icache seam (PROVEN 2026-08-07)
+
+`iupdate` is the flush; `ilock` is the load. Same geometry, same `IBLOCK`
+arithmetic, same `DinodeEnc` encoding, `memmove` running the other way.
+`ilock` is 174 bytes at `KernelSyms.ilock`, `iunlock` 64.
+
+```c
+ilock(ip):  if (ip == 0 || ip->ref < 1) panic("ilock");
+            acquiresleep(&ip->lock);
+            if (ip->valid == 0) {
+              bp = bread(ip->dev, IBLOCK(ip->inum, sb));
+              dip = (struct dinode *)bp->data + ip->inum % IPB;
+              ip->type/major/minor/nlink/size = dip->...;
+              memmove(ip->addrs, dip->addrs, sizeof(ip->addrs));
+              brelse(bp); ip->valid = 1;
+              if (ip->type == 0) panic("ilock: no type");
+            }
+iunlock(ip): if (ip == 0 || !holdingsleep(&ip->lock) || ip->ref < 1) panic;
+             releasesleep(&ip->lock);
+```
+
+Files: `InodeLock.v` (the seam), `SpecIlock.v` / `ProofIlock.v` /
+`LinkIlock.v`, `SpecIunlock.v` / `ProofIunlock.v` / `LinkIunlock.v`.
+`K_ilock = 44` (4 frame slots + bread's 40), `K_iunlock = 26` (4 +
+releasesleep's 22). ONE `bslot` — bread's reference, which brelse returns;
+no `log_op`, no `log_ctx`, no `log_write`.
+
+### What it produces: `inode_locked`
+
+Exactly what `readi`, `writei` and `iupdate` consume, bundled:
+
+```coq
+  inode_locked γfs γi cov logstart ip dn bm :=
+    ∃ data, ⌜inode_ok cov logstart dn bm data⌝ ∗ inode_keys γi dn bm ∗
+            i_valid ip ↦₄ 1 ∗ inode_meta ip dn ∗ inode_map γfs ip bm ∗
+            inode_blocks γfs bm data
+
+  inode_ok cov ls dn bm data :=
+    blkmap_wf cov ls bm /\ bm_covers bm (di_size dn)
+    /\ di_addrs dn = bm_cells bm /\ di_type dn <> 0
+    /\ blk_holes_zero bm data
+```
+
+`ilock` is the only function that can mint those, which is why every fs.c
+caller is behind it. **The same conclusion on BOTH arms**: the cached arm
+hands back what the lock parked, the uncached arm reconstitutes it from the
+on-disk dinode, and the contract does not say which happened.
+
+`inode_blocks` and `blk_holes_zero` are in the bundle although ilock never
+touches them: without them a caller holding `inode_locked` still could not
+call `readi`, and threading them through costs four lines. `data` stays
+existential — readi/writei take it as a parameter, so a caller instantiates
+rather than supplies it.
+
+### DEFER the icache — but the seam needs a SHADOW, not just a predicate
+
+The plan was "state `ilock` over an abstract parked-resource predicate".
+That is right, and `InodeLock.inode_parked` is it:
+
+```coq
+  inode_parked γfs γi cov ls ip :=
+    ∃ v dn bm data, ⌜inode_ok cov ls dn bm data⌝ ∗ inode_key γi v dn bm ∗
+      i_valid ip ↦₄ valid_word v ∗ ind_res γfs bm ∗ inode_blocks γfs bm data ∗
+      (if v then inode_meta ip dn ∗ inode_addrs ip (bm_cells bm)
+            else inode_raw ip)
+```
+
+but an EXISTENTIAL predicate alone is not enough, and the reason is worth
+keeping. `is_sleeplock`'s `R` is fixed at lock-creation time while `dn` and
+`bm` move (writei, iupdate), so they must be existential. Yet on the
+`valid = 0` arm ilock reads the dinode OFF THE DISK and must produce
+`inode_map γfs ip bm` — whose `ind_res γfs bm` can only come from the lock.
+So the map the disk names and the map the lock parked have to be the SAME
+`bm`, and nothing in an existential says so. Every route that avoids saying
+it was tried and fails:
+
+- putting the `ind_res` in the CALLER's hands instead is contradictory on
+  the cached arm (two `blk_own` tokens for one indirect block);
+- a `∀ bm, … -∗ ind_res γfs bm` "opener" in the lock is a resource nothing
+  can produce;
+- parameterising `inode_parked` by `dn`/`bm` makes `iunlock` re-parkable
+  only at the values it was locked at, i.e. unusable after any write.
+
+This is `durable-notes.md`'s rule verbatim — *an invariant that takes an
+exclusive fragment across a sleep must RECORD the fragment's value*. The
+record is a `ghost_var` half:
+
+```coq
+  inode_key  γi v dn bm := ghost_var γi (1/2) (v, dn, bm)    (* unlocked *)
+  inode_keys γi   dn bm := inode_key γi true dn bm ∗ inode_key γi true dn bm
+```
+
+The icache holds one half between locks and the lock holds the other;
+locked, the caller holds both — which is what lets it retag the pair after a
+write (`inode_keys_update`) before iunlock parks it again. `ilock` reads the
+two halves against each other (`inode_key_agree`), learns the lock's
+`dn`/`bm` ARE the ones its premises are about, and retags `v := true`.
+`inodeG` is a one-instance class introduced in `InodeLock.v`; nothing below
+the inode layer knows about it.
+
+### The `v` in the shadow is what makes the on-disk premise HONEST
+
+The shadow carries "has this inode ever been loaded", and that is what lets
+the caller state the on-disk agreement CONDITIONALLY:
+
+```
+  vv = false -> ds !!! islot inum = dn
+```
+
+— "if nobody has read this dinode yet, the block you are handing me holds
+it". Unconditionally it would be FALSE for an inode with unflushed in-memory
+changes, and demanding it would make ilock unusable for exactly the inodes
+iupdate exists for. It is the deferred inode table's obligation and the only
+thing ilock cannot check.
+
+Note what this replaced: the design said the `valid = 0` arm needs an
+on-disk well-formedness premise "the way iupdate requires `diblk_wf ds`".
+`diblk_wf` is still required (the block really is sixteen dinodes, for
+`diblk_slot_acc`), but the well-formedness that matters — `blkmap_wf`,
+`bm_covers`, `di_addrs = bm_cells`, `type <> 0` — lives in `inode_ok`
+INSIDE the parked predicate, where the icache establishes it once, rather
+than as a premise every caller restates.
+
+### Both panics are dead, and the second one costs one lemma
+
+`ip == 0 || ip->ref < 1` from `uint ip <> 0` and
+`0 < bv_unsigned refv < 2^31` (`InodeLock.inode_ptr_nonzero` /
+`inode_ref_spos`; the latter is `FileInv.fref_word_spos` for struct file's
+count, one level over). `ip->type == 0` from `inode_ok`'s type conjunct
+carried across the load by the agreement premise — the `lh a5,68(s1)` at
++0x98 reads back the halfword just stored, so the test is about `di_type dn`
+and `il_type_nonzero` closes it. That lemma wants injectivity of
+`sign_extend' 64` at SIXTEEN bits, which `DinodeSlot.trunc16_sext64` already
+gives (`rewrite -(trunc16_sext64 a) -(trunc16_sext64 c)`) — no new bitvector
+work. All three of iunlock's tests are dead the same way, the
+`!holdingsleep` one because `SpecHoldingsleep` is stated in the HOLDER's
+form.
+
+### The proof's shape, and the `s2` quirk
+
+Three lemmas, entered right to left: `il_epilogue` (+0x1e..+0x26, the JOIN),
+`il_load` (+0x36..+0xa0, the uncached arm), `wp_ilock_sconf` (+0x00..+0x1c).
+gcc saves `s2` only on the uncached arm (`sd s2,0(sp)` at +0x36, restored at
++0x9e, one instruction before the `c.j` back to the join) — **bmap's `s4`
+quirk verbatim**: the epilogue takes the FULL `il_thr5` plus frame slot 4 as
+an ANONYMOUS word, the interior carries the weaker `il_thr6`, and no per-arm
+duplication is needed.
+
+**There is no runtime case analysis at the branch.** The cell holds
+`valid_word vv` for the shadow's `vv`, so one `destruct vv` settles at once
+which way the `c.beqz` goes AND which side of the parked resource's `if v`
+is in hand.
+
+### What transferred from iupdate, and the one thing that did not
+
+`ProofIupdateParts.v` was **promoted to `DinodeSlot.v`** rather than copied:
+ilock needed every line of it (the `srliw`/`addw` IBLOCK arithmetic, the
+`andi`/`slli` slot offset, `trunc16_sext64`, the bcache-geometry alignment,
+`dislot` + `dislot_acc_gen` + `diblk_slot_acc`, the three bio-handle lemmas,
+`iu_buf_bytes`), and a Proof file may not require another Proof file. Names
+are unchanged, so `ProofIupdate.v` moved by one `Require` line.
+`SpecIupdate.sb_inodestart` moved to `InodeInv.v` for the same reason — a
+Spec file must not require another function's Spec.
+
+The ONE thing that had to be new is the memmove DESTINATION accessor,
+`ProofIlock.il_addrs_buf_upd`: `InodeInv.inode_addrs_buf` hands the thirteen
+`i_addr` cells out as 52 bytes and takes them back at the SAME list (iupdate
+only reads them), while ilock WRITES them, so the back-wand takes any list
+of the same length. The per-cell 4-alignment the byte view forgets depends
+only on the length, which is why one length premise is all the wand needs.
+
+`ilock` reads the buffer and gives the slot back UNCHANGED, so the inode
+block comes back at `ds` (`<[islot inum := dn]> ds = ds` by `list_insert_id`
+off the agreement premise) and the `bio_locked` brelse demands is what bread
+returned — no `log_write`, which is why ilock needs no log budget at all.

@@ -61,6 +61,7 @@ Require Import FsCrash.   (* [BSIZE]: the block size [bm_covers] divides by *)
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+From Kernel Require KernelSyms.
 
 Local Open Scope Z_scope.
 
@@ -164,6 +165,23 @@ Proof.
   rewrite /pa_add /add_vec_int /i_addr.
   rewrite iv_addv_assoc iv_moi_add (ia_off_arith j). reflexivity.
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  THE ONE SUPERBLOCK FIELD THE INODE LAYER READS                         *)
+(*                                                                          *)
+(*  [sb.inodestart] is at [sb + 24] -- the [lw a1,<off>(a1)] off the        *)
+(*  [auipc a1,0x1d] in iupdate (+0x14) and in ilock (+0x3e) both resolve to *)
+(*  0x80020868, i.e. KernelSyms.sb + 0x18.  It rides through every contract *)
+(*  as a plain FRACTIONAL cell, the way SpecInitlog.v takes [sb + 20] for   *)
+(*  logstart: read once, handed straight back.  There is deliberately no    *)
+(*  superblock abstraction for one field.                                   *)
+(*                                                                          *)
+(*  It lives HERE rather than in a Spec file because iupdate and ilock both *)
+(*  state their contracts on it and a Spec file must not require another    *)
+(*  function's Spec (the [file_byte] relocation, same rule).                *)
+(* ---------------------------------------------------------------------- *)
+Definition sb_inodestart : mword 64 :=
+  pa_add (mword_of_int KernelSyms.sb : mword 64) 24.
 
 (* ===================================================================== *)
 (*  The pure model: a file's block map                                    *)

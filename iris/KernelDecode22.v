@@ -17,6 +17,11 @@ Require Import WpRvcBridge.
 Local Open Scope Z_scope.
 Import Defs.
 
+Lemma kd_05b1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x05b1 : mword 16)) s
+  = Some (C_ADDI (mword_of_int 12, Regidx (mword_of_int 11)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_4481 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x4481 : mword 16)) s
   = Some (C_LI (mword_of_int 0, Regidx (mword_of_int 9)), s).

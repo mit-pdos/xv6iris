@@ -107,13 +107,8 @@ Local Open Scope Z_scope.
    log_write 18 and memmove 2. *)
 Definition K_iupdate : nat := 44%nat.
 
-(* THE SUPERBLOCK FIELD.  [sb.inodestart] is at [sb + 24] -- the [lw
-   a1,1850(a1)] off the [auipc a1,0x1d] at +0x14 resolves to 0x80020868,
-   i.e. KernelSyms.sb + 0x18.  Named here (spec vocabulary belongs in the
-   Spec file) so a caller can state its fraction without recomputing the
-   offset. *)
-Definition sb_inodestart : mword 64 :=
-  pa_add (mword_of_int KernelSyms.sb : mword 64) 24.
+(* [sb_inodestart] -- the [sb + 24] cell iupdate reads at +0x18 -- now
+   lives in InodeInv.v, where ilock's contract can also name it. *)
 
 Definition wp_iupdate_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,

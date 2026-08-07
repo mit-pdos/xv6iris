@@ -5,6 +5,9 @@ This file is the worklist.
 
 ## Status (2026-08-07)
 
+**Stage 4 IS COMPLETE: `ilock` and `iunlock` are proven and linked,
+both with no caveat** (see below).  Stage 3 before it:
+
 **Stage 3 IS COMPLETE: `bmap`, `iupdate`, `writei` and `readi` are all
 proven and linked.** fs.c is **5/24, 910/3338 bytes (27.3%)**; tree totals
 124 proven / 13520 of 23342 bytes (58%). `bmap` and `writei` carry the `!`
@@ -427,6 +430,80 @@ Bmap.wp_bmap_sconf` is unchanged.
       **Neither break arm needed a special case** — both stop `tot` early
       and coverage claims nothing at or above the final size, so the
       disturbed region is out of scope.
+
+## Stage 4 — `ilock` / `iunlock`: PROVEN AND LINKED (2026-08-07)
+
+Both carry **NO caveat** — all six callees (acquiresleep, bread, memmove,
+brelse, holdingsleep, releasesleep) are proven, so
+`Print Assumptions Ilock.wp_ilock_sconf` and the iunlock equivalent are the
+tree's standing six (five `rv64d.*` platform hooks + `functional_extensionality_dep`)
+and nothing else. fs.c is now **7/24, 1148/3338 bytes (34.4%)**; tree totals
+**135 proven / 15062 of 23360 bytes (64%)**, 10 caveats (unchanged).
+`proof_coverage.py --check` rc=0.
+
+Design and the decision record: `../design/fs-inode.md`, "ilock / iunlock —
+the LOAD, and the icache seam". Files:
+
+- **`InodeLock.v`** (NEW, definitional) — the icache seam: `inodeG`,
+  `inode_key`/`inode_keys` (the shadow), `inode_ok`, `inode_raw`,
+  `inode_parked` (the sleeplock's `R`), `inode_locked` (what a holder has),
+  and the two guard readings `inode_ptr_nonzero` / `inode_ref_spos`.
+- **`SpecIlock.v` / `ProofIlock.v` (1939 lines, 33 s) / `LinkIlock.v`**
+- **`SpecIunlock.v` / `ProofIunlock.v` / `LinkIunlock.v`**
+
+### Two relocations, both because a Proof/Spec file may not require a sibling
+
+- **`ProofIupdateParts.v` -> `DinodeSlot.v`** (git rename, declaration list
+  byte-identical). ilock needs EVERY lemma in it, and copying 450 lines of
+  bitvector arithmetic to work around the no-Proof-imports rule is the shape
+  the guiding principle forbids. Names unchanged, so `ProofIupdate.v` moved
+  by one `Require` line. `lemma_diff.py` is silent (git sees the rename).
+- **`SpecIupdate.sb_inodestart` -> `InodeInv.v`.** iupdate and ilock both
+  state contracts on the `sb + 24` cell. `lemma_diff.py` reports it as the
+  single `GONE` — that is the move (same justification as the `file_byte`
+  relocation out of `SpecWritei.v`).
+
+### What this stage paid for (all recur)
+
+- **AN EXISTENTIALLY-QUANTIFIED LOCK RESOURCE CANNOT HAND BACK A RESOURCE
+  THE CALLER MUST IDENTIFY.** ilock's uncached arm reads a `bm` off the disk
+  and needs the lock's `ind_res γfs bm` for the SAME `bm`; an existential
+  `∃ bm, ind_res γfs bm` does not say they agree, and no wand-shaped
+  workaround exists (three were tried; see the design doc). The fix is
+  `durable-notes.md`'s recorded rule — a `ghost_var` half the caller holds
+  between locks — and it is worth reaching for FIRST at any
+  park-and-hand-back seam, not after the arms fail.
+- **PUT THE ARM SELECTOR IN THE SHADOW TOO.** Carrying `v` ("has this inode
+  ever been loaded") in the ghost is what lets ilock's on-disk agreement
+  premise be `v = false -> ds !!! islot inum = dn` rather than an
+  unconditional claim that is FALSE for a dirty inode. It also removes the
+  runtime case analysis: one `destruct vv` decides the `c.beqz` AND which
+  side of the parked resource's `if v` is in hand.
+- **A `c.beqz` ON A 16-BIT FIELD READ BACK BY `lh` NEEDS SIGN-EXTENSION
+  INJECTIVITY AT 16, AND `trunc16_sext64` ALREADY IS IT.**
+  `rewrite -(trunc16_sext64 a) -(trunc16_sext64 c)` gives
+  `sext64_16_inj` in two lines; do not re-derive the `bv_wrap`/`bv_swrap`
+  chain (`ProofBmapParts.bm_eqz_false` is the 32-bit twin, via
+  `sext64_32_inj`).
+- **A `wp_cbeqz_taken_s_sconf` CONTINUATION IS UNDER A `▷`** and needs
+  `iApply bi.later_intro` before `iIntros` (as in ProofBmap); `wp_cj_s_sconf`
+  has the `▷` INSIDE its `wp_next`, so there the `iApply bi.later_intro`
+  comes AFTER `iIntros (CID Hq)`.
+- **A read-only byte-window accessor does not serve a WRITER.**
+  `InodeInv.inode_addrs_buf` returns the cells at the same list;
+  `ProofIlock.il_addrs_buf_upd` is the write-direction twin, back-wand at any
+  list of the same LENGTH (which is all the per-cell alignment depends on).
+- **bmap's `s4` lesson transferred verbatim** at `s2`: saved only on the
+  uncached arm and restored one instruction before the join, so the epilogue
+  takes the full threading plus an ANONYMOUS frame slot and the two arms
+  share it with no duplication.
+
+### Still deferred (unchanged by this stage)
+
+The inode TABLE itself: who mints `inode_parked`/`inode_key` for an entry,
+how `iget` hands out references, how `ip->ref` is counted. `ilock` takes
+`i_ref` as a plain fraction and the on-disk agreement as a premise, which is
+the honest statement of what it guarantees until that layer exists.
 
 ## Deferred: proving balloc
 

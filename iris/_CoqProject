@@ -549,7 +549,7 @@ ProofBmapParts.v
 ProofBmap.v
 LinkBmap.v
 SpecIupdate.v
-ProofIupdateParts.v
+DinodeSlot.v
 ProofIupdate.v
 LinkIupdate.v
 TicksInv.v
@@ -852,3 +852,12 @@ SpecWritei.v
 ProofWriteiParts.v
 ProofWritei.v
 SpecReadi.v
+InodeLock.v
+CodeIlock.v
+CodeIunlock.v
+SpecIlock.v
+ProofIlock.v
+LinkIlock.v
+SpecIunlock.v
+ProofIunlock.v
+LinkIunlock.v
