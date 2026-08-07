@@ -238,8 +238,7 @@ the target equation the lemma already takes as a premise FIRST
 
 ## The capstone: what is proven
 
-`ProofFileclose.v` is at 815 lines, compiles in **19.5 s**, and has ONE
-`admit` left. Proven:
+`ProofFileclose.v` is at 952 lines and has TWO `admit`s left. Proven:
 
 - the prologue (8-slot push, the three spills, the frame pointer, `s1 := f`,
   `a0 := &ftable`) and the `jal acquire`;
@@ -260,11 +259,19 @@ the target equation the lemma already takes as a premise FIRST
   FREE while the payload leaves with the closer — the model's version of
   "`f->type = FD_NONE` before the release".
 
-What the `admit` covers: the second `release`, and the three-way type
-dispatch (`beq s2,1` → pipeclose; `addiw a5,s2,-2; bgeu a4,a5` → begin_op /
-iput / end_op; else nothing), each landing in `fc_restore4` and then
-`fc_epi`. The one piece of arithmetic still owed is that the `addiw`/`bgeu`
-pair is exactly "type ∈ {FD_INODE, FD_DEVICE}".
+- the second `release`, and the FD_PIPE test at `+0x54`/`+0x56`. `s2` holds
+  the SIGN-EXTENDED `ff.type`, so the `beq` compares at 64 bits while the
+  content field is 32; `fc_ty_eq1` says the two tests agree, because sign
+  extension is injective and `trunc32` is its inverse. That is what lets the
+  proof case on `fc_type Cf = FD_PIPE` rather than on a register value.
+
+What the two remaining `admit`s cover: the three arms — `pipeclose`,
+`begin_op`/`iput`/`end_op`, and nothing — each landing in `fc_restore4` and
+then `fc_epi`. The next thing to prove is the arithmetic of the second test:
+`addiw a5,s2,-2; bgeu a4,a5` with `a4 = 1` is exactly "type ∈ {FD_INODE,
+FD_DEVICE}", and it has to hold for an ARBITRARY 32-bit type field — the
+`addiw` wraps, so a type at or above 2^31 sign-extends negative and still has
+to come out of the comparison on the right side.
 
 It stays out of `iris/` until that admit is gone: `proof_coverage.py --check`
 rejects an `iris/*.v` that `_CoqProject` omits, and listing it would put an
