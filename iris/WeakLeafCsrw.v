@@ -67,216 +67,9 @@ Local Open Scope Z_scope.
     [exec_returnM] → [exec_eff_returnM], [exec_read_reg]/[exec_write_reg] →
     their eff twins. *)
 
-(** *** 1a. The hartSupports leaves *)
-
-Lemma exec_eff_hartSupports_S s :
-  exec_eff (hartSupports Ext_S) s = Some (true, s, []).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_S) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)).
-  apply exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_hartSupports_U s :
-  exec_eff (hartSupports Ext_U) s = Some (true, s, []).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_U) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)).
-  apply exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_hartSupports_Zicsr s :
-  exec_eff (hartSupports Ext_Zicsr) s = Some (true, s, []).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Zicsr) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)).
-  apply exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_hartSupports_Zicfilp s :
-  exec_eff (hartSupports Ext_Zicfilp) s = Some (true, s, []).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Zicfilp) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)).
-  apply exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_hartSupports_Sv32 s :
-  exec_eff (hartSupports Ext_Sv32) s = Some (false, s, []).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Sv32) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)).
-  replace (andb false (Z.eqb xlen 32)) with false by (vm_compute; reflexivity).
-  apply exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_hartSupports_Sv39 s :
-  exec_eff (hartSupports Ext_Sv39) s = Some (true, s, []).
-Proof.
-  unfold hartSupports. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_hartSupports]. unfold Defs.assert_exp'.
-  replace (Z.geb (hartSupports_measure Ext_Sv39) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)).
-  replace (andb true (Z.eqb xlen 64)) with true by (vm_compute; reflexivity).
-  apply exec_eff_returnM.
-Qed.
-
-(** *** 1b. The currentlyEnabled chain *)
-
-Lemma exec_eff_rec_cE_Zicsr_any (k : Z) (acc : Acc (Zwf 0) k) s :
-  Z.geb k 0 = true ->
-  exec_eff (_rec_currentlyEnabled Ext_Zicsr k acc) s = Some (true, s, []).
-Proof.
-  intro Hk. destruct acc. cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  rewrite Hk. cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)). cbn match.
-  apply exec_eff_hartSupports_Zicsr.
-Qed.
-
-Lemma exec_eff_currentlyEnabled_S s :
-  exec_eff (currentlyEnabled Ext_S) s
-    = Some (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1"), s, []).
-Proof.
-  unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_S) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)). cbn match.
-  rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_hartSupports_S s)).
-  cbn match.
-  match goal with |- context[Defs.and_boolM ?l _] =>
-    assert (Hmb : exec_eff l s
-                  = Some (eq_vec (_get_Misa_S (register_lookup misa s.(sregs)))
-                            ('b"1"), s, []))
-      by (rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg misa s));
-          apply exec_eff_returnM);
-    rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hmb)
-  end.
-  destruct (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1")) eqn:Hb.
-  - match goal with |- context[_rec_currentlyEnabled Ext_Zicsr ?k ?a] =>
-      exact (exec_eff_rec_cE_Zicsr_any k a s ltac:(vm_compute; reflexivity)) end.
-  - reflexivity.
-Qed.
-
-Lemma exec_eff_currentlyEnabled_U s :
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec_eff (currentlyEnabled Ext_U) s = Some (true, s, []).
-Proof.
-  intro HU. unfold currentlyEnabled. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-  replace (Z.geb (currentlyEnabled_measure Ext_U) 0) with true by reflexivity.
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)). cbn match.
-  rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_hartSupports_U s)). cbn match.
-  match goal with |- context[Defs.and_boolM ?l _] =>
-    assert (Hu : exec_eff l s = Some (true, s, [])) by
-      (rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg misa s));
-       rewrite (exec_eff_returnM _ s); rewrite HU; reflexivity);
-    rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hu)
-  end. cbn match.
-  match goal with |- context[_rec_currentlyEnabled Ext_Zicsr ?k ?acc] =>
-    destruct acc; cbn [_rec_currentlyEnabled]; unfold Defs.assert_exp';
-    replace (Z.geb k 0) with true by reflexivity; cbn match;
-    rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)); cbn match
-  end.
-  apply exec_eff_hartSupports_Zicsr.
-Qed.
-
-Lemma exec_eff_virtual_memory_supported s :
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec_eff (virtual_memory_supported tt) s = Some (true, s, []).
-Proof.
-  intro HS. unfold virtual_memory_supported. destruct (Defs.Zwf_guarded _).
-  cbn [_rec_virtual_memory_supported]. unfold Defs.assert_exp'.
-  replace (Z.geb 3 0) with true by reflexivity. cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)). cbn match.
-  match goal with |- context[_rec_currentlyEnabled Ext_Sv32 ?k ?a] =>
-    assert (H32 : exec_eff (_rec_currentlyEnabled Ext_Sv32 k a) s
-                  = Some (false, s, [])) end.
-  { match goal with |- exec_eff (_rec_currentlyEnabled Ext_Sv32 ?k ?a) s = _ =>
-      destruct a end.
-    cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-    replace (Z.geb (Z.sub 3 1) 0) with true by reflexivity. cbn match.
-    rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)). cbn match.
-    rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_hartSupports_Sv32 s)).
-    reflexivity. }
-  rewrite (exec_eff_or_boolM_nil _ _ _ _ _ H32). cbn match.
-  match goal with |- context[_rec_currentlyEnabled Ext_Sv39 ?k ?a] =>
-    assert (H39 : exec_eff (_rec_currentlyEnabled Ext_Sv39 k a) s
-                  = Some (true, s, [])) end.
-  { match goal with |- exec_eff (_rec_currentlyEnabled Ext_Sv39 ?k ?a) s = _ =>
-      destruct a end.
-    cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-    replace (Z.geb (Z.sub 3 1) 0) with true by reflexivity. cbn match.
-    rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)). cbn match.
-    rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_hartSupports_Sv39 s)).
-    cbn match.
-    match goal with |- context[_rec_currentlyEnabled Ext_S ?k ?a] =>
-      assert (HSm : exec_eff (_rec_currentlyEnabled Ext_S k a) s
-                    = Some (eq_vec (_get_Misa_S (register_lookup misa s.(sregs)))
-                              ('b"1"), s, [])) end.
-    { match goal with |- exec_eff (_rec_currentlyEnabled Ext_S ?k ?a) s = _ =>
-        destruct a end.
-      cbn [_rec_currentlyEnabled]. unfold Defs.assert_exp'.
-      replace (Z.geb (Z.sub (Z.sub 3 1) 1) 0) with true by reflexivity. cbn match.
-      rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM eq_refl s)). cbn match.
-      rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_hartSupports_S s)).
-      cbn match.
-      match goal with |- context[Defs.and_boolM ?l _] =>
-        assert (Hmb : exec_eff l s
-                      = Some (eq_vec (_get_Misa_S (register_lookup misa s.(sregs)))
-                                ('b"1"), s, []))
-          by (rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg misa s));
-              apply exec_eff_returnM);
-        rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hmb)
-      end.
-      destruct (eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1"))
-        eqn:Hb.
-      - match goal with |- context[_rec_currentlyEnabled Ext_Zicsr ?k2 ?a2] =>
-          exact (exec_eff_rec_cE_Zicsr_any k2 a2 s ltac:(reflexivity)) end.
-      - reflexivity. }
-    rewrite HSm. rewrite HS. reflexivity. }
-  rewrite (exec_eff_or_boolM_nil _ _ _ _ _ H39). reflexivity.
-Qed.
-
-Lemma exec_eff_lowest_supported_privLevel s :
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec_eff (lowest_supported_privLevel tt) s = Some (User, s, []).
-Proof.
-  intro HU. unfold lowest_supported_privLevel.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_currentlyEnabled_U s HU)).
-  cbn match.
-  apply exec_eff_returnM.
-Qed.
-
-Lemma exec_eff_have_nominal_privLevel (priv : mword 2) s :
-  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
-  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
-  exec_eff (have_nominal_privLevel priv) s = Some (have_nom_val priv, s, []).
-Proof.
-  intros HU HS. unfold have_nominal_privLevel, have_nom_val.
-  destruct (eq_vec priv ('b"00")) eqn:E0.
-  - exact (exec_eff_currentlyEnabled_U s HU).
-  - destruct (eq_vec priv ('b"01")) eqn:E1.
-    + rewrite (exec_eff_currentlyEnabled_S s). rewrite HS. reflexivity.
-    + apply exec_eff_returnM.
-Qed.
+(** *** 1a/1b. The hartSupports / currentlyEnabled ENABLEMENT CHAIN now
+    lives in [WeakLeafEffCommon] §2 (hoisted when the second csrw leaf
+    landed, as the batch-2 worklist records). *)
 
 (** *** 1c. The legalizer *)
 
@@ -538,16 +331,8 @@ Proof.
     rewrite sregs_set_reg. apply register_lookup_set.
 Qed.
 
-(** The data half of a text-only window ([wwin pc pc 0]) is empty
-    ([WkEntryNew.win0_absurd], cloned — that file is not imported here). *)
-Lemma cw_win0_absurd (Q : nat -> Prop) :
-  forall j : nat, (j < N.to_nat 0)%nat -> Q j.
-Proof. intros j Hj. exfalso. cbn in Hj. lia. Qed.
-
-(** One-read no-write trace ([WkEntryEff.nowrite_read1], same clone note). *)
-Lemma cw_nowrite_read1 (ak : akinfo) (pa : Arch.pa) (n : N) :
-  nowrite_trace [WEread ak pa n].
-Proof. constructor; [exact I|constructor]. Qed.
+(** The window/trace nat-helpers ([win0_absurd] / [nowrite_read1]) come
+    from [WeakLeafEffCommon] §3 (hoisted; this file had clones). *)
 
 (* ====================================================================== *)
 (** ** 3. THE LEAF *)
@@ -627,7 +412,7 @@ Section leaf.
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc 4])
               wQ_pure Hgid Haccpc Hpmp HmIE HMPRV
               (wcert_nowrite (fin_to_nat cpu_id) pc
-                 [WEread wak_plain pc 4] (cw_nowrite_read1 wak_plain pc 4))
+                 [WEread wak_plain pc 4] (nowrite_read1 wak_plain pc 4))
               with "Hhw Hmiv Hhs Hpriv Hms0 Hpmpc Hpc [] ").
     { iApply (winstr_intro pc false
                 (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
@@ -708,8 +493,8 @@ Section leaf.
       apply (wP_eff_of_leaf_base (fin_to_nat cpu_id) σ (wwin pc pc 0)
                pc w (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW)) [] D dst).
       - exact Hwf.
-      - exact (wwin_nonzero pc pc 0 Hram (cw_win0_absurd _)).
-      - exact (wwin_pinned σ pc pc 0 Haccpc Hacc0 Hpin (cw_win0_absurd _)).
+      - exact (wwin_nonzero pc pc 0 Hram (win0_absurd _)).
+      - exact (wwin_pinned σ pc pc 0 Haccpc Hacc0 Hpin (win0_absurd _)).
       - exact Lpc0.
       - exact Lpriv.
       - rewrite Lpmpc. exact Hpmp.

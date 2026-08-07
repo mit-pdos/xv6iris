@@ -265,10 +265,8 @@ End leaf_same.
 (* ====================================================================== *)
 (** ** 2. Small helpers for the chain *)
 
-(** The data half of a text-only window ([wwin pc pc 0]) is empty. *)
-Lemma win0_absurd (Q : nat -> Prop) :
-  forall j : nat, (j < N.to_nat 0)%nat -> Q j.
-Proof. intros j Hj. exfalso. cbn in Hj. lia. Qed.
+(** The data half of a text-only window is empty:
+    [WeakLeafEffCommon.win0_absurd] (hoisted). *)
 
 (** RAM facts for an 8-byte window at a concrete address. *)
 Ltac ram_win8 :=

@@ -143,10 +143,7 @@ Lemma misaM_of_val (rs : Riscv.rv64d_types.regstate) :
   eq_vec (_get_Misa_M (register_lookup misa rs)) ('b"1") = true.
 Proof. intros ->. vm_compute. reflexivity. Qed.
 
-(** One-read no-write traces (the fetch of a 4-aligned or RVC instruction). *)
-Lemma nowrite_read1 (ak : akinfo) (pa : Arch.pa) (n : N) :
-  nowrite_trace [WEread ak pa n].
-Proof. constructor; [exact I|constructor]. Qed.
+(** One-read no-write traces: [WeakLeafEffCommon.nowrite_read1] (hoisted). *)
 
 (* ====================================================================== *)
 (** ** 2. THE SEVEN REGISTER-ONLY [exec_eff] MIRRORS
