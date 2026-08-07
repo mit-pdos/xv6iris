@@ -12,11 +12,14 @@
       ([WpSmodePtLock.exec_execute_AMOSWAP_4_gpr_S_walk_pt] over
       [WpAmo]'s Supervisor stack, and [UserMemArms]' U-mode arms); there was
       no M-mode [exec_execute_AMOSWAP_4_gpr] anywhere.  §§1–3 are the
-      Machine-privilege clones of [WpAmo]'s [Atomic (AMOSWAP, Data, Data)]
-      chain — the privilege-independent leaves ([exec_pmaCheck_ram_amo_4],
+      Machine-privilege clones of [WpAmo]'s
+      [Atomic (AMOSWAP, true, false, Data, Data)] chain — the
+      privilege-independent leaves ([exec_pmaCheck_ram_amo_4],
       [exec_read_ram_resacq_4], [exec_write_ram_cond_4],
-      [exec_mem_write_ea_amo_4], [exec_is_shadow_stack_amo]) are REUSED
-      verbatim from [WpAmo] rather than cloned.
+      [exec_is_shadow_stack_amo]) are REUSED verbatim from [WpAmo] rather than
+      cloned.  ([mem_write_ea] used to be on that list; since the sail bump it
+      resolves the effective privilege and runs the full PMA/PMP check, so it
+      is privilege-dependent and gets an M-mode clone here.)
 
       HALF B, §§5–7, is the [exec_eff] mirror, [exec_eff_execute_AMOSWAP_4_gpr],
       whose trace is exactly TWO ADJACENT elements — the read then the write.
@@ -25,15 +28,15 @@
     THE TWO ACCESS KINDS, READ OFF THE MODEL (NOT GUESSED)
     ===================================================================
 
-    [execute_AMO] (rv64d.v:40350) issues its read as
+    [execute_AMO] (rv64d.v:41898) issues its read as
     [mem_read access pbmt addr width aq (aq && rl) true] and its write as
     [mem_write_value addr width … (aq && rl) rl true].  At [aq = true],
     [rl = false] that is [(aq, rl, res) = (true, false, true)] for the read
     and [(aq, rl, con) = (false, false, true)] for the write.  Hence:
 
       READ.  [read_kind_of_flags true false true = Read_RISCV_reserved_acquire]
-             (**rv64d.v:22529**), and [read_ram]'s [Read_RISCV_reserved_acquire]
-             arm (**rv64d.v:6162–6165**) builds
+             (**rv64d.v:23709**), and [read_ram]'s [Read_RISCV_reserved_acquire]
+             arm (**rv64d.v:6983–6986**) builds
              [AK_explicit {| variety := AV_exclusive;
                              strength := AS_rel_or_acq |}].
              [WeakInterp.classify] (WeakInterp.v:248) of that is
@@ -46,8 +49,8 @@
              acquire certificate applies; no model finding to report against.
 
       WRITE. [write_kind_of_flags false false true = Write_RISCV_conditional]
-             (**rv64d.v:22549**), and [write_ram]'s [Write_RISCV_conditional]
-             arm (**rv64d.v:6108–6111**) builds
+             (**rv64d.v:23734**), and [write_ram]'s [Write_RISCV_conditional]
+             arm (**rv64d.v:6929–6932**) builds
              [AK_explicit {| variety := AV_exclusive;
                              strength := AS_normal |}], whose [classify] is
              **[AkInfo false true false]** — exclusive (latest) but NOT
@@ -81,7 +84,7 @@
     in [WpMmodeLeafBase]'s [Section ExecStoreG] (l.883).  In the [exec_eff]
     section that premise is replaced by the abstract
     [Hpmp_eff : exec_eff (pmpCheck (Physaddr pa) 4
-                            (Atomic (AMOSWAP, Data, Data)) Machine) s
+                            (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
                 = Some (None, s, [])]
     (dischargeable by [WeakPmpEff.exec_eff_pmpCheck_machine_none]), and the
     four MMIO-window probes are taken in their [exec_eff] form with the empty
@@ -123,16 +126,19 @@ Import Defs.
 
 Lemma exec_effectivePrivilege_amo_M (m : mword 64) s :
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
-  exec (effectivePrivilege (Atomic (AMOSWAP, Data, Data)) m Machine) s = Some (Machine, s).
+  exec (effectivePrivilege (Atomic (AMOSWAP, true, false, Data, Data)) m Machine) s
+    = Some (Machine, s).
 Proof.
-  intro H. unfold effectivePrivilege. cbn [generic_neq generic_eq].
+  intro H. unfold effectivePrivilege.
+  replace (generic_neq (Atomic (AMOSWAP, true, false, Data, Data)) (InstructionFetch tt)) with true
+    by (vm_compute; reflexivity).
   rewrite H. cbn [andb]. apply exec_returnm.
 Qed.
 
 Lemma exec_translateAddr_identity_amo_M (a : mword 64) s :
   register_lookup cur_privilege s.(sregs) = Machine ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false ->
-  exec (translateAddr (Virtaddr a) (Atomic (AMOSWAP, Data, Data))) s
+  exec (translateAddr (Virtaddr a) (Atomic (AMOSWAP, true, false, Data, Data))) s
     = Some (Ok (Physaddr (zero_extend' 64 (bits_of_virtaddr (Virtaddr a))),
                 PBMT_PMA, init_ext_ptw), s).
 Proof.
@@ -144,24 +150,24 @@ Proof.
   rewrite Hcp.
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_amo_M _ s Hmprv)).
   rewrite (execR_liftR_seq _ _ _ _ _ (exec_translationMode_M s)).
-  rewrite (execR_liftR_seq _ _ _ _ _ (exec_is_shadow_stack_amo s)).
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_is_shadow_stack_amo true false s)).
   unfold Defs.bind0.
   replace (generic_eq Bare Bare) with true by (vm_compute; reflexivity).
   rewrite execR_bind. cbn match. reflexivity.
 Qed.
 
 Lemma exec_is_pmm_applicable_amo_M s :
-  exec (is_pmm_applicable (Atomic (AMOSWAP, Data, Data)) Machine) s = Some (true, s).
+  exec (is_pmm_applicable (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s = Some (true, s).
 Proof.
   unfold is_pmm_applicable.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (InstructionFetch tt)) with true
+  replace (generic_neq (Atomic (AMOSWAP, true, false, Data, Data)) (InstructionFetch tt)) with true
     by (vm_compute; reflexivity). cbn match.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (Load PageTableEntry)) with true
+  replace (generic_neq (Atomic (AMOSWAP, true, false, Data, Data)) (Load PageTableEntry)) with true
     by (vm_compute; reflexivity). cbn match.
   rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (Store PageTableEntry)) with true
+  replace (generic_neq (Atomic (AMOSWAP, true, false, Data, Data)) (Store PageTableEntry)) with true
     by (vm_compute; reflexivity). cbn match.
   match goal with
   | |- context [ and_boolM ?orb _ ] => assert (Hor : exec orb s = Some (true, s))
@@ -176,7 +182,7 @@ Qed.
 
 Lemma exec_get_pmlen_amo_M s :
   pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs))) = PMM_Disabled ->
-  exec (get_pmlen (Atomic (AMOSWAP, Data, Data)) Machine) s = Some (0, s).
+  exec (get_pmlen (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s = Some (0, s).
 Proof.
   intro Hpmm. unfold get_pmlen.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_is_pmm_applicable_amo_M s)).
@@ -194,7 +200,7 @@ Lemma exec_transform_effective_address_amo_M (ea : mword 64) s :
   register_lookup cur_privilege s.(sregs) = Machine ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
   pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs))) = PMM_Disabled ->
-  exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, Data, Data))) s
+  exec (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, true, false, Data, Data))) s
     = Some (pm_transform_PA (Virtaddr ea) 0, s).
 Proof.
   intros Hcp Hmprv Hpmm. unfold transform_effective_address.
@@ -215,13 +221,16 @@ Qed.
     [_checked_mem_write_] / [_mem_write_value_] with the Supervisor PMP walk
     replaced by the ABSTRACT [pmpCheck] fact (which at M-mode comes from
     [RiscvTryStep.exec_pmpCheck_machine_none], i.e. from unlocked entries),
-    and [Supervisor] replaced by [Machine].  The [read_ram] /[write_ram]
-    leaves, the PMA check and [mem_write_ea] are privilege-independent and are
-    reused from [WpAmo] verbatim. *)
+    and [Supervisor] replaced by [Machine].  The [read_ram] / [write_ram]
+    leaves and the PMA check are privilege-independent and are reused from
+    [WpAmo] verbatim; [mem_write_ea] is NOT any more (since the sail bump it
+    resolves the effective privilege and runs the full PMA/PMP check), so it
+    gets an M-mode clone here too. *)
 
 Lemma exec_checked_mem_read_ram_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 32) s :
-  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s = Some (None, s) ->
+  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
+    = Some (None, s) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
@@ -234,36 +243,65 @@ Lemma exec_checked_mem_read_ram_amo_4_M (pbmt : page_based_mem_type) (addr : mwo
   dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec (checked_mem_read (Atomic (AMOSWAP, Data, Data)) pbmt Machine (Physaddr addr) 4
-          true false true false) s = Some (Ok (w, default_meta), s).
+  exec (checked_mem_read (Atomic (AMOSWAP, true, false, Data, Data)) pbmt Machine
+          (Physaddr addr) 4 true false true false) s = Some (Ok (w, default_meta), s).
 Proof.
   intros Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes.
-  unfold checked_mem_read.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ Hpmp).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _
-                (exec_pmaCheck_ram_amo_4 addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
-      cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s))).
-  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (read_kind_of_flags _ _ _) s
-                 = Some (rv64d_types.Read_RISCV_reserved_acquire, s))).
+  assert (Hcp : exec (check_pma_with_pmp_priority (Atomic (AMOSWAP, true, false, Data, Data))
+                        pbmt Machine (Physaddr addr) 4 true) s = Some (Ok pma_ok_aligned, s)).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_amo_4 addr pbmt region true false s
+                  Hmatch Halign Hread Hwrite Hamo)).
+    cbn match. apply exec_returnM. }
+  assert (Hmmio : exec (within_mmio_readable (Physaddr addr) 4) s = Some (false, s)).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  unfold checked_mem_read. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 4 0 s)). cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (read_kind_of_flags _ _ true) s
+                  = Some (rv64d_types.Read_RISCV_reserved_acquire, s))).
   2:{ unfold read_kind_of_flags. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_ram_resacq_4 addr w s Hdev Hbytes)).
-  apply exec_returnM.
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m ?c ?b) _] =>
+    assert (Hu : execR (Defs.untilMT vs m c b) s = Some (inr (w, true, 0), s)) end.
+  { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    assert (Havi : add_vec_int addr (0 * 4) = addr)
+      by (change (0 * 4)%Z with 0%Z; apply avi0).
+    rewrite Havi.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hpmp). cbn beta.
+    cbn match.
+    match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+      assert (Hseq : execR (Defs.bind0 a b) s = Some (inr false, s)) end.
+    { rewrite execR_bind0. rewrite execR_returnR. cbn match.
+      rewrite execR_liftR. rewrite Hmmio. reflexivity. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta. cbn match.
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+      assert (Hrd : execR (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                    = Some (inr w, s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_ram_resacq_4 addr w s Hdev Hbytes)).
+      cbn beta match. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hrd). cbn beta zeta.
+    rewrite autocast_id. rewrite usvd_zeros_full_32.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite autocast_id. rewrite execR_returnR. reflexivity.
 Qed.
 
 Lemma exec_mem_read_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 32) (m : mword 64) s :
-  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s = Some (None, s) ->
+  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
+    = Some (None, s) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
@@ -279,8 +317,8 @@ Lemma exec_mem_read_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
   register_lookup cur_privilege s.(sregs) = Machine ->
-  exec (mem_read (Atomic (AMOSWAP, Data, Data)) pbmt (Physaddr addr) 4 true false true)
-       s = Some (Ok w, s).
+  exec (mem_read (Atomic (AMOSWAP, true, false, Data, Data)) pbmt (Physaddr addr) 4
+          true false true) s = Some (Ok w, s).
 Proof.
   intros Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes Hms Hmprv Hpriv.
   unfold mem_read.
@@ -292,18 +330,82 @@ Proof.
   unfold mem_read_priv.
   rewrite (exec_bind_Some _ _ _ _ _
             (_ : exec (mem_read_priv_meta _ _ _ _ 4 _ _ _ _) s = Some (Ok (w, default_meta), s))).
-  2:{ unfold mem_read_priv_meta.
-      rewrite Halign. cbn [orb andb negb Riscv.rv64d.not].
+  2:{ (* [mem_read_priv_meta] no longer guards on alignment; it dispatches on the
+         (aq, rl, res) triple and this one is the general arm *)
+      unfold mem_read_priv_meta. cbn match.
       rewrite (exec_bind_Some _ _ _ _ _
                 (_ : exec (checked_mem_read _ _ _ _ 4 _ _ _ _) s = Some (Ok (w, default_meta), s))).
-      2:{ cbn match. apply exec_checked_mem_read_ram_amo_4_M with (region := region); assumption. }
+      2:{ apply exec_checked_mem_read_ram_amo_4_M with (region := region); assumption. }
       cbn match. unfold mem_read_callback. apply exec_returnM. }
   cbn [MemoryOpResult_drop_meta]. apply exec_returnM.
 Qed.
 
+(** [mem_write_ea] is no longer a bare write-kind computation: since the bump
+    it resolves the effective privilege, runs the PMA/PMP check and walks the
+    same one-iteration split loop as [checked_mem_write] (announcing the write
+    address per split with [write_ram_ea], a state no-op).  So the M-mode AMO
+    needs its own clone of [WpAmo.exec_mem_write_ea_amo_4] — the region and
+    privilege facts are now premises. *)
+Lemma exec_mem_write_ea_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (m : mword 64) s :
+  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
+    = Some (None, s) ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
+  is_aligned_paddr (Physaddr addr) 4 = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+  pma_allows_atomic_op ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support))
+    AMOSWAP 4 = true ->
+  register_lookup mstatus s.(sregs) = m ->
+  eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
+  register_lookup cur_privilege s.(sregs) = Machine ->
+  exec (mem_write_ea (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) pbmt
+          false false true) s = Some (Ok tt, s).
+Proof.
+  intros Hpmp Hmatch Halign Hread Hwrite Hamo Hms Hmprv Hpriv.
+  assert (Hcp : exec (check_pma_with_pmp_priority (Atomic (AMOSWAP, true, false, Data, Data))
+                        pbmt Machine (Physaddr addr) 4 true) s = Some (Ok pma_ok_aligned, s)).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_amo_4 addr pbmt region true false s
+                  Hmatch Halign Hread Hwrite Hamo)).
+    cbn match. apply exec_returnM. }
+  unfold mem_write_ea. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite Hpriv. rewrite Hms.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_effectivePrivilege_amo_M m s Hmprv)).
+  cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 4 0 s)). cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (write_kind_of_flags false false true) s
+                  = Some (rv64d_types.Write_RISCV_conditional, s))).
+  2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?b) _] =>
+    assert (Hu : execR (Defs.untilMT vs m0 c b) s = Some (inr (true, 0), s)) end.
+  { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    assert (Havi : add_vec_int addr (0 * 4) = addr)
+      by (change (0 * 4)%Z with 0%Z; apply avi0).
+    rewrite Havi.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hpmp).
+    cbn beta. cbn match.
+    rewrite execR_bind0. rewrite execR_returnR. cbn match zeta.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite execR_returnR. reflexivity.
+Qed.
+
 Lemma exec_checked_mem_write_ram_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (data : bv 32) s :
-  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s = Some (None, s) ->
+  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
+    = Some (None, s) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
@@ -314,39 +416,66 @@ Lemma exec_checked_mem_write_ram_amo_4_M (pbmt : page_based_mem_type) (addr : mw
   exec (within_sig (Physaddr addr) 4) s = Some (false, s) ->
   exec (within_htif_writable (Physaddr addr) 4) s = Some (false, s) ->
   dev_addr addr = false ->
-  exec (checked_mem_write (Physaddr addr) 4 data (Atomic (AMOSWAP, Data, Data)) pbmt Machine
-          tt false false true) s
+  exec (checked_mem_write (Physaddr addr) 4 data (Atomic (AMOSWAP, true, false, Data, Data))
+          pbmt Machine tt false false true) s
     = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
 Proof.
   intros Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev.
-  unfold checked_mem_write.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (phys_access_check _ _ _ _ _ _) s = Some (None, s))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_bind_Some _ _ _ _ _ Hpmp).
-      cbn match.
-      rewrite (exec_bind_Some _ _ _ _ _
-                (exec_pmaCheck_ram_amo_4 addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
-      cbn match. apply exec_returnM. }
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (within_mmio_writable (Physaddr addr) 4) s = Some (false, s))).
-  2:{ unfold within_mmio_writable. cbn [get_config_rvfi].
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
-  cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _
-            (_ : exec (write_kind_of_flags false false true) s
-                 = Some (rv64d_types.Write_RISCV_conditional, s))).
+  assert (Hcp : exec (check_pma_with_pmp_priority (Atomic (AMOSWAP, true, false, Data, Data))
+                        pbmt Machine (Physaddr addr) 4 true) s = Some (Ok pma_ok_aligned, s)).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_bind_Some _ _ _ _ _
+               (exec_pmaCheck_ram_amo_4 addr pbmt region true false s
+                  Hmatch Halign Hread Hwrite Hamo)).
+    cbn match. apply exec_returnM. }
+  assert (Hmmio : exec (within_mmio_writable (Physaddr addr) 4) s = Some (false, s)).
+  { unfold within_mmio_writable. cbn [get_config_rvfi].
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_or_boolM_Some _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ Hh). cbn match. reflexivity. }
+  set (sw := MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
+  unfold checked_mem_write. rewrite exec_catch_early_return.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_bind. rewrite execR_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr 4 0 s)). cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _
+             (_ : exec (write_kind_of_flags false false true) s
+                  = Some (rv64d_types.Write_RISCV_conditional, s))).
   2:{ unfold write_kind_of_flags. cbn match. apply exec_returnM. }
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_write_ram_cond_4 addr data s Hdev)).
-  apply exec_returnM.
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?b) _] =>
+    assert (Hu : execR (Defs.untilMT vs m0 c b) s = Some (inr (true, 0, true), sw)) end.
+  { eapply execR_untilMT_1; [ reflexivity | | apply execR_returnR_fwd ].
+    rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    assert (Havi : add_vec_int addr (0 * 4) = addr)
+      by (change (0 * 4)%Z with 0%Z; apply avi0).
+    rewrite Havi.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hpmp).
+    cbn beta. cbn match.
+    rewrite execR_bind0. rewrite execR_returnR. cbn match zeta.
+    rewrite (execR_liftR_seq _ _ _ _ _ Hmmio). cbn beta. cbn match.
+    rewrite autocast_id.
+    change (8 * (0 + 1) * 4 - 1) with 31. change (8 * 0 * 4) with 0.
+    rewrite subrange_full_32.
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (write_ram ?wk ?pa ?wd ?dt ?mt)) ?k1) _] =>
+      assert (Hwr : execR (Defs.bind (Defs.liftR (write_ram wk pa wd dt mt)) k1) s
+                    = Some (inr true, sw)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ (exec_write_ram_cond_4 addr data s Hdev)).
+      cbn beta. cbn [andb]. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hwr). cbn beta zeta.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite execR_returnR. reflexivity.
 Qed.
 
 Lemma exec_mem_write_value_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (data : bv 32) (m : mword 64) s :
-  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s = Some (None, s) ->
+  exec (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
+    = Some (None, s) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
@@ -360,7 +489,7 @@ Lemma exec_mem_write_value_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
   register_lookup cur_privilege s.(sregs) = Machine ->
-  exec (mem_write_value (Physaddr addr) 4 data (Atomic (AMOSWAP, Data, Data)) pbmt
+  exec (mem_write_value (Physaddr addr) 4 data (Atomic (AMOSWAP, true, false, Data, Data)) pbmt
           false false true) s
     = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
 Proof.
@@ -371,7 +500,6 @@ Proof.
   rewrite Hpriv. rewrite Hms.
   rewrite (exec_bind_Some _ _ _ _ _ (exec_effectivePrivilege_amo_M m s Hmprv)).
   unfold mem_write_value_priv_meta.
-  rewrite Halign. cbn [orb andb negb Riscv.rv64d.not].
   rewrite (exec_bind_Some _ _ _ _ _
             (exec_checked_mem_write_ram_amo_4_M pbmt addr region data s
                Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev)).
@@ -433,8 +561,8 @@ Lemma exec_execute_AMOSWAP_4_gpr :
                      (sign_extend' 64
                         (autocast (T := mword) (w : mword (8 * 4)) : mword (4 * 8))))).
 Proof.
-  assert (Hpmpchk : exec (pmpCheck (Physaddr pa) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s
-                    = Some (None, s))
+  assert (Hpmpchk : exec (pmpCheck (Physaddr pa) 4 (Atomic (AMOSWAP, true, false, Data, Data))
+                            Machine) s = Some (None, s))
     by (apply exec_pmpCheck_machine_none; exact Hpmp).
   change (execute (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd)))
     with (execute_AMO AMOSWAP true false (Regidx rs2) (Regidx rs1) 4 (Regidx rd)).
@@ -445,11 +573,12 @@ Proof.
     by (unfold assert_exp'; cbn match; apply exec_returnm).
   rewrite (execR_liftR_seq _ _ _ _ _ Hae).
   assert (Hgta : exec (get_transformed_data_addr (Regidx rs1) (zeros' 64)
-                         (Atomic (AMOSWAP, Data, Data)) 4) s
+                         (Atomic (AMOSWAP, true, false, Data, Data)) 4) s
                  = Some (Ext_DataAddr_OK (Virtaddr a8), s)).
   { unfold get_transformed_data_addr.
     rewrite (exec_bind_Some _ _ _ _ _
-              (exec_ext_data_get_addr_gpr rs1 (zeros' 64) (Atomic (AMOSWAP, Data, Data)) 4 s)).
+              (exec_ext_data_get_addr_gpr rs1 (zeros' 64)
+                 (Atomic (AMOSWAP, true, false, Data, Data)) 4 s)).
     cbn match.
     rewrite (exec_bind_Some _ _ _ _ _
               (exec_transform_effective_address_amo_M ea s Hcp Hmprv Hpmm)).
@@ -463,12 +592,12 @@ Proof.
   cbn match.
   rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (Physaddr pa, PBMT_PMA) s)).
   cbn beta match.
-  replace (Z.leb 4 xlen_bytes) with true by (vm_compute; reflexivity).
-  cbv iota.
-  rewrite execR_bind.
-  rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
-  cbn beta. rewrite execR_returnR. cbn match.
-  rewrite (execR_liftR_seq _ _ _ _ _ (exec_mem_write_ea_amo_4 pa s Hpalign)).
+  (* upstream reordered the body: the effective-address announcement and the
+     load now run BEFORE [rs2] is read *)
+  rewrite (execR_liftR_seq _ _ _ _ _
+            (exec_mem_write_ea_amo_4_M PBMT_PMA pa region
+               (register_lookup mstatus s.(sregs)) s
+               Hpmpchk Hmatch Hpalign Hread Hwrite Hamo eq_refl Hmprv Hcp)).
   cbn match.
   rewrite execR_bind.
   rewrite (execR_liftR_seq _ _ _ _ _
@@ -476,6 +605,11 @@ Proof.
                Hpmpchk Hmatch Hpalign Hread Hwrite Hamo Hc Hsig Hhr Hdev
                (fun j Hj => Hbytes j Hj) eq_refl Hmprv Hcp)).
   cbn match. rewrite execR_returnR. cbn match.
+  replace (Z.leb 4 xlen_bytes) with true by (vm_compute; reflexivity).
+  cbv iota.
+  rewrite execR_bind.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_rX_bits_gpr rs2 s)).
+  cbn beta. rewrite execR_returnR. cbn match.
   cbn zeta. cbn match.
   replace (generic_eq AMOSWAP AMOCAS) with false by (vm_compute; reflexivity).
   unfold and_boolM.
@@ -602,21 +736,24 @@ Qed.
 
 Lemma exec_eff_effectivePrivilege_amo_M (m : mword 64) s :
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
-  exec_eff (effectivePrivilege (Atomic (AMOSWAP, Data, Data)) m Machine) s
+  exec_eff (effectivePrivilege (Atomic (AMOSWAP, true, false, Data, Data)) m Machine) s
     = Some (Machine, s, []).
 Proof.
-  intro H. unfold effectivePrivilege. cbn [generic_neq generic_eq].
+  intro H. unfold effectivePrivilege.
+  replace (generic_neq (Atomic (AMOSWAP, true, false, Data, Data)) (InstructionFetch tt)) with true
+    by (vm_compute; reflexivity).
   rewrite H. cbn [andb]. apply exec_eff_returnm.
 Qed.
 
 Lemma exec_eff_is_shadow_stack_amo s :
-  exec_eff (is_shadow_stack_access (Atomic (AMOSWAP, Data, Data))) s = Some (false, s, []).
+  exec_eff (is_shadow_stack_access (Atomic (AMOSWAP, true, false, Data, Data))) s
+    = Some (false, s, []).
 Proof. unfold is_shadow_stack_access. cbn match. apply exec_eff_returnM. Qed.
 
 Lemma exec_eff_translateAddr_identity_amo_M (a : mword 64) s :
   register_lookup cur_privilege s.(sregs) = Machine ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1" : mword 1) = false ->
-  exec_eff (translateAddr (Virtaddr a) (Atomic (AMOSWAP, Data, Data))) s
+  exec_eff (translateAddr (Virtaddr a) (Atomic (AMOSWAP, true, false, Data, Data))) s
     = Some (Ok (Physaddr (zero_extend' 64 (bits_of_virtaddr (Virtaddr a))),
                 PBMT_PMA, init_ext_ptw), s, []).
 Proof.
@@ -635,17 +772,18 @@ Proof.
 Qed.
 
 Lemma exec_eff_is_pmm_applicable_amo_M s :
-  exec_eff (is_pmm_applicable (Atomic (AMOSWAP, Data, Data)) Machine) s = Some (true, s, []).
+  exec_eff (is_pmm_applicable (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
+    = Some (true, s, []).
 Proof.
   unfold is_pmm_applicable.
   rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (InstructionFetch tt)) with true
+  replace (generic_neq (Atomic (AMOSWAP, true, false, Data, Data)) (InstructionFetch tt)) with true
     by (vm_compute; reflexivity). cbn match.
   rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (Load PageTableEntry)) with true
+  replace (generic_neq (Atomic (AMOSWAP, true, false, Data, Data)) (Load PageTableEntry)) with true
     by (vm_compute; reflexivity). cbn match.
   rewrite (exec_eff_and_boolM_nil _ _ _ _ _ (exec_eff_returnM _ s)).
-  replace (generic_neq (Atomic (AMOSWAP, Data, Data)) (Store PageTableEntry)) with true
+  replace (generic_neq (Atomic (AMOSWAP, true, false, Data, Data)) (Store PageTableEntry)) with true
     by (vm_compute; reflexivity). cbn match.
   match goal with
   | |- context [ and_boolM ?orb _ ] => assert (Hor : exec_eff orb s = Some (true, s, []))
@@ -660,7 +798,7 @@ Qed.
 
 Lemma exec_eff_get_pmlen_amo_M s :
   pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs))) = PMM_Disabled ->
-  exec_eff (get_pmlen (Atomic (AMOSWAP, Data, Data)) Machine) s = Some (0, s, []).
+  exec_eff (get_pmlen (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s = Some (0, s, []).
 Proof.
   intro Hpmm. unfold get_pmlen.
   rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_is_pmm_applicable_amo_M s)).
@@ -679,7 +817,8 @@ Lemma exec_eff_transform_effective_address_amo_M (ea : mword 64) s :
   register_lookup cur_privilege s.(sregs) = Machine ->
   eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false ->
   pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs))) = PMM_Disabled ->
-  exec_eff (transform_effective_address (Virtaddr ea) (Atomic (AMOSWAP, Data, Data))) s
+  exec_eff (transform_effective_address (Virtaddr ea)
+              (Atomic (AMOSWAP, true, false, Data, Data))) s
     = Some (pm_transform_PA (Virtaddr ea) 0, s, []).
 Proof.
   intros Hcp Hmprv Hpmm. unfold transform_effective_address.
@@ -693,6 +832,10 @@ Proof.
   apply exec_eff_returnM.
 Qed.
 
+(** [pmaCheck] answers a PLAN since the sail bump ([result Phys_Mem_Access_Info
+    ExceptionType], an early-return body ending in [mag_pma_check]); the AMO arm
+    asserts [res_or_con] and then conjoins the three PMA facts.  Mirror of
+    [WpAmo.exec_pmaCheck_ram_amo_4], which is the SC original. *)
 Lemma exec_eff_pmaCheck_ram_amo_4 (addr : mword 64) (pbmt : page_based_mem_type)
     (region : PMA_Region) s :
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
@@ -701,44 +844,88 @@ Lemma exec_eff_pmaCheck_ram_amo_4 (addr : mword 64) (pbmt : page_based_mem_type)
   (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
   pma_allows_atomic_op ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support))
     AMOSWAP 4 = true ->
-  exec_eff (pmaCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) pbmt true) s
-    = Some (None, s, []).
+  exec_eff (pmaCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) pbmt true) s
+    = Some (Ok pma_ok_aligned, s, []).
 Proof.
   intros Hmatch Halign Hread Hwrite Hamo.
-  unfold pmaCheck.
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_read_reg pma_regions s)).
-  rewrite Hmatch.
   destruct region as [rbase rsize rattr rdtree].
   cbn [PMA_Region_attributes] in Hread, Hwrite, Hamo |- *.
-  rewrite Halign. cbn [Riscv.rv64d.not negb].
-  rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnM None s)).
-  cbn match beta.
-  match goal with |- exec_eff (Defs.bind ?m ?k) s = _ =>
-    assert (Hass : exec_eff m s
-            = Some (andb (PMA_readable (override_PMA rattr pbmt))
-                      (andb (PMA_writable (override_PMA rattr pbmt))
-                         (pma_allows_atomic_op (PMA_atomic_support (override_PMA rattr pbmt))
-                            AMOSWAP 4)), s, []))
-      by (rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_returnm eq_refl s));
-          apply exec_eff_returnM);
-    rewrite (exec_eff_bind_nil _ _ _ _ _ Hass)
-  end.
-  cbn beta.
-  rewrite Hread Hwrite Hamo. cbn [andb]. cbn match.
-  apply exec_eff_returnM.
+  unfold pmaCheck. rewrite exec_eff_catch_early_return.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_read_reg pma_regions s)). cbn beta.
+  rewrite Hmatch.
+  cbn match.
+  rewrite execR_eff_bind_eq. rewrite execR_eff_returnR. cbn match beta.
+  rewrite execR_eff_bind_eq.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_assert_exp'_true _ s)). cbn beta.
+  rewrite execR_eff_returnR. cbn match beta.
+  rewrite Hread. rewrite Hwrite. rewrite Hamo. cbn [andb Riscv.rv64d.not negb].
+  rewrite (execR_eff_liftR_seq _ _ _ _ _
+             (exec_eff_mag_pma_check_aligned _ (Atomic (AMOSWAP, true, false, Data, Data))
+                (Physaddr addr) 4 true s (exec_eff_is_mag_applicable_amo AMOSWAP true false 4 s)
+                Halign)).
+  cbn beta. cbn match. rewrite execR_eff_returnR. cbn [app]. reflexivity.
 Qed.
 
-Lemma exec_eff_mem_write_ea_amo_4 (addr : mword 64) s :
+(** [mem_write_ea]'s eff mirror: since the bump it resolves the effective
+    privilege and runs the full PMA/PMP check + the one-iteration split loop,
+    so it needs all the region facts (and the PMP grant) the write itself does.
+    Everything on the path is register-only, so the trace stays empty:
+    [write_ram_ea] is a pure [tt]. *)
+Lemma exec_eff_mem_write_ea_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
+    (region : PMA_Region) (m : mword 64) s :
+  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
+    = Some (None, s, []) ->
+  matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
-  exec_eff (mem_write_ea (Physaddr addr) 4 false false true) s = Some (Ok tt, s, []).
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_readable) = true ->
+  (override_PMA (PMA_Region_attributes region) pbmt).(PMA_writable) = true ->
+  pma_allows_atomic_op ((override_PMA (PMA_Region_attributes region) pbmt).(PMA_atomic_support))
+    AMOSWAP 4 = true ->
+  register_lookup mstatus s.(sregs) = m ->
+  eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
+  register_lookup cur_privilege s.(sregs) = Machine ->
+  exec_eff (mem_write_ea (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) pbmt
+              false false true) s = Some (Ok tt, s, []).
 Proof.
-  intro Halign. unfold mem_write_ea.
-  rewrite Halign. cbn [orb andb negb Riscv.rv64d.not].
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (write_kind_of_flags false false true) s
-                 = Some (rv64d_types.Write_RISCV_conditional, s, []))).
+  intros Hpmp Hmatch Halign Hread Hwrite Hamo Hms Hmprv Hpriv.
+  assert (Hcp : exec_eff (check_pma_with_pmp_priority
+                            (Atomic (AMOSWAP, true, false, Data, Data)) pbmt Machine
+                            (Physaddr addr) 4 true) s = Some (Ok pma_ok_aligned, s, [])).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_pmaCheck_ram_amo_4 addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
+    cbn match. apply exec_eff_returnM. }
+  unfold mem_write_ea. rewrite exec_eff_catch_early_return.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_read_reg mstatus s)). cbn beta.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_read_reg cur_privilege s)). cbn beta.
+  rewrite Hpriv. rewrite Hms.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_effectivePrivilege_amo_M m s Hmprv)).
+  cbn beta.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_eff_bind_eq. rewrite execR_eff_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_split_misaligned_unsplit addr 4 0 s)).
+  cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _
+             (_ : exec_eff (write_kind_of_flags false false true) s
+                  = Some (rv64d_types.Write_RISCV_conditional, s, []))).
   2:{ unfold write_kind_of_flags. cbn match. apply exec_eff_returnM. }
-  apply exec_eff_returnM.
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?b) _] =>
+    assert (Hu : execR_eff (Defs.untilMT vs m0 c b) s = Some (inr (true, 0), s, [])) end.
+  { eapply execR_eff_untilMT_1; [ reflexivity | | apply execR_eff_returnR ].
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    assert (Havi : add_vec_int addr (0 * 4) = addr)
+      by (change (0 * 4)%Z with 0%Z; apply avi0).
+    rewrite Havi.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hpmp).
+    cbn beta. cbn match.
+    rewrite execR_eff_bind0_eq. rewrite execR_eff_returnR. cbn match zeta.
+    rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+  rewrite (execR_eff_bind_nil _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite execR_eff_returnR. reflexivity.
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -747,11 +934,11 @@ Qed.
     The PMP grant arrives as the abstract [exec_eff] fact (empty trace); every
     check above the [read_ram]/[write_ram] leaf is register-only, so
     [WeakEff.exec_eff_bind_nil] carries each one through unchanged and only the
-    leaf's bind needs the concatenating [_bind_Some]. *)
+    leaf's bind needs the concatenating [_bind_cat]. *)
 
 Lemma exec_eff_checked_mem_read_ram_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 32) s :
-  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s
+  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
     = Some (None, s, []) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
@@ -765,37 +952,67 @@ Lemma exec_eff_checked_mem_read_ram_amo_4_M (pbmt : page_based_mem_type) (addr :
   dev_addr addr = false ->
   (forall j : nat, (N.of_nat j < 4)%N ->
      s.(mem) !! (pa_add addr j) = Some (nth_byte w j)) ->
-  exec_eff (checked_mem_read (Atomic (AMOSWAP, Data, Data)) pbmt Machine (Physaddr addr) 4
-              true false true false) s
+  exec_eff (checked_mem_read (Atomic (AMOSWAP, true, false, Data, Data)) pbmt Machine
+              (Physaddr addr) 4 true false true false) s
     = Some (Ok (w, default_meta), s, [WEread (AkInfo false true true) addr 4]).
 Proof.
   intros Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes.
-  unfold checked_mem_read.
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (phys_access_check _ _ _ _ _ _) s = Some (None, s, []))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_eff_bind_nil _ _ _ _ _ Hpmp).
-      cbn match.
-      rewrite (exec_eff_bind_nil _ _ _ _ _
-                (exec_eff_pmaCheck_ram_amo_4 addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
-      cbn match. apply exec_eff_returnM. }
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (within_mmio_readable (Physaddr addr) 4) s = Some (false, s, []))).
-  2:{ unfold within_mmio_readable. cbn [get_config_rvfi].
-      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (read_kind_of_flags _ _ _) s
-                 = Some (rv64d_types.Read_RISCV_reserved_acquire, s, []))).
+  assert (Hcp : exec_eff (check_pma_with_pmp_priority
+                            (Atomic (AMOSWAP, true, false, Data, Data)) pbmt Machine
+                            (Physaddr addr) 4 true) s = Some (Ok pma_ok_aligned, s, [])).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_pmaCheck_ram_amo_4 addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
+    cbn match. apply exec_eff_returnM. }
+  assert (Hmmio : exec_eff (within_mmio_readable (Physaddr addr) 4) s = Some (false, s, [])).
+  { unfold within_mmio_readable. cbn [get_config_rvfi].
+    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
+  unfold checked_mem_read. rewrite exec_eff_catch_early_return.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_eff_bind_eq. rewrite execR_eff_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_split_misaligned_unsplit addr 4 0 s)).
+  cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _
+             (_ : exec_eff (read_kind_of_flags _ _ true) s
+                  = Some (rv64d_types.Read_RISCV_reserved_acquire, s, []))).
   2:{ unfold read_kind_of_flags. apply exec_eff_returnM. }
-  rewrite (exec_eff_bind_Some _ _ _ _ _ _ (exec_eff_read_ram_resacq_4 addr w s Hdev Hbytes)).
-  rewrite exec_eff_returnM. cbn [app]. reflexivity.
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?b) _] =>
+    assert (Hu : execR_eff (Defs.untilMT vs m0 c b) s
+                 = Some (inr (w, true, 0), s, [WEread (AkInfo false true true) addr 4])) end.
+  { eapply execR_eff_untilMT_1; [ reflexivity | | apply execR_eff_returnR ].
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    assert (Havi : add_vec_int addr (0 * 4) = addr)
+      by (change (0 * 4)%Z with 0%Z; apply avi0).
+    rewrite Havi.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hpmp). cbn beta.
+    cbn match.
+    match goal with |- context[Defs.bind (Defs.bind0 ?a ?b) _] =>
+      assert (Hseq : execR_eff (Defs.bind0 a b) s = Some (inr false, s, [])) end.
+    { rewrite execR_eff_bind0_eq. rewrite execR_eff_returnR. cbn match.
+      rewrite execR_eff_liftR. rewrite Hmmio. cbn [app]. reflexivity. }
+    rewrite (execR_eff_bind_nil _ _ _ _ _ Hseq). cbn beta. cbn match.
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (read_ram ?rk ?pa ?wd ?mt)) ?k1) _] =>
+      assert (Hrd : execR_eff (Defs.bind (Defs.liftR (read_ram rk pa wd mt)) k1) s
+                    = Some (inr w, s, [WEread (AkInfo false true true) addr 4])) end.
+    { rewrite (execR_eff_liftR_cat _ _ _ _ _ _ (exec_eff_read_ram_resacq_4 addr w s Hdev Hbytes)).
+      cbn beta match. rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+    rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hrd). cbn beta zeta.
+    rewrite autocast_id. rewrite usvd_zeros_full_32.
+    rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+  rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite autocast_id. rewrite execR_eff_returnR. cbn [app]. reflexivity.
 Qed.
 
 Lemma exec_eff_mem_read_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (w : bv 32) (m : mword 64) s :
-  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s
+  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
     = Some (None, s, []) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
@@ -812,7 +1029,8 @@ Lemma exec_eff_mem_read_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
   register_lookup cur_privilege s.(sregs) = Machine ->
-  exec_eff (mem_read (Atomic (AMOSWAP, Data, Data)) pbmt (Physaddr addr) 4 true false true) s
+  exec_eff (mem_read (Atomic (AMOSWAP, true, false, Data, Data)) pbmt (Physaddr addr) 4
+              true false true) s
     = Some (Ok w, s, [WEread (AkInfo false true true) addr 4]).
 Proof.
   intros Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev Hbytes Hms Hmprv Hpriv.
@@ -827,14 +1045,14 @@ Proof.
             (_ : exec_eff (mem_read_priv_meta _ _ _ _ 4 _ _ _ _) s
                  = Some (Ok (w, default_meta), s,
                          [WEread (AkInfo false true true) addr 4]))).
-  2:{ unfold mem_read_priv_meta.
-      rewrite Halign. cbn [orb andb negb Riscv.rv64d.not].
+  2:{ (* [mem_read_priv_meta] dispatches on the (aq, rl, res) triple; this one
+         is the general arm *)
+      unfold mem_read_priv_meta. cbn match.
       rewrite (exec_eff_bind_Some _ _ _ _ _ _
                 (_ : exec_eff (checked_mem_read _ _ _ _ 4 _ _ _ _) s
                      = Some (Ok (w, default_meta), s,
                              [WEread (AkInfo false true true) addr 4]))).
-      2:{ cbn match.
-          apply exec_eff_checked_mem_read_ram_amo_4_M with (region := region); assumption. }
+      2:{ apply exec_eff_checked_mem_read_ram_amo_4_M with (region := region); assumption. }
       cbn match. unfold mem_read_callback.
       rewrite exec_eff_returnM. cbn [app]. reflexivity. }
   cbn [MemoryOpResult_drop_meta].
@@ -843,7 +1061,7 @@ Qed.
 
 Lemma exec_eff_checked_mem_write_ram_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (data : bv 32) s :
-  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s
+  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
     = Some (None, s, []) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
@@ -855,40 +1073,70 @@ Lemma exec_eff_checked_mem_write_ram_amo_4_M (pbmt : page_based_mem_type) (addr 
   exec_eff (within_sig (Physaddr addr) 4) s = Some (false, s, []) ->
   exec_eff (within_htif_writable (Physaddr addr) 4) s = Some (false, s, []) ->
   dev_addr addr = false ->
-  exec_eff (checked_mem_write (Physaddr addr) 4 data (Atomic (AMOSWAP, Data, Data)) pbmt Machine
-              tt false false true) s
+  exec_eff (checked_mem_write (Physaddr addr) 4 data
+              (Atomic (AMOSWAP, true, false, Data, Data)) pbmt Machine tt false false true) s
     = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev),
             [WEwrite (AkInfo false true false) addr 4 data]).
 Proof.
   intros Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev.
-  unfold checked_mem_write.
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (phys_access_check _ _ _ _ _ _) s = Some (None, s, []))).
-  2:{ unfold phys_access_check.
-      rewrite (exec_eff_bind_nil _ _ _ _ _ Hpmp).
-      cbn match.
-      rewrite (exec_eff_bind_nil _ _ _ _ _
-                (exec_eff_pmaCheck_ram_amo_4 addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
-      cbn match. apply exec_eff_returnM. }
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (within_mmio_writable (Physaddr addr) 4) s = Some (false, s, []))).
-  2:{ unfold within_mmio_writable. cbn [get_config_rvfi].
-      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
-      rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
-      rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
-  cbn match.
-  rewrite (exec_eff_bind_nil _ _ _ _ _
-            (_ : exec_eff (write_kind_of_flags false false true) s
-                 = Some (rv64d_types.Write_RISCV_conditional, s, []))).
+  assert (Hcp : exec_eff (check_pma_with_pmp_priority
+                            (Atomic (AMOSWAP, true, false, Data, Data)) pbmt Machine
+                            (Physaddr addr) 4 true) s = Some (Ok pma_ok_aligned, s, [])).
+  { unfold check_pma_with_pmp_priority.
+    rewrite (exec_eff_bind_nil _ _ _ _ _
+               (exec_eff_pmaCheck_ram_amo_4 addr pbmt region s Hmatch Halign Hread Hwrite Hamo)).
+    cbn match. apply exec_eff_returnM. }
+  assert (Hmmio : exec_eff (within_mmio_writable (Physaddr addr) 4) s = Some (false, s, [])).
+  { unfold within_mmio_writable. cbn [get_config_rvfi].
+    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hc). cbn match.
+    rewrite (exec_eff_or_boolM_nil _ _ _ _ _ Hsig). cbn match.
+    rewrite (exec_eff_and_boolM_nil _ _ _ _ _ Hh). cbn match. reflexivity. }
+  set (sw := MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev)).
+  unfold checked_mem_write. rewrite exec_eff_catch_early_return.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ Hcp). cbn beta. cbn match.
+  rewrite execR_eff_bind_eq. rewrite execR_eff_returnR. cbn match beta.
+  rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_split_misaligned_unsplit addr 4 0 s)).
+  cbn beta.
+  rewrite misaligned_order_1. cbn zeta.
+  rewrite (execR_eff_liftR_seq _ _ _ _ _
+             (_ : exec_eff (write_kind_of_flags false false true) s
+                  = Some (rv64d_types.Write_RISCV_conditional, s, []))).
   2:{ unfold write_kind_of_flags. cbn match. apply exec_eff_returnM. }
-  rewrite (exec_eff_bind_Some _ _ _ _ _ _ (exec_eff_write_ram_cond_4 addr data s Hdev)).
-  reflexivity.
+  cbn beta.
+  match goal with |- context[Defs.bind (Defs.untilMT ?vs ?m0 ?c ?b) _] =>
+    assert (Hu : execR_eff (Defs.untilMT vs m0 c b) s
+                 = Some (inr (true, 0, true), sw,
+                         [WEwrite (AkInfo false true false) addr 4 data])) end.
+  { eapply execR_eff_untilMT_1; [ reflexivity | | apply execR_eff_returnR ].
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_assert_exp'_true _ s)). cbn beta.
+    change (bits_of_physaddr (Physaddr addr)) with addr.
+    assert (Havi : add_vec_int addr (0 * 4) = addr)
+      by (change (0 * 4)%Z with 0%Z; apply avi0).
+    rewrite Havi.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hpmp).
+    cbn beta. cbn match.
+    rewrite execR_eff_bind0_eq. rewrite execR_eff_returnR. cbn match zeta.
+    rewrite (execR_eff_liftR_seq _ _ _ _ _ Hmmio). cbn beta. cbn match.
+    rewrite autocast_id.
+    change (8 * (0 + 1) * 4 - 1) with 31. change (8 * 0 * 4) with 0.
+    rewrite subrange_full_32.
+    match goal with
+      |- context[Defs.bind (Defs.bind (Defs.liftR (write_ram ?wk ?pa ?wd ?dt ?mt)) ?k1) _] =>
+      assert (Hwr : execR_eff (Defs.bind (Defs.liftR (write_ram wk pa wd dt mt)) k1) s
+                    = Some (inr true, sw,
+                            [WEwrite (AkInfo false true false) addr 4 data])) end.
+    { rewrite (execR_eff_liftR_cat _ _ _ _ _ _ (exec_eff_write_ram_cond_4 addr data s Hdev)).
+      cbn beta. cbn [andb]. rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+    rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hwr). cbn beta zeta.
+    rewrite execR_eff_returnR. cbn [app]. reflexivity. }
+  rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hu). cbn beta zeta.
+  rewrite execR_eff_returnR. cbn [app]. reflexivity.
 Qed.
 
 Lemma exec_eff_mem_write_value_amo_4_M (pbmt : page_based_mem_type) (addr : mword 64)
     (region : PMA_Region) (data : bv 32) (m : mword 64) s :
-  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s
+  exec_eff (pmpCheck (Physaddr addr) 4 (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
     = Some (None, s, []) ->
   matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr addr) 4 = Some region ->
   is_aligned_paddr (Physaddr addr) 4 = true ->
@@ -903,8 +1151,8 @@ Lemma exec_eff_mem_write_value_amo_4_M (pbmt : page_based_mem_type) (addr : mwor
   register_lookup mstatus s.(sregs) = m ->
   eq_vec (_get_Mstatus_MPRV m) ('b"1" : mword 1) = false ->
   register_lookup cur_privilege s.(sregs) = Machine ->
-  exec_eff (mem_write_value (Physaddr addr) 4 data (Atomic (AMOSWAP, Data, Data)) pbmt
-              false false true) s
+  exec_eff (mem_write_value (Physaddr addr) 4 data
+              (Atomic (AMOSWAP, true, false, Data, Data)) pbmt false false true) s
     = Some (Ok true, MState s.(sregs) (write_bytes s.(mem) addr 4 data) s.(mdev),
             [WEwrite (AkInfo false true false) addr 4 data]).
 Proof.
@@ -915,7 +1163,6 @@ Proof.
   rewrite Hpriv. rewrite Hms.
   rewrite (exec_eff_bind_nil _ _ _ _ _ (exec_eff_effectivePrivilege_amo_M m s Hmprv)).
   unfold mem_write_value_priv_meta.
-  rewrite Halign. cbn [orb andb negb Riscv.rv64d.not].
   rewrite (exec_eff_bind_Some _ _ _ _ _ _
             (exec_eff_checked_mem_write_ram_amo_4_M pbmt addr region data s
                Hpmp Hmatch Halign Hread Hwrite Hamo Hc Hsig Hh Hdev)).
@@ -981,7 +1228,8 @@ Hypothesis Hmprv : eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))
 Hypothesis Hpmm : pmm_mode_backwards (_get_Seccfg_PMM (register_lookup mseccfg s.(sregs)))
                   = PMM_Disabled.
 Hypothesis Halign : is_aligned_vaddr (Virtaddr a8) 4 = true.
-Hypothesis Hpmp_eff : exec_eff (pmpCheck (Physaddr pa) 4 (Atomic (AMOSWAP, Data, Data)) Machine) s
+Hypothesis Hpmp_eff : exec_eff (pmpCheck (Physaddr pa) 4
+                                  (Atomic (AMOSWAP, true, false, Data, Data)) Machine) s
                       = Some (None, s, []).
 Hypothesis Hmatch : matching_pma_region (register_lookup pma_regions s.(sregs)) (Physaddr pa) 4
                     = Some region.
@@ -1019,12 +1267,12 @@ Proof.
     by (unfold assert_exp'; cbn match; apply exec_eff_returnm).
   rewrite (execR_eff_liftR_seq _ _ _ _ _ Hae).
   assert (Hgta : exec_eff (get_transformed_data_addr (Regidx rs1) (zeros' 64)
-                             (Atomic (AMOSWAP, Data, Data)) 4) s
+                             (Atomic (AMOSWAP, true, false, Data, Data)) 4) s
                  = Some (Ext_DataAddr_OK (Virtaddr a8), s, [])).
   { unfold get_transformed_data_addr.
     rewrite (exec_eff_bind_nil _ _ _ _ _
               (exec_eff_ext_data_get_addr_gpr rs1 (zeros' 64)
-                 (Atomic (AMOSWAP, Data, Data)) 4 s)).
+                 (Atomic (AMOSWAP, true, false, Data, Data)) 4 s)).
     cbn match.
     rewrite (exec_eff_bind_nil _ _ _ _ _
               (exec_eff_transform_effective_address_amo_M ea s Hcp Hmprv Hpmm)).
@@ -1039,20 +1287,13 @@ Proof.
   cbn match.
   rewrite (execR_eff_bind_nil _ _ _ _ _ (execR_eff_returnR (Physaddr pa, PBMT_PMA) s)).
   cbn beta match.
-  replace (Z.leb 4 xlen_bytes) with true by (vm_compute; reflexivity).
-  cbv iota.
-  (* rs2's value: register-only, empty trace *)
-  match goal with
-  | |- context [ Defs.bind (Defs.liftR (rX_bits (Regidx rs2))) ?k ] =>
-      assert (Hrs2 : execR_eff (Defs.bind (Defs.liftR (rX_bits (Regidx rs2))) k) s
-                     = Some (inr (trunc (Z.mul (__id 4) 8) vrs2), s, []))
-  end.
-  { rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_rX_bits_gpr rs2 s)).
-    apply execR_eff_returnR. }
-  rewrite (execR_eff_bind_nil _ _ _ _ _ Hrs2).
-  cbn beta.
-  (* mem_write_ea: no trace (it only picks the write kind) *)
-  rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_mem_write_ea_amo_4 pa s Hpalign)).
+  (* upstream reordered the body: the effective-address announcement and the
+     load now run BEFORE [rs2] is read.  [mem_write_ea] is register-only (it
+     announces the address with the pure [write_ram_ea]), so no trace. *)
+  rewrite (execR_eff_liftR_seq _ _ _ _ _
+            (exec_eff_mem_write_ea_amo_4_M PBMT_PMA pa region
+               (register_lookup mstatus s.(sregs)) s
+               Hpmp_eff Hmatch Hpalign Hread Hwrite Hamo eq_refl Hmprv Hcp)).
   cbn match.
   (* THE READ: the first trace element *)
   match goal with
@@ -1068,6 +1309,18 @@ Proof.
                  (fun j Hj => Hbytes j Hj) eq_refl Hmprv Hcp)).
     cbn match. rewrite execR_eff_returnR. reflexivity. }
   rewrite (execR_eff_bind_cat _ _ _ _ _ _ Hload).
+  replace (Z.leb 4 xlen_bytes) with true by (vm_compute; reflexivity).
+  cbv iota.
+  (* rs2's value: register-only, empty trace *)
+  match goal with
+  | |- context [ Defs.bind (Defs.liftR (rX_bits (Regidx rs2))) ?k ] =>
+      assert (Hrs2 : execR_eff (Defs.bind (Defs.liftR (rX_bits (Regidx rs2))) k) s
+                     = Some (inr (trunc (Z.mul (__id 4) 8) vrs2), s, []))
+  end.
+  { rewrite (execR_eff_liftR_seq _ _ _ _ _ (exec_eff_rX_bits_gpr rs2 s)).
+    apply execR_eff_returnR. }
+  rewrite (execR_eff_bind_nil _ _ _ _ _ Hrs2).
+  cbn beta.
   cbn zeta. cbn match.
   (* the CAS guard short-circuits: [generic_eq AMOSWAP AMOCAS = false] *)
   match goal with
