@@ -471,6 +471,7 @@ ProofFiledup.v
 LinkFiledup.v
 CodeFileclose.v
 SpecFileclose.v
+ProofFilecloseParts.v
 LinkFilealloc.v
 PageFields.v
 PipeInv.v

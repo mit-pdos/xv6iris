@@ -196,7 +196,31 @@ closed the pipe's last end — so kexit's loop invariant carries it
 existentially. Check `disk_geom` when landing this: if it is not persistent
 it has to be routed back too.
 
-## What is LEFT: the proof
+## The proof: what is done
+
+`ProofFilecloseParts.v` holds the two blocks the five exits SHARE, and it
+compiles in **5.5 s**:
+
+- **`fc_epi`** — the epilogue at `+0x8e` (restore ra/s0/s1, trade the frame
+  back, `ret`), which every exit reaches. It restores only THREE registers,
+  because `s2..s5` are saved LAZILY (on the slow path alone, at `+0x26`): the
+  fast path never spills them, so they arrive as arbitrary words and
+  `callee_saved` is discharged from a PREMISE about the incoming map rather
+  than from any load here.
+- **`fc_restore4`** — `ld s2..s5; j +0x8e`, which gcc emitted three times
+  (`+0x64` for the FD_NONE arm, `+0xa0` after pipeclose, `+0xb8` after
+  end_op). One lemma over the block's five pcs as literals, per the
+  block-lemma recipe.
+
+**The one performance trap, and it cost an hour:** `wp_cj_s_sconf`'s
+alignment side condition is about the JUMP TARGET, and in a block lemma the
+pc and the immediate are variables — so the reflex `ltac:(vm_compute;
+reflexivity)` normalizes an open bitvector term and never returns. Rewrite
+the target equation the lemma already takes as a premise FIRST
+(`ltac:(rewrite Hjt; vm_compute; reflexivity)`). Lifted to
+[`../durable-notes.md`](../durable-notes.md).
+
+## What is LEFT: the capstone
 
 Nothing exotic is expected; the shape is `ProofFiledup.v` (acquire, the dead
 `f->ref < 1` panic arm via `FileInv.fref_word_spos`, the ghost step, release)
