@@ -16,7 +16,6 @@ Require Import KernelText.
 Require Import WpMmodeLeafBase.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode00.
 Require Import KernelDecode01.
 Require Import KernelDecode02.
 Require Import KernelDecode03.
@@ -25,11 +24,16 @@ Require Import KernelDecode05.
 Require Import KernelDecode07.
 Require Import KernelDecode08.
 Require Import KernelDecode10.
-Require Import KernelDecode11.
 Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode16.
+Require Import KernelDecode19.
+Require Import KernelDecode21.
+Require Import KernelDecode24.
+Require Import KernelDecode26.
+Require Import KernelDecode27.
 Local Open Scope Z_scope.
 Import Defs.
 

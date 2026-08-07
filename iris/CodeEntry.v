@@ -21,6 +21,8 @@ Require Import KernelDecode07.
 Require Import KernelDecode10.
 Require Import KernelDecode11.
 Require Import KernelDecode12.
+Require Import KernelDecode26.
+Require Import KernelDecode27.
 Require Import ExecCommon.
 Local Open Scope Z_scope.
 Import Defs.

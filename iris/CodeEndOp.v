@@ -32,6 +32,20 @@ Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
 Require Import KernelDecode15.
+Require Import KernelDecode17.
+Require Import KernelDecode18.
+Require Import KernelDecode19.
+Require Import KernelDecode20.
+Require Import KernelDecode21.
+Require Import KernelDecode22.
+Require Import KernelDecode23.
+Require Import KernelDecode24.
+Require Import KernelDecode25.
+Require Import KernelDecode26.
+Require Import KernelDecode27.
+Require Import KernelDecode28.
+Require Import KernelDecode29.
+Require Import KernelDecode30.
 Local Open Scope Z_scope.
 Import Defs.
 

@@ -223,17 +223,23 @@ def decode(w, width):
     return None if r is None else (r[0], r[1], r[2])
 
 
-SHARDS = 16
+# Sized to the CI runner's core count, not to the lemma count: the shards have
+# no dependency on each other, so they are the build's widest parallel step and
+# a core past SHARDS has nothing from this layer to do.  There is a floor to
+# what splitting further buys, though -- every shard pays the same fixed cost
+# to load the Sail model before it proves anything, and that cost is per FILE.
+SHARDS = 32
 
 
 def shard_of(word):
     """Which KernelDecode<NN>.v a word's lemmas live in.
 
     Keyed on the WORD, not on position: adding or removing an instruction then
-    lands in ONE shard and leaves the other fifteen byte-identical, so an
-    incremental rebuild after a re-dump recompiles a fraction rather than the
-    lot.  A positional split (round-robin over a sorted list) would rewrite
-    every shard on any change.
+    lands in ONE shard and leaves the others byte-identical, so an incremental
+    rebuild after a re-dump recompiles a fraction rather than the lot.  A
+    positional split (round-robin over a sorted list) would rewrite every shard
+    on any change.  Changing SHARDS re-keys every word, so it rewrites the
+    whole layer -- shards and the Code files naming them alike.
 
     It has to be a MIXING hash, not `word % SHARDS`: a RISC-V base opcode
     almost always ends in 0b0011 (0x13, 0x23, 0x03, 0x63, 0x33, 0x73), so the

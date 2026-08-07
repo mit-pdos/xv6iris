@@ -19,12 +19,13 @@ From Kernel Require KernelSyms.
 Require Import KernelDecode01.
 Require Import KernelDecode06.
 Require Import KernelDecode07.
-Require Import KernelDecode08.
 Require Import KernelDecode11.
-Require Import KernelDecode12.
 Require Import KernelDecode13.
 Require Import KernelDecode14.
-Require Import KernelDecode15.
+Require Import KernelDecode23.
+Require Import KernelDecode24.
+Require Import KernelDecode28.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
