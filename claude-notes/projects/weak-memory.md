@@ -1998,8 +1998,40 @@ stages parallelize):
   producing `wstep_ok_racy` (the recorded missing piece).
 - **P3** (WeakBridge/WeakRacy): exec-modulo-variants with the confined
   write; transport across the intervening write-back; multi-window join.
-- **P4**: `wkpt_inv` + the weak absorption theorem + the Q plumbing for
-  the write-back message.
+- **P4 — DONE, ALL FOUR OUTCOME ARMS** (`iris/WeakKpt.v`, 1622 lines /
+  16.6 s, commit `2def6166`): `wkpt_inv root T_kpt` (namespace inv,
+  timeless body; SC's ghost/spec triple verbatim; `ptree_own` replaced
+  role-split per mapped vpn — PERSISTENT `wptr8` pointer slots at
+  DfracDiscarded with stored `wpte_valid`/geometry, EXCLUSIVE
+  `wleaf_res` windows retargeted via `wlat8_store_prim`),
+  `wtlb_res_pt` mirroring `tlb_res_pt` field-for-field
+  (`KptShare.tlb_snap_ok` REUSED verbatim), and the absorption theorem
+  `wtlb_res_pt_translateAddr_at` — one theorem, O1/O2/O2′-refresh/O3,
+  pa variant-independent, the racy-leaf collapse
+  (`wadm → variant ∧ pte_ad_le latest`), pointer bytes pinned for the
+  caller's `trace_pin`, and the O3 arm handing back
+  `wlog_auth`/`wlat_interp` AT THE APPENDED LOG with the exact message
+  (matches `wcert_ptw_upd`'s `wQ_store_w 8`); `kpt_lb` survives O3 by
+  `ptree_canon_set_leaf`, no ghost update. Footprints:
+  collapse/kperm-twins CLOSED; the theorem = `plat_term_write` +
+  funext (the ptree carrier — SC parity); no reservation quartet.
+  **DESIGN CORRECTION (supersedes the whole-log closure above)**: the
+  whole-log `wlog_variants`/fresh-derived conjuncts are UNMINTABLE —
+  a real boot's era log has pre-kvminit messages in the leaf windows
+  (freerange/kalloc memset PT pages before kvmmake writes them). Both
+  conjuncts are CLIPPED at the window's install timestamp `T0`,
+  stored against a `wlog_lb` snapshot + `wwin_install`; the collapse
+  survives via `wbyte_ok_ge` (a floor covering the install bars reads
+  below `T0`); extension to the current log derives from the
+  element's `latest_ts`. Knock-ons: the theorem consumes `wlog_auth`
+  ALONGSIDE `wlat_interp` (forced), and `wkpt_inv` carries the public
+  `T_kpt`. The "6b twins" `wkperm_variant_check/_valid` are proven
+  here (§2). Consolidation debts: export
+  `WeakVariant.log_byte_take`; hoist WeakKpt §1's clipped layer into
+  WeakVariant. The boot MINT is now mintable (thanks to clipping);
+  still gated on batch-5's escrow for the secondary receipt. The 6a
+  S-mode fetch-chain restatement is UNBLOCKED (it has its absorption
+  shape).
 - **6a**: the S-mode fetch chain at the flat state (`tlb_inv_pt_fetch`'s
   pure/wlat restatement over the absorption theorem) + the translate/walk
   `exec_eff` cone. **THE WALK READ-CONE MIRROR IS DONE**
