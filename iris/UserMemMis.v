@@ -1328,7 +1328,7 @@ Qed.
 Section StraddleWrite.
   Context (W p q : Z) (va pa1 : mword 64) (dat : mword (8 * W)).
   Context (ep : Privilege) (md : SATPMode) (s s1 s2 s3 : mstate).
-  Context (Hp : 0 < p) (Hq : 0 < q).
+  Context (Hpq : (0 < p /\ 0 < q)%Z).
   Context (Hsplit : exec (split_on_page_boundary va W) s = Some ((p, q), s)).
   Context (Hpme : plat_misaligned_exception (Store Data) false = None).
   Context (Heff : exec (effectivePrivilege (Store Data)
@@ -1351,7 +1351,7 @@ Section StraddleWrite.
     exec (vmem_write_addr (Virtaddr va) W dat (Store Data) false false false) s
       = Some (Ok b, s3).
   Proof.
-    intros Htr Hea Hwv Htwv.
+    intros Htr Hea Hwv Htwv. destruct Hpq as [Hp Hq].
     unfold vmem_write_addr. rewrite exec_catch_early_return.
     match goal with |- context[Defs.bind0 ?G ?k] =>
       assert (Hg : execR G s = Some (inr tt, s)) end.
@@ -1427,7 +1427,7 @@ Section StraddleWrite.
     exec (vmem_write_addr (Virtaddr va) W dat (Store Data) false false false) s
       = Some (Err er, s1).
   Proof.
-    intros Htr Hme.
+    intros Htr Hme. destruct Hpq as [Hp Hq].
     unfold vmem_write_addr. rewrite exec_catch_early_return.
     match goal with |- context[Defs.bind0 ?G ?k] =>
       assert (Hg : execR G s = Some (inr tt, s)) end.
@@ -1477,7 +1477,7 @@ Section StraddleWrite.
     exec (vmem_write_addr (Virtaddr va) W dat (Store Data) false false false) s
       = Some (Err er, s3).
   Proof.
-    intros Htr Hea Hwv Htwv.
+    intros Htr Hea Hwv Htwv. destruct Hpq as [Hp Hq].
     unfold vmem_write_addr. rewrite exec_catch_early_return.
     match goal with |- context[Defs.bind0 ?G ?k] =>
       assert (Hg : execR G s = Some (inr tt, s)) end.

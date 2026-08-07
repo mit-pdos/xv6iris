@@ -23,7 +23,7 @@ Require Import SmodeCore.
 Require Import UptTree UserPtTree UserExec UserCompute UserClassify.
 Require Import UserExecFacts UserMemArms WpMmodeLeafBase.
 Require Import WpGprCsrwC.
-Require Import UserMemAccess UserMemPt.
+Require Import UserMemAccess UserMemPt UserMemMis.
 Require Import TrampPt KptTree UserTranslate.
 Require Import UserTotalU Pt4kWalk.
 Require Import RiscvModelBytes CommonWalk WpLoad MemAmo4.
@@ -463,572 +463,134 @@ Section AlignedClassifyInstances.
 End AlignedClassifyInstances.
 
 (* ===================================================================== *)
-(* §6 The MISALIGNED SPLIT-WITH-FAULT read composer -- the misaligned-axis *)
-(*    analog of data_classify for plain LOAD.  A misaligned plain load does *)
-(*    NOT fault outright; the model SPLITS it into [N] chunks of [bytes]    *)
-(*    each and faults at the FIRST straddled chunk whose translate faults.  *)
-(*    [vmem_read_split_fault]: J good chunks (folded via [gbody]) then the  *)
-(*    J-th chunk translate-faults ([fbody]) -> the untilMT loop early-      *)
-(*    returns the User trap; state at the fault point.  Reuses the existing *)
-(*    all-mapped split machinery (split_body/split_var/split_cond_false)    *)
-(*    for the good prefix.                                                  *)
+(* §6 THE MISALIGNED ACCESS, PER PAGE.                                     *)
+(*                                                                         *)
+(* The bump moved the misaligned split in two directions at once (see       *)
+(* UserMemMis.v's header), and the consequence here is that this file no    *)
+(* longer folds anything over CHUNKS.  A data access touches ONE page       *)
+(* ([in_one_page]) or TWO ([exec_split_on_page_boundary_straddle]), and     *)
+(* each page gets exactly one [data_classify] and one translation.  Whether *)
+(* the access is aligned no longer enters into it: the platform raises no   *)
+(* misalignment exception for plain load/store, so the aligned and the      *)
+(* in-page misaligned cases are the SAME peel.                              *)
 (* ===================================================================== *)
-Lemma execR_bind_inl {R X Y} (m : Defs.monadR R exception Y)
-    (f : Y -> Defs.monadR R exception X) s s' (r : R) :
-  execR m s = Some (inl r, s') -> execR (Defs.bind m f) s = Some (inl r, s').
-Proof. intro H. rewrite execR_bind. rewrite H. reflexivity. Qed.
 
-Lemma execR_untilMT'_fault {R Vars} (limit:Z) (vars:Vars) cond body s s' (r:R)
-    (acc:Acc (Zwf 0) limit) :
-  (limit >= 0)%Z ->
-  execR (body vars) s = Some (inl r, s') ->
-  execR (Defs.untilMT' limit vars cond body acc) s = Some (inl r, s').
+Definition cfg_okR (s : mstate) : Prop :=
+  register_lookup misa s.(sregs) = MISA_C /\
+  register_lookup menvcfg s.(sregs) = MENVCFG_S /\
+  register_lookup htif_tohost_base s.(sregs) = None /\
+  register_lookup cur_privilege s.(sregs) = User /\
+  _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" /\
+  eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false /\
+  pma_allows_all (register_lookup pma_regions s.(sregs)).
+
+Lemma cfg_okR_pres (s s' : mstate) :
+  (s'.(sregs) = s.(sregs) \/ exists tv, s'.(sregs) = register_set tlb tv s.(sregs)) ->
+  cfg_okR s -> cfg_okR s'.
 Proof.
-  intros Hlim Hb. destruct acc as [af]. cbn [Defs.untilMT'].
-  destruct (Z_ge_dec limit 0) as [Hge|Hge]; [|lia].
-  rewrite execR_bind. rewrite Hb. reflexivity.
+  intros Hd (H1 & H2 & H3 & H4 & H5 & H6 & H7). unfold cfg_okR.
+  assert (Tr : forall r : register, register_beq r tlb = false ->
+            register_lookup r s'.(sregs) = register_lookup r s.(sregs)).
+  { intros r Hne. destruct Hd as [Heq | (tv & Heq)]; rewrite Heq;
+      [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+  rewrite (Tr misa ltac:(vm_compute; reflexivity)).
+  rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)).
+  rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)).
+  rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)).
+  rewrite (Tr mstatus ltac:(vm_compute; reflexivity)).
+  rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)).
+  repeat split; assumption.
 Qed.
 
-Lemma execR_untilMT'_chain_fault {R Vars}
-    (cond : Vars -> Defs.monadR R exception bool) (body : Vars -> Defs.monadR R exception Vars) :
-  forall (J:nat)(v:nat->Vars)(st:nat->mstate)(r:R)(limit0:Z)(acc:Acc (Zwf 0) limit0),
-  (limit0 >= Z.of_nat J)%Z ->
-  (forall k,(k<J)%nat -> execR (body (v k)) (st k) = Some (inr (v (S k)), st (S k))) ->
-  (forall k,(k<J)%nat -> execR (cond (v (S k))) (st (S k)) = Some (inr false, st (S k))) ->
-  execR (body (v J)) (st J) = Some (inl r, st (S J)) ->
-  execR (Defs.untilMT' limit0 (v 0%nat) cond body acc) (st 0%nat) = Some (inl r, st (S J)).
-Proof.
-  intros J. induction J as [|J' IH]; intros v st r limit0 acc Hlim Hbody Hcondf HbodyF.
-  - apply (execR_untilMT'_fault limit0 (v 0%nat) cond body (st 0%nat) (st 1%nat) r acc);
-      [lia | exact HbodyF].
-  - edestruct (execR_untilMT'_step limit0 (v 0%nat) (v 1%nat) cond body (st 0%nat) (st 1%nat) acc)
-      as [acc' Hstep].
-    + lia.
-    + apply (Hbody 0%nat); lia.
-    + apply (Hcondf 0%nat); lia.
-    + rewrite Hstep.
-      apply (IH (fun k => v (S k)) (fun k => st (S k)) r (limit0-1) acc').
-      * lia.
-      * intros k Hk. apply (Hbody (S k)); lia.
-      * intros k Hk. apply (Hcondf (S k)); lia.
-      * exact HbodyF.
-Qed.
+(* [in_one_page] is decidable, and that is the case split the whole misaligned
+   pipeline turns on. *)
+Lemma in_one_page_dec (va : mword 64) (W : Z) :
+  {in_one_page va W} + {~ in_one_page va W}.
+Proof. unfold in_one_page. apply Z_le_dec. Qed.
 
-Section SplitFaultRead.
-  Context (width bytes : Z) (va pc : mword 64) (acc : MemoryAccessType mem_payload)
-          (aq rl : bool) (e : ExceptionType).
-  Context (N J : nat) (pa : nat -> mword 64) (val : nat -> mword (8*bytes)) (st : nat -> mstate).
-  Context (HN : (1 <= N)%nat) (Hbytes : 0 < bytes) (HJ : (J < N)%nat).
-  Context (Hwidth : Z.of_nat N * bytes = width).
-  Notation vbits := (bits_of_virtaddr (Virtaddr va)).
-  Notation RES := (result (mword (8*width)) ExecutionResult).
-  Notation n := (Z.of_nat N).
-
-  Hypothesis Htr : forall k, (k < J)%nat ->
-    exec (translateAddr (Virtaddr (add_vec_int vbits (Z.of_nat k * bytes))) acc) (st k)
-      = Some (Ok (Physaddr (pa k), PBMT_PMA, init_ext_ptw), st (S k)).
-  Hypothesis Hmr : forall k, (k < J)%nat ->
-    exec (mem_read acc PBMT_PMA (Physaddr (pa k)) bytes aq rl false) (st (S k))
-      = Some (Ok (val k), st (S k)).
-  Hypothesis HtrF : exec (translateAddr (Virtaddr (add_vec_int vbits (Z.of_nat J * bytes))) acc) (st J)
-      = Some (Err (e, tt), st (S J)).
-  Hypothesis HcpF : register_lookup cur_privilege (st (S J)).(sregs) = User.
-  Hypothesis HpcF : register_lookup PC (st (S J)).(sregs) = pc.
-
-  Notation trapval := ((Err (rv64d_types.Trap (User, make_sync_exception e
-     (add_vec_int vbits (Z.of_nat J * bytes)), pc))) : RES).
-
-  (* good body step, k<J (reproof of split_body_step with the narrower bound) *)
-  Lemma gbody (k : nat) : (k < J)%nat ->
-    execR (split_body width bytes va acc aq rl N (split_var bytes N val k)) (st k)
-      = Some (inr (split_var bytes N val (S k)), st (S k)).
-  Proof.
-    intros Hk. unfold split_body, split_var.
-    replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
-    replace (Nat.min k (N-1)) with k by lia.
-    cbn match.
-    assert (Hass : exec (assert_exp' true "loop dummy assert") (st k) = Some (@eq_refl bool true, st k)) by reflexivity.
-    rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-    rewrite (execR_liftR_seq _ _ _ _ _ (Htr k Hk)).
-    cbn match.
-    match goal with
-    | |- execR (Defs.bind ?mrm ?post) (st (S k)) = _ =>
-      assert (Hmrm : execR mrm (st (S k)) = Some (inr (data_seq bytes N val (S k)), st (S k)))
-    end.
-    { rewrite (execR_liftR_seq _ _ _ _ _ (Hmr k Hk)). cbn match.
-      rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt (st (S k)))).
-      cbn [data_seq]. apply execR_returnR_fwd. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
-    destruct (Z.eqb (Z.of_nat k) (n-1)) eqn:Eq; cbn match;
-      rewrite execR_returnR_fwd; do 3 f_equal; unfold split_var.
-    - apply Z.eqb_eq in Eq.
-      replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
-      replace (Nat.min (S k) (N-1)) with k by lia. reflexivity.
-    - apply Z.eqb_neq in Eq.
-      replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
-      replace (Nat.min (S k) (N-1)) with (S k) by lia.
-      replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
-  Qed.
-
-  (* fault body step at J: translate faults -> loop body early-returns the trap *)
-  Lemma fbody :
-    execR (split_body width bytes va acc aq rl N (split_var bytes N val J)) (st J)
-      = Some (inl trapval, st (S J)).
-  Proof.
-    unfold split_body, split_var.
-    replace (Nat.eqb J N) with false by (symmetry; apply Nat.eqb_neq; lia).
-    replace (Nat.min J (N-1)) with J by lia.
-    cbn match.
-    assert (Hass : exec (assert_exp' true "loop dummy assert") (st J) = Some (@eq_refl bool true, st J)) by reflexivity.
-    rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-    rewrite (execR_liftR_seq _ _ _ _ _ HtrF).
-    cbn match.
-    match goal with
-    | |- execR (Defs.bind ?mm ?post) (st (S J)) = _ =>
-      assert (Hmrm : execR mm (st (S J)) = Some (inl trapval, st (S J)))
-    end.
-    { match goal with
-      | |- context [ memory_exception (Virtaddr ?vv) e ] =>
-        rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception vv pc e User (st (S J)) HcpF HpcF))
-      end. cbn match.
-      rewrite execR_bind0. rewrite execR_early_ret. reflexivity. }
-    rewrite execR_bind. rewrite Hmrm. reflexivity.
-  Qed.
-
-
-  Lemma split_loop_fault :
-    execR (Defs.untilMT (zeros' (8 * n * bytes), false, 0%Z)
-             (fun '(data, finished, i) => n)
-             (fun '(data, finished, i) => returnR RES finished)
-             (split_body width bytes va acc aq rl N)) (st 0%nat)
-      = Some (inl trapval, st (S J)).
-  Proof.
-    rewrite <- (split_var0 bytes N val HN Hbytes).
-    unfold Defs.untilMT.
-    set (L := (fun '(data, finished, i) => n) (split_var bytes N val 0%nat)).
-    assert (HL : L = n) by (unfold L; rewrite (split_var0 bytes N val HN Hbytes); reflexivity).
-    clearbody L. rewrite HL.
-    apply (execR_untilMT'_chain_fault (fun '(data, finished, i) => returnR RES finished)
-             (split_body width bytes va acc aq rl N) J (split_var bytes N val) st trapval n _).
-    - lia.
-    - intros k Hk. apply gbody; exact Hk.
-    - intros k Hk. apply split_cond_false; lia.
-    - apply fbody.
-  Qed.
-
-  Lemma vmem_read_split_fault :
-    is_aligned_vaddr (Virtaddr va) width = false ->
-    is_amo_access acc = false ->
-    is_vector_access acc = false ->
-    exec (split_misaligned (Virtaddr va) width) (st 0%nat) = Some ((n, bytes), st 0%nat) ->
-    exec (vmem_read_addr (Virtaddr va) width acc aq rl false) (st 0%nat)
-      = Some (trapval, st (S J)).
-  Proof.
-    intros Hnal Hamo Hvec Hsplit.
-    unfold vmem_read_addr. rewrite exec_catch_early_return.
-    rewrite Hnal. cbn [Riscv.rv64d.not negb].
-    match goal with
-    | |- context [ Defs.bind0 ?g (Defs.liftR (split_misaligned (Virtaddr va) width)) ] =>
-        set (GRD := g)
-    end.
-    assert (Hg : execR GRD (st 0%nat) = Some (inr tt, st 0%nat)).
-    { unfold GRD.
-      rewrite (execR_liftR_seq _ _ _ _ _ (exec_plat_misaligned_loadstore_none acc (st 0%nat) Hamo Hvec)).
-      cbn match. apply execR_returnR_fwd. }
-    assert (Hinner : execR (Defs.bind0 GRD (liftR (split_misaligned (Virtaddr va) width))) (st 0%nat)
-                     = Some (inr (n, bytes), st 0%nat)).
-    { rewrite (execR_bind0_Some _ _ _ _ Hg).
-      rewrite execR_liftR. rewrite Hsplit. reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-    rewrite misaligned_order_split. cbn match.
-    rewrite (execR_bind_inl _ _ _ _ _ split_loop_fault). reflexivity.
-  Qed.
-
-End SplitFaultRead.
-
-(* ===================================================================== *)
-(* §7 The MISALIGNED SPLIT-WITH-FAULT write composer -- the STORE analog   *)
-(*    of §6.  Same shape: J good chunks (translate+ea+value succeed, folded *)
-(*    via [wgbody]) then chunk J translate-faults ([wfbody]) -> the untilMT *)
-(*    write loop early-returns the User trap.                              *)
-(* ===================================================================== *)
-Section SplitFaultWrite.
-  Context (width bytes : Z) (va pc : mword 64) (dat : mword (8*width)) (e : ExceptionType).
-  Context (N J : nat) (pa : nat -> mword 64) (sk : nat -> bool) (stt st : nat -> mstate).
-  Context (HN : (1 <= N)%nat) (Hbytes : 0 < bytes) (HJ : (J < N)%nat).
-  Context (Hwidth : Z.of_nat N * bytes = width).
-  Notation vbits := (bits_of_virtaddr (Virtaddr va)).
-  Notation RES := (result bool ExecutionResult).
-  Notation n := (Z.of_nat N).
-
-  Hypothesis Htr : forall k, (k < J)%nat ->
-    exec (translateAddr (Virtaddr (add_vec_int vbits (Z.of_nat k * bytes))) (Store Data)) (st k)
-      = Some (Ok (Physaddr (pa k), PBMT_PMA, init_ext_ptw), stt k).
-  Hypothesis Hea : forall k, (k < J)%nat ->
-    exec (mem_write_ea (Physaddr (pa k)) bytes false false false) (stt k) = Some (Ok tt, stt k).
-  Hypothesis Hwv : forall k, (k < J)%nat ->
-    exec (mem_write_value (Physaddr (pa k)) bytes (wv width bytes dat k) (Store Data) PBMT_PMA false false false) (stt k)
-      = Some (Ok (sk k), st (S k)).
-  Hypothesis HtrF : exec (translateAddr (Virtaddr (add_vec_int vbits (Z.of_nat J * bytes))) (Store Data)) (st J)
-      = Some (Err (e, tt), st (S J)).
-  Hypothesis HcpF : register_lookup cur_privilege (st (S J)).(sregs) = User.
-  Hypothesis HpcF : register_lookup PC (st (S J)).(sregs) = pc.
-
-  Notation trapvalW := ((Err (rv64d_types.Trap (User, make_sync_exception e
-     (add_vec_int vbits (Z.of_nat J * bytes)), pc))) : RES).
-
-  Lemma wgbody (k : nat) : (k < J)%nat ->
-    execR (write_body width bytes va dat N (write_var N sk k)) (st k)
-      = Some (inr (write_var N sk (S k)), st (S k)).
-  Proof.
-    intros Hk. unfold write_body, write_var.
-    replace (Nat.eqb k N) with false by (symmetry; apply Nat.eqb_neq; lia).
-    replace (Nat.min k (N-1)) with k by lia.
-    cbn match.
-    assert (Hass : exec (assert_exp' true "loop dummy assert") (st k) = Some (@eq_refl bool true, st k)) by reflexivity.
-    rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-    rewrite (execR_liftR_seq _ _ _ _ _ (Htr k Hk)).
-    cbn match.
-    match goal with
-    | |- execR (Defs.bind ?mrm ?post) (stt k) = _ =>
-      assert (Hmrm : execR mrm (stt k) = Some (inr (ws_seq sk (S k)), st (S k)))
-    end.
-    { assert (Hsc : exec (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") (stt k) = Some (tt, stt k)) by reflexivity.
-      assert (Hscm : execR (Defs.liftR (assert_exp (Bool.eqb false (is_store_conditional (Store Data))) "sys/vmem_utils.sail:197.50-197.51") : Defs.monadR RES exception unit) (stt k) = Some (inr tt, stt k))
-        by (rewrite execR_liftR; rewrite Hsc; reflexivity).
-      rewrite (execR_bind0_Some _ _ _ _ Hscm).
-      rewrite (execR_liftR_seq _ _ _ _ _ (Hea k Hk)). cbn match.
-      rewrite (execR_liftR_seq _ _ _ _ _ (Hwv k Hk)). cbn match.
-      cbn [ws_seq]. apply execR_returnR_fwd. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hmrm).
-    destruct (Z.eqb (Z.of_nat k) (n-1)) eqn:Eq; cbn match;
-      rewrite execR_returnR_fwd; do 3 f_equal; unfold write_var.
-    - apply Z.eqb_eq in Eq.
-      replace (Nat.eqb (S k) N) with true by (symmetry; apply Nat.eqb_eq; lia).
-      replace (Nat.min (S k) (N-1)) with k by lia. reflexivity.
-    - apply Z.eqb_neq in Eq.
-      replace (Nat.eqb (S k) N) with false by (symmetry; apply Nat.eqb_neq; lia).
-      replace (Nat.min (S k) (N-1)) with (S k) by lia.
-      replace (Z.of_nat (S k)) with (Z.of_nat k + 1) by lia. reflexivity.
-  Qed.
-
-  Lemma wfbody :
-    execR (write_body width bytes va dat N (write_var N sk J)) (st J)
-      = Some (inl trapvalW, st (S J)).
-  Proof.
-    unfold write_body, write_var.
-    replace (Nat.eqb J N) with false by (symmetry; apply Nat.eqb_neq; lia).
-    replace (Nat.min J (N-1)) with J by lia.
-    cbn match.
-    assert (Hass : exec (assert_exp' true "loop dummy assert") (st J) = Some (@eq_refl bool true, st J)) by reflexivity.
-    rewrite (execR_liftR_seq _ _ _ _ _ Hass).
-    rewrite (execR_liftR_seq _ _ _ _ _ HtrF).
-    cbn match.
-    match goal with
-    | |- execR (Defs.bind ?mm ?post) (st (S J)) = _ =>
-      assert (Hmrm : execR mm (st (S J)) = Some (inl trapvalW, st (S J)))
-    end.
-    { match goal with
-      | |- context [ memory_exception (Virtaddr ?vv) e ] =>
-        rewrite (execR_liftR_seq _ _ _ _ _ (exec_memory_exception vv pc e User (st (S J)) HcpF HpcF))
-      end. cbn match.
-      rewrite execR_bind0. rewrite execR_early_ret. reflexivity. }
-    rewrite execR_bind. rewrite Hmrm. reflexivity.
-  Qed.
-
-  Lemma write_loop_fault :
-    execR (Defs.untilMT (false, 0%Z, true)
-             (fun '(finished, i, write_success) => n)
-             (fun '(finished, i, write_success) => returnR RES finished)
-             (write_body width bytes va dat N)) (st 0%nat)
-      = Some (inl trapvalW, st (S J)).
-  Proof.
-    rewrite <- (write_var0 bytes N sk HN Hbytes).
-    unfold Defs.untilMT.
-    set (L := (fun '(finished, i, write_success) => n) (write_var N sk 0%nat)).
-    assert (HL : L = n) by (unfold L; rewrite (write_var0 bytes N sk HN Hbytes); reflexivity).
-    clearbody L. rewrite HL.
-    apply (execR_untilMT'_chain_fault (fun '(finished, i, write_success) => returnR RES finished)
-             (write_body width bytes va dat N) J (write_var N sk) st trapvalW n _).
-    - lia.
-    - intros k Hk. apply wgbody; exact Hk.
-    - intros k Hk. apply write_cond_false; lia.
-    - apply wfbody.
-  Qed.
-
-  Lemma vmem_write_split_fault :
-    is_aligned_vaddr (Virtaddr va) width = false ->
-    exec (split_misaligned (Virtaddr va) width) (st 0%nat) = Some ((n, bytes), st 0%nat) ->
-    exec (vmem_write_addr (Virtaddr va) width dat (Store Data) false false false) (st 0%nat)
-      = Some (trapvalW, st (S J)).
-  Proof.
-    intros Hnal Hsplit.
-    unfold vmem_write_addr. rewrite exec_catch_early_return.
-    rewrite Hnal. cbn [Riscv.rv64d.not negb].
-    match goal with
-    | |- context [ Defs.bind0 ?g (Defs.liftR (split_misaligned (Virtaddr va) width)) ] =>
-        set (GRD := g)
-    end.
-    assert (Hg : execR GRD (st 0%nat) = Some (inr tt, st 0%nat)).
-    { unfold GRD.
-      rewrite (execR_liftR_seq _ _ _ _ _ (exec_plat_misaligned_loadstore_none (Store Data) (st 0%nat) eq_refl eq_refl)).
-      cbn match. apply execR_returnR_fwd. }
-    assert (Hinner : execR (Defs.bind0 GRD (liftR (split_misaligned (Virtaddr va) width))) (st 0%nat)
-                     = Some (inr (n, bytes), st 0%nat)).
-    { rewrite (execR_bind0_Some _ _ _ _ Hg).
-      rewrite execR_liftR. rewrite Hsplit. reflexivity. }
-    rewrite (execR_bind_Some _ _ _ _ _ Hinner).
-    rewrite misaligned_order_split. cbn match.
-    rewrite (execR_bind_inl _ _ _ _ _ write_loop_fault). reflexivity.
-  Qed.
-
-End SplitFaultWrite.
-
-(* ===================================================================== *)
-(* §8 The MISALIGNED per-chunk-leaf READ classify FOLD -- the iris side of *)
-(*    the total misaligned read classify.  Folds the split chunks [0,M):   *)
-(*    at each chunk data_classify decides mapped-ok (run user_pt_load_data_ *)
-(*    g at THAT chunk's own leaf -- handles cross-page straddling, unlike   *)
-(*    split_load_fold's single-leaf assumption) or fault; returns either    *)
-(*    ALL-good (translate+read facts for every chunk) or first-fault-at-j   *)
-(*    (good prefix facts + u_fault_flavor at chunk j).  Feeds the all-good  *)
-(*    split composer (retire) / the §6 vmem_read_split_fault (trap).        *)
-(* ===================================================================== *)
-Section MisReadClassify.
+Section MisPageComposers.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (bytes : Z).
-  Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)) (Huintb : uint (to_bits 64 bytes) = bytes).
-  Context (Hread_plain : forall (addr : mword 64) (ww : mword (8 * bytes)) s,
-      dev_addr addr = false ->
-      (forall j : nat, (N.of_nat j < Z.to_N bytes)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte ww j)) ->
-      exec (read_ram rv64d_types.Read_plain (Physaddr addr) bytes false) s = Some ((ww, default_meta), s)).
-  Context (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa) (va : mword 64).
-  Context (Hwf : upt_acc_wf um) (Hcov : udata_cov um data).
 
-  Notation cva k := (add_vec_int va (Z.of_nat k * bytes)).
-
-  Definition cfg_okR (s : mstate) : Prop :=
-    register_lookup misa s.(sregs) = MISA_C /\
-    register_lookup menvcfg s.(sregs) = MENVCFG_S /\
-    register_lookup htif_tohost_base s.(sregs) = None /\
-    register_lookup cur_privilege s.(sregs) = User /\
-    _get_Mstatus_SXL (register_lookup mstatus s.(sregs)) = 'b"10" /\
-    eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false /\
-    pma_allows_all (register_lookup pma_regions s.(sregs)).
-
-  Lemma cfg_okR_pres (s s' : mstate) :
-    (s'.(sregs) = s.(sregs) \/ exists tv, s'.(sregs) = register_set tlb tv s.(sregs)) ->
-    cfg_okR s -> cfg_okR s'.
+  (* the two facts a page's translation supplies, at any width the vmem level
+     can hand a page: it lands, or it faults with a delegated User page fault *)
+  Lemma u_translate_ok (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+      (data : gset Arch.pa) (w va : mword 64) (W : Z) (σ : mstate) :
+    0 < W -> W <= 8 ->
+    um !! svpn_of va = Some w ->
+    uleaf_ok (Load Data) w ->
+    udata_cov um data ->
+    in_one_page va W ->
+    neq_vec (bits_of_virtaddr (Virtaddr va))
+       (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr va)) (Z.sub 39 1) 0)) = false ->
+    cfg_okR σ ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗
+    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
+    ∃ (dv : mword (8 * W)) (σ' : mstate),
+      ⌜exec (translate_and_read_value (Virtaddr va) W (Load Data) false false false) σ
+        = Some (Ok (Physaddr (u_walk_pa w va), dv), σ')⌝ ∗
+      ⌜σ'.(mdev) = σ.(mdev)⌝ ∗
+      ⌜(σ'.(sregs) = σ.(sregs) \/
+        exists tv, σ'.(sregs) = register_set tlb tv σ.(sregs))%type⌝ ∗
+      reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
+      utlb_inv_pt uroot tfp um ∗ udata_own data.
   Proof.
-    intros Hd (H1 & H2 & H3 & H4 & H5 & H6 & H7). unfold cfg_okR.
-    assert (Tr : forall r : register, register_beq r tlb = false ->
-              register_lookup r s'.(sregs) = register_lookup r s.(sregs)).
-    { intros r Hne. destruct Hd as [Heq | (tv & Heq)]; rewrite Heq;
-        [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-    rewrite (Tr misa ltac:(vm_compute; reflexivity)).
-    rewrite (Tr menvcfg ltac:(vm_compute; reflexivity)).
-    rewrite (Tr htif_tohost_base ltac:(vm_compute; reflexivity)).
-    rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)).
-    rewrite (Tr mstatus ltac:(vm_compute; reflexivity)).
-    rewrite (Tr pma_regions ltac:(vm_compute; reflexivity)).
-    repeat split; assumption.
+    intros HW HW8 Hl Hchk Hcov Hp Hcanon Hcfg.
+    pose proof Hcfg as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & Hmprv & Hall).
+    iIntros "Hri Hgh Hinv Hdata".
+    iMod (user_pt_load_data_mis uroot tfp um data w va W σ HW HW8 Hl Hchk Hcov Hp
+            Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall with "Hri Hgh Hinv Hdata")
+      as (dv σ') "(%Htr & %Hmr & %Hmdev & %Hsregs & Hri & Hgh & Hinv & Hdata)".
+    iModIntro. iExists dv, σ'. iFrame "Hri Hgh Hinv Hdata". iPureIntro.
+    split; [ exact (exec_translate_and_read_value_g W va (u_walk_pa w va) PBMT_PMA
+                      dv σ σ' σ' Htr Hmr) | ].
+    split; [ exact Hmdev | exact Hsregs ].
   Qed.
 
-  Context (σ0 : mstate).
-
-  Fixpoint sst (k : nat) : mstate :=
-    match k with
-    | O => σ0
-    | S k' =>
-      match exec (translateAddr (Virtaddr (cva k')) (Load Data)) (sst k') with
-      | Some (Ok (Physaddr _, _, _), s') => s'
-      | _ => sst k'
-      end
-    end.
-  Definition spaR (k : nat) : mword 64 :=
-    match exec (translateAddr (Virtaddr (cva k)) (Load Data)) (sst k) with
-    | Some (Ok (Physaddr p, _, _), _) => p
-    | _ => zeros' 64
-    end.
-  Definition svalR (k : nat) : mword (8 * bytes) :=
-    match exec (mem_read (Load Data) PBMT_PMA (Physaddr (spaR k)) bytes false false false) (sst (S k)) with
-    | Some (Ok v, _) => v
-    | _ => zeros' (8 * bytes)
-    end.
-
-  Lemma read_classify_fold (M : nat) :
-    (forall k, (k < M)%nat -> is_aligned_vaddr (Virtaddr (cva k)) bytes = true) ->
-    cfg_okR σ0 ->
-    reg_interp σ0.(sregs) -∗ gen_heap_interp σ0.(mem) -∗
-    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
-    ( (⌜forall k, (k < M)%nat ->
-         exec (translateAddr (Virtaddr (cva k)) (Load Data)) (sst k)
-           = Some (Ok (Physaddr (spaR k), PBMT_PMA, init_ext_ptw), sst (S k))⌝ ∗
-       ⌜forall k, (k < M)%nat ->
-         exec (mem_read (Load Data) PBMT_PMA (Physaddr (spaR k)) bytes false false false) (sst (S k))
-           = Some (Ok (svalR k), sst (S k))⌝ ∗
-       ⌜(sst M).(mdev) = σ0.(mdev)⌝ ∗ ⌜cfg_okR (sst M)⌝ ∗
-       ⌜register_lookup (R_bool minstret_increment) (sst M).(sregs)
-          = register_lookup (R_bool minstret_increment) σ0.(sregs)⌝ ∗
-       ⌜register_lookup nextPC (sst M).(sregs) = register_lookup nextPC σ0.(sregs)⌝ ∗
-       reg_interp (sst M).(sregs) ∗ gen_heap_interp (sst M).(mem) ∗
-       utlb_inv_pt uroot tfp um ∗ udata_own data)
-     ∨ (∃ j : nat, ⌜(j < M)%nat⌝ ∗
-         ⌜forall k, (k < j)%nat ->
-           exec (translateAddr (Virtaddr (cva k)) (Load Data)) (sst k)
-             = Some (Ok (Physaddr (spaR k), PBMT_PMA, init_ext_ptw), sst (S k))⌝ ∗
-         ⌜forall k, (k < j)%nat ->
-           exec (mem_read (Load Data) PBMT_PMA (Physaddr (spaR k)) bytes false false false) (sst (S k))
-             = Some (Ok (svalR k), sst (S k))⌝ ∗
-         ⌜u_fault_flavor (Load Data) tfp um (cva j)⌝ ∗
-         ⌜cfg_okR (sst j)⌝ ∗ ⌜(sst j).(mdev) = σ0.(mdev)⌝ ∗
-         ⌜register_lookup (R_bool minstret_increment) (sst j).(sregs)
-            = register_lookup (R_bool minstret_increment) σ0.(sregs)⌝ ∗
-         ⌜register_lookup nextPC (sst j).(sregs) = register_lookup nextPC σ0.(sregs)⌝ ∗
-         reg_interp (sst j).(sregs) ∗ gen_heap_interp (sst j).(mem) ∗
-         utlb_inv_pt uroot tfp um ∗ udata_own data))%I.
+  Lemma u_translate_fault (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
+      (acc : MemoryAccessType mem_payload) (e : ExceptionType)
+      (va pc : mword 64) (W : Z) (σ : mstate) :
+    (acc = Load Data /\ e = E_Load_Page_Fault tt) \/
+    (acc = Store Data /\ e = E_SAMO_Page_Fault tt) ->
+    u_fault_flavor acc tfp um va ->
+    cfg_okR σ -> register_lookup PC σ.(sregs) = pc ->
+    reg_interp σ.(sregs) -∗ gen_heap_interp σ.(mem) -∗ utlb_inv_pt uroot tfp um -∗
+    ⌜exec (translateAddr (Virtaddr va) acc) σ = Some (Err (e, tt), σ) /\
+     exec (memory_exception (Virtaddr va) e) σ
+       = Some (Trap (User, make_sync_exception e va, pc), σ)⌝.
   Proof.
-    induction M as [|M' IH]; intros Hal Hcfg; iIntros "Hri Hgh Hinv Hdata".
-    - iModIntro. iLeft. iFrame. iPureIntro.
-      split; [intros; lia|]. split; [intros; lia|].
-      split; [reflexivity|]. split; [exact Hcfg|]. split; [reflexivity|]. reflexivity.
-    - iMod (IH ltac:(intros; apply Hal; lia) Hcfg with "Hri Hgh Hinv Hdata") as "[HAll | HF]".
-      + iDestruct "HAll" as "(%Htr & %Hmr & %Hmdev & %Hcfg' & %Hmi & %Hnpc & Hri & Hgh & Hinv & Hdata)".
-        destruct (data_classify (Load Data) tfp um (cva M') (or_intror (or_introl eq_refl)) Hwf)
-          as [ (w & Hum & Hok & Hcanon) | Hfault ].
-        * pose proof Hcfg' as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & Hmprv & Hall).
-          iMod (user_pt_load_data_g bytes Hb Hb8 Hbdvd Huintb Hread_plain
-                  uroot tfp um data w (cva M') (sst M')
-                  Hum Hok Hcov (Hal M' ltac:(lia)) Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
-                  with "Hri Hgh Hinv Hdata")
-            as (dv σ') "(%Htr0 & %Hmr0 & %Hmdev0 & %Hsregs & Hri & Hgh & Hinv & Hdata)".
-          assert (Hstep : sst (S M') = σ').
-          { cbn [sst]. rewrite Htr0. reflexivity. }
-          assert (Hspa : spaR M' = u_walk_pa w (cva M')).
-          { unfold spaR. rewrite Htr0. reflexivity. }
-          assert (Hsval : svalR M' = dv).
-          { unfold svalR. rewrite Hspa. rewrite Hstep. rewrite Hmr0. reflexivity. }
-          assert (Ttr : forall r : register, register_beq r tlb = false ->
-                    register_lookup r σ'.(sregs) = register_lookup r (sst M').(sregs)).
-          { intros r Hne. destruct Hsregs as [He | (tv & He)]; rewrite He;
-              [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-          iModIntro. iLeft. rewrite Hstep. iFrame.
-          iPureIntro. split; [| split; [| split; [| split; [| split]]]].
-          -- intros k Hk. destruct (Nat.eq_dec k M') as [->|Hne].
-             ++ rewrite Hspa Hstep. exact Htr0.
-             ++ apply Htr; lia.
-          -- intros k Hk. destruct (Nat.eq_dec k M') as [->|Hne].
-             ++ rewrite Hspa Hsval Hstep. exact Hmr0.
-             ++ apply Hmr; lia.
-          -- rewrite Hmdev0. exact Hmdev.
-          -- exact (cfg_okR_pres (sst M') σ' Hsregs Hcfg').
-          -- rewrite (Ttr (R_bool minstret_increment) ltac:(vm_compute; reflexivity)). exact Hmi.
-          -- rewrite (Ttr nextPC ltac:(vm_compute; reflexivity)). exact Hnpc.
-        * iModIntro. iRight. iExists M'.
-          iFrame. iPureIntro. split; [lia|]. split; [exact Htr|]. split; [exact Hmr|].
-          split; [exact Hfault|]. split; [exact Hcfg'|]. split; [exact Hmdev|].
-          split; [exact Hmi|]. exact Hnpc.
-      + iDestruct "HF" as (j) "(%Hj & %Htr & %Hmr & %Hfl & %Hcfgj & %Hmdevj & %Hmij & %Hnpcj & Hri & Hgh & Hinv & Hdata)".
-        iModIntro. iRight. iExists j. iFrame. iPureIntro.
-        split; [lia|]. split; [exact Htr|]. split; [exact Hmr|]. split; [exact Hfl|].
-        split; [exact Hcfgj|]. split; [exact Hmdevj|]. split; [exact Hmij|]. exact Hnpcj.
-  Qed.
-
-End MisReadClassify.
-
-(* ===================================================================== *)
-(* §10 The TOTAL MISALIGNED read composer: fold [0,N) (§8) then either the *)
-(*     all-good split (§5-style exec_vmem_read_addr_misaligned_split, Ok)  *)
-(*     or the first-fault split (§6 vmem_read_split_fault, Err via the     *)
-(*     fault head at chunk j).  Takes the split fact as a hypothesis (the  *)
-(*     ctz split-derivation supplies it).                                  *)
-(* ===================================================================== *)
-Section MisReadTotal.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context (bytes : Z).
-  Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)) (Huintb : uint (to_bits 64 bytes) = bytes).
-  Context (Hread_plain : forall (addr : mword 64) (ww : mword (8 * bytes)) s,
-      dev_addr addr = false ->
-      (forall j : nat, (N.of_nat j < Z.to_N bytes)%N -> s.(mem) !! (pa_add addr j) = Some (nth_byte ww j)) ->
-      exec (read_ram rv64d_types.Read_plain (Physaddr addr) bytes false) s = Some ((ww, default_meta), s)).
-  Context (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa).
-  Context (Hwf : upt_acc_wf um) (Hcov : udata_cov um data).
-
-  Notation cva va k := (add_vec_int va (Z.of_nat k * bytes)).
-
-  Lemma mem_read_misaligned_total (W : Z) (N : nat) (va : mword 64) (s : mstate) :
-    (1 <= N)%nat -> Z.of_nat N * bytes = W ->
-    is_aligned_vaddr (Virtaddr va) W = false ->
-    exec (split_misaligned (Virtaddr va) W) s = Some ((Z.of_nat N, bytes), s) ->
-    (forall k, (k < N)%nat -> is_aligned_vaddr (Virtaddr (cva va k)) bytes = true) ->
-    cfg_okR s ->
-    reg_interp s.(sregs) -∗ gen_heap_interp s.(mem) -∗
-    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
-    (∃ (dvv : mword (8 * W)) (σ' : mstate),
-        ⌜exec (vmem_read_addr (Virtaddr va) W (Load Data) false false false) s = Some (Ok dvv, σ')⌝ ∗
-        ⌜σ'.(mdev) = s.(mdev)⌝ ∗
-        ⌜register_lookup (R_bool minstret_increment) σ'.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
-        ⌜register_lookup nextPC σ'.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
-        reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um ∗ udata_own data)
-    ∨ (∃ (σ' : mstate) (e : ExceptionType) (xv pc : mword 64),
-        ⌜exec (vmem_read_addr (Virtaddr va) W (Load Data) false false false) s
-           = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pc)), σ')⌝ ∗
-        ⌜user_exc e = true⌝ ∗
-        ⌜σ'.(mdev) = s.(mdev)⌝ ∗
-        ⌜register_lookup (R_bool minstret_increment) σ'.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
-        ⌜register_lookup nextPC σ'.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
-        reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um ∗ udata_own data).
-  Proof.
-    intros HN Hwidth Hnal Hsplit Halk Hcfg.
-    iIntros "Hreg Hgh Hutlb Hudata".
-    iMod (read_classify_fold bytes Hb Hb8 Hbdvd Huintb Hread_plain uroot tfp um data va Hwf Hcov s N Halk Hcfg
-            with "Hreg Hgh Hutlb Hudata") as "[HAll | HF]".
-    - iDestruct "HAll" as "(%Htr & %Hmr & %Hmdev & %Hcfgn & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-      destruct (exec_vmem_read_addr_misaligned_split W bytes va (Load Data) false false N
-                  (spaR bytes va s) (svalR bytes va s) (sst bytes va s)
-                  HN Hb Htr Hmr Hnal eq_refl eq_refl Hsplit) as (dvv & Hvr).
-      iModIntro. iLeft. iExists dvv, (sst bytes va s N).
-      iFrame "Hreg Hgh Hutlb Hudata". iPureIntro. split; [exact Hvr |]. split; [exact Hmdev|].
-      split; [exact Hmi | exact Hnpc].
-    - iDestruct "HF" as (j) "(%Hj & %Htr & %Hmr & %Hfl & %Hcfgj & %Hmdevj & %Hmij & %Hnpcj & Hreg & Hgh & Hutlb & Hudata)".
-      pose proof Hcfgj as (Hmisaj & Hmenvj & Hhtifj & Hcpj & HSXLj & HMPRVj & Hpmaj).
-      iDestruct (utlb_inv_pt_translateAddr_u_fault (Load Data) uroot tfp um (cva va j)
-                   (E_Load_Page_Fault tt) (sst bytes va s j) Hfl Hhtifj Hcpj HSXLj
+    intros Hacc Hflavor Hcfg Lpc.
+    pose proof Hcfg as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & Hmprv & Hall).
+    iIntros "Hri Hgh Hinv".
+    destruct Hacc as [ [Ha He] | [Ha He] ]; subst acc; subst e.
+    - iDestruct (utlb_inv_pt_translateAddr_u_fault (Load Data) uroot tfp um va
+                   (E_Load_Page_Fault tt) σ Hflavor Hhtif Hcp HSXL
                    (exec_effectivePrivilege_mprv0 (Load Data)
-                      (register_lookup mstatus (sst bytes va s j).(sregs)) User (sst bytes va s j) HMPRVj)
-                   (exec_is_shadow_stack_u_acc (Load Data) (sst bytes va s j) (or_intror (or_introl eq_refl)))
-                   Hpmaj
+                      (register_lookup mstatus σ.(sregs)) User σ Hmprv)
+                   (exec_is_shadow_stack_u_acc (Load Data) σ
+                      (or_intror (or_introl eq_refl))) Hall
                    ltac:(unfold translationException; cbn match; apply exec_returnm)
                    ltac:(unfold translationException; cbn match; apply exec_returnm)
                    ltac:(unfold translationException; cbn match; apply exec_returnm)
-                   with "Hreg Hgh Hutlb") as %Htrf.
-      set (pcj := register_lookup PC (sst bytes va s j).(sregs)).
-      assert (Hstepj : sst bytes va s (S j) = sst bytes va s j).
-      { cbn [sst]. fold (cva va j).
-        change (bits_of_virtaddr (Virtaddr va)) with va in Htrf.
-        rewrite Htrf. reflexivity. }
-      assert (HtrF : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (Z.of_nat j * bytes))) (Load Data)) (sst bytes va s j)
-                     = Some (Err (E_Load_Page_Fault tt, tt), sst bytes va s (S j))).
-      { change (bits_of_virtaddr (Virtaddr va)) with va. rewrite Hstepj. exact Htrf. }
-      assert (HcpF : register_lookup cur_privilege (sst bytes va s (S j)).(sregs) = User)
-        by (rewrite Hstepj; exact Hcpj).
-      assert (HpcF : register_lookup PC (sst bytes va s (S j)).(sregs) = pcj)
-        by (rewrite Hstepj; reflexivity).
-      pose proof (vmem_read_split_fault W bytes va pcj (Load Data) false false (E_Load_Page_Fault tt)
-                    N j (spaR bytes va s) (svalR bytes va s) (sst bytes va s)
-                    HN Hb Hj Htr Hmr HtrF HcpF HpcF Hnal eq_refl eq_refl Hsplit) as Hvr.
-      rewrite Hstepj in Hvr.
-      iModIntro. iRight.
-      iExists (sst bytes va s j), (E_Load_Page_Fault tt),
-        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (Z.of_nat j * bytes)), pcj.
-      iFrame "Hreg Hgh Hutlb Hudata". iPureIntro.
-      split; [exact Hvr |]. split; [reflexivity |]. split; [exact Hmdevj|].
-      split; [exact Hmij | exact Hnpcj].
+                   with "Hri Hgh Hinv") as %Htr.
+      iPureIntro. split; [ exact Htr | ].
+      exact (exec_memory_exception va pc (E_Load_Page_Fault tt) User σ Hcp Lpc).
+    - iDestruct (utlb_inv_pt_translateAddr_u_fault (Store Data) uroot tfp um va
+                   (E_SAMO_Page_Fault tt) σ Hflavor Hhtif Hcp HSXL
+                   (exec_effectivePrivilege_mprv0 (Store Data)
+                      (register_lookup mstatus σ.(sregs)) User σ Hmprv)
+                   (exec_is_shadow_stack_u_acc (Store Data) σ
+                      (or_intror (or_intror (or_introl eq_refl)))) Hall
+                   ltac:(unfold translationException; cbn match; apply exec_returnm)
+                   ltac:(unfold translationException; cbn match; apply exec_returnm)
+                   ltac:(unfold translationException; cbn match; apply exec_returnm)
+                   with "Hri Hgh Hinv") as %Htr.
+      iPureIntro. split; [ exact Htr | ].
+      exact (exec_memory_exception va pc (E_SAMO_Page_Fault tt) User σ Hcp Lpc).
   Qed.
 
-End MisReadTotal.
+End MisPageComposers.
+
 
 Lemma zext5_concat1_3_unsigned (x : mword 1) (y : mword 3) :
   bv_unsigned (zero_extend' 5 (concat_vec x y) : mword 5)
@@ -1069,396 +631,6 @@ Proof.
   rewrite He in H0. apply Z.leb_le in H0. vm_compute in H0. discriminate.
 Qed.
 
-(* ===================================================================== *)
-(* §11 The ctz split-derivation: for a misaligned va of width W in {2,4,8}, *)
-(*     reduce split_misaligned to the concrete chunk count/size (bytes =    *)
-(*     2^ctz(va), N = W/bytes) + per-chunk alignment.  count_trailing_zeros *)
-(*     is characterized via a foreach_Z_down' suffix invariant.            *)
-(* ===================================================================== *)
-Lemma shiftr_mod2_testbit (x i : Z) : 0 <= i ->
-  (Z.shiftr x i) mod 2 = Z.b2z (Z.testbit x i).
-Proof.
-  intros Hi.
-  rewrite Zmod_odd.
-  rewrite <- Z.bit0_odd.
-  rewrite Z.shiftr_spec; [| lia].
-  replace (0 + i) with i; [| lia].
-  destruct (Z.testbit x i); reflexivity.
-Qed.
-
-Lemma access_unsigned_64 (w : mword 64) (i : Z) : 0 <= i ->
-  bv_unsigned (access_vec_dec w i) = Z.b2z (Z.testbit (bv_unsigned w) i).
-Proof.
-  intros Hi.
-  unfold access_vec_dec, access_mword_dec.
-  unfold MachineWord.MachineWord.slice.
-  cbv [get_word].
-  rewrite bv_extract_unsigned.
-  unfold bv_wrap.
-  change (bv_modulus (MachineWord.MachineWord.Z_idx 1)) with 2.
-  replace (Z.of_N (MachineWord.MachineWord.Z_idx i)) with i.
-  2:{ unfold MachineWord.MachineWord.Z_idx. rewrite Z2N.id; [| lia]. reflexivity. }
-  apply shiftr_mod2_testbit; lia.
-Qed.
-
-Lemma bvu_moi1 : bv_unsigned (mword_of_int 1 : mword 1) = 1.
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma allowed_misaligned_false (a : mword 64) (W : Z) :
-  (W = 2 \/ W = 4 \/ W = 8) -> allowed_misaligned a W 0 = false.
-Proof.
-  intros HW. unfold allowed_misaligned.
-  destruct HW as [ -> | [ -> | -> ] ]; reflexivity.
-Qed.
-
-Section WithVa.
-Variable va : mword 64.
-
-Definition body (i r : Z) : Z :=
-  if eq_vec (access_vec_dec va i) (mword_of_int 1) then i else r.
-
-Lemma body_eq (i r : Z) :
-  body i r = (if eq_vec (access_vec_dec va i) (mword_of_int 1) then i else r).
-Proof. reflexivity. Qed.
-
-Lemma bit_set (i : Z) : 0 <= i ->
-  Z.testbit (bv_unsigned va) i = true ->
-  eq_vec (access_vec_dec va i) (mword_of_int 1) = true.
-Proof.
-  intros Hi Hb. apply eq_vec_true_iff. apply bv_eq.
-  rewrite access_unsigned_64; [| lia]. rewrite Hb. rewrite bvu_moi1. reflexivity.
-Qed.
-
-Lemma bit_clear (i : Z) : 0 <= i ->
-  Z.testbit (bv_unsigned va) i = false ->
-  eq_vec (access_vec_dec va i) (mword_of_int 1) = false.
-Proof.
-  intros Hi Hb. apply eq_vec_false_iff. intro Heq.
-  apply (f_equal bv_unsigned) in Heq.
-  rewrite access_unsigned_64 in Heq; [| lia]. rewrite Hb in Heq.
-  rewrite bvu_moi1 in Heq. simpl in Heq. discriminate.
-Qed.
-
-Lemma fold_low_clear : forall (n : nat) (off r : Z),
-  (forall j, 0 <= j <= 63 + off -> eq_vec (access_vec_dec va j) (mword_of_int 1) = false) ->
-  foreach_Z_down' 63 0 1 off n r body = r.
-Proof.
-  induction n as [|n IH]; intros off r Hclear.
-  - cbn [foreach_Z_down'].
-    destruct (sumbool_of_bool (0 <=? 63 + off)); reflexivity.
-  - cbn [foreach_Z_down'].
-    destruct (sumbool_of_bool (0 <=? 63 + off)) as [Hg|Hg]; [ | reflexivity ].
-    apply Z.leb_le in Hg.
-    rewrite body_eq.
-    rewrite (Hclear (63 + off)); [ | lia ].
-    cbn match.
-    apply IH. intros j Hj. apply Hclear. lia.
-Qed.
-
-Lemma fold_gives_k : forall (n : nat) (off k : Z),
-  0 <= k <= 63 + off ->
-  n = S (Z.to_nat (63 + off)) ->
-  Z.testbit (bv_unsigned va) k = true ->
-  (forall j, 0 <= j < k -> Z.testbit (bv_unsigned va) j = false) ->
-  forall (r : Z), foreach_Z_down' 63 0 1 off n r body = k.
-Proof.
-  induction n as [|n IH]; intros off k Hk Hn Hset Hlow r.
-  - discriminate Hn.
-  - cbn [foreach_Z_down'].
-    destruct (sumbool_of_bool (0 <=? 63 + off)) as [Hg|Hg].
-    2:{ apply Z.leb_gt in Hg. lia. }
-    apply Z.leb_le in Hg.
-    injection Hn as Hn'.
-    destruct (Z.eq_dec k (63 + off)) as [Hkeq|Hkne].
-    + rewrite body_eq.
-      rewrite <- Hkeq.
-      rewrite (bit_set k ltac:(lia) Hset).
-      cbn match.
-      apply fold_low_clear.
-      intros j Hj. apply bit_clear; [ lia | apply Hlow; lia ].
-    + rewrite body_eq.
-      apply IH.
-      * lia.
-      * rewrite Hn'.
-        replace (63 + (off - 1)) with (62 + off); [| lia].
-        replace (63 + off) with (Z.succ (62 + off)); [| lia].
-        rewrite Z2Nat.inj_succ; [| lia]. reflexivity.
-      * exact Hset.
-      * exact Hlow.
-Qed.
-
-Lemma ctz_val (k : Z) :
-  0 <= k <= 63 ->
-  Z.testbit (bv_unsigned va) k = true ->
-  (forall j, 0 <= j < k -> Z.testbit (bv_unsigned va) j = false) ->
-  count_trailing_zeros va = k.
-Proof.
-  intros Hk Hset Hlow.
-  transitivity (foreach_Z_down' 63 0 1 0 64 64 body).
-  { unfold count_trailing_zeros, foreach_Z_down. reflexivity. }
-  apply (fold_gives_k 64 0 k).
-  - lia.
-  - reflexivity.
-  - exact Hset.
-  - exact Hlow.
-Qed.
-
-Lemma low_bits_zero_mod (m : nat) :
-  (forall j, 0 <= j < Z.of_nat m -> Z.testbit (bv_unsigned va) j = false) ->
-  bv_unsigned va mod (2 ^ Z.of_nat m) = 0.
-Proof.
-  intros H.
-  apply (proj1 (Z.bits_inj_iff' (bv_unsigned va mod 2 ^ Z.of_nat m) 0)).
-  intros i Hi. rewrite Z.bits_0.
-  destruct (Z.lt_ge_cases i (Z.of_nat m)) as [Hlt|Hge].
-  - rewrite Z.mod_pow2_bits_low; [| lia]. apply H. lia.
-  - rewrite Z.mod_pow2_bits_high; [| lia]. reflexivity.
-Qed.
-
-Lemma chunk_aligned (bytes j : Z) :
-  0 < bytes -> (bytes | 4096) -> 0 <= j < 4096 ->
-  bv_unsigned va mod bytes = 0 -> j mod bytes = 0 ->
-  is_aligned_vaddr (Virtaddr (add_vec_int va j)) bytes = true.
-Proof.
-  intros Hb Hdvd Hj Hva Hjm.
-  unfold is_aligned_vaddr. apply Z.eqb_eq.
-  rewrite (uint_unsigned_n _).
-  rewrite Z.rem_mod_nonneg;
-    [ | pose proof (bv_unsigned_in_range _ (add_vec_int va j)); lia | exact Hb ].
-  rewrite (Znumtheory.Zmod_div_mod bytes 4096 _ Hb ltac:(lia) Hdvd).
-  pose proof (uint_add_vec_int_mod4096 va j Hj) as Hm.
-  rewrite !(uint_unsigned_n _) in Hm.
-  rewrite Hm.
-  rewrite <- (Znumtheory.Zmod_div_mod bytes 4096 _ Hb ltac:(lia) Hdvd).
-  rewrite Z.add_mod; [| lia].
-  rewrite Hva. rewrite Hjm. rewrite Z.add_0_l. apply Zmod_0_l.
-Qed.
-
-Lemma exec_split (W k : Z) (s : mstate) :
-  is_aligned_vaddr (Virtaddr va) W = false ->
-  allowed_misaligned va W 0 = false ->
-  count_trailing_zeros va = k ->
-  Z.eqb W (Z.quot W (pow2 k) * pow2 k) = true ->
-  exec (split_misaligned (Virtaddr va) W) s
-    = Some ((Z.quot W (pow2 k), pow2 k), s).
-Proof.
-  intros Hmis Hallow Hctz Hguard.
-  unfold split_misaligned.
-  unfold sys_misaligned_allowed_within_exp, sys_misaligned_byte_by_byte.
-  cbn zeta.
-  change (bits_of_virtaddr (Virtaddr va)) with va.
-  rewrite Hmis.
-  rewrite Hallow.
-  cbn [orb].
-  cbn match.
-  rewrite Hctz.
-  rewrite Hguard.
-  erewrite exec_bind_Some.
-  2:{ unfold assert_exp'. cbn match. apply exec_returnm. }
-  cbn beta. apply exec_returnm.
-Qed.
-
-Lemma assemble (W k bytes num : Z) (Nn : nat) (s : mstate) :
-  is_aligned_vaddr (Virtaddr va) W = false ->
-  allowed_misaligned va W 0 = false ->
-  count_trailing_zeros va = k ->
-  bv_unsigned va mod bytes = 0 ->
-  bytes = pow2 k ->
-  num = Z.quot W bytes ->
-  Z.of_nat Nn = num ->
-  (1 <= Nn)%nat ->
-  0 < bytes -> bytes < W -> W <= 8 ->
-  (bytes | 4096) ->
-  uint (to_bits 64 bytes) = bytes ->
-  Z.of_nat Nn * bytes = W ->
-  Z.eqb W (num * bytes) = true ->
-  exists (N : nat) (bytes0 : Z),
-    (1 <= N)%nat /\ Z.of_nat N * bytes0 = W /\ 0 < bytes0 /\ bytes0 < W /\
-    (bytes0 | 4096) /\ uint (to_bits 64 bytes0) = bytes0 /\
-    exec (split_misaligned (Virtaddr va) W) s = Some ((Z.of_nat N, bytes0), s) /\
-    (forall k0, (k0 < N)%nat ->
-       is_aligned_vaddr (Virtaddr (add_vec_int va (Z.of_nat k0 * bytes0))) bytes0 = true).
-Proof.
-  intros Hmis Hallow Hctz Hvamod Hbytes Hnum HN HNn Hbpos HbltW HWle Hdvd Hub HNbW Hguard.
-  exists Nn, bytes.
-  split; [ exact HNn |].
-  split; [ exact HNbW |].
-  split; [ exact Hbpos |].
-  split; [ exact HbltW |].
-  split; [ exact Hdvd |].
-  split; [ exact Hub |].
-  split.
-  { rewrite HN. rewrite Hnum. rewrite Hbytes.
-    apply (exec_split W k s Hmis Hallow Hctz).
-    rewrite <- Hbytes. rewrite <- Hnum. exact Hguard. }
-  { intros k0 Hk0. apply chunk_aligned.
-    - exact Hbpos.
-    - exact Hdvd.
-    - assert (Hk0z : Z.of_nat k0 < Z.of_nat Nn) by (apply inj_lt; exact Hk0).
-      assert (Hk0nn : 0 <= Z.of_nat k0) by apply Nat2Z.is_nonneg.
-      split.
-      + nia.
-      + nia.
-    - exact Hvamod.
-    - apply Z.mod_mul. lia. }
-Qed.
-
-End WithVa.
-
-Lemma split_misaligned_derive (W : Z) (va : mword 64) (s : mstate) :
-  (W = 2 \/ W = 4 \/ W = 8) ->
-  is_aligned_vaddr (Virtaddr va) W = false ->
-  exists (N : nat) (bytes : Z),
-    (1 <= N)%nat /\ Z.of_nat N * bytes = W /\ 0 < bytes /\ bytes < W /\
-    (bytes | 4096) /\ uint (to_bits 64 bytes) = bytes /\
-    exec (split_misaligned (Virtaddr va) W) s = Some ((Z.of_nat N, bytes), s) /\
-    (forall k, (k < N)%nat ->
-       is_aligned_vaddr (Virtaddr (add_vec_int va (Z.of_nat k * bytes))) bytes = true).
-Proof.
-  intros HW Halign.
-  pose proof (allowed_misaligned_false va W HW) as Hallow.
-  assert (HWpos : 0 < W) by (destruct HW as [ -> | [ -> | -> ] ]; lia).
-  assert (Hmodne : bv_unsigned va mod W <> 0).
-  { unfold is_aligned_vaddr in Halign. apply Z.eqb_neq in Halign.
-    rewrite (uint_unsigned_n _) in Halign.
-    rewrite Z.rem_mod_nonneg in Halign;
-      [ exact Halign | pose proof (bv_unsigned_in_range _ va); lia | exact HWpos ]. }
-  destruct HW as [ -> | [ -> | -> ] ].
-  - destruct (Z.testbit (bv_unsigned va) 0) eqn:E0.
-    + apply (assemble va 2 0 1 2 2%nat s).
-      * exact Halign.
-      * exact Hallow.
-      * apply ctz_val; [ lia | exact E0 | intros j Hj; lia ].
-      * apply Z.mod_1_r.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * lia.
-      * lia.
-      * lia.
-      * lia.
-      * exists 4096; vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-    + exfalso. apply Hmodne. change 2 with (2 ^ Z.of_nat 1).
-      apply low_bits_zero_mod. intros j Hj.
-      assert (j = 0) as -> by lia. exact E0.
-  - destruct (Z.testbit (bv_unsigned va) 0) eqn:E0.
-    + apply (assemble va 4 0 1 4 4%nat s).
-      * exact Halign.
-      * exact Hallow.
-      * apply ctz_val; [ lia | exact E0 | intros j Hj; lia ].
-      * apply Z.mod_1_r.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * lia.
-      * lia.
-      * lia.
-      * lia.
-      * exists 4096; vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-    + destruct (Z.testbit (bv_unsigned va) 1) eqn:E1.
-      * apply (assemble va 4 1 2 2 2%nat s).
-        -- exact Halign.
-        -- exact Hallow.
-        -- apply ctz_val; [ lia | exact E1 | intros j Hj; assert (j = 0) as -> by lia; exact E0 ].
-        -- change 2 with (2 ^ Z.of_nat 1). apply low_bits_zero_mod.
-           intros j Hj. assert (j = 0) as -> by lia. exact E0.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- lia.
-        -- lia.
-        -- lia.
-        -- lia.
-        -- exists 2048; vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-      * exfalso. apply Hmodne. change 4 with (2 ^ Z.of_nat 2).
-        apply low_bits_zero_mod. intros j Hj.
-        assert (j = 0 \/ j = 1) as [ -> | -> ] by lia; [ exact E0 | exact E1 ].
-  - destruct (Z.testbit (bv_unsigned va) 0) eqn:E0.
-    + apply (assemble va 8 0 1 8 8%nat s).
-      * exact Halign.
-      * exact Hallow.
-      * apply ctz_val; [ lia | exact E0 | intros j Hj; lia ].
-      * apply Z.mod_1_r.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * lia.
-      * lia.
-      * lia.
-      * lia.
-      * exists 4096; vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-    + destruct (Z.testbit (bv_unsigned va) 1) eqn:E1.
-      * apply (assemble va 8 1 2 4 4%nat s).
-        -- exact Halign.
-        -- exact Hallow.
-        -- apply ctz_val; [ lia | exact E1 | intros j Hj; assert (j = 0) as -> by lia; exact E0 ].
-        -- change 2 with (2 ^ Z.of_nat 1). apply low_bits_zero_mod.
-           intros j Hj. assert (j = 0) as -> by lia. exact E0.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- lia.
-        -- lia.
-        -- lia.
-        -- lia.
-        -- exists 2048; vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-      * destruct (Z.testbit (bv_unsigned va) 2) eqn:E2.
-        -- apply (assemble va 8 2 4 2 2%nat s).
-           ++ exact Halign.
-           ++ exact Hallow.
-           ++ apply ctz_val; [ lia | exact E2
-              | intros j Hj; assert (j = 0 \/ j = 1) as [ -> | -> ] by lia; [ exact E0 | exact E1 ] ].
-           ++ change 4 with (2 ^ Z.of_nat 2). apply low_bits_zero_mod.
-              intros j Hj. assert (j = 0 \/ j = 1) as [ -> | -> ] by lia; [ exact E0 | exact E1 ].
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ lia.
-           ++ lia.
-           ++ lia.
-           ++ lia.
-           ++ exists 1024; vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-        -- exfalso. apply Hmodne. change 8 with (2 ^ Z.of_nat 3).
-           apply low_bits_zero_mod. intros j Hj.
-           assert (j = 0 \/ j = 1 \/ j = 2) as [ -> | [ -> | -> ] ] by lia;
-             [ exact E0 | exact E1 | exact E2 ].
-Qed.
-
-
-
-(* ===================================================================== *)
-(* §12 The TOTAL read classify (aligned §5 / misaligned §10+split_deriv),  *)
-(*     the width-k LOAD engine (mem_exec_core), and the compressed LOAD    *)
-(*     arms C_LH/C_LHU/C_LW/C_LD (each: ExecuteAs to a base LOAD at literal *)
-(*     width, engine, rvc_post).                                           *)
-(* ===================================================================== *)
-Lemma pow2_le8 (b : Z) : 0 < b -> b < 8 -> (b | 4096) -> b = 1 \/ b = 2 \/ b = 4.
-Proof.
-  intros Hpos Hlt Hdvd.
-  assert (Hb : b = 1 \/ b = 2 \/ b = 3 \/ b = 4 \/ b = 5 \/ b = 6 \/ b = 7) by lia.
-  destruct Hdvd as [q Hq].
-  destruct Hb as [H|[H|[H|[H|[H|[H|H]]]]]]; subst b;
-    try (left; reflexivity); try (right; left; reflexivity);
-    try (right; right; reflexivity); exfalso; lia.
-Qed.
 
 
 (* ===================================================================== *)
@@ -1607,50 +779,120 @@ Section MemReadTotal.
     intros Hcfg Lpc.
     pose proof Hcfg as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & HMPRV & Hpma).
     iIntros "Hreg Hgh Hutlb Hudata".
-    destruct (is_aligned_vaddr (Virtaddr va) k) eqn:Hal.
-    - (* aligned: the §5 classify *)
-      iMod (user_pt_vmem_read_addr_load_classify k Hk Hk8 Hkdvd Huintk Hread_plain_k
-              uroot tfp um data va pc s Hwf Hcov Hal Hmisa Hmenv Hhtif Lpc Hcp HSXL HMPRV Hpma
-              with "Hreg Hgh Hutlb Hudata") as "[HOk | HErr]".
-      + iDestruct "HOk" as (dvv σ') "(%Hvr & %Hmdev & %Hsregs & Hreg & Hgh & Hutlb & Hudata)".
+    iDestruct (utlb_inv_pt_tmode uroot tfp um s HSXL with "Hreg Hutlb") as %Htm.
+    assert (Heff : exec (effectivePrivilege (Load Data)
+                           (register_lookup mstatus s.(sregs))
+                           (register_lookup cur_privilege s.(sregs))) s = Some (User, s))
+      by (rewrite Hcp; apply exec_effectivePrivilege_mprv0; exact HMPRV).
+    assert (Hpm : plat_misaligned_exception (Load Data) false = None)
+      by (apply plat_misaligned_loadstore_none; reflexivity).
+    destruct (in_one_page_dec va k) as [Hin | Hout].
+    - (* ONE PAGE: one classify, one translation, whatever the alignment *)
+      destruct (data_classify (Load Data) tfp um va (or_intror (or_introl eq_refl)) Hwf)
+        as [ (w & Hum & Hok & Hcanon) | Hfault ].
+      + iMod (u_translate_ok uroot tfp um data w va k s Hk Hk8 Hum Hok Hcov Hin Hcanon Hcfg
+                with "Hreg Hgh Hutlb Hudata")
+          as (dv σ') "(%Htrv & %Hmdev & %Hsregs & Hreg & Hgh & Hutlb & Hudata)".
         assert (Tr : forall r : register, register_beq r tlb = false ->
                   register_lookup r σ'.(sregs) = register_lookup r s.(sregs)).
         { intros r Hne. destruct Hsregs as [He | (tv & He)]; rewrite He;
             [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-        iModIntro. iLeft. iExists dvv, σ'. iFrame. iPureIntro.
-        split; [exact Hvr |]. split; [exact Hmdev|].
+        iModIntro. iLeft. iExists dv, σ'. iFrame. iPureIntro.
+        split.
+        { exact (exec_vmem_read_addr_intra k va (u_walk_pa w va) dv (Load Data)
+                   false false false User Sv39 s σ' Hk
+                   (exec_split_on_page_boundary_intra va k s Hk Hin)
+                   (or_intror Hpm) Heff Htm Htrv ltac:(discriminate)). }
+        split; [ exact Hmdev |].
         split; [ apply Tr; vm_compute; reflexivity | apply Tr; vm_compute; reflexivity ].
-      + iDestruct "HErr" as "(%Herr & Hreg & Hgh & Hutlb & Hudata)".
+      + iDestruct (u_translate_fault uroot tfp um (Load Data) (E_Load_Page_Fault tt) va pc k s
+                     (or_introl (conj eq_refl eq_refl)) Hfault Hcfg Lpc
+                     with "Hreg Hgh Hutlb") as %(Htr & Hme).
         iModIntro. iRight. iExists s, (E_Load_Page_Fault tt), va, pc.
-        iFrame. iPureIntro. split; [exact Herr |]. split; [vm_compute; reflexivity |].
-        split; [reflexivity|]. split; [reflexivity|]. reflexivity.
-    - (* misaligned: split then the total misaligned composer *)
-      destruct (split_misaligned_derive k va s HkW Hal)
-        as (N & bytes & HN & Hwidth & Hbpos & Hblt & Hbdvd & Huintb & Hsplit & Halk).
-      assert (Hblt8 : bytes < 8) by (destruct HkW as [Hkv|[Hkv|Hkv]]; subst k; lia).
-      destruct (pow2_le8 bytes Hbpos Hblt8 Hbdvd) as [Hbe|[Hbe|Hbe]]; subst bytes.
-      + iMod (mem_read_misaligned_total 1 ltac:(lia) ltac:(lia) ltac:(exists 4096; reflexivity)
-                ltac:(vm_compute; reflexivity) exec_read_ram_plain_1 uroot tfp um data Hwf Hcov
-                k N va s HN Hwidth Hal Hsplit Halk Hcfg with "Hreg Hgh Hutlb Hudata") as "[HOk | HErr]".
-        * iDestruct "HOk" as (dvv σ') "(%Hvr & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iLeft. iExists dvv, σ'. iFrame. iPureIntro. split; [exact Hvr |]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-        * iDestruct "HErr" as (σ' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iRight. iExists σ', e, xv, pcx. iFrame. iPureIntro. split; [exact Herr|]. split; [exact Hue|]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-      + iMod (mem_read_misaligned_total 2 ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
-                ltac:(vm_compute; reflexivity) exec_read_ram_plain_2 uroot tfp um data Hwf Hcov
-                k N va s HN Hwidth Hal Hsplit Halk Hcfg with "Hreg Hgh Hutlb Hudata") as "[HOk | HErr]".
-        * iDestruct "HOk" as (dvv σ') "(%Hvr & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iLeft. iExists dvv, σ'. iFrame. iPureIntro. split; [exact Hvr |]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-        * iDestruct "HErr" as (σ' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iRight. iExists σ', e, xv, pcx. iFrame. iPureIntro. split; [exact Herr|]. split; [exact Hue|]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-      + iMod (mem_read_misaligned_total 4 ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
-                ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 uroot tfp um data Hwf Hcov
-                k N va s HN Hwidth Hal Hsplit Halk Hcfg with "Hreg Hgh Hutlb Hudata") as "[HOk | HErr]".
-        * iDestruct "HOk" as (dvv σ') "(%Hvr & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iLeft. iExists dvv, σ'. iFrame. iPureIntro. split; [exact Hvr |]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-        * iDestruct "HErr" as (σ' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iRight. iExists σ', e, xv, pcx. iFrame. iPureIntro. split; [exact Herr|]. split; [exact Hue|]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
+        iFrame. iPureIntro.
+        split.
+        { exact (exec_vmem_read_addr_intra_err k va
+                   (Trap (User, make_sync_exception (E_Load_Page_Fault tt) va, pc))
+                   (Load Data) false false false User Sv39 s s Hk
+                   (exec_split_on_page_boundary_intra va k s Hk Hin)
+                   (or_intror Hpm) Heff Htm
+                   (exec_translate_and_read_value_err k va (Load Data) false false false
+                      (E_Load_Page_Fault tt) _ s s Htr Hme)). }
+        split; [ vm_compute; reflexivity |].
+        split; [ reflexivity |]. split; [ reflexivity | reflexivity ].
+    - (* TWO PAGES: the access ends one page and starts the next *)
+      destruct (straddle_bounds va k Hk Hk8 Hout) as (Hp0 & Hq0 & Hp8 & Hq8).
+      pose proof (exec_split_on_page_boundary_straddle va k s Hk Hk8 Hout) as Hsp.
+      set (pp := 4096 - bv_unsigned va mod 4096) in *.
+      set (qq := k - pp) in *.
+      set (vb := add_vec_int va pp).
+      destruct (data_classify (Load Data) tfp um va (or_intror (or_introl eq_refl)) Hwf)
+        as [ (w1 & Hum1 & Hok1 & Hcanon1) | Hf1 ].
+      + (* the first page lands; classify the second *)
+        iMod (u_translate_ok uroot tfp um data w1 va pp s Hp0 Hp8 Hum1 Hok1 Hcov
+                (straddle_part1_in_page va k) Hcanon1 Hcfg with "Hreg Hgh Hutlb Hudata")
+          as (dv1 σ1) "(%Htrv1 & %Hmdev1 & %Hsregs1 & Hreg & Hgh & Hutlb & Hudata)".
+        assert (Tr1 : forall r : register, register_beq r tlb = false ->
+                  register_lookup r σ1.(sregs) = register_lookup r s.(sregs)).
+        { intros r Hne. destruct Hsregs1 as [He | (tv & He)]; rewrite He;
+            [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+        pose proof (cfg_okR_pres s σ1 Hsregs1 Hcfg) as Hcfg1.
+        pose proof Hcfg1 as (Hmisa1 & Hmenv1 & Hhtif1 & Hcp1 & HSXL1 & HMPRV1 & Hpma1).
+        destruct (data_classify (Load Data) tfp um vb (or_intror (or_introl eq_refl)) Hwf)
+          as [ (w2 & Hum2 & Hok2 & Hcanon2) | Hf2 ].
+        * iMod (u_translate_ok uroot tfp um data w2 vb qq σ1 Hq0 Hq8 Hum2 Hok2 Hcov
+                  (straddle_part2_in_page va k Hk Hk8 Hout) Hcanon2 Hcfg1
+                  with "Hreg Hgh Hutlb Hudata")
+            as (dv2 σ2) "(%Htrv2 & %Hmdev2 & %Hsregs2 & Hreg & Hgh & Hutlb & Hudata)".
+          assert (Tr2 : forall r : register, register_beq r tlb = false ->
+                    register_lookup r σ2.(sregs) = register_lookup r σ1.(sregs)).
+          { intros r Hne. destruct Hsregs2 as [He | (tv & He)]; rewrite He;
+              [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+          destruct (exec_vmem_read_addr_split2 k pp qq va (u_walk_pa w1 va) (u_walk_pa w2 vb)
+                      dv1 dv2 (Load Data) false false User Sv39 s σ1 σ2
+                      Hp0 Hq0 Hsp Hpm Heff Htm ltac:(vm_compute; reflexivity) Htrv1 Htrv2)
+            as (dvv & Hvr).
+          iModIntro. iLeft. iExists dvv, σ2. iFrame. iPureIntro.
+          split; [ exact Hvr |]. split; [ rewrite Hmdev2; exact Hmdev1 |].
+          split; [ rewrite (Tr2 (R_bool minstret_increment) ltac:(vm_compute; reflexivity));
+                   apply Tr1; vm_compute; reflexivity
+                 | rewrite (Tr2 nextPC ltac:(vm_compute; reflexivity));
+                   apply Tr1; vm_compute; reflexivity ].
+        * (* the second page faults *)
+          set (pc1 := register_lookup PC σ1.(sregs)).
+          iDestruct (u_translate_fault uroot tfp um (Load Data) (E_Load_Page_Fault tt) vb pc1 qq σ1
+                       (or_introl (conj eq_refl eq_refl)) Hf2 Hcfg1 eq_refl
+                       with "Hreg Hgh Hutlb") as %(Htr2 & Hme2).
+          iDestruct (utlb_inv_pt_tmode uroot tfp um σ1 HSXL1 with "Hreg Hutlb") as %Htm1.
+          iModIntro. iRight.
+          iExists σ1, (E_Load_Page_Fault tt), vb, pc1.
+          iFrame. iPureIntro.
+          split.
+          { exact (exec_vmem_read_addr_split2_err2 k pp qq va (u_walk_pa w1 va) dv1
+                     (Trap (User, make_sync_exception (E_Load_Page_Fault tt) vb, pc1))
+                     (Load Data) false false User Sv39 s σ1 σ1
+                     Hp0 Hq0 Hsp Hpm Heff Htm ltac:(vm_compute; reflexivity) Htrv1
+                     (exec_translate_and_read_value_err qq vb (Load Data) false false false
+                        (E_Load_Page_Fault tt) _ σ1 σ1 Htr2 Hme2)). }
+          split; [ vm_compute; reflexivity |]. split; [ exact Hmdev1 |].
+          split; [ apply Tr1; vm_compute; reflexivity | apply Tr1; vm_compute; reflexivity ].
+      + (* the FIRST page faults *)
+        iDestruct (u_translate_fault uroot tfp um (Load Data) (E_Load_Page_Fault tt) va pc pp s
+                     (or_introl (conj eq_refl eq_refl)) Hf1 Hcfg Lpc
+                     with "Hreg Hgh Hutlb") as %(Htr1 & Hme1).
+        iModIntro. iRight. iExists s, (E_Load_Page_Fault tt), va, pc.
+        iFrame. iPureIntro.
+        split.
+        { exact (exec_vmem_read_addr_split2_err1 k pp qq va
+                   (Trap (User, make_sync_exception (E_Load_Page_Fault tt) va, pc))
+                   (Load Data) false false User Sv39 s s
+                   Hp0 Hq0 Hsp Hpm Heff Htm ltac:(vm_compute; reflexivity)
+                   (exec_translate_and_read_value_err pp va (Load Data) false false false
+                      (E_Load_Page_Fault tt) _ s s Htr1 Hme1)). }
+        split; [ vm_compute; reflexivity |].
+        split; [ reflexivity |]. split; [ reflexivity | reflexivity ].
   Qed.
+
 
 
   Lemma mem_exec_load_k (pt : uptd) (k : Z)
@@ -2151,221 +1393,8 @@ Qed.
 (* ===================================================================== *)
 Unset Keyed Unification.
 
-Section MisWriteClassify.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context (bytes : Z).
-  Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)) (Huintb : uint (to_bits 64 bytes) = bytes).
-  Context (Hwrite_plain : forall (addr : mword 64) (dd : mword (8 * bytes)) s,
-      dev_addr addr = false ->
-      exec (write_ram rv64d_types.Write_plain (Physaddr addr) bytes dd tt) s
-      = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N bytes) dd) s.(mdev))).
-  Context (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa).
-  Context (Hwf : upt_acc_wf um) (Hcov : udata_cov um data).
-  Context (W : Z) (va : mword 64) (dat : mword (8 * W)).
-  Context (σ0 : mstate).
-
-  Notation cva k := (add_vec_int va (Z.of_nat k * bytes)).
-
-  Definition wchunk (k' : nat) (s : mstate) : mstate :=
-    match exec (translateAddr (Virtaddr (cva k')) (Store Data)) s with
-    | Some (Ok (Physaddr p, _, _), stt) =>
-        match exec (mem_write_value (Physaddr p) bytes (wv W bytes dat k') (Store Data) PBMT_PMA false false false) stt with
-        | Some (Ok _, s'') => s'' | _ => stt end
-    | _ => s end.
-  Fixpoint sstS (k : nat) : mstate :=
-    match k with O => σ0 | S k' => wchunk k' (sstS k') end.
-  Definition sttS (k : nat) : mstate :=
-    match exec (translateAddr (Virtaddr (cva k)) (Store Data)) (sstS k) with
-    | Some (Ok (Physaddr _, _, _), stt) => stt | _ => sstS k end.
-  Definition spaS (k : nat) : mword 64 :=
-    match exec (translateAddr (Virtaddr (cva k)) (Store Data)) (sstS k) with
-    | Some (Ok (Physaddr p, _, _), _) => p | _ => zeros' 64 end.
-
-  Lemma write_classify_fold (M : nat) :
-    (forall k, (k < M)%nat -> is_aligned_vaddr (Virtaddr (cva k)) bytes = true) ->
-    cfg_okR σ0 ->
-    reg_interp σ0.(sregs) -∗ gen_heap_interp σ0.(mem) -∗
-    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
-    ( (⌜forall k, (k < M)%nat ->
-         exec (translateAddr (Virtaddr (cva k)) (Store Data)) (sstS k)
-           = Some (Ok (Physaddr (spaS k), PBMT_PMA, init_ext_ptw), sttS k)⌝ ∗
-       ⌜forall k, (k < M)%nat ->
-         exec (mem_write_ea (Physaddr (spaS k)) bytes false false false) (sttS k)
-           = Some (Ok tt, sttS k)⌝ ∗
-       ⌜forall k, (k < M)%nat ->
-         exec (mem_write_value (Physaddr (spaS k)) bytes (wv W bytes dat k) (Store Data) PBMT_PMA false false false) (sttS k)
-           = Some (Ok true, sstS (S k))⌝ ∗
-       ⌜(sstS M).(mdev) = σ0.(mdev)⌝ ∗ ⌜cfg_okR (sstS M)⌝ ∗
-       ⌜register_lookup (R_bool minstret_increment) (sstS M).(sregs) = register_lookup (R_bool minstret_increment) σ0.(sregs)⌝ ∗
-       ⌜register_lookup nextPC (sstS M).(sregs) = register_lookup nextPC σ0.(sregs)⌝ ∗
-       reg_interp (sstS M).(sregs) ∗ gen_heap_interp (sstS M).(mem) ∗
-       utlb_inv_pt uroot tfp um ∗ udata_own data)
-     ∨ (∃ j : nat, ⌜(j < M)%nat⌝ ∗
-         ⌜forall k, (k < j)%nat ->
-           exec (translateAddr (Virtaddr (cva k)) (Store Data)) (sstS k)
-             = Some (Ok (Physaddr (spaS k), PBMT_PMA, init_ext_ptw), sttS k)⌝ ∗
-         ⌜forall k, (k < j)%nat ->
-           exec (mem_write_ea (Physaddr (spaS k)) bytes false false false) (sttS k)
-             = Some (Ok tt, sttS k)⌝ ∗
-         ⌜forall k, (k < j)%nat ->
-           exec (mem_write_value (Physaddr (spaS k)) bytes (wv W bytes dat k) (Store Data) PBMT_PMA false false false) (sttS k)
-             = Some (Ok true, sstS (S k))⌝ ∗
-         ⌜u_fault_flavor (Store Data) tfp um (cva j)⌝ ∗
-         ⌜cfg_okR (sstS j)⌝ ∗ ⌜(sstS j).(mdev) = σ0.(mdev)⌝ ∗
-         ⌜register_lookup (R_bool minstret_increment) (sstS j).(sregs) = register_lookup (R_bool minstret_increment) σ0.(sregs)⌝ ∗
-         ⌜register_lookup nextPC (sstS j).(sregs) = register_lookup nextPC σ0.(sregs)⌝ ∗
-         reg_interp (sstS j).(sregs) ∗ gen_heap_interp (sstS j).(mem) ∗
-         utlb_inv_pt uroot tfp um ∗ udata_own data))%I.
-  Proof.
-    induction M as [|M' IH]; intros Hal Hcfg; iIntros "Hri Hgh Hinv Hdata".
-    - iModIntro. iLeft. iFrame. iPureIntro.
-      split; [intros; lia|]. split; [intros; lia|]. split; [intros; lia|].
-      split; [reflexivity|]. split; [exact Hcfg|]. split; [reflexivity|]. reflexivity.
-    - iMod (IH ltac:(intros; apply Hal; lia) Hcfg with "Hri Hgh Hinv Hdata") as "[HAll | HF]".
-      + iDestruct "HAll" as "(%Htr & %Hea & %Hwvf & %Hmdev & %Hcfg' & %Hmi & %Hnpc & Hri & Hgh & Hinv & Hdata)".
-        destruct (data_classify (Store Data) tfp um (cva M') (or_intror (or_intror (or_introl eq_refl))) Hwf)
-          as [ (w & Hum & Hok & Hcanon) | Hfault ].
-        * pose proof Hcfg' as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & Hmprv & Hall).
-          iMod (user_pt_store_data_g bytes Hb Hb8 Hbdvd Huintb Hwrite_plain
-                  uroot tfp um data w (cva M') (wv W bytes dat M') (sstS M')
-                  Hum Hok Hcov (Hal M' ltac:(lia)) Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall
-                  with "Hri Hgh Hinv Hdata")
-            as (σ') "(%Htr0 & %Hwv0 & %Hmdev0 & %Hsregs & Hri & Hgh & Hinv & Hdata)".
-          assert (Hstt : sttS M' = σ').
-          { unfold sttS. rewrite Htr0. reflexivity. }
-          assert (Hspa : spaS M' = u_walk_pa w (cva M')).
-          { unfold spaS. rewrite Htr0. reflexivity. }
-          assert (Hstep : sstS (S M') = MState σ'.(sregs) (write_bytes σ'.(mem) (u_walk_pa w (cva M')) (Z.to_N bytes) (wv W bytes dat M')) σ'.(mdev)).
-          { cbn [sstS]. unfold wchunk. rewrite Htr0. rewrite Hwv0. reflexivity. }
-          assert (Ttr : forall r : register, register_beq r tlb = false ->
-                    register_lookup r σ'.(sregs) = register_lookup r (sstS M').(sregs)).
-          { intros r Hne. destruct Hsregs as [He | (tv & He)]; rewrite He;
-              [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-          iModIntro. iLeft.
-          set (X := sstS (S M')).
-          assert (HXm : X = MState σ'.(sregs) (write_bytes σ'.(mem) (u_walk_pa w (cva M')) (Z.to_N bytes) (wv W bytes dat M')) σ'.(mdev)).
-          { unfold X. exact Hstep. }
-          rewrite HXm. iFrame.
-          iPureIntro. split; [| split; [| split; [| split; [| split; [| split]]]]].
-          -- intros k Hk. destruct (Nat.eq_dec k M') as [->|Hne].
-             ++ rewrite Hspa Hstt. exact Htr0.
-             ++ apply Htr; lia.
-          -- intros k Hk. destruct (Nat.eq_dec k M') as [->|Hne].
-             ++ rewrite Hspa Hstt. apply exec_mem_write_ea_g.
-             ++ apply Hea; lia.
-          -- intros k Hk. destruct (Nat.eq_dec k M') as [->|Hne].
-             ++ rewrite Hspa Hstt Hstep. exact Hwv0.
-             ++ apply Hwvf; lia.
-          -- cbn [mdev]. rewrite Hmdev0. exact Hmdev.
-          -- cbn [sregs].
-             exact (cfg_okR_pres (sstS M') σ' Hsregs Hcfg').
-          -- cbn [sregs].
-             rewrite (Ttr (R_bool minstret_increment) ltac:(vm_compute; reflexivity)). exact Hmi.
-          -- cbn [sregs].
-             rewrite (Ttr nextPC ltac:(vm_compute; reflexivity)). exact Hnpc.
-        * iModIntro. iRight. iExists M'.
-          iFrame. iPureIntro. split; [lia|]. split; [exact Htr|]. split; [exact Hea|]. split; [exact Hwvf|].
-          split; [exact Hfault|]. split; [exact Hcfg'|]. split; [exact Hmdev|].
-          split; [exact Hmi|]. exact Hnpc.
-      + iDestruct "HF" as (j) "(%Hj & %Htr & %Hea & %Hwvf & %Hfl & %Hcfgj & %Hmdevj & %Hmij & %Hnpcj & Hri & Hgh & Hinv & Hdata)".
-        iModIntro. iRight. iExists j. iFrame. iPureIntro.
-        split; [lia|]. split; [exact Htr|]. split; [exact Hea|]. split; [exact Hwvf|]. split; [exact Hfl|].
-        split; [exact Hcfgj|]. split; [exact Hmdevj|]. split; [exact Hmij|]. exact Hnpcj.
-  Qed.
-
-End MisWriteClassify.
 
 
-Lemma ws_seq_true (N : nat) : ws_seq (fun _ => true) N = true.
-Proof. induction N as [|N IH]; [reflexivity | cbn [ws_seq]; rewrite IH; reflexivity]. Qed.
-
-Section MemWriteTot.
-  Context `{!riscvGS Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context (bytes : Z).
-  Context (Hb : 0 < bytes) (Hb8 : bytes <= 8) (Hbdvd : (bytes | 4096)) (Huintb : uint (to_bits 64 bytes) = bytes).
-  Context (Hwrite_plain : forall (addr : mword 64) (dd : mword (8 * bytes)) s,
-      dev_addr addr = false ->
-      exec (write_ram rv64d_types.Write_plain (Physaddr addr) bytes dd tt) s
-      = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N bytes) dd) s.(mdev))).
-  Context (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa).
-  Context (Hwf : upt_acc_wf um) (Hcov : udata_cov um data).
-
-  Notation cvaW va k := (add_vec_int va (Z.of_nat k * bytes)).
-
-  Lemma mem_write_misaligned_total (W : Z) (N : nat) (va : mword 64) (dat : mword (8 * W)) (s : mstate) :
-    (1 <= N)%nat -> Z.of_nat N * bytes = W ->
-    is_aligned_vaddr (Virtaddr va) W = false ->
-    exec (split_misaligned (Virtaddr va) W) s = Some ((Z.of_nat N, bytes), s) ->
-    (forall k, (k < N)%nat -> is_aligned_vaddr (Virtaddr (cvaW va k)) bytes = true) ->
-    cfg_okR s ->
-    reg_interp s.(sregs) -∗ gen_heap_interp s.(mem) -∗
-    utlb_inv_pt uroot tfp um -∗ udata_own data ==∗
-    (∃ (σ' : mstate),
-        ⌜exec (vmem_write_addr (Virtaddr va) W dat (Store Data) false false false) s = Some (Ok true, σ')⌝ ∗
-        ⌜σ'.(mdev) = s.(mdev)⌝ ∗
-        ⌜register_lookup (R_bool minstret_increment) σ'.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
-        ⌜register_lookup nextPC σ'.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
-        reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um ∗ udata_own data)
-    ∨ (∃ (σ' : mstate) (e : ExceptionType) (xv pc : mword 64),
-        ⌜exec (vmem_write_addr (Virtaddr va) W dat (Store Data) false false false) s
-           = Some (Err (rv64d_types.Trap (User, make_sync_exception e xv, pc)), σ')⌝ ∗
-        ⌜user_exc e = true⌝ ∗
-        ⌜σ'.(mdev) = s.(mdev)⌝ ∗
-        ⌜register_lookup (R_bool minstret_increment) σ'.(sregs) = register_lookup (R_bool minstret_increment) s.(sregs)⌝ ∗
-        ⌜register_lookup nextPC σ'.(sregs) = register_lookup nextPC s.(sregs)⌝ ∗
-        reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗ utlb_inv_pt uroot tfp um ∗ udata_own data).
-  Proof.
-    intros HN Hwidth Hnal Hsplit Halk Hcfg.
-    iIntros "Hreg Hgh Hutlb Hudata".
-    iMod (write_classify_fold bytes Hb Hb8 Hbdvd Huintb Hwrite_plain uroot tfp um data Hwf Hcov
-            W va dat s N Halk Hcfg with "Hreg Hgh Hutlb Hudata") as "[HAll | HF]".
-    - iDestruct "HAll" as "(%Htr & %Hea & %Hwvf & %Hmdev & %Hcfgn & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-      pose proof (exec_vmem_write_addr_misaligned_split W bytes va dat N
-                    (spaS bytes W va dat s) (fun _ => true) (sttS bytes W va dat s) (sstS bytes W va dat s)
-                    HN Hb Htr Hea Hwvf Hnal Hsplit) as Hvw.
-      rewrite ws_seq_true in Hvw.
-      iModIntro. iLeft. iExists (sstS bytes W va dat s N).
-      iFrame "Hreg Hgh Hutlb Hudata". iPureIntro. split; [exact Hvw |]. split; [exact Hmdev|].
-      split; [exact Hmi | exact Hnpc].
-    - iDestruct "HF" as (j) "(%Hj & %Htr & %Hea & %Hwvf & %Hfl & %Hcfgj & %Hmdevj & %Hmij & %Hnpcj & Hreg & Hgh & Hutlb & Hudata)".
-      pose proof Hcfgj as (Hmisaj & Hmenvj & Hhtifj & Hcpj & HSXLj & HMPRVj & Hpmaj).
-      iDestruct (utlb_inv_pt_translateAddr_u_fault (Store Data) uroot tfp um (cvaW va j)
-                   (E_SAMO_Page_Fault tt) (sstS bytes W va dat s j) Hfl Hhtifj Hcpj HSXLj
-                   (exec_effectivePrivilege_mprv0 (Store Data)
-                      (register_lookup mstatus (sstS bytes W va dat s j).(sregs)) User (sstS bytes W va dat s j) HMPRVj)
-                   (exec_is_shadow_stack_u_acc (Store Data) (sstS bytes W va dat s j) (or_intror (or_intror (or_introl eq_refl))))
-                   Hpmaj
-                   ltac:(unfold translationException; cbn match; apply exec_returnm)
-                   ltac:(unfold translationException; cbn match; apply exec_returnm)
-                   ltac:(unfold translationException; cbn match; apply exec_returnm)
-                   with "Hreg Hgh Hutlb") as %Htrf.
-      set (pcj := register_lookup PC (sstS bytes W va dat s j).(sregs)).
-      assert (Hstepsj : sstS bytes W va dat s (S j) = sstS bytes W va dat s j).
-      { cbn [sstS]. unfold wchunk.
-        change (bits_of_virtaddr (Virtaddr va)) with va in Htrf.
-        rewrite Htrf. reflexivity. }
-      assert (HtrF : exec (translateAddr (Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr va)) (Z.of_nat j * bytes))) (Store Data)) (sstS bytes W va dat s j)
-                     = Some (Err (E_SAMO_Page_Fault tt, tt), sstS bytes W va dat s (S j))).
-      { change (bits_of_virtaddr (Virtaddr va)) with va. rewrite Hstepsj. exact Htrf. }
-      assert (HcpF : register_lookup cur_privilege (sstS bytes W va dat s (S j)).(sregs) = User)
-        by (rewrite Hstepsj; exact Hcpj).
-      assert (HpcF : register_lookup PC (sstS bytes W va dat s (S j)).(sregs) = pcj)
-        by (rewrite Hstepsj; reflexivity).
-      pose proof (vmem_write_split_fault W bytes va pcj dat (E_SAMO_Page_Fault tt)
-                    N j (spaS bytes W va dat s) (fun _ => true) (sttS bytes W va dat s) (sstS bytes W va dat s)
-                    HN Hb Hj Htr Hea Hwvf HtrF HcpF HpcF Hnal Hsplit) as Hvw.
-      rewrite Hstepsj in Hvw.
-      iModIntro. iRight.
-      iExists (sstS bytes W va dat s j), (E_SAMO_Page_Fault tt),
-        (add_vec_int (bits_of_virtaddr (Virtaddr va)) (Z.of_nat j * bytes)), pcj.
-      iFrame "Hreg Hgh Hutlb Hudata". iPureIntro.
-      split; [exact Hvw |]. split; [reflexivity |]. split; [exact Hmdevj|].
-      split; [exact Hmij | exact Hnpcj].
-  Qed.
-
-End MemWriteTot.
 
 Section MemWriteTotalDisp.
   Context `{!riscvGS Σ}.
@@ -2401,51 +1430,134 @@ Section MemWriteTotalDisp.
     intros Hcfg Lpc.
     pose proof Hcfg as (Hmisa & Hmenv & Hhtif & Hcp & HSXL & HMPRV & Hpma).
     iIntros "Hreg Hgh Hutlb Hudata".
-    destruct (is_aligned_vaddr (Virtaddr va) k) eqn:Hal.
-    - iMod (user_pt_vmem_write_addr_store_classify k Hk Hk8 Hkdvd Huintk Hwrite_plain_k
-              uroot tfp um data va pc dat s Hwf Hcov Hal Hmisa Hmenv Hhtif Lpc Hcp HSXL HMPRV Hpma
-              with "Hreg Hgh Hutlb Hudata") as "[HOk | HErr]".
-      + iDestruct "HOk" as (w σ') "(%Hvw & %Hmdev & %Hsregs & Hreg & Hgh & Hutlb & Hudata)".
+    iDestruct (utlb_inv_pt_tmode uroot tfp um s HSXL with "Hreg Hutlb") as %Htm.
+    assert (Heff : exec (effectivePrivilege (Store Data)
+                           (register_lookup mstatus s.(sregs))
+                           (register_lookup cur_privilege s.(sregs))) s = Some (User, s))
+      by (rewrite Hcp; apply exec_effectivePrivilege_mprv0; exact HMPRV).
+    assert (Hpm : plat_misaligned_exception (Store Data) false = None)
+      by (apply plat_misaligned_loadstore_none; reflexivity).
+    destruct (in_one_page_dec va k) as [Hin | Hout].
+    - (* ONE PAGE *)
+      destruct (data_classify (Store Data) tfp um va
+                  (or_intror (or_intror (or_introl eq_refl))) Hwf)
+        as [ (w & Hum & Hok & Hcanon) | Hfault ].
+      + iMod (user_pt_store_data_mis uroot tfp um data w va k dat s Hk Hk8 Hum Hok Hcov Hin
+                Hcanon Hmisa Hmenv Hhtif Hcp HSXL HMPRV Hpma with "Hreg Hgh Hutlb Hudata")
+          as (σ' σ'') "(%Htr & %Hea & %Hwv & %Hs2 & %Hmdev & %Hsregs & Hreg & Hgh & Hutlb & Hudata)".
         assert (Tr : forall r : register, register_beq r tlb = false ->
                   register_lookup r σ'.(sregs) = register_lookup r s.(sregs)).
         { intros r Hne. destruct Hsregs as [He | (tv & He)]; rewrite He;
             [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
-        iModIntro. iLeft.
-        iExists (MState σ'.(sregs) (write_bytes σ'.(mem) (u_walk_pa w va) (Z.to_N k)
-                   (autocast (T := mword) (subrange_vec_dec dat (8 * (0 + 1) * k - 1) (8 * 0 * k)))) σ'.(mdev)).
-        cbn [sregs mem mdev]. iFrame. iPureIntro.
-        split; [exact Hvw |]. split; [exact Hmdev|].
-        split; [ apply Tr; vm_compute; reflexivity | apply Tr; vm_compute; reflexivity ].
-      + iDestruct "HErr" as "(%Herr & Hreg & Hgh & Hutlb & Hudata)".
+        iModIntro. iLeft. iExists σ''. iFrame. iPureIntro.
+        split.
+        { apply (exec_vmem_write_addr_intra k va (u_walk_pa w va) dat User Sv39 s σ' σ'' Hk
+                   (exec_split_on_page_boundary_intra va k s Hk Hin)
+                   (or_intror Hpm) Heff Htm Htr Hea).
+          rewrite (subrange_full_gen_cast (8 * k) dat ltac:(lia)). exact Hwv. }
+        split; [ exact Hmdev |].
+        split; [ rewrite Hs2; apply Tr; vm_compute; reflexivity
+               | rewrite Hs2; apply Tr; vm_compute; reflexivity ].
+      + iDestruct (u_translate_fault uroot tfp um (Store Data) (E_SAMO_Page_Fault tt) va pc k s
+                     (or_intror (conj eq_refl eq_refl)) Hfault Hcfg Lpc
+                     with "Hreg Hgh Hutlb") as %(Htr & Hme).
         iModIntro. iRight. iExists s, (E_SAMO_Page_Fault tt), va, pc.
-        iFrame. iPureIntro. split; [exact Herr |]. split; [vm_compute; reflexivity |].
-        split; [reflexivity|]. split; [reflexivity|]. reflexivity.
-    - destruct (split_misaligned_derive k va s HkW Hal)
-        as (N & bytes & HN & Hwidth & Hbpos & Hblt & Hbdvd & Huintb & Hsplit & Halk).
-      assert (Hblt8 : bytes < 8) by (destruct HkW as [Hkv|[Hkv|Hkv]]; subst k; lia).
-      destruct (pow2_le8 bytes Hbpos Hblt8 Hbdvd) as [Hbe|[Hbe|Hbe]]; subst bytes.
-      + iMod (mem_write_misaligned_total 1 ltac:(lia) ltac:(lia) ltac:(exists 4096; reflexivity)
-                ltac:(vm_compute; reflexivity) exec_write_ram_plain_1 uroot tfp um data Hwf Hcov
-                k N va dat s HN Hwidth Hal Hsplit Halk Hcfg with "Hreg Hgh Hutlb Hudata") as "[HOk | HErr]".
-        * iDestruct "HOk" as (σ') "(%Hvw & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iLeft. iExists σ'. iFrame. iPureIntro. split; [exact Hvw |]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-        * iDestruct "HErr" as (σ' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iRight. iExists σ', e, xv, pcx. iFrame. iPureIntro. split; [exact Herr|]. split; [exact Hue|]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-      + iMod (mem_write_misaligned_total 2 ltac:(lia) ltac:(lia) ltac:(exists 2048; reflexivity)
-                ltac:(vm_compute; reflexivity) exec_write_ram_plain_2 uroot tfp um data Hwf Hcov
-                k N va dat s HN Hwidth Hal Hsplit Halk Hcfg with "Hreg Hgh Hutlb Hudata") as "[HOk | HErr]".
-        * iDestruct "HOk" as (σ') "(%Hvw & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iLeft. iExists σ'. iFrame. iPureIntro. split; [exact Hvw |]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-        * iDestruct "HErr" as (σ' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iRight. iExists σ', e, xv, pcx. iFrame. iPureIntro. split; [exact Herr|]. split; [exact Hue|]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-      + iMod (mem_write_misaligned_total 4 ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity)
-                ltac:(vm_compute; reflexivity) exec_write_ram_plain_4 uroot tfp um data Hwf Hcov
-                k N va dat s HN Hwidth Hal Hsplit Halk Hcfg with "Hreg Hgh Hutlb Hudata") as "[HOk | HErr]".
-        * iDestruct "HOk" as (σ') "(%Hvw & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iLeft. iExists σ'. iFrame. iPureIntro. split; [exact Hvw |]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
-        * iDestruct "HErr" as (σ' e xv pcx) "(%Herr & %Hue & %Hmdev & %Hmi & %Hnpc & Hreg & Hgh & Hutlb & Hudata)".
-          iModIntro. iRight. iExists σ', e, xv, pcx. iFrame. iPureIntro. split; [exact Herr|]. split; [exact Hue|]. split; [exact Hmdev|]. split; [exact Hmi | exact Hnpc].
+        iFrame. iPureIntro.
+        split.
+        { exact (exec_vmem_write_addr_intra_terr k va dat (Store Data) false false false
+                   (E_SAMO_Page_Fault tt)
+                   (Trap (User, make_sync_exception (E_SAMO_Page_Fault tt) va, pc))
+                   User Sv39 s s Hk
+                   (exec_split_on_page_boundary_intra va k s Hk Hin)
+                   (or_intror Hpm) Heff Htm Htr Hme). }
+        split; [ vm_compute; reflexivity |].
+        split; [ reflexivity |]. split; [ reflexivity | reflexivity ].
+    - (* TWO PAGES *)
+      destruct (straddle_bounds va k Hk Hk8 Hout) as (Hp0 & Hq0 & Hp8 & Hq8).
+      pose proof (exec_split_on_page_boundary_straddle va k s Hk Hk8 Hout) as Hsp.
+      set (pp := 4096 - bv_unsigned va mod 4096) in *.
+      set (qq := k - pp) in *.
+      set (vb := add_vec_int va pp).
+      set (d1 := autocast (T := mword) (subrange_vec_dec dat (8 * pp - 1) 0) : mword (8 * pp)).
+      set (d2 := autocast (T := mword) (subrange_vec_dec dat (8 * k - 1) (8 * pp)) : mword (8 * qq)).
+      destruct (data_classify (Store Data) tfp um va
+                  (or_intror (or_intror (or_introl eq_refl))) Hwf)
+        as [ (w1 & Hum1 & Hok1 & Hcanon1) | Hf1 ].
+      + iMod (user_pt_store_data_mis uroot tfp um data w1 va pp d1 s Hp0 Hp8 Hum1 Hok1 Hcov
+                (straddle_part1_in_page va k) Hcanon1 Hmisa Hmenv Hhtif Hcp HSXL HMPRV Hpma
+                with "Hreg Hgh Hutlb Hudata")
+          as (σ1 σ1') "(%Htr1 & %Hea1 & %Hwv1 & %Hs1' & %Hmdev1 & %Hsregs1 & Hreg & Hgh & Hutlb & Hudata)".
+        assert (Tr1 : forall r : register, register_beq r tlb = false ->
+                  register_lookup r σ1.(sregs) = register_lookup r s.(sregs)).
+        { intros r Hne. destruct Hsregs1 as [He | (tv & He)]; rewrite He;
+            [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+        assert (Hsregs1' : (σ1'.(sregs) = s.(sregs) \/
+                  exists tv, σ1'.(sregs) = register_set tlb tv s.(sregs))%type)
+          by (rewrite Hs1'; exact Hsregs1).
+        pose proof (cfg_okR_pres s σ1' Hsregs1' Hcfg) as Hcfg1.
+        pose proof Hcfg1 as (Hmisa1 & Hmenv1 & Hhtif1 & Hcp1 & HSXL1 & HMPRV1 & Hpma1).
+        assert (Tr1' : forall r : register, register_beq r tlb = false ->
+                  register_lookup r σ1'.(sregs) = register_lookup r s.(sregs))
+          by (intros r Hne; rewrite Hs1'; apply Tr1; exact Hne).
+        destruct (data_classify (Store Data) tfp um vb
+                    (or_intror (or_intror (or_introl eq_refl))) Hwf)
+          as [ (w2 & Hum2 & Hok2 & Hcanon2) | Hf2 ].
+        * iMod (user_pt_store_data_mis uroot tfp um data w2 vb qq d2 σ1' Hq0 Hq8 Hum2 Hok2 Hcov
+                  (straddle_part2_in_page va k Hk Hk8 Hout) Hcanon2
+                  Hmisa1 Hmenv1 Hhtif1 Hcp1 HSXL1 HMPRV1 Hpma1
+                  with "Hreg Hgh Hutlb Hudata")
+            as (σ2 σ2') "(%Htr2 & %Hea2 & %Hwv2 & %Hs2' & %Hmdev2 & %Hsregs2 & Hreg & Hgh & Hutlb & Hudata)".
+          assert (Tr2 : forall r : register, register_beq r tlb = false ->
+                    register_lookup r σ2.(sregs) = register_lookup r σ1'.(sregs)).
+          { intros r Hne. destruct Hsregs2 as [He | (tv & He)]; rewrite He;
+              [ reflexivity | apply irrelevant_register_set; exact Hne ]. }
+          iModIntro. iLeft. iExists σ2'. iFrame. iPureIntro.
+          split.
+          { exact (exec_vmem_write_addr_split2 k pp qq va (u_walk_pa w1 va) dat
+                     User Sv39 s σ1 σ1' σ2' (conj Hp0 Hq0) Hsp Hpm Heff Htm
+                     ltac:(vm_compute; reflexivity) true Htr1 Hea1 Hwv1
+                     (exec_translate_and_write_value_gen qq vb (u_walk_pa w2 vb) d2
+                        (Store Data) false false false PBMT_PMA true σ1' σ2 σ2'
+                        Htr2 Hea2 Hwv2)). }
+          split; [ rewrite Hmdev2; exact Hmdev1 |].
+          split; [ rewrite Hs2'; rewrite (Tr2 (R_bool minstret_increment) ltac:(vm_compute; reflexivity));
+                   apply Tr1'; vm_compute; reflexivity
+                 | rewrite Hs2'; rewrite (Tr2 nextPC ltac:(vm_compute; reflexivity));
+                   apply Tr1'; vm_compute; reflexivity ].
+        * set (pc1 := register_lookup PC σ1'.(sregs)).
+          iDestruct (u_translate_fault uroot tfp um (Store Data) (E_SAMO_Page_Fault tt) vb pc1 qq σ1'
+                       (or_intror (conj eq_refl eq_refl)) Hf2 Hcfg1 eq_refl
+                       with "Hreg Hgh Hutlb") as %(Htr2 & Hme2).
+          iModIntro. iRight.
+          iExists σ1', (E_SAMO_Page_Fault tt), vb, pc1.
+          iFrame. iPureIntro.
+          split.
+          { exact (exec_vmem_write_addr_split2_err2 k pp qq va (u_walk_pa w1 va) dat
+                     User Sv39 s σ1 σ1' σ1' (conj Hp0 Hq0) Hsp Hpm Heff Htm
+                     ltac:(vm_compute; reflexivity)
+                     (Trap (User, make_sync_exception (E_SAMO_Page_Fault tt) vb, pc1))
+                     Htr1 Hea1 Hwv1
+                     (exec_translate_and_write_value_err qq vb d2 (Store Data) false false false
+                        (E_SAMO_Page_Fault tt) _ σ1' σ1' Htr2 Hme2)). }
+          split; [ vm_compute; reflexivity |].
+          split; [ exact Hmdev1 |].
+          split; [ apply Tr1'; vm_compute; reflexivity | apply Tr1'; vm_compute; reflexivity ].
+      + iDestruct (u_translate_fault uroot tfp um (Store Data) (E_SAMO_Page_Fault tt) va pc pp s
+                     (or_intror (conj eq_refl eq_refl)) Hf1 Hcfg Lpc
+                     with "Hreg Hgh Hutlb") as %(Htr1 & Hme1).
+        iModIntro. iRight. iExists s, (E_SAMO_Page_Fault tt), va, pc.
+        iFrame. iPureIntro.
+        split.
+        { exact (exec_vmem_write_addr_split2_err1 k pp qq va dat
+                   User Sv39 s s (conj Hp0 Hq0) Hsp Hpm Heff Htm
+                   ltac:(vm_compute; reflexivity)
+                   (E_SAMO_Page_Fault tt)
+                   (Trap (User, make_sync_exception (E_SAMO_Page_Fault tt) va, pc))
+                   Htr1 Hme1). }
+        split; [ vm_compute; reflexivity |].
+        split; [ reflexivity |]. split; [ reflexivity | reflexivity ].
   Qed.
+
 
 End MemWriteTotalDisp.
 
