@@ -1109,3 +1109,225 @@ Section MisUser.
   Qed.
 
 End MisUser.
+
+(* ===================================================================== *)
+(* §g THE PAGE-STRADDLING VMEM ACCESS.  [do_split_access] is TRUE, so the   *)
+(*    model performs TWO translate-and-access steps, in ASCENDING order     *)
+(*    ([sys_misaligned_order_decreasing] is false): [in_page_bytes] at       *)
+(*    [va], then [next_page_bytes] at [va + in_page_bytes].  This is the     *)
+(*    ONLY place the vmem level still splits, and it is at most two ways;    *)
+(*    either part can translate-fault, so each direction has an Ok arm and   *)
+(*    two Err arms.                                                        *)
+(* ===================================================================== *)
+
+Lemma exec_vmem_read_addr_split2 (W p q : Z) (va pa1 pa2 : mword 64)
+    (v1 : mword (8 * p)) (v2 : mword (8 * q))
+    (acc : MemoryAccessType mem_payload) (aq rl : bool)
+    (ep : Privilege) (md : SATPMode) s s1 s2 :
+  0 < p -> 0 < q ->
+  exec (split_on_page_boundary va W) s = Some ((p, q), s) ->
+  plat_misaligned_exception acc false = None ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  generic_neq md Bare = true ->
+  exec (translate_and_read_value (Virtaddr va) p acc aq rl false) s
+    = Some (Ok (Physaddr pa1, v1), s1) ->
+  exec (translate_and_read_value (Virtaddr (add_vec_int va p)) q acc aq rl false) s1
+    = Some (Ok (Physaddr pa2, v2), s2) ->
+  exists dvv : mword (8 * W),
+    exec (vmem_read_addr (Virtaddr va) W acc aq rl false) s = Some (Ok dvv, s2).
+Proof.
+  intros Hp Hq Hsplit Hpme Heff Htm Hbare Htrv1 Htrv2.
+  eexists.
+  unfold vmem_read_addr. rewrite exec_catch_early_return.
+  match goal with |- context[Defs.bind0 ?G ?k] =>
+    assert (Hg : execR G s = Some (inr tt, s)) end.
+  { destruct (is_aligned_vaddr (Virtaddr va) W) eqn:E.
+    - cbn [Riscv.rv64d.not negb]. apply execR_returnR_fwd.
+    - cbn [Riscv.rv64d.not negb]. rewrite Hpme. apply execR_returnR_fwd. }
+  rewrite (execR_bind0_Some _ _ _ _ Hg).
+  cbn [bits_of_virtaddr]. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hsplit). cbn beta zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Heff). cbn beta.
+  match goal with |- context[Defs.and_boolM ?A ?B] =>
+    assert (Hds : execR (Defs.and_boolM A B) s = Some (inr true, s)) end.
+  { unfold Defs.and_boolM.
+    match goal with |- context[Defs.bind (Defs.bind (Defs.liftR ?m) ?k1) _] =>
+      assert (Hl : execR (Defs.bind (Defs.liftR m) k1) s
+                   = Some (inr (generic_neq md Bare), s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ Htm). cbn beta. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hl). rewrite Hbare. cbn match beta.
+    replace (Z.gtb q 0) with true by (symmetry; apply Z.gtb_lt; lia).
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hds). cbn match beta zeta.
+  unfold sys_misaligned_order_decreasing. cbn [andb]. cbn match beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (zeros' (8 * W)) s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Htrv1). cbn match beta.
+  match goal with |- context[Defs.bind (Defs.bind0 ?IF ?rr) ?k] =>
+    assert (Hseq : execR (Defs.bind0 IF rr) s1
+                   = Some (inr (update_subrange_vec_dec (zeros' (8 * W))
+                                  (8 * p - 1) 0 (autocast (T := mword) v1)), s1)) end.
+  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s1)).
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta.
+  cbn [Riscv.rv64d.not negb andb]. cbn match beta.
+  cbn [Riscv.rv64d.not negb].
+  (* the assert-bind is the LEFT operand of the outer data bind, so
+     [execR_liftR_seq] has nothing to match until it is [assert]ed on its own *)
+  match goal with
+  | |- context[execR (Defs.bind ?inner ?k2) s1] =>
+      assert (Hin : execR inner s1
+              = Some (inr (update_subrange_vec_dec
+                             (update_subrange_vec_dec (zeros' (8 * W)) (8 * p - 1) 0
+                                (autocast (T := mword) v1))
+                             (8 * W - 1) (8 * p) (autocast (T := mword) v2)), s2))
+  end.
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s1)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ Htrv2). cbn match beta.
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hin). cbn beta.
+  rewrite execR_returnR. reflexivity.
+Qed.
+
+(* an early return propagates through any number of binds *)
+Lemma execR_bind_inl {R X Y} (m : Defs.monadR R exception Y)
+    (f : Y -> Defs.monadR R exception X) s s' (r : R) :
+  execR m s = Some (inl r, s') -> execR (Defs.bind m f) s = Some (inl r, s').
+Proof. intro H. rewrite execR_bind. rewrite H. reflexivity. Qed.
+
+Lemma exec_vmem_read_addr_split2_err1 (W p q : Z) (va : mword 64)
+    (er : ExecutionResult) (acc : MemoryAccessType mem_payload) (aq rl : bool)
+    (ep : Privilege) (md : SATPMode) s s1 :
+  0 < p -> 0 < q ->
+  exec (split_on_page_boundary va W) s = Some ((p, q), s) ->
+  plat_misaligned_exception acc false = None ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  generic_neq md Bare = true ->
+  exec (translate_and_read_value (Virtaddr va) p acc aq rl false) s = Some (Err er, s1) ->
+  exec (vmem_read_addr (Virtaddr va) W acc aq rl false) s = Some (Err er, s1).
+Proof.
+  intros Hp Hq Hsplit Hpme Heff Htm Hbare Htrv1.
+  unfold vmem_read_addr. rewrite exec_catch_early_return.
+  match goal with |- context[Defs.bind0 ?G ?k] =>
+    assert (Hg : execR G s = Some (inr tt, s)) end.
+  { destruct (is_aligned_vaddr (Virtaddr va) W) eqn:E.
+    - cbn [Riscv.rv64d.not negb]. apply execR_returnR_fwd.
+    - cbn [Riscv.rv64d.not negb]. rewrite Hpme. apply execR_returnR_fwd. }
+  rewrite (execR_bind0_Some _ _ _ _ Hg).
+  cbn [bits_of_virtaddr]. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hsplit). cbn beta zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Heff). cbn beta.
+  match goal with |- context[Defs.and_boolM ?A ?B] =>
+    assert (Hds : execR (Defs.and_boolM A B) s = Some (inr true, s)) end.
+  { unfold Defs.and_boolM.
+    match goal with |- context[Defs.bind (Defs.bind (Defs.liftR ?m) ?k1) _] =>
+      assert (Hl : execR (Defs.bind (Defs.liftR m) k1) s
+                   = Some (inr (generic_neq md Bare), s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ Htm). cbn beta. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hl). rewrite Hbare. cbn match beta.
+    replace (Z.gtb q 0) with true by (symmetry; apply Z.gtb_lt; lia).
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hds). cbn match beta zeta.
+  unfold sys_misaligned_order_decreasing. cbn [andb]. cbn match beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (zeros' (8 * W)) s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Htrv1). cbn match beta.
+  (* the early return propagates through the data binds *)
+  match goal with |- context[execR (Defs.bind ?m1 ?k1) s1] =>
+    assert (Hin : execR m1 s1 = Some (inl (Err er), s1)) end.
+  { rewrite execR_bind0. rewrite execR_early_ret. reflexivity. }
+  rewrite (execR_bind_inl _ _ _ _ _ Hin). cbn match. reflexivity.
+Qed.
+
+Lemma exec_vmem_read_addr_split2_err2 (W p q : Z) (va pa1 : mword 64)
+    (v1 : mword (8 * p)) (er : ExecutionResult)
+    (acc : MemoryAccessType mem_payload) (aq rl : bool)
+    (ep : Privilege) (md : SATPMode) s s1 s2 :
+  0 < p -> 0 < q ->
+  exec (split_on_page_boundary va W) s = Some ((p, q), s) ->
+  plat_misaligned_exception acc false = None ->
+  exec (effectivePrivilege acc (register_lookup mstatus s.(sregs))
+          (register_lookup cur_privilege s.(sregs))) s = Some (ep, s) ->
+  exec (translationMode ep) s = Some (md, s) ->
+  generic_neq md Bare = true ->
+  exec (translate_and_read_value (Virtaddr va) p acc aq rl false) s
+    = Some (Ok (Physaddr pa1, v1), s1) ->
+  exec (translate_and_read_value (Virtaddr (add_vec_int va p)) q acc aq rl false) s1
+    = Some (Err er, s2) ->
+  exec (vmem_read_addr (Virtaddr va) W acc aq rl false) s = Some (Err er, s2).
+Proof.
+  intros Hp Hq Hsplit Hpme Heff Htm Hbare Htrv1 Htrv2.
+  unfold vmem_read_addr. rewrite exec_catch_early_return.
+  match goal with |- context[Defs.bind0 ?G ?k] =>
+    assert (Hg : execR G s = Some (inr tt, s)) end.
+  { destruct (is_aligned_vaddr (Virtaddr va) W) eqn:E.
+    - cbn [Riscv.rv64d.not negb]. apply execR_returnR_fwd.
+    - cbn [Riscv.rv64d.not negb]. rewrite Hpme. apply execR_returnR_fwd. }
+  rewrite (execR_bind0_Some _ _ _ _ Hg).
+  cbn [bits_of_virtaddr]. cbn zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Hsplit). cbn beta zeta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg mstatus s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ (exec_read_reg cur_privilege s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Heff). cbn beta.
+  match goal with |- context[Defs.and_boolM ?A ?B] =>
+    assert (Hds : execR (Defs.and_boolM A B) s = Some (inr true, s)) end.
+  { unfold Defs.and_boolM.
+    match goal with |- context[Defs.bind (Defs.bind (Defs.liftR ?m) ?k1) _] =>
+      assert (Hl : execR (Defs.bind (Defs.liftR m) k1) s
+                   = Some (inr (generic_neq md Bare), s)) end.
+    { rewrite (execR_liftR_seq _ _ _ _ _ Htm). cbn beta. apply execR_returnR_fwd. }
+    rewrite (execR_bind_Some _ _ _ _ _ Hl). rewrite Hbare. cbn match beta.
+    replace (Z.gtb q 0) with true by (symmetry; apply Z.gtb_lt; lia).
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hds). cbn match beta zeta.
+  unfold sys_misaligned_order_decreasing. cbn [andb]. cbn match beta.
+  rewrite (execR_bind_Some _ _ _ _ _ (execR_returnR_fwd (zeros' (8 * W)) s)). cbn beta.
+  rewrite (execR_liftR_seq _ _ _ _ _ Htrv1). cbn match beta.
+  match goal with |- context[Defs.bind (Defs.bind0 ?IF ?rr) ?k] =>
+    assert (Hseq : execR (Defs.bind0 IF rr) s1
+                   = Some (inr (update_subrange_vec_dec (zeros' (8 * W))
+                                  (8 * p - 1) 0 (autocast (T := mword) v1)), s1)) end.
+  { rewrite (execR_bind0_Some _ _ _ _ (execR_returnR_fwd tt s1)).
+    apply execR_returnR_fwd. }
+  rewrite (execR_bind_Some _ _ _ _ _ Hseq). cbn beta.
+  cbn [Riscv.rv64d.not negb andb]. cbn match beta.
+  cbn [Riscv.rv64d.not negb].
+  match goal with
+  | |- context[execR (Defs.bind ?inner ?k2) s1] =>
+      assert (Hin : execR inner s1 = Some (inl (Err er), s2))
+  end.
+  { rewrite (execR_liftR_seq _ _ _ _ _ (exec_assert_exp'_true _ s1)). cbn beta.
+    rewrite (execR_liftR_seq _ _ _ _ _ Htrv2). cbn match beta.
+    rewrite execR_bind0. rewrite execR_early_ret. reflexivity. }
+  rewrite (execR_bind_inl _ _ _ _ _ Hin). cbn match. reflexivity.
+Qed.
+
+(* ---- the STORE side of the page straddle -- PORT PENDING.
+ *
+ * The shape is the mirror of [exec_vmem_read_addr_split2]: the first part is a
+ * bare [translateAddr] + [mem_write_ea] + [mem_write_value] at [in_page_bytes]
+ * (the model does not use [translate_and_write_value] there, because the
+ * reservation check sits between the translation and the write), then
+ * [translate_and_write_value] at [va + in_page_bytes] for [next_page_bytes].
+ *
+ * The one thing standing in the way is the reservation [if] in
+ * [vmem_write_addr]: its scrutinee is [andb res (not (match_reservation ...))]
+ * with [res] the literal [false], so the [if] IS its else branch by
+ * CONVERSION -- but [rewrite] needs the branch syntactically, and every way of
+ * exposing it tried so far ([cbn [andb]; cbn match], with the memory leaves
+ * [Local Opaque]) reduces through [mem_write_ea] into the monad's bind
+ * fixpoint and the goal explodes.  [durable-notes] records the same trap for
+ * the aligned store, where the fix was to hold the else branch opaque with a
+ * [set]; that does not apply here because the [if] is DEPENDENT
+ * ([if ... return MR _ bool then ... else ...]), so the Ltac1 pattern
+ * [if ?c then ?T else ?E] does not match it.  What is wanted is a way to name
+ * the two branches of a dependent [if] -- an Ltac2 [match], or a small
+ * [Lemma if_false_dep] stated at the exact motive.
+ *)
+
