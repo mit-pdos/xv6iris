@@ -48,7 +48,7 @@ Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvE
 Require Import MinstretInv InstrBytes.
 Require Import RegFile WpGpr WpMmodeLeafBase WpDecodeBridge.
 Require Import ExecCommon WpDecode WpAuipc WpMmodeJal WpMmodeMul WpGprCsrrCommon WpGprCsrrA.
-Require Import CodeEntry.
+Require Import CodeEntry CodeEntryAux.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelText.
