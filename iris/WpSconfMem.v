@@ -563,16 +563,8 @@ Section WpSconfMem.
   Qed.
 
   Local Lemma data2_ext_1_unsigned (v : mword 8) :
-    extend_value true (update_subrange_vec_dec (zeros' (8*1*1)) 7 0 (autocast (T := mword) v)) = zero_extend' 64 v.
-  Proof.
-    unfold extend_value. f_equal. apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
-    erewrite bv_concat_unsigned by (cbn; lia). erewrite bv_concat_unsigned by (cbn; lia).
-    rewrite !bv_unsigned_N_0.
-    rewrite Z.shiftl_0_l. rewrite Z.shiftl_0_r.
-    rewrite Z.lor_0_r. rewrite Z.lor_0_l. reflexivity.
-  Qed.
+    extend_value true v = zero_extend' 64 v.
+  Proof. unfold extend_value. reflexivity. Qed.
   (* lbu rd, imm(rs1) -- the width-1 UNSIGNED load, as an instance of
      [wp_load_s_sconf_ugen].  [dqm]-parametric: the byte may be owned outright
      (a stack buffer) or held at [DfracDiscarded] (a read-only image byte out
@@ -597,7 +589,7 @@ Section WpSconfMem.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbyte Hcont".
     iApply (wp_load_s_sconf_ugen 1 false Φ pc rd rs1 imm m n v (zero_extend' 64 v) b
-              ltac:(lia) ltac:(lia) ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_1 (data2_ext_1_unsigned v) Hrd Hrdok
               with "Hcg Hpc Hinstr [Hbyte] [-]").
     { rewrite /wordw_pointsto.
@@ -617,39 +609,16 @@ Section WpSconfMem.
   (* the loaded-value facts: extend_value of the generic data2 = the
      per-width value written to rd. *)
   Lemma data2_ext_8 (v : mword 64) :
-    extend_value false
-      (update_subrange_vec_dec (zeros' (8*1*8)) (8*(0+1)*8-1) (8*0*8) (autocast (T := mword) v)) = v.
-  Proof. unfold extend_value. rewrite sign_extend'_id. rewrite autocast_id. apply data2_id. Qed.
+    extend_value false v = v.
+  Proof. unfold extend_value. apply sign_extend'_id. Qed.
 
   Lemma data2_ext_4 (v : mword 32) :
-    extend_value false
-      (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) (autocast (T := mword) v)) = sign_extend' 64 v.
-  Proof.
-    unfold extend_value. rewrite autocast_id. f_equal.
-    apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
-    erewrite bv_concat_unsigned by (cbn; lia).
-    erewrite bv_concat_unsigned by (cbn; lia).
-    rewrite !bv_unsigned_N_0.
-    rewrite Z.shiftl_0_l. rewrite Z.shiftl_0_r. rewrite Z.lor_0_r. rewrite Z.lor_0_l.
-    reflexivity.
-  Qed.
+    extend_value false v = sign_extend' 64 v.
+  Proof. unfold extend_value. reflexivity. Qed.
 
   Lemma data2_ext_4_unsigned (v : mword 32) :
-    extend_value true
-      (update_subrange_vec_dec (zeros' (8*1*4)) (8*(0+1)*4-1) (8*0*4) (autocast (T := mword) v)) = zero_extend' 64 v.
-  Proof.
-    unfold extend_value. rewrite autocast_id. f_equal.
-    apply bv_eq. unfold update_subrange_vec_dec. rewrite autocast_id.
-    unfold to_word_idx, to_word. rewrite MachineWord.MachineWord.cast_idx_refl.
-    unfold get_word, MachineWord.MachineWord.update_slice, MachineWord.MachineWord.slice.
-    erewrite bv_concat_unsigned by (cbn; lia).
-    erewrite bv_concat_unsigned by (cbn; lia).
-    rewrite !bv_unsigned_N_0.
-    rewrite Z.shiftl_0_l. rewrite Z.shiftl_0_r. rewrite Z.lor_0_r. rewrite Z.lor_0_l.
-    reflexivity.
-  Qed.
+    extend_value true v = zero_extend' 64 v.
+  Proof. unfold extend_value. reflexivity. Qed.
 
   (* lwu rd, imm(rs1) -- the width-4 UNSIGNED load (printk's %u and %x read
      their [uint32] argument with it).  One line off [wp_load_s_sconf_ugen],
@@ -670,7 +639,7 @@ Section WpSconfMem.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_ugen 4 false Φ pc rd rs1 imm m n v (zero_extend' 64 v) b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4_unsigned v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -691,7 +660,7 @@ Section WpSconfMem.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen 8 true Φ pc rd rs1 imm m n v v b
-              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -712,7 +681,7 @@ Section WpSconfMem.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen 8 false Φ pc rd rs1 imm m n v v b
-              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -733,7 +702,7 @@ Section WpSconfMem.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen 4 true Φ pc rd rs1 imm m n v (sign_extend' 64 v) b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -754,7 +723,7 @@ Section WpSconfMem.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_load_s_sconf_gen 4 false Φ pc rd rs1 imm m n v (sign_extend' 64 v) b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -779,11 +748,9 @@ Section WpSconfMem.
        dev_addr addr = false ->
        exec (write_ram rv64d_types.Write_plain (Physaddr addr) width data tt) s
          = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N width) data) s.(mdev))) ->
-    autocast (T := mword)
-      (subrange_vec_dec
-         (autocast (T := mword)
-            (subrange_vec_dec (rget m rs2) (width*8-1) 0) : mword (8*width))
-         (8*(0+1)*width-1) (8*0*width)) = sv ->
+    (* the vmem level writes the value itself now, not the split projection *)
+    (autocast (T := mword) (subrange_vec_dec (rget m rs2) (width*8-1) 0)
+     : mword (8*width)) = sv ->
     (* see [wp_load_s_sconf_au]: the absorb runs with the accessor open *)
     ↑kptN ⊆ Em ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -933,7 +900,7 @@ Section WpSconfMem.
                               s_tr.(mdev))).
     {
       pose proof (ram_pmp_match_w (pa_of ppn pa) (vec_access_dec (register_lookup pmpaddr_n s_tr.(sregs)) 0) width Hw0 Huintw Hlo Hfit Hcov) as Hrange_st.
-      pose proof (exec_execute_STORE_w_gpr_S_walk_pt width Hw0 Hw8 Hvw Hwrite_plain rs2 rs1 imm region_st s_pc s_tr (pa_of ppn pa)
+      pose proof (exec_execute_STORE_w_gpr_S_walk_pt width Hw0 Hw8 Hvw Hwrite_plain rs2 rs1 imm region_st s_pc s_tr (pa_of ppn pa) md0
                Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign)
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Htr_pc)
@@ -994,11 +961,9 @@ Section WpSconfMem.
        dev_addr addr = false ->
        exec (write_ram rv64d_types.Write_plain (Physaddr addr) width data tt) s
          = Some (true, MState s.(sregs) (write_bytes s.(mem) addr (Z.to_N width) data) s.(mdev))) ->
-    autocast (T := mword)
-      (subrange_vec_dec
-         (autocast (T := mword)
-            (subrange_vec_dec (rget m rs2) (width*8-1) 0) : mword (8*width))
-         (8*(0+1)*width-1) (8*0*width)) = sv ->
+    (* the vmem level writes the value itself now, not the split projection *)
+    (autocast (T := mword) (subrange_vec_dec (rget m rs2) (width*8-1) 0)
+     : mword (8*width)) = sv ->
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
@@ -1024,13 +989,8 @@ Section WpSconfMem.
   Qed.
 
   Lemma store_ext_8 (r : mword 64) :
-    autocast (T := mword)
-      (subrange_vec_dec (autocast (T := mword) (subrange_vec_dec r (8*8-1) 0) : mword (8*8))
-         (8*(0+1)*8-1) (8*0*8)) = r.
-  Proof.
-    change (8*(0+1)*8-1) with (8*8-1). change (8*0*8) with 0.
-    rewrite (autocast_subrange_id r). apply autocast_subrange_id.
-  Qed.
+    (autocast (T := mword) (subrange_vec_dec r (8*8-1) 0) : mword (8*8)) = r.
+  Proof. apply (subrange_full_gen_cast 64 r ltac:(lia)). Qed.
 
   Lemma autocast_subrange32_id (d : mword 32) :
     autocast (T := mword) (subrange_vec_dec d (8*(0+1)*4-1) (8*0*4)) = d.
@@ -1046,10 +1006,8 @@ Section WpSconfMem.
   Qed.
 
   Lemma store_ext_4 (r : mword 64) :
-    autocast (T := mword)
-      (subrange_vec_dec (autocast (T := mword) (subrange_vec_dec r (4*8-1) 0) : mword (8*4))
-         (8*(0+1)*4-1) (8*0*4)) = trunc32 r.
-  Proof. unfold trunc32. apply autocast_subrange32_id. Qed.
+    (autocast (T := mword) (subrange_vec_dec r (4*8-1) 0) : mword (8*4)) = trunc32 r.
+  Proof. unfold trunc32. reflexivity. Qed.
 
   Lemma wp_csd_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
@@ -1067,7 +1025,7 @@ Section WpSconfMem.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 8 true Φ pc rs2 rs1 imm m n vold storeval b
-              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -1089,7 +1047,7 @@ Section WpSconfMem.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 8 false Φ pc rs2 rs1 imm m n vold storeval b
-              ltac:(lia) ltac:(lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -1110,7 +1068,7 @@ Section WpSconfMem.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 4 true Φ pc rs2 rs1 imm m n vold storeval b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -1131,7 +1089,7 @@ Section WpSconfMem.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iApply (wp_store_s_sconf_gen 4 false Φ pc rs2 rs1 imm m n vold storeval b
-              ltac:(lia) ltac:(lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
@@ -1323,13 +1281,13 @@ Section WpSconfMem.
       pose proof (exec_execute_STORE_1_gpr_S_walk_pt rs2 rs1 imm region_st s_pc s_tr (pa_of ppn pa)
                     Htea
                     ltac:(apply is_aligned_vaddr_1)
-                    ltac:(rewrite Lva subrange_id sign_extend'_id avi0_mul1; exact Htr_pc)
+                    md0 Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
+                    ltac:(rewrite Lva subrange_id sign_extend'_id; exact Htr_pc)
                     Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
                     HA0 Hord0
                     Hrange_st
                     HW
                     ltac:(rewrite Lpma_tr; exact Hmatch_st0)
-                    ltac:(apply is_aligned_paddr_1)
                     Hwrite_st Hwc Hws Hwh
                     (addr_is_ram_not_dev _ Hram0)) as H0.
       rewrite Lv2 in H0.
@@ -1565,7 +1523,8 @@ Section WpSconfMem.
       pose proof (exec_execute_STORE_8_gpr_S_walk_pt (mword_of_int 0 : mword 5) rs1 imm region_st s_pc s_tr (pa_of ppn pa)
                Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign4)
-               ltac:(rewrite Lva subrange_id sign_extend'_id avi0_mul8; exact Htr_pc)
+               md0 Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
+               ltac:(rewrite Lva subrange_id sign_extend'_id; exact Htr_pc)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
                HA0 Hord0
                Hrange_st HW
@@ -1749,7 +1708,8 @@ Section WpSconfMem.
       pose proof (exec_execute_STORE_4_gpr_S_walk_pt (mword_of_int 0 : mword 5) rs1 imm region_st s_pc s_tr (pa_of ppn pa)
                Htea
                ltac:(rewrite Lva subrange_id sign_extend'_id; exact Halign4)
-               ltac:(rewrite Lva subrange_id sign_extend'_id avi0_mul4; exact Htr_pc)
+               md0 Lpriv_pc ltac:(rewrite Lms_pc; exact HMPRV) Htm_pc
+               ltac:(rewrite Lva subrange_id sign_extend'_id; exact Htr_pc)
                Lpriv_tr ltac:(rewrite Lms_tr; exact HMPRV)
                HA0 Hord0
                Hrange_st HW
