@@ -30,403 +30,133 @@ Local Open Scope Z_scope.
 Import Defs.
 
 (* ===================================================================== *)
-(* §11 The ctz split-derivation: for a misaligned va of width W in {2,4,8}, *)
-(*     reduce split_misaligned to the concrete chunk count/size (bytes =    *)
-(*     2^ctz(va), N = W/bytes) + per-chunk alignment.  count_trailing_zeros *)
-(*     is characterized via a foreach_Z_down' suffix invariant.            *)
+(* §a THE PHYSICAL CHUNK PLAN.                                             *)
+(*                                                                         *)
+(* [split_misaligned] on the PHYSICAL address, under whatever plan the      *)
+(* Misaligned Atomicity Granule check answered, always resolves to a chunk  *)
+(* count and a chunk width that multiply to the access width.  Two          *)
+(* branches: the access does not split (the plan is [CannotSplit], or the   *)
+(* address is aligned after all, or it fits in one granule) and it is ONE   *)
+(* operation of the full width; otherwise [split_access] gives              *)
+(* [2^min(ctz(pa), ctz(W))]-byte chunks.  NOTHING here needs to know which  *)
+(* branch was taken or what the granule is -- which is why the granule can  *)
+(* stay a platform detail that [pma_allows_all] does not pin.               *)
+(*                                                                         *)
+(* The chunk width divides [W] because [min(ctz(pa),ctz(W)) <= ctz(W)] and  *)
+(* [2^ctz(W)] divides [W]; only that last fact is width-specific, and for   *)
+(* the eight widths a vmem-level access part can have it is a [vm_compute]. *)
+(* (This replaces a ~200-line characterization of [count_trailing_zeros] as *)
+(* a [foreach_Z_down'] suffix invariant: the old vmem-level split needed    *)
+(* the chunk ADDRESSES to be aligned, and so needed ctz exactly; the        *)
+(* physical split needs only that the chunk width divides the access.)      *)
 (* ===================================================================== *)
-Lemma shiftr_mod2_testbit (x i : Z) : 0 <= i ->
-  (Z.shiftr x i) mod 2 = Z.b2z (Z.testbit x i).
+
+Lemma foreach_Z_down'_nonneg (b : Z -> Z -> Z) :
+  (forall i r, 0 <= i -> 0 <= r -> 0 <= b i r) ->
+  forall (n : nat) (from off r : Z), 0 <= r ->
+  0 <= foreach_Z_down' from 0 1 off n r b.
 Proof.
-  intros Hi.
-  rewrite Zmod_odd.
-  rewrite <- Z.bit0_odd.
-  rewrite Z.shiftr_spec; [| lia].
-  replace (0 + i) with i; [| lia].
-  destruct (Z.testbit x i); reflexivity.
-Qed.
-
-Lemma access_unsigned_64 (w : mword 64) (i : Z) : 0 <= i ->
-  bv_unsigned (access_vec_dec w i) = Z.b2z (Z.testbit (bv_unsigned w) i).
-Proof.
-  intros Hi.
-  unfold access_vec_dec, access_mword_dec.
-  unfold MachineWord.MachineWord.slice.
-  cbv [get_word].
-  rewrite bv_extract_unsigned.
-  unfold bv_wrap.
-  change (bv_modulus (MachineWord.MachineWord.Z_idx 1)) with 2.
-  replace (Z.of_N (MachineWord.MachineWord.Z_idx i)) with i.
-  2:{ unfold MachineWord.MachineWord.Z_idx. rewrite Z2N.id; [| lia]. reflexivity. }
-  apply shiftr_mod2_testbit; lia.
-Qed.
-
-Lemma bvu_moi1 : bv_unsigned (mword_of_int 1 : mword 1) = 1.
-Proof. vm_compute. reflexivity. Qed.
-
-Lemma allowed_misaligned_false (a : mword 64) (W : Z) :
-  (W = 2 \/ W = 4 \/ W = 8) -> allowed_misaligned a W 0 = false.
-Proof.
-  intros HW. unfold allowed_misaligned.
-  destruct HW as [ -> | [ -> | -> ] ]; reflexivity.
-Qed.
-
-Section WithVa.
-Variable va : mword 64.
-
-Definition body (i r : Z) : Z :=
-  if eq_vec (access_vec_dec va i) (mword_of_int 1) then i else r.
-
-Lemma body_eq (i r : Z) :
-  body i r = (if eq_vec (access_vec_dec va i) (mword_of_int 1) then i else r).
-Proof. reflexivity. Qed.
-
-Lemma bit_set (i : Z) : 0 <= i ->
-  Z.testbit (bv_unsigned va) i = true ->
-  eq_vec (access_vec_dec va i) (mword_of_int 1) = true.
-Proof.
-  intros Hi Hb. apply eq_vec_true_iff. apply bv_eq.
-  rewrite access_unsigned_64; [| lia]. rewrite Hb. rewrite bvu_moi1. reflexivity.
-Qed.
-
-Lemma bit_clear (i : Z) : 0 <= i ->
-  Z.testbit (bv_unsigned va) i = false ->
-  eq_vec (access_vec_dec va i) (mword_of_int 1) = false.
-Proof.
-  intros Hi Hb. apply eq_vec_false_iff. intro Heq.
-  apply (f_equal bv_unsigned) in Heq.
-  rewrite access_unsigned_64 in Heq; [| lia]. rewrite Hb in Heq.
-  rewrite bvu_moi1 in Heq. simpl in Heq. discriminate.
-Qed.
-
-Lemma fold_low_clear : forall (n : nat) (off r : Z),
-  (forall j, 0 <= j <= 63 + off -> eq_vec (access_vec_dec va j) (mword_of_int 1) = false) ->
-  foreach_Z_down' 63 0 1 off n r body = r.
-Proof.
-  induction n as [|n IH]; intros off r Hclear.
+  intros Hb n. induction n as [|n IH]; intros from off r Hr.
+  - cbn [foreach_Z_down']. destruct (sumbool_of_bool (0 <=? from + off)); exact Hr.
   - cbn [foreach_Z_down'].
-    destruct (sumbool_of_bool (0 <=? 63 + off)); reflexivity.
-  - cbn [foreach_Z_down'].
-    destruct (sumbool_of_bool (0 <=? 63 + off)) as [Hg|Hg]; [ | reflexivity ].
+    destruct (sumbool_of_bool (0 <=? from + off)) as [Hg|Hg]; [| exact Hr].
     apply Z.leb_le in Hg.
-    rewrite body_eq.
-    rewrite (Hclear (63 + off)); [ | lia ].
-    cbn match.
-    apply IH. intros j Hj. apply Hclear. lia.
+    apply IH. apply Hb; [exact Hg | exact Hr].
 Qed.
 
-Lemma fold_gives_k : forall (n : nat) (off k : Z),
-  0 <= k <= 63 + off ->
-  n = S (Z.to_nat (63 + off)) ->
-  Z.testbit (bv_unsigned va) k = true ->
-  (forall j, 0 <= j < k -> Z.testbit (bv_unsigned va) j = false) ->
-  forall (r : Z), foreach_Z_down' 63 0 1 off n r body = k.
+Lemma ctz_nonneg {n : Z} (x : mword n) : 0 <= n -> 0 <= count_trailing_zeros x.
 Proof.
-  induction n as [|n IH]; intros off k Hk Hn Hset Hlow r.
-  - discriminate Hn.
-  - cbn [foreach_Z_down'].
-    destruct (sumbool_of_bool (0 <=? 63 + off)) as [Hg|Hg].
-    2:{ apply Z.leb_gt in Hg. lia. }
-    apply Z.leb_le in Hg.
-    injection Hn as Hn'.
-    destruct (Z.eq_dec k (63 + off)) as [Hkeq|Hkne].
-    + rewrite body_eq.
-      rewrite <- Hkeq.
-      rewrite (bit_set k ltac:(lia) Hset).
-      cbn match.
-      apply fold_low_clear.
-      intros j Hj. apply bit_clear; [ lia | apply Hlow; lia ].
-    + rewrite body_eq.
-      apply IH.
-      * lia.
-      * rewrite Hn'.
-        replace (63 + (off - 1)) with (62 + off); [| lia].
-        replace (63 + off) with (Z.succ (62 + off)); [| lia].
-        rewrite Z2Nat.inj_succ; [| lia]. reflexivity.
-      * exact Hset.
-      * exact Hlow.
+  intro Hn. unfold count_trailing_zeros, foreach_Z_down.
+  apply foreach_Z_down'_nonneg; [| exact Hn ].
+  intros i r Hi Hr. destruct (eq_vec (access_vec_dec x i) (mword_of_int 1)); assumption.
 Qed.
 
-Lemma ctz_val (k : Z) :
-  0 <= k <= 63 ->
-  Z.testbit (bv_unsigned va) k = true ->
-  (forall j, 0 <= j < k -> Z.testbit (bv_unsigned va) j = false) ->
-  count_trailing_zeros va = k.
+(* the one width-specific fact: [2^ctz(W)] divides [W].  A vmem-level access
+   part is at most 8 bytes wide (and at least 1), so this is eight cases. *)
+Lemma width_ctz_facts (W : Z) : 0 < W -> W <= 8 ->
+  let kw := count_trailing_zeros (to_bits (Z.add 12 1) W) in
+  0 <= kw /\ (2 ^ kw | W) /\ 2 ^ kw <= W.
 Proof.
-  intros Hk Hset Hlow.
-  transitivity (foreach_Z_down' 63 0 1 0 64 64 body).
-  { unfold count_trailing_zeros, foreach_Z_down. reflexivity. }
-  apply (fold_gives_k 64 0 k).
-  - lia.
-  - reflexivity.
-  - exact Hset.
-  - exact Hlow.
+  intros Hpos Hle. cbn zeta.
+  assert (HWv : W = 1 \/ W = 2 \/ W = 3 \/ W = 4 \/ W = 5 \/ W = 6 \/ W = 7 \/ W = 8)
+    by lia.
+  destruct HWv as [ -> | [ -> | [ -> | [ -> | [ -> | [ -> | [ -> | -> ] ] ] ] ] ] ];
+    (split; [ vm_compute; discriminate
+            | split; [ | vm_compute; discriminate ] ]);
+    match goal with |- (2 ^ ?k | ?w) => let v := eval vm_compute in k in
+      change k with v end;
+    [ exists 1 | exists 1 | exists 3 | exists 1 | exists 5 | exists 3 | exists 7 | exists 1 ];
+    reflexivity.
 Qed.
 
-Lemma low_bits_zero_mod (m : nat) :
-  (forall j, 0 <= j < Z.of_nat m -> Z.testbit (bv_unsigned va) j = false) ->
-  bv_unsigned va mod (2 ^ Z.of_nat m) = 0.
-Proof.
-  intros H.
-  apply (proj1 (Z.bits_inj_iff' (bv_unsigned va mod 2 ^ Z.of_nat m) 0)).
-  intros i Hi. rewrite Z.bits_0.
-  destruct (Z.lt_ge_cases i (Z.of_nat m)) as [Hlt|Hge].
-  - rewrite Z.mod_pow2_bits_low; [| lia]. apply H. lia.
-  - rewrite Z.mod_pow2_bits_high; [| lia]. reflexivity.
-Qed.
-
-Lemma chunk_aligned (bytes j : Z) :
-  0 < bytes -> (bytes | 4096) -> 0 <= j < 4096 ->
-  bv_unsigned va mod bytes = 0 -> j mod bytes = 0 ->
-  is_aligned_vaddr (Virtaddr (add_vec_int va j)) bytes = true.
-Proof.
-  intros Hb Hdvd Hj Hva Hjm.
-  unfold is_aligned_vaddr. apply Z.eqb_eq.
-  rewrite (uint_unsigned_n _).
-  rewrite Z.rem_mod_nonneg;
-    [ | pose proof (bv_unsigned_in_range _ (add_vec_int va j)); lia | exact Hb ].
-  rewrite (Znumtheory.Zmod_div_mod bytes 4096 _ Hb ltac:(lia) Hdvd).
-  pose proof (uint_add_vec_int_mod4096 va j Hj) as Hm.
-  rewrite !(uint_unsigned_n _) in Hm.
-  rewrite Hm.
-  rewrite <- (Znumtheory.Zmod_div_mod bytes 4096 _ Hb ltac:(lia) Hdvd).
-  rewrite Z.add_mod; [| lia].
-  rewrite Hva. rewrite Hjm. rewrite Z.add_0_l. apply Zmod_0_l.
-Qed.
-
-Lemma exec_split (W k g : Z) (sp : Splittability) (s : mstate) :
-  generic_eq sp CannotSplit = false ->
-  Z.eqb (Z.rem (uint va) W) 0 = false ->
-  allowed_misaligned (subrange_vec_dec va (xlen - 1) 0) W g = false ->
-  count_trailing_zeros va = k ->
-  Z.min k (count_trailing_zeros (to_bits (Z.add 12 1) W)) = k ->
-  Z.eqb W (Z.quot W (pow2 k) * pow2 k) = true ->
-  exec (split_misaligned (Physaddr va) W g sp) s
-    = Some ((Z.quot W (pow2 k), pow2 k), s).
-Proof.
-  intros Hsp Hmis Hallow Hctz Hmin Hguard.
-  unfold split_misaligned.
-  unfold sys_misaligned_byte_by_byte.
-  cbn zeta.
-  change (bits_of_physaddr (Physaddr va)) with va.
-  rewrite Hsp. rewrite Hmis. rewrite Hallow.
-  cbn [orb].
-  cbn match.
-  unfold split_access. cbn zeta.
-  rewrite Hctz. rewrite Hmin.
-  rewrite Hguard.
-  erewrite exec_bind_Some.
-  2:{ unfold assert_exp'. cbn match. apply exec_returnm. }
-  cbn beta. apply exec_returnm.
-Qed.
-
-Lemma assemble (W k bytes num g : Z) (sp : Splittability) (Nn : nat) (s : mstate) :
-  generic_eq sp CannotSplit = false ->
-  Z.eqb (Z.rem (uint va) W) 0 = false ->
-  allowed_misaligned (subrange_vec_dec va (xlen - 1) 0) W g = false ->
-  count_trailing_zeros va = k ->
-  Z.min k (count_trailing_zeros (to_bits (Z.add 12 1) W)) = k ->
-  bytes = pow2 k ->
-  num = Z.quot W bytes ->
-  Z.of_nat Nn = num ->
-  (1 <= Nn)%nat ->
-  0 < bytes -> bytes < W -> W <= 8 ->
-  (bytes | 4096) ->
-  uint (to_bits 64 bytes) = bytes ->
-  Z.of_nat Nn * bytes = W ->
-  Z.eqb W (num * bytes) = true ->
-  exists (N : nat) (bytes0 : Z),
-    (1 <= N)%nat /\ Z.of_nat N * bytes0 = W /\ 0 < bytes0 /\ bytes0 <= W /\
-    (bytes0 | 4096) /\ uint (to_bits 64 bytes0) = bytes0 /\
-    exec (split_misaligned (Physaddr va) W g sp) s = Some ((Z.of_nat N, bytes0), s).
-Proof.
-  intros Hsp Hmis Hallow Hctz Hmin Hbytes Hnum HN HNn Hbpos HbltW HWle Hdvd Hub HNbW Hguard.
-  exists Nn, bytes.
-  split; [ exact HNn |].
-  split; [ exact HNbW |].
-  split; [ exact Hbpos |].
-  split; [ lia |].
-  split; [ exact Hdvd |].
-  split; [ exact Hub |].
-  rewrite HN. rewrite Hnum. rewrite Hbytes.
-  apply (exec_split W k g sp s Hsp Hmis Hallow Hctz Hmin).
-  rewrite <- Hbytes. rewrite <- Hnum. exact Hguard.
-Qed.
-
-End WithVa.
-
-(* THE PHYSICAL CHUNK PLAN.  Unconditional: whichever answer the PMA's
-   Misaligned Atomicity Granule gave, [split_misaligned] resolves to a chunk
-   count and a chunk width that multiply to [W] and that the per-width RAM
-   leaves cover.  The two answers are the two branches: the access fits in one
-   granule (or the plan is [CannotSplit], or the address is aligned after all)
-   and it is ONE operation of the full width; otherwise it is [W / 2^ctz(pa)]
-   operations of [2^ctz(pa)] bytes. *)
-Lemma split_misaligned_phys_derive (W : Z) (va : mword 64) (g : Z)
+Lemma split_misaligned_phys_derive (W : Z) (pa : mword 64) (g : Z)
     (sp : Splittability) (s : mstate) :
-  (W = 2 \/ W = 4 \/ W = 8) ->
+  0 < W -> W <= 8 ->
   exists (N : nat) (bytes : Z),
     (1 <= N)%nat /\ Z.of_nat N * bytes = W /\ 0 < bytes /\ bytes <= W /\
-    (bytes | 4096) /\ uint (to_bits 64 bytes) = bytes /\
-    exec (split_misaligned (Physaddr va) W g sp) s = Some ((Z.of_nat N, bytes), s).
+    uint (to_bits 64 bytes) = bytes /\
+    exec (split_misaligned (Physaddr pa) W g sp) s = Some ((Z.of_nat N, bytes), s).
 Proof.
-  intros HW.
-  assert (HWpos : 0 < W) by (destruct HW as [ -> | [ -> | -> ] ]; lia).
-  (* the [do_not_split] disjunction, once *)
-  destruct (generic_eq sp CannotSplit) eqn:Hsp.
-  { exists 1%nat, W. repeat split; try lia.
-    - destruct HW as [ -> | [ -> | -> ] ];
-        [ exists 2048 | exists 1024 | exists 512 ]; reflexivity.
-    - destruct HW as [ -> | [ -> | -> ] ]; vm_compute; reflexivity.
-    - unfold split_misaligned. cbn zeta.
-      change (bits_of_physaddr (Physaddr va)) with va.
-      rewrite Hsp. cbn [orb]. cbn match. apply exec_returnm. }
-  destruct (Z.eqb (Z.rem (uint va) W) 0) eqn:Halignb.
-  { exists 1%nat, W. repeat split; try lia.
-    - destruct HW as [ -> | [ -> | -> ] ];
-        [ exists 2048 | exists 1024 | exists 512 ]; reflexivity.
-    - destruct HW as [ -> | [ -> | -> ] ]; vm_compute; reflexivity.
-    - unfold split_misaligned. cbn zeta.
-      change (bits_of_physaddr (Physaddr va)) with va.
-      rewrite Hsp. rewrite Halignb. cbn [orb]. cbn match. apply exec_returnm. }
-  destruct (allowed_misaligned (subrange_vec_dec va (xlen - 1) 0) W g) eqn:Hallow.
-  { exists 1%nat, W. repeat split; try lia.
-    - destruct HW as [ -> | [ -> | -> ] ];
-        [ exists 2048 | exists 1024 | exists 512 ]; reflexivity.
-    - destruct HW as [ -> | [ -> | -> ] ]; vm_compute; reflexivity.
-    - unfold split_misaligned. cbn zeta.
-      change (bits_of_physaddr (Physaddr va)) with va.
-      rewrite Hsp. rewrite Halignb. rewrite Hallow. cbn [orb]. cbn match.
-      apply exec_returnm. }
-  (* the genuine split: chunk width 2^ctz(pa) *)
-  assert (Hmodne : bv_unsigned va mod W <> 0).
-  { apply Z.eqb_neq in Halignb.
-    rewrite (uint_unsigned_n _) in Halignb.
-    rewrite Z.rem_mod_nonneg in Halignb;
-      [ exact Halignb | pose proof (bv_unsigned_in_range _ va); lia | exact HWpos ]. }
-  destruct HW as [ -> | [ -> | -> ] ].
-  - destruct (Z.testbit (bv_unsigned va) 0) eqn:E0.
-    + apply (assemble va 2 0 1 2 g sp 2%nat s).
-      * exact Hsp.
-      * exact Halignb.
-      * exact Hallow.
-      * apply ctz_val; [ lia | exact E0 | intros j Hj; lia ].
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * lia.
-      * lia.
-      * lia.
-      * lia.
-      * exists 4096; vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-    + exfalso. apply Hmodne. change 2 with (2 ^ Z.of_nat 1).
-      apply low_bits_zero_mod. intros j Hj.
-      assert (j = 0) as -> by lia. exact E0.
-  - destruct (Z.testbit (bv_unsigned va) 0) eqn:E0.
-    + apply (assemble va 4 0 1 4 g sp 4%nat s).
-      * exact Hsp.
-      * exact Halignb.
-      * exact Hallow.
-      * apply ctz_val; [ lia | exact E0 | intros j Hj; lia ].
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * lia.
-      * lia.
-      * lia.
-      * lia.
-      * exists 4096; vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-    + destruct (Z.testbit (bv_unsigned va) 1) eqn:E1.
-      * apply (assemble va 4 1 2 2 g sp 2%nat s).
-        -- exact Hsp.
-        -- exact Halignb.
-        -- exact Hallow.
-        -- apply ctz_val; [ lia | exact E1 | intros j Hj; assert (j = 0) as -> by lia; exact E0 ].
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- lia.
-        -- lia.
-        -- lia.
-        -- lia.
-        -- exists 2048; vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-      * exfalso. apply Hmodne. change 4 with (2 ^ Z.of_nat 2).
-        apply low_bits_zero_mod. intros j Hj.
-        assert (j = 0 \/ j = 1) as [ -> | -> ] by lia; [ exact E0 | exact E1 ].
-  - destruct (Z.testbit (bv_unsigned va) 0) eqn:E0.
-    + apply (assemble va 8 0 1 8 g sp 8%nat s).
-      * exact Hsp.
-      * exact Halignb.
-      * exact Hallow.
-      * apply ctz_val; [ lia | exact E0 | intros j Hj; lia ].
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * lia.
-      * lia.
-      * lia.
-      * lia.
-      * exists 4096; vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-      * vm_compute; reflexivity.
-    + destruct (Z.testbit (bv_unsigned va) 1) eqn:E1.
-      * apply (assemble va 8 1 2 4 g sp 4%nat s).
-        -- exact Hsp.
-        -- exact Halignb.
-        -- exact Hallow.
-        -- apply ctz_val; [ lia | exact E1 | intros j Hj; assert (j = 0) as -> by lia; exact E0 ].
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- lia.
-        -- lia.
-        -- lia.
-        -- lia.
-        -- exists 2048; vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-        -- vm_compute; reflexivity.
-      * destruct (Z.testbit (bv_unsigned va) 2) eqn:E2.
-        -- apply (assemble va 8 2 4 2 g sp 2%nat s).
-           ++ exact Hsp.
-           ++ exact Halignb.
-           ++ exact Hallow.
-           ++ apply ctz_val; [ lia | exact E2
-              | intros j Hj; assert (j = 0 \/ j = 1) as [ -> | -> ] by lia; [ exact E0 | exact E1 ] ].
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ lia.
-           ++ lia.
-           ++ lia.
-           ++ lia.
-           ++ exists 1024; vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-           ++ vm_compute; reflexivity.
-        -- exfalso. apply Hmodne. change 8 with (2 ^ Z.of_nat 3).
-           apply low_bits_zero_mod. intros j Hj.
-           assert (j = 0 \/ j = 1 \/ j = 2) as [ -> | [ -> | -> ] ] by lia;
-             [ exact E0 | exact E1 | exact E2 ].
+  intros HWpos HWle.
+  assert (HWu : uint (to_bits 64 W) = W).
+  { assert (HWv : W = 1 \/ W = 2 \/ W = 3 \/ W = 4 \/ W = 5 \/ W = 6 \/ W = 7 \/ W = 8)
+      by lia.
+    destruct HWv as [ -> | [ -> | [ -> | [ -> | [ -> | [ -> | [ -> | -> ] ] ] ] ] ] ];
+      vm_compute; reflexivity. }
+  (* the [do_not_split] disjunction: any of its three arms gives ONE
+     operation of the full width *)
+  destruct (orb (generic_eq sp CannotSplit)
+              (orb (Z.eqb (Z.rem (uint (bits_of_physaddr (Physaddr pa))) W) 0)
+                 (allowed_misaligned
+                    (subrange_vec_dec (bits_of_physaddr (Physaddr pa)) (Z.sub xlen 1) 0)
+                    W g))) eqn:Ends.
+  { exists 1%nat, W. split; [lia|]. split; [lia|]. split; [lia|]. split; [lia|].
+    split; [exact HWu|].
+    unfold split_misaligned. cbn zeta. rewrite Ends. cbn match. apply exec_returnm. }
+  (* ...otherwise [split_access].  Reduce the goal FIRST, so the chunk width
+     can be named exactly as it appears in it. *)
+  unfold split_misaligned. cbn zeta. rewrite Ends. cbn match.
+  unfold sys_misaligned_byte_by_byte. cbn match.
+  unfold split_access. cbn zeta.
+  change (bits_of_physaddr (Physaddr pa)) with pa.
+  destruct (width_ctz_facts W HWpos HWle) as (Hkw0 & Hkwd & Hkwle).
+  set (kw := count_trailing_zeros (to_bits (Z.add 12 1) W)) in *.
+  assert (Hka0 : 0 <= count_trailing_zeros pa) by (apply ctz_nonneg; lia).
+  set (ka := count_trailing_zeros pa) in *.
+  set (m := Z.min ka kw) in *.
+  assert (Hm0 : 0 <= m) by (unfold m; lia).
+  assert (Hmkw : m <= kw) by (unfold m; lia).
+  assert (Hpw : pow2 m = 2 ^ m) by reflexivity.
+  rewrite Hpw.
+  assert (Hbpos : 0 < 2 ^ m) by (apply Z.pow_pos_nonneg; lia).
+  assert (Hbdvd : (2 ^ m | W)).
+  { apply (Z.divide_trans _ (2 ^ kw) _); [| exact Hkwd].
+    exists (2 ^ (kw - m)). rewrite <- Z.pow_add_r; [| lia | lia].
+    f_equal. lia. }
+  assert (Hble : 2 ^ m <= W).
+  { apply (Z.le_trans _ (2 ^ kw) _); [| exact Hkwle].
+    apply Z.pow_le_mono_r; lia. }
+  destruct Hbdvd as [q Hq].
+  assert (Hqpos : 0 < q) by nia.
+  assert (Hquot : Z.quot W (2 ^ m) = q) by (rewrite Hq; rewrite Z.quot_mul; lia).
+  rewrite Hquot.
+  exists (Z.to_nat q), (2 ^ m).
+  split; [lia|].
+  split; [rewrite Z2Nat.id; lia|].
+  split; [exact Hbpos|].
+  split; [exact Hble|].
+  split.
+  { assert (Hm3 : m <= 3).
+    { destruct (Z_le_gt_dec m 3) as [Hle3|Hgt3]; [exact Hle3|].
+      exfalso. assert (2 ^ 4 <= 2 ^ m) by (apply Z.pow_le_mono_r; lia). lia. }
+    assert (Hmv : m = 0 \/ m = 1 \/ m = 2 \/ m = 3) by lia.
+    destruct Hmv as [ Hv | [ Hv | [ Hv | Hv ] ] ]; rewrite Hv;
+      vm_compute; reflexivity. }
+  replace (Z.eqb W (q * 2 ^ m)) with true by (symmetry; apply Z.eqb_eq; lia).
+  erewrite exec_bind_Some.
+  2:{ unfold assert_exp'. cbn match. apply exec_returnm. }
+  cbn beta. rewrite Z2Nat.id; [| lia]. apply exec_returnm.
 Qed.
-
-
 
 Lemma pow2_le8 (b : Z) : 0 < b -> b < 8 -> (b | 4096) -> b = 1 \/ b = 2 \/ b = 4.
 Proof.
@@ -779,7 +509,7 @@ Proof. induction N as [|N IH]; [reflexivity | cbn [ws_seq]; rewrite IH; reflexiv
 
 Section MisPhys.
   Context (pa : mword 64) (W : Z) (s : mstate).
-  Context (HW : W = 2 \/ W = 4 \/ W = 8).
+  Context (HWpos : 0 < W) (HWle : W <= 8).
   Context (HA : pmpAddrMatchType_encdec_backwards
                   (_get_Pmpcfg_ent_A (vec_access_dec (register_lookup pmpcfg_n s.(sregs)) 0)) = TOR).
   Context (Hord : zopz0zKzJ_u (zeros' 64)
@@ -789,11 +519,6 @@ Section MisPhys.
   Context (Hhtif : register_lookup htif_tohost_base s.(sregs) = None).
   Context (Hall : pma_allows_all (register_lookup pma_regions s.(sregs))).
   Context (Hwin : forall j : nat, (j < Z.to_nat W)%nat -> addr_is_ram (pa_add pa j)).
-
-  Local Lemma HWpos : 0 < W.
-  Proof. destruct HW as [ -> | [ -> | -> ] ]; lia. Qed.
-  Local Lemma HWle : W <= 8.
-  Proof. destruct HW as [ -> | [ -> | -> ] ]; lia. Qed.
 
   (* offset arithmetic: chunk [k] of [bytes] at byte [j] is offset
      [k*bytes + j] of the access, and that stays inside it *)
@@ -911,8 +636,8 @@ Section MisPhys.
       rewrite (exec_bind_Some _ _ _ _ _ Hpma). cbn match. apply exec_returnM. }
     destruct (split_misaligned_phys_derive W pa
                 (Phys_Mem_Access_Info_granule_size_exp plan)
-                (Phys_Mem_Access_Info_splittable plan) s HW)
-      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbdvd & Hbuint & Hsplit).
+                (Phys_Mem_Access_Info_splittable plan) s HWpos HWle)
+      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbuint & Hsplit).
     assert (Hb8 : bytes <= 8) by lia.
     assert (Hpmp : forall k, (k < N)%nat ->
               exec (pmpCheck (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes
@@ -977,8 +702,8 @@ Section MisPhys.
       rewrite (exec_bind_Some _ _ _ _ _ Hpma). cbn match. apply exec_returnM. }
     destruct (split_misaligned_phys_derive W pa
                 (Phys_Mem_Access_Info_granule_size_exp plan)
-                (Phys_Mem_Access_Info_splittable plan) s HW)
-      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbdvd & Hbuint & Hsplit).
+                (Phys_Mem_Access_Info_splittable plan) s HWpos HWle)
+      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbuint & Hsplit).
     assert (Hb8 : bytes <= 8) by lia.
     assert (Hpmp : forall k, (k < N)%nat ->
               exec (pmpCheck (Physaddr (add_vec_int pa (Z.of_nat k * bytes))) bytes
@@ -1077,8 +802,8 @@ Section MisPhys.
       rewrite (exec_bind_Some _ _ _ _ _ Hpma). cbn match. apply exec_returnM. }
     destruct (split_misaligned_phys_derive W pa
                 (Phys_Mem_Access_Info_granule_size_exp plan)
-                (Phys_Mem_Access_Info_splittable plan) s HW)
-      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbdvd & Hbuint & Hsplit).
+                (Phys_Mem_Access_Info_splittable plan) s HWpos HWle)
+      as (N & bytes & HN & Hwidth & Hbpos & Hble & Hbuint & Hsplit).
     assert (Hb8 : bytes <= 8) by lia.
     exists bytes, N. split; [exact Hbpos|]. split; [exact Hwidth|]. split; [exact HN|].
     (* every chunk's state along the chain has the same registers as [s], so
@@ -1234,7 +959,7 @@ Section MisUser.
   Lemma user_pt_load_data_mis (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
       (w va : mword 64) (W : Z) (σ : mstate) :
-    (W = 2 \/ W = 4 \/ W = 8) ->
+    0 < W -> W <= 8 ->
     um !! svpn_of va = Some w ->
     uleaf_ok (Load Data) w ->
     udata_cov um data ->
@@ -1261,9 +986,8 @@ Section MisUser.
       reg_interp σ'.(sregs) ∗ gen_heap_interp σ'.(mem) ∗
       utlb_inv_pt uroot tfp um ∗ udata_own data.
   Proof.
-    intros HW Hl Hchk Hcov Hp Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
+    intros HWpos HWle Hl Hchk Hcov Hp Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
     iIntros "Hri Hgh Hinv Hdata".
-    assert (HWpos : 0 < W) by (destruct HW as [ -> | [ -> | -> ] ]; lia).
     iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
       as %(HA & Hord & HX & HRp & HWp & Hcovp).
     iMod (utlb_inv_pt_translateAddr_u (Load Data) uroot tfp um w va
@@ -1280,7 +1004,7 @@ Section MisUser.
     iDestruct (udata_window_facts um data w va W σ' HWpos Hl Hcov Hp with "Hgh Hdata")
       as %Hwin.
     iModIntro.
-    destruct (exec_mem_read_mis_U (u_walk_pa w va) W σ' HW
+    destruct (exec_mem_read_mis_U (u_walk_pa w va) W σ' HWpos HWle
                 (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
                 (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
                 (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp))
@@ -1300,7 +1024,7 @@ Section MisUser.
   Lemma user_pt_store_data_mis (uroot tfp : mword 44)
       (um : gmap (mword 27) (mword 64)) (data : gset Arch.pa)
       (w va : mword 64) (W : Z) (dat : mword (8 * W)) (σ : mstate) :
-    (W = 2 \/ W = 4 \/ W = 8) ->
+    0 < W -> W <= 8 ->
     um !! svpn_of va = Some w ->
     uleaf_ok (Store Data) w ->
     udata_cov um data ->
@@ -1329,9 +1053,8 @@ Section MisUser.
       reg_interp σ''.(sregs) ∗ gen_heap_interp σ''.(mem) ∗
       utlb_inv_pt uroot tfp um ∗ udata_own data.
   Proof.
-    intros HW Hl Hchk Hcov Hp Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
+    intros HWpos HWle Hl Hchk Hcov Hp Hcanon Hmisa Hmenv Hhtif Hcp HSXL Hmprv Hall.
     iIntros "Hri Hgh Hinv Hdata".
-    assert (HWpos : 0 < W) by (destruct HW as [ -> | [ -> | -> ] ]; lia).
     iDestruct (utlb_inv_pt_pmp_facts uroot tfp um σ with "Hri Hinv")
       as %(HA & Hord & HX & HRp & HWp & Hcovp).
     iMod (utlb_inv_pt_translateAddr_u (Store Data) uroot tfp um w va
@@ -1351,7 +1074,7 @@ Section MisUser.
     set (pa := u_walk_pa w va).
     assert (Hea : exec (mem_write_ea (Physaddr pa) W (Store Data) PBMT_PMA
                           false false false) σ' = Some (Ok tt, σ')).
-    { exact (exec_mem_write_ea_mis_U pa W σ' HW
+    { exact (exec_mem_write_ea_mis_U pa W σ' HWpos HWle
                (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
                (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
                (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp))
@@ -1360,7 +1083,7 @@ Section MisUser.
                (ltac:(rewrite (Tr mstatus ltac:(vm_compute; reflexivity)); exact Hmprv))
                (ltac:(rewrite (Tr cur_privilege ltac:(vm_compute; reflexivity)); exact Hcp))
                (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HWp))). }
-    destruct (exec_mem_write_value_mis_U pa W σ' HW
+    destruct (exec_mem_write_value_mis_U pa W σ' HWpos HWle
                 (ltac:(rewrite (Tr pmpcfg_n ltac:(vm_compute; reflexivity)); exact HA))
                 (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hord))
                 (ltac:(rewrite (Tr pmpaddr_n ltac:(vm_compute; reflexivity)); exact Hcovp))
