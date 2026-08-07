@@ -49,12 +49,12 @@ Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn CalleeSaved KernelText WpAuipc.
+Require Import StackOwn CalleeSaved KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfVc.
-Require Import WpLock CodeMycpu ProcGeom CpuOwn KernelRvcDecode.
+Require Import WpLock ProcGeom CpuOwn KernelRvcDecode.
 Require Import IntrDefs HartTp WpNext.
 Require Import DevModel DiskPtsto WpUart.
-Require Import SpecUart CodeUartPutcSync WpSconfUartAccess WpUartgetc.
+Require Import SpecUart WpSconfUartAccess WpUartgetc.
 Require Import UartTxInv.
 Require Import SpecPanic.
 Require Import SchedCtx.
@@ -63,8 +63,6 @@ Require Import SpecAcquire SpecRelease SpecWakeup SpecConsoleintr.
 Require Import CodeUartintr.
 Require Import SpecUartintr.
 From Kernel Require KernelSyms.
-Require Import CodeUartPutcSyncAux.
-Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 Local Open Scope Z_scope.
@@ -937,7 +935,7 @@ Section ProofUartintr.
           (add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0x7fc : mword 12)))]> T1) with T2.
       iEval (rewrite P66) in "Hpc".
       (* +0x66 jal ra,wakeup *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uartintr + 0x66)) Rra (mword_of_int 5406 : mword 21)
+      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uartintr + 0x66)) Rra (mword_of_int 5416 : mword 21)
                 T2 (av - 4)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi66 [-]").
       iApply wp_next_off_intro.
@@ -945,7 +943,7 @@ Section ProofUartintr.
       set (T3 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x66) : mword 64) 4)]> T2).
       change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uartintr + 0x66) : mword 64) 4)]> T2) with T3.
       assert (Hjwk : add_vec (mword_of_int (KernelSyms.uartintr + 0x66) : mword 64)
-                       (sign_extend' 64 (mword_of_int 5406 : mword 21)) = mword_of_int KernelSyms.wakeup) by pcw.
+                       (sign_extend' 64 (mword_of_int 5416 : mword 21)) = mword_of_int KernelSyms.wakeup) by pcw.
       iEval (rewrite Hjwk) in "Hpc".
       assert (HT3ra : T3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.uartintr + 0x66) : mword 64) 4)
         by (rewrite /T3 upd_eq; reflexivity).

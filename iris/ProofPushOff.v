@@ -18,15 +18,43 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import HartTp WpNext.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode KernelBaseDecode WpPushOffCsr CodeMycpu SpecMycpu CodePushOff CodePopOff.
+Require Import WpGprCsrwCommon WpIntenaBits KernelRvcDecode KernelBaseDecode WpPushOffCsr SpecMycpu CodePushOff CodePopOff.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CpuOwn.
 Require Import WpPushOffBridges.
 Require Import SpecPushOff.
-Require Import CodeMycpuAux.
-Require Import CodePopOffAux.
+Require Import ProcGeom.
+Require WpGprCsrwC.
 Import Defs.
 
+(* SIE=0 (folded into smode_config) gives pop_off's interrupt-off fact
+   [sstatus & 2 = 0] with mstatus0 hidden.  [mword1_zero_of_ne_one] is the
+   shared pure bitvector fact (RiscvExtras). *)
+Lemma pop_sstatus_clear_neq (m : mword 64) :
+  eq_vec (_get_Mstatus_SIE m) ('b"1") = false ->
+  neq_vec (and_vec (sstatus_read m)
+             (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false.
+Proof.
+  intro HSIE.
+  unfold neq_vec. apply negb_false_iff. apply eq_vec_true_iff.
+  assert (Hz : _get_Mstatus_SIE m = ('b"0" : mword 1))
+    by (apply mword1_zero_of_ne_one; exact HSIE).
+  assert (Hb1 : Z.testbit (bv_unsigned (sstatus_read m)) 1 = false).
+  { unfold sstatus_read. rewrite WpGprCsrwC.subrange_full.
+    apply WpGprCsrwC.sie_bit. rewrite WpGprCsrwC.mSIE_lower. exact Hz. }
+  assert (Hmask : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)) : mword 64) = 2)
+    by (vm_compute; reflexivity).
+  assert (Hzr : bv_unsigned (zero_reg : mword 64) = 0) by (vm_compute; reflexivity).
+  apply bv_eq. rewrite WpGprCsrwC.and_vec_unsigned. rewrite Hmask. rewrite Hzr.
+  apply Z.bits_inj'. intros j Hj. rewrite Z.land_spec. rewrite Z.bits_0.
+  destruct (decide (j = 1)) as [->|Hne].
+  - rewrite Hb1. reflexivity.
+  - assert (Ht2 : Z.testbit 2 j = false).
+    { destruct (Z.eq_dec j 0) as [->|Hj0].
+      - reflexivity.
+      - apply Z.bits_above_log2; [lia|]. change (Z.log2 2) with 1. lia. }
+    rewrite Ht2. apply andb_false_r.
+Qed.
 
 (* +0x24  0x10016073  csrsi sstatus,2 (rd = x0) -- pop_off's intr_on.  Its
    decode is KernelBaseDecode.v's shared [bdec_10016073], stated with the csr
@@ -296,7 +324,7 @@ Section ProofPushOff.
       by (rewrite upd_ne; [ reflexivity | vm_compute; discriminate ]).
     iIntros "Hcg #Htext Hpc Hnoff Hpp24 Hpp16 Hpp8 Hgap Hcont".
     iPoseProof (poi_18 with "Htext") as "Hi18".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ P (mword_of_int 0xcfe : mword 21) ms av p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ P (mword_of_int 0xd00 : mword 21) ms av p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi18 [-]").
@@ -704,7 +732,7 @@ Section ProofPushOff.
       rewrite /N2. rewrite upd_ne; [| vm_compute; discriminate].
       rewrite /N1. rewrite upd_ne; [| vm_compute; discriminate]. exact Hcsp0. }
     iPoseProof (poi_10 with "Htext") as "Hi10".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.push_off + 0x10)) (mword_of_int 0xd06 : mword 21) N3 (av - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.push_off + 0x10)) (mword_of_int 0xd08 : mword 21) N3 (av - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi10 [-]").
@@ -771,7 +799,7 @@ Section ProofPushOff.
       iEval (rewrite Htgt2c) in "Hpc".
       (* ---- 0x2c: jal ra,mycpu (jimm=0xcea) ---- *)
       iPoseProof (poi_2c with "Htext") as "Hi2c".
-      iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.push_off + 0x2c)) (mword_of_int 0xcea : mword 21) N5 (av - 4)%nat p
+      iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.push_off + 0x2c)) (mword_of_int 0xcec : mword 21) N5 (av - 4)%nat p
                 ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
                 ltac:(lia)
                 with "Hcg Htext Hpc Hi2c [-]").
@@ -1269,7 +1297,7 @@ Section ProofPushOff.
     (* ---- 0x08: jal ra,mycpu ---- *)
     assert (Hcsp1 : P1 !!! Regidx csp_rs1 = spd)
       by (rewrite /P1 upd_ne; [exact Hcsp0 | vm_compute; discriminate]).
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.pop_off + 0x08)) (mword_of_int 0xc94 : mword 21) P1 (av - 2)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.pop_off + 0x08)) (mword_of_int 0xc96 : mword 21) P1 (av - 2)%nat p
  ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi08 [-]").

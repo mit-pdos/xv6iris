@@ -36,7 +36,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
-Require Import KernelText WpAuipc.
+Require Import KernelText.
+Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.
@@ -54,8 +55,76 @@ Require Import SpecUartPutc.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
-Require Import CodeUartPutcSyncAux.
 Local Open Scope Z_scope.
+
+(* ===================================================================== *)
+(*  uartputc_sync's device core, as register-file transformers.  One      *)
+(*  definition per device-core instruction that writes a GPR, named to    *)
+(*  keep the WP threading readable (CodeMycpu-style).                     *)
+(*                                                                        *)
+(*    0x982  lui   a4,0x10000        -> ppc_f1                            *)
+(*    0x986  addi  a4,a4,5           -> ppc_f2                            *)
+(*    0x988  lbu   a5,0(a4)          -- LSR read (off 5)                  *)
+(*    0x98c  andi  a5,a5,32          -> ppc_f4' (loop exit, by exit byte) *)
+(*    0x992  zext.b a0,s1            -> ppc_f5'                           *)
+(*    0x996  lui   a5,0x10000        -> ppc_f6' (the pre-THR-store map)   *)
+(*    0x99a  sb    a0,0(a5)          -- THR write (off 0)                 *)
+(* ===================================================================== *)
+Section UartPutcMaps.
+  Context `{!riscvGS Σ}.
+
+  Definition ppc_f1 (m : regfile) : regfile :=
+    <[Regidx (mword_of_int 14) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> m.
+  Definition ppc_f2 (m : regfile) : regfile :=
+    <[Regidx (mword_of_int 14) := regval_into_reg (add_vec (ppc_f1 m !!! Regidx (mword_of_int 14))
+        (sign_extend' 64 (sign_extend' 12 (mword_of_int 5 : mword 6))))]> (ppc_f1 m).
+
+  (* the call-site register lookup the LSR-read leaf needs. *)
+  Lemma ppc_f2_a4 (m : regfile) :
+    ppc_f2 m !!! Regidx (mword_of_int 14) = uart_pa 5.
+  Proof.
+    unfold ppc_f2, ppc_f1. rewrite !upd_eq.
+    apply bv_eq; vm_compute; reflexivity.
+  Qed.
+
+  (* The mask [andi a5,a5,32] applied to the LSR-load value for a read byte. *)
+  Definition lsr_masked (b : bv 8) : mword 64 :=
+    and_vec (lsr_ldval_of b) (sign_extend' 64 (mword_of_int 32 : mword 12)).
+
+  (* The post-loop register maps, indexed by the EXIT byte [b] the poll
+     observed (not by a UART state, which the caller can no longer name). *)
+  Definition ppc_f4' (m : regfile) (b : bv 8) : regfile :=
+    <[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked b)]> (ppc_f2 m).
+  Definition ppc_f5' (m : regfile) (b : bv 8) : regfile :=
+    <[Regidx (mword_of_int 10) := regval_into_reg (and_vec (ppc_f4' m b !!! Regidx (mword_of_int 9))
+        (sign_extend' 64 (mword_of_int 255 : mword 12)))]> (ppc_f4' m b).
+  Definition ppc_f6' (m : regfile) (b : bv 8) : regfile :=
+    <[Regidx (mword_of_int 15) := regval_into_reg (luival (mword_of_int 0x10000 : mword 20))]> (ppc_f5' m b).
+
+  Lemma ppc_f4'_s1 (m : regfile) (b : bv 8) :
+    ppc_f4' m b !!! Regidx (mword_of_int 9) = m !!! Regidx (mword_of_int 9).
+  Proof.
+    unfold ppc_f4', ppc_f2, ppc_f1.
+    do 3 (rewrite upd_ne; [| vm_compute; discriminate]). reflexivity.
+  Qed.
+
+  Lemma ppc_f6'_a5 (m : regfile) (b : bv 8) :
+    ppc_f6' m b !!! Regidx (mword_of_int 15) = uart_pa 0.
+  Proof.
+    unfold ppc_f6'. rewrite upd_eq.
+    apply bv_eq; vm_compute; reflexivity.
+  Qed.
+
+  Lemma ppc_f6'_a0 (m : regfile) (b : bv 8) :
+    ppc_f6' m b !!! Regidx (mword_of_int 10)
+    = and_vec (m !!! Regidx (mword_of_int 9)) (sign_extend' 64 (mword_of_int 255 : mword 12)).
+  Proof.
+    unfold ppc_f6', ppc_f5'.
+    rewrite upd_ne; [| vm_compute; discriminate].
+    rewrite upd_eq. rewrite ppc_f4'_s1. reflexivity.
+  Qed.
+
+End UartPutcMaps.
 
 Module UartPutcProof (Uart : UART) : UARTPUTC.
 

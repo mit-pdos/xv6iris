@@ -3017,6 +3017,24 @@ Section ProcPt.
   Lemma proc_pt_wf_get (P : uptd) : proc_pt P ⊢ ⌜proc_pt_wf P⌝.
   Proof. rewrite /proc_pt. iIntros "(%Hwf & _)". iPureIntro. exact Hwf. Qed.
 
+  (* THE ROOT PAGE IS A KALLOC PAGE, and it is a fact of the RESOURCE, not of
+     [proc_pt_wf] (which records it only for the trapframe page).  It comes
+     straight out of the tree's own node claim -- [PtTree.ptree_own_page_valid]
+     reads it without opening the tree -- via [upt_tree_spec]'s first conjunct
+     [pt_base t = ud_root P].
+       Stated as a plain projection because its consumers are contracts that
+     must NOT ask a caller for it: freeproc null-checks [p->pagetable] and has
+     to refute the [c.beqz] from what it was handed, and its callers (kwait's
+     ZOMBIE child, allocproc's failure tails) hold nothing but the block. *)
+  Lemma proc_pt_root_valid (P : uptd) :
+    proc_pt P ⊢ ⌜page_valid (page_base P.(ud_root))⌝.
+  Proof.
+    rewrite /proc_pt /pt_frame.
+    iIntros "(_ & Ht & _)". iDestruct "Ht" as (t) "[%Hspec Ht]".
+    iDestruct (ptree_own_page_valid 2 (DfracOwn 1) t with "Ht") as %Hv.
+    iPureIntro. destruct Hspec as [Hbase _]. by rewrite -Hbase.
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (* INTRO AT THE EMPTY MAP -- the join with the CONSTRUCTION side.       *)
   (* [wp_proc_pagetable] (SpecProcPagetable.v) delivers                   *)

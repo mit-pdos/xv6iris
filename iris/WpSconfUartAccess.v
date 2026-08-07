@@ -30,10 +30,33 @@ Require Import IntrDefs.
 Require Import IntrDefs.
 Require Import SpecUart.
 Require Import WpSmodeUart.
-Require Import CodeUartPutcSync.
 From Kernel Require KernelSyms.
-Require Import CodeUartPutcSyncAux.
 Local Open Scope Z_scope.
+
+(* ===================================================================== *)
+(*  The LSR poll's read value and branch test, as functions of the byte   *)
+(*  the device returned.  The device state is shared, so a poll cannot    *)
+(*  name the byte in advance: everything downstream is phrased in terms   *)
+(*  of [b] and only re-connected to the UART inside a leaf's ghost step.  *)
+(* ===================================================================== *)
+
+(* the value the [lbu] leaf writes back for a read byte [b] *)
+Definition lsr_ldval_of (b : bv 8) : mword 64 :=
+  extend_value true (update_subrange_vec_dec (zeros' (1*1*8)) (1*(0+1)*8-1) (1*0*8) b).
+
+(* THE POLL'S BRANCH TEST: [andi a5,a5,32] then [c.beqz a5].
+   True = THRE clear = branch taken = spin again. *)
+Definition lsr_thre_clear (b : bv 8) : bool :=
+  eq_vec (and_vec (lsr_ldval_of b) (sign_extend' 64 (mword_of_int 32 : mword 12))) zero_reg.
+
+(* THRE clear really does take the branch, so the two cases of the poll are
+   exactly [uart_thre u]. *)
+Lemma uart_nothre_beqz (u : uart_state) :
+  uart_thre u = false -> lsr_thre_clear (uart_lsr u) = true.
+Proof.
+  intro H. unfold lsr_thre_clear, lsr_ldval_of, uart_lsr. rewrite H.
+  destruct (uart_rx_ready u); vm_compute; reflexivity.
+Qed.
 
 Module UartAccessProof (Uart : UART).
 Section WpSconfUartAccess.

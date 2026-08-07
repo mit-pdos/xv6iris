@@ -7,22 +7,32 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes WpDecodeBridge.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode.
-Require Import ExecCommon.
+Require Import KernelDecode00.
+Require Import KernelDecode03.
+Require Import KernelDecode04.
+Require Import KernelDecode06.
+Require Import KernelDecode07.
+Require Import KernelDecode09.
+Require Import KernelDecode10.
+Require Import KernelDecode12.
+Require Import KernelDecode13.
+Require Import KernelDecode14.
+Require Import KernelDecode15.
+Require Import KernelDecode19.
+Require Import KernelDecode20.
+Require Import KernelDecode21.
+Require Import KernelDecode25.
+Require Import KernelDecode28.
+Require Import KernelDecode29.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -53,9 +63,9 @@ Section CodeMyproc.
   Proof. mk_rvc (KernelSyms.myproc + 0x8) (mword_of_int 0x1000 : mword 16)
     (mword_of_int (KernelSyms.myproc + 0x8) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 8 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_1000 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma mpi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0xa) : mword 64) false (JAL (mword_of_int 2093760 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.myproc + 0xa) (mword_of_int 0xac0ff0ef : mword 32)
-    (mword_of_int (KernelSyms.myproc + 0xa) : mword 64) (JAL (mword_of_int 2093760 : mword 21, Regidx (mword_of_int 1))) kd_ac0ff0ef. Qed.
+  Lemma mpi_0a : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0xa) : mword 64) false (JAL (mword_of_int 2093758 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.myproc + 0xa) (mword_of_int 0xabeff0ef : mword 32)
+    (mword_of_int (KernelSyms.myproc + 0xa) : mword 64) (JAL (mword_of_int 2093758 : mword 21, Regidx (mword_of_int 1))) kd_abeff0ef. Qed.
 
   Lemma mpi_0e : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0xe) : mword 64) true (RTYPE (Regidx (mword_of_int 4), zreg, Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.myproc + 0xe) (mword_of_int 0x8792 : mword 16)
@@ -73,9 +83,9 @@ Section CodeMyproc.
   Proof. mk_base (KernelSyms.myproc + 0x14) (mword_of_int 0x00011717 : mword 32)
     (mword_of_int (KernelSyms.myproc + 0x14) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 14), AUIPC)) kd_00011717. Qed.
 
-  Lemma mpi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) false (ITYPE (mword_of_int 2608 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
-  Proof. mk_base (KernelSyms.myproc + 0x18) (mword_of_int 0xa3070713 : mword 32)
-    (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) (ITYPE (mword_of_int 2608 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_a3070713. Qed.
+  Lemma mpi_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) false (ITYPE (mword_of_int 2606 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)).
+  Proof. mk_base (KernelSyms.myproc + 0x18) (mword_of_int 0xa2e70713 : mword 32)
+    (mword_of_int (KernelSyms.myproc + 0x18) : mword 64) (ITYPE (mword_of_int 2606 : mword 12, Regidx (mword_of_int 14), Regidx (mword_of_int 14), ADDI)) kd_a2e70713. Qed.
 
   Lemma mpi_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x1c) : mword 64) true (RTYPE (Regidx (mword_of_int 14), Regidx (mword_of_int 15), Regidx (mword_of_int 15), ADD)).
   Proof. mk_rvc (KernelSyms.myproc + 0x1c) (mword_of_int 0x97ba : mword 16)
@@ -89,9 +99,9 @@ Section CodeMyproc.
   Proof. mk_rvc (KernelSyms.myproc + 0x20) (mword_of_int 0x84be : mword 16)
     (mword_of_int (KernelSyms.myproc + 0x20) : mword 64) (RTYPE (Regidx (mword_of_int 15), zreg, Regidx (mword_of_int 9), ADD)) kd_84be exec_execute_C_MV. Qed.
 
-  Lemma mpi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x22) : mword 64) false (JAL (mword_of_int 2093858 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.myproc + 0x22) (mword_of_int 0xb22ff0ef : mword 32)
-    (mword_of_int (KernelSyms.myproc + 0x22) : mword 64) (JAL (mword_of_int 2093858 : mword 21, Regidx (mword_of_int 1))) kd_b22ff0ef. Qed.
+  Lemma mpi_22 : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x22) : mword 64) false (JAL (mword_of_int 2093856 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.myproc + 0x22) (mword_of_int 0xb20ff0ef : mword 32)
+    (mword_of_int (KernelSyms.myproc + 0x22) : mword 64) (JAL (mword_of_int 2093856 : mword 21, Regidx (mword_of_int 1))) kd_b20ff0ef. Qed.
 
   Lemma mpi_26 : kernel_text -∗ instr (mword_of_int (KernelSyms.myproc + 0x26) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)).
   Proof. mk_rvc (KernelSyms.myproc + 0x26) (mword_of_int 0x8526 : mword 16)

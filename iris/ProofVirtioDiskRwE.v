@@ -55,7 +55,6 @@ Require Import ProcGeom.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn SchedCtx FdSlots.
-Require Import WpAuipc.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
 Require Import VirtioModel DiskPtsto VirtioProto DiskInv.
 Require Import VirtioModel.
@@ -437,7 +436,7 @@ Section ProofVirtioDiskRwE.
       iEval (rewrite Hp1a4) in "Hpc".
       (* ---- +0x1a4  jal ra,sleep ---- *)
       iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a4) : mword 64) Rra
-                (mword_of_int 2082322 : mword 21) L2 (K - 12)%nat false
+                (mword_of_int 2082316 : mword 21) L2 (K - 12)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1a4 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -446,7 +445,7 @@ Section ProofVirtioDiskRwE.
       change (<[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a4) : mword 64) 4)]> L2) with L3.
       assert (Hjsl : add_vec (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a4) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2082322 : mword 21))
+                       (sign_extend' 64 (mword_of_int 2082316 : mword 21))
                      = mword_of_int KernelSyms.sleep) by pcstep.
       iEval (rewrite Hjsl) in "Hpc".
       assert (HL3a1 : add_vec (L3 !!! Regidx Ra1)
@@ -673,16 +672,16 @@ Section ProofVirtioDiskRwE.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x196)) by pcstep.
     iEval (rewrite Hp196) in "Hpc".
     iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x196) : mword 64) Rs2 Rs2
-              (mword_of_int 3166 : mword 12) N3 (K - 12)%nat false
+              (mword_of_int 3150 : mword 12) N3 (K - 12)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi196 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     set (N4 := <[Regidx Rs2 := regval_into_reg
                   (add_vec (N3 !!! Regidx Rs2)
-                     (sign_extend' 64 (mword_of_int 3166 : mword 12)))]> N3).
+                     (sign_extend' 64 (mword_of_int 3150 : mword 12)))]> N3).
     change (<[Regidx Rs2 := regval_into_reg
                   (add_vec (N3 !!! Regidx Rs2)
-                     (sign_extend' 64 (mword_of_int 3166 : mword 12)))]> N3) with N4.
+                     (sign_extend' 64 (mword_of_int 3150 : mword 12)))]> N3) with N4.
     assert (HN4s2 : N4 !!! Regidx Rs2 = (d_lock : SailStdpp.Values.mword 64)).
     { rewrite /N4 upd_eq /N3 upd_eq.
       unfold d_lock, disk_base, pa_add, add_vec_int. apply bv_eq; vm_compute; reflexivity. }

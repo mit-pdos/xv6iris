@@ -82,7 +82,7 @@ Require Import RegFile.
 Require Import InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import ByteCursor.
-Require Import StackOwn CalleeSaved KernelText WpAuipc.
+Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
@@ -764,7 +764,7 @@ Section UwBodies.
     assert (Jexit : add_vec (mword_of_int (KernelSyms.uartwrite + 0x68) : mword 64)
                       (sign_extend' 64 (mword_of_int 10 : mword 13)) = mword_of_int (KernelSyms.uartwrite + 0x72)) by pcw.
     assert (Jcall : add_vec (mword_of_int (KernelSyms.uartwrite + 0x52) : mword 64)
-                      (sign_extend' 64 (mword_of_int 5592 : mword 21)) = mword_of_int KernelSyms.sleep) by pcw.
+                      (sign_extend' 64 (mword_of_int 5602 : mword 21)) = mword_of_int KernelSyms.sleep) by pcw.
     (* ================================================================= *)
     (*  THE BODY: +0x5a .. +0x68.  ANCHORED at this iteration's own hart. *)
     (* ================================================================= *)
@@ -918,7 +918,7 @@ Section UwBodies.
       change (<[Regidx Ra0 := regval_into_reg (add_vec zero_reg (S1 !!! Regidx Rs2))]> S1) with S2.
       iEval (rewrite P52) in "Hpc".
       (* --- +0x52  jal ra,sleep --- *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uartwrite + 0x52)) Rra (mword_of_int 5592 : mword 21)
+      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uartwrite + 0x52)) Rra (mword_of_int 5602 : mword 21)
                 S2 (av - 10)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi52 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".

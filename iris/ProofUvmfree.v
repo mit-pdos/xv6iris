@@ -121,12 +121,21 @@ Qed.
 (* ...so a run of [ceil(v/4096)] pages starting at 0 stays inside the user
    region.  [mword]-free, because the [lia] zify hook answers "Cannot find
    witness" whenever ANY [mword] is merely in context. *)
+(* [uvm_maxsz] is itself a multiple of 4096 (= 4096 * 67108862), so rounding a
+   size that merely REACHES it up to a page boundary cannot leave the region.
+   That is why the premise is [v <= uvm_maxsz] and not [v + 4096 <= uvm_maxsz]:
+   [p->sz] is allowed to be exactly TRAPFRAME (growproc's own test is
+   [sz + n > TRAPFRAME]), so the stronger form is undischargeable by the only
+   caller that has a live process's size.  [Z.div_lt_upper_bound] is what does
+   the rounding, at the STRICT bound -- the non-strict one is false at
+   [v = uvm_maxsz]. *)
 Lemma uf_z_np_range (v : Z) :
-  0 <= v -> v + 4096 <= 274877898752 ->
+  0 <= v -> v <= 274877898752 ->
   (v + 4095) / 4096 * 4096 <= 274877898752.
 Proof.
   intros H0 H1.
-  pose proof (uf_z_np_le (v + 4095) ltac:(lia)) as H.
+  assert (Hq : (v + 4095) / 4096 < 67108863).
+  { apply Z.div_lt_upper_bound; lia. }
   lia.
 Qed.
 
@@ -137,7 +146,7 @@ Proof. lia. Qed.
 
 (* the size premise, as the no-wrap the two bridges below run on *)
 Lemma uf_no_wrap (sz : mword 64) :
-  uint sz + 4096 <= uvm_maxsz -> bv_unsigned sz + 4095 < 2 ^ 64.
+  uint sz <= uvm_maxsz -> bv_unsigned sz + 4095 < 2 ^ 64.
 Proof.
   intros Hb. apply z_maxsz_no_wrap.
   rewrite <- uint_unsigned. rewrite <- uvm_maxsz_val. clear -Hb. lia.
@@ -148,7 +157,7 @@ Qed.
    ([ProcPtOwn.pgroundup_quot]) is unconditional; only identifying the
    wrapped sum with [uint sz + 4095] needs the range premise. *)
 Lemma uf_np_shift (sz : mword 64) :
-  uint sz + 4096 <= uvm_maxsz ->
+  uint sz <= uvm_maxsz ->
   bv_unsigned (add_vec sz (mword_of_int 4095)) / 4096 = Z.of_nat (uvm_np sz).
 Proof.
   intros Hb.
@@ -165,11 +174,11 @@ Qed.
 (* ...and the whole run fits the user region, which is uvmunmap's range
    premise at [va = 0]. *)
 Lemma uf_np_range (sz : mword 64) :
-  uint sz + 4096 <= uvm_maxsz -> Z.of_nat (uvm_np sz) * 4096 <= uvm_maxsz.
+  uint sz <= uvm_maxsz -> Z.of_nat (uvm_np sz) * 4096 <= uvm_maxsz.
 Proof.
   intros Hb.
   assert (Hmax : uvm_maxsz = 274877898752) by (vm_compute; reflexivity).
-  assert (Hbz : bv_unsigned sz + 4096 <= 274877898752)
+  assert (Hbz : bv_unsigned sz <= 274877898752)
     by (rewrite -uint_unsigned -Hmax; exact Hb).
   assert (Hlo : 0 <= bv_unsigned sz) by exact (proj1 (bv_unsigned_in_range _ sz)).
   assert (Hn : Z.of_nat (uvm_np sz) = (bv_unsigned sz + 4095) / 4096).

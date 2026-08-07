@@ -5,7 +5,8 @@
 
    trapinit is a thin initlock wrapper, so it is an INSTANCE of the shape
    proved once in WpInitlockWrapper.v: all this file supplies is trapinit's
-   thirteen instructions (CodeTrapinit.tri_code) and the three relocations
+   thirteen instructions (CodeTrapinit.v, bundled as [tri_code] below) and the
+   three relocations
    -- a1 = &"time" (auipc 0x5 / addi -450), a0 = &tickslock (auipc 0x16 /
    addi -666), and the jal displacement to initlock. *)
 From Stdlib Require Import ZArith.
@@ -18,14 +19,42 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelDataInv.
-Require Import SpecInitlock WpInitlockWrapper.
-Require Import CodeTrapinit.
+Require Import SpecInitlock SpecInitlockWrapper WpInitlockWrapper.
+Require Import KernelText CodeTrapinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecTrapinit.
-Require Import CodeTrapinitAux.
 Local Open Scope Z_scope.
 Import Defs.
+
+Section CodeTrapinitBundle.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* trapinit's thirteen instructions (CodeTrapinit.v), in the
+     thin-initlock-wrapper pattern.  The five immediates are exactly what the
+     whole-function proof needs to know about trapinit's code. *)
+  Lemma tri_code :
+    kernel_text -∗ ilw_code KernelSyms.trapinit (mword_of_int 5) (mword_of_int 22)
+                            (mword_of_int 3632) (mword_of_int 3416) (mword_of_int 2090848).
+  Proof.
+    iIntros "#Ht". rewrite /ilw_code.
+    iSplitR; [iApply (tri_00 with "Ht")|].
+    iSplitR; [iApply (tri_02 with "Ht")|].
+    iSplitR; [iApply (tri_04 with "Ht")|].
+    iSplitR; [iApply (tri_06 with "Ht")|].
+    iSplitR; [iApply (tri_08 with "Ht")|].
+    iSplitR; [iApply (tri_0c with "Ht")|].
+    iSplitR; [iApply (tri_10 with "Ht")|].
+    iSplitR; [iApply (tri_14 with "Ht")|].
+    iSplitR; [iApply (tri_18 with "Ht")|].
+    iSplitR; [iApply (tri_1c with "Ht")|].
+    iSplitR; [iApply (tri_1e with "Ht")|].
+    iSplitR; [iApply (tri_20 with "Ht")|].
+    iApply (tri_22 with "Ht").
+  Qed.
+
+End CodeTrapinitBundle.
 
 Module TrapinitProof (Initlock : INITLOCK) : TRAPINIT.
 
@@ -56,8 +85,8 @@ Section ProofTrapinit.
     iPoseProof (kernel_data_string time_name_str "time"%string name eq_refl ltac:(unfold text_end, time_name_str; lia) Htime
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf Φ m K KernelSyms.trapinit
-              (mword_of_int 5) (mword_of_int 22) (mword_of_int 3646) (mword_of_int 3430)
-              (mword_of_int 2090862) lk name "time"%string vlock vname vcpu b p HK
+              (mword_of_int 5) (mword_of_int 22) (mword_of_int 3632) (mword_of_int 3416)
+              (mword_of_int 2090848) lk name "time"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

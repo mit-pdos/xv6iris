@@ -7,22 +7,33 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes WpDecodeBridge.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode.
-Require Import ExecCommon.
+Require Import KernelDecode00.
+Require Import KernelDecode04.
+Require Import KernelDecode07.
+Require Import KernelDecode10.
+Require Import KernelDecode13.
+Require Import KernelDecode14.
+Require Import KernelDecode15.
+Require Import KernelDecode16.
+Require Import KernelDecode17.
+Require Import KernelDecode19.
+Require Import KernelDecode21.
+Require Import KernelDecode25.
+Require Import KernelDecode26.
+Require Import KernelDecode27.
+Require Import KernelDecode28.
+Require Import KernelDecode29.
+Require Import KernelDecode30.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -73,9 +84,9 @@ Section CodeSysClose.
   Proof. mk_base (KernelSyms.sys_close + 0x18) (mword_of_int 0x02054163 : mword 32)
     (mword_of_int (KernelSyms.sys_close + 0x18) : mword 64) (BTYPE (mword_of_int 34 : mword 13, zreg, Regidx (mword_of_int 10), BLT)) kd_02054163. Qed.
 
-  Lemma sci_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) false (JAL (mword_of_int 2083888 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.sys_close + 0x1c) (mword_of_int 0xc31fc0ef : mword 32)
-    (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) (JAL (mword_of_int 2083888 : mword 21, Regidx (mword_of_int 1))) kd_c31fc0ef. Qed.
+  Lemma sci_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) false (JAL (mword_of_int 2083876 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.sys_close + 0x1c) (mword_of_int 0xc25fc0ef : mword 32)
+    (mword_of_int (KernelSyms.sys_close + 0x1c) : mword 64) (JAL (mword_of_int 2083876 : mword 21, Regidx (mword_of_int 1))) kd_c25fc0ef. Qed.
 
   Lemma sci_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.sys_close + 0x20) : mword 64) false (LOAD (mword_of_int 4076 : mword 12, Regidx (mword_of_int 8), Regidx (mword_of_int 15), false, 4)).
   Proof. mk_base (KernelSyms.sys_close + 0x20) (mword_of_int 0xfec42783 : mword 32)

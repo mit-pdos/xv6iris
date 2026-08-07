@@ -17,7 +17,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore RegFile WpMmodeLeafBase.
 Require Import HartTp WpNext IntrDefs.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr WpAuipc.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfCsr.
+Require Import RiscvExtras.
 Require Import CalleeSaved StackOwn.
 Require Import KernelRvcDecode.
 Require Import CodeTrapinithart.
@@ -132,13 +133,13 @@ Section TrapinithartBody.
     assert (Hp0c : add_vec_int (mword_of_int (KernelSyms.trapinithart + 0x08) : mword 64) 4 = mword_of_int (KernelSyms.trapinithart + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0c) in "Hpc".
     (* ============ +0x0c addi a5,a5,-14 : a5 := kernelvec ============ *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.trapinithart + 0x0c)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0xff2 : mword 12)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.trapinithart + 0x0c)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 0xff4 : mword 12)
               A0 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
-    set (A1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 0xff2 : mword 12)))]> A0).
+    set (A1 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 4084 : mword 12)))]> A0).
     assert (Ha5 : A1 !!! Regidx (mword_of_int 15 : mword 5) = (mword_of_int KernelSyms.kernelvec : mword 64)).
     { rewrite /A1 upd_eq. rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.trapinithart + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.trapinithart + 0x10)) by (apply bv_eq; vm_compute; reflexivity).

@@ -26,13 +26,11 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base.
 Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
-Require Import WpEntryNew WpStartNew.
+Require Import WpEntryNew WpTimerinit WpStartNew.
+Require Import WpGprMretWp WpGprCsrwA WpGprCsrwB.
 Require Import SpecEntry.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import CodeStart.
-Require Import CodeTimerinit.
-Require Import CodeEntry.
 Require Import CodeEntryAux.
 Require Import CodeStartAux.
 Require Import CodeTimerinitAux.
@@ -48,14 +46,22 @@ Section ProofEntry.
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 : mword 64)
       (mcounteren0 : mword 32)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
-      (n : nat) {dq : dfrac} :
+      (sp0 : mword 64) (n : nat) {dq : dfrac} :
     wp_entry_boot_body Φ m v_stack0 mhartid_in mepc0 satp0 medeleg0 mideleg0
-      mie0 menvcfg0 stimecmp0 mcounteren0 pmpcfg0 pmpaddr00 n dq.
+      mie0 menvcfg0 stimecmp0 mcounteren0 pmpcfg0 pmpaddr00 sp0 n dq.
   Proof.
     cbv beta delta [wp_entry_boot_body].
-    intros pcE pcMain sp0 Hn4 Hpmp HlpeE Hbnd_ra Hbnd_s0.
+    intros pcE pcMain Hsp0 Hn4 Hpmp Hmenv0 Hmie0 Hmdl0 Hbnd_ra Hbnd_s0.
     iIntros "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv Hmcen
              Hstc Hstk Hstko #Htext Hcont".
+    (* The contract's premises are stated in [MbootVocab]'s vocabulary; the
+       three M-mode lemmas want their own.  Convert once, here: this file is
+       the only place the two spellings meet. *)
+    assert (HlpeE : _get_MEnvcfg_LPE menvcfg0 = ('b"0"))
+      by (rewrite Hmenv0; vm_compute; reflexivity).
+    rewrite <- (ti_ea_ra_mb sp0) in Hbnd_ra.
+    rewrite <- (ti_ea_s0_mb sp0) in Hbnd_s0.
+    iEval (rewrite <- entry_ld_ea_mb) in "Hstk".
     (* ---- _entry: reset -> jal start (PC = 0x80000058) ---- *)
     iEval (change pcE with pc_e0) in "Hpc".
     iApply (wp_entry Φ m v_stack0 mhartid_in pmpcfg0 (dq := dq) Hpmp
@@ -78,19 +84,44 @@ Section ProofEntry.
               (m !!! Regidx ti_s0)
               mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 mhartid_in
               mcounteren0 pmpcfg0 pmpaddr00 n
-              Hn4 Hpmp HlpeE eq_refl HEra HEs0
+              Hn4 Hpmp HlpeE (eq_trans (m_jal_sp m v_stack0 mhartid_in) Hsp0) HEra HEs0
               Hbnd_ra Hbnd_s0
               with "Hmm Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
                     Hmcen Hstc Hstko Htext [Hcont Hstk]").
     iIntros (tv ms0 HoIE HoPRV HoSXL HoKF)
       "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
        Hmenv Hmcen Hstc Hstko".
-    (* ---- <main>, in S-mode: the composed continuation ---- *)
+    (* ---- <main>, in S-mode: the composed continuation ----
+       Here the M-mode symbolic execution is DISCHARGED into facts: the client
+       is handed the post-state as eleven opaque values plus the seven things
+       it consumes about them, and never sees [st_mout]'s tower again. *)
     iEval (change st_main with pcMain) in "Hpc".
     iEval (change st_main with pcMain) in "Hmepc".
-    iApply ("Hcont" $! tv ms0 HoIE HoPRV HoSXL HoKF
-              with "Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl
-                    Hmie Hmenv Hmcen Hstc Hstk Hstko").
+    iEval (rewrite entry_ld_ea_mb) in "Hstk".
+    destruct (st_boot_csr_facts menvcfg0 mie0 mideleg0 satp0 Hmenv0 Hmie0 Hmdl0)
+      as (Hmenvf & Hmief & Hsatpf).
+    iApply ("Hcont" $! (st_mout (m_jal m v_stack0 mhartid_in) sp0 ms0 mie0 mideleg0
+                          menvcfg0 mcounteren0 tv mhartid_in)
+                       (cms5 (st_ms1 ms0))
+                       (satp_legalized satp0 (mword_of_int 0))
+                       (legalize_medeleg medeleg0 st_ffff)
+                       (st_mdl1 mideleg0)
+                       (st_mie1 mie0 mideleg0)
+                       (menvcfg_legalized (st_menv_adue menvcfg0)
+                          (ti_menv1 (st_menv_adue menvcfg0)))
+                       (stimecmp_legalized stimecmp0 (ti_deadline tv))
+                       (legalize_mcounteren mcounteren0 (ti_mcen1 mcounteren0))
+                       (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00)
+              with "[] Hhs Hpriv Hms Hpcf Hpaddr Hpc Hfile Hmh Hmepc Hsatp Hmede
+                    Hmdl Hmie Hmenv Hmcen Hstc Hstk Hstko").
+    iPureIntro. split_and!.
+    - exact (st_mout_sp _ _ _ _ _ _ _ _ _).
+    - exact (st_mout_tp _ _ _ _ _ _ _ _ _).
+    - exact (st_boot_ms_kernel_facts ms0 HoKF).
+    - exact Hmenvf.
+    - exact Hmief.
+    - exact Hsatpf.
+    - exact (st_pmp_open pmpcfg0 pmpaddr00 Hpmp).
   Qed.
 
 End ProofEntry.

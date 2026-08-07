@@ -7,22 +7,28 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes WpDecodeBridge.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode.
-Require Import ExecCommon.
+Require Import KernelDecode01.
+Require Import KernelDecode06.
+Require Import KernelDecode07.
+Require Import KernelDecode08.
+Require Import KernelDecode11.
+Require Import KernelDecode13.
+Require Import KernelDecode14.
+Require Import KernelDecode19.
+Require Import KernelDecode20.
+Require Import KernelDecode23.
+Require Import KernelDecode24.
+Require Import KernelDecode28.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -49,9 +55,9 @@ Section CodePlicinithart.
   Proof. mk_rvc (KernelSyms.plicinithart + 0x6) (mword_of_int 0x0800 : mword 16)
     (mword_of_int (KernelSyms.plicinithart + 0x6) : mword 64) (ITYPE (caddi4spn_imm (mword_of_int 4 : mword 8), sp, creg2reg_idx (Cregidx (mword_of_int 0)), ADDI)) kd_0800 exec_execute_C_ADDI4SPN. Qed.
 
-  Lemma phi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) false (JAL (mword_of_int 2081840 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.plicinithart + 0x8) (mword_of_int 0xc30fc0ef : mword 32)
-    (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) (JAL (mword_of_int 2081840 : mword 21, Regidx (mword_of_int 1))) kd_c30fc0ef. Qed.
+  Lemma phi_08 : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) false (JAL (mword_of_int 2081826 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.plicinithart + 0x8) (mword_of_int 0xc22fc0ef : mword 32)
+    (mword_of_int (KernelSyms.plicinithart + 0x8) : mword 64) (JAL (mword_of_int 2081826 : mword 21, Regidx (mword_of_int 1))) kd_c22fc0ef. Qed.
 
   Lemma phi_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.plicinithart + 0xc) : mword 64) false (SHIFTIWOP (mword_of_int 8 : mword 5, Regidx (mword_of_int 10), Regidx (mword_of_int 14), SLLIW)).
   Proof. mk_base (KernelSyms.plicinithart + 0xc) (mword_of_int 0x0085171b : mword 32)

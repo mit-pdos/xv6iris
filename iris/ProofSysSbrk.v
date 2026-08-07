@@ -371,7 +371,7 @@ Section ProofSysSbrk.
     iEval (rewrite Hpp5c) in "Hpc".
     (* ---- +0x5c: jal ra,growproc ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_sbrk + 0x5c))
-              Rra (mword_of_int 2093686 : mword 21) G1 (av - 6)%nat b
+              Rra (mword_of_int 2093682 : mword 21) G1 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi5c [-]").
     iIntros (CIDb Hsb) "Hcg Hpc".
@@ -380,7 +380,7 @@ Section ProofSysSbrk.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_sbrk + 0x5c) : mword 64) 4)]> G1) with G2.
     assert (Hjmpgp : add_vec (mword_of_int (KernelSyms.sys_sbrk + 0x5c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2093686 : mword 21)) = mword_of_int KernelSyms.growproc)
+                       (sign_extend' 64 (mword_of_int 2093682 : mword 21)) = mword_of_int KernelSyms.growproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmpgp) in "Hpc".
     assert (HG2a0 : G2 !!! Regidx Ra0 = sign_extend' 64 nw).
@@ -813,7 +813,7 @@ Section ProofSysSbrk.
       rewrite (callee_saved_lookup HcsB r Hr). apply HthrA3; assumption. }
     (* ---- +0x1e: jal ra,myproc ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_sbrk + 0x1e))
-              Rra (mword_of_int 2092974 : mword 21) B (av - 6)%nat b
+              Rra (mword_of_int 2092962 : mword 21) B (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1e [-]").
     iIntros (CIDs12 Hq12) "Hcg Hpc".
@@ -822,7 +822,7 @@ Section ProofSysSbrk.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_sbrk + 0x1e) : mword 64) 4)]> B) with B1.
     assert (Hjmpmp : add_vec (mword_of_int (KernelSyms.sys_sbrk + 0x1e) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2092974 : mword 21)) = mword_of_int KernelSyms.myproc)
+                       (sign_extend' 64 (mword_of_int 2092962 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmpmp) in "Hpc".
     assert (HB1sp : B1 !!! Regidx csp_rs1 = pa_stk sp0 6)
@@ -1266,7 +1266,7 @@ Section ProofSysSbrk.
     iEval (rewrite Hpp48) in "Hpc".
     (* ---- +0x48: the SECOND myproc() ---- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_sbrk + 0x48))
-              Rra (mword_of_int 2092932 : mword 21) L4 (av - 6)%nat b
+              Rra (mword_of_int 2092920 : mword 21) L4 (av - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi48 [-]").
     iIntros (CIDs30 Hq30) "Hcg Hpc".
@@ -1275,7 +1275,7 @@ Section ProofSysSbrk.
     change (<[Regidx Rra := regval_into_reg
               (add_vec_int (mword_of_int (KernelSyms.sys_sbrk + 0x48) : mword 64) 4)]> L4) with L5.
     assert (Hjmpmp2 : add_vec (mword_of_int (KernelSyms.sys_sbrk + 0x48) : mword 64)
-                        (sign_extend' 64 (mword_of_int 2092932 : mword 21)) = mword_of_int KernelSyms.myproc)
+                        (sign_extend' 64 (mword_of_int 2092920 : mword 21)) = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmpmp2) in "Hpc".
     assert (HL5sp : L5 !!! Regidx csp_rs1 = pa_stk sp0 6)

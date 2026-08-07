@@ -379,12 +379,12 @@ Section ProofUvmcreate.
     assert (Hp0a : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0a) in "Hpc".
     (* +0x0a jal kalloc *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uvmcreate + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095436 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uvmcreate + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095434 : mword 21)
               W2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0a [-]").
     iIntros (CID6 Hs6) "Hcg Hpc".
     set (J := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) 4)]> W2).
-    assert (Htgtk : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095436 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Htgtk : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x0a) : mword 64) (sign_extend' 64 (mword_of_int 2095434 : mword 21)) = mword_of_int KernelSyms.kalloc) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtk) in "Hpc".
     iDestruct "Henv" as (γk) "(#Hlock & Havail & #Hpanic)".
     assert (HJ4 : J !!! Regidx (mword_of_int 4 : mword 5) = mm !!! Regidx (mword_of_int 4)).
@@ -518,12 +518,12 @@ Section ProofUvmcreate.
     assert (Hp16 : add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x14) : mword 64) 2 = mword_of_int (KernelSyms.uvmcreate + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp16) in "Hpc".
     (* +0x16 jal memset *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uvmcreate + 0x16)) (mword_of_int 1 : mword 5) (mword_of_int 2095834 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uvmcreate + 0x16)) (mword_of_int 1 : mword 5) (mword_of_int 2095832 : mword 21)
               M3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16 [-]").
     iIntros (CID12 Hs12) "Hcg Hpc".
     set (M4 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) 4)]> M3).
-    assert (Htgtm : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) (sign_extend' 64 (mword_of_int 2095834 : mword 21)) = mword_of_int KernelSyms.memset) by (apply bv_eq; vm_compute; reflexivity).
+    assert (Htgtm : add_vec (mword_of_int (KernelSyms.uvmcreate + 0x16) : mword 64) (sign_extend' 64 (mword_of_int 2095832 : mword 21)) = mword_of_int KernelSyms.memset) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtm) in "Hpc".
     (* memset(root, 0, 4096): bridge page_own to the per-byte buffer.
        memset's OWN a1/a2 premises stay plain [!!!] lookups (concrete

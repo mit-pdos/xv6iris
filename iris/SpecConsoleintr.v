@@ -40,7 +40,6 @@ Require Import SmodeCore.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import InstrBytes KernelText.
-Require Import CodeMycpu.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import CalleeSaved.
@@ -50,7 +49,6 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
-Require Import CodeMycpuAux.
 (* consoleintr's own frame plus its deepest callee (wakeup, 18). *)
 Definition consoleintr_stack : nat := 32%nat.
 

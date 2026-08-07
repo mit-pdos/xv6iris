@@ -37,7 +37,6 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import InstrBytes.
-Require Import WpAuipc.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
@@ -69,7 +68,7 @@ Module PipeallocProof (Filealloc : FILEALLOC) (Kalloc : KALLOC)
                       (Initlock : INITLOCK) (Fileclose : FILECLOSE) : PIPEALLOC.
 
 Section ProofPipealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !pipeG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
@@ -998,14 +997,14 @@ Section ProofPipealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp2c) in "Hpc".
     (* +0x2c jal ra,kalloc *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0x2c)) Rra (mword_of_int 0x1fc784 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0x2c)) Rra (mword_of_int 0x1fc776 : mword 21)
               mD (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi2c [-]").
     iIntros (CID20 Hs20) "Hcg Hpc".
     set (mE := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64) 4)]> mD).
     assert (Htgtka : add_vec (mword_of_int (KernelSyms.pipealloc + 0x2c) : mword 64)
-                       (sign_extend' 64 (mword_of_int 0x1fc784 : mword 21))
+                       (sign_extend' 64 (mword_of_int 0x1fc776 : mword 21))
                      = mword_of_int KernelSyms.kalloc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtka) in "Hpc".
@@ -1306,7 +1305,7 @@ Section ProofPipealloc.
     iIntros (CID29 Hs29) "Hcg Hpc Hnr". iEval (rgne) in "Hnr".
     iEval (rewrite -Hnrad) in "Hnr".
     iEval (rewrite Hpp48) in "Hpc".
-    (* +0x48 auipc a1,0x3 ; +0x4c addi a1,a1,466 -- a1 := "pipe" *)
+    (* +0x48 auipc a1,0x3 ; +0x4c addi a1,a1,472 -- a1 := "pipe" *)
     iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0x48)) Ra1 (mword_of_int 3 : mword 20)
               G2 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi48 [-]").
@@ -1317,12 +1316,12 @@ Section ProofPipealloc.
     assert (Hpp4c : add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x48) : mword 64) 4 = mword_of_int (KernelSyms.pipealloc + 0x4c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4c) in "Hpc".
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0x4c)) Ra1 Ra1 (mword_of_int 0x1d2 : mword 12)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0x4c)) Ra1 Ra1 (mword_of_int 0x1c4 : mword 12)
               G3 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi4c [-]").
     iIntros (CID31 Hs31) "Hcg Hpc". iEval (rgne) in "Hcg".
     set (G4 := <[Regidx Ra1 := regval_into_reg
-                  (add_vec (G3 !!! Regidx Ra1) (sign_extend' 64 (mword_of_int 0x1d2 : mword 12)))]> G3).
+                  (add_vec (G3 !!! Regidx Ra1) (sign_extend' 64 (mword_of_int 452 : mword 12)))]> G3).
     assert (HG4a1 : G4 !!! Regidx Ra1 = (mword_of_int pipe_name_str : mword 64)).
     { rewrite /G4 upd_eq /G3 upd_eq. unfold pipe_name_str.
       apply bv_eq; vm_compute; reflexivity. }
@@ -1353,14 +1352,14 @@ Section ProofPipealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp50) in "Hpc".
     (* +0x50 jal ra,initlock *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0x50)) Rra (mword_of_int 0x1fc7ba : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.pipealloc + 0x50)) Rra (mword_of_int 0x1fc7ac : mword 21)
               G4 (K - 6)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi50 [-]").
     iIntros (CID32 Hs32) "Hcg Hpc".
     set (G5 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64) 4)]> G4).
     assert (Htgtil : add_vec (mword_of_int (KernelSyms.pipealloc + 0x50) : mword 64)
-                       (sign_extend' 64 (mword_of_int 0x1fc7ba : mword 21))
+                       (sign_extend' 64 (mword_of_int 0x1fc7ac : mword 21))
                      = mword_of_int KernelSyms.initlock)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtil) in "Hpc".
@@ -1433,10 +1432,45 @@ Section ProofPipealloc.
       rewrite (callee_saved_lookup HcsH_cs c Hcs). apply HG5thr; assumption. }
     iDestruct (sie_cap_gpr_x0 mH (K - 6)%nat b p Rz ltac:(vm_compute; reflexivity) with "Hcg")
       as "[%HHx0 Hcg]".
-    iDestruct "Href0" as "[Htok0 Hf0]".
+    iDestruct "Href0" as "(Htok0 & Hf0 & Hpay0)".
     iDestruct "Hf0" as "(Hty0 & Hrd0 & Hwr0 & Hpp0 & Hip0 & Hoff0 & Hmaj0)".
-    iDestruct "Href1" as "[Htok1 Hf1]".
+    iDestruct "Href1" as "(Htok1 & Hf1 & Hpay1)".
     iDestruct "Hf1" as "(Hty1 & Hrd1 & Hwr1 & Hpp1 & Hip1 & Hoff1 & Hmaj1)".
+    (* ---- PUBLISHING THE PAYLOAD ----
+       The eight stores below turn two FD_NONE slots into the two ends of
+       [pi].  On the ghost side that is one step per slot: overwrite the
+       payload-names field with the pipe's names, which the holder of the
+       ONLY reference may do with no lock held ([fpay_tok_update]) -- and
+       that is the whole reason those names are not on the ftable
+       authority.  Both [file_pay]s are built HERE, at their FINAL contents,
+       because the payload is a function of the content and nothing between
+       here and the epilogue can touch it. *)
+    iDestruct "Hpay0" as (pn0) "[Hpn0 _]".
+    iDestruct "Hpay1" as (pn1) "[Hpn1 _]".
+    iMod (fpay_tok_update γf k0 pn0 (MkFPNames γpl γp) with "Hpn0") as "Hpn0".
+    iMod (fpay_tok_update γf k1 pn1 (MkFPNames γpl γp) with "Hpn1") as "Hpn1".
+    iAssert (file_pay γf k0 1
+               (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
+                  (mword_of_int 0 : mword 8) pi
+                  (fc_ip Cf0) (fc_off Cf0) (fc_major Cf0)))
+      with "[Hpn0 Hrd]" as "Hpay0".
+    { iExists (MkFPNames γpl γp). iFrame "Hpn0".
+      rewrite /file_payload /fc_wbool; cbn [fc_type fc_pipe fc_writable].
+      rewrite bool_decide_eq_true_2; [|reflexivity].
+      rewrite (_ : negb (eq_vec (mword_of_int 0 : mword 8) (mword_of_int 0 : mword 8))
+                   = false); [|vm_compute; reflexivity].
+      cbn [fp_lock fp_pipe]. iSplitR; [iExact "Hpipe"|iExact "Hrd"]. }
+    iAssert (file_pay γf k1 1
+               (MkFContent FD_PIPE (mword_of_int 0 : mword 8)
+                  (mword_of_int 1 : mword 8) pi
+                  (fc_ip Cf1) (fc_off Cf1) (fc_major Cf1)))
+      with "[Hpn1 Hwr]" as "Hpay1".
+    { iExists (MkFPNames γpl γp). iFrame "Hpn1".
+      rewrite /file_payload /fc_wbool; cbn [fc_type fc_pipe fc_writable].
+      rewrite bool_decide_eq_true_2; [|reflexivity].
+      rewrite (_ : negb (eq_vec (mword_of_int 1 : mword 8) (mword_of_int 0 : mword 8))
+                   = true); [|vm_compute; reflexivity].
+      cbn [fp_lock fp_pipe]. iSplitR; [iExact "Hpipe"|iExact "Hwr"]. }
     (* +0x54 load the file pointer, +0x56 store the field *)
     assert (Hld54 : pf0 = add_vec (mH !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))).
     { rewrite (_ : mH !!! Regidx Rs1 = pf0); [symmetry; apply addv_sext0 | assumption]. }
@@ -1887,7 +1921,7 @@ Section ProofPipealloc.
     { iExists (mD !!! Regidx Rs2), (m !!! Regidx Rs3). iFrame "Hr16 Hr8". }
     rewrite /pipealloc_post. iRight.
     iSplitR; [done|]. iFrame "Hav".
-    iExists γpl, γp, pi, k0, k1,
+    iExists pi, k0, k1,
       (MkFContent FD_PIPE (mword_of_int 1 : mword 8) (mword_of_int 0 : mword 8) pi
          (fc_ip Cf0) (fc_off Cf0) (fc_major Cf0)),
       (MkFContent FD_PIPE (mword_of_int 0 : mword 8) (mword_of_int 1 : mword 8) pi
@@ -1895,10 +1929,11 @@ Section ProofPipealloc.
     iSplitR; [iPureIntro; split; assumption|].
     iSplitR; [iPureIntro; rewrite /pipe_file; cbn; repeat split; reflexivity|].
     iSplitR; [iPureIntro; rewrite /pipe_file; cbn; repeat split; reflexivity|].
-    iFrame "Hc0 Hc1 Hpipe Hrd Hwr".
-    rewrite /file_ref /file_fields; cbn.
-    iFrame "Htok0 Hty0 Hrd0 Hwr0 Hpp0 Hip0 Hoff0 Hmaj0".
-    iFrame "Htok1 Hty1 Hrd1 Hwr1 Hpp1 Hip1 Hoff1 Hmaj1".
+    iFrame "Hc0 Hc1".
+    rewrite /file_ref /file_fields; cbn [fc_type fc_readable fc_writable
+                                          fc_pipe fc_ip fc_off fc_major].
+    iFrame "Htok0 Hty0 Hrd0 Hwr0 Hpp0 Hip0 Hoff0 Hmaj0 Hpay0".
+    iFrame "Htok1 Hty1 Hrd1 Hwr1 Hpp1 Hip1 Hoff1 Hmaj1 Hpay1".
   Qed.
 
 End ProofPipealloc.

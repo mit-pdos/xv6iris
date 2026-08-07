@@ -12,7 +12,7 @@
        return 0;
      }
 
-   @ KernelSyms.argfd = 0x80004a0a, 29 instructions (a 48-byte frame; the
+   @ KernelSyms.argfd = 0x80004a04, 29 instructions (a 48-byte frame; the
    [int fd] local lives at s0-36, which is why the caller's [pfd] is a
    SEPARATE cell from the one argint writes).
 

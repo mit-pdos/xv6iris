@@ -7,22 +7,26 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes WpDecodeBridge.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode.
-Require Import ExecCommon.
+Require Import KernelDecode04.
+Require Import KernelDecode07.
+Require Import KernelDecode10.
+Require Import KernelDecode12.
+Require Import KernelDecode13.
+Require Import KernelDecode14.
+Require Import KernelDecode15.
+Require Import KernelDecode17.
+Require Import KernelDecode19.
+Require Import KernelDecode21.
+Require Import KernelDecode29.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -57,9 +61,9 @@ Section CodeSetkilled.
   Proof. mk_rvc (KernelSyms.setkilled + 0xa) (mword_of_int 0x84aa : mword 16)
     (mword_of_int (KernelSyms.setkilled + 0xa) : mword 64) (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 9), ADD)) kd_84aa exec_execute_C_MV. Qed.
 
-  Lemma ski_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.setkilled + 0xc) : mword 64) false (JAL (mword_of_int 2091742 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.setkilled + 0xc) (mword_of_int 0xadffe0ef : mword 32)
-    (mword_of_int (KernelSyms.setkilled + 0xc) : mword 64) (JAL (mword_of_int 2091742 : mword 21, Regidx (mword_of_int 1))) kd_adffe0ef. Qed.
+  Lemma ski_0c : kernel_text -∗ instr (mword_of_int (KernelSyms.setkilled + 0xc) : mword 64) false (JAL (mword_of_int 2091732 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.setkilled + 0xc) (mword_of_int 0xad5fe0ef : mword 32)
+    (mword_of_int (KernelSyms.setkilled + 0xc) : mword 64) (JAL (mword_of_int 2091732 : mword 21, Regidx (mword_of_int 1))) kd_ad5fe0ef. Qed.
 
   Lemma ski_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.setkilled + 0x10) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 15), ADDI)).
   Proof. mk_rvc (KernelSyms.setkilled + 0x10) (mword_of_int 0x4785 : mword 16)
@@ -73,9 +77,9 @@ Section CodeSetkilled.
   Proof. mk_rvc (KernelSyms.setkilled + 0x14) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.setkilled + 0x14) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma ski_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) false (JAL (mword_of_int 2091868 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.setkilled + 0x16) (mword_of_int 0xb5dfe0ef : mword 32)
-    (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) (JAL (mword_of_int 2091868 : mword 21, Regidx (mword_of_int 1))) kd_b5dfe0ef. Qed.
+  Lemma ski_16 : kernel_text -∗ instr (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) false (JAL (mword_of_int 2091858 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.setkilled + 0x16) (mword_of_int 0xb53fe0ef : mword 32)
+    (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) (JAL (mword_of_int 2091858 : mword 21, Regidx (mword_of_int 1))) kd_b53fe0ef. Qed.
 
   Lemma ski_1a : kernel_text -∗ instr (mword_of_int (KernelSyms.setkilled + 0x1a) : mword 64) true (LOAD (zero_extend' 12 (concat_vec (mword_of_int 3 : mword 6) ('b"000")), sp, Regidx (mword_of_int 1), false, 8)).
   Proof. mk_rvc (KernelSyms.setkilled + 0x1a) (mword_of_int 0x60e2 : mword 16)

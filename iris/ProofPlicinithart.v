@@ -212,7 +212,7 @@ Section ProofPlicinithart.
        own now-[b = false] contract, so the call's continuation is entered
        directly. ---- *)
     iApply (Cpuid.wp_call_cpuid_sconf_cs Φ (mword_of_int (KernelSyms.plicinithart + 0x08))
-              (mword_of_int 2081840 : mword 21) m2 (n - 2)%nat p
+              (mword_of_int 2081826 : mword 21) m2 (n - 2)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity)
               ltac:(lia)

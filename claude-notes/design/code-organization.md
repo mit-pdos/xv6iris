@@ -43,8 +43,9 @@
     the map lookup is still folded), never with an inline `bv_wrap_add_idemp_l`
     /`bv_wrap_add_modulus_1` block: **do not re-derive it.** A new instance is
     one line off the general form.
-  - **What is where, and what duplication is left** (tree-wide statement scan, 2026-08-03). Every instruction word with a decode lemma in more than one file has exactly one proof — `cdec_<word>` in `KernelRvcDecode.v`, `bdec_<word>` in `KernelBaseDecode.v` — and each of these pure identities has exactly one home: `add_vec_zero_l` (`WpMmodeLeafBase.v`); `frame_cancel*`, `po_addv_assoc`, `creg_c1`/`creg_c2`/`creg_c7` (`KernelRvcDecode.v`); `add_vec64_unsigned`, `sub_vec64_unsigned`, `moi64_unsigned`, `moi64_small`, `moi64_mod`, `addv_sext0`, `add_vec64_comm`, `bv_modulus64`, `uint_unsigned`, `subrange_dec_unsigned{,_lo0}` (`RiscvExtras.v`). Grep the STATEMENT, not the name, before proving any of these again.
-    Still outstanding, all found the same way: (a) `exec_jump_to_zca` has five copies outside `ExecCommon.v`, `exec_execute_JALR_ret_zca` two outside `WpMmodeLeafBase.v`, and the `Ext_U` / `Ext_Sstc` `hartSupports`/`currentlyEnabled` facts three each. (b) The sp push/pop pairs (`add_vec X <-N> = pa_stk X (N/8)` and its inverse) are re-proved per function — four copies at frame 48, four at 32 — and belong next to `pa_stk` in `StackOwn.v`. (c) `uint_pa_add`, `mword_of_int_uint`, `and_vec_unsigned` and `add_vec_int`-small have three homes each. (d) Ten `Proof<F>.v` files still `assert (add_vec_unsigned : …)` inline instead of using `RiscvExtras.add_vec64_unsigned`.
+  - **What is where, and what duplication is left** (tree-wide statement scan, 2026-08-03). Every instruction word with a decode lemma in more than one file has exactly one proof — `cdec_<word>` in `KernelRvcDecode.v`, `bdec_<word>` in `KernelBaseDecode.v` — and each of these pure identities has exactly one home: `add_vec_zero_l` (`WpMmodeLeafBase.v`); `frame_cancel*`, `po_addv_assoc`, `creg_c1`/`creg_c2`/`creg_c7` (`KernelRvcDecode.v`); `add_vec64_unsigned`, `sub_vec64_unsigned`, `moi64_unsigned`, `moi64_small`, `moi64_mod`, `addv_sext0`, `add_vec64_comm`, `bv_modulus64`, `uint_unsigned`, `subrange_dec_unsigned{,_lo0}`, `auipc_off`, `eq_vec_refl` (`RiscvExtras.v`).
+    `auipc_off` in particular is a *definition*, and it lived in `WpAuipc.v` — a weakest precondition — until every closed-form return-value definition that mentions an auipc/addi pair (`ProcGeom.mycpu_ret` is the one with ~20 consumers) had to import a WP to be stated. Pure vocabulary a SPEC is written in must sit below every WP; see [`spec-modules.md`](spec-modules.md). Grep the STATEMENT, not the name, before proving any of these again.
+    Still outstanding, all found the same way: (a) `exec_jump_to_zca` has five copies outside `ExecCommon.v`, `exec_execute_JALR_ret_zca` two outside `WpMmodeLeafBase.v`, and the `Ext_U` / `Ext_Sstc` `hartSupports`/`currentlyEnabled` facts three each. (a′) `eq_vec x x = true` still has three private clones — `kk_eq_vec_refl` (ProofKkill), `ci_eq_vec_refl` (ProofClockintr), `su_eq_vec_refl` (ProofSysUptime, *unused*) — all one-line instances of `RiscvExtras.eq_vec_refl`; and `trunc32 (sign_extend' 64 w) = w` is stated twice, as `RiscvExtras.trunc32_sext64` and `VcGen.trunc32_sext`. (b) The sp push/pop pairs (`add_vec X <-N> = pa_stk X (N/8)` and its inverse) are re-proved per function — four copies at frame 48, four at 32 — and belong next to `pa_stk` in `StackOwn.v`. (c) `uint_pa_add`, `mword_of_int_uint`, `and_vec_unsigned` and `add_vec_int`-small have three homes each. (d) Ten `Proof<F>.v` files still `assert (add_vec_unsigned : …)` inline instead of using `RiscvExtras.add_vec64_unsigned`.
     **`VirtioQueue.v` is the one file that legitimately keeps private copies** (`vq_add_vec_unsigned`, `vq_moi_unsigned`, `vq_mod64`): it uses `rewrite … by`, so it cannot import `RiscvExtras.v`, which pulls in ssreflect via `iris.program_logic`. Do not "fix" it.
   - Rule of thumb before adding a `Require Import` of a `Wp<Function>.v` file: if you only need a bits-/index-/offset-keyed fact from it, that fact is misfiled — relocate it down, don't import the function proof up.
   - **The rule binds hardest on *definitions*.** `MstatusBits.v` (the pure mstatus transform theory: `trap_ms`, `sret_ms1..5`, `sret_newpriv`, `sret_tgt` + their field lemmas and the trap/SRET round trip) contains no Iris and no WP; it sits at the bottom of the graph, holds the `sret_ms*` `Definition`s itself, and `WpSmodeSret.v` requires it. Putting those definitions in the WP file instead would cost ~9 s of critical path, because it puts the whole S-mode WP tower (`InstrBytes → WpGprCsrwB → SmodePte → SmodeCore → WpSmodeSret`) in front of every user-mode proof. **When a pure-theory file needs a `Require` of a WP file, the definitions are in the wrong place — move them down to the theory, don't move the theory up.**
@@ -52,6 +53,58 @@
   - **A `Wp` prefix on a file means "holds a weakest precondition" — check before you trust it, and do not relocate a fact INTO a misnamed file.** `ExecCommon.v` holds only Sail symbolic-executor reduction facts — `exec e s = Some (v, s')`, the instruction-word constants they are keyed by, and the dispatch-peeling tactics — with no `WP`, no `iProp`, no separation connective anywhere. It is the home for a model fact that mentions no privilege mode and no instruction family (`exec_architecture_Supervisor` is there): parking such a fact in a family WP file like `WpGprCsrwB.v` puts that family in front of everything the fact's other users need — worth ~19 s of critical path in that one case. **23 `Wp*.v` files hold no WP at all** — a content scan (`grep -cw WP` plus "declares a `wp_*` lemma"), not the file name, is the only way to tell; among them `WpDecode`, `WpDecodeBridge`, `WpRvcBridge`, `WpGprCsrrCommon`, `WpGprCsrwCommon`, `WpGprMret`, `WpAmo`, `WpPlicExec`, `WpSmodeUart`, `WpSmodeMemGen`, `WpSmodeGpr`, `WpSmodeLeafBase`, `WpSieFlipBits`, `WpIntenaBits`. Rename them as you touch them, and never take the prefix as evidence that a file is WP-level. Every decode word now lives in a `Code<F>.v` or in one of the two shared catalogs.
   - **A dead `Require` costs a DAG edge, not CPU.** A `Require` of a file none of whose names are used is worth ~0.5 s of load (measured isolated); delete such lines to keep the dependency graph honest — but do not expect a CPU win, and check whether the edge was on a tail before claiming a wall win.
   - **A whole-function proof file (`Proof<Function>.v`) must contain only the function's body/chunk/whole-function WPs — never a single-instruction leaf WP.** Base ALU leaves go in `WpSconfAlu.v` (e.g. `wp_lui_s_sconf`, `wp_andi_s_sconf`); call-site-specialized **device-access** leaves (one MMIO instruction, geometry pre-discharged) go in a leaf **functor over the device module** — e.g. `WpSconfUartAccess.v`'s `UartAccessProof (Uart : UART)` holding `wp_uart_lsr_read_s_sconf` / `wp_uart_thr_write_s_sconf`, which a function proof instantiates with `Module UAcc := UartAccessProof Uart.`. Don't clone a leaf locally when a more general one already exists at the right altitude (the general `wp_andi_s_sconf` is wval-parametric; pass `_` + `eq_refl`).
+
+## A hand-written decode layer beside a generated one: convert, don't restate
+
+`Code<F>.v` is generated (`make gen-code`) and states each instruction's
+`instr` fact with the encoding word and every decoded immediate as literals
+read off the tracked dump. Three functions — `_entry`, `start`, `timerinit` —
+also had a **complete hand-written duplicate** in `Code<F>Aux.v`: 68 `instr`
+facts, 59 `<f>_decodeN` word-keyed decode templates, and private copies of the
+encoding words, all predating the generator. The M-mode WPs were written in the
+hand-written *operand vocabulary* (`i9`, `si52`, `ti_a5`, `imm_caddi`, …), not
+in literals, so the duplicate could not simply be deleted.
+
+**The move that dissolves it is a conversion, not a rewrite.** The two
+statements differ only in spelling — `sign_extend' 12 i9` vs
+`sign_extend' 12 (mword_of_int 48 : mword 6)`, `Regidx csp_rs1` vs
+`Regidx (mword_of_int 2)` — and Rocq's conversion sees through both, so each
+hand-written fact becomes one line:
+
+```coq
+Lemma ti_instr9 :
+  kernel_text -∗ instr ti_pc9 true (ITYPE (sign_extend' 12 i9, Regidx csp_rs1, Regidx csp_rs1, ADDI)).
+Proof. exact tmi_00. Qed.
+```
+
+All 68 went through unchanged (21 timerinit + 39 start + 8 `_entry`), after
+which the decode templates and 55 encoding-word `Definition`s were dead, and
+`CodeEntryAux.v` also gave up **fifteen empty `Section` husks** — `Context` /
+`Hypothesis` / `Let` scaffolding whose lemmas earlier cleanups had already
+removed. 902 → 729 lines across the three files, and `CodeEntryAux.v` alone
+455 → 154.
+
+**The conversion is also the staleness check, and that is the reason to prefer
+it to deleting the vocabulary.** The hand-written operand constants are now
+checked against the dump on every build: an upstream bump that re-encodes an
+instruction updates the generated literal, and the `exact` stops typechecking —
+a loud failure, where a private copy of a word just goes quietly stale. So the
+rule for a hand-written layer that survives beside a generated one is: keep
+whatever vocabulary the proofs are written in, and make every fact a
+`Proof. exact <generated>. Qed.` so the two are pinned together.
+
+Two related things this turned up:
+
+- **`make check-decode` diffs the MANIFEST's outputs, not the `iris/Code*.v`
+  glob.** The glob also sweeps the hand-written `Code<F>Aux.v`, so any
+  uncommitted edit to one of those failed the target with a diff that had
+  nothing to do with the dump (it fired twice on unrelated work before being
+  narrowed).
+- `CodeStartAux.v` still imports `CodeTimerinitAux.v`, but now only for the
+  register indices and frame immediates the two functions genuinely share
+  (same 16-byte frame, same registers) — not for words. That is the residue of
+  the "no `Code<F>.v` imports another function's" rule, and the fix when it
+  next matters is to move those constants down, not to re-copy them.
 
 ## Two literals in every decode site are the IMAGE's, not the proof's
 
@@ -95,6 +148,32 @@ by hand** (`make check-decode` / `make update-decode`):
 The compressed jumps (`c.j`, `c.beqz`/`c.bnez`) carry relocated immediates too
 and are handled; every other compressed displacement is a stack or struct
 offset that no relayout moves.
+
+Two invariants of `tools/gen_code.py` and its `tools/code_manifest.json`:
+
+- **The manifest's lemma-prefix column must be unique per function.** Prefixes
+  are initials, so collisions are easy (`printk` and `printkinit` both had
+  `pki_`, making `CodePrintk.pki_00` and `CodePrintkinit.pki_00` differ only by
+  which file a proof imported last). Nothing errors — a proof just silently
+  steps the wrong function's instruction. Check the column when adding a row.
+- **`--only` restricts the `Code<F>.v` files, never `KernelDecode*.v`.** The
+  shards are keyed by WORD over the *whole* covered set, so they are always
+  computed from every group; deriving them from a restricted set would rewrite
+  all sixteen with one function's handful of words. The same shape applies to
+  anything else the generator keys globally.
+- **A generated file's imports are derived from its own body, not a fixed
+  header** (`COMMON_IMPORTS` / `CODE_IMPORTS` / `SHARD_IMPORTS` /
+  `NAME_IMPORTS` + `code_imports` in the generator). A `Code<F>.v` therefore
+  names the `KernelDecode<NN>` shards holding *its* words rather than the
+  `KernelDecode` facade — which is also what keeps a re-dump that lands in one
+  shard off everyone else's dependency list — and conditional imports
+  (`ExecCommon` for a MUL, the two decode-bridge tactic files) appear only in
+  the files that use them. Nothing excludes generated files from the nightly
+  dead-import sweep, so exactness here is what keeps the sweep from rewriting
+  the generator's output; if a sweep commit ever touches a generated file,
+  fix the import table rather than the sweep. Note that the four
+  `Code*Aux.v` files are hand-written and are legitimately in the sweep's
+  scope.
 
 ## Specific-vs-generic leaf lemmas
 

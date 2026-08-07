@@ -33,7 +33,6 @@ Local Open Scope Z_scope.
 Require Import Riscv.rv64d.
 Require Import SpecMemset.
 Require Import KernelRvcDecode.
-Require Import CodeMemsetAux.
 Import Defs.
 
 Module MemsetArrayProof (Memset : MEMSET_PARTS) : MEMSET.
@@ -67,15 +66,15 @@ Section WpMemsetArray.
     { unfold sp', imm_entry, pa_stk, add_vec_int. apply f_equal.
       apply bv_eq; vm_compute; reflexivity. }
     iIntros "Hcg #Htext Hpc Hbuf Hcont".
-    iPoseProof (minstr_cba with "Htext") as "Hi0".
-    iPoseProof (minstr_cbc with "Htext") as "Hi2".
-    iPoseProof (minstr_cbe with "Htext") as "Hi4".
-    iPoseProof (minstr_cc0 with "Htext") as "Hi6".
-    iPoseProof (minstr_cc2 with "Htext") as "Hi8".
-    iPoseProof (minstr_cd8 with "Htext") as "HiL0".
-    iPoseProof (minstr_cda with "Htext") as "HiL2".
-    iPoseProof (minstr_cdc with "Htext") as "HiL4".
-    iPoseProof (minstr_cde with "Htext") as "HiL6".
+    iPoseProof (minstr_000 with "Htext") as "Hi0".
+    iPoseProof (minstr_002 with "Htext") as "Hi2".
+    iPoseProof (minstr_004 with "Htext") as "Hi4".
+    iPoseProof (minstr_006 with "Htext") as "Hi6".
+    iPoseProof (minstr_008 with "Htext") as "Hi8".
+    iPoseProof (minstr_01e with "Htext") as "HiL0".
+    iPoseProof (minstr_020 with "Htext") as "HiL2".
+    iPoseProof (minstr_022 with "Htext") as "HiL4".
+    iPoseProof (minstr_024 with "Htext") as "HiL6".
     (* --- HEAD: 0x00..0x06 --- *)
     iApply (Memset.wp_memset_head_sconf Φ m0 n imm_entry nzimm_s0 b pcur Hn Hsp'
               with "Hcg Hpc Hi0 Hi2 Hi4 Hi6 [-]").
@@ -159,19 +158,19 @@ Section WpMemsetArray.
     { iApply (big_sepL_impl with "Hbuf0"). iIntros "!>" (k j _) "H".
       rewrite ms_pa_ms_addr. iExact "H". }
     (* --- prefix/loop/suffix instr resources --- *)
-    iPoseProof (minstr_cba with "Htext") as "Hi0".
-    iPoseProof (minstr_cbc with "Htext") as "Hi2".
-    iPoseProof (minstr_cbe with "Htext") as "Hi4".
-    iPoseProof (minstr_cc0 with "Htext") as "Hi6".
-    iPoseProof (minstr_cc2 with "Htext") as "Hi8".
-    iPoseProof (minstr_cc4 with "Htext") as "Hi10".
-    iPoseProof (minstr_cc6 with "Htext") as "Hi12".
-    iPoseProof (minstr_cc8 with "Htext") as "Hi14".
-    iPoseProof (minstr_cca with "Htext") as "Hi16".
-    iPoseProof (minstr_cd8 with "Htext") as "HiL0".
-    iPoseProof (minstr_cda with "Htext") as "HiL2".
-    iPoseProof (minstr_cdc with "Htext") as "HiL4".
-    iPoseProof (minstr_cde with "Htext") as "HiL6".
+    iPoseProof (minstr_000 with "Htext") as "Hi0".
+    iPoseProof (minstr_002 with "Htext") as "Hi2".
+    iPoseProof (minstr_004 with "Htext") as "Hi4".
+    iPoseProof (minstr_006 with "Htext") as "Hi6".
+    iPoseProof (minstr_008 with "Htext") as "Hi8".
+    iPoseProof (minstr_00a with "Htext") as "Hi10".
+    iPoseProof (minstr_00c with "Htext") as "Hi12".
+    iPoseProof (minstr_00e with "Htext") as "Hi14".
+    iPoseProof (minstr_010 with "Htext") as "Hi16".
+    iPoseProof (minstr_01e with "Htext") as "HiL0".
+    iPoseProof (minstr_020 with "Htext") as "HiL2".
+    iPoseProof (minstr_022 with "Htext") as "HiL4".
+    iPoseProof (minstr_024 with "Htext") as "HiL6".
     (* the value-coupling premises for the setup and the loop *)
     assert (Hn0 : eq_vec (m2 !!! Regidx a2_idx) zero_reg = false).
     { unfold m2, m1.
@@ -240,7 +239,7 @@ Section WpMemsetArray.
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
-              minstr_cce minstr_cd2 minstr_cd4
+              minstr_014 minstr_018 minstr_01a
               len 0%nat m6 ltac:(reflexivity) ltac:(lia) Hcur Hm4 Hm1
               with "Hcg Htext Hpc Hbuf [-]").
     iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hcg Hpc Hbuf".

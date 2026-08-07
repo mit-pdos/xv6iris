@@ -7,21 +7,40 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes WpDecodeBridge.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode.
+Require Import KernelDecode01.
+Require Import KernelDecode02.
+Require Import KernelDecode03.
+Require Import KernelDecode05.
+Require Import KernelDecode06.
+Require Import KernelDecode07.
+Require Import KernelDecode08.
+Require Import KernelDecode09.
+Require Import KernelDecode10.
+Require Import KernelDecode12.
+Require Import KernelDecode13.
+Require Import KernelDecode14.
+Require Import KernelDecode15.
+Require Import KernelDecode17.
+Require Import KernelDecode18.
+Require Import KernelDecode20.
+Require Import KernelDecode21.
+Require Import KernelDecode24.
+Require Import KernelDecode25.
+Require Import KernelDecode26.
+Require Import KernelDecode27.
+Require Import KernelDecode28.
+Require Import KernelDecode29.
+Require Import KernelDecode30.
+Require Import KernelDecode31.
 Require Import ExecCommon.
 Local Open Scope Z_scope.
 Import Defs.
@@ -77,57 +96,57 @@ Section CodeProcinit.
   Proof. mk_base (KernelSyms.procinit + 0x14) (mword_of_int 0x00006597 : mword 32)
     (mword_of_int (KernelSyms.procinit + 0x14) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00006597. Qed.
 
-  Lemma pii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x18) : mword 64) false (ITYPE (mword_of_int 2354 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.procinit + 0x18) (mword_of_int 0x93258593 : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x18) : mword 64) (ITYPE (mword_of_int 2354 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_93258593. Qed.
+  Lemma pii_18 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x18) : mword 64) false (ITYPE (mword_of_int 2352 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.procinit + 0x18) (mword_of_int 0x93058593 : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x18) : mword 64) (ITYPE (mword_of_int 2352 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_93058593. Qed.
 
   Lemma pii_1c : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x1c) : mword 64) false (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.procinit + 0x1c) (mword_of_int 0x00011517 : mword 32)
     (mword_of_int (KernelSyms.procinit + 0x1c) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00011517. Qed.
 
-  Lemma pii_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x20) : mword 64) false (ITYPE (mword_of_int 2834 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.procinit + 0x20) (mword_of_int 0xb1250513 : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x20) : mword 64) (ITYPE (mword_of_int 2834 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_b1250513. Qed.
+  Lemma pii_20 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x20) : mword 64) false (ITYPE (mword_of_int 2832 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.procinit + 0x20) (mword_of_int 0xb1050513 : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x20) : mword 64) (ITYPE (mword_of_int 2832 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_b1050513. Qed.
 
-  Lemma pii_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x24) : mword 64) false (JAL (mword_of_int 2093898 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.procinit + 0x24) (mword_of_int 0xb4aff0ef : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x24) : mword 64) (JAL (mword_of_int 2093898 : mword 21, Regidx (mword_of_int 1))) kd_b4aff0ef. Qed.
+  Lemma pii_24 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x24) : mword 64) false (JAL (mword_of_int 2093896 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.procinit + 0x24) (mword_of_int 0xb48ff0ef : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x24) : mword 64) (JAL (mword_of_int 2093896 : mword 21, Regidx (mword_of_int 1))) kd_b48ff0ef. Qed.
 
   Lemma pii_28 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x28) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)).
   Proof. mk_base (KernelSyms.procinit + 0x28) (mword_of_int 0x00006597 : mword 32)
     (mword_of_int (KernelSyms.procinit + 0x28) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 11), AUIPC)) kd_00006597. Qed.
 
-  Lemma pii_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x2c) : mword 64) false (ITYPE (mword_of_int 2342 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
-  Proof. mk_base (KernelSyms.procinit + 0x2c) (mword_of_int 0x92658593 : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x2c) : mword 64) (ITYPE (mword_of_int 2342 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_92658593. Qed.
+  Lemma pii_2c : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x2c) : mword 64) false (ITYPE (mword_of_int 2340 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)).
+  Proof. mk_base (KernelSyms.procinit + 0x2c) (mword_of_int 0x92458593 : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x2c) : mword 64) (ITYPE (mword_of_int 2340 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 11), ADDI)) kd_92458593. Qed.
 
   Lemma pii_30 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x30) : mword 64) false (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 10), AUIPC)).
   Proof. mk_base (KernelSyms.procinit + 0x30) (mword_of_int 0x00011517 : mword 32)
     (mword_of_int (KernelSyms.procinit + 0x30) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00011517. Qed.
 
-  Lemma pii_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x34) : mword 64) false (ITYPE (mword_of_int 2838 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.procinit + 0x34) (mword_of_int 0xb1650513 : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x34) : mword 64) (ITYPE (mword_of_int 2838 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_b1650513. Qed.
+  Lemma pii_34 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x34) : mword 64) false (ITYPE (mword_of_int 2836 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.procinit + 0x34) (mword_of_int 0xb1450513 : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x34) : mword 64) (ITYPE (mword_of_int 2836 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_b1450513. Qed.
 
-  Lemma pii_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x38) : mword 64) false (JAL (mword_of_int 2093878 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.procinit + 0x38) (mword_of_int 0xb36ff0ef : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x38) : mword 64) (JAL (mword_of_int 2093878 : mword 21, Regidx (mword_of_int 1))) kd_b36ff0ef. Qed.
+  Lemma pii_38 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x38) : mword 64) false (JAL (mword_of_int 2093876 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.procinit + 0x38) (mword_of_int 0xb34ff0ef : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x38) : mword 64) (JAL (mword_of_int 2093876 : mword 21, Regidx (mword_of_int 1))) kd_b34ff0ef. Qed.
 
   Lemma pii_3c : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x3c) : mword 64) false (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)).
   Proof. mk_base (KernelSyms.procinit + 0x3c) (mword_of_int 0x00011497 : mword 32)
     (mword_of_int (KernelSyms.procinit + 0x3c) : mword 64) (UTYPE (mword_of_int 17 : mword 20, Regidx (mword_of_int 9), AUIPC)) kd_00011497. Qed.
 
-  Lemma pii_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x40) : mword 64) false (ITYPE (mword_of_int 3874 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
-  Proof. mk_base (KernelSyms.procinit + 0x40) (mword_of_int 0xf2248493 : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x40) : mword 64) (ITYPE (mword_of_int 3874 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_f2248493. Qed.
+  Lemma pii_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x40) : mword 64) false (ITYPE (mword_of_int 3872 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)).
+  Proof. mk_base (KernelSyms.procinit + 0x40) (mword_of_int 0xf2048493 : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x40) : mword 64) (ITYPE (mword_of_int 3872 : mword 12, Regidx (mword_of_int 9), Regidx (mword_of_int 9), ADDI)) kd_f2048493. Qed.
 
   Lemma pii_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x44) : mword 64) false (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 22), AUIPC)).
   Proof. mk_base (KernelSyms.procinit + 0x44) (mword_of_int 0x00006b17 : mword 32)
     (mword_of_int (KernelSyms.procinit + 0x44) : mword 64) (UTYPE (mword_of_int 6 : mword 20, Regidx (mword_of_int 22), AUIPC)) kd_00006b17. Qed.
 
-  Lemma pii_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x48) : mword 64) false (ITYPE (mword_of_int 2330 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
-  Proof. mk_base (KernelSyms.procinit + 0x48) (mword_of_int 0x91ab0b13 : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x48) : mword 64) (ITYPE (mword_of_int 2330 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)) kd_91ab0b13. Qed.
+  Lemma pii_48 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x48) : mword 64) false (ITYPE (mword_of_int 2328 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)).
+  Proof. mk_base (KernelSyms.procinit + 0x48) (mword_of_int 0x918b0b13 : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x48) : mword 64) (ITYPE (mword_of_int 2328 : mword 12, Regidx (mword_of_int 22), Regidx (mword_of_int 22), ADDI)) kd_918b0b13. Qed.
 
   Lemma pii_4c : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x4c) : mword 64) true (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 21), ADD)).
   Proof. mk_rvc (KernelSyms.procinit + 0x4c) (mword_of_int 0x8aa6 : mword 16)
@@ -181,9 +200,9 @@ Section CodeProcinit.
   Proof. mk_base (KernelSyms.procinit + 0x70) (mword_of_int 0x00017a17 : mword 32)
     (mword_of_int (KernelSyms.procinit + 0x70) : mword 64) (UTYPE (mword_of_int 23 : mword 20, Regidx (mword_of_int 20), AUIPC)) kd_00017a17. Qed.
 
-  Lemma pii_74 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x74) : mword 64) false (ITYPE (mword_of_int 2286 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
-  Proof. mk_base (KernelSyms.procinit + 0x74) (mword_of_int 0x8eea0a13 : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x74) : mword 64) (ITYPE (mword_of_int 2286 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_8eea0a13. Qed.
+  Lemma pii_74 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x74) : mword 64) false (ITYPE (mword_of_int 2284 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)).
+  Proof. mk_base (KernelSyms.procinit + 0x74) (mword_of_int 0x8eca0a13 : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x74) : mword 64) (ITYPE (mword_of_int 2284 : mword 12, Regidx (mword_of_int 20), Regidx (mword_of_int 20), ADDI)) kd_8eca0a13. Qed.
 
   Lemma pii_78 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x78) : mword 64) true (RTYPE (Regidx (mword_of_int 22), zreg, Regidx (mword_of_int 11), ADD)).
   Proof. mk_rvc (KernelSyms.procinit + 0x78) (mword_of_int 0x85da : mword 16)
@@ -193,9 +212,9 @@ Section CodeProcinit.
   Proof. mk_rvc (KernelSyms.procinit + 0x7a) (mword_of_int 0x8526 : mword 16)
     (mword_of_int (KernelSyms.procinit + 0x7a) : mword 64) (RTYPE (Regidx (mword_of_int 9), zreg, Regidx (mword_of_int 10), ADD)) kd_8526 exec_execute_C_MV. Qed.
 
-  Lemma pii_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x7c) : mword 64) false (JAL (mword_of_int 2093810 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.procinit + 0x7c) (mword_of_int 0xaf2ff0ef : mword 32)
-    (mword_of_int (KernelSyms.procinit + 0x7c) : mword 64) (JAL (mword_of_int 2093810 : mword 21, Regidx (mword_of_int 1))) kd_af2ff0ef. Qed.
+  Lemma pii_7c : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x7c) : mword 64) false (JAL (mword_of_int 2093808 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.procinit + 0x7c) (mword_of_int 0xaf0ff0ef : mword 32)
+    (mword_of_int (KernelSyms.procinit + 0x7c) : mword 64) (JAL (mword_of_int 2093808 : mword 21, Regidx (mword_of_int 1))) kd_af0ff0ef. Qed.
 
   Lemma pii_80 : kernel_text -∗ instr (mword_of_int (KernelSyms.procinit + 0x80) : mword 64) false (STORE (mword_of_int 24 : mword 12, zreg, Regidx (mword_of_int 9), 4)).
   Proof. mk_base (KernelSyms.procinit + 0x80) (mword_of_int 0x0004ac23 : mword 32)

@@ -1651,7 +1651,7 @@ Section WriteiLoop.
     change (2 ^ 31)%Z with 2147483648%Z in Hszdn, Hofflt, Hnlt.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     destruct Hgeom as [Hcovok Hlogsub].
-    pose proof Hrng as Hrng2. rewrite wi_maxfile_bsize in Hrng2.
+    pose proof Hrng as Hrng2. rewrite wi_maxfile_bsize_nat in Hrng2.
     intro W. revert CID0.
     induction W as [| W IH];
       intros CID0 tot bmI dataI wroteI PI nI M

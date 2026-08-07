@@ -11,7 +11,7 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
-Require Import InstrBytes WpMmodeLeafBase WpAuipc.
+Require Import InstrBytes WpMmodeLeafBase.
 Require Import RegFile.
 From Stdlib Require Import FunctionalExtensionality.
 Require Import SmodeCore.
@@ -20,16 +20,58 @@ Require Import StackOwn CalleeSaved KernelText.
 Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
-Require Import WpLock CodeMycpu CpuOwn WpAmo KernelRvcDecode.
+Require Import WpLock CpuOwn WpAmo KernelRvcDecode.
 Require Import SpecMycpu SpecHolding.
 Require Import SpecPanic.
 Require Import SpecPushOff.
 Require Import CodeAcquire.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecAcquire.
-Require Import CodeAcquireAux.
-Require Import CodeMycpuAux.
+Require Import ProcGeom.
 Import Defs.
+
+(* ---- the sext.w round-trip on the amoswap result (acquire +0x20) ---- *)
+Lemma aq_wrap_signed (n : N) (b : bv n) : bv_wrap n (bv_signed b) = bv_unsigned b.
+Proof.
+  unfold bv_signed, bv_swrap, bv_wrap.
+  rewrite Zminus_mod_idemp_l.
+  replace (bv_unsigned b + bv_half_modulus n - bv_half_modulus n) with (bv_unsigned b) by lia.
+  apply Z.mod_small. apply bv_unsigned_in_range.
+Qed.
+
+Lemma aq_loaded_sext (x : mword 32) : amoswap_loaded x = sign_extend' 64 x.
+Proof. unfold amoswap_loaded. f_equal; try (exact (autocast_id 32 x)). Qed.
+
+Lemma aq_subrange_sext (x : mword 32) :
+  subrange_vec_dec (sign_extend' 64 x) 31 0 = x.
+Proof.
+  apply bv_eq.
+  unfold subrange_vec_dec.
+  unfold to_word_idx, to_word, get_word.
+  rewrite MachineWord.cast_idx_refl.
+  unfold MachineWord.slice.
+  rewrite bv_extract_unsigned.
+  change (Z.of_N (MachineWord.Z_idx 0)) with 0.
+  rewrite Z.shiftr_0_r.
+  unfold sign_extend', Operators_mwords.sign_extend, Operators_mwords.exts_vec,
+    SailStdpp.Values.to_word, to_word, get_word, MachineWord.sign_extend.
+  rewrite bv_sign_extend_unsigned.
+  rewrite bv_wrap_bv_wrap; [| vm_compute; intro Hc; discriminate Hc].
+  apply aq_wrap_signed.
+Qed.
+
+Lemma aq_sextw_round (x : mword 32) :
+  sign_extend' 64 (subrange_vec_dec (add_vec (amoswap_loaded x)
+      (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6)))) 31 0)
+  = sign_extend' 64 x.
+Proof.
+  replace (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))) with (mword_of_int 0 : mword 64)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite kv_addv_zero.
+  rewrite aq_loaded_sext.
+  rewrite aq_subrange_sext.
+  reflexivity.
+Qed.
 
 
 Module AcquireGenProof (Mycpu : MYCPU) (Holding : HOLDING) (PushOff : PUSHOFF) : ACQUIRE_GEN.
@@ -472,7 +514,7 @@ Section ProofAcquire.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspB2. }
     iPoseProof (aqi_24 with "Htext") as "Hi24".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcb8 : mword 21) B8 (av - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcba : mword 21) B8 (av - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi24 [-]").

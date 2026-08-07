@@ -113,7 +113,7 @@ Definition file_fields k dq C : iProp Σ :=          (* the 7 non-ref cells *)
 
 (* THE predicate: holding one reference on file slot [k]. *)
 Definition file_ref γ k q C : iProp Σ :=
-  fref_tok γ k q ∗ file_fields k (DfracOwn q) C ∗ file_payload q C.
+  fref_tok γ k q ∗ file_fields k (DfracOwn q) C ∗ file_pay γ k q C.
 ```
 
 `file_ref` is the unit of ownership everywhere: a process's `p->ofile[fd]`, a
@@ -127,41 +127,77 @@ properties:
   `type`/`ip`/… , for free;
 - **`file_ref γ k 1 C` is writable** — the exclusive/uninitialized state.
 
-### `file_payload`: the thing the file is a reference *to*
+### `file_payload`: the thing the file is a reference *to* (BUILT)
 
 A `struct file` owns a reference on its pipe or its inode, created when the
-file is initialized and consumed by `fileclose`'s `pipeclose`/`iput`. Rather
-than parking it in the ftable invariant (which would force a "publish" ghost
-step under a lock the code does not hold at initialization time), make it
-**fractional too**, indexed by the type:
+file is initialized and consumed by `fileclose`'s `pipeclose`/`iput`. Parking
+it in the ftable invariant is not an option — that would force a "publish"
+ghost step under a lock the code does not hold at initialization time
+(`pipealloc` writes `f->type`/`f->pipe` after `filealloc` has released). So it
+is **fractional too**, and — the load-bearing part — a **function of the
+content**:
 
 ```coq
-Definition file_payload q C : iProp Σ :=
-  match fc_type C with
-  | FD_PIPE            => pipe_ref (fc_pipe C) q
-  | FD_INODE|FD_DEVICE => inode_ref (fc_ip C) q
-  | FD_NONE            => emp
-  end.
+Definition file_payload q pn C : iProp Σ :=
+  if fc_type C = FD_PIPE then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
+                              pipe_ref (fp_pipe pn) (fc_wbool C) q
+  else if fc_type C ∈ {FD_INODE, FD_DEVICE} then inode_ref (fc_ip C) q
+  else emp.
 ```
 
-`inode_ref`/`pipe_ref` are themselves reference-counted objects with the same
-shape, so a fraction of one is still a witness that the object is alive (enough
-to `ilock`), and the last file reference (`q = 1`) recovers the whole thing to
-hand to `iput`. `sys_open` supplies the `inode_ref` it got from
-`namei`/`create` at the moment it writes `f->ip`; nothing has to be deposited
-anywhere.
+Being a function of `C` is exactly what lets the exclusive holder **publish** a
+payload by *storing to memory*: after `f->type = FD_PIPE; f->pipe = pi` the
+same predicate, read at the new content, is the pipe end — no ghost step, no
+lock. `fc_wbool C` is `f->writable`'s truth value, which is both the bool that
+indexes `pipe_ref`'s two ends and the second argument `fileclose` passes to
+`pipeclose`.
+
+`inode_ref v q` is the fractional placeholder the inode layer will fill;
+`ProcInv.cwd_ref v` is `inode_ref v 1`, so the reference `iput` consumes and
+the one a FD_INODE file carries are the same predicate rather than two holes.
+
+**The names field, and why it cannot live on the authority.** `fcontent`
+records the pipe's *address*; a `pipe_ref` is indexed by its *ghost names*.
+Quantifying them existentially (`PipeInv.pipe_held`) does not work: two shares
+of one slot's payload could then not be recombined, and recombining them is
+precisely what the last `fileclose` does when it takes `file_rest`'s parked
+fraction back. An `agree` component on the reference-count authority does not
+work either — a fragment of an `auth` cannot be updated without the
+authoritative element, and `pipealloc` holds no lock when it publishes. What
+works is a per-slot **frac × agree ghost field** with *no authority*:
+
+```coq
+Definition fpay_tok γ k q pn := own γ ((ε, {[k := (q, to_agree pn)]}) : fileUR).
+Definition file_pay γ k q C := ∃ pn, fpay_tok γ k q pn ∗ file_payload q pn C.
+```
+
+It splits and agrees like a points-to, and the holder of the *whole* of it can
+overwrite the value by a frame-preserving update on its own fragment
+(`fpay_tok_update`) — which is pipealloc's one ghost step. It is a second
+*component* of the table's existing `γf` (`fileUR := prodUR frefUR fpayUR`),
+not a second ghost name, so nothing above the file layer and no boot wiring
+learns that the payload has an identity at all. `file_pay` joins because the
+names agree; that join is `file_rest_join`, and it is the whole point.
+
+`fileG` also **subsumes `pipeG`** (a superclass field), so the ~100 files that
+merely mention `proc_priv` do not have to name the pipe layer's ghosts. A file
+needing both must take `fileG` alone: two instance paths to `inG Σ fracR`
+print identically and do not unify, and the failure is an `iExact` that "does
+not match" a hypothesis you can see in the goal.
 
 This is why the free state pins `fc_type = FD_NONE`: a free slot then carries
 no payload, which is exactly the real xv6 invariant (`fileclose` writes
-`FD_NONE` before releasing, and the BSS starts zeroed).
+`FD_NONE` before releasing — *before* it spends the payload — and the BSS
+starts zeroed).
 
 ## The ftable lock invariant
 
 ```coq
-Definition fslot (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
+Definition fslot γ (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
   match M !! k with
-  | None        => a_fref k ↦₄ 0 ∗ ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k (DfracOwn 1) C
-  | Some (q, n) => a_fref k ↦₄ (word32 (Zpos n)) ∗ ⌜Zpos n < 2^31⌝ ∗ file_rest k q
+  | None        => a_fref k ↦₄ 0 ∗ ∃ C, ⌜fc_type C = FD_NONE⌝ ∗
+                     file_fields k (DfracOwn 1) C ∗ file_pay γ k 1 C
+  | Some (q, n) => a_fref k ↦₄ (word32 (Zpos n)) ∗ ⌜Zpos n < 2^31⌝ ∗ file_rest γ k q
   end.
 
 Definition file_rest k q : iProp Σ :=      (* the fraction NOT handed out *)
@@ -195,11 +231,21 @@ on it:
 |---|---|---|
 | `file_alloc_step` | filealloc: `ref==0` → `ref=1` | `M !! k = None ⇝ Some (1,1)`; invariant's full `file_fields` goes out as `file_ref γ k 1 C` |
 | `file_dup_step` | filedup: `ref++` | `(qt,n),(q,1) ⇝ (qt,n+1),(q/2,1)·(q/2,1)`; splits the caller's points-to fraction in half |
-| `file_close_step` | fileclose: `--ref` | `n≥2`: `(qt,n),(q,1) ⇝ (qt-q,n-1),ε`, the invariant absorbs `q` back into `file_rest`. `n=1`: validity forces `q=qt=1`, `Some(1,1),Some(1,1) ⇝ None,None`, and the closer walks away with fraction 1 of everything (so it can write `FD_NONE`) plus the whole `file_payload` for `pipeclose`/`iput` |
+| `file_close_step` | fileclose: `--ref` at `n≥2` | `(qt,n),(q,1) ⇝ (qt-q,n-1),ε`; the closer's `q` — of the cells, the names field and the payload alike — goes back into `file_rest` (`file_rest_absorb`) |
+| `file_close_last_step` | fileclose: `--ref` at `n=1` | `Some(qt,1),Some(qt,1) ⇝ None,None` at **any** `qt`, and the closer joins its `qt` with the invariant's `1-qt` (`file_rest_join`) to hold fraction 1 of everything: enough to write `FD_NONE`, and a WHOLE pipe end / inode reference for `pipeclose`/`iput` |
 
 The `n≥2 → n-1` case is the one that fixes the shape of the algebra: the
 returned fraction has to have somewhere to go, which is why the authority's
 frac component tracks *outstanding* fraction rather than being pinned at 1.
+
+**`file_close_last_step` is stated at an arbitrary `qt`, and that is not
+generality for its own sake — the `qt = 1` version is unusable.** After any
+earlier close the outstanding total has shrunk (`file_close_step` moved `q`
+out of it), so the *real* last closer holds `q = qt < 1`. What makes it the
+last is the COUNT, not the fraction: `positiveR` has no unit, so no frame can
+sit beside a fragment recording count 1, and the entry can be deleted at any
+`qt`. (The first draft required `M !! k = Some (1,1)` and would have been
+undischargeable for every file that had ever been `dup`ed.)
 
 ## How the sharing patterns come out
 
@@ -405,29 +451,19 @@ definition rather than every caller.
 
 ## Open items
 
-- **THE PAYLOAD LINK DOES NOT EXIST, and it is the next real design step.**
-  `file_ref` in the landed `FileInv.v` is `fref_tok ∗ file_fields` — the
-  `file_payload q C` third component described above is designed and NOT built.
-  Consequences, all currently true:
-  * `pipealloc` returns `file_ref γf k 1 C ∗ pipe_ref γp w 1` as *separate*
-    resources (`SpecPipealloc.v`), and `sys_pipe`'s postcondition is
-    `proc_priv … ∗ fd_slot ∗ fd_slot` — **both `pipe_ref`s are dropped on the
-    floor.** Iris is affine so that typechecks; it means the descriptors
-    sys_pipe creates are not connected to the pipe in the model.
-  * `sys_read`/`sys_write` on a pipe fd have nowhere to obtain the `pipe_ref`
-    that `piperead`/`pipewrite` demand. They are blocked on this, not on the
-    fd-table split.
-  * `fileclose`'s last-reference arm needs the whole payload for
-    `pipeclose(ff.pipe, ff.writable)` / `iput(ff.ip)`, which is likely part of
-    why it is the one unproven hole damming the proved-but-unlinked cone.
-
-  The fix is `file_payload q C` as a disjunction on `fc_type C` (FD_PIPE → that
-  end's `pipe_ref` at `q`; FD_INODE/FD_DEVICE → an inode ref at `q`; FD_NONE →
-  `emp`) moved INSIDE `file_ref`, so `filedup`'s halving splits it and
-  `fileclose` at `q = 1` collects it whole. It touches `filealloc`, `filedup`,
-  `fileclose`, `pipealloc`, `sys_pipe`, `ofile_slot` and `fdalloc` — bigger
-  than the fd-table split was, and it re-proves fdalloc, so do not interleave
-  the two.
+- **The payload link is BUILT** (see "`file_payload`" above). What it changed,
+  as a checklist for the next layer that adds a payload kind (`sys_open`'s
+  inode files):
+  * `pipealloc` now folds the two ends INTO the two `file_ref`s — its
+    postcondition no longer mentions `is_pipe`/`pipe_ref`, and `sys_pipe` no
+    longer drops them on the floor. A descriptor sys_pipe creates now really
+    does own its end of the pipe in the model.
+  * `filealloc`/`filedup` were unaffected in their CONTRACTS — the payload of
+    a fresh file is `emp` (type FD_NONE), and `filedup` splits whatever is
+    there. Only the ghost steps' statements grew a conjunct.
+  * `fdalloc`, `ofile_slot`, `proc_priv` and the ~100 files above them did not
+    change at all: the names ghost is a component of the existing `γf` and
+    `pipeG` became a superclass of `fileG`.
 
 ## Why `f->ref++` cannot overflow: the fd-slot resource
 
@@ -515,15 +551,16 @@ references, and its supply has no principled source.)
   proven: [`../projects/sys-pipe.md`](../projects/sys-pipe.md).
  **`lh`/`sh` leaves.** `↦₂` exists but nothing loads or stores a halfword yet;
   `sys_open`'s `f->major = ip->major` will need the leaves.
-- **The next function is `fileclose`.** Its ghost steps
-  (`file_close_step` / `file_close_last_step`) are already proved, its
-  contract is written and it is already CONSUMED by two proofs
-  (`ProofPipealloc`, `ProofSysClose`); what is missing is the
-  instruction-level proof, and that needs the last-reference arm's callees —
-  `pipeclose`, `begin_op`, `iput`, `end_op` — to have specs first.
-  `fileclose_stack` in `SpecFileclose.v` will grow when they do. Because it
-  is unproven there is no `LinkFileclose.v`, hence no `LinkSysClose.v`
-  either: `sys_close` is proved but not yet linked.
+- **The next function is `fileclose`**, and everything under it is now in
+  place: its ghost steps (`file_close_step` / `file_close_last_step` /
+  `file_rest_absorb` / `file_rest_join`) are proved, the payload link is
+  built, its four last-arm callees (`pipeclose`, `begin_op`, `iput`,
+  `end_op`) all have specs, and `CodeFileclose.v` has its 72 instruction
+  facts. What is left is the CONTRACT'S SECOND HALF and the proof — see
+  [`../projects/fileclose.md`](../projects/fileclose.md). Because it is
+  unproven there is no `LinkFileclose.v`, hence no `LinkSysClose.v`,
+  `LinkSysPipe.v` or `LinkKexit.v` either: three proved functions are
+  unlinked behind this one.
 - **Every failure arm returns its `fd_slot`s, and that is load-bearing.**
   `filealloc`'s failure arm (the scan found no free entry, so no reference was
   created) hands its unit straight back, and `pipealloc`'s failure disjunct

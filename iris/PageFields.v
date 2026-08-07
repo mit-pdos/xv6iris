@@ -286,6 +286,26 @@ Section PageFields.
     pa_add p o ↦₈ w ⊢ [∗ list] j ∈ seq o 8, byte_any (pa_add p j).
   Proof. rewrite bwin_rebase. apply word8_bwin. Qed.
 
+  (* the converse of [page_words8]: a run of word cells forgets its contents
+     and becomes a window again.  This is the direction an object being TORN
+     DOWN needs -- freeproc handing a trapframe page back to kfree is the
+     first consumer. *)
+  Lemma page_words8_back (p : mword 64) (ws : list (mword 64)) :
+    ([∗ list] i ↦ w ∈ ws, pa_add p (8 * i)%nat ↦₈ w) ⊢
+    [∗ list] j ∈ seq 0 (8 * length ws), byte_any (pa_add p j).
+  Proof.
+    induction ws as [|w ws IH] using rev_ind; [ by iIntros "_" | ].
+    (* NO [/=] here: [simpl] would unfold the [8 * _] and the [bwin_split]
+       instance below would then match nothing. *)
+    replace (8 * length (ws ++ [w]))%nat with (8 * length ws + 8)%nat
+      by (rewrite length_app; cbn [length]; lia).
+    rewrite (bwin_split p 0 (8 * length ws) 8) Nat.add_0_l.
+    rewrite big_sepL_app big_sepL_singleton Nat.add_0_r.
+    iIntros "[Hpre Hlast]".
+    iSplitL "Hpre"; [ by iApply IH | ].
+    iApply (page_field8_back p (8 * length ws)%nat w with "Hlast").
+  Qed.
+
   (* the converse of [bwin_bytes_list]: a tracked byte list forgets its
      contents and becomes a window again. *)
   Lemma bytes_list_bwin (a : mword 64) (bs : list (bv 8)) :

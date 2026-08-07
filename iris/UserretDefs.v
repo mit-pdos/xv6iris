@@ -253,6 +253,7 @@ Qed.
 (* 4. The 38-instruction catalog.                                         *)
 (* ===================================================================== *)
 
+Definition uw_fencei : mword 32 := mword_of_int 0x0000100f.
 Definition uw_sfence : mword 32 := mword_of_int 0x12000073.
 Definition uw_csrw   : mword 32 := mword_of_int 0x18051073.
 Definition uw_lui    : mword 32 := mword_of_int 0x02000537.
@@ -297,6 +298,9 @@ Definition uh_cld_a0 : mword 16 := mword_of_int 0x7928.
 (* --- ASTs --- *)
 Definition ureg (n : Z) : regidx := Regidx (mword_of_int n).
 Definition ucreg (n : Z) : cregidx := Cregidx (mword_of_int n).
+(* [fence.i] -- flush the icache before returning to a process whose text
+   this hart may never have executed (xv6 9dd28f5). *)
+Definition ai_fencei : instruction := FENCEI (zeros' 12, zreg, zreg).
 Definition ai_sfence : instruction := SFENCE_VMA (zreg, zreg).
 Definition ai_csrw : instruction := CSRReg (csr_satp, ureg 10, zreg, CSRRW).
 Definition ai_lui : instruction := UTYPE (mword_of_int 0x2000, ureg 10, LUI).
@@ -311,6 +315,13 @@ Definition ai_cld_tgt (rdc : Z) (uimm : Z) : instruction :=
   LOAD (mword_of_int (uimm * 8), ureg 10, ureg (8 + rdc), false, 8).
 
 (* --- decode facts --- *)
+(* the pred/succ-style fields arrive as SLICES of the word, so this needs the
+   _bv bridge, as FENCE and the CSRs do. *)
+Lemma udec_fencei s :
+  register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode uw_fencei) s = Some (ai_fencei, s).
+Proof. decode_bridge_ms_bv. Qed.
+
 Lemma udec_sfence s :
   register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode uw_sfence) s = Some (ai_sfence, s).
@@ -511,157 +522,161 @@ Section UserretInstrs.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  Lemma ui_fencei :
+    kernel_text -∗ instr (upa 0x9c) false ai_fencei.
+  Proof. mk_base (KernelSyms.trampoline + 0x9c) uw_fencei (upa 0x9c) ai_fencei udec_fencei. Qed.
+
   Lemma ui_sfence1 :
-    kernel_text -∗ instr (upa 0x9c) false ai_sfence.
-  Proof. mk_base (KernelSyms.trampoline + 0x9c) uw_sfence (upa 0x9c) ai_sfence udec_sfence. Qed.
+    kernel_text -∗ instr (upa 0xa0) false ai_sfence.
+  Proof. mk_base (KernelSyms.trampoline + 0xa0) uw_sfence (upa 0xa0) ai_sfence udec_sfence. Qed.
 
   Lemma ui_csrw :
-    kernel_text -∗ instr (upa 0xa0) false ai_csrw.
-  Proof. mk_base (KernelSyms.trampoline + 0xa0) uw_csrw (upa 0xa0) ai_csrw udec_csrw. Qed.
+    kernel_text -∗ instr (upa 0xa4) false ai_csrw.
+  Proof. mk_base (KernelSyms.trampoline + 0xa4) uw_csrw (upa 0xa4) ai_csrw udec_csrw. Qed.
 
   Lemma ui_sfence2 :
-    kernel_text -∗ instr (upa 0xa4) false ai_sfence.
-  Proof. mk_base (KernelSyms.trampoline + 0xa4) uw_sfence (upa 0xa4) ai_sfence udec_sfence. Qed.
+    kernel_text -∗ instr (upa 0xa8) false ai_sfence.
+  Proof. mk_base (KernelSyms.trampoline + 0xa8) uw_sfence (upa 0xa8) ai_sfence udec_sfence. Qed.
 
   Lemma ui_lui :
-    kernel_text -∗ instr (upa 0xa8) false ai_lui.
-  Proof. mk_base (KernelSyms.trampoline + 0xa8) uw_lui (upa 0xa8) ai_lui udec_lui. Qed.
+    kernel_text -∗ instr (upa 0xac) false ai_lui.
+  Proof. mk_base (KernelSyms.trampoline + 0xac) uw_lui (upa 0xac) ai_lui udec_lui. Qed.
 
   Lemma ui_addiw :
-    kernel_text -∗ instr (upa 0xac) true ai_addiw.
-  Proof. mk_rvc (KernelSyms.trampoline + 0xac) uh_addiw (upa 0xac) ai_addiw udec_addiw exec_execute_C_ADDIW. Qed.
+    kernel_text -∗ instr (upa 0xb0) true ai_addiw.
+  Proof. mk_rvc (KernelSyms.trampoline + 0xb0) uh_addiw (upa 0xb0) ai_addiw udec_addiw exec_execute_C_ADDIW. Qed.
 
   Lemma ui_slli :
-    kernel_text -∗ instr (upa 0xae) true ai_slli.
-  Proof. mk_rvc (KernelSyms.trampoline + 0xae) uh_slli (upa 0xae) ai_slli udec_slli exec_execute_C_SLLI. Qed.
+    kernel_text -∗ instr (upa 0xb2) true ai_slli.
+  Proof. mk_rvc (KernelSyms.trampoline + 0xb2) uh_slli (upa 0xb2) ai_slli udec_slli exec_execute_C_SLLI. Qed.
 
   Lemma ui_ld_ra :
-    kernel_text -∗ instr (upa 0xb0) false (ai_ld 1 40).
-  Proof. mk_base (KernelSyms.trampoline + 0xb0) uw_ld_ra (upa 0xb0) (ai_ld 1 40) udec_ld_ra. Qed.
+    kernel_text -∗ instr (upa 0xb4) false (ai_ld 1 40).
+  Proof. mk_base (KernelSyms.trampoline + 0xb4) uw_ld_ra (upa 0xb4) (ai_ld 1 40) udec_ld_ra. Qed.
 
   Lemma ui_ld_sp :
-    kernel_text -∗ instr (upa 0xb4) false (ai_ld 2 48).
-  Proof. mk_base (KernelSyms.trampoline + 0xb4) uw_ld_sp (upa 0xb4) (ai_ld 2 48) udec_ld_sp. Qed.
+    kernel_text -∗ instr (upa 0xb8) false (ai_ld 2 48).
+  Proof. mk_base (KernelSyms.trampoline + 0xb8) uw_ld_sp (upa 0xb8) (ai_ld 2 48) udec_ld_sp. Qed.
 
   Lemma ui_ld_gp :
-    kernel_text -∗ instr (upa 0xb8) false (ai_ld 3 56).
-  Proof. mk_base (KernelSyms.trampoline + 0xb8) uw_ld_gp (upa 0xb8) (ai_ld 3 56) udec_ld_gp. Qed.
+    kernel_text -∗ instr (upa 0xbc) false (ai_ld 3 56).
+  Proof. mk_base (KernelSyms.trampoline + 0xbc) uw_ld_gp (upa 0xbc) (ai_ld 3 56) udec_ld_gp. Qed.
 
   Lemma ui_ld_tp :
-    kernel_text -∗ instr (upa 0xbc) false (ai_ld 4 64).
-  Proof. mk_base (KernelSyms.trampoline + 0xbc) uw_ld_tp (upa 0xbc) (ai_ld 4 64) udec_ld_tp. Qed.
+    kernel_text -∗ instr (upa 0xc0) false (ai_ld 4 64).
+  Proof. mk_base (KernelSyms.trampoline + 0xc0) uw_ld_tp (upa 0xc0) (ai_ld 4 64) udec_ld_tp. Qed.
 
   Lemma ui_ld_t0 :
-    kernel_text -∗ instr (upa 0xc0) false (ai_ld 5 72).
-  Proof. mk_base (KernelSyms.trampoline + 0xc0) uw_ld_t0 (upa 0xc0) (ai_ld 5 72) udec_ld_t0. Qed.
+    kernel_text -∗ instr (upa 0xc4) false (ai_ld 5 72).
+  Proof. mk_base (KernelSyms.trampoline + 0xc4) uw_ld_t0 (upa 0xc4) (ai_ld 5 72) udec_ld_t0. Qed.
 
   Lemma ui_ld_t1 :
-    kernel_text -∗ instr (upa 0xc4) false (ai_ld 6 80).
-  Proof. mk_base (KernelSyms.trampoline + 0xc4) uw_ld_t1 (upa 0xc4) (ai_ld 6 80) udec_ld_t1. Qed.
+    kernel_text -∗ instr (upa 0xc8) false (ai_ld 6 80).
+  Proof. mk_base (KernelSyms.trampoline + 0xc8) uw_ld_t1 (upa 0xc8) (ai_ld 6 80) udec_ld_t1. Qed.
 
   Lemma ui_ld_t2 :
-    kernel_text -∗ instr (upa 0xc8) false (ai_ld 7 88).
-  Proof. mk_base (KernelSyms.trampoline + 0xc8) uw_ld_t2 (upa 0xc8) (ai_ld 7 88) udec_ld_t2. Qed.
+    kernel_text -∗ instr (upa 0xcc) false (ai_ld 7 88).
+  Proof. mk_base (KernelSyms.trampoline + 0xcc) uw_ld_t2 (upa 0xcc) (ai_ld 7 88) udec_ld_t2. Qed.
 
   Lemma ui_ld_a6 :
-    kernel_text -∗ instr (upa 0xda) false (ai_ld 16 160).
-  Proof. mk_base (KernelSyms.trampoline + 0xda) uw_ld_a6 (upa 0xda) (ai_ld 16 160) udec_ld_a6. Qed.
+    kernel_text -∗ instr (upa 0xde) false (ai_ld 16 160).
+  Proof. mk_base (KernelSyms.trampoline + 0xde) uw_ld_a6 (upa 0xde) (ai_ld 16 160) udec_ld_a6. Qed.
 
   Lemma ui_ld_a7 :
-    kernel_text -∗ instr (upa 0xde) false (ai_ld 17 168).
-  Proof. mk_base (KernelSyms.trampoline + 0xde) uw_ld_a7 (upa 0xde) (ai_ld 17 168) udec_ld_a7. Qed.
+    kernel_text -∗ instr (upa 0xe2) false (ai_ld 17 168).
+  Proof. mk_base (KernelSyms.trampoline + 0xe2) uw_ld_a7 (upa 0xe2) (ai_ld 17 168) udec_ld_a7. Qed.
 
   Lemma ui_ld_s2 :
-    kernel_text -∗ instr (upa 0xe2) false (ai_ld 18 176).
-  Proof. mk_base (KernelSyms.trampoline + 0xe2) uw_ld_s2 (upa 0xe2) (ai_ld 18 176) udec_ld_s2. Qed.
+    kernel_text -∗ instr (upa 0xe6) false (ai_ld 18 176).
+  Proof. mk_base (KernelSyms.trampoline + 0xe6) uw_ld_s2 (upa 0xe6) (ai_ld 18 176) udec_ld_s2. Qed.
 
   Lemma ui_ld_s3 :
-    kernel_text -∗ instr (upa 0xe6) false (ai_ld 19 184).
-  Proof. mk_base (KernelSyms.trampoline + 0xe6) uw_ld_s3 (upa 0xe6) (ai_ld 19 184) udec_ld_s3. Qed.
+    kernel_text -∗ instr (upa 0xea) false (ai_ld 19 184).
+  Proof. mk_base (KernelSyms.trampoline + 0xea) uw_ld_s3 (upa 0xea) (ai_ld 19 184) udec_ld_s3. Qed.
 
   Lemma ui_ld_s4 :
-    kernel_text -∗ instr (upa 0xea) false (ai_ld 20 192).
-  Proof. mk_base (KernelSyms.trampoline + 0xea) uw_ld_s4 (upa 0xea) (ai_ld 20 192) udec_ld_s4. Qed.
+    kernel_text -∗ instr (upa 0xee) false (ai_ld 20 192).
+  Proof. mk_base (KernelSyms.trampoline + 0xee) uw_ld_s4 (upa 0xee) (ai_ld 20 192) udec_ld_s4. Qed.
 
   Lemma ui_ld_s5 :
-    kernel_text -∗ instr (upa 0xee) false (ai_ld 21 200).
-  Proof. mk_base (KernelSyms.trampoline + 0xee) uw_ld_s5 (upa 0xee) (ai_ld 21 200) udec_ld_s5. Qed.
+    kernel_text -∗ instr (upa 0xf2) false (ai_ld 21 200).
+  Proof. mk_base (KernelSyms.trampoline + 0xf2) uw_ld_s5 (upa 0xf2) (ai_ld 21 200) udec_ld_s5. Qed.
 
   Lemma ui_ld_s6 :
-    kernel_text -∗ instr (upa 0xf2) false (ai_ld 22 208).
-  Proof. mk_base (KernelSyms.trampoline + 0xf2) uw_ld_s6 (upa 0xf2) (ai_ld 22 208) udec_ld_s6. Qed.
+    kernel_text -∗ instr (upa 0xf6) false (ai_ld 22 208).
+  Proof. mk_base (KernelSyms.trampoline + 0xf6) uw_ld_s6 (upa 0xf6) (ai_ld 22 208) udec_ld_s6. Qed.
 
   Lemma ui_ld_s7 :
-    kernel_text -∗ instr (upa 0xf6) false (ai_ld 23 216).
-  Proof. mk_base (KernelSyms.trampoline + 0xf6) uw_ld_s7 (upa 0xf6) (ai_ld 23 216) udec_ld_s7. Qed.
+    kernel_text -∗ instr (upa 0xfa) false (ai_ld 23 216).
+  Proof. mk_base (KernelSyms.trampoline + 0xfa) uw_ld_s7 (upa 0xfa) (ai_ld 23 216) udec_ld_s7. Qed.
 
   Lemma ui_ld_s8 :
-    kernel_text -∗ instr (upa 0xfa) false (ai_ld 24 224).
-  Proof. mk_base (KernelSyms.trampoline + 0xfa) uw_ld_s8 (upa 0xfa) (ai_ld 24 224) udec_ld_s8. Qed.
+    kernel_text -∗ instr (upa 0xfe) false (ai_ld 24 224).
+  Proof. mk_base (KernelSyms.trampoline + 0xfe) uw_ld_s8 (upa 0xfe) (ai_ld 24 224) udec_ld_s8. Qed.
 
   Lemma ui_ld_s9 :
-    kernel_text -∗ instr (upa 0xfe) false (ai_ld 25 232).
-  Proof. mk_base (KernelSyms.trampoline + 0xfe) uw_ld_s9 (upa 0xfe) (ai_ld 25 232) udec_ld_s9. Qed.
+    kernel_text -∗ instr (upa 0x102) false (ai_ld 25 232).
+  Proof. mk_base (KernelSyms.trampoline + 0x102) uw_ld_s9 (upa 0x102) (ai_ld 25 232) udec_ld_s9. Qed.
 
   Lemma ui_ld_s10 :
-    kernel_text -∗ instr (upa 0x102) false (ai_ld 26 240).
-  Proof. mk_base (KernelSyms.trampoline + 0x102) uw_ld_s10 (upa 0x102) (ai_ld 26 240) udec_ld_s10. Qed.
+    kernel_text -∗ instr (upa 0x106) false (ai_ld 26 240).
+  Proof. mk_base (KernelSyms.trampoline + 0x106) uw_ld_s10 (upa 0x106) (ai_ld 26 240) udec_ld_s10. Qed.
 
   Lemma ui_ld_s11 :
-    kernel_text -∗ instr (upa 0x106) false (ai_ld 27 248).
-  Proof. mk_base (KernelSyms.trampoline + 0x106) uw_ld_s11 (upa 0x106) (ai_ld 27 248) udec_ld_s11. Qed.
+    kernel_text -∗ instr (upa 0x10a) false (ai_ld 27 248).
+  Proof. mk_base (KernelSyms.trampoline + 0x10a) uw_ld_s11 (upa 0x10a) (ai_ld 27 248) udec_ld_s11. Qed.
 
   Lemma ui_ld_t3 :
-    kernel_text -∗ instr (upa 0x10a) false (ai_ld 28 256).
-  Proof. mk_base (KernelSyms.trampoline + 0x10a) uw_ld_t3 (upa 0x10a) (ai_ld 28 256) udec_ld_t3. Qed.
+    kernel_text -∗ instr (upa 0x10e) false (ai_ld 28 256).
+  Proof. mk_base (KernelSyms.trampoline + 0x10e) uw_ld_t3 (upa 0x10e) (ai_ld 28 256) udec_ld_t3. Qed.
 
   Lemma ui_ld_t4 :
-    kernel_text -∗ instr (upa 0x10e) false (ai_ld 29 264).
-  Proof. mk_base (KernelSyms.trampoline + 0x10e) uw_ld_t4 (upa 0x10e) (ai_ld 29 264) udec_ld_t4. Qed.
+    kernel_text -∗ instr (upa 0x112) false (ai_ld 29 264).
+  Proof. mk_base (KernelSyms.trampoline + 0x112) uw_ld_t4 (upa 0x112) (ai_ld 29 264) udec_ld_t4. Qed.
 
   Lemma ui_ld_t5 :
-    kernel_text -∗ instr (upa 0x112) false (ai_ld 30 272).
-  Proof. mk_base (KernelSyms.trampoline + 0x112) uw_ld_t5 (upa 0x112) (ai_ld 30 272) udec_ld_t5. Qed.
+    kernel_text -∗ instr (upa 0x116) false (ai_ld 30 272).
+  Proof. mk_base (KernelSyms.trampoline + 0x116) uw_ld_t5 (upa 0x116) (ai_ld 30 272) udec_ld_t5. Qed.
 
   Lemma ui_ld_t6 :
-    kernel_text -∗ instr (upa 0x116) false (ai_ld 31 280).
-  Proof. mk_base (KernelSyms.trampoline + 0x116) uw_ld_t6 (upa 0x116) (ai_ld 31 280) udec_ld_t6. Qed.
+    kernel_text -∗ instr (upa 0x11a) false (ai_ld 31 280).
+  Proof. mk_base (KernelSyms.trampoline + 0x11a) uw_ld_t6 (upa 0x11a) (ai_ld 31 280) udec_ld_t6. Qed.
 
   Lemma ui_cld_s0 :
-    kernel_text -∗ instr (upa 0xcc) true (ai_cld_tgt 0 12).
-  Proof. mk_rvc (KernelSyms.trampoline + 0xcc) uh_cld_s0 (upa 0xcc) (ai_cld_tgt 0 12) udec_cld_s0 exec_execute_C_LD. Qed.
+    kernel_text -∗ instr (upa 0xd0) true (ai_cld_tgt 0 12).
+  Proof. mk_rvc (KernelSyms.trampoline + 0xd0) uh_cld_s0 (upa 0xd0) (ai_cld_tgt 0 12) udec_cld_s0 exec_execute_C_LD. Qed.
 
   Lemma ui_cld_s1 :
-    kernel_text -∗ instr (upa 0xce) true (ai_cld_tgt 1 13).
-  Proof. mk_rvc (KernelSyms.trampoline + 0xce) uh_cld_s1 (upa 0xce) (ai_cld_tgt 1 13) udec_cld_s1 exec_execute_C_LD. Qed.
+    kernel_text -∗ instr (upa 0xd2) true (ai_cld_tgt 1 13).
+  Proof. mk_rvc (KernelSyms.trampoline + 0xd2) uh_cld_s1 (upa 0xd2) (ai_cld_tgt 1 13) udec_cld_s1 exec_execute_C_LD. Qed.
 
   Lemma ui_cld_a1 :
-    kernel_text -∗ instr (upa 0xd0) true (ai_cld_tgt 3 15).
-  Proof. mk_rvc (KernelSyms.trampoline + 0xd0) uh_cld_a1 (upa 0xd0) (ai_cld_tgt 3 15) udec_cld_a1 exec_execute_C_LD. Qed.
+    kernel_text -∗ instr (upa 0xd4) true (ai_cld_tgt 3 15).
+  Proof. mk_rvc (KernelSyms.trampoline + 0xd4) uh_cld_a1 (upa 0xd4) (ai_cld_tgt 3 15) udec_cld_a1 exec_execute_C_LD. Qed.
 
   Lemma ui_cld_a2 :
-    kernel_text -∗ instr (upa 0xd2) true (ai_cld_tgt 4 16).
-  Proof. mk_rvc (KernelSyms.trampoline + 0xd2) uh_cld_a2 (upa 0xd2) (ai_cld_tgt 4 16) udec_cld_a2 exec_execute_C_LD. Qed.
+    kernel_text -∗ instr (upa 0xd6) true (ai_cld_tgt 4 16).
+  Proof. mk_rvc (KernelSyms.trampoline + 0xd6) uh_cld_a2 (upa 0xd6) (ai_cld_tgt 4 16) udec_cld_a2 exec_execute_C_LD. Qed.
 
   Lemma ui_cld_a3 :
-    kernel_text -∗ instr (upa 0xd4) true (ai_cld_tgt 5 17).
-  Proof. mk_rvc (KernelSyms.trampoline + 0xd4) uh_cld_a3 (upa 0xd4) (ai_cld_tgt 5 17) udec_cld_a3 exec_execute_C_LD. Qed.
+    kernel_text -∗ instr (upa 0xd8) true (ai_cld_tgt 5 17).
+  Proof. mk_rvc (KernelSyms.trampoline + 0xd8) uh_cld_a3 (upa 0xd8) (ai_cld_tgt 5 17) udec_cld_a3 exec_execute_C_LD. Qed.
 
   Lemma ui_cld_a4 :
-    kernel_text -∗ instr (upa 0xd6) true (ai_cld_tgt 6 18).
-  Proof. mk_rvc (KernelSyms.trampoline + 0xd6) uh_cld_a4 (upa 0xd6) (ai_cld_tgt 6 18) udec_cld_a4 exec_execute_C_LD. Qed.
+    kernel_text -∗ instr (upa 0xda) true (ai_cld_tgt 6 18).
+  Proof. mk_rvc (KernelSyms.trampoline + 0xda) uh_cld_a4 (upa 0xda) (ai_cld_tgt 6 18) udec_cld_a4 exec_execute_C_LD. Qed.
 
   Lemma ui_cld_a5 :
-    kernel_text -∗ instr (upa 0xd8) true (ai_cld_tgt 7 19).
-  Proof. mk_rvc (KernelSyms.trampoline + 0xd8) uh_cld_a5 (upa 0xd8) (ai_cld_tgt 7 19) udec_cld_a5 exec_execute_C_LD. Qed.
+    kernel_text -∗ instr (upa 0xdc) true (ai_cld_tgt 7 19).
+  Proof. mk_rvc (KernelSyms.trampoline + 0xdc) uh_cld_a5 (upa 0xdc) (ai_cld_tgt 7 19) udec_cld_a5 exec_execute_C_LD. Qed.
 
   Lemma ui_cld_a0 :
-    kernel_text -∗ instr (upa 0x11a) true (ai_cld_tgt 2 14).
-  Proof. mk_rvc (KernelSyms.trampoline + 0x11a) uh_cld_a0 (upa 0x11a) (ai_cld_tgt 2 14) udec_cld_a0 exec_execute_C_LD. Qed.
+    kernel_text -∗ instr (upa 0x11e) true (ai_cld_tgt 2 14).
+  Proof. mk_rvc (KernelSyms.trampoline + 0x11e) uh_cld_a0 (upa 0x11e) (ai_cld_tgt 2 14) udec_cld_a0 exec_execute_C_LD. Qed.
 
   Lemma ui_sret :
-    kernel_text -∗ instr (upa 0x11c) false ai_sret.
-  Proof. mk_base (KernelSyms.trampoline + 0x11c) uw_sret (upa 0x11c) ai_sret udec_sret. Qed.
+    kernel_text -∗ instr (upa 0x120) false ai_sret.
+  Proof. mk_base (KernelSyms.trampoline + 0x120) uw_sret (upa 0x120) ai_sret udec_sret. Qed.
 
 
 End UserretInstrs.

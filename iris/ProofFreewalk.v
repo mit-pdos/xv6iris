@@ -462,7 +462,7 @@ Section ProofFreewalk.
     iEval (rewrite Hp4a) in "Hpc".
     (* --- +0x4a jal ra,kfree --- *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.freewalk + 0x4a)) Rra
-              (mword_of_int 2094726 : mword 21) E0 (K - 6) b
+              (mword_of_int 2094724 : mword 21) E0 (K - 6) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi4a [-]").
@@ -470,7 +470,7 @@ Section ProofFreewalk.
     set (E1 := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.freewalk + 0x4a) : mword 64) 4)]> E0).
     assert (Htgtkf : add_vec (mword_of_int (KernelSyms.freewalk + 0x4a) : mword 64)
-              (sign_extend' 64 (mword_of_int 2094726 : mword 21))
+              (sign_extend' 64 (mword_of_int 2094724 : mword 21))
             = mword_of_int KernelSyms.kfree) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtkf) in "Hpc".
     assert (HE1a0 : E1 !!! Regidx Ra0 = page_base bpt).

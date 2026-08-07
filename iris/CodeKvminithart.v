@@ -7,22 +7,31 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes WpDecodeBridge.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode.
-Require Import ExecCommon.
+Require Import KernelDecode01.
+Require Import KernelDecode04.
+Require Import KernelDecode06.
+Require Import KernelDecode07.
+Require Import KernelDecode11.
+Require Import KernelDecode12.
+Require Import KernelDecode13.
+Require Import KernelDecode14.
+Require Import KernelDecode15.
+Require Import KernelDecode16.
+Require Import KernelDecode17.
+Require Import KernelDecode20.
+Require Import KernelDecode24.
+Require Import KernelDecode26.
+Require Import KernelDecode29.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -57,9 +66,9 @@ Section CodeKvminithart.
   Proof. mk_base (KernelSyms.kvminithart + 0xc) (mword_of_int 0x00009797 : mword 32)
     (mword_of_int (KernelSyms.kvminithart + 0xc) : mword 64) (UTYPE (mword_of_int 9 : mword 20, Regidx (mword_of_int 15), AUIPC)) kd_00009797. Qed.
 
-  Lemma kvi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminithart + 0x10) : mword 64) false (LOAD (mword_of_int 764 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8)).
-  Proof. mk_base (KernelSyms.kvminithart + 0x10) (mword_of_int 0x2fc7b783 : mword 32)
-    (mword_of_int (KernelSyms.kvminithart + 0x10) : mword 64) (LOAD (mword_of_int 764 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8)) kd_2fc7b783. Qed.
+  Lemma kvi_10 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminithart + 0x10) : mword 64) false (LOAD (mword_of_int 762 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8)).
+  Proof. mk_base (KernelSyms.kvminithart + 0x10) (mword_of_int 0x2fa7b783 : mword 32)
+    (mword_of_int (KernelSyms.kvminithart + 0x10) : mword 64) (LOAD (mword_of_int 762 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 15), false, 8)) kd_2fa7b783. Qed.
 
   Lemma kvi_14 : kernel_text -∗ instr (mword_of_int (KernelSyms.kvminithart + 0x14) : mword 64) true (SHIFTIOP (mword_of_int 12 : mword 6, creg2reg_idx (Cregidx (mword_of_int 7)), creg2reg_idx (Cregidx (mword_of_int 7)), SRLI)).
   Proof. mk_rvc (KernelSyms.kvminithart + 0x14) (mword_of_int 0x83b1 : mword 16)

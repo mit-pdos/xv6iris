@@ -736,10 +736,3 @@ Section UProofSync.
   Qed.
 
 End UProofSync.
-
-(* SOUNDNESS SENTINEL.  [wp_sync_start] is the top of this cone (it consumes
-   [wp_sync_main], which consumes both stubs), so one printout covers all
-   four: the 5 platform axioms of the Sail model (load/match/cancel/valid
-   reservation, plat_term_write) plus functional_extensionality_dep (the
-   [regfile] update law [upd_upd]) -- and nothing else. *)
-Print Assumptions wp_sync_start.

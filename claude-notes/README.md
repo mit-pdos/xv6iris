@@ -149,8 +149,15 @@ are working on that effort — the relevant `projects/` file.
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone
   (`killed`/`setkilled`/`kkill`/`sys_kill`), `sys_getpid`, `sys_close`,
-  `sys_pause`, `fetchaddr`, `fdalloc`) and what is next (the remaining
-  syscalls, and `cwd_ref`). Keeps the measured account of why
+  `sys_pause`, `fetchaddr`, `fdalloc`, **`kwait` + `sys_wait`**) and what is
+  next (the remaining syscalls, and `cwd_ref`). `kwait` is the
+  entry to read before writing any loop that can RETURN from inside itself:
+  the function exit is one linear resource the inner loop takes as a premise
+  and hands back to its own exit, what the exit still wants back rides
+  through as an abstract frame rather than inside a closure, a parking
+  loop's carried continuation is anchored at the TURN's hart (a `wp_next`
+  re-anchors only forward), and `cpu_own` is the one bundle no leaf
+  re-anchors. Keeps the measured account of why
   `argraw`'s six-arm proof cost 74 GB, sys_pause's path-dependent-frame
   recipe, — from fetchaddr, the first function spanning the `proc_priv`
   and bare-cell tiers — the `proc_priv_copy` accessor and the x0-as-source
@@ -163,6 +170,33 @@ are working on that effort — the relevant `projects/` file.
   worklist spells out the exact chain that makes it work in `kfork`'s
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
+- **[`kexit.md`](projects/kexit.md)** — `kexit()`, the process-lifetime cone's
+  other half (kwait reclaims a zombie; kexit makes one). **PROVEN** —
+  `ProofKexit.v`, no `Axiom` and no `admit` of its own — **but NOT LINKED**, and it
+  cannot be until file.c's `fileclose` has a proof, which is the same single
+  callee `sys_pipe` waits on; until then `proof_coverage.py` prints it
+  `assumed`. The protocol change it needed is the interesting part: parking
+  at ZOMBIE is a different kind of park, because a zombie's private block
+  cannot ride the parked closure — wait()/freeproc, running on another
+  process, must find the user page table in `p->lock`. So the crossing
+  carries the block MINUS its context cells (`ProcInv.proc_dormant_noctx`)
+  and the reclaiming scheduler puts the two back together
+  (`SchedCtx.park_pay` / `proc_slots_park_gen`), FORGETTING the zombie's
+  record down to its cells rather than claiming it resumable. Also:
+  `SpecIput.v` (assumed, one isolated axiom), the diverging-contract shape,
+  why having no epilogue makes the frame existential and keeps it out of the
+  loop, and `ProcInv.proc_priv_cwd_pid` (the accessor the three FS calls
+  forced). kwait's own worklist is item S10 of
+  [`proc-struct-resources.md`](projects/proc-struct-resources.md), not here.
+- **[`fileclose.md`](projects/fileclose.md)** — `fileclose`, the single
+  unproven callee behind THREE unlinked proved functions (sys_pipe,
+  sys_close, kexit). The payload link it needed has LANDED — a `file_ref`
+  now carries the pipe end / inode reference it names, so the last closer
+  has a whole `pipe_ref` to hand `pipeclose` — as has `CodeFileclose.v`.
+  What is left is the contract's second half (a TYPE-INDEXED callee
+  environment, so pipealloc and sys_pipe are not made to own a file system),
+  the 18→68 stack-constant ripple, the four callers, and the proof. Design
+  in [`design/file-table.md`](design/file-table.md).
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a

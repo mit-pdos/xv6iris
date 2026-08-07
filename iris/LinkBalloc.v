@@ -26,8 +26,8 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
 Require Import WpLock FdSlots WpUart.
-Require Import DiskPtsto DiskInv.
-Require Import BcacheInv BioInv.
+Require Import DiskPtsto.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import SpecBalloc.
 

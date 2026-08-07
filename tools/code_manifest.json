@@ -192,6 +192,12 @@
   2
  ],
  [
+  "CodeFileclose.v",
+  "fileclose",
+  "fci_",
+  2
+ ],
+ [
   "CodeFiledup.v",
   "filedup",
   "fdi_",
@@ -207,6 +213,12 @@
   "CodeFreeDesc.v",
   "free_desc",
   "fdi_",
+  2
+ ],
+ [
+  "CodeFreeproc.v",
+  "freeproc",
+  "fri_",
   2
  ],
  [
@@ -288,6 +300,12 @@
   2
  ],
  [
+  "CodeKexit.v",
+  "kexit",
+  "kxi_",
+  2
+ ],
+ [
   "CodeKilled.v",
   "killed",
   "kli_",
@@ -327,6 +345,12 @@
   "CodeKvmmap.v",
   "kvmmap",
   "ki_",
+  2
+ ],
+ [
+  "CodeKwait.v",
+  "kwait",
+  "kwi_",
   2
  ],
  [
@@ -440,7 +464,7 @@
  [
   "CodePrintkinit.v",
   "printkinit",
-  "pki_",
+  "pkni_",
   2
  ],
  [
@@ -483,6 +507,12 @@
   "CodeRelease.v",
   "release",
   "rli_",
+  2
+ ],
+ [
+  "CodeReparent.v",
+  "reparent",
+  "rpi_",
   2
  ],
  [
@@ -603,6 +633,12 @@
   "CodeSysUptime.v",
   "sys_uptime",
   "sui_",
+  2
+ ],
+ [
+  "CodeSysWait.v",
+  "sys_wait",
+  "swi_",
   2
  ],
  [

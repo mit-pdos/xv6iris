@@ -16,7 +16,8 @@ Require Import SailStdpp.Base SailStdpp.Operators_mwords SailStdpp.Values SailSt
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvLang.
 Require Import SmodeCore RegFile WpGpr WpMmodeLeafBase.
-Require Import HartTp WpNext IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfCtl WpAuipc.
+Require Import HartTp WpNext IntrDefs WpSmodeIntr WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import RiscvExtras.
 Require Import CalleeSaved StackOwn.
 Require Import InstrBytes.
 Require Import PtTree.
@@ -177,9 +178,9 @@ Section KvminithartBody.
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
     (* ============ +0x10 ld a5,764(a5) : a5 := root_b ============ *)
-    assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 764 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
+    assert (Haddr : add_vec (A0 !!! Regidx (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 762 : mword 12)) = mword_of_int KernelSyms.kernel_pagetable).
     { rewrite /A0 upd_eq. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_ld_s_sconf Φ (mword_of_int (KernelSyms.kvminithart + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 764 : mword 12)
+    iApply (wp_ld_s_sconf Φ (mword_of_int (KernelSyms.kvminithart + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 762 : mword 12)
               A0 (K - 2)%nat (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [] [-]").

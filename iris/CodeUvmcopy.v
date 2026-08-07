@@ -7,22 +7,43 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes WpDecodeBridge.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode.
-Require Import ExecCommon.
+Require Import KernelDecode00.
+Require Import KernelDecode01.
+Require Import KernelDecode02.
+Require Import KernelDecode03.
+Require Import KernelDecode05.
+Require Import KernelDecode06.
+Require Import KernelDecode07.
+Require Import KernelDecode08.
+Require Import KernelDecode09.
+Require Import KernelDecode12.
+Require Import KernelDecode13.
+Require Import KernelDecode14.
+Require Import KernelDecode15.
+Require Import KernelDecode16.
+Require Import KernelDecode17.
+Require Import KernelDecode19.
+Require Import KernelDecode20.
+Require Import KernelDecode21.
+Require Import KernelDecode22.
+Require Import KernelDecode23.
+Require Import KernelDecode24.
+Require Import KernelDecode25.
+Require Import KernelDecode26.
+Require Import KernelDecode27.
+Require Import KernelDecode28.
+Require Import KernelDecode29.
+Require Import KernelDecode30.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -145,9 +166,9 @@ Section CodeUvmcopy.
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x3e) (mword_of_int 0xd3fd : mword 16)
     (mword_of_int (KernelSyms.uvmcopy + 0x3e) : mword 64) (BTYPE (sign_extend' 13 (concat_vec (mword_of_int 243 : mword 8) ('b"0")), zreg, creg2reg_idx (Cregidx (mword_of_int 7)), BEQ)) kd_d3fd exec_execute_C_BEQZ. Qed.
 
-  Lemma uci_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) false (JAL (mword_of_int 2094826 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcopy + 0x40) (mword_of_int 0xeeaff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) (JAL (mword_of_int 2094826 : mword 21, Regidx (mword_of_int 1))) kd_eeaff0ef. Qed.
+  Lemma uci_40 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) false (JAL (mword_of_int 2094824 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcopy + 0x40) (mword_of_int 0xee8ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcopy + 0x40) : mword 64) (JAL (mword_of_int 2094824 : mword 21, Regidx (mword_of_int 1))) kd_ee8ff0ef. Qed.
 
   Lemma uci_44 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x44) : mword 64) true (RTYPE (Regidx (mword_of_int 10), zreg, Regidx (mword_of_int 18), ADD)).
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x44) (mword_of_int 0x892a : mword 16)
@@ -169,9 +190,9 @@ Section CodeUvmcopy.
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x4e) (mword_of_int 0x05b2 : mword 16)
     (mword_of_int (KernelSyms.uvmcopy + 0x4e) : mword 64) (SHIFTIOP (mword_of_int 12 : mword 6, Regidx (mword_of_int 11), Regidx (mword_of_int 11), SLLI)) kd_05b2 exec_execute_C_SLLI. Qed.
 
-  Lemma uci_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) false (JAL (mword_of_int 2095316 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcopy + 0x50) (mword_of_int 0x8d5ff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) (JAL (mword_of_int 2095316 : mword 21, Regidx (mword_of_int 1))) kd_8d5ff0ef. Qed.
+  Lemma uci_50 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) false (JAL (mword_of_int 2095314 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcopy + 0x50) (mword_of_int 0x8d3ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcopy + 0x50) : mword 64) (JAL (mword_of_int 2095314 : mword 21, Regidx (mword_of_int 1))) kd_8d3ff0ef. Qed.
 
   Lemma uci_54 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x54) : mword 64) false (ITYPE (mword_of_int 1023 : mword 12, Regidx (mword_of_int 19), Regidx (mword_of_int 14), ANDI)).
   Proof. mk_base (KernelSyms.uvmcopy + 0x54) (mword_of_int 0x3ff9f713 : mword 32)
@@ -205,9 +226,9 @@ Section CodeUvmcopy.
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x66) (mword_of_int 0x854a : mword 16)
     (mword_of_int (KernelSyms.uvmcopy + 0x66) : mword 64) (RTYPE (Regidx (mword_of_int 18), zreg, Regidx (mword_of_int 10), ADD)) kd_854a exec_execute_C_MV. Qed.
 
-  Lemma uci_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) false (JAL (mword_of_int 2094554 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.uvmcopy + 0x68) (mword_of_int 0xddaff0ef : mword 32)
-    (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) (JAL (mword_of_int 2094554 : mword 21, Regidx (mword_of_int 1))) kd_ddaff0ef. Qed.
+  Lemma uci_68 : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) false (JAL (mword_of_int 2094552 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.uvmcopy + 0x68) (mword_of_int 0xdd8ff0ef : mword 32)
+    (mword_of_int (KernelSyms.uvmcopy + 0x68) : mword 64) (JAL (mword_of_int 2094552 : mword 21, Regidx (mword_of_int 1))) kd_dd8ff0ef. Qed.
 
   Lemma uci_6c : kernel_text -∗ instr (mword_of_int (KernelSyms.uvmcopy + 0x6c) : mword 64) true (ITYPE (sign_extend' 12 (mword_of_int 1 : mword 6), zreg, Regidx (mword_of_int 13), ADDI)).
   Proof. mk_rvc (KernelSyms.uvmcopy + 0x6c) (mword_of_int 0x4685 : mword 16)

@@ -11,7 +11,7 @@
        return 0;
      }
 
-   Thirty-three instructions (KernelInstrs @ 0x80004a0a; the listing is in
+   Thirty-three instructions (KernelInstrs @ 0x80004a04; the listing is in
    CodeArgfd.v).  What is new here relative to sys_close:
 
    * THREE arms joining at the epilogue (+0x46) -- each [return -1] tail being
@@ -825,7 +825,7 @@ Section ProofArgfd.
       { exfalso. apply lookup_ge_None_1 in Hlk. rewrite Hoflen in Hlk. lia. }
       (* ---- +0x22: jal ra,myproc ---- *)
       iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.argfd + 0x22))
-                (mword_of_int 1 : mword 5) (mword_of_int 2084568 : mword 21) A2 (av - 6)%nat b
+                (mword_of_int 1 : mword 5) (mword_of_int 2084556 : mword 21) A2 (av - 6)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi22 [-]").
       iIntros (CID15 Hk15) "Hcg Hpc".
@@ -834,7 +834,7 @@ Section ProofArgfd.
       change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg
                 (add_vec_int (mword_of_int (KernelSyms.argfd + 0x22) : mword 64) 4)]> A2) with B.
       assert (Hjmp : add_vec (mword_of_int (KernelSyms.argfd + 0x22) : mword 64)
-                       (sign_extend' 64 (mword_of_int 2084568 : mword 21)) = mword_of_int KernelSyms.myproc)
+                       (sign_extend' 64 (mword_of_int 2084556 : mword 21)) = mword_of_int KernelSyms.myproc)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hjmp) in "Hpc".
       assert (HBra : B !!! Regidx (mword_of_int 1 : mword 5)

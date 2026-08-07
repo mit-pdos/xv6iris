@@ -246,7 +246,7 @@ Section ProofSysKill.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
     (* +0x16 jal ra,kkill *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_kill + 0x16)) Rra (mword_of_int 2094672 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_kill + 0x16)) Rra (mword_of_int 2094668 : mword 21)
               B1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16 [-]").
@@ -254,7 +254,7 @@ Section ProofSysKill.
     set (B2 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_kill + 0x16) : mword 64) 4)]> B1).
     change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_kill + 0x16) : mword 64) 4)]> B1) with B2.
     assert (Hjkk : add_vec (mword_of_int (KernelSyms.sys_kill + 0x16) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2094672 : mword 21)) = mword_of_int KernelSyms.kkill)
+                     (sign_extend' 64 (mword_of_int 2094668 : mword 21)) = mword_of_int KernelSyms.kkill)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjkk) in "Hpc".
     assert (HB2ra : B2 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.sys_kill + 0x16) : mword 64) 4)

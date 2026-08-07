@@ -40,13 +40,44 @@ Require Import StackOwn CalleeSaved.
 Require Import WpSmodeIntr.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfLock.
 Require Import WpLock.
-Require Import KernelRvcDecode CodeMycpu SpecMycpu.
+Require Import KernelRvcDecode SpecMycpu.
 Require Import CodeHolding WpHoldingInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecHolding.
-Require Import CodeHoldingAux.
-Require Import CodeMycpuAux.
+Require Import ProcGeom.
 Import Defs.
+
+(* seqz on (a - b) is 0 when a <> b (holding +0x1e). *)
+Lemma seqz_sub_neq (a b : mword 64) :
+  eq_vec a b = false ->
+  zero_extend' 64 (bool_to_bit (zopz0zI_u (sub_vec a b)
+    (sign_extend' 64 (mword_of_int 1 : mword 12)))) = (mword_of_int 0 : mword 64).
+Proof.
+  intro Hne.
+  replace (sign_extend' 64 (mword_of_int 1 : mword 12)) with (mword_of_int 1 : mword 64)
+    by (apply bv_eq; vm_compute; reflexivity).
+  assert (Hab : a <> b) by (apply eq_vec_false_iff; exact Hne).
+  destruct (zopz0zI_u (sub_vec a b) (mword_of_int 1)) eqn:Hlt.
+  - exfalso. apply Hab.
+    unfold zopz0zI_u in Hlt.
+    apply Z.ltb_lt in Hlt.
+    change (uint (mword_of_int 1 : mword 64)) with 1 in Hlt.
+    rewrite uint_unsigned in Hlt.
+    pose proof (bv_unsigned_in_range _ (sub_vec a b)) as [Hlo _].
+    assert (H0 : bv_unsigned (sub_vec a b) = 0) by lia.
+    apply bv_eq.
+    rewrite sub_vec64_unsigned in H0.
+    pose proof (bv_unsigned_in_range _ a) as Ha.
+    pose proof (bv_unsigned_in_range _ b) as Hb.
+    unfold bv_wrap in H0.
+    assert (M : bv_modulus 64 = 18446744073709551616) by reflexivity.
+    rewrite M in H0. rewrite M in Ha. rewrite M in Hb.
+    apply Z.mod_divide in H0; [| lia].
+    destruct H0 as [q Hq].
+    assert (Hq0 : q = 0) by lia.
+    lia.
+  - apply bv_eq. vm_compute. reflexivity.
+Qed.
 
 
 
@@ -272,7 +303,7 @@ Section ProofHolding.
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
     iPoseProof (his_16 with "Htext") as "Hi16".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2e : mword 21) S4 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi16 [-]").
@@ -631,7 +662,7 @@ Section ProofHolding.
       rewrite /S2 upd_ne; [| vm_compute; discriminate].
       exact HcspS0. }
     iPoseProof (his_16 with "Htext") as "Hi16".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2c : mword 21) S4 (n - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs Φ (mword_of_int (KernelSyms.holding + 0x16)) (mword_of_int 0xd2e : mword 21) S4 (n - 4)%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi16 [-]").

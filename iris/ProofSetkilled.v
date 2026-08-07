@@ -39,9 +39,10 @@ Require Import SpecSetkilled.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSetkilled.
-Require Import CodeSetkilledAux.
 Import Defs.
 Local Open Scope Z_scope.
+
+Notation sk_ra := (mword_of_int 1 : mword 5).
 (* a failing tactic in a whole-function WP over the proc invariant otherwise
    spends tens of minutes FORMATTING the goal -- see durable-notes. *)
 Set Printing Depth 40.
@@ -166,14 +167,14 @@ Section ProofSetkilled.
       rewrite /M1 upd_ne; [| vm_compute; discriminate]. exact Ha0. }
     (* +0x0c: jal ra,acquire *)
     iPoseProof (ski_0c with "Htext") as "Hi0c".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.setkilled + 0x0c)) sk_ra (mword_of_int 2091742 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.setkilled + 0x0c)) sk_ra (mword_of_int 2091732 : mword 21)
               A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0c [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (B1 := <[Regidx sk_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) 4)]> A2).
     change (<[Regidx sk_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) 4)]> A2) with B1.
-    assert (Hjacq : add_vec (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2091742 : mword 21)) = mword_of_int KernelSyms.acquire)
+    assert (Hjacq : add_vec (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) (sign_extend' 64 (mword_of_int 2091732 : mword 21)) = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjacq) in "Hpc".
     assert (HB1ra : B1 !!! Regidx sk_ra = add_vec_int (mword_of_int (KernelSyms.setkilled + 0x0c) : mword 64) 4) by (rewrite /B1 upd_eq; reflexivity).
@@ -241,7 +242,7 @@ Section ProofSetkilled.
       by (rewrite /C2 upd_eq add_vec_zero_l; exact HC1s1).
     (* +0x16: jal ra,release *)
     iPoseProof (ski_16 with "Htext") as "Hi16".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.setkilled + 0x16)) sk_ra (mword_of_int 2091868 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.setkilled + 0x16)) sk_ra (mword_of_int 2091858 : mword 21)
               C2 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16 [-]").
@@ -249,7 +250,7 @@ Section ProofSetkilled.
     iIntros "Hcg Hpc".
     set (C3 := <[Regidx sk_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) 4)]> C2).
     change (<[Regidx sk_ra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) 4)]> C2) with C3.
-    assert (Hjrel : add_vec (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) (sign_extend' 64 (mword_of_int 2091868 : mword 21)) = mword_of_int KernelSyms.release)
+    assert (Hjrel : add_vec (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) (sign_extend' 64 (mword_of_int 2091858 : mword 21)) = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjrel) in "Hpc".
     assert (HC3ra : C3 !!! Regidx sk_ra = add_vec_int (mword_of_int (KernelSyms.setkilled + 0x16) : mword 64) 4) by (rewrite /C3 upd_eq; reflexivity).

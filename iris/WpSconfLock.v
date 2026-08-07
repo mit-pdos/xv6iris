@@ -43,11 +43,10 @@ Require Import SmodeCorePt WpSmodePtLock WpAmo.
 Require Import MemAccessGen.
 Require Import UserBits.
 Require Import WpLock.
-Require Import CodeMycpu ProcGeom.
+Require Import ProcGeom.
 Require Import SRegime.
 Require Import IntrDefs WpSmodeIntr.
 Require Import WpSconfMem.
-Require Import CodeMycpuAux.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Local Open Scope Z_scope.
 Import Defs.

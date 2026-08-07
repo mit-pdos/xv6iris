@@ -46,8 +46,6 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
 Require Import WpSmodeWfi.
 Require Import WpLock.
-Require Import CodeMycpu.
-Require Import WpAuipc.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import SwtchCtx.
@@ -57,7 +55,6 @@ Require Import CodeScheduler.
 Require Import SpecAcquire SpecRelease SpecSwtch SpecScheduler.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
-Require Import CodeMycpuAux.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.
@@ -515,22 +512,22 @@ Section ProofScheduler.
     iEval (rewrite Hpc24) in "Hpc".
     (* +0x24 addi a4,a4,1454 *)
     iPoseProof (schi_24 with "Htext") as "Hi24".
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x24)) Ra4 Ra4 (mword_of_int 1454 : mword 12)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x24)) Ra4 Ra4 (mword_of_int 1444 : mword 12)
               A5 (av - 10)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [-]").
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
     iIntros "Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A6 := <[Regidx Ra4 := regval_into_reg
-        (add_vec (A5 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1454 : mword 12)))]> A5).
+        (add_vec (A5 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1444 : mword 12)))]> A5).
     change (<[Regidx Ra4 := regval_into_reg
-        (add_vec (A5 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1454 : mword 12)))]> A5) with A6.
+        (add_vec (A5 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1444 : mword 12)))]> A5) with A6.
     assert (Hpc28 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x24) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x28))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc28) in "Hpc".
     assert (HA6a4 : A6 !!! Regidx Ra4
                     = add_vec (add_vec (mword_of_int (KernelSyms.scheduler + 0x20) : mword 64) (auipc_off (mword_of_int 0x10 : mword 20)))
-                              (sign_extend' 64 (mword_of_int 1454 : mword 12)))
+                              (sign_extend' 64 (mword_of_int 1444 : mword 12)))
       by (rewrite /A6 upd_eq /A5 upd_eq; reflexivity).
     assert (HA6s6 : A6 !!! Regidx Rs6 = mycpu_a5 cid_word).
     { rewrite /A6 upd_ne; [| vm_compute; discriminate].
@@ -605,22 +602,22 @@ Section ProofScheduler.
     iEval (rewrite Hpc32) in "Hpc".
     (* +0x32 addi a4,a4,1496 *)
     iPoseProof (schi_32 with "Htext") as "Hi32".
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x32)) Ra4 Ra4 (mword_of_int 1496 : mword 12)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x32)) Ra4 Ra4 (mword_of_int 1486 : mword 12)
               A8 (av - 10)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi32 [-]").
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
     iIntros "Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A9 := <[Regidx Ra4 := regval_into_reg
-        (add_vec (A8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1496 : mword 12)))]> A8).
+        (add_vec (A8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1486 : mword 12)))]> A8).
     change (<[Regidx Ra4 := regval_into_reg
-        (add_vec (A8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1496 : mword 12)))]> A8) with A9.
+        (add_vec (A8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1486 : mword 12)))]> A8) with A9.
     assert (Hpc36 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x32) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x36))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc36) in "Hpc".
     assert (HA9a4 : A9 !!! Regidx Ra4
                     = add_vec (add_vec (mword_of_int (KernelSyms.scheduler + 0x2e) : mword 64) (auipc_off (mword_of_int 0x10 : mword 20)))
-                              (sign_extend' 64 (mword_of_int 1496 : mword 12)))
+                              (sign_extend' 64 (mword_of_int 1486 : mword 12)))
       by (rewrite /A9 upd_eq /A8 upd_eq; reflexivity).
     assert (HA9s6 : A9 !!! Regidx Rs6 = mycpu_a5 cid_word).
     { rewrite /A9 upd_ne; [| vm_compute; discriminate].
@@ -702,22 +699,22 @@ Section ProofScheduler.
     iEval (rewrite Hpc40) in "Hpc".
     (* +0x40 addi s4,s4,1426 *)
     iPoseProof (schi_40 with "Htext") as "Hi40".
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x40)) Rs4 Rs4 (mword_of_int 1426 : mword 12)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x40)) Rs4 Rs4 (mword_of_int 1416 : mword 12)
               A13 (av - 10)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi40 [-]").
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
     iIntros "Hcg Hpc".
     iEval (repeat rgne) in "Hcg".
     set (A14 := <[Regidx Rs4 := regval_into_reg
-        (add_vec (A13 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 1426 : mword 12)))]> A13).
+        (add_vec (A13 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 1416 : mword 12)))]> A13).
     change (<[Regidx Rs4 := regval_into_reg
-        (add_vec (A13 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 1426 : mword 12)))]> A13) with A14.
+        (add_vec (A13 !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 1416 : mword 12)))]> A13) with A14.
     assert (Hpc44 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x40) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x44))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc44) in "Hpc".
     assert (HA14s4 : A14 !!! Regidx Rs4
                      = add_vec (add_vec (mword_of_int (KernelSyms.scheduler + 0x3c) : mword 64) (auipc_off (mword_of_int 0x10 : mword 20)))
-                               (sign_extend' 64 (mword_of_int 1426 : mword 12)))
+                               (sign_extend' 64 (mword_of_int 1416 : mword 12)))
       by (rewrite /A14 upd_eq /A13 upd_eq; reflexivity).
     assert (HA14a5 : A14 !!! Regidx Ra5 = mycpu_a5 cid_word).
     { rewrite /A14 upd_ne; [| vm_compute; discriminate].
@@ -852,14 +849,14 @@ Section ProofScheduler.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hq4c) in "Hpc".
       (* +0x4c jal release *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x4c)) Rra (mword_of_int 2092746 : mword 21)
+      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x4c)) Rra (mword_of_int 2092736 : mword 21)
                 T0 (av - 10)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi4c [-]").
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros "Hcg Hpc".
       set (T1 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x4c) : mword 64) 4)]> T0).
       change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x4c) : mword 64) 4)]> T0) with T1.
-      assert (Hqrl : add_vec (mword_of_int (KernelSyms.scheduler + 0x4c) : mword 64) (sign_extend' 64 (mword_of_int 2092746 : mword 21))
+      assert (Hqrl : add_vec (mword_of_int (KernelSyms.scheduler + 0x4c) : mword 64) (sign_extend' 64 (mword_of_int 2092736 : mword 21))
                      = mword_of_int KernelSyms.release) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hqrl) in "Hpc".
       assert (HT1ra : T1 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.scheduler + 0x4c) : mword 64) 4)
@@ -1025,14 +1022,14 @@ Section ProofScheduler.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hr5a) in "Hpc".
       (* +0x5a jal acquire *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x5a)) Rra (mword_of_int 2092596 : mword 21)
+      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x5a)) Rra (mword_of_int 2092586 : mword 21)
                 M0 (av - 10)%nat ebc ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5a [-]").
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros "Hcg Hpc".
       set (M1 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x5a) : mword 64) 4)]> M0).
       change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x5a) : mword 64) 4)]> M0) with M1.
-      assert (Hraq : add_vec (mword_of_int (KernelSyms.scheduler + 0x5a) : mword 64) (sign_extend' 64 (mword_of_int 2092596 : mword 21))
+      assert (Hraq : add_vec (mword_of_int (KernelSyms.scheduler + 0x5a) : mword 64) (sign_extend' 64 (mword_of_int 2092586 : mword 21))
                      = mword_of_int KernelSyms.acquire) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hraq) in "Hpc".
       assert (HM1ra : M1 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.scheduler + 0x5a) : mword 64) 4)
@@ -1247,14 +1244,14 @@ Section ProofScheduler.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hr72) in "Hpc".
         (* +0x72 jal swtch *)
-        iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x72)) Rra (mword_of_int 1452 : mword 21)
+        iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x72)) Rra (mword_of_int 1456 : mword 21)
                   M4 (av - 10)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi72 [-]").
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
         iIntros "Hcg Hpc".
         set (Mc := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x72) : mword 64) 4)]> M4).
         change (<[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.scheduler + 0x72) : mword 64) 4)]> M4) with Mc.
-        assert (Hrsw : add_vec (mword_of_int (KernelSyms.scheduler + 0x72) : mword 64) (sign_extend' 64 (mword_of_int 1452 : mword 21))
+        assert (Hrsw : add_vec (mword_of_int (KernelSyms.scheduler + 0x72) : mword 64) (sign_extend' 64 (mword_of_int 1456 : mword 21))
                        = mword_of_int KernelSyms.swtch) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hrsw) in "Hpc".
         (* the swtch call site's register facts *)
@@ -1309,7 +1306,7 @@ Section ProofScheduler.
         iDestruct (p_sched_at_cpu γs cpu_id A' jj cret (rget m' Rtp) Hjj with "Hpay2")
           as "(%Htpv & %Hcret & %HA' & Hcsrs & Hpay3)".
         subst A'.
-        iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts Hheld']".
+        iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts [Hheld' Hppay]]".
         destruct Hfacts as [Hgl' Hneeds'].
         assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
         iEval (rewrite /proc_held) in "Hheld'".
@@ -1410,16 +1407,25 @@ Section ProofScheduler.
         { rewrite /M5 upd_eq. rewrite Hm23.
           rewrite (HMcthr Rs7 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)).
           rewrite HM2s7. intro Hbad. discriminate. }
-        (* rebuild the lock resource at the parked state *)
+        (* rebuild the lock resource at the parked state.  ONE lemma for both
+           kinds of park (SchedCtx.proc_slots_park_gen): the record the swtch
+           handed back, the rejoined receipt, and whatever the crossing's
+           [park_pay] carried -- the dormant block at a ZOMBIE park, nothing
+           at a resumable one.  The update is that lemma's ZOMBIE arm
+           forgetting the record down to its cells. *)
+        (* the update is eliminated against the WP through [fupd_wp], the way
+           every other fancy-update step in this tree is -- there is no
+           [ElimModal] instance for a bare [WP] goal here. *)
+        iApply fupd_wp.
+        iMod (proc_slots_park_gen Φ γs ⊤ (proc_addr jj) st' Hneeds'
+                with "[Hvc'] [Hpark] Hppay") as "Hsl".
+        { iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'". }
+        { iApply (park_at_full_intro jj false Hjj with "Hpark"). }
+        iModIntro.
         iAssert (proc_lock_res Φ γs γl (proc_addr jj))
-          with "[Hstate Hchan Hpub Hvc' Hpark]" as "HR".
-        { rewrite /proc_lock_res. iExists st', ch'. iFrame "Hstate Hchan Hpub".
-          rewrite /proc_slots Hneeds' (sc_needs_ctx_not_dormant st' Hneeds')
-                  (not_running_of_needs_ctx st' Hneeds').
-          iSplitL "Hvc'".
-          - iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'".
-          - iSplitR; [done|].
-            iApply (park_at_full_intro jj false Hjj with "Hpark"). }
+          with "[Hstate Hchan Hpub Hsl]" as "HR".
+        { rewrite /proc_lock_res. iExists st', ch'.
+          iFrame "Hstate Hchan Hpub Hsl". }
         (* c->proc is 0 again, so re-tag the bundle back to the idle index --
            this is what keeps [wp_next_idle] available at the loop head. *)
         iEval (rewrite (sc_retag_p M5 (av - 10)%nat (proc_addr jj) zero_reg)) in "Hcg".
@@ -1533,16 +1539,16 @@ Section ProofScheduler.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ho94) in "Hpc".
       (* +0x94 addi s1,s1,2414 : &proc[0] *)
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x94)) Rs1 Rs1 (mword_of_int 2414 : mword 12)
+      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x94)) Rs1 Rs1 (mword_of_int 2404 : mword 12)
                 B1 (av - 10)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi94 [-]").
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros "Hcg Hpc".
       iEval (repeat rgne) in "Hcg".
       set (B2 := <[Regidx Rs1 := regval_into_reg
-          (add_vec (B1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 2414 : mword 12)))]> B1).
+          (add_vec (B1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 2404 : mword 12)))]> B1).
       change (<[Regidx Rs1 := regval_into_reg
-          (add_vec (B1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 2414 : mword 12)))]> B1) with B2.
+          (add_vec (B1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 2404 : mword 12)))]> B1) with B2.
       assert (Ho98 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x94) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x98))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ho98) in "Hpc".
@@ -1575,16 +1581,16 @@ Section ProofScheduler.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ho9e) in "Hpc".
       (* +0x9e addi s2,s2,868 : &proc[NPROC] *)
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x9e)) Rs2 Rs2 (mword_of_int 868 : mword 12)
+      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x9e)) Rs2 Rs2 (mword_of_int 858 : mword 12)
                 B4 (av - 10)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi9e [-]").
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       iIntros "Hcg Hpc".
       iEval (repeat rgne) in "Hcg".
       set (B5 := <[Regidx Rs2 := regval_into_reg
-          (add_vec (B4 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 868 : mword 12)))]> B4).
+          (add_vec (B4 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 858 : mword 12)))]> B4).
       change (<[Regidx Rs2 := regval_into_reg
-          (add_vec (B4 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 868 : mword 12)))]> B4) with B5.
+          (add_vec (B4 !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 858 : mword 12)))]> B4) with B5.
       assert (Hoa2 : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x9e) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0xa2))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hoa2) in "Hpc".

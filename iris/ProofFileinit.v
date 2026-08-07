@@ -5,7 +5,8 @@
 
    fileinit is a thin initlock wrapper, so it is an INSTANCE of the shape proved
    once in WpInitlockWrapper.v: all this file supplies is fileinit's thirteen
-   instructions (CodeFileinit.fii_code) and the three relocations -- a1 =
+   instructions (CodeFileinit.v, bundled as [fii_code] below) and the three
+   relocations -- a1 =
    &"ftable" (auipc 0x3 / addi +1468), a0 = &ftable (auipc 0x1e / addi +1212),
    and the jal displacement to initlock. *)
 From Stdlib Require Import ZArith.
@@ -18,14 +19,42 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RegFile.
 Require Import SmodeCore.
 Require Import KernelDataInv.
-Require Import SpecInitlock WpInitlockWrapper.
-Require Import CodeFileinit.
+Require Import SpecInitlock SpecInitlockWrapper WpInitlockWrapper.
+Require Import KernelText CodeFileinit.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecFileinit.
-Require Import CodeFileinitAux.
 Local Open Scope Z_scope.
 Import Defs.
+
+Section CodeFileinitBundle.
+  Context `{!riscvGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* fileinit's thirteen instructions (CodeFileinit.v), in the
+     thin-initlock-wrapper pattern.  The five immediates are exactly what the
+     whole-function proof needs to know about fileinit's code. *)
+  Lemma fii_code :
+    kernel_text -∗ ilw_code KernelSyms.fileinit (mword_of_int 3) (mword_of_int 30)
+                            (mword_of_int 1448) (mword_of_int 1192) (mword_of_int 2083784).
+  Proof.
+    iIntros "#Ht". rewrite /ilw_code.
+    iSplitR; [iApply (fii_00 with "Ht")|].
+    iSplitR; [iApply (fii_02 with "Ht")|].
+    iSplitR; [iApply (fii_04 with "Ht")|].
+    iSplitR; [iApply (fii_06 with "Ht")|].
+    iSplitR; [iApply (fii_08 with "Ht")|].
+    iSplitR; [iApply (fii_0c with "Ht")|].
+    iSplitR; [iApply (fii_10 with "Ht")|].
+    iSplitR; [iApply (fii_14 with "Ht")|].
+    iSplitR; [iApply (fii_18 with "Ht")|].
+    iSplitR; [iApply (fii_1c with "Ht")|].
+    iSplitR; [iApply (fii_1e with "Ht")|].
+    iSplitR; [iApply (fii_20 with "Ht")|].
+    iApply (fii_22 with "Ht").
+  Qed.
+
+End CodeFileinitBundle.
 
 Module FileinitProof (Initlock : INITLOCK) : FILEINIT.
 
@@ -56,8 +85,8 @@ Section ProofFileinit.
     iPoseProof (kernel_data_string ftable_name_str "ftable"%string name eq_refl ltac:(unfold text_end, ftable_name_str; lia) Hftable
                   with "Hkdata") as "#Hstr".
     iApply (ILW.wp_initlock_wrapper_sconf Φ m K KernelSyms.fileinit
-              (mword_of_int 3) (mword_of_int 30) (mword_of_int 1462) (mword_of_int 1206)
-              (mword_of_int 2083798) lk name "ftable"%string vlock vname vcpu b p HK
+              (mword_of_int 3) (mword_of_int 30) (mword_of_int 1448) (mword_of_int 1192)
+              (mword_of_int 2083784) lk name "ftable"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)
               ltac:(apply bv_eq; vm_compute; reflexivity)

@@ -57,7 +57,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - bug: missing fence iorw,iorw in virtio disk driver
 - RVWMO doesn't cover icache behavior, Sail model doesn't include icache either; also no precise model of MMIO/DMA
 - Sail model represents A/D page table flushes as regular reads/writes, but actual RISC-V spec doc says they should be atomic w.r.t. other PTE accesses.  problem with model: uvmunmap clears PTE entry, another HART writes it back with A|D.  not possible on HW, but Sail allows this.
-- gen_decode.py generates CodeF.v, helps with updating proofs after xv6 source changes.
+- gen_code.py generates CodeF.v, helps with updating proofs after xv6 source changes.
 - promise-free weak memory plan; need soundness proof for LB without promises
 
 Big things that still need to be done/explored:

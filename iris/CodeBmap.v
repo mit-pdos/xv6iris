@@ -7,22 +7,40 @@
    which is why this file is generated rather than maintained.
 
    Regenerate with:  make gen-code                                        *)
-From Stdlib Require Import ZArith.
-From stdpp Require Import bitvector.definitions.
-From iris.proofmode Require Import proofmode.
 From iris.program_logic Require Import lifting.
-Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
-Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec RiscvFetchExec.
-Require Import InstrBytes WpDecodeBridge.
+Require Import RiscvLang RiscvPtsto.
+Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpMmodeLeafBase.
-Require Import WpRvcBridge.
 From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
-Require Import KernelDecode.
-Require Import ExecCommon.
+Require Import KernelDecode00.
+Require Import KernelDecode01.
+Require Import KernelDecode02.
+Require Import KernelDecode04.
+Require Import KernelDecode05.
+Require Import KernelDecode07.
+Require Import KernelDecode08.
+Require Import KernelDecode10.
+Require Import KernelDecode11.
+Require Import KernelDecode12.
+Require Import KernelDecode13.
+Require Import KernelDecode14.
+Require Import KernelDecode15.
+Require Import KernelDecode18.
+Require Import KernelDecode19.
+Require Import KernelDecode20.
+Require Import KernelDecode22.
+Require Import KernelDecode23.
+Require Import KernelDecode24.
+Require Import KernelDecode25.
+Require Import KernelDecode26.
+Require Import KernelDecode27.
+Require Import KernelDecode28.
+Require Import KernelDecode29.
+Require Import KernelDecode31.
 Local Open Scope Z_scope.
 Import Defs.
 
@@ -305,12 +323,12 @@ Section CodeBmap.
   Proof. mk_base (KernelSyms.bmap + 0xb4) (mword_of_int 0x00004517 : mword 32)
     (mword_of_int (KernelSyms.bmap + 0xb4) : mword 64) (UTYPE (mword_of_int 4 : mword 20, Regidx (mword_of_int 10), AUIPC)) kd_00004517. Qed.
 
-  Lemma bmi_b8 : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) false (ITYPE (mword_of_int 1192 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
-  Proof. mk_base (KernelSyms.bmap + 0xb8) (mword_of_int 0x4a850513 : mword 32)
-    (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) (ITYPE (mword_of_int 1192 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_4a850513. Qed.
+  Lemma bmi_b8 : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) false (ITYPE (mword_of_int 1178 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)).
+  Proof. mk_base (KernelSyms.bmap + 0xb8) (mword_of_int 0x49a50513 : mword 32)
+    (mword_of_int (KernelSyms.bmap + 0xb8) : mword 64) (ITYPE (mword_of_int 1178 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 10), ADDI)) kd_49a50513. Qed.
 
-  Lemma bmi_bc : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) false (JAL (mword_of_int 2087118 : mword 21, Regidx (mword_of_int 1))).
-  Proof. mk_base (KernelSyms.bmap + 0xbc) (mword_of_int 0x8cffd0ef : mword 32)
-    (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) (JAL (mword_of_int 2087118 : mword 21, Regidx (mword_of_int 1))) kd_8cffd0ef. Qed.
+  Lemma bmi_bc : kernel_text -∗ instr (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) false (JAL (mword_of_int 2087104 : mword 21, Regidx (mword_of_int 1))).
+  Proof. mk_base (KernelSyms.bmap + 0xbc) (mword_of_int 0x8c1fd0ef : mword 32)
+    (mword_of_int (KernelSyms.bmap + 0xbc) : mword 64) (JAL (mword_of_int 2087104 : mword 21, Regidx (mword_of_int 1))) kd_8c1fd0ef. Qed.
 
 End CodeBmap.

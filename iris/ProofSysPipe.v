@@ -6,7 +6,7 @@
        -> copyout(&fd0) -> copyout(&fd1) -> return 0
      bad: null whichever descriptors were installed, fileclose both, return -1
 
-   Seventy-one instructions (KernelInstrs @ 0x8000533e; the listing is in
+   Seventy-one instructions (KernelInstrs @ 0x80005338; the listing is in
    CodeSysPipe.v).  Four things carry the proof.
 
    * THE FRAME IS THE STATE.  Like pipealloc, every branch after a call
@@ -365,7 +365,7 @@ Module SysPipeProof (Myproc : MYPROC) (Argaddr : ARGADDR) (Pipealloc : PIPEALLOC
   : SYSPIPE.
 
 Section ProofSysPipe.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ, !pipeG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register indices, named once *)
@@ -1010,7 +1010,7 @@ Section ProofSysPipe.
     (*  +0x0a  jal ra,myproc                                             *)
     (* ================================================================= *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_pipe + 0x0a)) Rra
-              (mword_of_int 2082236 : mword 21) R2 (av - 8)%nat b
+              (mword_of_int 2082224 : mword 21) R2 (av - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi0a [-]").
     iIntros (CID24 Hcr24) "Hcg Hpc".
@@ -1019,7 +1019,7 @@ Section ProofSysPipe.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0x0a) : mword 64) 4)]> R2) with R3.
     assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x0a) : mword 64)
-                     (sign_extend' 64 (mword_of_int 2082236 : mword 21))
+                     (sign_extend' 64 (mword_of_int 2082224 : mword 21))
                    = mword_of_int KernelSyms.myproc)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjmp) in "Hpc".
@@ -1321,17 +1321,15 @@ Section ProofSysPipe.
       iLeft. iSplitR; [done|]. iExact "Hpriv". }
     (* ============ pipealloc succeeded ================================= *)
     iDestruct "Hsucc" as "(%Hr0 & _ & Hpipe)".
-    iDestruct "Hpipe" as (γl γp pi k0 k1 Cf0 Cf1)
-      "(%Hklt & %Hpf0 & %Hpf1 & Hb6 & Hb7 & #Hispipe & Href0 & Hpr0 & Href1 & Hpr1)".
+    iDestruct "Hpipe" as (pi k0 k1 Cf0 Cf1)
+      "(%Hklt & %Hpf0 & %Hpf1 & Hb6 & Hb7 & Href0 & Href1)".
     destruct Hklt as [Hk0lt Hk1lt].
-    (* THE ONE DELIBERATE DROP.  [FileInv.file_ref] is stage 1: it carries no
-       [file_payload] yet, so the two pipe-end references pipealloc hands back
-       have nowhere to go once the files enter the fd table.  They are dropped
-       here (the logic is affine): a leak of the pipe's page, not a soundness
-       hole, and it disappears the moment [file_payload] lands -- pipealloc
-       will then fold the ends INTO the two [file_ref]s and this proof will
-       not mention them at all.  See design/file-table.md. *)
-    iClear "Hpr0 Hpr1".
+    (* Nothing about the pipe appears from here on, and that is the point:
+       each end rides INSIDE its file's [FileInv.file_ref] as the payload
+       [pipe_file] pins, so installing a descriptor installs the reference to
+       the pipe with it.  (Before the payload link this proof had to DROP the
+       two ends here -- affine, so it typechecked, and it meant sys_pipe's
+       descriptors were not connected to the pipe in the model.) *)
     assert (HW1a0' : W1 !!! Regidx Ra0 = (zero_reg : mword 64))
       by (rewrite HW1a0; exact Hr0).
     iApply (wp_blt_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.sys_pipe + 0x28))
@@ -1939,7 +1937,7 @@ Section ProofSysPipe.
     iEval (rewrite Hpp5c) in "Hpc".
     (* +0x5c jal ra,copyout *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_pipe + 0x5c)) Rra
-              (mword_of_int 2081418 : mword 21) A4 (av - 8)%nat b
+              (mword_of_int 2081406 : mword 21) A4 (av - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5c [-]").
     iIntros (CID60 Hcr60) "Hcg Hpc".
@@ -1948,7 +1946,7 @@ Section ProofSysPipe.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0x5c) : mword 64) 4)]> A4) with A5.
     assert (Hjco1 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x5c) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2081418 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2081406 : mword 21))
                     = mword_of_int KernelSyms.copyout)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjco1) in "Hpc".
@@ -2316,7 +2314,7 @@ Section ProofSysPipe.
     iEval (rewrite Hpp72) in "Hpc".
     (* +0x72 jal ra,copyout *)
     iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.sys_pipe + 0x72)) Rra
-              (mword_of_int 2081396 : mword 21) C5 (av - 8)%nat b
+              (mword_of_int 2081384 : mword 21) C5 (av - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi72 [-]").
     iIntros (CID75 Hcr75) "Hcg Hpc".
@@ -2325,7 +2323,7 @@ Section ProofSysPipe.
     change (<[Regidx Rra := regval_into_reg
         (add_vec_int (mword_of_int (KernelSyms.sys_pipe + 0x72) : mword 64) 4)]> C5) with C6.
     assert (Hjco2 : add_vec (mword_of_int (KernelSyms.sys_pipe + 0x72) : mword 64)
-                      (sign_extend' 64 (mword_of_int 2081396 : mword 21))
+                      (sign_extend' 64 (mword_of_int 2081384 : mword 21))
                     = mword_of_int KernelSyms.copyout)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hjco2) in "Hpc".

@@ -11,7 +11,7 @@
        return 0;
      }
 
-   @ KernelSyms.sys_close = 0x80004cb8, 24 instructions (see
+   @ KernelSyms.sys_close = 0x80004cb2, 24 instructions (see
    CodeSysClose.v for the listing).
 
    THE POINT OF THIS SPEC.  sys_close is the first proof in which a

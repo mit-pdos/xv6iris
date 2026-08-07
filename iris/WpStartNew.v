@@ -74,7 +74,7 @@ Require Import WpGprCsrwCommon.
 Require Import MstatusFacts.
 Require Import SailStdpp.Base SailStdpp.TypeCasts.
 Require Import RiscvLang RiscvPtsto RiscvFetchExec RiscvExtras WpGpr.
-Require Import WpAuipc WpMmodeShiftiop WpMmodeJal.
+Require Import WpMmodeShiftiop WpMmodeJal.
 Require Import WpMmodeLeafBase.
 Require Import WpMmodeUtype.
 Require Import WpMmodeAddiw.
@@ -90,10 +90,9 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
-Require Import CodeStart.
-Require Import CodeTimerinit.
 
 Require Import CodeStartAux.
+Require Import MbootVocab.
 Require Import CodeTimerinitAux.
 (* ===================================================================== *)
 (* Symbolic values of the run (functions of the entry state).  start()'s *)
@@ -138,6 +137,17 @@ Definition st_pmpaddr1 (cfg0 : type_of_register pmpcfg_n)
   pmp0_newaddr cfg0 pa0 st_pmpw.
 Definition st_tpv (mh : mword 64) : mword 64 :=
   sign_extend' 64 (subrange_vec_dec (add_vec mh (sign_extend' 64 si61)) 31 0).
+
+(* start()'s tp write, in the contract's vocabulary: the [c.addiw a5,0] is a
+   32-bit truncate-and-sign-extend, and [si61] is 0. *)
+Lemma st_tpv_mb (mh : mword 64) : st_tpv mh = mb_tpv mh.
+Proof.
+  unfold st_tpv, mb_tpv.
+  replace (sign_extend' 64 si61 : mword 64)
+    with (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
+    by (apply bv_eq; vm_compute; reflexivity).
+  rewrite addv_sext0. reflexivity.
+Qed.
 
 (* s0 := sp + 16 after the -16 prologue is the ORIGINAL sp. *)
 Lemma st_s0_16 (sp0 : mword 64) :
@@ -384,6 +394,27 @@ Lemma st_boot_ms_kernel_facts (ms : mword 64) :
   mstatus_kernel_facts ms -> mstatus_kernel_facts (cms5 (st_ms1 ms)).
 Proof. intros H. exact (cms5_kernel_facts _ (st_ms1_kernel_facts _ H)). Qed.
 
+(* The other three CSR facts the boot contract exports, off a RESET entry
+   machine in the three registers they are computed from.  (satp needs no
+   premise: writing 0 selects Bare whatever the old value was, since
+   [satp_legalized]'s Bare arm returns the WRITTEN value.)  A client could not
+   discharge these itself -- the entry mstatus is hidden inside
+   [mmode_config] -- which is why they are exported rather than assumed. *)
+Lemma st_boot_csr_facts (menvcfg0 mie0 mideleg0 satp0 : mword 64) :
+  menvcfg0 = (mword_of_int 0 : mword 64) ->
+  mie0 = (mword_of_int 0 : mword 64) ->
+  mideleg0 = (mword_of_int 0 : mword 64) ->
+  menvcfg_legalized (st_menv_adue menvcfg0)
+    (ti_menv1 (st_menv_adue menvcfg0)) = MENVCFG_S /\
+  and_vec (st_mie1 mie0 mideleg0) (not_vec (st_mdl1 mideleg0)) = zeros' 64 /\
+  _get_Satp64_Mode (Mk_Satp64 (satp_legalized satp0 (mword_of_int 0)))
+    = ('b"0000" : mword 4).
+Proof.
+  intros -> -> ->.
+  split_and!;
+    first [ vm_compute; reflexivity | apply bv_eq; vm_compute; reflexivity ].
+Qed.
+
 (* ===================================================================== *)
 (* menvcfg.LPE (bit 2) is never set by the boot flow: the legalizer's     *)
 (* LPE field is written from the written value, whose bit 2 the           *)
@@ -609,20 +640,18 @@ Proof.
   apply bv_eq; vm_compute; reflexivity.
 Qed.
 
-(* entry 0 of the written pmpcfg is TOR + unlocked (byte 0x0f). *)
-Lemma st_pmpcfg1_entry0 (cfg0 : type_of_register pmpcfg_n) :
-  pmp_all_off cfg0 ->
-  pmpAddrMatchType_encdec_backwards
-    (_get_Pmpcfg_ent_A (vec_access_dec (st_pmpcfg1 cfg0) 0)) = TOR
-  /\ pmpLocked (vec_access_dec (st_pmpcfg1 cfg0) 0) = false.
+(* Byte 0 of the written pmpcfg, peeled out of the eight-deep vector update
+   start()'s [csrw pmpcfg0] leaves.  Stated once: every fact about entry 0
+   (A = TOR, unlocked, R/W/X) is a [vm_compute] on top of it, and the peel is
+   twenty-five lines that must not be written twice. *)
+Lemma st_pmpcfg1_ent0_val (cfg0 : type_of_register pmpcfg_n) :
+  vec_access_dec (st_pmpcfg1 cfg0) 0
+  = pmpWriteCfg_val (vec_access_dec cfg0 (Z.add (Z.mul 0 4) 0))
+      (autocast (T := mword)
+         (subrange_vec_dec (mword_of_int 15 : mword 64)
+            (Z.add (Z.mul 8 0) 7) (Z.mul 8 0))).
 Proof.
-  intro Hoff.
-  assert (HE : vec_access_dec (st_pmpcfg1 cfg0) 0
-               = pmpWriteCfg_val (vec_access_dec cfg0 (Z.add (Z.mul 0 4) 0))
-                   (autocast (T := mword)
-                      (subrange_vec_dec (mword_of_int 15 : mword 64)
-                         (Z.add (Z.mul 8 0) 7) (Z.mul 8 0)))).
-  { unfold st_pmpcfg1, pmpcfg_written.
+  unfold st_pmpcfg1, pmpcfg_written.
     unfold pmpcfg0_vecupd at 1.
     rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 7) 0 _ ltac:(lia)).
     replace (Z.eqb 0 (Z.add (Z.mul 0 4) 7)) with false by reflexivity.
@@ -647,12 +676,67 @@ Proof.
     unfold pmpcfg0_vecupd at 1.
     rewrite (pmpcfg_access_update _ (Z.add (Z.mul 0 4) 0) 0 _ ltac:(lia)).
     replace (Z.eqb 0 (Z.add (Z.mul 0 4) 0)) with true by reflexivity.
-    reflexivity. }
-  rewrite HE.
+    reflexivity.
+Qed.
+
+(* entry 0 of the written pmpcfg is TOR + unlocked (byte 0x0f). *)
+Lemma st_pmpcfg1_entry0 (cfg0 : type_of_register pmpcfg_n) :
+  pmp_all_off cfg0 ->
+  pmpAddrMatchType_encdec_backwards
+    (_get_Pmpcfg_ent_A (vec_access_dec (st_pmpcfg1 cfg0) 0)) = TOR
+  /\ pmpLocked (vec_access_dec (st_pmpcfg1 cfg0) 0) = false.
+Proof.
+  intro Hoff.
+  rewrite (st_pmpcfg1_ent0_val cfg0).
   destruct (Hoff (Z.add (Z.mul 0 4) 0)) as [_ HL0].
   unfold pmpWriteCfg_val.
   rewrite HL0.
   split; vm_compute; reflexivity.
+Qed.
+
+(* The R/W/X bits of the entry start() wrote.  Together with
+   [st_pmpcfg1_entry0]'s A = TOR and [st_pmpaddr1_cov]'s ordering and coverage
+   bounds these are exactly the six premises of [SmodeCore.pmp_config_intro],
+   which is why [st_pmp_open] below bundles them as [MbootVocab.mb_pmp_open]:
+   the boot contract hands that bundle over and its client never has to know
+   which pmpcfg the machine powered up with. *)
+Lemma st_pmpcfg1_xwr (cfg0 : type_of_register pmpcfg_n) :
+  pmp_all_off cfg0 ->
+  eq_vec (_get_Pmpcfg_ent_X (vec_access_dec (st_pmpcfg1 cfg0) 0)) ('b"1") = true /\
+  eq_vec (_get_Pmpcfg_ent_W (vec_access_dec (st_pmpcfg1 cfg0) 0)) ('b"1") = true /\
+  eq_vec (_get_Pmpcfg_ent_R (vec_access_dec (st_pmpcfg1 cfg0) 0)) ('b"1") = true.
+Proof.
+  intro Hoff.
+  rewrite (st_pmpcfg1_ent0_val cfg0).
+  destruct (Hoff (Z.add (Z.mul 0 4) 0)) as [_ HL0].
+  unfold pmpWriteCfg_val. rewrite HL0.
+  split_and!; vm_compute; reflexivity.
+Qed.
+
+(* The written TOR bound is above all of RAM, and above 0 -- the ordering and
+   coverage halves of [pmp_config]'s fact set. *)
+Lemma st_pmpaddr1_cov (cfg0 : type_of_register pmpcfg_n)
+    (pa0 : type_of_register pmpaddr_n) :
+  pmp_all_off cfg0 ->
+  zopz0zKzJ_u (zeros' 64) (vec_access_dec (st_pmpaddr1 cfg0 pa0) 0) = false /\
+  (ram_base + ram_size <= uint (vec_access_dec (st_pmpaddr1 cfg0 pa0) 0) * 4)%Z.
+Proof.
+  intro Hoff. rewrite (st_pmpaddr1_entry0 cfg0 pa0 Hoff).
+  split; [vm_compute; reflexivity |].
+  replace (uint st_pmpw) with 0x3fffffffffffff by (vm_compute; reflexivity).
+  unfold ram_base, ram_size. lia.
+Qed.
+
+(* the bundle the boot contract hands to its client. *)
+Lemma st_pmp_open (cfg0 : type_of_register pmpcfg_n)
+    (pa0 : type_of_register pmpaddr_n) :
+  pmp_all_off cfg0 -> mb_pmp_open (st_pmpcfg1 cfg0) (st_pmpaddr1 cfg0 pa0).
+Proof.
+  intro Hoff. unfold mb_pmp_open.
+  destruct (st_pmpcfg1_entry0 cfg0 Hoff) as [HA _].
+  destruct (st_pmpcfg1_xwr cfg0 Hoff) as (HX & HW & HR).
+  destruct (st_pmpaddr1_cov cfg0 pa0 Hoff) as [Hord Hcov].
+  split_and!; assumption.
 Qed.
 
 (* THE data-side PMP fact wp_timerinit needs, for a bounded access. *)
@@ -741,6 +825,49 @@ Definition st_m61 (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
 Definition st_mout (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
     (mcen0 : mword 32) (mtime0 mh : mword 64) :=
   <[Regidx st_tp := regval_into_reg (st_tpv mh)]> (st_m61 m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh).
+
+(* ===================================================================== *)
+(* The bridges OUT of the tower.  [st_mout] is 27 inserts deep on top of  *)
+(* [ti_mout]'s 15 and [m_jal]'s 8, and the boot contract used to name it  *)
+(* -- so every client of [SpecEntry] inherited all fifty definitions.     *)
+(* What a client actually reads is TWO slots, and here they are.  Nothing *)
+(* below this line escapes into the interface: [SpecEntry] quantifies the *)
+(* final register file and states these two equations about it.           *)
+(* ===================================================================== *)
+
+Local Ltac sn_reg_neq :=
+  let H := fresh in intro H;
+  apply (f_equal (fun r : regidx => uint (regidx_bits r))) in H;
+  vm_compute in H; discriminate H.
+
+Local Ltac sn_look :=
+  repeat first [ rewrite upd_eq
+               | rewrite upd_ne; [ | sn_reg_neq ] ];
+  first [ reflexivity | assumption ].
+
+Local Ltac sn_unfold :=
+  unfold st_mout, st_m61, st_m60, st_mti, st_m59,
+         st_m_ae3, st_m_ae2, st_m_ae1, st_m_ae0, st_m57, st_m55, st_m54,
+         st_m52, st_m51, st_m48, st_m47, st_m45, st_m43, st_m42, st_m40,
+         st_m39, st_m38, st_m37, st_m36, st_m35, st_m34, st_m33, st_m30,
+         ti_mout, ti_m27, ti_m26, ti_m24, ti_m23, ti_m22, ti_m21, ti_m19,
+         ti_m18, ti_m16, ti_m15, ti_m14, ti_m13, ti_m12, ti_m1.
+
+(* sp is start()'s STILL-OPEN frame base: start() MRETs from inside itself, so
+   its epilogue never runs and sp never comes back up. *)
+Lemma st_mout_sp (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+    (mcen0 : mword 32) (mtime0 mh : mword 64) :
+  st_mout m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh !!! Regidx csp_rs1
+  = mb_frame sp0.
+Proof. rewrite <- ti_sp1_mb. sn_unfold; sn_look. Qed.
+
+(* tp is sext32(mhartid): start()'s last write before the MRET. *)
+Lemma st_mout_tp (m : regfile) (sp0 ms0 mie0 mdl0 menv0 : mword 64)
+    (mcen0 : mword 32) (mtime0 mh : mword 64) :
+  st_mout m sp0 ms0 mie0 mdl0 menv0 mcen0 mtime0 mh
+    !!! Regidx (mword_of_int 4 : mword 5)
+  = mb_tpv mh.
+Proof. rewrite <- st_tpv_mb. sn_unfold; sn_look. Qed.
 
 (* concrete-register-key disequality + total-lookup driver (ti_look clones). *)
 Local Ltac st_reg_neq :=

@@ -56,7 +56,6 @@ Require Import RiscvExtras.
 Require Import RegFile.
 Require Import HartTp WpNext.
 Require Import InstrBytes.
-Require Import WpAuipc.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
@@ -227,14 +226,14 @@ Section ProofFilealloc.
     assert (Hpp0e : add_vec_int (mword_of_int (KernelSyms.filealloc + 0x0a) : mword 64) 4 = mword_of_int (KernelSyms.filealloc + 0x0e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
-    (* +0x0e addi a0,a0,1176  (a0 := &ftable) *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x0e)) Ra0 Ra0 (mword_of_int 0x498 : mword 12)
+    (* +0x0e addi a0,a0,1182  (a0 := &ftable) *)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x0e)) Ra0 Ra0 (mword_of_int 0x48a : mword 12)
               R3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R4 := <[Regidx Ra0 := regval_into_reg
-                  (add_vec (R3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0x498 : mword 12)))]> R3).
+                  (add_vec (R3 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1162 : mword 12)))]> R3).
     assert (HR4a0 : R4 !!! Regidx Ra0 = ftable_addr).
     { rewrite /R4 upd_eq /R3 upd_eq. rewrite /ftable_addr.
       apply bv_eq; vm_compute; reflexivity. }
@@ -242,14 +241,14 @@ Section ProofFilealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp12) in "Hpc".
     (* ===== +0x12 jal ra,acquire ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x12)) Rra (mword_of_int 0x1fcc38 : mword 21)
+    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x12)) Rra (mword_of_int 0x1fcc2a : mword 21)
               R4 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi12 [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
     set (mA := <[Regidx Rra := regval_into_reg
                   (add_vec_int (mword_of_int (KernelSyms.filealloc + 0x12) : mword 64) 4)]> R4).
     assert (Htgtacq : add_vec (mword_of_int (KernelSyms.filealloc + 0x12) : mword 64)
-                        (sign_extend' 64 (mword_of_int 0x1fcc38 : mword 21))
+                        (sign_extend' 64 (mword_of_int 0x1fcc2a : mword 21))
                       = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtacq) in "Hpc".
@@ -298,14 +297,14 @@ Section ProofFilealloc.
     assert (Hpp1a : add_vec_int (mword_of_int (KernelSyms.filealloc + 0x16) : mword 64) 4 = mword_of_int (KernelSyms.filealloc + 0x1a))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
-    (* +0x1a addi s1,s1,1188 *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x1a)) Rs1 Rs1 (mword_of_int 0x4a4 : mword 12)
+    (* +0x1a addi s1,s1,1194 *)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x1a)) Rs1 Rs1 (mword_of_int 0x496 : mword 12)
               R6 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R7 := <[Regidx Rs1 := regval_into_reg
-                  (add_vec (R6 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 0x4a4 : mword 12)))]> R6).
+                  (add_vec (R6 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 1174 : mword 12)))]> R6).
     assert (HR7s1 : R7 !!! Regidx Rs1 = fnode 0).
     { rewrite /R7 upd_eq /R6 upd_eq. rewrite /fnode /acur /file_base /file_stride.
       apply bv_eq; vm_compute; reflexivity. }
@@ -323,14 +322,14 @@ Section ProofFilealloc.
     assert (Hpp22 : add_vec_int (mword_of_int (KernelSyms.filealloc + 0x1e) : mword 64) 4 = mword_of_int (KernelSyms.filealloc + 0x22))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp22) in "Hpc".
-    (* +0x22 addi a4,a4,1084 *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x22)) Ra4 Ra4 (mword_of_int 0x43c : mword 12)
+    (* +0x22 addi a4,a4,1090 *)
+    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x22)) Ra4 Ra4 (mword_of_int 0x42e : mword 12)
               R8 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
     set (R9 := <[Regidx Ra4 := regval_into_reg
-                  (add_vec (R8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 0x43c : mword 12)))]> R8).
+                  (add_vec (R8 !!! Regidx Ra4) (sign_extend' 64 (mword_of_int 1070 : mword 12)))]> R8).
     assert (HR9a4 : R9 !!! Regidx Ra4 = fnode NFILE).
     { rewrite /R9 upd_eq /R8 upd_eq. rewrite /fnode /acur /file_base /file_stride /NFILE.
       apply bv_eq; vm_compute; reflexivity. }
@@ -544,14 +543,14 @@ Section ProofFilealloc.
                 Mi !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mi (K - 4)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x42)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I).
     set (Cfull := (∀ (Mf : regfile),
         ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
              Mf !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mf (K - 4)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x32)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I).
     iAssert (∀ (fuel j : nat) (M : regfile),
         ⌜ (NFILE - j <= fuel)%nat ⌝ -∗
@@ -562,7 +561,7 @@ Section ProofFilealloc.
                 M !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr M (K - 4)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x26)) -∗
-        ([∗ list] k ∈ seq 0 NFILE, fslot Mg k) -∗
+        ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
         (* the two exits are conjoined, NOT separated: exactly one is taken,
            so they must SHARE the ambient resources (lock token, cpu_own,
            the authority, the epilogue) rather than split them. *)
@@ -573,7 +572,7 @@ Section ProofFilealloc.
         iIntros (j M) "%Hfuel %Hj (%Hcurs1 & %Ha4 & %Hthr) Hcg Hpc Hslots Hexit".
       { exfalso. lia. }
       (* --- +0x26 c.lw a5,4(s1) : read this entry's ref field --- *)
-      iDestruct (ftable_slots_acc Mg j ltac:(lia) with "Hslots") as "[Hslot Hback]".
+      iDestruct (ftable_slots_acc γf Mg j ltac:(lia) with "Hslots") as "[Hslot Hback]".
       assert (Hpa : add_vec (rget M Rs1) (sign_extend' 64 (mword_of_int 4 : mword 12))
                     = a_fref j).
       { rewrite (rget_ne M Rs1 ltac:(vm_compute; discriminate)) Hcurs1. reflexivity. }
@@ -733,10 +732,10 @@ Section ProofFilealloc.
       iPoseProof (fai_46 with "Htext") as "Hi46".
       iPoseProof (fai_4a with "Htext") as "Hi4a".
       iPoseProof (fai_4e with "Htext") as "Hi4e".
-      iDestruct (ftable_slots_acc Mg i ltac:(lia) with "Hslots") as "[Hslot Hback]".
+      iDestruct (ftable_slots_acc γf Mg i ltac:(lia) with "Hslots") as "[Hslot Hback]".
       iEval (rewrite /fslot HMgi) in "Hslot".
       iDestruct "Hslot" as "[Hcell Hfree]".
-      iDestruct "Hfree" as (Cf) "[%HCtype Hfields]".
+      iDestruct "Hfree" as (Cf) "(%HCtype & Hfields & Hfpay)".
       (* +0x42 c.li a5,1 *)
       iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x42)) Ra5 (mword_of_int 1 : mword 6)
                 (mword_of_int 1 : mword 64) Mi (K - 4)%nat false
@@ -764,7 +763,7 @@ Section ProofFilealloc.
         rewrite /F1 upd_eq. apply bv_eq; vm_compute; reflexivity. }
       iEval (rewrite Hstv) in "Hcell".
       (* the ghost step: the slot enters the authority at (1,1) *)
-      iMod (file_alloc_step γf Mg i Cf HMgi with "Hauth Hfields") as "[Hauth Href]".
+      iMod (file_alloc_step γf Mg i Cf HMgi with "Hauth Hfields Hfpay") as "[Hauth Href]".
       iDestruct ("Hback" $! (<[i := (1%Qp, 1%positive)]> Mg) with "[%] [Hcell Hfdslot]") as "Hslots".
       { intros k Hk. rewrite lookup_insert_ne; [reflexivity | regne]. }
       { rewrite /fslot lookup_insert. rewrite file_rest_full.
@@ -779,7 +778,7 @@ Section ProofFilealloc.
       assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.filealloc + 0x44) : mword 64) 2 = mword_of_int (KernelSyms.filealloc + 0x46))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp46) in "Hpc".
-      (* +0x46 auipc a0,0x1e ; +0x4a addi a0,a0,1116  (a0 := &ftable) *)
+      (* +0x46 auipc a0,0x1e ; +0x4a addi a0,a0,1122  (a0 := &ftable) *)
       iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x46)) Ra0 (mword_of_int 0x1e : mword 20)
                 F1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi46 [-]").
@@ -790,13 +789,13 @@ Section ProofFilealloc.
       assert (Hpp4a : add_vec_int (mword_of_int (KernelSyms.filealloc + 0x46) : mword 64) 4 = mword_of_int (KernelSyms.filealloc + 0x4a))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp4a) in "Hpc".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x4a)) Ra0 Ra0 (mword_of_int 0x45c : mword 12)
+      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x4a)) Ra0 Ra0 (mword_of_int 0x44e : mword 12)
                 F2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi4a [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       iEval (rgne) in "Hcg".
       set (F3 := <[Regidx Ra0 := regval_into_reg
-                    (add_vec (F2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0x45c : mword 12)))]> F2).
+                    (add_vec (F2 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1102 : mword 12)))]> F2).
       assert (HF3a0 : F3 !!! Regidx Ra0 = ftable_addr).
       { rewrite /F3 upd_eq /F2 upd_eq. rewrite /ftable_addr.
         apply bv_eq; vm_compute; reflexivity. }
@@ -804,14 +803,14 @@ Section ProofFilealloc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp4e) in "Hpc".
       (* +0x4e jal ra,release *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x4e)) Rra (mword_of_int 0x1fcc84 : mword 21)
+      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x4e)) Rra (mword_of_int 0x1fcc76 : mword 21)
                 F3 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi4e [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       set (F4 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.filealloc + 0x4e) : mword 64) 4)]> F3).
       assert (Htgtrel : add_vec (mword_of_int (KernelSyms.filealloc + 0x4e) : mword 64)
-                          (sign_extend' 64 (mword_of_int 0x1fcc84 : mword 21))
+                          (sign_extend' 64 (mword_of_int 0x1fcc76 : mword 21))
                         = mword_of_int KernelSyms.release)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtrel) in "Hpc".
@@ -883,7 +882,7 @@ Section ProofFilealloc.
       iPoseProof (fai_40 with "Htext") as "Hi40".
       iAssert (ftable_res γf) with "[Hauth Hfdauth Hslots]" as "HRres".
       { iExists Mg. iFrame "Hauth Hfdauth Hslots". iPureIntro. exact Hdom. }
-      (* +0x32 auipc a0,0x1e ; +0x36 addi a0,a0,1136 *)
+      (* +0x32 auipc a0,0x1e ; +0x36 addi a0,a0,1142 *)
       iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x32)) Ra0 (mword_of_int 0x1e : mword 20)
                 Mf (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi32 [-]").
@@ -894,13 +893,13 @@ Section ProofFilealloc.
       assert (Hpp36 : add_vec_int (mword_of_int (KernelSyms.filealloc + 0x32) : mword 64) 4 = mword_of_int (KernelSyms.filealloc + 0x36))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp36) in "Hpc".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x36)) Ra0 Ra0 (mword_of_int 0x470 : mword 12)
+      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x36)) Ra0 Ra0 (mword_of_int 0x462 : mword 12)
                 G1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       iEval (rgne) in "Hcg".
       set (G2 := <[Regidx Ra0 := regval_into_reg
-                    (add_vec (G1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0x470 : mword 12)))]> G1).
+                    (add_vec (G1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 1122 : mword 12)))]> G1).
       assert (HG2a0 : G2 !!! Regidx Ra0 = ftable_addr).
       { rewrite /G2 upd_eq /G1 upd_eq. rewrite /ftable_addr.
         apply bv_eq; vm_compute; reflexivity. }
@@ -908,14 +907,14 @@ Section ProofFilealloc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* +0x3a jal ra,release *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x3a)) Rra (mword_of_int 0x1fcc98 : mword 21)
+      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.filealloc + 0x3a)) Rra (mword_of_int 0x1fcc8a : mword 21)
                 G2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi3a [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc".
       set (G3 := <[Regidx Rra := regval_into_reg
                     (add_vec_int (mword_of_int (KernelSyms.filealloc + 0x3a) : mword 64) 4)]> G2).
       assert (Htgtrel : add_vec (mword_of_int (KernelSyms.filealloc + 0x3a) : mword 64)
-                          (sign_extend' 64 (mword_of_int 0x1fcc98 : mword 21))
+                          (sign_extend' 64 (mword_of_int 0x1fcc8a : mword 21))
                         = mword_of_int KernelSyms.release)
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtrel) in "Hpc".
