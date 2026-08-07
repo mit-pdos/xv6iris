@@ -779,7 +779,10 @@ LinkIput.v
 SpecKexit.v
 CodeKexit.v
 ProofKexit.v
+SpecSysWait.v
 CodeSysWait.v
+ProofSysWait.v
+LinkSysWait.v
 SpecAllocproc.v
 CodeAllocproc.v
 ProofAllocproc.v

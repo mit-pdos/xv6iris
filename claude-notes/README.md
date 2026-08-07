@@ -149,8 +149,8 @@ are working on that effort — the relevant `projects/` file.
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone
   (`killed`/`setkilled`/`kkill`/`sys_kill`), `sys_getpid`, `sys_close`,
-  `sys_pause`, `fetchaddr`, `fdalloc`, **`kwait`**) and what is next (the
-  remaining syscalls — `sys_wait` first — and `cwd_ref`). `kwait` is the
+  `sys_pause`, `fetchaddr`, `fdalloc`, **`kwait` + `sys_wait`**) and what is
+  next (the remaining syscalls, and `cwd_ref`). `kwait` is the
   entry to read before writing any loop that can RETURN from inside itself:
   the function exit is one linear resource the inner loop takes as a premise
   and hands back to its own exit, what the exit still wants back rides

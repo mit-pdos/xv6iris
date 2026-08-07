@@ -424,8 +424,18 @@ the evidence for every offset. This file is only the worklist.
       This is the function that reclaims a ZOMBIE child, it is the first one
       that holds TWO locks at once, and it is the first UNBOUNDED loop that
       parks (an `iLöb` with a `sleep` inside it).
-      **`sys_wait` (thirteen instructions over ARGADDR + KWAIT) is what is
-      left of this cone**; sysproc.c is 5/8.
+      **`sys_wait` is PROVEN and LINKED too** (`SpecSysWait.v` /
+      `ProofSysWait.v` / `LinkSysWait.v`, over ARGADDR + KWAIT, same axiom
+      footprint), so this cone is closed; sysproc.c is 6/8.  It is
+      `sys_kill`'s shape byte for byte and its proof is `ProofSysKill.v`'s
+      with two differences worth knowing: its `uint64 p` local is a WHOLE
+      frame slot (no `word_pointsto_split4`/join pair, unlike an `int`
+      local), and **the trapframe fraction argaddr wants is BORROWED OUT OF
+      `proc_priv`** (`ProcInv.proc_priv_tf`) for the duration of the call
+      rather than passed alongside it, because the second callee wants the
+      whole block back — which is why the contract names the argument as
+      `pv_tf V !! tf_arg_idx 0 = Some v0`, sys_sbrk's spelling, rather than
+      taking a free `ws` the way sys_kill's does.
 
       **What landed with it, and is reusable on its own:**
 
