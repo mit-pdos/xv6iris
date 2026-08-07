@@ -1456,10 +1456,10 @@ Section ProofPipealloc.
       rewrite (callee_saved_lookup HcsH_cs c Hcs). apply HG5thr; assumption. }
     iDestruct (sie_cap_gpr_x0 mH (K - 6)%nat b p Rz ltac:(vm_compute; reflexivity) with "Hcg")
       as "[%HHx0 Hcg]".
-    iDestruct "Href0" as "(Htok0 & Hf0 & Hpay0)".
-    iDestruct "Hf0" as "(Hty0 & Hrd0 & Hwr0 & Hpp0 & Hip0 & Hoff0 & Hmaj0)".
-    iDestruct "Href1" as "(Htok1 & Hf1 & Hpay1)".
-    iDestruct "Hf1" as "(Hty1 & Hrd1 & Hwr1 & Hpp1 & Hip1 & Hoff1 & Hmaj1)".
+    iDestruct "Href0" as "(Htok0 & Hf0 & Hpay0 & Hlv0)".
+    iDestruct "Hf0" as "(Hty0 & Hrd0 & Hwr0 & Hpp0 & Hip0 & Hmaj0)".
+    iDestruct "Href1" as "(Htok1 & Hf1 & Hpay1 & Hlv1)".
+    iDestruct "Hf1" as "(Hty1 & Hrd1 & Hwr1 & Hpp1 & Hip1 & Hmaj1)".
     (* ---- PUBLISHING THE PAYLOAD ----
        The eight stores below turn two FD_NONE slots into the two ends of
        [pi].  On the ghost side that is one step per slot: overwrite the
@@ -1476,7 +1476,7 @@ Section ProofPipealloc.
     iAssert (file_pay γf k0 1
                (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
                   (mword_of_int 0 : mword 8) pi
-                  (fc_ip Cf0) (fc_off Cf0) (fc_major Cf0)))
+                  (fc_ip Cf0) (fc_major Cf0)))
       with "[Hpn0 Hrd]" as "Hpay0".
     { iExists (MkFPNames γpl γp). iFrame "Hpn0".
       rewrite /file_payload /fc_wbool; cbn [fc_type fc_pipe fc_writable].
@@ -1487,7 +1487,7 @@ Section ProofPipealloc.
     iAssert (file_pay γf k1 1
                (MkFContent FD_PIPE (mword_of_int 0 : mword 8)
                   (mword_of_int 1 : mword 8) pi
-                  (fc_ip Cf1) (fc_off Cf1) (fc_major Cf1)))
+                  (fc_ip Cf1) (fc_major Cf1)))
       with "[Hpn1 Hwr]" as "Hpay1".
     { iExists (MkFPNames γpl γp). iFrame "Hpn1".
       rewrite /file_payload /fc_wbool; cbn [fc_type fc_pipe fc_writable].
@@ -1947,17 +1947,17 @@ Section ProofPipealloc.
     iSplitR; [done|]. iFrame "Hav".
     iExists pi, k0, k1,
       (MkFContent FD_PIPE (mword_of_int 1 : mword 8) (mword_of_int 0 : mword 8) pi
-         (fc_ip Cf0) (fc_off Cf0) (fc_major Cf0)),
+         (fc_ip Cf0) (fc_major Cf0)),
       (MkFContent FD_PIPE (mword_of_int 0 : mword 8) (mword_of_int 1 : mword 8) pi
-         (fc_ip Cf1) (fc_off Cf1) (fc_major Cf1)).
+         (fc_ip Cf1) (fc_major Cf1)).
     iSplitR; [iPureIntro; split; assumption|].
     iSplitR; [iPureIntro; rewrite /pipe_file; cbn; repeat split; reflexivity|].
     iSplitR; [iPureIntro; rewrite /pipe_file; cbn; repeat split; reflexivity|].
     iFrame "Hc0 Hc1".
     rewrite /file_ref /file_fields; cbn [fc_type fc_readable fc_writable
-                                          fc_pipe fc_ip fc_off fc_major].
-    iFrame "Htok0 Hty0 Hrd0 Hwr0 Hpp0 Hip0 Hoff0 Hmaj0 Hpay0".
-    iFrame "Htok1 Hty1 Hrd1 Hwr1 Hpp1 Hip1 Hoff1 Hmaj1 Hpay1".
+                                          fc_pipe fc_ip fc_major].
+    iFrame "Htok0 Hty0 Hrd0 Hwr0 Hpp0 Hip0 Hmaj0 Hpay0 Hlv0".
+    iFrame "Htok1 Hty1 Hrd1 Hwr1 Hpp1 Hip1 Hmaj1 Hpay1 Hlv1".
   Qed.
 
 End ProofPipealloc.

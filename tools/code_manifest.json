@@ -48,9 +48,21 @@
   2
  ],
  [
+  "CodeBalloc.v",
+  "balloc",
+  "bai_",
+  3
+ ],
+ [
   "CodeBeginOp.v",
   "begin_op",
   "boi_",
+  2
+ ],
+ [
+  "CodeBfree.v",
+  "bfree",
+  "bfi_",
   2
  ],
  [
@@ -207,6 +219,12 @@
   "CodeFileinit.v",
   "fileinit",
   "fii_",
+  2
+ ],
+ [
+  "CodeFileread.v",
+  "fileread",
+  "fri_",
   2
  ],
  [

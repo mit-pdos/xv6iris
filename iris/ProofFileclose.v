@@ -326,7 +326,7 @@ Section ProofFileclose.
        THE CRITICAL SECTION (literal [false]: no hart threading).
        =================================================================== *)
     iDestruct "HRres" as (Mg) "(Hauth & Hfdauth & %Hdom & Hslots)".
-    iDestruct "Href" as "(Hrtok & Hrfields & Hrpay)".
+    iDestruct "Href" as "(Hrtok & Hrfields & Hrpay & Hrlv)".
     iDestruct (fref_tok_lookup with "Hauth Hrtok")
       as %(qt & cnt & HMk & Hqt1 & Hn1 & _ & Hqlt).
     assert (Hk : (k < NFILE)%nat) by (apply Hdom; rewrite HMk; eauto).
@@ -449,8 +449,8 @@ Section ProofFileclose.
       assert (Hsub : (qt - q)%Qp = Some qr) by (apply Qp.sub_Some; exact Hqr).
       iMod (file_close_step γf Mg k q Cf qt n' qr
               ltac:(rewrite -Hsucc; exact HMk) Hsub
-              with "Hauth [Hrtok Hrfields Hrpay]") as "(Hauth & Hfl & Hpy)".
-      { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields Hrpay". }
+              with "Hauth [Hrtok Hrfields Hrpay Hrlv]") as "(Hauth & Hfl & Hpy)".
+      { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields Hrpay Hrlv". }
       iDestruct (file_rest_absorb γf k qt q qr Cf Hsub Hqt1 with "Hrest Hfl Hpy")
         as "Hrest".
       (* the fd slot the destroyed reference was holding comes back *)
@@ -584,13 +584,13 @@ Section ProofFileclose.
              whole slot ([file_rest_join]).  Doing it here, before the reads,
              is what puts every content cell at fraction 1. ---- *)
       iMod (file_close_last_step γf Mg k Cf q HMk
-              with "Hauth [Hrtok Hrfields Hrpay]") as "(Hauth & Hfl & Hpy)".
-      { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields Hrpay". }
+              with "Hauth [Hrtok Hrfields Hrpay Hrlv]") as "(Hauth & Hfl & Hpy)".
+      { rewrite /file_ref /fref_tok. iFrame "Hrtok Hrfields Hrpay Hrlv". }
       iDestruct (file_rest_join γf k q Cf Hqt1 with "Hfl Hpy Hrest") as "[Hfl Hpy]".
       assert (Hzz : (Z.pos 1 - 1)%Z = 0%Z) by lia.
       iEval (rewrite Hzz) in "Hcell".
       rewrite /file_fields.
-      iDestruct "Hfl" as "(Hcty & Hcrd & Hcwr & Hcpp & Hcip & Hcoff & Hcmaj)".
+      iDestruct "Hfl" as "(Hcty & Hcrd & Hcwr & Hcpp & Hcip & Hcmaj)".
       iPoseProof (fci_26 with "Htext") as "Hi26".
       iPoseProof (fci_28 with "Htext") as "Hi28".
       iPoseProof (fci_2a with "Htext") as "Hi2a".
@@ -787,7 +787,7 @@ Section ProofFileclose.
       iEval (rewrite Hpp48) in "Hpc".
       (* ---- the slot goes back FREE, and the payload leaves with us ---- *)
       set (C0 := MkFContent (mword_of_int 0 : mword 32) (fc_readable Cf)
-                   (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf) (fc_off Cf) (fc_major Cf)).
+                   (fc_writable Cf) (fc_pipe Cf) (fc_ip Cf) (fc_major Cf)).
       iDestruct "Hpy" as (pn) "[Hpn Hpl]".
       iAssert (file_pay γf k 1 C0) with "[Hpn]" as "Hpy0".
       { iExists pn. iFrame "Hpn". rewrite /file_payload /C0; cbn [fc_type].
@@ -798,14 +798,14 @@ Section ProofFileclose.
          slots, and the unit the destroyed reference was accounted by is
          exactly what the postcondition returns -- framing it here would
          drain the supply one unit per close. *)
-      iDestruct ("Hback" $! (delete k Mg) with "[%] [Hcell Hcty Hcrd Hcwr Hcpp Hcip Hcoff Hcmaj Hpy0]")
+      iDestruct ("Hback" $! (delete k Mg) with "[%] [Hcell Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpy0]")
         as "Hslots".
       { intros j Hj. rewrite lookup_delete_ne; [reflexivity | congruence]. }
       { rewrite /fslot lookup_delete. iFrame "Hcell". iExists C0.
         iSplitR; [iPureIntro; rewrite /C0 /FD_NONE; reflexivity|].
         rewrite /file_fields /C0;
-          cbn [fc_type fc_readable fc_writable fc_pipe fc_ip fc_off fc_major].
-        iFrame "Hcty Hcrd Hcwr Hcpp Hcip Hcoff Hcmaj Hpy0". }
+          cbn [fc_type fc_readable fc_writable fc_pipe fc_ip fc_major].
+        iFrame "Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpy0". }
       iAssert (ftable_res γf) with "[Hauth Hfdauth Hslots]" as "HRres".
       { iExists (delete k Mg). iFrame "Hauth Hfdauth Hslots".
         iPureIntro. intros j Hj.

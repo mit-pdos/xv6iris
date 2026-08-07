@@ -153,6 +153,30 @@ what makes this tractable at all); then fix what it does NOT cover.
 > `[file, symbol, prefix, width]`, where `width` is the zero-padded hex width
 > of the offset in the lemma name — `2` under 256 bytes, `3` at or above.)
 >
+> **`gen_code.py` PICKS THE CLOSING TACTIC FROM THE AST'S HEAD, AND THE
+> WHITELIST IS INCOMPLETE — A NEW INSTRUCTION FORM CAN EMIT A DECODE LEMMA
+> THAT DOES NOT COMPILE.** The generator closes each `kd_<word>` with
+> `decode_bridge_ms`, whose final `vm_compute; reflexivity` needs the two
+> sides' bitvector WELL-FORMEDNESS PROOF TERMS to coincide; where they do
+> not it selects `decode_bridge_ms_bv` instead, but only for a hard-coded
+> list (`FENCE (`, `FENCEI (`, `CSRReg (`, `CSRImm (`). **`SHIFTIWOP` is
+> missing from that list**, so every `sraiw` in the image emits a lemma
+> that fails: SRAIW's `funct7 = 0100000` sits above the 5-bit shamt, so the
+> decoder yields `Z_to_bv 5 (1024 + shamt)` while the lemma states
+> `mword_of_int shamt` — same `bv_unsigned`, different
+> `Z_to_bv_obligation_1`, and the error prints two sides that look
+> IDENTICAL (the `subrange_vec_dec` trap below, in a new place). `slliw` /
+> `srliw` / `sllw` are unaffected because their slices carry no funct7
+> bits, which is why this stayed hidden until balloc — the first covered
+> function containing `sraiw` — was added. Fixing it is one token per
+> lemma (`decode_bridge_ms` -> `decode_bridge_ms_bv`, ~1.9 s for the whole
+> shard) but the REAL fix is the selection line in `gen_code.py`, because a
+> hand-patched shard is silently reverted by the next `make gen-code`.
+> **The general rule: any instruction whose AST field is NARROWER than the
+> encoded field it is sliced from needs the `_bv` bridge.** When three
+> decode shards fail at once after adding a function, look at what
+> instruction forms that function introduced, not at the shards.
+>
 > **A `Code<F>.v` WITH NO MANIFEST ROW IS A TIME BOMB, and its own `.vo`
 > hides it.** `CodeReadi.v` sat in the tree and in `_CoqProject` with a
 > `.vo`, but its 25 decode words were never in `KernelDecode*.v` — the
@@ -209,6 +233,14 @@ If a change has a way of going wrong that still compiles, that way WILL be
 taken, and no build will tell you. A checker exists because of exactly that,
 and it is cheap enough to run on every touched file:
 
+- **A `Local Lemma` is INVISIBLE to every other file, and the error names the
+  USER, not the definition.** `ProofBallocParts.bal_pow_mod8_small` was
+  `Local`, so `ProofBalloc.v` failed with *"The variable bal_pow_mod8_small was
+  not found"* — which reads like a typo in the caller. Before hunting a
+  misspelling, `grep -rn "<name>"` and check for `Local`; a helper that a
+  sibling proof file needs must not be `Local`, and the proof that it is needed
+  is that the sibling names it.
+
 - **`tools/lemma_diff.py [--ref REF]`** — reports top-level declarations that
   VANISHED relative to a git ref, plus `Admitted`/`admit`/`Abort` and any new
   `Axiom`/`Parameter`/`Hypothesis`. A sweep's characteristic failure is not a
@@ -222,6 +254,28 @@ The definitive soundness check for a whole cone is still
 sees through every functor and seal. Do it once at the end of any interface
 change and diff the axiom list against what the coverage report says should be
 assumed; anything else is a regression.
+
+## A `.v`-vs-`.vo` MTIME SWEEP IS NOT A STALENESS CHECK
+
+The obvious "is the tree built?" loop --
+
+    for f in *.v; do [ "$f" -nt "${f%.v}.vo" ] && echo STALE $f; done
+
+-- compares each file against ITS OWN `.vo` and therefore misses TRANSITIVE
+staleness entirely. Edit `SpecFoo.v`, rebuild it alone, and every `.vo` above
+it is now stale while this sweep reports the tree clean, because none of those
+`.v` files were touched. It reported "1 stale file" on a tree where
+`LinkBalloc.vo`/`LinkBmap.vo`/`LinkWritei.vo` were all stale against a
+`SpecBalloc.vo` rebuilt 35 minutes later — and the conclusion drawn from it
+("the tree is fully green") was wrong and was stated to a human.
+
+Only `make` knows the dependency graph. **The cheap correct check is
+`make -f CoqMakefile -q` (or a plain `make`, which prints `Nothing to be done`
+when genuinely up to date); the cheap correct SPOT check is
+`find . -name '*.vo' ! -newer <the .vo you just rebuilt>` restricted to the
+files that actually Require it.** Never report a build state from mtimes alone
+— and note this is the same family as the two lying build checks below: the
+failure mode is a green-looking answer, not an error.
 
 ## Two ways a build check can LIE about being green
 
@@ -330,6 +384,8 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - **An argument to a LOCAL hypothesis parses with no scope information.** For a global constant, `f (l ++ bs)` picks list_scope from the argument's type; for a hypothesis (e.g. an induction hypothesis `IH`) there is no `Arguments` scope binding, the innermost OPEN scope wins, and with string_scope open `++` elaborates as String.append — a baffling "has type list … expected string" error at the call. Annotate the argument (`((l ++ bs)%list)`). Related list-append recipe: to feed a continuation expecting `P (l ++ [])` (or a reassociated `l ++ bs ++ bs'`) from a hypothesis about `l`, do NOT `rewrite -(app_nil_r l)` in your own hypothesis — the replacement contains the pattern and the rewrite dies on an evar-scope error. `iSpecialize` the continuation at the concrete lists FIRST, then rewrite the SHRINKING direction in it: `iEval (rewrite (app_nil_r l)) in "Hcont"` (or `(app_assoc l bs bs')`).
 - **`tramp_vpn` lives in `KptExecMap.v` and `tf_vpn` in `TrampPt.v`**, not in `UptTree.v` where `tramp_vpn_unsigned` / `tf_vpn_unsigned` are stated. A `proc_pt`-altitude proof that NAMES either constant must `Require Import` those two files directly — `Import` is not transitive. Likewise `KALLOC` / `KFREE` take `γl : gname` AND `γk : gname * gname`; passing only `γk` gives "has type (gname * gname)%type while it is expected to have type gname".
 - **AN IMPLICIT BINDER INSIDE A `Definition`'s BODY IS SILENTLY IGNORED, AND A LOCAL HYPOTHESIS OF A Pi TYPE HAS NO IMPLICIT ARGUMENTS AT ALL.** Writing `Definition c : Prop := forall `{GEN : GenId} `{CID : CpuId} …, wp_<f>_body …` — the natural way to name a callee's contract so it can be passed as a HYPOTHESIS rather than a functor argument (ProofBmap.v's `balloc_contract`, which is what keeps the no-alloc instance free of balloc's Axiom) — gets you *"Warning: Ignoring implicit binder declaration in unexpected position"* and two EXPLICIT binders; implicit binders are only honoured in the ascribed TYPE of a `Definition`/`Parameter`/`Lemma`, never in a term-position `forall`. And even where the type does carry them, a hypothesis (`H : c`) is not a global reference, so no implicit-argument metadata attaches to it. Write the binders explicit, spell the body `wp_<f>_body (GEN := GENa) (CID := CIDa) …`, and pass `_ _` at the call site: **nothing is lost, because an evar whose type is a CLASS is still filled by typeclass resolution** — with the most recently introduced `CpuId`, which is exactly what an implicit-instance argument would have picked (and is why every such call site transports `cpu_own` to the current hart first). Related, same family: **`bi.emp_intro` does not exist in this iris** — an `⊢ emp` goal is closed by plain `done`.
+- **A `={E}=∗` LEMMA CANNOT BE `iMod`-ed DIRECTLY ONTO A `WP (Loop) {{Φ}}` GOAL** -- it fails with *"cannot eliminate modality"* on a goal that is visibly a weakest precondition. The idiom that works is **`iApply fupd_wp. iMod (…) as "…". iModIntro.`** (`ProofInitlog.v` lines 665 and 1410 are the precedent). This bites the FIRST caller of any accessor stated as a fancy update -- `FileOff.off_checkout` / `off_checkin` were written long before `fileread` existed, so the seam had never been exercised and the lemma statements looked fine in isolation. **A fancy-update lemma with no caller is an untested lemma**; when you add one, add its call site or at least a two-line consumer.
+- **`rget` IS INDEXED BY THE AMBIENT `CpuId`, AND AN EXPLICIT `rget_ne D R pf` DOES NOT SURVIVE A `wp_next` BOUNDARY.** A term produced by a leaf carries the `CID` in force at the `iApply`; an `assert` written *after* the following `iIntros (CIDn …)` elaborates its `rget` at `CIDn`, and the two do not unify -- the error reads *"does not match any subterm"* on a term you can see in the goal, which sends you hunting for an address mismatch that is not there. **Use `rgne` / `iEval (rgne) in "H"` and let unification pick the instance**; reserve explicit `rget_ne` for facts that never cross a boundary. Cost three debug rounds on `ProofFileread.v`. Same family as the "post-resume half must be its OWN lemma with `CID` as a BINDER" rule below.
 - **`pc_is` is not in scope transitively.** It is defined in a Section of `InstrBytes.v` and nothing in a typical ProofSched-derived import list re-exports it, so a proof file that only ever FED leaves compiles fine, while one that STATES a loop invariant (`iAssert (∀ m, … pc_is …)`) fails with *"The variable pc_is was not found in the current environment"* — reported at the line inside the iAssert, and possibly after `-time` already printed a success line for that sentence. Fix: `Require Import InstrBytes.`
 - **Replacing a `destruct H as [A|B]` with a `destruct <bool>` does NOT keep the two bullets' order stable, and `cycle 1` cannot be trusted to fix it.** Observed in ProofBread: after the swap the first bullet still received the `true` case, `cycle 1` did not reorder, and the failure surfaced as an `iExact` mismatch printing the OTHER branch's payload (which is what identifies this). Swap the two arm BODIES textually instead of relying on goal reordering.
 - **A scripted binder-drop must keep the line's terminator.** Deleting a spec binder line that carried the closing `:` (`(bs_disk : list (bv 8)) :`) produces `Syntax error: ':=' or ':' expected` reported ~40 lines later at the NEXT lemma, with nothing wrong there.

@@ -160,6 +160,27 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
+(* printk's contract as a PROP, so a caller can carry it as a HYPOTHESIS
+   rather than instantiate a functor.  [wp_printk_gen_sconf_body] has Coq-arrow
+   premises ([38 <= K], [nonul f], ...), so it is NOT an [iProp] and cannot be
+   boxed the way [SpecPanic.panic_wp_any] is; this is the [Prop] twin of that
+   idiom, and the same one [ProofBmap.balloc_contract] already uses.
+
+   WHY IT MATTERS: [PRINTK_GEN]'s only instance is [LinkPrintkGen]'s own
+   [Axiom], so a function that instantiated the functor would carry that axiom
+   into its own [Print Assumptions] -- and, through any caller, into theirs.
+   Carrying the contract as a hypothesis instead keeps such a function at the
+   standing six and pushes the obligation up to whoever finally discharges it,
+   exactly as [panic_wp_any] is pushed.  balloc's out-of-blocks arm is the
+   first fs.c consumer. *)
+Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}
+    `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId}
+    (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
+  forall (CIDp : CpuId) (Φ : mval -> iProp Σ)
+    (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
+    (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool),
+    wp_printk_gen_sconf_body (CID := CIDp) γpr γd γv Φ m0 K eb pj C dqf f descs b.
+
 Module Type PRINTK_GEN.
   Parameter wp_printk_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ}

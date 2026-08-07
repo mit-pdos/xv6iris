@@ -117,6 +117,11 @@ Lemma kd_8f75 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_AND (Cregidx (mword_of_int 6), Cregidx (mword_of_int 5)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_8f7d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0x8f7d : mword 16)) s
+  = Some (C_AND (Cregidx (mword_of_int 6), Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_9962 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0x9962 : mword 16)) s
   = Some (C_ADD (Regidx (mword_of_int 18), Regidx (mword_of_int 24)), s).
@@ -240,6 +245,11 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_00015497 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0x00015497 : mword 32) : M instruction) s
   = Some (UTYPE (mword_of_int 21 : mword 20, Regidx (mword_of_int 9), AUIPC), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_0001eb17 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0x0001eb17 : mword 32) : M instruction) s
+  = Some (UTYPE (mword_of_int 30 : mword 20, Regidx (mword_of_int 22), AUIPC), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_00053983 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
@@ -430,6 +440,11 @@ Proof. decode_bridge_ms. Qed.
 Lemma kd_d9afc0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
   exec (ext_decode (mword_of_int 0xd9afc0ef : mword 32) : M instruction) s
   = Some (JAL (mword_of_int 2082202 : mword 21, Regidx (mword_of_int 1)), s).
+Proof. decode_bridge_ms. Qed.
+
+Lemma kd_e3dff0ef s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->
+  exec (ext_decode (mword_of_int 0xe3dff0ef : mword 32) : M instruction) s
+  = Some (JAL (mword_of_int 2096700 : mword 21, Regidx (mword_of_int 1)), s).
 Proof. decode_bridge_ms. Qed.
 
 Lemma kd_e40509e3 s : register_lookup misa (sregs s) = MISA_C -> cfg_ok s ->

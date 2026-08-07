@@ -330,6 +330,7 @@ WpLock.v
 ArrCursor.v
 FdSlots.v
 FileInv.v
+FileOff.v
 KallocInv.v
 ByteBuf.v
 WpHoldingInv.v
@@ -470,6 +471,7 @@ SpecFiledup.v
 ProofFiledup.v
 LinkFiledup.v
 CodeFileclose.v
+CodeFileread.v
 SpecFileclose.v
 ProofFilecloseParts.v
 LinkFilealloc.v
@@ -611,6 +613,8 @@ LinkProcPagetable.v
 ProcPtOwn.v
 PtFree.v
 BarePt.v
+BitmapEnc.v
+BitmapInv.v
 SpecVmfault.v
 CodeVmfault.v
 ProofVmfault.v
@@ -820,6 +824,8 @@ ProtoSchedsInv.v
 CrashProto.v
 BootChain.v
 BootShared.v
+CodeBalloc.v
+CodeBfree.v
 SystemAdequacy.v
 CodeSysDup.v
 SpecSysDup.v
@@ -859,9 +865,20 @@ SpecReadi.v
 InodeLock.v
 CodeIlock.v
 CodeIunlock.v
+LinkBfree.v
+LinkConsoleread.v
+LinkFileread.v
 SpecIlock.v
 ProofIlock.v
 LinkIlock.v
 SpecIunlock.v
 ProofIunlock.v
 LinkIunlock.v
+ProofBalloc.v
+ProofBallocParts.v
+ProofBfree.v
+ProofFileread.v
+ProofFilereadParts.v
+SpecBfree.v
+SpecConsoleread.v
+SpecFileread.v

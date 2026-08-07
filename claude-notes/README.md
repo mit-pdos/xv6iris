@@ -82,6 +82,16 @@ are working on that effort — the relevant `projects/` file.
   returned, `BlockWords.v`'s word-in-a-block vocabulary, and the
   SPEND-AT-MOST budget rule — why any function above the log that does not
   take `log.lock` can only promise to spend at most N units, never exactly N.
+- **[`fs-bitmap.md`](design/fs-bitmap.md)** — the block bitmap: the
+  bits-in-a-block vocabulary (`BitmapEnc.v`, the third after `BlockWords`'
+  words and `DinodeEnc`'s records), the `bitmap_res` resource and the FREE
+  POOL that parks a free block's `fsblock` half and its exclusive
+  `blk_own` token (`BitmapInv.v`), why that token's exclusivity is what
+  makes the alloc/free handshake sound AND what refutes `bfree`'s
+  `panic("freeing free block")`, `bfree`'s contract, the single-bitmap-block
+  simplification (`FSSIZE = 2000 < BPB`), and the recorded finding that the
+  existing `Module Type BALLOC` is UNPROVABLE as written — with the minimal
+  delta and its ripple into `bmap`/`writei`.
 - **[`virtio-driver.md`](design/virtio-driver.md)** — the virtio driver's
   own design notes.
 - **[`file-table.md`](design/file-table.md)** — the open-file table: `struct

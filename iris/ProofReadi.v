@@ -214,6 +214,46 @@ Section ReadiDefs.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 13 ↦₈ (m !!! Regidx Rs11 : mword 64) ∗
      (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 14 ↦₈ v))%I.
 
+  (* THE DESTINATION AND THE PID SHARE THAT RIDES WITH IT -- SpecReadi's
+     [if user then … else …] premise, named once.
+
+     THE PID FRACTION IS THE KERNEL ARM'S.  On the user arm readi holds the
+     whole [proc_priv] block instead and BORROWS the quarter out of it at
+     each of bmap/bread/brelse ([rd_dst_pid] below, over
+     [ProcInv.proc_priv_pid]); it has to, because that accessor consumes the
+     block and returns a wand, so nobody can hold both at once.  The three
+     bio callees take the fraction at a universally quantified dfrac, which
+     is what makes one borrow serve both arms ([rd_q]); either_copyout takes
+     the block and never the fraction, so the borrow is always closed before
+     the copy. *)
+  Definition rd_dst (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
+      (user : bool) (Vc : pprivate) (dstb : mword 64) (n : nat)
+      (bytes : nat -> bv 8) : iProp Σ :=
+    (if user
+     then proc_priv γf (proc_addr j) pidv Vc
+     else ([∗ list] i ∈ seq 0 n, pa_add dstb i ↦ₘ bytes i) ∗
+          p_pid (proc_addr j) ↦₄{dq} pidv)%I.
+
+  (* the dfrac the borrowed share carries: [proc_priv]'s own quarter on the
+     user arm, the caller's whole share on the kernel one *)
+  Definition rd_q (user : bool) (dq : dfrac) : dfrac :=
+    if user then DfracOwn (1/4) else dq.
+
+  Lemma rd_dst_pid (γf : gname) (j : nat) (pidv : mword 32) (dq : dfrac)
+      (user : bool) (Vc : pprivate) (dstb : mword 64) (n : nat)
+      (bytes : nat -> bv 8) :
+    rd_dst γf j pidv dq user Vc dstb n bytes -∗
+      p_pid (proc_addr j) ↦₄{rd_q user dq} pidv ∗
+      (p_pid (proc_addr j) ↦₄{rd_q user dq} pidv -∗
+         rd_dst γf j pidv dq user Vc dstb n bytes).
+  Proof.
+    rewrite /rd_dst /rd_q. destruct user.
+    - iIntros "Hp". iDestruct (proc_priv_pid with "Hp") as "[Hq Hback]".
+      iSplitL "Hq"; [iExact "Hq"|]. iIntros "Hq". iApply ("Hback" with "Hq").
+    - iIntros "Hd". iDestruct "Hd" as "[Hb Hq]". iSplitL "Hq"; [iExact "Hq"|].
+      iIntros "Hq". iSplitL "Hb"; [iExact "Hb"|]. iExact "Hq".
+  Qed.
+
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
   Definition rd_cont `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
@@ -236,16 +276,13 @@ Section ReadiDefs.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         own_ctx (p_context (proc_addr j)) -∗
         park_hlf j true -∗
-        p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         inode_meta ip dn -∗
         inode_map γfs ip bm -∗
         inode_blocks γfs bm data -∗
-        (if user
-         then proc_priv γf (proc_addr j) pidv (upd_upt V P')
-         else [∗ list] i ∈ seq 0 n,
-                pa_add (m !!! Regidx Ra2 : mword 64) i
-                  ↦ₘ rd_delivered data dst_olds off tot i) -∗
+        rd_dst γf j pidv dq user (upd_upt V P')
+               (m !!! Regidx Ra2 : mword 64) n
+               (rd_delivered data dst_olds off tot) -∗
         bslot bn -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
@@ -292,16 +329,13 @@ Section ReadiRet.
     rd_fr7 m -∗
     own_ctx (p_context (proc_addr j)) -∗
     park_hlf j true -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    (if user
-     then proc_priv γf (proc_addr j) pidv (upd_upt V P')
-     else [∗ list] i ∈ seq 0 n,
-            pa_add (m !!! Regidx Ra2 : mword 64) i
-              ↦ₘ rd_delivered data dst_olds off tot i) -∗
+    rd_dst γf j pidv dq user (upd_upt V P')
+           (m !!! Regidx Ra2 : mword 64) n
+           (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
     rd_cont (CID0 := CID0) Φ γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K C b -∗
@@ -309,7 +343,7 @@ Section ReadiRet.
   Proof.
     intros HK Hsp Hs2 Hs3 Hs8 Hs9 Hs10 Hs11 Hext Htotle Harm.
     pose proof HK as HK'. unfold K_readi in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hoctx Hpark Hppid Hidev
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hoctx Hpark Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
     iPoseProof (rdi_0dc with "Htext") as "Hidc".
     iPoseProof (rdi_0de with "Htext") as "Hide".
@@ -562,7 +596,7 @@ Section ReadiRet.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot P'
               with "[%] [%] [%] [%] Hcg Hcnt Hpc
-                    Hoctx Hpark Hppid Hidev Hmeta Hmap Hblocks Hdst Hsl").
+                    Hoctx Hpark Hidev Hmeta Hmap Hblocks Hdst Hsl").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hext. }
     { exact Htotle. }
@@ -605,16 +639,13 @@ Section ReadiJoin.
     rd_fr8 m -∗
     own_ctx (p_context (proc_addr j)) -∗
     park_hlf j true -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    (if user
-     then proc_priv γf (proc_addr j) pidv (upd_upt V P')
-     else [∗ list] i ∈ seq 0 n,
-            pa_add (m !!! Regidx Ra2 : mword 64) i
-              ↦ₘ rd_delivered data dst_olds off tot i) -∗
+    rd_dst γf j pidv dq user (upd_upt V P')
+           (m !!! Regidx Ra2 : mword 64) n
+           (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
     rd_cont (CID0 := CID0) Φ γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K C b -∗
@@ -622,7 +653,7 @@ Section ReadiJoin.
   Proof.
     intros HK Hsp Hs3v Hs2 Hs8 Hs9 Hs10 Hs11 Hext Htotle Harm.
     pose proof HK as HK'. unfold K_readi in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hoctx Hpark Hppid Hidev
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hoctx Hpark Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
     iPoseProof (rdi_0d8 with "Htext") as "Hid8".
     iPoseProof (rdi_0da with "Htext") as "Hida".
@@ -698,7 +729,7 @@ Section ReadiJoin.
               user off n tot dst_olds V P' pidv dq dqd j m T1 K C b
               HK HT1sp HT1s2 HT1s3 HT1s8 HT1s9 HT1s10 HT1s11 Hext Htotle
               ltac:(rewrite HT1a0; exact Harm)
-              with "Hcg Hcnt Htext Hpc Hframe Hoctx Hpark Hppid Hidev
+              with "Hcg Hcnt Htext Hpc Hframe Hoctx Hpark Hidev
                     Hmeta Hmap Hblocks Hdst Hsl [Hcont]").
     iApply (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
               with "Hcont").
@@ -765,16 +796,13 @@ Section ReadiExit.
     rd_fr13 m -∗
     own_ctx (p_context (proc_addr j)) -∗
     park_hlf j true -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    (if user
-     then proc_priv γf (proc_addr j) pidv (upd_upt V P')
-     else [∗ list] i ∈ seq 0 n,
-            pa_add (m !!! Regidx Ra2 : mword 64) i
-              ↦ₘ rd_delivered data dst_olds off tot i) -∗
+    rd_dst γf j pidv dq user (upd_upt V P')
+           (m !!! Regidx Ra2 : mword 64) n
+           (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
     rd_cont (CID0 := CID0) Φ γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K C b -∗
@@ -783,7 +811,7 @@ Section ReadiExit.
     intros HK Hsp Hs3v Hext Htotle Harm Hab Hbc Hcd Hde Hef Htgt Hal.
     pose proof HK as HK'. unfold K_readi in HK'.
     iIntros "Hcg Hcnt #Htext Hpc Hia Hib Hic Hid Hie Hif Hframe Hoctx Hpark
-              Hppid Hidev Hmeta Hmap Hblocks Hdst Hsl Hcont".
+              Hidev Hmeta Hmap Hblocks Hdst Hsl Hcont".
     rewrite /rd_fr13.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 & Hf9
                             & HfA & HfB & HfC & HfD & HfE)".
@@ -920,7 +948,7 @@ Section ReadiExit.
     iApply (rd_join (CID0 := CID6) Φ γfs bn γf dev ip bm data dn
               user off n tot dst_olds V P' ans pidv dq dqd j m Q5 K C b
               HK HQ5sp HQ5s3 HQ5s2 HQ5s8 HQ5s9 HQ5s10 HQ5s11 Hext Htotle Harm
-              with "Hcg Hcnt Htext Hpc Hframe Hoctx Hpark Hppid Hidev
+              with "Hcg Hcnt Htext Hpc Hframe Hoctx Hpark Hidev
                     Hmeta Hmap Hblocks Hdst Hsl [Hcont]").
     iApply (wp_next_shift (CIDa := CID0) (CIDb := CID6) ltac:(wp_next_chain)
               with "Hcont").
@@ -1015,16 +1043,13 @@ Section ReadiLoop.
     rd_fr13 m -∗
     own_ctx (p_context (proc_addr j)) -∗
     park_hlf j true -∗
-    p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
     inode_blocks γfs bm data -∗
-    (if user
-     then proc_priv γf (proc_addr j) pidv (upd_upt V PI)
-     else [∗ list] i ∈ seq 0 n,
-            pa_add (m !!! Regidx Ra2 : mword 64) i
-              ↦ₘ rd_delivered data dst_olds off tot i) -∗
+    rd_dst γf j pidv dq user (upd_upt V PI)
+           (m !!! Regidx Ra2 : mword 64) n
+           (rd_delivered data dst_olds off tot) -∗
     bslot bn -∗
     rd_cont (CID0 := CID0) Φ γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K C b -∗
@@ -1070,8 +1095,14 @@ Section ReadiLoop.
     assert (Hblt' : (uint (blkmap_get bm fbn : mword 32) < 2147483648)%Z)
       by (rewrite Hubno; exact Hblt).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hkenv #Hprocs #Hscheds
-              #Hdevi #Hdgeom #Hdlock Hframe Hoctx Hpark Hppid Hidev
+              #Hdevi #Hdgeom #Hdlock Hframe Hoctx Hpark Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
+    (* BORROW the pid share for bmap and bread; it goes back into [Hdst]
+       before either_copyout, which wants the block whole. *)
+    iDestruct (rd_dst_pid γf j pidv dq user (upd_upt V PI)
+                 (m !!! Regidx Ra2 : mword 64) n
+                 (rd_delivered data dst_olds off tot) with "Hdst")
+      as "[Hppid Hdstback]".
     iPoseProof (rdi_07c with "Htext") as "Hi7c".
     iPoseProof (rdi_080 with "Htext") as "Hi80".
     iPoseProof (rdi_082 with "Htext") as "Hi82".
@@ -1143,7 +1174,7 @@ Section ReadiLoop.
                  with "Hcont") as "Hcont".
     assert (HKbm : (K_bmap <= K - 14)%nat) by (unfold K_bmap; lia).
     iApply (BM.wp_bmap_noalloc_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
-              cov logstart dev ip bm data fbn pidv dq dqd
+              cov logstart dev ip bm data fbn pidv (rd_q user dq) dqd
               A3 (K - 14)%nat true C b
               HKbm Hgeom0 Hfbnlt Hwf Hbnzz Hj Hgl HA3a0 HA3a1 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hidev Hmap Hblocks Hppid
@@ -1277,7 +1308,8 @@ Section ReadiLoop.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     assert (HKbr : (K_bread <= K - 14)%nat) by (unfold K_bread; lia).
     iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
-              (fs_view γfs γd dev cov) pidv dev (blkmap_get bm fbn) dq
+              (fs_view γfs γd dev cov) pidv dev (blkmap_get bm fbn)
+              (rd_q user dq)
               B3 (K - 14)%nat true C b
               HKbr Hblt' eq_refl Hbcov'
               eq_refl Hj Hgl HB3a0 HB3a1 eq_refl
@@ -1285,6 +1317,8 @@ Section ReadiLoop.
                     Hpark Hdevi Hdgeom Hdlock Hsl").
     iIntros (CIDa9 Hqa9 mBr kkb bsB bsdB dB)
       "%Hfacts Hcg Hcnt Hpc Hoctx Hpark Hppid Hheld".
+    (* the borrow closes: either_copyout wants the block whole *)
+    iDestruct ("Hdstback" with "Hppid") as "Hdst".
     destruct Hfacts as [Hcs2 HmBra0].
     assert (Hpc92 : ret_pc (B3 !!! Regidx Rra : mword 64)
                     = mword_of_int (RI + 0x92)) by (rewrite HB3ra; pcw).
@@ -1449,7 +1483,7 @@ Section ReadiLoop.
         sie_cap_gpr Mb (K - 14)%nat b (proc_addr j) -∗
         pc_is (mword_of_int (RI + 0x4c) : mword 64) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I
-      with "[Hcnt Hcont Hframe Hoctx Hpark Hppid Hidev Hmeta Hmap Hdst
+      with "[Hcnt Hcont Hframe Hoctx Hpark Hidev Hmeta Hmap Hdst
              Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
     { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs2 %Hbs4 %Hbs7
                             %Hbs6 %Hbs1 %Hbs5 %Hbs3 %Hbs9 %Hbs8 Hcg Hpc".
@@ -1606,22 +1640,25 @@ Section ReadiLoop.
                        pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot) jj
                          ↦ₘ rd_delivered data dst_olds off tot (tot + jj)%nat)
                ∗ (if user then True
-                  else ([∗ list] jj ∈ seq 0 tot,
-                          pa_add (m !!! Regidx Ra2 : mword 64) jj
-                            ↦ₘ rd_delivered data dst_olds off tot jj)
+                  else p_pid (proc_addr j) ↦₄{dq} pidv
+                       ∗ ([∗ list] jj ∈ seq 0 tot,
+                            pa_add (m !!! Regidx Ra2 : mword 64) jj
+                              ↦ₘ rd_delivered data dst_olds off tot jj)
                        ∗ ([∗ list] jj ∈ seq 0 (n - tot - mm),
                             pa_add (pa_add (pa_add (m !!! Regidx Ra2 : mword 64) tot)
                                       mm) jj
                               ↦ₘ rd_delivered data dst_olds off tot
                                    (tot + (mm + jj))%nat)))%I
         with "[Hdst]" as "[Hdstw Hdstrest]".
-      { destruct user.
+      { rewrite /rd_dst. destruct user.
         - iSplitL "Hdst"; [iExact "Hdst" | done].
-        - iDestruct (rd_split3 (m !!! Regidx Ra2 : mword 64)
+        - iDestruct "Hdst" as "[Hdst Hppid]".
+          iDestruct (rd_split3 (m !!! Regidx Ra2 : mword 64)
                        tot mm (n - tot - mm)%nat n
                        (fun i => rd_delivered data dst_olds off tot i)
                        ltac:(lia) with "Hdst") as "(Hp & Hq & Hr)".
-          iSplitL "Hq"; [iExact "Hq"|]. iSplitL "Hp"; [iExact "Hp"|]. iExact "Hr". }
+          iSplitL "Hq"; [iExact "Hq"|]. iSplitL "Hppid"; [iExact "Hppid"|].
+          iSplitL "Hp"; [iExact "Hp"|]. iExact "Hr". }
       (* ===== +0x60 jal ra,either_copyout ===== *)
       iApply (wp_jal_s_sconf Φ (mword_of_int (RI + 0x60)) Rra
                 (mword_of_int 2092192 : mword 21) D7 (K - 14)%nat b
@@ -1672,12 +1709,11 @@ Section ReadiLoop.
                  ⌜(mE !!! Regidx Ra0 : mword 64) = (mword_of_int 0 : mword 64)
                   \/ ((mE !!! Regidx Ra0 : mword 64)
                         = (mword_of_int (-1) : mword 64) /\ user = true)⌝ ∗
-                 (if user then proc_priv γf (proc_addr j) pidv (upd_upt V P2)
-                  else [∗ list] i ∈ seq 0 n,
-                         pa_add (m !!! Regidx Ra2 : mword 64) i
-                           ↦ₘ rd_delivered data dst_olds off (tot + mm)%nat i))%I
+                 rd_dst γf j pidv dq user (upd_upt V P2)
+                        (m !!! Regidx Ra2 : mword 64) n
+                        (rd_delivered data dst_olds off (tot + mm)%nat))%I
         with "[Hpost Hdstrest]" as "Hnorm".
-      { destruct user.
+      { rewrite /rd_dst. destruct user.
         - iDestruct "Hpost" as "(%Hr & Hpp)".
           iDestruct "Hpp" as (P2) "[%Hx Hpriv]".
           iExists P2.
@@ -1686,10 +1722,11 @@ Section ReadiLoop.
                     [left; exact Hr | right; split; [exact Hr | reflexivity]]|].
           iExact "Hpriv".
         - iDestruct "Hpost" as "(%Hr & Hmid)".
-          iDestruct "Hdstrest" as "[Hp Hq]".
+          iDestruct "Hdstrest" as "(Hppid & Hp & Hq)".
           iExists PI.
           iSplitR; [iPureIntro; exact HextI|].
           iSplitR; [iPureIntro; left; exact Hr|].
+          iSplitR "Hppid"; [| iExact "Hppid"].
           iApply (rd_join3 (m !!! Regidx Ra2 : mword 64)
                     tot mm (n - tot - mm)%nat n
                     (fun i => rd_delivered data dst_olds off (tot + mm)%nat i)
@@ -1802,12 +1839,17 @@ Section ReadiLoop.
         assert (HF2a0 : F2 !!! Regidx Ra0 = bnode kkb) by lkp.
         iDestruct (cpu_own_transport CIDb9 CIDc3 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (rd_dst_pid γf j pidv dq user (upd_upt V P2)
+                     (m !!! Regidx Ra2 : mword 64) n
+                     (rd_delivered data dst_olds off (tot + mm)%nat)
+                     with "Hdst2") as "[Hppid Hdstback]".
         iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kkb
-                  pidv dev (blkmap_get bm fbn) dq F2 (K - 14)%nat true
+                  pidv dev (blkmap_get bm fbn) (rd_q user dq) F2 (K - 14)%nat true
                   (proc_addr j) C (data fbn) bsdB dB b
                   HKbl Hkklt HF2a0
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
         iIntros (CIDc7 Hqc7 mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl".
+        iDestruct ("Hdstback" with "Hppid") as "Hdst2".
         assert (Hpc6e : ret_pc (F2 !!! Regidx Rra : mword 64)
                         = mword_of_int (RI + 0x6e)) by (rewrite HF2ra; pcw).
         iEval (rewrite Hpc6e) in "Hpc".
@@ -1976,7 +2018,7 @@ Section ReadiLoop.
                     ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw)
                     ltac:(pcw) ltac:(vm_compute; reflexivity)
                     with "Hcg Hcnt Htext Hpc Hjbe Hjc0 Hjc2 Hjc4 Hjc6 Hjc8
-                          Hframe Hoctx Hpark Hppid Hidev Hmeta Hmap Hblocks
+                          Hframe Hoctx Hpark Hidev Hmeta Hmap Hblocks
                           Hdst2 Hsl [Hcont]").
           iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDc11)
                     ltac:(wp_next_chain) with "Hcont").
@@ -2015,7 +2057,7 @@ Section ReadiLoop.
                     ltac:(lia) Hext2 ltac:(lia)
                     HG3sp HG3s6 HG3s7 HG3s4 HG3s1 HG3s5 HG3s3 HG3s9 HG3s8
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hprocs Hscheds
-                          Hdevi Hdgeom Hdlock Hframe Hoctx Hpark Hppid Hidev
+                          Hdevi Hdgeom Hdlock Hframe Hoctx Hpark Hidev
                           Hmeta Hmap Hblocks Hdst2 Hsl Hcont").
       - (* ====== THE COPY OUT FAULTED -- only reachable on the USER arm,
              where either_copyout may answer -1.  readi releases a buffer
@@ -2064,12 +2106,17 @@ Section ReadiLoop.
         assert (HJ2a0 : J2 !!! Regidx Ra0 = bnode kkb) by lkp.
         iDestruct (cpu_own_transport CIDb9 CIDd3 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+        iDestruct (rd_dst_pid γf j pidv dq user (upd_upt V P2)
+                     (m !!! Regidx Ra2 : mword 64) n
+                     (rd_delivered data dst_olds off (tot + mm)%nat)
+                     with "Hdst2") as "[Hppid Hdstback]".
         iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kkb
-                  pidv dev (blkmap_get bm fbn) dq J2 (K - 14)%nat true
+                  pidv dev (blkmap_get bm fbn) (rd_q user dq) J2 (K - 14)%nat true
                   (proc_addr j) C (data fbn) bsdB dB b
                   HKbl Hkklt HJ2a0
                   with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld").
         iIntros (CIDd7 Hqd7 mR) "%HcsR Hcg Hcnt Hpc Hppid Hsl".
+        iDestruct ("Hdstback" with "Hppid") as "Hdst2".
         assert (Hpcb0 : ret_pc (J2 !!! Regidx Rra : mword 64)
                         = mword_of_int (RI + 0xb0)) by (rewrite HJ2ra; pcw).
         iEval (rewrite Hpcb0) in "Hpc".
@@ -2098,13 +2145,11 @@ Section ReadiLoop.
         iEval (rewrite Hpp) in "Hpc". clear Hpp.
         (* the destination claim reverts to [tot]: on this arm [user] is
            [true], so both readings are the same [proc_priv]. *)
-        iAssert (if user
-                 then proc_priv γf (proc_addr j) pidv (upd_upt V P2)
-                 else [∗ list] i ∈ seq 0 n,
-                        pa_add (m !!! Regidx Ra2 : mword 64) i
-                          ↦ₘ rd_delivered data dst_olds off tot i)%I
+        iAssert (rd_dst γf j pidv dq user (upd_upt V P2)
+                        (m !!! Regidx Ra2 : mword 64) n
+                        (rd_delivered data dst_olds off tot))%I
           with "[Hdst2]" as "Hdst3".
-        { destruct user; [iExact "Hdst2" | discriminate Huser]. }
+        { rewrite /rd_dst. destruct user; [iExact "Hdst2" | discriminate Huser]. }
         iPoseProof (rdi_0b2 with "Htext") as "Hjb2".
         iPoseProof (rdi_0b4 with "Htext") as "Hjb4".
         iPoseProof (rdi_0b6 with "Htext") as "Hjb6".
@@ -2125,7 +2170,7 @@ Section ReadiLoop.
                   ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw)
                   ltac:(pcw) ltac:(vm_compute; reflexivity)
                   with "Hcg Hcnt Htext Hpc Hjb2 Hjb4 Hjb6 Hjb8 Hjba Hjbc
-                        Hframe Hoctx Hpark Hppid Hidev Hmeta Hmap Hblocks
+                        Hframe Hoctx Hpark Hidev Hmeta Hmap Hblocks
                         Hdst3 Hsl [Hcont]").
         iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDd8)
                   ltac:(wp_next_chain) with "Hcont"). }
@@ -2296,11 +2341,11 @@ Section ReadiMain.
     assert (Hsumu : bv_unsigned (mword_of_int (Z.of_nat (off + n)) : mword 64)
                     = Z.of_nat (off + n)) by (apply rd_nat_u; lia).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hkenv Hidev
-              Hmeta Hmap Hblocks Hdst Hppid #Hprocs #Hscheds Hoctx
+              Hmeta Hmap Hblocks Hdst #Hprocs #Hscheds Hoctx
               Hpark #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iAssert (rd_cont (CID0 := CID) Φ γfs bn γf dev ip bm data dn user off n
                dst_olds V pidv dq dqd j m K C b)%I with "[Hcont]" as "Hcont";
-      [rewrite /rd_cont; iExact "Hcont"|].
+      [rewrite /rd_cont /rd_dst; iExact "Hcont"|].
     iPoseProof (rdi_000 with "Htext") as "Hi00".
     iPoseProof (rdi_002 with "Htext") as "Hi02".
     iPoseProof (rdi_006 with "Htext") as "Hi06".
@@ -2403,15 +2448,15 @@ Section ReadiMain.
         iSplitL "Hmt"; [iExact "Hmt"|]. iSplitL "Hmj"; [iExact "Hmj"|].
         iSplitL "Hmn"; [iExact "Hmn"|]. iSplitL "Hml"; [iExact "Hml"|].
         iExact "Hmz". }
-      iAssert (if user
-               then proc_priv γf (proc_addr j) pidv (upd_upt V (pv_upt V))
-               else [∗ list] i ∈ seq 0 n,
-                      pa_add (m !!! Regidx Ra2 : mword 64) i
-                        ↦ₘ rd_delivered data dst_olds off 0%nat i)%I
+      iAssert (rd_dst γf j pidv dq user (upd_upt V (pv_upt V))
+                      (m !!! Regidx Ra2 : mword 64) n
+                      (rd_delivered data dst_olds off 0%nat))%I
         with "[Hdst]" as "Hdst".
-      { destruct user.
+      { rewrite /rd_dst. destruct user.
         - rewrite rd_upd_upt_id. iExact "Hdst".
-        - iApply (big_sepL_mono with "Hdst"). intros i jj Hj2.
+        - iDestruct "Hdst" as "[Hdst Hppid]".
+          iSplitR "Hppid"; [| iExact "Hppid"].
+          iApply (big_sepL_mono with "Hdst"). intros i jj Hj2.
           apply lookup_seq in Hj2 as [-> Hlt]. rewrite Nat.add_0_l.
           rewrite (rd_deliver_0 data dst_olds off i). reflexivity. }
       iDestruct (cpu_own_transport CID CIDx3 0 true (proc_addr j) C b
@@ -2420,7 +2465,7 @@ Section ReadiMain.
       iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! X1 0%nat (pv_upt V)
                 with "[%] [%] [%] [%] Hcg Hcnt Hpc
-                      Hoctx Hpark Hppid Hidev Hmeta Hmap Hblocks Hdst Hsl").
+                      Hoctx Hpark Hidev Hmeta Hmap Hblocks Hdst Hsl").
       { unfold callee_saved. split_and!; lkp. }
       { apply uptd_ext_refl. }
       { lia. }
@@ -2429,15 +2474,15 @@ Section ReadiMain.
     (* ---- everything past this point holds the destination at [tot = 0]
        and the descriptor at [pv_upt V] ---- *)
     assert (HVid : upd_upt V (pv_upt V) = V) by apply rd_upd_upt_id.
-    iAssert (if user
-             then proc_priv γf (proc_addr j) pidv (upd_upt V (pv_upt V))
-             else [∗ list] i ∈ seq 0 n,
-                    pa_add (m !!! Regidx Ra2 : mword 64) i
-                      ↦ₘ rd_delivered data dst_olds off 0%nat i)%I
+    iAssert (rd_dst γf j pidv dq user (upd_upt V (pv_upt V))
+                    (m !!! Regidx Ra2 : mword 64) n
+                    (rd_delivered data dst_olds off 0%nat))%I
       with "[Hdst]" as "Hdst".
-    { destruct user.
+    { rewrite /rd_dst. destruct user.
       - rewrite HVid. iExact "Hdst".
-      - iApply (big_sepL_mono with "Hdst"). intros i jj Hj2.
+      - iDestruct "Hdst" as "[Hdst Hppid]".
+        iSplitR "Hppid"; [| iExact "Hppid"].
+        iApply (big_sepL_mono with "Hdst"). intros i jj Hj2.
         apply lookup_seq in Hj2 as [-> Hlt]. rewrite Nat.add_0_l.
         rewrite (rd_deliver_0 data dst_olds off i). reflexivity. }
     iAssert (inode_meta ip dn) with "[Hmt Hmj Hmn Hml Hmz]" as "Hmeta".
@@ -2810,7 +2855,7 @@ Section ReadiMain.
         sie_cap_gpr Mt (K - 14)%nat b (proc_addr j) -∗
         pc_is (mword_of_int (RI + 0x34) : mword 64) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I
-      with "[Hcnt Hcont Hframe Hoctx Hpark Hppid Hidev Hmeta Hmap Hblocks
+      with "[Hcnt Hcont Hframe Hoctx Hpark Hidev Hmeta Hmap Hblocks
              Hdst Hsl]" as "TAIL".
     { iIntros (CIDt Mt nc) "%Hanch %Hncdef %Hncn %Hoffnc %Htsp %Hts5 %Hts6 %Hts7
                             %Hts4 %Hts1 %Hts2 %Hts8 %Hts9 %Hts10 %Hts11 Hcg Hpc".
@@ -2873,7 +2918,7 @@ Section ReadiMain.
                   HK HZ1sp HZ1s3 HZ1s2 HZ1s8 HZ1s9 HZ1s10 HZ1s11
                   ltac:(apply uptd_ext_refl) ltac:(lia)
                   ltac:(right; split; [reflexivity | exact Hncdef])
-                  with "Hcg Hcnt Htext Hpc Hframe Hoctx Hpark Hppid Hidev
+                  with "Hcg Hcnt Htext Hpc Hframe Hoctx Hpark Hidev
                         Hmeta Hmap Hblocks Hdst Hsl [Hcont]").
         iApply (wp_next_shift (CIDa := CID) (CIDb := CIDz3) ltac:(wp_next_chain)
                   with "Hcont"). }
@@ -3054,7 +3099,7 @@ Section ReadiMain.
                       replace (nc - 0)%nat with nc by lia; lia)
                 HU3sp HU3s6 HU3s7 HU3s4 HU3s1 HU3s5 HU3s3 HU3s9 HU3s8
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hprocs Hscheds
-                      Hdevi Hdgeom Hdlock Hframe Hoctx Hpark Hppid Hidev
+                      Hdevi Hdgeom Hdlock Hframe Hoctx Hpark Hidev
                       Hmeta Hmap Hblocks Hdst Hsl Hcont"). }
     (* ===== +0x2c bgeu a5,a4 : does the read fit inside the file? ===== *)
     destruct (Nat.leb_spec (off + n) szn) as [Hge | Hlt].

@@ -75,6 +75,19 @@
    either restored or never written.  That is a fact about bmap's PROOF;
    the contract below just says [callee_saved m mf].
 
+   THE BITMAP RIDES THROUGH, because balloc's does.  bmap takes the two
+   superblock cells and [BitmapInv.bitmap_res] and hands them back; the
+   returned bitmap is at an EXISTENTIAL [used'] with [used ⊆ used'],
+   because bmap may allocate twice (the indirect block and the data block)
+   and a caller has no use for the exact set -- only for the fact that the
+   allocator never un-marks a block.  Who owns the bitmap between calls is
+   deliberately still open (claude-notes/design/fs-bitmap.md, "Who owns
+   bitmap_res between calls"); it is passed in and returned updated, as
+   [inode_map] is.
+
+   [BMAP_NOALLOC] below is UNCHANGED by this: with all three allocation
+   sites dead there is no balloc, hence no bitmap and no superblock cell.
+
    bmap SLEEPS (bread, and balloc), so it threads the full running-process
    bundle exactly as SpecBread.v does.  It enters and returns at noff 0. *)
 From Stdlib Require Import ZArith Lia List.
@@ -105,6 +118,9 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import InodeInv.
+Require Import BitmapEnc BitmapInv.
+Require Import KernelDataInv.
+Require Import SpecPrintkGen.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -126,10 +142,11 @@ Definition wp_bmap_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
-    (cov : gset Z) (logstart : Z) (dev : mword 32)
+    (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z) (γpr : gname)
     (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
     (n : nat)
-    (pidv : mword 32) (dq dqd : dfrac)
+    (pidv : mword 32) (dq dqd dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bmap in
@@ -145,6 +162,12 @@ Definition wp_bmap_sconf_body
      premise, and 0 is never a client block) and the fact that the log's
      own storage is covered *)
   log_geom_ok cov logstart ->
+  (* the bitmap's geometry, forwarded verbatim to balloc *)
+  bitmap_geom_ok cov logstart bmapstart size ->
+  (* balloc's out-of-blocks arm calls the GENERAL printk path; its contract
+     rides as a hypothesis, never a functor, so that neither balloc nor bmap
+     inherits LinkPrintkGen's Axiom.  See SpecBalloc.v's header. *)
+  printk_gen_contract γpr γu γd ->
   (* KILLS THE PANIC ARM *)
   (fbn < MAXFILE)%nat ->
   blkmap_wf cov logstart bm ->
@@ -161,6 +184,9 @@ Definition wp_bmap_sconf_body
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
+  (* the two PERSISTENT printk credentials, forwarded to balloc *)
+  kernel_data -∗
+  printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* ip->dev, read (never written) on all four balloc/bread call paths --
@@ -178,6 +204,10 @@ Definition wp_bmap_sconf_body
   inode_blocks γfs bm data -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
+  (* the two superblock fields and the bitmap, all three for balloc's sake *)
+  sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
@@ -204,8 +234,12 @@ Definition wp_bmap_sconf_body
      loop can present its counter directly and re-present what comes back. *)
   log_op γ n -∗
   wp_next b pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8)),
+  ∀ (mf : regfile) (bm' : blkmap) (n' : nat) (data' : nat -> list (bv 8))
+    (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
+      (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows.  The exact set is
+         existential because bmap may allocate twice. *)
+      ⌜used ⊆ used'⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       (* bm' agrees with bm at every file index except possibly bn *)
       ⌜forall i : nat, (i < MAXFILE)%nat -> i <> fbn ->
@@ -230,6 +264,9 @@ Definition wp_bmap_sconf_body
       own_ctx (p_context pj) -∗
       park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
+      sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      bitmap_res γfs bmapstart cov logstart size used' -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_map γfs ip bm' -∗
       (* THE DEPOSIT.  [data'] is [data] except that a freshly allocated
@@ -271,14 +308,16 @@ Module Type BMAP.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z) (γpr : gname)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (fbn : nat)
       (n : nat)
-      (pidv : mword 32) (dq dqd : dfrac)
+      (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_bmap_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
-                         cov logstart dev ip bm data fbn n pidv dq dqd m K eb C b.
+                         cov logstart bmapstart size dev used γpr ip bm data fbn n
+                         pidv dq dqd dqb dqs m K eb C b.
 End BMAP.
 
 (* ===================================================================== *)

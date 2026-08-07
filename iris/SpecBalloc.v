@@ -42,13 +42,55 @@
      nothing to state because the postcondition is already a two-arm
      disjunction on the return value.
 
-   THE OPEN QUESTION THIS DEFERS is where a FREE block's [fsblock] half
-   lives while free.  FsBoot mints one per covered block at boot, so they
-   exist; proving balloc means designing the bitmap invariant that holds
-   them and tying bit b of the bitmap to the claim that block b's half is
-   in the pool.  Stating balloc needs none of that, which is exactly why
-   it is worth assuming first -- the shape of bmap's proof does not depend
-   on it.
+   *** THE OUT-OF-BLOCKS ARM IS LIVE, AND IT CALLS printk. ***  Nothing in
+   [BitmapInv.bitmap_res] prevents every bit below [sb.size] being set --
+   [free_pool] is then the empty big-op and [bitmap_ok] is vacuous -- so the
+   scan CAN fall out of the loop and reach
+   [auipc a0,0x4 / addi a0,a0,1350 / jal printk] on "balloc: out of blocks".
+   That is the GENERAL printk path ([SpecPrintkGen.v]), not the panic path,
+   so this contract takes:
+
+     - [γpr] and the two PERSISTENT credentials [kernel_data] and
+       [printk_env γpr γu γd] (the format string itself needs no premise:
+       [KernelDataInv.kernel_data_string] mints its persistent [↦ₛ□] out of
+       [kernel_data]);
+     - printk's contract as a [Prop] HYPOTHESIS
+       ([SpecPrintkGen.printk_gen_contract]), never as a functor argument.
+
+   *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  [PRINTK_GEN]'s only
+   instance is [LinkPrintkGen]'s own [Axiom].  Instantiating the functor here
+   would put a SEVENTH entry in [Print Assumptions Balloc.wp_balloc_sconf] --
+   and, through the ripple, in bmap's and writei's too.  Carrying it as a
+   hypothesis keeps all three at the standing six, but that is NOT
+   self-containment: balloc's six are modulo a THREADED printk obligation
+   that its callers must eventually discharge, exactly the standing that
+   [SpecPanic.panic_wp_any] already has throughout this tree.  A reader who
+   takes the six for "depends on nothing else" is misreading it.
+
+   THE BITMAP RIDES THROUGH THE CONTRACT.  balloc reads BOTH superblock
+   fields out of memory ([sb.size] at sb+4, [sb.bmapstart] at sb+28) and
+   rewrites the bitmap block, so the two cells and [BitmapInv.bitmap_res]
+   are premises -- there is no way to discharge the postcondition's
+   [fsblock] + [blk_own] without a resource they come out of, and
+   [BitmapInv.free_pool] is that resource.  Both cells ride as plain
+   FRACTIONAL cells, the way SpecInitlog.v takes [sb + 20] and
+   SpecIupdate.v takes [sb + 24]; the bitmap is PASSED IN AND RETURNED
+   UPDATED, exactly as InodeInv.inode_map is for bmap, because who owns it
+   between calls is the free-space layer's business and is deliberately
+   not designed here (claude-notes/design/fs-bitmap.md, "Who owns
+   bitmap_res between calls").
+
+   ONE BITMAP BLOCK, AND A THIRD DEAD ARM.  [FSSIZE = 2000 < BPB = 8192],
+   so [0 < size <= BPB] is a premise, BBLOCK collapses
+   ([BitmapInv.BBLOCK_single]) and the outer loop runs a single iteration:
+   b starts at 0, the inner scan exits on [b + bi >= sb.size] or on
+   [bi == BPB], and [b += BPB] then makes [b >= sb.size] unconditionally.
+   The [0 < size] half of that premise also kills balloc's OWN
+   [beqz a5,+0xf6] at +0x12 -- the [sb.size == 0] jump straight to the
+   printk, skipping the s2..s8 restore -- which is dead in the same sense
+   as log_write's two panics, bmap's "out of range" and bfree's "freeing
+   free block": the premise makes the arm unreachable, so it is refuted
+   rather than proved.
 
    balloc SLEEPS (it breads), so it threads the full running-process
    bundle exactly as SpecBread.v does: procs_inv / scheds_inv / own_ctx /
@@ -72,6 +114,8 @@ Require Import IntrDefs.
 Require Import WpNext.
 Require Import WpLock.
 Require Import SpecPanic.
+Require Import KernelDataInv.
+Require Import SpecPrintkGen.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -82,6 +126,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
+Require Import BitmapEnc BitmapInv.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -103,9 +148,11 @@ Definition wp_balloc_sconf_body
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
-    (cov : gset Z) (logstart : Z) (dev : mword 32)
+    (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z)
+    (γpr : gname)
     (u : nat)
-    (pidv : mword 32) (dq : dfrac)
+    (pidv : mword 32) (dq dqb dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.balloc in
@@ -116,6 +163,17 @@ Definition wp_balloc_sconf_body
      premise, and 0 is never a client block) and the fact that the log's
      own storage is covered *)
   log_geom_ok cov logstart ->
+  (* THE OUT-OF-BLOCKS ARM'S CALLEE, as a hypothesis and not a functor -- see
+     the header for why that is what keeps this proof at the standing six *)
+  printk_gen_contract γpr γu γd ->
+  (* ONE BITMAP BLOCK (see the header), and the [0 < size] that kills the
+     +0x12 arm *)
+  0 < size <= BPB ->
+  (* the bitmap block is a covered HOME block: bread's premise, and
+     log_write's *)
+  0 <= bmapstart ->
+  bmapstart ∈ cov ->
+  ~ (bmapstart ∈ log_region_set logstart) ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the uint argument arrives sign-extended (RV64 ABI) *)
@@ -128,10 +186,19 @@ Definition wp_balloc_sconf_body
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
+  (* the general printk path's two PERSISTENT credentials, for the
+     out-of-blocks arm *)
+  kernel_data -∗
+  printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
+  (* the two superblock fields, read at +0x0a and +0xa0 and never written *)
+  sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  (* THE BITMAP, with its free pool: passed in, returned updated *)
+  bitmap_res γfs bmapstart cov logstart size used -∗
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
@@ -156,9 +223,13 @@ Definition wp_balloc_sconf_body
       own_ctx (p_context pj) -∗
       park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
+      sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bslots bn 2 -∗
-      ((* FAILURE: a0 = 0, nothing allocated, nothing spent *)
+      ((* FAILURE: a0 = 0, nothing allocated, nothing spent, the bitmap
+          unchanged -- every bit below size was already set *)
        (⌜mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int 0 : mword 64)⌝ ∗
+        bitmap_res γfs bmapstart cov logstart size used ∗
         log_op γ (2 + u))
        ∨
        (* SUCCESS: a0 = a nonzero covered home block, zeroed, two units gone *)
@@ -178,6 +249,9 @@ Definition wp_balloc_sconf_body
              [InodeInv.blkmap_wf]'s injectivity at an insertion (see
              [InodeInv.inode_fresh]).  Without it bmap is unprovable. *)
           blk_own γfs (bv_unsigned blk) ∗
+          (* ...and the bitmap with exactly that bit newly set *)
+          bitmap_res γfs bmapstart cov logstart size
+                     (used ∪ {[ bv_unsigned blk ]}) ∗
           log_op γ u)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -193,11 +267,14 @@ Module Type BALLOC.
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z)
+      (γpr : gname)
       (u : nat)
-      (pidv : mword 32) (dq : dfrac)
+      (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_balloc_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart dev u pidv dq m K eb C b.
+                           cov logstart bmapstart size dev used γpr u
+                           pidv dq dqb dqs m K eb C b.
 End BALLOC.

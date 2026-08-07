@@ -193,6 +193,9 @@ Require Import FsCrash.
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import BitmapEnc BitmapInv.
+Require Import KernelDataInv.
+Require Import SpecPrintkGen.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
@@ -249,13 +252,15 @@ Definition wp_writei_sconf_body
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
+    (cov : gset Z) (logstart : Z) (inodestart : Z)
+    (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z) (γpr : gname)
     (ip : mword 64) (inum : mword 32)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode) (ds : list dinode)
     (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
     (V : pprivate) (ncount : nat)
-    (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+    (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.writei in
@@ -298,6 +303,11 @@ Definition wp_writei_sconf_body
      than proving what the code does when it fires. *)
   (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
+  (* the bitmap's geometry, forwarded through bmap to balloc *)
+  bitmap_geom_ok cov logstart bmapstart size ->
+  (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
+     hypothesis, never a functor.  See SpecBalloc.v's header. *)
+  printk_gen_contract γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = ip *)
@@ -316,6 +326,9 @@ Definition wp_writei_sconf_body
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
+  (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
+  kernel_data -∗
+  printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
@@ -330,6 +343,11 @@ Definition wp_writei_sconf_body
   inode_blocks γfs bm data -∗
   (* sb.inodestart, read once inside iupdate *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  (* sb.size and sb.bmapstart, and THE BITMAP: bmap's interior balloc needs
+     all three, and writei calls bmap once per straddled block *)
+  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
   (* THE INODE BLOCK, as sixteen pure dinodes *)
   fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
   (* THE SOURCE.  On the user arm a virtual address into the running
@@ -358,8 +376,12 @@ Definition wp_writei_sconf_body
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' : dinode) (ds' : list dinode) (n' : nat)
-    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd),
+    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
+    (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
+      (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
+         the loop performs. *)
+      ⌜used ⊆ used'⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       ⌜blk_holes_zero bm' data'⌝ -∗
       ⌜diblk_wf ds'⌝ -∗
@@ -410,6 +432,9 @@ Definition wp_writei_sconf_body
       inode_map γfs ip bm' -∗
       inode_blocks γfs bm' data' -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      bitmap_res γfs bmapstart cov logstart size used' -∗
       fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds') -∗
       (if user
        then proc_priv γf pj pidv (upd_upt V P')
@@ -431,17 +456,20 @@ Module Type WRITEI.
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z)
+      (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z) (γpr : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (ds : list dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
       (V : pprivate) (ncount : nat)
-      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_writei_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs γa γf
-                           cov logstart inodestart dev ip inum bm data dn ds
+                           cov logstart inodestart bmapstart size dev used γpr
+                           ip inum bm data dn ds
                            user off n src_bytes V ncount
-                           pidv dq dqd dqn dqs m K eb C b.
+                           pidv dq dqd dqn dqs dqb dqbs m K eb C b.
 End WRITEI.

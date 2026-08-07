@@ -242,15 +242,30 @@ Definition wp_readi_sconf_body
   (* THE FILE'S BLOCK MAP AND ITS DATA BLOCKS, both returned UNCHANGED *)
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
-  (* THE DESTINATION.  On the user arm a virtual address into the running
-     process's own space; on the kernel arm the caller's own [n]-byte
-     buffer, whose current contents are [dst_olds]. *)
+  (* THE DESTINATION, AND THE PID CELL THAT RIDES WITH IT.  On the user arm a
+     virtual address into the running process's own space; on the kernel arm
+     the caller's own [n]-byte buffer, whose current contents are [dst_olds].
+
+     THE PID FRACTION IS THE KERNEL ARM'S, AND ONLY THE KERNEL ARM'S.  bread's
+     acquiresleep records the caller's pid, so readi needs a share of
+     [p->pid] either way -- but on the USER arm it borrows that share out of
+     [proc_priv] itself ([ProcInv.proc_priv_pid]) rather than asking for it.
+     It has to: that accessor is a BORROW, it consumes the block and returns a
+     wand, so no caller can hold [proc_priv] and the fraction at the same
+     time.  The cell is fully accounted for -- [ProcInv.proc_priv_core] holds
+     one half and [SchedCtx.proc_pub] the other, behind [p->lock] -- so there
+     is no third fragment anywhere for a caller to reach.  A caller therefore
+     supplies ONE OR THE OTHER and never both.
+
+     (An earlier version of this contract asked for both at once, with a
+     comment claiming [proc_priv_pid] supplied the quarter alongside the
+     block.  It does not, and the user arm was uncallable; fileread, its
+     first caller, is what found it.  [SpecWritei.v] still has the same
+     shape -- see claude-notes/design/file-table.md.) *)
   (if user
    then proc_priv γf pj pidv V
-   else [∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ dst_olds i) -∗
-  (* the caller's own pid cell (acquiresleep records it).  On the user arm
-     this is [proc_priv]'s own quarter (ProcInv.proc_priv_pid). *)
-  p_pid pj ↦₄{dq} pidv -∗
+   else ([∗ list] i ∈ seq 0 n, pa_add dst i ↦ₘ dst_olds i) ∗
+        p_pid pj ↦₄{dq} pidv) -∗
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
@@ -283,17 +298,19 @@ Definition wp_readi_sconf_body
       pc_is ret_tgt -∗
       own_ctx (p_context pj) -∗
       park_hlf j true -∗
-      p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_meta ip dn -∗
       inode_map γfs ip bm -∗
       inode_blocks γfs bm data -∗
       (* THE BYTES DELIVERED ARE THE FILE'S BYTES.  Exact on both ends: the
-         untouched tail still holds what the caller put there. *)
+         untouched tail still holds what the caller put there.  The pid
+         fraction goes back the way it came -- with the kernel arm's buffer,
+         or inside the user arm's block. *)
       (if user
        then proc_priv γf pj pidv (upd_upt V P')
-       else [∗ list] i ∈ seq 0 n,
-              pa_add dst i ↦ₘ rd_delivered data dst_olds off tot i) -∗
+       else ([∗ list] i ∈ seq 0 n,
+              pa_add dst i ↦ₘ rd_delivered data dst_olds off tot i) ∗
+            p_pid pj ↦₄{dq} pidv) -∗
       bslot bn -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

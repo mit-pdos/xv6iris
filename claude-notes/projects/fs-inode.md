@@ -533,3 +533,43 @@ tree — it is a sweep of its own. The recipe is in
 [`../completed/either-copy.md`](../completed/either-copy.md) ("grep the
 STATEMENT rather than the word; diff every `*_<off>` fact against HEAD
 afterwards").
+
+## Owed: merge the duplicated ALU leaves back into the shared layer
+
+`sllw` (register-register 32-bit left shift) has NO leaf in the shared layer
+— `WpSconfAlu.v` has `slliw`/`srl`/`addw`/`subw` but not this one — and it
+is exactly how both bfree (+0x26) and balloc (+0x0be) form the bitmap mask
+`1 << (bi % 8)`. It is currently proved TWICE, in `ProofBallocParts.v` and
+again in `ProofBfree.v`.
+
+**That duplication is deliberate, not an oversight.** bfree is proven and
+linked with `Print Assumptions` = the standing six; balloc was not yet, and
+`LinkBalloc.v` still carried an `Axiom`, so making bfree's cone depend on
+balloc's would have put balloc's assumption inside bfree's. Once balloc is
+linked the two copies should be merged into `WpMmodeShiftiop.v` (the exec
+bridge, beside ADDW/SUBW) plus `WpSconfAlu.v` (the leaf, beside
+`wp_slliw_s_sconf`), which deletes both. This joins the `WpSconfSrliw`
+merge-back already owed.
+
+Same story, same fix, for the XOR / zero-extend twins of
+`RiscvExtras.and_vec64_unsigned` / `or_vec64_unsigned` (bfree's
+`bf_xor_vec64_unsigned` / `bf_zext8_unsigned`), which belong in
+`RiscvExtras.v`; and for a content-generic single-byte buffer accessor in
+`ByteBuf.v`/`BufOwn.v` (`DinodeSlot.iu_buf_bytes` is hard-wired to
+`diblk_bytes ds`, so bfree carries a local 20-line wrapper).
+
+## Owed: `SpecWritei.v` has readi's `proc_priv` / `p_pid` defect
+
+`SpecReadi.v` was found to demand `proc_priv γf pj pidv V` AND the `p_pid pj
+↦₄{dq} pidv` fraction SIMULTANEOUSLY on its user arm — which no caller can
+hold, because `ProcInv.proc_priv_pid` says the pid fraction is already inside
+`proc_priv`. It was fixed by moving the pid fraction into the KERNEL arm, and
+`ProofReadi.v` was re-proved.
+
+**`SpecWritei.v` has the same shape and the same defect** (`proc_priv γf pj
+pidv V` on the user arm beside an unconditional `p_pid pj ↦₄{dq} pidv`), and
+it is owed work. It was NOT fixed in the bitmap pass because `SpecWritei.v`
+and `ProofWritei.v` were being rewritten concurrently for balloc's contract
+change, and two overlapping reworks of a 4000-line proof is how a landed proof
+gets broken. Do it as its own change, against readi's fix as the worked
+precedent.
