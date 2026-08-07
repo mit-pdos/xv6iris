@@ -203,6 +203,16 @@ Lemma ke_e488 s :
   = Some (ExecuteAs (STORE (mword_of_int 8 : mword 12, Regidx (mword_of_int 10), Regidx (mword_of_int 9), 8)), s).
 Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
 
+Lemma kd_e70c s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xe70c : mword 16)) s
+  = Some (C_SD (mword_of_int 1, Cregidx (mword_of_int 6), Cregidx (mword_of_int 3)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
+Lemma ke_e70c s :
+  exec (execute (C_SD (mword_of_int 1, Cregidx (mword_of_int 6), Cregidx (mword_of_int 3)))) s
+  = Some (ExecuteAs (STORE (mword_of_int 8 : mword 12, Regidx (mword_of_int 11), Regidx (mword_of_int 14), 8)), s).
+Proof. apply exec_execute_C_SD_leaf; first [ apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity ]. Qed.
+
 Lemma kd_e852 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xe852 : mword 16)) s
   = Some (C_SDSP (mword_of_int 2, Regidx (mword_of_int 20)), s).

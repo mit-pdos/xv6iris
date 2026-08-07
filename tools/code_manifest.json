@@ -336,6 +336,12 @@
   2
  ],
  [
+  "CodeKfork.v",
+  "kfork",
+  "kfk_",
+  3
+ ],
+ [
   "CodeKilled.v",
   "killed",
   "kli_",
@@ -399,6 +405,12 @@
   "CodeMappages.v",
   "mappages",
   "mi_",
+  2
+ ],
+ [
+  "CodeStrncpy.v",
+  "strncpy",
+  "sncp_",
   2
  ],
  [
@@ -543,6 +555,12 @@
   "CodeReparent.v",
   "reparent",
   "rpi_",
+  2
+ ],
+ [
+  "CodeSafestrcpy.v",
+  "safestrcpy",
+  "sscp_",
   2
  ],
  [
