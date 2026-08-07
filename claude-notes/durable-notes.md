@@ -69,6 +69,7 @@ change that produced it.
 - Single file: `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel -w -notation-overridden <file>.v`
 - Full build: `make -f CoqMakefile -j16` (CoqMakefile auto-regenerates from `_CoqProject`; coqdep decides order).
 - ALWAYS grep the build log for `Error` — `make …; echo $?` masks make's exit via the echo.
+- **PICK `-j` BY RAM, NOT BY CORES.** A `Code*.v` worker peaks near **2 GB** and the `Code*` band runs many at once, so `-j` above `RAM_GB / 2` gets workers OOM-killed — which make reports as **`Error 137`** with no Coq error at all, on whichever targets happened to be in flight. Measured 2026-08-07 on a 15 GB / 8-core box: `-j24` killed three `Code*.v` targets; `-j6` completes, a full rebuild taking ~45 min. The `-j16`/`-j32` figures elsewhere in these notes are from a much larger machine — re-derive the bound before reusing them.
 - Never `git add -A` from a parent dir (sweeps sibling untracked trees `coq-sail-stdpp*/`, `lean/`, `rocq/`, `sail-riscv/`); use `git add -A .` from `iris/`.
 - Build is **both** critical-path bound and core-saturated in the middle. Measured 2026-08-03, 669 files, clean, `-j32`: **wall 479s, ΣCPU 9364s, critical path 356s, avg parallelism 19.9×.** The path is a ~86s shared prefix + a ~90s leaf-library branch + ONE ~190s whole-function proof; the ~125s of wall above the path is core starvation and is NOT recoverable by scheduling — reordering `_CoqProject` and raising `-j` were both measured and both did nothing (see `optimization.md`). Each big file pays a 12–40s `Qed` kernel-typecheck. For iterative re-checking, a `-vos`/`-vok` two-phase build drops the Qed off the critical path (no proof changes) — but interactive tactics still run, so a vos build is still >2min.
 - **opam switch:** everything builds in the project-local switch `/shared/xv6rocq` (Rocq 9.0.1, coq-iris 4.4.0, coq-stdpp/-bitvector 1.12.0, coq-sail-stdpp 0.20.1). `eval $(opam env --switch=/shared/xv6rocq)` is mandatory in any raw `coqc` invocation — a fresh shell defaults to the wrong switch (→ "Cannot find SailStdpp.*"). Rocq ≥9.1 is not an option (coq-sail-stdpp 0.20.1 is capped `< 9.1~`).
@@ -131,6 +132,28 @@ true set was 14. Shifting the other 78 would have broken working proofs.
 `XV6_REV`; run `tools/gen_code.py` (it regenerates every Code file in
 `tools/code_manifest.json` straight from the image — 117 files, and it is
 what makes this tractable at all); then fix what it does NOT cover.
+
+> **`gen_code.py --only` IS A FOOTGUN — DO NOT USE IT ALONE.** `--only`
+> restricts which *Code* files are written, but `main()` ALWAYS rewrites all
+> 16 `KernelDecode*.v` shards from the `decoded` dict, which under `--only`
+> holds just that one function's words. Running `--only CodeReadi.v` would
+> have replaced the 2306-lemma shared catalogue with 84 lemmas. To add ONE
+> function: run the FULL generator into a scratch directory and copy out only
+> what changed — then confirm every pre-existing Code file came back
+> byte-identical, and that the shard diffs are pure additions with no removed
+> lines. (Adding a function also means a `tools/code_manifest.json` entry:
+> `[file, symbol, prefix, width]`, where `width` is the zero-padded hex width
+> of the offset in the lemma name — `2` under 256 bytes, `3` at or above.)
+>
+> **A `Code<F>.v` WITH NO MANIFEST ROW IS A TIME BOMB, and its own `.vo`
+> hides it.** `CodeReadi.v` sat in the tree and in `_CoqProject` with a
+> `.vo`, but its 25 decode words were never in `KernelDecode*.v` — the
+> ad-hoc generator run that produced it had written the shards and they were
+> reverted afterwards. It surfaced only on the next full build, as
+> *"Variable decname should be bound to a term but is bound to the
+> identifier `kd_0ed7e663`"*, with the stale `.vo` masking it until then.
+> The manifest row is what makes a Code file reproducible, so **a Code file
+> the manifest does not list is the tell**; recover with the recipe above.
 
 ### The three things that bite, none of which a grep for addresses finds
 
@@ -286,6 +309,7 @@ and axioms each proven function rests on. `--format text|md|html|json`.
 - **An `Ltac` body cannot reference a hypothesis by literal name.** `Ltac t := subst c; vm_compute in Hc; rewrite Hxx in H.` resolves those names at *definition* time and errors "Hypothesis c was not found". Worse, a `subst`-based variant can silently fail to peel in a large context while passing in a small standalone test, and the symptom surfaces as a confusing `apply` unification error one line later. Write the tactic name-free (`first [ … ; assumption | congruence ]`, `lazymatch goal with H : … |- _ => … end`); `congruence` sees through `Regidx`'s injectivity, so no `injection`/`subst` is needed for a register disequality. But see optimization.md before putting `congruence` in a peel loop.
 - **An argument to a LOCAL hypothesis parses with no scope information.** For a global constant, `f (l ++ bs)` picks list_scope from the argument's type; for a hypothesis (e.g. an induction hypothesis `IH`) there is no `Arguments` scope binding, the innermost OPEN scope wins, and with string_scope open `++` elaborates as String.append — a baffling "has type list … expected string" error at the call. Annotate the argument (`((l ++ bs)%list)`). Related list-append recipe: to feed a continuation expecting `P (l ++ [])` (or a reassociated `l ++ bs ++ bs'`) from a hypothesis about `l`, do NOT `rewrite -(app_nil_r l)` in your own hypothesis — the replacement contains the pattern and the rewrite dies on an evar-scope error. `iSpecialize` the continuation at the concrete lists FIRST, then rewrite the SHRINKING direction in it: `iEval (rewrite (app_nil_r l)) in "Hcont"` (or `(app_assoc l bs bs')`).
 - **`tramp_vpn` lives in `KptExecMap.v` and `tf_vpn` in `TrampPt.v`**, not in `UptTree.v` where `tramp_vpn_unsigned` / `tf_vpn_unsigned` are stated. A `proc_pt`-altitude proof that NAMES either constant must `Require Import` those two files directly — `Import` is not transitive. Likewise `KALLOC` / `KFREE` take `γl : gname` AND `γk : gname * gname`; passing only `γk` gives "has type (gname * gname)%type while it is expected to have type gname".
+- **AN IMPLICIT BINDER INSIDE A `Definition`'s BODY IS SILENTLY IGNORED, AND A LOCAL HYPOTHESIS OF A Pi TYPE HAS NO IMPLICIT ARGUMENTS AT ALL.** Writing `Definition c : Prop := forall `{GEN : GenId} `{CID : CpuId} …, wp_<f>_body …` — the natural way to name a callee's contract so it can be passed as a HYPOTHESIS rather than a functor argument (ProofBmap.v's `balloc_contract`, which is what keeps the no-alloc instance free of balloc's Axiom) — gets you *"Warning: Ignoring implicit binder declaration in unexpected position"* and two EXPLICIT binders; implicit binders are only honoured in the ascribed TYPE of a `Definition`/`Parameter`/`Lemma`, never in a term-position `forall`. And even where the type does carry them, a hypothesis (`H : c`) is not a global reference, so no implicit-argument metadata attaches to it. Write the binders explicit, spell the body `wp_<f>_body (GEN := GENa) (CID := CIDa) …`, and pass `_ _` at the call site: **nothing is lost, because an evar whose type is a CLASS is still filled by typeclass resolution** — with the most recently introduced `CpuId`, which is exactly what an implicit-instance argument would have picked (and is why every such call site transports `cpu_own` to the current hart first). Related, same family: **`bi.emp_intro` does not exist in this iris** — an `⊢ emp` goal is closed by plain `done`.
 - **`pc_is` is not in scope transitively.** It is defined in a Section of `InstrBytes.v` and nothing in a typical ProofSched-derived import list re-exports it, so a proof file that only ever FED leaves compiles fine, while one that STATES a loop invariant (`iAssert (∀ m, … pc_is …)`) fails with *"The variable pc_is was not found in the current environment"* — reported at the line inside the iAssert, and possibly after `-time` already printed a success line for that sentence. Fix: `Require Import InstrBytes.`
 - **Replacing a `destruct H as [A|B]` with a `destruct <bool>` does NOT keep the two bullets' order stable, and `cycle 1` cannot be trusted to fix it.** Observed in ProofBread: after the swap the first bullet still received the `true` case, `cycle 1` did not reorder, and the failure surfaced as an `iExact` mismatch printing the OTHER branch's payload (which is what identifies this). Swap the two arm BODIES textually instead of relying on goal reordering.
 - **A scripted binder-drop must keep the line's terminator.** Deleting a spec binder line that carried the closing `:` (`(bs_disk : list (bv 8)) :`) produces `Syntax error: ':=' or ':' expected` reported ~40 lines later at the NEXT lemma, with nothing wrong there.

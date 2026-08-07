@@ -813,3 +813,7 @@ SpecWritei.v
 ProofWriteiParts.v
 ProofWritei.v
 LinkWritei.v
+SpecReadi.v
+ProofReadiParts.v
+ProofReadi.v
+LinkReadi.v

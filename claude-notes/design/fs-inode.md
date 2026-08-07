@@ -474,6 +474,155 @@ so it cannot be handled by the same epilogue lemma as everything else and
 must not be given frame ownership. Nothing else in the inode layer has
 this shape.
 
+## `readi`, and why it forced a no-alloc `bmap` (PROVEN 2026-08-07)
+
+242 bytes, 97 instructions, structurally writei's twin. `readi` calls
+`bmap`, and `bmap` allocates when the slot is zero — which calls
+`log_write`. But **`fileread` does not wrap `readi` in a transaction** (no
+`begin_op`/`end_op`), so an allocating read would hit
+`panic("log_write outside of trans")`. It never happens, because every
+block below a file's size is allocated; nothing in this layer said so, and
+`bmap`'s contract demanded `log_op γ n` with `5 <= n` unconditionally.
+Two pieces fix it, and both are in the tree.
+
+### 1. `bm_covers`, in `InodeInv.v`
+
+```coq
+  bm_covers bm (sz : Z) : Prop
+    := forall i, (i < MAXFILE)%nat -> Z.of_nat i * Z.of_nat BSIZE < sz ->
+         bv_unsigned (blkmap_get bm i) <> 0
+```
+
+The bound is on the BYTE offset of the block's first byte, because that is
+the shape both producers and consumers have. Five laws ship with it, and
+the one readi's loop actually calls is **`bm_covers_off`**, which does the
+division: from `0 <= o < sz` and `o < MAXFILE*BSIZE` it returns BOTH
+`Z.to_nat (o / BSIZE) < MAXFILE` and the nonzero conclusion, so no caller
+re-derives `o / BSIZE * BSIZE <= o`. The others are `bm_covers_get` (the
+plain index reading the statement above), `bm_covers_mono` (readi clamps
+`n` to the size), `bm_covers_nonpos`, and — the one that makes the
+predicate composable — **`bm_covers_keep`**: coverage survives any map
+change that never un-allocates, which is *precisely* the clause bmap's own
+postcondition already carries, so a caller threads `bm_covers` straight
+across a bmap call at the cost of one lemma application.
+
+`bm_covers` needs `BSIZE`, which lives in `FsCrash.v`; `InodeInv.v` now
+requires it (no cycle — `FsCrash` requires `LogInv`, which `InodeInv`
+already did).
+
+### 2. `BMAP_NOALLOC` — `SpecBmap.v`, `LinkBmapNoalloc.v`
+
+ONE premise beyond BMAP's — `bv_unsigned (blkmap_get bm fbn) <> 0` — kills
+all three allocation sites, and the contract then drops `γ : log_names`
+entirely: no `log_op`, no budget premise, no `log_ctx`, and **`bslot bn`
+instead of `bslots bn 3`** (the three were bread's one held across balloc's
+two; with balloc dead only bread's own remains, and brelse hands it back).
+The postcondition is exact rather than existential: `inode_map` and
+`inode_blocks` come back at the SAME `bm` and `data`, and
+`a0 = blkmap_get bm fbn`.
+
+**The indirect path needs no second premise.** `blkmap_wf`'s "no indirect
+block => no entries" conjunct read backwards says a nonzero entry at an
+indirect index forces `bm_ind bm <> 0` — that is
+`InodeInv.blkmap_wf_ind_nz`, and it is what decides the `+0x4c` branch from
+the single premise above.
+
+### How the two contracts share ONE proof — the `ak` parameter
+
+`ProofBmap.v` is now `Module BmapCore (BR : BREAD) (BL : BRELSE)` holding
+the whole chain, plus two thin sealed wrappers (`BmapProof : BMAP`,
+`BmapNoallocProof : BMAP_NOALLOC`) that only weaken its conclusion; neither
+proves a step about the code. The core is parameterised by
+
+```coq
+  ak : option log_names        (* "the allocation kit I was given, if any" *)
+```
+
+and exactly three things hang off it — this is the shape to copy for any
+second contract over one function:
+
+- **the resources.** `bm_kit ak … n` is `log_ctx ∗ bslots bn 2 ∗ log_op γ n`
+  at `Some γ` and `emp` at `None`. bread's own slot unit is threaded
+  SEPARATELY as `bslots bn 1`, because `3 = 1 + 2` is exactly the split
+  between "what both callers have" and "what only an allocator has".
+- **the callee contracts.** balloc's and log_write's specs arrive as
+  `ak <> None -> _` **Coq hypotheses**, not as functor arguments — which is
+  what keeps the no-alloc instance's proof TERM free of `LinkBalloc`'s
+  Axiom. Had they been functor parameters, `BmapNoalloc` would have had to
+  be applied to `Balloc` and would have inherited the assumption for arms
+  that are dead. (Their `GenId`/`CpuId` binders must be written EXPLICIT
+  and passed as `_ _` at the call site: an implicit binder inside a
+  `Definition`'s BODY is silently ignored by Coq, and a hypothesis of a Pi
+  type carries no implicit-argument metadata anyway. Nothing is lost — an
+  evar whose type is a class is still filled by typeclass resolution, with
+  the most recently introduced `CpuId`, which is what an implicit-instance
+  argument would have picked.)
+- **the branches.** At each `addr == 0` test the allocating arm is entered
+  only after `ak <> None` has been *derived* from the branch condition plus
+  the premise `ak = None -> blkmap_get bm fbn <> 0`; then
+  `destruct ak as [γ|]` makes the kit concrete and the arm proceeds
+  verbatim.
+
+The core proves one clause MORE than BMAP does —
+`⌜ak = None -> bm' = bm /\ data' = data⌝` — and that is what makes the
+no-alloc postcondition exact. BMAP's own statement is untouched, so writei
+did not move.
+
+Cost of the factoring: **+230 lines on a 2752-line file and no measurable
+compile-time change** (54 s isolated, against 55 s before), with
+`Print Assumptions Bmap.wp_bmap_sconf` unchanged and
+`Print Assumptions BmapNoalloc.wp_bmap_noalloc_sconf` equal to the tree's
+standing six — so readi rests on nothing assumed. **Do not clone this
+proof.** (`SpecWalk.v`'s `WALK` / `WALK_NOALLOC` pair is NOT the precedent
+to follow here: walk's `alloc = 0` takes a genuinely different path through
+the code, so those really are two proofs.)
+
+### readi's own contract, and why it is EXACT rather than bounded
+
+`SpecReadi.v`. Two arms, not three:
+
+```
+  (a0 = -1 /\ user = true)
+  \/ (a0 = tot /\ tot = rd_clamp (di_size dn) off n)
+```
+
+Under `bm_covers` the "bmap returned 0" break is DEAD, and
+`either_copyout` answers 0 unconditionally on the kernel arm, so the only
+early stop is a user-arm fault. The up-front `off > size` failure is not a
+third arm — it returns 0 and `rd_clamp` is 0 there, so it IS the second arm
+at `tot = 0`. Collapsing them is what lets a caller conclude that a
+*returning* readi read everything there was to read.
+
+The DELIVERED BYTES need no existential either. writei's `wrote` had to be
+existential because its source was user memory; readi's source is the file,
+which the caller's own `inode_blocks` names. So the destination comes back
+at
+
+```
+  rd_delivered data dst_olds off tot k
+    = if k < tot then file_byte data (off + k) else dst_olds k
+```
+
+— exact at both ends, and inside the `if user` because the destination is a
+pointer into one of two address spaces. `inode_map`, `inode_blocks` and
+`inode_meta` come back at the SAME `bm`, `data` and `dn`, so `bm_covers`
+needs no restatement in the postcondition.
+
+Two premises beyond writei's: `bm_covers bm (bv_unsigned (di_size dn))`,
+and `bv_unsigned (di_size dn) <= MAXFILE * BSIZE`. The second is a real
+file-system invariant rather than bookkeeping — readi has NO
+`MAXFILE*BSIZE` check of its own (it clamps `n` to the size and trusts it),
+so a larger size would drive bmap past MAXFILE into its out-of-range panic.
+No `log_op`, no `log_ctx`, no `γ : log_names`, and ONE `bslot` (bmap's and
+bread's uses do not overlap).
+
+### Owed, not done here
+
+`writei` should PRESERVE `bm_covers` — it extends the file, so it must
+re-establish the predicate at the new size. That means re-opening writei's
+postcondition, and is deliberately deferred so readi is not blocked behind
+it; recorded in the worklist.
+
 ## Order of work
 
 1. `BlockWords.v` — the `ind_*` vocabulary and its four laws.

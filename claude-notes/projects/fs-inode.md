@@ -3,14 +3,16 @@
 Design: [`../design/fs-inode.md`](../design/fs-inode.md) — read it first.
 This file is the worklist.
 
-## Status (2026-08-06)
+## Status (2026-08-07)
 
-**Stages 1–3 are COMPLETE: `bmap`, `iupdate` and `writei` are all proven
-and linked.** fs.c is **4/24, 668/3338 bytes (20.0%)**; tree totals 123
-proven / 13278 of 23342 bytes (57%). `bmap` and `writei` carry the `!`
+**Stage 3 IS COMPLETE: `bmap`, `iupdate`, `writei` and `readi` are all
+proven and linked.** fs.c is **5/24, 910/3338 bytes (27.3%)**; tree totals
+124 proven / 13520 of 23342 bytes (58%). `bmap` and `writei` carry the `!`
 caveat for the still-assumed `balloc` (writei inherits it through bmap);
-`iinit` and `iupdate` rest on nothing assumed. `proof_coverage.py --check`
-rc=0, `lemma_diff.py` clean, zero admits tree-wide.
+`iinit`, `iupdate` and `readi` rest on nothing assumed — readi because it
+takes bmap through `BMAP_NOALLOC`, whose proof term never mentions
+`LinkBalloc`'s Axiom. `proof_coverage.py --check` rc=0, `lemma_diff.py`
+clean, zero admits tree-wide.
 
 **writei required fixing a bug in the xv6 SOURCE** — see
 [`../kernel-defects.md`](../kernel-defects.md) D1, and
@@ -35,18 +37,30 @@ What is in the tree:
   three of bmap's stores go through.
 - **`SpecBalloc.v`** — ASSUMED contract, `K_balloc = 50`; its success arm
   returns `blk_own γfs blk`, and that token IS the freshness claim.
+  `InodeInv.v` also carries **`bm_covers`** (every file block below the
+  size is allocated) with its five laws, and **`blkmap_wf_ind_nz`** — the
+  "no indirect block => no entries" conjunct read backwards. Both exist for
+  readi; see the design doc's readi section.
 - **`SpecBmap.v`** — `Module Type BMAP`, `K_bmap = 56`; threads
-  `inode_blocks` in and out with the deposit disjunction.
+  `inode_blocks` in and out with the deposit disjunction. It also carries
+  **`Module Type BMAP_NOALLOC`**, bmap's second contract, for a caller that
+  cannot allocate.
 - **`CodeBmap.v`** — all 70 instruction facts + 40 decode words.
 - **`ProofBmapParts.v`** — bmap's vocabulary (445 lines, 4.2 s).
-- **`ProofBmap.v`** — the chain (2752 lines, 55 s isolated; the two biggest
-  sentences are `Qed`s at 5.2 s and 2.8 s, nothing else above 0.6 s).
-- **`LinkBalloc.v`** (the single `Axiom`) and **`LinkBmap.v`**.
+- **`ProofBmap.v`** — the chain, as `Module BmapCore (BR) (BL)` plus the two
+  sealed wrappers `BmapProof : BMAP` and `BmapNoallocProof : BMAP_NOALLOC`
+  (2982 lines, 54 s isolated).
+- **`LinkBalloc.v`** (the single `Axiom`), **`LinkBmap.v`** and
+  **`LinkBmapNoalloc.v`**.
 
 `Print Assumptions Bmap.wp_bmap_sconf` is `LinkBalloc.Balloc.wp_balloc_sconf`
 plus exactly the six the whole tree carries (the five rv64d platform hooks
 and `functional_extensionality_dep`) — i.e. identical to `bread`'s footprint
-plus the one deliberate assumption.
+plus the one deliberate assumption. `Print Assumptions
+BmapNoalloc.wp_bmap_noalloc_sconf` is the standing six ALONE: the no-alloc
+contract's proof term never mentions balloc, because the allocation arms'
+callee contracts are `ak <> None ->`-gated Coq hypotheses rather than
+functor arguments.
 
 ### How the proof is cut, and why
 
@@ -298,9 +312,108 @@ Bmap.wp_bmap_sconf` is unchanged.
         able to discharge `wi_cost off n <= ncount` at MAXOPBLOCKS.
         Tightening it needs an arm-aware bmap budget, not a change to
         writei.
-- [ ] `readi` — blocked on the same question only if `either_copyout` can
-      fail after a partial write; it can, but readi's failure arm brelses a
-      buffer it never modified, so readi is unaffected.
+- [x] `readi` — **PROVEN AND LINKED, AND IT CARRIES NO CAVEAT**
+      (`SpecReadi.v`, `ProofReadiParts.v`, `ProofReadi.v`, `LinkReadi.v`).
+      All four callees are proven and bmap arrives through
+      `BMAP_NOALLOC`, whose proof term never mentions `LinkBalloc`'s
+      Axiom, so `Print Assumptions Readi.wp_readi_sconf` is the tree's
+      standing six ALONE — readi is the second fs.c function (after
+      `iupdate`) resting on nothing assumed.
+
+      Proof shape: `rd_ret` (+0xdc, pop the seven unconditional saves) /
+      `rd_join` (+0xd8, `a0 := s3` and the s3 restore; THREE paths join) /
+      `rd_exit` (the five pops + the `c.j`, **parameterised by its own
+      pcs** — gcc emitted that block twice) / `rd_loop` (+0x7c head,
+      +0x4c body, +0xaa failure tail, fuel induction) /
+      `wp_readi_sconf` (prologue, pre-frame exit, clamp, `n = 0` arm).
+
+      ### What readi's contract came out as, and why it is EXACT
+
+      Two arms, not three. Under `bm_covers` the "bmap returned 0" break
+      is dead, and `either_copyout` answers 0 unconditionally on the
+      kernel arm, so the ONLY early stop is a user-arm fault:
+
+        (a0 = -1 /\ user = true) \/ (a0 = tot /\ tot = rd_clamp size off n)
+
+      The up-front `off > size` failure is NOT a third arm — it returns 0
+      and `rd_clamp` is 0 there, so it IS the second arm at `tot = 0`.
+      Collapsing them is what makes the contract say "a returning readi
+      read everything there was to read" rather than merely bounding
+      `tot`.
+
+      Likewise the DELIVERED BYTES need no existential: writei's `wrote`
+      was existential because its source was user memory, but readi's
+      source is the file, which the caller's own `inode_blocks` names. So
+      the destination comes back at `rd_delivered data dst_olds off tot`
+      = "the file's bytes below `tot`, the caller's own at and above it",
+      exact on both ends and inside the `if user`.
+
+      `bm_covers` is NOT restated in the postcondition: `bm` and `dn`
+      come back literally unchanged, so the caller's premise still holds
+      of them.
+
+      Premises beyond writei's: `bm_covers bm (bv_unsigned (di_size dn))`
+      and `bv_unsigned (di_size dn) <= MAXFILE * BSIZE`. The second is a
+      genuine file-system invariant, not bookkeeping: readi has NO
+      MAXFILE*BSIZE check of its own (it clamps and trusts the size), so
+      without it a large size would drive bmap past MAXFILE into its
+      out-of-range panic.
+
+      ### Things readi paid for (all recur)
+
+      - **A `Code<F>.v` can be in the tree and in `_CoqProject` and still
+        not compile, because its DECODE WORDS were never added to the
+        shared catalogue.** `CodeReadi.v` was generated with an ad-hoc
+        `gen_code.py` run whose `KernelDecode*.v` additions were later
+        reverted, so `kd_0ed7e663` (and 24 more) did not exist and the
+        file failed with *"Variable decname should be bound to a term but
+        is bound to the identifier kd_…"* — a stale `.vo` from the ad-hoc
+        run hid it until the next full build. The fix is the durable
+        notes' recipe verbatim: add the `tools/code_manifest.json` row
+        (`["CodeReadi.v","readi","rdi_",3]`), run the FULL generator into
+        a scratch `--iris` dir, confirm every pre-existing Code file comes
+        back byte-identical, and copy over only the shard diffs after
+        checking they are PURE ADDITIONS (here: 0 removed / 125 added
+        lines over 15 shards). **A `Code<F>.v` with no manifest row is the
+        tell.**
+      - **`c.addw` needed no new leaf.** `WpSconfAlu.wp_addw_s_sconf` IS
+        the compressed two-operand form; the only gap is that the
+        generated AST spells its operands through `creg2reg_idx`. Two
+        one-line conversions (`ProofReadiParts.rd_creg_a3` / `_a4`,
+        `vm_compute; reflexivity`) rewritten into the `instr` fact make
+        the existing leaf apply. Reach for a conversion before a new leaf
+        file.
+      - **`rewrite decide_False` can fail where `case_decide` succeeds**,
+        on a goal that visibly is `if decide P then _ else _` (here after
+        unfolding `rd_delivered`). The durable notes already say to prefer
+        `case_decide`; this is the second instance.
+      - **Keep the file's SIZE as a `nat` and tie it once.** `lia` under
+        the `bitvector.tactics` zify hook fails on any goal mentioning
+        `bv_unsigned`, and readi's arithmetic is all about the size. One
+        `remember (Z.to_nat (bv_unsigned (di_size dn))) as szn` plus
+        `Z.of_nat szn = bv_unsigned (di_size dn)`
+        (`ProofReadiParts.rd_size_nat`), rewritten into every premise up
+        front, keeps every later `lia` in pure nat/Z.
+      - **This machine is 8 cores / 15 GB**, not the 32-core box the
+        optimization notes were measured on: `make -j24` OOM-kills
+        (`Error 137`) in the `Code*.v` band. Use `-j6`; a full rebuild is
+        then ~45 min.
+
+      ### Owed
+
+      `SpecReadi.v` requires `SpecWritei.v` for ONE definition,
+      `file_byte`. The flat per-byte view of `inode_blocks` belongs next
+      to `inode_blocks` in `InodeInv.v` together with `blk_holes_zero`;
+      the merge-back was not taken here only because moving a definition
+      out of `SpecWritei.v` shows up in `lemma_diff.py` as a `GONE`, and
+      that check had to stay clean. Do both merge-backs in one commit
+      whose lemma_diff output is explained.
+
+- [ ] **`writei` should PRESERVE `bm_covers`.** It extends the file, so it
+      must re-establish the predicate at the new size — needed the moment a
+      caller chains a write and a read. Deliberately deferred (it means
+      re-opening writei's postcondition) so readi was not blocked behind
+      re-proving writei.
 
 ## Deferred: proving balloc
 
