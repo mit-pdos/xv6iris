@@ -1,8 +1,11 @@
 # Project: the sail-riscv model bump (fork pin + the 2026-08 upstream bump)
 
-**STATUS: IN FLIGHT.** The model is regenerated, installed and compiles; the
-`iris/` port is partly done and `make proofs` currently FAILS — see
-"Where the build stands". Everything below is the recipe and the worklist.
+**STATUS: IN FLIGHT, one file from green.** The model is regenerated, installed
+and compiles; `make proofs -k` is green on every `iris/` file except
+`UserMemClassify.v`, whose MISALIGNED pipeline is still written against the
+pre-bump model. **Read "Where it stands" and "THE ONE THING TO UNDERSTAND ABOUT
+THE MISALIGNED AXIS" first** — the sections before them are the (still
+accurate) account of what the bump changed and the peel recipes.
 
 ## What changed and why
 
@@ -198,58 +201,11 @@ rewrite autocast_id. rewrite execR_returnR. reflexivity.
   (`usvd_zeros_full_tac`) but the statement cannot be made width-generic as it
   stands — see the comment there.
 
-## The keystone still to build
+## The fork delta (the page-table walk) — DONE, kept for the shape
 
-`checked_mem_read`/`checked_mem_write` are proven per access type in ~17 files.
-Do NOT port them one at a time — state ONE generic lemma each and make every
-existing lemma an application of it:
-
-```coq
-Lemma exec_checked_mem_read_unsplit (acc : MemoryAccessType mem_payload)
-    (pbmt : page_based_mem_type) (priv : Privilege) (addr : mword 64)
-    (width : Z) (aq rl res meta : bool) (rk : read_kind) (w : mword (8 * width)) s :
-  exec (check_pma_with_pmp_priority acc pbmt priv (Physaddr addr) width res) s
-    = Some (Ok pma_ok_aligned, s) ->
-  exec (read_kind_of_flags aq rl res) s = Some (rk, s) ->
-  exec (pmpCheck (Physaddr addr) width acc priv) s = Some (None, s) ->
-  exec (within_mmio_readable (Physaddr addr) width) s = Some (false, s) ->
-  exec (read_ram rk (Physaddr addr) width meta) s = Some ((w, tt), s) ->
-  exec (checked_mem_read acc pbmt priv (Physaddr addr) width aq rl res meta) s
-    = Some (Ok (w, default_meta), s).
-```
-
-The peel, verified as far as the loop body:
-
-```coq
-unfold checked_mem_read. rewrite exec_catch_early_return.
-rewrite (execR_liftR_seq _ _ _ _ _ Hpac). cbn beta. cbn match.
-rewrite execR_bind. rewrite execR_returnR. cbn match beta.
-rewrite pma_ok_aligned_splittable pma_ok_aligned_granule.
-rewrite (execR_liftR_seq _ _ _ _ _ (exec_split_misaligned_unsplit addr width 0 s)). cbn beta.
-rewrite misaligned_order_1. cbn zeta.
-rewrite (execR_liftR_seq _ _ _ _ _ Hrk). cbn beta.
-(* then: eapply execR_untilMT_1; [reflexivity | <the body> | apply execR_returnR_fwd] *)
-```
-
-What is left inside the body, all of it concrete after the above: the
-`assert_exp' true "loop dummy assert"` (use `exec_assert_exp'_true`), the
-per-split `pmpCheck` at `add_vec_int (bits_of_physaddr (Physaddr addr)) (0 *
-width)` (`change (bits_of_physaddr (Physaddr addr)) with addr`, then `avi0`),
-`within_mmio_readable`, `read_ram`, and finally the accumulator
-`update_subrange_vec_dec (zeros' (8 * 1 * width)) (8 * 1 * width - 1) 0
-(autocast split_data)`. **The tree's convention is to CARRY that subrange term
-rather than simplify it** — `ProofPlicClaim.v` / `ProofVirtioDiskInit.v` already
-state their post-values that way, from the virtual-side split loop that existed
-before. Follow it: a `= split_data` identity would need the `autocast` width
-coercion discharged at every width.
-
-`check_pma_with_pmp_priority` is `pmaCheck` first and `pmpCheck` only to
-PRIORITISE a PMA failure's exception, so on the success path it is
-`pmaCheck`'s answer — one thin lemma over the ported `pmaCheck` ones.
-
-## The fork delta's own worklist (the page-table walk)
-
-Independent of the above, and the reason for the bump:
+This is the reason for the bump, and it is ported: `CommonWalk` (the walk),
+`PtTree` (the TLB hit) and `PtTreeAdue` (the live A/D write-back) are all
+green. Kept because the shapes below are what those proofs now look like.
 
 - **`_rec_pt_walk` restructured.** The non-leaf branch is now guarded by
   `not(pte_is_invalid …) & pte_is_non_leaf … & level > 0` (one `and_boolM`), and
@@ -286,59 +242,182 @@ Independent of the above, and the reason for the bump:
   Its §1 PTE-store stack keeps working: the `Store PageTableEntry` arm of
   `pmaCheck` is exactly the one the fork stopped asserting on.
 
-## Where the build stands (checkpoint)
+## Where it stands (this is the current section — read it first)
 
-`make model` is green. `iris/` builds **504 of 792** files (17 before this work).
-Branch **`sail-model-bump`**, 10 commits on top of `main`; NOT pushed (waiting on
-a green build). There are no `Admitted`s and `tools/lemma_diff.py` is clean.
+`make proofs -k` is green on **every file but one**: `UserMemClassify.v`, whose
+MISALIGNED pipeline (§6–§13) is still written against the pre-bump model. Do
+not trust a `-k` build's compile count as a green count — make does not attempt
+anything behind a red file; check `.vo` timestamps against
+`model-xv6iris/rv64d.vo`.
 
-**Environment gotcha that will bite immediately:** `git add` fails with
-`fatal: unable to write new index file`. This is NOT repo damage — `/shared` is
-an idmapped mount and `.git/index` is unlinkable (`rm`/`mv` give EOVERFLOW).
-Work around it with a scratch index:
+`ProofPlicClaim` is fixed (the a0 value is `extend_value false cv` now, not the
+split accumulator the vmem level used to hand back).
 
-    export GIT_INDEX_FILE=/tmp/<scratch>/gitindex && git read-tree HEAD
-    git add -A . && git commit ...
+The model is regenerated with the misaligned-AMO fault RESTORED (see the config
+header) and with **sail 0.20.2**, which is what
+`sail-riscv/cmake/sail_required_version.txt` asks for — earlier generations in
+this port silently fell back to 0.20.1 via `regen_sail_model.sh`'s version
+warning, so if you regenerate, make sure 0.20.2 is the `sail` on PATH (it lives
+in the `default` opam switch; `coqc` must still come from `/shared/xv6rocq`).
 
-**Build/wait discipline:** never poll for `rocqworker`/`coqc` (the self-match trap
-in `durable-notes.md`). Run the build in the background writing its own sentinel
-(`…; echo "EXIT=$?" >> log`) and wait with `until grep -q EXIT log; do sleep 30; done`.
-A single-file check is `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel
--w -notation-overridden <F>.v` under `ulimit -s 65536`, but ONLY for a file whose
-dependencies are already built — after touching `RiscvExtras.v` you must run the
-whole `make -f CoqMakefile -j32 -k` or every single-file check dies with
-"inconsistent assumptions".
+## THE ONE THING TO UNDERSTAND ABOUT THE MISALIGNED AXIS
 
-### Root failures remaining
+The bump moved the misaligned split in **two** directions at once, and neither
+is where the old proofs looked for it.
 
-| file | what it needs |
-|---|---|
-| `PtTreeAdue` | in progress: the PTE write is ported, the A/D write-back arms (§2–§4) are not |
-| `WpPlicExec`, `WpSmodeUart` | the MMIO variant of the split-loop recipe (`within_mmio_*` is TRUE, so the body takes the `mmio_read`/`mmio_write` arm instead of `read_ram`/`write_ram`) |
-| `WpSmodeMemGen`, `WpSmodePtLock`, `PtBuild` | the RAM recipe again |
-| `WpGprCsrwB` | `stimecmp` — see its in-file PORT PENDING comment; the only item that is not just the recipe |
+- `vmem_read_addr` / `vmem_write_addr` split only across a **PAGE** boundary —
+  at most two ways, each part with its own `translateAddr`, in ascending order
+  (`sys_misaligned_order_decreasing` is false).
+- The MAG/alignment split moved **DOWN** into `checked_mem_read` /
+  `checked_mem_write`, under a **single** translation and with **no fault of
+  its own** (the per-split loop only does `pmpCheck`, `within_mmio_*` and
+  `read_ram`/`write_ram`).
 
-Everything below `PtTree` is done, including the fork's own delta on both the
-walk (`CommonWalk`) and the TLB-hit (`PtTree`) paths.
+So the iris-level work is **per PAGE, not per chunk**: the chunk sequence is a
+pure `exec` computation whose per-chunk leaves all come out of ONE page's
+ownership. That is the whole reason the old §8/§10/§13 fold — a per-chunk
+`translateAddr` with a per-chunk fault arm — has to go rather than be ported.
 
-### The recipe, in one place
+## What is BUILT and green (use these; do not rebuild them)
 
-Every remaining file is some composition of these four peels. Worked, compiling
+### `MemAccessGen.v` — the pure physical split kit
+
+- `execR_untilMT'_last` / `_step` / `_chain`, `misaligned_order_split` — moved
+  down from `UserMemAccess` (the physical loop needs them too).
+- `exec_checked_mem_read_split` / `exec_checked_mem_write_split` /
+  `exec_mem_write_ea_split` — the N-chunk loops. Premises are per-chunk
+  `pmpCheck` / `within_mmio_*` / `read_ram`|`write_ram` at
+  `add_vec_int pa (k * bytes)`, plus the plan and the split fact. The read is
+  state-invariant; the write threads state (`sw : nat -> mstate`).
+- `exec_mem_read_of_checked_plain` / `exec_mem_write_value_of_checked_plain` —
+  the thin wrappers up to `mem_read` / `mem_write_value`.
+- `exec_read_ram_plain_gen` / `exec_write_ram_plain_gen` — the **width-generic**
+  RAM leaves. A page-straddling 8-byte access is split at widths the per-width
+  leaves do not cover, and at a symbolic width the model's `cast_N` on the
+  request value stops computing — so both are stated EXISTENTIALLY in the
+  bitvector. That costs nothing: a misaligned read's value is existential all
+  the way up, and `udata_own` is indexed by ADDRESSES, so a store's ghost
+  update never inspects the bytes it writes.
+
+### `RiscvFetchExec.v` — one new platform conjunct
+
+`pma_allows_all`'s RAM class now also says the region's
+`PMAMisalignedExceptions_load_store` is `None`. Without it a misaligned user
+load would have to be classified as an access fault, which is false of the
+machine. It deliberately does **not** pin the granule — the split derivation
+handles either answer, so the granule stays a platform detail. (Proved for
+`pma_boot` in `BootConfig`; the only call site that had to change was
+`PtTreeAdue`'s `pma_all_ram` destructuring, which needed one more `& _`.)
+
+### `UserMemMis.v` (new) — the misaligned user access
+
+- `split_misaligned_phys_derive` — the chunk plan, **generic in the width over
+  the whole vmem-level range [1..8]**. The chunk width divides the access
+  because `min(ctz(pa), ctz(W)) <= ctz(W)` and `2^ctz(W)` divides `W`; only that
+  last step is width-specific and it is a `vm_compute` at each of the eight
+  widths. **This retired ~200 lines of `count_trailing_zeros` characterization**
+  (`fold_gives_k` / `ctz_val` / `low_bits_zero_mod` / `chunk_aligned`), which
+  existed because the OLD vmem-level split needed every chunk ADDRESS to be
+  aligned — the physical split needs only that the chunk width divides the
+  access.
+- `in_one_page` + `exec_split_on_page_boundary_intra` + `u_walk_pa_window_page`
+  — what the aligned window facts were really using (that the access stays
+  inside one page), taken as the primitive. The aligned case is a corollary.
+- `exec_pmaCheck_ram_load_plan` / `_store_plan` + `Ltac pma_plan_peel` — the
+  plan-generic `pmaCheck` (same walk as `RiscvExtras.pma_ok_peel`, but the tail
+  keeps whatever plan the MAG check answered instead of pinning
+  `pma_ok_aligned`).
+- `Section MisPhys` — the per-chunk PMP / MMIO / RAM leaves out of a plain
+  window hypothesis, and the three composers `exec_mem_read_mis_U`,
+  `exec_mem_write_ea_mis_U`, `exec_mem_write_value_mis_U`.
+- `udata_window_facts` / `udata_own_store_window` / `wchain` / `wchain_own` —
+  the iris side. A store's post-state is the per-chunk WRITE CHAIN and
+  `wchain_own` is the ghost update along it.
+- `user_pt_load_data_mis` / `user_pt_store_data_mis` — the two user-level
+  composers, same shape as `UserMemPt`'s aligned `user_pt_load_data_g` /
+  `user_pt_store_data_g`.
+- `exec_vmem_read_addr_split2` / `_err1` / `_err2` — the page-straddling READ.
+
+## WHAT IS LEFT
+
+### 1. `exec_vmem_write_addr_split2` (the page-straddling STORE)
+
+Written up as a PORT PENDING comment at the end of `UserMemMis.v`, with the
+statement it wants. The one obstacle: the reservation `if` in
+`vmem_write_addr`. Its scrutinee is `andb res (not (match_reservation …))` with
+`res` the literal `false`, so the `if` IS its else branch by CONVERSION — but
+`rewrite` needs the branch syntactically, and every way of exposing it tried so
+far (`cbn [andb]; cbn match`, with the memory leaves `Local Opaque`) reduces
+through `mem_write_ea` into the monad's bind fixpoint and the goal explodes.
+`durable-notes` records the same trap for the aligned store, where the fix was
+to hold the else branch opaque with a `set`; that does **not** apply here
+because the `if` is DEPENDENT (`if … return MR _ bool then … else …`), so the
+Ltac1 pattern `if ?c then ?T else ?E` does not match it. What is wanted is a
+way to name the two branches of a dependent `if` — an Ltac2 `match`, or a small
+`Lemma if_false_dep` stated at the exact motive.
+
+### 2. The iris straddle composers
+
+`user_pt_load_data_mis` / `user_pt_store_data_mis` cover ONE page. The
+straddling case classifies TWO: `data_classify` at `va` and at
+`va + in_page_bytes`, four outcomes (ok/ok, ok/fault, fault/-, and the fault
+flavour). Both parts are `in_one_page` by construction, and both are at widths
+in [1..7] — which is exactly why the composers above were generalized off
+`W ∈ {2,4,8}`.
+
+Also needed: the straddle side of `split_on_page_boundary`, i.e.
+`~ in_one_page va W -> exec (split_on_page_boundary va W) s = Some ((p, q), s)`
+with `p = 4096 - (uint va mod 4096)`, `q = W - p`. The model computes
+`nbytes_to_boundary = 8 - uint(addr[2:0])`, which agrees with the page distance
+for `W <= 8` because a page-crossing access has `uint va mod 4096 >= 4096 - W`.
+
+### 3. `UserMemClassify.v` §6–§13, restated
+
+This is the last file. The pieces that must go, and what replaces them:
+
+| gone | why | replacement |
+|---|---|---|
+| `SplitFaultRead` / `SplitFaultWrite` (§6/§7) | the vmem level no longer runs an N-chunk loop with a per-chunk fault | nothing — the fault is per PAGE now, and `MemAccessGen.exec_vmem_{read,write}_addr_intra_err` / the straddle `_err` lemmas cover it |
+| `MisReadClassify.read_classify_fold` (§8) and `MisWriteClassify.write_classify_fold` (§13) | they fold `data_classify` over N chunks | ONE `data_classify` per page (two at most) |
+| `split_misaligned_derive` (§11) | `split_misaligned` is 4-ary and physical now | `UserMemMis.split_misaligned_phys_derive`, already applied INSIDE the composers — the classifier never sees it |
+| `MisReadTotal.mem_read_misaligned_total` (§10) / `MemWriteTot.mem_write_misaligned_total` | per-chunk state sequence `sst`/`sstS` | a single `σ -> σ'` (read) or `σ -> σ' -> wchain` (store) |
+
+`mem_read_total` / `mem_write_total` and everything above them
+(`mem_exec_load_k`, `mem_exec_store_k`, the compressed arms) keep their
+statements unchanged — only the misaligned branch of their proofs moves. The
+misaligned branch becomes:
+
+```coq
+- (* misaligned *)
+  destruct (in_one_page_dec va k) as [Hin | Hout].
+  + (* one page: data_classify once, then user_pt_{load,store}_data_mis *)
+  + (* two pages: data_classify twice, then the straddle composer *)
+```
+
+`pow2_le8` moved to `UserMemMis.v` (with a `pow2_le8'` for `b <= 8`); the
+classifier no longer dispatches on the chunk width at all, because the chunk
+widths now live entirely inside the pure layer.
+
+## The recipe, in one place (unchanged, still current)
+
+Every ALIGNED file is some composition of these four peels. Worked, compiling
 instances: `RiscvFetchExec` (widths 4, 2), `WpLoad` (8), `SmodePte` (PTE read),
 `WpMmodeLeafBase` (all six shapes), `MemAccessGen` (width-generic), `WpAmo`
 (AMO/res=true), `WpSmodeGpr`, `SmodeCore`, `UserMem`.
 
 1. **`pmaCheck`** → `Ltac pma_ok_peel Hmatch Hfield Hmag Halign` (RiscvExtras).
    Needs the region destructed first. `Hmag` is one of the
-   `exec_is_mag_applicable_*` facts.
+   `exec_is_mag_applicable_*` facts. For a MISALIGNED access use
+   `UserMemMis.pma_plan_peel` instead, which keeps the plan.
 2. **`check_pma_with_pmp_priority`** is `pmaCheck` on the success path:
    `unfold`, `rewrite (exec_bind_Some … <the pmaCheck lemma>)`, `cbn match`,
    `apply exec_returnM`.
 3. **`checked_mem_read`/`checked_mem_write`/`mem_write_ea`** — the
    `catch_early_return` + one-iteration `untilMT` walk. Copy
    `WpLoad.exec_checked_mem_read_ram_load` verbatim and swap the four
-   applications (pma, pmp, ram, and the `usvd_zeros_full_*` / `subrange_full_*`
-   at the width).
+   applications (pma, pmp, ram, and the `usvd_zeros_full_*` /
+   `subrange_full_*` at the width). For an N-iteration walk use
+   `MemAccessGen.exec_checked_mem_{read,write}_split`.
 4. **`vmem_read_addr`/`vmem_write_addr`** — straight-line now; page split, then
    `do_split_access = false`, then one `translate_and_read_value` /
    `translateAddr`+`mem_write_ea`+`mem_write_value`. Copy
@@ -347,110 +426,49 @@ instances: `RiscvFetchExec` (widths 4, 2), `WpLoad` (8), `SmodePte` (PTE read),
 Traps, all of which cost real time at least once:
 
 - `execR_liftR_seq` only fires when `execR (bind (liftR m) k)` is ITSELF a
-  subterm. An inner bind (the `bind0` seq into `within_mmio_*`, the RAM read that
-  drops its meta, the RAM write that folds the success flag) must be `assert`ed
-  and fed to `execR_bind_Some` first.
-- The outer `catch_early_return` closes with `rewrite execR_returnR; reflexivity`,
-  never `apply execR_returnR_fwd`.
-- The reservation-check `if` in `vmem_write_addr` must be stripped by CONVERSION
-  with the else branch held opaque (nested `assert` so the goal is `execR _ = _`,
-  or `set (NN := …)`). A bare `cbn` there reduces through `mem_write_ea` into the
-  monad's bind fixpoint and the goal explodes.
+  subterm. An inner bind (the `bind0` seq into `within_mmio_*`, the RAM read
+  that drops its meta, the RAM write that folds the success flag, and — new —
+  the second half of the page-straddle, whose `assert_exp'` bind sits under the
+  outer data bind) must be `assert`ed and fed to `execR_bind_Some` first.
+  Grab the term from the goal with
+  `match goal with |- context[execR (Defs.bind ?inner ?k) s] => assert … end`
+  rather than transcribing it.
+- The outer `catch_early_return` closes with `rewrite execR_returnR;
+  reflexivity`, never `apply execR_returnR_fwd`.
+- **`Defs.bind0` IS `Defs.bind` up to notation**, so `rewrite execR_bind` will
+  eat a `>>` and then `execR_bind0` no longer matches. Reach for `execR_bind0`
+  FIRST.
+- **This file imports `iris.proofmode`, hence ssreflect's `rewrite`**: `rewrite
+  a, b` is a syntax error (use two `rewrite`s), and an intro pattern must be
+  spaced (`[ -> | -> ]`, not `[->|->]`).
+- The reservation-check `if` in `vmem_write_addr` must be stripped by
+  CONVERSION with the else branch held opaque — see "What is left" §1 for why
+  the recorded `set` trick does not work on the straddle path.
 - `generic_neq` on the access type compares the WHOLE payload, so with abstract
   aq/rl it does not reduce — `destruct aq, rl` first.
 - `mem_read_priv_meta` no longer guards on alignment; `mem_write_value_priv_meta`
   still does, but only for `rl || con`.
 - Consumers of a ported lemma often need `Require Import RiscvExtras` (and
   `RiscvFetchExec`, for `execR_untilMT_1`) added — `Import` is not transitive.
+- A `nat`-indexed EXISTENTIAL cannot be turned into the `nat -> mword _` the
+  split loop wants. `exec` is a function, so read the value back out of it:
+  `UserMemMis.ram_chunk` is that, and `exec_read_ram_chunk` is the bridge.
 
+## Environment gotchas
 
-## Status at the second full build (Aug 6, late)
+- **`git add` fails** with `fatal: unable to write new index file`. This is NOT
+  repo damage — `/shared` is an idmapped mount and `.git/index` is unlinkable
+  (`rm`/`mv` give EOVERFLOW). Work around it with a scratch index:
 
-`make proofs -k` reaches 344 files. Green and COMMITTED: the whole width-generic
-memory stack (`WpSmodeMemGen` + the new kit in `RiscvExtras`/`MemAccessGen`),
-both A/D write-back arms (`PtTreeAdue`), `KptTree`, `TransPt`, `PtBuild`,
-`WpSmodePtLock`, `WpGprCsrwB`+`WpSconfTimer` (stimecmp/clint_dispatch),
-`WpPlicExec`, `WpSmodeUart`, `UserretPt`, `UserPtTree`/`ProcPtOwn` (the `u_acc`
-patterns).
+      export GIT_INDEX_FILE=/tmp/<scratch>/gitindex && git read-tree HEAD
+      git add -A . && git commit ...
 
-Still to port: `WpSmodePtLeaves`, `WpSmodePtUart`, `WpPlic`, `WpVirtioDev`, and
-whatever the next `-k` sweep turns up behind them.
-
-### The three shared moves, and what they cost callers
-
-1. **The vmem level resolves the effective privilege AND ITS TRANSLATION MODE
-   before the access.** Every section that proves a `vmem_read_addr` /
-   `vmem_write_addr` fact therefore grows FOUR things:
-
-       Variable md : SATPMode.
-       Hypothesis Hcps  : register_lookup cur_privilege s.(sregs) = Supervisor.
-       Hypothesis Hmprvs: eq_vec (_get_Mstatus_MPRV (register_lookup mstatus s.(sregs))) ('b"1") = false.
-       Hypothesis Htm   : exec (translationMode Supervisor) s = Some (md, s).
-
-   BUT: a section that already carries `Hcp`/`Hmprv`/`HSXL`/`Hsatp`/`Hmode`
-   (every gpr/execute-level section does) should NOT grow them -- derive
-   `Htm` in the proof with `exec_translationMode_S_sv39` and pass
-   `Sv39 Hcp Hmprv Htmv`. Adding them mechanically everywhere makes the call
-   sites worse, not better.
-
-2. **`Htr` is stated at the BARE vaddr** (`Virtaddr a`), not at
-   `Virtaddr (add_vec_int (bits_of_virtaddr (Virtaddr a)) (0 * w))` -- the split
-   offset no longer exists. Call sites lose their `avi0_mul8` rewrite.
-
-3. **The vmem level returns the VALUE, not the split accumulator.** Delete the
-   `Let data2 := update_subrange_vec_dec (zeros' …) … v` from each section and
-   substitute `v`; declare the value `Variable v : mword (8*W)` (NOT `bv 64` --
-   `extend_value`'s width becomes uninferable). Consumers that bridged through
-   `data2_id` now just need `extend_value (n := 8*W) false v = v`, i.e.
-   `sign_extend'_id`.
-
-Argument order after the edit is declaration order: `md Hcps Hmprvs Htm Htr`
-goes exactly where `Htr` used to be.
-
-### Two more model deltas found in this sweep
-
-- `pte_is_invalid` gained TWO disjuncts: an unknown-PBMT one gated on Svpbmt,
-  and a `pte_reserved_bits_must_be_zero` gate that the rest now sits under.
-  `PtBuild.pte_valid_ptr_ext0` peels both (the gate is discharged by
-  `vm_compute in Eprb; discriminate`).
-- `execute_AMO` reordered: `mem_write_ea` and the load now run BEFORE `rs2` is
-  read, and the `Atomic`/`LoadReserved`/`StoreConditional` access-type
-  constructors carry `aq`/`rl` (so `u_acc`-style destructuring patterns need
-  `(aq & rl & ->)` / `(op & aq & rl & ->)`).
-
-## Where it stands
-
-Green except TWO files. Do not trust a `-k` build's compile count as a green
-count -- make does not attempt anything behind a red file; check `.vo`
-timestamps against `model-xv6iris/rv64d.vo`.
-
-The model is regenerated with the misaligned-AMO fault RESTORED (see the config
-header) and with **sail 0.20.2**, which is what
-`sail-riscv/cmake/sail_required_version.txt` asks for -- earlier generations in
-this port silently fell back to 0.20.1 via `regen_sail_model.sh`'s version
-warning, so if you regenerate, make sure 0.20.2 is the `sail` on PATH (it lives
-in the `default` opam switch; `coqc` must still come from `/shared/xv6rocq`).
-
-RED:
-
-1. `ProofPlicClaim:296` -- an [iSpecialize] evar in a `wp_cldsp_s_sconf`
-   application.  `ProofAllocpid` uses the same lemma and is green, so this is
-   local, not a contract change.
-
-2. `UserMemClassify:543` -- THE LAST REAL PIECE.  `SplitFaultRead` /
-   `SplitFaultWrite` (lines ~517-785) still use `split_body`/`split_var`, the
-   vmem-level N-chunk machinery deleted from `UserMemAccess` because the model
-   no longer does it.  Note the restored AMO policy does NOT help here:
-   `load_store` was `{"None": null}` in the OLD config too, so misaligned plain
-   loads/stores have always proceeded -- what the bump changed is that the
-   chunking moved DOWN into `checked_mem_*` under a SINGLE translation.
-
-   Restate both sections over `MemAccessGen.exec_vmem_{read,write}_addr_intra`
-   and `..._intra_err`, which are proven and take exactly the two premises this
-   needs (the page split leaves no next-page bytes; the platform raises no
-   misalignment exception for the access).  A misaligned in-page access is ONE
-   full-width operation, so the per-chunk state sequence `st k` collapses to a
-   single `s -> s'`, and the consumers at ~1054 and ~2325 simplify with it.
-
-Everything else in this file (the recipe, the traps, the model deltas, the
-settled misaligned question) is current.
+- **Build/wait discipline:** never poll for `rocqworker`/`coqc` (the self-match
+  trap in `durable-notes.md`). Run the build in the background writing its own
+  sentinel (`…; echo "EXIT=$?" >> log`) and wait with
+  `until grep -q EXIT log; do sleep 30; done`. A single-file check is
+  `coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel
+  -w -notation-overridden <F>.v` under `ulimit -s 65536`, but ONLY for a file
+  whose dependencies are already built — after touching `RiscvExtras.v` or
+  `RiscvFetchExec.v` you must run the whole `make -f CoqMakefile -j32 -k` or
+  every single-file check dies with "inconsistent assumptions".
