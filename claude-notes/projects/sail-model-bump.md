@@ -418,55 +418,39 @@ goes exactly where `Htr` used to be.
   constructors carry `aq`/`rl` (so `u_acc`-style destructuring patterns need
   `(aq & rl & ->)` / `(op & aq & rl & ->)`).
 
-## Where it stands (accurate as of the end of the session)
+## Where it stands
 
-Do not trust file counts from a `-k` build: make does not ATTEMPT anything
-behind a red file, so "N compiled" is not "N green". Check `.vo` timestamps
-against `model-xv6iris/rv64d.vo` before believing a number. (An earlier note in
-this file claimed the user-mode layer was green. It was not -- those `.vo`s
-predate the bump entirely.)
+Green except TWO files. Do not trust a `-k` build's compile count as a green
+count -- make does not attempt anything behind a red file; check `.vo`
+timestamps against `model-xv6iris/rv64d.vo`.
 
-GREEN and verified: the model regeneration; the fork's atomic PTE A/D update in
-BOTH arms (miss and hit, the hit one split because the fork's re-read genuinely
-changes the outcome); the width-generic memory stack and its bitvector kit; the
-S-mode, page-table, device and MMIO layers; stimecmp/clint_dispatch; the
-regime's `sr_tmode`; the whole vmem layer (aligned and misaligned, read and
-write, retire and fault, plain and reserved); WpSconfMem.
+The model is regenerated with the misaligned-AMO fault RESTORED (see the config
+header) and with **sail 0.20.2**, which is what
+`sail-riscv/cmake/sail_required_version.txt` asks for -- earlier generations in
+this port silently fell back to 0.20.1 via `regen_sail_model.sh`'s version
+warning, so if you regenerate, make sure 0.20.2 is the `sail` on PATH (it lives
+in the `default` opam switch; `coqc` must still come from `/shared/xv6rocq`).
 
-RED: `UserMemArms` (line ~718).
-UNATTEMPTED: `UserMemClassify` (~6400 lines) and the user-mode WP layer behind
-it. Neither has been compiled against the new model even once.
+RED:
 
-### The one open QUESTION, and it must be answered first
+1. `ProofPlicClaim:296` -- an [iSpecialize] evar in a `wp_cldsp_s_sconf`
+   application.  `ProofAllocpid` uses the same lemma and is green, so this is
+   local, not a contract change.
 
-Regenerating the config from the new upstream template changed the platform's
-misaligned-AMO policy:
+2. `UserMemClassify:543` -- THE LAST REAL PIECE.  `SplitFaultRead` /
+   `SplitFaultWrite` (lines ~517-785) still use `split_body`/`split_var`, the
+   vmem-level N-chunk machinery deleted from `UserMemAccess` because the model
+   no longer does it.  Note the restored AMO policy does NOT help here:
+   `load_store` was `{"None": null}` in the OLD config too, so misaligned plain
+   loads/stores have always proceeded -- what the bump changed is that the
+   chunking moved DOWN into `checked_mem_*` under a SINGLE translation.
 
-    old template:  "amo": "AccessFault"            (the only value it offered)
-    new template:  "amo": { "None": null }         (upstream added a no-fault
-                                                    case and defaulted to it)
-
-So `plat_misaligned_exception (Atomic ...) false` is now `None`: a misaligned
-AMO no longer traps at the vmem level, it proceeds into `mag_pma_check` and the
-region's atomic-support attributes decide.
-
-That is not a one-lemma problem. `exec_execute_AMO_u_misaligned` is consumed
-TWICE inside `UserMemClassify`, so the choice decides whether the classifier's
-misaligned-AMO branch survives as-is or has to be restructured:
-
-  (a) Restore `"amo": {"Some": "AccessFault"}`.  This development has always
-      modelled a platform that faults there -- the old template offered nothing
-      else -- so upstream's new option is a new degree of freedom, not a
-      correction, and taking their default silently changes the modelled
-      hardware.  Keeps the classifier's structure.  COSTS a model regeneration
-      (`tools/regen_sail_model.sh`) and a full rebuild.
-
-  (b) Accept upstream's default.  Faithful to "take the model from the fork",
-      but the classifier's misaligned-AMO reasoning has to be redone against
-      the PMA path, and it is not obvious the same exception comes out.
-
-Recommendation: (a).  The bump was meant to be about the PTE A/D update, not
-about changing what hardware is being modelled.
+   Restate both sections over `MemAccessGen.exec_vmem_{read,write}_addr_intra`
+   and `..._intra_err`, which are proven and take exactly the two premises this
+   needs (the page split leaves no next-page bytes; the platform raises no
+   misalignment exception for the access).  A misaligned in-page access is ONE
+   full-width operation, so the per-chunk state sequence `st k` collapses to a
+   single `s -> s'`, and the consumers at ~1054 and ~2325 simplify with it.
 
 Everything else in this file (the recipe, the traps, the model deltas, the
-settled misaligned-access question) is current.
+settled misaligned question) is current.
