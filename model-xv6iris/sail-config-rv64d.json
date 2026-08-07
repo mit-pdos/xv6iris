@@ -303,8 +303,16 @@
         },
         // Similarly, a misaligned AMO can be configured with the same
         // option values.
+        //
+        // DEVIATION from the upstream template, which defaults this to
+        // {"None": null}.  The template this project was originally generated
+        // from offered no such option -- a misaligned AMO always faulted -- so
+        // that is the platform this development models, and the proofs
+        // (UserMemArms/UserMemClassify's misaligned-AMO arms) are sound about
+        // it.  Taking upstream's new default would change the modelled
+        // hardware, not just the model.
         "amo": {
-          "None": null
+          "Some": "AccessFault"
         },
         // A misaligned LR/SC currently always faults, and this field can specify
         // whether it generates an access fault (use `"AccessFault"`)

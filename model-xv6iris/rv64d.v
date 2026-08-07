@@ -202,8 +202,11 @@ Definition hex_bits_1_forwards (arg_ : mword 1) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_1_backwards (arg_ : string) : mword 1 :=
-   match arg_ with | s => hex_bits_backwards ((1, s)) end.
+Definition hex_bits_1_backwards (arg_ : string) : M (mword 1) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((1, s)) then returnM ((hex_bits_backwards ((1, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 1).
 
 Definition hex_bits_1_forwards_matches (arg_ : mword 1) : M (bool) :=
    let head_exp_ := arg_ in
@@ -219,7 +222,10 @@ Definition hex_bits_1_forwards_matches (arg_ : mword 1) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_1_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_1_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((1, s)) then true
+   else false.
 
 Definition hex_bits_2_forwards (arg_ : mword 2) : M (string) :=
    let head_exp_ := arg_ in
@@ -236,8 +242,11 @@ Definition hex_bits_2_forwards (arg_ : mword 2) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_2_backwards (arg_ : string) : mword 2 :=
-   match arg_ with | s => hex_bits_backwards ((2, s)) end.
+Definition hex_bits_2_backwards (arg_ : string) : M (mword 2) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((2, s)) then returnM ((hex_bits_backwards ((2, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 2).
 
 Definition hex_bits_2_forwards_matches (arg_ : mword 2) : M (bool) :=
    let head_exp_ := arg_ in
@@ -253,7 +262,10 @@ Definition hex_bits_2_forwards_matches (arg_ : mword 2) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_2_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_2_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((2, s)) then true
+   else false.
 
 Definition hex_bits_3_forwards (arg_ : mword 3) : M (string) :=
    let head_exp_ := arg_ in
@@ -270,8 +282,11 @@ Definition hex_bits_3_forwards (arg_ : mword 3) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_3_backwards (arg_ : string) : mword 3 :=
-   match arg_ with | s => hex_bits_backwards ((3, s)) end.
+Definition hex_bits_3_backwards (arg_ : string) : M (mword 3) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((3, s)) then returnM ((hex_bits_backwards ((3, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 3).
 
 Definition hex_bits_3_forwards_matches (arg_ : mword 3) : M (bool) :=
    let head_exp_ := arg_ in
@@ -287,7 +302,10 @@ Definition hex_bits_3_forwards_matches (arg_ : mword 3) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_3_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_3_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((3, s)) then true
+   else false.
 
 Definition hex_bits_4_forwards (arg_ : mword 4) : M (string) :=
    let head_exp_ := arg_ in
@@ -304,8 +322,11 @@ Definition hex_bits_4_forwards (arg_ : mword 4) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_4_backwards (arg_ : string) : mword 4 :=
-   match arg_ with | s => hex_bits_backwards ((4, s)) end.
+Definition hex_bits_4_backwards (arg_ : string) : M (mword 4) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((4, s)) then returnM ((hex_bits_backwards ((4, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 4).
 
 Definition hex_bits_4_forwards_matches (arg_ : mword 4) : M (bool) :=
    let head_exp_ := arg_ in
@@ -321,7 +342,10 @@ Definition hex_bits_4_forwards_matches (arg_ : mword 4) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_4_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_4_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((4, s)) then true
+   else false.
 
 Definition hex_bits_5_forwards (arg_ : mword 5) : M (string) :=
    let head_exp_ := arg_ in
@@ -338,8 +362,11 @@ Definition hex_bits_5_forwards (arg_ : mword 5) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_5_backwards (arg_ : string) : mword 5 :=
-   match arg_ with | s => hex_bits_backwards ((5, s)) end.
+Definition hex_bits_5_backwards (arg_ : string) : M (mword 5) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((5, s)) then returnM ((hex_bits_backwards ((5, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 5).
 
 Definition hex_bits_5_forwards_matches (arg_ : mword 5) : M (bool) :=
    let head_exp_ := arg_ in
@@ -355,7 +382,10 @@ Definition hex_bits_5_forwards_matches (arg_ : mword 5) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_5_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_5_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((5, s)) then true
+   else false.
 
 Definition hex_bits_6_forwards (arg_ : mword 6) : M (string) :=
    let head_exp_ := arg_ in
@@ -372,8 +402,11 @@ Definition hex_bits_6_forwards (arg_ : mword 6) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_6_backwards (arg_ : string) : mword 6 :=
-   match arg_ with | s => hex_bits_backwards ((6, s)) end.
+Definition hex_bits_6_backwards (arg_ : string) : M (mword 6) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((6, s)) then returnM ((hex_bits_backwards ((6, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 6).
 
 Definition hex_bits_6_forwards_matches (arg_ : mword 6) : M (bool) :=
    let head_exp_ := arg_ in
@@ -389,7 +422,10 @@ Definition hex_bits_6_forwards_matches (arg_ : mword 6) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_6_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_6_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((6, s)) then true
+   else false.
 
 Definition hex_bits_7_forwards (arg_ : mword 7) : M (string) :=
    let head_exp_ := arg_ in
@@ -406,8 +442,11 @@ Definition hex_bits_7_forwards (arg_ : mword 7) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_7_backwards (arg_ : string) : mword 7 :=
-   match arg_ with | s => hex_bits_backwards ((7, s)) end.
+Definition hex_bits_7_backwards (arg_ : string) : M (mword 7) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((7, s)) then returnM ((hex_bits_backwards ((7, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 7).
 
 Definition hex_bits_7_forwards_matches (arg_ : mword 7) : M (bool) :=
    let head_exp_ := arg_ in
@@ -423,7 +462,10 @@ Definition hex_bits_7_forwards_matches (arg_ : mword 7) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_7_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_7_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((7, s)) then true
+   else false.
 
 Definition hex_bits_8_forwards (arg_ : mword 8) : M (string) :=
    let head_exp_ := arg_ in
@@ -440,8 +482,11 @@ Definition hex_bits_8_forwards (arg_ : mword 8) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_8_backwards (arg_ : string) : mword 8 :=
-   match arg_ with | s => hex_bits_backwards ((8, s)) end.
+Definition hex_bits_8_backwards (arg_ : string) : M (mword 8) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((8, s)) then returnM ((hex_bits_backwards ((8, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 8).
 
 Definition hex_bits_8_forwards_matches (arg_ : mword 8) : M (bool) :=
    let head_exp_ := arg_ in
@@ -457,7 +502,10 @@ Definition hex_bits_8_forwards_matches (arg_ : mword 8) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_8_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_8_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((8, s)) then true
+   else false.
 
 Definition hex_bits_9_forwards (arg_ : mword 9) : M (string) :=
    let head_exp_ := arg_ in
@@ -474,8 +522,11 @@ Definition hex_bits_9_forwards (arg_ : mword 9) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_9_backwards (arg_ : string) : mword 9 :=
-   match arg_ with | s => hex_bits_backwards ((9, s)) end.
+Definition hex_bits_9_backwards (arg_ : string) : M (mword 9) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((9, s)) then returnM ((hex_bits_backwards ((9, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 9).
 
 Definition hex_bits_9_forwards_matches (arg_ : mword 9) : M (bool) :=
    let head_exp_ := arg_ in
@@ -491,7 +542,10 @@ Definition hex_bits_9_forwards_matches (arg_ : mword 9) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_9_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_9_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((9, s)) then true
+   else false.
 
 Definition hex_bits_10_forwards (arg_ : mword 10) : M (string) :=
    let head_exp_ := arg_ in
@@ -508,8 +562,11 @@ Definition hex_bits_10_forwards (arg_ : mword 10) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_10_backwards (arg_ : string) : mword 10 :=
-   match arg_ with | s => hex_bits_backwards ((10, s)) end.
+Definition hex_bits_10_backwards (arg_ : string) : M (mword 10) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((10, s)) then returnM ((hex_bits_backwards ((10, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 10).
 
 Definition hex_bits_10_forwards_matches (arg_ : mword 10) : M (bool) :=
    let head_exp_ := arg_ in
@@ -525,7 +582,10 @@ Definition hex_bits_10_forwards_matches (arg_ : mword 10) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_10_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_10_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((10, s)) then true
+   else false.
 
 Definition hex_bits_11_forwards (arg_ : mword 11) : M (string) :=
    let head_exp_ := arg_ in
@@ -542,8 +602,11 @@ Definition hex_bits_11_forwards (arg_ : mword 11) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_11_backwards (arg_ : string) : mword 11 :=
-   match arg_ with | s => hex_bits_backwards ((11, s)) end.
+Definition hex_bits_11_backwards (arg_ : string) : M (mword 11) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((11, s)) then returnM ((hex_bits_backwards ((11, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 11).
 
 Definition hex_bits_11_forwards_matches (arg_ : mword 11) : M (bool) :=
    let head_exp_ := arg_ in
@@ -559,7 +622,10 @@ Definition hex_bits_11_forwards_matches (arg_ : mword 11) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_11_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_11_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((11, s)) then true
+   else false.
 
 Definition hex_bits_12_forwards (arg_ : mword 12) : M (string) :=
    let head_exp_ := arg_ in
@@ -576,8 +642,11 @@ Definition hex_bits_12_forwards (arg_ : mword 12) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_12_backwards (arg_ : string) : mword 12 :=
-   match arg_ with | s => hex_bits_backwards ((12, s)) end.
+Definition hex_bits_12_backwards (arg_ : string) : M (mword 12) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((12, s)) then returnM ((hex_bits_backwards ((12, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 12).
 
 Definition hex_bits_12_forwards_matches (arg_ : mword 12) : M (bool) :=
    let head_exp_ := arg_ in
@@ -593,7 +662,10 @@ Definition hex_bits_12_forwards_matches (arg_ : mword 12) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_12_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_12_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((12, s)) then true
+   else false.
 
 Definition hex_bits_13_forwards (arg_ : mword 13) : M (string) :=
    let head_exp_ := arg_ in
@@ -610,8 +682,11 @@ Definition hex_bits_13_forwards (arg_ : mword 13) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_13_backwards (arg_ : string) : mword 13 :=
-   match arg_ with | s => hex_bits_backwards ((13, s)) end.
+Definition hex_bits_13_backwards (arg_ : string) : M (mword 13) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((13, s)) then returnM ((hex_bits_backwards ((13, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 13).
 
 Definition hex_bits_13_forwards_matches (arg_ : mword 13) : M (bool) :=
    let head_exp_ := arg_ in
@@ -627,7 +702,10 @@ Definition hex_bits_13_forwards_matches (arg_ : mword 13) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_13_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_13_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((13, s)) then true
+   else false.
 
 Definition hex_bits_14_forwards (arg_ : mword 14) : M (string) :=
    let head_exp_ := arg_ in
@@ -644,8 +722,11 @@ Definition hex_bits_14_forwards (arg_ : mword 14) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_14_backwards (arg_ : string) : mword 14 :=
-   match arg_ with | s => hex_bits_backwards ((14, s)) end.
+Definition hex_bits_14_backwards (arg_ : string) : M (mword 14) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((14, s)) then returnM ((hex_bits_backwards ((14, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 14).
 
 Definition hex_bits_14_forwards_matches (arg_ : mword 14) : M (bool) :=
    let head_exp_ := arg_ in
@@ -661,7 +742,10 @@ Definition hex_bits_14_forwards_matches (arg_ : mword 14) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_14_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_14_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((14, s)) then true
+   else false.
 
 Definition hex_bits_15_forwards (arg_ : mword 15) : M (string) :=
    let head_exp_ := arg_ in
@@ -678,8 +762,11 @@ Definition hex_bits_15_forwards (arg_ : mword 15) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_15_backwards (arg_ : string) : mword 15 :=
-   match arg_ with | s => hex_bits_backwards ((15, s)) end.
+Definition hex_bits_15_backwards (arg_ : string) : M (mword 15) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((15, s)) then returnM ((hex_bits_backwards ((15, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 15).
 
 Definition hex_bits_15_forwards_matches (arg_ : mword 15) : M (bool) :=
    let head_exp_ := arg_ in
@@ -695,7 +782,10 @@ Definition hex_bits_15_forwards_matches (arg_ : mword 15) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_15_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_15_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((15, s)) then true
+   else false.
 
 Definition hex_bits_16_forwards (arg_ : mword 16) : M (string) :=
    let head_exp_ := arg_ in
@@ -712,8 +802,11 @@ Definition hex_bits_16_forwards (arg_ : mword 16) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_16_backwards (arg_ : string) : mword 16 :=
-   match arg_ with | s => hex_bits_backwards ((16, s)) end.
+Definition hex_bits_16_backwards (arg_ : string) : M (mword 16) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((16, s)) then returnM ((hex_bits_backwards ((16, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 16).
 
 Definition hex_bits_16_forwards_matches (arg_ : mword 16) : M (bool) :=
    let head_exp_ := arg_ in
@@ -729,7 +822,10 @@ Definition hex_bits_16_forwards_matches (arg_ : mword 16) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_16_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_16_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((16, s)) then true
+   else false.
 
 Definition hex_bits_17_forwards (arg_ : mword 17) : M (string) :=
    let head_exp_ := arg_ in
@@ -746,8 +842,11 @@ Definition hex_bits_17_forwards (arg_ : mword 17) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_17_backwards (arg_ : string) : mword 17 :=
-   match arg_ with | s => hex_bits_backwards ((17, s)) end.
+Definition hex_bits_17_backwards (arg_ : string) : M (mword 17) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((17, s)) then returnM ((hex_bits_backwards ((17, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 17).
 
 Definition hex_bits_17_forwards_matches (arg_ : mword 17) : M (bool) :=
    let head_exp_ := arg_ in
@@ -763,7 +862,10 @@ Definition hex_bits_17_forwards_matches (arg_ : mword 17) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_17_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_17_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((17, s)) then true
+   else false.
 
 Definition hex_bits_18_forwards (arg_ : mword 18) : M (string) :=
    let head_exp_ := arg_ in
@@ -780,8 +882,11 @@ Definition hex_bits_18_forwards (arg_ : mword 18) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_18_backwards (arg_ : string) : mword 18 :=
-   match arg_ with | s => hex_bits_backwards ((18, s)) end.
+Definition hex_bits_18_backwards (arg_ : string) : M (mword 18) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((18, s)) then returnM ((hex_bits_backwards ((18, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 18).
 
 Definition hex_bits_18_forwards_matches (arg_ : mword 18) : M (bool) :=
    let head_exp_ := arg_ in
@@ -797,7 +902,10 @@ Definition hex_bits_18_forwards_matches (arg_ : mword 18) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_18_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_18_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((18, s)) then true
+   else false.
 
 Definition hex_bits_19_forwards (arg_ : mword 19) : M (string) :=
    let head_exp_ := arg_ in
@@ -814,8 +922,11 @@ Definition hex_bits_19_forwards (arg_ : mword 19) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_19_backwards (arg_ : string) : mword 19 :=
-   match arg_ with | s => hex_bits_backwards ((19, s)) end.
+Definition hex_bits_19_backwards (arg_ : string) : M (mword 19) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((19, s)) then returnM ((hex_bits_backwards ((19, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 19).
 
 Definition hex_bits_19_forwards_matches (arg_ : mword 19) : M (bool) :=
    let head_exp_ := arg_ in
@@ -831,7 +942,10 @@ Definition hex_bits_19_forwards_matches (arg_ : mword 19) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_19_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_19_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((19, s)) then true
+   else false.
 
 Definition hex_bits_20_forwards (arg_ : mword 20) : M (string) :=
    let head_exp_ := arg_ in
@@ -848,8 +962,11 @@ Definition hex_bits_20_forwards (arg_ : mword 20) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_20_backwards (arg_ : string) : mword 20 :=
-   match arg_ with | s => hex_bits_backwards ((20, s)) end.
+Definition hex_bits_20_backwards (arg_ : string) : M (mword 20) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((20, s)) then returnM ((hex_bits_backwards ((20, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 20).
 
 Definition hex_bits_20_forwards_matches (arg_ : mword 20) : M (bool) :=
    let head_exp_ := arg_ in
@@ -865,7 +982,10 @@ Definition hex_bits_20_forwards_matches (arg_ : mword 20) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_20_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_20_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((20, s)) then true
+   else false.
 
 Definition hex_bits_21_forwards (arg_ : mword 21) : M (string) :=
    let head_exp_ := arg_ in
@@ -882,8 +1002,11 @@ Definition hex_bits_21_forwards (arg_ : mword 21) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_21_backwards (arg_ : string) : mword 21 :=
-   match arg_ with | s => hex_bits_backwards ((21, s)) end.
+Definition hex_bits_21_backwards (arg_ : string) : M (mword 21) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((21, s)) then returnM ((hex_bits_backwards ((21, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 21).
 
 Definition hex_bits_21_forwards_matches (arg_ : mword 21) : M (bool) :=
    let head_exp_ := arg_ in
@@ -899,7 +1022,10 @@ Definition hex_bits_21_forwards_matches (arg_ : mword 21) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_21_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_21_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((21, s)) then true
+   else false.
 
 Definition hex_bits_22_forwards (arg_ : mword 22) : M (string) :=
    let head_exp_ := arg_ in
@@ -916,8 +1042,11 @@ Definition hex_bits_22_forwards (arg_ : mword 22) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_22_backwards (arg_ : string) : mword 22 :=
-   match arg_ with | s => hex_bits_backwards ((22, s)) end.
+Definition hex_bits_22_backwards (arg_ : string) : M (mword 22) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((22, s)) then returnM ((hex_bits_backwards ((22, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 22).
 
 Definition hex_bits_22_forwards_matches (arg_ : mword 22) : M (bool) :=
    let head_exp_ := arg_ in
@@ -933,7 +1062,10 @@ Definition hex_bits_22_forwards_matches (arg_ : mword 22) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_22_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_22_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((22, s)) then true
+   else false.
 
 Definition hex_bits_23_forwards (arg_ : mword 23) : M (string) :=
    let head_exp_ := arg_ in
@@ -950,8 +1082,11 @@ Definition hex_bits_23_forwards (arg_ : mword 23) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_23_backwards (arg_ : string) : mword 23 :=
-   match arg_ with | s => hex_bits_backwards ((23, s)) end.
+Definition hex_bits_23_backwards (arg_ : string) : M (mword 23) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((23, s)) then returnM ((hex_bits_backwards ((23, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 23).
 
 Definition hex_bits_23_forwards_matches (arg_ : mword 23) : M (bool) :=
    let head_exp_ := arg_ in
@@ -967,7 +1102,10 @@ Definition hex_bits_23_forwards_matches (arg_ : mword 23) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_23_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_23_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((23, s)) then true
+   else false.
 
 Definition hex_bits_24_forwards (arg_ : mword 24) : M (string) :=
    let head_exp_ := arg_ in
@@ -984,8 +1122,11 @@ Definition hex_bits_24_forwards (arg_ : mword 24) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_24_backwards (arg_ : string) : mword 24 :=
-   match arg_ with | s => hex_bits_backwards ((24, s)) end.
+Definition hex_bits_24_backwards (arg_ : string) : M (mword 24) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((24, s)) then returnM ((hex_bits_backwards ((24, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 24).
 
 Definition hex_bits_24_forwards_matches (arg_ : mword 24) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1001,7 +1142,10 @@ Definition hex_bits_24_forwards_matches (arg_ : mword 24) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_24_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_24_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((24, s)) then true
+   else false.
 
 Definition hex_bits_25_forwards (arg_ : mword 25) : M (string) :=
    let head_exp_ := arg_ in
@@ -1018,8 +1162,11 @@ Definition hex_bits_25_forwards (arg_ : mword 25) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_25_backwards (arg_ : string) : mword 25 :=
-   match arg_ with | s => hex_bits_backwards ((25, s)) end.
+Definition hex_bits_25_backwards (arg_ : string) : M (mword 25) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((25, s)) then returnM ((hex_bits_backwards ((25, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 25).
 
 Definition hex_bits_25_forwards_matches (arg_ : mword 25) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1035,7 +1182,10 @@ Definition hex_bits_25_forwards_matches (arg_ : mword 25) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_25_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_25_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((25, s)) then true
+   else false.
 
 Definition hex_bits_26_forwards (arg_ : mword 26) : M (string) :=
    let head_exp_ := arg_ in
@@ -1052,8 +1202,11 @@ Definition hex_bits_26_forwards (arg_ : mword 26) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_26_backwards (arg_ : string) : mword 26 :=
-   match arg_ with | s => hex_bits_backwards ((26, s)) end.
+Definition hex_bits_26_backwards (arg_ : string) : M (mword 26) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((26, s)) then returnM ((hex_bits_backwards ((26, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 26).
 
 Definition hex_bits_26_forwards_matches (arg_ : mword 26) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1069,7 +1222,10 @@ Definition hex_bits_26_forwards_matches (arg_ : mword 26) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_26_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_26_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((26, s)) then true
+   else false.
 
 Definition hex_bits_27_forwards (arg_ : mword 27) : M (string) :=
    let head_exp_ := arg_ in
@@ -1086,8 +1242,11 @@ Definition hex_bits_27_forwards (arg_ : mword 27) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_27_backwards (arg_ : string) : mword 27 :=
-   match arg_ with | s => hex_bits_backwards ((27, s)) end.
+Definition hex_bits_27_backwards (arg_ : string) : M (mword 27) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((27, s)) then returnM ((hex_bits_backwards ((27, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 27).
 
 Definition hex_bits_27_forwards_matches (arg_ : mword 27) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1103,7 +1262,10 @@ Definition hex_bits_27_forwards_matches (arg_ : mword 27) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_27_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_27_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((27, s)) then true
+   else false.
 
 Definition hex_bits_28_forwards (arg_ : mword 28) : M (string) :=
    let head_exp_ := arg_ in
@@ -1120,8 +1282,11 @@ Definition hex_bits_28_forwards (arg_ : mword 28) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_28_backwards (arg_ : string) : mword 28 :=
-   match arg_ with | s => hex_bits_backwards ((28, s)) end.
+Definition hex_bits_28_backwards (arg_ : string) : M (mword 28) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((28, s)) then returnM ((hex_bits_backwards ((28, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 28).
 
 Definition hex_bits_28_forwards_matches (arg_ : mword 28) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1137,7 +1302,10 @@ Definition hex_bits_28_forwards_matches (arg_ : mword 28) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_28_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_28_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((28, s)) then true
+   else false.
 
 Definition hex_bits_29_forwards (arg_ : mword 29) : M (string) :=
    let head_exp_ := arg_ in
@@ -1154,8 +1322,11 @@ Definition hex_bits_29_forwards (arg_ : mword 29) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_29_backwards (arg_ : string) : mword 29 :=
-   match arg_ with | s => hex_bits_backwards ((29, s)) end.
+Definition hex_bits_29_backwards (arg_ : string) : M (mword 29) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((29, s)) then returnM ((hex_bits_backwards ((29, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 29).
 
 Definition hex_bits_29_forwards_matches (arg_ : mword 29) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1171,7 +1342,10 @@ Definition hex_bits_29_forwards_matches (arg_ : mword 29) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_29_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_29_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((29, s)) then true
+   else false.
 
 Definition hex_bits_30_forwards (arg_ : mword 30) : M (string) :=
    let head_exp_ := arg_ in
@@ -1188,8 +1362,11 @@ Definition hex_bits_30_forwards (arg_ : mword 30) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_30_backwards (arg_ : string) : mword 30 :=
-   match arg_ with | s => hex_bits_backwards ((30, s)) end.
+Definition hex_bits_30_backwards (arg_ : string) : M (mword 30) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((30, s)) then returnM ((hex_bits_backwards ((30, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 30).
 
 Definition hex_bits_30_forwards_matches (arg_ : mword 30) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1205,7 +1382,10 @@ Definition hex_bits_30_forwards_matches (arg_ : mword 30) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_30_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_30_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((30, s)) then true
+   else false.
 
 Definition hex_bits_31_forwards (arg_ : mword 31) : M (string) :=
    let head_exp_ := arg_ in
@@ -1222,8 +1402,11 @@ Definition hex_bits_31_forwards (arg_ : mword 31) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_31_backwards (arg_ : string) : mword 31 :=
-   match arg_ with | s => hex_bits_backwards ((31, s)) end.
+Definition hex_bits_31_backwards (arg_ : string) : M (mword 31) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((31, s)) then returnM ((hex_bits_backwards ((31, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 31).
 
 Definition hex_bits_31_forwards_matches (arg_ : mword 31) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1239,7 +1422,10 @@ Definition hex_bits_31_forwards_matches (arg_ : mword 31) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_31_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_31_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((31, s)) then true
+   else false.
 
 Definition hex_bits_32_forwards (arg_ : mword 32) : M (string) :=
    let head_exp_ := arg_ in
@@ -1256,8 +1442,11 @@ Definition hex_bits_32_forwards (arg_ : mword 32) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_32_backwards (arg_ : string) : mword 32 :=
-   match arg_ with | s => hex_bits_backwards ((32, s)) end.
+Definition hex_bits_32_backwards (arg_ : string) : M (mword 32) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((32, s)) then returnM ((hex_bits_backwards ((32, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 32).
 
 Definition hex_bits_32_forwards_matches (arg_ : mword 32) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1273,7 +1462,10 @@ Definition hex_bits_32_forwards_matches (arg_ : mword 32) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_32_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_32_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((32, s)) then true
+   else false.
 
 Definition hex_bits_33_forwards (arg_ : mword 33) : M (string) :=
    let head_exp_ := arg_ in
@@ -1290,8 +1482,11 @@ Definition hex_bits_33_forwards (arg_ : mword 33) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_33_backwards (arg_ : string) : mword 33 :=
-   match arg_ with | s => hex_bits_backwards ((33, s)) end.
+Definition hex_bits_33_backwards (arg_ : string) : M (mword 33) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((33, s)) then returnM ((hex_bits_backwards ((33, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 33).
 
 Definition hex_bits_33_forwards_matches (arg_ : mword 33) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1307,7 +1502,10 @@ Definition hex_bits_33_forwards_matches (arg_ : mword 33) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_33_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_33_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((33, s)) then true
+   else false.
 
 Definition hex_bits_34_forwards (arg_ : mword 34) : M (string) :=
    let head_exp_ := arg_ in
@@ -1324,8 +1522,11 @@ Definition hex_bits_34_forwards (arg_ : mword 34) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_34_backwards (arg_ : string) : mword 34 :=
-   match arg_ with | s => hex_bits_backwards ((34, s)) end.
+Definition hex_bits_34_backwards (arg_ : string) : M (mword 34) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((34, s)) then returnM ((hex_bits_backwards ((34, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 34).
 
 Definition hex_bits_34_forwards_matches (arg_ : mword 34) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1341,7 +1542,10 @@ Definition hex_bits_34_forwards_matches (arg_ : mword 34) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_34_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_34_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((34, s)) then true
+   else false.
 
 Definition hex_bits_35_forwards (arg_ : mword 35) : M (string) :=
    let head_exp_ := arg_ in
@@ -1358,8 +1562,11 @@ Definition hex_bits_35_forwards (arg_ : mword 35) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_35_backwards (arg_ : string) : mword 35 :=
-   match arg_ with | s => hex_bits_backwards ((35, s)) end.
+Definition hex_bits_35_backwards (arg_ : string) : M (mword 35) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((35, s)) then returnM ((hex_bits_backwards ((35, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 35).
 
 Definition hex_bits_35_forwards_matches (arg_ : mword 35) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1375,7 +1582,10 @@ Definition hex_bits_35_forwards_matches (arg_ : mword 35) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_35_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_35_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((35, s)) then true
+   else false.
 
 Definition hex_bits_36_forwards (arg_ : mword 36) : M (string) :=
    let head_exp_ := arg_ in
@@ -1392,8 +1602,11 @@ Definition hex_bits_36_forwards (arg_ : mword 36) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_36_backwards (arg_ : string) : mword 36 :=
-   match arg_ with | s => hex_bits_backwards ((36, s)) end.
+Definition hex_bits_36_backwards (arg_ : string) : M (mword 36) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((36, s)) then returnM ((hex_bits_backwards ((36, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 36).
 
 Definition hex_bits_36_forwards_matches (arg_ : mword 36) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1409,7 +1622,10 @@ Definition hex_bits_36_forwards_matches (arg_ : mword 36) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_36_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_36_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((36, s)) then true
+   else false.
 
 Definition hex_bits_37_forwards (arg_ : mword 37) : M (string) :=
    let head_exp_ := arg_ in
@@ -1426,8 +1642,11 @@ Definition hex_bits_37_forwards (arg_ : mword 37) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_37_backwards (arg_ : string) : mword 37 :=
-   match arg_ with | s => hex_bits_backwards ((37, s)) end.
+Definition hex_bits_37_backwards (arg_ : string) : M (mword 37) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((37, s)) then returnM ((hex_bits_backwards ((37, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 37).
 
 Definition hex_bits_37_forwards_matches (arg_ : mword 37) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1443,7 +1662,10 @@ Definition hex_bits_37_forwards_matches (arg_ : mword 37) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_37_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_37_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((37, s)) then true
+   else false.
 
 Definition hex_bits_38_forwards (arg_ : mword 38) : M (string) :=
    let head_exp_ := arg_ in
@@ -1460,8 +1682,11 @@ Definition hex_bits_38_forwards (arg_ : mword 38) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_38_backwards (arg_ : string) : mword 38 :=
-   match arg_ with | s => hex_bits_backwards ((38, s)) end.
+Definition hex_bits_38_backwards (arg_ : string) : M (mword 38) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((38, s)) then returnM ((hex_bits_backwards ((38, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 38).
 
 Definition hex_bits_38_forwards_matches (arg_ : mword 38) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1477,7 +1702,10 @@ Definition hex_bits_38_forwards_matches (arg_ : mword 38) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_38_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_38_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((38, s)) then true
+   else false.
 
 Definition hex_bits_39_forwards (arg_ : mword 39) : M (string) :=
    let head_exp_ := arg_ in
@@ -1494,8 +1722,11 @@ Definition hex_bits_39_forwards (arg_ : mword 39) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_39_backwards (arg_ : string) : mword 39 :=
-   match arg_ with | s => hex_bits_backwards ((39, s)) end.
+Definition hex_bits_39_backwards (arg_ : string) : M (mword 39) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((39, s)) then returnM ((hex_bits_backwards ((39, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 39).
 
 Definition hex_bits_39_forwards_matches (arg_ : mword 39) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1511,7 +1742,10 @@ Definition hex_bits_39_forwards_matches (arg_ : mword 39) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_39_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_39_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((39, s)) then true
+   else false.
 
 Definition hex_bits_40_forwards (arg_ : mword 40) : M (string) :=
    let head_exp_ := arg_ in
@@ -1528,8 +1762,11 @@ Definition hex_bits_40_forwards (arg_ : mword 40) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_40_backwards (arg_ : string) : mword 40 :=
-   match arg_ with | s => hex_bits_backwards ((40, s)) end.
+Definition hex_bits_40_backwards (arg_ : string) : M (mword 40) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((40, s)) then returnM ((hex_bits_backwards ((40, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 40).
 
 Definition hex_bits_40_forwards_matches (arg_ : mword 40) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1545,7 +1782,10 @@ Definition hex_bits_40_forwards_matches (arg_ : mword 40) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_40_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_40_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((40, s)) then true
+   else false.
 
 Definition hex_bits_41_forwards (arg_ : mword 41) : M (string) :=
    let head_exp_ := arg_ in
@@ -1562,8 +1802,11 @@ Definition hex_bits_41_forwards (arg_ : mword 41) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_41_backwards (arg_ : string) : mword 41 :=
-   match arg_ with | s => hex_bits_backwards ((41, s)) end.
+Definition hex_bits_41_backwards (arg_ : string) : M (mword 41) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((41, s)) then returnM ((hex_bits_backwards ((41, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 41).
 
 Definition hex_bits_41_forwards_matches (arg_ : mword 41) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1579,7 +1822,10 @@ Definition hex_bits_41_forwards_matches (arg_ : mword 41) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_41_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_41_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((41, s)) then true
+   else false.
 
 Definition hex_bits_42_forwards (arg_ : mword 42) : M (string) :=
    let head_exp_ := arg_ in
@@ -1596,8 +1842,11 @@ Definition hex_bits_42_forwards (arg_ : mword 42) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_42_backwards (arg_ : string) : mword 42 :=
-   match arg_ with | s => hex_bits_backwards ((42, s)) end.
+Definition hex_bits_42_backwards (arg_ : string) : M (mword 42) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((42, s)) then returnM ((hex_bits_backwards ((42, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 42).
 
 Definition hex_bits_42_forwards_matches (arg_ : mword 42) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1613,7 +1862,10 @@ Definition hex_bits_42_forwards_matches (arg_ : mword 42) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_42_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_42_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((42, s)) then true
+   else false.
 
 Definition hex_bits_43_forwards (arg_ : mword 43) : M (string) :=
    let head_exp_ := arg_ in
@@ -1630,8 +1882,11 @@ Definition hex_bits_43_forwards (arg_ : mword 43) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_43_backwards (arg_ : string) : mword 43 :=
-   match arg_ with | s => hex_bits_backwards ((43, s)) end.
+Definition hex_bits_43_backwards (arg_ : string) : M (mword 43) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((43, s)) then returnM ((hex_bits_backwards ((43, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 43).
 
 Definition hex_bits_43_forwards_matches (arg_ : mword 43) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1647,7 +1902,10 @@ Definition hex_bits_43_forwards_matches (arg_ : mword 43) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_43_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_43_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((43, s)) then true
+   else false.
 
 Definition hex_bits_44_forwards (arg_ : mword 44) : M (string) :=
    let head_exp_ := arg_ in
@@ -1664,8 +1922,11 @@ Definition hex_bits_44_forwards (arg_ : mword 44) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_44_backwards (arg_ : string) : mword 44 :=
-   match arg_ with | s => hex_bits_backwards ((44, s)) end.
+Definition hex_bits_44_backwards (arg_ : string) : M (mword 44) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((44, s)) then returnM ((hex_bits_backwards ((44, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 44).
 
 Definition hex_bits_44_forwards_matches (arg_ : mword 44) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1681,7 +1942,10 @@ Definition hex_bits_44_forwards_matches (arg_ : mword 44) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_44_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_44_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((44, s)) then true
+   else false.
 
 Definition hex_bits_45_forwards (arg_ : mword 45) : M (string) :=
    let head_exp_ := arg_ in
@@ -1698,8 +1962,11 @@ Definition hex_bits_45_forwards (arg_ : mword 45) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_45_backwards (arg_ : string) : mword 45 :=
-   match arg_ with | s => hex_bits_backwards ((45, s)) end.
+Definition hex_bits_45_backwards (arg_ : string) : M (mword 45) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((45, s)) then returnM ((hex_bits_backwards ((45, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 45).
 
 Definition hex_bits_45_forwards_matches (arg_ : mword 45) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1715,7 +1982,10 @@ Definition hex_bits_45_forwards_matches (arg_ : mword 45) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_45_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_45_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((45, s)) then true
+   else false.
 
 Definition hex_bits_46_forwards (arg_ : mword 46) : M (string) :=
    let head_exp_ := arg_ in
@@ -1732,8 +2002,11 @@ Definition hex_bits_46_forwards (arg_ : mword 46) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_46_backwards (arg_ : string) : mword 46 :=
-   match arg_ with | s => hex_bits_backwards ((46, s)) end.
+Definition hex_bits_46_backwards (arg_ : string) : M (mword 46) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((46, s)) then returnM ((hex_bits_backwards ((46, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 46).
 
 Definition hex_bits_46_forwards_matches (arg_ : mword 46) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1749,7 +2022,10 @@ Definition hex_bits_46_forwards_matches (arg_ : mword 46) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_46_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_46_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((46, s)) then true
+   else false.
 
 Definition hex_bits_47_forwards (arg_ : mword 47) : M (string) :=
    let head_exp_ := arg_ in
@@ -1766,8 +2042,11 @@ Definition hex_bits_47_forwards (arg_ : mword 47) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_47_backwards (arg_ : string) : mword 47 :=
-   match arg_ with | s => hex_bits_backwards ((47, s)) end.
+Definition hex_bits_47_backwards (arg_ : string) : M (mword 47) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((47, s)) then returnM ((hex_bits_backwards ((47, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 47).
 
 Definition hex_bits_47_forwards_matches (arg_ : mword 47) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1783,7 +2062,10 @@ Definition hex_bits_47_forwards_matches (arg_ : mword 47) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_47_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_47_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((47, s)) then true
+   else false.
 
 Definition hex_bits_48_forwards (arg_ : mword 48) : M (string) :=
    let head_exp_ := arg_ in
@@ -1800,8 +2082,11 @@ Definition hex_bits_48_forwards (arg_ : mword 48) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_48_backwards (arg_ : string) : mword 48 :=
-   match arg_ with | s => hex_bits_backwards ((48, s)) end.
+Definition hex_bits_48_backwards (arg_ : string) : M (mword 48) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((48, s)) then returnM ((hex_bits_backwards ((48, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 48).
 
 Definition hex_bits_48_forwards_matches (arg_ : mword 48) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1817,7 +2102,10 @@ Definition hex_bits_48_forwards_matches (arg_ : mword 48) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_48_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_48_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((48, s)) then true
+   else false.
 
 Definition hex_bits_49_forwards (arg_ : mword 49) : M (string) :=
    let head_exp_ := arg_ in
@@ -1834,8 +2122,11 @@ Definition hex_bits_49_forwards (arg_ : mword 49) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_49_backwards (arg_ : string) : mword 49 :=
-   match arg_ with | s => hex_bits_backwards ((49, s)) end.
+Definition hex_bits_49_backwards (arg_ : string) : M (mword 49) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((49, s)) then returnM ((hex_bits_backwards ((49, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 49).
 
 Definition hex_bits_49_forwards_matches (arg_ : mword 49) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1851,7 +2142,10 @@ Definition hex_bits_49_forwards_matches (arg_ : mword 49) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_49_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_49_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((49, s)) then true
+   else false.
 
 Definition hex_bits_50_forwards (arg_ : mword 50) : M (string) :=
    let head_exp_ := arg_ in
@@ -1868,8 +2162,11 @@ Definition hex_bits_50_forwards (arg_ : mword 50) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_50_backwards (arg_ : string) : mword 50 :=
-   match arg_ with | s => hex_bits_backwards ((50, s)) end.
+Definition hex_bits_50_backwards (arg_ : string) : M (mword 50) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((50, s)) then returnM ((hex_bits_backwards ((50, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 50).
 
 Definition hex_bits_50_forwards_matches (arg_ : mword 50) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1885,7 +2182,10 @@ Definition hex_bits_50_forwards_matches (arg_ : mword 50) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_50_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_50_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((50, s)) then true
+   else false.
 
 Definition hex_bits_51_forwards (arg_ : mword 51) : M (string) :=
    let head_exp_ := arg_ in
@@ -1902,8 +2202,11 @@ Definition hex_bits_51_forwards (arg_ : mword 51) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_51_backwards (arg_ : string) : mword 51 :=
-   match arg_ with | s => hex_bits_backwards ((51, s)) end.
+Definition hex_bits_51_backwards (arg_ : string) : M (mword 51) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((51, s)) then returnM ((hex_bits_backwards ((51, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 51).
 
 Definition hex_bits_51_forwards_matches (arg_ : mword 51) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1919,7 +2222,10 @@ Definition hex_bits_51_forwards_matches (arg_ : mword 51) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_51_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_51_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((51, s)) then true
+   else false.
 
 Definition hex_bits_52_forwards (arg_ : mword 52) : M (string) :=
    let head_exp_ := arg_ in
@@ -1936,8 +2242,11 @@ Definition hex_bits_52_forwards (arg_ : mword 52) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_52_backwards (arg_ : string) : mword 52 :=
-   match arg_ with | s => hex_bits_backwards ((52, s)) end.
+Definition hex_bits_52_backwards (arg_ : string) : M (mword 52) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((52, s)) then returnM ((hex_bits_backwards ((52, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 52).
 
 Definition hex_bits_52_forwards_matches (arg_ : mword 52) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1953,7 +2262,10 @@ Definition hex_bits_52_forwards_matches (arg_ : mword 52) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_52_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_52_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((52, s)) then true
+   else false.
 
 Definition hex_bits_53_forwards (arg_ : mword 53) : M (string) :=
    let head_exp_ := arg_ in
@@ -1970,8 +2282,11 @@ Definition hex_bits_53_forwards (arg_ : mword 53) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_53_backwards (arg_ : string) : mword 53 :=
-   match arg_ with | s => hex_bits_backwards ((53, s)) end.
+Definition hex_bits_53_backwards (arg_ : string) : M (mword 53) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((53, s)) then returnM ((hex_bits_backwards ((53, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 53).
 
 Definition hex_bits_53_forwards_matches (arg_ : mword 53) : M (bool) :=
    let head_exp_ := arg_ in
@@ -1987,7 +2302,10 @@ Definition hex_bits_53_forwards_matches (arg_ : mword 53) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_53_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_53_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((53, s)) then true
+   else false.
 
 Definition hex_bits_54_forwards (arg_ : mword 54) : M (string) :=
    let head_exp_ := arg_ in
@@ -2004,8 +2322,11 @@ Definition hex_bits_54_forwards (arg_ : mword 54) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_54_backwards (arg_ : string) : mword 54 :=
-   match arg_ with | s => hex_bits_backwards ((54, s)) end.
+Definition hex_bits_54_backwards (arg_ : string) : M (mword 54) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((54, s)) then returnM ((hex_bits_backwards ((54, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 54).
 
 Definition hex_bits_54_forwards_matches (arg_ : mword 54) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2021,7 +2342,10 @@ Definition hex_bits_54_forwards_matches (arg_ : mword 54) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_54_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_54_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((54, s)) then true
+   else false.
 
 Definition hex_bits_55_forwards (arg_ : mword 55) : M (string) :=
    let head_exp_ := arg_ in
@@ -2038,8 +2362,11 @@ Definition hex_bits_55_forwards (arg_ : mword 55) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_55_backwards (arg_ : string) : mword 55 :=
-   match arg_ with | s => hex_bits_backwards ((55, s)) end.
+Definition hex_bits_55_backwards (arg_ : string) : M (mword 55) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((55, s)) then returnM ((hex_bits_backwards ((55, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 55).
 
 Definition hex_bits_55_forwards_matches (arg_ : mword 55) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2055,7 +2382,10 @@ Definition hex_bits_55_forwards_matches (arg_ : mword 55) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_55_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_55_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((55, s)) then true
+   else false.
 
 Definition hex_bits_56_forwards (arg_ : mword 56) : M (string) :=
    let head_exp_ := arg_ in
@@ -2072,8 +2402,11 @@ Definition hex_bits_56_forwards (arg_ : mword 56) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_56_backwards (arg_ : string) : mword 56 :=
-   match arg_ with | s => hex_bits_backwards ((56, s)) end.
+Definition hex_bits_56_backwards (arg_ : string) : M (mword 56) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((56, s)) then returnM ((hex_bits_backwards ((56, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 56).
 
 Definition hex_bits_56_forwards_matches (arg_ : mword 56) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2089,7 +2422,10 @@ Definition hex_bits_56_forwards_matches (arg_ : mword 56) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_56_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_56_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((56, s)) then true
+   else false.
 
 Definition hex_bits_57_forwards (arg_ : mword 57) : M (string) :=
    let head_exp_ := arg_ in
@@ -2106,8 +2442,11 @@ Definition hex_bits_57_forwards (arg_ : mword 57) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_57_backwards (arg_ : string) : mword 57 :=
-   match arg_ with | s => hex_bits_backwards ((57, s)) end.
+Definition hex_bits_57_backwards (arg_ : string) : M (mword 57) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((57, s)) then returnM ((hex_bits_backwards ((57, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 57).
 
 Definition hex_bits_57_forwards_matches (arg_ : mword 57) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2123,7 +2462,10 @@ Definition hex_bits_57_forwards_matches (arg_ : mword 57) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_57_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_57_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((57, s)) then true
+   else false.
 
 Definition hex_bits_58_forwards (arg_ : mword 58) : M (string) :=
    let head_exp_ := arg_ in
@@ -2140,8 +2482,11 @@ Definition hex_bits_58_forwards (arg_ : mword 58) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_58_backwards (arg_ : string) : mword 58 :=
-   match arg_ with | s => hex_bits_backwards ((58, s)) end.
+Definition hex_bits_58_backwards (arg_ : string) : M (mword 58) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((58, s)) then returnM ((hex_bits_backwards ((58, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 58).
 
 Definition hex_bits_58_forwards_matches (arg_ : mword 58) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2157,7 +2502,10 @@ Definition hex_bits_58_forwards_matches (arg_ : mword 58) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_58_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_58_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((58, s)) then true
+   else false.
 
 Definition hex_bits_59_forwards (arg_ : mword 59) : M (string) :=
    let head_exp_ := arg_ in
@@ -2174,8 +2522,11 @@ Definition hex_bits_59_forwards (arg_ : mword 59) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_59_backwards (arg_ : string) : mword 59 :=
-   match arg_ with | s => hex_bits_backwards ((59, s)) end.
+Definition hex_bits_59_backwards (arg_ : string) : M (mword 59) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((59, s)) then returnM ((hex_bits_backwards ((59, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 59).
 
 Definition hex_bits_59_forwards_matches (arg_ : mword 59) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2191,7 +2542,10 @@ Definition hex_bits_59_forwards_matches (arg_ : mword 59) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_59_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_59_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((59, s)) then true
+   else false.
 
 Definition hex_bits_60_forwards (arg_ : mword 60) : M (string) :=
    let head_exp_ := arg_ in
@@ -2208,8 +2562,11 @@ Definition hex_bits_60_forwards (arg_ : mword 60) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_60_backwards (arg_ : string) : mword 60 :=
-   match arg_ with | s => hex_bits_backwards ((60, s)) end.
+Definition hex_bits_60_backwards (arg_ : string) : M (mword 60) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((60, s)) then returnM ((hex_bits_backwards ((60, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 60).
 
 Definition hex_bits_60_forwards_matches (arg_ : mword 60) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2225,7 +2582,10 @@ Definition hex_bits_60_forwards_matches (arg_ : mword 60) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_60_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_60_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((60, s)) then true
+   else false.
 
 Definition hex_bits_61_forwards (arg_ : mword 61) : M (string) :=
    let head_exp_ := arg_ in
@@ -2242,8 +2602,11 @@ Definition hex_bits_61_forwards (arg_ : mword 61) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_61_backwards (arg_ : string) : mword 61 :=
-   match arg_ with | s => hex_bits_backwards ((61, s)) end.
+Definition hex_bits_61_backwards (arg_ : string) : M (mword 61) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((61, s)) then returnM ((hex_bits_backwards ((61, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 61).
 
 Definition hex_bits_61_forwards_matches (arg_ : mword 61) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2259,7 +2622,10 @@ Definition hex_bits_61_forwards_matches (arg_ : mword 61) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_61_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_61_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((61, s)) then true
+   else false.
 
 Definition hex_bits_62_forwards (arg_ : mword 62) : M (string) :=
    let head_exp_ := arg_ in
@@ -2276,8 +2642,11 @@ Definition hex_bits_62_forwards (arg_ : mword 62) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_62_backwards (arg_ : string) : mword 62 :=
-   match arg_ with | s => hex_bits_backwards ((62, s)) end.
+Definition hex_bits_62_backwards (arg_ : string) : M (mword 62) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((62, s)) then returnM ((hex_bits_backwards ((62, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 62).
 
 Definition hex_bits_62_forwards_matches (arg_ : mword 62) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2293,7 +2662,10 @@ Definition hex_bits_62_forwards_matches (arg_ : mword 62) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_62_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_62_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((62, s)) then true
+   else false.
 
 Definition hex_bits_63_forwards (arg_ : mword 63) : M (string) :=
    let head_exp_ := arg_ in
@@ -2310,8 +2682,11 @@ Definition hex_bits_63_forwards (arg_ : mword 63) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_63_backwards (arg_ : string) : mword 63 :=
-   match arg_ with | s => hex_bits_backwards ((63, s)) end.
+Definition hex_bits_63_backwards (arg_ : string) : M (mword 63) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((63, s)) then returnM ((hex_bits_backwards ((63, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 63).
 
 Definition hex_bits_63_forwards_matches (arg_ : mword 63) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2327,7 +2702,10 @@ Definition hex_bits_63_forwards_matches (arg_ : mword 63) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_63_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_63_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((63, s)) then true
+   else false.
 
 Definition hex_bits_64_forwards (arg_ : mword 64) : M (string) :=
    let head_exp_ := arg_ in
@@ -2344,8 +2722,11 @@ Definition hex_bits_64_forwards (arg_ : mword 64) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_64_backwards (arg_ : string) : mword 64 :=
-   match arg_ with | s => hex_bits_backwards ((64, s)) end.
+Definition hex_bits_64_backwards (arg_ : string) : M (mword 64) :=
+   let s := arg_ in
+   (if hex_bits_backwards_matches ((64, s)) then returnM ((hex_bits_backwards ((64, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 64).
 
 Definition hex_bits_64_forwards_matches (arg_ : mword 64) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2361,7 +2742,10 @@ Definition hex_bits_64_forwards_matches (arg_ : mword 64) : M (bool) :=
    | None => match head_exp_ with | _ => false end
    end).
 
-Definition hex_bits_64_backwards_matches (arg_ : string) : bool := match arg_ with | s => true end.
+Definition hex_bits_64_backwards_matches (arg_ : string) : bool :=
+   let s := arg_ in
+   if hex_bits_backwards_matches ((64, s)) then true
+   else false.
 
 Definition hex_bits_signed_forwards {n : Z} (bv : mword n) (*n >=? 0*) (*n >? 0*) : (Z * string) :=
    let len := length_mword (bv) in
@@ -2406,8 +2790,12 @@ Definition hex_bits_signed_1_forwards (arg_ : mword 1) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_1_backwards (arg_ : string) : mword 1 :=
-   match arg_ with | s => hex_bits_signed_backwards ((1, s)) end.
+Definition hex_bits_signed_1_backwards (arg_ : string) : M (mword 1) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((1, s)) then
+      returnM ((hex_bits_signed_backwards ((1, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 1).
 
 Definition hex_bits_signed_1_forwards_matches (arg_ : mword 1) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2424,7 +2812,9 @@ Definition hex_bits_signed_1_forwards_matches (arg_ : mword 1) : M (bool) :=
    end).
 
 Definition hex_bits_signed_1_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((1, s)) then true
+   else false.
 
 Definition hex_bits_signed_2_forwards (arg_ : mword 2) : M (string) :=
    let head_exp_ := arg_ in
@@ -2441,8 +2831,12 @@ Definition hex_bits_signed_2_forwards (arg_ : mword 2) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_2_backwards (arg_ : string) : mword 2 :=
-   match arg_ with | s => hex_bits_signed_backwards ((2, s)) end.
+Definition hex_bits_signed_2_backwards (arg_ : string) : M (mword 2) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((2, s)) then
+      returnM ((hex_bits_signed_backwards ((2, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 2).
 
 Definition hex_bits_signed_2_forwards_matches (arg_ : mword 2) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2459,7 +2853,9 @@ Definition hex_bits_signed_2_forwards_matches (arg_ : mword 2) : M (bool) :=
    end).
 
 Definition hex_bits_signed_2_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((2, s)) then true
+   else false.
 
 Definition hex_bits_signed_3_forwards (arg_ : mword 3) : M (string) :=
    let head_exp_ := arg_ in
@@ -2476,8 +2872,12 @@ Definition hex_bits_signed_3_forwards (arg_ : mword 3) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_3_backwards (arg_ : string) : mword 3 :=
-   match arg_ with | s => hex_bits_signed_backwards ((3, s)) end.
+Definition hex_bits_signed_3_backwards (arg_ : string) : M (mword 3) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((3, s)) then
+      returnM ((hex_bits_signed_backwards ((3, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 3).
 
 Definition hex_bits_signed_3_forwards_matches (arg_ : mword 3) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2494,7 +2894,9 @@ Definition hex_bits_signed_3_forwards_matches (arg_ : mword 3) : M (bool) :=
    end).
 
 Definition hex_bits_signed_3_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((3, s)) then true
+   else false.
 
 Definition hex_bits_signed_4_forwards (arg_ : mword 4) : M (string) :=
    let head_exp_ := arg_ in
@@ -2511,8 +2913,12 @@ Definition hex_bits_signed_4_forwards (arg_ : mword 4) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_4_backwards (arg_ : string) : mword 4 :=
-   match arg_ with | s => hex_bits_signed_backwards ((4, s)) end.
+Definition hex_bits_signed_4_backwards (arg_ : string) : M (mword 4) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((4, s)) then
+      returnM ((hex_bits_signed_backwards ((4, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 4).
 
 Definition hex_bits_signed_4_forwards_matches (arg_ : mword 4) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2529,7 +2935,9 @@ Definition hex_bits_signed_4_forwards_matches (arg_ : mword 4) : M (bool) :=
    end).
 
 Definition hex_bits_signed_4_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((4, s)) then true
+   else false.
 
 Definition hex_bits_signed_5_forwards (arg_ : mword 5) : M (string) :=
    let head_exp_ := arg_ in
@@ -2546,8 +2954,12 @@ Definition hex_bits_signed_5_forwards (arg_ : mword 5) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_5_backwards (arg_ : string) : mword 5 :=
-   match arg_ with | s => hex_bits_signed_backwards ((5, s)) end.
+Definition hex_bits_signed_5_backwards (arg_ : string) : M (mword 5) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((5, s)) then
+      returnM ((hex_bits_signed_backwards ((5, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 5).
 
 Definition hex_bits_signed_5_forwards_matches (arg_ : mword 5) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2564,7 +2976,9 @@ Definition hex_bits_signed_5_forwards_matches (arg_ : mword 5) : M (bool) :=
    end).
 
 Definition hex_bits_signed_5_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((5, s)) then true
+   else false.
 
 Definition hex_bits_signed_6_forwards (arg_ : mword 6) : M (string) :=
    let head_exp_ := arg_ in
@@ -2581,8 +2995,12 @@ Definition hex_bits_signed_6_forwards (arg_ : mword 6) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_6_backwards (arg_ : string) : mword 6 :=
-   match arg_ with | s => hex_bits_signed_backwards ((6, s)) end.
+Definition hex_bits_signed_6_backwards (arg_ : string) : M (mword 6) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((6, s)) then
+      returnM ((hex_bits_signed_backwards ((6, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 6).
 
 Definition hex_bits_signed_6_forwards_matches (arg_ : mword 6) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2599,7 +3017,9 @@ Definition hex_bits_signed_6_forwards_matches (arg_ : mword 6) : M (bool) :=
    end).
 
 Definition hex_bits_signed_6_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((6, s)) then true
+   else false.
 
 Definition hex_bits_signed_7_forwards (arg_ : mword 7) : M (string) :=
    let head_exp_ := arg_ in
@@ -2616,8 +3036,12 @@ Definition hex_bits_signed_7_forwards (arg_ : mword 7) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_7_backwards (arg_ : string) : mword 7 :=
-   match arg_ with | s => hex_bits_signed_backwards ((7, s)) end.
+Definition hex_bits_signed_7_backwards (arg_ : string) : M (mword 7) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((7, s)) then
+      returnM ((hex_bits_signed_backwards ((7, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 7).
 
 Definition hex_bits_signed_7_forwards_matches (arg_ : mword 7) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2634,7 +3058,9 @@ Definition hex_bits_signed_7_forwards_matches (arg_ : mword 7) : M (bool) :=
    end).
 
 Definition hex_bits_signed_7_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((7, s)) then true
+   else false.
 
 Definition hex_bits_signed_8_forwards (arg_ : mword 8) : M (string) :=
    let head_exp_ := arg_ in
@@ -2651,8 +3077,12 @@ Definition hex_bits_signed_8_forwards (arg_ : mword 8) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_8_backwards (arg_ : string) : mword 8 :=
-   match arg_ with | s => hex_bits_signed_backwards ((8, s)) end.
+Definition hex_bits_signed_8_backwards (arg_ : string) : M (mword 8) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((8, s)) then
+      returnM ((hex_bits_signed_backwards ((8, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 8).
 
 Definition hex_bits_signed_8_forwards_matches (arg_ : mword 8) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2669,7 +3099,9 @@ Definition hex_bits_signed_8_forwards_matches (arg_ : mword 8) : M (bool) :=
    end).
 
 Definition hex_bits_signed_8_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((8, s)) then true
+   else false.
 
 Definition hex_bits_signed_9_forwards (arg_ : mword 9) : M (string) :=
    let head_exp_ := arg_ in
@@ -2686,8 +3118,12 @@ Definition hex_bits_signed_9_forwards (arg_ : mword 9) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_9_backwards (arg_ : string) : mword 9 :=
-   match arg_ with | s => hex_bits_signed_backwards ((9, s)) end.
+Definition hex_bits_signed_9_backwards (arg_ : string) : M (mword 9) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((9, s)) then
+      returnM ((hex_bits_signed_backwards ((9, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 9).
 
 Definition hex_bits_signed_9_forwards_matches (arg_ : mword 9) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2704,7 +3140,9 @@ Definition hex_bits_signed_9_forwards_matches (arg_ : mword 9) : M (bool) :=
    end).
 
 Definition hex_bits_signed_9_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((9, s)) then true
+   else false.
 
 Definition hex_bits_signed_10_forwards (arg_ : mword 10) : M (string) :=
    let head_exp_ := arg_ in
@@ -2721,8 +3159,12 @@ Definition hex_bits_signed_10_forwards (arg_ : mword 10) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_10_backwards (arg_ : string) : mword 10 :=
-   match arg_ with | s => hex_bits_signed_backwards ((10, s)) end.
+Definition hex_bits_signed_10_backwards (arg_ : string) : M (mword 10) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((10, s)) then
+      returnM ((hex_bits_signed_backwards ((10, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 10).
 
 Definition hex_bits_signed_10_forwards_matches (arg_ : mword 10) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2739,7 +3181,9 @@ Definition hex_bits_signed_10_forwards_matches (arg_ : mword 10) : M (bool) :=
    end).
 
 Definition hex_bits_signed_10_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((10, s)) then true
+   else false.
 
 Definition hex_bits_signed_11_forwards (arg_ : mword 11) : M (string) :=
    let head_exp_ := arg_ in
@@ -2756,8 +3200,12 @@ Definition hex_bits_signed_11_forwards (arg_ : mword 11) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_11_backwards (arg_ : string) : mword 11 :=
-   match arg_ with | s => hex_bits_signed_backwards ((11, s)) end.
+Definition hex_bits_signed_11_backwards (arg_ : string) : M (mword 11) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((11, s)) then
+      returnM ((hex_bits_signed_backwards ((11, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 11).
 
 Definition hex_bits_signed_11_forwards_matches (arg_ : mword 11) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2774,7 +3222,9 @@ Definition hex_bits_signed_11_forwards_matches (arg_ : mword 11) : M (bool) :=
    end).
 
 Definition hex_bits_signed_11_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((11, s)) then true
+   else false.
 
 Definition hex_bits_signed_12_forwards (arg_ : mword 12) : M (string) :=
    let head_exp_ := arg_ in
@@ -2791,8 +3241,12 @@ Definition hex_bits_signed_12_forwards (arg_ : mword 12) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_12_backwards (arg_ : string) : mword 12 :=
-   match arg_ with | s => hex_bits_signed_backwards ((12, s)) end.
+Definition hex_bits_signed_12_backwards (arg_ : string) : M (mword 12) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((12, s)) then
+      returnM ((hex_bits_signed_backwards ((12, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 12).
 
 Definition hex_bits_signed_12_forwards_matches (arg_ : mword 12) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2809,7 +3263,9 @@ Definition hex_bits_signed_12_forwards_matches (arg_ : mword 12) : M (bool) :=
    end).
 
 Definition hex_bits_signed_12_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((12, s)) then true
+   else false.
 
 Definition hex_bits_signed_13_forwards (arg_ : mword 13) : M (string) :=
    let head_exp_ := arg_ in
@@ -2826,8 +3282,12 @@ Definition hex_bits_signed_13_forwards (arg_ : mword 13) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_13_backwards (arg_ : string) : mword 13 :=
-   match arg_ with | s => hex_bits_signed_backwards ((13, s)) end.
+Definition hex_bits_signed_13_backwards (arg_ : string) : M (mword 13) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((13, s)) then
+      returnM ((hex_bits_signed_backwards ((13, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 13).
 
 Definition hex_bits_signed_13_forwards_matches (arg_ : mword 13) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2844,7 +3304,9 @@ Definition hex_bits_signed_13_forwards_matches (arg_ : mword 13) : M (bool) :=
    end).
 
 Definition hex_bits_signed_13_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((13, s)) then true
+   else false.
 
 Definition hex_bits_signed_14_forwards (arg_ : mword 14) : M (string) :=
    let head_exp_ := arg_ in
@@ -2861,8 +3323,12 @@ Definition hex_bits_signed_14_forwards (arg_ : mword 14) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_14_backwards (arg_ : string) : mword 14 :=
-   match arg_ with | s => hex_bits_signed_backwards ((14, s)) end.
+Definition hex_bits_signed_14_backwards (arg_ : string) : M (mword 14) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((14, s)) then
+      returnM ((hex_bits_signed_backwards ((14, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 14).
 
 Definition hex_bits_signed_14_forwards_matches (arg_ : mword 14) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2879,7 +3345,9 @@ Definition hex_bits_signed_14_forwards_matches (arg_ : mword 14) : M (bool) :=
    end).
 
 Definition hex_bits_signed_14_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((14, s)) then true
+   else false.
 
 Definition hex_bits_signed_15_forwards (arg_ : mword 15) : M (string) :=
    let head_exp_ := arg_ in
@@ -2896,8 +3364,12 @@ Definition hex_bits_signed_15_forwards (arg_ : mword 15) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_15_backwards (arg_ : string) : mword 15 :=
-   match arg_ with | s => hex_bits_signed_backwards ((15, s)) end.
+Definition hex_bits_signed_15_backwards (arg_ : string) : M (mword 15) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((15, s)) then
+      returnM ((hex_bits_signed_backwards ((15, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 15).
 
 Definition hex_bits_signed_15_forwards_matches (arg_ : mword 15) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2914,7 +3386,9 @@ Definition hex_bits_signed_15_forwards_matches (arg_ : mword 15) : M (bool) :=
    end).
 
 Definition hex_bits_signed_15_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((15, s)) then true
+   else false.
 
 Definition hex_bits_signed_16_forwards (arg_ : mword 16) : M (string) :=
    let head_exp_ := arg_ in
@@ -2931,8 +3405,12 @@ Definition hex_bits_signed_16_forwards (arg_ : mword 16) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_16_backwards (arg_ : string) : mword 16 :=
-   match arg_ with | s => hex_bits_signed_backwards ((16, s)) end.
+Definition hex_bits_signed_16_backwards (arg_ : string) : M (mword 16) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((16, s)) then
+      returnM ((hex_bits_signed_backwards ((16, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 16).
 
 Definition hex_bits_signed_16_forwards_matches (arg_ : mword 16) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2949,7 +3427,9 @@ Definition hex_bits_signed_16_forwards_matches (arg_ : mword 16) : M (bool) :=
    end).
 
 Definition hex_bits_signed_16_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((16, s)) then true
+   else false.
 
 Definition hex_bits_signed_17_forwards (arg_ : mword 17) : M (string) :=
    let head_exp_ := arg_ in
@@ -2966,8 +3446,12 @@ Definition hex_bits_signed_17_forwards (arg_ : mword 17) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_17_backwards (arg_ : string) : mword 17 :=
-   match arg_ with | s => hex_bits_signed_backwards ((17, s)) end.
+Definition hex_bits_signed_17_backwards (arg_ : string) : M (mword 17) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((17, s)) then
+      returnM ((hex_bits_signed_backwards ((17, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 17).
 
 Definition hex_bits_signed_17_forwards_matches (arg_ : mword 17) : M (bool) :=
    let head_exp_ := arg_ in
@@ -2984,7 +3468,9 @@ Definition hex_bits_signed_17_forwards_matches (arg_ : mword 17) : M (bool) :=
    end).
 
 Definition hex_bits_signed_17_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((17, s)) then true
+   else false.
 
 Definition hex_bits_signed_18_forwards (arg_ : mword 18) : M (string) :=
    let head_exp_ := arg_ in
@@ -3001,8 +3487,12 @@ Definition hex_bits_signed_18_forwards (arg_ : mword 18) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_18_backwards (arg_ : string) : mword 18 :=
-   match arg_ with | s => hex_bits_signed_backwards ((18, s)) end.
+Definition hex_bits_signed_18_backwards (arg_ : string) : M (mword 18) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((18, s)) then
+      returnM ((hex_bits_signed_backwards ((18, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 18).
 
 Definition hex_bits_signed_18_forwards_matches (arg_ : mword 18) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3019,7 +3509,9 @@ Definition hex_bits_signed_18_forwards_matches (arg_ : mword 18) : M (bool) :=
    end).
 
 Definition hex_bits_signed_18_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((18, s)) then true
+   else false.
 
 Definition hex_bits_signed_19_forwards (arg_ : mword 19) : M (string) :=
    let head_exp_ := arg_ in
@@ -3036,8 +3528,12 @@ Definition hex_bits_signed_19_forwards (arg_ : mword 19) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_19_backwards (arg_ : string) : mword 19 :=
-   match arg_ with | s => hex_bits_signed_backwards ((19, s)) end.
+Definition hex_bits_signed_19_backwards (arg_ : string) : M (mword 19) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((19, s)) then
+      returnM ((hex_bits_signed_backwards ((19, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 19).
 
 Definition hex_bits_signed_19_forwards_matches (arg_ : mword 19) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3054,7 +3550,9 @@ Definition hex_bits_signed_19_forwards_matches (arg_ : mword 19) : M (bool) :=
    end).
 
 Definition hex_bits_signed_19_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((19, s)) then true
+   else false.
 
 Definition hex_bits_signed_20_forwards (arg_ : mword 20) : M (string) :=
    let head_exp_ := arg_ in
@@ -3071,8 +3569,12 @@ Definition hex_bits_signed_20_forwards (arg_ : mword 20) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_20_backwards (arg_ : string) : mword 20 :=
-   match arg_ with | s => hex_bits_signed_backwards ((20, s)) end.
+Definition hex_bits_signed_20_backwards (arg_ : string) : M (mword 20) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((20, s)) then
+      returnM ((hex_bits_signed_backwards ((20, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 20).
 
 Definition hex_bits_signed_20_forwards_matches (arg_ : mword 20) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3089,7 +3591,9 @@ Definition hex_bits_signed_20_forwards_matches (arg_ : mword 20) : M (bool) :=
    end).
 
 Definition hex_bits_signed_20_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((20, s)) then true
+   else false.
 
 Definition hex_bits_signed_21_forwards (arg_ : mword 21) : M (string) :=
    let head_exp_ := arg_ in
@@ -3106,8 +3610,12 @@ Definition hex_bits_signed_21_forwards (arg_ : mword 21) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_21_backwards (arg_ : string) : mword 21 :=
-   match arg_ with | s => hex_bits_signed_backwards ((21, s)) end.
+Definition hex_bits_signed_21_backwards (arg_ : string) : M (mword 21) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((21, s)) then
+      returnM ((hex_bits_signed_backwards ((21, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 21).
 
 Definition hex_bits_signed_21_forwards_matches (arg_ : mword 21) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3124,7 +3632,9 @@ Definition hex_bits_signed_21_forwards_matches (arg_ : mword 21) : M (bool) :=
    end).
 
 Definition hex_bits_signed_21_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((21, s)) then true
+   else false.
 
 Definition hex_bits_signed_22_forwards (arg_ : mword 22) : M (string) :=
    let head_exp_ := arg_ in
@@ -3141,8 +3651,12 @@ Definition hex_bits_signed_22_forwards (arg_ : mword 22) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_22_backwards (arg_ : string) : mword 22 :=
-   match arg_ with | s => hex_bits_signed_backwards ((22, s)) end.
+Definition hex_bits_signed_22_backwards (arg_ : string) : M (mword 22) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((22, s)) then
+      returnM ((hex_bits_signed_backwards ((22, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 22).
 
 Definition hex_bits_signed_22_forwards_matches (arg_ : mword 22) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3159,7 +3673,9 @@ Definition hex_bits_signed_22_forwards_matches (arg_ : mword 22) : M (bool) :=
    end).
 
 Definition hex_bits_signed_22_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((22, s)) then true
+   else false.
 
 Definition hex_bits_signed_23_forwards (arg_ : mword 23) : M (string) :=
    let head_exp_ := arg_ in
@@ -3176,8 +3692,12 @@ Definition hex_bits_signed_23_forwards (arg_ : mword 23) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_23_backwards (arg_ : string) : mword 23 :=
-   match arg_ with | s => hex_bits_signed_backwards ((23, s)) end.
+Definition hex_bits_signed_23_backwards (arg_ : string) : M (mword 23) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((23, s)) then
+      returnM ((hex_bits_signed_backwards ((23, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 23).
 
 Definition hex_bits_signed_23_forwards_matches (arg_ : mword 23) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3194,7 +3714,9 @@ Definition hex_bits_signed_23_forwards_matches (arg_ : mword 23) : M (bool) :=
    end).
 
 Definition hex_bits_signed_23_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((23, s)) then true
+   else false.
 
 Definition hex_bits_signed_24_forwards (arg_ : mword 24) : M (string) :=
    let head_exp_ := arg_ in
@@ -3211,8 +3733,12 @@ Definition hex_bits_signed_24_forwards (arg_ : mword 24) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_24_backwards (arg_ : string) : mword 24 :=
-   match arg_ with | s => hex_bits_signed_backwards ((24, s)) end.
+Definition hex_bits_signed_24_backwards (arg_ : string) : M (mword 24) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((24, s)) then
+      returnM ((hex_bits_signed_backwards ((24, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 24).
 
 Definition hex_bits_signed_24_forwards_matches (arg_ : mword 24) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3229,7 +3755,9 @@ Definition hex_bits_signed_24_forwards_matches (arg_ : mword 24) : M (bool) :=
    end).
 
 Definition hex_bits_signed_24_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((24, s)) then true
+   else false.
 
 Definition hex_bits_signed_25_forwards (arg_ : mword 25) : M (string) :=
    let head_exp_ := arg_ in
@@ -3246,8 +3774,12 @@ Definition hex_bits_signed_25_forwards (arg_ : mword 25) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_25_backwards (arg_ : string) : mword 25 :=
-   match arg_ with | s => hex_bits_signed_backwards ((25, s)) end.
+Definition hex_bits_signed_25_backwards (arg_ : string) : M (mword 25) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((25, s)) then
+      returnM ((hex_bits_signed_backwards ((25, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 25).
 
 Definition hex_bits_signed_25_forwards_matches (arg_ : mword 25) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3264,7 +3796,9 @@ Definition hex_bits_signed_25_forwards_matches (arg_ : mword 25) : M (bool) :=
    end).
 
 Definition hex_bits_signed_25_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((25, s)) then true
+   else false.
 
 Definition hex_bits_signed_26_forwards (arg_ : mword 26) : M (string) :=
    let head_exp_ := arg_ in
@@ -3281,8 +3815,12 @@ Definition hex_bits_signed_26_forwards (arg_ : mword 26) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_26_backwards (arg_ : string) : mword 26 :=
-   match arg_ with | s => hex_bits_signed_backwards ((26, s)) end.
+Definition hex_bits_signed_26_backwards (arg_ : string) : M (mword 26) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((26, s)) then
+      returnM ((hex_bits_signed_backwards ((26, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 26).
 
 Definition hex_bits_signed_26_forwards_matches (arg_ : mword 26) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3299,7 +3837,9 @@ Definition hex_bits_signed_26_forwards_matches (arg_ : mword 26) : M (bool) :=
    end).
 
 Definition hex_bits_signed_26_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((26, s)) then true
+   else false.
 
 Definition hex_bits_signed_27_forwards (arg_ : mword 27) : M (string) :=
    let head_exp_ := arg_ in
@@ -3316,8 +3856,12 @@ Definition hex_bits_signed_27_forwards (arg_ : mword 27) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_27_backwards (arg_ : string) : mword 27 :=
-   match arg_ with | s => hex_bits_signed_backwards ((27, s)) end.
+Definition hex_bits_signed_27_backwards (arg_ : string) : M (mword 27) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((27, s)) then
+      returnM ((hex_bits_signed_backwards ((27, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 27).
 
 Definition hex_bits_signed_27_forwards_matches (arg_ : mword 27) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3334,7 +3878,9 @@ Definition hex_bits_signed_27_forwards_matches (arg_ : mword 27) : M (bool) :=
    end).
 
 Definition hex_bits_signed_27_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((27, s)) then true
+   else false.
 
 Definition hex_bits_signed_28_forwards (arg_ : mword 28) : M (string) :=
    let head_exp_ := arg_ in
@@ -3351,8 +3897,12 @@ Definition hex_bits_signed_28_forwards (arg_ : mword 28) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_28_backwards (arg_ : string) : mword 28 :=
-   match arg_ with | s => hex_bits_signed_backwards ((28, s)) end.
+Definition hex_bits_signed_28_backwards (arg_ : string) : M (mword 28) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((28, s)) then
+      returnM ((hex_bits_signed_backwards ((28, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 28).
 
 Definition hex_bits_signed_28_forwards_matches (arg_ : mword 28) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3369,7 +3919,9 @@ Definition hex_bits_signed_28_forwards_matches (arg_ : mword 28) : M (bool) :=
    end).
 
 Definition hex_bits_signed_28_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((28, s)) then true
+   else false.
 
 Definition hex_bits_signed_29_forwards (arg_ : mword 29) : M (string) :=
    let head_exp_ := arg_ in
@@ -3386,8 +3938,12 @@ Definition hex_bits_signed_29_forwards (arg_ : mword 29) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_29_backwards (arg_ : string) : mword 29 :=
-   match arg_ with | s => hex_bits_signed_backwards ((29, s)) end.
+Definition hex_bits_signed_29_backwards (arg_ : string) : M (mword 29) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((29, s)) then
+      returnM ((hex_bits_signed_backwards ((29, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 29).
 
 Definition hex_bits_signed_29_forwards_matches (arg_ : mword 29) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3404,7 +3960,9 @@ Definition hex_bits_signed_29_forwards_matches (arg_ : mword 29) : M (bool) :=
    end).
 
 Definition hex_bits_signed_29_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((29, s)) then true
+   else false.
 
 Definition hex_bits_signed_30_forwards (arg_ : mword 30) : M (string) :=
    let head_exp_ := arg_ in
@@ -3421,8 +3979,12 @@ Definition hex_bits_signed_30_forwards (arg_ : mword 30) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_30_backwards (arg_ : string) : mword 30 :=
-   match arg_ with | s => hex_bits_signed_backwards ((30, s)) end.
+Definition hex_bits_signed_30_backwards (arg_ : string) : M (mword 30) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((30, s)) then
+      returnM ((hex_bits_signed_backwards ((30, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 30).
 
 Definition hex_bits_signed_30_forwards_matches (arg_ : mword 30) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3439,7 +4001,9 @@ Definition hex_bits_signed_30_forwards_matches (arg_ : mword 30) : M (bool) :=
    end).
 
 Definition hex_bits_signed_30_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((30, s)) then true
+   else false.
 
 Definition hex_bits_signed_31_forwards (arg_ : mword 31) : M (string) :=
    let head_exp_ := arg_ in
@@ -3456,8 +4020,12 @@ Definition hex_bits_signed_31_forwards (arg_ : mword 31) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_31_backwards (arg_ : string) : mword 31 :=
-   match arg_ with | s => hex_bits_signed_backwards ((31, s)) end.
+Definition hex_bits_signed_31_backwards (arg_ : string) : M (mword 31) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((31, s)) then
+      returnM ((hex_bits_signed_backwards ((31, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 31).
 
 Definition hex_bits_signed_31_forwards_matches (arg_ : mword 31) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3474,7 +4042,9 @@ Definition hex_bits_signed_31_forwards_matches (arg_ : mword 31) : M (bool) :=
    end).
 
 Definition hex_bits_signed_31_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((31, s)) then true
+   else false.
 
 Definition hex_bits_signed_32_forwards (arg_ : mword 32) : M (string) :=
    let head_exp_ := arg_ in
@@ -3491,8 +4061,12 @@ Definition hex_bits_signed_32_forwards (arg_ : mword 32) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_32_backwards (arg_ : string) : mword 32 :=
-   match arg_ with | s => hex_bits_signed_backwards ((32, s)) end.
+Definition hex_bits_signed_32_backwards (arg_ : string) : M (mword 32) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((32, s)) then
+      returnM ((hex_bits_signed_backwards ((32, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 32).
 
 Definition hex_bits_signed_32_forwards_matches (arg_ : mword 32) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3509,7 +4083,9 @@ Definition hex_bits_signed_32_forwards_matches (arg_ : mword 32) : M (bool) :=
    end).
 
 Definition hex_bits_signed_32_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((32, s)) then true
+   else false.
 
 Definition hex_bits_signed_33_forwards (arg_ : mword 33) : M (string) :=
    let head_exp_ := arg_ in
@@ -3526,8 +4102,12 @@ Definition hex_bits_signed_33_forwards (arg_ : mword 33) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_33_backwards (arg_ : string) : mword 33 :=
-   match arg_ with | s => hex_bits_signed_backwards ((33, s)) end.
+Definition hex_bits_signed_33_backwards (arg_ : string) : M (mword 33) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((33, s)) then
+      returnM ((hex_bits_signed_backwards ((33, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 33).
 
 Definition hex_bits_signed_33_forwards_matches (arg_ : mword 33) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3544,7 +4124,9 @@ Definition hex_bits_signed_33_forwards_matches (arg_ : mword 33) : M (bool) :=
    end).
 
 Definition hex_bits_signed_33_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((33, s)) then true
+   else false.
 
 Definition hex_bits_signed_34_forwards (arg_ : mword 34) : M (string) :=
    let head_exp_ := arg_ in
@@ -3561,8 +4143,12 @@ Definition hex_bits_signed_34_forwards (arg_ : mword 34) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_34_backwards (arg_ : string) : mword 34 :=
-   match arg_ with | s => hex_bits_signed_backwards ((34, s)) end.
+Definition hex_bits_signed_34_backwards (arg_ : string) : M (mword 34) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((34, s)) then
+      returnM ((hex_bits_signed_backwards ((34, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 34).
 
 Definition hex_bits_signed_34_forwards_matches (arg_ : mword 34) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3579,7 +4165,9 @@ Definition hex_bits_signed_34_forwards_matches (arg_ : mword 34) : M (bool) :=
    end).
 
 Definition hex_bits_signed_34_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((34, s)) then true
+   else false.
 
 Definition hex_bits_signed_35_forwards (arg_ : mword 35) : M (string) :=
    let head_exp_ := arg_ in
@@ -3596,8 +4184,12 @@ Definition hex_bits_signed_35_forwards (arg_ : mword 35) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_35_backwards (arg_ : string) : mword 35 :=
-   match arg_ with | s => hex_bits_signed_backwards ((35, s)) end.
+Definition hex_bits_signed_35_backwards (arg_ : string) : M (mword 35) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((35, s)) then
+      returnM ((hex_bits_signed_backwards ((35, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 35).
 
 Definition hex_bits_signed_35_forwards_matches (arg_ : mword 35) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3614,7 +4206,9 @@ Definition hex_bits_signed_35_forwards_matches (arg_ : mword 35) : M (bool) :=
    end).
 
 Definition hex_bits_signed_35_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((35, s)) then true
+   else false.
 
 Definition hex_bits_signed_36_forwards (arg_ : mword 36) : M (string) :=
    let head_exp_ := arg_ in
@@ -3631,8 +4225,12 @@ Definition hex_bits_signed_36_forwards (arg_ : mword 36) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_36_backwards (arg_ : string) : mword 36 :=
-   match arg_ with | s => hex_bits_signed_backwards ((36, s)) end.
+Definition hex_bits_signed_36_backwards (arg_ : string) : M (mword 36) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((36, s)) then
+      returnM ((hex_bits_signed_backwards ((36, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 36).
 
 Definition hex_bits_signed_36_forwards_matches (arg_ : mword 36) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3649,7 +4247,9 @@ Definition hex_bits_signed_36_forwards_matches (arg_ : mword 36) : M (bool) :=
    end).
 
 Definition hex_bits_signed_36_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((36, s)) then true
+   else false.
 
 Definition hex_bits_signed_37_forwards (arg_ : mword 37) : M (string) :=
    let head_exp_ := arg_ in
@@ -3666,8 +4266,12 @@ Definition hex_bits_signed_37_forwards (arg_ : mword 37) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_37_backwards (arg_ : string) : mword 37 :=
-   match arg_ with | s => hex_bits_signed_backwards ((37, s)) end.
+Definition hex_bits_signed_37_backwards (arg_ : string) : M (mword 37) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((37, s)) then
+      returnM ((hex_bits_signed_backwards ((37, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 37).
 
 Definition hex_bits_signed_37_forwards_matches (arg_ : mword 37) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3684,7 +4288,9 @@ Definition hex_bits_signed_37_forwards_matches (arg_ : mword 37) : M (bool) :=
    end).
 
 Definition hex_bits_signed_37_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((37, s)) then true
+   else false.
 
 Definition hex_bits_signed_38_forwards (arg_ : mword 38) : M (string) :=
    let head_exp_ := arg_ in
@@ -3701,8 +4307,12 @@ Definition hex_bits_signed_38_forwards (arg_ : mword 38) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_38_backwards (arg_ : string) : mword 38 :=
-   match arg_ with | s => hex_bits_signed_backwards ((38, s)) end.
+Definition hex_bits_signed_38_backwards (arg_ : string) : M (mword 38) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((38, s)) then
+      returnM ((hex_bits_signed_backwards ((38, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 38).
 
 Definition hex_bits_signed_38_forwards_matches (arg_ : mword 38) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3719,7 +4329,9 @@ Definition hex_bits_signed_38_forwards_matches (arg_ : mword 38) : M (bool) :=
    end).
 
 Definition hex_bits_signed_38_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((38, s)) then true
+   else false.
 
 Definition hex_bits_signed_39_forwards (arg_ : mword 39) : M (string) :=
    let head_exp_ := arg_ in
@@ -3736,8 +4348,12 @@ Definition hex_bits_signed_39_forwards (arg_ : mword 39) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_39_backwards (arg_ : string) : mword 39 :=
-   match arg_ with | s => hex_bits_signed_backwards ((39, s)) end.
+Definition hex_bits_signed_39_backwards (arg_ : string) : M (mword 39) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((39, s)) then
+      returnM ((hex_bits_signed_backwards ((39, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 39).
 
 Definition hex_bits_signed_39_forwards_matches (arg_ : mword 39) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3754,7 +4370,9 @@ Definition hex_bits_signed_39_forwards_matches (arg_ : mword 39) : M (bool) :=
    end).
 
 Definition hex_bits_signed_39_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((39, s)) then true
+   else false.
 
 Definition hex_bits_signed_40_forwards (arg_ : mword 40) : M (string) :=
    let head_exp_ := arg_ in
@@ -3771,8 +4389,12 @@ Definition hex_bits_signed_40_forwards (arg_ : mword 40) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_40_backwards (arg_ : string) : mword 40 :=
-   match arg_ with | s => hex_bits_signed_backwards ((40, s)) end.
+Definition hex_bits_signed_40_backwards (arg_ : string) : M (mword 40) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((40, s)) then
+      returnM ((hex_bits_signed_backwards ((40, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 40).
 
 Definition hex_bits_signed_40_forwards_matches (arg_ : mword 40) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3789,7 +4411,9 @@ Definition hex_bits_signed_40_forwards_matches (arg_ : mword 40) : M (bool) :=
    end).
 
 Definition hex_bits_signed_40_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((40, s)) then true
+   else false.
 
 Definition hex_bits_signed_41_forwards (arg_ : mword 41) : M (string) :=
    let head_exp_ := arg_ in
@@ -3806,8 +4430,12 @@ Definition hex_bits_signed_41_forwards (arg_ : mword 41) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_41_backwards (arg_ : string) : mword 41 :=
-   match arg_ with | s => hex_bits_signed_backwards ((41, s)) end.
+Definition hex_bits_signed_41_backwards (arg_ : string) : M (mword 41) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((41, s)) then
+      returnM ((hex_bits_signed_backwards ((41, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 41).
 
 Definition hex_bits_signed_41_forwards_matches (arg_ : mword 41) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3824,7 +4452,9 @@ Definition hex_bits_signed_41_forwards_matches (arg_ : mword 41) : M (bool) :=
    end).
 
 Definition hex_bits_signed_41_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((41, s)) then true
+   else false.
 
 Definition hex_bits_signed_42_forwards (arg_ : mword 42) : M (string) :=
    let head_exp_ := arg_ in
@@ -3841,8 +4471,12 @@ Definition hex_bits_signed_42_forwards (arg_ : mword 42) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_42_backwards (arg_ : string) : mword 42 :=
-   match arg_ with | s => hex_bits_signed_backwards ((42, s)) end.
+Definition hex_bits_signed_42_backwards (arg_ : string) : M (mword 42) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((42, s)) then
+      returnM ((hex_bits_signed_backwards ((42, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 42).
 
 Definition hex_bits_signed_42_forwards_matches (arg_ : mword 42) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3859,7 +4493,9 @@ Definition hex_bits_signed_42_forwards_matches (arg_ : mword 42) : M (bool) :=
    end).
 
 Definition hex_bits_signed_42_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((42, s)) then true
+   else false.
 
 Definition hex_bits_signed_43_forwards (arg_ : mword 43) : M (string) :=
    let head_exp_ := arg_ in
@@ -3876,8 +4512,12 @@ Definition hex_bits_signed_43_forwards (arg_ : mword 43) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_43_backwards (arg_ : string) : mword 43 :=
-   match arg_ with | s => hex_bits_signed_backwards ((43, s)) end.
+Definition hex_bits_signed_43_backwards (arg_ : string) : M (mword 43) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((43, s)) then
+      returnM ((hex_bits_signed_backwards ((43, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 43).
 
 Definition hex_bits_signed_43_forwards_matches (arg_ : mword 43) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3894,7 +4534,9 @@ Definition hex_bits_signed_43_forwards_matches (arg_ : mword 43) : M (bool) :=
    end).
 
 Definition hex_bits_signed_43_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((43, s)) then true
+   else false.
 
 Definition hex_bits_signed_44_forwards (arg_ : mword 44) : M (string) :=
    let head_exp_ := arg_ in
@@ -3911,8 +4553,12 @@ Definition hex_bits_signed_44_forwards (arg_ : mword 44) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_44_backwards (arg_ : string) : mword 44 :=
-   match arg_ with | s => hex_bits_signed_backwards ((44, s)) end.
+Definition hex_bits_signed_44_backwards (arg_ : string) : M (mword 44) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((44, s)) then
+      returnM ((hex_bits_signed_backwards ((44, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 44).
 
 Definition hex_bits_signed_44_forwards_matches (arg_ : mword 44) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3929,7 +4575,9 @@ Definition hex_bits_signed_44_forwards_matches (arg_ : mword 44) : M (bool) :=
    end).
 
 Definition hex_bits_signed_44_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((44, s)) then true
+   else false.
 
 Definition hex_bits_signed_45_forwards (arg_ : mword 45) : M (string) :=
    let head_exp_ := arg_ in
@@ -3946,8 +4594,12 @@ Definition hex_bits_signed_45_forwards (arg_ : mword 45) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_45_backwards (arg_ : string) : mword 45 :=
-   match arg_ with | s => hex_bits_signed_backwards ((45, s)) end.
+Definition hex_bits_signed_45_backwards (arg_ : string) : M (mword 45) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((45, s)) then
+      returnM ((hex_bits_signed_backwards ((45, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 45).
 
 Definition hex_bits_signed_45_forwards_matches (arg_ : mword 45) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3964,7 +4616,9 @@ Definition hex_bits_signed_45_forwards_matches (arg_ : mword 45) : M (bool) :=
    end).
 
 Definition hex_bits_signed_45_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((45, s)) then true
+   else false.
 
 Definition hex_bits_signed_46_forwards (arg_ : mword 46) : M (string) :=
    let head_exp_ := arg_ in
@@ -3981,8 +4635,12 @@ Definition hex_bits_signed_46_forwards (arg_ : mword 46) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_46_backwards (arg_ : string) : mword 46 :=
-   match arg_ with | s => hex_bits_signed_backwards ((46, s)) end.
+Definition hex_bits_signed_46_backwards (arg_ : string) : M (mword 46) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((46, s)) then
+      returnM ((hex_bits_signed_backwards ((46, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 46).
 
 Definition hex_bits_signed_46_forwards_matches (arg_ : mword 46) : M (bool) :=
    let head_exp_ := arg_ in
@@ -3999,7 +4657,9 @@ Definition hex_bits_signed_46_forwards_matches (arg_ : mword 46) : M (bool) :=
    end).
 
 Definition hex_bits_signed_46_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((46, s)) then true
+   else false.
 
 Definition hex_bits_signed_47_forwards (arg_ : mword 47) : M (string) :=
    let head_exp_ := arg_ in
@@ -4016,8 +4676,12 @@ Definition hex_bits_signed_47_forwards (arg_ : mword 47) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_47_backwards (arg_ : string) : mword 47 :=
-   match arg_ with | s => hex_bits_signed_backwards ((47, s)) end.
+Definition hex_bits_signed_47_backwards (arg_ : string) : M (mword 47) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((47, s)) then
+      returnM ((hex_bits_signed_backwards ((47, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 47).
 
 Definition hex_bits_signed_47_forwards_matches (arg_ : mword 47) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4034,7 +4698,9 @@ Definition hex_bits_signed_47_forwards_matches (arg_ : mword 47) : M (bool) :=
    end).
 
 Definition hex_bits_signed_47_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((47, s)) then true
+   else false.
 
 Definition hex_bits_signed_48_forwards (arg_ : mword 48) : M (string) :=
    let head_exp_ := arg_ in
@@ -4051,8 +4717,12 @@ Definition hex_bits_signed_48_forwards (arg_ : mword 48) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_48_backwards (arg_ : string) : mword 48 :=
-   match arg_ with | s => hex_bits_signed_backwards ((48, s)) end.
+Definition hex_bits_signed_48_backwards (arg_ : string) : M (mword 48) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((48, s)) then
+      returnM ((hex_bits_signed_backwards ((48, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 48).
 
 Definition hex_bits_signed_48_forwards_matches (arg_ : mword 48) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4069,7 +4739,9 @@ Definition hex_bits_signed_48_forwards_matches (arg_ : mword 48) : M (bool) :=
    end).
 
 Definition hex_bits_signed_48_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((48, s)) then true
+   else false.
 
 Definition hex_bits_signed_49_forwards (arg_ : mword 49) : M (string) :=
    let head_exp_ := arg_ in
@@ -4086,8 +4758,12 @@ Definition hex_bits_signed_49_forwards (arg_ : mword 49) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_49_backwards (arg_ : string) : mword 49 :=
-   match arg_ with | s => hex_bits_signed_backwards ((49, s)) end.
+Definition hex_bits_signed_49_backwards (arg_ : string) : M (mword 49) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((49, s)) then
+      returnM ((hex_bits_signed_backwards ((49, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 49).
 
 Definition hex_bits_signed_49_forwards_matches (arg_ : mword 49) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4104,7 +4780,9 @@ Definition hex_bits_signed_49_forwards_matches (arg_ : mword 49) : M (bool) :=
    end).
 
 Definition hex_bits_signed_49_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((49, s)) then true
+   else false.
 
 Definition hex_bits_signed_50_forwards (arg_ : mword 50) : M (string) :=
    let head_exp_ := arg_ in
@@ -4121,8 +4799,12 @@ Definition hex_bits_signed_50_forwards (arg_ : mword 50) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_50_backwards (arg_ : string) : mword 50 :=
-   match arg_ with | s => hex_bits_signed_backwards ((50, s)) end.
+Definition hex_bits_signed_50_backwards (arg_ : string) : M (mword 50) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((50, s)) then
+      returnM ((hex_bits_signed_backwards ((50, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 50).
 
 Definition hex_bits_signed_50_forwards_matches (arg_ : mword 50) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4139,7 +4821,9 @@ Definition hex_bits_signed_50_forwards_matches (arg_ : mword 50) : M (bool) :=
    end).
 
 Definition hex_bits_signed_50_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((50, s)) then true
+   else false.
 
 Definition hex_bits_signed_51_forwards (arg_ : mword 51) : M (string) :=
    let head_exp_ := arg_ in
@@ -4156,8 +4840,12 @@ Definition hex_bits_signed_51_forwards (arg_ : mword 51) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_51_backwards (arg_ : string) : mword 51 :=
-   match arg_ with | s => hex_bits_signed_backwards ((51, s)) end.
+Definition hex_bits_signed_51_backwards (arg_ : string) : M (mword 51) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((51, s)) then
+      returnM ((hex_bits_signed_backwards ((51, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 51).
 
 Definition hex_bits_signed_51_forwards_matches (arg_ : mword 51) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4174,7 +4862,9 @@ Definition hex_bits_signed_51_forwards_matches (arg_ : mword 51) : M (bool) :=
    end).
 
 Definition hex_bits_signed_51_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((51, s)) then true
+   else false.
 
 Definition hex_bits_signed_52_forwards (arg_ : mword 52) : M (string) :=
    let head_exp_ := arg_ in
@@ -4191,8 +4881,12 @@ Definition hex_bits_signed_52_forwards (arg_ : mword 52) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_52_backwards (arg_ : string) : mword 52 :=
-   match arg_ with | s => hex_bits_signed_backwards ((52, s)) end.
+Definition hex_bits_signed_52_backwards (arg_ : string) : M (mword 52) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((52, s)) then
+      returnM ((hex_bits_signed_backwards ((52, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 52).
 
 Definition hex_bits_signed_52_forwards_matches (arg_ : mword 52) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4209,7 +4903,9 @@ Definition hex_bits_signed_52_forwards_matches (arg_ : mword 52) : M (bool) :=
    end).
 
 Definition hex_bits_signed_52_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((52, s)) then true
+   else false.
 
 Definition hex_bits_signed_53_forwards (arg_ : mword 53) : M (string) :=
    let head_exp_ := arg_ in
@@ -4226,8 +4922,12 @@ Definition hex_bits_signed_53_forwards (arg_ : mword 53) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_53_backwards (arg_ : string) : mword 53 :=
-   match arg_ with | s => hex_bits_signed_backwards ((53, s)) end.
+Definition hex_bits_signed_53_backwards (arg_ : string) : M (mword 53) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((53, s)) then
+      returnM ((hex_bits_signed_backwards ((53, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 53).
 
 Definition hex_bits_signed_53_forwards_matches (arg_ : mword 53) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4244,7 +4944,9 @@ Definition hex_bits_signed_53_forwards_matches (arg_ : mword 53) : M (bool) :=
    end).
 
 Definition hex_bits_signed_53_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((53, s)) then true
+   else false.
 
 Definition hex_bits_signed_54_forwards (arg_ : mword 54) : M (string) :=
    let head_exp_ := arg_ in
@@ -4261,8 +4963,12 @@ Definition hex_bits_signed_54_forwards (arg_ : mword 54) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_54_backwards (arg_ : string) : mword 54 :=
-   match arg_ with | s => hex_bits_signed_backwards ((54, s)) end.
+Definition hex_bits_signed_54_backwards (arg_ : string) : M (mword 54) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((54, s)) then
+      returnM ((hex_bits_signed_backwards ((54, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 54).
 
 Definition hex_bits_signed_54_forwards_matches (arg_ : mword 54) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4279,7 +4985,9 @@ Definition hex_bits_signed_54_forwards_matches (arg_ : mword 54) : M (bool) :=
    end).
 
 Definition hex_bits_signed_54_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((54, s)) then true
+   else false.
 
 Definition hex_bits_signed_55_forwards (arg_ : mword 55) : M (string) :=
    let head_exp_ := arg_ in
@@ -4296,8 +5004,12 @@ Definition hex_bits_signed_55_forwards (arg_ : mword 55) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_55_backwards (arg_ : string) : mword 55 :=
-   match arg_ with | s => hex_bits_signed_backwards ((55, s)) end.
+Definition hex_bits_signed_55_backwards (arg_ : string) : M (mword 55) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((55, s)) then
+      returnM ((hex_bits_signed_backwards ((55, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 55).
 
 Definition hex_bits_signed_55_forwards_matches (arg_ : mword 55) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4314,7 +5026,9 @@ Definition hex_bits_signed_55_forwards_matches (arg_ : mword 55) : M (bool) :=
    end).
 
 Definition hex_bits_signed_55_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((55, s)) then true
+   else false.
 
 Definition hex_bits_signed_56_forwards (arg_ : mword 56) : M (string) :=
    let head_exp_ := arg_ in
@@ -4331,8 +5045,12 @@ Definition hex_bits_signed_56_forwards (arg_ : mword 56) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_56_backwards (arg_ : string) : mword 56 :=
-   match arg_ with | s => hex_bits_signed_backwards ((56, s)) end.
+Definition hex_bits_signed_56_backwards (arg_ : string) : M (mword 56) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((56, s)) then
+      returnM ((hex_bits_signed_backwards ((56, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 56).
 
 Definition hex_bits_signed_56_forwards_matches (arg_ : mword 56) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4349,7 +5067,9 @@ Definition hex_bits_signed_56_forwards_matches (arg_ : mword 56) : M (bool) :=
    end).
 
 Definition hex_bits_signed_56_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((56, s)) then true
+   else false.
 
 Definition hex_bits_signed_57_forwards (arg_ : mword 57) : M (string) :=
    let head_exp_ := arg_ in
@@ -4366,8 +5086,12 @@ Definition hex_bits_signed_57_forwards (arg_ : mword 57) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_57_backwards (arg_ : string) : mword 57 :=
-   match arg_ with | s => hex_bits_signed_backwards ((57, s)) end.
+Definition hex_bits_signed_57_backwards (arg_ : string) : M (mword 57) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((57, s)) then
+      returnM ((hex_bits_signed_backwards ((57, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 57).
 
 Definition hex_bits_signed_57_forwards_matches (arg_ : mword 57) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4384,7 +5108,9 @@ Definition hex_bits_signed_57_forwards_matches (arg_ : mword 57) : M (bool) :=
    end).
 
 Definition hex_bits_signed_57_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((57, s)) then true
+   else false.
 
 Definition hex_bits_signed_58_forwards (arg_ : mword 58) : M (string) :=
    let head_exp_ := arg_ in
@@ -4401,8 +5127,12 @@ Definition hex_bits_signed_58_forwards (arg_ : mword 58) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_58_backwards (arg_ : string) : mword 58 :=
-   match arg_ with | s => hex_bits_signed_backwards ((58, s)) end.
+Definition hex_bits_signed_58_backwards (arg_ : string) : M (mword 58) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((58, s)) then
+      returnM ((hex_bits_signed_backwards ((58, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 58).
 
 Definition hex_bits_signed_58_forwards_matches (arg_ : mword 58) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4419,7 +5149,9 @@ Definition hex_bits_signed_58_forwards_matches (arg_ : mword 58) : M (bool) :=
    end).
 
 Definition hex_bits_signed_58_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((58, s)) then true
+   else false.
 
 Definition hex_bits_signed_59_forwards (arg_ : mword 59) : M (string) :=
    let head_exp_ := arg_ in
@@ -4436,8 +5168,12 @@ Definition hex_bits_signed_59_forwards (arg_ : mword 59) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_59_backwards (arg_ : string) : mword 59 :=
-   match arg_ with | s => hex_bits_signed_backwards ((59, s)) end.
+Definition hex_bits_signed_59_backwards (arg_ : string) : M (mword 59) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((59, s)) then
+      returnM ((hex_bits_signed_backwards ((59, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 59).
 
 Definition hex_bits_signed_59_forwards_matches (arg_ : mword 59) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4454,7 +5190,9 @@ Definition hex_bits_signed_59_forwards_matches (arg_ : mword 59) : M (bool) :=
    end).
 
 Definition hex_bits_signed_59_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((59, s)) then true
+   else false.
 
 Definition hex_bits_signed_60_forwards (arg_ : mword 60) : M (string) :=
    let head_exp_ := arg_ in
@@ -4471,8 +5209,12 @@ Definition hex_bits_signed_60_forwards (arg_ : mword 60) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_60_backwards (arg_ : string) : mword 60 :=
-   match arg_ with | s => hex_bits_signed_backwards ((60, s)) end.
+Definition hex_bits_signed_60_backwards (arg_ : string) : M (mword 60) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((60, s)) then
+      returnM ((hex_bits_signed_backwards ((60, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 60).
 
 Definition hex_bits_signed_60_forwards_matches (arg_ : mword 60) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4489,7 +5231,9 @@ Definition hex_bits_signed_60_forwards_matches (arg_ : mword 60) : M (bool) :=
    end).
 
 Definition hex_bits_signed_60_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((60, s)) then true
+   else false.
 
 Definition hex_bits_signed_61_forwards (arg_ : mword 61) : M (string) :=
    let head_exp_ := arg_ in
@@ -4506,8 +5250,12 @@ Definition hex_bits_signed_61_forwards (arg_ : mword 61) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_61_backwards (arg_ : string) : mword 61 :=
-   match arg_ with | s => hex_bits_signed_backwards ((61, s)) end.
+Definition hex_bits_signed_61_backwards (arg_ : string) : M (mword 61) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((61, s)) then
+      returnM ((hex_bits_signed_backwards ((61, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 61).
 
 Definition hex_bits_signed_61_forwards_matches (arg_ : mword 61) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4524,7 +5272,9 @@ Definition hex_bits_signed_61_forwards_matches (arg_ : mword 61) : M (bool) :=
    end).
 
 Definition hex_bits_signed_61_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((61, s)) then true
+   else false.
 
 Definition hex_bits_signed_62_forwards (arg_ : mword 62) : M (string) :=
    let head_exp_ := arg_ in
@@ -4541,8 +5291,12 @@ Definition hex_bits_signed_62_forwards (arg_ : mword 62) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_62_backwards (arg_ : string) : mword 62 :=
-   match arg_ with | s => hex_bits_signed_backwards ((62, s)) end.
+Definition hex_bits_signed_62_backwards (arg_ : string) : M (mword 62) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((62, s)) then
+      returnM ((hex_bits_signed_backwards ((62, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 62).
 
 Definition hex_bits_signed_62_forwards_matches (arg_ : mword 62) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4559,7 +5313,9 @@ Definition hex_bits_signed_62_forwards_matches (arg_ : mword 62) : M (bool) :=
    end).
 
 Definition hex_bits_signed_62_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((62, s)) then true
+   else false.
 
 Definition hex_bits_signed_63_forwards (arg_ : mword 63) : M (string) :=
    let head_exp_ := arg_ in
@@ -4576,8 +5332,12 @@ Definition hex_bits_signed_63_forwards (arg_ : mword 63) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_63_backwards (arg_ : string) : mword 63 :=
-   match arg_ with | s => hex_bits_signed_backwards ((63, s)) end.
+Definition hex_bits_signed_63_backwards (arg_ : string) : M (mword 63) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((63, s)) then
+      returnM ((hex_bits_signed_backwards ((63, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 63).
 
 Definition hex_bits_signed_63_forwards_matches (arg_ : mword 63) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4594,7 +5354,9 @@ Definition hex_bits_signed_63_forwards_matches (arg_ : mword 63) : M (bool) :=
    end).
 
 Definition hex_bits_signed_63_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((63, s)) then true
+   else false.
 
 Definition hex_bits_signed_64_forwards (arg_ : mword 64) : M (string) :=
    let head_exp_ := arg_ in
@@ -4611,8 +5373,12 @@ Definition hex_bits_signed_64_forwards (arg_ : mword 64) : M (string) :=
    end
     : M (string).
 
-Definition hex_bits_signed_64_backwards (arg_ : string) : mword 64 :=
-   match arg_ with | s => hex_bits_signed_backwards ((64, s)) end.
+Definition hex_bits_signed_64_backwards (arg_ : string) : M (mword 64) :=
+   let s := arg_ in
+   (if hex_bits_signed_backwards_matches ((64, s)) then
+      returnM ((hex_bits_signed_backwards ((64, s))))
+    else assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt)
+    : M (mword 64).
 
 Definition hex_bits_signed_64_forwards_matches (arg_ : mword 64) : M (bool) :=
    let head_exp_ := arg_ in
@@ -4629,7 +5395,9 @@ Definition hex_bits_signed_64_forwards_matches (arg_ : mword 64) : M (bool) :=
    end).
 
 Definition hex_bits_signed_64_backwards_matches (arg_ : string) : bool :=
-   match arg_ with | s => true end.
+   let s := arg_ in
+   if hex_bits_signed_backwards_matches ((64, s)) then true
+   else false.
 
 Definition dec_bits_forwards {n : Z} (bv : mword n) (*n >=? 0*) (*n >? 0*) : (Z * string) :=
    ((length_mword (bv), dec_str ((uint (bv))))).
@@ -5115,60 +5883,60 @@ Definition is_highest_zero {n : Z} (op : mword n) (*n >=? 0*) (*0 <? n*) : bool 
 Definition is_all_zeros {n : Z} (op : mword n) (*n >=? 0*) (*0 <? n*) : bool :=
    eq_vec (op) ((zeros n)).
 
-Definition float_is_nan {ex569625_ : Z} (op : mword ex569625_)
-(*member_Z_list ex569625_ [16; 32; 64; 128]*)
+Definition float_is_nan {ex570900_ : Z} (op : mword ex570900_)
+(*member_Z_list ex570900_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_ones (exp))) ((negb ((is_all_zeros (mantissa))))).
 
-Definition float_is_snan {ex569642_ : Z} (op : mword ex569642_)
-(*member_Z_list ex569642_ [16; 32; 64; 128]*)
+Definition float_is_snan {ex570917_ : Z} (op : mword ex570917_)
+(*member_Z_list ex570917_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_mantissa := mantissa; float_bits_sign := _; float_bits_exp := _ |}) :=
      float_decompose (op) in
    andb ((float_is_nan (op))) ((is_highest_zero (mantissa))).
 
-Definition float_is_qnan {ex569649_ : Z} (op : mword ex569649_)
-(*member_Z_list ex569649_ [16; 32; 64; 128]*)
+Definition float_is_qnan {ex570924_ : Z} (op : mword ex570924_)
+(*member_Z_list ex570924_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_mantissa := mantissa; float_bits_sign := _; float_bits_exp := _ |}) :=
      float_decompose (op) in
    andb ((float_is_nan (op))) ((is_highest_one (mantissa))).
 
-Definition float_is_inf {ex569656_ : Z} (op : mword ex569656_)
-(*member_Z_list ex569656_ [16; 32; 64; 128]*)
+Definition float_is_inf {ex570931_ : Z} (op : mword ex570931_)
+(*member_Z_list ex570931_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_ones (exp))) ((is_all_zeros (mantissa))).
 
-Definition float_is_positive {ex569663_ : Z} (op : mword ex569663_)
-(*member_Z_list ex569663_ [16; 32; 64; 128]*)
+Definition float_is_positive {ex570938_ : Z} (op : mword ex570938_)
+(*member_Z_list ex570938_ [16; 32; 64; 128]*)
 : bool :=
    is_highest_zero (op).
 
-Definition float_is_negative {ex569665_ : Z} (op : mword ex569665_)
-(*member_Z_list ex569665_ [16; 32; 64; 128]*)
+Definition float_is_negative {ex570940_ : Z} (op : mword ex570940_)
+(*member_Z_list ex570940_ [16; 32; 64; 128]*)
 : bool :=
    is_highest_one (op).
 
-Definition float_is_zero {ex569667_ : Z} (op : mword ex569667_)
-(*member_Z_list ex569667_ [16; 32; 64; 128]*)
+Definition float_is_zero {ex570942_ : Z} (op : mword ex570942_)
+(*member_Z_list ex570942_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
    andb ((is_all_zeros (exp))) ((is_all_zeros (mantissa))).
 
-Definition float_is_normal {ex569674_ : Z} (op : mword ex569674_)
-(*member_Z_list ex569674_ [16; 32; 64; 128]*)
+Definition float_is_normal {ex570949_ : Z} (op : mword ex570949_)
+(*member_Z_list ex570949_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_sign := _; float_bits_mantissa := _ |}) :=
      float_decompose (op) in
    andb ((negb ((is_all_ones (exp))))) ((negb ((is_all_zeros (exp))))).
 
-Definition float_is_subnormal {ex569692_ : Z} (op : mword ex569692_)
-(*member_Z_list ex569692_ [16; 32; 64; 128]*)
+Definition float_is_subnormal {ex570967_ : Z} (op : mword ex570967_)
+(*member_Z_list ex570967_ [16; 32; 64; 128]*)
 : bool :=
    let '({| float_bits_exp := exp; float_bits_mantissa := mantissa; float_bits_sign := _ |}) :=
      float_decompose (op) in
@@ -5511,8 +6279,8 @@ Definition undefined_float_class '(tt : unit) : M (float_class) :=
       float_class_qnan]))
     : M (float_class).
 
-Definition float_classify {ex570068_ : Z} (f : mword ex570068_)
-(*member_Z_list ex570068_ [16; 32; 64; 128]*)
+Definition float_classify {ex571343_ : Z} (f : mword ex571343_)
+(*member_Z_list ex571343_ [16; 32; 64; 128]*)
 : M (float_class) :=
    (if float_is_snan (f) then returnM (float_class_snan)
     else if float_is_qnan (f) then returnM (float_class_qnan)
@@ -5989,42 +6757,42 @@ Definition unwrap_or {a : Type} {b : Type} (r : result a b) (y : a) : a :=
 
 Axiom read_mem_ :
   forall
-  {fv38629_a : Type}
-  (_ : fv38629_a) (fv38630_addrsize : Z) (_ : mword fv38630_addrsize) (fv38631_n : Z)
-  (*fv38631_n >=? 0*) (*fv38630_addrsize >=? 0*) (*(fv38631_n >=? 0) &&
-    member_Z_list fv38630_addrsize [32; 64]*),
-  mword (8 * fv38631_n).
+  {fv38637_a : Type}
+  (_ : fv38637_a) (fv38638_addrsize : Z) (_ : mword fv38638_addrsize) (fv38639_n : Z)
+  (*fv38639_n >=? 0*) (*fv38638_addrsize >=? 0*) (*(fv38639_n >=? 0) &&
+    member_Z_list fv38638_addrsize [32; 64]*),
+  mword (8 * fv38639_n).
 
 Axiom read_mem_ifetch_ :
   forall
-  {fv38632_a : Type}
-  (_ : fv38632_a) (fv38633_addrsize : Z) (_ : mword fv38633_addrsize) (fv38634_n : Z)
-  (*fv38634_n >=? 0*) (*fv38633_addrsize >=? 0*) (*(fv38634_n >=? 0) &&
-    member_Z_list fv38633_addrsize [32; 64]*),
-  mword (8 * fv38634_n).
+  {fv38640_a : Type}
+  (_ : fv38640_a) (fv38641_addrsize : Z) (_ : mword fv38641_addrsize) (fv38642_n : Z)
+  (*fv38642_n >=? 0*) (*fv38641_addrsize >=? 0*) (*(fv38642_n >=? 0) &&
+    member_Z_list fv38641_addrsize [32; 64]*),
+  mword (8 * fv38642_n).
 
 Axiom read_mem_exclusive_ :
   forall
-  {fv38635_a : Type}
-  (_ : fv38635_a) (fv38636_addrsize : Z) (_ : mword fv38636_addrsize) (fv38637_n : Z)
-  (*fv38637_n >=? 0*) (*fv38636_addrsize >=? 0*) (*(fv38637_n >=? 0) &&
-    member_Z_list fv38636_addrsize [32; 64]*),
-  mword (8 * fv38637_n).
+  {fv38643_a : Type}
+  (_ : fv38643_a) (fv38644_addrsize : Z) (_ : mword fv38644_addrsize) (fv38645_n : Z)
+  (*fv38645_n >=? 0*) (*fv38644_addrsize >=? 0*) (*(fv38645_n >=? 0) &&
+    member_Z_list fv38644_addrsize [32; 64]*),
+  mword (8 * fv38645_n).
 
 Axiom write_mem_ :
   forall
-  {fv38638_a : Type}
-  (_ : fv38638_a) (fv38639_addrsize : Z) (_ : mword fv38639_addrsize) (fv38640_n : Z) (_ : mword (8 * fv38640_n))
-  (*fv38640_n >=? 0*) (*fv38639_addrsize >=? 0*) (*(fv38640_n >? 0) &&
-    member_Z_list fv38639_addrsize [32; 64]*),
+  {fv38646_a : Type}
+  (_ : fv38646_a) (fv38647_addrsize : Z) (_ : mword fv38647_addrsize) (fv38648_n : Z) (_ : mword (8 * fv38648_n))
+  (*fv38648_n >=? 0*) (*fv38647_addrsize >=? 0*) (*(fv38648_n >? 0) &&
+    member_Z_list fv38647_addrsize [32; 64]*),
   bool.
 
 Axiom write_mem_exclusive_ :
   forall
-  {fv38641_a : Type}
-  (_ : fv38641_a) (fv38642_addrsize : Z) (_ : mword fv38642_addrsize) (fv38643_n : Z) (_ : mword (8 * fv38643_n))
-  (*fv38643_n >=? 0*) (*fv38642_addrsize >=? 0*) (*(fv38643_n >? 0) &&
-    member_Z_list fv38642_addrsize [32; 64]*),
+  {fv38649_a : Type}
+  (_ : fv38649_a) (fv38650_addrsize : Z) (_ : mword fv38650_addrsize) (fv38651_n : Z) (_ : mword (8 * fv38651_n))
+  (*fv38651_n >=? 0*) (*fv38650_addrsize >=? 0*) (*(fv38651_n >? 0) &&
+    member_Z_list fv38650_addrsize [32; 64]*),
   bool.
 
 Definition sail_instr_announce {n : Z} (_ : mword n) (*n >=? 0*) (*n >? 0*) : unit := tt.
@@ -6235,16 +7003,16 @@ Definition read_ram (rk : read_kind) '((Physaddr addr) : physaddr) (width : Z) (
 
 Axiom __TraceMemoryWrite :
   forall
-  {fv38658_m : Z}
-  (fv38659_n : Z) (_ : mword fv38658_m) (_ : mword (8 * fv38659_n))
-  (*fv38659_n >=? 0*) (*fv38658_m >=? 0*),
+  {fv38666_m : Z}
+  (fv38667_n : Z) (_ : mword fv38666_m) (_ : mword (8 * fv38667_n))
+  (*fv38667_n >=? 0*) (*fv38666_m >=? 0*),
   unit.
 
 Axiom __TraceMemoryRead :
   forall
-  {fv38660_m : Z}
-  (fv38661_n : Z) (_ : mword fv38660_m) (_ : mword (8 * fv38661_n))
-  (*fv38661_n >=? 0*) (*fv38660_m >=? 0*),
+  {fv38668_m : Z}
+  (fv38669_n : Z) (_ : mword fv38668_m) (_ : mword (8 * fv38669_n))
+  (*fv38669_n >=? 0*) (*fv38668_m >=? 0*),
   unit.
 
 Definition brev8 {m : Z} (input : mword m) (*m >=? 0*) (*(m >=? 0) && ((ZEuclid.modulo m 8) =? 0)*)
@@ -12784,7 +13552,7 @@ Definition misaligned_exception_is_access_fault (e : option misaligned_exception
 Definition plat_misaligned_access : GlobalMisalignedExceptions :=
 {| GlobalMisalignedExceptions_load_store := None;
    GlobalMisalignedExceptions_vector := None;
-   GlobalMisalignedExceptions_amo := None;
+   GlobalMisalignedExceptions_amo := Some (AccessFault);
    GlobalMisalignedExceptions_lrsc := AccessFault |}.
 #[export] Hint Unfold plat_misaligned_access : sail.
 Definition undefined_ExtContextPolicy '(tt : unit) : M (ExtContextPolicy) :=
@@ -14329,358 +15097,361 @@ Definition csr_full_read_callback (_ : string) (_ : mword 12) (_ : mword 64) : u
 
 Definition redirect_callback (_ : mword 64) : unit := tt.
 
-Definition trap_callback (ex575285_ : bool) (_ : mword 6) : unit := tt.
+Definition trap_callback (ex576560_ : bool) (_ : mword 6) : unit := tt.
 
-Definition xret_callback (ex575286_ : bool) : unit := tt.
+Definition xret_callback (ex576561_ : bool) : unit := tt.
 
 Definition csr_name_map_backwards (arg_ : string) : M (mword 12) :=
    let head_exp_ := arg_ in
    let p0_ := head_exp_ in
-   match if generic_eq (p0_) ("misa") then Some ((Ox"301"))
-         else if generic_eq (p0_) ("mstatus") then Some ((Ox"300"))
-         else if generic_eq (p0_) ("mstatush") then Some ((Ox"310"))
-         else if generic_eq (p0_) ("mseccfg") then Some ((Ox"747"))
-         else if generic_eq (p0_) ("mseccfgh") then Some ((Ox"757"))
-         else if generic_eq (p0_) ("menvcfg") then Some ((Ox"30A"))
-         else if generic_eq (p0_) ("menvcfgh") then Some ((Ox"31A"))
-         else if generic_eq (p0_) ("senvcfg") then Some ((Ox"10A"))
-         else if generic_eq (p0_) ("mcause") then Some ((Ox"342"))
-         else if generic_eq (p0_) ("mtval") then Some ((Ox"343"))
-         else if generic_eq (p0_) ("mscratch") then Some ((Ox"340"))
-         else if generic_eq (p0_) ("scounteren") then Some ((Ox"106"))
-         else if generic_eq (p0_) ("mcounteren") then Some ((Ox"306"))
-         else if generic_eq (p0_) ("mcountinhibit") then Some ((Ox"320"))
-         else if generic_eq (p0_) ("mvendorid") then Some ((Ox"F11"))
-         else if generic_eq (p0_) ("marchid") then Some ((Ox"F12"))
-         else if generic_eq (p0_) ("mimpid") then Some ((Ox"F13"))
-         else if generic_eq (p0_) ("mhartid") then Some ((Ox"F14"))
-         else if generic_eq (p0_) ("mconfigptr") then Some ((Ox"F15"))
-         else if generic_eq (p0_) ("sstatus") then Some ((Ox"100"))
-         else if generic_eq (p0_) ("sscratch") then Some ((Ox"140"))
-         else if generic_eq (p0_) ("scause") then Some ((Ox"142"))
-         else if generic_eq (p0_) ("stval") then Some ((Ox"143"))
-         else if generic_eq (p0_) ("tselect") then Some ((Ox"7A0"))
-         else if generic_eq (p0_) ("tdata1") then Some ((Ox"7A1"))
-         else if generic_eq (p0_) ("tdata2") then Some ((Ox"7A2"))
-         else if generic_eq (p0_) ("tdata3") then Some ((Ox"7A3"))
-         else if generic_eq (p0_) ("mie") then Some ((Ox"304"))
-         else if generic_eq (p0_) ("mip") then Some ((Ox"344"))
-         else if generic_eq (p0_) ("medeleg") then Some ((Ox"302"))
-         else if generic_eq (p0_) ("medelegh") then Some ((Ox"312"))
-         else if generic_eq (p0_) ("mideleg") then Some ((Ox"303"))
-         else if generic_eq (p0_) ("sip") then Some ((Ox"144"))
-         else if generic_eq (p0_) ("sie") then Some ((Ox"104"))
-         else if generic_eq (p0_) ("stvec") then Some ((Ox"105"))
-         else if generic_eq (p0_) ("sepc") then Some ((Ox"141"))
-         else if generic_eq (p0_) ("mtvec") then Some ((Ox"305"))
-         else if generic_eq (p0_) ("mepc") then Some ((Ox"341"))
-         else if generic_eq (p0_) ("pmpcfg0") then Some ((Ox"3A0"))
-         else if generic_eq (p0_) ("pmpcfg1") then Some ((Ox"3A1"))
-         else if generic_eq (p0_) ("pmpcfg2") then Some ((Ox"3A2"))
-         else if generic_eq (p0_) ("pmpcfg3") then Some ((Ox"3A3"))
-         else if generic_eq (p0_) ("pmpcfg4") then Some ((Ox"3A4"))
-         else if generic_eq (p0_) ("pmpcfg5") then Some ((Ox"3A5"))
-         else if generic_eq (p0_) ("pmpcfg6") then Some ((Ox"3A6"))
-         else if generic_eq (p0_) ("pmpcfg7") then Some ((Ox"3A7"))
-         else if generic_eq (p0_) ("pmpcfg8") then Some ((Ox"3A8"))
-         else if generic_eq (p0_) ("pmpcfg9") then Some ((Ox"3A9"))
-         else if generic_eq (p0_) ("pmpcfg10") then Some ((Ox"3AA"))
-         else if generic_eq (p0_) ("pmpcfg11") then Some ((Ox"3AB"))
-         else if generic_eq (p0_) ("pmpcfg12") then Some ((Ox"3AC"))
-         else if generic_eq (p0_) ("pmpcfg13") then Some ((Ox"3AD"))
-         else if generic_eq (p0_) ("pmpcfg14") then Some ((Ox"3AE"))
-         else if generic_eq (p0_) ("pmpcfg15") then Some ((Ox"3AF"))
-         else if generic_eq (p0_) ("pmpaddr0") then Some ((Ox"3B0"))
-         else if generic_eq (p0_) ("pmpaddr1") then Some ((Ox"3B1"))
-         else if generic_eq (p0_) ("pmpaddr2") then Some ((Ox"3B2"))
-         else if generic_eq (p0_) ("pmpaddr3") then Some ((Ox"3B3"))
-         else if generic_eq (p0_) ("pmpaddr4") then Some ((Ox"3B4"))
-         else if generic_eq (p0_) ("pmpaddr5") then Some ((Ox"3B5"))
-         else if generic_eq (p0_) ("pmpaddr6") then Some ((Ox"3B6"))
-         else if generic_eq (p0_) ("pmpaddr7") then Some ((Ox"3B7"))
-         else if generic_eq (p0_) ("pmpaddr8") then Some ((Ox"3B8"))
-         else if generic_eq (p0_) ("pmpaddr9") then Some ((Ox"3B9"))
-         else if generic_eq (p0_) ("pmpaddr10") then Some ((Ox"3BA"))
-         else if generic_eq (p0_) ("pmpaddr11") then Some ((Ox"3BB"))
-         else if generic_eq (p0_) ("pmpaddr12") then Some ((Ox"3BC"))
-         else if generic_eq (p0_) ("pmpaddr13") then Some ((Ox"3BD"))
-         else if generic_eq (p0_) ("pmpaddr14") then Some ((Ox"3BE"))
-         else if generic_eq (p0_) ("pmpaddr15") then Some ((Ox"3BF"))
-         else if generic_eq (p0_) ("pmpaddr16") then Some ((Ox"3C0"))
-         else if generic_eq (p0_) ("pmpaddr17") then Some ((Ox"3C1"))
-         else if generic_eq (p0_) ("pmpaddr18") then Some ((Ox"3C2"))
-         else if generic_eq (p0_) ("pmpaddr19") then Some ((Ox"3C3"))
-         else if generic_eq (p0_) ("pmpaddr20") then Some ((Ox"3C4"))
-         else if generic_eq (p0_) ("pmpaddr21") then Some ((Ox"3C5"))
-         else if generic_eq (p0_) ("pmpaddr22") then Some ((Ox"3C6"))
-         else if generic_eq (p0_) ("pmpaddr23") then Some ((Ox"3C7"))
-         else if generic_eq (p0_) ("pmpaddr24") then Some ((Ox"3C8"))
-         else if generic_eq (p0_) ("pmpaddr25") then Some ((Ox"3C9"))
-         else if generic_eq (p0_) ("pmpaddr26") then Some ((Ox"3CA"))
-         else if generic_eq (p0_) ("pmpaddr27") then Some ((Ox"3CB"))
-         else if generic_eq (p0_) ("pmpaddr28") then Some ((Ox"3CC"))
-         else if generic_eq (p0_) ("pmpaddr29") then Some ((Ox"3CD"))
-         else if generic_eq (p0_) ("pmpaddr30") then Some ((Ox"3CE"))
-         else if generic_eq (p0_) ("pmpaddr31") then Some ((Ox"3CF"))
-         else if generic_eq (p0_) ("pmpaddr32") then Some ((Ox"3D0"))
-         else if generic_eq (p0_) ("pmpaddr33") then Some ((Ox"3D1"))
-         else if generic_eq (p0_) ("pmpaddr34") then Some ((Ox"3D2"))
-         else if generic_eq (p0_) ("pmpaddr35") then Some ((Ox"3D3"))
-         else if generic_eq (p0_) ("pmpaddr36") then Some ((Ox"3D4"))
-         else if generic_eq (p0_) ("pmpaddr37") then Some ((Ox"3D5"))
-         else if generic_eq (p0_) ("pmpaddr38") then Some ((Ox"3D6"))
-         else if generic_eq (p0_) ("pmpaddr39") then Some ((Ox"3D7"))
-         else if generic_eq (p0_) ("pmpaddr40") then Some ((Ox"3D8"))
-         else if generic_eq (p0_) ("pmpaddr41") then Some ((Ox"3D9"))
-         else if generic_eq (p0_) ("pmpaddr42") then Some ((Ox"3DA"))
-         else if generic_eq (p0_) ("pmpaddr43") then Some ((Ox"3DB"))
-         else if generic_eq (p0_) ("pmpaddr44") then Some ((Ox"3DC"))
-         else if generic_eq (p0_) ("pmpaddr45") then Some ((Ox"3DD"))
-         else if generic_eq (p0_) ("pmpaddr46") then Some ((Ox"3DE"))
-         else if generic_eq (p0_) ("pmpaddr47") then Some ((Ox"3DF"))
-         else if generic_eq (p0_) ("pmpaddr48") then Some ((Ox"3E0"))
-         else if generic_eq (p0_) ("pmpaddr49") then Some ((Ox"3E1"))
-         else if generic_eq (p0_) ("pmpaddr50") then Some ((Ox"3E2"))
-         else if generic_eq (p0_) ("pmpaddr51") then Some ((Ox"3E3"))
-         else if generic_eq (p0_) ("pmpaddr52") then Some ((Ox"3E4"))
-         else if generic_eq (p0_) ("pmpaddr53") then Some ((Ox"3E5"))
-         else if generic_eq (p0_) ("pmpaddr54") then Some ((Ox"3E6"))
-         else if generic_eq (p0_) ("pmpaddr55") then Some ((Ox"3E7"))
-         else if generic_eq (p0_) ("pmpaddr56") then Some ((Ox"3E8"))
-         else if generic_eq (p0_) ("pmpaddr57") then Some ((Ox"3E9"))
-         else if generic_eq (p0_) ("pmpaddr58") then Some ((Ox"3EA"))
-         else if generic_eq (p0_) ("pmpaddr59") then Some ((Ox"3EB"))
-         else if generic_eq (p0_) ("pmpaddr60") then Some ((Ox"3EC"))
-         else if generic_eq (p0_) ("pmpaddr61") then Some ((Ox"3ED"))
-         else if generic_eq (p0_) ("pmpaddr62") then Some ((Ox"3EE"))
-         else if generic_eq (p0_) ("pmpaddr63") then Some ((Ox"3EF"))
-         else if generic_eq (p0_) ("fflags") then Some ((Ox"001"))
-         else if generic_eq (p0_) ("frm") then Some ((Ox"002"))
-         else if generic_eq (p0_) ("fcsr") then Some ((Ox"003"))
-         else if generic_eq (p0_) ("vstart") then Some ((Ox"008"))
-         else if generic_eq (p0_) ("vxsat") then Some ((Ox"009"))
-         else if generic_eq (p0_) ("vxrm") then Some ((Ox"00A"))
-         else if generic_eq (p0_) ("vcsr") then Some ((Ox"00F"))
-         else if generic_eq (p0_) ("vl") then Some ((Ox"C20"))
-         else if generic_eq (p0_) ("vtype") then Some ((Ox"C21"))
-         else if generic_eq (p0_) ("vlenb") then Some ((Ox"C22"))
-         else if generic_eq (p0_) ("mcyclecfg") then Some ((Ox"321"))
-         else if generic_eq (p0_) ("mcyclecfgh") then Some ((Ox"721"))
-         else if generic_eq (p0_) ("minstretcfg") then Some ((Ox"322"))
-         else if generic_eq (p0_) ("minstretcfgh") then Some ((Ox"722"))
-         else if generic_eq (p0_) ("mstateen0") then Some ((Ox"30C"))
-         else if generic_eq (p0_) ("mstateen1") then Some ((Ox"30D"))
-         else if generic_eq (p0_) ("mstateen2") then Some ((Ox"30E"))
-         else if generic_eq (p0_) ("mstateen3") then Some ((Ox"30F"))
-         else if generic_eq (p0_) ("mstateen0h") then Some ((Ox"31C"))
-         else if generic_eq (p0_) ("mstateen1h") then Some ((Ox"31D"))
-         else if generic_eq (p0_) ("mstateen2h") then Some ((Ox"31E"))
-         else if generic_eq (p0_) ("mstateen3h") then Some ((Ox"31F"))
-         else if generic_eq (p0_) ("hstateen0") then Some ((Ox"60C"))
-         else if generic_eq (p0_) ("hstateen1") then Some ((Ox"60D"))
-         else if generic_eq (p0_) ("hstateen2") then Some ((Ox"60E"))
-         else if generic_eq (p0_) ("hstateen3") then Some ((Ox"60F"))
-         else if generic_eq (p0_) ("hstateen0h") then Some ((Ox"61C"))
-         else if generic_eq (p0_) ("hstateen1h") then Some ((Ox"61D"))
-         else if generic_eq (p0_) ("hstateen2h") then Some ((Ox"61E"))
-         else if generic_eq (p0_) ("hstateen3h") then Some ((Ox"61F"))
-         else if generic_eq (p0_) ("sstateen0") then Some ((Ox"10C"))
-         else if generic_eq (p0_) ("sstateen1") then Some ((Ox"10D"))
-         else if generic_eq (p0_) ("sstateen2") then Some ((Ox"10E"))
-         else if generic_eq (p0_) ("sstateen3") then Some ((Ox"10F"))
-         else if generic_eq (p0_) ("satp") then Some ((Ox"180"))
-         else if generic_eq (p0_) ("hpmcounter3") then Some ((Ox"C03"))
-         else if generic_eq (p0_) ("hpmcounter4") then Some ((Ox"C04"))
-         else if generic_eq (p0_) ("hpmcounter5") then Some ((Ox"C05"))
-         else if generic_eq (p0_) ("hpmcounter6") then Some ((Ox"C06"))
-         else if generic_eq (p0_) ("hpmcounter7") then Some ((Ox"C07"))
-         else if generic_eq (p0_) ("hpmcounter8") then Some ((Ox"C08"))
-         else if generic_eq (p0_) ("hpmcounter9") then Some ((Ox"C09"))
-         else if generic_eq (p0_) ("hpmcounter10") then Some ((Ox"C0A"))
-         else if generic_eq (p0_) ("hpmcounter11") then Some ((Ox"C0B"))
-         else if generic_eq (p0_) ("hpmcounter12") then Some ((Ox"C0C"))
-         else if generic_eq (p0_) ("hpmcounter13") then Some ((Ox"C0D"))
-         else if generic_eq (p0_) ("hpmcounter14") then Some ((Ox"C0E"))
-         else if generic_eq (p0_) ("hpmcounter15") then Some ((Ox"C0F"))
-         else if generic_eq (p0_) ("hpmcounter16") then Some ((Ox"C10"))
-         else if generic_eq (p0_) ("hpmcounter17") then Some ((Ox"C11"))
-         else if generic_eq (p0_) ("hpmcounter18") then Some ((Ox"C12"))
-         else if generic_eq (p0_) ("hpmcounter19") then Some ((Ox"C13"))
-         else if generic_eq (p0_) ("hpmcounter20") then Some ((Ox"C14"))
-         else if generic_eq (p0_) ("hpmcounter21") then Some ((Ox"C15"))
-         else if generic_eq (p0_) ("hpmcounter22") then Some ((Ox"C16"))
-         else if generic_eq (p0_) ("hpmcounter23") then Some ((Ox"C17"))
-         else if generic_eq (p0_) ("hpmcounter24") then Some ((Ox"C18"))
-         else if generic_eq (p0_) ("hpmcounter25") then Some ((Ox"C19"))
-         else if generic_eq (p0_) ("hpmcounter26") then Some ((Ox"C1A"))
-         else if generic_eq (p0_) ("hpmcounter27") then Some ((Ox"C1B"))
-         else if generic_eq (p0_) ("hpmcounter28") then Some ((Ox"C1C"))
-         else if generic_eq (p0_) ("hpmcounter29") then Some ((Ox"C1D"))
-         else if generic_eq (p0_) ("hpmcounter30") then Some ((Ox"C1E"))
-         else if generic_eq (p0_) ("hpmcounter31") then Some ((Ox"C1F"))
-         else if generic_eq (p0_) ("hpmcounter3h") then Some ((Ox"C83"))
-         else if generic_eq (p0_) ("hpmcounter4h") then Some ((Ox"C84"))
-         else if generic_eq (p0_) ("hpmcounter5h") then Some ((Ox"C85"))
-         else if generic_eq (p0_) ("hpmcounter6h") then Some ((Ox"C86"))
-         else if generic_eq (p0_) ("hpmcounter7h") then Some ((Ox"C87"))
-         else if generic_eq (p0_) ("hpmcounter8h") then Some ((Ox"C88"))
-         else if generic_eq (p0_) ("hpmcounter9h") then Some ((Ox"C89"))
-         else if generic_eq (p0_) ("hpmcounter10h") then Some ((Ox"C8A"))
-         else if generic_eq (p0_) ("hpmcounter11h") then Some ((Ox"C8B"))
-         else if generic_eq (p0_) ("hpmcounter12h") then Some ((Ox"C8C"))
-         else if generic_eq (p0_) ("hpmcounter13h") then Some ((Ox"C8D"))
-         else if generic_eq (p0_) ("hpmcounter14h") then Some ((Ox"C8E"))
-         else if generic_eq (p0_) ("hpmcounter15h") then Some ((Ox"C8F"))
-         else if generic_eq (p0_) ("hpmcounter16h") then Some ((Ox"C90"))
-         else if generic_eq (p0_) ("hpmcounter17h") then Some ((Ox"C91"))
-         else if generic_eq (p0_) ("hpmcounter18h") then Some ((Ox"C92"))
-         else if generic_eq (p0_) ("hpmcounter19h") then Some ((Ox"C93"))
-         else if generic_eq (p0_) ("hpmcounter20h") then Some ((Ox"C94"))
-         else if generic_eq (p0_) ("hpmcounter21h") then Some ((Ox"C95"))
-         else if generic_eq (p0_) ("hpmcounter22h") then Some ((Ox"C96"))
-         else if generic_eq (p0_) ("hpmcounter23h") then Some ((Ox"C97"))
-         else if generic_eq (p0_) ("hpmcounter24h") then Some ((Ox"C98"))
-         else if generic_eq (p0_) ("hpmcounter25h") then Some ((Ox"C99"))
-         else if generic_eq (p0_) ("hpmcounter26h") then Some ((Ox"C9A"))
-         else if generic_eq (p0_) ("hpmcounter27h") then Some ((Ox"C9B"))
-         else if generic_eq (p0_) ("hpmcounter28h") then Some ((Ox"C9C"))
-         else if generic_eq (p0_) ("hpmcounter29h") then Some ((Ox"C9D"))
-         else if generic_eq (p0_) ("hpmcounter30h") then Some ((Ox"C9E"))
-         else if generic_eq (p0_) ("hpmcounter31h") then Some ((Ox"C9F"))
-         else if generic_eq (p0_) ("mhpmevent3") then Some ((Ox"323"))
-         else if generic_eq (p0_) ("mhpmevent4") then Some ((Ox"324"))
-         else if generic_eq (p0_) ("mhpmevent5") then Some ((Ox"325"))
-         else if generic_eq (p0_) ("mhpmevent6") then Some ((Ox"326"))
-         else if generic_eq (p0_) ("mhpmevent7") then Some ((Ox"327"))
-         else if generic_eq (p0_) ("mhpmevent8") then Some ((Ox"328"))
-         else if generic_eq (p0_) ("mhpmevent9") then Some ((Ox"329"))
-         else if generic_eq (p0_) ("mhpmevent10") then Some ((Ox"32A"))
-         else if generic_eq (p0_) ("mhpmevent11") then Some ((Ox"32B"))
-         else if generic_eq (p0_) ("mhpmevent12") then Some ((Ox"32C"))
-         else if generic_eq (p0_) ("mhpmevent13") then Some ((Ox"32D"))
-         else if generic_eq (p0_) ("mhpmevent14") then Some ((Ox"32E"))
-         else if generic_eq (p0_) ("mhpmevent15") then Some ((Ox"32F"))
-         else if generic_eq (p0_) ("mhpmevent16") then Some ((Ox"330"))
-         else if generic_eq (p0_) ("mhpmevent17") then Some ((Ox"331"))
-         else if generic_eq (p0_) ("mhpmevent18") then Some ((Ox"332"))
-         else if generic_eq (p0_) ("mhpmevent19") then Some ((Ox"333"))
-         else if generic_eq (p0_) ("mhpmevent20") then Some ((Ox"334"))
-         else if generic_eq (p0_) ("mhpmevent21") then Some ((Ox"335"))
-         else if generic_eq (p0_) ("mhpmevent22") then Some ((Ox"336"))
-         else if generic_eq (p0_) ("mhpmevent23") then Some ((Ox"337"))
-         else if generic_eq (p0_) ("mhpmevent24") then Some ((Ox"338"))
-         else if generic_eq (p0_) ("mhpmevent25") then Some ((Ox"339"))
-         else if generic_eq (p0_) ("mhpmevent26") then Some ((Ox"33A"))
-         else if generic_eq (p0_) ("mhpmevent27") then Some ((Ox"33B"))
-         else if generic_eq (p0_) ("mhpmevent28") then Some ((Ox"33C"))
-         else if generic_eq (p0_) ("mhpmevent29") then Some ((Ox"33D"))
-         else if generic_eq (p0_) ("mhpmevent30") then Some ((Ox"33E"))
-         else if generic_eq (p0_) ("mhpmevent31") then Some ((Ox"33F"))
-         else if generic_eq (p0_) ("mhpmcounter3") then Some ((Ox"B03"))
-         else if generic_eq (p0_) ("mhpmcounter4") then Some ((Ox"B04"))
-         else if generic_eq (p0_) ("mhpmcounter5") then Some ((Ox"B05"))
-         else if generic_eq (p0_) ("mhpmcounter6") then Some ((Ox"B06"))
-         else if generic_eq (p0_) ("mhpmcounter7") then Some ((Ox"B07"))
-         else if generic_eq (p0_) ("mhpmcounter8") then Some ((Ox"B08"))
-         else if generic_eq (p0_) ("mhpmcounter9") then Some ((Ox"B09"))
-         else if generic_eq (p0_) ("mhpmcounter10") then Some ((Ox"B0A"))
-         else if generic_eq (p0_) ("mhpmcounter11") then Some ((Ox"B0B"))
-         else if generic_eq (p0_) ("mhpmcounter12") then Some ((Ox"B0C"))
-         else if generic_eq (p0_) ("mhpmcounter13") then Some ((Ox"B0D"))
-         else if generic_eq (p0_) ("mhpmcounter14") then Some ((Ox"B0E"))
-         else if generic_eq (p0_) ("mhpmcounter15") then Some ((Ox"B0F"))
-         else if generic_eq (p0_) ("mhpmcounter16") then Some ((Ox"B10"))
-         else if generic_eq (p0_) ("mhpmcounter17") then Some ((Ox"B11"))
-         else if generic_eq (p0_) ("mhpmcounter18") then Some ((Ox"B12"))
-         else if generic_eq (p0_) ("mhpmcounter19") then Some ((Ox"B13"))
-         else if generic_eq (p0_) ("mhpmcounter20") then Some ((Ox"B14"))
-         else if generic_eq (p0_) ("mhpmcounter21") then Some ((Ox"B15"))
-         else if generic_eq (p0_) ("mhpmcounter22") then Some ((Ox"B16"))
-         else if generic_eq (p0_) ("mhpmcounter23") then Some ((Ox"B17"))
-         else if generic_eq (p0_) ("mhpmcounter24") then Some ((Ox"B18"))
-         else if generic_eq (p0_) ("mhpmcounter25") then Some ((Ox"B19"))
-         else if generic_eq (p0_) ("mhpmcounter26") then Some ((Ox"B1A"))
-         else if generic_eq (p0_) ("mhpmcounter27") then Some ((Ox"B1B"))
-         else if generic_eq (p0_) ("mhpmcounter28") then Some ((Ox"B1C"))
-         else if generic_eq (p0_) ("mhpmcounter29") then Some ((Ox"B1D"))
-         else if generic_eq (p0_) ("mhpmcounter30") then Some ((Ox"B1E"))
-         else if generic_eq (p0_) ("mhpmcounter31") then Some ((Ox"B1F"))
-         else if generic_eq (p0_) ("mhpmcounter3h") then Some ((Ox"B83"))
-         else if generic_eq (p0_) ("mhpmcounter4h") then Some ((Ox"B84"))
-         else if generic_eq (p0_) ("mhpmcounter5h") then Some ((Ox"B85"))
-         else if generic_eq (p0_) ("mhpmcounter6h") then Some ((Ox"B86"))
-         else if generic_eq (p0_) ("mhpmcounter7h") then Some ((Ox"B87"))
-         else if generic_eq (p0_) ("mhpmcounter8h") then Some ((Ox"B88"))
-         else if generic_eq (p0_) ("mhpmcounter9h") then Some ((Ox"B89"))
-         else if generic_eq (p0_) ("mhpmcounter10h") then Some ((Ox"B8A"))
-         else if generic_eq (p0_) ("mhpmcounter11h") then Some ((Ox"B8B"))
-         else if generic_eq (p0_) ("mhpmcounter12h") then Some ((Ox"B8C"))
-         else if generic_eq (p0_) ("mhpmcounter13h") then Some ((Ox"B8D"))
-         else if generic_eq (p0_) ("mhpmcounter14h") then Some ((Ox"B8E"))
-         else if generic_eq (p0_) ("mhpmcounter15h") then Some ((Ox"B8F"))
-         else if generic_eq (p0_) ("mhpmcounter16h") then Some ((Ox"B90"))
-         else if generic_eq (p0_) ("mhpmcounter17h") then Some ((Ox"B91"))
-         else if generic_eq (p0_) ("mhpmcounter18h") then Some ((Ox"B92"))
-         else if generic_eq (p0_) ("mhpmcounter19h") then Some ((Ox"B93"))
-         else if generic_eq (p0_) ("mhpmcounter20h") then Some ((Ox"B94"))
-         else if generic_eq (p0_) ("mhpmcounter21h") then Some ((Ox"B95"))
-         else if generic_eq (p0_) ("mhpmcounter22h") then Some ((Ox"B96"))
-         else if generic_eq (p0_) ("mhpmcounter23h") then Some ((Ox"B97"))
-         else if generic_eq (p0_) ("mhpmcounter24h") then Some ((Ox"B98"))
-         else if generic_eq (p0_) ("mhpmcounter25h") then Some ((Ox"B99"))
-         else if generic_eq (p0_) ("mhpmcounter26h") then Some ((Ox"B9A"))
-         else if generic_eq (p0_) ("mhpmcounter27h") then Some ((Ox"B9B"))
-         else if generic_eq (p0_) ("mhpmcounter28h") then Some ((Ox"B9C"))
-         else if generic_eq (p0_) ("mhpmcounter29h") then Some ((Ox"B9D"))
-         else if generic_eq (p0_) ("mhpmcounter30h") then Some ((Ox"B9E"))
-         else if generic_eq (p0_) ("mhpmcounter31h") then Some ((Ox"B9F"))
-         else if generic_eq (p0_) ("mhpmevent3h") then Some ((Ox"723"))
-         else if generic_eq (p0_) ("mhpmevent4h") then Some ((Ox"724"))
-         else if generic_eq (p0_) ("mhpmevent5h") then Some ((Ox"725"))
-         else if generic_eq (p0_) ("mhpmevent6h") then Some ((Ox"726"))
-         else if generic_eq (p0_) ("mhpmevent7h") then Some ((Ox"727"))
-         else if generic_eq (p0_) ("mhpmevent8h") then Some ((Ox"728"))
-         else if generic_eq (p0_) ("mhpmevent9h") then Some ((Ox"729"))
-         else if generic_eq (p0_) ("mhpmevent10h") then Some ((Ox"72A"))
-         else if generic_eq (p0_) ("mhpmevent11h") then Some ((Ox"72B"))
-         else if generic_eq (p0_) ("mhpmevent12h") then Some ((Ox"72C"))
-         else if generic_eq (p0_) ("mhpmevent13h") then Some ((Ox"72D"))
-         else if generic_eq (p0_) ("mhpmevent14h") then Some ((Ox"72E"))
-         else if generic_eq (p0_) ("mhpmevent15h") then Some ((Ox"72F"))
-         else if generic_eq (p0_) ("mhpmevent16h") then Some ((Ox"730"))
-         else if generic_eq (p0_) ("mhpmevent17h") then Some ((Ox"731"))
-         else if generic_eq (p0_) ("mhpmevent18h") then Some ((Ox"732"))
-         else if generic_eq (p0_) ("mhpmevent19h") then Some ((Ox"733"))
-         else if generic_eq (p0_) ("mhpmevent20h") then Some ((Ox"734"))
-         else if generic_eq (p0_) ("mhpmevent21h") then Some ((Ox"735"))
-         else if generic_eq (p0_) ("mhpmevent22h") then Some ((Ox"736"))
-         else if generic_eq (p0_) ("mhpmevent23h") then Some ((Ox"737"))
-         else if generic_eq (p0_) ("mhpmevent24h") then Some ((Ox"738"))
-         else if generic_eq (p0_) ("mhpmevent25h") then Some ((Ox"739"))
-         else if generic_eq (p0_) ("mhpmevent26h") then Some ((Ox"73A"))
-         else if generic_eq (p0_) ("mhpmevent27h") then Some ((Ox"73B"))
-         else if generic_eq (p0_) ("mhpmevent28h") then Some ((Ox"73C"))
-         else if generic_eq (p0_) ("mhpmevent29h") then Some ((Ox"73D"))
-         else if generic_eq (p0_) ("mhpmevent30h") then Some ((Ox"73E"))
-         else if generic_eq (p0_) ("mhpmevent31h") then Some ((Ox"73F"))
-         else if generic_eq (p0_) ("scountovf") then Some ((Ox"DA0"))
-         else if generic_eq (p0_) ("stimecmp") then Some ((Ox"14D"))
-         else if generic_eq (p0_) ("stimecmph") then Some ((Ox"15D"))
-         else if generic_eq (p0_) ("ssp") then Some ((Ox"011"))
-         else if generic_eq (p0_) ("cycle") then Some ((Ox"C00"))
-         else if generic_eq (p0_) ("time") then Some ((Ox"C01"))
-         else if generic_eq (p0_) ("instret") then Some ((Ox"C02"))
-         else if generic_eq (p0_) ("cycleh") then Some ((Ox"C80"))
-         else if generic_eq (p0_) ("timeh") then Some ((Ox"C81"))
-         else if generic_eq (p0_) ("instreth") then Some ((Ox"C82"))
-         else if generic_eq (p0_) ("mcycle") then Some ((Ox"B00"))
-         else if generic_eq (p0_) ("minstret") then Some ((Ox"B02"))
-         else if generic_eq (p0_) ("mcycleh") then Some ((Ox"B80"))
-         else if generic_eq (p0_) ("minstreth") then Some ((Ox"B82"))
-         else if generic_eq (p0_) ("srmcfg") then Some ((Ox"181"))
-         else if hex_bits_12_backwards_matches (p0_) then
-           match hex_bits_12_backwards (p0_) with | reg => Some (reg) end
-         else None with
+   (if generic_eq (p0_) ("misa") then returnM ((Some ((Ox"301"))))
+    else if generic_eq (p0_) ("mstatus") then returnM ((Some ((Ox"300"))))
+    else if generic_eq (p0_) ("mstatush") then returnM ((Some ((Ox"310"))))
+    else if generic_eq (p0_) ("mseccfg") then returnM ((Some ((Ox"747"))))
+    else if generic_eq (p0_) ("mseccfgh") then returnM ((Some ((Ox"757"))))
+    else if generic_eq (p0_) ("menvcfg") then returnM ((Some ((Ox"30A"))))
+    else if generic_eq (p0_) ("menvcfgh") then returnM ((Some ((Ox"31A"))))
+    else if generic_eq (p0_) ("senvcfg") then returnM ((Some ((Ox"10A"))))
+    else if generic_eq (p0_) ("mcause") then returnM ((Some ((Ox"342"))))
+    else if generic_eq (p0_) ("mtval") then returnM ((Some ((Ox"343"))))
+    else if generic_eq (p0_) ("mscratch") then returnM ((Some ((Ox"340"))))
+    else if generic_eq (p0_) ("scounteren") then returnM ((Some ((Ox"106"))))
+    else if generic_eq (p0_) ("mcounteren") then returnM ((Some ((Ox"306"))))
+    else if generic_eq (p0_) ("mcountinhibit") then returnM ((Some ((Ox"320"))))
+    else if generic_eq (p0_) ("mvendorid") then returnM ((Some ((Ox"F11"))))
+    else if generic_eq (p0_) ("marchid") then returnM ((Some ((Ox"F12"))))
+    else if generic_eq (p0_) ("mimpid") then returnM ((Some ((Ox"F13"))))
+    else if generic_eq (p0_) ("mhartid") then returnM ((Some ((Ox"F14"))))
+    else if generic_eq (p0_) ("mconfigptr") then returnM ((Some ((Ox"F15"))))
+    else if generic_eq (p0_) ("sstatus") then returnM ((Some ((Ox"100"))))
+    else if generic_eq (p0_) ("sscratch") then returnM ((Some ((Ox"140"))))
+    else if generic_eq (p0_) ("scause") then returnM ((Some ((Ox"142"))))
+    else if generic_eq (p0_) ("stval") then returnM ((Some ((Ox"143"))))
+    else if generic_eq (p0_) ("tselect") then returnM ((Some ((Ox"7A0"))))
+    else if generic_eq (p0_) ("tdata1") then returnM ((Some ((Ox"7A1"))))
+    else if generic_eq (p0_) ("tdata2") then returnM ((Some ((Ox"7A2"))))
+    else if generic_eq (p0_) ("tdata3") then returnM ((Some ((Ox"7A3"))))
+    else if generic_eq (p0_) ("mie") then returnM ((Some ((Ox"304"))))
+    else if generic_eq (p0_) ("mip") then returnM ((Some ((Ox"344"))))
+    else if generic_eq (p0_) ("medeleg") then returnM ((Some ((Ox"302"))))
+    else if generic_eq (p0_) ("medelegh") then returnM ((Some ((Ox"312"))))
+    else if generic_eq (p0_) ("mideleg") then returnM ((Some ((Ox"303"))))
+    else if generic_eq (p0_) ("sip") then returnM ((Some ((Ox"144"))))
+    else if generic_eq (p0_) ("sie") then returnM ((Some ((Ox"104"))))
+    else if generic_eq (p0_) ("stvec") then returnM ((Some ((Ox"105"))))
+    else if generic_eq (p0_) ("sepc") then returnM ((Some ((Ox"141"))))
+    else if generic_eq (p0_) ("mtvec") then returnM ((Some ((Ox"305"))))
+    else if generic_eq (p0_) ("mepc") then returnM ((Some ((Ox"341"))))
+    else if generic_eq (p0_) ("pmpcfg0") then returnM ((Some ((Ox"3A0"))))
+    else if generic_eq (p0_) ("pmpcfg1") then returnM ((Some ((Ox"3A1"))))
+    else if generic_eq (p0_) ("pmpcfg2") then returnM ((Some ((Ox"3A2"))))
+    else if generic_eq (p0_) ("pmpcfg3") then returnM ((Some ((Ox"3A3"))))
+    else if generic_eq (p0_) ("pmpcfg4") then returnM ((Some ((Ox"3A4"))))
+    else if generic_eq (p0_) ("pmpcfg5") then returnM ((Some ((Ox"3A5"))))
+    else if generic_eq (p0_) ("pmpcfg6") then returnM ((Some ((Ox"3A6"))))
+    else if generic_eq (p0_) ("pmpcfg7") then returnM ((Some ((Ox"3A7"))))
+    else if generic_eq (p0_) ("pmpcfg8") then returnM ((Some ((Ox"3A8"))))
+    else if generic_eq (p0_) ("pmpcfg9") then returnM ((Some ((Ox"3A9"))))
+    else if generic_eq (p0_) ("pmpcfg10") then returnM ((Some ((Ox"3AA"))))
+    else if generic_eq (p0_) ("pmpcfg11") then returnM ((Some ((Ox"3AB"))))
+    else if generic_eq (p0_) ("pmpcfg12") then returnM ((Some ((Ox"3AC"))))
+    else if generic_eq (p0_) ("pmpcfg13") then returnM ((Some ((Ox"3AD"))))
+    else if generic_eq (p0_) ("pmpcfg14") then returnM ((Some ((Ox"3AE"))))
+    else if generic_eq (p0_) ("pmpcfg15") then returnM ((Some ((Ox"3AF"))))
+    else if generic_eq (p0_) ("pmpaddr0") then returnM ((Some ((Ox"3B0"))))
+    else if generic_eq (p0_) ("pmpaddr1") then returnM ((Some ((Ox"3B1"))))
+    else if generic_eq (p0_) ("pmpaddr2") then returnM ((Some ((Ox"3B2"))))
+    else if generic_eq (p0_) ("pmpaddr3") then returnM ((Some ((Ox"3B3"))))
+    else if generic_eq (p0_) ("pmpaddr4") then returnM ((Some ((Ox"3B4"))))
+    else if generic_eq (p0_) ("pmpaddr5") then returnM ((Some ((Ox"3B5"))))
+    else if generic_eq (p0_) ("pmpaddr6") then returnM ((Some ((Ox"3B6"))))
+    else if generic_eq (p0_) ("pmpaddr7") then returnM ((Some ((Ox"3B7"))))
+    else if generic_eq (p0_) ("pmpaddr8") then returnM ((Some ((Ox"3B8"))))
+    else if generic_eq (p0_) ("pmpaddr9") then returnM ((Some ((Ox"3B9"))))
+    else if generic_eq (p0_) ("pmpaddr10") then returnM ((Some ((Ox"3BA"))))
+    else if generic_eq (p0_) ("pmpaddr11") then returnM ((Some ((Ox"3BB"))))
+    else if generic_eq (p0_) ("pmpaddr12") then returnM ((Some ((Ox"3BC"))))
+    else if generic_eq (p0_) ("pmpaddr13") then returnM ((Some ((Ox"3BD"))))
+    else if generic_eq (p0_) ("pmpaddr14") then returnM ((Some ((Ox"3BE"))))
+    else if generic_eq (p0_) ("pmpaddr15") then returnM ((Some ((Ox"3BF"))))
+    else if generic_eq (p0_) ("pmpaddr16") then returnM ((Some ((Ox"3C0"))))
+    else if generic_eq (p0_) ("pmpaddr17") then returnM ((Some ((Ox"3C1"))))
+    else if generic_eq (p0_) ("pmpaddr18") then returnM ((Some ((Ox"3C2"))))
+    else if generic_eq (p0_) ("pmpaddr19") then returnM ((Some ((Ox"3C3"))))
+    else if generic_eq (p0_) ("pmpaddr20") then returnM ((Some ((Ox"3C4"))))
+    else if generic_eq (p0_) ("pmpaddr21") then returnM ((Some ((Ox"3C5"))))
+    else if generic_eq (p0_) ("pmpaddr22") then returnM ((Some ((Ox"3C6"))))
+    else if generic_eq (p0_) ("pmpaddr23") then returnM ((Some ((Ox"3C7"))))
+    else if generic_eq (p0_) ("pmpaddr24") then returnM ((Some ((Ox"3C8"))))
+    else if generic_eq (p0_) ("pmpaddr25") then returnM ((Some ((Ox"3C9"))))
+    else if generic_eq (p0_) ("pmpaddr26") then returnM ((Some ((Ox"3CA"))))
+    else if generic_eq (p0_) ("pmpaddr27") then returnM ((Some ((Ox"3CB"))))
+    else if generic_eq (p0_) ("pmpaddr28") then returnM ((Some ((Ox"3CC"))))
+    else if generic_eq (p0_) ("pmpaddr29") then returnM ((Some ((Ox"3CD"))))
+    else if generic_eq (p0_) ("pmpaddr30") then returnM ((Some ((Ox"3CE"))))
+    else if generic_eq (p0_) ("pmpaddr31") then returnM ((Some ((Ox"3CF"))))
+    else if generic_eq (p0_) ("pmpaddr32") then returnM ((Some ((Ox"3D0"))))
+    else if generic_eq (p0_) ("pmpaddr33") then returnM ((Some ((Ox"3D1"))))
+    else if generic_eq (p0_) ("pmpaddr34") then returnM ((Some ((Ox"3D2"))))
+    else if generic_eq (p0_) ("pmpaddr35") then returnM ((Some ((Ox"3D3"))))
+    else if generic_eq (p0_) ("pmpaddr36") then returnM ((Some ((Ox"3D4"))))
+    else if generic_eq (p0_) ("pmpaddr37") then returnM ((Some ((Ox"3D5"))))
+    else if generic_eq (p0_) ("pmpaddr38") then returnM ((Some ((Ox"3D6"))))
+    else if generic_eq (p0_) ("pmpaddr39") then returnM ((Some ((Ox"3D7"))))
+    else if generic_eq (p0_) ("pmpaddr40") then returnM ((Some ((Ox"3D8"))))
+    else if generic_eq (p0_) ("pmpaddr41") then returnM ((Some ((Ox"3D9"))))
+    else if generic_eq (p0_) ("pmpaddr42") then returnM ((Some ((Ox"3DA"))))
+    else if generic_eq (p0_) ("pmpaddr43") then returnM ((Some ((Ox"3DB"))))
+    else if generic_eq (p0_) ("pmpaddr44") then returnM ((Some ((Ox"3DC"))))
+    else if generic_eq (p0_) ("pmpaddr45") then returnM ((Some ((Ox"3DD"))))
+    else if generic_eq (p0_) ("pmpaddr46") then returnM ((Some ((Ox"3DE"))))
+    else if generic_eq (p0_) ("pmpaddr47") then returnM ((Some ((Ox"3DF"))))
+    else if generic_eq (p0_) ("pmpaddr48") then returnM ((Some ((Ox"3E0"))))
+    else if generic_eq (p0_) ("pmpaddr49") then returnM ((Some ((Ox"3E1"))))
+    else if generic_eq (p0_) ("pmpaddr50") then returnM ((Some ((Ox"3E2"))))
+    else if generic_eq (p0_) ("pmpaddr51") then returnM ((Some ((Ox"3E3"))))
+    else if generic_eq (p0_) ("pmpaddr52") then returnM ((Some ((Ox"3E4"))))
+    else if generic_eq (p0_) ("pmpaddr53") then returnM ((Some ((Ox"3E5"))))
+    else if generic_eq (p0_) ("pmpaddr54") then returnM ((Some ((Ox"3E6"))))
+    else if generic_eq (p0_) ("pmpaddr55") then returnM ((Some ((Ox"3E7"))))
+    else if generic_eq (p0_) ("pmpaddr56") then returnM ((Some ((Ox"3E8"))))
+    else if generic_eq (p0_) ("pmpaddr57") then returnM ((Some ((Ox"3E9"))))
+    else if generic_eq (p0_) ("pmpaddr58") then returnM ((Some ((Ox"3EA"))))
+    else if generic_eq (p0_) ("pmpaddr59") then returnM ((Some ((Ox"3EB"))))
+    else if generic_eq (p0_) ("pmpaddr60") then returnM ((Some ((Ox"3EC"))))
+    else if generic_eq (p0_) ("pmpaddr61") then returnM ((Some ((Ox"3ED"))))
+    else if generic_eq (p0_) ("pmpaddr62") then returnM ((Some ((Ox"3EE"))))
+    else if generic_eq (p0_) ("pmpaddr63") then returnM ((Some ((Ox"3EF"))))
+    else if generic_eq (p0_) ("fflags") then returnM ((Some ((Ox"001"))))
+    else if generic_eq (p0_) ("frm") then returnM ((Some ((Ox"002"))))
+    else if generic_eq (p0_) ("fcsr") then returnM ((Some ((Ox"003"))))
+    else if generic_eq (p0_) ("vstart") then returnM ((Some ((Ox"008"))))
+    else if generic_eq (p0_) ("vxsat") then returnM ((Some ((Ox"009"))))
+    else if generic_eq (p0_) ("vxrm") then returnM ((Some ((Ox"00A"))))
+    else if generic_eq (p0_) ("vcsr") then returnM ((Some ((Ox"00F"))))
+    else if generic_eq (p0_) ("vl") then returnM ((Some ((Ox"C20"))))
+    else if generic_eq (p0_) ("vtype") then returnM ((Some ((Ox"C21"))))
+    else if generic_eq (p0_) ("vlenb") then returnM ((Some ((Ox"C22"))))
+    else if generic_eq (p0_) ("mcyclecfg") then returnM ((Some ((Ox"321"))))
+    else if generic_eq (p0_) ("mcyclecfgh") then returnM ((Some ((Ox"721"))))
+    else if generic_eq (p0_) ("minstretcfg") then returnM ((Some ((Ox"322"))))
+    else if generic_eq (p0_) ("minstretcfgh") then returnM ((Some ((Ox"722"))))
+    else if generic_eq (p0_) ("mstateen0") then returnM ((Some ((Ox"30C"))))
+    else if generic_eq (p0_) ("mstateen1") then returnM ((Some ((Ox"30D"))))
+    else if generic_eq (p0_) ("mstateen2") then returnM ((Some ((Ox"30E"))))
+    else if generic_eq (p0_) ("mstateen3") then returnM ((Some ((Ox"30F"))))
+    else if generic_eq (p0_) ("mstateen0h") then returnM ((Some ((Ox"31C"))))
+    else if generic_eq (p0_) ("mstateen1h") then returnM ((Some ((Ox"31D"))))
+    else if generic_eq (p0_) ("mstateen2h") then returnM ((Some ((Ox"31E"))))
+    else if generic_eq (p0_) ("mstateen3h") then returnM ((Some ((Ox"31F"))))
+    else if generic_eq (p0_) ("hstateen0") then returnM ((Some ((Ox"60C"))))
+    else if generic_eq (p0_) ("hstateen1") then returnM ((Some ((Ox"60D"))))
+    else if generic_eq (p0_) ("hstateen2") then returnM ((Some ((Ox"60E"))))
+    else if generic_eq (p0_) ("hstateen3") then returnM ((Some ((Ox"60F"))))
+    else if generic_eq (p0_) ("hstateen0h") then returnM ((Some ((Ox"61C"))))
+    else if generic_eq (p0_) ("hstateen1h") then returnM ((Some ((Ox"61D"))))
+    else if generic_eq (p0_) ("hstateen2h") then returnM ((Some ((Ox"61E"))))
+    else if generic_eq (p0_) ("hstateen3h") then returnM ((Some ((Ox"61F"))))
+    else if generic_eq (p0_) ("sstateen0") then returnM ((Some ((Ox"10C"))))
+    else if generic_eq (p0_) ("sstateen1") then returnM ((Some ((Ox"10D"))))
+    else if generic_eq (p0_) ("sstateen2") then returnM ((Some ((Ox"10E"))))
+    else if generic_eq (p0_) ("sstateen3") then returnM ((Some ((Ox"10F"))))
+    else if generic_eq (p0_) ("satp") then returnM ((Some ((Ox"180"))))
+    else if generic_eq (p0_) ("hpmcounter3") then returnM ((Some ((Ox"C03"))))
+    else if generic_eq (p0_) ("hpmcounter4") then returnM ((Some ((Ox"C04"))))
+    else if generic_eq (p0_) ("hpmcounter5") then returnM ((Some ((Ox"C05"))))
+    else if generic_eq (p0_) ("hpmcounter6") then returnM ((Some ((Ox"C06"))))
+    else if generic_eq (p0_) ("hpmcounter7") then returnM ((Some ((Ox"C07"))))
+    else if generic_eq (p0_) ("hpmcounter8") then returnM ((Some ((Ox"C08"))))
+    else if generic_eq (p0_) ("hpmcounter9") then returnM ((Some ((Ox"C09"))))
+    else if generic_eq (p0_) ("hpmcounter10") then returnM ((Some ((Ox"C0A"))))
+    else if generic_eq (p0_) ("hpmcounter11") then returnM ((Some ((Ox"C0B"))))
+    else if generic_eq (p0_) ("hpmcounter12") then returnM ((Some ((Ox"C0C"))))
+    else if generic_eq (p0_) ("hpmcounter13") then returnM ((Some ((Ox"C0D"))))
+    else if generic_eq (p0_) ("hpmcounter14") then returnM ((Some ((Ox"C0E"))))
+    else if generic_eq (p0_) ("hpmcounter15") then returnM ((Some ((Ox"C0F"))))
+    else if generic_eq (p0_) ("hpmcounter16") then returnM ((Some ((Ox"C10"))))
+    else if generic_eq (p0_) ("hpmcounter17") then returnM ((Some ((Ox"C11"))))
+    else if generic_eq (p0_) ("hpmcounter18") then returnM ((Some ((Ox"C12"))))
+    else if generic_eq (p0_) ("hpmcounter19") then returnM ((Some ((Ox"C13"))))
+    else if generic_eq (p0_) ("hpmcounter20") then returnM ((Some ((Ox"C14"))))
+    else if generic_eq (p0_) ("hpmcounter21") then returnM ((Some ((Ox"C15"))))
+    else if generic_eq (p0_) ("hpmcounter22") then returnM ((Some ((Ox"C16"))))
+    else if generic_eq (p0_) ("hpmcounter23") then returnM ((Some ((Ox"C17"))))
+    else if generic_eq (p0_) ("hpmcounter24") then returnM ((Some ((Ox"C18"))))
+    else if generic_eq (p0_) ("hpmcounter25") then returnM ((Some ((Ox"C19"))))
+    else if generic_eq (p0_) ("hpmcounter26") then returnM ((Some ((Ox"C1A"))))
+    else if generic_eq (p0_) ("hpmcounter27") then returnM ((Some ((Ox"C1B"))))
+    else if generic_eq (p0_) ("hpmcounter28") then returnM ((Some ((Ox"C1C"))))
+    else if generic_eq (p0_) ("hpmcounter29") then returnM ((Some ((Ox"C1D"))))
+    else if generic_eq (p0_) ("hpmcounter30") then returnM ((Some ((Ox"C1E"))))
+    else if generic_eq (p0_) ("hpmcounter31") then returnM ((Some ((Ox"C1F"))))
+    else if generic_eq (p0_) ("hpmcounter3h") then returnM ((Some ((Ox"C83"))))
+    else if generic_eq (p0_) ("hpmcounter4h") then returnM ((Some ((Ox"C84"))))
+    else if generic_eq (p0_) ("hpmcounter5h") then returnM ((Some ((Ox"C85"))))
+    else if generic_eq (p0_) ("hpmcounter6h") then returnM ((Some ((Ox"C86"))))
+    else if generic_eq (p0_) ("hpmcounter7h") then returnM ((Some ((Ox"C87"))))
+    else if generic_eq (p0_) ("hpmcounter8h") then returnM ((Some ((Ox"C88"))))
+    else if generic_eq (p0_) ("hpmcounter9h") then returnM ((Some ((Ox"C89"))))
+    else if generic_eq (p0_) ("hpmcounter10h") then returnM ((Some ((Ox"C8A"))))
+    else if generic_eq (p0_) ("hpmcounter11h") then returnM ((Some ((Ox"C8B"))))
+    else if generic_eq (p0_) ("hpmcounter12h") then returnM ((Some ((Ox"C8C"))))
+    else if generic_eq (p0_) ("hpmcounter13h") then returnM ((Some ((Ox"C8D"))))
+    else if generic_eq (p0_) ("hpmcounter14h") then returnM ((Some ((Ox"C8E"))))
+    else if generic_eq (p0_) ("hpmcounter15h") then returnM ((Some ((Ox"C8F"))))
+    else if generic_eq (p0_) ("hpmcounter16h") then returnM ((Some ((Ox"C90"))))
+    else if generic_eq (p0_) ("hpmcounter17h") then returnM ((Some ((Ox"C91"))))
+    else if generic_eq (p0_) ("hpmcounter18h") then returnM ((Some ((Ox"C92"))))
+    else if generic_eq (p0_) ("hpmcounter19h") then returnM ((Some ((Ox"C93"))))
+    else if generic_eq (p0_) ("hpmcounter20h") then returnM ((Some ((Ox"C94"))))
+    else if generic_eq (p0_) ("hpmcounter21h") then returnM ((Some ((Ox"C95"))))
+    else if generic_eq (p0_) ("hpmcounter22h") then returnM ((Some ((Ox"C96"))))
+    else if generic_eq (p0_) ("hpmcounter23h") then returnM ((Some ((Ox"C97"))))
+    else if generic_eq (p0_) ("hpmcounter24h") then returnM ((Some ((Ox"C98"))))
+    else if generic_eq (p0_) ("hpmcounter25h") then returnM ((Some ((Ox"C99"))))
+    else if generic_eq (p0_) ("hpmcounter26h") then returnM ((Some ((Ox"C9A"))))
+    else if generic_eq (p0_) ("hpmcounter27h") then returnM ((Some ((Ox"C9B"))))
+    else if generic_eq (p0_) ("hpmcounter28h") then returnM ((Some ((Ox"C9C"))))
+    else if generic_eq (p0_) ("hpmcounter29h") then returnM ((Some ((Ox"C9D"))))
+    else if generic_eq (p0_) ("hpmcounter30h") then returnM ((Some ((Ox"C9E"))))
+    else if generic_eq (p0_) ("hpmcounter31h") then returnM ((Some ((Ox"C9F"))))
+    else if generic_eq (p0_) ("mhpmevent3") then returnM ((Some ((Ox"323"))))
+    else if generic_eq (p0_) ("mhpmevent4") then returnM ((Some ((Ox"324"))))
+    else if generic_eq (p0_) ("mhpmevent5") then returnM ((Some ((Ox"325"))))
+    else if generic_eq (p0_) ("mhpmevent6") then returnM ((Some ((Ox"326"))))
+    else if generic_eq (p0_) ("mhpmevent7") then returnM ((Some ((Ox"327"))))
+    else if generic_eq (p0_) ("mhpmevent8") then returnM ((Some ((Ox"328"))))
+    else if generic_eq (p0_) ("mhpmevent9") then returnM ((Some ((Ox"329"))))
+    else if generic_eq (p0_) ("mhpmevent10") then returnM ((Some ((Ox"32A"))))
+    else if generic_eq (p0_) ("mhpmevent11") then returnM ((Some ((Ox"32B"))))
+    else if generic_eq (p0_) ("mhpmevent12") then returnM ((Some ((Ox"32C"))))
+    else if generic_eq (p0_) ("mhpmevent13") then returnM ((Some ((Ox"32D"))))
+    else if generic_eq (p0_) ("mhpmevent14") then returnM ((Some ((Ox"32E"))))
+    else if generic_eq (p0_) ("mhpmevent15") then returnM ((Some ((Ox"32F"))))
+    else if generic_eq (p0_) ("mhpmevent16") then returnM ((Some ((Ox"330"))))
+    else if generic_eq (p0_) ("mhpmevent17") then returnM ((Some ((Ox"331"))))
+    else if generic_eq (p0_) ("mhpmevent18") then returnM ((Some ((Ox"332"))))
+    else if generic_eq (p0_) ("mhpmevent19") then returnM ((Some ((Ox"333"))))
+    else if generic_eq (p0_) ("mhpmevent20") then returnM ((Some ((Ox"334"))))
+    else if generic_eq (p0_) ("mhpmevent21") then returnM ((Some ((Ox"335"))))
+    else if generic_eq (p0_) ("mhpmevent22") then returnM ((Some ((Ox"336"))))
+    else if generic_eq (p0_) ("mhpmevent23") then returnM ((Some ((Ox"337"))))
+    else if generic_eq (p0_) ("mhpmevent24") then returnM ((Some ((Ox"338"))))
+    else if generic_eq (p0_) ("mhpmevent25") then returnM ((Some ((Ox"339"))))
+    else if generic_eq (p0_) ("mhpmevent26") then returnM ((Some ((Ox"33A"))))
+    else if generic_eq (p0_) ("mhpmevent27") then returnM ((Some ((Ox"33B"))))
+    else if generic_eq (p0_) ("mhpmevent28") then returnM ((Some ((Ox"33C"))))
+    else if generic_eq (p0_) ("mhpmevent29") then returnM ((Some ((Ox"33D"))))
+    else if generic_eq (p0_) ("mhpmevent30") then returnM ((Some ((Ox"33E"))))
+    else if generic_eq (p0_) ("mhpmevent31") then returnM ((Some ((Ox"33F"))))
+    else if generic_eq (p0_) ("mhpmcounter3") then returnM ((Some ((Ox"B03"))))
+    else if generic_eq (p0_) ("mhpmcounter4") then returnM ((Some ((Ox"B04"))))
+    else if generic_eq (p0_) ("mhpmcounter5") then returnM ((Some ((Ox"B05"))))
+    else if generic_eq (p0_) ("mhpmcounter6") then returnM ((Some ((Ox"B06"))))
+    else if generic_eq (p0_) ("mhpmcounter7") then returnM ((Some ((Ox"B07"))))
+    else if generic_eq (p0_) ("mhpmcounter8") then returnM ((Some ((Ox"B08"))))
+    else if generic_eq (p0_) ("mhpmcounter9") then returnM ((Some ((Ox"B09"))))
+    else if generic_eq (p0_) ("mhpmcounter10") then returnM ((Some ((Ox"B0A"))))
+    else if generic_eq (p0_) ("mhpmcounter11") then returnM ((Some ((Ox"B0B"))))
+    else if generic_eq (p0_) ("mhpmcounter12") then returnM ((Some ((Ox"B0C"))))
+    else if generic_eq (p0_) ("mhpmcounter13") then returnM ((Some ((Ox"B0D"))))
+    else if generic_eq (p0_) ("mhpmcounter14") then returnM ((Some ((Ox"B0E"))))
+    else if generic_eq (p0_) ("mhpmcounter15") then returnM ((Some ((Ox"B0F"))))
+    else if generic_eq (p0_) ("mhpmcounter16") then returnM ((Some ((Ox"B10"))))
+    else if generic_eq (p0_) ("mhpmcounter17") then returnM ((Some ((Ox"B11"))))
+    else if generic_eq (p0_) ("mhpmcounter18") then returnM ((Some ((Ox"B12"))))
+    else if generic_eq (p0_) ("mhpmcounter19") then returnM ((Some ((Ox"B13"))))
+    else if generic_eq (p0_) ("mhpmcounter20") then returnM ((Some ((Ox"B14"))))
+    else if generic_eq (p0_) ("mhpmcounter21") then returnM ((Some ((Ox"B15"))))
+    else if generic_eq (p0_) ("mhpmcounter22") then returnM ((Some ((Ox"B16"))))
+    else if generic_eq (p0_) ("mhpmcounter23") then returnM ((Some ((Ox"B17"))))
+    else if generic_eq (p0_) ("mhpmcounter24") then returnM ((Some ((Ox"B18"))))
+    else if generic_eq (p0_) ("mhpmcounter25") then returnM ((Some ((Ox"B19"))))
+    else if generic_eq (p0_) ("mhpmcounter26") then returnM ((Some ((Ox"B1A"))))
+    else if generic_eq (p0_) ("mhpmcounter27") then returnM ((Some ((Ox"B1B"))))
+    else if generic_eq (p0_) ("mhpmcounter28") then returnM ((Some ((Ox"B1C"))))
+    else if generic_eq (p0_) ("mhpmcounter29") then returnM ((Some ((Ox"B1D"))))
+    else if generic_eq (p0_) ("mhpmcounter30") then returnM ((Some ((Ox"B1E"))))
+    else if generic_eq (p0_) ("mhpmcounter31") then returnM ((Some ((Ox"B1F"))))
+    else if generic_eq (p0_) ("mhpmcounter3h") then returnM ((Some ((Ox"B83"))))
+    else if generic_eq (p0_) ("mhpmcounter4h") then returnM ((Some ((Ox"B84"))))
+    else if generic_eq (p0_) ("mhpmcounter5h") then returnM ((Some ((Ox"B85"))))
+    else if generic_eq (p0_) ("mhpmcounter6h") then returnM ((Some ((Ox"B86"))))
+    else if generic_eq (p0_) ("mhpmcounter7h") then returnM ((Some ((Ox"B87"))))
+    else if generic_eq (p0_) ("mhpmcounter8h") then returnM ((Some ((Ox"B88"))))
+    else if generic_eq (p0_) ("mhpmcounter9h") then returnM ((Some ((Ox"B89"))))
+    else if generic_eq (p0_) ("mhpmcounter10h") then returnM ((Some ((Ox"B8A"))))
+    else if generic_eq (p0_) ("mhpmcounter11h") then returnM ((Some ((Ox"B8B"))))
+    else if generic_eq (p0_) ("mhpmcounter12h") then returnM ((Some ((Ox"B8C"))))
+    else if generic_eq (p0_) ("mhpmcounter13h") then returnM ((Some ((Ox"B8D"))))
+    else if generic_eq (p0_) ("mhpmcounter14h") then returnM ((Some ((Ox"B8E"))))
+    else if generic_eq (p0_) ("mhpmcounter15h") then returnM ((Some ((Ox"B8F"))))
+    else if generic_eq (p0_) ("mhpmcounter16h") then returnM ((Some ((Ox"B90"))))
+    else if generic_eq (p0_) ("mhpmcounter17h") then returnM ((Some ((Ox"B91"))))
+    else if generic_eq (p0_) ("mhpmcounter18h") then returnM ((Some ((Ox"B92"))))
+    else if generic_eq (p0_) ("mhpmcounter19h") then returnM ((Some ((Ox"B93"))))
+    else if generic_eq (p0_) ("mhpmcounter20h") then returnM ((Some ((Ox"B94"))))
+    else if generic_eq (p0_) ("mhpmcounter21h") then returnM ((Some ((Ox"B95"))))
+    else if generic_eq (p0_) ("mhpmcounter22h") then returnM ((Some ((Ox"B96"))))
+    else if generic_eq (p0_) ("mhpmcounter23h") then returnM ((Some ((Ox"B97"))))
+    else if generic_eq (p0_) ("mhpmcounter24h") then returnM ((Some ((Ox"B98"))))
+    else if generic_eq (p0_) ("mhpmcounter25h") then returnM ((Some ((Ox"B99"))))
+    else if generic_eq (p0_) ("mhpmcounter26h") then returnM ((Some ((Ox"B9A"))))
+    else if generic_eq (p0_) ("mhpmcounter27h") then returnM ((Some ((Ox"B9B"))))
+    else if generic_eq (p0_) ("mhpmcounter28h") then returnM ((Some ((Ox"B9C"))))
+    else if generic_eq (p0_) ("mhpmcounter29h") then returnM ((Some ((Ox"B9D"))))
+    else if generic_eq (p0_) ("mhpmcounter30h") then returnM ((Some ((Ox"B9E"))))
+    else if generic_eq (p0_) ("mhpmcounter31h") then returnM ((Some ((Ox"B9F"))))
+    else if generic_eq (p0_) ("mhpmevent3h") then returnM ((Some ((Ox"723"))))
+    else if generic_eq (p0_) ("mhpmevent4h") then returnM ((Some ((Ox"724"))))
+    else if generic_eq (p0_) ("mhpmevent5h") then returnM ((Some ((Ox"725"))))
+    else if generic_eq (p0_) ("mhpmevent6h") then returnM ((Some ((Ox"726"))))
+    else if generic_eq (p0_) ("mhpmevent7h") then returnM ((Some ((Ox"727"))))
+    else if generic_eq (p0_) ("mhpmevent8h") then returnM ((Some ((Ox"728"))))
+    else if generic_eq (p0_) ("mhpmevent9h") then returnM ((Some ((Ox"729"))))
+    else if generic_eq (p0_) ("mhpmevent10h") then returnM ((Some ((Ox"72A"))))
+    else if generic_eq (p0_) ("mhpmevent11h") then returnM ((Some ((Ox"72B"))))
+    else if generic_eq (p0_) ("mhpmevent12h") then returnM ((Some ((Ox"72C"))))
+    else if generic_eq (p0_) ("mhpmevent13h") then returnM ((Some ((Ox"72D"))))
+    else if generic_eq (p0_) ("mhpmevent14h") then returnM ((Some ((Ox"72E"))))
+    else if generic_eq (p0_) ("mhpmevent15h") then returnM ((Some ((Ox"72F"))))
+    else if generic_eq (p0_) ("mhpmevent16h") then returnM ((Some ((Ox"730"))))
+    else if generic_eq (p0_) ("mhpmevent17h") then returnM ((Some ((Ox"731"))))
+    else if generic_eq (p0_) ("mhpmevent18h") then returnM ((Some ((Ox"732"))))
+    else if generic_eq (p0_) ("mhpmevent19h") then returnM ((Some ((Ox"733"))))
+    else if generic_eq (p0_) ("mhpmevent20h") then returnM ((Some ((Ox"734"))))
+    else if generic_eq (p0_) ("mhpmevent21h") then returnM ((Some ((Ox"735"))))
+    else if generic_eq (p0_) ("mhpmevent22h") then returnM ((Some ((Ox"736"))))
+    else if generic_eq (p0_) ("mhpmevent23h") then returnM ((Some ((Ox"737"))))
+    else if generic_eq (p0_) ("mhpmevent24h") then returnM ((Some ((Ox"738"))))
+    else if generic_eq (p0_) ("mhpmevent25h") then returnM ((Some ((Ox"739"))))
+    else if generic_eq (p0_) ("mhpmevent26h") then returnM ((Some ((Ox"73A"))))
+    else if generic_eq (p0_) ("mhpmevent27h") then returnM ((Some ((Ox"73B"))))
+    else if generic_eq (p0_) ("mhpmevent28h") then returnM ((Some ((Ox"73C"))))
+    else if generic_eq (p0_) ("mhpmevent29h") then returnM ((Some ((Ox"73D"))))
+    else if generic_eq (p0_) ("mhpmevent30h") then returnM ((Some ((Ox"73E"))))
+    else if generic_eq (p0_) ("mhpmevent31h") then returnM ((Some ((Ox"73F"))))
+    else if generic_eq (p0_) ("scountovf") then returnM ((Some ((Ox"DA0"))))
+    else if generic_eq (p0_) ("stimecmp") then returnM ((Some ((Ox"14D"))))
+    else if generic_eq (p0_) ("stimecmph") then returnM ((Some ((Ox"15D"))))
+    else if generic_eq (p0_) ("ssp") then returnM ((Some ((Ox"011"))))
+    else if generic_eq (p0_) ("cycle") then returnM ((Some ((Ox"C00"))))
+    else if generic_eq (p0_) ("time") then returnM ((Some ((Ox"C01"))))
+    else if generic_eq (p0_) ("instret") then returnM ((Some ((Ox"C02"))))
+    else if generic_eq (p0_) ("cycleh") then returnM ((Some ((Ox"C80"))))
+    else if generic_eq (p0_) ("timeh") then returnM ((Some ((Ox"C81"))))
+    else if generic_eq (p0_) ("instreth") then returnM ((Some ((Ox"C82"))))
+    else if generic_eq (p0_) ("mcycle") then returnM ((Some ((Ox"B00"))))
+    else if generic_eq (p0_) ("minstret") then returnM ((Some ((Ox"B02"))))
+    else if generic_eq (p0_) ("mcycleh") then returnM ((Some ((Ox"B80"))))
+    else if generic_eq (p0_) ("minstreth") then returnM ((Some ((Ox"B82"))))
+    else if generic_eq (p0_) ("srmcfg") then returnM ((Some ((Ox"181"))))
+    else if hex_bits_12_backwards_matches (p0_) return M (option (mword 12)) then
+      (hex_bits_12_backwards (p0_)) >>= fun (w__0 : mword 12) =>
+      let w__1 : option (mword 12) := match w__0 with | reg => Some (reg) end in
+      returnM (w__1)
+    else returnM (None)) >>= fun (w__344 : option (mword 12)) =>
+   match w__344 with
    | Some result' => returnM (result')
    | _ => assert_exp' false "Pattern match failure at unknown location" >>= fun _ => exit tt
    end
@@ -17203,21 +17974,21 @@ Axiom riscv_f64Eq : forall  (_ : mword 64) (_ : mword 64) , (mword 5 * bool).
 Axiom riscv_f16roundToInt :
   forall
 
-  (_ : mword 3) (_ : mword 16) (ex654358_ : bool)
+  (_ : mword 3) (_ : mword 16) (ex655635_ : bool)
   ,
   (mword 5 * mword 16).
 
 Axiom riscv_f32roundToInt :
   forall
 
-  (_ : mword 3) (_ : mword 32) (ex654359_ : bool)
+  (_ : mword 3) (_ : mword 32) (ex655636_ : bool)
   ,
   (mword 5 * mword 32).
 
 Axiom riscv_f64roundToInt :
   forall
 
-  (_ : mword 3) (_ : mword 64) (ex654360_ : bool)
+  (_ : mword 3) (_ : mword 64) (ex655637_ : bool)
   ,
   (mword 5 * mword 64).
 
@@ -21022,8 +21793,8 @@ Definition pm_transform_PA '((Virtaddr effective_address) : virtaddr) (pmlen : Z
 Axiom load_reservation :
   forall
 
-  (_ : mword ((if 64 =? 32 then 34 else 64))) (fv39242_n : Z)
-  (*(0 <? fv39242_n) && (fv39242_n <? 4096)*),
+  (_ : mword ((if 64 =? 32 then 34 else 64))) (fv39250_n : Z)
+  (*(0 <? fv39250_n) && (fv39250_n <? 4096)*),
   M (unit).
 
 Axiom match_reservation : forall  (_ : mword ((if 64 =? 32 then 34 else 64))) , bool.
@@ -23810,19 +24581,19 @@ Definition ptw_start_callback
    tt.
 
 Definition ptw_step_callback
-(ex611155_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64))) (_ : mword 64)
-(*(0 <=? ex611155_) && (ex611155_ <=? 4)*)
+(ex612430_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64))) (_ : mword 64)
+(*(0 <=? ex612430_) && (ex612430_ <=? 4)*)
 : unit :=
    tt.
 
-Definition ptw_success_callback (_ : mword 64) (ex611156_ : Z)
-(*(0 <=? ex611156_) && (ex611156_ <=? 4)*)
+Definition ptw_success_callback (_ : mword 64) (ex612431_ : Z)
+(*(0 <=? ex612431_) && (ex612431_ <=? 4)*)
 : unit :=
    tt.
 
 Definition ptw_fail_callback
-(_ : PTW_Error) (ex611157_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64)))
-(*(0 <=? ex611157_) && (ex611157_ <=? 4)*)
+(_ : PTW_Error) (ex612432_ : Z) (_ : mword ((if 64 =? 32 then 34 else 64)))
+(*(0 <=? ex612432_) && (ex612432_ <=? 4)*)
 : unit :=
    tt.
 
@@ -23879,14 +24650,14 @@ Definition tlb_get_pbmt (ent : TLB_Entry) : M (page_based_mem_type) :=
 
 Definition num_tlb_entries_exp := 6.
 #[export] Hint Unfold num_tlb_entries_exp : sail.
-Definition tlb_add_callback (_ : vec (option TLB_Entry) (2 ^ 6)) (ex611227_ : Z)
-(*(0 <=? ex611227_) && (ex611227_ <=? (2 ^ 6))*)
+Definition tlb_add_callback (_ : vec (option TLB_Entry) (2 ^ 6)) (ex612502_ : Z)
+(*(0 <=? ex612502_) && (ex612502_ <=? (2 ^ 6))*)
 : unit :=
    tt.
 
 Definition tlb_flush_begin_callback (_ : unit) : unit := tt.
 
-Definition tlb_flush_callback (ex611228_ : Z) (*(0 <=? ex611228_) && (ex611228_ <=? (2 ^ 6))*)
+Definition tlb_flush_callback (ex612503_ : Z) (*(0 <=? ex612503_) && (ex612503_ <=? (2 ^ 6))*)
 : unit :=
    tt.
 
@@ -41758,354 +42529,356 @@ Definition csr_name_map_forwards_matches (arg_ : mword 12) : bool :=
 Definition csr_name_map_backwards_matches (arg_ : string) : M (bool) :=
    let head_exp_ := arg_ in
    let p0_ := head_exp_ in
-   returnM (match if generic_eq (p0_) ("misa") then Some (true)
-                  else if generic_eq (p0_) ("mstatus") then Some (true)
-                  else if generic_eq (p0_) ("mstatush") then Some (true)
-                  else if generic_eq (p0_) ("mseccfg") then Some (true)
-                  else if generic_eq (p0_) ("mseccfgh") then Some (true)
-                  else if generic_eq (p0_) ("menvcfg") then Some (true)
-                  else if generic_eq (p0_) ("menvcfgh") then Some (true)
-                  else if generic_eq (p0_) ("senvcfg") then Some (true)
-                  else if generic_eq (p0_) ("mcause") then Some (true)
-                  else if generic_eq (p0_) ("mtval") then Some (true)
-                  else if generic_eq (p0_) ("mscratch") then Some (true)
-                  else if generic_eq (p0_) ("scounteren") then Some (true)
-                  else if generic_eq (p0_) ("mcounteren") then Some (true)
-                  else if generic_eq (p0_) ("mcountinhibit") then Some (true)
-                  else if generic_eq (p0_) ("mvendorid") then Some (true)
-                  else if generic_eq (p0_) ("marchid") then Some (true)
-                  else if generic_eq (p0_) ("mimpid") then Some (true)
-                  else if generic_eq (p0_) ("mhartid") then Some (true)
-                  else if generic_eq (p0_) ("mconfigptr") then Some (true)
-                  else if generic_eq (p0_) ("sstatus") then Some (true)
-                  else if generic_eq (p0_) ("sscratch") then Some (true)
-                  else if generic_eq (p0_) ("scause") then Some (true)
-                  else if generic_eq (p0_) ("stval") then Some (true)
-                  else if generic_eq (p0_) ("tselect") then Some (true)
-                  else if generic_eq (p0_) ("tdata1") then Some (true)
-                  else if generic_eq (p0_) ("tdata2") then Some (true)
-                  else if generic_eq (p0_) ("tdata3") then Some (true)
-                  else if generic_eq (p0_) ("mie") then Some (true)
-                  else if generic_eq (p0_) ("mip") then Some (true)
-                  else if generic_eq (p0_) ("medeleg") then Some (true)
-                  else if generic_eq (p0_) ("medelegh") then Some (true)
-                  else if generic_eq (p0_) ("mideleg") then Some (true)
-                  else if generic_eq (p0_) ("sip") then Some (true)
-                  else if generic_eq (p0_) ("sie") then Some (true)
-                  else if generic_eq (p0_) ("stvec") then Some (true)
-                  else if generic_eq (p0_) ("sepc") then Some (true)
-                  else if generic_eq (p0_) ("mtvec") then Some (true)
-                  else if generic_eq (p0_) ("mepc") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg0") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg1") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg2") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg3") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg4") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg5") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg6") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg7") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg8") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg9") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg10") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg11") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg12") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg13") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg14") then Some (true)
-                  else if generic_eq (p0_) ("pmpcfg15") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr0") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr1") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr2") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr3") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr4") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr5") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr6") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr7") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr8") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr9") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr10") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr11") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr12") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr13") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr14") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr15") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr16") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr17") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr18") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr19") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr20") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr21") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr22") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr23") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr24") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr25") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr26") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr27") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr28") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr29") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr30") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr31") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr32") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr33") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr34") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr35") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr36") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr37") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr38") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr39") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr40") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr41") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr42") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr43") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr44") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr45") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr46") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr47") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr48") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr49") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr50") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr51") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr52") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr53") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr54") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr55") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr56") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr57") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr58") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr59") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr60") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr61") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr62") then Some (true)
-                  else if generic_eq (p0_) ("pmpaddr63") then Some (true)
-                  else if generic_eq (p0_) ("fflags") then Some (true)
-                  else if generic_eq (p0_) ("frm") then Some (true)
-                  else if generic_eq (p0_) ("fcsr") then Some (true)
-                  else if generic_eq (p0_) ("vstart") then Some (true)
-                  else if generic_eq (p0_) ("vxsat") then Some (true)
-                  else if generic_eq (p0_) ("vxrm") then Some (true)
-                  else if generic_eq (p0_) ("vcsr") then Some (true)
-                  else if generic_eq (p0_) ("vl") then Some (true)
-                  else if generic_eq (p0_) ("vtype") then Some (true)
-                  else if generic_eq (p0_) ("vlenb") then Some (true)
-                  else if generic_eq (p0_) ("mcyclecfg") then Some (true)
-                  else if generic_eq (p0_) ("mcyclecfgh") then Some (true)
-                  else if generic_eq (p0_) ("minstretcfg") then Some (true)
-                  else if generic_eq (p0_) ("minstretcfgh") then Some (true)
-                  else if generic_eq (p0_) ("mstateen0") then Some (true)
-                  else if generic_eq (p0_) ("mstateen1") then Some (true)
-                  else if generic_eq (p0_) ("mstateen2") then Some (true)
-                  else if generic_eq (p0_) ("mstateen3") then Some (true)
-                  else if generic_eq (p0_) ("mstateen0h") then Some (true)
-                  else if generic_eq (p0_) ("mstateen1h") then Some (true)
-                  else if generic_eq (p0_) ("mstateen2h") then Some (true)
-                  else if generic_eq (p0_) ("mstateen3h") then Some (true)
-                  else if generic_eq (p0_) ("hstateen0") then Some (true)
-                  else if generic_eq (p0_) ("hstateen1") then Some (true)
-                  else if generic_eq (p0_) ("hstateen2") then Some (true)
-                  else if generic_eq (p0_) ("hstateen3") then Some (true)
-                  else if generic_eq (p0_) ("hstateen0h") then Some (true)
-                  else if generic_eq (p0_) ("hstateen1h") then Some (true)
-                  else if generic_eq (p0_) ("hstateen2h") then Some (true)
-                  else if generic_eq (p0_) ("hstateen3h") then Some (true)
-                  else if generic_eq (p0_) ("sstateen0") then Some (true)
-                  else if generic_eq (p0_) ("sstateen1") then Some (true)
-                  else if generic_eq (p0_) ("sstateen2") then Some (true)
-                  else if generic_eq (p0_) ("sstateen3") then Some (true)
-                  else if generic_eq (p0_) ("satp") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter3") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter4") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter5") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter6") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter7") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter8") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter9") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter10") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter11") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter12") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter13") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter14") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter15") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter16") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter17") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter18") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter19") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter20") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter21") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter22") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter23") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter24") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter25") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter26") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter27") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter28") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter29") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter30") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter31") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter3h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter4h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter5h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter6h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter7h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter8h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter9h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter10h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter11h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter12h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter13h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter14h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter15h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter16h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter17h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter18h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter19h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter20h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter21h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter22h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter23h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter24h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter25h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter26h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter27h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter28h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter29h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter30h") then Some (true)
-                  else if generic_eq (p0_) ("hpmcounter31h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent3") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent4") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent5") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent6") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent7") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent8") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent9") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent10") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent11") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent12") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent13") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent14") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent15") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent16") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent17") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent18") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent19") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent20") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent21") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent22") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent23") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent24") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent25") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent26") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent27") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent28") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent29") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent30") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent31") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter3") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter4") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter5") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter6") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter7") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter8") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter9") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter10") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter11") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter12") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter13") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter14") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter15") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter16") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter17") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter18") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter19") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter20") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter21") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter22") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter23") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter24") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter25") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter26") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter27") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter28") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter29") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter30") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter31") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter3h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter4h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter5h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter6h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter7h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter8h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter9h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter10h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter11h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter12h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter13h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter14h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter15h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter16h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter17h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter18h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter19h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter20h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter21h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter22h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter23h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter24h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter25h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter26h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter27h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter28h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter29h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter30h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmcounter31h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent3h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent4h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent5h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent6h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent7h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent8h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent9h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent10h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent11h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent12h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent13h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent14h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent15h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent16h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent17h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent18h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent19h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent20h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent21h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent22h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent23h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent24h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent25h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent26h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent27h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent28h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent29h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent30h") then Some (true)
-                  else if generic_eq (p0_) ("mhpmevent31h") then Some (true)
-                  else if generic_eq (p0_) ("scountovf") then Some (true)
-                  else if generic_eq (p0_) ("stimecmp") then Some (true)
-                  else if generic_eq (p0_) ("stimecmph") then Some (true)
-                  else if generic_eq (p0_) ("ssp") then Some (true)
-                  else if generic_eq (p0_) ("cycle") then Some (true)
-                  else if generic_eq (p0_) ("time") then Some (true)
-                  else if generic_eq (p0_) ("instret") then Some (true)
-                  else if generic_eq (p0_) ("cycleh") then Some (true)
-                  else if generic_eq (p0_) ("timeh") then Some (true)
-                  else if generic_eq (p0_) ("instreth") then Some (true)
-                  else if generic_eq (p0_) ("mcycle") then Some (true)
-                  else if generic_eq (p0_) ("minstret") then Some (true)
-                  else if generic_eq (p0_) ("mcycleh") then Some (true)
-                  else if generic_eq (p0_) ("minstreth") then Some (true)
-                  else if generic_eq (p0_) ("srmcfg") then Some (true)
-                  else if hex_bits_12_backwards_matches (p0_) then
-                    match hex_bits_12_backwards (p0_) with | reg => Some (true) end
-                  else None with
-   | Some result' => result'
-   | None => match head_exp_ with | _ => false end
-   end).
+   (if generic_eq (p0_) ("misa") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstatus") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstatush") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mseccfg") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mseccfgh") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("menvcfg") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("menvcfgh") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("senvcfg") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mcause") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mtval") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mscratch") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("scounteren") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mcounteren") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mcountinhibit") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mvendorid") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("marchid") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mimpid") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhartid") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mconfigptr") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sstatus") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sscratch") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("scause") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("stval") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("tselect") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("tdata1") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("tdata2") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("tdata3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mie") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mip") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("medeleg") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("medelegh") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mideleg") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sip") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sie") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("stvec") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sepc") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mtvec") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mepc") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg0") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg1") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg2") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg4") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg5") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg6") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg7") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg8") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg9") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg10") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg11") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg12") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg13") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg14") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpcfg15") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr0") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr1") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr2") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr4") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr5") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr6") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr7") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr8") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr9") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr10") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr11") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr12") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr13") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr14") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr15") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr16") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr17") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr18") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr19") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr20") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr21") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr22") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr23") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr24") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr25") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr26") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr27") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr28") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr29") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr30") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr31") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr32") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr33") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr34") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr35") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr36") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr37") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr38") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr39") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr40") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr41") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr42") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr43") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr44") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr45") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr46") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr47") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr48") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr49") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr50") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr51") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr52") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr53") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr54") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr55") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr56") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr57") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr58") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr59") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr60") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr61") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr62") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("pmpaddr63") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("fflags") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("frm") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("fcsr") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("vstart") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("vxsat") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("vxrm") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("vcsr") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("vl") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("vtype") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("vlenb") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mcyclecfg") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mcyclecfgh") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("minstretcfg") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("minstretcfgh") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstateen0") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstateen1") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstateen2") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstateen3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstateen0h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstateen1h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstateen2h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mstateen3h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hstateen0") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hstateen1") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hstateen2") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hstateen3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hstateen0h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hstateen1h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hstateen2h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hstateen3h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sstateen0") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sstateen1") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sstateen2") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("sstateen3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("satp") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter4") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter5") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter6") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter7") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter8") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter9") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter10") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter11") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter12") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter13") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter14") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter15") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter16") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter17") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter18") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter19") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter20") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter21") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter22") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter23") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter24") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter25") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter26") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter27") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter28") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter29") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter30") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter31") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter3h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter4h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter5h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter6h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter7h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter8h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter9h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter10h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter11h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter12h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter13h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter14h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter15h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter16h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter17h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter18h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter19h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter20h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter21h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter22h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter23h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter24h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter25h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter26h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter27h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter28h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter29h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter30h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("hpmcounter31h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent4") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent5") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent6") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent7") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent8") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent9") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent10") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent11") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent12") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent13") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent14") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent15") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent16") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent17") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent18") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent19") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent20") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent21") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent22") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent23") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent24") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent25") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent26") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent27") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent28") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent29") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent30") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent31") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter3") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter4") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter5") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter6") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter7") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter8") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter9") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter10") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter11") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter12") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter13") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter14") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter15") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter16") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter17") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter18") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter19") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter20") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter21") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter22") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter23") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter24") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter25") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter26") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter27") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter28") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter29") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter30") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter31") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter3h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter4h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter5h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter6h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter7h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter8h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter9h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter10h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter11h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter12h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter13h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter14h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter15h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter16h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter17h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter18h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter19h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter20h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter21h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter22h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter23h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter24h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter25h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter26h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter27h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter28h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter29h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter30h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmcounter31h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent3h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent4h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent5h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent6h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent7h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent8h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent9h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent10h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent11h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent12h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent13h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent14h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent15h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent16h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent17h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent18h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent19h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent20h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent21h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent22h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent23h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent24h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent25h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent26h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent27h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent28h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent29h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent30h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mhpmevent31h") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("scountovf") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("stimecmp") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("stimecmph") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("ssp") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("cycle") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("time") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("instret") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("cycleh") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("timeh") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("instreth") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mcycle") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("minstret") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("mcycleh") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("minstreth") then returnM ((Some (true)))
+    else if generic_eq (p0_) ("srmcfg") then returnM ((Some (true)))
+    else if hex_bits_12_backwards_matches (p0_) return M (option bool) then
+      (hex_bits_12_backwards (p0_)) >>= fun (w__0 : mword 12) =>
+      let w__1 : option bool := match w__0 with | reg => Some (true) end in
+      returnM (w__1)
+    else returnM (None)) >>= fun (w__344 : option bool) =>
+   let w__345 : bool :=
+     match w__344 with | Some result' => result' | None => match head_exp_ with | _ => false end end in
+   returnM (w__345).
 
 Definition hart_is_active (s : HartState) : bool :=
    match s with | HART_ACTIVE tt => true | HART_WAITING _ => false end.
@@ -43620,7 +44393,7 @@ Definition check_extension_param_constraints '(tt : unit) : bool :=
          if misaligned_exception_is_access_fault
               ((({| GlobalMisalignedExceptions_load_store := None;
                     GlobalMisalignedExceptions_vector := None;
-                    GlobalMisalignedExceptions_amo := None;
+                    GlobalMisalignedExceptions_amo := Some (AccessFault);
                     GlobalMisalignedExceptions_lrsc := AccessFault |})
                : GlobalMisalignedExceptions).(GlobalMisalignedExceptions_load_store)) then
            let valid : bool := false in
@@ -43633,7 +44406,7 @@ Definition check_extension_param_constraints '(tt : unit) : bool :=
        if misaligned_exception_is_access_fault
             ((({| GlobalMisalignedExceptions_load_store := None;
                   GlobalMisalignedExceptions_vector := None;
-                  GlobalMisalignedExceptions_amo := None;
+                  GlobalMisalignedExceptions_amo := Some (AccessFault);
                   GlobalMisalignedExceptions_lrsc := AccessFault |})
              : GlobalMisalignedExceptions).(GlobalMisalignedExceptions_vector)) then
          let valid : bool := false in
