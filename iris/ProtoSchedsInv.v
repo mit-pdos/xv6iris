@@ -108,15 +108,3 @@ Section Payoff.
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
 End Payoff.
-
-(* ---------------------------------------------------------------------- *)
-(* The mechanism closes with no [Admitted] and no local axiom.             *)
-(* ---------------------------------------------------------------------- *)
-Print Assumptions scheds_take.
-Print Assumptions scheds_put.
-Print Assumptions scheds_dispatch.
-Print Assumptions scheds_reclaim.
-Print Assumptions scheds_idle.
-Print Assumptions scheds_alloc.
-Print Assumptions scheds_put_take.
-Print Assumptions cpu_own_full_is_vacuous.
