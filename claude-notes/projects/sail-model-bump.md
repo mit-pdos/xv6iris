@@ -420,54 +420,48 @@ goes exactly where `Htr` used to be.
 
 ## Where it stands
 
-`make proofs -k` is green through everything EXCEPT `UserMemAccess.v` and the
-user-mode layer behind it (`UserMem`, `UserMemClassify`, and the user WP
-files). Every other file in the tree builds, including the whole S-mode and
-device stack, both A/D write-back arms, and the Iris layer above them.
+Green through everything except `UserMemAccess.v` and the user-mode layer
+behind it (`UserMem`, `UserMemClassify`, the user WP files). Nothing is
+admitted anywhere; `tools/lemma_diff.py` is clean on every commit.
 
-### What is left, and why the last piece is not a port
+### The misaligned question is ANSWERED (do not re-open it)
 
-`UserMemAccess.v` has three kinds of content. The first is done:
+An earlier note said restating the misaligned lemmas needed an interface
+decision. It does not -- the model decides it. The bump moved the
+misalignment split OUT of the vmem layer: `vmem_read_addr`/`vmem_write_addr`
+split only across a PAGE boundary, and the MAG/alignment split moved down into
+`checked_mem_read`/`checked_mem_write`, under a SINGLE translation. So an
+in-page access, aligned or not, is one full-width translate-and-access.
 
-- **aligned, res-generic reads** -- `exec_vmem_read_addr_aligned` now goes
-  through `MemAccessGen.exec_vmem_read_addr_aligned_gen`, which covers LOAD
-  (res=false) and LR (res=true); the LR arm's reservation is a premise the
-  caller discharges from the platform axiom.
+`MemAccessGen.exec_vmem_read_addr_intra` / `exec_vmem_write_addr_intra` carry
+exactly that; the alignment premise is replaced by two weaker ones (the page
+split leaves no next-page bytes; and either the access is aligned OR the
+platform raises no misalignment exception for it -- true for plain load/store,
+false for LR/SC/AMO, which is why those must stay aligned). The aligned lemmas
+are one-line corollaries. `UserMemAccess`'s `exec_vmem_{read,write}_addr_
+misaligned` are instances; the old `data_seq`/`split_body`/`split_loop`
+machinery is deleted because it described N vmem-level translations the model
+no longer performs.
 
-The second is mechanical and unfinished:
+### What is actually left
 
-- **the aligned SC write** (`exec_vmem_write_addr_sc`) and the two remaining
-  aligned sites around lines 1119/1246. `vmem_write_addr`'s SC path is now:
-  translate, `assert (res = is_store_conditional access)`, then
-  `if res && not (match_reservation pa)` -> re-check the access and return
-  `false` WITHOUT writing, else ea + write. Both arms are still there; the
-  lemma needs restating over the new shape, and the access-type constructors
-  now carry aq/rl (`StoreConditional (aq, rl, Data)`).
+1. `UserMemAccess.exec_vmem_write_addr_sc` (line ~105). The SC path is now:
+   translate; `assert (res = is_store_conditional access)`; then
+   `if res && not (match_reservation pa)` -> re-check via `phys_access_check`
+   (which returns `Ok plan` now, not `None`) and return `false` WITHOUT
+   writing, else `mem_write_ea` + `mem_write_value`. Both arms survive; the
+   contract needs the `Ok plan` shape, the aq/rl-carrying
+   `StoreConditional (aq, rl, Data)` constructor, and the pre-state
+   privilege/mode premises every vmem lemma now takes.
+2. The two remaining aligned sites in that file (search `split_misaligned`).
+3. `UserMemClassify`: it must now supply ONE full-width `mem_read` /
+   `mem_write_value` where it supplied N chunk facts. That is mechanical given
+   the above -- the chunk sequence lives inside `checked_mem_*` now -- but it
+   is ~2400 lines of consumer and will want an N-iteration `untilMT` lemma
+   (the kit has only `execR_untilMT_1`, the one-iteration case every aligned
+   access takes) for the sub-case where the PMA does not admit the misaligned
+   access whole.
+4. The user-mode WP layer behind `UserMemClassify`: untouched.
 
-The third is NOT a port:
-
-- **`MisalignedSplitRead` / `MisalignedSplitWrite`.** These prove that a
-  misaligned user access becomes N chunk operations at the VMEM level, each
-  with its OWN `translateAddr`. In the new model that is no longer what
-  happens. The vmem level splits only on a PAGE BOUNDARY (at most two pieces,
-  and zero for an in-page access); the misalignment/MAG split moved DOWN into
-  `checked_mem_read`/`checked_mem_write`, where it is a PHYSICAL-address split
-  under a single translation.
-
-  So the chunk sequence these lemmas expose to `UserMemClassify` (N
-  translations, N `mem_read`s, `data_seq` accumulated at the vmem level) is a
-  description of the old model. Restating them means:
-
-    1. an N-iteration `untilMT` lemma at the `checked_mem_read` level (the kit
-       currently only has `execR_untilMT_1`, the one-iteration case every
-       aligned access takes), and
-    2. deciding what `UserMemClassify` should now be told -- one translation
-       and a physical chunk sequence, not N translations. That changes the
-       INTERFACE, not just the proof, so it wants a look at what
-       `UserMemClassify` actually needs from it before any proof is written.
-
-  Do not try to force the old statement through; it is no longer true of the
-  model.
-
-Everything else in this file (the recipe, the traps, the two model deltas) is
-still current.
+Everything else in this file (the recipe, the traps, the model deltas) is
+current.
