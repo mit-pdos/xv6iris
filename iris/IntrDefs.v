@@ -546,6 +546,19 @@ Section IntrDefs.
     sconf_at ms -∗ ⌜ sconf_ms_facts ms ⌝.
   Proof. iIntros "[(_ & _ & _ & %H) _]". iPureIntro. exact H. Qed.
 
+  (* READING THE TWO sret BITS OFF THE BUNDLE.  A holder of the travelling
+     half turns it into a fact about the LIVE mstatus by agreement with the
+     tie -- which is the whole point of the mirror: it is what survives the
+     instruction funnel's [exists ms], and so it is how a trap handler
+     entered from S-mode still knows SPP = 1 several instructions later. *)
+  Lemma sconf_at_sret (ms : mword 64) (a b : mword 1) :
+    sconf_at ms -∗ sret_bits a b -∗
+    ⌜ _get_Mstatus_SPP ms = a /\ _get_Mstatus_SPIE ms = b ⌝.
+  Proof.
+    iIntros "[(_ & _ & Htie & _) _] Hc".
+    iDestruct (sret_bits_agree with "Htie Hc") as %[-> ->]. done.
+  Qed.
+
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
      its index [b], backed by the ghost QUARTER's value (agreement with
      [sconf]'s tied half pins the live bit).  It owns ALL the free stack

@@ -188,13 +188,29 @@ End KERNELTRAP_RETURNS.
    be pending, which is exactly devintr's two.  See
    [claude-notes/projects/kerneltrap.md].
 
-   THE mstatus-EXPOSING BUNDLE IS USED ON BOTH SIDES, and only there.  SPP is
-   not in [sconf_ms_facts], so the precondition needs [sie_cap_gpr_at ms_e] to
-   state [Hspp]; and kernelvec's [sret] reads SPP and SPIE of the mstatus
-   kerneltrap leaves, so the postcondition needs [sie_cap_gpr_at ms_f] to
-   report them.  Everything BETWEEN threads the plain [sie_cap_gpr] -- the
-   flavour is closed right after the entry `csrr s1,sstatus` and re-opened
-   only by the final `csrw sstatus`.
+   HOW THE SPP FACT REACHES THE CHECK: [sret_bits], the ghost mirror of
+   mstatus.SPP and SPIE (IntrDefs).  The check runs FOUR instructions after
+   entry, and every instruction round-trips [sconf] through
+   [wp_instr_s_sconf], whose [exists ms] destroys the identity of the
+   mstatus -- so no fact ABOUT a named entry mstatus can survive, and no
+   flavour of the bundle rescues it.  What survives is the ghost, threaded
+   independently: the caller hands over the travelling half at ('1','1')
+   (the trap came from S-mode with interrupts enabled), and agreement with
+   the tie inside [sconf] recovers the fact at whatever mstatus the sstatus
+   read names.
+
+   BECAUSE OF THAT, THE POSTCONDITION IS ABSOLUTE, NOT RELATIVE.  The final
+   [csrw sstatus] writes back the saved word, so the mstatus kerneltrap
+   leaves has SPP = 1, SPIE = 1 and SIE = 0 outright -- there is no need to
+   name an entry mstatus anywhere in the contract, and the precondition
+   threads the PLAIN [sie_cap_gpr].  Only the postcondition uses the
+   mstatus-exposing flavour, and only because [sret] is what reads those
+   bits.
+
+   The travelling half CROSSES THE PARK with the other trap CSRs: on the
+   resuming hart it comes back at that hart's own values, and the final
+   [csrw sstatus] re-pins it from the word held in s1 -- a register value,
+   which migrates for free.
 
    THE CROSSING IS REAL: [wp_next true p].  kerneltrap yields on a timer
    interrupt when this cpu has a current process, so execution can resume on
@@ -246,19 +262,21 @@ Definition wp_kerneltrap_sconf_body
     (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
     (Φ : mval -> iProp Σ) (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
-    (ms_e : mword 64) (ep sc tv : mword 64) :=
+    (ep sc tv : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kerneltrap in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   length γs = NPROC ->
   (kerneltrap_stack <= av)%nat ->
-  (* the trap was taken FROM SUPERVISOR MODE *)
-  _get_Mstatus_SPP ms_e = ('b"1" : mword 1) ->
-  (* ... and from a cause devintr RECOGNISES *)
+  (* the trap was taken from a cause devintr RECOGNISES *)
   devintr_ret sc <> (mword_of_int 0 : mword 64) ->
   (* the saved epc is instruction-aligned, so restoring it lands verbatim
      (sepc's write legalizes through the same bit-0 clear [ret_pc] is) *)
   ret_pc ep = ep ->
-  sie_cap_gpr_at ms_e m av false p -∗
+  sie_cap_gpr m av false p -∗
+  (* THE TRAP CAME FROM S-MODE WITH INTERRUPTS ENABLED: SPP = 1 and
+     SPIE = 1.  This is the [sret_bits] travelling half, which is what
+     carries the fact past the four instructions before the check. *)
+  sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
   cpu_own 0 false p C false -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
@@ -268,12 +286,13 @@ Definition wp_kerneltrap_sconf_body
   wp_next true p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (ms_f sc' tv' : mword 64),
       ⌜ callee_saved m mf ⌝ -∗
-      (* what the sret needs, and all it needs: the trapped mstatus's two
-         return fields are back, and interrupts are still off *)
-      ⌜ _get_Mstatus_SPP  ms_f = _get_Mstatus_SPP  ms_e ⌝ -∗
-      ⌜ _get_Mstatus_SPIE ms_f = _get_Mstatus_SPIE ms_e ⌝ -∗
-      ⌜ _get_Mstatus_SIE  ms_f = _get_Mstatus_SIE  ms_e ⌝ -∗
+      (* what the sret needs, and all it needs: return to S-mode, re-enable
+         interrupts from SPIE, and they are still off until it does *)
+      ⌜ _get_Mstatus_SPP  ms_f = ('b"1" : mword 1) ⌝ -∗
+      ⌜ _get_Mstatus_SPIE ms_f = ('b"1" : mword 1) ⌝ -∗
+      ⌜ _get_Mstatus_SIE  ms_f = ('b"0" : mword 1) ⌝ -∗
       sie_cap_gpr_at ms_f mf av false p -∗
+      sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
       cpu_own 0 false p C false -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
          resuming hart, so their values are existential *)
@@ -290,7 +309,7 @@ Module Type KERNELTRAP.
       (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
       (Φ : mval -> iProp Σ) (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
-      (ms_e : mword 64) (ep sc tv : mword 64),
+      (ep sc tv : mword 64),
       wp_kerneltrap_sconf_body γu γv γtx γdk γtl Φ γs pd pav pu
-        m av p C ms_e ep sc tv.
+        m av p C ep sc tv.
 End KERNELTRAP.

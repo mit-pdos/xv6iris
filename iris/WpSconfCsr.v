@@ -516,7 +516,13 @@ Section WpSconfCsr.
       ∀ ms : mword 64,
       ⌜ sconf_ms_facts ms ⌝ -∗
       hart_state ↦ᵣ HART_ACTIVE tt -∗
-      sconf -∗
+      (* [sconf_at ms], not [sconf]: the leaf NAMES the mstatus it read, so
+         handing back the mstatus-EXPOSING flavour costs nothing and is
+         strictly more useful -- it is what lets a holder of the [sret_bits]
+         travelling half turn it into a fact about SPP/SPIE at this very [ms]
+         ([sconf_at_sret]).  [sconf_at_close] recovers the plain bundle in
+         one line for callers that do not care. *)
+      sconf_at ms -∗
       strans_inv -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (tp_pin (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m)) -∗
@@ -601,8 +607,12 @@ Section WpSconfCsr.
     iApply ("Hcont" $! ms0 with "[%] Hhs' [Hpriv Hms Hhalf Hspp Hmiex Hmenvx] Htr
                           [$Hpc' $Hnpc] [Hfmap] Hpair").
     { exact Hmsf. }
-    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
-      iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
+    { rewrite /sconf_at /sconf_msown.
+      iSplitL "Hms Hhalf Hspp".
+      { iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
+      iIntros (ms') "(Hms' & Hhalf' & Hspp' & %Hmsf')".
+      iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+      iExists ms'. iFrame "Hms' Hhalf' Hspp'". iPureIntro. exact Hmsf'. }
     iExact "Hfmap".
   Qed.
 

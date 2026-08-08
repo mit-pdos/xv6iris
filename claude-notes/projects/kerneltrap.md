@@ -54,15 +54,16 @@ goes away and nothing takes its place.**
 
 Two consequences for the shape:
 
-- **The precondition needs the mstatus-EXPOSING bundle too**, not just the
-  postcondition: SPP is not in `sconf_ms_facts`, so `sie_cap_gpr_at ms_e` in
-  / `sie_cap_gpr_at ms_f` out, with `⌜_get_Mstatus_SPP ms_e = 'b"1"⌝`.  The
-  body still threads the plain `sie_cap_gpr` — the flavour is closed right
-  after the entry `csrr s1,sstatus` (which is where `ms_e` gets recorded into
-  a register) and re-opened only by the final `csrw sstatus`.  This wants an
-  `_at` variant of `wp_csrr_sstatus_s_sconf`, whose value is then PINNED to
-  `sstatus_read ms_e` instead of `∀ ms`-quantified — strictly nicer than the
-  existing shape.
+- **The SPP/SPIE facts reach the check through `sret_bits`, the ghost
+  mirror** — NOT through any flavour of the bundle.  The precondition threads
+  the PLAIN `sie_cap_gpr` plus `sret_bits '1' '1'`; the postcondition is then
+  ABSOLUTE (`SPP = 1`, `SPIE = 1`, `SIE = 0` outright) rather than relative to
+  an entry mstatus, because the final `csrw sstatus` writes back the saved
+  word.  No entry mstatus is named anywhere in the contract.  The
+  mstatus-exposing flavour appears only on the OUTPUT side, and only because
+  `sret` is what reads those bits.  `wp_csrr_sstatus_s_sconf` now hands back
+  `sconf_at ms` (it already named the mstatus it read, so exposing it costs
+  nothing), and `sconf_at_sret` turns the travelling half into the fact.
 - **The engine now owes the scause fact.**  `wp_exec_step_intr`'s σ-callback
   hands out only `exec (dispatchInterrupt Supervisor) σ = Some (None, σ)`; the
   trap-TAKING arm computes `s_dispatch mip meip seip mie mdv ms = Some (i, Supervisor)`
