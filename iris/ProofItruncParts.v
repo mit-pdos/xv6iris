@@ -657,6 +657,18 @@ Section ItruncDefs.
       [exfalso; exact (Hnz Hc) |]. iIntros "$".
   Qed.
 
+  (* the indirect block's content half and token, when it exists *)
+  Lemma ind_res_nz (γfs : fs_names) (bmx : blkmap) :
+    bv_unsigned (bm_ind bmx) <> 0 ->
+    ind_res γfs bmx -∗
+      fsblock γfs (bv_unsigned (bm_ind bmx)) (ind_bytes (bm_ent bmx)) ∗
+      blk_own γfs (bv_unsigned (bm_ind bmx)).
+  Proof.
+    intros Hnz. rewrite /ind_res /ind_blk /ind_tok.
+    destruct (decide (bv_unsigned (bm_ind bmx) = 0)) as [Hc|_];
+      [exfalso; exact (Hnz Hc) |]. iIntros "$".
+  Qed.
+
   (* opened and closed by lemma, for the same IH reason as the direct
      loop's state *)
   Lemma it_ent_state_open (γ : log_names) (γfs : fs_names) (bm : blkmap)
