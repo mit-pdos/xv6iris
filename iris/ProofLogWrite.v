@@ -1996,18 +1996,21 @@ Section ProofLogWrite.
            insert is the identity -- and the unit is handed straight back. *)
         specialize (Hcredit eq_refl).
         iDestruct (log_absorb_step with "Hoauth Hop") as (i0) "%Hi0".
-        assert (Hun : Sb ∪ {[uint bno]} = Sb) by set_solver.
+        assert (Hun : Sb ∪ {[uint bno]} = Sb).
+        { rewrite (comm_L (∪) Sb ({[uint bno]} : gset Z)).
+          apply subseteq_union_1_L, elem_of_subseteq_singleton, Hcredit. }
         iModIntro. iExists om. iFrame "Hoauth".
         rewrite Hun. iFrame "Hop".
         iSplitR; [iPureIntro; exact Hsz|].
         iSplitR; [iPureIntro; exact Hbnd|].
         iSplitR; [iPureIntro; intros _ j e Hj; exact (Hsub j e Hj)|].
-        iSplitR; [iPureIntro; intros j e Hj; pose proof (Hsub j e Hj); set_solver|].
+        iSplitR; [iPureIntro; intros j e Hj; exact (union_subseteq_l' _ _ _ (Hsub j e Hj))|].
         iSplitR; [iPureIntro; exact Hsum|].
         iSplitR; [iPureIntro; discriminate|].
         iSplitR.
         { iPureIntro. intros _.
-          pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs. set_solver. }
+          pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs.
+          exact (elem_of_weaken _ _ _ Hcredit Hs). }
         (* the unit in hand bounds the sum below, hence lh.n above *)
         iPureIntro. pose proof (op_sum_delete om i0 (S u, Sb) Hi0) as He.
         cbn in He. lia.
@@ -2034,16 +2037,18 @@ Section ProofLogWrite.
         { iPureIntro. intros HinLB j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
           - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
-            pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs. set_solver.
+            pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs.
+            apply union_least; [exact Hs | apply elem_of_subseteq_singleton, HinLB].
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
             exact (Hsub j e Hj). }
         iSplitR.
         { iPureIntro. intros j e Hj. unfold om' in Hj.
           destruct (decide (j = i0)) as [->|Hne].
           - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
-            pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs. set_solver.
+            pose proof (Hsub i0 (S u, Sb) Hi0) as Hs. cbn in Hs.
+            exact (union_mono_r _ _ _ Hs).
           - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
-            pose proof (Hsub j e Hj). set_solver. }
+            exact (union_subseteq_l' _ _ _ (Hsub j e Hj)). }
         iSplitR; [iPureIntro; rewrite Hspend; unfold LOGBLOCKS in *; lia|].
         iSplitR;
           [iPureIntro; intros _; rewrite Hspend; unfold LOGBLOCKS in *; lia|].
@@ -2347,8 +2352,8 @@ Section ProofLogWrite.
             - rewrite length_app HlenW /=. lia.
             - unfold LOGBLOCKS in *. lia. }
           iSplitR.
-          { iPureIntro. subst LB. rewrite map_app list_to_set_app_L /=.
-            set_solver. }
+          { iPureIntro. subst LB. rewrite map_app list_to_set_app_L /= right_id_L.
+            reflexivity. }
           iSplitR; [iPureIntro; apply lw_nodup_snoc; assumption|].
           iSplitR; [iPureIntro; apply lw_wok_snoc; assumption|].
           iSplitL "Hncell".
