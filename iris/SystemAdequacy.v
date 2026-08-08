@@ -121,7 +121,7 @@ Section SystemBoot.
     iMod (boot_shared_alloc g XV6_DISK_BYTES (fun _ => True%I) Hbf with "Hres")
       as (Hfd γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Huart &
+        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Hpst & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".

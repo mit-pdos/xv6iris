@@ -831,7 +831,7 @@ Section ParkGhost.
     by iDestruct (ghost_var_agree with "Hg1 Hg2") as %->.
   Qed.
 
-  Local Lemma ghost_var_halve (γ : gname) (r : bool) :
+  Local Lemma ghost_var_halve {A : Type} `{!ghost_varG Σ A} (γ : gname) (r : A) :
     ghost_var γ 1 r ⊣⊢ ghost_var γ (1/2) r ∗ ghost_var γ (1/2) r.
   Proof.
     iSplit.
@@ -883,4 +883,67 @@ Section ParkGhost.
   Lemma park_at_full_elim (j : nat) (r : bool) :
     (j < NPROC)%nat -> park_at_full (proc_addr j) r -∗ park_full j r.
   Proof. exact (park_at_elim j 1 r). Qed.
+  (* ==================================================================== *)
+  (* THE PER-PROC STATE MIRROR (design/proc-struct.md, the state ghost).    *)
+  (*                                                                       *)
+  (* A [ghost_var] carrying [p->state]'s value, in two halves.  The proc    *)
+  (* lock invariant owns half #1, tied to the cell; half #2 is lock-        *)
+  (* resident on [unclaimed] and held by the claiming thread otherwise.     *)
+  (* Since a ghost_var cannot move on half alone and the tie forbids moving *)
+  (* the cell without the ghost, THE RIGHT TO WRITE [p->state] IS EXACTLY   *)
+  (* OWNERSHIP OF HALF #2.                                                  *)
+  (*                                                                       *)
+  (* It carries the whole 32-bit value rather than a guard class.  The tie  *)
+  (* to the cell is then a plain equality, and the two scanners that write  *)
+  (* state without being the claimant (wakeup, kill) read [SLEEPING] off    *)
+  (* the cell and get the ghost value for free.                            *)
+  (* ==================================================================== *)
+  Definition pstate_own (j : nat) (q : Qp) (st : mword 32) : iProp Σ :=
+    ghost_var (pstate_name j) q st.
+
+  Definition pstate_hlf (j : nat) (st : mword 32) : iProp Σ := pstate_own j (1/2) st.
+  Definition pstate_full (j : nat) (st : mword 32) : iProp Σ := pstate_own j 1 st.
+
+  Global Instance pstate_own_timeless j q st : Timeless (pstate_own j q st).
+  Proof. rewrite /pstate_own. apply _. Qed.
+
+  Lemma pstate_own_agree (j : nat) (q1 q2 : Qp) (st1 st2 : mword 32) :
+    pstate_own j q1 st1 -∗ pstate_own j q2 st2 -∗ ⌜st1 = st2⌝.
+  Proof.
+    iIntros "Hg1 Hg2".
+    by iDestruct (ghost_var_agree with "Hg1 Hg2") as %->.
+  Qed.
+
+  Lemma pstate_split (j : nat) (st : mword 32) :
+    pstate_full j st ⊣⊢ pstate_hlf j st ∗ pstate_hlf j st.
+  Proof. rewrite /pstate_full /pstate_hlf /pstate_own ghost_var_halve //. Qed.
+
+  (* THE WRITE.  Both halves, which is the whole point: no lock holder can
+     move [p->state] without the claimant's half. *)
+  Lemma pstate_update (j : nat) (st st' : mword 32) :
+    pstate_hlf j st -∗ pstate_hlf j st ==∗ pstate_hlf j st' ∗ pstate_hlf j st'.
+  Proof.
+    rewrite /pstate_hlf /pstate_own. iIntros "Hg1 Hg2".
+    iMod (ghost_var_update_halves st' with "Hg1 Hg2") as "[$ $]". done.
+  Qed.
+
+  (* the address-keyed spelling, for the same reason [park_at] has one:
+     [SchedCtx.proc_slots] is keyed on the proc's ADDRESS, not its index. *)
+  Definition pstate_at (pa : mword 64) (q : Qp) (st : mword 32) : iProp Σ :=
+    (∃ j : nat, ⌜pa = proc_addr j /\ (j < NPROC)%nat⌝ ∗ pstate_own j q st)%I.
+
+  Definition pstate_at_hlf (pa : mword 64) (st : mword 32) : iProp Σ :=
+    pstate_at pa (1/2) st.
+
+  Lemma pstate_at_intro (j : nat) (q : Qp) (st : mword 32) :
+    (j < NPROC)%nat -> pstate_own j q st -∗ pstate_at (proc_addr j) q st.
+  Proof. iIntros (Hj) "Hg". iExists j. iFrame "Hg". done. Qed.
+
+  Lemma pstate_at_elim (j : nat) (q : Qp) (st : mword 32) :
+    (j < NPROC)%nat -> pstate_at (proc_addr j) q st -∗ pstate_own j q st.
+  Proof.
+    iIntros (Hj) "(%j' & [%Hpa %Hj'] & Hg)".
+    rewrite (_ : j' = j); [iExact "Hg"|].
+    exact (proc_addr_inj j' j Hj' Hj (eq_sym Hpa)).
+  Qed.
 End ParkGhost.

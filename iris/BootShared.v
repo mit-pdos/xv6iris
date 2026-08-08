@@ -736,6 +736,7 @@ Section BootAlloc.
       ([∗ list] c ∈ enum CPU, hart_spp c) ∗
       ([∗ list] c ∈ enum CPU, hart_spie c) ∗
       ([∗ list] j ∈ seq 0 NPROC, park_full j false) ∗
+      ([∗ list] j ∈ seq 0 NPROC, pstate_full j UNUSED) ∗
       uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
       virtio_frag (g.(gdev).(dvirtio)) ∗
       (* the BOOT MINT: this era's whole disk image, in fragments
@@ -854,6 +855,7 @@ Section BootAlloc.
       main_locks_raw ∗ main_globals_raw ∗
       ([∗ list] h ∈ enum CPU, cpu_proc_half h (zero_reg : mword 64)) ∗
       ([∗ list] i ∈ seq 0 NPROC, park_full i false) ∗
+      ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) ∗
       (∃ l0 : list (bv 8),
          uart_tx_own γd l0 ∗ uart_sent γd l0 ∗ uart_out_lb γd l0) ∗
       (∃ b0 : bool, uart_dlab_is γd (DfracOwn (1/2)) b0) ∗
@@ -884,7 +886,7 @@ Section BootAlloc.
     iIntros "H".
     iDestruct (power_boot_res_unpack g ndisk with "H") as
       "(Hregs & Hbytes & Hkauth & Hkfrags & Hkpt & Hstrans & Hsie & Hspp & Hspie &
-        Hpark & Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
+        Hpark & Hpst & Huf & Hpf & Hvf & Hdimg & Hmir & #Hcinv & #Hcert)".
     (* ---- the claims bundle FIRST: both image halves need it ---- *)
     iMod (kmap_static_claims_intro with "Hkfrags") as "#Hcl".
     (* ---- the image: text persisted, data persisted up to [img_end] ---- *)
@@ -981,6 +983,7 @@ Section BootAlloc.
     iSplitL "Hglobals"; [iExact "Hglobals" |].
     iSplitL "Hprochalves"; [iExact "Hprochalves" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
+    iSplitL "Hpst"; [iExact "Hpst" |].
     iSplitL "Htx Hsent".
     { iExists (uart_acc (g.(gdev).(duart))). iFrame "Htx Hsent Hlb". }
     iSplitL "Hdlab"; [iExists (uart_dlab (g.(gdev).(duart))); iExact "Hdlab" |].
