@@ -990,7 +990,7 @@ Section ProofSleep.
        p->lock spends it. *)
     iAssert trap_csrs with "[Hpay0]" as "Htc". { iExact "Hpay0". }
     iApply (Sched.wp_sched_sconf Φ γs j γl SLEEPING chan D1 (av - 6)%nat true
-              Hj Hgl (park_ok_SLEEPING) eq_refl ltac:(lia)
+              Hj Hgl (park_ok_SLEEPING) ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hchan Hpub Hpark] [] Htc Hcpuemp Hown Hvc [-]").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub Hpark". }
     (* a SLEEPING park owes the slot nothing beyond its record. *)

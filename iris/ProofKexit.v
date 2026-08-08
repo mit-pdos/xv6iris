@@ -1149,7 +1149,7 @@ Section KexitPark.
     iModIntro.
     iDestruct ("Hback" with "Hph") as "Hcpuemp".
     iApply (Sched.wp_sched_sconf (CID := CIDa) Φ γs j γl ZOMBIE ch0 PD av true
-              Hj Hgl park_ok_ZOMBIE eq_refl ltac:(lia)
+              Hj Hgl park_ok_ZOMBIE ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hchan Hkilled Hxstate Hpidh Hpark]
                     [Hpriv Hsp] Hpay Hcpuemp Hoc Hvc [-]").
     { rewrite /proc_held. iFrame "Hlkp Hstate Hchan Hpark".

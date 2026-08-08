@@ -536,7 +536,7 @@ Section ProofSched.
     : wp_sched_sconf_body Φ γs j γl st ch m av eb.
   Proof.
     cbv beta delta [wp_sched_sconf_body].
-    intros pcE pj ret_tgt Hj Hgl Hneeds Heb Hav.
+    intros pcE pj ret_tgt Hj Hgl Hneeds Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg #Htext Hpc #Hprocs Hheld Hpay Htc Hcpu Hown Hvc Hcont".
     (* the cpu bundle [cpu_own 1 eb pj emp false] arrives whole at level 1;

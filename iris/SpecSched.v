@@ -3,9 +3,9 @@
    proof file -- so every function proof can be checked in parallel.
 
    sched() parks the current process: entered holding EXACTLY p->lock
-   (noff == 1, interrupts off, saved base enable [eb = true] -- a kernel
-   thread that can park always got here from interrupts-enabled code, and
-   that is what makes the trap-CSR exchange below balanced), with the
+   (noff == 1, interrupts off, saved base enable [eb] ARBITRARY -- see the
+   premise block below; a thread parked from kerneltrap has [eb = false]),
+   with the
    process's state already moved to a parked state (yield sets RUNNABLE,
    sleep sets SLEEPING -- [needs_ctx st]).  It swtches into this CPU's
    scheduler context, handing over the held lock, the state/chan cells, the
@@ -74,14 +74,18 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      (ProcGeom.v) because the third one never comes back -- see the
      [park_pay] premise below, and SchedCtx's [proc_slots_park_gen]. *)
   park_ok st = true ->
-  (* THE PARKING PRECONDITION: the saved base enable is [true].  At level 1
-     with [eb = true] the pushing acquire has taken the trap CSRs out of the
-     re-enabled SIE arm, so the parking thread genuinely HOLDS them and can
-     hand them across -- which the chain payload demands unconditionally
-     (the scheduler always holds a set at every dispatch).  A parked kernel
-     thread always got here from interrupts-enabled code, so this costs
-     nothing. *)
-  eb = true ->
+  (* NO CONSTRAINT ON [eb].  It used to be pinned [true], on the reasoning
+     that a parked kernel thread always got here from interrupts-enabled
+     code -- which is FALSE of a thread parked from kerneltrap: that one got
+     here from a TRAP, so the pushing acquire recorded intena = 0.  The
+     premise was never used by the proof either (it was introduced and
+     dropped), because nothing here depends on the value: the trap CSRs are
+     threaded EXPLICITLY below rather than taken out of the SIE arm, and the
+     post-swtch intena restore + ghost retune already run at both values
+     ([intr_count_retune_on] / [_off]).  [intr_handler_avail] in the
+     postcondition is likewise value-independent: it comes from the DISPATCH
+     payload -- the scheduler that resumes this thread always runs with
+     interrupts on -- not from this thread's own entry stash. *)
   (16 <= av)%nat ->
   (* TWO INDICES, AND THEY ARE OPPOSITE CONSTANTS.  sched is entered holding
      p->lock at noff == 1, so its OWN resource index is pinned [false]

@@ -555,6 +555,33 @@ Section IntrDefs.
      | S _ => emp
      end)%I.
 
+  (* THE COMPLEMENT OF [trap_csrs_pay] AT LEVEL 0: what a caller has to
+     BRING because the bundle does not already own it.  At level 0 the arm
+     index and the saved base coincide, so at [eb = true] the enabled arm
+     owns the trap CSRs and the caller brings nothing, while at
+     [eb = false] nothing in the bundle owns them and the caller brings the
+     whole set.
+
+     A function that PARKS needs the set unconditionally -- sched's crossing
+     takes it and re-delivers the RESUMING hart's, because sepc/scause/stval
+     are PER-HART registers and framing them around a migration would be
+     unsound.  So yield takes [trap_csrs_pay 0 eb] out of its own push_off
+     and [trap_csrs_ext eb] from its caller, and exactly one of the two is
+     [emp].  The [eb = false] case is kerneltrap's: the trap cleared SIE, so
+     the pushing acquire records intena = 0 and hands out nothing, and the
+     handler is holding the trap CSRs itself because the TRAP gave them to
+     it. *)
+  Definition trap_csrs_ext (eb : bool) : iProp Σ :=
+    (if eb then emp else trap_csrs)%I.
+
+  Lemma trap_csrs_ext_split (eb : bool) :
+    trap_csrs_pay 0 eb ∗ trap_csrs_ext eb ⊣⊢ trap_csrs.
+  Proof.
+    destruct eb; rewrite /trap_csrs_pay /trap_csrs_ext.
+    - by rewrite bi.sep_emp.
+    - by rewrite bi.emp_sep.
+  Qed.
+
   Definition intr_restore : iProp Σ :=
     (intr_handler_avail ∗ trap_csrs)%I.
 
@@ -1325,6 +1352,27 @@ Section IntrDefs.
   Qed.
 
 End IntrDefs.
+
+(* ===================================================================== *)
+(* TRANSPORTING [trap_csrs_ext] ACROSS A MIGRATION -- the [cpu_own]       *)
+(* transport's twin, and needed for the same reason.  sepc/scause/stval   *)
+(* are PER-HART registers, so [trap_csrs_ext] is hart-indexed and cannot  *)
+(* simply be framed around a step that can move the hart.  It transports  *)
+(* anyway, by the two halves of what such a step gives you: at            *)
+(* [eb = true] the proposition is [emp], which mentions no hart at all;   *)
+(* at [eb = false] no trap can have been taken, so [wp_next]'s            *)
+(* conditional equality pins the hart.  Chain the per-step equalities     *)
+(* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
+(* ===================================================================== *)
+Lemma trap_csrs_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+    (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
+  (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+  trap_csrs_ext (CID := CID0) eb -∗ trap_csrs_ext (CID := CID1) eb.
+Proof.
+  intros Heq. destruct eb.
+  - (* [emp]: no hart in the term *) rewrite /trap_csrs_ext. iIntros "$".
+  - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
+Qed.
 
 (* ==================================================================== *)
 (* THE PORT'S STANDARD TACTICS (outside the section: an [Ltac] defined   *)

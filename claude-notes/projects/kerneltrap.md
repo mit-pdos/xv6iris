@@ -289,49 +289,80 @@ existentially inside `sconf` — and pinning it is not provable of a real
 handler, whose push_off/pop_off pairs leave `legalize_sstatus_val`-shaped
 mstatus values rather than the literal original.
 
-## FINDING: `SpecYield`/`SpecSched`'s `eb = true` premise is too strong
+## DONE: `SpecYield`/`SpecSched` are now `forall eb`
 
-**`kerneltrap` runs at `eb = false`, and today's `yield` contract cannot be
-called from it.**  Derivation, from both sides:
+They used to pin `eb = true`, which made both contracts unusable from
+kerneltrap.  Derivation of why, from both sides:
 
 - *From the C*: the trap cleared SIE, so `push_off` inside `yield`'s
   `acquire(&p->lock)` records `intena = intr_get() = 0`.  `sched` saves and
   restores that across the `swtch`; the matching `release` pops to noff 0 with
   `intena == false` and does NOT `intr_on()`.  kerneltrap therefore returns
   with interrupts still off, and kernelvec's `sret` is what re-enables them
-  from SPIE.  This is correct xv6 behaviour, not a bug.
+  from SPIE.  Correct xv6 behaviour, not a bug.
 - *From the ghosts*: at level 0 `intr_count 0 eb` is the eighth at
-  `sie_bit eb`, and `sie_arm b` holds the complementary eighth at `sie_bit b`;
-  `ghost_var` agreement forces `b = eb` at level 0.  Inside the handler the
-  live SIE bit is '0', so `eb = false`.  (The same agreement is why
-  `SpecYield`'s `b` parameter is already pinned to `true` by its `eb = true`
-  premise — the two indices were never independent at level 0.)
+  `sie_bit eb` and `sie_arm b` holds the complementary eighth at `sie_bit b`;
+  `ghost_var` agreement forces `b = eb` (`CpuOwn.cpu_own_eb_agree`).  Inside
+  the handler the live SIE bit is '0', so `eb = false`.
+- `SpecSched.v`'s comment "A parked kernel thread always got here from
+  interrupts-enabled code, so this costs nothing" was the assumption that
+  fails: a thread parked from `kerneltrap` got there from a TRAP.  Nobody had
+  hit it because `wp_yield_sconf` had **zero consumers** — kerneltrap is its
+  first.
 
-`SpecSched.v`'s comment "A parked kernel thread always got here from
-interrupts-enabled code, so this costs nothing" is the assumption that fails:
-a thread parked from `kerneltrap` got there from a TRAP.
+### What the generalization turned out to be
 
-### The generalization to make
+**`sched` needed no proof change at all.**  Its `eb = true` premise was
+introduced by `intros` and never used: the trap CSRs were already threaded
+explicitly rather than taken out of the SIE arm, the post-swtch intena
+restore and ghost retune already ran at both values
+(`intr_count_retune_on`/`_off`), and the `intr_handler_avail` in its
+postcondition comes from the DISPATCH payload — the scheduler that resumes
+the thread always runs with interrupts on — not from the parking thread's own
+entry stash.  Deleting the premise and the dead `intros` name was the whole
+change (plus dropping one `eq_refl` at each of the three call sites).
 
-Collapse the two indices into one and make the trap-CSR payload explicit:
+**`yield` collapsed from two indices to one.**  `eb` and the resource index
+`b` were separate binders that `cpu_own_eb_agree` already forced equal at
+level 0, so the second only ever admitted vacuous instances; the contract now
+carries one `eb` and threads it through every leaf.
 
-```coq
-(* at level 0 the arm index and the saved base-enable are the same bit *)
-Definition trap_csrs_ext (b : bool) : iProp Σ := if b then emp else trap_csrs.
+**Two things had to be added, and both are about per-hart resources.**
 
-wp_yield_sconf ... (e : bool) :
-  sie_cap_gpr m av e pj -∗ cpu_own 0 e pj C e -∗ trap_csrs_ext e -∗ ...
-  wp_next true pj (fun CID => ... sie_cap_gpr mf av e pj -∗ cpu_own 0 e pj C e
-                              -∗ trap_csrs_ext e -∗ ...)
-```
+- `IntrDefs.trap_csrs_ext eb := if eb then emp else trap_csrs`, the
+  complement of `trap_csrs_pay 0 eb`, with
+  `trap_csrs_ext_split : trap_csrs_pay 0 eb ∗ trap_csrs_ext eb ⊣⊢ trap_csrs`.
+  `sched`'s crossing demands the whole set unconditionally, and
+  sepc/scause/stval are PER-HART registers, so a parking function cannot
+  frame them — it must hand them over and take the resuming hart's back.  At
+  `eb = true` yield's own acquire produces them by dismantling the enabled
+  arm and the caller brings `emp`; at `eb = false` there is no arm and the
+  caller brings the set.  Exactly one of the two is `emp`.
+- `IntrDefs.trap_csrs_ext_transport`, the twin of `cpu_own_transport` and
+  needed for the same reason: the lent set is hart-indexed, so it cannot be
+  framed around a step that may move the hart.  It transports by the same two
+  halves — at `eb = true` the proposition is literally `emp` and mentions no
+  hart; at `eb = false` no trap was taken, so `wp_next`'s conditional
+  equality pins the hart.  **A hart-indexed resource that survives a possible
+  migration needs a transport lemma, not a frame** — this is the second
+  instance of that shape, and the pattern is worth reaching for directly.
 
-At `e = true` this is today's contract verbatim (`trap_csrs_ext true = emp`,
-the arm owns them).  At `e = false` the caller — kerneltrap — hands its own
-trap CSRs across the park and gets the RESUMING hart's back, which is the
-whole point: `sepc`/`scause`/`stval` are per-hart registers, and framing them
-around a migration would be unsound.  `sched`'s crossing already carries
-`trap_csrs` unconditionally, so the payload plumbing exists; what changes is
-which side supplies it.
+**And `wp_next_chain` had to stop assuming one index.**  A PARKING function's
+own `wp_next` index is the literal `true`, while the leaves it ran carry its
+caller's `eb`, so the goal and the chain facts are disjunctions with
+different left components and a plain `specialize` does not typecheck.  The
+tactic now falls back to keeping the RIGHT disjunct (the left one,
+`true = false`, is absurd) and re-injecting it at whatever index each chain
+fact carries.  At a matching index the old path still fires.
+
+### The crossing index is now the literal `true`
+
+`wp_next b pj` became `wp_next true pj`, matching `sched`.  This is a
+correctness fix, not bookkeeping: at `eb = false` the old form collapsed via
+`wp_next_off` to "yield returns on the hart that called it", which is false —
+yield parks, and a `swtch` moves the hart with interrupts off, so it has
+nothing to do with SIE.  It was invisible only because the contract had no
+consumers and its `eb = true` instance made `b` true.
 
 ## Worklist, in dependency order
 
@@ -346,8 +377,8 @@ which side supplies it.
    is a `vm_compute` on the dispatch set.
 6. The `_at` variant of `wp_csrr_sstatus_s_sconf` (value pinned to
    `sstatus_read ms_e`).
-7. The `eb` generalization of `SpecYield`/`ProofYield`/`SpecSched`/`ProofSched`
-   described above.
+7. ~~The `eb` generalization of `SpecYield`/`ProofYield`/`SpecSched`/`ProofSched`~~
+   **done** (see the section above).
 8. ~~`SpecKerneltrap.v` on the house-spec shape~~ **done**.
 9. `ProofKerneltrap.v` + `LinkKerneltrap.v` — the `Axiom` goes away and
    **nothing replaces it** (see the panic-arm table).
