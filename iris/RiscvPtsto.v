@@ -204,6 +204,14 @@ Record riscvEraGS := RiscvEraGS {
      [strans_name]: a second instance of that class would make resolution
      ambiguous.  SPP is one bit, so [sieG]'s instance already fits. *)
   era_spp_name : CPU -> gname;
+  (* mstatus.SPIE's mirror, the twin of [spp_name] and travelling with it.
+     SPIE is the OTHER bit an [sret] reads (it restores SIE from it), it is
+     written by the same trap, and it is preserved by the same SIE flips --
+     so it obeys the identical discipline and the two are always held
+     together, as [IntrDefs.sret_bits].  Two names rather than one ghost over
+     a pair only because [sieG]'s [ghost_varG (mword 1)] then serves both
+     with no new class. *)
+  era_spie_name : CPU -> gname;
   (* THE PARK RECEIPT, CANONICALLY per proc slot.  One [ghost_var bool] per
      entry of the proc[] array, recording whether hart-h's parked scheduler
      record is RESIDENT in the global [SchedCtx.scheds_inv] slot of the hart
@@ -393,6 +401,7 @@ Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name riscv_eraGS.
 Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name riscv_eraGS.
 Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
 Definition spp_name `{!riscvGS Σ} : CPU -> gname := era_spp_name riscv_eraGS.
+Definition spie_name `{!riscvGS Σ} : CPU -> gname := era_spie_name riscv_eraGS.
 Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
 (* the AMBIENT era's disk-image gname: what [DiskPtsto.disk_names]'s [dn_img]
    field is always constructed at ([VirtioProto.disk_ghosts_alloc]), and what

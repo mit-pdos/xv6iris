@@ -264,7 +264,7 @@ Section BootBridge.
     ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
     (* the SPP mirror's TIED half, at this mstatus.  Its twin travels with
        [trap_csrs] -- boot holds it, because interrupts are off. *)
-    spp_hlf (_get_Mstatus_SPP ms) -∗
+    sret_tie ms -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     sconf.
   Proof.
@@ -293,7 +293,7 @@ Section BootBridge.
       (pmpcfgf : type_of_register pmpcfg_n)
       (pmpaddrf : type_of_register pmpaddr_n)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (nv iv : mword 32) (p0 : mword 64) (vspp1 vspp2 : mword 1) :
+      (nv iv : mword 32) (p0 : mword 64) (vspp1a vspp1b vspp2a vspp2b : mword 1) :
     (* the register file, in the two slots the S-mode side reads *)
     Mf !!! Regidx csp_rs1 = mb_frame sp0 ->
     Mf !!! Regidx (mword_of_int 4 : mword 5) = tpv ->
@@ -345,7 +345,7 @@ Section BootBridge.
        Nothing is tied to that value: this bridge is where the tie is first
        established, and holding both is what lets it set them to the mstatus
        it is installing. *)
-    spp_hlf vspp1 -∗ spp_hlf vspp2 -∗
+    sret_bits vspp1a vspp1b -∗ sret_bits vspp2a vspp2b -∗
     (* --- the raw .bss cells --- *)
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     a_cpu_noff cid_word ↦₄ nv -∗
@@ -414,7 +414,8 @@ Section BootBridge.
     { rewrite Hsie. iExact "Hg2". }
     (* SET THE TIE.  Both halves are in hand exactly here, which is the only
        moment they ever are outside a leaf that writes mstatus. *)
-    iMod (spp_hlf_update vspp1 vspp2 (_get_Mstatus_SPP msf) with "Hspp1 Hspp2")
+    iMod (sret_bits_update vspp1a vspp1b vspp2a vspp2b
+            (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) with "Hspp1 Hspp2")
       as "[Hspp1 Hspp2]".
     iDestruct (sconf_intro msf mief midelegf MENVCFG_S Hmsf Hmiez eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hspp1 Hmie Hmdl Hmenv") as "Hsconf".
@@ -437,7 +438,7 @@ Section BootBridge.
     iFrame "Hcpu Hg4a".
     rewrite /main_hart_raw /trap_csrs.
     iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
-    iExists (_get_Mstatus_SPP msf). iExact "Hspp2".
+    iExists (_get_Mstatus_SPP msf), (_get_Mstatus_SPIE msf). iExact "Hspp2".
   Qed.
 
 End BootBridge.

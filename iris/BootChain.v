@@ -383,8 +383,8 @@ Section BootRun.
      (* BOTH halves of the SPP mirror.  Adequacy mints them at an arbitrary
         value; the M->S bridge is what ties them to the mstatus it installs,
         so nothing here depends on which value that is. *)
-     spp_hlf ('b"0" : mword 1) ∗
-     spp_hlf ('b"0" : mword 1) ∗
+     sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
+     sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
      a_cpu_noff cid_word ↦₄ noff_val 0 ∗
      a_cpu_int cid_word ↦₄ iv ∗
      cpu_proc_half cpu_id zero_reg ∗
@@ -468,7 +468,7 @@ Section BootRun.
               msf satpf midelegf mief menvcfgf
               (mb_tpv (boot_w64 (Z.of_nat (fin_to_nat cpu_id))))
               pmpcfgf pmpaddrf (register_lookup tlb rs)
-              (noff_val 0) iv zero_reg _ _
+              (noff_val 0) iv zero_reg _ _ _ _
               Hsp Htpf (mstatus_kernel_SIE _ Hkf) (sconf_ms_facts_of_kernel _ Hkf)
               Hmenvl Hmiez Hsatpm Hpmpo
               ltac:(exact (st_tpv_of_nat _ Hn))

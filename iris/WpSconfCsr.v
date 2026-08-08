@@ -749,7 +749,7 @@ Section WpSconfCsr.
       iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & (Hcells & Hc1))".
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
       iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hc1)".
-      destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hmsf').
+      destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
       (* the trap-vector invariant: open it for the quarter, flip, reseal *)
       iDestruct "Hhx" as (handler) "#Hintr".
@@ -798,9 +798,9 @@ Section WpSconfCsr.
         unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
       iEval (rewrite -Hsie') in "Hhalf".
-      (* the SPP tie is untouched by an SIE flip ([Hspp']), so it only needs
-         re-expressing at the new mstatus. *)
-      iEval (rewrite -Hspp') in "Hspp".
+      (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
+         re-expressing at the new mstatus -- no ghost movement. *)
+      iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
       tp_refold Hrdtp "Hfmap".
       iAssert (sie_cap (<[Regidx rd := regval_into_reg (sstatus_read ms0)]> m) n false p)
         with "[Hstk Htr Hq]" as "Hcap".
@@ -1000,7 +1000,7 @@ Section WpSconfCsr.
       iDestruct "Hsepcx'" as (v2) "Hsepc2".
       iDestruct (reg_pointsto_excl sepc v1 v2 with "Hsepc1 Hsepc2") as %[].
     - (* ---- b = false: the real restore ---- *)
-      destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hmsf').
+      destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
       iDestruct "Hhx" as (handler) "[#Hintr #Hspec]".
       iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
@@ -1031,9 +1031,9 @@ Section WpSconfCsr.
         unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
       iEval (rewrite -Hsie') in "Hhalf".
-      (* the SPP tie is untouched by an SIE flip ([Hspp']), so it only needs
-         re-expressing at the new mstatus. *)
-      iEval (rewrite -Hspp') in "Hspp".
+      (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
+         re-expressing at the new mstatus -- no ghost movement. *)
+      iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
       iAssert (sie_cap m n true p)
         with "[Hqcap Hqcnt Hsepcx Hscausex Hstvalx Hsppc Hstk Htr Hcells]" as "Hcap".
       { iSplitL "Hstk". { iExact "Hstk". }
@@ -1190,7 +1190,7 @@ Section WpSconfCsr.
     iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
     iAssert (sie_cap m n true p) with "[Hstk Htr Hq1 Harest]" as "Hcap".
     { iFrame "Hstk Htr Hq1 Harest". }
-    destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hmsf').
+    destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
     iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
     iModIntro.
@@ -1212,9 +1212,9 @@ Section WpSconfCsr.
     iEval (rewrite Lnpc) in "Hpc'".
     iEval (rewrite Hb1) in "Hhalf".
     iEval (rewrite -Hsie') in "Hhalf".
-      (* the SPP tie is untouched by an SIE flip ([Hspp']), so it only needs
-         re-expressing at the new mstatus. *)
-      iEval (rewrite -Hspp') in "Hspp".
+      (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
+         re-expressing at the new mstatus -- no ghost movement. *)
+      iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
     iAssert (sconf) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
       iExists ms1. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf'. }
@@ -1298,7 +1298,7 @@ Section WpSconfCsr.
       iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & (Hcells & Hc1))".
       iClear "Hcnt".
       iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt)".
-      destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hmsf').
+      destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
       (* the trap-vector invariant: open it for the quarter, flip, reseal *)
       iDestruct "Hhx" as (handler) "#Hintr".
@@ -1332,9 +1332,9 @@ Section WpSconfCsr.
         unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
       iEval (rewrite Lnpc) in "Hpc'".
       iEval (rewrite -Hsie') in "Hhalf".
-      (* the SPP tie is untouched by an SIE flip ([Hspp']), so it only needs
-         re-expressing at the new mstatus. *)
-      iEval (rewrite -Hspp') in "Hspp".
+      (* SPP and SPIE are untouched by an SIE flip, so the tie only needs
+         re-expressing at the new mstatus -- no ghost movement. *)
+      iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
       iAssert (sie_cap m n false p) with "[Hstk Htr Hq]" as "Hcap".
       { iSplitL "Hstk"; [iExact "Hstk" |].
         iFrame "Htr". iExact "Hq". }
@@ -1454,7 +1454,7 @@ Section WpSconfCsr.
      [sie_cap_gpr_at_close] as soon as they have been recorded. ---- *)
   Lemma wp_csrw_sstatus_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (b : bool) (ms0 : mword 64) (vspp : mword 1) :
+      (m : regfile) (n : nat) (b : bool) (ms0 : mword 64) (vspp vspie : mword 1) :
     uint rs1 <> 0 ->
     rget m rs1 = sstatus_read ms0 ->
     sconf_ms_facts ms0 ->
@@ -1466,7 +1466,7 @@ Section WpSconfCsr.
        the enabled arm holds it instead and no caller can supply it -- the
        instance is then vacuous, which is right: SPP is not a value enabled
        code may pin. *)
-    spp_hlf vspp -∗
+    sret_bits vspp vspie -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -1475,7 +1475,7 @@ Section WpSconfCsr.
       ⌜ _get_Mstatus_SPP  msf = _get_Mstatus_SPP  ms0 ⌝ -∗
       ⌜ _get_Mstatus_SPIE msf = _get_Mstatus_SPIE ms0 ⌝ -∗
       sie_cap_gpr_at msf m n b p -∗
-      spp_hlf (_get_Mstatus_SPP msf) -∗
+      sret_bits (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -1547,7 +1547,8 @@ Section WpSconfCsr.
     iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
     (* re-tie SPP to the mstatus the write installs -- the only leaf that has
        to, and the only one holding both halves. *)
-    iMod (spp_hlf_update (_get_Mstatus_SPP ms) vspp (_get_Mstatus_SPP ms1)
+    iMod (sret_bits_update (_get_Mstatus_SPP ms) (_get_Mstatus_SPIE ms)
+            vspp vspie (_get_Mstatus_SPP ms1) (_get_Mstatus_SPIE ms1)
             with "Hspp Hsppc") as "[Hspp Hsppc]".
     iModIntro.
     iExists (set_reg s_pc mstatus ms1).

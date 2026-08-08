@@ -94,7 +94,7 @@ Proof. unfold lift_sstatus. cbn zeta.
    splitter reduces each field to a vm-computed mask bit. ---- *)
 Local Ltac s_prep :=
   unfold _get_Sstatus_SIE, _get_Sstatus_MXR, _get_Sstatus_FS, _get_Sstatus_VS,
-         _get_Sstatus_XS, _get_Sstatus_SPP;
+         _get_Sstatus_XS, _get_Sstatus_SPP, _get_Sstatus_SPIE;
   unfold subrange_vec_dec;
   rewrite !autocast_refl;
   unfold to_word_idx, to_word, get_word;
@@ -171,6 +171,10 @@ Proof. sfield_and1. Qed.
 Local Lemma sSPP_and2 (w : mword 64) :
   _get_Sstatus_SPP (and_vec w mask2c) = _get_Sstatus_SPP w.
 Proof. sfield_and1. Qed.
+(* SPIE (bit 5) is off the mask too -- the OTHER bit an sret reads. *)
+Local Lemma sSPIE_and2 (w : mword 64) :
+  _get_Sstatus_SPIE (and_vec w mask2c) = _get_Sstatus_SPIE w.
+Proof. sfield_and1. Qed.
 Local Lemma sFS_and2 (w : mword 64) :
   _get_Sstatus_FS (and_vec w mask2c) = _get_Sstatus_FS w.
 Proof. sfield_and2w. Qed.
@@ -226,6 +230,9 @@ Local Lemma sMXR_or2 (w : mword 64) :
 Proof. sfield_or1. Qed.
 Local Lemma sSPP_or2 (w : mword 64) :
   _get_Sstatus_SPP (or_vec w mask2s) = _get_Sstatus_SPP w.
+Proof. sfield_or1. Qed.
+Local Lemma sSPIE_or2 (w : mword 64) :
+  _get_Sstatus_SPIE (or_vec w mask2s) = _get_Sstatus_SPIE w.
 Proof. sfield_or1. Qed.
 Local Lemma sFS_or2 (w : mword 64) :
   _get_Sstatus_FS (or_vec w mask2s) = _get_Sstatus_FS w.
@@ -320,9 +327,12 @@ Section Assembly.
     sconf_ms_facts ms ->
     _get_Mstatus_SIE (legalize_sstatus_val ms (sstatus_write_val ms (mword_of_int 2)))
       = ('b"0" : mword 1) /\
-    (* SPP UNMOVED: the tie survives the flip untouched *)
+    (* SPP AND SPIE UNMOVED: the [sret_bits] tie survives the flip untouched,
+       so push_off / pop_off need no ghost movement at all *)
     _get_Mstatus_SPP (legalize_sstatus_val ms (sstatus_write_val ms (mword_of_int 2)))
       = _get_Mstatus_SPP ms /\
+    _get_Mstatus_SPIE (legalize_sstatus_val ms (sstatus_write_val ms (mword_of_int 2)))
+      = _get_Mstatus_SPIE ms /\
     sconf_ms_facts (legalize_sstatus_val ms (sstatus_write_val ms (mword_of_int 2))).
   Proof.
     intros Hf.
@@ -330,10 +340,12 @@ Section Assembly.
     assert (Hsie : _get_Sstatus_SIE (sstatus_write_val ms (mword_of_int 2))
                    = ('b"0" : mword 1)).
     { unfold sstatus_write_val, sstatus_read. rewrite subrange_full. apply sSIE_and2. }
-    destruct (flip_core ms _ ('b"0") Hf Hsie Hmxr Hfs Hvs Hxs) as (H1 & H2 & _ & H4).
-    split; [ exact H1 |]. split; [| exact H4 ].
-    rewrite H2. unfold sstatus_write_val, sstatus_read.
-    rewrite subrange_full sSPP_and2 sSPP_lower. reflexivity.
+    destruct (flip_core ms _ ('b"0") Hf Hsie Hmxr Hfs Hvs Hxs) as (H1 & H2 & H3 & H4).
+    split; [ exact H1 |]. split; [| split; [| exact H4 ]].
+    - rewrite H2. unfold sstatus_write_val, sstatus_read.
+      rewrite subrange_full sSPP_and2 sSPP_lower. reflexivity.
+    - rewrite H3. unfold sstatus_write_val, sstatus_read.
+      rewrite subrange_full sSPIE_and2 sSPIE_lower. reflexivity.
   Qed.
 
   Lemma csrsi_sie_flip (ms : mword 64) :
@@ -342,6 +354,8 @@ Section Assembly.
       = ('b"1" : mword 1) /\
     _get_Mstatus_SPP (legalize_sstatus_val ms (sstatus_write_set_val ms (mword_of_int 2)))
       = _get_Mstatus_SPP ms /\
+    _get_Mstatus_SPIE (legalize_sstatus_val ms (sstatus_write_set_val ms (mword_of_int 2)))
+      = _get_Mstatus_SPIE ms /\
     sconf_ms_facts (legalize_sstatus_val ms (sstatus_write_set_val ms (mword_of_int 2))).
   Proof.
     intros Hf.
@@ -349,10 +363,12 @@ Section Assembly.
     assert (Hsie : _get_Sstatus_SIE (sstatus_write_set_val ms (mword_of_int 2))
                    = ('b"1" : mword 1)).
     { unfold sstatus_write_set_val, sstatus_read. rewrite subrange_full. apply sSIE_or2. }
-    destruct (flip_core ms _ ('b"1") Hf Hsie Hmxr Hfs Hvs Hxs) as (H1 & H2 & _ & H4).
-    split; [ exact H1 |]. split; [| exact H4 ].
-    rewrite H2. unfold sstatus_write_set_val, sstatus_read.
-    rewrite subrange_full sSPP_or2 sSPP_lower. reflexivity.
+    destruct (flip_core ms _ ('b"1") Hf Hsie Hmxr Hfs Hvs Hxs) as (H1 & H2 & H3 & H4).
+    split; [ exact H1 |]. split; [| split; [| exact H4 ]].
+    - rewrite H2. unfold sstatus_write_set_val, sstatus_read.
+      rewrite subrange_full sSPP_or2 sSPP_lower. reflexivity.
+    - rewrite H3. unfold sstatus_write_set_val, sstatus_read.
+      rewrite subrange_full sSPIE_or2 sSPIE_lower. reflexivity.
   Qed.
 
 End Assembly.

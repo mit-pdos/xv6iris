@@ -280,8 +280,8 @@ Section WpSmodeIntr.
          both to the mstatus the engine returns. *)
       iDestruct (intr_config_of_v2 with "Hsc Hq1 Hsepcx Hscausex Hstvalx")
         as "(Hic & Hq1 & Hmenv & Hsppt)".
-      iDestruct "Hsppt" as (vt) "Hsppt".
-      iDestruct "Hsppc" as (vc) "Hsppc".
+      iDestruct "Hsppt" as (vta vtb) "Hsppt".
+      iDestruct "Hsppc" as (vca vcb) "Hsppc".
       (* the engine runs at the PINNED map: its [gpr_file] / [intr_frame]
          are the bundle's, retargeted along [Hsppin]. *)
       iAssert (intr_frame root_ppn (tp_pin m)) with "[Hmenv Htlbinv Hstk]" as "HF".
@@ -293,7 +293,7 @@ Section WpSmodeIntr.
       iIntros (σ Hpceq) "Hic Hfile HF Hnpc Hsi".
       iDestruct (intr_frame_retarget root_ppn (tp_pin m) m Hsppin with "HF") as "HF".
       iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
-      iMod (v2_of_intr_config vt vc with "Hic Hmenv Hsppt Hsppc")
+      iMod (v2_of_intr_config vta vtb vca vcb with "Hic Hmenv Hsppt Hsppc")
         as "(Hsc & Hsppc & Hsepcx & Hscausex & Hstvalx)".
       iMod ("H" $! σ Hpceq
               with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hsppc Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
