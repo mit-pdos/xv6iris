@@ -98,6 +98,112 @@ Local Open Scope Z_scope.
    and log_write 18. *)
 Definition K_bfree : nat := 44%nat.
 
+Definition wp_bfree_gen_body
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (Φ : mval -> iProp Σ)
+    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
+    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
+    (pd pav pu : mword 64)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names)
+    (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z) (bno : mword 32) (bs : list (bv 8))
+    (u : nat) (cr : bool) (Sb : gset Z)
+    (pidv : mword 32) (dq dqb : dfrac)
+    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+    (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.bfree in
+  let pj := proc_addr j in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  (K_bfree <= K)%nat ->
+  (* the covered range's block-number bounds (bread's 2^31 arithmetic
+     premise, and 0 is never a client block) and the fact that the log's own
+     storage is covered *)
+  log_geom_ok cov logstart ->
+  (* ONE BITMAP BLOCK: the mkfs image has FSSIZE = 2000 < BPB = 8192, so
+     BBLOCK collapses and the outer geometry never appears *)
+  0 < size <= BPB ->
+  (* the bitmap block is a covered HOME block: bread's premise, and
+     log_write's *)
+  0 <= bmapstart ->
+  bmapstart ∈ cov ->
+  ~ (bmapstart ∈ log_region_set logstart) ->
+  (* the block being freed: in range for the bitmap, and a covered home
+     block -- the two facts [bitmap_ok] must be re-established with, and
+     exactly what the caller's [InodeInv.blkmap_wf] already gives it *)
+  0 <= bv_unsigned bno < size ->
+  bv_unsigned bno ∈ cov ->
+  ~ (bv_unsigned bno ∈ log_region_set logstart) ->
+  (* ...and it really is a block's worth of bytes *)
+  length bs = BSIZE ->
+  (* THE CREDIT'S PREMISE: claiming the free arm means claiming this op has
+     already logged THE BITMAP BLOCK in this batch.  There is only one --
+     FSSIZE = 2000 < BPB = 8192 -- which is why itrunc can free 269 blocks
+     against a single credit. *)
+  (cr = true -> bmapstart ∈ Sb) ->
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  (* the two uint arguments arrive sign-extended (RV64 ABI) *)
+  m !!! Regidx (mword_of_int 10 : mword 5) = sign_extend' 64 dev ->
+  m !!! Regidx (mword_of_int 11 : mword 5) = sign_extend' 64 bno ->
+  (* PARKING PREMISE (hart-generic scheduler protocol) -- bread sleeps, and a
+     parking thread hands the trap CSRs across the crossing only with an
+     enabled base.  See SpecSched.v / SpecSleep.v. *)
+  eb = true ->
+  sie_cap_gpr m K b pj -∗
+  cpu_own 0 eb pj C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  (* sb.bmapstart, read once at +0x12 *)
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  (* THE BITMAP, with its free pool *)
+  bitmap_res γfs bmapstart cov logstart size used -∗
+  (* THE BLOCK BEING FREED: its logical content half and -- the load-bearing
+     half of the handshake -- its EXCLUSIVE ownership token.  Holding the
+     token is what makes the panic dead. *)
+  fsblock γfs (bv_unsigned bno) bs -∗
+  blk_own γfs (bv_unsigned bno) -∗
+  (* the caller's own pid cell (bread's acquiresleep records it) *)
+  p_pid pj ↦₄{dq} pidv -∗
+  (* the running-thread bundle *)
+  procs_inv Φ γs -∗
+  scheds_inv Φ γs -∗
+  own_ctx (p_context pj) -∗
+  park_hlf j true -∗
+  (* the disk fabric *)
+  dev_inv γu γd -∗
+  disk_geom γd pd pav pu -∗
+  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
+  (* TWO slot units: bread's reference is held across log_write, which wants
+     one of its own; brelse gives it back *)
+  bslots bn 2 -∗
+  (* THE RESERVATION.  A unit must be in hand either way (log_write's own
+     requirement -- it is what bounds lh.n).  Uncredited it is spent on the
+     bitmap block's first log_write of this batch; credited, that block is
+     already in the header, log_write ABSORBS, and the unit comes back. *)
+  log_opS γ (S u) Sb -∗
+  wp_next b pj (fun (CID : CpuId) =>
+  ∀ mf : regfile,
+      ⌜callee_saved m mf⌝ -∗
+      sie_cap_gpr mf K b pj -∗
+      cpu_own 0 eb pj C b -∗
+      pc_is ret_tgt -∗
+      own_ctx (p_context pj) -∗
+      park_hlf j true -∗
+      p_pid pj ↦₄{dq} pidv -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      (* THE FREE: bit [bno] is clear, and the block's content half and its
+         token are back in the pool *)
+      bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bv_unsigned bno ]}) -∗
+      bslots bn 2 -∗
+      log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
 Definition wp_bfree_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
@@ -197,6 +303,29 @@ Definition wp_bfree_sconf_body
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type BFREE.
+  (* THE CREDITED / GENERAL FORM; [wp_bfree_sconf] below is its
+     set-forgetting instance at [cr = false], kept as its own parameter so
+     that balloc and every other caller is unchanged. *)
+  Parameter wp_bfree_gen :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (Φ : mval -> iProp Σ)
+      (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z) (bno : mword 32) (bs : list (bv 8))
+      (u : nat) (cr : bool) (Sb : gset Z)
+      (pidv : mword 32) (dq dqb : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
+      (b : bool),
+      wp_bfree_gen_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
+                        cov logstart bmapstart size dev used bno bs u cr Sb
+                        pidv dq dqb m K eb C b.
+
   Parameter wp_bfree_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}

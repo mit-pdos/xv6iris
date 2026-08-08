@@ -88,6 +88,80 @@ Local Open Scope Z_scope.
    10).  acquire/release directly want only 10. *)
 Definition K_log_write : nat := 18%nat.
 
+Definition wp_log_write_gen_body
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (Φ : mval -> iProp Σ)
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γd : disk_names)
+    (cov : gset Z) (logstart : Z) (dev : mword 32)
+    (k : nat) (pidv bno : mword 32)
+    (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+    (cr : bool) (Sb : gset Z)
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (K : nat) (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.log_write in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
+  (K_log_write <= K)%nat ->
+  (* bpin runs UNDER log.lock, i.e. at nesting level S n, and its own
+     acquire pushes again: the premise must cover TWO pushes above the
+     entry level (the SpecPipeclose/SpecConsoleintr convention -- the +1
+     form is underivable at the bpin call site, cpu_cells' own bound at
+     level S n gives back only +1). *)
+  (Z.of_nat n + 2 < 2 ^ 31)%Z ->
+  (* a0 is the buffer being logged *)
+  (k < NBUF)%nat ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  (* the block is a covered HOME block: never the log's own storage.  (The
+     covered fact is also carried by the handle below; it is restated here
+     because log_batch's own conjunct is what the append path must
+     re-establish.) *)
+  uint bno ∈ cov ->
+  ~ (uint bno ∈ log_region_set logstart) ->
+  (* THE CREDIT'S PREMISE: claiming the free arm means claiming this op
+     has already appended [bno] in this batch. *)
+  (cr = true -> uint bno ∈ Sb) ->
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  (* the slot unit backing the (possible) bpin *)
+  bslot bn -∗
+  (* THE RESERVATION.  A unit must be IN HAND either way -- that is what
+     bounds lh.n below LOGBLOCKS and so keeps the header's next slot
+     writable ([nl <= 29]); a caller with an exhausted budget has no
+     business in log_write even to absorb.  Uncredited (cr = false) the
+     unit is spent and the block joins this op's already-logged set;
+     credited (cr = true) the block is already in that set, log_write
+     ABSORBS, lh.n does not grow, and THE UNIT COMES BACK. *)
+  log_opS γ (S u) Sb -∗
+  (* the caller's own view of the block, at its OLD content *)
+  fsblock γfs (uint bno) bsl -∗
+  (* the checked-out buffer.  [bio_held], NOT [bio_locked]: the caller has
+     typically edited the bytes, so bs <> bsl and the payload is still
+     indexed at bsl. *)
+  bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b p -∗
+    cpu_own n eb p C b -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    (* the block is in the set either way -- it was already there on the
+       credited arm ([Sb ∪ {[bno]} = Sb] under the premise), where the unit
+       is also handed straight back *)
+    log_opS γ (if cr then S u else u) (Sb ∪ {[uint bno]}) -∗
+    (* L(bno) is now the bytes the caller wrote *)
+    fsblock γfs (uint bno) bs -∗
+    (* the handle re-indexed at those bytes and now DIRTY: brelse-able *)
+    bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
+    (* the slot unit comes back UNCONDITIONALLY -- see the header note *)
+    bslot bn -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+  WP (Loop : expr riscv_lang) {{ Φ }}.
+
 Definition wp_log_write_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -151,6 +225,25 @@ Definition wp_log_write_sconf_body
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
 Module Type LOG_WRITE.
+  (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the
+     set-forgetting instance of this at [cr = false]; it is kept as its own
+     parameter so that every existing caller -- which threads [log_op] and
+     neither knows nor cares which blocks this op has logged -- is unchanged. *)
+  Parameter wp_log_write_gen :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
+      `{GEN : GenId} `{CID : CpuId}
+      (Φ : mval -> iProp Σ)
+      (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γd : disk_names)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (k : nat) (pidv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (cr : bool) (Sb : gset Z)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (K : nat) (b : bool),
+      wp_log_write_gen_body Φ bn γ γfs γd cov logstart dev k pidv bno
+                            bs bsl bsd d u cr Sb m n eb p C K b.
+
   Parameter wp_log_write_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}

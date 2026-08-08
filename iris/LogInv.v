@@ -563,6 +563,21 @@ Section LogInv.
   (* an op token against the authority: out >= 1 (kills log_write's
      "outside of trans" panic and end_op's "log.committing" one, via the
      cmt -> out = 0 conjunct) *)
+  (* the same fact against a CREDITED op token *)
+  Lemma log_opS_positive γ (om : gmap nat op_entry) (u : nat) (Sb : gset Z) :
+    ghost_map_auth (ln_ops γ) 1 om -∗ log_opS γ u Sb -∗
+    ⌜(1 <= size om)%nat⌝.
+  Proof.
+    iIntros "Ha He". rewrite /log_opS. iDestruct "He" as (i) "He".
+    iDestruct (ghost_map_lookup with "Ha He") as %Hi.
+    iPureIntro.
+    assert (Hne : om ≠ ∅).
+    { intros ->. rewrite lookup_empty in Hi. done. }
+    assert (Hs : size om ≠ 0%nat).
+    { intros Hz. apply Hne. by apply map_size_empty_iff. }
+    lia.
+  Qed.
+
   Lemma log_op_positive γ (om : gmap nat op_entry) (u : nat) :
     ghost_map_auth (ln_ops γ) 1 om -∗ log_op γ u -∗
     ⌜(1 <= size om)%nat⌝.
