@@ -6,8 +6,6 @@
    shared with [LinkBmap.v]'s: both are wrappers over ProofBmap.v's
    [BmapCore], which is parameterised by whether the allocation arms are
    live.  Precedent: LinkWalkNoalloc.v. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import SpecBmap SpecBread SpecBrelse.
 Require Import LinkBread LinkBrelse ProofBmap.
 
 Module BmapNoalloc := BmapNoallocProof Bread Brelse.

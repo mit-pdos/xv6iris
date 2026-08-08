@@ -110,7 +110,6 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RiscvExtras.
 Require Import InstrBytes.
 Require Import RegFile.
@@ -131,7 +130,6 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
@@ -141,7 +139,8 @@ Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import PipeInv.
 Require Import FileInv FileOff ProcInv.
-Require Import SpecIlock SpecIunlock SpecReadi SpecPiperead SpecConsoleread.
+Require Import SpecReadi.
+Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

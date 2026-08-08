@@ -13,9 +13,8 @@ From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.Values.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import RegFile.
-Require Import WpLock SwtchCtx.
-Require Import FdSlots FileInv ProcInv SchedCtx.
+Require Import WpLock.
+Require Import FdSlots FileInv ProcInv.
 Require Import SpecForkretPark.
 
 Module ForkretPark : FORKRET_PARK.

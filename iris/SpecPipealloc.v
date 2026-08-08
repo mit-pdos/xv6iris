@@ -67,14 +67,13 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import FdSlots FileInv.
 Require Import KallocInv.
-Require Import PipeInv.
 Require Import WpLock.
 Require Import WpNext.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.

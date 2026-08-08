@@ -25,7 +25,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
 Require Import FdSlots WpLock.
-Require Import KallocInv KvmSpec.
+Require Import KallocInv.
 Require Import FileInv ProcInv.
 Require Import SpecConsoleread.
 

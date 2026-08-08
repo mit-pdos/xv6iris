@@ -64,13 +64,13 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvExec.
+Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import RiscvExtras.
 Require Import InstrBytes.
 Require Import KernelText KernelDataInv.
-Require Import RegFile HartTp WpNext WpGpr.
-Require Import WpMmodeLeafBase WpMmodeShiftiop.
+Require Import RegFile HartTp WpNext.
+Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
@@ -97,7 +97,7 @@ Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBalloc.
 Require Import SpecPanic.
-Require Import SpecPrintk SpecPrintkGen.
+Require Import SpecPrintkGen.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemset.
 Require Import ProofBallocParts.
 Require Import SpecBalloc.

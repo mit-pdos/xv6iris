@@ -4,7 +4,6 @@
    it rests on the still-assumed balloc (LinkBalloc.v's single Axiom).  So
    writei inherits exactly that one caveat in tools/proof_coverage.py and
    nothing else. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import SpecWritei SpecBmap SpecBread SpecBrelse SpecLogWrite
         SpecEitherCopyin SpecIupdate.
 Require Import LinkBmap LinkBread LinkBrelse LinkLogWrite LinkEitherCopyin

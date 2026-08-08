@@ -22,11 +22,10 @@ Require Import WpGpr UserBits.
 Require Import SmodeCore.
 Require Import UptTree UserPtTree UserExec UserCompute UserClassify.
 Require Import UserExecFacts UserMemArms WpMmodeLeafBase.
-Require Import WpGprCsrwC.
 Require Import UserMemAccess UserMemPt UserMemMis.
 Require Import TrampPt KptTree UserTranslate.
 Require Import UserTotalU Pt4kWalk.
-Require Import RiscvModelBytes CommonWalk WpLoad MemAmo4.
+Require Import RiscvModelBytes CommonWalk WpLoad.
 Local Open Scope Z_scope.
 Import Defs.
 

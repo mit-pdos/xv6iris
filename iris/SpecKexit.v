@@ -115,8 +115,7 @@ Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
-Require Import PipeInv.
-Require Import SpecIput.
+Require Import SwtchCtx.
 Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.

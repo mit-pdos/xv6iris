@@ -11,7 +11,6 @@ From iris.base_logic.lib Require Import gen_heap ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvModelBytes RiscvLang RiscvExec RiscvTryStep RiscvFetchExec.
-Require Import WpLoad.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvExtras.   (* vmem_width, the page-split kit, pma_ok_aligned *)
 Local Open Scope Z_scope.

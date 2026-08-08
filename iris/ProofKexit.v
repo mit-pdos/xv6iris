@@ -62,15 +62,12 @@ Require Import SmodeCore.
 Require Import InstrBytes KernelText.
 Require Import StackOwn CalleeSaved.
 Require Import WpMmodeLeafBase.
-Require Import KernelRvcDecode KernelBaseDecode.
-Require Import WpAuipc.
+Require Import KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSmodeIntr.
 Require Import IntrDefs HartTp WpNext.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import UptTree UserPtTree.
-Require Import ProcPtOwn.
 Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
@@ -78,12 +75,11 @@ Require Import SchedCtx.
 Require Import WaitInv.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecMyproc SpecAcquire SpecRelease SpecSched.
 Require Import KallocInv.
-Require Import PipeInv.
 Require Import SpecIput.
 Require Import SpecFileclose SpecReparent SpecWakeup.
 Require Import SpecBeginOp SpecEndOp SpecIput.

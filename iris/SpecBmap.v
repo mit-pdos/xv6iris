@@ -118,7 +118,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import InodeInv.
-Require Import BitmapEnc BitmapInv.
+Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintkGen.
 From Kernel Require KernelSyms.

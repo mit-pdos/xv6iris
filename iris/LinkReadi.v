@@ -3,8 +3,6 @@
    its second contract [BMAP_NOALLOC] (LinkBmapNoalloc.v), whose proof term
    never mentions LinkBalloc.v's Axiom.  So readi -- unlike writei, which
    inherits balloc's caveat through bmap -- rests on nothing assumed. *)
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import SpecReadi SpecBmap SpecBread SpecBrelse SpecEitherCopyout.
 Require Import LinkBmapNoalloc LinkBread LinkBrelse LinkEitherCopyout ProofReadi.
 
 Module Readi := ReadiProof BmapNoalloc Bread Brelse EitherCopyout.

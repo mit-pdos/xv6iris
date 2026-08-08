@@ -56,15 +56,10 @@ From iris.algebra Require Import auth gmap frac.
 From iris.base_logic.lib Require Import ghost_var ghost_map.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvPtsto.
 Require Import RiscvExtras.
-Require Import InstrBytes.
-Require Import ByteBuf.
 Require Import DiskPtsto.
 Require Import FsBlocks.
-Require Import LogInv.
-Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

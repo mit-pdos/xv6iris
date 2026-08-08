@@ -130,10 +130,9 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import KallocInv.

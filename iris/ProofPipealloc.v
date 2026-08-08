@@ -55,7 +55,7 @@ Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.

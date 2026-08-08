@@ -78,7 +78,7 @@ Require Import RegFile InstrBytes WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import KernelRvcDecode.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSmodeIntr.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import HartTp WpNext IntrDefs.
 Require Import ByteCursor ByteBuf.
 Require Import KstackArith.

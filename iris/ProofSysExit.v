@@ -36,23 +36,16 @@ Require Import IntrDefs WpNext.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
-Require Import SchedCtx.
 Require Import KallocInv.
 Require Import UserPtTree.
-Require Import PipeInv.
-Require Import SpecIput.
 Require Import SpecFileclose.
-Require Import WaitInv.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecPanic.
-Require Import SpecProcinit.
 Require Import SpecArgint SpecKexit.
 Require Import SpecSysExit.
 From Kernel Require KernelInstrs KernelSyms.

@@ -187,13 +187,12 @@ Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
-Require Import BcacheInv BioInv.
+Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
-Require Import BitmapEnc BitmapInv.
+Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintkGen.
 Require Import KallocInv.
@@ -201,7 +200,7 @@ Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FileInv ProcInv.
-Require Import SpecIupdate.
+Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

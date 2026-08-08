@@ -40,7 +40,7 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
-Require Import HartTp WpNext.
+Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
@@ -49,7 +49,7 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs.
 Require Import CodeFileclose.
 From Kernel Require KernelSyms.

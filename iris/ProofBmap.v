@@ -101,7 +101,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import BlockWords.
 Require Import InodeInv.
-Require Import BitmapEnc BitmapInv.
+Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintkGen.
 Require Import CodeBmap.

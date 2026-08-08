@@ -66,9 +66,7 @@ Require Import DiskPtsto.
 Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
-Require Import WpSmodeHalf.
 Require Import WpSconfSrliw.
-Require Import ByteCursor.
 Require Import ByteBuf.
 Require Import PrintintArith.
 Require Import FdSlots.
@@ -78,7 +76,6 @@ Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import DinodeSlot.
 Require Import BitmapEnc BitmapInv.
 Require Import CodeBfree.

@@ -110,14 +110,12 @@ Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import FdSlots FileInv.
-Require Import PipeInv.
 Require Import KallocInv.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ProcGeom.
-Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.

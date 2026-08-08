@@ -70,9 +70,6 @@ Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
-Require Import VcGen.
-Require Import InstrBytes.
-Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpSmodeIntr WpSmodeHalf.
 Require Import IntrDefs.
@@ -80,11 +77,11 @@ Require Import CpuOwn.
 Require Import FdSlots FileInv FileOff.
 Require Import PipeInv.
 Require Import KallocInv.
-Require Import UserPtTree KvmSpec ProcPtOwn.
-Require Import ProcGeom ProcInv SchedCtx.
-Require Import SleepLock.
-Require Import WpUart DiskPtsto DiskInv BioInv FsBlocks LogInv FsCrash.
-Require Import BlockWords DinodeEnc InodeInv InodeLock.
+Require Import ProcPtOwn.
+Require Import SpecPanic.
+Require Import ProcInv.
+Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
+Require Import DinodeEnc InodeInv InodeLock.
 Require Import WpLock.
 Require Import SpecPanic.
 Require Import SpecPiperead SpecIlock SpecReadi SpecIunlock SpecConsoleread.

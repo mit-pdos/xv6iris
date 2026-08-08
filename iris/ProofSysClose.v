@@ -48,10 +48,8 @@ Require Import IntrDefs HartTp WpNext WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import KallocInv.
-Require Import PipeInv.
-Require Import SchedCtx.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
