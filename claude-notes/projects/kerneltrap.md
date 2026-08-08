@@ -41,7 +41,7 @@ design:
 
 | arm | refuted by |
 | --- | --- |
-| `panic("kerneltrap: not from supervisor mode")` | the entry mstatus has `_get_Mstatus_SPP = 'b"1"` — the trap came from S-mode, which `trap_ms` in the handler contract already says. **But see the fork below: carrying that fact to the check needs a mechanism the bundle does not have.** |
+| `panic("kerneltrap: not from supervisor mode")` | the caller's half of the SPP ghost mirror, at `'b"1"` — the trap came from S-mode, which `trap_ms` in the handler contract already says. Carrying that fact to the check is what `spp_hlf` exists for (below) |
 | `panic("kerneltrap: interrupts enabled")` | the live SIE bit is the ambient arm index, and the handler runs at `b = false` (the trap cleared SIE). `IntrDefs.sie_arm_half_agree` reads it off the index at either arm, no case split |
 | `printk(...)` + `panic("kerneltrap")` | `scause` is threaded at a PINNED value with `devintr_ret sc ≠ 0`, i.e. the cause is one of the two `devintr` recognises |
 
@@ -69,57 +69,39 @@ Two consequences for the shape:
   and throws `i` away.  It has to expose it, and relate it to the word the
   trap writes into `scause`, so kernelvec can discharge `devintr_ret sc ≠ 0`.
 
-### THE SPP ARM IS THE EXPENSIVE ONE, AND IT IS A FORK
+### DONE: the SPP arm, and the ghost mirror that refutes it
 
-Of the three refutations the table promises, two are cheap and one is not.
+Of the three refutations the table promises, two were cheap and one was not.
 
-- **interrupts-enabled: FREE.** `wp_csrr_sstatus_s_sconf` already hands the
+- **interrupts-enabled: FREE.**  `wp_csrr_sstatus_s_sconf` already hands the
   caller `⌜_get_Mstatus_SIE ms0 = sie_bit b⌝` for the very `ms0` whose S-view
-  it read, and a handler runs at `b = false`.  Nothing to add.
-- **scause: cheap.** Pin `mie` in `sconf` (previous section) and expose the
-  taken cause out of the engine.
-- **SPP: needs a new mechanism.** `_get_Mstatus_SPP ms_e = 'b"1"` is a fact
-  about the mstatus *at kerneltrap's entry*, but the check runs FOUR
-  instructions later (frame push, three stores, `csrr s2,sepc`), and **each of
-  those round-trips `sconf` through `wp_instr_s_sconf`, whose `∃ ms` destroys
-  the identity of the mstatus**.  `sie_cap_gpr_at` does NOT rescue this: it is
-  an accessor, so closing it to feed the funnel consumes the closer, and what
-  comes back out is an arbitrary `ms`.  The information is genuinely destroyed
-  by the existential.
+  it read, and a handler runs at `b = false`.
+- **scause: cheap.**  Pin `mie` in `sconf` (next section) and expose the taken
+  cause out of the engine.
+- **SPP: needed a new mechanism, now built.**  `_get_Mstatus_SPP ms_e = 'b"1"`
+  is a fact about the mstatus at kerneltrap's *entry*, but the check runs FOUR
+  instructions later, and **every one of those round-trips `sconf` through
+  `wp_instr_s_sconf`, whose `∃ ms` destroys the identity of the mstatus**.
+  `sie_cap_gpr_at` does not rescue it: it is an accessor, so closing it to
+  feed the funnel spends the closer and an arbitrary `ms` comes back.  The
+  information is destroyed by the existential, not mislaid — which is why an
+  `_at` variant of the sstatus READ leaf would not have helped either.
 
-Three ways out, and the choice is a real one:
+**The fix, landed:** `spp_hlf`, a ghost mirror of mstatus.SPP threaded
+independently of the register package, exactly as SIE already is.  See
+[`design/interrupts.md`](../design/interrupts.md) for the full write-up.  The
+short version: two halves, one tied inside `sconf` to `_get_Mstatus_SPP ms`
+and one travelling in `trap_csrs` — existential in `sie_arm true`, pinned in
+the hands of interrupts-off code.  Four things fell out of the discipline
+rather than being designed in: `intr_config` must NOT carry a tie (a trap and
+its sret move the bit, so the funnel re-ties both halves after the engine);
+push_off/pop_off need no ghost movement at all (the SIE mask misses bit 8);
+`csrw sstatus` is the one leaf that moves SPP and is vacuous at `b = true`;
+and the tie is first established at the M→S bridge, the only moment outside
+an mstatus-writing leaf when both halves are in hand.
 
-1. **Index the funnel.**  State `wp_instr_s_sconf` at `sconf_at ms`.  Then
-   every leaf needs an `_at` twin — the leaf × mstatus cross-product the
-   guiding principle exists to prevent.  Rejected.
-2. **Tie SPP to a ghost, exactly as SIE already is.**  Add a second
-   `ghost_var` to `sconf`'s mstatus conjunct at `_get_Mstatus_SPP ms`; a
-   caller holding the other half re-pins SPP after any number of round-trips,
-   by the same agreement `sie_arm_half_agree` uses.  This is the RIGHT
-   mechanism and it mirrors one the file already has.  Cost: a new ghost class
-   + boot allocation, and every site that opens the mstatus conjunct
-   (`iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)"` — ~47 candidate
-   matches across ~20 files, though most are other patterns) plus the four
-   mstatus WRITERS, which must move both halves.  csrci/csrsi preserve SPP
-   (`lift_SPP` + `mstatus_legalized_SPP` give SPP of the flip = SPP of the
-   write value = SPP of `sstatus_read ms` = SPP of `ms`); `csrw sstatus`
-   changes it, so that leaf takes and returns the SPP half.
-3. **Close the SPP arm with `panic_wp_any`.**  Costs NOTHING in the axiom
-   ledger — `panic` is proven and already rides in `devintr_caps` — and it is
-   what every other panic arm in this tree does (acquire, release, wakeup).
-   devintr's printk arm was refuted not because panics are bad but because
-   *printk* is unproven.  What it gives up is the stronger reading of the
-   contract: the proof would then allow kerneltrap to panic there rather than
-   showing it cannot.
-
-**Recommendation: (3) now, (2) if the stronger property is wanted.**  The
-axiom ledger — the thing that made refuting the scause arm worth premising —
-is indifferent to the SPP arm, and (2) is a bottom-of-tree ghost addition that
-should be its own change with its own build, not a rider on the kerneltrap
-proof.  Note that (2) also does NOT survive the yield: after a migration the
-resuming hart's SPP is whatever its last trap left, so the ghost would have to
-be re-established or dropped across the park — another reason to want it as a
-separate, deliberate piece of work.
+Fallout was five thin layers (3 → 7 → 2 → 1 → 1 files), almost all
+ride-through sites in proofs that never touch mstatus.
 
 ### RESOLVED: what makes the scause premise dischargeable — pin `mie`, not `mip`
 
@@ -427,11 +409,10 @@ consumers and its `eb = true` instance made `b` true.
 5. Expose the taken cause out of `wp_exec_step_intr`'s trap arm and relate it
    to the `scause` the trap writes; with `mie` pinned, "the cause is 5 or 9"
    is a `vm_compute` on the dispatch set.
-6. Settle the SPP fork (see "THE SPP ARM IS THE EXPENSIVE ONE"): either
-   `panic_wp_any` on that arm (free, conventional) or the SPP ghost tie (a
-   separate bottom-of-tree change).  An `_at` variant of
-   `wp_csrr_sstatus_s_sconf` does NOT help and should not be attempted — the
-   funnel's `∃ ms` is what loses the pinning, not the leaf.
+6. ~~The SPP ghost mirror~~ **done** (see the section above).  Note for
+   anyone tempted: an `_at` variant of `wp_csrr_sstatus_s_sconf` does NOT
+   help and should not be attempted — the funnel's `∃ ms` is what loses the
+   pinning, not the leaf.
 7. ~~The `eb` generalization of `SpecYield`/`ProofYield`/`SpecSched`/`ProofSched`~~
    **done** (see the section above).
 8. ~~`SpecKerneltrap.v` on the house-spec shape~~ **done**.
