@@ -679,6 +679,37 @@ Section ItruncDefs.
     it_ent_state γ γfs bm data cov logstart bmapstart size used q.
   Proof. iIntros "A B C". rewrite /it_ent_state. iFrame. Qed.
 
+  (* THE HANDOFF from the direct loop to the indirect one.  After the direct
+     loop every direct slot of the map is zero, so [inode_blocks] at that
+     map is [True] on indices below NDIRECT and the entry list on the rest --
+     which is exactly [it_ent_res] at cursor 0.  Stating it as a lemma keeps
+     the arm from having to reason about the bundle's shape. *)
+  Lemma inode_blocks_to_ent_res (γfs : fs_names) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    length (bm_dir bm) = NDIRECT -> length (bm_ent bm) = NINDIRECT ->
+    inode_blocks γfs (bm_dir_zeroed bm NDIRECT) data -∗
+      it_ent_res γfs bm data 0.
+  Proof.
+    intros Hd He. rewrite /inode_blocks /it_ent_res Nat.sub_0_r.
+    (* MAXFILE = NDIRECT + NINDIRECT, and the first NDIRECT entries are all
+       [True]: [bm_dir_zeroed] at the top has an all-zero direct part *)
+    replace MAXFILE with (NDIRECT + NINDIRECT)%nat
+      by (unfold MAXFILE, NDIRECT, NINDIRECT; lia).
+    rewrite seq_app big_sepL_app.
+    iIntros "[_ Hhi]".
+    (* the high half runs over [seq NDIRECT NINDIRECT]; the target runs over
+       [seq 0 NINDIRECT] with the index shifted, so re-index before mono *)
+    replace (0 + NDIRECT)%nat with (NDIRECT + 0)%nat by lia.
+    iEval (rewrite -(fmap_add_seq NDIRECT 0 NINDIRECT) big_sepL_fmap) in "Hhi".
+    iApply (big_sepL_mono with "Hhi").
+    intros t x Hx.
+    apply lookup_seq in Hx as [-> Hlt].
+    rewrite /blkmap_get. cbn [bm_dir_zeroed bm_dir bm_ind bm_ent].
+    destruct (decide ((NDIRECT + (0 + t)) < NDIRECT)%nat); [lia|].
+    replace (NDIRECT + (0 + t) - NDIRECT)%nat with t by lia.
+    replace (NDIRECT + (0 + t))%nat with (NDIRECT + t)%nat by lia. done.
+  Qed.
+
   (* peeling the cursor entry off the remaining bundle -- the step both the
      free and the skip take *)
   Lemma it_ent_res_peel (γfs : fs_names) (bm : blkmap)

@@ -1634,4 +1634,44 @@ Section ItruncELoop.
 
 End ItruncELoop.
 
+(* ===================================================================== *)
+(*  THE INDIRECT ARM: +0x50 .. +0x92                                      *)
+(*                                                                        *)
+(*  Entered only when ip->addrs[NDIRECT] is nonzero.  Saves s4 (the ONLY   *)
+(*  path that touches the sixth frame slot), breads the indirect block,    *)
+(*  runs the 256-entry loop over it, brelses it, frees the block itself,   *)
+(*  clears the cell, restores s4 and rejoins the tail at +0x38.            *)
+(* ===================================================================== *)
+Section ItruncIArm.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+
+  (* what the arm hands to the tail: the inode names nothing at all *)
+  Definition it_armexit `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+      (γ : log_names) (γfs : fs_names) (bn : bio_names)
+      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (dev : mword 32) (ip : mword 64) (bm : blkmap)
+      (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
+      (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
+    wp_next b (proc_addr j) (fun (CID : CpuId) =>
+      ∀ Mx : regfile,
+        ⌜it_sp m Mx⌝ -∗ ⌜it_thr m Mx⌝ -∗ ⌜Mx !!! Regidx Rs3 = ip⌝ -∗
+        sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
+        cpu_own 0 true (proc_addr j) C b -∗
+        pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
+        own_ctx (p_context (proc_addr j)) -∗
+        park_hlf j true -∗
+        p_pid (proc_addr j) ↦₄{dq} pidv -∗
+        i_dev ip ↦₄{dqd} dev -∗
+        sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+        (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ v) -∗
+        inode_map γfs ip bm_empty -∗
+        inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
+        bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
+        bslots bn 2 -∗
+        bm_paid γ bmapstart 1 -∗
+        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+
+End ItruncIArm.
+
 End ItruncProof.
