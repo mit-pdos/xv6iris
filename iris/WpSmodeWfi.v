@@ -528,7 +528,7 @@ Section WpSmodeWfi.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
     destruct Hmsf' as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     (* SIE = 0 by ghost agreement: the tied half vs the count's eighth *)
@@ -633,12 +633,12 @@ Section WpSmodeWfi.
     iApply (wp_wfi_wait Φ pc (zero_extend' 32 w)
               (sconf ∗ sie_cap m n b p ∗ gpr_file (tp_pin m) ∗ intr_count 0 false)%I
               with "Hminv Hhs Hpcr Hnpc
-                    [Hpriv Hms Hhalf Hmie Hmdl Hmenv Hstk Htr Harm Hfile Hcnt]
+                    [Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv Hstk Htr Harm Hfile Hcnt]
                     [Hcont]").
-    { iSplitL "Hpriv Hms Hhalf Hmie Hmdl Hmenv".
+    { iSplitL "Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv".
       { iFrame "Hhw Hminv Hpriv".
-        iSplitL "Hms Hhalf".
-        { iExists ms. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+        iSplitL "Hms Hhalf Hspp".
+        { iExists ms. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
         iSplitL "Hmie Hmdl".
         { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.

@@ -181,6 +181,29 @@ Record riscvEraGS := RiscvEraGS {
      parameterized.  The functor instance comes from [sieG] at the use sites,
      for the same reason spelled out for [strans_name] above. *)
   era_sie_name : CPU -> gname;
+  (* mstatus.SPP's ghost MIRROR, canonically per hart -- the same shape as
+     [sie_name], and needed for a reason the other trap-scribbled state does
+     not have.  A trap writes sepc / scause / stval AND mstatus.SPP; the
+     first three are whole registers, so ownership of them moves by moving
+     the cell (they sit in [IntrDefs.trap_csrs], inside [sie_arm true] while
+     interrupts are enabled and in the code's hands while they are off).
+     SPP is a BIT INSIDE mstatus, and mstatus cannot leave [sconf] -- SIE
+     lives there too, and so do the well-formedness facts -- so its
+     ownership has to move as a ghost instead.
+
+     Hence TWO halves, exactly as SIE has: one TIED inside [sconf] to
+     [_get_Mstatus_SPP ms], and one that travels with [trap_csrs], held at
+     an EXISTENTIAL value by the enabled arm (a trap can rewrite SPP between
+     any two instructions) and at a PINNED value by interrupts-off code.
+     That is what lets a trap handler entered from S-mode still know, four
+     instructions later, that SPP = 1 -- the fact the funnel's [exists ms]
+     would otherwise destroy.
+
+     The [ghost_varG Σ (mword 1)] functor instance comes from [sieG] at the
+     use sites, NOT from a field here, for the same reason spelled out for
+     [strans_name]: a second instance of that class would make resolution
+     ambiguous.  SPP is one bit, so [sieG]'s instance already fits. *)
+  era_spp_name : CPU -> gname;
   (* THE PARK RECEIPT, CANONICALLY per proc slot.  One [ghost_var bool] per
      entry of the proc[] array, recording whether hart-h's parked scheduler
      record is RESIDENT in the global [SchedCtx.scheds_inv] slot of the hart
@@ -369,6 +392,7 @@ Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name riscv_eraGS.
 Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name riscv_eraGS.
 Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name riscv_eraGS.
 Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
+Definition spp_name `{!riscvGS Σ} : CPU -> gname := era_spp_name riscv_eraGS.
 Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
 (* the AMBIENT era's disk-image gname: what [DiskPtsto.disk_names]'s [dn_img]
    field is always constructed at ([VirtioProto.disk_ghosts_alloc]), and what

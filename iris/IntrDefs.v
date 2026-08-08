@@ -162,6 +162,30 @@ Section IntrDefs.
      the section closes it over exactly [riscvGS] and [CpuId] regardless.) *)
   Definition sie_gname : gname := sie_name cpu_id.
 
+  (* mstatus.SPP's ghost MIRROR (RiscvPtsto.era_spp_name), canonical per hart
+     for the same reason [sie_gname] is.  TWO halves: one TIED inside [sconf]
+     to [_get_Mstatus_SPP ms], one travelling with [trap_csrs] -- existential
+     while the enabled arm holds it (a trap rewrites SPP whenever it likes)
+     and PINNED while interrupts-off code does.  [spp_agree] is what turns
+     the held half into a fact about the live bit, and it is what lets a trap
+     handler still know SPP = 1 several instructions after entry, which the
+     instruction funnel's [exists ms] would otherwise have destroyed. *)
+  Definition spp_gname : gname := spp_name cpu_id.
+
+  Definition spp_hlf (v : mword 1) : iProp Σ :=
+    ghost_var spp_gname (1/2) v.
+
+  Lemma spp_hlf_agree (v v' : mword 1) : spp_hlf v -∗ spp_hlf v' -∗ ⌜ v = v' ⌝.
+  Proof. iIntros "H1 H2". iApply (ghost_var_agree with "H1 H2"). Qed.
+
+  Lemma spp_hlf_update (v v' w : mword 1) :
+    spp_hlf v -∗ spp_hlf v' ==∗ spp_hlf w ∗ spp_hlf w.
+  Proof.
+    iIntros "H1 H2".
+    iMod (ghost_var_update_2 w with "H1 H2") as "[$ $]";
+      [ rewrite Qp.half_half // | done ].
+  Qed.
+
   (* [sie_ghost_alloc] / [sie_ghost_flip]* stay GHOST-GENERIC: they are
      statements about a raw [ghost_var], with no sconf-tier resource in
      sight, and one of their consumers (the per-trap tie ProofKernelvec.v
@@ -427,6 +451,7 @@ Section IntrDefs.
      (∃ ms : mword 64,
         mstatus ↦ᵣ ms ∗
         ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
+        spp_hlf (_get_Mstatus_SPP ms) ∗
         ⌜ sconf_ms_facts ms ⌝) ∗
      (∃ mie_v mdv0 : mword 64,
         mie ↦ᵣ mie_v ∗ mideleg ↦ᵣ mdv0 ∗
@@ -466,6 +491,7 @@ Section IntrDefs.
   Definition sconf_msown (ms : mword 64) : iProp Σ :=
     (mstatus ↦ᵣ ms ∗
      ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
+     spp_hlf (_get_Mstatus_SPP ms) ∗
      ⌜ sconf_ms_facts ms ⌝)%I.
 
   Definition sconf_at (ms : mword 64) : iProp Σ :=
@@ -477,19 +503,19 @@ Section IntrDefs.
   Lemma sconf_at_open : sconf -∗ ∃ ms : mword 64, sconf_at ms.
   Proof.
     iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmie & Hmenv)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
-    iExists ms. iSplitL "Hms Hhalf".
-    { iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
-    iIntros (ms') "(Hms' & Hhalf' & %Hmsf')".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
+    iExists ms. iSplitL "Hms Hhalf Hspp".
+    { iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
+    iIntros (ms') "(Hms' & Hhalf' & Hspp' & %Hmsf')".
     iFrame "Hhw Hminv Hpriv Hmie Hmenv".
-    iExists ms'. iFrame "Hms' Hhalf'". iPureIntro. exact Hmsf'.
+    iExists ms'. iFrame "Hms' Hhalf' Hspp'". iPureIntro. exact Hmsf'.
   Qed.
 
   (* the mstatus facts are readable straight off the flavour, without
      closing it -- what a caller reasoning about SPP/SPIE needs. *)
   Lemma sconf_at_facts (ms : mword 64) :
     sconf_at ms -∗ ⌜ sconf_ms_facts ms ⌝.
-  Proof. iIntros "[(_ & _ & %H) _]". iPureIntro. exact H. Qed.
+  Proof. iIntros "[(_ & _ & _ & %H) _]". iPureIntro. exact H. Qed.
 
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
      its index [b], backed by the ghost QUARTER's value (agreement with
@@ -544,10 +570,17 @@ Section IntrDefs.
      pop_off, acquire's post / release's pre, the flip leaves), via
      [trap_csrs_pay]: owed exactly at a level-0 boundary with an enabled
      base.  Push/pop-balanced functions never mention them. *)
+  (* WHAT A TRAP SCRIBBLES.  sepc / scause / stval are whole registers, so
+     they move as cells; mstatus.SPP is a BIT inside a register [sconf] has
+     to keep, so its travelling half moves as the ghost mirror [spp_hlf].
+     All four belong to the same discipline and travel together: existential
+     inside [sie_arm true] (a trap can rewrite any of them between two
+     instructions), pinned in the hands of interrupts-off code. *)
   Definition trap_csrs : iProp Σ :=
     ((∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
-     (∃ v : mword 64, stval ↦ᵣ v))%I.
+     (∃ v : mword 64, stval ↦ᵣ v) ∗
+     (∃ v : mword 1, spp_hlf v))%I.
 
   Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
     (match n with
@@ -662,6 +695,7 @@ Section IntrDefs.
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
            (∃ v : mword 64, scause ↦ᵣ v) ∗
            (∃ v : mword 64, stval ↦ᵣ v) ∗
+           (∃ v : mword 1, spp_hlf v) ∗
            cpu_hart 0 true p)
      else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
 
@@ -689,6 +723,7 @@ Section IntrDefs.
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
       (∃ v : mword 64, stval ↦ᵣ v) ∗
+      (∃ v : mword 1, spp_hlf v) ∗
       cpu_hart 0 true p)).
   Proof.
     iSplit.
@@ -707,7 +742,7 @@ Section IntrDefs.
     (∃ handler : mword 64, intr_inv handler) ∗
     trap_csrs ∗
     cpu_hart 0 true p.
-  Proof. iIntros "(Hbit & Hinv & Hsep & Hsca & Hstv & Hcpu)". iFrame. Qed.
+  Proof. iIntros "(Hbit & Hinv & Hsep & Hsca & Hstv & Hspp & Hcpu)". iFrame. Qed.
 
   Lemma sie_arm_on_in (p : mword 64) :
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
@@ -715,7 +750,7 @@ Section IntrDefs.
     trap_csrs -∗
     cpu_hart 0 true p -∗
     sie_arm true p.
-  Proof. iIntros "Hbit Hinv (Hsep & Hsca & Hstv) Hcpu". iFrame. Qed.
+  Proof. iIntros "Hbit Hinv (Hsep & Hsca & Hstv & Hspp) Hcpu". iFrame. Qed.
 
   (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
      S-mode translation invariant, regime and root hidden.  Clients thread
@@ -1285,9 +1320,11 @@ Section IntrDefs.
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
+    (∃ v : mword 1, spp_hlf v) -∗
     intr_restore.
   Proof.
-    iIntros "#Hi #Hs Hsep Hsca Hstv". iFrame "Hsep Hsca Hstv".
+    iIntros "#Hi #Hs Hsep Hsca Hstv Hspp".
+    iFrame "Hsep Hsca Hstv Hspp".
     iExists h. iFrame "Hi". iNext. iExact "Hs".
   Qed.
 
@@ -1317,38 +1354,58 @@ Section IntrDefs.
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
-    intr_config ∗ ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S.
+    intr_config ∗ ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S ∗
+    (* THE SPP TIE COMES OUT.  [intr_config] carries no SPP tie, and it must
+       not: a trap sets SPP := 1 and the matching sret sets it back to 0, so
+       across the engine the bit MOVES.  The funnel holds this half and the
+       travelling one (out of [sie_arm true]) and re-ties both to the final
+       mstatus when it converts back -- which is the whole reason the enabled
+       arm holds SPP at an EXISTENTIAL value. *)
+    (∃ v : mword 1, spp_hlf v).
   Proof.
     iIntros "Hsc Hq Hsepc Hscause Hstval".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     iDestruct (ghost_var_agree with "Hhalf Hq") as %Hb1.
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & _ & _ & _ & _ & %Hval)".
     subst menvcfg0.
     iFrame "Hq Hmenv Hhw Hminv Hpriv Hmiex Hsepc Hscause Hstval".
+    iSplitR "Hspp"; [| iExists (_get_Mstatus_SPP ms); iExact "Hspp" ].
     iExists ms. iFrame "Hms Hhalf".
     iPureIntro. apply intr_ms_facts_iff. split; [ | exact Hmsf ].
     rewrite Hb1. vm_compute. reflexivity.
   Qed.
 
-  Lemma v2_of_intr_config :
+  Lemma v2_of_intr_config (vt vc : mword 1) :
     intr_config -∗
     menvcfg ↦ᵣ MENVCFG_S -∗
+    (* BOTH SPP halves, at ARBITRARY values -- the tie one this conversion's
+       dual handed out, and the travelling one from [sie_arm true].  A trap
+       and its sret move SPP, so neither is about the mstatus coming back;
+       holding both is what lets this re-tie them to it.  That is also why
+       the enabled arm holds SPP existentially: while interrupts are on, its
+       value is not the client's to know. *)
+    spp_hlf vt -∗ spp_hlf vc ==∗
     sconf ∗
+    (∃ v : mword 1, spp_hlf v) ∗
     (∃ v : mword 64, sepc ↦ᵣ v) ∗
     (∃ v : mword 64, scause ↦ᵣ v) ∗
     (∃ v : mword 64, stval ↦ᵣ v).
   Proof.
-    iIntros "Hic Hmenv".
+    iIntros "Hic Hmenv Ht Hc".
     iDestruct "Hic" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepc & Hscause & Hstval)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
     pose proof (proj1 (intr_ms_facts_iff ms) Hmsf) as [_ Hcommon].
-    iFrame "Hsepc Hscause Hstval Hhw Hminv Hpriv Hmiex".
-    iSplitL "Hms Hhalf".
-    { iExists ms. iFrame "Hms Hhalf". iPureIntro. exact Hcommon. }
-    iExists MENVCFG_S. iFrame "Hmenv".
-    iPureIntro.
-    repeat split; vm_compute; reflexivity.
+    iMod (spp_hlf_update vt vc (_get_Mstatus_SPP ms) with "Ht Hc") as "[Ht Hc]".
+    iModIntro.
+    iSplitR "Hc Hsepc Hscause Hstval".
+    { iFrame "Hhw Hminv Hpriv Hmiex".
+      iSplitL "Hms Hhalf Ht".
+      { iExists ms. iFrame "Hms Hhalf Ht". iPureIntro. exact Hcommon. }
+      iExists MENVCFG_S. iFrame "Hmenv".
+      iPureIntro. repeat split; vm_compute; reflexivity. }
+    iFrame "Hsepc Hscause Hstval".
+    iExists (_get_Mstatus_SPP ms). iExact "Hc".
   Qed.
 
 End IntrDefs.

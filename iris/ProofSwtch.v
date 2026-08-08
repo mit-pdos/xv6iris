@@ -103,7 +103,7 @@ Section ProofSwtch.
     iEval (rewrite /sie_cap) in "Hcap".
     iDestruct "Hcap" as "(Hstk & Htr & Hsiearm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
     destruct Hmsf' as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
@@ -255,15 +255,15 @@ Section ProofSwtch.
               ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hret
-                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hq0 Hcpuown Hstk_t]").
+                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t]").
     (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
     iNext.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile".
     (* ---- rebuild sconf ---- *)
-    iAssert sconf with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv]" as "Hsc".
+    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv]" as "Hsc".
     { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
-      iSplitL "Hms Hhalf".
-      { iExists ms. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+      iSplitL "Hms Hhalf Hspp".
+      { iExists ms. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iSplitL "Hmie Hmdl".
       { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }

@@ -135,7 +135,7 @@ Section KvminithartBody.
               with "Hcg Hpc Hi08").
     iIntros (σ1 Hpceq1) "Hsc Hcap Hfile Hnpc Hsi".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms1) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms1) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv1.
@@ -163,8 +163,8 @@ Section KvminithartBody.
     assert (Hpnpc1 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x08) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpnpc1) in "Hnpc".
     (* reassemble the ambient bundle at pc = 0x0c *)
-    iAssert sconf with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx". iExists ms1. iFrame "Hms Hhalf". done. }
+    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
+    { iFrame "Hhw Hminv Hpriv Hmiex Hmenvx". iExists ms1. iFrame "Hms Hhalf Hspp". done. }
     iAssert (pc_is (mword_of_int (KernelSyms.kvminithart + 0x0c))) with "[Hpc Hnpc]" as "Hpc".
     { iFrame "Hpc Hnpc". }
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
@@ -248,7 +248,7 @@ Section KvminithartBody.
               with "Hcg Hpc Hi1c").
     iIntros (σ2 Hpceq2) "Hsc Hcap Hfile Hnpc Hsi".
     iDestruct "Hsc" as "(#Hhw2 & #Hminv2 & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms2) "(Hms & Hhalf & %Hmsf2)".
+    iDestruct "Hmsx" as (ms2) "(Hms & Hhalf & Hspp & %Hmsf2)".
     pose proof Hmsf2 as (HMPRV2 & HSXL2 & HMXR2 & HTSR2 & HXS2 & HFS2 & HVS2 & HSD2 & HMPP2 & HTVM2).
     iPoseProof "Hhw2" as "#Hhwc2".
     iDestruct "Hhwc2" as (misa0 mseccfg0 pmar0 elp0)
@@ -310,8 +310,8 @@ Section KvminithartBody.
     iEval (rewrite Lnpc2) in "Hpc".
     assert (Hpnpc2 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x1c) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x20)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpnpc2) in "Hnpc".
-    iAssert sconf with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw2 Hminv2 Hpriv Hmiex Hmenvx". iExists ms2. iFrame "Hms Hhalf". done. }
+    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
+    { iFrame "Hhw2 Hminv2 Hpriv Hmiex Hmenvx". iExists ms2. iFrame "Hms Hhalf Hspp". done. }
     iAssert (pc_is (mword_of_int (KernelSyms.kvminithart + 0x20))) with "[Hpc Hnpc]" as "Hpc".
     { iFrame "Hpc Hnpc". }
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".
@@ -321,7 +321,7 @@ Section KvminithartBody.
               with "Hcg Hpc Hi20").
     iIntros (σ3 Hpceq3) "Hsc Hcap Hfile Hnpc Hsi".
     iDestruct "Hsc" as "(#Hhw3 & #Hminv3 & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms3) "(Hms & Hhalf & %Hmsf3)".
+    iDestruct "Hmsx" as (ms3) "(Hms & Hhalf & Hspp & %Hmsf3)".
     pose proof Hmsf3 as (HMPRV3 & HSXL3 & HMXR3 & HTSR3 & HXS3 & HFS3 & HVS3 & HSD3 & HMPP3 & HTVM3).
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv3.
@@ -366,8 +366,8 @@ Section KvminithartBody.
     iEval (rewrite Lnpc3) in "Hpc".
     assert (Hpnpc3 : add_vec_int (mword_of_int (KernelSyms.kvminithart + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.kvminithart + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpnpc3) in "Hnpc".
-    iAssert sconf with "[Hpriv Hms Hhalf Hmiex Hmenvx]" as "Hsc".
-    { iFrame "Hhw3 Hminv3 Hpriv Hmiex Hmenvx". iExists ms3. iFrame "Hms Hhalf". done. }
+    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmiex Hmenvx]" as "Hsc".
+    { iFrame "Hhw3 Hminv3 Hpriv Hmiex Hmenvx". iExists ms3. iFrame "Hms Hhalf Hspp". done. }
     iAssert (pc_is (mword_of_int (KernelSyms.kvminithart + 0x24))) with "[Hpc Hnpc]" as "Hpc".
     { iFrame "Hpc Hnpc". }
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile") as "Hcg".

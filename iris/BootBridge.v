@@ -262,12 +262,16 @@ Section BootBridge.
     cur_privilege ↦ᵣ Supervisor -∗
     mstatus ↦ᵣ ms -∗
     ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
+    (* the SPP mirror's TIED half, at this mstatus.  Its twin travels with
+       [trap_csrs] -- boot holds it, because interrupts are off. *)
+    spp_hlf (_get_Mstatus_SPP ms) -∗
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     sconf.
   Proof.
-    iIntros (Hms Hmie ->) "#Hhw #Hmin Hpriv Hmst Hg Hmie Hmdl Hmenv".
+    iIntros (Hms Hmie ->) "#Hhw #Hmin Hpriv Hmst Hg Hspp Hmie Hmdl Hmenv".
     rewrite /sconf. iFrame "Hhw Hmin Hpriv".
-    iSplitL "Hmst Hg". { iExists ms. iFrame "Hmst Hg". iPureIntro. exact Hms. }
+    iSplitL "Hmst Hg Hspp".
+    { iExists ms. iFrame "Hmst Hg Hspp". iPureIntro. exact Hms. }
     iSplitL "Hmie Hmdl". { iExists mie_v, mdv0. iFrame. iPureIntro. exact Hmie. }
     iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
     split_and!; vm_compute; reflexivity.
@@ -289,7 +293,7 @@ Section BootBridge.
       (pmpcfgf : type_of_register pmpcfg_n)
       (pmpaddrf : type_of_register pmpaddr_n)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-      (nv iv : mword 32) (p0 : mword 64) :
+      (nv iv : mword 32) (p0 : mword 64) (vspp1 vspp2 : mword 1) :
     (* the register file, in the two slots the S-mode side reads *)
     Mf !!! Regidx csp_rs1 = mb_frame sp0 ->
     Mf !!! Regidx (mword_of_int 4 : mword 5) = tpv ->
@@ -337,6 +341,11 @@ Section BootBridge.
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
+    (* BOTH halves of the SPP mirror, at whatever value adequacy minted them.
+       Nothing is tied to that value: this bridge is where the tie is first
+       established, and holding both is what lets it set them to the mstatus
+       it is installing. *)
+    spp_hlf vspp1 -∗ spp_hlf vspp2 -∗
     (* --- the raw .bss cells --- *)
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     a_cpu_noff cid_word ↦₄ nv -∗
@@ -362,8 +371,8 @@ Section BootBridge.
   Proof.
     iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
-             Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval Hstv
-             Hnoff Hint Hproc Hctx".
+             Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval
+             Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hctx".
     (* --- the SIE ghost: 1/2 tied + 1/4 for main + 1/4 = two eighths --- *)
     iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
     { iPureIntro. apply (bool_decide_unpack _). by compute. }
@@ -403,8 +412,12 @@ Section BootBridge.
     iAssert (ghost_var sie_gname (1/2) (_get_Mstatus_SIE msf))
       with "[Hg2]" as "Hg2".
     { rewrite Hsie. iExact "Hg2". }
+    (* SET THE TIE.  Both halves are in hand exactly here, which is the only
+       moment they ever are outside a leaf that writes mstatus. *)
+    iMod (spp_hlf_update vspp1 vspp2 (_get_Mstatus_SPP msf) with "Hspp1 Hspp2")
+      as "[Hspp1 Hspp2]".
     iDestruct (sconf_intro msf mief midelegf MENVCFG_S Hmsf Hmiez eq_refl
-                 with "Hhw Hmin Hpriv Hmst Hg2 Hmie Hmdl Hmenv") as "Hsconf".
+                 with "Hhw Hmin Hpriv Hmst Hg2 Hspp1 Hmie Hmdl Hmenv") as "Hsconf".
     (* --- cpus[cid] --- *)
     iDestruct (cpu_own_init_boot p0 nv iv cpu_ctx_free Hnv
                  with "Hnoff Hint He2 Hproc Hctx") as "Hcpu".
@@ -422,7 +435,9 @@ Section BootBridge.
     iSplitL "Hhs Hsconf Hcap Hfile".
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
     iFrame "Hcpu Hg4a".
-    rewrite /main_hart_raw /trap_csrs. iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
+    rewrite /main_hart_raw /trap_csrs.
+    iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
+    iExists (_get_Mstatus_SPP msf). iExact "Hspp2".
   Qed.
 
 End BootBridge.

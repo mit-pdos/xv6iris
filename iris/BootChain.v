@@ -380,6 +380,11 @@ Section BootRun.
      ghost_var sie_gname (1/2) ('b"0" : mword 1) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+     (* BOTH halves of the SPP mirror.  Adequacy mints them at an arbitrary
+        value; the M->S bridge is what ties them to the mstatus it installs,
+        so nothing here depends on which value that is. *)
+     spp_hlf ('b"0" : mword 1) ∗
+     spp_hlf ('b"0" : mword 1) ∗
      a_cpu_noff cid_word ↦₄ noff_val 0 ∗
      a_cpu_int cid_word ↦₄ iv ∗
      cpu_proc_half cpu_id zero_reg ∗
@@ -420,7 +425,7 @@ Section BootRun.
     iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
-              Hg4a & Hg4b & Hnoff & Hint & Hproc & Hctx & _) Hcont".
+              Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hctx & _) Hcont".
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".
@@ -463,7 +468,7 @@ Section BootRun.
               msf satpf midelegf mief menvcfgf
               (mb_tpv (boot_w64 (Z.of_nat (fin_to_nat cpu_id))))
               pmpcfgf pmpaddrf (register_lookup tlb rs)
-              (noff_val 0) iv zero_reg
+              (noff_val 0) iv zero_reg _ _
               Hsp Htpf (mstatus_kernel_SIE _ Hkf) (sconf_ms_facts_of_kernel _ Hkf)
               Hmenvl Hmiez Hsatpm Hpmpo
               ltac:(exact (st_tpv_of_nat _ Hn))
@@ -472,7 +477,7 @@ Section BootRun.
               eq_refl
               with "Hhw Hmin Hhs Hpriv Hmst Hpmpc Hpmpa Hfile Hsatp Hmdl Hmie
                     Hmenv Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
-                    Hstval Hstvec Hnoff Hint Hproc Hctx")
+                    Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hctx")
       as (mf) "(Hcap & Hcpu & Hg & Hraw)".
     iApply ("Hcont" $! mf with "Hcap Hcpu Hg Hraw Hpc").
   Qed.

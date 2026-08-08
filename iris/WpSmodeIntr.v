@@ -250,7 +250,7 @@ Section WpSmodeIntr.
     - (* ---- b = true: the interrupt-absorbing engine.  [sie_arm true]
            needs no unfolding: the [if] reduces by conversion, so
            [iDestruct] / [iFrame] / [iExact] see through it. ---- *)
-      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hcpu)".
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
       iDestruct "Hhx" as (handler) "#Hintr".
       (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_inv] owns stvec
          inside its invariant, and the Bare slot owns the same cell. *)
@@ -272,8 +272,16 @@ Section WpSmodeIntr.
         iDestruct "Hbytes" as "[%H2al _]". iPureIntro. exact H2al. }
       assert (Hpc0 : ret_pc pc = pc)
         by (unfold ret_pc; exact (update_bit0_zero_of_aligned2 pc Hal2)).
+      (* THE SPP TIE COMES OUT WITH THE CONFIG.  [intr_config] carries none:
+         the trap sets SPP := 1 and its sret clears it, so across the engine
+         the bit MOVES and a tie framed around the call would be stale.  We
+         hold the tie half here and the TRAVELLING half [Hsppc] out of the
+         enabled arm, which is exactly what lets the conversion back re-tie
+         both to the mstatus the engine returns. *)
       iDestruct (intr_config_of_v2 with "Hsc Hq1 Hsepcx Hscausex Hstvalx")
-        as "(Hic & Hq1 & Hmenv)".
+        as "(Hic & Hq1 & Hmenv & Hsppt)".
+      iDestruct "Hsppt" as (vt) "Hsppt".
+      iDestruct "Hsppc" as (vc) "Hsppc".
       (* the engine runs at the PINNED map: its [gpr_file] / [intr_frame]
          are the bundle's, retargeted along [Hsppin]. *)
       iAssert (intr_frame root_ppn (tp_pin m)) with "[Hmenv Htlbinv Hstk]" as "HF".
@@ -285,15 +293,15 @@ Section WpSmodeIntr.
       iIntros (σ Hpceq) "Hic Hfile HF Hnpc Hsi".
       iDestruct (intr_frame_retarget root_ppn (tp_pin m) m Hsppin with "HF") as "HF".
       iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
-      iDestruct (v2_of_intr_config with "Hic Hmenv")
-        as "(Hsc & Hsepcx & Hscausex & Hstvalx)".
+      iMod (v2_of_intr_config vt vc with "Hic Hmenv Hsppt Hsppc")
+        as "(Hsc & Hsppc & Hsepcx & Hscausex & Hstvalx)".
       iMod ("H" $! σ Hpceq
-              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
+              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hsppc Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iSplitL "Hstk Hdeep".
         { iApply stack_own_app. iFrame "Hstk Hdeep". }
         iSplitL "Htlbinv Hbit1". { iRight. iFrame "Hbit1". iExists root_ppn. iExact "Htlbinv". }
-        iFrame "Hq1 Hsepcx Hscausex Hstvalx Hcpu".
+        iFrame "Hq1 Hsepcx Hscausex Hstvalx Hsppc Hcpu".
         iExists handler. iExact "Hintr". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
@@ -301,7 +309,7 @@ Section WpSmodeIntr.
     - (* ---- b = false: the dispatch-None engine, SIE=0 from ghost ---- *)
       iRename "Harm" into "Hq0".
       iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-      iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
+      iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
       pose proof Hmsf as Hmsf'.
       destruct Hmsf' as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
       iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
@@ -316,11 +324,13 @@ Section WpSmodeIntr.
                 with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpcr Hinstr").
       iIntros (σ Hpceq) "Hpriv Hms Hmie Hmdl Hmenv Htr Hsi".
       iMod ("H" $! σ Hpceq
-              with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv] [Hstk Htr Hq0] Hfile Hnpc Hsi")
+              with "[Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv] [Hstk Htr Hq0] Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iFrame "Hhw Hminv Hpriv".
-        iSplitL "Hms Hhalf".
-        { iExists ms. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+        (* interrupts are OFF here, so no trap can be taken and mstatus is
+           whatever it was: the SPP tie rides through untouched. *)
+        iSplitL "Hms Hhalf Hspp".
+        { iExists ms. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
         iSplitL "Hmie Hmdl".
         { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.

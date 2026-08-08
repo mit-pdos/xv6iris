@@ -470,6 +470,12 @@ Proof.
      three pieces of the choreography *)
   iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
     as (γsie) "Hsie".
+  (* the SPP mirror, TWO halves like the translation bit.  The value here is
+     arbitrary: nothing is tied to it until the M->S bridge builds [sconf],
+     and that site holds BOTH halves and sets them to the mstatus it is
+     about to install ([BootBridge.sconf_intro]). *)
+  iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
+    as (γspp) "Hspp".
   (* the shared kernel table's one-shot agreement, unset *)
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
   (* EVERY proc slot's park receipt, minted at [false] *)
@@ -486,7 +492,7 @@ Proof.
      single-generation theorem hands its client no FS custody, and the first
      real one is minted by [initlog]'s swap. *)
   iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => []))) as (γmir) "_".
-  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark γdisk γmir).
+  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γspp γpark γdisk γmir).
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
   (* THE FS TIE, minted at the machine's own disk image and split: one half
      goes into [state_interp]'s fixed conjunct below, the other into
@@ -766,6 +772,12 @@ Section power.
         ghost_var (era_sie_name HE c) (1/2)%Qp sie_bit_off ∗
         ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off ∗
         ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off) ∗
+     (* BOTH halves of the SPP mirror.  The value is arbitrary here -- the
+        M->S bridge holds both and sets them to the mstatus it installs --
+        which is why this is not stated at any particular bit. *)
+     ([∗ list] c ∈ enum CPU,
+        ghost_var (era_spp_name HE c) (1/2)%Qp sie_bit_off ∗
+        ghost_var (era_spp_name HE c) (1/2)%Qp sie_bit_off) ∗
      ([∗ list] j ∈ seq 0 nproc, ghost_var (era_park_name HE j) 1 false) ∗
      ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
      ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
@@ -899,6 +911,8 @@ Section power.
               (NoDup_enum CPU)) as (γs) "Hs".
       iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU)
               (NoDup_enum CPU)) as (γsie) "Hsie".
+      iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU)
+              (NoDup_enum CPU)) as (γspp) "Hspp".
       iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
       (* THE BOOT MINT: a BRAND-NEW image map at the disk content the reset
          machine still carries ([boot_shape] preserves [v_disk]), together
@@ -912,7 +926,7 @@ Section power.
          checked-out arm at [initlog]'s swap. *)
       iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => [])))
         as (γmir) "Hmir".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γpark γdisk γmir).
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γspp γpark γdisk γmir).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -928,11 +942,11 @@ Section power.
       (* run the client's boot entailment over the fresh era *)
       iMod "Hback" as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf with
-              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF
+              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hpark HuF HpF HvF
                 Hdfrags Hmir]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
-        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF Hdfrags Hmir".
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hpark HuF HpF HvF Hdfrags Hmir".
         iFrame "Helems".
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
