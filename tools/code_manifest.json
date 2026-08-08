@@ -306,6 +306,12 @@
   2
  ],
  [
+  "CodeItrunc.v",
+  "itrunc",
+  "iti_",
+  2
+ ],
+ [
   "CodeIunlock.v",
   "iunlock",
   "iui2_",

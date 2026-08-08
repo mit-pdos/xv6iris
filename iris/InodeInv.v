@@ -454,6 +454,90 @@ Definition blk_holes_zero (bm : blkmap) (data : nat -> list (bv 8)) : Prop :=
     data i = replicate BSIZE (bv_0 8).
 
 (* ===================================================================== *)
+(*  THE EMPTIED MAP: what itrunc leaves behind                            *)
+(* ===================================================================== *)
+
+(* Every direct entry, every indirect entry, and the indirect block itself
+   at zero.  itrunc's postcondition is stated at this ONE closed value
+   rather than at "some map whose slots are all zero", because the caller
+   that matters (iput) then needs no reasoning at all to see that the inode
+   names no blocks: the resources below collapse definitionally. *)
+Definition bm_empty : blkmap :=
+  MkBlkmap (replicate NDIRECT (bv_0 32)) (bv_0 32)
+           (replicate NINDIRECT (bv_0 32)).
+
+Lemma bm_empty_get (i : nat) : blkmap_get bm_empty i = bv_0 32.
+Proof.
+  rewrite /blkmap_get /bm_empty. cbn [bm_dir bm_ind bm_ent].
+  destruct (decide (i < NDIRECT)%nat) as [Hlt|Hge].
+  - apply list_lookup_total_correct, lookup_replicate_2. lia.
+  - destruct (decide ((i - NDIRECT) < NINDIRECT)%nat) as [Hlt2|Hge2].
+    + apply list_lookup_total_correct, lookup_replicate_2. lia.
+    + rewrite list_lookup_total_alt lookup_ge_None_2; [reflexivity|].
+      rewrite length_replicate. lia.
+Qed.
+
+Lemma bm_empty_slot (i : nat) : bm_slot bm_empty i = bv_0 32.
+Proof.
+  rewrite /bm_slot. destruct (decide (i = MAXFILE)) as [->|_];
+    [reflexivity | apply bm_empty_get].
+Qed.
+
+Lemma bm_empty_slot0 (i : nat) : bv_unsigned (bm_slot bm_empty i) = 0.
+Proof. rewrite bm_empty_slot. reflexivity. Qed.
+
+(* WELL-FORMED FOR FREE.  Both of [blkmap_wf]'s interesting clauses --
+   coverage and injectivity -- are guarded by "this slot is nonzero", and
+   no slot is; the lengths and the no-indirect-no-entries clause are
+   immediate from the [replicate]s. *)
+Lemma bm_empty_wf (cov : gset Z) (ls : Z) : blkmap_wf cov ls bm_empty.
+Proof.
+  rewrite /blkmap_wf /bm_empty. cbn [bm_dir bm_ind bm_ent].
+  split; [apply length_replicate|].
+  split; [apply length_replicate|].
+  split; [reflexivity|].
+  split.
+  - intros i _ Hnz. exfalso. apply Hnz. apply bm_empty_slot0.
+  - intros i j _ _ Hnz _. exfalso. apply Hnz. apply bm_empty_slot0.
+Qed.
+
+(* the truncated file reads as all zeros at every index -- the normalisation
+   [blk_holes_zero] wants, at the map itrunc produces *)
+Lemma bm_empty_holes (data : nat -> list (bv 8)) :
+  (forall i : nat, data i = replicate BSIZE (bv_0 8)) ->
+  blk_holes_zero bm_empty data.
+Proof. intros H i _ _. exact (H i). Qed.
+
+(* THE BLOCKS AN INODE NAMES, as a set: what itrunc returns to the free
+   pool.  Indexed over [S MAXFILE] so the indirect block -- slot MAXFILE --
+   is included; it is freed too. *)
+Definition bm_blocks (bm : blkmap) : gset Z :=
+  list_to_set (map (fun i => bv_unsigned (bm_slot bm i)) (seq 0 (S MAXFILE)))
+  ∖ {[ 0 ]}.
+
+Lemma bm_blocks_spec (bm : blkmap) (b : Z) :
+  b ∈ bm_blocks bm <->
+  (b <> 0 /\ exists i : nat, (i <= MAXFILE)%nat /\ bv_unsigned (bm_slot bm i) = b).
+Proof.
+  rewrite /bm_blocks elem_of_difference elem_of_singleton elem_of_list_to_set.
+  split.
+  - intros [Hin Hnz]. split; [exact Hnz|].
+    apply elem_of_list_fmap in Hin as (i & -> & Hi).
+    exists i. split; [|reflexivity].
+    apply elem_of_seq in Hi. lia.
+  - intros (Hnz & i & Hi & <-). split; [|exact Hnz].
+    apply elem_of_list_fmap. exists i. split; [reflexivity|].
+    apply elem_of_seq. lia.
+Qed.
+
+Lemma bm_blocks_empty : bm_blocks bm_empty = ∅.
+Proof.
+  apply set_eq. intros b. split; [|set_solver].
+  rewrite bm_blocks_spec. intros (Hnz & i & _ & Hb).
+  exfalso. apply Hnz. rewrite -Hb. apply bm_empty_slot0.
+Qed.
+
+(* ===================================================================== *)
 (*  INSTALLING ONE BLOCK: the pure half of what bmap's three stores do    *)
 (*                                                                        *)
 (*  All three of bmap's installs -- [ip->addrs[bn]], [ip->addrs[NDIRECT]] *)
