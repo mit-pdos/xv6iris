@@ -767,14 +767,16 @@ Section SchedCtx.
     iIntros "Hd Hp". iSplitR; [done|]. iSplitR; [done|]. iFrame "Hd Hp".
   Qed.
 
-  (* ... and its inverse at USED, where BOTH the context and the dormant
-     guards are false and only the receipt is owed. *)
+  (* ... and its USED counterpart.  [needs_ctx USED] is TRUE
+     ([ProcGeom.needs_ctx]): a USED proc is one kfork has finished setting up
+     and released the lock on, so its slot owns a real parked record exactly
+     as RUNNABLE does.  Only the dormant and running guards are false. *)
   Lemma proc_slots_used (pa : mword 64) :
-    park_at_full pa false -∗ proc_slots pa USED.
+    ▷ proc_ctx pa -∗ park_at_full pa false -∗ proc_slots pa USED.
   Proof.
-    rewrite /proc_slots inv_dormant_USED not_running_USED is_running_USED.
-    rewrite (_ : needs_ctx USED = false); [| vm_compute; reflexivity].
-    iIntros "H". iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "H".
+    rewrite /proc_slots inv_dormant_USED not_running_USED is_running_USED
+            needs_ctx_USED.
+    iIntros "$ $".
   Qed.
 
   (* THE SCHEDULER'S TWO SLOT MOVES, spelled at the proc-lock end.

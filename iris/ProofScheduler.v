@@ -135,11 +135,7 @@ Qed.
    private field block for.  (Case on the two [needs_ctx] disjuncts.) *)
 Lemma sc_needs_ctx_not_dormant (st : mword 32) :
   needs_ctx st = true -> inv_dormant st = false.
-Proof.
-  intro H. unfold needs_ctx in H. apply orb_prop in H.
-  destruct H as [H|H]; apply bool_decide_eq_true in H; subst st;
-    vm_compute; reflexivity.
-Qed.
+Proof. exact (inv_dormant_of_needs_ctx st). Qed.
 
 Lemma sc_neq_vec_false (n : Z) (x y : mword n) : neq_vec x y = false -> x = y.
 Proof.

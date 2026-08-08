@@ -271,15 +271,39 @@ Proof. vm_compute. reflexivity. Qed.
 Lemma inv_dormant_RUNNING : inv_dormant RUNNING = false.
 Proof. vm_compute. reflexivity. Qed.
 
+(* USED IS IN HERE, and it is not a rounding error.  [USED] is a state a proc
+   can be in with its lock RELEASED: kfork drops p->lock after allocproc so it
+   can take wait_lock to set p->parent (taking wait_lock under p->lock inverts
+   the lock order), and only re-acquires to store RUNNABLE.  During that window
+   any table scan -- wakeup, kill, wait -- can acquire the slot's lock, so
+   whatever the slot owns has to be IN the invariant, not in kfork's frame.
+
+   And the record really is there: allocproc writes context.ra = forkret and
+   context.sp = the kstack top, which is exactly why kfork can go live with a
+   single store to p->state.  The "almost" against RUNNABLE is that the
+   scheduler must not dispatch a USED proc -- enforced by the C's
+   [if (p->state == RUNNABLE)], not by this guard. *)
 Definition needs_ctx (st : mword 32) : bool :=
-  bool_decide (st = RUNNABLE) || bool_decide (st = SLEEPING).
+  bool_decide (st = RUNNABLE) || bool_decide (st = SLEEPING) ||
+  bool_decide (st = USED).
 
 Lemma needs_ctx_SLEEPING : needs_ctx SLEEPING = true.
-Proof. rewrite /needs_ctx orb_true_r. done. Qed.
+Proof. vm_compute. reflexivity. Qed.
 
 Lemma needs_ctx_RUNNABLE : needs_ctx RUNNABLE = true.
+Proof. vm_compute. reflexivity. Qed.
+
+Lemma needs_ctx_USED : needs_ctx USED = true.
+Proof. vm_compute. reflexivity. Qed.
+
+(* the one elimination form the three derived guards below all go through, so
+   widening [needs_ctx] again costs exactly one case here. *)
+Lemma needs_ctx_cases (st : mword 32) :
+  needs_ctx st = true -> st = RUNNABLE \/ st = SLEEPING \/ st = USED.
 Proof.
-  rewrite /needs_ctx. rewrite (bool_decide_eq_true_2 (RUNNABLE = RUNNABLE)); done.
+  rewrite /needs_ctx. intros Hn.
+  apply orb_true_iff in Hn as [Hn|Hn]; [apply orb_true_iff in Hn as [Hn|Hn]|];
+    apply bool_decide_eq_true_1 in Hn; auto.
 Qed.
 
 Lemma needs_ctx_RUNNING : needs_ctx RUNNING = false.
@@ -331,9 +355,7 @@ Proof. rewrite /is_running /not_running negb_involutive. reflexivity. Qed.
 Lemma is_running_of_needs_ctx (st : mword 32) :
   needs_ctx st = true -> is_running st = false.
 Proof.
-  rewrite /needs_ctx /is_running. intro H.
-  apply orb_true_elim in H as [H|H]; apply bool_decide_eq_true_1 in H; subst;
-    vm_compute; reflexivity.
+  intro H. apply needs_ctx_cases in H as [H|[H|H]]; subst; vm_compute; reflexivity.
 Qed.
 
 Lemma not_running_RUNNING : not_running RUNNING = false.
@@ -362,10 +384,10 @@ Qed.
 Lemma inv_dormant_of_needs_ctx (st : mword 32) :
   needs_ctx st = true -> inv_dormant st = false.
 Proof.
-  rewrite /needs_ctx. intros Hn.
-  apply orb_true_iff in Hn as [Hn|Hn]; apply bool_decide_eq_true in Hn; subst.
+  intros Hn. apply needs_ctx_cases in Hn as [Hn|[Hn|Hn]]; subst.
   - exact inv_dormant_RUNNABLE.
   - exact inv_dormant_SLEEPING.
+  - exact inv_dormant_USED.
 Qed.
 
 (* every state that owns a saved context is not RUNNING *)
