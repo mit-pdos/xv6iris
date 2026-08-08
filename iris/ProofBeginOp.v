@@ -391,7 +391,7 @@ Section BoProps.
       log_res γ bn γfs cov logstart -∗
       log_op γ MAXOPBLOCKS -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      park_hlf j true -∗
+      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       trap_csrs_pay 0 eb -∗
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
@@ -414,7 +414,7 @@ Section BoProps.
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      park_hlf j true -∗
+      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       trap_csrs_pay 0 eb -∗
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
@@ -460,7 +460,7 @@ Section BoBodies.
     log_res γ bn γfs cov logstart -∗
     log_op γ MAXOPBLOCKS -∗
     p_pid pj ↦₄{dq} pidv -∗
-    park_hlf j true -∗
+    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
@@ -471,7 +471,7 @@ Section BoBodies.
         sie_cap_gpr mf K true pj -∗
         cpu_own 0 eb pj C true -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         p_pid pj ↦₄{dq} pidv -∗
         log_op γ MAXOPBLOCKS -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -728,7 +728,7 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    park_hlf j true -∗
+    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
@@ -840,7 +840,7 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    park_hlf j true -∗
+    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
@@ -967,7 +967,7 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    park_hlf j true -∗
+    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗

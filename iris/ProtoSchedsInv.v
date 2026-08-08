@@ -71,7 +71,7 @@ Local Open Scope Z_scope.
 (*   -  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj      (premise)   DELETED   *)
 (*   -  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj      (post)      DELETED   *)
 (*   +  scheds_inv Φ γs                               persistent, hart-free *)
-(*   +  park_hlf j true                               hart-free token       *)
+(*   +  running_claim j                               hart-free token       *)
 (* The two additions are exactly as transportable as [procs_inv] and       *)
 (* [p_pid] already are, so [wp_next]'s ∀CID lambda carries them for free.  *)
 (* ====================================================================== *)
@@ -95,14 +95,14 @@ Section Payoff.
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗                          (* NEW: persistent, hart-free *)
     panic_wp_any -∗
-    park_hlf j true -∗                          (* NEW: hart-free receipt *)
+    running_claim j -∗                          (* NEW: hart-free receipt *)
     wp_next b pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf av b pj -∗
         cpu_own 0 eb pj C b -∗
         pc_is ret_tgt -∗
-        park_hlf j true -∗
+        running_claim j -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
 End Payoff.

@@ -245,7 +245,7 @@ Section ProofVirtioDiskRwB.
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs_pay 0 eb -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0b0) : mword 64) -∗
-       park_hlf j true -∗
+       running_claim j -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗
@@ -270,7 +270,7 @@ Section ProofVirtioDiskRwB.
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs_pay 0 eb -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0a8) : mword 64) -∗
-       park_hlf j true -∗
+       running_claim j -∗
        locked γk cpu_id -∗
        disk_res γd pd pav pu -∗
        vdrw_scratch sp0 -∗
@@ -290,7 +290,7 @@ Section ProofVirtioDiskRwB.
     trap_csrs_pay 0 eb -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
     panic_wp_any -∗ procs_inv Φ γs -∗ scheds_inv Φ γs -∗
-    park_hlf j true -∗
+    running_claim j -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗
@@ -504,7 +504,7 @@ Section ProofVirtioDiskRwB.
                   cpu_own 1 eb (proc_addr j) C false -∗
                   trap_csrs_pay 0 eb -∗
                   pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x094) : mword 64) -∗
-                  park_hlf j true -∗
+                  running_claim j -∗
                   locked γk cpu_id -∗
                   free_bundles pd fr -∗
                   vdrw_scratch sp0 -∗

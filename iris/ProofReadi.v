@@ -271,7 +271,7 @@ Section ReadiDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         i_dev ip ↦₄{dqd} dev -∗
         inode_meta ip dn -∗
         inode_map γfs ip bm -∗
@@ -323,7 +323,7 @@ Section ReadiRet.
     kernel_text -∗
     pc_is (mword_of_int (RI + 0xdc) : mword 64) -∗
     rd_fr7 m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -632,7 +632,7 @@ Section ReadiJoin.
     kernel_text -∗
     pc_is (mword_of_int (RI + 0xd8) : mword 64) -∗
     rd_fr8 m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -788,7 +788,7 @@ Section ReadiExit.
              sp, Regidx Rs11, false, 8)) -∗
     instr (mword_of_int zf : mword 64) true (JAL (jimm, zreg)) -∗
     rd_fr13 m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -1034,7 +1034,7 @@ Section ReadiLoop.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     rd_fr13 m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗

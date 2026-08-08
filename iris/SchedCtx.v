@@ -147,6 +147,13 @@ Section SchedCtx.
   Definition proc_held (i : CPU) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) : iProp Σ :=
     (locked γl i ∗
      p_state (proc_addr j) ↦₄ st ∗
+     (* THE WHOLE STATE MIRROR.  A lock holder has both halves at every
+        state: half #1 is the invariant's, out on loan while the lock is
+        held, and half #2 is either the invariant's too (unclaimed) or the
+        holder's own, since a claimed proc is claimed BY the holder.  The
+        split back into [pstate_lock] happens at release
+        ([ProcGeom.pstate_whole_split]). *)
+     pstate_whole (proc_addr j) st ∗
      p_chan (proc_addr j) ↦₈ ch ∗
      proc_pub (proc_addr j) ∗
      park_hlf j false)%I.
@@ -719,6 +726,18 @@ Section SchedCtx.
   Definition proc_lock_res (γl : gname) (pa : mword 64) : iProp Σ :=
     (∃ (st : mword 32) (ch : mword 64),
        p_state pa ↦₄ st ∗
+       (* THE STATE MIRROR'S LOCK-SIDE SHARE, at the same [st] the cell holds.
+          Half #1 is the tie: nothing moves the cell without moving the ghost,
+          and a ghost_var does not move on half alone.  Half #2 is here too
+          exactly on [unclaimed] -- so on an unclaimed state the lock can move
+          the state by itself, and on a claimed one the claimant must bring
+          the other half.  THE RIGHT TO WRITE [p->state] IS OWNERSHIP OF
+          HALF #2.
+
+          It lives HERE rather than in [proc_slots] because it is keyed on
+          [st] itself: putting it in a slot arm would make [proc_slots_recast]
+          -- the resource-free state change -- have to move a ghost. *)
+       pstate_lock pa st ∗
        p_chan pa ↦₈ ch ∗
        proc_pub pa ∗
        proc_slots pa st)%I.
@@ -946,30 +965,39 @@ Section SchedCtx.
      supply the (▷-guarded) [proc_ctx]. *)
   Lemma proc_lock_res_intro (γl : gname) (pa : mword 64) (st : mword 32) (ch : mword 64) :
     p_state pa ↦₄ st -∗
+    pstate_lock pa st -∗
     p_chan pa ↦₈ ch -∗
     proc_pub pa -∗
     proc_slots pa st -∗
     proc_lock_res γl pa.
-  Proof. iIntros "Hs Hc Hpub Hsl". iExists st, ch. iFrame. Qed.
+  Proof. iIntros "Hs Hg Hc Hpub Hsl". iExists st, ch. iFrame. Qed.
 
   Lemma proc_lock_res_elim (γl : gname) (pa : mword 64) :
     proc_lock_res γl pa -∗
     ∃ (st : mword 32) (ch : mword 64),
-      p_state pa ↦₄ st ∗ p_chan pa ↦₈ ch ∗ proc_pub pa ∗ proc_slots pa st.
+      p_state pa ↦₄ st ∗ pstate_lock pa st ∗
+      p_chan pa ↦₈ ch ∗ proc_pub pa ∗ proc_slots pa st.
   Proof. iIntros "H". iExact "H". Qed.
 
   (* the wakeup transition: a proc found SLEEPING (hence carrying the
      ▷-guarded context), with its state cell flipped to RUNNABLE, still
      satisfies [proc_lock_res].  The saved context survives untouched. *)
+  (* SLEEPING and RUNNABLE are both [unclaimed], so the lock holds the WHOLE
+     mirror at either and moves it alone -- which is exactly why wakeup and
+     kill may write [p->state] without being the claimant. *)
   Lemma proc_lock_res_wakeup (γl : gname) (pa : mword 64) (st : mword 32) (ch : mword 64) :
     st = SLEEPING ->
     p_state pa ↦₄ RUNNABLE -∗
+    pstate_lock pa st -∗
     p_chan pa ↦₈ ch -∗
     proc_pub pa -∗
     proc_slots pa st -∗
-    proc_lock_res γl pa.
+    |==> proc_lock_res γl pa.
   Proof.
-    intros ->. iIntros "Hs Hc Hpub Hsl". iExists RUNNABLE, ch. iFrame "Hs Hc Hpub".
+    intros ->. iIntros "Hs Hg Hc Hpub Hsl".
+    iMod (pstate_lock_write pa SLEEPING RUNNABLE
+            unclaimed_SLEEPING unclaimed_RUNNABLE with "Hg") as "Hg".
+    iModIntro. iExists RUNNABLE, ch. iFrame "Hs Hg Hc Hpub".
     iApply (proc_slots_recast pa SLEEPING RUNNABLE
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; reflexivity)

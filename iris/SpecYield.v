@@ -96,7 +96,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
   panic_wp_any -∗
-  park_hlf j true -∗
+  running_claim j -∗
   trap_csrs_ext eb -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
@@ -104,7 +104,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       sie_cap_gpr mf av eb pj -∗
       cpu_own 0 eb pj C eb -∗
       pc_is ret_tgt -∗
-      park_hlf j true -∗
+      running_claim j -∗
       trap_csrs_ext eb -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

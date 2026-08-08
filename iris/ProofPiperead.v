@@ -593,7 +593,7 @@ Section ProofPiperead.
                cpu_own 0%nat true pj C true -∗
                pipe_ref γp w q -∗
                proc_priv γf pj pid (upd_upt V P') -∗
-               park_hlf j true -∗
+               running_claim j -∗
                pa_stk sp0 1 ↦₈ vra -∗ pa_stk sp0 2 ↦₈ vs0 -∗ pa_stk sp0 3 ↦₈ vs1 -∗
                pa_stk sp0 4 ↦₈ vs2 -∗ pa_stk sp0 5 ↦₈ vs3 -∗ pa_stk sp0 6 ↦₈ vs4 -∗
                pa_stk sp0 7 ↦₈ vs5 -∗
@@ -1134,7 +1134,7 @@ Section ProofPiperead.
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
         proc_priv γf pj pid V -∗
-        park_hlf j true -∗
+        running_claim j -∗
         pa_stk sp0 8 ↦₈ vs6 -∗
         pa_stk sp0 9 ↦₈ vs7 -∗
         pa_stk sp0 10 ↦₈ vs8 -∗
@@ -1158,7 +1158,7 @@ Section ProofPiperead.
                cpu_own 0%nat true pj C true -∗
                pipe_ref γp w q -∗
                proc_priv γf pj pid (upd_upt V P') -∗
-               park_hlf j true -∗
+               running_claim j -∗
                (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
@@ -1290,7 +1290,7 @@ Section ProofPiperead.
           pipe_res γp pi -∗
           pipe_ref γp w q -∗
           proc_priv γf pj pid (upd_upt V P') -∗
-          park_hlf j true -∗
+          running_claim j -∗
           (∃ b : bv 8, chaddr ↦ₘ b) -∗
           WP (Loop : expr riscv_lang) {{ Φ }})%I : iProp Σ)).
       iAssert WXP with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hc8 Hc9 Hc10 Hq12 Hchback]" as "HWX".
@@ -1550,7 +1550,7 @@ Section ProofPiperead.
              p_pagetable pj ↦₈ page_base (ud_root (pv_upt V)) -∗ proc_pt P'' -∗
              proc_priv γf pj pid (upd_upt V P'')) -∗
           chaddr ↦ₘ chb -∗
-          park_hlf j true -∗
+          running_claim j -∗
           WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "CLOOP".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
         { iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark".
@@ -2140,7 +2140,7 @@ Section ProofPiperead.
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
         proc_priv γf pj pid V -∗
-        park_hlf j true -∗
+        running_claim j -∗
         (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗

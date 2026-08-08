@@ -318,6 +318,28 @@ Proof. vm_compute. reflexivity. Qed.
 Definition not_running (st : mword 32) : bool :=
   negb (bool_decide (st = RUNNING)).
 
+(* ... and the USED cut-out.  Together with [not_running] this is [unclaimed]
+   below: the states in which NO THREAD has claimed the proc, and so the lock
+   owns both halves of the state mirror. *)
+Definition not_used (st : mword 32) : bool :=
+  negb (bool_decide (st = USED)).
+
+Definition unclaimed (st : mword 32) : bool :=
+  not_running st && not_used st.
+
+Lemma unclaimed_UNUSED   : unclaimed UNUSED   = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma unclaimed_RUNNABLE : unclaimed RUNNABLE = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma unclaimed_SLEEPING : unclaimed SLEEPING = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma unclaimed_ZOMBIE   : unclaimed ZOMBIE   = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma unclaimed_RUNNING  : unclaimed RUNNING  = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma unclaimed_USED     : unclaimed USED     = false.
+Proof. vm_compute. reflexivity. Qed.
+
 (* ... and its complement, the fourth flat guard.  [p->lock] holds the raw
    context CELLS exactly while the proc is RUNNING: a running proc has no
    parked record ([needs_ctx] is what says "there is a resumable thread saved
@@ -408,26 +430,45 @@ Qed.
    crossing carries ([SchedCtx.park_pay]) and what the reclaiming scheduler
    rebuilds ([SchedCtx.proc_slots_park_gen]), which is why this predicate,
    rather than [needs_ctx], is sched's premise. *)
+(* [not_used] IS PART OF THIS, and has to be: [needs_ctx] covers USED (a
+   USED proc's slot owns a real parked record), but a thread cannot PARK at
+   USED -- it is the state kfork leaves behind while the child has never
+   run.  Without the cut-out, sched's premise would admit a park whose
+   state is claimed, and the reclaiming scheduler could not put the state
+   mirror back whole. *)
 Definition park_ok (st : mword 32) : bool :=
-  needs_ctx st || bool_decide (st = ZOMBIE).
+  (needs_ctx st || bool_decide (st = ZOMBIE)) && not_used st.
 
 Lemma park_ok_RUNNABLE : park_ok RUNNABLE = true.
-Proof. rewrite /park_ok needs_ctx_RUNNABLE. reflexivity. Qed.
+Proof. vm_compute. reflexivity. Qed.
 Lemma park_ok_SLEEPING : park_ok SLEEPING = true.
-Proof. rewrite /park_ok needs_ctx_SLEEPING. reflexivity. Qed.
+Proof. vm_compute. reflexivity. Qed.
 Lemma park_ok_ZOMBIE : park_ok ZOMBIE = true.
 Proof. vm_compute. reflexivity. Qed.
 
 Lemma park_ok_of_needs_ctx (st : mword 32) :
-  needs_ctx st = true -> park_ok st = true.
-Proof. intros Hn. rewrite /park_ok Hn. reflexivity. Qed.
+  needs_ctx st = true -> not_used st = true -> park_ok st = true.
+Proof. intros Hn Hu. rewrite /park_ok Hn Hu. reflexivity. Qed.
+
+(* what the reclaiming scheduler needs: a parked state is unclaimed, so the
+   lock's share of the mirror is the whole variable again. *)
+Lemma park_ok_unclaimed (st : mword 32) :
+  park_ok st = true -> unclaimed st = true.
+Proof.
+  rewrite /park_ok /unclaimed. intros H.
+  apply andb_true_iff in H as [Hd Hu]. rewrite Hu andb_true_r.
+  apply orb_true_iff in Hd as [Hd|Hd].
+  - exact (not_running_of_needs_ctx st Hd).
+  - apply bool_decide_eq_true_1 in Hd. subst st. exact not_running_ZOMBIE.
+Qed.
 
 (* the case analysis every consumer of [park_ok] does: a parking state either
    keeps a resumable record, or IS the zombie state. *)
 Lemma park_ok_cases (st : mword 32) :
   park_ok st = true -> needs_ctx st = true \/ st = ZOMBIE.
 Proof.
-  rewrite /park_ok. intros H. apply orb_true_iff in H as [H|H].
+  rewrite /park_ok. intros H.
+  apply andb_true_iff in H as [H _]. apply orb_true_iff in H as [H|H].
   - by left.
   - right. by apply bool_decide_eq_true in H.
 Qed.
@@ -945,5 +986,181 @@ Section ParkGhost.
     iIntros (Hj) "(%j' & [%Hpa %Hj'] & Hg)".
     rewrite (_ : j' = j); [iExact "Hg"|].
     exact (proc_addr_inj j' j Hj' Hj (eq_sym Hpa)).
+  Qed.
+
+  (* ==================================================================== *)
+  (* WHAT THE PROC LOCK OWNS OF THE MIRROR: half #1 always -- the tie to   *)
+  (* the [p->state] cell -- plus half #2 exactly on [unclaimed].  So on an *)
+  (* unclaimed state the lock has the WHOLE variable and can move it       *)
+  (* alone; on a claimed one it has half and the claimant must bring the   *)
+  (* other.  The four lemmas below are the only moves the C makes.         *)
+  (* ==================================================================== *)
+  Definition pstate_lock (pa : mword 64) (st : mword 32) : iProp Σ :=
+    (pstate_at_hlf pa st ∗
+     (if unclaimed st then pstate_at_hlf pa st else emp))%I.
+
+  Local Lemma pstate_lock_whole (pa : mword 64) (st : mword 32) :
+    unclaimed st = true ->
+    pstate_lock pa st ⊣⊢ pstate_at_hlf pa st ∗ pstate_at_hlf pa st.
+  Proof. intros Hu. rewrite /pstate_lock Hu //. Qed.
+
+  (* the address-keyed update, once: both halves in, both halves out. *)
+  Local Lemma pstate_at_update (pa : mword 64) (st st' : mword 32) :
+    pstate_at_hlf pa st -∗ pstate_at_hlf pa st ==∗
+    pstate_at_hlf pa st' ∗ pstate_at_hlf pa st'.
+  Proof.
+    iIntros "(%j & [%Hpa %Hj] & Hg1) (%j' & [%Hpa' %Hj'] & Hg2)".
+    assert (Hjj : j' = j)
+      by exact (proc_addr_inj j' j Hj' Hj (eq_trans (eq_sym Hpa') Hpa)).
+    subst j'.
+    iMod (pstate_update j st st' with "Hg1 Hg2") as "[Hg1 Hg2]".
+    iModIntro. iSplitL "Hg1"; iExists j; by iFrame.
+  Qed.
+
+  (* ==================================================================== *)
+  (* THE RUNNING CLAIM: what a thread carries to say "I am proc j, running". *)
+  (*                                                                       *)
+  (* Two things with identical lifetimes and identical travel: the park     *)
+  (* receipt (the scheduler's record for the hart running j is in its box)  *)
+  (* and half #2 of j's state mirror (the right to change j's state).  Both *)
+  (* are issued at dispatch, both are spent at a park, and both must reach  *)
+  (* yield / sleep / exit -- and so, eventually, a PREEMPTING kerneltrap.   *)
+  (*                                                                       *)
+  (* Named as ONE bundle so that every function between here and sleep      *)
+  (* mentions the concept rather than its parts: re-homing the pieces (the  *)
+  (* record into [sie_arm], the park receipt away entirely) then changes    *)
+  (* this definition and the handful of places that OPEN it, not the ~60    *)
+  (* files that merely pass it through.                                     *)
+  (* ==================================================================== *)
+  Definition running_claim (j : nat) : iProp Σ :=
+    (park_hlf j true ∗ pstate_hlf j RUNNING)%I.
+
+  Lemma running_claim_split (j : nat) :
+    running_claim j ⊣⊢ park_hlf j true ∗ pstate_hlf j RUNNING.
+  Proof. done. Qed.
+
+  (* WHAT A LOCK HOLDER HAS: the WHOLE variable, at every state.  On an
+     unclaimed state that is just [pstate_lock]; on a claimed one it is the
+     lock's half #1 plus the claimant's half #2, which the holder is by
+     definition also carrying (it claimed the proc, or it is about to hand
+     the claim on).  So the swtch payload [SchedCtx.proc_held] carries this
+     and the split happens at release. *)
+  Definition pstate_whole (pa : mword 64) (st : mword 32) : iProp Σ :=
+    pstate_at pa 1 st.
+
+  Lemma pstate_whole_split (pa : mword 64) (st : mword 32) :
+    pstate_whole pa st ⊣⊢
+    pstate_lock pa st ∗ (if unclaimed st then emp else pstate_at_hlf pa st).
+  Proof.
+    rewrite /pstate_whole /pstate_lock /pstate_at_hlf /pstate_at.
+    destruct (unclaimed st).
+    - iSplit.
+      + iIntros "(%j & [%Hpa %Hj] & Hg)".
+        rewrite /pstate_own ghost_var_halve. iDestruct "Hg" as "[Hg1 Hg2]".
+        iSplitL; [| done]. iSplitL "Hg1"; iExists j; by iFrame.
+      + iIntros "[[(%j & [%Hpa %Hj] & Hg1) (%j' & [%Hpa' %Hj'] & Hg2)] _]".
+        assert (Hjj : j' = j)
+          by exact (proc_addr_inj j' j Hj' Hj (eq_trans (eq_sym Hpa') Hpa)).
+        subst j'. iExists j. iSplitR; [done|].
+        rewrite /pstate_own ghost_var_halve. iFrame "Hg1 Hg2".
+    - iSplit.
+      + iIntros "(%j & [%Hpa %Hj] & Hg)".
+        rewrite /pstate_own ghost_var_halve. iDestruct "Hg" as "[Hg1 Hg2]".
+        iSplitR "Hg2"; [iSplitL "Hg1"; [| done] |]; iExists j; by iFrame.
+      + iIntros "[[(%j & [%Hpa %Hj] & Hg1) _] (%j' & [%Hpa' %Hj'] & Hg2)]".
+        assert (Hjj : j' = j)
+          by exact (proc_addr_inj j' j Hj' Hj (eq_trans (eq_sym Hpa') Hpa)).
+        subst j'. iExists j. iSplitR; [done|].
+        rewrite /pstate_own ghost_var_halve. iFrame "Hg1 Hg2".
+  Qed.
+
+  (* the whole variable moves with no side conditions at all -- which is why
+     every state change is stated on the HELD form and the guard only shows
+     up where the lock is released. *)
+  Lemma pstate_whole_update (pa : mword 64) (st st' : mword 32) :
+    pstate_whole pa st ==∗ pstate_whole pa st'.
+  Proof.
+    iIntros "(%j & [%Hpa %Hj] & Hg)".
+    rewrite /pstate_own. iMod (ghost_var_update st' with "Hg") as "Hg".
+    iModIntro. iExists j. by iFrame.
+  Qed.
+
+  (* MOVE 1 -- an unclaimed state to another: the lock alone.  This is
+     wakeup's and kill's SLEEPING -> RUNNABLE, the two writes the C makes
+     without being the claimant (both read the cell first). *)
+  Lemma pstate_lock_write (pa : mword 64) (st st' : mword 32) :
+    unclaimed st = true -> unclaimed st' = true ->
+    pstate_lock pa st ==∗ pstate_lock pa st'.
+  Proof.
+    intros Hu Hu'. rewrite (pstate_lock_whole pa st Hu) /pstate_lock Hu'.
+    iIntros "[H1 H2]". by iApply (pstate_at_update with "H1 H2").
+  Qed.
+
+  (* MOVE 2 -- ISSUING the claim: the scheduler's RUNNABLE -> RUNNING and
+     allocproc's UNUSED -> USED.  The lock keeps the tie and hands half #2
+     to the thread that now owns the right to change the state. *)
+  Lemma pstate_lock_claim (pa : mword 64) (st st' : mword 32) :
+    unclaimed st = true -> unclaimed st' = false ->
+    pstate_lock pa st ==∗ pstate_lock pa st' ∗ pstate_at_hlf pa st'.
+  Proof.
+    intros Hu Hu'. rewrite (pstate_lock_whole pa st Hu) /pstate_lock Hu'.
+    iIntros "[H1 H2]".
+    iMod (pstate_at_update with "H1 H2") as "[$ $]". by iFrame.
+  Qed.
+
+  (* MOVE 3 -- RETURNING it: yield's RUNNING -> RUNNABLE, sleep's
+     RUNNING -> SLEEPING, kexit's RUNNING -> ZOMBIE, kfork's
+     USED -> RUNNABLE.  The claimant spends half #2 and the lock is whole
+     again. *)
+  Lemma pstate_lock_release (pa : mword 64) (st st' : mword 32) :
+    unclaimed st = false -> unclaimed st' = true ->
+    pstate_lock pa st -∗ pstate_at_hlf pa st ==∗ pstate_lock pa st'.
+  Proof.
+    intros Hu Hu'. rewrite /pstate_lock Hu Hu'.
+    iIntros "[H1 _] H2". by iApply (pstate_at_update with "H1 H2").
+  Qed.
+
+  (* MOVE 4 -- claim to claim, the claimant keeping it: freeproc's
+     USED -> UNUSED runs inside kfork's failure path, which still holds
+     half #2, so state it generally. *)
+  Lemma pstate_lock_rebind (pa : mword 64) (st st' : mword 32) :
+    unclaimed st = false -> unclaimed st' = false ->
+    pstate_lock pa st -∗ pstate_at_hlf pa st ==∗
+    pstate_lock pa st' ∗ pstate_at_hlf pa st'.
+  Proof.
+    intros Hu Hu'. rewrite /pstate_lock Hu Hu'.
+    iIntros "[H1 _] H2".
+    iMod (pstate_at_update with "H1 H2") as "[$ $]". by iFrame.
+  Qed.
+
+  (* AND THE READ THAT COSTS NOTHING.  Presenting half #2 at a lock proves
+     both that the state is what the half says and that it is a CLAIMED one
+     -- if it were unclaimed the lock would hold the whole variable and a
+     third half would be invalid.  This is what lets yield/sleep/exit learn
+     [st = RUNNING], and kfork [st = USED], without reading the cell. *)
+  Lemma pstate_lock_claimed (pa : mword 64) (st st' : mword 32) :
+    pstate_lock pa st -∗ pstate_at_hlf pa st' -∗
+    ⌜ st = st' /\ unclaimed st = false ⌝.
+  Proof.
+    iIntros "Hl Hh".
+    destruct (unclaimed st) eqn:Hu.
+    - rewrite (pstate_lock_whole pa st Hu).
+      iDestruct "Hl" as "[(%j & [%Hpa %Hj] & Hg1) (%j2 & [%Hpa2 %Hj2] & Hg2)]".
+      iDestruct "Hh" as "(%j3 & [%Hpa3 %Hj3] & Hg3)".
+      assert (H2 : j2 = j)
+        by exact (proc_addr_inj j2 j Hj2 Hj (eq_trans (eq_sym Hpa2) Hpa)).
+      assert (H3 : j3 = j)
+        by exact (proc_addr_inj j3 j Hj3 Hj (eq_trans (eq_sym Hpa3) Hpa)).
+      subst j2 j3.
+      iCombine "Hg1 Hg2" as "Hg".
+      rewrite /pstate_hlf /pstate_own.
+      by iDestruct (ghost_var_valid_2 with "Hg Hg3") as %[Hq _].
+    - rewrite /pstate_lock Hu.
+      iDestruct "Hl" as "[(%j & [%Hpa %Hj] & Hg1) _]".
+      iDestruct "Hh" as "(%j3 & [%Hpa3 %Hj3] & Hg3)".
+      assert (H3 : j3 = j)
+        by exact (proc_addr_inj j3 j Hj3 Hj (eq_trans (eq_sym Hpa3) Hpa)).
+      subst j3.
+      iDestruct (pstate_own_agree with "Hg1 Hg3") as %->. done.
   Qed.
 End ParkGhost.

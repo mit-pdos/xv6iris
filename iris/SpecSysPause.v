@@ -120,7 +120,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
   panic_wp_any -∗
-  park_hlf j true -∗
+  running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : mword 64),
       ⌜ callee_saved m mf /\
@@ -131,7 +131,7 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       pc_is ret_tgt -∗
       p_trapframe pj ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
-      park_hlf j true -∗
+      running_claim j -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

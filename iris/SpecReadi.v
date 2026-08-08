@@ -268,7 +268,7 @@ Definition wp_readi_sconf_body
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -294,7 +294,7 @@ Definition wp_readi_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      park_hlf j true -∗
+      running_claim j -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_meta ip dn -∗
       inode_map γfs ip bm -∗

@@ -742,7 +742,7 @@ Section VdrwfP6.
         sie_cap_gpr mf K true (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) C true -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         buf_own b bno (mword_of_int 0 : SailStdpp.Values.mword 32)
                 (vdrwd_sldata wr bs_buf bs_disk) -∗
         disk_block γd (uint bno) (vdrwd_sldata wr bs_buf bs_disk) -∗

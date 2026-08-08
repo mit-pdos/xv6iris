@@ -111,7 +111,7 @@ Definition wp_consoleread_sconf_body
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
   panic_wp_any -∗
-  park_hlf j true -∗
+  running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -124,7 +124,7 @@ Definition wp_consoleread_sconf_body
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗
-      park_hlf j true -∗
+      running_claim j -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

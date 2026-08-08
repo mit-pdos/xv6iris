@@ -544,7 +544,7 @@ Section ProofKwait.
      and touches nowhere in between: it is [R] for every block below, and
      the two resources sleep wants back at the outer loop's foot. *)
   Definition kw_rt (pme : mword 64) (jj : nat) : iProp Σ :=
-    (park_hlf jj true)%I.
+    (running_claim jj)%I.
 
   (* ------------------------------------------------------------------ *)
   (* THE OUTER LOOP, +0xdc.  Unbounded (every wakeup re-scans), so this   *)
@@ -1232,6 +1232,9 @@ Section ProofKwait.
     is_lock γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) -∗
     locked γk CIDp -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
+    (* ZOMBIE is unclaimed, so the caller's lock share is the whole mirror --
+       which is what the [proc_held] freeproc wants needs. *)
+    pstate_whole (proc_addr k) ZOMBIE -∗
     p_chan (proc_addr k) ↦₈ ch -∗
     proc_pub (proc_addr k) -∗
     proc_dormant (proc_addr k) ZOMBIE -∗
@@ -1252,7 +1255,7 @@ Section ProofKwait.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros sp0 spr HK Hk Hsp Hs1 Hs3 Hcs.
-    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hchan Hpub
+    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hpsg Hchan Hpub
              Hdorm Hpark #Hlk Htok Hps Hframe Hcont".
     iPoseProof (kwi_5c with "Htext") as "Hi5c".
     iPoseProof (kwi_60 with "Htext") as "Hi60".
@@ -1339,8 +1342,8 @@ Section ProofKwait.
               (Some (pv_upt Vc)) (Some (ud_tfp (pv_upt Vc), pv_tf Vc))
               (K - 10)%nat eb pme C 2%nat
               (kw_K44 K HK) kw_ilvl2 HR1a0
-              with "Hcg Hown Htext Hpc [Htokk Hstate Hchan Hpub Hparka] Hrest Hpt Htf Henv [-]").
-    { rewrite /proc_held. iFrame "Htokk Hstate Hchan Hpub Hparka". }
+              with "Hcg Hown Htext Hpc [Htokk Hstate Hpsg Hchan Hpub Hparka] Hrest Hpt Htf Henv [-]").
+    { rewrite /proc_held. iFrame "Htokk Hstate Hpsg Hchan Hpub Hparka". }
     iApply wp_next_off_intro.
     iIntros (mfp) "Hcg Hown Hpc %Hcsfp Hheld Hdorm".
     assert (Hp66 : ret_pc (R1 !!! Regidx Rra) = mword_of_int (KW + 0x66))
@@ -1401,12 +1404,16 @@ Section ProofKwait.
       by (rewrite HR3a0; apply addv_sext0).
     (* the emptied slot goes back into the lock at UNUSED; the park receipt
        rejoins from the half freeproc handed back inside [proc_held]. *)
-    iDestruct "Hheld" as "(Htokk & Hstate & Hchan & Hpub & Hparkc)".
+    iDestruct "Hheld" as "(Htokk & Hstate & Hpsg & Hchan & Hpub & Hparkc)".
     iAssert (park_at_full (proc_addr k) false) with "[Hparkb Hparkc]" as "Hpark".
     { iApply (park_at_full_intro k false Hk). rewrite park_split. iFrame "Hparkb Hparkc". }
-    iAssert (proc_lock_res Φ γs γk (proc_addr k)) with "[Hstate Hchan Hpub Hdorm Hpark]" as "HRk".
+    (* UNUSED is unclaimed, so the whole mirror freeproc handed back becomes
+       the lock's share again. *)
+    iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwu _]".
+    iDestruct ("Hwu" with "Hpsg") as "[Hpsg _]".
+    iAssert (proc_lock_res Φ γs γk (proc_addr k)) with "[Hstate Hpsg Hchan Hpub Hdorm Hpark]" as "HRk".
     { iApply (proc_lock_res_intro Φ γs γk (proc_addr k) UNUSED (zero_reg : mword 64)
-                with "Hstate Hchan Hpub [Hdorm Hpark]").
+                with "Hstate Hpsg Hchan Hpub [Hdorm Hpark]").
       iApply (proc_slots_unused_intro Φ γs (proc_addr k) with "Hdorm Hpark"). }
     iApply (Release.wp_release_sconf Φ γk (proc_addr k) "proc"%string
               (proc_lock_res Φ γs γk (proc_addr k)) R3 1%nat eb pme C (K - 10)%nat
@@ -1536,6 +1543,9 @@ Section ProofKwait.
     is_lock γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) -∗
     locked γk CIDf -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
+    (* the whole mirror: ZOMBIE is unclaimed, so the lock's share is both
+       halves, and [kw_reap] hands it on to freeproc's [proc_held]. *)
+    pstate_whole (proc_addr k) ZOMBIE -∗
     p_chan (proc_addr k) ↦₈ ch -∗
     proc_pub (proc_addr k) -∗
     proc_dormant (proc_addr k) ZOMBIE -∗
@@ -1558,7 +1568,7 @@ Section ProofKwait.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros sp0 spr HK Hk Hsp Hs1 Hs2 Hcs.
-    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hchan Hpub
+    iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hpsg Hchan Hpub
              Hdorm Hpark #Hlk Htok Hps Hpriv Hframe Hcont".
     iPoseProof (kwi_40 with "Htext") as "Hi40".
     iPoseProof (kwi_44 with "Htext") as "Hi44".
@@ -1612,7 +1622,7 @@ Section ProofKwait.
       { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
       iApply (kw_reap Φ γs γa γw γk mm F0 pme k K eb C pidc ch ps
                 HK Hk HF0sp HF0s1 HF0s3 HF0cs
-                with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hchan
+                with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
                       Hpub Hdorm Hpark Hlk Htok Hps Hframe [Hcont Hpriv]").
       iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
       iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
@@ -1807,9 +1817,11 @@ Section ProofKwait.
                          = mword_of_int (KW + 0x90))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt90) in "Hpc".
-        iAssert (proc_lock_res Φ γs γk (proc_addr k)) with "[Hstate Hchan Hpub Hdorm Hpark]" as "HRk".
+        iDestruct (pstate_whole_split (proc_addr k) ZOMBIE) as "[Hwz2 _]".
+        iDestruct ("Hwz2" with "Hpsg") as "[Hpsg _]".
+        iAssert (proc_lock_res Φ γs γk (proc_addr k)) with "[Hstate Hpsg Hchan Hpub Hdorm Hpark]" as "HRk".
         { iApply (proc_lock_res_intro Φ γs γk (proc_addr k) ZOMBIE ch
-                    with "Hstate Hchan Hpub [Hdorm Hpark]").
+                    with "Hstate Hpsg Hchan Hpub [Hdorm Hpark]").
           rewrite /proc_slots inv_dormant_ZOMBIE not_running_ZOMBIE is_running_ZOMBIE.
           rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
           iSplitR; [done |]. iSplitR; [done |]. iFrame "Hdorm Hpark". }
@@ -1837,7 +1849,7 @@ Section ProofKwait.
         iEval (rewrite Hp5c) in "Hpc".
         iApply (kw_reap Φ γs γa γw γk mm mco pme k K eb C pidc ch ps
                   HK Hk Hcosp Hcos1 Hcos3 Hcocs
-                  with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hchan
+                  with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
                         Hpub Hdorm Hpark Hlk Htok Hps Hframe [Hcont Hpriv]").
         iIntros (CIDz) "%Hsz". iIntros (mf) "%Hcsf %Ha0 Hcg Hown Hpc".
         iSpecialize ("Hcont" $! CIDz with "[%]"); [wp_next_chain |].
@@ -2141,7 +2153,7 @@ Section ProofKwait.
         assert (HAcq : kw_scan_regs Macq mm pme addr kk)
           by (eapply kw_scan_regs_cs; [exact Hpins | exact HS2]).
         iDestruct (proc_lock_res_elim Φ γs γk (proc_addr kk) with "HRk")
-          as (st ch) "(Hstate & Hchan & Hpub & Hslots)".
+          as (st ch) "(Hstate & Hpsg & Hchan & Hpub & Hslots)".
         (* +0xba lw a5,24(s1) : pp->state *)
         assert (Heaba : add_vec (rget (CID := CID0) Macq Rs1)
                           (sign_extend' 64 (mword_of_int 24 : mword 12)) = p_state (proc_addr kk)).
@@ -2190,6 +2202,11 @@ Section ProofKwait.
           iEval (rewrite Htgt40) in "Hpc".
           rewrite Hstz.
           iDestruct (kw_slots_zombie Φ γs (proc_addr kk) with "Hslots") as "[Hdorm Hpark]".
+          (* ZOMBIE is unclaimed, so the lock's share is the whole mirror --
+             which is what [proc_held] wants for the freeproc call below. *)
+          iDestruct (pstate_whole_split (proc_addr kk) ZOMBIE) as "[_ Hwz]".
+          iDestruct ("Hwz" with "[Hpsg]") as "Hpsg";
+            [rewrite unclaimed_ZOMBIE; iFrame "Hpsg"|].
           (* the found arm is the one that RETURNS, so this is where [R] is
              cashed into the caller's continuation -- which turns the
              frame-carrying [kw_exit_fn] back into [kw_found]'s plain one. *)
@@ -2211,7 +2228,7 @@ Section ProofKwait.
               [exact Hcsq | exact Ha0q | exact Hextq]. }
           iApply (kw_found Φ γs γa γf γw γk mm S3 pme kk K eb C pid V ch ps
                     HK Hk HS3sp HS3s1 HS3s2 HS3cs
-                    with "Hcg Hown Hpay1 Hpay Htext Hpc Henv Hlkk Htokk Hstate Hchan
+                    with "Hcg Hown Hpay1 Hpay Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
                           Hpub Hdorm Hpark Hlk Htok Hps Hpriv Hframe Hqfn2").
         * (* ===== not a ZOMBIE: release, set havekids, continue ===== *)
           iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KW + 0xbc))
@@ -2266,9 +2283,9 @@ Section ProofKwait.
           assert (Hlkc : add_vec (S5 !!! Regidx Ra0)
                            (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr kk)
             by (rewrite HS5a0; apply addv_sext0).
-          iAssert (proc_lock_res Φ γs γk (proc_addr kk)) with "[Hstate Hchan Hpub Hslots]" as "HRk".
+          iAssert (proc_lock_res Φ γs γk (proc_addr kk)) with "[Hstate Hpsg Hchan Hpub Hslots]" as "HRk".
           { iApply (proc_lock_res_intro Φ γs γk (proc_addr kk) st ch
-                      with "Hstate Hchan Hpub Hslots"). }
+                      with "Hstate Hpsg Hchan Hpub Hslots"). }
           iApply (Release.wp_release_sconf Φ γk (proc_addr kk) "proc"%string
                     (proc_lock_res Φ γs γk (proc_addr kk)) S5 1%nat eb pme C (K - 10)%nat
                     Hlkc (kw_K10 K HK)

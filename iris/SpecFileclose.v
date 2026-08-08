@@ -222,7 +222,7 @@ Section SpecFileclose.
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      bslots (fcn_bio fn) 3 ∗
-     park_hlf (fcn_j fn) true ∗
+     running_claim (fcn_j fn) ∗
      p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn)%I.
 
   (* the same bundle WITHOUT the caller's pid cell.  kexit closes every
@@ -247,7 +247,7 @@ Section SpecFileclose.
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      bslots (fcn_bio fn) 3 ∗
-     park_hlf (fcn_j fn) true)%I.
+     running_claim (fcn_j fn))%I.
 
   Lemma fileclose_fs_env_split_pid Φ fn n eb p :
     fileclose_fs_env Φ fn n eb p ⊣⊢
@@ -266,7 +266,7 @@ Section SpecFileclose.
   Qed.
 
   Definition fileclose_fs_out (fn : fclose_names) : iProp Σ :=
-    (park_hlf (fcn_j fn) true ∗
+    (running_claim (fcn_j fn) ∗
      p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn ∗
      bslots (fcn_bio fn) 3)%I.
 

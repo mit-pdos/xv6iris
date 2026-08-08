@@ -239,7 +239,7 @@ Section ProofVirtioDiskRwE.
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs_pay 0 eb -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1b0) : mword 64) -∗
-       park_hlf j true -∗
+       running_claim j -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr fr -∗
        disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector
@@ -269,7 +269,7 @@ Section ProofVirtioDiskRwE.
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs_pay 0 eb -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a0) : mword 64) -∗
-       park_hlf j true -∗
+       running_claim j -∗
        locked γk cpu_id -∗
        disk_res γd pd pav pu -∗
        disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector

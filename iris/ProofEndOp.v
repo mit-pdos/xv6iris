@@ -607,7 +607,7 @@ Section EndOpDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         WP (Loop : expr riscv_lang) {{ Φ }})%I.
 
@@ -895,7 +895,7 @@ Section EndOpBlocks.
     cpu_own 0 eb (proc_addr j) C b -∗
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.end_op + 0x92) : mword 64) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     eo_frame4 m -∗
     eo_frameJ m -∗
@@ -1139,7 +1139,7 @@ Section EndOpBlocks.
     panic_wp_any -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv Φ γs -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     eo_frame4 m -∗
     eo_frameJ m -∗
@@ -1634,7 +1634,7 @@ Section EndOpBlocks.
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
-    park_hlf j true -∗
+    running_claim j -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -2148,7 +2148,7 @@ Section EndOpBlocks.
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
-    park_hlf j true -∗
+    running_claim j -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -3328,7 +3328,7 @@ Section EndOpBlocks.
     panic_wp_any -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv Φ γs -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     eo_frame4 m -∗
     eo_frameJ m -∗

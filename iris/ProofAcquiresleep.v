@@ -58,7 +58,7 @@
        therefore trap-CSR-balanced and its own contract does not mention them.
      * the parked-scheduler record is NOT threaded here any more.  It lives in
        the global [SchedCtx.scheds_inv]; what a sleeping thread carries is the
-       persistent [scheds_inv] plus the per-PROC receipt [park_hlf j true],
+       persistent [scheds_inv] plus the per-PROC receipt [running_claim j],
        both HART-FREE.  acquiresleep never parks itself, so it does nothing
        with them but frame them through into sleep and back out.
      * [panic_wp_any] is what acquire and sleep take; acquiresleep has no
@@ -174,7 +174,7 @@ Section AslProps.
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      park_hlf j true -∗
+      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       trap_csrs_pay 0 eb -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
@@ -196,7 +196,7 @@ Section AslProps.
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      park_hlf j true -∗
+      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       trap_csrs_pay 0 eb -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
@@ -248,7 +248,7 @@ Section AslBodies.
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    park_hlf j true -∗
+    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
@@ -263,7 +263,7 @@ Section AslBodies.
         sl_pid slk ↦₄ pidv -∗
         R -∗
         p_pid pj ↦₄{dq} pidv -∗
-        park_hlf j true -∗
+        running_claim j -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -582,7 +582,7 @@ Section AslBodies.
     locked γl cpu_id -∗
     sl_res γsl slk R -∗
     p_pid pj ↦₄{dq} pidv -∗
-    park_hlf j true -∗
+    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
@@ -682,7 +682,7 @@ Section AslBodies.
     locked γl cpu_id -∗
     (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    park_hlf j true -∗
+    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗

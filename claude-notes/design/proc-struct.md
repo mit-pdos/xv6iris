@@ -535,11 +535,7 @@ Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
   ((if needs_ctx st   then ▷ proc_ctx pa            else emp) ∗
    (if is_running st  then own_ctx (p_context pa)   else emp) ∗
    (if inv_dormant st then proc_dormant pa st       else emp) ∗
-   (if unclaimed st   then pstate_hlf2 pa st        else emp))%I
-
-(* [unclaimed st := not_running st && not_used st] -- the states in which no
-   thread has claimed the proc, and so the lock owns BOTH halves of the state
-   ghost.  See "The state ghost" below. *)
+   (if not_running st then park_at_full pa false    else emp))%I
 
 Lemma proc_slots_recast pa st st' :
   needs_ctx st' = needs_ctx st -> not_running st' = not_running st ->
@@ -576,9 +572,31 @@ frame. The same requirement drives the state ghost below.
 
 ### The state ghost
 
-A per-proc ghost variable carrying the state value. The lock invariant owns
-half #1, tied to the `p->state` cell; half #2 is lock-resident under
-`not_running st && not_used st` — everywhere except the two states in which a
+A per-proc `ghost_var` carrying the state value. It lives in `proc_lock_res`
+beside the cell, **not** in a `proc_slots` arm — putting it in a slot arm
+would make `proc_slots_recast`, the resource-free state change, have to move
+a ghost.
+
+```coq
+Definition unclaimed (st : mword 32) : bool := not_running st && not_used st.
+
+(* what the LOCK owns: half #1 always -- the tie -- plus half #2 exactly on
+   [unclaimed] *)
+Definition pstate_lock (pa : mword 64) (st : mword 32) : iProp Σ :=
+  (pstate_at_hlf pa st ∗ (if unclaimed st then pstate_at_hlf pa st else emp))%I.
+
+(* what a lock HOLDER has: the whole variable, at every state.  A claimed
+   proc is claimed BY the holder, so [proc_held] carries this and the split
+   happens at release. *)
+Definition pstate_whole (pa : mword 64) (st : mword 32) : iProp Σ :=
+  pstate_at pa 1 st.
+
+Lemma pstate_whole_split pa st :
+  pstate_whole pa st ⊣⊢
+  pstate_lock pa st ∗ (if unclaimed st then emp else pstate_at_hlf pa st).
+```
+
+So half #2 is lock-resident everywhere except the two states in which a
 thread has **claimed** the proc.
 
 So the right to write `p->state` belongs to the claimant: a `ghost_var` cannot
@@ -586,6 +604,24 @@ move on half alone, and the tie means the cell cannot move without the ghost.
 `yield`/`sleep`/`exit` carry half #2 at `RUNNING`; kfork carries it at `USED`
 across the released-lock window, which is what tells it on re-acquire that the
 slot did not drift.
+
+Half #2 travels bundled with the park receipt, since the two have identical
+lifetimes — both issued at dispatch, both spent at a park:
+
+```coq
+Definition running_claim (j : nat) : iProp Σ :=
+  (park_hlf j true ∗ pstate_hlf j RUNNING)%I.
+```
+
+Every function between here and `sleep` names the bundle rather than its
+parts, so re-homing the pieces changes this definition and the handful of
+places that OPEN it, not the ~60 files that pass it through.
+
+`park_ok` excludes `USED` explicitly (`(needs_ctx st || st = ZOMBIE) &&
+not_used st`): `needs_ctx` covers `USED`, but a thread cannot *park* at
+`USED`, and without the cut-out sched's premise would admit a park at a
+claimed state, where the reclaiming scheduler could not put the mirror back
+whole.
 
 The lifecycle closes: half #2 is **issued** by the scheduler at dispatch — it
 reads the cell, the tie gives it `RUNNABLE`, so it owns both halves and can

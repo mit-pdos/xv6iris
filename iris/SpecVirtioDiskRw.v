@@ -118,7 +118,7 @@ Definition wp_virtio_disk_rw_sconf_body
   panic_wp_any -∗
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -151,7 +151,7 @@ Definition wp_virtio_disk_rw_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      park_hlf j true -∗
+      running_claim j -∗
       (* the exchange: a read fills the buffer from the block, a write
          moves the buffer's bytes onto the disk; b->disk ends at 0 *)
       buf_own bp bno (mword_of_int 0 : mword 32)

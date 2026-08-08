@@ -216,7 +216,7 @@ Section BallocDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -335,7 +335,7 @@ Section BallocEpilogue.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x7e) : mword 64) -∗
     ba_frame m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -600,7 +600,7 @@ Section BallocOut.
     panic_wp_any -∗
     printk_env γpr γu γd -∗
     ba_frame m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -979,7 +979,7 @@ Section BallocExhaust.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv Φ γs -∗
     ba_frame m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1189,7 +1189,7 @@ Section BallocRestore.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.balloc + 0x70) : mword 64) -∗
     ba_frame m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1463,7 +1463,7 @@ Section BallocBzero.
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
     ba_frame m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -2012,7 +2012,7 @@ Section BallocAlloc.
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
     ba_frame m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -2443,7 +2443,7 @@ Section BallocScan.
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
     ba_frame m -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

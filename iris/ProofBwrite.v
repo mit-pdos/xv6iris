@@ -416,7 +416,7 @@ Section ProofBwrite.
     (* words of ONE hart's [struct cpu], for which no [wp_next] transport   *)
     (* exists or could exist.  The record now lives in the global           *)
     (* [SchedCtx.scheds_inv], and what a thread carries instead is the      *)
-    (* persistent [scheds_inv] plus the per-PROC receipt [park_hlf j true]. *)
+    (* persistent [scheds_inv] plus the per-PROC receipt [running_claim j]. *)
     (* Both are HART-FREE, so they cross rw's [wp_next] as ordinary frames, *)
     (* exactly the way [procs_inv] and [p_pid] already do.  bwrite itself   *)
     (* never parks, so it does nothing with the receipt but pass it on.     *)

@@ -66,7 +66,7 @@
        trap-CSR-balanced and its contract does not mention them.
      * the parked-scheduler record is not threaded here: it lives in the global
        [SchedCtx.scheds_inv], and what a sleeping thread carries is that
-       persistent proposition plus the per-PROC receipt [park_hlf j true].
+       persistent proposition plus the per-PROC receipt [running_claim j].
 
    A functor over ACQUIRE / RELEASE / SLEEP / UART. *)
 From Stdlib Require Import ZArith Lia List.
@@ -360,7 +360,7 @@ Section UwProps.
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f (S i)) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-       park_hlf j true -∗
+       running_claim j -∗
        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   Definition uw_exit_cont `{GEN : GenId} (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
@@ -375,7 +375,7 @@ Section UwProps.
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f n) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-       park_hlf j true -∗
+       running_claim j -∗
        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
   (* the loop head at +0x6c, ENTERED at whatever hart the last park landed on *)
@@ -391,7 +391,7 @@ Section UwProps.
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f i) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-       park_hlf j true -∗
+       running_claim j -∗
        uw_exit_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq -∗
        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
@@ -407,7 +407,7 @@ Section UwProps.
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          Rbuf -∗
          uart_sent_sub γu bs -∗
-         park_hlf j true -∗
+         running_claim j -∗
          WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
 End UwProps.
@@ -450,7 +450,7 @@ Section UwBodies.
     uart_sent_sub γu bs -∗
     uw_saved sp0 m0 -∗ uw_gap5 sp0 -∗ uw_slot10 sp0 -∗
     Rbuf -∗
-    park_hlf j true -∗
+    running_claim j -∗
     uw_ret CID0 γu Φ j m0 av eb C bs Rbuf -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -707,7 +707,7 @@ Section UwBodies.
     locked γl cpu_id -∗ tx_res γu -∗
     uart_sent_sub γu (uw_bytes f i) -∗
     uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-    park_hlf j true -∗
+    running_claim j -∗
     ( uw_next_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq i
       ∧ uw_exit_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq ) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -771,7 +771,7 @@ Section UwBodies.
       locked γl cpu_id -∗ a_tx_busy ↦₄ b2 -∗
       uart_tx_own γu l2 -∗ uart_out_lb γu l2 -∗
       uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-      park_hlf j true -∗
+      running_claim j -∗
       ( uw_next_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq i
         ∧ uw_exit_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq ) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[]" as "#Body".
@@ -887,7 +887,7 @@ Section UwBodies.
       pc_is (mword_of_int (KernelSyms.uartwrite + 0x4e)) -∗
       locked γl cpu_id -∗ tx_res γu -∗
       uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-      park_hlf j true -∗
+      running_claim j -∗
       ( uw_next_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq i
         ∧ uw_exit_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq ) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[]" as "Sleep".

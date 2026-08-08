@@ -738,7 +738,7 @@ Section KexitPark.
     cpu_own 0 eb pj C b -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
     procs_inv Φ γs -∗ scheds_inv Φ γs -∗ panic_wp_any -∗
-    park_hlf j true -∗
+    running_claim j -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
@@ -1010,8 +1010,15 @@ Section KexitPark.
        slot's [not_running] arm, so the state under the lock is RUNNING --
        and the RUNNING arm is the raw context cells sched wants.  That is
        why exit needs no [own_ctx] premise. *)
-    iDestruct (proc_lock_res_elim Φ γs γl pj with "HR") as (st0 ch0) "(Hstate & Hchan & Hpub & Hslot)".
+    iDestruct (proc_lock_res_elim Φ γs γl pj with "HR") as (st0 ch0) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
+    iDestruct "Hpark" as "[Hpark Hclm]".
     iDestruct (proc_slots_running Φ γs j st0 Hj with "Hpark Hslot") as "(Hpark & -> & Hoc)".
+    (* the claim joins the lock's tie: kexit's store of ZOMBIE below moves
+       the whole mirror, and ZOMBIE is unclaimed, so the claim is spent. *)
+    iDestruct (pstate_at_intro j (1/2) RUNNING Hj with "Hclm") as "Hclm".
+    iDestruct (pstate_whole_split pj RUNNING) as "[_ Hwe]".
+    iDestruct ("Hwe" with "[Hpg Hclm]") as "Hpg".
+    { rewrite unclaimed_RUNNING. iFrame "Hpg Hclm". }
     iDestruct "Hpub" as (kl xs pidv) "(Hkilled & Hxstate & Hpidh)".
     iPoseProof (kxi_80 with "Htext") as "Hi80".
     iPoseProof (kxi_84 with "Htext") as "Hi84".
@@ -1145,15 +1152,19 @@ Section KexitPark.
     iDestruct (kx_cpu_own_ctx_take with "Hown") as "[HC Hcpuemp]".
     iDestruct (cpu_own_set_proc 1%nat true pj pj emp with "Hcpuemp") as "[Hph Hback]".
     iApply fupd_wp.
+    (* the store of ZOMBIE moved the cell; the mirror follows.  ZOMBIE is
+       unclaimed, so this is the claim being spent for good -- kexit never
+       comes back. *)
+    iMod (pstate_whole_update (proc_addr j) RUNNING ZOMBIE with "Hpg") as "Hpg".
     iMod (SchedCtx.scheds_take Φ γs ⊤ CIDa j with "Hscheds Hph Hpark")
       as "(Hvc & Hph & Hpark)"; [solve_ndisj|exact Hj|].
     iModIntro.
     iDestruct ("Hback" with "Hph") as "Hcpuemp".
     iApply (Sched.wp_sched_sconf (CID := CIDa) Φ γs j γl ZOMBIE ch0 PD av true
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hchan Hkilled Hxstate Hpidh Hpark]
+              with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh Hpark]
                     [Hpriv Hsp] Hpay Hcpuemp Hoc Hvc [-]").
-    { rewrite /proc_held. iFrame "Hlkp Hstate Hchan Hpark".
+    { rewrite /proc_held. iFrame "Hlkp Hstate Hpg Hchan Hpark".
       iExists kl, (trunc32 (rget (CID := CIDa) mlk (mword_of_int 20 : mword 5))), pidv.
       iFrame "Hkilled Hxstate Hpidh". }
     { iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp"). }
@@ -1234,7 +1245,7 @@ Section KexitRest.
     cpu_own 0 eb pj C b -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
     procs_inv Φ γs -∗ scheds_inv Φ γs -∗ panic_wp_any -∗
-    park_hlf j true -∗
+    running_claim j -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
