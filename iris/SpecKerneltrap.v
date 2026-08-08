@@ -232,6 +232,16 @@ End KERNELTRAP_RETURNS.
    [SpecDevintr.devintr_stack] = 40 (myproc wants 10, yield 20). *)
 Definition kerneltrap_stack : nat := 46%nat.
 
+(* THE CHECK THAT KEEPS [IntrDefs.kv_frame_slots] HONEST.  That constant is
+   the stack a trap may consume below the interrupted sp, and it has to cover
+   kernelvec's own 32-slot frame PLUS this whole cone.  It is written as a
+   literal there because this file sits above IntrDefs, so nothing would stop
+   the two from drifting -- and drift is exactly the silent kind: growing
+   kerneltrap's cone still compiles and only fails deep inside the handler
+   proof, at a place that looks unrelated. *)
+Lemma kt_carve_fits : (32 + kerneltrap_stack <= kv_frame_slots)%nat.
+Proof. unfold kerneltrap_stack, kv_frame_slots. lia. Qed.
+
 Section KtProcRes.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.

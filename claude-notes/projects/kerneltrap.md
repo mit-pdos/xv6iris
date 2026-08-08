@@ -374,8 +374,21 @@ consumers and its `eb = true` instance made `b` true.
 6. ~~`SpecKerneltrap.v` on the house-spec shape~~ **done**.
 7. ~~`ProofKerneltrapParts.v` + `ProofKerneltrap.v` + `LinkKerneltrap.v`~~
    **done — kerneltrap is proven.**
-8. **The only thing left: the `intr_handler_spec` upgrade + `ProofKernelvec.v`
-   rewiring** (explicit-cpuid Stage 2).  The handler contract must start
+8. ~~Grow `kv_frame_slots` 32 -> 78 to cover the whole trap path~~ **done**
+   (kernelvec's 32-slot frame + `kerneltrap_stack` = 46; `kt_carve_fits`
+   ties the two so they cannot drift).  `kernelvec_handler_spec` now splits
+   the carve, keeps the top 32 for its own save windows, and frames the
+   lower 46 across as the callee budget.  Everything else absorbed it
+   symbolically; `boot_stack_slots K_main` went 86 -> 132 slots (1056 bytes,
+   still inside `_entry`'s 4096-byte slice).
+
+9. **THE OPEN FORK — where preemption's resources live.**  See the section
+   below.  This is what the old notes deferred as "should be made against
+   kerneltrap's real contract, not guessed"; the contract now exists, so the
+   question is answerable, and it is bigger than a wiring change.
+
+10. **The `intr_handler_spec` upgrade + `ProofKernelvec.v` rewiring**
+   (explicit-cpuid Stage 2).  The handler contract must start
    handing the handler the trap CSRs, `cpu_hart`, the `sret_bits` mirror at
    `('b"1", 'b"1")`, a deep enough `kv_frame_slots`, the persistent device/proc
    credentials, `kt_proc_res`, and a hart-generic Loeb.  It also owes the two
@@ -383,3 +396,39 @@ consumers and its `eb = true` instance made `b` true.
    above) and expose the taken cause out of `wp_exec_step_intr`'s trap arm.
    When it lands, delete `KERNELTRAP_RETURNS`, `KerneltrapRet`, `kv_cell` and
    `kt_clobbered`; nothing else refers to them.
+
+## THE OPEN FORK: where preemption's resources live
+
+`kerneltrap` PREEMPTS.  On a timer interrupt with a current process it calls
+`yield`, which parks the interrupted thread — and parking needs that thread's
+`own_ctx (p_context p)` and `park_hlf j true`.
+
+**Today those are ordinary frames** held by whichever function happened to be
+interrupted, so they are *unreachable* from the handler: a frame lives outside
+the handler's WP.  For the trap to park the thread they have to be reachable,
+and there are only two places they can be.
+
+Measured footprint of each:
+
+- **(A) Move them into `sie_arm true`**, beside `cpu_hart 0 true p`, with
+  surrender/reclaim plumbing at the SIE flips (`csrci` hands them to the code,
+  `csrsi` takes them back) — the same shape `cpu_cells_pay` already has.
+  Cost: **35 `Spec*.v` and 31 `Proof*.v` files** thread `own_ctx`/`park_hlf`
+  today (essentially the whole blocking half of the kernel: sleep, the log,
+  bio, the pipe and file layers, kexit/kwait).  Every one of them would gain
+  the pay/reclaim conjunct.  `own_ctx`/`ctx_cells` also have to move below
+  `IntrDefs` first — cheap, they depend only on `↦₈` — because `SwtchCtx`
+  currently imports `IntrDefs`, not the other way round.
+- **(B) Put the current thread's park resources in a per-hart INVARIANT**, so
+  the handler OPENS them rather than being handed them.  `SchedCtx.scheds_inv`
+  already does exactly this for one half of the park bit, per hart, which is
+  why this looks like the natural extension.  Cost is concentrated in
+  `SchedCtx.v` + the handler contract instead of spread over 66 files —
+  but it is a real design change to the parked-scheduler protocol, not a
+  mechanical sweep, and it has to keep `own_ctx`'s exclusivity honest.
+
+**Recommendation: investigate (B) before committing to (A).**  (A) is the
+brute-force answer and its cost is now measured rather than guessed; (B) is
+plausibly an order of magnitude smaller and follows a protocol the tree
+already has.  Either way this is the last thing between the proven
+`kerneltrap` and deleting `KERNELTRAP_RETURNS`.

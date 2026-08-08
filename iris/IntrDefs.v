@@ -315,7 +315,7 @@ Section IntrDefs.
   (*                                                                       *)
   (* [intr_frame] is THE per-trap frame the interrupt handler consumes     *)
   (* and re-establishes: THE KERNEL MUST MAINTAIN [stack_own] OF DEPTH AT  *)
-  (* LEAST [kv_frame_slots] (32 slots = 256 bytes, kernelvec's c.addi16sp  *)
+  (* LEAST [kv_frame_slots] (78 slots: kernelvec's 32-slot c.addi16sp     *)
   (* frame) BELOW SP AT EVERY INTERRUPTS-ENABLED INSTRUCTION -- the trap   *)
   (* saves its 17 caller-saved registers into the top of that region --    *)
   (* plus the allocation-fixed menvcfg cell and tlb_inv_pt.  The depth is  *)
@@ -341,7 +341,19 @@ Section IntrDefs.
   (* the handler run; the handler never touches it).  [s_dispatch] reads   *)
   (* mie/mideleg, so the handler spec owns them explicitly.                *)
   (* =================================================================== *)
-  Definition kv_frame_slots : nat := 32.
+  (* THE RESERVED CARVE MUST COVER THE WHOLE TRAP PATH, not just
+     kernelvec's own frame.  A trap taken at an interrupts-enabled
+     instruction runs kernelvec (32 slots = 256 bytes, its c.addi16sp frame)
+     AND everything kernelvec calls, which is kerneltrap and its cone
+     ([SpecKerneltrap.kerneltrap_stack] = 46: its own 6-slot frame plus
+     devintr's 40).  So 32 + 46 = 78.
+
+     The literal is written out because [kerneltrap_stack] lives ABOVE this
+     file; [SpecKerneltrap.kt_carve_fits] ties the two together so the pair
+     cannot drift silently -- growing kerneltrap's cone without growing this
+     would otherwise still compile and only fail deep inside the handler
+     proof. *)
+  Definition kv_frame_slots : nat := 78.
 
   (* menvcfg is pinned to [MENVCFG_S] here rather than parameterized: the
      handler contract below is only PROVABLE at that value (its own fetches
