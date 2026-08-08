@@ -194,7 +194,6 @@ UserKernelBridge.v
 IntrDefs.v
 WpIntrInv.v
 SpecKerneltrap.v
-LinkKerneltrap.v
 SpecKernelvec.v
 ProofKernelvec.v
 LinkKernelvec.v
@@ -772,6 +771,8 @@ ProofDevintr.v
 LinkDevintr.v
 CodeKerneltrap.v
 ProofKerneltrapParts.v
+ProofKerneltrap.v
+LinkKerneltrap.v
 SpecAllocpid.v
 CodeAllocpid.v
 ProofAllocpid.v
