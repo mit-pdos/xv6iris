@@ -439,6 +439,58 @@ Section IntrDefs.
         ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝ ∗
         ⌜ menvcfg0 = MENVCFG_S ⌝))%I.
 
+  (* ------------------------------------------------------------------- *)
+  (* §6' THE mstatus-EXPOSING FLAVOUR [sconf_at].                          *)
+  (*                                                                       *)
+  (* [sconf] hides mstatus behind an existential, which is right for       *)
+  (* almost everything -- no leaf and no whole-function spec cares WHICH   *)
+  (* mstatus it is running at, only that the fact set holds.  Two places   *)
+  (* do care: a leaf that WRITES sstatus (what the instruction did to      *)
+  (* SPP/SPIE is its entire content), and the trap handler's own contract, *)
+  (* because kernelvec's [sret] reads exactly those two fields.            *)
+  (* [sconf_at ms] is [sconf] with the mstatus cell pulled OUT at a named  *)
+  (* value.                                                                *)
+  (*                                                                       *)
+  (* IT IS AN ACCESSOR, NOT A SECOND COPY OF [sconf]'s BODY: the payload   *)
+  (* is the mstatus triple plus a wand that swallows any REPLACEMENT       *)
+  (* triple and gives [sconf] back.  So there is nothing to keep in sync   *)
+  (* when [sconf] grows a conjunct, and [sconf] itself is untouched --     *)
+  (* every existing destructuring of it still works.                       *)
+  (*                                                                       *)
+  (* USE IT ONLY AT BOUNDARIES.  A function threads plain [sie_cap_gpr]    *)
+  (* through its body and switches to the [_at] flavour on the OUTPUT side *)
+  (* of the one instruction (or the one contract) whose mstatus effect is  *)
+  (* the point.  Giving every leaf an [_at] twin would be the leaf x       *)
+  (* mstatus cross-product the guiding principle exists to prevent.        *)
+  (* ------------------------------------------------------------------- *)
+  Definition sconf_msown (ms : mword 64) : iProp Σ :=
+    (mstatus ↦ᵣ ms ∗
+     ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
+     ⌜ sconf_ms_facts ms ⌝)%I.
+
+  Definition sconf_at (ms : mword 64) : iProp Σ :=
+    (sconf_msown ms ∗ (∀ ms' : mword 64, sconf_msown ms' -∗ sconf))%I.
+
+  Lemma sconf_at_close (ms : mword 64) : sconf_at ms -∗ sconf.
+  Proof. iIntros "[Hown Hcl]". iApply ("Hcl" with "Hown"). Qed.
+
+  Lemma sconf_at_open : sconf -∗ ∃ ms : mword 64, sconf_at ms.
+  Proof.
+    iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmie & Hmenv)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
+    iExists ms. iSplitL "Hms Hhalf".
+    { iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+    iIntros (ms') "(Hms' & Hhalf' & %Hmsf')".
+    iFrame "Hhw Hminv Hpriv Hmie Hmenv".
+    iExists ms'. iFrame "Hms' Hhalf'". iPureIntro. exact Hmsf'.
+  Qed.
+
+  (* the mstatus facts are readable straight off the flavour, without
+     closing it -- what a caller reasoning about SPP/SPIE needs. *)
+  Lemma sconf_at_facts (ms : mword 64) :
+    sconf_at ms -∗ ⌜ sconf_ms_facts ms ⌝.
+  Proof. iIntros "[(_ & _ & %H) _]". iPureIntro. exact H. Qed.
+
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
      its index [b], backed by the ghost QUARTER's value (agreement with
      [sconf]'s tied half pins the live bit).  It owns ALL the free stack
@@ -585,6 +637,22 @@ Section IntrDefs.
            (∃ v : mword 64, stval ↦ᵣ v) ∗
            cpu_hart 0 true p)
      else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
+
+  (* THE ARM INDEX IS THE LIVE BIT, at either index and without a case split
+     at the call site.  [sconf]'s tied half and the arm's eighth are
+     fragments of the same ghost, so agreement reads the live SIE off the
+     index -- which is what every leaf that has to know whether interrupts
+     are on (the sstatus reads, the sstatus RESTORE) actually needs. *)
+  Lemma sie_arm_half_agree (b : bool) (px : mword 64) (ms : mword 64) :
+    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
+    sie_arm b px -∗
+    ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝.
+  Proof.
+    iIntros "Hhalf Harm". rewrite /sie_arm. destruct b.
+    - iDestruct "Harm" as "(Hq & _ & _ & _ & _ & _)".
+      iDestruct (ghost_var_agree with "Hhalf Hq") as %H. iPureIntro. exact H.
+    - iDestruct (ghost_var_agree with "Hhalf Harm") as %H. iPureIntro. exact H.
+  Qed.
 
   Lemma sie_arm_of_ex (p : mword 64) :
     (∃ b : bool, sie_arm b p) ⊣⊢
@@ -884,6 +952,32 @@ Section IntrDefs.
      sconf ∗
      sie_cap m avail b p ∗
      gpr_file (tp_pin m))%I.
+
+  (* the [sie_cap_gpr] flavour with mstatus exposed -- see [sconf_at].
+     Boundary use only; [sie_cap_gpr_at_close] is how it rejoins the
+     ordinary threading. *)
+  Definition sie_cap_gpr_at (ms : mword 64)
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) : iProp Σ :=
+    (hart_state ↦ᵣ HART_ACTIVE tt ∗
+     sconf_at ms ∗
+     sie_cap m avail b p ∗
+     gpr_file (tp_pin m))%I.
+
+  Lemma sie_cap_gpr_at_close (ms : mword 64) m avail b p :
+    sie_cap_gpr_at ms m avail b p -∗ sie_cap_gpr m avail b p.
+  Proof.
+    iIntros "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (sconf_at_close with "Hsc") as "Hsc".
+    rewrite /sie_cap_gpr. iFrame "Hhs Hsc Hcap Hfile".
+  Qed.
+
+  Lemma sie_cap_gpr_at_open m avail b p :
+    sie_cap_gpr m avail b p -∗ ∃ ms : mword 64, sie_cap_gpr_at ms m avail b p.
+  Proof.
+    iIntros "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (sconf_at_open with "Hsc") as (ms) "Hsc".
+    iExists ms. iFrame "Hhs Hsc Hcap Hfile".
+  Qed.
 
   Global Instance sie_cap_gpr_into_sep m avail b p :
     IntoSep (sie_cap_gpr m avail b p)

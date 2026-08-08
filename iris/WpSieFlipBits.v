@@ -39,6 +39,20 @@ Local Lemma lift_SIE (m s : mword 64) :
   _get_Mstatus_SIE (lift_sstatus m s) = _get_Sstatus_SIE s.
 Proof. unfold lift_sstatus. cbn zeta. rewrite qSIE_uSIE. reflexivity. Qed.
 
+(* SPP / SPIE: the two fields an [sret] reads.  Like SIE they come from the
+   WRITE value, not from [m] -- they are S-writable -- so a restore of a
+   saved sstatus puts back exactly what was saved.  That is the whole
+   content of kerneltrap's last instruction. *)
+Local Lemma lift_SPP (m s : mword 64) :
+  _get_Mstatus_SPP (lift_sstatus m s) = _get_Sstatus_SPP s.
+Proof. unfold lift_sstatus. cbn zeta.
+  rewrite qSPP_uSIE qSPP_uSPIE qSPP_uSPP. reflexivity. Qed.
+
+Local Lemma lift_SPIE (m s : mword 64) :
+  _get_Mstatus_SPIE (lift_sstatus m s) = _get_Sstatus_SPIE s.
+Proof. unfold lift_sstatus. cbn zeta.
+  rewrite qSPIE_uSIE qSPIE_uSPIE. reflexivity. Qed.
+
 Local Lemma lift_MPRV (m s : mword 64) :
   _get_Mstatus_MPRV (lift_sstatus m s) = _get_Mstatus_MPRV m.
 Proof. unfold lift_sstatus. cbn zeta.
@@ -247,9 +261,15 @@ Section Assembly.
     auto.
   Qed.
 
-  (* one generic core covering both flips: the legalized write of a value
-     whose S-fields off bit 1 mirror [ms] and whose SIE field is [b]. *)
-  Local Lemma flip_core (ms W : mword 64) (b : mword 1) :
+  (* ONE GENERIC CORE, and it is the reusable statement, not an internal
+     step: the legalized write of ANY value [W] whose tracked S-fields
+     mirror [ms] preserves [sconf_ms_facts] and lands SIE / SPP / SPIE at
+     [W]'s own.  The two SIE flips below are the [W = sstatus_write_val ...]
+     instances; [csrw sstatus] with a saved sstatus is the other consumer
+     (kerneltrap restoring the trap state -- SPP and SPIE are what
+     kernelvec's [sret] then reads), which is why this is NOT [Local]: a
+     [Local Lemma] is invisible to every other file. *)
+  Lemma flip_core (ms W : mword 64) (b : mword 1) :
     sconf_ms_facts ms ->
     _get_Sstatus_SIE W = b ->
     _get_Sstatus_MXR W = _get_Mstatus_MXR ms ->
@@ -257,6 +277,8 @@ Section Assembly.
     _get_Sstatus_VS W = _get_Mstatus_VS ms ->
     _get_Sstatus_XS W = _get_Mstatus_XS ms ->
     _get_Mstatus_SIE (legalize_sstatus_val ms W) = b /\
+    _get_Mstatus_SPP (legalize_sstatus_val ms W) = _get_Sstatus_SPP W /\
+    _get_Mstatus_SPIE (legalize_sstatus_val ms W) = _get_Sstatus_SPIE W /\
     sconf_ms_facts (legalize_sstatus_val ms W).
   Proof.
     intros (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM)
@@ -266,6 +288,10 @@ Section Assembly.
     unfold Mk_Sstatus.
     split.
     { rewrite mstatus_legalized_SIE lift_SIE. exact HbW. }
+    split.
+    { rewrite mstatus_legalized_SPP lift_SPP. reflexivity. }
+    split.
+    { rewrite mstatus_legalized_SPIE lift_SPIE. reflexivity. }
     unfold sconf_ms_facts.
     rewrite mstatus_legalized_MPRV lift_MPRV.
     rewrite mstatus_legalized_SXL.
@@ -289,8 +315,11 @@ Section Assembly.
   Proof.
     intros Hf.
     destruct (wval_and_field ms) as (Hmxr & Hfs & Hvs & Hxs).
-    apply (flip_core ms _ ('b"0")); try assumption.
-    unfold sstatus_write_val, sstatus_read. rewrite subrange_full. apply sSIE_and2.
+    assert (Hsie : _get_Sstatus_SIE (sstatus_write_val ms (mword_of_int 2))
+                   = ('b"0" : mword 1)).
+    { unfold sstatus_write_val, sstatus_read. rewrite subrange_full. apply sSIE_and2. }
+    destruct (flip_core ms _ ('b"0") Hf Hsie Hmxr Hfs Hvs Hxs) as (H1 & _ & _ & H4).
+    exact (conj H1 H4).
   Qed.
 
   Lemma csrsi_sie_flip (ms : mword 64) :
@@ -301,8 +330,11 @@ Section Assembly.
   Proof.
     intros Hf.
     destruct (wval_or_field ms) as (Hmxr & Hfs & Hvs & Hxs).
-    apply (flip_core ms _ ('b"1")); try assumption.
-    unfold sstatus_write_set_val, sstatus_read. rewrite subrange_full. apply sSIE_or2.
+    assert (Hsie : _get_Sstatus_SIE (sstatus_write_set_val ms (mword_of_int 2))
+                   = ('b"1" : mword 1)).
+    { unfold sstatus_write_set_val, sstatus_read. rewrite subrange_full. apply sSIE_or2. }
+    destruct (flip_core ms _ ('b"1") Hf Hsie Hmxr Hfs Hvs Hxs) as (H1 & _ & _ & H4).
+    exact (conj H1 H4).
   Qed.
 
 End Assembly.

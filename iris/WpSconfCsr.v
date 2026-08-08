@@ -36,6 +36,10 @@ Require Import SmodeCore WpMmodeLeafBase.
    (exec_write_CSR_sstatus & co.) is exported from WpPushOffCsr.v --
    relocate those down when the csr leaves get a shared base. *)
 Require Import WpGprCsrrCommon WpGprCsrrB.
+(* [mepc_val] -- the shared xepc legalizer (bit 0 cleared).  sepc's READ
+   runs the same function via [align_pc], so the sepc leaves below name it
+   rather than introducing a second copy. *)
+Require Import WpGprCsrwA.
 Require Import WpPushOffCsr WpSieFlipBits.
 Require WpGprCsrwC.
 Require Import StackOwn.
@@ -109,22 +113,52 @@ Qed.
 (* scause is gated on Ext_S alone, exactly as stvec's write is.            *)
 (* ===================================================================== *)
 
+(* THE Ext_S ACCESSIBILITY CHECK, ONCE.  sepc / scause / stval are all
+   plain S-level CSRs whose only gate is Ext_S, so what distinguishes them
+   in the check is nothing at all: the four dispatch facts are closed and
+   vm-computable per CSR, and the misa.S step is shared.  Stated over the
+   CSR number so each of the three contributes four [vm_compute]s. *)
+Lemma exec_check_CSR_result_read_extS (csr : mword 12) s :
+  check_CSR_priv csr Supervisor = returnM true ->
+  check_CSR_access csr CSRRead = true ->
+  is_CSR_accessible csr Supervisor CSRRead = currentlyEnabled Ext_S ->
+  stateen_allows_CSR_access csr Supervisor CSRRead = returnM true ->
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (check_CSR_result csr Supervisor CSRRead) s = Some (CSR_Check_OK tt, s).
+Proof.
+  intros Hpriv Hacc Hred Hst HS.
+  apply exec_check_CSR_result_read_p. apply exec_check_CSR_read_p.
+  - rewrite Hpriv. apply exec_returnm.
+  - exact Hacc.
+  - rewrite Hred. rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity.
+  - rewrite Hst. apply exec_returnm.
+Qed.
+
 Lemma exec_check_CSR_result_scause_S s :
   eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (check_CSR_result csr_scause Supervisor CSRRead) s = Some (CSR_Check_OK tt, s).
 Proof.
-  intro HS.
-  apply exec_check_CSR_result_read_p. apply exec_check_CSR_read_p.
-  - assert (H : check_CSR_priv csr_scause Supervisor = returnM true)
-      by (vm_compute; reflexivity).
-    rewrite H. apply exec_returnm.
-  - vm_compute; reflexivity.
-  - assert (Hred : is_CSR_accessible csr_scause Supervisor CSRRead
-                   = currentlyEnabled Ext_S) by csr_dispatch_eq.
-    rewrite Hred. rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity.
-  - assert (H : stateen_allows_CSR_access csr_scause Supervisor CSRRead = returnM true)
-      by (vm_compute; reflexivity).
-    rewrite H. apply exec_returnm.
+  apply exec_check_CSR_result_read_extS;
+    [ vm_compute; reflexivity | vm_compute; reflexivity
+    | csr_dispatch_eq | vm_compute; reflexivity ].
+Qed.
+
+Lemma exec_check_CSR_result_stval_S s :
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (check_CSR_result csr_stval Supervisor CSRRead) s = Some (CSR_Check_OK tt, s).
+Proof.
+  apply exec_check_CSR_result_read_extS;
+    [ vm_compute; reflexivity | vm_compute; reflexivity
+    | csr_dispatch_eq | vm_compute; reflexivity ].
+Qed.
+
+Lemma exec_check_CSR_result_sepc_S s :
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (check_CSR_result csr_sepc Supervisor CSRRead) s = Some (CSR_Check_OK tt, s).
+Proof.
+  apply exec_check_CSR_result_read_extS;
+    [ vm_compute; reflexivity | vm_compute; reflexivity
+    | csr_dispatch_eq | vm_compute; reflexivity ].
 Qed.
 
 Lemma exec_execute_csrr_scause_gpr_S (rd : mword 5) s :
@@ -148,6 +182,203 @@ Proof.
   - rewrite (exec_wX_bits_gpr rd (register_lookup scause s.(sregs)) s).
     replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
     reflexivity.
+Qed.
+
+Lemma exec_execute_csrr_stval_gpr_S (rd : mword 5) s :
+  uint rd <> 0 ->
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (execute_CSRReg csr_stval zreg (Regidx rd) CSRRS) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                    (regval_into_reg (register_lookup stval s.(sregs)))).
+Proof.
+  intros Hrd Hpriv HS.
+  apply (csrr_read_step_p Supervisor csr_stval rd
+           (register_lookup stval s.(sregs)) s _ Hpriv).
+  - apply (exec_check_CSR_result_stval_S s HS).
+  - vm_compute; reflexivity.
+  - apply exec_read_CSR_stval.
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - apply exec_csr_id_read_callback_stval.
+  - rewrite (exec_wX_bits_gpr rd (register_lookup stval s.(sregs)) s).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    reflexivity.
+Qed.
+
+(* sepc's read is the one that is not its cell: [align_pc] clears bit 0,
+   so this needs misa.C as well and the value carries the wrapper. *)
+Lemma exec_execute_csrr_sepc_gpr_S (rd : mword 5) s :
+  uint rd <> 0 ->
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (execute_CSRReg csr_sepc zreg (Regidx rd) CSRRS) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                    (regval_into_reg
+                       (mepc_val (register_lookup sepc s.(sregs))))).
+Proof.
+  intros Hrd Hpriv HS HC.
+  apply (csrr_read_step_p Supervisor csr_sepc rd
+           (mepc_val (register_lookup sepc s.(sregs))) s _ Hpriv).
+  - apply (exec_check_CSR_result_sepc_S s HS).
+  - vm_compute; reflexivity.
+  - apply (exec_read_CSR_sepc s HC).
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - apply exec_csr_id_read_callback_sepc.
+  - rewrite (exec_wX_bits_gpr rd (mepc_val (register_lookup sepc s.(sregs))) s).
+    replace (Z.eqb (uint rd) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrd).
+    reflexivity.
+Qed.
+
+(* ===================================================================== *)
+(* exec layer: [csrw sstatus,rs1] at Supervisor -- the S-status RESTORE.  *)
+(*                                                                        *)
+(* The privilege-free chain (check_CSR_priv / read / legalize / write /   *)
+(* the id write callback) is WpPushOffCsr.v's, built there for the csrci   *)
+(* flip; what is new here is the CSRWrite accessibility check (csrci is a  *)
+(* read-MODIFY-write, so it goes through CSRReadWrite) and the [execute]   *)
+(* instance for the rd = x0 form, which does not read the CSR at all.      *)
+(* ===================================================================== *)
+
+Lemma exec_check_CSR_result_csrw_sstatus_S s :
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (check_CSR_result csr_sstatus Supervisor CSRWrite) s = Some (CSR_Check_OK tt, s).
+Proof.
+  intro HS.
+  apply exec_check_CSR_result_csrw_p. apply exec_check_CSR_csrw_p.
+  - apply exec_check_CSR_priv_sstatus_S.
+  - vm_compute; reflexivity.
+  - assert (Hred : is_CSR_accessible csr_sstatus Supervisor CSRWrite
+                   = currentlyEnabled Ext_S) by csr_dispatch_eq.
+    rewrite Hred. rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity.
+  - assert (H : stateen_allows_CSR_access csr_sstatus Supervisor CSRWrite = returnM true)
+      by (vm_compute; reflexivity).
+    rewrite H. apply exec_returnm.
+Qed.
+
+Lemma exec_execute_csrw_sstatus_S (rs1 : mword 5) (ms : mword 64) s :
+  uint rs1 <> 0 ->
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  register_lookup mstatus s.(sregs) = ms ->
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  eq_vec (_get_Misa_U (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (execute (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s mstatus
+              (legalize_sstatus_val ms
+                 (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
+Proof.
+  intros Hrs1 Hpriv Hms HS HU.
+  change (execute (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW)))
+    with (execute_CSRReg csr_sstatus (Regidx rs1) zreg CSRRW).
+  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    with (if Z.eqb (uint rs1) 0 then zero_reg
+          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    by (replace (Z.eqb (uint rs1) 0) with false
+          by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
+  apply (exec_execute_csrw_gpr_p Supervisor csr_sstatus rs1 s _
+           (subrange_vec_dec
+              (lower_mstatus
+                 (legalize_sstatus_val ms
+                    (if Z.eqb (uint rs1) 0 then zero_reg
+                     else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))))
+              (Z.sub xlen 1) 0)).
+  - exact Hpriv.
+  - apply exec_check_CSR_result_csrw_sstatus_S; assumption.
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - rewrite (exec_write_CSR_sstatus _ s HS HU). rewrite Hms. reflexivity.
+  - apply exec_csr_id_write_callback_sstatus.
+Qed.
+
+(* ===================================================================== *)
+(* exec layer: [csrw sepc,rs1] at Supervisor.                             *)
+(*                                                                        *)
+(* Unlike stvec's, sepc's privilege-FREE half lives here rather than in    *)
+(* WpGprCsrwB.v: the write runs [set_xepc Supervisor], whose legalizer     *)
+(* ([exec_legalize_xepc] / [mepc_val]) is mepc's, i.e. in WpGprCsrwA --    *)
+(* and importing A into B to reach it would invert the A/B layering for    *)
+(* the sake of one CSR that has no M-mode consumer at all.  So the whole   *)
+(* sepc chain sits next to its leaf.                                       *)
+(*                                                                        *)
+(* THE WRITTEN WORD IS LEGALIZED, and the postcondition says so            *)
+(* ([mepc_val], bit 0 cleared) rather than pretending otherwise -- the     *)
+(* same choice as satp/stimecmp, and the opposite of stvec, whose          *)
+(* legalizer is provably the identity at this platform's parameters.  A    *)
+(* caller writing back an aligned epc collapses the wrapper itself.        *)
+(* ===================================================================== *)
+
+Lemma exec_write_CSR_sepc (v : mword 64) s :
+  exec (write_CSR csr_sepc v) s = Some (Ok (mepc_val v), set_reg s sepc (mepc_val v)).
+Proof.
+  unfold write_CSR. skip_csr_false_clauses.
+  assert (Hsx : exec (set_xepc Supervisor v) s
+                = Some (mepc_val v, set_reg s sepc (mepc_val v))).
+  { unfold set_xepc.
+    rewrite (exec_bind_Some _ _ _ _ _ (exec_legalize_xepc v s)). cbn match.
+    rewrite (exec_bind0_Some _ _ _ _ _ (exec_write_reg sepc (mepc_val v) s)).
+    apply exec_returnM. }
+  rewrite (exec_bind_Some _ _ _ _ _ Hsx).
+  apply exec_returnM.
+Qed.
+
+Lemma exec_csr_id_write_callback_sepc (d : mword 64) s :
+  exec (csr_id_write_callback csr_sepc d) s = Some (tt, s).
+Proof.
+  assert (H : csr_id_write_callback csr_sepc d = returnM tt) by (vm_compute; reflexivity).
+  rewrite H. apply exec_returnM.
+Qed.
+
+Lemma exec_check_CSR_result_csrw_sepc_S s :
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (check_CSR_result csr_sepc Supervisor CSRWrite) s = Some (CSR_Check_OK tt, s).
+Proof.
+  intro HS.
+  apply exec_check_CSR_result_csrw_p. apply exec_check_CSR_csrw_p.
+  - assert (H : check_CSR_priv csr_sepc Supervisor = returnM true)
+      by (vm_compute; reflexivity).
+    rewrite H. apply exec_returnm.
+  - vm_compute; reflexivity.
+  - assert (Hred : is_CSR_accessible csr_sepc Supervisor CSRWrite
+                   = currentlyEnabled Ext_S) by csr_dispatch_eq.
+    rewrite Hred. rewrite (exec_currentlyEnabled_S s). rewrite HS. reflexivity.
+  - assert (H : stateen_allows_CSR_access csr_sepc Supervisor CSRWrite = returnM true)
+      by (vm_compute; reflexivity).
+    rewrite H. apply exec_returnm.
+Qed.
+
+Lemma exec_execute_csrw_sepc_S (rs1 : mword 5) s :
+  uint rs1 <> 0 ->
+  register_lookup cur_privilege s.(sregs) = Supervisor ->
+  eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (execute (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW))) s
+    = Some (RETIRE_SUCCESS,
+            set_reg s sepc
+              (mepc_val (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
+Proof.
+  intros Hrs1 Hpriv HS.
+  change (execute (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW)))
+    with (execute_CSRReg csr_sepc (Regidx rs1) zreg CSRRW).
+  replace (register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    with (if Z.eqb (uint rs1) 0 then zero_reg
+          else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs))
+    by (replace (Z.eqb (uint rs1) 0) with false
+          by (symmetry; apply Z.eqb_neq; exact Hrs1); reflexivity).
+  apply (exec_execute_csrw_gpr_p Supervisor csr_sepc rs1 s _
+           (mepc_val (if Z.eqb (uint rs1) 0 then zero_reg
+                      else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s.(sregs)))).
+  - exact Hpriv.
+  - apply exec_check_CSR_result_csrw_sepc_S; assumption.
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - vm_compute; reflexivity.
+  - apply exec_write_CSR_sepc.
+  - apply exec_csr_id_write_callback_sepc.
 Qed.
 
 (* ===================================================================== *)
@@ -1187,16 +1418,329 @@ Section WpSconfCsr.
     iPureIntro. done.
   Qed.
 
-  (* ---- csrr rd,scause: rd := the trap cause.
-     THE CELL IS THREADED, AND AT A PINNED VALUE.  A trap-cause read is the
-     one CSR read whose RESULT a caller has to reason about -- devintr's whole
-     body is a three-way branch on it -- so unlike [wp_csrr_time_s_sconf],
-     whose value is ∀-quantified because mtime is unowned, this leaf takes the
-     cell and hands the SAME word back in [rd].  The fraction is arbitrary:
-     reading pins the value and does not need the cell exclusively, so a caller
-     holding scause under [IntrDefs.trap_csrs] can lend a share.
-     Note [sie_cap] is untouched: at [b = true] its arm holds a scause cell of
-     its OWN under the existential, and this leaf never opens it. ---- *)
+  (* ---- csrw sstatus,rs1 -- THE S-STATUS RESTORE, and the one leaf whose
+     postcondition EXPOSES mstatus.
+
+     The written word is taken as [sstatus_read ms0] for a well-formed
+     source mstatus [ms0] rather than as an abstract word with a field
+     predicate: that IS the only way the instruction is used (kerneltrap
+     writes back the sstatus an earlier csrr saved), and it makes the four
+     field premises [flip_core] wants derivable inside the leaf instead of
+     inflicted on the caller.
+
+     THE WRITE MUST NOT MOVE SIE -- premise [_get_Mstatus_SIE ms0 = sie_bit
+     b].  A restore whose saved SIE differs from the live one would have to
+     move all THREE ghost pieces and re-seal the interrupt invariant; that
+     is what the csrci/csrsi flip leaves are for, and duplicating their
+     choreography here would be the wrong shape.  At the trap-handler use
+     the premise is free: the trap cleared SIE, nothing in the handler
+     turned it back on, and the saved word was read after the clear.
+
+     The post hands back [sie_cap_gpr_at msf] -- the mstatus-EXPOSING
+     flavour (IntrDefs) -- because SPP and SPIE are the entire point: they
+     are what kernelvec's [sret] reads.  Close it with
+     [sie_cap_gpr_at_close] as soon as they have been recorded. ---- *)
+  Lemma wp_csrw_sstatus_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rs1 : mword 5)
+      (m : regfile) (n : nat) (b : bool) (ms0 : mword 64) :
+    uint rs1 <> 0 ->
+    rget m rs1 = sstatus_read ms0 ->
+    sconf_ms_facts ms0 ->
+    _get_Mstatus_SIE ms0 = sie_bit b ->
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ msf : mword 64,
+      ⌜ _get_Mstatus_SIE  msf = _get_Mstatus_SIE  ms0 ⌝ -∗
+      ⌜ _get_Mstatus_SPP  msf = _get_Mstatus_SPP  ms0 ⌝ -∗
+      ⌜ _get_Mstatus_SPIE msf = _get_Mstatus_SPIE ms0 ⌝ -∗
+      sie_cap_gpr_at msf m n b p -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrs1 Hwval Hms0f Hsie0) "Hcg Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf m n b Φ pc false
+              (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW))
+              with "Hcg Hpc Hinstr").
+    iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & %HmisaU & _)".
+    (* the live SIE bit is the arm index *)
+    iDestruct "Hcap" as "(Hstk & Htr & Harm)".
+    iDestruct (sie_arm_half_agree b p ms with "Hhalf Harm") as %Hsie_ms.
+    (* the four field equalities [flip_core] wants: both sides are the
+       constants [sconf_ms_facts] pins, on [ms0] and on [ms] respectively. *)
+    pose proof Hmsf  as (_ & _ & HMXR  & _ & HXS  & HFS  & HVS  & _ & _ & _).
+    pose proof Hms0f as (_ & _ & HMXR0 & _ & HXS0 & HFS0 & HVS0 & _ & _ & _).
+    apply eq_vec_true_iff in HMXR. apply eq_vec_true_iff in HMXR0.
+    assert (HWsie : _get_Sstatus_SIE (sstatus_read ms0) = _get_Mstatus_SIE ms0)
+      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSIE_lower).
+    assert (HWspp : _get_Sstatus_SPP (sstatus_read ms0) = _get_Mstatus_SPP ms0)
+      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSPP_lower).
+    assert (HWspie : _get_Sstatus_SPIE (sstatus_read ms0) = _get_Mstatus_SPIE ms0)
+      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSPIE_lower).
+    assert (HWmxr : _get_Sstatus_MXR (sstatus_read ms0) = _get_Mstatus_MXR ms).
+    { unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; rewrite WpGprCsrwC.sMXR_lower.
+      rewrite HMXR0 HMXR. reflexivity. }
+    assert (HWfs : _get_Sstatus_FS (sstatus_read ms0) = _get_Mstatus_FS ms).
+    { unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; rewrite WpGprCsrwC.sFS_lower.
+      rewrite HFS0 HFS. reflexivity. }
+    assert (HWvs : _get_Sstatus_VS (sstatus_read ms0) = _get_Mstatus_VS ms).
+    { unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; rewrite WpGprCsrwC.sVS_lower.
+      rewrite HVS0 HVS. reflexivity. }
+    assert (HWxs : _get_Sstatus_XS (sstatus_read ms0) = _get_Mstatus_XS ms).
+    { unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; rewrite WpGprCsrwC.sXS_lower.
+      rewrite HXS0 HXS. reflexivity. }
+    set (ms1 := legalize_sstatus_val ms (sstatus_read ms0)).
+    destruct (flip_core ms (sstatus_read ms0) (_get_Mstatus_SIE ms0)
+                Hmsf HWsie HWmxr HWfs HWvs HWxs)
+      as (Hf_sie & Hf_spp & Hf_spie & Hf_facts).
+    fold ms1 in Hf_sie, Hf_spp, Hf_spie, Hf_facts.
+    rewrite HWspp in Hf_spp. rewrite HWspie in Hf_spie.
+    (* the ghost half does not move: both indices are [sie_bit b] *)
+    assert (Hhalf_eq : _get_Mstatus_SIE ms1 = _get_Mstatus_SIE ms)
+      by (rewrite Hf_sie Hsie0 Hsie_ms; reflexivity).
+    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg sigma nextPC (add_vec_int pc 4)).
+    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
+      by (unfold s_pc; tmig; exact Lpriv).
+    assert (Lms_spc : register_lookup mstatus s_pc.(sregs) = ms)
+      by (unfold s_pc; tmig; exact Lms).
+    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
+      by (unfold s_pc; tmig; exact Lmisa).
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
+    iDestruct ("Hfb" with "Hr1c") as "Hfile".
+    assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
+                   = sstatus_read ms0).
+    { rewrite -Hwval. unfold rget. rewrite rf_lookup. rewrite -Lva.
+      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
+      reflexivity. }
+    iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
+    iModIntro.
+    iExists (set_reg s_pc mstatus ms1).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      unfold ms1. rewrite <- Lrs1.
+      apply (exec_execute_csrw_sstatus_S rs1 ms s_pc Hrs1 Lpriv_spc Lms_spc);
+        rewrite Lmisa_spc; [ exact HmisaS | exact HmisaU ]. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC (set_reg s_pc mstatus ms1).(sregs)
+                   = add_vec_int pc 4).
+    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iEval (rewrite -Hhalf_eq) in "Hhalf".
+    iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
+    iApply ("Hcont" $! ms1 with "[%] [%] [%] [Hhs' Hpriv Hmiex Hmenvx Hms Hhalf Hstk Htr Harm Hfile] [$Hpc' $Hnpc]").
+    { exact Hf_sie. }
+    { exact Hf_spp. }
+    { exact Hf_spie. }
+    rewrite /sie_cap_gpr_at /sconf_at /sconf_msown.
+    iFrame "Hhs'".
+    iSplitL "Hms Hhalf Hpriv Hmiex Hmenvx".
+    { iSplitL "Hms Hhalf".
+      { iFrame "Hms Hhalf". iPureIntro. exact Hf_facts. }
+      iIntros (ms') "(Hms' & Hhalf' & %Hmsf')".
+      iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
+      iExists ms'. iFrame "Hms' Hhalf'". iPureIntro. exact Hmsf'. }
+    rewrite /sie_cap. iFrame "Hstk Htr Harm Hfile".
+  Qed.
+
+  (* ---- csrw sepc,rs1 -- restores the trapped pc.  The [sepc] cell is
+     threaded EXPLICITLY, exactly as stvec's is at [wp_csrw_stvec_s_sconf]
+     and for the same reason: at [b = false] nothing in the ambient bundle
+     owns it (the enabled arm's copy exists only at [b = true], and a
+     handler running with interrupts off holds the trap CSRs itself).
+     Unlike stvec's, the written word does NOT land verbatim: sepc's write
+     legalizes through [mepc_val], so the post-value carries the wrapper --
+     a caller writing back a 2-aligned epc collapses it. ---- *)
+  Lemma wp_csrw_sepc_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rs1 : mword 5)
+      (m : regfile) (n : nat) (b : bool) (ep0 wval : mword 64) :
+    uint rs1 <> 0 ->
+    rget m rs1 = wval ->
+    sie_cap_gpr m n b p -∗
+    sepc ↦ᵣ ep0 -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr m n b p -∗
+      sepc ↦ᵣ mepc_val wval -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrs1 Hwval) "Hcg Hsepc Hpc Hinstr Hcont".
+    iApply (wp_instr_s_sconf m n b Φ pc false
+              (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW))
+              with "Hcg Hpc Hinstr").
+    iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & _ & _ & _ & _ & %HmisaS & _)".
+    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid    with "Hreg Hsepc") as %Lsepc.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg sigma nextPC (add_vec_int pc 4)).
+    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
+      by (unfold s_pc; tmig; exact Lpriv).
+    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
+      by (unfold s_pc; tmig; exact Lmisa).
+    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hr1c Hfb]".
+    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
+    iDestruct ("Hfb" with "Hr1c") as "Hfile".
+    assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
+                   = wval).
+    { rewrite -Hwval. unfold rget. rewrite rf_lookup. rewrite -Lva.
+      replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
+      reflexivity. }
+    iMod (reg_update _ sepc _ (mepc_val wval) with "Hreg Hsepc") as "[Hreg Hsepc]".
+    iModIntro.
+    iExists (set_reg s_pc sepc (mepc_val wval)).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      rewrite <- Lrs1.
+      apply (exec_execute_csrw_sepc_S rs1 s_pc Hrs1 Lpriv_spc
+               ltac:(rewrite Lmisa_spc; exact HmisaS)). }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC (set_reg s_pc sepc (mepc_val wval)).(sregs)
+                   = add_vec_int pc 4).
+    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hmsx $Hmiex $Hmenvx] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! cpu_id with "[] Hcg Hsepc [$Hpc' $Hnpc]").
+    iPureIntro. done.
+  Qed.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE READ-ONLY S-CSR LEAF, STATED ONCE.                                *)
+  (*                                                                       *)
+  (* sepc / scause / stval are the same instruction with three different   *)
+  (* CSR numbers, and the WP-level plumbing (funnel, nextPC bump, gpr      *)
+  (* insert, [sie_cap] retarget, rejoin) is character-for-character the    *)
+  (* same for all three.  So the leaf abstracts over the two things that   *)
+  (* actually vary -- the CSR number with its exec-layer fact, and how the *)
+  (* architectural read transforms the cell ([f]: the identity for         *)
+  (* scause/stval, bit-0 clearing for sepc, whose read runs [align_pc]) -- *)
+  (* and each CSR contributes a five-line instance below.  Cloning the     *)
+  (* proof three times is what this replaces.                              *)
+  (*                                                                       *)
+  (* THE CELL IS THREADED, AND AT A PINNED VALUE.  A trap-CSR read is the  *)
+  (* kind of read whose RESULT a caller has to reason about -- devintr's   *)
+  (* whole body is a three-way branch on scause, and kerneltrap saves sepc *)
+  (* to restore it later -- so unlike [wp_csrr_time_s_sconf], whose value  *)
+  (* is Forall-quantified because mtime is unowned, this leaf takes the    *)
+  (* cell and hands the SAME word back in [rd].  The fraction is           *)
+  (* arbitrary: reading pins the value and does not need the cell          *)
+  (* exclusively, so a caller holding the cell under [IntrDefs.trap_csrs]  *)
+  (* can lend a share.                                                     *)
+  (*                                                                       *)
+  (* [rg] is a [register_bitvector_64] rather than a [register] so that    *)
+  (* the cell's value type is definitionally [mword 64]; [Hnpc_ne] is what *)
+  (* migrates its lookup across the nextPC bump, and is a [vm_compute] at  *)
+  (* every instance.  Note [sie_cap] is untouched: at [b = true] its arm   *)
+  (* holds trap-CSR cells of its OWN under existentials, and this leaf     *)
+  (* never opens it -- so a caller at that arm must be lending a share it  *)
+  (* got from somewhere else.                                              *)
+  (* ------------------------------------------------------------------- *)
+  Lemma wp_csrr_ro_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (csrn : mword 12) (rg : register_bitvector_64)
+      (f : mword 64 -> mword 64) (rd : mword 5)
+      (m : regfile) (n : nat) (b : bool) (dq : dfrac) (v : mword 64) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    register_beq (R_bitvector_64 rg) nextPC = false ->
+    ( forall s : mstate,
+        register_lookup cur_privilege s.(sregs) = Supervisor ->
+        eq_vec (_get_Misa_S (register_lookup misa s.(sregs))) ('b"1") = true ->
+        eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+        exec (execute (CSRReg (csrn, zreg, Regidx rd, CSRRS))) s
+          = Some (RETIRE_SUCCESS,
+                  set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
+                    (regval_into_reg
+                       (f (register_lookup (R_bitvector_64 rg) s.(sregs))))) ) ->
+    sie_cap_gpr m n b p -∗
+    R_bitvector_64 rg ↦ᵣ{dq} v -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csrn, zreg, Regidx rd, CSRRS)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (f v)]> m) n b p -∗
+      R_bitvector_64 rg ↦ᵣ{dq} v -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdok Hne Hexec) "Hcg Hcell Hpc Hinstr Hcont".
+    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
+    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
+    iApply (wp_instr_s_sconf m n b Φ pc false
+              (CSRReg (csrn, zreg, Regidx rd, CSRRS))
+              with "Hcg Hpc Hinstr").
+    iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hrest)".
+    iPoseProof "Hhw" as "#Hhwc".
+    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
+      "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
+    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iDestruct (reg_valid_dq with "Hreg Hcell") as %Lcell.
+    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    set (s_pc := set_reg sigma nextPC (add_vec_int pc 4)).
+    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
+      by (unfold s_pc; tmig; exact Lpriv).
+    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
+      by (unfold s_pc; tmig; exact Lmisa).
+    assert (Lcell_spc : register_lookup (R_bitvector_64 rg) s_pc.(sregs) = v).
+    { unfold s_pc. rewrite irrelevant_register_set; [ exact Lcell | exact Hne ]. }
+    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (f v))
+                 with "Hfile") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz rd _ Hrd).
+    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (f v))
+            with "Hreg Hrdc") as "[Hreg Hrdc]".
+    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
+    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    iModIntro.
+    iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (f v))).
+    iSplitR.
+    { iPureIntro. rewrite Hpceq. fold s_pc. rewrite -Lcell_spc.
+      apply (Hexec s_pc Lpriv_spc);
+        rewrite Lmisa_spc; [ exact HmisaS | exact HmisaC ]. }
+    iSplitL "Hreg Hmem".
+    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
+    iIntros "Hhs' Hpc'".
+    assert (Lnpc : register_lookup nextPC
+             (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg (f v))).(sregs)
+             = add_vec_int pc 4).
+    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
+    iEval (rewrite Lnpc) in "Hpc'".
+    assert (Hsp : m !!! Regidx csp_rs1
+                  = <[Regidx rd := regval_into_reg (f v)]> m !!! Regidx csp_rs1)
+      by (symmetry; apply upd_ne; congruence).
+    tp_refold Hrdtp "Hfile".
+    iDestruct (sie_cap_retarget m
+                 (<[Regidx rd := regval_into_reg (f v)]> m) n b Hsp with "Hcap") as "Hcap".
+    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hrest] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! cpu_id with "[] Hcg Hcell [$Hpc' $Hnpc]").
+    iPureIntro. done.
+  Qed.
+
+  (* ---- the three instances.  scause and stval read their cell verbatim;
+     sepc's read runs [align_pc], so its value carries [mepc_val]. ---- *)
+
   Lemma wp_csrr_scause_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd : mword 5)
       (m : regfile) (n : nat) (b : bool) (dq : dfrac) (sc : mword 64) :
@@ -1213,60 +1757,61 @@ Section WpSconfCsr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros (Hrd Hrdok) "Hcg Hsc0 Hpc Hinstr Hcont".
-    pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
-    pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b Φ pc false
-              (CSRReg (csr_scause, zreg, Regidx rd, CSRRS))
-              with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hrest)".
-    iPoseProof "Hhw" as "#Hhwc".
-    iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
-      "(#Hmisa & _ & _ & _ & _ & %HmisaS & _)".
-    iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iDestruct (reg_valid_dq with "Hreg Hsc0")  as %Lsc.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
-    set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    assert (Lpriv_spc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
-      by (unfold s_pc; tmig; exact Lpriv).
-    assert (Lmisa_spc : register_lookup misa s_pc.(sregs) = misa0)
-      by (unfold s_pc; tmig; exact Lmisa).
-    assert (Lsc_spc : register_lookup scause s_pc.(sregs) = sc)
-      by (unfold s_pc; tmig; exact Lsc).
-    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg sc)
-                 with "Hfile") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg sc)
-            with "Hreg Hrdc") as "[Hreg Hrdc]".
-    iDestruct ("Hfins" with "[Hrdc]") as "Hfile".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
-    iModIntro.
-    iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg sc)).
-    iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc. rewrite -Lsc_spc.
-      change (execute (CSRReg (csr_scause, zreg, Regidx rd, CSRRS)))
-        with (execute_CSRReg csr_scause zreg (Regidx rd) CSRRS).
-      apply (exec_execute_csrr_scause_gpr_S rd s_pc Hrd Lpriv_spc).
-      rewrite Lmisa_spc. exact HmisaS. }
-    iSplitL "Hreg Hmem".
-    { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    iIntros "Hhs' Hpc'".
-    assert (Lnpc : register_lookup nextPC
-             (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg sc)).(sregs)
-             = add_vec_int pc 4).
-    { unfold s_pc; cbn [sregs]. tmig. rewrite register_lookup_set. reflexivity. }
-    iEval (rewrite Lnpc) in "Hpc'".
-    assert (Hsp : m !!! Regidx csp_rs1
-                  = <[Regidx rd := regval_into_reg sc]> m !!! Regidx csp_rs1)
-      by (symmetry; apply upd_ne; congruence).
-    tp_refold Hrdtp "Hfile".
-    iDestruct (sie_cap_retarget m
-                 (<[Regidx rd := regval_into_reg sc]> m) n b Hsp with "Hcap") as "Hcap".
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hrest] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg Hsc0 [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iIntros (Hrd Hrdok).
+    iApply (wp_csrr_ro_s_sconf Φ pc csr_scause scause (fun x => x) rd m n b dq sc
+              Hrd Hrdok ltac:(vm_compute; reflexivity)).
+    intros s Hpriv HS _.
+    exact (exec_execute_csrr_scause_gpr_S rd s Hrd Hpriv HS).
+  Qed.
+
+  Lemma wp_csrr_stval_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5)
+      (m : regfile) (n : nat) (b : bool) (dq : dfrac) (tv : mword 64) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr m n b p -∗
+    stval ↦ᵣ{dq} tv -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_stval, zreg, Regidx rd, CSRRS)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b p -∗
+      stval ↦ᵣ{dq} tv -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdok).
+    iApply (wp_csrr_ro_s_sconf Φ pc csr_stval stval (fun x => x) rd m n b dq tv
+              Hrd Hrdok ltac:(vm_compute; reflexivity)).
+    intros s Hpriv HS _.
+    exact (exec_execute_csrr_stval_gpr_S rd s Hrd Hpriv HS).
+  Qed.
+
+  (* sepc: the value that lands in [rd] is [mepc_val ep], not [ep].  A
+     caller that knows its saved epc is 2-aligned (every write to the cell
+     went through [legalize_xepc], and every trap writes an aligned pc)
+     collapses the wrapper itself; the leaf does not assume it. *)
+  Lemma wp_csrr_sepc_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd : mword 5)
+      (m : regfile) (n : nat) (b : bool) (dq : dfrac) (ep : mword 64) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr m n b p -∗
+    sepc ↦ᵣ{dq} ep -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_sepc, zreg, Regidx rd, CSRRS)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (mepc_val ep)]> m) n b p -∗
+      sepc ↦ᵣ{dq} ep -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdok).
+    iApply (wp_csrr_ro_s_sconf Φ pc csr_sepc sepc mepc_val rd m n b dq ep
+              Hrd Hrdok ltac:(vm_compute; reflexivity)).
+    intros s Hpriv HS HC.
+    exact (exec_execute_csrr_sepc_gpr_S rd s Hrd Hpriv HS HC).
   Qed.
 
 End WpSconfCsr.

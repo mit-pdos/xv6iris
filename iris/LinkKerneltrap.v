@@ -4,7 +4,7 @@
    callees' PROOFS.  kerneltrap has none, so this link supplies the interface
    with an [Axiom] instead -- the single assumption the kernelvec cone rests
    on ([tools/proof_coverage.py] reports it as such).  Isolating it here means
-   [ProofKernelvec.v] itself is axiom-free: it is a functor over [KERNELTRAP],
+   [ProofKernelvec.v] itself is axiom-free: it is a functor over [KERNELTRAP_RETURNS],
    and proving kerneltrap later replaces this file, nothing else.
 
    Written out with an explicit [Axiom] rather than a [Declare Module]: both
@@ -20,7 +20,7 @@ Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
 Require Import SpecKerneltrap.
 
-Module Kerneltrap : KERNELTRAP.
+Module Kerneltrap : KERNELTRAP_RETURNS.
   Axiom kerneltrap_returns :
     forall `{!riscvGS Σ} `{GenId} `{CpuId} `{!sieG Σ}
       (γ : gname) (dq : dfrac)

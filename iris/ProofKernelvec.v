@@ -1,6 +1,6 @@
 (* ProofKernelvec.v -- the complete WP for xv6's kernelvec, the S-mode trap
    vector (kernelvec.S), as a sealed functor over its one callee's contract
-   ([SpecKerneltrap.KERNELTRAP]).
+   ([SpecKerneltrap.KERNELTRAP_RETURNS]).
 
      kernelvec:
        addi sp, sp, -256          # 1 instr : open the frame
@@ -63,7 +63,7 @@ Require Import KernelRvcDecode.
 Local Open Scope Z_scope.
 Import Defs.
 
-Module KernelvecProof (Kerneltrap : KERNELTRAP) : KERNELVEC.
+Module KernelvecProof (Kerneltrap : KERNELTRAP_RETURNS) : KERNELVEC.
 (* ===================================================================== *)
 (* Pure helpers.                                                          *)
 (* ===================================================================== *)
@@ -1175,7 +1175,7 @@ Section KernelvecCore.
   (* THE CAPSTONE: the complete kernelvec handler, entry to SRET, with   *)
   (* the GPR FILE FULLY PRESERVED (the 17 loads restore the 17 stores;   *)
   (* the axiom preserves the callee-saved rest; -256/+256 cancels on     *)
-  (* sp).  Only the KERNELTRAP contract + platform externs are assumed. *)
+  (* sp).  Only the KERNELTRAP_RETURNS contract + platform externs are assumed. *)
   (* =================================================================== *)
   Lemma wp_kernelvec (root_ppn : mword 44) (γ : gname)
       (m : regfile)

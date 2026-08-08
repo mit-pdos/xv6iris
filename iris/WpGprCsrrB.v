@@ -246,6 +246,54 @@ Proof.
   rewrite H. apply exec_returnm.
 Qed.
 
+(* ===== stval (0x143): the second of the three trap-scratch CSRs, and    *)
+(* character-for-character scause's twin -- Ext_S-gated, read = the        *)
+(* register itself, no subrange and no lowering. ===== *)
+Definition csr_stval : mword 12 := Ox"143".
+
+Lemma exec_read_CSR_stval s :
+  exec (read_CSR (Ox"143")) s = Some (register_lookup stval s.(sregs), s).
+Proof. drive_csr. reflexivity. Qed.
+
+Lemma exec_csr_id_read_callback_stval s d :
+  exec (csr_id_read_callback csr_stval d) s = Some (tt, s).
+Proof.
+  assert (H : csr_id_read_callback csr_stval d = returnM tt) by (vm_compute; reflexivity).
+  rewrite H. apply exec_returnm.
+Qed.
+
+(* ===== sepc (0x141): the third, and the one that is NOT its cell.  The   *)
+(* read is [get_xepc Supervisor], which runs the raw word through          *)
+(* [align_pc]; with Zca enabled -- misa.C = 1 on this platform, hence the  *)
+(* premise -- that clears bit 0.  Every WRITE goes through [legalize_xepc],*)
+(* which clears the same bit, so the cell can only ever hold an aligned    *)
+(* word and the wrapper is the identity in practice; nothing here assumes  *)
+(* that, and a caller who knows it collapses the wrapper itself.  The      *)
+(* wrapper term is spelled out rather than named: it is definitionally     *)
+(* [WpGprCsrwA.mepc_val], the legalizer shared with mepc, and introducing  *)
+(* a second name for it here would be the duplication, not the fix. ===== *)
+Definition csr_sepc : mword 12 := Ox"141".
+
+Lemma exec_read_CSR_sepc s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (read_CSR (Ox"141")) s
+    = Some (update_vec_dec (register_lookup sepc s.(sregs)) 0 ('b"0"), s).
+Proof.
+  intro HmisaC. drive_csr.
+  unfold get_xepc. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg sepc s)).
+  unfold align_pc.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Zca s HmisaC)).
+  cbn zeta match. apply exec_returnM.
+Qed.
+
+Lemma exec_csr_id_read_callback_sepc s d :
+  exec (csr_id_read_callback csr_sepc d) s = Some (tt, s).
+Proof.
+  assert (H : csr_id_read_callback csr_sepc d = returnM tt) by (vm_compute; reflexivity).
+  rewrite H. apply exec_returnm.
+Qed.
+
 Lemma menvcfg_rdval_set_nextPC (s : mstate) (v : mword 64) :
   menvcfg_rdval (set_reg s nextPC v) = menvcfg_rdval s.
 Proof. unfold menvcfg_rdval; rewrite ?sregs_set_reg.

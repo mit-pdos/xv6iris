@@ -210,6 +210,18 @@ are working on that effort — the relevant `projects/` file.
   split (catalog / store+CSR leaves / reverse pt2 switch / chain) with its
   reusable lessons, and the remaining work: prove usertrap(), then the
   whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
+- **[`kerneltrap.md`](projects/kerneltrap.md)** — proving `kerneltrap()`, the
+  last big assumed contract on the interrupt path. Decode layer and the CSR
+  leaves (one generic read-only S-CSR leaf covering sepc/scause/stval, plus
+  `csrw sepc` and `csrw sstatus`), the mstatus-EXPOSING bundle `sconf_at`,
+  and THE SPEC have LANDED — the contract is stated at kernelvec's call site,
+  which makes all three panic arms dead and means discharging it removes an
+  axiom without adding one. What remains is the proof and the
+  `intr_handler_spec` upgrade that connects it (= explicit-cpuid Stage 2).
+  Read it before touching `SpecYield`/`SpecSched`:
+  it records the finding that their `eb = true` premise is too strong —
+  kerneltrap yields at `eb = false` and has to hand its own trap CSRs across
+  the park.
 - **[`printk.md`](projects/printk.md)** — the formatted-output cone (printk →
   printint → consputc → uartputc_sync), ALL PROVEN and linked on the PANIC
   path (`panicking ≠ 0`, so no lock and no `intr_count` anywhere in it).
