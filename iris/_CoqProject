@@ -771,6 +771,7 @@ CodeDevintr.v
 ProofDevintr.v
 LinkDevintr.v
 CodeKerneltrap.v
+ProofKerneltrapParts.v
 SpecAllocpid.v
 CodeAllocpid.v
 ProofAllocpid.v
