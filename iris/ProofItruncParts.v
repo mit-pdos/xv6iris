@@ -330,3 +330,122 @@ Lemma it_dir_limit (ip : mword 64) :
 Proof.
   rewrite /i_addr /pa_add /add_vec_int /NDIRECT. f_equal.
 Qed.
+
+(* ===================================================================== *)
+(*  THE RESOURCE-LEVEL VOCABULARY: the frame, and the two loop states     *)
+(* ===================================================================== *)
+
+Require Import WpMmodeLeafBase.
+Require Import SmodeCore.
+Require Import StackOwn.
+Require Import BufOwn.
+Require Import CalleeSaved.
+Require Import IntrDefs.
+Require Import WpNext.
+Require Import WpLock.
+Require Import SpecPanic.
+Require Import FdSlots.
+Require Import ProcGeom.
+Require Import CpuOwn.
+Require Import SchedCtx.
+Require Import WpUart.
+Require Import DiskPtsto DiskInv.
+Require Import BioInv.
+Require Import LogInv.
+Require Import FsCrash.
+Require Import BitmapEnc BitmapInv.
+Require Import SpecItrunc.
+
+Notation Rra := (mword_of_int 1 : mword 5).
+Notation Rs0 := (mword_of_int 8 : mword 5).
+Notation Rs1 := (mword_of_int 9 : mword 5).
+Notation Rs2 := (mword_of_int 18 : mword 5).
+Notation Rs3 := (mword_of_int 19 : mword 5).
+Notation Rs4 := (mword_of_int 20 : mword 5).
+Notation Ra0 := (mword_of_int 10 : mword 5).
+Notation Ra1 := (mword_of_int 11 : mword 5).
+
+Section ItruncDefs.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+
+  (* itrunc's 48-byte frame: ra@40 s0@32 s1@24 s2@16 s3@8, and slot 6 (@0)
+     which the DIRECT path never touches -- [sd s4,0(sp)] is at +0x50,
+     inside the indirect arm, and the matching [ld s4,0(sp)] at +0x90.  So
+     the sixth slot is owned but unconstrained: the frame claimed it at the
+     [addi sp,sp,-48], and only the indirect arm gives it a value. *)
+  Definition it_frame (m : regfile) : iProp Σ :=
+    (pa_stk (m !!! Regidx csp_rs1 : mword 64) 1 ↦₈ (m !!! Regidx Rra : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 2 ↦₈ (m !!! Regidx Rs0 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64) ∗
+     pa_stk (m !!! Regidx csp_rs1 : mword 64) 5 ↦₈ (m !!! Regidx Rs3 : mword 64) ∗
+     (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 6 ↦₈ v))%I.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE DIRECT LOOP'S STATE, at cursor k                               *)
+  (* ------------------------------------------------------------------ *)
+
+  (* Everything the loop owns and moves.  The map is [bm_dir_zeroed bm k];
+     the pool has grown by [bm_dir_freed bm k]; the [inode_blocks] bundle
+     has lost exactly the entries below the cursor -- which is why it is
+     indexed at the ZEROED map, whose [blk_res] at those indices is [True].
+
+     The budget is [bm_paid], NOT a unit count: that is the whole point of
+     the credited arms.  It is idempotent under bfree, so this assertion is
+     literally unchanged from k = 0 to k = NDIRECT. *)
+  Definition it_dir_state (γ : log_names) (γfs : fs_names)
+      (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
+      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (bn : bio_names) (k : nat) : iProp Σ :=
+    (inode_map γfs ip (bm_dir_zeroed bm k) ∗
+     inode_blocks γfs (bm_dir_zeroed bm k) data ∗
+     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
+     bm_paid γ bmapstart 1)%I.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE INDIRECT LOOP'S STATE, at cursor q                             *)
+  (* ------------------------------------------------------------------ *)
+
+  (* The map does NOT appear: the C never writes the entry list back, so
+     [bm_ent bm] is fixed and the only things moving are the pool and the
+     [inode_blocks] entries at indices [NDIRECT + q].  [it_ent_res] is what
+     is LEFT of the bundle -- the entries at and above the cursor -- stated
+     as a big-op over the remaining indices rather than as an [inode_blocks]
+     at some doctored map, because there is no map here to doctor. *)
+  Definition it_ent_res (γfs : fs_names) (bm : blkmap)
+      (data : nat -> list (bv 8)) (q : nat) : iProp Σ :=
+    ([∗ list] t ∈ seq q (NINDIRECT - q),
+       blk_res γfs (bm_ent bm !!! t) (data (NDIRECT + t)%nat))%I.
+
+  Definition it_ent_state (γ : log_names) (γfs : fs_names)
+      (bm : blkmap) (data : nat -> list (bv 8))
+      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (q : nat) : iProp Σ :=
+    (it_ent_res γfs bm data q ∗
+     bitmap_res γfs bmapstart cov logstart size
+       (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
+     bm_paid γ bmapstart 1)%I.
+
+  (* peeling the cursor entry off the remaining bundle -- the step both the
+     free and the skip take *)
+  Lemma it_ent_res_peel (γfs : fs_names) (bm : blkmap)
+      (data : nat -> list (bv 8)) (q : nat) :
+    (q < NINDIRECT)%nat ->
+    it_ent_res γfs bm data q -∗
+      blk_res γfs (bm_ent bm !!! q) (data (NDIRECT + q)%nat) ∗
+      it_ent_res γfs bm data (S q).
+  Proof.
+    intros Hq. rewrite /it_ent_res.
+    replace (NINDIRECT - q)%nat with (S (NINDIRECT - S q))%nat by lia.
+    rewrite -cons_seq big_sepL_cons. iIntros "[$ $]".
+  Qed.
+
+  Lemma it_ent_res_done (γfs : fs_names) (bm : blkmap)
+      (data : nat -> list (bv 8)) :
+    it_ent_res γfs bm data NINDIRECT ⊣⊢ emp.
+  Proof.
+    rewrite /it_ent_res Nat.sub_diag /=. reflexivity.
+  Qed.
+
+End ItruncDefs.
