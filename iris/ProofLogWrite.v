@@ -1950,30 +1950,56 @@ Section ProofLogWrite.
     iDestruct (log_op_positive with "Hoauth Hop") as %Hpos.
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
-    iDestruct "Hbatch" as (nl) "(%Hsum & Hbatch)".
+    iDestruct "Hbatch" as (nl LB) "(%Hsum & %Hsub & Hbatch)".
     rewrite /log_batch.
     iDestruct "Hbatch" as (W L D)
-      "(%Hlen & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
+      "(%Hlen & %HLB & %Hnodup & %Hwok & Hncell & HW & Hjunk & HLauth & HDauth & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
     destruct Hlen as [HlenW HnlB].
-    (* ---- the ledger spend: one budget unit, and nl <= 29 out of it ---- *)
-    iMod (log_spend_step with "Hoauth Hop") as (i0) "(%Hi0 & Hoauth & Hop)".
+    (* ---- the ledger spend: one budget unit, and nl <= 29 out of it.
+           This is the UNCREDITED arm, so the block joins the op's
+           already-logged set and the next write of it will be free. ---- *)
+    rewrite /log_op. iDestruct "Hop" as (Sb0) "Hop".
+    iMod (log_spend_step γ om u Sb0 (uint bno) with "Hoauth Hop") as (i0) "(%Hi0 & Hoauth & HopS)".
+    (* this contract's postcondition is the SET-FORGETTING [log_op]; the
+       credited arm that keeps the set is [wp_log_write_sconf_cr] below *)
+    iDestruct (log_opS_op with "HopS") as "Hop".
+    set (om' := <[i0 := (u, Sb0 ∪ {[uint bno]})]> om).
     assert (Hsum1 : (1 <= op_sum om)%nat).
-    { pose proof (op_sum_delete om i0 (S u) Hi0) as He. lia. }
+    { pose proof (op_sum_delete om i0 (S u, Sb0) Hi0) as He. cbn in He. lia. }
     assert (Hnl : (nl <= 29)%nat) by (unfold LOGBLOCKS in Hsum; lia).
-    assert (Hspend : op_sum (<[i0 := u]> om) = (op_sum om - 1)%nat)
-      by (apply op_sum_spend; exact Hi0).
-    assert (HsumA : (nl + op_sum (<[i0 := u]> om) <= LOGBLOCKS)%nat)
+    assert (Hspend : op_sum om' = (op_sum om - 1)%nat)
+      by (unfold om';
+          apply (op_sum_spend om i0 u Sb0 (Sb0 ∪ {[uint bno]})); exact Hi0).
+    assert (HsumA : (nl + op_sum om' <= LOGBLOCKS)%nat)
       by (rewrite Hspend; unfold LOGBLOCKS in *; lia).
-    assert (HsumB : (S nl + op_sum (<[i0 := u]> om) <= LOGBLOCKS)%nat)
+    assert (HsumB : (S nl + op_sum om' <= LOGBLOCKS)%nat)
       by (rewrite Hspend; unfold LOGBLOCKS in *; lia).
-    assert (Hsz' : size (<[i0 := u]> om) = out)
-      by (rewrite map_size_insert_Some; [exact Hsz | eauto]).
-    assert (Hbnd' : forall j v, <[i0 := u]> om !! j = Some v -> (v <= MAXOPBLOCKS)%nat).
-    { intros j v Hj. destruct (decide (j = i0)) as [->|Hne].
-      - rewrite lookup_insert in Hj. injection Hj as <-.
-        pose proof (Hbnd i0 (S u) Hi0). lia.
+    assert (Hsz' : size om' = out)
+      by (unfold om'; rewrite map_size_insert_Some; [exact Hsz | eauto]).
+    assert (Hbnd' : forall j e, om' !! j = Some e -> (e.1 <= MAXOPBLOCKS)%nat).
+    { intros j e Hj. unfold om' in Hj. destruct (decide (j = i0)) as [->|Hne].
+      - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+        pose proof (Hbnd i0 (S u, Sb0) Hi0) as Hb. cbn in Hb. lia.
       - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
-        exact (Hbnd j v Hj). }
+        exact (Hbnd j e Hj). }
+    (* THE CREDIT CLAUSE, re-established on both exits.  On the ABSORB exit
+       the header is unchanged and [uint bno] is already in LB (the block is
+       in W); on the APPEND exit LB grows by exactly [uint bno], which is
+       what the spend just added to this op's set.  Every OTHER op's set is
+       unchanged and LB only grows, so their clauses survive. *)
+    assert (HsubA : uint bno ∈ LB ->
+                    forall j e, om' !! j = Some e -> e.2 ⊆ LB).
+    { intros HinLB j e Hj. unfold om' in Hj. destruct (decide (j = i0)) as [->|Hne].
+      - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+        pose proof (Hsub i0 (S u, Sb0) Hi0) as Hs. cbn in Hs. set_solver.
+      - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+        exact (Hsub j e Hj). }
+    assert (HsubB : forall j e, om' !! j = Some e -> e.2 ⊆ LB ∪ {[uint bno]}).
+    { intros j e Hj. unfold om' in Hj. destruct (decide (j = i0)) as [->|Hne].
+      - rewrite lookup_insert in Hj. injection Hj as <-. cbn.
+        pose proof (Hsub i0 (S u, Sb0) Hi0) as Hs. cbn in Hs. set_solver.
+      - rewrite lookup_insert_ne in Hj; [| exact (not_eq_sym Hne)].
+        pose proof (Hsub j e Hj). set_solver. }
     (* ---- the handle, opened ---- *)
     rewrite /bio_held.
     iDestruct "Hheld" as
@@ -2175,15 +2201,20 @@ Section ProofLogWrite.
         iDestruct "Hextra" as (q) "Href".
         iModIntro.
         iSplitR "HpL HpD Href Hslk Hpid Hvalid Hdevh Hbnoc Hbdisk Hbytes Hdisk Hfsb Hop Hslot".
-        + rewrite /log_res. iExists out, false, nc, (<[i0 := u]> om).
+        + rewrite /log_res. iExists out, false, nc, om'.
           iFrame "Houtc Hcmtc Hncc Hoauth".
           iSplitR; [iPureIntro; exact Hsz'|].
           iSplitR; [iPureIntro; exact Hbnd'|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; intros Hc; discriminate|].
-          iExists nl. iSplitR; [iPureIntro; exact HsumA|].
+          iExists nl, LB. iSplitR; [iPureIntro; exact HsumA|].
+          (* ABSORB: W is unchanged, so LB is too, and the block is already
+             in it -- which is exactly what [Hmem] says. *)
+          iSplitR.
+          { iPureIntro. apply HsubA. rewrite HLB. by apply elem_of_list_to_set. }
           rewrite /log_batch. iExists W, (<[uint bno := bs]> L), D.
           iSplitR; [iPureIntro; split; [exact HlenW | exact HnlB]|].
+          iSplitR; [iPureIntro; exact HLB|].
           iSplitR; [iPureIntro; exact Hnodup|].
           iSplitR; [iPureIntro; exact Hwok|].
           iFrame "Hncell HW".
@@ -2233,19 +2264,25 @@ Section ProofLogWrite.
         iModIntro.
         iSplitR "HpL HpD Hrt Hrdev Hrbno Hslk Hpid Hvalid Hdevh Hbnoc Hbdisk Hbytes
                  Hdisk Hfsb Hop Hslot".
-        + rewrite /log_res. iExists out, false, nc, (<[i0 := u]> om).
+        + rewrite /log_res. iExists out, false, nc, om'.
           iFrame "Houtc Hcmtc Hncc Hoauth".
           iSplitR; [iPureIntro; exact Hsz'|].
           iSplitR; [iPureIntro; exact Hbnd'|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; intros Hc; discriminate|].
-          iExists (S nl). iSplitR; [iPureIntro; exact HsumB|].
+          iExists (S nl), (LB ∪ {[uint bno]}).
+          iSplitR; [iPureIntro; exact HsumB|].
+          (* APPEND: LB grows by exactly the block this op just logged *)
+          iSplitR; [iPureIntro; exact HsubB|].
           rewrite /log_batch. iExists (W ++ [bno]), (<[uint bno := bs]> L),
                                      (<[uint bno := true]> D).
           iSplitR.
           { iPureIntro. split.
             - rewrite length_app HlenW /=. lia.
             - unfold LOGBLOCKS in *. lia. }
+          iSplitR.
+          { iPureIntro. subst LB. rewrite map_app list_to_set_app_L /=.
+            set_solver. }
           iSplitR; [iPureIntro; apply lw_nodup_snoc; assumption|].
           iSplitR; [iPureIntro; apply lw_wok_snoc; assumption|].
           iSplitL "Hncell".

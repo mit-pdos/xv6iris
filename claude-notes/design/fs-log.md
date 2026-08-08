@@ -628,6 +628,40 @@ recovery spec/proof; sys_sync.
   cannot predict absorption, a conditional resource poisons every caller
   proof, and always-consume matches the C code's own MAXOPBLOCKS
   worst-case accounting.
+  **AMENDED 2026-08-08 — the rejection stands for the shape it describes,
+  but always-consume turned out to be unsound as an APPROXIMATION, and the
+  fix is a different shape.** `itrunc` frees up to `NDIRECT + NINDIRECT + 1`
+  = 269 blocks and then calls `iupdate`; at one unit per `log_write` that is
+  270 units against a `MAXOPBLOCKS` of 10, so `itrunc` is not provable, and
+  any contract demanding 270 is uncallable by `iput` (which runs inside
+  `begin_op`/`end_op`). The C is correct: `FSSIZE = 2000 < BPB = 8192`
+  means all 269 frees hit ONE bitmap block, so real `lh.n` grows by 2.
+  What was wrong was the accounting, not the kernel.
+  The fix is NOT a conditional refund — that is the rejected shape, and the
+  objection to it is right: a caller cannot predict whether the block it is
+  about to write is already in `lh.block[]`. The fix is a **positive,
+  client-held claim**: each ledger entry carries the set of blocks THIS OP
+  HAS ALREADY APPENDED (`op_entry := nat * gset Z`), and log_write gains a
+  second arm that consumes such a credit and charges nothing. A caller
+  does not have to predict absorption; it KNOWS, because it is the one that
+  logged the block a moment ago. `itrunc`'s first `bfree` pays a unit and
+  earns the credit; the other 268 present it and pay nothing.
+  **Why the set lives in the op entry** rather than in a free-floating
+  token: the credit is sound only while the block really is in
+  `lh.block[]`, which is cleared at commit, so the witness must be revoked
+  by then — and the one handle the log has on a client's resources at
+  commit time is the op entry itself, which `end_op` collects and whose
+  absence (`cmt = true -> out = 0`) is what permits commit at all. A token
+  outliving `end_op` would be presentable in the next batch, where the
+  absorb arm would skip a spend while `lh.n` actually grew.
+  **Why it stayed additive**: `log_op γ u` is redefined as
+  `∃ Sb, log_opS γ u Sb`, so every existing caller — balloc, bmap, iupdate,
+  writei, begin_op, end_op — is untouched; only the arms that claim the
+  credit mention `log_opS`. The one non-local consequence is that
+  `log_batch` must EXPOSE its logged-block set (`LB`) rather than hiding it
+  existentially, because the soundness clause `∀ i e, om !! i = Some e →
+  e.2 ⊆ LB` relates the ledger authority (in `log_res`) to the header (in
+  `log_batch`), and the two cannot be tied while `LB` is hidden.
 - **Crash permits as PURE TRANSITION TAGS in the timeless slots**
   (enumerating the WAL's four write kinds as data the completion
   case-splits on): rejected in favour of the logatom permit above. It

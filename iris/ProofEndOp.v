@@ -676,8 +676,8 @@ Section EndOpDefs.
      bslots bn ((LOGBLOCKS - n) + 2)%nat)%I.
 
   Lemma eo_open_of_batch (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) :
-    log_batch bn γfs cov logstart n -∗
+      (logstart : Z) (n : nat) (LB : gset Z) :
+    log_batch bn γfs cov logstart n LB -∗
     ∃ (W : list (mword 32)) (L : gmap Z (list (bv 8))) (D : gmap Z bool),
       ⌜n = length W /\ (n <= LOGBLOCKS)%nat⌝ ∗
       ⌜NoDup (map uint W)⌝ ∗
@@ -690,7 +690,7 @@ Section EndOpDefs.
   Proof.
     rewrite /log_batch /eo_open.
     iIntros "H". iDestruct "H" as (W L D)
-      "(%Hlen & %Hnd & %Hwok & Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
+      "(%Hlen & %HLB & %Hnd & %Hwok & Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & Hlogr & Hpool & Hmirc)".
     iExists W, L, D.
     iSplitR; [iPureIntro; exact Hlen|].
     iSplitR; [iPureIntro; exact Hnd|].
@@ -713,12 +713,14 @@ Section EndOpDefs.
       (Lw : nat -> list (bv 8)) :
     log_mirror_clean -∗
     eo_open bn γfs cov logstart 0 [] L D Lw 0 -∗
-    log_batch bn γfs cov logstart 0.
+    log_batch bn γfs cov logstart 0 ∅.
   Proof.
     rewrite /log_batch /eo_open.
     iIntros "Hmirc (Hncell & HW & Hjunk & HauthL & HauthD & Hcov & Hhdr & _ & Hlogr & Hpool)".
     iExists [], L, D.
     iSplitR; [iPureIntro; split; [reflexivity | unfold LOGBLOCKS; lia]|].
+    (* the emptied batch has logged nothing *)
+    iSplitR; [iPureIntro; reflexivity|].
     iSplitR; [iPureIntro; constructor|].
     iSplitR; [iPureIntro; intros w Hw; apply elem_of_nil in Hw; done|].
     iSplitL "Hncell"; [iExact "Hncell"|].
@@ -1144,7 +1146,7 @@ Section EndOpBlocks.
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     eo_frame4 m -∗
     eo_frameJ m -∗
-    log_batch bn γfs cov logstart 0 -∗
+    log_batch bn γfs cov logstart 0 ∅ -∗
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -1281,10 +1283,10 @@ Section EndOpBlocks.
     (* committing IS still set: the committer holds the batch's fs_L
        AUTHORITY, and log_res's cmt = false arm holds one too. *)
     destruct cmt.
-    2: { iDestruct "Hrest" as (n0) "(_ & Hb2)".
+    2: { iDestruct "Hrest" as (n0 LB0) "(_ & _ & Hb2)".
          rewrite /log_batch.
-         iDestruct "Hbatch" as (W1 L1 D1) "(_ & _ & _ & _ & _ & _ & Ha1 & _)".
-         iDestruct "Hb2" as (W2 L2 D2) "(_ & _ & _ & _ & _ & _ & Ha2 & _)".
+         iDestruct "Hbatch" as (W1 L1 D1) "(_ & _ & _ & _ & _ & _ & _ & Ha1 & _)".
+         iDestruct "Hb2" as (W2 L2 D2) "(_ & _ & _ & _ & _ & _ & _ & Ha2 & _)".
          iDestruct (ghost_map_auth_valid_2 with "Ha1 Ha2") as %[Hbad _].
          exfalso. by apply (Qp.not_add_le_l 1 1). }
     (* ===== +0x50 sw zero,32(s1) : committing := 0 ===== *)
@@ -1482,6 +1484,15 @@ Section EndOpBlocks.
     assert (Hsum : (0 + op_sum om <= LOGBLOCKS)%nat).
     { pose proof (op_sum_bound om MAXOPBLOCKS Hbnd) as Hb.
       rewrite Hsz in Hb. unfold MAXOPBLOCKS, LOGBLOCKS in *. lia. }
+    (* THE BATCH GOES BACK EMPTY, so LB is empty too -- and no surviving op
+       may hold a credit against it.  None can: this arm ran with
+       committing = 1, which forces out = 0 ([Hcmt0]) and hence om = empty,
+       so the credit clause is vacuous.  That is the same fact that makes
+       the commit safe in the first place -- no operation is open across
+       it, so no operation's already-logged set can outlive the header it
+       referred to. *)
+    assert (Hommt : om = ∅).
+    { apply map_size_empty_iff. rewrite Hsz. exact (Hcmt0 eq_refl). }
     iAssert (log_res γ bn γfs cov logstart)
       with "[Houtc Hcmtc Hncc Hoauth Hbatch]" as "HRres".
     { rewrite /log_res. iExists out, false, nc', om.
@@ -1493,7 +1504,11 @@ Section EndOpBlocks.
       iSplitR; [iPureIntro; exact Hbnd|].
       iSplitR; [iPureIntro; exact Hout3|].
       iSplitR; [iPureIntro; discriminate|].
-      iExists 0%nat. iSplitR; [iPureIntro; exact Hsum|]. iExact "Hbatch". }
+      iExists 0%nat, ∅. iSplitR; [iPureIntro; exact Hsum|].
+      iSplitR.
+      { iPureIntro. intros i e Hi. rewrite Hommt lookup_empty in Hi.
+        discriminate. }
+      iExact "Hbatch". }
     iApply (Rel.wp_release_sconf Φ (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) G2 0%nat eb (proc_addr j) C
               (K - 8)%nat
@@ -2039,7 +2054,7 @@ Section EndOpBlocks.
       iSplitL "Hpool"; [iExact "Hpool"|].
       rewrite (bslots_op bn 1 (1 + length W)).
       iSplitL "Hu3"; [iExact "Hu3"|iExact "Hu2"]. }
-    iAssert (log_batch bn γfs cov logstart 0)
+    iAssert (log_batch bn γfs cov logstart 0 ∅)
       with "[Hncell HauthL HauthD Hcov Hhdr Hjunk Hlogr Hpool Hmirc]" as "Hbatch".
     { iApply (eo_open_to_batch bn γfs cov logstart
                 (<[log_hdr_bno logstart := bs2]> (<[log_hdr_bno logstart := bs1]> L))
@@ -3824,15 +3839,20 @@ Section ProofEndOp.
        log_res's own conjunct then refutes committing. *)
     destruct cmt.
     { exfalso. specialize (Hcmt0 eq_refl). lia. }
-    iDestruct "Hrest" as (nl) "(%Hsum & Hbatch)".
-    iMod (log_end_step with "Hoauth Hop") as (i0) "(%Hi0 & Hoauth)".
+    iDestruct "Hrest" as (nl LB) "(%Hsum & %Hsub & Hbatch)".
+    iMod (log_end_step with "Hoauth Hop") as (i0 Sb0) "(%Hi0 & Hoauth)".
     assert (Hszd : size (delete i0 om) = (out - 1)%nat).
     { rewrite map_size_delete Hi0 Hsz. symmetry. apply Nat.sub_1_r. }
-    assert (Hbndd : forall i v, delete i0 om !! i = Some v -> (v <= MAXOPBLOCKS)%nat).
-    { intros i v Hv. apply (Hbnd i v). rewrite lookup_delete_Some in Hv.
+    assert (Hbndd : forall i e, delete i0 om !! i = Some e -> (e.1 <= MAXOPBLOCKS)%nat).
+    { intros i e Hv. apply (Hbnd i e). rewrite lookup_delete_Some in Hv.
+      exact (proj2 Hv). }
+    (* DELETING an entry only shrinks the map, so every surviving op's
+       credit clause is the one it already had *)
+    assert (Hsubd : forall i e, delete i0 om !! i = Some e -> e.2 ⊆ LB).
+    { intros i e Hv. apply (Hsub i e). rewrite lookup_delete_Some in Hv.
       exact (proj2 Hv). }
     assert (Hsumd : (nl + op_sum (delete i0 om) <= LOGBLOCKS)%nat).
-    { pose proof (op_sum_delete om i0 u Hi0) as Hd. lia. }
+    { pose proof (op_sum_delete om i0 (u, Sb0) Hi0) as Hd. cbn in Hd. lia. }
     assert (Hout3d : ((out - 1) <= 3)%nat) by lia.
     assert (Hout1 : (1 <= out)%nat) by lia.
     iPoseProof (eoi_26 with "Htext") as "Hi26".
@@ -4435,7 +4455,8 @@ Section ProofEndOp.
         iSplitR; [iPureIntro; exact Hbndd|].
         iSplitR; [iPureIntro; exact Hout3d|].
         iSplitR; [iPureIntro; discriminate|].
-        iExists nl. iSplitR; [iPureIntro; exact Hsumd|]. iExact "Hbatch". }
+        iExists nl, LB. iSplitR; [iPureIntro; exact Hsumd|].
+        iSplitR; [iPureIntro; exact Hsubd|]. iExact "Hbatch". }
       assert (HT4regsE : eo_regsE m T4).
       { rewrite /eo_regsE. split.
         - rewrite HT4sp. exact (proj1 HqregsE).

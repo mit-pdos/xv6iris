@@ -349,19 +349,20 @@ Section BoProps.
 
   (* the log lock's batch, opened just for its [lh.n] cell *)
   Lemma bo_batch_lhn (bn : bio_names) (γfs : fs_names) (cov : gset Z)
-      (logstart : Z) (n : nat) :
-    log_batch bn γfs cov logstart n -∗
+      (logstart : Z) (n : nat) (LB : gset Z) :
+    log_batch bn γfs cov logstart n LB -∗
     ⌜(n <= LOGBLOCKS)%nat⌝ ∗
     lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) ∗
     (lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
-       log_batch bn γfs cov logstart n).
+       log_batch bn γfs cov logstart n LB).
   Proof.
     iIntros "H". rewrite /log_batch.
-    iDestruct "H" as (W L D) "(%Hlen & %Hnd & %Hcv & Hn & Hblk & Hjunk & HL & HD & Hdirty & Hhdr & Hsl & Hpool & Hmirc)".
+    iDestruct "H" as (W L D) "(%Hlen & %HLB & %Hnd & %Hcv & Hn & Hblk & Hjunk & HL & HD & Hdirty & Hhdr & Hsl & Hpool & Hmirc)".
     iSplitR; [iPureIntro; exact (proj2 Hlen)|].
     iFrame "Hn". iIntros "Hn".
     iExists W, L, D.
     iSplitR; [iPureIntro; exact Hlen|].
+    iSplitR; [iPureIntro; exact HLB|].
     iSplitR; [iPureIntro; exact Hnd|].
     iSplitR; [iPureIntro; exact Hcv|].
     iFrame "Hn Hblk Hjunk HL HD Hdirty Hhdr Hsl Hpool Hmirc".
@@ -1034,18 +1035,20 @@ Section BoBodies.
     iPoseProof (boi_42 with "Htext") as "Hi42".
     destruct cmt.
     - (* ================= COMMITTING: c.bnez TAKEN -> +0x24 ================= *)
-      iAssert (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32) (om : gmap nat nat),
+      iAssert (∃ (out : nat) (cmt : bool) (nc : SailStdpp.Values.mword 32) (om : gmap nat op_entry),
                  l_out ↦₄ (mword_of_int (Z.of_nat out) : mword 32) ∗
                  l_cmt ↦₄ (mword_of_int (if cmt then 1 else 0) : mword 32) ∗
                  l_ncommit ↦₄ nc ∗
                  ghost_map_auth (ln_ops γ) 1 om ∗
                  ⌜size om = out⌝ ∗
-                 ⌜forall i u, om !! i = Some u -> (u <= MAXOPBLOCKS)%nat⌝ ∗
+                 ⌜forall i e, om !! i = Some e -> (e.1 <= MAXOPBLOCKS)%nat⌝ ∗
                  ⌜(out <= 3)%nat⌝ ∗
                  ⌜cmt = true -> out = 0%nat⌝ ∗
                  (if cmt then emp
-                  else ∃ n : nat, ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
-                       log_batch bn γfs cov logstart n))%I
+                  else ∃ (n : nat) (LB : gset Z),
+                       ⌜(n + op_sum om <= LOGBLOCKS)%nat⌝ ∗
+                       ⌜forall i e, om !! i = Some e -> e.2 ⊆ LB⌝ ∗
+                       log_batch bn γfs cov logstart n LB))%I
         with "[Hout Hcmt Hnc Hauth Hrest]" as "Hres".
       { iExists out, true, nc, om. iFrame "Hout Hcmt Hnc Hauth".
         iSplitR; [iPureIntro; exact Hsz|].
@@ -1069,7 +1072,7 @@ Section BoBodies.
                 HK Heb Hj Hjl Hanch HboE1
                 with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
-      iDestruct "Hrest" as (n) "(%Hsum & Hbatch)".
+      iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & Hbatch)".
       iDestruct (bo_batch_lhn with "Hbatch") as "(%Hn30 & Hlhn & Hbclose)".
       iApply (wp_cbnez_fall_s_sconf Φ (mword_of_int (KernelSyms.begin_op + 0x2e)) (mword_of_int 251 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) E1 (K - 4)%nat false
@@ -1316,24 +1319,35 @@ Section BoBodies.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp58) in "Hpc".
         (* THE LEDGER STEP: mint a fresh operation at full budget *)
-        iMod (log_begin_step γ om with "Hauth") as (i Hi) "(Hauth & Hop)".
+        iMod (log_begin_step γ om with "Hauth") as (i Hi) "(Hauth & HopS)".
+        iDestruct (log_opS_op with "HopS") as "Hop".
         iAssert (log_res γ bn γfs cov logstart) with "[Hout Hcmt Hnc Hauth Hlhn Hbclose]" as "Hres".
-        { rewrite /log_res. iExists (S out), false, nc, (<[i := MAXOPBLOCKS]> om).
+        { rewrite /log_res. iExists (S out), false, nc, (<[i := (MAXOPBLOCKS, ∅)]> om).
           iFrame "Hout Hcmt Hnc Hauth".
           iSplitR.
           { iPureIntro. rewrite map_size_insert_None; [ by rewrite Hsz | exact Hi ]. }
           iSplitR.
-          { iPureIntro. intros k u Hk.
+          { iPureIntro. intros k e Hk.
             destruct (decide (k = i)) as [->|Hne].
             - rewrite lookup_insert in Hk.
-              assert (u = MAXOPBLOCKS) as -> by congruence.
+              assert (e = (MAXOPBLOCKS, ∅)) as -> by congruence.
               apply Nat.le_refl.
-            - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hbnd k u Hk). }
+            - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hbnd k e Hk). }
           iSplitR; [iPureIntro; exact (bo_guard_out3 out n Hle)|].
           iSplitR; [iPureIntro; discriminate|].
-          iExists n. iSplitR.
-          { iPureIntro. rewrite (op_sum_insert om i MAXOPBLOCKS Hi).
+          iExists n, LB. iSplitR.
+          { iPureIntro. rewrite (op_sum_insert om i (MAXOPBLOCKS, ∅) Hi).
             exact (log_reserve_ok n out om Hsz Hbnd (bo_guard_sum out n Hle)). }
+          iSplitR.
+          (* THE FRESH OP HAS LOGGED NOTHING, so its credit set is empty and
+             the soundness clause is immediate; the other entries are
+             untouched. *)
+          { iPureIntro. intros k e Hk.
+            destruct (decide (k = i)) as [->|Hne].
+            - rewrite lookup_insert in Hk.
+              assert (e = (MAXOPBLOCKS, ∅)) as -> by congruence.
+              set_solver.
+            - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hsub k e Hk). }
           iApply ("Hbclose" with "Hlhn"). }
         rewrite /bo_exit.
         iSpecialize ("Hexit" $! CID with "[%]"); [wp_next_chain|].
@@ -1347,7 +1361,8 @@ Section BoBodies.
           iSplitR; [iPureIntro; exact Hbnd|].
           iSplitR; [iPureIntro; exact Hout3|].
           iSplitR; [iPureIntro; exact Hcmtout|].
-          iExists n. iSplitR; [iPureIntro; exact Hsum|].
+          iExists n, LB. iSplitR; [iPureIntro; exact Hsum|].
+          iSplitR; [iPureIntro; exact Hsub|].
           iApply ("Hbclose" with "Hlhn"). }
         iApply (wp_bge_fall_s_sconf Φ (mword_of_int (KernelSyms.begin_op + 0x42)) (mword_of_int 14 : mword 13)
                   (mword_of_int 15 : mword 5) (mword_of_int 18 : mword 5) E8 (K - 4)%nat false

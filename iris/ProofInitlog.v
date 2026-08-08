@@ -1415,11 +1415,13 @@ Section ProofInitlog.
     iMod "HQ" as "[Hmirc #Hswlb]".
     iAssert (log_mirror_clean) with "[Hmirc]" as "Hmirc";
       [rewrite /log_mirror_clean; iExact "Hmirc"|].
-    iAssert (log_batch bn γfs cov logstart 0%nat)
+    iAssert (log_batch bn γfs cov logstart 0%nat ∅)
       with "[Hncell Hblk HLauth HDauth Hcovf Hfsb Hslotsfs Hpool Hmirc]" as "Hbatch".
     { rewrite /log_batch.
       iExists ([] : list (mword 32)), (<[log_hdr_bno logstart := bs']> L), D.
       iSplitR; [iPureIntro; split; [reflexivity | unfold LOGBLOCKS; lia]|].
+      (* the fresh batch has logged nothing: LB = list_to_set [] = empty *)
+      iSplitR; [iPureIntro; reflexivity|].
       iSplitR; [iPureIntro; constructor|].
       iSplitR; [iPureIntro; exact Hwcov0|].
       iSplitL "Hncell"; [iExact "Hncell"|].
@@ -1436,17 +1438,18 @@ Section ProofInitlog.
     iAssert (log_res (MkLogNames γlk γops) bn γfs cov logstart)
       with "[Hout Hcmt Hnc Hops Hbatch]" as "Hres".
     { rewrite /log_res.
-      iExists 0%nat, false, v_nc, (∅ : gmap nat nat).
+      iExists 0%nat, false, v_nc, (∅ : gmap nat op_entry).
       iSplitL "Hout"; [iExact "Hout"|].
       iSplitL "Hcmt"; [iExact "Hcmt"|].
       iSplitL "Hnc"; [iExact "Hnc"|].
       iSplitL "Hops"; [iExact "Hops"|].
       iSplitR; [iPureIntro; apply map_size_empty|].
-      iSplitR; [iPureIntro; intros i u Hi; rewrite lookup_empty in Hi; discriminate|].
+      iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iSplitR; [iPureIntro; lia|].
       iSplitR; [iPureIntro; discriminate|].
-      iExists 0%nat.
+      iExists 0%nat, ∅.
       iSplitR; [iPureIntro; rewrite op_sum_empty; unfold LOGBLOCKS; lia|].
+      iSplitR; [iPureIntro; intros i e Hi; rewrite lookup_empty in Hi; discriminate|].
       iExact "Hbatch". }
     iMod ("Hmk" $! (log_res (MkLogNames γlk γops) bn γfs cov logstart)
             with "Hres") as "#Hislk".
