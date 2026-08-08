@@ -844,3 +844,61 @@ only on the length, which is why one length premise is all the wand needs.
 block comes back at `ds` (`<[islot inum := dn]> ds = ds` by `list_insert_id`
 off the agreement premise) and the `bio_locked` brelse demands is what bread
 returned — no `log_write`, which is why ilock needs no log budget at all.
+
+## `itrunc` — emptying the inode, and an invariant the model still owes
+
+`itrunc` frees every block an inode names and flushes the emptied inode.
+Contract in `iris/SpecItrunc.v`; the model (`bm_empty`, `bm_blocks`,
+`di_trunc`) is in `InodeInv.v`.
+
+**The budget was the blocker, and it was a MODEL bug, not a kernel bug.**
+`itrunc` calls `bfree` up to `NDIRECT + NINDIRECT + 1` = 269 times and then
+`iupdate` once. Under the old always-consume accounting that is 270 units
+against a `MAXOPBLOCKS` of 10 — unprovable, and any contract demanding 270
+is uncallable by `iput`, which runs inside `begin_op`/`end_op`. The C is
+correct: `FSSIZE = 2000 < BPB = 8192` means all 269 frees hit ONE bitmap
+block, which the log absorbs, so the real cost is 2. The fix was the
+per-op already-logged set in the ledger — see
+[`fs-log.md`](fs-log.md)'s decision record, "log_write returning the unit
+on absorption", which that amendment explains at length.
+
+**`bm_paid` is the shape the loops carry.** "The bitmap block's log slot is
+paid for, and `u` units remain for everything else", as a disjunction over
+whether the payment has happened. It is IDEMPOTENT under `bfree` — the
+unpaid arm spends its spare unit and becomes paid, the paid arm presents
+its credit and absorbs — so the loop invariant is `bm_paid γ bmapstart 1`
+unchanged across all 269 calls, with no case split on which free was first.
+That is the whole reason the credit was worth building as a *positive,
+client-held claim* rather than a conditional refund: the caller never has
+to predict absorption, because it is the one that logged the block.
+
+**No `bm_blocks bm ⊆ used` premise.** `itrunc` holds `blk_own` for every
+block it frees (through `inode_blocks` and `ind_res`), and `bfree` derives
+"the bit is set" from that token itself
+(`BitmapInv.free_pool_own_used`). Demanding the set inclusion would have
+made the contract uncallable by `iput`, which has no source for it. This is
+the fourth time in this effort a contract was nearly written with a premise
+its only caller could not supply; the check is always the same — *name the
+caller and the resource it would hand over*.
+
+### OWED: an inode names only real block numbers
+
+`bfree` needs `0 <= b < size`, and **nothing in the model says so**:
+
+- `blkmap_wf` records covered / not-in-log / injective, but takes no `size`;
+- `cov_ok` bounds a covered block only by `2^31`;
+- `bitmap_ok` runs the other way — clear bits *below* `size` are covered.
+
+So `itrunc` takes it as an explicit premise, one clause per named slot.
+That is honest but it pushes the obligation onto the caller, and `iput` has
+nowhere to get it either. It wants to live in one of two places:
+
+- in `blkmap_wf`, which would have to take `size` — ripples to `bmap`,
+  `writei`, `readi`, every `blkmap_wf` site; or
+- in whatever invariant `ilock` establishes when it reads an inode off the
+  disk, which is where an out-of-range block number would actually enter.
+
+The second is the real home — it is a statement about what a *disk* inode
+may contain — but it needs the icache design first, so it is recorded here
+rather than guessed at. Until then `itrunc`'s premise is a hypothesis, and
+`iput` will inherit it.

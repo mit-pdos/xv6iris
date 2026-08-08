@@ -877,6 +877,7 @@ LinkIdup.v
 SpecIlock.v
 ProofIlock.v
 LinkIlock.v
+SpecItrunc.v
 SpecIunlock.v
 ProofIunlock.v
 LinkIunlock.v
