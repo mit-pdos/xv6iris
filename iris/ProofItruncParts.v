@@ -48,6 +48,7 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import KernelText.
 Require Import RiscvExtras.
+Require Import BufOwn.
 Require Import BlockWords.
 Require Import FsBlocks.
 Require Import DinodeEnc.
@@ -235,6 +236,13 @@ Proof.
   rewrite /bm_ent_freed seq_S map_app list_to_set_app_L /=. set_solver.
 Qed.
 
+Lemma bm_ent_freed_skip (bm : blkmap) (q : nat) :
+  bv_unsigned (bm_ent bm !!! q) = 0 ->
+  bm_ent_freed bm (S q) = bm_ent_freed bm q.
+Proof.
+  intros Hz. rewrite bm_ent_freed_step Hz. set_solver.
+Qed.
+
 (* THE TOTAL.  [bm_blocks] runs over [bm_slot] on [seq 0 (S MAXFILE)]; the
    two partial sums run over the direct list and the entry list.  This is
    the bridge -- the direct entries are slots [0, NDIRECT), the entries are
@@ -376,6 +384,37 @@ Proof.
   assert (Hq0 : q = 0) by nia.
   lia.
 Qed.
+
+(* THE INNER LOOP'S CURSOR walks bp->data by fours and stops at
+   bp->data + 1024, so it needs the same injectivity the direct loop's
+   exit test needed -- distinct entry positions are distinct addresses.
+   Offsets are 4q for q <= 256, so again nothing wraps. *)
+Lemma b_data_off_inj (pb : mword 64) (a c : nat) :
+  (a <= NINDIRECT)%nat -> (c <= NINDIRECT)%nat ->
+  pa_add (b_data pb) (4 * a)%nat = pa_add (b_data pb) (4 * c)%nat -> a = c.
+Proof.
+  intros Ha Hc Heq. unfold NINDIRECT in Ha, Hc.
+  rewrite /pa_add /add_vec_int in Heq.
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite !add_vec64_unsigned !moi64_unsigned in Heq.
+  rewrite (bvw64_small (Z.of_nat (4 * a))) in Heq; [| lia].
+  rewrite (bvw64_small (Z.of_nat (4 * c))) in Heq; [| lia].
+  unfold bv_wrap in Heq.
+  assert (Hz : (Z.of_nat (4 * a) - Z.of_nat (4 * c)) mod 2 ^ 64 = 0).
+  { replace (Z.of_nat (4 * a) - Z.of_nat (4 * c))
+      with ((bv_unsigned (b_data pb) + Z.of_nat (4 * a))
+            - (bv_unsigned (b_data pb) + Z.of_nat (4 * c))) by ring.
+    rewrite Zminus_mod Heq Z.sub_diag Zmod_0_l. reflexivity. }
+  apply Z.mod_divide in Hz; [| lia].
+  destruct Hz as [q Hq].
+  assert (Hq0 : q = 0) by nia.
+  lia.
+Qed.
+
+Lemma b_data_cursor (pb : mword 64) (q : nat) :
+  pa_add (pa_add (b_data pb) (4 * q)%nat) 4%nat
+  = pa_add (b_data pb) (4 * S q)%nat.
+Proof. rewrite pa_add_add. f_equal. lia. Qed.
 
 (* the limit s2 = ip+128 is the cell one past the twelfth, i.e. [i_addr ip
    NDIRECT] -- which is also [ip->addrs[NDIRECT]], the indirect cell the
@@ -605,6 +644,40 @@ Section ItruncDefs.
     destruct (decide (bv_unsigned (bv_0 32) = 0)) as [_|Hc];
       [done | exfalso; apply Hc; reflexivity].
   Qed.
+
+  (* a nonzero slot's [blk_res] is the pair; the [if decide] lives inside an
+     Iris hypothesis, where a Coq [destruct] cannot reach it *)
+  Lemma blk_res_nz (γfs : fs_names) (w : bv 32) (bs : list (bv 8)) :
+    bv_unsigned w <> 0 ->
+    blk_res γfs w bs -∗
+      fsblock γfs (bv_unsigned w) bs ∗ blk_own γfs (bv_unsigned w).
+  Proof.
+    intros Hnz. rewrite /blk_res.
+    destruct (decide (bv_unsigned w = 0)) as [Hc|_];
+      [exfalso; exact (Hnz Hc) |]. iIntros "$".
+  Qed.
+
+  (* opened and closed by lemma, for the same IH reason as the direct
+     loop's state *)
+  Lemma it_ent_state_open (γ : log_names) (γfs : fs_names) (bm : blkmap)
+      (data : nat -> list (bv 8)) (cov : gset Z)
+      (logstart bmapstart size : Z) (used : gset Z) (q : nat) :
+    it_ent_state γ γfs bm data cov logstart bmapstart size used q -∗
+      it_ent_res γfs bm data q ∗
+      bitmap_res γfs bmapstart cov logstart size
+        (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
+      bm_paid γ bmapstart 1.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  Lemma it_ent_state_close (γ : log_names) (γfs : fs_names) (bm : blkmap)
+      (data : nat -> list (bv 8)) (cov : gset Z)
+      (logstart bmapstart size : Z) (used : gset Z) (q : nat) :
+    it_ent_res γfs bm data q -∗
+    bitmap_res γfs bmapstart cov logstart size
+      (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) -∗
+    bm_paid γ bmapstart 1 -∗
+    it_ent_state γ γfs bm data cov logstart bmapstart size used q.
+  Proof. iIntros "A B C". rewrite /it_ent_state. iFrame. Qed.
 
   (* peeling the cursor entry off the remaining bundle -- the step both the
      free and the skip take *)
