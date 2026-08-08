@@ -427,6 +427,104 @@ Section ItruncDefs.
        (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
      bm_paid γ bmapstart 1)%I.
 
+  (* THE ONE STEP bfree TAKES, and why the loops never case-split.
+
+     Whichever disjunct [bm_paid] is in, it yields a budget token bfree's
+     credited arm can consume -- with [cr] and the spare unit chosen to
+     match -- and the resource that comes back is the SAME in both cases:
+     [log_opS gamma (S u) (Sb ∪ {[bmapstart]})], which is the PAID
+     disjunct, since [bmapstart] is in that set by construction.
+
+       paid   (cr = true,  u' = u):   S u  units in, S u units back
+       unpaid (cr = false, u' = S u): S u+1 units in, S u units back
+
+     So the wand closes back into [bm_paid gamma bmapstart u] either way,
+     and a loop that frees an unknown number of blocks carries the single
+     assertion unchanged.  This is the whole payoff of the absorption
+     credit being a positive client-held claim. *)
+  Lemma bm_paid_use (γ : log_names) (bmapstart : Z) (u : nat) :
+    bm_paid γ bmapstart u -∗ ∃ (cr : bool) (u' : nat) (Sb : gset Z),
+      ⌜cr = true -> bmapstart ∈ Sb⌝ ∗
+      ⌜(if cr then S u' else u') = S u⌝ ∗
+      log_opS γ (S u') Sb ∗
+      (log_opS γ (S u) (Sb ∪ {[bmapstart]}) -∗ bm_paid γ bmapstart u).
+  Proof.
+    rewrite /bm_paid. iIntros "[H|H]".
+    - (* already paid: present the credit, keep the unit *)
+      iDestruct "H" as (Sb) "(%Hin & Hop)".
+      iExists true, u, Sb.
+      iSplitR; [iPureIntro; intros _; exact Hin|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb ∪ {[bmapstart]}).
+      iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
+    - (* not yet: spend the spare unit and become paid *)
+      iDestruct "H" as (Sb) "Hop".
+      iExists false, (S u), Sb.
+      iSplitR; [iPureIntro; discriminate|].
+      iSplitR; [iPureIntro; reflexivity|].
+      iFrame "Hop". iIntros "Hop". iLeft. iExists (Sb ∪ {[bmapstart]}).
+      iSplitR; [iPureIntro; set_solver|]. iFrame "Hop".
+  Qed.
+
+  (* TAKING A BLOCK OUT FOR GOOD.  [InodeInv.inode_blocks_acc] lends a block
+     and demands it back; itrunc hands it to the free pool instead, so the
+     remaining bundle must be at a map whose slot [i] is ZERO -- where
+     [blk_res] is definitionally [True], and the entry simply vanishes.
+     That is the whole reason the direct loop's state is indexed at
+     [bm_dir_zeroed] rather than at [bm] with side conditions. *)
+  Lemma inode_blocks_take (γfs : fs_names) (bm bm' : blkmap)
+      (data : nat -> list (bv 8)) (i : nat) :
+    (i < MAXFILE)%nat ->
+    bv_unsigned (blkmap_get bm i) <> 0 ->
+    bv_unsigned (blkmap_get bm' i) = 0 ->
+    (forall t : nat, (t < MAXFILE)%nat -> t <> i ->
+       blkmap_get bm' t = blkmap_get bm t) ->
+    inode_blocks γfs bm data -∗
+      (fsblock γfs (bv_unsigned (blkmap_get bm i)) (data i) ∗
+       blk_own γfs (bv_unsigned (blkmap_get bm i))) ∗
+      inode_blocks γfs bm' data.
+  Proof.
+    intros Hi Hnz Hz Hag.
+    assert (Hlk : seq 0 MAXFILE !! i = Some i)
+      by (apply lookup_seq; split; [lia | exact Hi]).
+    rewrite /inode_blocks.
+    rewrite (big_sepL_delete
+               (fun (_ : nat) (k : nat) => blk_res γfs (blkmap_get bm k) (data k))
+               (seq 0 MAXFILE) i i Hlk).
+    rewrite (big_sepL_delete
+               (fun (_ : nat) (k : nat) => blk_res γfs (blkmap_get bm' k) (data k))
+               (seq 0 MAXFILE) i i Hlk).
+    iIntros "[Hb Hrest]".
+    rewrite {1}/blk_res.
+    destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hc|_];
+      [exfalso; exact (Hnz Hc)|].
+    iDestruct "Hb" as "[Hfs Htok]".
+    iSplitL "Hfs Htok"; [iFrame "Hfs Htok"|].
+    iSplitR.
+    { rewrite /blk_res.
+      destruct (decide (bv_unsigned (blkmap_get bm' i) = 0)) as [_|Hc];
+        [done | exfalso; exact (Hc Hz)]. }
+    iApply (big_sepL_mono with "Hrest").
+    intros t x Hx.
+    destruct (decide (t = i)) as [->|Hne]; [done|].
+    apply lookup_seq in Hx as [-> Hlt].
+    rewrite (Hag (0 + t)%nat ltac:(lia) ltac:(lia)). done.
+  Qed.
+
+  (* AN EMPTIED BUNDLE IS TRIVIAL, at any naming whatsoever: every slot of
+     [bm_empty] is zero, so every [blk_res] is [True].  This is what lets
+     itrunc's postcondition name the all-zero file content without having
+     to transport the [data] it actually carried. *)
+  Lemma inode_blocks_empty_any (γfs : fs_names) (data : nat -> list (bv 8)) :
+    ⊢ inode_blocks γfs bm_empty data.
+  Proof.
+    rewrite /inode_blocks.
+    iApply big_sepL_intro. iIntros "!>" (t x Hx).
+    rewrite /blk_res bm_empty_get.
+    destruct (decide (bv_unsigned (bv_0 32) = 0)) as [_|Hc];
+      [done | exfalso; apply Hc; reflexivity].
+  Qed.
+
   (* peeling the cursor entry off the remaining bundle -- the step both the
      free and the skip take *)
   Lemma it_ent_res_peel (γfs : fs_names) (bm : blkmap)
