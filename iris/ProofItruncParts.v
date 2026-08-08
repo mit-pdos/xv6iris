@@ -47,6 +47,7 @@ Require Import RiscvModelBytes.
 Require Import InstrBytes.
 Require Import RegFile.
 Require Import KernelText.
+Require Import RiscvExtras.
 Require Import BlockWords.
 Require Import FsBlocks.
 Require Import DinodeEnc.
@@ -125,6 +126,24 @@ Proof.
   rewrite replicate_S_end -app_assoc. cbn [insert app]. reflexivity.
 Qed.
 
+(* THE SKIP BRANCH.  When [ip->addrs[k]] is already zero the C frees
+   nothing and stores nothing, so the loop's whole state must be unchanged
+   -- and it is, definitionally: zeroing a slot that is already zero leaves
+   the list alone, and adding 0 to the freed set adds nothing, since
+   [bm_dir_freed] quotients 0 out. *)
+Lemma bm_dir_zeroed_skip (bm : blkmap) (k : nat) :
+  (k < length (bm_dir bm))%nat ->
+  bv_unsigned (bm_dir bm !!! k) = 0 ->
+  bm_dir_zeroed bm (S k) = bm_dir_zeroed bm k.
+Proof.
+  intros Hk Hz.
+  assert (Hzz : bm_dir bm !!! k = bv_0 32) by (apply bv_eq; rewrite Hz; reflexivity).
+  rewrite /bm_dir_zeroed. f_equal.
+  rewrite (drop_S (bm_dir bm) (bm_dir bm !!! k) k);
+    [| apply list_lookup_lookup_total_lt; lia].
+  rewrite Hzz replicate_S_end -app_assoc. reflexivity.
+Qed.
+
 (* the slot readings the well-formedness proof needs *)
 Lemma bm_dir_zeroed_slot (bm : blkmap) (k i : nat) :
   length (bm_dir bm) = NDIRECT -> (k <= NDIRECT)%nat -> (i <= MAXFILE)%nat ->
@@ -200,6 +219,13 @@ Lemma bm_dir_freed_step (bm : blkmap) (k : nat) :
   = bm_dir_freed bm k ∪ ({[ bv_unsigned (bm_dir bm !!! k) ]} ∖ {[ 0 ]}).
 Proof.
   rewrite /bm_dir_freed seq_S map_app list_to_set_app_L /=. set_solver.
+Qed.
+
+Lemma bm_dir_freed_skip (bm : blkmap) (k : nat) :
+  bv_unsigned (bm_dir bm !!! k) = 0 ->
+  bm_dir_freed bm (S k) = bm_dir_freed bm k.
+Proof.
+  intros Hz. rewrite bm_dir_freed_step Hz. set_solver.
 Qed.
 
 Lemma bm_ent_freed_step (bm : blkmap) (j : nat) :
@@ -320,6 +346,35 @@ Lemma it_dir_cursor (ip : mword 64) (k : nat) :
 Proof.
   rewrite (i_addr_from_0 ip k) (i_addr_from_0 ip (S k)) pa_add_add.
   f_equal. lia.
+Qed.
+
+(* THE LOOP'S EXIT TEST is [beq s1,s2] on two ADDRESSES, so the proof needs
+   that distinct cursor positions really are distinct words -- i.e. that
+   [i_addr ip] is injective over the range the loop walks.  The offsets are
+   [80 + 4i] for i <= NDIRECT = 12, so they are tiny and distinct and
+   nothing wraps; that is the whole content, but it has to be said. *)
+Lemma i_addr_inj (ip : mword 64) (a c : nat) :
+  (a <= NDIRECT)%nat -> (c <= NDIRECT)%nat ->
+  i_addr ip a = i_addr ip c -> a = c.
+Proof.
+  intros Ha Hc Heq. unfold NDIRECT in Ha, Hc.
+  rewrite /i_addr in Heq.
+  apply (f_equal bv_unsigned) in Heq.
+  rewrite !add_vec64_unsigned !moi64_unsigned in Heq.
+  rewrite (bvw64_small (80 + 4 * Z.of_nat a)) in Heq; [| lia].
+  rewrite (bvw64_small (80 + 4 * Z.of_nat c)) in Heq; [| lia].
+  unfold bv_wrap in Heq.
+  (* the base cancels, leaving 4*(a-c) divisible by 2^64 -- and |4*(a-c)|
+     is at most 48, so the quotient is 0 *)
+  assert (Hz : (4 * Z.of_nat a - 4 * Z.of_nat c) mod 2 ^ 64 = 0).
+  { replace (4 * Z.of_nat a - 4 * Z.of_nat c)
+      with ((bv_unsigned ip + (80 + 4 * Z.of_nat a))
+            - (bv_unsigned ip + (80 + 4 * Z.of_nat c))) by ring.
+    rewrite Zminus_mod Heq Z.sub_diag Zmod_0_l. reflexivity. }
+  apply Z.mod_divide in Hz; [| lia].
+  destruct Hz as [q Hq].
+  assert (Hq0 : q = 0) by nia.
+  lia.
 Qed.
 
 (* the limit s2 = ip+128 is the cell one past the twelfth, i.e. [i_addr ip
