@@ -303,13 +303,12 @@ Section ProofKerneltrap.
         assert (Hpne : p <> zero_reg).
         { intro He. apply Hp0. rgne. rewrite Hmpa0 He. apply eq_vec_true_iff. reflexivity. }
         iDestruct "Hproc" as "[%Hz | Hproc]"; [ exfalso; exact (Hpne Hz) |].
-        iDestruct "Hproc" as (j) "(%Hj & %Hpj & Hown & Hpark)".
+        iDestruct "Hproc" as (j) "(%Hj & %Hpj & Hpark)".
         (* yield states everything at [proc_addr j] and ours is at [p];
            [Hpj] is the bridge.  NOT [subst p]: myproc's postcondition also
            defines p ([Hmpa0]), and subst picks that equation instead. *)
         iEval (rewrite -Hpj) in "Hcg".
         iEval (rewrite -Hpj) in "Hcpu".
-        iEval (rewrite -Hpj) in "Hown".
         (* ---- +0x8c: jal yield ---- *)
         iPoseProof (kti_8c with "Htext") as "Hi8c".
         iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x8c)) ra_idx
@@ -346,17 +345,15 @@ Section ProofKerneltrap.
         destruct (lookup_lt_is_Some_2 γs j Hjl) as [γl Hgl].
         iApply (Yield.wp_yield_sconf Φ γs j γl Y0 (av - 6)%nat false C
                   Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
-                  with "Hcg Hcpu Htext Hpc Hprocs Hscheds Hpanic [Hown] Hpark
+                  with "Hcg Hcpu Htext Hpc Hprocs Hscheds Hpanic Hpark
                         [Hsepc Hscause Hstval Hmir] [-]").
-        { iExact "Hown". }
         { rewrite /trap_csrs_ext /trap_csrs.
           iSplitL "Hsepc". { iExists ep. iExact "Hsepc". }
           iSplitL "Hscause". { iExists sc. iExact "Hscause". }
           iSplitL "Hstval". { iExists tv. iExact "Hstval". }
           iExists ('b"1"), ('b"1"). iExact "Hmir". }
-        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hown Hpark Hext".
+        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hpark Hext".
         iEval (rewrite Hpj) in "Hcg". iEval (rewrite Hpj) in "Hcpu".
-        iEval (rewrite Hpj) in "Hown".
         (* back, possibly on ANOTHER hart: the trap CSRs are that hart's *)
         rewrite /trap_csrs_ext /trap_csrs.
         iDestruct "Hext" as "(Hsepc & Hscause & Hstval & Hmir)".
@@ -405,11 +402,11 @@ Section ProofKerneltrap.
         iSpecialize ("Hcont" $! CIDy with "[%]").
         { intros [Hf | Hz]; [ discriminate | exfalso; exact (Hpne Hz) ]. }
         iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Hcpu
-                              Hsepc Hscause Hstval Hpc [Hown Hpark]").
+                              Hsepc Hscause Hstval Hpc [Hpark]").
         { exact Hcsf. }
         { exact Hsppf. } { exact Hspief. } { exact Hsief. }
-        { iRight. iExists j. iFrame "Hpark". iSplitR; [iPureIntro; exact Hj|].
-          iSplitR; [iPureIntro; exact Hpj|]. iExact "Hown". }
+        { iRight. iExists j. iSplitR; [iPureIntro; exact Hj|].
+          iSplitR; [iPureIntro; exact Hpj|]. iExact "Hpark". }
     - (* ===== the NON-timer path: straight to the epilogue ===== *)
       iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x32))
                 (mword_of_int 84 : mword 13) a5_idx a0_idx D1 (av - 6)%nat false

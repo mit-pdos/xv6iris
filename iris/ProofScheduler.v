@@ -1167,10 +1167,10 @@ Section ProofScheduler.
         iPoseProof (schi_76 with "Htext") as "Hi76".
         iPoseProof (schi_7a with "Htext") as "Hi7a".
         iPoseProof (schi_7c with "Htext") as "Hi7c".
-        (* the RUNNABLE slot carries the parked context; the dormant half is emp *)
-        iEval (rewrite /proc_slots needs_ctx_RUNNABLE inv_dormant_RUNNABLE
-                       not_running_RUNNABLE) in "Hslot".
-        iDestruct "Hslot" as "[Hvc [_ Hpark]]".
+        (* the RUNNABLE slot carries the parked context and the receipt; the
+           running and dormant arms are both [emp]. *)
+        iDestruct (proc_slots_dispatch _ _ (proc_addr jj) RUNNABLE needs_ctx_RUNNABLE
+                     with "Hslot") as "[Hvc Hpark]".
         iDestruct (park_at_full_elim jj false Hjj with "Hpark") as "Hpark".
         (* +0x64 sw s8,24(s1) : p->state = RUNNING.  Both the base and the
            stored value are read through [rget], so both need respelling. *)

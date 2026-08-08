@@ -742,7 +742,6 @@ Section VdrwfP6.
         sie_cap_gpr mf K true (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) C true -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
-        own_ctx (p_context (proc_addr j)) -∗
         park_hlf j true -∗
         buf_own b bno (mword_of_int 0 : SailStdpp.Values.mword 32)
                 (vdrwd_sldata wr bs_buf bs_disk) -∗
@@ -758,7 +757,7 @@ Section VdrwfP6.
     iIntros "#Htext #Hpanic #Hpinv #Hqinv #Hrcpt #Hgeom #Hlk Hsaved Hbno Hcont".
     rewrite /P5.vdrw_p5_exit.
     iIntros (CIDx Hsx M q np nr fl pk tr fr h m2 t pin)
-            "%Hrh %Hok %Hpq %Hpinr %Hal Hcg Hown Hpay Hpc Hctx Hpark Htok
+            "%Hrh %Hok %Hpq %Hpinr %Hal Hcg Hown Hpay Hpc Hpark Htok
              Hbody Hclaim Hrm Hrt Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).
@@ -1736,7 +1735,7 @@ Section VdrwfP6.
                   ltac:(rgall; rewrite Hbsd Hlendisk; exact Hcbuf) with "Hkm Hbufp"). }
     iSpecialize ("Hcont" $! CIDp12 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! R11 with
-              "[%] Hcg Hown Hpc Hctx Hpark [Hbno Hbdisk Hbufm] [Hdbytes] [HQ]").
+              "[%] Hcg Hown Hpc Hpark [Hbno Hbdisk Hbufm] [Hdbytes] [HQ]").
     - exact Hcs.
     - rewrite /buf_own. iFrame "Hbno Hbdisk Hbufm".
       iPureIntro. exact Hlensl.
@@ -1774,7 +1773,7 @@ Section ProofVirtioDiskRwF.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].
     intros HK Hbnolt Hbufkd Hj Hjl Heb.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hscheds Hctx Hpark
+    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hscheds Hpark
              #Hdinv #Hgeom #Hlk Hbuf Hdisk Hperm Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX: the [b = false]
        instance of this contract is vacuous, so the whole prologue below is
@@ -1830,7 +1829,7 @@ Section ProofVirtioDiskRwF.
     iApply (P2.wp_vdrw_p2 (CID := CIDa) γk Φ γs j γl γd pd pav pu M K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) m HK Hj Hjl Hglen Heb Hregs Hhi
-              with "Hcg Hown Hpay Htext Hpc Hpanic Hpinv Hscheds Hctx Hpark Hgeom Hlk
+              with "Hcg Hown Hpay Htext Hpc Hpanic Hpinv Hscheds Hpark Hgeom Hlk
                     Htok HR Hscr [-]").
     (* ---- P3: the chain formatting ---- *)
     iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk Φ γs j γd pd pav pu K eb C
@@ -1852,12 +1851,12 @@ Section ProofVirtioDiskRwF.
               (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl Heb
               with "Htext Hpanic Hpinv Hqinv Hrcpt Hgeom Hlk Hsaved Hbno [-]").
-    iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hpc Hctx Hpark Hbufo Hdisko HQ".
+    iIntros (CIDf Hsf mf) "%Hcsf Hcg Hown Hpc Hpark Hbufo Hdisko HQ".
     iEval (rewrite Hsld) in "Hbufo".
     iEval (rewrite Hsld) in "Hdisko".
     iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! mf with
-              "[%] Hcg Hown Hpc Hctx Hpark Hbufo Hdisko HQ").
+              "[%] Hcg Hown Hpc Hpark Hbufo Hdisko HQ").
     exact Hcsf.
   Qed.
 

@@ -1228,7 +1228,7 @@ Section ProofFileclose.
           rewrite /fileclose_fs_env.
           iDestruct "Henv" as "(%Hn0 & %Heb & %Hpj & %Hjlt & %Hgl & %Hgeom &
                                 #Hprocs & #Hscheds & #Hbio & #Hlog & #Hseam &
-                                #Hgen & #Hdev & #Hgeo & #Hdlk & Hbsl & Hoc &
+                                #Hgen & #Hdev & #Hgeo & #Hdlk & Hbsl &
                                 Hpark & Hpid)".
           subst n. subst eb. subst p.
           (* with no lock held and the parking premise, the SIE arm is fixed:
@@ -1277,8 +1277,8 @@ Section ProofFileclose.
                     (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
                     (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat true C true
                     ltac:(unfold K_begin_op; lia) Hjlt Hgl eq_refl
-                    with "Hcg Hcnt Htext Hpc Hpanic Hlog Hpid Hprocs Hscheds Hoc Hpark [-]").
-          iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt Hpc Hoc Hpark Hpid Hop".
+                    with "Hcg Hcnt Htext Hpc Hpanic Hlog Hpid Hprocs Hscheds Hpark [-]").
+          iIntros (CIDf3 Hsf3 mb) "%Hbcs Hcg Hcnt Hpc Hpark Hpid Hop".
           pose proof Hbcs as Hbcs_cs.
           assert (Hpcae : ret_pc (B1 !!! Regidx Rra) = mword_of_int (FC + 0xae)).
           { rewrite HB1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1335,8 +1335,8 @@ Section ProofFileclose.
                     ltac:(unfold K_iput; lia) Hgeom
                     ltac:(unfold iput_units; lia) Hjlt Hgl HB3a0 eq_refl
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hpid Hprocs Hscheds
-                          Hoc Hpark Hdev Hgeo Hdlk Hbsl Hcwd Hop [-]").
-          iIntros (CIDf6 Hsf6 mi ni) "%Hics Hcg Hcnt Hpc Hoc Hpark Hpid Hbsl %Hni Hop".
+                          Hpark Hdev Hgeo Hdlk Hbsl Hcwd Hop [-]").
+          iIntros (CIDf6 Hsf6 mi ni) "%Hics Hcg Hcnt Hpc Hpark Hpid Hbsl %Hni Hop".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
           { rewrite HB3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1370,8 +1370,8 @@ Section ProofFileclose.
                     B4 (K - 8)%nat true C true
                     ltac:(unfold K_end_op; lia) Hgeom Hjlt Hgl eq_refl
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpid
-                          Hprocs Hscheds Hoc Hpark Hdev Hgeo Hdlk Hop [-]").
-          iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hpc Hoc Hpark Hpid".
+                          Hprocs Hscheds Hpark Hdev Hgeo Hdlk Hop [-]").
+          iIntros (CIDf8 Hsf8 me) "%Hecs Hcg Hcnt Hpc Hpark Hpid".
           pose proof Hecs as Hecs_cs.
           assert (Hpcb8 : ret_pc (B4 !!! Regidx Rra) = mword_of_int (FC + 0xb8)).
           { rewrite HB4ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1441,11 +1441,11 @@ Section ProofFileclose.
           iDestruct (cpu_own_transport CIDf8 CIDf10 0 true (proc_addr (fcn_j fn)) C true
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iSpecialize ("Hcont" $! CIDf10 with "[]"); [iPureIntro; wp_next_chain|].
-          iApply ("Hcont" $! mf with "Hcg Hcnt [Hpc] [%] Hfd [Hoc Hpark Hpid Hbsl]").
+          iApply ("Hcont" $! mf with "Hcg Hcnt [Hpc] [%] Hfd [Hpark Hpid Hbsl]").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
           { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib /fileclose_fs_out. iFrame "Hoc Hpark Hpid Hbsl". }
+            rewrite Hib /fileclose_fs_out. iFrame "Hpark Hpid Hbsl". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
           iApply (wp_bgeu_fall_s_sconf Φ (mword_of_int (FC + 0x60))
                     (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat b

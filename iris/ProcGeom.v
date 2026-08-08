@@ -294,6 +294,48 @@ Proof. vm_compute. reflexivity. Qed.
 Definition not_running (st : mword 32) : bool :=
   negb (bool_decide (st = RUNNING)).
 
+(* ... and its complement, the fourth flat guard.  [p->lock] holds the raw
+   context CELLS exactly while the proc is RUNNING: a running proc has no
+   parked record ([needs_ctx] is what says "there is a resumable thread saved
+   here"), but its context field still exists and something must own it.
+
+   PUTTING IT IN THE LOCK RATHER THAN WITH THE RUNNING THREAD IS WHAT LETS A
+   TRAP PREEMPT.  kerneltrap -> yield parks the interrupted thread, and
+   parking needs those cells; held as an ordinary frame by whichever function
+   was interrupted they would be unreachable from the handler, because a
+   frame lives outside the handler's WP.  Taken from [p->lock] -- which yield
+   acquires anyway -- they are simply there.  It is also the more faithful
+   reading of the C: [p->context] IS protected by [p->lock], and [swtch] runs
+   under that lock in both the save and the restore direction. *)
+Definition is_running (st : mword 32) : bool :=
+  bool_decide (st = RUNNING).
+
+Lemma is_running_RUNNING : is_running RUNNING = true.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_running_RUNNABLE : is_running RUNNABLE = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_running_SLEEPING : is_running SLEEPING = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_running_UNUSED : is_running UNUSED = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_running_USED : is_running USED = false.
+Proof. vm_compute. reflexivity. Qed.
+Lemma is_running_ZOMBIE : is_running ZOMBIE = false.
+Proof. vm_compute. reflexivity. Qed.
+
+(* the two running guards are one boolean, so a lemma that already fixes
+   [not_running] fixes this one too -- no new premise anywhere. *)
+Lemma is_running_negb (st : mword 32) : is_running st = negb (not_running st).
+Proof. rewrite /is_running /not_running negb_involutive. reflexivity. Qed.
+
+Lemma is_running_of_needs_ctx (st : mword 32) :
+  needs_ctx st = true -> is_running st = false.
+Proof.
+  rewrite /needs_ctx /is_running. intro H.
+  apply orb_true_elim in H as [H|H]; apply bool_decide_eq_true_1 in H; subst;
+    vm_compute; reflexivity.
+Qed.
+
 Lemma not_running_RUNNING : not_running RUNNING = false.
 Proof. vm_compute. reflexivity. Qed.
 Lemma not_running_UNUSED : not_running UNUSED = true.

@@ -158,6 +158,8 @@ Section YieldPostSched.
     trap_csrs -∗
     cpu_own 1 eb pj emp false -∗
     C -∗
+    (* the cells swtch handed back; they go into the RUNNING lock at the
+       release below, which is where the NEXT yield will find them. *)
     own_ctx (p_context pj) -∗
     ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
     (* the three saved frame words + the frame's bottom slot *)
@@ -171,7 +173,6 @@ Section YieldPostSched.
         sie_cap_gpr mf av eb pj -∗
         cpu_own 0 eb pj C eb -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
-        own_ctx (p_context pj) -∗
         park_hlf j true -∗
         trap_csrs_ext eb -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -251,11 +252,15 @@ Section YieldPostSched.
     { rewrite Ha0_D1.
       assert (H0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H0. apply kv_addv_zero. }
-    (* rebuild the lock resource: RUNNING needs no context, no dormant block
-       and -- since it IS running -- no park receipt either. *)
-    iAssert (proc_lock_res Φ γs γl (proc_addr j)) with "[Hstate Hchan Hpub]" as "HR2".
+    (* rebuild the lock resource: at RUNNING there is no parked record, no
+       dormant block and -- since it IS running -- no park receipt either,
+       but the RAW CONTEXT CELLS go back in.  They are what swtch handed
+       this thread when the scheduler resumed it, and leaving them in the
+       lock is what lets the NEXT yield (or the next preempting trap) find
+       them without being handed them by a caller. *)
+    iAssert (proc_lock_res Φ γs γl (proc_addr j)) with "[Hstate Hchan Hpub Hown']" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, ch'. iFrame "Hstate Hchan Hpub".
-      rewrite /proc_slots needs_ctx_RUNNING inv_dormant_RUNNING not_running_RUNNING. done. }
+      iApply (proc_slots_running_intro with "Hown'"). }
     (* THE TRAP-CSR SPLIT.  release consumes [trap_csrs_pay 0 eb] -- the set
        at [eb = true], nothing at [eb = false].  The complement is what this
        call was handed from outside and owes back to yield's caller; exactly
@@ -432,7 +437,7 @@ Section YieldPostSched.
     iDestruct (trap_csrs_ext_transport CID0 CIDe5 eb pj ltac:(wp_next_chain)
                  with "Hext") as "Hext".
     iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hown' Hpark Hext").
+    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hpark Hext").
     unfold callee_saved. repeat split; assumption.
   Qed.
 
@@ -450,7 +455,7 @@ Section ProofYield.
     cbv beta delta [wp_yield_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hscheds #Hpanic Hown Hpark Hext Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hscheds #Hpanic Hpark Hext Hcont".
     (* ONE INDEX.  [eb] is both the saved base enable and the resource index:
        at level 0 they are forced equal ([CpuOwn.cpu_own_eb_agree]), so there
        is nothing to derive and nothing to case-split on.  yield's own
@@ -608,10 +613,13 @@ Section ProofYield.
     assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.yield + 0x14)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
-    (* unpack the lock resource; drop the detachable slots (the proc is
-       RUNNING, so all three are [emp], but nothing here needs to know). *)
+    (* unpack the lock resource.  THE PARK RECEIPT PAYS FOR THE STATE: the
+       half this thread carries refutes the slot's [not_running] arm, so the
+       state under the lock is RUNNING -- and the RUNNING arm is exactly the
+       raw context cells sched is about to want.  That is why yield needs no
+       [own_ctx] premise: it takes the cells from the lock. *)
     iDestruct (proc_lock_res_elim Φ γs γl (proc_addr j) with "HR") as (st0 ch0) "(Hstate & Hchan & Hpub & Hslot)".
-    iClear "Hslot".
+    iDestruct (proc_slots_running Φ γs j st0 Hj with "Hpark Hslot") as "(Hpark & -> & Hown)".
     (* +0x14: c.li a5,3 *)
     iPoseProof (ydi_14 with "Htext") as "Hi14".
     iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 3 : mword 6)
@@ -645,7 +653,7 @@ Section ProofYield.
     (* +0x16: c.sw a5,24(s1) : p->state := RUNNABLE *)
     iPoseProof (ydi_16 with "Htext") as "Hi16".
     iApply (wp_csw_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 24 : mword 12) C0 (av - 4)%nat st0 false
+              (mword_of_int 24 : mword 12) C0 (av - 4)%nat RUNNING false
               with "Hcg Hpc Hi16 [Hstate] [-]").
     { iEval (rewrite Hrec_state_g). iExact "Hstate". }
     iApply wp_next_off_intro.

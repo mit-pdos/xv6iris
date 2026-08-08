@@ -299,7 +299,7 @@ Section ProofInitlog.
     unfold K_initlog in HK.
     iIntros "Hcg Hcnt #Htext #Hkdata Hpc #Hpanic #Hbio #Hseam #Hcert Hmirf
               Hppid #Hprocs #Hscheds
-              Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
+              Hpark #Hdevi #Hdgeom #Hdlock Hsbf Hlock Hname Hcpu
               Hstc Hdevc Hout Hcmt Hnc Hncell Hblk HLauth HDauth Hcovf Hfsb
               Hslotsfs Hslots Hcont".
     (* ---- the header block is covered, and its number is a small int ---- *)
@@ -814,9 +814,9 @@ Section ProofInitlog.
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               T3 (K - 6)%nat true C b
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                     Hdevi Hdgeom Hdlock Hs1u [-]").
-    iIntros (CID22 Hs22 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hoctx Hpark Hppid Hheld".
+    iIntros (CID22 Hs22 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hpark Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc3a : ret_pc (T3 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x3a)).
@@ -1077,7 +1077,7 @@ Section ProofInitlog.
               HKit Hgeomok Hj Hgl eq_refl
               Hrec0 HC2a0 Hshape0 Hnodup0 Hwcov0 Hlw0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hscheds
-                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
+                    Hpark Hdevi Hdgeom Hdlock Hncell Hnil1 HLauth HDauth
                     Hnil2 Hs2 [] [] [-]").
     (* THE EMPTY WRITE SET's per-entry permits: this call installs NOTHING
        (the on-disk header is clean, which is initlog's precondition), so the
@@ -1086,7 +1086,7 @@ Section ProofInitlog.
     { iModIntro. iIntros (i w bs') "%Hi _ _". rewrite lookup_nil in Hi.
       discriminate. }
     { done. }
-    iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt Hpc Hoctx Hpark Hppid
+    iIntros (CID30 Hs30 mI) "%Hcs3 Hcg Hcnt Hpc Hpark Hppid
                              Hncell _ HLauth HDauth _ Hs2 _".
     assert (Hpc68 : ret_pc (C2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x68)).
@@ -1187,7 +1187,7 @@ Section ProofInitlog.
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I
               HKwh Hgeomok Hj Hgl eq_refl Hshape0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hfroz Hppid Hprocs Hscheds
-                    Hoctx Hpark Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
+                    Hpark Hdevi Hdgeom Hdlock Hncell Hnil3 HLauth [Hfsb]
                     Hs1u [Hmirf] [-]").
     { iExists bs_hdr. iExact "Hfsb". }
     (* THE SWAP, riding this write (phase C2b/D1 stage 3): the era takes
@@ -1201,7 +1201,7 @@ Section ProofInitlog.
       iApply (fs_swap_permit cov logstart bs' ltac:(exact Hlen')
                 ltac:(rewrite Hhn'; reflexivity)
                 with "Hseam Hregc Hstc Hmirf"). }
-    iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hpc Hoctx Hpark Hppid
+    iIntros (CID34 Hs34 mW bs') "%Hcs4 Hcg Hcnt Hpc Hpark Hppid
                                  Hncell _ HLauth Hfsb %Hhn %Hhdec Hs1u HQ".
     assert (Hpc74 : ret_pc (D2 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.initlog + 0x74)).
@@ -1466,7 +1466,7 @@ Section ProofInitlog.
     iDestruct (cpu_own_transport CID34 CID41 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID41 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hsbf Hs2 Hctx").
+    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hpark Hppid Hsbf Hs2 Hctx").
     { unfold callee_saved. repeat split; assumption. }
   Qed.
 

@@ -391,7 +391,6 @@ Section BoProps.
       log_res γ bn γfs cov logstart -∗
       log_op γ MAXOPBLOCKS -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      own_ctx (p_context (proc_addr j)) -∗
       park_hlf j true -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       trap_csrs_pay 0 eb -∗
@@ -415,7 +414,6 @@ Section BoProps.
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      own_ctx (p_context (proc_addr j)) -∗
       park_hlf j true -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       trap_csrs_pay 0 eb -∗
@@ -462,7 +460,6 @@ Section BoBodies.
     log_res γ bn γfs cov logstart -∗
     log_op γ MAXOPBLOCKS -∗
     p_pid pj ↦₄{dq} pidv -∗
-    own_ctx (p_context pj) -∗
     park_hlf j true -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
@@ -474,7 +471,6 @@ Section BoBodies.
         sie_cap_gpr mf K true pj -∗
         cpu_own 0 eb pj C true -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
-        own_ctx (p_context pj) -∗
         park_hlf j true -∗
         p_pid pj ↦₄{dq} pidv -∗
         log_op γ MAXOPBLOCKS -∗
@@ -483,7 +479,7 @@ Section BoBodies.
   Proof.
     intros pj HK Heb Hanch Hspd Hsp0 Hbo. subst eb.
     destruct Hbo as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
-    iIntros "#Htext #Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hctx Hpark Hown Hpay Hcg Hpc Hcont".
+    iIntros "#Htext #Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hpark Hown Hpay Hcg Hpc Hcont".
     iDestruct "Hlog" as "(#Hislock & #Hldev & #Hlstart)".
     (* the four saved-slot addresses in the [c.ldsp] leaf's spelling *)
     assert (Hb1 : add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
@@ -682,7 +678,7 @@ Section BoBodies.
     iDestruct (cpu_own_transport CIDr CIDe6 0 true pj C true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Q6c with "[%] Hcg Hown Hpc Hctx Hpark Hpid Hop").
+    iApply ("Hcont" $! Q6c with "[%] Hcg Hown Hpc Hpark Hpid Hop").
     { unfold callee_saved.
       split. { rewrite /Q6c upd_eq. rewrite Hwv. exact Hsp0. }
       split. { rewrite /Q6c upd_ne; [| reg_neq]. rewrite /Q6a upd_ne; [| reg_neq].
@@ -732,7 +728,6 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    own_ctx (p_context pj) -∗
     park_hlf j true -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
@@ -741,7 +736,7 @@ Section BoBodies.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros pj HK Heb Hj Hjl Hanch Hbo.
-    iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc".
+    iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc".
     iDestruct "Hlog" as "(#Hislock & #Hldev & #Hlstart)".
     assert (HboM : bo_regs m M spd) by exact Hbo.
     destruct Hbo as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -802,15 +797,15 @@ Section BoBodies.
     iApply (Sleep.wp_sleep_sconf Φ γs j γl (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) A2 (K - 4)%nat eb C
               Hj Hjl Hsl_lka Heb (bo_K22 K HK)
-              with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hislock Htok Hres Hpanic Hctx Hpark [-]").
-    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok Hres Hctx Hpark".
+              with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hislock Htok Hres Hpanic Hpark [-]").
+    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok Hres Hpark".
     assert (Hpc2c : ret_pc (A2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x2c))
       by (rewrite HA2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
     assert (HboMfs : bo_regs m mfs spd) by (apply (bo_regs_cs m A2 mfs spd Hs_cs HboA2)).
     rewrite /bo_loop.
     iSpecialize ("IH" $! CIDs with "[%]"); [wp_next_chain|].
-    iApply ("IH" $! mfs with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc Hexit").
+    iApply ("IH" $! mfs with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc Hexit").
     exact HboMfs.
   Qed.
 
@@ -845,7 +840,6 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    own_ctx (p_context pj) -∗
     park_hlf j true -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
@@ -854,7 +848,7 @@ Section BoBodies.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros pj HK Heb Hj Hjl Hanch Hbo.
-    iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc".
+    iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc".
     iDestruct "Hlog" as "(#Hislock & #Hldev & #Hlstart)".
     assert (HboM : bo_regs m M spd) by exact Hbo.
     destruct Hbo as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -916,8 +910,8 @@ Section BoBodies.
     iApply (Sleep.wp_sleep_sconf Φ γs j γl (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) B2 (K - 4)%nat eb C
               Hj Hjl Hsl_lka Heb (bo_K22 K HK)
-              with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hislock Htok Hres Hpanic Hctx Hpark [-]").
-    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok Hres Hctx Hpark".
+              with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hislock Htok Hres Hpanic Hpark [-]").
+    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok Hres Hpark".
     assert (Hpc4e : ret_pc (B2 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.begin_op + 0x4e))
       by (rewrite HB2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc4e) in "Hpc".
@@ -938,7 +932,7 @@ Section BoBodies.
     iEval (rewrite Hbk) in "Hpc".
     rewrite /bo_loop.
     iSpecialize ("IH" $! CIDs with "[%]"); [wp_next_chain|].
-    iApply ("IH" $! mfs with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc Hexit").
+    iApply ("IH" $! mfs with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc Hexit").
     exact HboMfs.
   Qed.
 
@@ -973,7 +967,6 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    own_ctx (p_context pj) -∗
     park_hlf j true -∗
     cpu_own 1 eb pj C false -∗
     trap_csrs_pay 0 eb -∗
@@ -982,7 +975,7 @@ Section BoBodies.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros pj HK Heb Hj Hjl Hanch Hbo.
-    iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc".
+    iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc".
     iPoseProof "Hlog" as "#Hlogc".
     iDestruct "Hlogc" as "(#Hislock & #Hldev & #Hlstart)".
     assert (HboM : bo_regs m M spd) by exact Hbo.
@@ -1070,7 +1063,7 @@ Section BoBodies.
       iEval (rewrite Htgt24) in "Hpc".
       iApply (bo_armA_body (CID := CID) CID0 Φ γs j γl γ bn γfs cov logstart dev m E1 pidv dq K eb C spd sp0
                 HK Heb Hj Hjl Hanch HboE1
-                with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc").
+                with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
       iDestruct "Hrest" as (n LB) "(%Hsum & %Hsub & Hbatch)".
       iDestruct (bo_batch_lhn with "Hbatch") as "(%Hn30 & Hlhn & Hbclose)".
@@ -1351,7 +1344,7 @@ Section BoBodies.
           iApply ("Hbclose" with "Hlhn"). }
         rewrite /bo_exit.
         iSpecialize ("Hexit" $! CID with "[%]"); [wp_next_chain|].
-        iApply ("Hexit" $! E9 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hctx Hpark Hown Hpay Hcg Hpc").
+        iApply ("Hexit" $! E9 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hpark Hown Hpay Hcg Hpc").
         exact HboE9.
       + (* ---- NO SPACE: the branch FALLS THROUGH, control at +0x46 ---- *)
         iAssert (log_res γ bn γfs cov logstart) with "[Hout Hcmt Hnc Hauth Hlhn Hbclose]" as "Hres".
@@ -1374,7 +1367,7 @@ Section BoBodies.
         iEval (rewrite Hp46) in "Hpc".
         iApply (bo_armB_body (CID := CID) CID0 Φ γs j γl γ bn γfs cov logstart dev m E8 pidv dq K eb C spd sp0
                   HK Heb Hj Hjl Hanch HboE8
-                  with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc").
+                  with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc").
   Qed.
 
 End BoBodies.
@@ -1400,7 +1393,7 @@ Section ProofBeginOp.
     intros pcE pj ret_tgt HK Hj Hjl Heb.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hlog Hpid #Hpinv #Hscheds Hctx Hpark Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hlog Hpid #Hpinv #Hscheds Hpark Hcont".
     iPoseProof "Hlog" as "#Hlogc".
     iDestruct "Hlogc" as "(#Hislock & #Hldev & #Hlstart)".
     (* level 0 with an enabled base forces the enabled index *)
@@ -1586,17 +1579,17 @@ Section ProofBeginOp.
     (* ============ the anchored EXIT continuation (+0x58 -> ret) ============ *)
     iAssert (bo_exit CID Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0) with "[Hcont]" as "Hexit".
     { rewrite /bo_exit.
-      iIntros (CIDx Hsx Mx) "%HboE Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hctx Hpark Hown Hpay Hcg Hpc".
+      iIntros (CIDx Hsx Mx) "%HboE Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hpark Hown Hpay Hcg Hpc".
       iApply (bo_exit_body (CID := CIDx) CID Φ j γ bn γfs cov logstart dev m Mx pidv dq K eb C spd sp0
                 HK Heb Hsx Hspd Hsp0 HboE
-                with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hctx Hpark Hown Hpay Hcg Hpc Hcont"). }
+                with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hpark Hown Hpay Hcg Hpc Hcont"). }
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ======== *)
     iAssert (bo_loop CID Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /bo_loop.
-      iIntros (CIDy Hsy My) "%HboL Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc Hexit".
+      iIntros (CIDy Hsy My) "%HboL Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc Hexit".
       iApply (bo_loop_body (CID := CIDy) CID Φ γs j γl γ bn γfs cov logstart dev m My pidv dq K eb C spd sp0
                 HK Heb Hj Hjl Hsy HboL
-                with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc"). }
+                with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc"). }
     (* ============ +0x18..+0x22: s1 := &log, s2 := 30, jump to the test ==== *)
     iPoseProof (boi_18 with "Htext") as "Hi18".
     iPoseProof (boi_1c with "Htext") as "Hi1c".
@@ -1684,7 +1677,7 @@ Section ProofBeginOp.
     iEval (rewrite Htgt2c) in "Hpc".
     rewrite /bo_loop.
     iSpecialize ("Hloop" $! CIDa with "[%]"); [wp_next_chain|].
-    iApply ("Hloop" $! T3 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hctx Hpark Hown Hpay Hcg Hpc Hexit").
+    iApply ("Hloop" $! T3 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc Hexit").
     exact HboT3.
   Qed.
 

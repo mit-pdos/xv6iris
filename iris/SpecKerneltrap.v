@@ -263,7 +263,7 @@ Section KtProcRes.
   Definition kt_proc_res (p : mword 64) : iProp Σ :=
     (⌜ p = zero_reg ⌝ ∨
      ∃ j : nat, ⌜ (j < NPROC)%nat ⌝ ∗ ⌜ proc_addr j = p ⌝ ∗
-                own_ctx (p_context p) ∗ park_hlf j true)%I.
+                park_hlf j true)%I.
 End KtProcRes.
 
 Definition wp_kerneltrap_sconf_body

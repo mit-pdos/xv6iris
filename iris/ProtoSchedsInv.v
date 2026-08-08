@@ -95,7 +95,6 @@ Section Payoff.
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗                          (* NEW: persistent, hart-free *)
     panic_wp_any -∗
-    own_ctx (p_context pj) -∗
     park_hlf j true -∗                          (* NEW: hart-free receipt *)
     wp_next b pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
@@ -103,7 +102,6 @@ Section Payoff.
         sie_cap_gpr mf av b pj -∗
         cpu_own 0 eb pj C b -∗
         pc_is ret_tgt -∗
-        own_ctx (p_context pj) -∗
         park_hlf j true -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.

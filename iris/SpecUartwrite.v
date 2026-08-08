@@ -111,7 +111,6 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
   panic_wp_any -∗
-  own_ctx (p_context pj) -∗
   park_hlf j true -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
@@ -121,7 +120,6 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       pc_is ret_tgt -∗
       ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
       uart_sent_sub γu (f <$> seq 0 n) -∗
-      own_ctx (p_context pj) -∗
       park_hlf j true -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

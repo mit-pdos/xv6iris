@@ -117,7 +117,6 @@ Section ProofVirtioDiskRwCSeam.
        cpu_own 1 eb (proc_addr j) C false -∗
        trap_csrs_pay 0 eb -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) -∗
-       own_ctx (p_context (proc_addr j)) -∗
        park_hlf j true -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
@@ -142,7 +141,7 @@ Section ProofVirtioDiskRwCSeam.
     iIntros "#Htext #Hgeom Hbd Hexit".
     rewrite /P2.vdrw_p2_exit.
     iIntros (CIDx Hsx M np nr fl pk tr fr h m2 t) "%Hrh %Hfacts %Hdisj0 %Hal
-             Hcg Hown Hpay Hpc Hctx Hpark Htok Hbody Hbh Hbm Hbt Hidx".
+             Hcg Hown Hpay Hpc Hpark Htok Hbody Hbh Hbm Hbt Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
     destruct Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8).
@@ -155,7 +154,7 @@ Section ProofVirtioDiskRwCSeam.
     destruct F as (Hcs & H1a0 & H1a1 & H1a5).
     iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
     iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t
-              with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hctx Hpark Htok Hbody
+              with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hpark Htok Hbody
                     Hchain Hidx").
     - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
       destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).

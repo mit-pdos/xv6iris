@@ -109,7 +109,6 @@ Definition wp_begin_op_sconf_body
   (* the running-thread bundle threaded through the two sleeps *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
   park_hlf j true -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
@@ -117,7 +116,6 @@ Definition wp_begin_op_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
       park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* THE reservation: a full-budget operation *)

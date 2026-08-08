@@ -222,7 +222,6 @@ Section SpecFileclose.
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      bslots (fcn_bio fn) 3 ∗
-     own_ctx (p_context (proc_addr (fcn_j fn))) ∗
      park_hlf (fcn_j fn) true ∗
      p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn)%I.
 
@@ -248,7 +247,6 @@ Section SpecFileclose.
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      bslots (fcn_bio fn) 3 ∗
-     own_ctx (p_context (proc_addr (fcn_j fn))) ∗
      park_hlf (fcn_j fn) true)%I.
 
   Lemma fileclose_fs_env_split_pid Φ fn n eb p :
@@ -258,18 +256,17 @@ Section SpecFileclose.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid. iSplit.
     - iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
-                Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hctx & Hpark & $)".
+                Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark & $)".
       do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hctx Hpark".
+      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark".
     - iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
-                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hctx & Hpark) $]".
+                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark) $]".
       do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hctx Hpark".
+      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark".
   Qed.
 
   Definition fileclose_fs_out (fn : fclose_names) : iProp Σ :=
-    (own_ctx (p_context (proc_addr (fcn_j fn))) ∗
-     park_hlf (fcn_j fn) true ∗
+    (park_hlf (fcn_j fn) true ∗
      p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn ∗
      bslots (fcn_bio fn) 3)%I.
 
@@ -321,7 +318,7 @@ Section SpecFileclose.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_out.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              Hbs & Hctx & Hpark & Hpid)".
+              Hbs & Hpark & Hpid)".
     iFrame.
   Qed.
 
@@ -373,13 +370,13 @@ Section SpecFileclose.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_out.
     iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & #Hpr & #Hsc & #Hbio & #Hlog &
-              #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & Hctx & Hpark & Hpid)".
-    iSplitL "Hbs Hctx Hpark Hpid".
+              #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & Hpark & Hpid)".
+    iSplitL "Hbs Hpark Hpid".
     { do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hctx Hpark Hpid". }
-    iModIntro. iIntros "(Hctx & Hpark & Hpid & Hbs)".
+      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark Hpid". }
+    iModIntro. iIntros "(Hpark & Hpid & Hbs)".
     do 6 (iSplitR; [iPureIntro; assumption|]).
-    iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hctx Hpark Hpid".
+    iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark Hpid".
   Qed.
 
   (* ---- WHAT A CLOSER OF AN ARBITRARY DESCRIPTOR DOES ----

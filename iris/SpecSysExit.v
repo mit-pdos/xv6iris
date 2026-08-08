@@ -129,7 +129,6 @@ Definition wp_sys_exit_sconf_body
   scheds_inv Φ γs -∗
   panic_wp_any -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
-  own_ctx (p_context pj) -∗
   park_hlf j true -∗
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗

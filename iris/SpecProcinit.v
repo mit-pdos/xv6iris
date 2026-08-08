@@ -169,11 +169,7 @@ Section ProcinitSeals.
     iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark".
     iFrame "Hlk Hks".
     iExists UNUSED, ch. iFrame "Hst Hch Hpub".
-    rewrite /proc_slots.
-    rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-    rewrite (_ : inv_dormant UNUSED = true); [| vm_compute; reflexivity].
-    rewrite not_running_UNUSED.
-    iSplitR; [done|]. iFrame "Hdorm Hpark".
+    iApply (proc_slots_unused_intro with "Hdorm Hpark").
   Qed.
 
 End ProcinitSeals.
@@ -302,11 +298,7 @@ Section ProcinitProcsInv.
               with "[Hst Hch Hpub Hdorm Hpark]") as "#Hlk".
       { iApply (proc_lock_res_intro Φ γs g (proc_addr i) UNUSED ch
                   with "Hst Hch Hpub [Hdorm Hpark]").
-        rewrite /proc_slots.
-        rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-        rewrite (_ : inv_dormant UNUSED = true); [| vm_compute; reflexivity].
-        rewrite not_running_UNUSED.
-        iSplitR; [done|]. iFrame "Hdorm Hpark". }
+        iApply (proc_slots_unused_intro with "Hdorm Hpark"). }
       iModIntro. iFrame "Hlk". iExists (kstack_va i). iExact "Hksp". }
     iMod (big_sepL_fupd with "Hmk") as "Hmk".
     rewrite (big_sepL_sep (PROP:=iPropI Σ)).

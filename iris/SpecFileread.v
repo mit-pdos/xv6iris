@@ -445,7 +445,6 @@ Definition wp_fileread_sconf_body
   kalloc_env γa None -∗
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
   park_hlf j true -∗
   (* ...and what the file's TYPE selects *)
   fileread_env Φ γf k fn Cf -∗
@@ -460,7 +459,6 @@ Definition wp_fileread_sconf_body
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
-      own_ctx (p_context pj) -∗
       park_hlf j true -∗
       fileread_env_out fn Cf -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗

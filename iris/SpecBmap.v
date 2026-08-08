@@ -211,7 +211,6 @@ Definition wp_bmap_sconf_body
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
   park_hlf j true -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
@@ -261,7 +260,6 @@ Definition wp_bmap_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
       park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
@@ -401,7 +399,6 @@ Definition wp_bmap_noalloc_sconf_body
   (* the running-thread bundle: bmap still SLEEPS, in bread *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
   park_hlf j true -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
@@ -418,7 +415,6 @@ Definition wp_bmap_noalloc_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
       park_hlf j true -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗

@@ -171,7 +171,7 @@ Which gives the state-keyed table:
 | `USED` | the lock holder (allocproc/fork mid-flight) | the lock holder | the lock holder |
 | `RUNNABLE` | the parked closure | the parked closure | lock invariant, `▷ proc_ctx` |
 | `SLEEPING` | the parked closure | the parked closure | lock invariant, `▷ proc_ctx` |
-| `RUNNING` | the running thread | the running thread | the running thread (`own_ctx`) |
+| `RUNNING` | the running thread | the running thread | lock invariant (`own_ctx`) |
 | `ZOMBIE` | lock invariant (post-`exit` shape) | lock invariant | lock invariant (dead, `own_ctx`) |
 
 Read the columns rather than the rows and the table collapses to **two
@@ -509,13 +509,57 @@ allocation/parking transitions:
 
 ```coq
 Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
-  ((if needs_ctx st   then ▷ proc_ctx pa       else emp) ∗
-   (if inv_dormant st then proc_dormant pa else emp))%I.
+  ((if needs_ctx st   then ▷ proc_ctx pa            else emp) ∗
+   (if is_running st  then own_ctx (p_context pa)   else emp) ∗
+   (if inv_dormant st then proc_dormant pa st       else emp) ∗
+   (if not_running st then park_at_full pa false    else emp))%I.
 
 Lemma proc_slots_recast pa st st' :
-  needs_ctx st' = needs_ctx st -> inv_dormant st' = inv_dormant st ->
+  needs_ctx st' = needs_ctx st -> not_running st' = not_running st ->
+  inv_dormant st = false -> inv_dormant st' = false ->
   proc_slots pa st -∗ proc_slots pa st'.
 ```
+
+`is_running` is `negb ∘ not_running`, so `recast` needs no extra premise for
+the new arm.
+
+### The RUNNING arm, and why the cells are not a frame
+
+The context cells are **never** a running thread's frame. They live in
+`p->lock` in one of two forms — a resumable `proc_ctx` record while parked,
+the bare `own_ctx` cells while RUNNING — and the state field says which.
+
+The move that makes that usable is that a running thread can *prove* the state
+under the lock is RUNNING without reading it. It carries `park_hlf j true`
+(half the park-receipt ghost); the lock's `not_running` arm carries the
+**full** receipt, so presenting the half refutes that arm, and
+`not_running st = false` is definitionally `st = RUNNING`:
+
+```coq
+Lemma proc_slots_running (j : nat) (st : mword 32) :
+  (j < NPROC)%nat ->
+  park_hlf j true -∗ proc_slots (proc_addr j) st -∗
+  park_hlf j true ∗ ⌜ st = RUNNING ⌝ ∗ own_ctx (p_context (proc_addr j)).
+```
+
+`yield`/`sleep`/`exit` already acquire `p->lock` before touching `p->state`,
+so each reads the cells out of the lock it just took, hands them to `sched`
+(the only consumer — its `swtch` is what writes them), and deposits them back
+at release via `proc_slots_running_intro`.
+
+WHY IT HAD TO CHANGE.  The cells used to be a precondition of
+`yield`/`sleep`/`exit`, which propagated `own_ctx (p_context pj) -∗` up
+through every function that might block — 173 wand positions across 55 files,
+pure pass-through everywhere except the three at the bottom.  That discipline
+is unsatisfiable for `kerneltrap`, which **preempts**: a timer interrupt calls
+`yield` on behalf of a thread whose frames it has no access to.  Moving the
+cells into the lock deletes the premise from all three specs and therefore
+from the whole sweep; `kt_proc_res` drops to `⌜p = zero_reg⌝ ∨ ∃ j, … ∗
+park_hlf j true`.
+
+The receipt itself has the same unreachability and is NOT yet fixed — see
+`design/interrupts.md` for the SIE-arm plan that mirrors how `sret_bits`
+handles SPP.
 
 Both side conditions are `vm_compute`, and the proof is `destruct` on two
 booleans. Because `proc_dormant` is not `st`-indexed, this holds in *both*
