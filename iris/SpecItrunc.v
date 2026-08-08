@@ -237,6 +237,12 @@ Definition wp_itrunc_sconf_body
      made the contract uncallable by iput, which has no source for it. *)
   (forall i : nat, (i <= MAXFILE)%nat -> bv_unsigned (bm_slot bm i) <> 0 ->
      bv_unsigned (bm_slot bm i) < size) ->
+  (* EVERY DATA BLOCK IS A BLOCK'S WORTH OF BYTES.  bfree demands it of the
+     block it frees, and [inode_blocks] does not carry it: the bundle names
+     contents but says nothing about their length.  Like the range premise
+     above this is a genuine FS fact the model does not yet hold anywhere,
+     and it is recorded as owed in fs-inode.md alongside it. *)
+  (forall i : nat, length (data i) = BSIZE) ->
   (* the record's addrs field names the cells the map owns -- iupdate's tie,
      restated here because itrunc rewrites both together *)
   di_addrs dn = bm_cells bm ->

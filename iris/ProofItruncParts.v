@@ -458,6 +458,32 @@ Section ItruncDefs.
      bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
      bm_paid γ bmapstart 1)%I.
 
+  (* Opened and closed by LEMMA, never by [rewrite /it_dir_state]: the Iris
+     context is part of the goal term, so unfolding the definition in the
+     body also unfolds it inside the induction hypothesis, and the IH then
+     no longer matches the bundle the loop carries. *)
+  Lemma it_dir_state_open (γ : log_names) (γfs : fs_names)
+      (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
+      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (bn : bio_names) (k : nat) :
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn k -∗
+      inode_map γfs ip (bm_dir_zeroed bm k) ∗
+      inode_blocks γfs (bm_dir_zeroed bm k) data ∗
+      bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
+      bm_paid γ bmapstart 1.
+  Proof. iIntros "H". iExact "H". Qed.
+
+  Lemma it_dir_state_close (γ : log_names) (γfs : fs_names)
+      (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
+      (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
+      (bn : bio_names) (k : nat) :
+    inode_map γfs ip (bm_dir_zeroed bm k) -∗
+    inode_blocks γfs (bm_dir_zeroed bm k) data -∗
+    bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) -∗
+    bm_paid γ bmapstart 1 -∗
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn k.
+  Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame. Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  THE INDIRECT LOOP'S STATE, at cursor q                             *)
   (* ------------------------------------------------------------------ *)
