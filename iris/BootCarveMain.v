@@ -289,7 +289,7 @@ Proof. exact (bnode_of_z NBUF). Qed.
    eleven out of the one .bss range with [boot_ran_split] alone.  Every step
    is [x + 24 <= y] on two literals, so the whole check is one [vm_compute]
    per conjunct.  (The full .bss decomposition -- which of these gaps holds
-   which other bundle -- is tabulated in claude-notes/projects/crash.md.) *)
+   which other bundle -- is tabulated in claude-notes/completed/crash.md.) *)
 Lemma main_lock_windows :
   img_end <= KernelSyms.cons /\
   KernelSyms.cons + 24 <= KernelSyms.pr /\

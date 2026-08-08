@@ -315,7 +315,7 @@ End BootBss.
 (* Everything above [img_end] is ZERO in the loaded image and OWNED by the  *)
 (* client, as ONE range; every bundle main and the chain ask for is a       *)
 (* window of it.  So the whole of this section is §1's cursor walked in     *)
-(* ADDRESS order (the layout table in claude-notes/projects/crash.md is     *)
+(* ADDRESS order (the layout table in claude-notes/completed/crash.md is    *)
 (* that order, boundary by boundary), handing each window to its carve      *)
 (* lemma.  Nothing here is a proof: a wrong boundary is a unification       *)
 (* failure at the next cut, which is exactly what makes the walk safe.      *)

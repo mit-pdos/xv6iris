@@ -9,7 +9,7 @@
    [InstrBytes.mmode_config] pinned only three of them (MIE / MPRV / SXL), so
    the M-mode boot contract's postcondition could not tell the S-mode side
    what it needs -- SEVEN of these are NOT derivable from those three (verified
-   at a hostile mstatus; see claude-notes/projects/crash.md, M6c).
+   at a hostile mstatus; see claude-notes/completed/crash.md, M6c).
 
    HOME: a file of its own, with MINIMAL imports (Stdlib + Sail + the model),
    because [InstrBytes] must require it and MstatusBits.v -- the obvious

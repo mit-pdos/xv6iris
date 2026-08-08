@@ -694,7 +694,7 @@ Definition reset_regs (c : CPU) (rs : regstate) : Prop :=
      the architecture's [reset_pmp] gives.  The closed cold-boot run makes it a
      COMPUTED fact ([ColdBoot.cold_boot_pmp_all_off]); deriving it from
      [reset_pmp]'s per-entry RMW over an OPEN power-on register file is the
-     ∀-garbage anchoring task's business (claude-notes/projects/crash.md). *)
+     ∀-garbage anchoring task's business (claude-notes/completed/crash.md). *)
   /\ pmp_all_off (register_lookup pmpcfg_n rs)
   (* mie AND mideleg CLEAR: every interrupt disabled, nothing delegated.  Like
      the [nextPC] pin above these are necessary-and-not-obvious, and for the
@@ -855,4 +855,3 @@ Proof.
 Qed.
 
 Definition riscv_lang : language := Language riscv_lang_mixin.
-

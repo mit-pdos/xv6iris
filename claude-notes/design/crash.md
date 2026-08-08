@@ -20,7 +20,7 @@ userinit, panic). What is left is future work rather than layer work: the crash
 predicate `Pc` is instantiated at `True` and the FS layer's `P_fs` is what will
 give it content, and the torn-write knob is still open. Worklist (with the
 per-milestone record):
-[`../projects/crash.md`](../projects/crash.md).
+[`../completed/crash.md`](../completed/crash.md).
 
 ## The semantics (RiscvLang.v)
 
@@ -81,7 +81,7 @@ per-milestone record):
     `Axiom` of the model — is lifted to a parameter whose elision is
     itself checked by `reflexivity`. `reset_regs` is a COLD-boot
     description; a warm-reset arm would need its own, weaker, fact set.
-    Still open, and recorded in projects/crash.md: the ∃-garbage anchoring
+    Still open, and recorded in completed/crash.md: the ∃-garbage anchoring
     (`reset()` alone over arbitrary power-on state), which waits on
     symbolic peeling because forcing any register field of the reset's
     result over an OPEN register file does not compute.
@@ -260,7 +260,7 @@ GHOST mirror deliberately is not.
     candidate channels — a second, non-timeless era invariant with a
     timeless ghost skeleton, or a `P_fs` closed under in-flight writes so
     that no per-slot deposit is needed — are written up in
-    `../projects/crash.md` (M5b). Until one lands, the completion mints
+    `../completed/crash.md` (M5b). Until one lands, the completion mints
     the identity permit, so nothing in the kernel yet owes anything. In-era
   kernel code has NO crash conditions anywhere — no wpc, no per-function
   crash specs; the write-ahead-log discipline lands entirely on the

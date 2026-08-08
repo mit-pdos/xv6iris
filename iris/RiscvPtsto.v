@@ -292,7 +292,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   (* the byte memory's PRE-class: the era layer stores only the two heap
      GNAMES (a [gen_heapGS] bundle would drag Σ into the era record, and
      the era record must be Σ-FREE so it can be a [ghost_map] VALUE in
-     the generation registry -- claude-notes/projects/crash.md); the
+     the generation registry -- claude-notes/completed/crash.md); the
      full [gen_heapGS] is reconstructed below as [riscv_memGS]. *)
   riscvF_memGpreS :: gen_heapGpreS Arch.pa (bv 8) Σ;
   (* the power/crash layer (claude-notes/design/crash.md): the GENERATION
@@ -1946,4 +1946,3 @@ Proof. rewrite /phys_pointsto. apply _. Qed.
 Global Instance phys_word_pointsto_timeless `{!riscvGS Σ} a dq w :
   Timeless (phys_word_pointsto a dq w).
 Proof. rewrite /phys_word_pointsto. apply _. Qed.
-

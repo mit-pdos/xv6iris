@@ -1133,7 +1133,7 @@ Section VirtioProto.
      the [disk_block] it handed in.
 
      THE CRASH WRITE PERMIT ITSELF CANNOT LIVE HERE, AND ITS KEY MUST
-     (claude-notes/design/crash.md, and the M5b entry in projects/crash.md).
+     (claude-notes/design/crash.md, and the M5b entry in completed/crash.md).
      The natural home for the enqueuer's obligation is this record -- it is
      the [vs_data] precedent, an exclusive resource recorded where the
      invariant keys on the request -- but [disk_inv_body] MUST BE [Timeless]:

@@ -230,7 +230,7 @@ a PREMISE over the rd value the caller reads, never a case split on the op;
 that is what keeps it one lemma per arm instead of ten.  (Until 2026-08-04 this
 read "only AMOSWAP retires, every other op denies at mem_read"; that was an
 artifact of the idealized AMOSwap-only PMA table, which is gone — the platform's
-DRAM is AMOCASQ.  See projects/crash.md, "PMA TABLE RETIREMENT".)
+DRAM is AMOCASQ.  See completed/crash.md, "PMA TABLE RETIREMENT".)
 
 ZICBOP gotcha: `execute_ZICBOP` retires for EVERY translate outcome
 (Ok/Err/phys-check all reduce to RETIRE), so no ok-vs-denied classification is

@@ -313,7 +313,7 @@ Definition boot_gprs : gset register := list_to_set boot_gpr_list.
      hence both main arms -- needs it, and [trapinithart] is what seals it
      into [intr_inv].
    The audit table (which spec forces which register, and how it is owned) is
-   in claude-notes/projects/crash.md's M6b section.
+   in claude-notes/completed/crash.md's M6b section.
 
    SPELLED AS A LIST, and that is not cosmetic: what a client actually needs
    is to take the set APART into the named cells its specs ask for, and

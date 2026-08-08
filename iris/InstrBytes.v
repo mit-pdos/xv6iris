@@ -775,7 +775,7 @@ Section InstrBytes.
      without it the M-mode boot contract's postcondition cannot tell the
      S-mode side what it needs, and seven of the eleven are NOT derivable from
      MIE/MPRV/SXL (verified at a hostile mstatus -- see
-     claude-notes/projects/crash.md, M6c).  Reality supplies it easily: the
+     claude-notes/completed/crash.md, M6c).  Reality supplies it easily: the
      reset mstatus 0xA00000000 has every field right, and the only mstatus
      writes on the M-mode path are start()'s MPP write and MRET, both of which
      preserve it ([WpStartNew.st_ms1_kernel_facts] / [cms5_kernel_facts]).

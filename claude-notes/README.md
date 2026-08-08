@@ -120,21 +120,6 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`crash.md`](projects/crash.md)** — the crash/power-cycling layer.
-  **DONE through M6: the SYSTEM THEOREM is proven.**
-  `SystemAdequacy.xv6_power_adequacy` — a machine that starts powered off at
-  generation 0 never gets stuck: every configuration reachable from
-  `[PowerLoopE]` under any interleaving of power cycles, hart steps and device
-  steps is reducible, with no hypothesis about the software and none about the
-  machine beyond "off at generation 0" (`boot_shape` supplies the rest per
-  era). Its footprint is the 5 `rv64d.*` platform axioms + funext + the four
-  sanctioned assumed kernel contracts (printk-general, kerneltrap, userinit,
-  panic). All six milestones landed: fixed/era split → language + GenId sweep
-  → death machinery → `wp_power_loop` + minimal adequacy → durable disk layer
-  → the ∀-era boot composition (`BootCarve`/`BootCarveMain` → `BootChain` →
-  `BootShared` → `SystemAdequacy`). Remaining is future work only: the FS
-  instantiation of `P_fs`/`Pc` (the theorem passes `True` today) and the
-  torn-write knob. Design in [`design/crash.md`](design/crash.md).
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation) only; stages 1–3 are finished and archived in
   [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).
@@ -256,6 +241,10 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`crash.md`](completed/crash.md)** — the completed crash/power-cycling
+  layer through M6. `SystemAdequacy.xv6_power_adequacy` proves reducibility
+  across arbitrary power cycles, hart scheduling, and device steps; the FS
+  durability instantiation and torn-write model are separate future work.
 - **[`sail-model-bump.md`](completed/sail-model-bump.md)** — the sail-riscv
   model bump: the model now comes from the `zeldovich/sail-riscv` FORK (pinned
   by `SAIL_RISCV_REV`), whose delta is the ATOMIC PTE A/D-bit update, and whose
