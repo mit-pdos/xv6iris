@@ -735,6 +735,10 @@ SpecStrlen.v
 CodeStrlen.v
 ProofStrlen.v
 LinkStrlen.v
+SpecStrncmp.v
+CodeStrncmp.v
+ProofStrncmp.v
+LinkStrncmp.v
 SpecCopyinstr.v
 CodeCopyinstr.v
 ProofCopyinstr.v

@@ -452,6 +452,56 @@ Section WpSconfAlu.
              Hrd Hrdok eq_refl).
   Qed.
 
+  Lemma wp_csubw_wval_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
+      (m : regfile) (n : nat) (b : bool) :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sign_extend' 64
+      (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
+               (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) = wval ->
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗ instr pc true (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      pc_is (add_vec_int pc 2) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rs1 rs2
+              (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) wval m n b
+              Hrd Hrdok _
+              with "Hcg Hpc Hinstr Hcont").
+    - intros s_pc Hnpc Hva Hvb.
+      change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)))
+        with (execute_RTYPEW (Regidx rs2) (Regidx rs1) (Regidx rd) SUBW).
+      rewrite (exec_execute_RTYPEW_SUBW_gpr rs2 rs1 rd s_pc).
+      replace (Z.eqb (uint rd) 0) with false
+        by (symmetry; apply Z.eqb_neq; exact Hrd).
+      unfold gpr_subw_val, gpr_src. rewrite Hva Hvb Hwval. reflexivity.
+  Qed.
+
+  Lemma wp_csubw_s_sconf (Φ : mval -> iProp Σ)
+      (pc : mword 64) (rd rs1 rs2 : mword 5)
+      (m : regfile) (n : nat) (b : bool) :
+    let wval := sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
+    uint rd <> 0 ->
+    rd_ok rd ->
+    sie_cap_gpr m n b p -∗
+    pc_is pc -∗ instr pc true (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) -∗
+    wp_next b p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
+      pc_is (add_vec_int pc 2) -∗
+      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    WP (Loop : expr riscv_lang) {{ Φ }}.
+  Proof.
+    intros wval Hrd Hrdok.
+    exact (wp_csubw_wval_s_sconf Φ pc rd rs1 rs2
+             (sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32))) m n b
+             Hrd Hrdok eq_refl).
+  Qed.
+
   Lemma wp_add_s_sconf (Φ : mval -> iProp Σ)
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
