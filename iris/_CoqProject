@@ -894,6 +894,12 @@ WeakLeafMret.v
 WeakPmpTorEff.v
 WeakLeafTor.v
 WeakLeafCsrrTime.v
+WeakLeafSdspOff.v
+WeakLeafItype.v
+WeakLeafUtypeShift.v
+WeakLeafRtypeW.v
+WeakLeafJump.v
+WeakLeafCsrrM.v
 WkStackOwn.v
 WkGprAcc.v
 WeakKpt.v

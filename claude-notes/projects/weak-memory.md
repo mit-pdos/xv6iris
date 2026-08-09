@@ -1815,16 +1815,55 @@ leaf ≈ 150–260 code lines + its write_CSR mirror.
   WeakWalkEff's), and the csrr spine/check kit (WeakLeafCsrrTime →
   WeakLeafRegOnly §3).
 
-**What remains for `wwp_start`/`wwp_timerinit` — NOTHING STRUCTURAL.**
-Every remaining leaf is register-only at a demonstrated recipe: the ALU
-leaves (addi ×14, lui ×4, auipc, and, or ×3, ori ×2, slli ×2, srli,
-addiw, add ×2 — hoist per-shape via the regonly kit instead of paying
-the WkEntryNew inline price), the jumps (jal, c.jr — `jal_sexec_facts`
-exists), the remaining csrr's (mstatus/sie/menvcfg/mcounteren/mhartid —
-csrr-time is the template; mstatus via the config funnel per the SXL
-note), and the two prologue c.sdsp stores under pmp_all_off (the
-WeakLeafTor leaves minus the TOR premise — same recipe). Then the two
-whole-function chains themselves and the composed
+**THE REMAINING-LEAF BATCH IS DONE (2026-08) — every leaf
+`wwp_start`/`wwp_timerinit` needs now exists.** Twenty leaves in six
+files (5807 raw lines; all first-compile green; footprint = funext +
+the 5 platform axioms per leaf, every execute mirror closed):
+
+- `WeakLeafSdspOff.v` (465): `wwp_sd8_off_rvc_leaf` — the two prologue
+  `c.sdsp`s under the all-OFF boot PMP. The missing corner of the
+  Sd8/Tor matrix: WeakLeafTor's compressed store leaf with the PMP pair
+  (`pmp_allows_all` + `pmp_tor0_grants`) collapsed back to the single
+  `pmp_all_off` (which implies both), and the `pmpaddr_n` cell dropped
+  with the grant that mentioned it.
+- `WeakLeafItype.v` (772): `wwp_addi_leaf`, `wwp_addi_rvc_leaf` (the
+  same ITYPE ast via a compressed decode — covers `c.addi`/`c.li`/
+  `c.addi4spn`), `wwp_ori_leaf`. Gpr-FILE-based (call sites have
+  rd = rs1 and rs1 = x0 — the `wwp_entry` cell-shape finding).
+- `WeakLeafUtypeShift.v` (1196): `wwp_lui_leaf`, `wwp_lui_rvc_leaf`,
+  `wwp_auipc_leaf` (WkEntryNew's inline `_entry` AUIPC block hoisted),
+  `wwp_slli_rvc_leaf`, `wwp_srli_rvc_leaf`.
+- `WeakLeafRtypeW.v` (1048): `wwp_add_rvc_leaf` (ONE lemma covers both
+  `c.add` (rd = rs1) and `c.mv` (rs1 = x0), through the x0-safe
+  `gpr_pt_value` read), `wwp_or_rvc_leaf`, `wwp_and_rvc_leaf`,
+  `wwp_addiw_rvc_leaf`.
+- `WeakLeafJump.v` (730): `wwp_jal_leaf`, `wwp_cjr_rvc_leaf`
+  (`c.jr`/`c.ret`), + `cjr_sexec_facts` (a jump writes nextPC TWICE
+  and, at rd = x0, no GPR at all — neither `load_sexec_facts` nor
+  `jal_sexec_facts` fits). THE ALIGNMENT SIDE CONDITION IS ABOUT THE
+  TARGET, not the pc: JAL takes the target's 4-alignment as a PREMISE
+  (both pc and imm are variables — the recorded branch/jump gotcha,
+  split with `aligned4_jump_bits`); the compressed return jump needs
+  none (under misa.C `jump_to` accepts 2-aligned, and `ret_pc` clears
+  bit 0 by construction).
+- `WeakLeafCsrrM.v` (1596): the five remaining csrr leaves —
+  `wwp_csrr_{menvcfg,mcounteren,sie,mhartid,mstatus}_leaf` — off
+  WeakLeafCsrrTime's imported csr-generic spine (each owes only its
+  `read_CSR` mirror + accessibility + callback, 10–40 lines). Four
+  ride the plain funnel; **csrr-mstatus rides the CONFIG funnel** (not
+  because it writes a config cell — the read VALUE is mstatus's whole
+  value and `wcfg_regs` carries only the MIE/MPRV bits; the config
+  callback's `ms0` pin is exactly the conclusion's shape, per the SXL
+  interface note above). Its §1 read-side check-kit dispatchers
+  (`_read_lit`/`_read_U`/`_read_U_and`/`_read_S`) are hoist candidates
+  next to the csrw four.
+
+All leaves are alignment-generic (`al4` a parameter): F_Base shapes via
+`wP_eff_of_leaf_regonly` + `wcert_regonly`, compressed shapes via
+`WeakLeafTor.wP_eff_of_leaf_rvc` at `es_x := []` + `wcert_nowrite`.
+
+**What remains for `wwp_start`/`wwp_timerinit`: only the two
+whole-function chains themselves** and the composed
 `SpecEntry`/`ProofEntry`/`LinkEntry` cone (until those land,
 `wwp_entry` stays a plain lemma exactly as SC's `wp_entry` is).
 
