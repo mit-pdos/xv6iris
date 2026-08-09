@@ -155,17 +155,22 @@ out 2026-08-09):**
   (icn_ref cn)`, `ic_escrow cn γfs γi cov logstart k`, `ireg_inv γi
   γfs inodestart nib`, the caller's reference `inode_ref (icn_ref cn)
   k q dev inum` (subsumes the old dev/inum fractions), and the
-  sleeplock now over `ic_tok cn k`. POST: `sleeplocked` + `sl_pid` +
-  half the reference back (checkout deposits the other half) + the
-  loaded bundle at ∃-bound `(dn, bm, dn0)`: valid cell at 1,
+  sleeplock now over `ic_tok cn k`. POST (corrected per §13.1d — a
+  reference cannot fraction-split without the authority, so checkout
+  deposits it WHOLE): `sleeplocked` + `sl_pid` + NO reference back +
+  the loaded bundle at ∃-bound `(dn, bm)`: valid cell at 1,
   `inode_meta`/`inode_addrs`/`ind_res`/`inode_blocks` + `dinode_at γi
-  inum dn0` + the arm's inum-cell half. THE "no type" PANIC IS LIVE
-  on the free-inode arm (§13.1) — say so in the header; the null/ref
-  panic stays refuted.
-- **SpecIunlock v2**: symmetric — consumes the bundle (at whatever
-  `dn'/bm'/dn0'` the holder ended with, valid still 1), parks it,
-  returns `ic_tok`-release via releasesleep and the reunited
-  reference.
+  inum dn` + the arm's inum-cell half (PARKED-MEANS-FLUSHED: at park
+  the region record must equal the parked record; inside the critical
+  section it may lag until iupdate retags — the bundle's dinode_at is
+  therefore at a separate existential while checked out). THE "no
+  type" PANIC IS LIVE on the free-inode arm (§13.1) — say so in the
+  header; the null/ref panic stays refuted.
+- **SpecIunlock v2**: consumes the bundle at whatever `(dn', bm')` the
+  holder ended with — WITH `dinode_at γi inum dn'` (the flushed-record
+  obligation, §13.1d) — parks it, returns the caller's reference WHOLE
+  (from the OUT arm) after its own lock-free ref read via
+  `ic_open_out`.
 - **SpecIdup flip**: `is_itable γl γic` → `is_itable2 γl cn …` with
   `γic := icn_ref cn`; the ref++ interior is untouched (ProofIdup
   frames the pool/ci through its critical section).

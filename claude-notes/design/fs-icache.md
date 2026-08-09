@@ -1247,6 +1247,36 @@ composes fine there. This is why the identity re-budget of §13.1b is
 not optional bookkeeping: the ½/full split of the inum cell IS the
 parked/mid discriminator.
 
+### 13.1d Transcription findings (C3a, 2026-08-09): the whole-reference
+### deposit, and PARKED-MEANS-FLUSHED
+
+Two facts surfaced landing `IcacheEscrow.v`, both now normative:
+
+* **A reference cannot be fraction-split without the authority**: two
+  `iref_tok`s at `(q/2, 1)` compose to count 2, a different element —
+  splitting the fraction splits the COUNT, which is `iref_dup_step`'s
+  job and needs the lock. So the checkout deposits the winner's WHOLE
+  `inode_ref` into the OUT arm and the park returns it whole (BioInv's
+  shape exactly). iunlock's lock-free `ip->ref < 1` read, which happens
+  INSIDE the critical section, borrows the deposited reference for one
+  atomic update via `ic_open_out` (the winner's FULL valid cell refutes
+  the other two arms). SpecIlock v2's postcondition returns the loaded
+  BUNDLE and no reference; SpecIunlock v2 returns the reference whole.
+* **PARKED-MEANS-FLUSHED**: the loaded arm's `dinode_at` is at the
+  in-memory `dn` — no separate `dn0`. Without this, iget's eviction
+  cannot conclude the pool's allocated shape (its `inode_ok` is about
+  the on-disk record) from the loaded arm's (about the in-memory one).
+  It is an honest invariant — every writer ends with iupdate (writei's
+  and itrunc's tails), so a holder can always re-establish it at
+  iunlock; the stale-record freedom lives only inside a critical
+  section, where the checked-out bundle's `dinode_at` may lag until the
+  holder's iupdate retags it. iunlock's contract carries the resulting
+  obligation: park only with the region record retagged to the parked
+  `dn'`.
+* The +0x72/+0x7c ghost moves are open/close PAIRS, not combined swaps
+  (bio's split): what an evicted payload becomes is iget's argument,
+  made between the two, not the definitional layer's.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`

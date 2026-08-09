@@ -313,6 +313,59 @@ Proof. reflexivity. Qed.
 Lemma ic_pos_succ_1_add (b : positive) : Pos.succ (1 + b) = (2 + b)%positive.
 Proof. lia. Qed.
 
+(* ---- the cache-HIT increment, as pure algebra (BioInv.bio_incr_lu) ----
+
+   iget's hit arm runs [ref++] holding NO reference of its own, so unlike
+   [iref_dup_step] (idup's shape) nothing can come out of a caller's
+   fragment: the entry GROWS by exactly the minted [(qn,1)], taken from the
+   share the table retained.  That makes the update an allocation keyed
+   pointwise rather than a [singleton_local_update].
+
+   Stated OUTSIDE the Iris section so the [own_update] below is handed a
+   CLOSED update -- BioInv.v's header explains why an evar-headed target
+   makes [apply auth_update_alloc] search forever. *)
+Local Lemma ic_incr_lu (M : gmap nat (Qp * positive)) (k : nat)
+    (qt qn : Qp) (n : positive) :
+  M !! k = Some (qt, n) ->
+  ✓ (qt + qn)%Qp ->
+  @local_update _ (gmapUR nat (prodR fracR positiveR))
+    (M, ∅) (<[k := ((qt + qn)%Qp, Pos.succ n)]> M, {[ k := (qn, 1%positive) ]}).
+Proof.
+  intros HM Hq.
+  apply gmap_local_update. intros i.
+  destruct (decide (i = k)) as [->|Hne]; last first.
+  { rewrite lookup_insert_ne // lookup_singleton_ne //. }
+  rewrite lookup_insert lookup_singleton lookup_empty HM.
+  apply local_update_unital_discrete. intros z Hv Hz.
+  rewrite left_id in Hz. rewrite -Hz.
+  split.
+  { apply Some_valid. split; cbn; [exact Hq | done]. }
+  rewrite -Some_op -pair_op frac_op ic_pos_op_add.
+  by rewrite (Qp.add_comm qn qt) Pos.add_1_l.
+Qed.
+
+Local Lemma ic_incr_upd (M : gmap nat (Qp * positive)) (k : nat)
+    (qt qn : Qp) (n : positive) :
+  M !! k = Some (qt, n) ->
+  ✓ (qt + qn)%Qp ->
+  (● M : icacheUR) ~~>
+  ● (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ⋅ ◯ {[ k := (qn, 1%positive) ]}.
+Proof. intros HM Hq. apply auth_update_alloc. by apply ic_incr_lu. Qed.
+
+(* the first reference's allocation, likewise closed (§13.1b's budget makes
+   the minted fraction a parameter, so the caller's [1/2 - q] side of the
+   split is what fixes it) *)
+Local Lemma ic_alloc_upd (M : gmap nat (Qp * positive)) (k : nat) (q : Qp) :
+  M !! k = None ->
+  ✓ q ->
+  (● M : icacheUR) ~~>
+  ● (<[k := (q, 1%positive)]> M) ⋅ ◯ {[ k := (q, 1%positive) ]}.
+Proof.
+  intros HM Hq. apply auth_update_alloc.
+  apply (alloc_singleton_local_update _ k (q, 1%positive)); [done|].
+  split; [exact Hq | done].
+Qed.
+
 (* the ref word of a LIVE slot is positive and in range: precisely the two
    bounds [InodeLock.inode_ref_spos] turns into "the panic is dead". *)
 Lemma iref_word_live (M : gmap nat (Qp * positive)) (k : nat) (q : Qp) (n : positive) :
@@ -411,6 +464,56 @@ Section IcacheGhost.
       + intros Hc. exfalso. rewrite Hc in Hq. by apply (irreflexivity Qp.lt qt).
   Qed.
 
+  (* A reference fragment against an authority showing NO reference at all:
+     the refutation every AUTHORITY-SIDE opener uses (design §10.3 -- iget's
+     recycle holds [itable.lock] at [M !! k = None] and refutes the escrow's
+     checked-out arm with this, holding no checkout token of its own).
+     BioInv.bref_tok_free_absurd's mirror, against the HALF authority --
+     [singleton_included_l] reads through any dfrac, exactly as in
+     [iref_lookup] above. *)
+  Lemma iref_tok_free_absurd γ M k q :
+    M !! k = None ->
+    itable_half γ M -∗ iref_tok γ k q -∗ False.
+  Proof.
+    rewrite /itable_half /iref_tok. iIntros (HM) "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf")
+      as %[_ [Hincl _]]%auth_both_dfrac_valid_discrete.
+    iPureIntro.
+    apply singleton_included_l in Hincl as [y [Hy _]].
+    rewrite HM in Hy. inversion Hy.
+  Qed.
+
+  (* TWO reference fragments at one slot force the count to be at least two.
+     This is REF-1 EXCLUSIVITY used as a refutation rather than as a
+     conclusion: a thread that has read [ip->ref == 1] (so [n = 1] by
+     [iref_lookup]) and holds one reference can rule out the existence of
+     any second one -- which is how iput's authority-side opening of the
+     escrow kills the checked-out arm.  The count component's inclusion is
+     the whole content: [(q1,1) ⋅ (q2,1) = (q1+q2, 2)]. *)
+  Lemma iref_tok_two_lookup γ M k q1 q2 :
+    itable_half γ M -∗ iref_tok γ k q1 -∗ iref_tok γ k q2 -∗
+    ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (2 <= Pos.to_nat n)%nat⌝.
+  Proof.
+    rewrite /itable_half /iref_tok. iIntros "Ha H1 H2".
+    assert (Hop : (◯ {[ k := (q1, 1%positive) ]} ⋅ ◯ {[ k := (q2, 1%positive) ]}
+                   : icacheUR)
+                  = ◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]}).
+    { rewrite -auth_frag_op singleton_op -pair_op frac_op. reflexivity. }
+    iAssert (own γ (◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]})) with "[H1 H2]" as "Hf".
+    { rewrite -Hop own_op. iFrame. }
+    iDestruct (own_valid_2 with "Ha Hf")
+      as %[_ [Hincl _]]%auth_both_dfrac_valid_discrete.
+    iPureIntro.
+    apply singleton_included_l in Hincl as [y [Hy Hle]].
+    apply leibniz_equiv in Hy. destruct y as [qt n]. exists qt, n.
+    split; [exact Hy|].
+    apply Some_included in Hle as [Heq | Hlt].
+    - destruct Heq as [_ Hn]; cbn in Hn.
+      assert (Hn' : (2%positive : positive) = n) by exact Hn. lia.
+    - apply pair_included in Hlt as [_ Hn]; cbn in Hn.
+      apply pos_included in Hn. lia.
+  Qed.
+
   (* a reference's slot is in range -- what the scan's index bound needs *)
   Lemma iref_tok_in_range γ M k q :
     icM_wf M -> itable_half γ M -∗ iref_tok γ k q -∗ ⌜(k < NINODE)%nat⌝.
@@ -431,18 +534,41 @@ Section IcacheGhost.
      [dev]/[inum] fractions moving in and out of [islot]) is one lemma per
      step and belongs with the contracts that consume them. *)
 
-  (* iget, recycling a free entry: [ref = 0] -> [ref = 1]. *)
-  Lemma iref_alloc_step γ M k :
+  (* iget, recycling a free entry: [ref = 0] -> [ref = 1], minting the first
+     reference at fraction [q].
+
+     [q] IS A PARAMETER, and the old [q = 1] form is gone (design §12.5): a
+     first reference holding the whole outstanding share leaves [islot_rest]
+     empty, and a later cache-HIT [iget] then has no retained share to mint
+     a new reference from -- its hit arm holds no caller token to split, so
+     [iref_dup_step] (idup's shape) cannot serve.  The budget of §13.1b caps
+     the minted fraction at 1/2, because the escrow's parked arm owns the
+     other half of [i_inum] permanently. *)
+  Lemma iref_alloc_step γ M k (q : Qp) :
     M !! k = None ->
+    (q ≤ 1/2)%Qp ->
     own γ (● M) ==∗
-    own γ (● (<[k := (1%Qp, 1%positive)]> M)) ∗ iref_tok γ k 1.
+    own γ (● (<[k := (q, 1%positive)]> M)) ∗ iref_tok γ k q.
   Proof.
-    iIntros (HM) "Ha".
-    iMod (own_update _ _ (● (<[k := (1%Qp, 1%positive)]> M)
-                          ⋅ ◯ {[k := (1%Qp, 1%positive)]}) with "Ha") as "H".
-    { apply auth_update_alloc.
-      apply (alloc_singleton_local_update _ k (1%Qp, 1%positive)); [done|].
-      split; done. }
+    iIntros (HM Hq) "Ha".
+    assert (Hv : ✓ q).
+    { apply frac_valid. etrans; [exact Hq | compute_done]. }
+    iMod (own_update _ _ _ (ic_alloc_upd M k q HM Hv) with "Ha") as "H".
+    rewrite own_op. iDestruct "H" as "[$ $]". done.
+  Qed.
+
+  (* iget's cache-HIT arm: [ref++] on a live entry, minting a fresh
+     reference at fraction [qn] taken from the table's RETAINED share.  The
+     incrementer holds no reference of its own, so the entry grows by exactly
+     the minted amount -- BioInv.bio_incr_step verbatim. *)
+  Lemma iref_incr_step γ M k qt (n : positive) (qn : Qp) :
+    M !! k = Some (qt, n) ->
+    ✓ (qt + qn)%Qp ->
+    own γ (● M) ==∗
+    own γ (● (<[k := ((qt + qn)%Qp, Pos.succ n)]> M)) ∗ iref_tok γ k qn.
+  Proof.
+    iIntros (HM Hq) "Ha". rewrite /iref_tok.
+    iMod (own_update _ _ _ (ic_incr_upd M k qt qn n HM Hq) with "Ha") as "H".
     rewrite own_op. iDestruct "H" as "[$ $]". done.
   Qed.
 
@@ -761,6 +887,16 @@ Section IcacheTable.
     done.
   Qed.
 
+  (* the fraction JOIN for one cell, as a wand.  A bare
+     [rewrite word4_pointsto_frac_split] at a call site rewrites the whole
+     [envs_entails] -- hypotheses included -- and silently re-splits the very
+     fragments being joined (durable-notes' proofmode rule); inside this
+     lemma the two hypotheses' dfracs are bare variables, so the pattern
+     matches the goal only. *)
+  Local Lemma word4_frac_join (a : Arch.pa) (q1 q2 : Qp) (w : bv 32) :
+    a ↦₄{DfracOwn q1} w -∗ a ↦₄{DfracOwn q2} w -∗ a ↦₄{DfracOwn (q1 + q2)} w.
+  Proof. iIntros "H1 H2". rewrite word4_pointsto_frac_split. iFrame. Qed.
+
   Lemma inode_ident_split k q1 q2 dev inum :
     inode_ident k (DfracOwn (q1 + q2)) dev inum ⊣⊢
     inode_ident k (DfracOwn q1) dev inum ∗ inode_ident k (DfracOwn q2) dev inum.
@@ -785,14 +921,48 @@ Section IcacheTable.
     iIntros "[_ H1] [_ H2]". iApply (inode_ident_agree with "H1 H2").
   Qed.
 
-  (* the identity fraction the table still holds: [q = 1] is "all of it is
-     out", and the table then holds nothing but the (invariant-resident)
-     ref word.  The [Qp.sub] shape is what lets a LONE holder be writable. *)
-  Definition islot_rest (k : nat) (q : Qp) : iProp Σ :=
-    match (1 - q)%Qp with
-    | Some q' => (∃ dev inum : mword 32, inode_ident k (DfracOwn q') dev inum)%I
-    | None => emp%I
+  (* ---- THE IDENTITY BUDGET (design §13.1b) ----
+
+     The two identity cells no longer carry the same mass, because the
+     escrow's PARKED arm owns HALF of [i_inum] permanently: that half is what
+     ties the arm's [dinode_at] to the entry the cells name, and the
+     ½-versus-FULL split of this one cell is what distinguishes the parked
+     arm from the recycle-window arm (§13.1c).  So
+
+         i_dev  :  1  =  q (the references)  +  (1 - q)  (the table)
+         i_inum :  1  =  ½ (the escrow, forever)
+                      +  q (the references)  +  (½ - q)  (the table)
+
+     and a reference's fraction therefore ranges in (0, ½].  A REFERENCE is
+     still [inode_ident] -- both cells at ONE fraction, which is all a
+     lock-free reader needs; it is only the table's RETAINED share that is
+     lopsided, so [islot_rest] can no longer be spelled with [inode_ident].
+
+     [islot_rest_at] pins the two values (the pool's slot->inum map wants
+     them pinned, §13.2); [islot_rest] is the ∃-bound form the plain
+     [itable_res] uses.  The [Qp.sub] shape is unchanged: [None] is the
+     [q = ½] case, where the whole shared half is out and the table keeps
+     only the dev cell's other half. *)
+  Definition islot_rest_at (k : nat) (q : Qp) (dev inum : mword 32) : iProp Σ :=
+    match (1/2 - q)%Qp with
+    | Some q' => (i_dev (ientry k) ↦₄{DfracOwn (1/2 + q')} dev ∗
+                  i_inum (ientry k) ↦₄{DfracOwn q'} inum)%I
+    | None => (i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev)%I
     end.
+
+  Definition islot_rest (k : nat) (q : Qp) : iProp Σ :=
+    (∃ dev inum : mword 32, islot_rest_at k q dev inum)%I.
+
+  (* ...and a FREE slot's share: the dev cell whole (iget's [sw] at +0x6e
+     writes it under the lock alone) and the inum cell's other half (the
+     escrow keeps one half; iget's [sw] at +0x72 joins them, which is why
+     that store cannot happen without opening the escrow -- §13.1c). *)
+  Definition islot_free_at (k : nat) (dev inum : mword 32) : iProp Σ :=
+    (i_dev (ientry k) ↦₄ dev ∗
+     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum)%I.
+
+  Definition islot_free (k : nat) : iProp Σ :=
+    (∃ dev inum : mword 32, islot_free_at k dev inum)%I.
 
   (* A LIVE slot also parks one iref-slot unit per outstanding reference.
      That is what lets a thread about to run [ref++] weigh the count against
@@ -802,7 +972,7 @@ Section IcacheTable.
      increment needs it and why no axiom may replace it. *)
   Definition islot (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
     match M !! k with
-    | None => (∃ dev inum : mword 32, inode_ident k (DfracOwn 1) dev inum)%I
+    | None => islot_free k
     | Some (q, n) => (islot_rest k q ∗ iref_slots (Pos.to_nat n))%I
     end.
 
@@ -850,21 +1020,37 @@ Section IcacheTable.
   (* THE LAST CLOSER'S JOIN, and the second half of REF-1 EXCLUSIVITY at
      the points-to level: [iref_lookup] forced [q = qt] on a slot whose
      count is one, so the closer's share plus whatever the table kept is
-     the WHOLE identity -- enough to hand the slot back to iget as free. *)
+     everything the TABLE can ever hold of this entry -- the dev cell whole,
+     and the inum cell's half.  That is exactly [islot_free_at], i.e. the
+     slot handed back to iget as free; the inum cell's OTHER half stays in
+     the escrow's parked arm forever (§13.1b) and is joined in only by the
+     recycler, inside the escrow opening that performs the [sw] at +0x72. *)
   Lemma islot_rest_join k (qt : Qp) dev inum :
-    (qt ≤ 1)%Qp ->
+    (qt ≤ 1/2)%Qp ->
     inode_ident k (DfracOwn qt) dev inum -∗ islot_rest k qt -∗
-    inode_ident k (DfracOwn 1) dev inum.
+    islot_free_at k dev inum.
   Proof.
-    intros Hle. rewrite /islot_rest.
-    destruct (1 - qt)%Qp as [q'|] eqn:Et.
-    - apply Qp.sub_Some in Et.        (* 1 = qt + q' *)
-      iIntros "Hi (%d & %n & Hi')".
-      iDestruct (inode_ident_agree with "Hi Hi'") as %[-> ->].
-      rewrite Et inode_ident_split. iFrame.
+    intros Hle. rewrite /islot_rest /islot_rest_at /islot_free_at /inode_ident.
+    destruct (1/2 - qt)%Qp as [q'|] eqn:Et.
+    - apply Qp.sub_Some in Et.        (* 1/2 = qt + q' *)
+      assert (Hq : (qt + (1/2 + q'))%Qp = 1%Qp).
+      { rewrite (Qp.add_comm (1/2)%Qp q') Qp.add_assoc -Et Qp.div_2.
+        reflexivity. }
+      iIntros "[Hd Hn] (%d & %n & [Hd' Hn'])".
+      iDestruct (word4_pointsto_agree with "Hd Hd'") as %->.
+      iDestruct (word4_pointsto_agree with "Hn Hn'") as %->.
+      iSplitL "Hd Hd'".
+      + iDestruct (word4_frac_join with "Hd Hd'") as "H".
+        iEval (rewrite Hq) in "H". iExact "H".
+      + iDestruct (word4_frac_join with "Hn Hn'") as "H".
+        iEval (rewrite -Et) in "H". iExact "H".
     - apply Qp.sub_None in Et.
-      assert (qt = 1%Qp) as -> by (apply (anti_symm (≤)%Qp); [exact Hle | exact Et]).
-      iIntros "H _". iExact "H".
+      assert (qt = (1/2)%Qp) as -> by
+        (apply (anti_symm (≤)%Qp); [exact Hle | exact Et]).
+      iIntros "[Hd Hn] (%d & %n & Hd')".
+      iDestruct (word4_pointsto_agree with "Hd Hd'") as %->.
+      iSplitR "Hn"; [| iExact "Hn"].
+      iApply (word4_pointsto_half_join with "Hd Hd'").
   Qed.
 
 End IcacheTable.
