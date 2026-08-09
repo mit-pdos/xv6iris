@@ -319,7 +319,7 @@ Section SpecFileclose.
     rewrite /fileclose_fs_env /fileclose_fs_out.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
               Hbs & Hpark & Hpid)".
-    iFrame.
+    iFrame "Hpark Hpid Hbs".
   Qed.
 
   (* THE FAST PATH'S OBLIGATION, checked here rather than discovered in the
