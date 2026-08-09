@@ -870,6 +870,7 @@ SpecReadi.v
 IrefSlots.v
 IcacheInv.v
 InodeLock.v
+InodeRegion.v
 CodeIdup.v
 CodeIlock.v
 CodeItrunc.v

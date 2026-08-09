@@ -652,6 +652,10 @@ blocks' ownership), which has to be settled before item 4.
 - **The "`acquiresleep()` won't block (or deadlock)" half of `iput`'s
   comment needs no theorem** in this logic (§5 (a)). The load-bearing part
   of that comment is an ownership statement, not a scheduling one.
+- **§11.4's "SETTLED" swap design was wrong** (§12): the checked-out arm
+  has nothing it can hold, by conservation against `log_write`'s own
+  footprint. The region is one-armed and `SpecLogWrite`'s `fsblock`
+  premise generalizes to a fupd instead.
 
 ---
 
@@ -870,7 +874,15 @@ alongside the `ind_res`/`inode_blocks` bundle, with `inode_ok` tying them.
 `iget`'s recycle moves the whole triple into the escrow; `ilock` finds it
 parked. C1, the pool, and the region become one coherent object.
 
-### 11.4 The borrow, and where it hangs -- SETTLED
+### 11.4 The borrow, and where it hangs -- SUPERSEDED BY §12
+
+**This subsection's swap design is unimplementable and §12 replaces it.**
+The checkout at +0x66 cannot state its checked-out arm: during the window
+the thread's own log_write footprint holds every per-block exclusive
+resource, so the arm has nothing to hold and a checkout can never refute
+it. §12 has the conservation argument and the (smaller) fix. The
+instruction observations below remain true and the ilock half survives in
+simplified form; only the +0x66/+0x6c swap pair is dead.
 
 The coupling must be OPENED to write: `iupdate` swaps the block's bytes at
 its `log_write`. An invariant cannot be held open across a call, so the
@@ -924,4 +936,152 @@ Both functions therefore have two plain register moves in exactly the right
 places, and neither needs an instruction invented for it. That is the last
 thing §10.5 was waiting on: the region is fully determined and the escrow
 can be written.
+
+*(The paragraph above was written before §12 found the checkout window
+unstatable. The register moves are real; the swaps that were to hang on
+them are not. Read §12.)*
+
+---
+
+## 12. §11.4'S CHECKOUT HAS NOTHING TO DEPOSIT: a conservation argument,
+## and the smaller design that replaces it
+
+Implementation (2026-08-09) hit a wall that re-derivation confirms is
+structural, not a proof-skill problem. Recording it the way §10.6 records
+bio's stale comment: so nobody re-settles §11.4 as written.
+
+### 12.1 The hole
+
+A §11.4-style escrow needs its CHECKED-OUT arm to contain something a
+would-be second checker-outer can be refuted by (bio's `buf_chain` holds
+`bown`; that is what makes `escrow_swap_checkout` provable). Whatever sits
+in that arm must be deposited by the FIRST checker-outer at +0x66 and sit
+there across its `log_write`. Now enumerate what the thread can spare
+during that window:
+
+* `SpecLogWrite`'s premise is `bio_held … bs bsl bsd d` PLUS the client
+  half `fsblock γfs (uint bno) bsl`. `bio_held` contains `disk_block γd
+  (uint bno) bsd` (full), and its `bio_pay` contains the machinery half
+  `bno ↪[fs_L]{½}` and the machinery dirty half — on BOTH the clean and
+  dirty arms.
+* The `fs_L` entry's total fragment mass is client ½ + machinery ½ = 1;
+  `disk_block` is a full exclusive element; the remaining dirty half and
+  the `fs_L` auth live inside `log.lock`, which `log_write` itself takes.
+
+So during the window **every per-block exclusive resource for that block
+is in the thread's own `log_write` footprint**, and by conservation the
+checked-out arm can hold none of it — not even a fraction. Nothing else
+refutes: a per-inum deposit (`dinode_at`, the inode's sleeplock token)
+does not clash with a checkout by a DIFFERENT inum of the same block, and
+a fresh per-block token has no sound resting place — its holder between
+windows would have to be "whoever holds the block's buffer", and there is
+no hook in bio's interface to ride on. bio's own escrow escapes only
+because `bown` is a resource its mid-window calls never need; the region
+has no such spare. Variants tried and killed by the same argument: an
+enter/exit pair bracketing the whole bread..brelse window (its mid state
+is unrefutable at enter for exactly the same reason); `blk_own` as the
+credential (no way to acquire it before the first opening); fractional
+splits of `disk_block` or the halves (mass conservation).
+
+### 12.2 The fix: no checked-out state, and log_write's fsblock premise
+### becomes a fupd
+
+The only moment the client half is actually NEEDED out of the region is
+`log_write`'s own ghost step — `ProofLogWrite.v:2074`, a single `iMod` of
+`fsblock_update` between two instruction dispatches, at mask ⊤, no
+invariant open. So the withdrawal happens INSIDE that step:
+
+* **The region is ONE-armed.** `ireg_inv` always holds, per inode block,
+  `∃ ds, ⌜diblk_wf ds⌝ ∗ fsblock γfs b (diblk_bytes ds)`, plus (globally)
+  `ghost_map_auth γi 1 m` with the pure coupling `m !! inum = Some (ds !!!
+  islot inum)` for the sixteen inums of each block. Callers hold FULL
+  fragments `dinode_at γi inum dn := uint inum ↪[γi] dn` (§11.2's shape,
+  unchanged). No arms, no tokens, no swap lemmas.
+
+* **`SpecLogWrite` generalizes its `fsblock` premise to an atomic-update
+  form**: instead of `fsblock γfs (uint bno) bsl` in hand, the caller
+  supplies
+
+      |={⊤, E'}=> ∃ bsl', fsblock γfs (uint bno) bsl' ∗
+         (⌜bsl' = bsl⌝ -∗ fsblock γfs (uint bno) bs ={E', ⊤}=∗ Φfsb)
+
+  fired at the 2074 ghost step; `fsblock_update`'s own agreement against
+  the handle's machinery half is what discharges `bsl' = bsl`, so the
+  caller never has to know the region's content in advance. The OLD form
+  is the trivial instance (a caller holding the fsblock wraps it in a
+  no-op fupd), derived once in the spec file — **no existing caller
+  moves, and `ProofLogWrite` changes at exactly one site.** Expose both
+  as `Module Type` parameters so the sealed functor serves old and new
+  consumers alike.
+
+* **`iupdate`** discharges the fupd by opening the region there: withdraw
+  the block's `fsblock` at `diblk_bytes ds`, let `fsblock_update` run,
+  deposit it back at `diblk_bytes (<[islot inum := dn']> ds)` and retag
+  `dinode_at γi inum dn'` against the auth in the same opening. Its
+  contract's `fsblock`-in/`fsblock`-out pair collapses to `dinode_at γi
+  inum dn -∗ … dinode_at γi inum dn'` exactly as §11.3 promised. The
+  +0x66/+0x6c register moves are no longer load-bearing.
+
+* **`ilock`** needs only a READ: one mask-preserving opening of `ireg_inv`
+  at any instruction while it holds the buffer — its payload's machinery
+  half agrees with the region's client half, pinning the bytes to
+  `diblk_bytes ds`; `dinode_at` against the auth plus the coupling gives
+  `ds !!! islot inum = dn`. Pure facts out, nothing withdrawn. This is
+  §11.4's read side minus the checkout it never needed.
+
+### 12.3 One new pure obligation: `diblk_bytes` is injective on wf lists
+
+Between `iupdate`'s bread (where it learns the block's `ds`) and its
+`log_write` (where the region's `∃ ds'` is opened again), nothing the
+thread holds pins the region's LIST — only its bytes (via the machinery
+half, which rides in the thread's payload the whole way). Concluding
+`ds' = ds`, which the coupling's re-establishment at the other fifteen
+slots needs, takes
+
+    diblk_wf ds -> diblk_wf ds' ->
+    diblk_bytes ds = diblk_bytes ds' -> ds = ds'
+
+i.e. per-field injectivity of `dinode_bytes`. Provable from the
+byte-extraction lemmas `DinodeSlot.v` already uses to read fields off a
+block; it did not exist before because nothing decoded. It belongs in
+`DinodeEnc.v`.
+
+### 12.4 What this retires, and what stands
+
+Retired: the three-state-per-block escrow of §11.4, `iblk_tok`, the
++0x66/+0x6c and +0x4e/+0x8e swap hangs. Standing, unchanged: §11.1–11.3
+(the granularity argument, `dinode_at`, the disappearing premise), §10's
+per-ENTRY escrow and pool (the itable entry's cells are a different object
+with a real sleeplock credential — bio's shape fits THERE), and every
+geometry/algebra layer in `IcacheInv.v`.
+
+### 12.5 ...and §10.2's THIRD arm is probably unnecessary too
+
+§10.2 argued the entry escrow needs bio's mid arm because iget's recycle
+writes four fields at four separate instructions and "between them the
+entry is in NEITHER stable state". That reasoning implicitly assumed the
+escrow owns all four cells, the way `buf_parked` owns a buffer's. It does
+not. In the landed architecture the four stores hit FOUR DIFFERENT
+homes:
+
+      +0x6e  sw s2,0(s3)      ip->dev    -- itable.lock's [islot] (held)
+      +0x72  sw s4,4(s3)      ip->inum   -- itable.lock's [islot] (held)
+      +0x78  sw a5,8(s3)      ip->ref    -- [itable_inv], one opening
+      +0x7c  sw zero,64(s3)   ip->valid  -- the escrow, one opening
+
+The identity cells are lock-carried (no instruction-level coupling: the
+lock's resource is re-established at RELEASE, not per store), the ref
+word's store and its `M` update share one `itable_inv` opening (§4), and
+the escrow — which owns only `i_valid` and the sleeplock payload content
+— sees exactly ONE store. Each object passes through no unstable window,
+so the escrow is TWO-armed (parked / checked out), and §10.2's dev-pin
+trick has nothing left to do. The checked-out arm still carries the
+count fragment, and `iget`'s valid store still refutes it by
+`iref_lookup` at `M !! k = None` — §10.3 stands verbatim.
+
+VERIFY WHEN C3 STARTS: read iget's actual store/branch stream off the
+image (both the hit arm and the recycle arm) and confirm no escrow-owned
+cell is touched twice between stable states; then build the two-armed
+escrow and let a stuck proof, if any, resurrect the mid arm with
+evidence.
 

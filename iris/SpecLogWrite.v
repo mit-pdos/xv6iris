@@ -161,6 +161,90 @@ Definition wp_log_write_gen_body
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* THE ATOMIC-UPDATE FORM (claude-notes/design/fs-icache.md, §12): the
+   caller's [fsblock] half arrives through a fupd fired at log_write's own
+   ghost step instead of sitting in its hands for the whole call.
+
+   WHY THIS EXISTS.  A dinode block's client half lives in the inode
+   REGION's invariant (InodeRegion.v) and can never sit in a caller's
+   hands across a call: iupdate's own log_write footprint holds every
+   per-block exclusive resource, so a §11.4-style checkout window has
+   nothing to deposit and is unstatable.  The only sound moment for the
+   half to leave the region is the single ghost step where the logged
+   view actually moves -- ProofLogWrite's [fsblock_update], a pure ghost
+   moment between two instruction dispatches at mask ⊤.  This premise
+   opens the caller's invariant exactly there:
+
+   - the fupd surrenders the half at WHATEVER content the invariant
+     parked ([bsl'], existential);
+   - [fsblock_update]'s own agreement against the handle's payload half
+     is what pins [bsl' = bsl] -- the caller never has to know the
+     invariant's content in advance;
+   - the closing fupd takes the half back at the WRITTEN bytes and pays
+     out [Φfsb], the caller's chosen receipt (for iupdate: the retagged
+     [dinode_at], via InodeRegion.ireg_write_au).
+
+   A caller that HOLDS the half is the degenerate instance: [Efs := ⊤],
+   [Φfsb := fsblock γfs (uint bno) bs], and the fupd is two iModIntros --
+   that is [wp_log_write_gen] below, derived, so no existing caller
+   moves. *)
+Definition wp_log_write_au_body
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
+    `{GEN : GenId} `{CID : CpuId}
+    (bn : bio_names)
+    (γ : log_names) (γfs : fs_names) (γd : disk_names)
+    (cov : gset Z) (logstart : Z) (dev : mword 32)
+    (k : nat) (pidv bno : mword 32)
+    (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+    (cr : bool) (Sb : gset Z)
+    (Efs : coPset) (Φfsb : iProp Σ)
+    (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    (K : nat) (b : bool) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.log_write in
+  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
+  (K_log_write <= K)%nat ->
+  (Z.of_nat n + 2 < 2 ^ 31)%Z ->
+  (* a0 is the buffer being logged *)
+  (k < NBUF)%nat ->
+  m !!! Regidx (mword_of_int 10 : mword 5) = bnode k ->
+  (* the block is a covered HOME block: never the log's own storage *)
+  uint bno ∈ cov ->
+  ~ (uint bno ∈ log_region_set logstart) ->
+  (* THE CREDIT'S PREMISE: claiming the free arm means claiming this op
+     has already appended [bno] in this batch. *)
+  (cr = true -> uint bno ∈ Sb) ->
+  sie_cap_gpr m K b p -∗
+  cpu_own n eb p C b -∗
+  kernel_text -∗ pc_is pcE -∗
+  panic_wp_any -∗
+  bio_ctx bn (fs_view γfs γd dev cov) -∗
+  log_ctx γ bn γfs cov logstart dev -∗
+  (* the slot unit backing the (possible) bpin *)
+  bslot bn -∗
+  log_opS γ (S u) Sb -∗
+  (* THE CALLER'S VIEW OF THE BLOCK, AS AN ATOMIC UPDATE -- see the header
+     note above.  Fired exactly once, at the ghost step. *)
+  (|={⊤, Efs}=> ∃ bsl' : list (bv 8),
+     fsblock γfs (uint bno) bsl' ∗
+     (⌜bsl' = bsl⌝ -∗ fsblock γfs (uint bno) bs ={Efs, ⊤}=∗ Φfsb)) -∗
+  (* the checked-out buffer, payload still indexed at the old content *)
+  bio_held bn (fs_view γfs γd dev cov) k pidv dev bno bs bsl bsd d -∗
+  wp_next b p (fun (CID : CpuId) =>
+    ∀ mr,
+    sie_cap_gpr mr K b p -∗
+    cpu_own n eb p C b -∗
+    pc_is ret_tgt -∗
+    ⌜ callee_saved m mr ⌝ -∗
+    log_opS γ (if cr then S u else u) (Sb ∪ {[uint bno]}) -∗
+    (* the caller's receipt: what its closing fupd paid out *)
+    Φfsb -∗
+    (* the handle re-indexed at the written bytes and now DIRTY *)
+    bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
+    (* the slot unit comes back UNCONDITIONALLY *)
+    bslot bn -∗
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
+
 Definition wp_log_write_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -223,6 +307,24 @@ Definition wp_log_write_sconf_body
   WP (Loop : expr riscv_lang).
 
 Module Type LOG_WRITE.
+  (* THE ATOMIC-UPDATE FORM -- the one the whole-function proof proves.
+     [wp_log_write_gen] is its degenerate instance at a held fsblock, and
+     [wp_log_write_sconf] forgets the credit set on top of that; both are
+     kept as their own parameters so no existing caller moves. *)
+  Parameter wp_log_write_au :
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γd : disk_names)
+      (cov : gset Z) (logstart : Z) (dev : mword 32)
+      (k : nat) (pidv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
+      (cr : bool) (Sb : gset Z)
+      (Efs : coPset) (Φfsb : iProp Σ)
+      (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (K : nat) (b : bool),
+      wp_log_write_au_body bn γ γfs γd cov logstart dev k pidv bno
+                           bs bsl bsd d u cr Sb Efs Φfsb m n eb p C K b.
+
   (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the
      set-forgetting instance of this at [cr = false]; it is kept as its own
      parameter so that every existing caller -- which threads [log_op] and

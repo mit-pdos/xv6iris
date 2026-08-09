@@ -135,6 +135,15 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
+- **[`fs-icache.md`](projects/fs-icache.md)** — the inode cache
+  IMPLEMENTATION effort (the design lives in
+  [`design/fs-icache.md`](design/fs-icache.md), §10–§12): the staged
+  cycle plan — C1 the inode region (`InodeRegion.v`, landed) +
+  `SpecLogWrite`'s atomic-update premise, C2 iupdate onto `dinode_at`
+  (with the worked SpecIupdate v2 delta and the three-touch-point
+  ProofIupdate recipe), C3 the per-entry escrow/pool + the InodeLock
+  restructure + ProofIlock's `il_load` re-proof, then iget/iput. Keeps
+  the branch-per-cycle strategy and the owed boot-wiring list.
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation) only; stages 1–3 are finished and archived in
   [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).
