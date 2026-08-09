@@ -283,8 +283,13 @@ Definition wp_itrunc_sconf_body
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  (* bread's reference held across log_write, plus brelse's return *)
-  bslots bn 2 -∗
+  (* THREE slot units, not two.  The indirect arm's bread holds ONE across
+     the whole 256-entry loop -- the buffer stays checked out while the
+     entries are freed -- and each nested bfree still wants the two its own
+     bread/log_write pair needs.  brelse gives the held one back at +0x7c.
+     The direct loop never has a bread outstanding, so two would do there;
+     the arm is what forces three. *)
+  bslots bn 3 -∗
   (* THE RESERVATION: two units.  One buys the bitmap block's log slot --
      ONCE, however many blocks are freed -- and one is iupdate's. *)
   log_op γ (S (S u)) -∗
@@ -309,7 +314,7 @@ Definition wp_itrunc_sconf_body
       (* the flush landed: slot [inum mod IPB] holds the truncated inode *)
       fsblock γfs (IBLOCK inum inodestart)
               (diblk_bytes (<[islot inum := di_trunc dn]> ds)) -∗
-      bslots bn 2 -∗
+      bslots bn 3 -∗
       (* SPEND AT MOST TWO, AT LEAST ONE: iupdate always runs; the bitmap
          unit is spent only if the inode named a block at all *)
       (∃ u' : nat, ⌜(u <= u' <= S u)%nat⌝ ∗ log_op γ u') -∗

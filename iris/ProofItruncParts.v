@@ -48,6 +48,7 @@ Require Import InstrBytes.
 Require Import RegFile.
 Require Import KernelText.
 Require Import RiscvExtras.
+Require Import BcacheInv.
 Require Import BufOwn.
 Require Import BlockWords.
 Require Import FsBlocks.
@@ -655,6 +656,20 @@ Section ItruncDefs.
     intros Hnz. rewrite /blk_res.
     destruct (decide (bv_unsigned w = 0)) as [Hc|_];
       [exfalso; exact (Hnz Hc) |]. iIntros "$".
+  Qed.
+
+  (* bread hands back a handle but no buffer index bound; the handle itself
+     carries it, as [bio_held]'s first conjunct.  Read it out and give the
+     handle straight back. *)
+  Lemma bio_locked_kbound (bn : bio_names) (V : bio_view Σ) (k : nat)
+      (pidv dev bno : mword 32) (bs bsd : list (bv 8)) (d : bool) :
+    bio_locked bn V k pidv dev bno bs bsd d -∗
+      ⌜(k < NBUF)%nat⌝ ∗ bio_locked bn V k pidv dev bno bs bsd d.
+  Proof.
+    rewrite /bio_locked /bio_held.
+    iIntros "(%Hk & %Hc & %Hd & Hr)".
+    iSplitR; [done|].
+    iSplitR; [done|]. iSplitR; [done|]. iSplitR; [done|]. iExact "Hr".
   Qed.
 
   (* the indirect block's content half and token, when it exists *)
