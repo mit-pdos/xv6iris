@@ -63,7 +63,8 @@ Import Defs.
 
 Local Open Scope Z_scope.
 
-Module ItruncProof (BR : BREAD) (BF : BFREE) (BL : BRELSE) (IU : IUPDATE).
+Module ItruncProof (BR : BREAD) (BF : BFREE) (BL : BRELSE) (IU : IUPDATE)
+  : ITRUNC.
 
 Local Ltac regne :=
   first [ apply not_eq_sym; apply is_cs_idx_true_neq;
@@ -112,7 +113,10 @@ Section ItruncCont.
         fsblock γfs (IBLOCK inum inodestart)
                 (diblk_bytes (<[islot inum := di_trunc dn]> ds)) -∗
         bslots bn 3 -∗
-        (∃ u' : nat, ⌜(u <= u' <= S u)%nat⌝ ∗ log_op γ u') -∗
+        (* EXACTLY u: iupdate always runs, so the tail always spends one.
+           The contract's RANGE is about the bitmap unit, which the tail
+           knows nothing about -- the main lemma does the widening. *)
+        log_op γ u -∗
         WP (Loop : expr riscv_lang))%I.
 
 End ItruncCont.
@@ -586,7 +590,7 @@ Section ItruncTail.
     { unfold callee_saved. split_and!; assumption. }
     { iEval (rewrite Hthree bslots_op). iSplitL "Hsl"; [iExact "Hsl"|].
       iExact "Hslp". }
-    { iExists u. iSplitR; [iPureIntro; lia|]. iExact "Hop". }
+    { iExact "Hop". }
   Qed.
 
 End ItruncTail.
@@ -611,7 +615,7 @@ Section ItruncDLoop.
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
-      (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
+      (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
@@ -625,7 +629,7 @@ Section ItruncDLoop.
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         bslots bn 2 -∗
         it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn
-                     NDIRECT -∗
+                     w NDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
   Local Lemma it_dloop `{GEN : GenId} `{CID0 : CpuId} 
@@ -636,7 +640,7 @@ Section ItruncDLoop.
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
       (used : gset Z) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
-      (pidv : mword 32) (dq dqd dqb : dfrac)
+      (pidv : mword 32) (dq dqd dqb : dfrac) (w : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (fuel : nat) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
@@ -675,9 +679,9 @@ Section ItruncDLoop.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots bn 2 -∗
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn k -∗
-    it_dexit (CID0 := CID0)  γ γfs bn cov logstart bmapstart size used dev
-             ip bm data pidv dq dqd dqb jx m K C b -∗
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn w k -∗
+    it_dexit (CID0 := CID0) γ γfs bn cov logstart bmapstart size used dev
+             ip bm data pidv dq dqd dqb jx w m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl.
@@ -755,7 +759,7 @@ Section ItruncDLoop.
       assert (Hfk : bm_dir_freed bm (S k) = bm_dir_freed bm k)
         by (apply bm_dir_freed_skip; exact Hzero).
       iAssert (it_dir_state γ γfs ip bm data cov logstart bmapstart size used
-                            bn (S k))
+                            bn w (S k))
         with "[Hmap Hblks Hbmr Hpaid]" as "Hst".
       { iApply (it_dir_state_close with "[Hmap] [Hblks] [Hbmr] Hpaid");
           [ rewrite Hsk; iExact "Hmap"
@@ -1047,7 +1051,7 @@ Section ItruncDLoop.
       iDestruct ("Hback" with "[Hop]") as "Hpaid";
         [ rewrite Hbud; iExact "Hop" |].
       iAssert (it_dir_state γ γfs ip bm data cov logstart bmapstart size used
-                            bn (S k))
+                            bn w (S k))
         with "[Hmap Hblks Hbmr Hpaid]" as "Hst".
       { iApply (it_dir_state_close with "Hmap Hblks Hbmr Hpaid"). }
       (* ===== +0x30 c.j : back to the increment ===== *)
@@ -1159,7 +1163,7 @@ Section ItruncELoop.
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
-      (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
+      (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
@@ -1175,7 +1179,7 @@ Section ItruncELoop.
         bslots bn 2 -∗
         buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
         it_ent_state γ γfs bm data cov logstart bmapstart size used
-                     NINDIRECT -∗
+                     w NINDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
   Local Lemma it_eloop `{GEN : GenId} `{CID0 : CpuId} 
@@ -1186,7 +1190,7 @@ Section ItruncELoop.
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
       (used : gset Z) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8)) (kk : nat) (dsk : mword 32)
-      (pidv : mword 32) (dq dqd dqb : dfrac)
+      (pidv : mword 32) (dq dqd dqb : dfrac) (w : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) (fuel : nat) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
@@ -1228,9 +1232,9 @@ Section ItruncELoop.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots bn 2 -∗
     buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
-    it_ent_state γ γfs bm data cov logstart bmapstart size used q -∗
-    it_eexit (CID0 := CID0)  γ γfs bn γd cov logstart bmapstart size used dev
-             ip bm data kk dsk pidv dq dqd dqb jx m K C b -∗
+    it_ent_state γ γfs bm data cov logstart bmapstart size used w q -∗
+    it_eexit (CID0 := CID0) γ γfs bn γd cov logstart bmapstart size used dev
+             ip bm data kk dsk pidv dq dqd dqb jx w m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hkk Hj Hgl.
@@ -1308,7 +1312,7 @@ Section ItruncELoop.
     - (* ---------- SKIP ---------- *)
       assert (Hfk : bm_ent_freed bm (S q) = bm_ent_freed bm q)
         by (apply bm_ent_freed_skip; exact Hzero).
-      iAssert (it_ent_state γ γfs bm data cov logstart bmapstart size used (S q))
+      iAssert (it_ent_state γ γfs bm data cov logstart bmapstart size used w (S q))
         with "[Hres Hbmr Hpaid]" as "Hst".
       { iApply (it_ent_state_close with "Hres [Hbmr] Hpaid").
         rewrite Hfk. iExact "Hbmr". }
@@ -1552,7 +1556,7 @@ Section ItruncELoop.
       iEval (rewrite Hfstep) in "Hbmr".
       iDestruct ("Hback" with "[Hop]") as "Hpaid";
         [ rewrite Hbud; iExact "Hop" |].
-      iAssert (it_ent_state γ γfs bm data cov logstart bmapstart size used (S q))
+      iAssert (it_ent_state γ γfs bm data cov logstart bmapstart size used w (S q))
         with "[Hres Hbmr Hpaid]" as "Hst".
       { iApply (it_ent_state_close with "Hres Hbmr Hpaid"). }
       (* ===== +0x78 c.j : back to the increment ===== *)
@@ -1666,7 +1670,7 @@ Section ItruncIArm.
       (γ : log_names) (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
-      (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat)
+      (pidv : mword 32) (dq dqd dqb : dfrac) (j : nat) (w : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
       ∀ Mx : regfile,
@@ -1683,18 +1687,17 @@ Section ItruncIArm.
         inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
         bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
         bslots bn 3 -∗
-        bm_paid γ bmapstart 1 -∗
+        bm_paid γ bmapstart w -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_iarm `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
-      (γs : list gname) (jx : nat) (γl : gname)
+  Local Lemma it_iarm `{GEN : GenId} `{CID0 : CpuId}       (γs : list gname) (jx : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names) (γ : log_names) (γfs : fs_names)
       (cov : gset Z) (logstart bmapstart size : Z) (dev : mword 32)
       (used : gset Z) (ip : mword 64) (bm : blkmap)
       (data : nat -> list (bv 8))
-      (pidv : mword 32) (dq dqd dqb : dfrac)
+      (pidv : mword 32) (dq dqd dqb : dfrac) (w : nat)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
     (K_itrunc <= K)%nat ->
     log_geom_ok cov logstart ->
@@ -1723,8 +1726,8 @@ Section ItruncIArm.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     running_claim jx -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
@@ -1738,10 +1741,10 @@ Section ItruncIArm.
     inode_map γfs ip (bm_dir_zeroed bm NDIRECT) -∗
     it_ent_res γfs bm data 0 -∗
     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm NDIRECT) -∗
-    bm_paid γ bmapstart 1 -∗
-    it_armexit (CID0 := CID0) Φ γ γfs bn cov logstart bmapstart size used dev
-               ip bm pidv dq dqd dqb jx m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    bm_paid γ bmapstart w -∗
+    it_armexit (CID0 := CID0) γ γfs bn cov logstart bmapstart size used dev
+               ip bm pidv dq dqd dqb jx w m K C b -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hindnz Hj Hgl
            Hsp Hthr Hs3 Ha1.
@@ -1780,7 +1783,7 @@ Section ItruncIArm.
     { rewrite Hsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hs6a) in "Hslot6".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (IT + 0x50))
+    iApply (wp_csdsp_s_sconf (mword_of_int (IT + 0x50))
               (mword_of_int 0 : mword 6) Rs4 M (K - 6)%nat v6 b
               with "Hcg Hpc Hi50 Hslot6").
     iIntros (CID1 Hq1) "Hcg Hpc Hslot6".
@@ -1799,7 +1802,7 @@ Section ItruncIArm.
                      (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
     { rgne. rewrite Hs3. reflexivity. }
     iEval (rewrite -Hdva) in "Hidev".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x52)) Ra0 Rs3
+    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x52)) Ra0 Rs3
               (mword_of_int 0 : mword 12) M (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi52 Hidev [-]").
     iIntros (CID2 Hq2) "Hcg Hpc Hidev".
@@ -1835,7 +1838,7 @@ Section ItruncIArm.
     assert (Hthree : (3 = 1 + 2)%nat) by lia.
     iEval (rewrite Hthree bslots_op) in "Hsl".
     iDestruct "Hsl" as "[Hsl1 Hsl]".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0x56)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (IT + 0x56)) Rra
               (mword_of_int 2095140 : mword 21) A0 (K - 6)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi56").
@@ -1873,7 +1876,7 @@ Section ItruncIArm.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
-    iApply (BR.wp_bread_sconf Φ γs jx γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs jx γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (bm_ind bm : mword 32) dq
               A1 (K - 6)%nat true C b
               HKbr
@@ -1897,7 +1900,7 @@ Section ItruncIArm.
                  (ind_bytes (bm_ent bm)) d0 with "Hindblk Hheld") as %Hbsl.
     iEval (rewrite Huc) in "Hindblk".
     (* ===== +0x5a mv s4,a0 : s4 := bp ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0x5a)) Rs4 Ra0
+    iApply (wp_cmv_s_sconf (mword_of_int (IT + 0x5a)) Rs4 Ra0
               mB (K - 6)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi5a").
     iIntros (CID5 Hq5) "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -1918,7 +1921,7 @@ Section ItruncIArm.
                    = mword_of_int (IT + 0x5c)) by pcw.
     iEval (rewrite Hp5c) in "Hpc".
     (* ===== +0x5c addi s1,a0,88 : s1 := bp->data ===== *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (IT + 0x5c)) Rs1 Ra0
+    iApply (wp_addi4_s_sconf (mword_of_int (IT + 0x5c)) Rs1 Ra0
               (mword_of_int 88 : mword 12) A2 (K - 6)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi5c").
     iIntros (CID6 Hq6) "Hcg Hpc".
@@ -1945,7 +1948,7 @@ Section ItruncIArm.
                    = mword_of_int (IT + 0x60)) by pcw.
     iEval (rewrite Hp60) in "Hpc".
     (* ===== +0x60 addi s2,a0,1112 : the limit, one past the last entry ===== *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (IT + 0x60)) Rs2 Ra0
+    iApply (wp_addi4_s_sconf (mword_of_int (IT + 0x60)) Rs2 Ra0
               (mword_of_int 1112 : mword 12) A3 (K - 6)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi60").
     iIntros (CID7 Hq7) "Hcg Hpc".
@@ -1986,7 +1989,7 @@ Section ItruncIArm.
                    = mword_of_int (IT + 0x64)) by pcw.
     iEval (rewrite Hp64) in "Hpc".
     (* ===== +0x64 c.j : into the body test ===== *)
-    iApply (wp_cj_s_sconf Φ (mword_of_int (IT + 0x64))
+    iApply (wp_cj_s_sconf (mword_of_int (IT + 0x64))
               (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")))
               A4 (K - 6)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi64 [-]").
@@ -2006,15 +2009,15 @@ Section ItruncIArm.
                   = used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm 0)).
     { rewrite bm_ent_freed_0. set_solver. }
     iEval (rewrite Hfz) in "Hbmr".
-    iAssert (it_ent_state γ γfs bm data cov logstart bmapstart size used 0)
+    iAssert (it_ent_state γ γfs bm data cov logstart bmapstart size used w 0)
       with "[Hres Hbmr Hpaid]" as "Hst".
     { iApply (it_ent_state_close with "Hres Hbmr Hpaid"). }
     (* Hcnt came back from bread at CID4, not from the pre-call transport *)
     iDestruct (cpu_own_transport CID4 CID8 0 true (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (it_eloop (CID0 := CID8) Φ γs jx γl γu γd γk pd pav pu bn γ γfs
+    iApply (it_eloop (CID0 := CID8) γs jx γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev used ip bm data kk
-              (mword_of_int 0 : mword 32) pidv dq dqd dqb m K C b NINDIRECT
+              (mword_of_int 0 : mword 32) pidv dq dqd dqb w m K C b NINDIRECT
               HK ltac:(split; [exact Hcovok | exact Hlogsub]) Hsize Hbm0
               Hbmcov Hbmlog Hwf Hrange Hblen
               Hkk Hj Hgl
@@ -2039,7 +2042,7 @@ Section ItruncIArm.
     iEval (rewrite Hbsl) in "Hheld".
     iDestruct (it_ent_state_open with "Hst") as "(Hres & Hbmr & Hpaid)".
     (* ===== +0x7a mv a0,s4 : a0 := bp ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (IT + 0x7a)) Ra0 Rs4
+    iApply (wp_cmv_s_sconf (mword_of_int (IT + 0x7a)) Ra0 Rs4
               Mx (K - 6)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi7a").
     iIntros (CID10 Hq10) "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -2067,7 +2070,7 @@ Section ItruncIArm.
                    = mword_of_int (IT + 0x7c)) by pcw.
     iEval (rewrite Hp7c) in "Hpc".
     (* ===== +0x7c jal brelse ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0x7c)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (IT + 0x7c)) Rra
               (mword_of_int 2095366 : mword 21) B0 (K - 6)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi7c").
@@ -2096,7 +2099,7 @@ Section ItruncIArm.
     (* Hcnt arrived with the loop's exit at CID9 *)
     iDestruct (cpu_own_transport CID9 CID11 0 true (proc_addr jx) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev (bm_ind bm : mword 32) dq B1 (K - 6)%nat true
               (proc_addr jx) C (ind_bytes (bm_ent bm)) bsd0 d0 b
               HKbl Hkk HB1a0
@@ -2129,7 +2132,7 @@ Section ItruncIArm.
                    = i_addr ip NDIRECT).
     { rgne. rewrite HmRs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
     iEval (rewrite -Hica) in "Hindcell".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x80)) Ra1 Rs3
+    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x80)) Ra1 Rs3
               (mword_of_int 128 : mword 12) mR (K - 6)%nat
               (bm_ind bm : mword 32) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi80 Hindcell [-]").
@@ -2155,7 +2158,7 @@ Section ItruncIArm.
                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = i_dev ip).
     { rgne. rewrite HC0s3. reflexivity. }
     iEval (rewrite -Hdva2) in "Hidev".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (IT + 0x84)) Ra0 Rs3
+    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x84)) Ra0 Rs3
               (mword_of_int 0 : mword 12) C0 (K - 6)%nat dev b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 Hidev [-]").
     iIntros (CID14 Hq14) "Hcg Hpc Hidev".
@@ -2177,7 +2180,7 @@ Section ItruncIArm.
                    = mword_of_int (IT + 0x88)) by pcw.
     iEval (rewrite Hp88) in "Hpc".
     (* ===== +0x88 jal bfree : the indirect block itself ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (IT + 0x88)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (IT + 0x88)) Rra
               (mword_of_int 2095590 : mword 21) C1 (K - 6)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi88").
@@ -2213,7 +2216,7 @@ Section ItruncIArm.
     iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID15)
                  ltac:(wp_next_chain) with "Hexit") as "Hexit".
     assert (HKbf2 : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
-    iApply (BF.wp_bfree_gen Φ γs jx γl γu γd γk pd pav pu bn γ γfs
+    iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev
               (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm NINDIRECT))
               (bm_ind bm : mword 32) (ind_bytes (bm_ent bm)) u' cr Sb
@@ -2260,7 +2263,7 @@ Section ItruncIArm.
                     = i_addr ip NDIRECT).
     { rgne. rewrite HmZs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
     iEval (rewrite -Hica2) in "Hindcell".
-    iApply (wp_sw_s_sconf Φ (mword_of_int (IT + 0x8c)) Rz Rs3
+    iApply (wp_sw_s_sconf (mword_of_int (IT + 0x8c)) Rz Rs3
               (mword_of_int 128 : mword 12) mZ (K - 6)%nat
               (bm_ind bm : mword 32) b with "Hcg Hpc Hi8c Hindcell").
     iIntros (CID17 Hq17) "Hcg Hpc Hindcell".
@@ -2293,7 +2296,7 @@ Section ItruncIArm.
     { rewrite HmZsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
     iEval (rewrite -Hs6b) in "Hslot6".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (IT + 0x90))
+    iApply (wp_cldsp_s_sconf (mword_of_int (IT + 0x90))
               (mword_of_int 0 : mword 6) Rs4
               mZ (K - 6)%nat (m !!! Regidx Rs4 : mword 64) b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi90 [Hslot6]").
@@ -2319,7 +2322,7 @@ Section ItruncIArm.
                    = mword_of_int (IT + 0x92)) by pcw.
     iEval (rewrite Hp92) in "Hpc".
     (* ===== +0x92 c.j : rejoin the tail at +0x38 ===== *)
-    iApply (wp_cj_s_sconf Φ (mword_of_int (IT + 0x92))
+    iApply (wp_cj_s_sconf (mword_of_int (IT + 0x92))
               (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0")))
               D0 (K - 6)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi92 [-]").
@@ -2347,5 +2350,464 @@ Section ItruncIArm.
   Qed.
 
 End ItruncIArm.
+
+(* ===================================================================== *)
+(*  THE WHOLE FUNCTION: prologue, the direct loop, the indirect test,     *)
+(*  and the shared tail.                                                  *)
+(* ===================================================================== *)
+Section ItruncMain.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+
+  Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
+      (γu : uart_names) (γd : disk_names) (γk : gname)
+      (pd pav pu : mword 64)
+      (bn : bio_names) (γ : log_names) (γfs : fs_names)
+      (cov : gset Z) (logstart bmapstart inodestart size : Z)
+      (dev : mword 32) (used : gset Z)
+      (ip : mword 64) (inum : mword 32)
+      (dn : dinode) (bm : blkmap) (ds : list dinode)
+      (data : nat -> list (bv 8)) (u : nat)
+      (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
+      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
+    : wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
+                           cov logstart bmapstart inodestart size dev used
+                           ip inum dn bm ds data u
+                           pidv dq dqd dqn dqb dqs m K eb C b.
+  Proof.
+    cbv beta delta [wp_itrunc_sconf_body].
+    intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
+           Hdswf Hwf Hrange Hblen Hadr Hj Hgl Ha0 Heb.
+    subst eb.
+    pose proof HK as HK'. unfold K_itrunc in HK'.
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinum Hmeta Hmap
+              Hblks Hsbb Hsbi Hbmr Hfsb Hppid #Hprocs #Hscheds Hrun #Hdevi
+              #Hdgeom #Hdlock Hsl Hop Hcont".
+    iPoseProof (iti_00 with "Htext") as "Hi00".
+    iPoseProof (iti_02 with "Htext") as "Hi02".
+    iPoseProof (iti_04 with "Htext") as "Hi04".
+    iPoseProof (iti_06 with "Htext") as "Hi06".
+    iPoseProof (iti_08 with "Htext") as "Hi08".
+    iPoseProof (iti_0a with "Htext") as "Hi0a".
+    iPoseProof (iti_0c with "Htext") as "Hi0c".
+    iPoseProof (iti_0e with "Htext") as "Hi0e".
+    iPoseProof (iti_10 with "Htext") as "Hi10".
+    iPoseProof (iti_14 with "Htext") as "Hi14".
+    iPoseProof (iti_18 with "Htext") as "Hi18".
+    (* ===== +0x00 c.addi16sp sp,-48 : claim the six slots ===== *)
+    assert (Hpush : add_vec (m !!! Regidx csp_rs1 : mword 64)
+                      (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6)))
+                    = pa_stk (m !!! Regidx csp_rs1 : mword 64) 6).
+    { unfold pa_stk, add_vec_int. apply f_equal. pcw. }
+    iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 61 : mword 6)
+              m K 6 b ltac:(lia) Hpush with "Hcg Hpc Hi00 [-]").
+    iIntros (CID1 Hq1) "Hcg Hstk Hpc".
+    assert (Hp02 : add_vec_int pcE 2 = mword_of_int (IT + 0x02)) by pcw.
+    iEval (rewrite Hp02) in "Hpc".
+    set (P0 := <[Regidx csp_rs1 := regval_into_reg
+                  (add_vec (m !!! Regidx csp_rs1 : mword 64)
+                     (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))]> m).
+    assert (HP0sp : it_sp m P0) by (rewrite /it_sp /P0; apply upd_eq).
+    assert (HP0thr : it_thr m P0).
+    { intros c Hcs N2 N8 N9 N18 N19.
+      rewrite /P0 upd_ne;
+        [reflexivity | intros Hq; injection Hq as Hq'; exact (N2 Hq')]. }
+    assert (HP0a0 : P0 !!! Regidx Ra0 = ip)
+      by (rewrite /P0 upd_ne; [exact Ha0 | nz]).
+    rewrite stack_own_slots. cbn [seq].
+    iDestruct "Hstk" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & _)".
+    iDestruct "Hf1" as (v1) "Hf1". iDestruct "Hf2" as (v2) "Hf2".
+    iDestruct "Hf3" as (v3) "Hf3". iDestruct "Hf4" as (v4) "Hf4".
+    iDestruct "Hf5" as (v5) "Hf5".
+    (* the five slot addresses, in the c.sdsp spelling *)
+    assert (Hsl1 : add_vec (P0 !!! Regidx csp_rs1)
+                     (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
+                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 1).
+    { rewrite HP0sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
+      f_equal; try pcw. }
+    assert (Hsl2 : add_vec (P0 !!! Regidx csp_rs1)
+                     (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
+                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 2).
+    { rewrite HP0sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
+      f_equal; try pcw. }
+    assert (Hsl3 : add_vec (P0 !!! Regidx csp_rs1)
+                     (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
+                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 3).
+    { rewrite HP0sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
+      f_equal; try pcw. }
+    assert (Hsl4 : add_vec (P0 !!! Regidx csp_rs1)
+                     (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
+                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 4).
+    { rewrite HP0sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
+      f_equal; try pcw. }
+    assert (Hsl5 : add_vec (P0 !!! Regidx csp_rs1)
+                     (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
+                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 5).
+    { rewrite HP0sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
+      f_equal; try pcw. }
+    assert (HP0ra : (P0 !!! Regidx Rra : mword 64)
+                    = (m !!! Regidx Rra : mword 64))
+      by (rewrite /P0 upd_ne; [reflexivity | nz]).
+    assert (HP0s0 : (P0 !!! Regidx Rs0 : mword 64)
+                    = (m !!! Regidx Rs0 : mword 64))
+      by (rewrite /P0 upd_ne; [reflexivity | nz]).
+    assert (HP0s1 : (P0 !!! Regidx Rs1 : mword 64)
+                    = (m !!! Regidx Rs1 : mword 64))
+      by (rewrite /P0 upd_ne; [reflexivity | nz]).
+    assert (HP0s2 : (P0 !!! Regidx Rs2 : mword 64)
+                    = (m !!! Regidx Rs2 : mword 64))
+      by (rewrite /P0 upd_ne; [reflexivity | nz]).
+    assert (HP0s3 : (P0 !!! Regidx Rs3 : mword 64)
+                    = (m !!! Regidx Rs3 : mword 64))
+      by (rewrite /P0 upd_ne; [reflexivity | nz]).
+    (* +0x02 sd ra,40(sp) *)
+    iEval (rewrite -Hsl1) in "Hf1".
+    iApply (wp_csdsp_s_sconf (mword_of_int (IT + 0x02))
+              (mword_of_int 5 : mword 6) Rra P0 (K - 6)%nat v1 b
+              with "Hcg Hpc Hi02 Hf1").
+    iIntros (CID2 Hq2) "Hcg Hpc Hf1".
+    iEval (rewrite Hsl1) in "Hf1". iEval (rgne) in "Hf1". iEval (rewrite HP0ra) in "Hf1".
+    assert (Hp04 : add_vec_int (mword_of_int (IT + 0x02) : mword 64) 2
+                   = mword_of_int (IT + 0x04)) by pcw.
+    iEval (rewrite Hp04) in "Hpc".
+    (* +0x04 sd rs0 *)
+    iEval (rewrite -Hsl2) in "Hf2".
+    iApply (wp_csdsp_s_sconf (mword_of_int (IT + 0x04))
+              (mword_of_int 4 : mword 6) Rs0 P0 (K - 6)%nat v2 b
+              with "Hcg Hpc Hi04 Hf2").
+    iIntros (CID3x Hq3x) "Hcg Hpc Hf2".
+    iEval (rewrite Hsl2) in "Hf2". iEval (rgne) in "Hf2". iEval (rewrite HP0s0) in "Hf2".
+    assert (Hp06 : add_vec_int (mword_of_int (IT + 0x04) : mword 64) 2
+                   = mword_of_int (IT + 0x06)) by pcw.
+    iEval (rewrite Hp06) in "Hpc".
+    (* +0x06 sd rs1 *)
+    iEval (rewrite -Hsl3) in "Hf3".
+    iApply (wp_csdsp_s_sconf (mword_of_int (IT + 0x06))
+              (mword_of_int 3 : mword 6) Rs1 P0 (K - 6)%nat v3 b
+              with "Hcg Hpc Hi06 Hf3").
+    iIntros (CID4x Hq4x) "Hcg Hpc Hf3".
+    iEval (rewrite Hsl3) in "Hf3". iEval (rgne) in "Hf3". iEval (rewrite HP0s1) in "Hf3".
+    assert (Hp08 : add_vec_int (mword_of_int (IT + 0x06) : mword 64) 2
+                   = mword_of_int (IT + 0x08)) by pcw.
+    iEval (rewrite Hp08) in "Hpc".
+    (* +0x08 sd rs2 *)
+    iEval (rewrite -Hsl4) in "Hf4".
+    iApply (wp_csdsp_s_sconf (mword_of_int (IT + 0x08))
+              (mword_of_int 2 : mword 6) Rs2 P0 (K - 6)%nat v4 b
+              with "Hcg Hpc Hi08 Hf4").
+    iIntros (CID5x Hq5x) "Hcg Hpc Hf4".
+    iEval (rewrite Hsl4) in "Hf4". iEval (rgne) in "Hf4". iEval (rewrite HP0s2) in "Hf4".
+    assert (Hp0a : add_vec_int (mword_of_int (IT + 0x08) : mword 64) 2
+                   = mword_of_int (IT + 0x0a)) by pcw.
+    iEval (rewrite Hp0a) in "Hpc".
+    (* +0x0a sd rs3 *)
+    iEval (rewrite -Hsl5) in "Hf5".
+    iApply (wp_csdsp_s_sconf (mword_of_int (IT + 0x0a))
+              (mword_of_int 1 : mword 6) Rs3 P0 (K - 6)%nat v5 b
+              with "Hcg Hpc Hi0a Hf5").
+    iIntros (CID6x Hq6x) "Hcg Hpc Hf5".
+    iEval (rewrite Hsl5) in "Hf5". iEval (rgne) in "Hf5". iEval (rewrite HP0s3) in "Hf5".
+    assert (Hp0c : add_vec_int (mword_of_int (IT + 0x0a) : mword 64) 2
+                   = mword_of_int (IT + 0x0c)) by pcw.
+    iEval (rewrite Hp0c) in "Hpc".
+    (* the frame is complete: five saved registers and the sixth slot,
+       which only the indirect arm ever writes *)
+    iAssert (it_frame m) with "[Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hframe".
+    { rewrite /it_frame. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5". iExact "Hf6". }
+    (* ===== +0x0c c.addi4spn s0,sp,48 : the frame pointer, unused below ==== *)
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (IT + 0x0c))
+              (Cregidx (mword_of_int 0)) (mword_of_int 12 : mword 8) Rs0
+              P0 (K - 6)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
+              ltac:(rdok) with "Hcg Hpc Hi0c").
+    iIntros (CID7x Hq7x) "Hcg Hpc".
+    set (Q0 := <[Regidx Rs0 := regval_into_reg
+                  (add_vec (P0 !!! Regidx csp_rs1)
+                     (sign_extend' 64 (caddi4spn_imm (mword_of_int 12 : mword 8))))]> P0).
+    assert (HQ0a0 : Q0 !!! Regidx Ra0 = ip)
+      by (rewrite /Q0 upd_ne; [exact HP0a0 | nz]).
+    assert (HQ0sp : it_sp m Q0)
+      by (rewrite /it_sp /Q0 upd_ne; [exact HP0sp | nz]).
+    assert (Hp0e : add_vec_int (mword_of_int (IT + 0x0c) : mword 64) 2
+                   = mword_of_int (IT + 0x0e)) by pcw.
+    iEval (rewrite Hp0e) in "Hpc".
+    (* ===== +0x0e mv s3,a0 : s3 := ip, and it stays there ===== *)
+    iApply (wp_cmv_s_sconf (mword_of_int (IT + 0x0e)) Rs3 Ra0
+              Q0 (K - 6)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0e").
+    iIntros (CID8x Hq8x) "Hcg Hpc".
+    iEval (rgne) in "Hcg".
+    set (Q1 := <[Regidx Rs3 := regval_into_reg
+                  (add_vec zero_reg (Q0 !!! Regidx Ra0 : mword 64))]> Q0).
+    change (<[Regidx Rs3 := regval_into_reg (add_vec zero_reg (rget Q0 Ra0))]> Q0)
+      with Q1.
+    assert (Hzl3 : forall x : mword 64, add_vec zero_reg x = x).
+    { intros x. apply bv_eq. rewrite add_vec64_unsigned.
+      assert (Hz : bv_unsigned (zero_reg : mword 64) = 0)
+        by (vm_compute; reflexivity).
+      rewrite Hz Z.add_0_l. apply bv_wrap_small, bv_unsigned_in_range. }
+    assert (HQ1s3 : Q1 !!! Regidx Rs3 = ip)
+      by (rewrite /Q1 upd_eq Hzl3; exact HQ0a0).
+    assert (HQ1a0 : Q1 !!! Regidx Ra0 = ip)
+      by (rewrite /Q1 upd_ne; [exact HQ0a0 | nz]).
+    assert (HQ1sp : it_sp m Q1)
+      by (rewrite /it_sp /Q1 upd_ne; [exact HQ0sp | nz]).
+    assert (Hp10 : add_vec_int (mword_of_int (IT + 0x0e) : mword 64) 2
+                   = mword_of_int (IT + 0x10)) by pcw.
+    iEval (rewrite Hp10) in "Hpc".
+    (* ===== +0x10 addi s1,a0,80 : the direct cursor ===== *)
+    iApply (wp_addi4_s_sconf (mword_of_int (IT + 0x10)) Rs1 Ra0
+              (mword_of_int 80 : mword 12) Q1 (K - 6)%nat b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10").
+    iIntros (CID9x Hq9x) "Hcg Hpc".
+    set (Q2 := <[Regidx Rs1 := regval_into_reg
+                  (add_vec (rget Q1 Ra0)
+                     (sign_extend' 64 (mword_of_int 80 : mword 12)))]> Q1).
+    assert (HQ2s1 : Q2 !!! Regidx Rs1 = i_addr ip 0).
+    { rewrite /Q2 upd_eq. rgne. rewrite HQ1a0 /i_addr. f_equal. }
+    assert (HQ2s3 : Q2 !!! Regidx Rs3 = ip)
+      by (rewrite /Q2 upd_ne; [exact HQ1s3 | nz]).
+    assert (HQ2a0 : Q2 !!! Regidx Ra0 = ip)
+      by (rewrite /Q2 upd_ne; [exact HQ1a0 | nz]).
+    assert (HQ2sp : it_sp m Q2)
+      by (rewrite /it_sp /Q2 upd_ne; [exact HQ1sp | nz]).
+    assert (Hp14 : add_vec_int (mword_of_int (IT + 0x10) : mword 64) 4
+                   = mword_of_int (IT + 0x14)) by pcw.
+    iEval (rewrite Hp14) in "Hpc".
+    (* ===== +0x14 addi s2,a0,128 : the direct loop's limit ===== *)
+    iApply (wp_addi4_s_sconf (mword_of_int (IT + 0x14)) Rs2 Ra0
+              (mword_of_int 128 : mword 12) Q2 (K - 6)%nat b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi14").
+    iIntros (CID10x Hq10x) "Hcg Hpc".
+    set (Q3 := <[Regidx Rs2 := regval_into_reg
+                  (add_vec (rget Q2 Ra0)
+                     (sign_extend' 64 (mword_of_int 128 : mword 12)))]> Q2).
+    assert (HQ3s2 : Q3 !!! Regidx Rs2 = i_addr ip NDIRECT).
+    { rewrite /Q3 upd_eq. rgne. rewrite HQ2a0 it_dir_limit
+              /pa_add /add_vec_int. f_equal. }
+    assert (HQ3s1 : Q3 !!! Regidx Rs1 = i_addr ip 0)
+      by (rewrite /Q3 upd_ne; [exact HQ2s1 | nz]).
+    assert (HQ3s3 : Q3 !!! Regidx Rs3 = ip)
+      by (rewrite /Q3 upd_ne; [exact HQ2s3 | nz]).
+    assert (HQ3sp : it_sp m Q3)
+      by (rewrite /it_sp /Q3 upd_ne; [exact HQ2sp | nz]).
+    (* the five saved registers are the caller's; s4 upward untouched *)
+    assert (HQ3thr : it_thr m Q3).
+    { intros c Hcs N2 N8 N9 N18 N19.
+      rewrite /Q3 upd_ne; [| regne]. rewrite /Q2 upd_ne; [| regne].
+      rewrite /Q1 upd_ne; [| regne]. rewrite /Q0 upd_ne; [| regne].
+      exact (HP0thr c Hcs N2 N8 N9 N18 N19). }
+    assert (Hp18 : add_vec_int (mword_of_int (IT + 0x14) : mword 64) 4
+                   = mword_of_int (IT + 0x18)) by pcw.
+    iEval (rewrite Hp18) in "Hpc".
+    (* ===== +0x18 c.j : into the direct loop's body test ===== *)
+    iApply (wp_cj_s_sconf (mword_of_int (IT + 0x18))
+              (sign_extend' 21 (concat_vec (mword_of_int 4 : mword 11) ('b"0")))
+              Q3 (K - 6)%nat b ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc Hi18 [-]").
+    iIntros (CID11x Hq11x). iNext. iIntros "Hcg Hpc".
+    assert (Htgt20 : add_vec (mword_of_int (IT + 0x18) : mword 64)
+                       (sign_extend' 64 (sign_extend' 21
+                          (concat_vec (mword_of_int 4 : mword 11) ('b"0"))))
+                     = mword_of_int (IT + 0x20)) by pcw.
+    iEval (rewrite Htgt20) in "Hpc".
+    (* the loop's state at cursor 0: the map is [bm] itself *)
+    assert (Hz0 : bm_dir_zeroed bm 0 = bm) by apply bm_dir_zeroed_0.
+    assert (Hf0 : used ∖ bm_dir_freed bm 0 = used)
+      by (rewrite bm_dir_freed_0; set_solver).
+    iDestruct (bm_paid_intro γ bmapstart u with "Hop") as "Hpaid".
+    iAssert (it_dir_state γ γfs ip bm data cov logstart bmapstart size used
+                          bn u 0)
+      with "[Hmap Hblks Hbmr Hpaid]" as "Hst".
+    { iApply (it_dir_state_close with "[Hmap] [Hblks] [Hbmr] Hpaid");
+        [ rewrite Hz0; iExact "Hmap"
+        | rewrite Hz0; iExact "Hblks"
+        | rewrite Hf0; iExact "Hbmr" ]. }
+    (* the direct loop needs two of the three slots; the third is parked
+       until the indirect arm's bread wants it *)
+    assert (H3 : (3 = 2 + 1)%nat) by lia.
+    iEval (rewrite H3 bslots_op) in "Hsl".
+    iDestruct "Hsl" as "[Hsl Hslp]".
+    iDestruct (cpu_own_transport CID CID11x 0 true (proc_addr j) C b
+                 ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+    iApply (it_dloop (CID0 := CID11x) γs j γl γu γd γk pd pav pu bn γ γfs
+              cov logstart bmapstart size dev used ip bm data
+              pidv dq dqd dqb u m K C b NDIRECT
+              HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl
+              0%nat Q3 ltac:(unfold NDIRECT; lia) ltac:(lia)
+              HQ3sp HQ3thr HQ3s1 HQ3s2 HQ3s3
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hrun
+                    Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hst [-]").
+    (* ===== the direct loop is done: +0x32 onwards ===== *)
+    iIntros (CID12x Hq12x Mx) "%HMsp %HMthr %HMs3 Hcg Hcnt Hpc Hrun Hppid
+                               Hidev Hsbb Hsl Hst".
+    iPoseProof (iti_32 with "Htext") as "Hi32".
+    iPoseProof (iti_36 with "Htext") as "Hi36".
+    iDestruct (it_dir_state_open with "Hst") as "(Hmap & Hblks & Hbmr & Hpaid)".
+    pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
+    pose proof (blkmap_wf_ent_len _ _ _ Hwf) as Hentlen.
+    assert (Hzlen : length (bm_dir (bm_dir_zeroed bm NDIRECT)) = NDIRECT)
+      by (rewrite bm_dir_zeroed_len; [exact Hdirlen | lia]).
+    iDestruct (inode_map_ind_acc γfs ip (bm_dir_zeroed bm NDIRECT) Hzlen
+                 with "Hmap") as "(Hindcell & Hindres & Hmapback)".
+    assert (Hindz : bm_ind (bm_dir_zeroed bm NDIRECT) = bm_ind bm)
+      by (rewrite /bm_dir_zeroed; reflexivity).
+    iEval (rewrite Hindz) in "Hindcell".
+    (* ===== +0x32 lw a1,128(s3) : a1 := ip->addrs[NDIRECT] ===== *)
+    assert (Hica0 : add_vec (rget Mx Rs3)
+                      (sign_extend' 64 (mword_of_int 128 : mword 12))
+                    = i_addr ip NDIRECT).
+    { rgne. rewrite HMs3 it_dir_limit /pa_add /add_vec_int. f_equal. }
+    iEval (rewrite -Hica0) in "Hindcell".
+    iApply (wp_lw_s_sconf (mword_of_int (IT + 0x32)) Ra1 Rs3
+              (mword_of_int 128 : mword 12) Mx (K - 6)%nat
+              (bm_ind bm : mword 32) b
+              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi32 Hindcell [-]").
+    iIntros (CID13x Hq13x) "Hcg Hpc Hindcell".
+    iEval (rewrite Hica0) in "Hindcell".
+    set (R0 := <[Regidx Ra1 := regval_into_reg
+                  (sign_extend' 64 (bm_ind bm : mword 32))]> Mx).
+    assert (HR0a1 : R0 !!! Regidx Ra1
+                    = sign_extend' 64 (bm_ind bm : mword 32))
+      by (rewrite /R0; apply upd_eq).
+    assert (HR0s3 : R0 !!! Regidx Rs3 = ip)
+      by (rewrite /R0 upd_ne; [exact HMs3 | nz]).
+    assert (HR0sp : it_sp m R0)
+      by (rewrite /it_sp /R0 upd_ne; [exact HMsp | nz]).
+    assert (HR0thr : it_thr m R0).
+    { intros c Hcs N2 N8 N9 N18 N19.
+      rewrite /R0 upd_ne; [| regne]. exact (HMthr c Hcs N2 N8 N9 N18 N19). }
+    assert (Hp36 : add_vec_int (mword_of_int (IT + 0x32) : mword 64) 4
+                   = mword_of_int (IT + 0x36)) by pcw.
+    iEval (rewrite Hp36) in "Hpc".
+    (* the map at this point is the direct-zeroed one; put the indirect
+       cell back so either path has a whole [inode_map] to work from *)
+    iDestruct ("Hmapback" $! (bm_ind bm) (bm_ent (bm_dir_zeroed bm NDIRECT))
+                 with "[Hindcell] Hindres") as "Hmap";
+      [ rewrite -Hindz; iExact "Hindcell" |].
+    assert (Hmid : MkBlkmap (bm_dir (bm_dir_zeroed bm NDIRECT))
+                     (bm_ind bm) (bm_ent (bm_dir_zeroed bm NDIRECT))
+                   = bm_dir_zeroed bm NDIRECT)
+      by (rewrite /bm_dir_zeroed; reflexivity).
+    iEval (rewrite Hmid) in "Hmap".
+    (* ===== +0x36 c.bnez a1 : is there an indirect block? ===== *)
+    destruct (decide (bv_unsigned (bm_ind bm : mword 32) = 0)) as [Hnoind|Hyesind].
+    - (* ---------- NO indirect block: straight to the tail ----------
+         THIS is what blkmap_wf's third clause is for: no indirect block
+         means no entries, so the direct-zeroed map IS bm_empty and there
+         is nothing left to free. *)
+      pose proof (blkmap_wf_no_ind cov logstart bm Hwf Hnoind) as Hentzero.
+      assert (Hisempty : bm_dir_zeroed bm NDIRECT = bm_empty).
+      { rewrite /bm_dir_zeroed /bm_empty.
+        rewrite (drop_ge (bm_dir bm) NDIRECT); [| lia].
+        rewrite app_nil_r Hentzero. f_equal.
+        apply bv_eq. rewrite Hnoind. reflexivity. }
+      assert (Hblkempty : bm_blocks bm = bm_dir_freed bm NDIRECT).
+      { rewrite (bm_blocks_split bm Hdirlen Hentlen).
+        assert (He0 : bm_ent_freed bm NINDIRECT = ∅).
+        { apply set_eq. intros z. rewrite bm_ent_freed_spec. split; [|set_solver].
+          intros (Hnz & q & Hq & Hz). exfalso. apply Hnz. rewrite -Hz Hentzero.
+          rewrite lookup_total_replicate_2; [reflexivity | lia]. }
+        rewrite He0 Hnoind. set_solver. }
+      (* the test is BNE, so "no indirect block" FALLS THROUGH to the tail *)
+      iApply (wp_cbnez_fall_s_sconf (mword_of_int (IT + 0x36))
+                (mword_of_int 13 : mword 8) (Cregidx (mword_of_int 3)) Ra1
+                R0 (K - 6)%nat b
+                ltac:(vm_compute; reflexivity) ltac:(nz)
+                ltac:(rgne; rewrite HR0a1; exact (it_neqz_false _ Hnoind))
+                with "Hcg Hpc Hi36 [-]").
+      iIntros (CID14x Hq14x) "Hcg Hpc".
+      assert (Hp38 : add_vec_int (mword_of_int (IT + 0x36) : mword 64) 2
+                     = mword_of_int (IT + 0x38)) by pcw.
+      iEval (rewrite Hp38) in "Hpc".
+      iEval (rewrite Hisempty) in "Hmap".
+      iEval (rewrite Hisempty) in "Hblks".
+      iEval (rewrite -Hblkempty) in "Hbmr".
+      iDestruct (bm_paid_elim with "Hpaid") as (n0) "(%Hn0 & Hop)".
+      (* iupdate wants a successor; bm_paid guarantees at least S u *)
+      destruct n0 as [|n1]; [exfalso; lia|].
+      iDestruct (cpu_own_transport CID12x CID14x 0 true (proc_addr j) C b
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID14x)
+                   ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iApply (it_tail (CID0 := CID14x) γs j γl γu γd γk pd pav pu bn γ γfs
+                cov logstart bmapstart inodestart size dev used ip inum dn bm ds
+                n1 pidv dq dqd dqn dqb dqs m R0 K C b
+                HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl HR0sp HR0thr HR0s3
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds
+                      Hframe Hrun Hppid Hidev Hinum Hsbb Hsbi
+                      Hmeta Hmap Hblks Hbmr Hfsb Hdevi Hdgeom Hdlock
+                      [Hsl Hslp] Hop [Hcont]").
+      { assert (H3b : (3 = 2 + 1)%nat) by lia.
+        rewrite H3b bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hslp"]. }
+      (* it_tail's continuation IS itrunc's postcondition, except that the
+         budget arrives as a concrete level and the contract states a range *)
+      rewrite /it_cont.
+      iIntros (CIDz) "%Hch". iSpecialize ("Hcont" $! CIDz with "[%]");
+        [exact Hch|].
+      iIntros (mf) "%Hcs Hsie Hcnt Hpc Hrun Hppid Hidev Hinum Hsbb Hsbi
+                    Hmeta Hmap Hblks Hbmr Hfsb Hsl Hop".
+      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hrun Hppid Hidev Hinum
+                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hsl
+                                  [Hop]");
+        [exact Hcs | iExists n1; iSplitR; [iPureIntro; lia|]; iExact "Hop"].
+    - (* ---------- there is one: take the arm ---------- *)
+      iApply (wp_cbnez_taken_s_sconf (mword_of_int (IT + 0x36))
+                (mword_of_int 13 : mword 8) (Cregidx (mword_of_int 3)) Ra1
+                R0 (K - 6)%nat b
+                ltac:(vm_compute; reflexivity) ltac:(nz)
+                ltac:(rgne; rewrite HR0a1; exact (it_neqz_true _ Hyesind))
+                ltac:(vm_compute; reflexivity)
+                with "Hcg Hpc Hi36 [-]").
+      iNext. iIntros (CID14y Hq14y) "Hcg Hpc".
+      assert (Htgt50 : add_vec (mword_of_int (IT + 0x36) : mword 64)
+                         (sign_extend' 64 (sign_extend' 13
+                            (concat_vec (mword_of_int 13 : mword 8) ('b"0"))))
+                       = mword_of_int (IT + 0x50)) by pcw.
+      iEval (rewrite Htgt50) in "Hpc".
+      iDestruct (inode_blocks_to_ent_res γfs bm data Hdirlen Hentlen
+                   with "Hblks") as "Hres0".
+      rewrite /it_frame.
+      iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6)".
+      iDestruct (cpu_own_transport CID12x CID14y 0 true (proc_addr j) C b
+                   ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
+      iApply (it_iarm (CID0 := CID14y) γs j γl γu γd γk pd pav pu bn γ γfs
+                cov logstart bmapstart size dev used ip bm data
+                pidv dq dqd dqb u m R0 K C b
+                HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hyesind
+                Hj Hgl HR0sp HR0thr HR0s3 HR0a1
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hrun
+                      Hppid Hidev Hsbb Hdevi Hdgeom Hdlock [Hf6]
+                      [Hsl Hslp] Hmap Hres0 Hbmr Hpaid [-]").
+      { iExact "Hf6". }
+      { assert (H3c : (3 = 2 + 1)%nat) by lia.
+        rewrite H3c bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hslp"]. }
+      (* ===== the arm rejoins at +0x38: hand on to the tail ===== *)
+      rewrite /it_armexit.
+      iIntros (CID15y Hq15y Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hpc Hrun Hppid
+                                 Hidev Hsbb Hslot6 Hmap Hblks Hbmr Hsl Hpaid".
+      iDestruct (bm_paid_elim with "Hpaid") as (n2) "(%Hn2 & Hop)".
+      destruct n2 as [|n3]; [exfalso; lia|].
+      iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID15y)
+                   ltac:(wp_next_chain) with "Hcont") as "Hcont".
+      iApply (it_tail (CID0 := CID15y) γs j γl γu γd γk pd pav pu bn γ γfs
+                cov logstart bmapstart inodestart size dev used ip inum dn bm ds
+                n3 pidv dq dqd dqn dqb dqs m Mz K C b
+                HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl HMzsp HMzthr HMzs3
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds
+                      [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hrun Hppid Hidev Hinum Hsbb
+                      Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hdevi Hdgeom Hdlock
+                      Hsl Hop [Hcont]").
+      { rewrite /it_frame. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5". iExact "Hslot6". }
+      rewrite /it_cont.
+      iIntros (CIDw) "%Hchw". iSpecialize ("Hcont" $! CIDw with "[%]");
+        [exact Hchw|].
+      iIntros (mf) "%Hcsw Hsie Hcnt Hpc Hrun Hppid Hidev Hinum Hsbb Hsbi
+                    Hmeta Hmap Hblks Hbmr Hfsb Hsl Hop".
+      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hrun Hppid Hidev Hinum
+                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hsl
+                                  [Hop]");
+        [exact Hcsw | iExists n3; iSplitR; [iPureIntro; lia|]; iExact "Hop"].
+  Qed.
+
+End ItruncMain.
 
 End ItruncProof.

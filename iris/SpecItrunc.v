@@ -242,7 +242,7 @@ Definition wp_itrunc_sconf_body
      contents but says nothing about their length.  Like the range premise
      above this is a genuine FS fact the model does not yet hold anywhere,
      and it is recorded as owed in fs-inode.md alongside it. *)
-  (forall i : nat, length (data i) = BSIZE) ->
+  (forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE) ->
   (* the record's addrs field names the cells the map owns -- iupdate's tie,
      restated here because itrunc rewrites both together *)
   di_addrs dn = bm_cells bm ->

@@ -386,6 +386,17 @@ Proof.
   lia.
 Qed.
 
+(* The +0x36 test is a BNE, so the arm needs [neq_vec] where the loops
+   needed [eq_vec].  ProofBmapParts has the eq_vec pair; these are the
+   negations, and nothing more. *)
+Lemma it_neqz_false (w : mword 32) : bv_unsigned w = 0 ->
+  neq_vec (sign_extend' 64 w : mword 64) (zero_reg : mword 64) = false.
+Proof. intros Hw. unfold neq_vec. rewrite (bm_eqz_true w Hw). reflexivity. Qed.
+
+Lemma it_neqz_true (w : mword 32) : bv_unsigned w <> 0 ->
+  neq_vec (sign_extend' 64 w : mword 64) (zero_reg : mword 64) = true.
+Proof. intros Hw. unfold neq_vec. rewrite (bm_eqz_false w Hw). reflexivity. Qed.
+
 (* THE INNER LOOP'S CURSOR walks bp->data by fours and stops at
    bp->data + 1024, so it needs the same injectivity the direct loop's
    exit test needed -- distinct entry positions are distinct addresses.
@@ -492,11 +503,11 @@ Section ItruncDefs.
   Definition it_dir_state (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
-      (bn : bio_names) (k : nat) : iProp Σ :=
+      (bn : bio_names) (w : nat) (k : nat) : iProp Σ :=
     (inode_map γfs ip (bm_dir_zeroed bm k) ∗
      inode_blocks γfs (bm_dir_zeroed bm k) data ∗
      bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
-     bm_paid γ bmapstart 1)%I.
+     bm_paid γ bmapstart w)%I.
 
   (* Opened and closed by LEMMA, never by [rewrite /it_dir_state]: the Iris
      context is part of the goal term, so unfolding the definition in the
@@ -505,24 +516,24 @@ Section ItruncDefs.
   Lemma it_dir_state_open (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
-      (bn : bio_names) (k : nat) :
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn k -∗
+      (bn : bio_names) (w : nat) (k : nat) :
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn w k -∗
       inode_map γfs ip (bm_dir_zeroed bm k) ∗
       inode_blocks γfs (bm_dir_zeroed bm k) data ∗
       bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) ∗
-      bm_paid γ bmapstart 1.
+      bm_paid γ bmapstart w.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma it_dir_state_close (γ : log_names) (γfs : fs_names)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8))
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
-      (bn : bio_names) (k : nat) :
+      (bn : bio_names) (w : nat) (k : nat) :
     inode_map γfs ip (bm_dir_zeroed bm k) -∗
     inode_blocks γfs (bm_dir_zeroed bm k) data -∗
     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) -∗
-    bm_paid γ bmapstart 1 -∗
-    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn k.
-  Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame "A B C D". Qed.
+    bm_paid γ bmapstart w -∗
+    it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn w k.
+  Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame. Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  THE INDIRECT LOOP'S STATE, at cursor q                             *)
@@ -542,11 +553,11 @@ Section ItruncDefs.
   Definition it_ent_state (γ : log_names) (γfs : fs_names)
       (bm : blkmap) (data : nat -> list (bv 8))
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
-      (q : nat) : iProp Σ :=
+      (w : nat) (q : nat) : iProp Σ :=
     (it_ent_res γfs bm data q ∗
      bitmap_res γfs bmapstart cov logstart size
        (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
-     bm_paid γ bmapstart 1)%I.
+     bm_paid γ bmapstart w)%I.
 
   (* THE ONE STEP bfree TAKES, and why the loops never case-split.
 
@@ -688,23 +699,23 @@ Section ItruncDefs.
      loop's state *)
   Lemma it_ent_state_open (γ : log_names) (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z)
-      (logstart bmapstart size : Z) (used : gset Z) (q : nat) :
-    it_ent_state γ γfs bm data cov logstart bmapstart size used q -∗
+      (logstart bmapstart size : Z) (used : gset Z) (w : nat) (q : nat) :
+    it_ent_state γ γfs bm data cov logstart bmapstart size used w q -∗
       it_ent_res γfs bm data q ∗
       bitmap_res γfs bmapstart cov logstart size
         (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) ∗
-      bm_paid γ bmapstart 1.
+      bm_paid γ bmapstart w.
   Proof. iIntros "H". iExact "H". Qed.
 
   Lemma it_ent_state_close (γ : log_names) (γfs : fs_names) (bm : blkmap)
       (data : nat -> list (bv 8)) (cov : gset Z)
-      (logstart bmapstart size : Z) (used : gset Z) (q : nat) :
+      (logstart bmapstart size : Z) (used : gset Z) (w : nat) (q : nat) :
     it_ent_res γfs bm data q -∗
     bitmap_res γfs bmapstart cov logstart size
       (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) -∗
-    bm_paid γ bmapstart 1 -∗
-    it_ent_state γ γfs bm data cov logstart bmapstart size used q.
-  Proof. iIntros "A B C". rewrite /it_ent_state. iFrame "A B C". Qed.
+    bm_paid γ bmapstart w -∗
+    it_ent_state γ γfs bm data cov logstart bmapstart size used w q.
+  Proof. iIntros "A B C". rewrite /it_ent_state. iFrame. Qed.
 
   (* THE HANDOFF from the direct loop to the indirect one.  After the direct
      loop every direct slot of the map is zero, so [inode_blocks] at that
