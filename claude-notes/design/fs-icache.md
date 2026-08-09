@@ -1334,6 +1334,49 @@ freedom of §13.1d applies only to holders that EDIT (writei/itrunc
 between their edit and their iupdate), and those flush before
 unlocking.
 
+### 13.7 §13.2's dom-tie is WRONG: ci tracks IDENTIFIED slots, and the
+### parked arm needs a VIRGIN shape (found working C6 forward, while C5
+### was in flight)
+
+`dom ci = dom M` ties ci to slots with ref > 0. Two fatal consequences:
+
+* **Boot is unsatisfiable.** At `M = ∅` the tie forces `ci = ∅`, the
+  pool formula then owns EVERY inum's bundle — and each of the fifty
+  escrows' parked arms demands `ipool_shape inum` for its ∃-bound inum,
+  i.e. a `dinode_at` the pool already holds. `dinode_at_excl` says no
+  state exists.
+* **iput's last close has nowhere to put the entry.** xv6 keeps a
+  ref-0 entry CACHED (its identity and payload stay; only iget's scan
+  treats it as recyclable — the scan's hit test requires `ref > 0`).
+  Under the tie, deleting `M !! k` forces deleting `ci !! k`, the pool
+  formula immediately claims the inum, and the bundle sitting in the
+  escrow becomes a second, contradictory copy.
+
+The fix, three parts:
+
+1. `ic_ci_wf`'s first clause becomes **`dom M ⊆ dom ci`** (a live slot
+   is identified; an identified slot may have ref 0). Injectivity and
+   the range clause stand.
+2. `islot2` gains the **(None, Some) arm** — "cached, ref 0": dev cell
+   FULL, inum cell at ½, both pinned at `ci !! k`; no `iref_slots`
+   parked. (Some, None) stays `False`.
+3. The parked payload gains a **VIRGIN alternative**: `inode_raw` +
+   valid word 0 + NO bundle and NO dinode_at — the boot state of all
+   fifty entries, before any identity has ever been written. The
+   escrow's parked arm is then satisfiable with the pool full and
+   `ci = ∅`. A virgin slot's cells are junk (∃-bound); iget's recycle
+   from a virgin slot evicts nothing; from an identified ref-0 slot it
+   evicts the old bundle to the pool and re-keys `ci`. iput's last
+   close deletes `M !! k` ONLY — `ci`, the cells, the escrow bundle
+   all stay; the entry parks as "cached, ref 0" with zero ghost work
+   outside `itable_inv`.
+
+Note what stays emergent rather than stated: global
+no-two-`dinode_at`-for-one-inum consistency is maintained by the moves
+(each pool extraction is paired with a `ci` insert and vice versa), not
+asserted as an invariant — the pool formula over `ci` plus the arms'
+shapes is all the proofs need.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
