@@ -107,15 +107,12 @@ Definition wp_begin_op_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through the two sleeps *)
   procs_inv γs -∗
-  scheds_inv γs -∗
-  running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* THE reservation: a full-budget operation *)
       log_op γ MAXOPBLOCKS -∗

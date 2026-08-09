@@ -331,8 +331,6 @@ Definition bm_gen_stmt
   inode_blocks γfs bm data -∗
   p_pid pj ↦₄{dq} pidv -∗
   procs_inv γs -∗
-  scheds_inv γs -∗
-  running_claim j -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -358,7 +356,6 @@ Definition bm_gen_stmt
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       inode_map γfs ip bm' -∗
@@ -460,7 +457,6 @@ Section BmapDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         inode_map γfs ip bm' -∗
@@ -528,7 +524,6 @@ Section BmapEpilogue.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.bmap + 0x8a) : mword 64) -∗
     bm_frame m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_map γfs ip bm' -∗
@@ -864,7 +859,6 @@ Section BmapRelease.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv γs -∗
     bm_frame4 m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_map γfs ip bm' -∗
@@ -1045,12 +1039,10 @@ Section BmapTail.
     bm_prk ak γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bm_frame4 m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_addrs ip (bm_cells bmI) -∗

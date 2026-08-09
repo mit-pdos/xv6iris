@@ -531,7 +531,6 @@ Section PwConts.
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x58) : mword 64) -∗
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
-       running_claim j -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* +0xd8: wakeup(&pi->nread); release(&pi->lock); jump to the epilogue.  Three
@@ -556,7 +555,6 @@ Section PwConts.
        pc_is (mword_of_int (KernelSyms.pipewrite + 0xd8) : mword 64) -∗
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
-       running_claim j -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* +0x46: release(&pi->lock); i := -1; reload s6..s10; fall into the
@@ -580,7 +578,6 @@ Section PwConts.
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x46) : mword 64) -∗
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
-       running_claim j -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* exactly ONE of the two is taken, so they are offered as a conjunction and
@@ -614,7 +611,6 @@ Section PwConts.
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V Pc) -∗
        kalloc_env γa None -∗
-       running_claim j -∗
        pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -788,7 +784,6 @@ Section PwGuard.
     pipe_ref γp w q -∗
     proc_priv γf (proc_addr j) pid (upd_upt V Pc) -∗
     kalloc_env γa None -∗
-    running_claim j -∗
     pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
     pw_loop CID0 γa γf γs j γl γp w q m av eb C pid V n sp0 pi addr -∗
     WP (Loop : expr riscv_lang).

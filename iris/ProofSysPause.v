@@ -300,7 +300,6 @@ Section SpProps.
         sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
         sie_cap_gpr M (av - 8) true pj -∗
         cpu_own 0 eb pj C true -∗
-        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x7e)) -∗
         WP (Loop : expr riscv_lang)))%I.
 
@@ -317,7 +316,6 @@ Section SpProps.
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
         cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
-        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x70)) -∗
         sp_tail CID0 j m av eb C sp0 pj -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -340,7 +338,6 @@ Section SpProps.
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
         cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
-        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x8c)) -∗
         sp_tail CID0 j m av eb C sp0 pj -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -362,7 +359,6 @@ Section SpProps.
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
         cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
-        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
         sp_exit0 CID0 γt j m av eb C sp0 pj -∗
         sp_exitk CID0 γt j m av eb C sp0 pj tk -∗
@@ -384,7 +380,6 @@ Section SpProps.
         pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
         sie_cap_gpr M (av - 8) true pj -∗
         cpu_own 0 eb pj C true -∗
-        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
         sp_tail CID0 j m av eb C sp0 pj -∗
         WP (Loop : expr riscv_lang)))%I.
@@ -431,7 +426,6 @@ Section SpBodies.
     cpu_own 0 eb pj C true -∗
     p_trapframe pj ↦₈{dqt} page_base tfp -∗
     tf_page tfp ws -∗
-    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x7e)) -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (rr : mword 64),
@@ -443,7 +437,6 @@ Section SpBodies.
         pc_is ret_tgt -∗
         p_trapframe pj ↦₈{dqt} page_base tfp -∗
         tf_page tfp ws -∗
-        running_claim j -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -588,7 +581,6 @@ Section SpBodies.
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (av - 8) false pj -∗
     cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
-    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x70)) -∗
     sp_tail CID0 j m av eb C sp0 pj -∗
     WP (Loop : expr riscv_lang).
@@ -703,7 +695,6 @@ Section SpBodies.
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (av - 8) false pj -∗
     cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
-    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x8c)) -∗
     sp_tail CID0 j m av eb C sp0 pj -∗
     WP (Loop : expr riscv_lang).
@@ -911,7 +902,6 @@ Section SpBodies.
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (av - 8)%nat false pj -∗
     cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
-    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x5c)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1110,7 +1100,6 @@ Section SpBodies.
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     panic_wp_any -∗
     ▷ sp_loop CID0 γt j m av eb C sp0 pj tk nv -∗
     sp_exit0 CID0 γt j m av eb C sp0 pj -∗
@@ -1126,7 +1115,6 @@ Section SpBodies.
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (av - 8)%nat false pj -∗
     cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
-    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1317,7 +1305,6 @@ Section SpBodies.
     kernel_text -∗
     is_tickslock γt -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     panic_wp_any -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
@@ -1325,7 +1312,6 @@ Section SpBodies.
     pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
     sie_cap_gpr M (av - 8)%nat true pj -∗
     cpu_own 0 eb pj C true -∗
-    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
     sp_tail CID0 j m av eb C sp0 pj -∗
     WP (Loop : expr riscv_lang).

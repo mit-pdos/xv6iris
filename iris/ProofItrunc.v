@@ -99,7 +99,6 @@ Section ItruncCont.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         i_inum ip ↦₄{dqn} inum -∗
@@ -186,9 +185,7 @@ Section ItruncTail.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     it_frame m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -599,7 +596,6 @@ Section ItruncDLoop.
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (mword_of_int (IT + 0x32) : mword 64) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -646,8 +642,6 @@ Section ItruncDLoop.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim jx -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1148,7 +1142,6 @@ Section ItruncELoop.
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (mword_of_int (IT + 0x7a) : mword 64) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1197,8 +1190,6 @@ Section ItruncELoop.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim jx -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1651,7 +1642,6 @@ Section ItruncIArm.
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

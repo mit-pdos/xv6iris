@@ -443,8 +443,6 @@ Definition wp_fileread_sconf_body
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
-  scheds_inv γs -∗
-  running_claim j -∗
   (* ...and what the file's TYPE selects *)
   fileread_env γf k fn Cf -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -458,7 +456,6 @@ Definition wp_fileread_sconf_body
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
-      running_claim j -∗
       fileread_env_out fn Cf -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

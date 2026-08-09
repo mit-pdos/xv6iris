@@ -170,10 +170,8 @@ Definition wp_kexit_sconf_body
   kernel_text -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
   procs_inv γs -∗
-  scheds_inv γs -∗
   panic_wp_any -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
-  running_claim j -∗
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)

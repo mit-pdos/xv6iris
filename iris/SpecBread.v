@@ -115,8 +115,6 @@ Definition wp_bread_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through acquiresleep and rw *)
   procs_inv γs -∗
-  scheds_inv γs -∗
-  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -130,7 +128,6 @@ Definition wp_bread_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the locked buffer, keyed to the request: its bytes ARE the
          block's logical content (the payload inside indexes them) *)

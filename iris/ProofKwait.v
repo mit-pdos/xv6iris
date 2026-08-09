@@ -544,7 +544,6 @@ Section ProofKwait.
      and touches nowhere in between: it is [R] for every block below, and
      the two resources sleep wants back at the outer loop's foot. *)
   Definition kw_rt (pme : mword 64) (jj : nat) : iProp Σ :=
-    (running_claim jj)%I.
 
   (* ------------------------------------------------------------------ *)
   (* THE OUTER LOOP, +0xdc.  Unbounded (every wakeup re-scans), so this   *)
@@ -2406,7 +2405,7 @@ Section ProofKwait.
     (true = false \/ pme = zero_reg -> (CIDt : CPU) = CID0) ->
     kw_scan_regs Mx mm pme addr NPROC ->
     Mx !!! Regidx Ra4 = hx ->
-    kernel_text -∗ procs_inv γs -∗ scheds_inv γs -∗ panic_wp_any -∗
+    kernel_text -∗ procs_inv γs -∗ panic_wp_any -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     kw_round CID0 γf γw jj mm pme addr K eb C pid V -∗
     kw_exit_fn CIDt γf mm pme K eb C pid V (kw_rt pme jj) -∗
@@ -2635,7 +2634,7 @@ Section ProofKwait.
     pme = proc_addr jj ->
     (true = false \/ pme = zero_reg -> (CIDy : CPU) = CID0) ->
     kw_round_regs M mm pme addr ->
-    kernel_text -∗ procs_inv γs -∗ scheds_inv γs -∗ panic_wp_any -∗
+    kernel_text -∗ procs_inv γs -∗ panic_wp_any -∗
     kalloc_env γa None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     ▷ kw_round CID0 γf γw jj mm pme addr K eb C pid V -∗

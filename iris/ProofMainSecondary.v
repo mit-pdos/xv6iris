@@ -570,7 +570,6 @@ Section ProofMainSecondary.
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
     dev_inv γd γv -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hp0.

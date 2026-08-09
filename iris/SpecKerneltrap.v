@@ -258,7 +258,6 @@ Section KtProcRes.
   Definition kt_proc_res (p : mword 64) : iProp Σ :=
     (⌜ p = zero_reg ⌝ ∨
      ∃ j : nat, ⌜ (j < NPROC)%nat ⌝ ∗ ⌜ proc_addr j = p ⌝ ∗
-                running_claim j)%I.
 End KtProcRes.
 
 Definition wp_kerneltrap_sconf_body
@@ -286,7 +285,6 @@ Definition wp_kerneltrap_sconf_body
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
   devintr_caps γu γv γtx γdk γtl γs pd pav pu -∗
-  scheds_inv γs -∗
   kt_proc_res p -∗
   (* THE RUNNING CLAIM, handed over by the TRAP: taking the trap cleared SIE
      and so dismantled [sie_arm true p], and the claim was one of its

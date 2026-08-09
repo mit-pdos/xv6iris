@@ -256,7 +256,6 @@ Section BreadDefs.
         sie_cap_gpr mf K eb pj -∗
         cpu_own 0 eb pj C eb -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
-        running_claim j -∗
         p_pid pj ↦₄{dq} pidv -∗
         bio_locked bn V k pidv dev bno bs bsd d -∗
         WP (Loop : expr riscv_lang))%I.
@@ -328,7 +327,6 @@ Section BreadBlocks.
     pc_is (mword_of_int (KernelSyms.bread + 0xb8) : mword 64) -∗
     bd_frame m -∗
     cpu_own 0 eb (proc_addr j) C eb -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     bio_locked bn V k pidv dev bno bs_out bsd d -∗
     bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
@@ -585,8 +583,6 @@ Section BreadBlocks.
     bd_frame m -∗
     cpu_own 0 eb (proc_addr j) C eb -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -929,8 +925,6 @@ Section BreadBlocks.
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -1204,8 +1198,6 @@ Section BreadBlocks.
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -1553,8 +1545,6 @@ Section BreadBlocks.
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -1831,8 +1821,6 @@ Section BreadBlocks.
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -2047,8 +2035,6 @@ Section BreadBlocks.
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -2085,7 +2071,6 @@ Section BreadBlocks.
                locked (bn_lk bn) cpu_id -∗
                bcache_scan bn V Mg ord devs bnos -∗
                bslot bn -∗
-               running_claim j -∗
                p_pid (proc_addr j) ↦₄{dq} pidv -∗
                bd_cont (CID0 := CID0)  j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
                WP (Loop : expr riscv_lang))%I as "HADV".

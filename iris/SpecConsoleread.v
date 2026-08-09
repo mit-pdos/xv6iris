@@ -109,9 +109,7 @@ Definition wp_consoleread_sconf_body
   proc_priv γf pj pid V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
-  scheds_inv γs -∗
   panic_wp_any -∗
-  running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -124,7 +122,6 @@ Definition wp_consoleread_sconf_body
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗
-      running_claim j -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

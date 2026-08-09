@@ -571,7 +571,6 @@ Section BfreeDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bi ]}) -∗
@@ -627,7 +626,6 @@ Section BfreeTail.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
     bf_frame m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 1 -∗

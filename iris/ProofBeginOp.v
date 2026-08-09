@@ -390,7 +390,6 @@ Section BoProps.
       log_res γ bn γfs cov logstart -∗
       log_op γ MAXOPBLOCKS -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
@@ -413,7 +412,6 @@ Section BoProps.
       locked (ln_lk γ) cpu_id -∗
       log_res γ bn γfs cov logstart -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
@@ -458,7 +456,6 @@ Section BoBodies.
     log_res γ bn γfs cov logstart -∗
     log_op γ MAXOPBLOCKS -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
@@ -469,7 +466,6 @@ Section BoBodies.
         sie_cap_gpr mf K true pj -∗
         cpu_own 0 eb pj C true -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
-        running_claim j -∗
         p_pid pj ↦₄{dq} pidv -∗
         log_op γ MAXOPBLOCKS -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -716,7 +712,6 @@ Section BoBodies.
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -726,7 +721,6 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
@@ -828,7 +822,6 @@ Section BoBodies.
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -838,7 +831,6 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
@@ -955,7 +947,6 @@ Section BoBodies.
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -965,7 +956,6 @@ Section BoBodies.
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗

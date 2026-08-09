@@ -736,8 +736,7 @@ Section KexitPark.
     sie_cap_gpr M av b pj -∗
     cpu_own 0 eb pj C b -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
-    procs_inv γs -∗ scheds_inv γs -∗ panic_wp_any -∗
-    running_claim j -∗
+    procs_inv γs -∗ panic_wp_any -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
@@ -1247,8 +1246,7 @@ Section KexitRest.
     sie_cap_gpr M av b pj -∗
     cpu_own 0 eb pj C b -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
-    procs_inv γs -∗ scheds_inv γs -∗ panic_wp_any -∗
-    running_claim j -∗
+    procs_inv γs -∗ panic_wp_any -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗

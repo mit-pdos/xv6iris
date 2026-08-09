@@ -65,7 +65,6 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      it holds HALF of [cpus[cid].proc], so the two [c->proc] stores the scan
      makes are mask-changing steps ([scheds_dispatch] / [scheds_reclaim]).
      Persistent and hart-free, like [procs_inv]; main allocates it. *)
-  scheds_inv γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]
      and its [p = zero_reg] hatch express -- but that is not the point: the
      [acquire] it calls in the scan asks for [panic_wp_any], a resource

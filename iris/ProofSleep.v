@@ -203,7 +203,6 @@ Section SleepPostSched.
     msch !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5) ->
     kernel_text -∗
     is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
-    scheds_inv γs -∗
     lock_openable γk lka Rk Dk -∗
     panic_wp_any -∗
     sie_cap_gpr msch (av - 6)%nat false pj -∗
@@ -234,7 +233,6 @@ Section SleepPostSched.
         Tk -∗
         locked γk cpu_id -∗
         Rk -∗
-        running_claim j -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.

@@ -151,7 +151,6 @@ Section YieldPostSched.
     msch !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5) ->
     kernel_text -∗
     is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
-    scheds_inv γs -∗
     sie_cap_gpr msch (av - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.yield + 0x1c)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
@@ -173,7 +172,6 @@ Section YieldPostSched.
         sie_cap_gpr mf av eb pj -∗
         cpu_own 0 eb pj C eb -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
-        running_claim j -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
         WP (Loop : expr riscv_lang)) -∗

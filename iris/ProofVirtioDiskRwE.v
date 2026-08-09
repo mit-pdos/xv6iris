@@ -239,7 +239,6 @@ Section ProofVirtioDiskRwE.
        cpu_own 1 eb (proc_addr j) C false -∗
        arm_pay 0 eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1b0) : mword 64) -∗
-       running_claim j -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr fr -∗
        disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector
@@ -269,7 +268,6 @@ Section ProofVirtioDiskRwE.
        cpu_own 1 eb (proc_addr j) C false -∗
        arm_pay 0 eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a0) : mword 64) -∗
-       running_claim j -∗
        locked γk cpu_id -∗
        disk_res γd pd pav pu -∗
        disk_claim γd q (DClaim b (vdrwd_slot kq b h wr sector
@@ -367,7 +365,6 @@ Section ProofVirtioDiskRwE.
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     dev_inv γu γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     vdrw_p5_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk

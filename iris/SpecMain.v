@@ -313,7 +313,6 @@ Section SpecMain.
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
          procs_inv γs -∗
-         scheds_inv γs -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
          disk_geom γv pd pav pu -∗
          kpt_inv root -∗

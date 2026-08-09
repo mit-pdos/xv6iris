@@ -173,7 +173,6 @@ Section AslProps.
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
@@ -195,7 +194,6 @@ Section AslProps.
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
@@ -246,7 +244,6 @@ Section AslBodies.
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
@@ -261,7 +258,6 @@ Section AslBodies.
         sl_pid slk ↦₄ pidv -∗
         R -∗
         p_pid pj ↦₄{dq} pidv -∗
-        running_claim j -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -580,7 +576,6 @@ Section AslBodies.
     locked γl cpu_id -∗
     sl_res γsl slk R -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
@@ -671,7 +666,6 @@ Section AslBodies.
     is_sleeplock γl γsl slk s R -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     ▷ asl_loop CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
@@ -680,7 +674,6 @@ Section AslBodies.
     locked γl cpu_id -∗
     (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗

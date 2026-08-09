@@ -103,9 +103,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   cpu_own 0%nat eb pj C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   procs_inv γs -∗
-  scheds_inv γs -∗
   panic_wp_any -∗
-  running_claim j -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   kalloc_env γa None -∗
   proc_priv γf pj pid V -∗
@@ -117,7 +115,6 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       sie_cap_gpr mf av b pj -∗
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
-      running_claim j -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

@@ -360,7 +360,6 @@ Section UwProps.
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f (S i)) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-       running_claim j -∗
        WP (Loop : expr riscv_lang)))%I.
 
   Definition uw_exit_cont `{GEN : GenId} (CID0 : CPU) (γl : gname) (γu : uart_names) 
@@ -375,7 +374,6 @@ Section UwProps.
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f n) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-       running_claim j -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* the loop head at +0x6c, ENTERED at whatever hart the last park landed on *)
@@ -391,7 +389,6 @@ Section UwProps.
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f i) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-       running_claim j -∗
        uw_exit_cont CID0 γl γu j m0 av eb C sp0 buf n f dq -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -407,7 +404,6 @@ Section UwProps.
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
          Rbuf -∗
          uart_sent_sub γu bs -∗
-         running_claim j -∗
          WP (Loop : expr riscv_lang)))%I.
 
 End UwProps.
@@ -450,7 +446,6 @@ Section UwBodies.
     uart_sent_sub γu bs -∗
     uw_saved sp0 m0 -∗ uw_gap5 sp0 -∗ uw_slot10 sp0 -∗
     Rbuf -∗
-    running_claim j -∗
     uw_ret CID0 γu j m0 av eb C bs Rbuf -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -700,14 +695,13 @@ Section UwBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     uw_loop_regs m0 M (pa_stk sp0 10) buf n i ->
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
-    procs_inv γs -∗ scheds_inv γs -∗ panic_wp_any -∗
+    procs_inv γs -∗ panic_wp_any -∗
     sie_cap_gpr M (av - 10) false pj -∗
     cpu_own 1%nat eb pj C false -∗ arm_pay 0%nat eb pj -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x6c)) -∗
     locked γl cpu_id -∗ tx_res γu -∗
     uart_sent_sub γu (uw_bytes f i) -∗
     uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-    running_claim j -∗
     ( uw_next_cont CID0 γl γu j m0 av eb C sp0 buf n f dq i
       ∧ uw_exit_cont CID0 γl γu j m0 av eb C sp0 buf n f dq ) -∗
     WP (Loop : expr riscv_lang).
@@ -771,7 +765,6 @@ Section UwBodies.
       locked γl cpu_id -∗ a_tx_busy ↦₄ b2 -∗
       uart_tx_own γu l2 -∗ uart_out_lb γu l2 -∗
       uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-      running_claim j -∗
       ( uw_next_cont CID0 γl γu j m0 av eb C sp0 buf n f dq i
         ∧ uw_exit_cont CID0 γl γu j m0 av eb C sp0 buf n f dq ) -∗
       WP (Loop : expr riscv_lang)))%I with "[]" as "#Body".
@@ -887,7 +880,6 @@ Section UwBodies.
       pc_is (mword_of_int (KernelSyms.uartwrite + 0x4e)) -∗
       locked γl cpu_id -∗ tx_res γu -∗
       uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
-      running_claim j -∗
       ( uw_next_cont CID0 γl γu j m0 av eb C sp0 buf n f dq i
         ∧ uw_exit_cont CID0 γl γu j m0 av eb C sp0 buf n f dq ) -∗
       WP (Loop : expr riscv_lang)))%I with "[]" as "Sleep".
@@ -1055,7 +1047,7 @@ Section UwBodies.
     eb = true ->
     forall i : nat, (i + S k)%nat = n ->
     ⊢ kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
-      procs_inv γs -∗ scheds_inv γs -∗ panic_wp_any -∗
+      procs_inv γs -∗ panic_wp_any -∗
       uw_head CID0 γl γu j m0 av eb C sp0 buf n f dq i.
   Proof.
     intros Hn31 Hj Hjlp Hav Heb.

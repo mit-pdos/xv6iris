@@ -95,14 +95,12 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   arm_pay 0 eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  scheds_inv γs -∗
   (* the caller's condition lock, HELD (acquired on this cpu) *)
   is_lock γk lka sk Rk -∗
   locked γk cpu_id -∗
   Rk -∗
   (* the running-thread bundle *)
   panic_wp_any -∗
-  running_claim j -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -114,7 +112,6 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       locked γk cpu_id -∗
       Rk -∗
       (* the running-thread bundle, refreshed *)
-      running_claim j -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -177,7 +174,6 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   arm_pay 0 eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
-  scheds_inv γs -∗
   (* the caller's condition lock, HELD, with the credential *)
   lock_openable γk lka Rk Dk -∗
   Tk -∗
@@ -185,7 +181,6 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   Rk -∗
   (* the running-thread bundle *)
   panic_wp_any -∗
-  running_claim j -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -199,7 +194,6 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       locked γk cpu_id -∗
       Rk -∗
       (* the running-thread bundle, refreshed *)
-      running_claim j -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

@@ -211,7 +211,7 @@ Section SpecFileclose.
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
      ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
-     procs_inv (fcn_procs fn) ∗ scheds_inv (fcn_procs fn) ∗
+     procs_inv (fcn_procs fn) ∗
      bio_ctx (fcn_bio fn)
        (fs_view (fcn_fs fn) (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
      log_ctx (fcn_log fn) (fcn_bio fn) (fcn_fs fn) (fcn_cov fn)
@@ -222,7 +222,6 @@ Section SpecFileclose.
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      bslots (fcn_bio fn) 3 ∗
-     running_claim (fcn_j fn) ∗
      p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn)%I.
 
   (* the same bundle WITHOUT the caller's pid cell.  kexit closes every
@@ -236,7 +235,7 @@ Section SpecFileclose.
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
      ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
-     procs_inv (fcn_procs fn) ∗ scheds_inv (fcn_procs fn) ∗
+     procs_inv (fcn_procs fn) ∗
      bio_ctx (fcn_bio fn)
        (fs_view (fcn_fs fn) (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
      log_ctx (fcn_log fn) (fcn_bio fn) (fcn_fs fn) (fcn_cov fn)
@@ -247,7 +246,6 @@ Section SpecFileclose.
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      bslots (fcn_bio fn) 3 ∗
-     running_claim (fcn_j fn))%I.
 
   Lemma fileclose_fs_env_split_pid fn n eb p :
     fileclose_fs_env fn n eb p ⊣⊢
@@ -302,8 +300,7 @@ Section SpecFileclose.
   Qed.
 
   Definition fileclose_fs_out (fn : fclose_names) : iProp Σ :=
-    (running_claim (fcn_j fn) ∗
-     p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn ∗
+    (     p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn ∗
      bslots (fcn_bio fn) 3)%I.
 
   (* ---- and the two, selected by the file's type ---- *)
