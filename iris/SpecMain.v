@@ -292,10 +292,6 @@ Section SpecMain.
     p0 = zero_reg ->
     sie_cap_gpr m K false p0 -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
-    (* THE SPARE HALF of [cpus[cid].proc], passed through to the scheduler()
-       this arm tail-calls: [cpu_own] keeps the other half, and holding both
-       is what makes the field writable ([SpecScheduler]). *)
-    cpu_proc_half cpu_id p0 -∗
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
        code that ever allocates [IntrDefs.intr_inv] (out of trapinithart's
        [stvec ↦ᵣ kernelvec]), and that is what consumes it. *)

@@ -121,7 +121,7 @@ Section SystemBoot.
     iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
       as (Hfd γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Hpst & Huart &
+        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hpark & Hpst & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
@@ -134,19 +134,19 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hh0 Hhrest Hlk Hgl Hhalves Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+    iSplitL "Hh0 Hhrest Hlk Hgl Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
 )%I).
-      iSplitL "Hh0 Hlk Hgl Hhalves Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+      iSplitL "Hh0 Hlk Hgl Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         iDestruct "Hh0" as (iv) "Hh0".
         iApply (boot_hart_primary (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  with "Htext Hdata Hh0 Hpanic Hstarted Hlk Hgl Hhalves Hpark Hpst
+                  with "Htext Hdata Hh0 Hpanic Hstarted Hlk Hgl Hpark Hpst
                         Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)

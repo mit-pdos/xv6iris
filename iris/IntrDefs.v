@@ -685,15 +685,12 @@ Section IntrDefs.
   (* current-process field [proc].  Split out of [CpuOwn.cpu_own] and     *)
   (* moved down here for the same reason as §6a.                          *)
   (*                                                                      *)
-  (* [proc] is held at HALF ([ProcGeom.cpu_proc_half]): the other half is *)
-  (* permanently owned by [SchedCtx.scheds_inv]'s slot for this hart, so  *)
-  (* that the global parked-scheduler protocol can read: the proc running *)
-  (* on hart h is p.  Keeping the FULL cell here would make that          *)
-  (* protocol's take-out move vacuous -- see                              *)
-  (* [SchedCtx.cpu_own_full_is_vacuous].  The two [c->proc] STORES the    *)
-  (* scheduler makes therefore have to reassemble the cell out of the     *)
-  (* invariant, which is what [SchedCtx.scheds_dispatch] /                *)
-  (* [scheds_reclaim] are.                                                *)
+  (* [proc] is held WHOLE ([ProcGeom.cur_proc]).  The field is private to *)
+  (* this hart: no invariant and no lock reads it, the "proc j runs on    *)
+  (* hart h" tie is carried by the HART TAG ([ProcGeom.hart_own]) instead,*)
+  (* and a thread's own identity comes from this bundle's index.  So the  *)
+  (* scheduler's two [c->proc] stores are plain stores to memory it       *)
+  (* already owns -- no mask change, no reassembly.                       *)
   (* ------------------------------------------------------------------- *)
   Definition noff_val (n : nat) : mword 32 := mword_of_int (Z.of_nat n).
   Definition intena_val (eb : bool) : mword 32 :=
@@ -706,7 +703,7 @@ Section IntrDefs.
       | O => (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv)%I
       | S _ => a_cpu_int cid_word ↦₄ intena_val eb
       end) ∗
-     cpu_proc_half cpu_id p)%I.
+     cur_proc p)%I.
 
   (* the cells PLUS the counting token -- the whole per-cpu bundle minus
      the caller's context-slot payload [C] (which is an ordinary caller
@@ -1604,6 +1601,22 @@ Lemma trap_csrs_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
 Proof.
   intros Heq. destruct eb.
   - (* [emp]: no hart in the term *) rewrite /trap_csrs_ext. iIntros "$".
+  - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
+Qed.
+
+(* THE CLAIM'S COMPLEMENT TRANSPORTS THE SAME WAY, AND FOR THE SAME REASON.
+   [cpu_claim] became hart-INDEXED when it grew the hart tag beside the state
+   half, so a caller-held [cpu_claim_ext] can no longer simply be framed
+   across a [wp_next] the way it could while the claim was hart-free.  It
+   does not have to be: [cpu_claim_ext true = emp], and at [eb = false] the
+   hart provably did not move -- which is exactly what the premise says. *)
+Lemma cpu_claim_ext_transport `{!riscvGS Σ}
+    (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
+  (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+  cpu_claim_ext (CID := CID0) eb p -∗ cpu_claim_ext (CID := CID1) eb p.
+Proof.
+  intros Heq. destruct eb.
+  - (* [emp]: no hart in the term *) rewrite /cpu_claim_ext. iIntros "$".
   - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
 Qed.
 

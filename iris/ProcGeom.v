@@ -812,20 +812,18 @@ Section CurProc.
 End CurProc.
 
 (* ===================================================================== *)
-(* THE SHARED HALF OF [cpus[h].proc], AND THE PER-PROC HART TAG.           *)
+(* THE PER-PROC HART TAG.                                                  *)
 (*                                                                        *)
-(* Both belong to the parked-scheduler protocol, which lives entirely in   *)
-(* the running proc's own lock ([SchedCtx.run_slot]).  They are stated     *)
-(* HERE, at the bottom of the proc/cpu geometry, because                   *)
-(* [IntrDefs.cpu_cells] (far below SchedCtx) has to name the half and      *)
-(* [IntrDefs.cpu_claim] the tag.                                          *)
+(* It belongs to the parked-scheduler protocol, which lives entirely in    *)
+(* the running proc's own lock ([SchedCtx.run_slot]).  It is stated HERE,  *)
+(* at the bottom of the proc/cpu geometry, because [IntrDefs.cpu_claim]    *)
+(* (far below SchedCtx) has to name it.                                    *)
 (*                                                                        *)
-(* [cpu_proc_half h p]: HALF of [cpus[h].proc], holding [p].  The thread   *)
-(* running on hart [h] carries one half inside [cpu_cells]; the other sits *)
-(* in the lock of the proc it is running, and is what lets the SCHEDULER   *)
-(* store [c->proc] (it needs the whole cell, and gets it by acquiring that *)
-(* lock).  This is also the only channel by which the logic can learn      *)
-(* "the proc running on hart h is p" -- exactly the fact myproc() reads.   *)
+(* NOTE that [cpus[h].proc] is NOT part of this protocol.  The field is    *)
+(* private to hart [h] -- no invariant and no lock reads it -- so the      *)
+(* whole cell sits in [IntrDefs.cpu_cells], i.e. in the running thread's   *)
+(* [cpu_own], and the scheduler's two stores to it are plain stores to     *)
+(* private memory.  [ProcGeom.cur_proc] is that cell.                      *)
 (*                                                                        *)
 (* [hart_own j q h]: fraction [q] of proc j's HART TAG -- "proc j is        *)
 (* running on hart h".  Split while j runs: half in j's lock beside that   *)
@@ -837,8 +835,8 @@ End CurProc.
 (* WHAT IT IS FOR.  The record is pinned to [cpus[h].context] but the lock *)
 (* holding it is hart-free, so the lock states it under an [∃ h], and a    *)
 (* thread must collapse that to its own hart or the [swtch] operand        *)
-(* address does not match.  The [cpu_proc_half] beside it cannot do that:  *)
-(* two harts each holding half of THEIR OWN c->proc cell, both reading     *)
+(* address does not match.  Nothing about the [c->proc] cell can do that:  *)
+(* two harts each owning THEIR OWN c->proc cell, both holding              *)
 (* [&proc[j]], is consistent as far as separation logic can see, and "at   *)
 (* most one hart runs proc j" is a global fact.  The tag states it         *)
 (* locally, and [hart_own_agree] is timeless, so the collapse happens      *)
@@ -854,33 +852,6 @@ End CurProc.
 (* ===================================================================== *)
 Section ParkGhost.
   Context `{!riscvGS Σ}.
-
-  Definition cpu_proc_half (h : CPU) (p : mword 64) : iProp Σ :=
-    (a_cpu_proc (cid_word_of h) ↦₈{DfracOwn (1/2)} p)%I.
-
-  Global Instance cpu_proc_half_timeless h p : Timeless (cpu_proc_half h p).
-  Proof. rewrite /cpu_proc_half /word_pointsto /mem_pointsto. apply _. Qed.
-
-  Lemma cpu_proc_halve (h : CPU) (p : mword 64) :
-    a_cpu_proc (cid_word_of h) ↦₈ p ⊣⊢ cpu_proc_half h p ∗ cpu_proc_half h p.
-  Proof. rewrite /cpu_proc_half -word_pointsto_frac_split Qp.div_2 //. Qed.
-
-  Lemma cpu_proc_half_agree (h : CPU) (p p' : mword 64) :
-    cpu_proc_half h p -∗ cpu_proc_half h p' -∗ ⌜p = p'⌝.
-  Proof. iIntros "H1 H2". iApply (word_pointsto_agree with "H1 H2"). Qed.
-
-  (* a FULL word cell excludes every further fraction of the same cell --
-     what makes "the invariant permanently holds a half" incompatible with
-     any resource still stating the cell in full. *)
-  Lemma word_pointsto_full_excl (a : Arch.pa) (dq : dfrac) (w w' : mword 64) :
-    a ↦₈ w -∗ a ↦₈{dq} w' -∗ False.
-  Proof.
-    iIntros "H1 H2".
-    iDestruct (word_pointsto_bytes with "H1") as "Hb1".
-    iDestruct (word_pointsto_bytes with "H2") as "Hb2".
-    cbn [seq]. iDestruct "Hb1" as "[Hc1 _]". iDestruct "Hb2" as "[Hc2 _]".
-    iDestruct (mem_pointsto_ne with "Hc1 Hc2") as %Hne. done.
-  Qed.
 
   Definition hart_own (j : nat) (q : Qp) (h : CPU) : iProp Σ :=
     ghost_var (park_name j) q h.

@@ -22,14 +22,14 @@
    with [eb = true], so from that release's exit to the re-acquire's return
    the hart may move, and those leaves take [iIntros (CIDk Hsk)].
 
-   THE SCHEDULER RECORD IS GLOBAL NOW (SchedCtx.scheds_inv): sleep no longer
-   carries [▷ sched_vc] -- fourteen exclusive words of ONE hart's struct cpu,
-   for which no [wp_next] transport exists -- but the persistent [scheds_inv]
-   plus the hart-free per-PROC receipt [running_claim j].  Its two moves are
-   [scheds_take] just before the [jal sched] (which turns the receipt into the
-   [park_hlf j false] that [proc_held] now demands, and produces the
-   [▷ sched_vc] sched's own contract still wants) and [scheds_put] at the
-   RESUMED hart, which deposits the record back and returns the receipt.
+   THE SCHEDULER RECORD LIVES IN THE RUNNING PROC'S OWN LOCK, which sleep is
+   holding when it parks.  [SchedCtx.proc_slots_running] takes it out: the
+   HART TAG half the thread carries inside [IntrDefs.cpu_claim] refutes every
+   non-RUNNING arm and collapses the arm's existential hart to this one, and
+   out come the whole tag, the raw context cells and this hart's record.  All
+   three cross the swtch and come back at the RESUMING hart, where
+   [proc_slots_running_intro] puts them into the lock the release gives up.
+   There is no global invariant and no receipt.
 
    The CONDITION lock is taken generically ([lock_openable] plus a credential
    [Tk] -- ACQUIRE_GEN / RELEASE_GEN), so a process may sleep on a reclaimable
@@ -215,6 +215,8 @@ Section SleepPostSched.
     (* the cells swtch handed back; they go into the RUNNING lock at the
        release below. *)
     own_ctx (p_context pj) -∗
+    (* the hart tag, whole, at the hart the dispatch resumed us on. *)
+    hart_full j cpu_id -∗
     ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
     (* the five saved callee-saved words + the frame's bottom slot *)
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
@@ -238,7 +240,7 @@ Section SleepPostSched.
   Proof.
     intros pj Hav Hjn Hspd Hsp0 Hlka0 HrefT HrefLkp Hsp_msch Hs1_msch Hs2_msch
            Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27.
-    iIntros "#Htext #Hislock #Hscheds #Hkopen #Hpanicany Hcg Hpc Hheld' Htc Hcpuemp HC HTk Hown' Hvc'
+    iIntros "#Htext #Hislock #Hkopen #Hpanicany Hcg Hpc Hheld' Htc Hcpuemp HC HTk Hown' Htag Hvc'
               Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hcont".
     (* frame-slot address bridges: slot k sits at [spd + 8*(6-k)]. *)
     assert (Hb1 : pa_stk sp0 1 = add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))
@@ -251,22 +253,17 @@ Section SleepPostSched.
       by (rewrite -Hspd; apply sl_frame_bridge; vm_compute; reflexivity).
     assert (Hb5 : pa_stk sp0 5 = add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))))
       by (rewrite -Hspd; apply sl_frame_bridge; vm_compute; reflexivity).
-    iDestruct "Hheld'" as "(Hlocked & Hstate & Hpg & Hchan & Hpub & Hpark)".
+    iDestruct "Hheld'" as "(Hlocked & Hstate & Hpg & Hchan & Hpub)".
     (* ------------------------------------------------------------------ *)
-    (* THE RESUMED THREAD'S FIRST MOVE: deposit hart [CID0]'s scheduler     *)
-    (* record back into the global invariant, turning the crossing's        *)
-    (* [park_hlf j false] back into the receipt sleep's postcondition owes.  *)
+    (* WHAT THE DISPATCH HANDED BACK, taken apart once: the record and the   *)
+    (* raw cells go into this proc's own lock at the release below, and the  *)
+    (* tag splits between that slot and this thread's [cpu_claim].           *)
     (* ------------------------------------------------------------------ *)
-    iDestruct (cpu_own_set_proc 1 true pj pj emp with "Hcpuemp") as "[Hph Hback]".
-    iApply fupd_wp.
     iDestruct (pstate_whole_split (proc_addr j) RUNNING) as "[Hws _]".
     iDestruct ("Hws" with "Hpg") as "[Hpg Hclm]".
     rewrite unclaimed_RUNNING.
     iDestruct (pstate_at_elim j (1/2) RUNNING Hjn with "Hclm") as "Hclm".
-    iMod (SchedCtx.scheds_put γs ⊤ (CID0 : CPU) j with "Hscheds Hph Hpark Hvc'") as "[Hph Hpark]";
-      [solve_ndisj|exact Hjn|].
-    iModIntro.
-    iDestruct ("Hback" with "Hph") as "Hcpuemp".
+    rewrite hart_split. iDestruct "Htag" as "[Htaga Htagb]".
     iAssert (cpu_own 1 true (proc_addr j) C false) with "[Hcpuemp HC]" as "Hcpu".
     { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
     (* ------------------------------------------------------------------ *)
@@ -333,16 +330,16 @@ Section SleepPostSched.
        no dormant block and no park receipt, but the raw context cells go
        back in -- they are what swtch handed back when the scheduler
        resumed this thread. *)
-    iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hpub Hown']" as "HR2".
+    iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hpub Hown' Htaga Hvc']" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, (zero_reg : mword 64). iFrame "Hstate Hpg Hchan Hpub".
-      iApply (proc_slots_running_intro with "Hown'"). }
+      iApply (proc_slots_running_intro γs j cpu_id Hjn with "Htaga Hown' Hvc'"). }
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) E1 0 true (proc_addr j) C (av - 6)%nat
               Hlka_r2
               ltac:(lia)
-              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [Htc Hclm] [-]").
+              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [Htc Hclm Htagb] [-]").
     { rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay. iFrame "Htc".
-      iApply (cpu_claim_proc j Hjn with "Hclm"). }
+      iApply (cpu_claim_proc j Hjn with "Hclm Htagb"). }
     iIntros (CID1 Hs1 mrel2) "Hcg Hpc %Hcs_rel2 Hcpu".
     assert (Hpc38 : ret_pc (E1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x38)) by (rewrite HE1ra; apply bv_eq; vm_compute; reflexivity).
@@ -595,8 +592,7 @@ Section SleepPostSched.
     assert (Cs11 : Gf !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
       by (rewrite (Hthr (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)); exact Hmsch27).
     iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc HTk Hklocked HRk [Hpark]");
-      [| rewrite /running_claim; iExact "Hpark"].
+    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc HTk Hklocked HRk").
     { unfold callee_saved. repeat split; assumption. }
   Qed.
 
@@ -625,9 +621,8 @@ Section ProofSleep.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     (* "HTk" is PARKED across the whole middle of the proof: the credential
        rides the sleeping process's frame through sched() and is presented
-       again at the re-acquire of lk.  So is "Hpark", the hart-free park
-       receipt, which [scheds_take] spends just before the jal. *)
-    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hscheds #Hkopen HTk Hklocked HRk #Hpanicany Hpark Hcont".
+       again at the re-acquire of lk. *)
+    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkopen HTk Hklocked HRk #Hpanicany Hcont".
     (* ------------------------------------------------------------------ *)
     (* Prologue: 48-byte frame (push 6), save ra/s0/s1/s2/s3.             *)
     (* sleep runs at noff = 1, so the resource index is the literal        *)
@@ -834,16 +829,19 @@ Section ProofSleep.
     assert (Hpc1c : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x1c)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
-    (* unpack the proc lock resource.  The park receipt this thread carries
-       refutes the slot's [not_running] arm, so the state under the lock is
-       RUNNING -- and the RUNNING arm is the raw context cells sched wants.
-       That is why sleep needs no [own_ctx] premise. *)
-    iDestruct (proc_lock_res_elim γs γl (proc_addr j) with "HR") as (st0 ch0) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
-    iDestruct (proc_slots_running γs j st0 Hj with "Hpark Hslot") as "(Hpark & -> & Hown)".
     (* this lemma runs at the literal [eb = true], so the arm owned the claim
-       and [arm_pay] carries it whole -- the caller's complement is [emp]. *)
+       and [arm_pay] carries it whole -- the caller's complement is [emp].
+       Taking it apart yields the state half AND the HART TAG half. *)
     iDestruct "Hpay0" as "[Hpay0 Hclm]".
-    iDestruct (cpu_claim_elim j Hj with "Hclm") as "Hclm".
+    iDestruct (cpu_claim_elim j Hj with "Hclm") as "[Hclm Htag]".
+    (* unpack the proc lock resource.  Presenting the tag half refutes the
+       slot's [not_running] arm, so the state under the lock is RUNNING --
+       and the RUNNING arm is the raw context cells sched wants plus THIS
+       hart's parked record.  That is why sleep needs no [own_ctx] premise
+       and no global invariant. *)
+    iDestruct (proc_lock_res_elim γs γl (proc_addr j) with "HR") as (st0 ch0) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
+    iDestruct (proc_slots_running γs j cpu_id st0 Hj with "Htag Hslot")
+      as "(-> & Htag & Hown & Hvc)".
     iDestruct (pstate_at_intro j (1/2) RUNNING Hj with "Hclm") as "Hclm".
     iDestruct (pstate_whole_split (proc_addr j) RUNNING) as "[_ Hwe]".
     iDestruct ("Hwe" with "[Hpg Hclm]") as "Hpg".
@@ -993,30 +991,22 @@ Section ProofSleep.
     assert (HD1ra : D1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sleep + 0x2a) : mword 64) 4)
       by (rewrite /D1 upd_eq; reflexivity).
     iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
-    (* CHECK THE SCHEDULER RECORD OUT of the global invariant: [scheds_take]
-       spends the [running_claim j] receipt (leaving the [park_hlf j false]
-       that [proc_held] carries across the crossing) and produces exactly the
-       [▷ sched_vc] sched's own contract demands. *)
-    iDestruct (cpu_own_set_proc 1 true (proc_addr j) (proc_addr j) emp with "Hcpuemp") as "[Hph Hback]".
     iApply fupd_wp.
     iMod (pstate_whole_update (proc_addr j) RUNNING SLEEPING with "Hpg") as "Hpg".
-    iMod (SchedCtx.scheds_take γs ⊤ (CID : CPU) j with "Hscheds Hph Hpark") as "(Hvc & Hph & Hpark)";
-      [solve_ndisj|exact Hj|].
     iModIntro.
-    iDestruct ("Hback" with "Hph") as "Hcpuemp".
     (* the trap-CSR set the spec's own pay carries crosses inside the chain
        payload and comes back at the dispatching hart, where the release of
        p->lock spends it. *)
     iAssert trap_csrs with "[Hpay0]" as "Htc". { iExact "Hpay0". }
     iApply (Sched.wp_sched_sconf γs j γl SLEEPING chan D1 (av - 6)%nat true
               Hj Hgl (park_ok_SLEEPING) ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub Hpark] [] Htc Hcpuemp Hown Hvc [-]").
-    { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub Hpark". }
+              with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc [-]").
+    { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
     (* a SLEEPING park owes the slot nothing beyond its record. *)
     { iApply (park_pay_needs_ctx (proc_addr j) SLEEPING needs_ctx_SLEEPING). }
     (* SCHED RETURNS ON HART [CIDs].  Everything below runs there, inside
        [sleep_post_sched] at [(CID0 := CIDs)]. *)
-    iIntros (CIDs Hss msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' #Havail Hcpuemp Hown' Hvc'".
+    iIntros (CIDs Hss msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' #Havail Hcpuemp Hown' Htag' Hvc'".
     (* what the post-resume half needs about [msch], read off this tower. *)
     assert (Hsp_msch : msch !!! Regidx csp_rs1 = spd).
     { rewrite (callee_saved_lookup Hcs_sch csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -1099,7 +1089,7 @@ Section ProofSleep.
               ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity) Hlka0 HrefT HrefLkp
               Hsp_msch Hs1_msch Hs2_msch
               Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27
-              with "Htext Hislock Hscheds Hkopen Hpanicany Hcg Hpc Hheld' Htc' Hcpuemp HC HTk Hown' Hvc'
+              with "Htext Hislock Hkopen Hpanicany Hcg Hpc Hheld' Htc' Hcpuemp HC HTk Hown' Htag' Hvc'
                     Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hcont").
   Qed.
 
@@ -1124,16 +1114,16 @@ Section OfGen.
   Proof.
     cbv beta delta [wp_sleep_sconf_body].
     intros pcE pj chan lk0 ret_tgt Hj Hgl Hlka0 Heb Hav.
-    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hscheds #Hkislock Hklocked HRk #Hpanic Hpark Hcont".
+    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkislock Hklocked HRk #Hpanic Hcont".
     iApply (G.wp_sleep_gen_sconf γs j γl γk lka Rk emp%I False%I m av eb C
               Hj Hgl Hlka0 Heb Hav
               (lock_refute_False _) (fun i => lock_refute_False _) (fun i => lock_refute_False _)
-              with "Hcg Hcpu Hpay0 Htext Hpc Hprocs Hscheds [] [] Hklocked HRk Hpanic Hpark [-]").
+              with "Hcg Hcpu Hpay0 Htext Hpc Hprocs [] [] Hklocked HRk Hpanic [-]").
     { iApply (is_lock_openable with "Hkislock"). }
     { done. }
     iIntros (CIDf) "%Hsf".
-    iIntros (mf) "%Hcs Hcg Hcpu Hpay Hpc _ Hklocked HRk Hpark".
-    iApply ("Hcont" $! CIDf with "[%] [//] Hcg Hcpu Hpay Hpc Hklocked HRk Hpark").
+    iIntros (mf) "%Hcs Hcg Hcpu Hpay Hpc _ Hklocked HRk".
+    iApply ("Hcont" $! CIDf with "[%] [//] Hcg Hcpu Hpay Hpc Hklocked HRk").
     { exact Hsf. }
   Qed.
 

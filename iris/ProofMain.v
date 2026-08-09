@@ -1245,7 +1245,6 @@ Section ProofMain.
     kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
-    cpu_proc_half cpu_id p0 -∗
     trap_csrs -∗ intr_handler_avail -∗
     started_inv P -∗
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
@@ -1272,7 +1271,7 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hspare Htcsr #Hintr #Hsinv #Hwand".
+    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Htcsr #Hintr #Hsinv #Hwand".
     iIntros "#Hpenv #Hpinv #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     iPoseProof (mni_a2 with "Htext") as "Hia2".
     iPoseProof (mni_a6 with "Htext") as "Hia6".
@@ -1392,7 +1391,7 @@ Section ProofMain.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
     iApply (Scheduler.wp_scheduler_sconf γs SS n p0 Hp0 ltac:(lia)
-              with "Hcg Hcpu Hspare Htext Hpc Hpinv Hpanic Htcsr Hintr").
+              with "Hcg Hcpu Htext Hpc Hpinv Hpanic Htcsr Hintr").
   Qed.
 
   (* =================================================================== *)
@@ -1411,7 +1410,7 @@ Section ProofMain.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hp0.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50).
-    iIntros "Hcg Hcpu Hspare Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Hwand Hlocks Hglobals".
+    iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hparks Hpst".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
@@ -1459,7 +1458,7 @@ Section ProofMain.
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
-              with "Hcg Htext Hpany Hpc Hcpu Hspare Htcsr Hintr Hsinv Hwand Hpenv
+              with "Hcg Htext Hpany Hpc Hcpu Htcsr Hintr Hsinv Hwand Hpenv
                     Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
   Qed.
 

@@ -196,6 +196,7 @@ Section SchedPostSwtch.
     trap_csrs -∗
     intr_handler_avail -∗
     own_ctx (p_context pj) -∗
+    hart_full j cpu_id -∗
     ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
     ( ∀ (mf : regfile) (ch0 : mword 64),
         ⌜callee_saved m mf⌝ -∗
@@ -206,13 +207,14 @@ Section SchedPostSwtch.
         intr_handler_avail -∗
         cpu_own 1 eb pj emp false -∗
         own_ctx (p_context pj) -∗
+        hart_full j cpu_id -∗
         ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
         WP (Loop : expr riscv_lang) ) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Hspd Hsp0 Hsp_m' Hs2addr Hs3v
            Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.
-    iIntros "#Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc #Havail Hown Hvc' Hcont".
+    iIntros "#Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc #Havail Hown Htag Hvc' Hcont".
     (* frame-slot address bridges: slot k sits at [spd + 8*(6-k)]. *)
     assert (Hb1 : pa_stk sp0 1 = add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))
       by (rewrite -Hspd; apply sched_frame_bridge; vm_compute; reflexivity).
@@ -488,7 +490,7 @@ Section SchedPostSwtch.
       rewrite /E0 upd_ne; [| exact H15].
       exact Hmm. }
     iApply ("Hcont" $! Ef ch'
-              with "[%] Hcg Hpc Hheld' Htc Havail Hcpu Hown Hvc'").
+              with "[%] Hcg Hpc Hheld' Htc Havail Hcpu Hown Htag Hvc'").
     { (* callee_saved m Ef *)
       assert (Hf_sp : Ef !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
         by (rewrite /Ef upd_eq Hsp_E8 -Hsp0; exact Hpopsp).
@@ -538,7 +540,7 @@ Section ProofSched.
     cbv beta delta [wp_sched_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hneeds Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg #Htext Hpc #Hprocs Hheld Hpay Htc Hcpu Hown Hvc Hcont".
+    iIntros "Hcg #Htext Hpc #Hprocs Hheld Hpay Htc Hcpu Hown Htag Hvc Hcont".
     (* the cpu bundle [cpu_own 1 eb pj emp false] arrives whole at level 1;
        it is unfolded to the individual cells + counting token after myproc.
        NOTE: no handler-avail stash is taken from it.  The return path resumes
@@ -1268,7 +1270,7 @@ Section ProofSched.
     (* build the parking-proc payload (proc-held facts only; the cpu bundle
        now crosses at the swtch's [cpu_own] interface, not in the payload). *)
     iPoseProof (p_sched_to_cpu γs cpu_id j γl st ch Hj Hgl Hneeds
-                  with "Htc [Hlocked Hstate Hchan Hpub] Hpay") as "HP".
+                  with "Htc [Hlocked Hstate Hchan Hpub] Htag Hpay") as "HP".
     { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub". }
     (* apply swtch.  The TARGET record is PINNED at this hart
        (cpus[cid].context is only ever resumed from hart cid's own tp); the
@@ -1291,7 +1293,7 @@ Section ProofSched.
     iDestruct (p_sched_at_proc γs h A' j cret (rget (CID := h) m' (mword_of_int 4 : mword 5)) pj Hj with "Hpay")
       as "(%Htpv & %Hcret & %Hpidx & %HA' & Htc' & #Havail & Hpay2)".
     subst A'.
-    iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld')".
+    iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld' & Htag')".
     assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
     iEval (rewrite Hcret) in "Hvc'".
     (* callee-image component equalities. *)
@@ -1430,7 +1432,7 @@ Section ProofSched.
     iApply (sched_post_swtch (CID := h)  γs j γl ch' m m' av eb eb' sp0 spd vgap
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
               Hsp_m' Hs2addr Hs3v Hf20 Hf21 Hf22 Hf23 Hf24 Hf25 Hf26 Hf27
-              with "Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc' Havail [Hctxback] Hvc' Hcont").
+              with "Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc' Havail [Hctxback] Htag' Hvc' Hcont").
     { rewrite /own_ctx. iExists (callee_img Mc). iSplit.
       { iPureIntro. unfold callee_img, ctx_regs. reflexivity. }
       iExact "Hctxback". }

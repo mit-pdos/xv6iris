@@ -175,7 +175,7 @@ Section CpuOwn.
     a_cpu_noff cid_word ↦₄ nv -∗
     a_cpu_int cid_word ↦₄ iv -∗
     intr_off_tok -∗
-    cpu_proc_half cpu_id p -∗
+    cur_proc p -∗
     C -∗
     cpu_own 0 false p C false.
   Proof.
@@ -196,21 +196,19 @@ Section CpuOwn.
     iIntros "[Hrest HC] HW". iFrame "Hrest". iApply ("HW" with "HC").
   Qed.
 
-  (* retarget the proc field (the scheduler's c->proc writes).  Only at the
-     DISABLED index: c->proc is written under a held lock, hence at level
-     ≥ 1, hence with interrupts off.
+  (* retarget the proc field (the scheduler's c->proc writes, and myproc()'s
+     read).  Only at the DISABLED index: at [b = true] the cells have moved
+     into the SIE arm.
 
-     THE ACCESSOR HANDS OUT ONLY THE HALF the bundle owns.  A store needs
-     the FULL cell, so the scheduler must pair this with the OTHER half --
-     the spare, which lives in the running proc's lock
-     ([SchedCtx.run_slot]) and reaches the scheduler through [proc_held].
-     So both [c->proc] stores happen holding a LOCK, not an invariant, and
-     neither is mask-changing. *)
+     THE ACCESSOR HANDS OUT THE WHOLE CELL, which is what a store needs.
+     [cpus[cid].proc] is private to this hart -- no invariant and no lock
+     holds a fraction of it -- so neither [c->proc] store is mask-changing
+     and neither needs anything but this bundle. *)
   Lemma cpu_own_set_proc (n : nat) (eb : bool)
       (p p' : mword 64) (C : iProp Σ) :
     cpu_own n eb p C false -∗
-    (cpu_proc_half cpu_id p ∗
-     (cpu_proc_half cpu_id p' -∗ cpu_own n eb p' C false)).
+    (cur_proc p ∗
+     (cur_proc p' -∗ cpu_own n eb p' C false)).
   Proof.
     iIntros "(((%Hbound & Hnoff & Hint & Hproc) & Hcnt) & HC)".
     iFrame "Hproc". iIntros "Hproc". iFrame "Hnoff Hint Hcnt HC Hproc".

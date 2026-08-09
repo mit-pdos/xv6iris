@@ -375,10 +375,10 @@ Section ProofMyproc.
     (* ---- 0x1e: c.ld a5,48(a5) -- read the current-proc field ---- *)
     (* expose c->proc from cpu_own for the read, then refold *)
     iDestruct (cpu_own_set_proc (S n) eb p p C with "Hown") as "(Hcur & Hown)".
-    iEval (rewrite /cpu_proc_half /a_cpu_proc) in "Hcur".
+    iEval (rewrite /cur_proc /a_cpu_proc) in "Hcur".
     iPoseProof (mpi_1e with "Htext") as "Hi1e".
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.myproc + 0x1e)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"000")))
-              B6 (av - 4)%nat p false (dqm := DfracOwn (1/2))
+              B6 (av - 4)%nat p false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hcur] [-]").
     { iEval (rewrite Hpa). iExact "Hcur". }

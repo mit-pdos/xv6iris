@@ -387,11 +387,9 @@ Section BootRun.
      sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
      a_cpu_noff cid_word ↦₄ noff_val 0 ∗
      a_cpu_int cid_word ↦₄ iv ∗
-     (* BOTH halves of [cpus[cid].proc] -- see [BootShared.boot_hart_bss].
-        One is [IntrDefs.cpu_cells]'s, the other is the spare that makes the
-        field writable and that this hart's scheduler starts out holding. *)
-     cpu_proc_half cpu_id zero_reg ∗
-     cpu_proc_half cpu_id zero_reg ∗
+     (* the WHOLE [cpus[cid].proc] cell -- see [BootShared.boot_hart_bss].
+        It is private to this hart and goes into [IntrDefs.cpu_cells]. *)
+     cur_proc zero_reg ∗
      cpu_ctx_free ∗
      True)%I.
 
@@ -596,7 +594,7 @@ Section BootPrimary.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive.
-    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hprocs Hpark Hpst
+    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hpark Hpst
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
@@ -608,17 +606,17 @@ Section BootPrimary.
               (cid_word_of_zero _ Hz) (le_n K_main) eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
               with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
-                    Hprocs Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
+                    Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
                     Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, so the wand
        is intro + exists + frame and nothing else. *)
     iModIntro.
     iIntros (γpr γs γk pd pav pu root pas)
-      "Hpr Hpi Hsi Hdl Hgeom Hkpti Hroot Htramp Hkst".
+      "Hpr Hpi Hdl Hgeom Hkpti Hroot Htramp Hkst".
     rewrite /main_deposit.
     iExists γpr, γk, γs, pd, pav, pu, root, pas.
-    iFrame "Hpr Hpi Hsi Hdl Hgeom Hkpti Hroot Htramp Hkst".
+    iFrame "Hpr Hpi Hdl Hgeom Hkpti Hroot Htramp Hkst".
   Qed.
 
 End BootPrimary.

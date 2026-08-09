@@ -177,7 +177,7 @@ Lemma sc_cpu_own_open `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
   a_cpu_noff cid_word ↦₄ noff_val 0 ∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) ∗
   intr_count 0 eb ∗
-  cpu_proc_half cpu_id px ∗ C.
+  cur_proc px ∗ C.
 Proof.
   rewrite cpu_own_off /cpu_hart /cpu_cells.
   iIntros "(((_ & Hn & Hi & Hp) & Hc) & HC)". iFrame.
@@ -187,7 +187,7 @@ Lemma sc_cpu_own_mk `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (px :
   a_cpu_noff cid_word ↦₄ noff_val 0 -∗
   (∃ iv : mword 32, a_cpu_int cid_word ↦₄ iv) -∗
   intr_count 0 false -∗
-  cpu_proc_half cpu_id px -∗
+  cur_proc px -∗
   cpu_own 0 false px emp false.
 Proof.
   iIntros "Hn Hi Hc Hp". rewrite cpu_own_off /cpu_hart /cpu_cells.
@@ -253,7 +253,7 @@ Section ProofScheduler.
     cbv beta delta [wp_scheduler_sconf_body].
     intros pcE Hp0 Hav. subst p0.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hsched #Hpanic Hcsrs #Havail".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hcsrs #Havail".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hprocs" as "[%H _]". iPureIntro. exact H. }
     (* split the entry cpu bundle: the context save area becomes [own_ctx],
@@ -552,31 +552,18 @@ Section ProofScheduler.
     assert (Hrec_proc0r : add_vec (rget A7 Ra4) (sign_extend' 64 (mword_of_int 48 : mword 12))
                           = a_cpu_proc cid_word) by (rgne; exact Hrec_proc0).
     iPoseProof (schi_2a with "Htext") as "Hi2a".
-    (* THE STORE IS MASK-CHANGING NOW.  [IntrDefs.cpu_cells] keeps only HALF
-       of [cpus[cid].proc]; the other half lives in [scheds_inv]'s slot for
-       this hart, so the FULL cell the store needs has to be reassembled with
-       the invariant open ([SchedCtx.scheds_idle]: 0 -> 0, which the slot's
-       zero value shows cannot orphan a record). *)
-    iDestruct (sie_cap_gpr_x0 A7 (av - 10)%nat false zero_reg (mword_of_int 0 : mword 5)
-                 ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx02a Hcg]".
-    assert (Hx02ar : rget A7 (mword_of_int 0 : mword 5) = zero_reg)
-      by (rgne; exact Hx02a).
-    iApply (wp_store_s_sconf_au 8 false (mword_of_int (KernelSyms.scheduler + 0x2a))
-              (mword_of_int 0 : mword 5) Ra4 (mword_of_int 48 : mword 12)
-              A7 (av - 10)%nat (rget A7 (mword_of_int 0 : mword 5))
-              (cpu_proc_half cpu_id zero_reg) (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
+    (* A PLAIN STORE.  [cpus[cid].proc] is private to this hart -- no
+       invariant and no lock holds a fraction of it -- so [IntrDefs.cpu_cells]
+       carries the WHOLE cell and the store neither opens anything nor
+       changes the mask. *)
+    iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.scheduler + 0x2a))
+              Ra4 (mword_of_int 48 : mword 12)
+              A7 (av - 10)%nat zero_reg false
               with "Hcg Hpc Hi2a [Hproc] [-]").
-    { iMod (scheds_idle γs (⊤ ∖ ↑minstretN) cpu_id ltac:(solve_ndisj)
-              with "Hsched Hproc") as "[Hcell Hclose]".
-      iModIntro. iExists zero_reg.
-      iSplitL "Hcell"; [ iEval (rewrite Hrec_proc0r); iExact "Hcell" |].
-      iIntros "Hcell". iEval (rewrite Hx02ar Hrec_proc0r) in "Hcell".
-      iMod ("Hclose" with "Hcell") as "$". done. }
+    { iEval (rewrite Hrec_proc0r). iExact "Hproc". }
     first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
     iIntros "Hcg Hpc Hproc".
+    iEval (rewrite Hrec_proc0r) in "Hproc".
     assert (Hpc2e : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x2a) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x2e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2e) in "Hpc".
@@ -1171,8 +1158,15 @@ Section ProofScheduler.
         (* the RUNNABLE slot carries the parked context and the receipt; the
            running and dormant arms are both [emp]. *)
         iDestruct (proc_slots_dispatch _ (proc_addr jj) RUNNABLE needs_ctx_RUNNABLE
-                     with "Hslot") as "[Hvc Hpark]".
-        iDestruct (park_at_full_elim jj false Hjj with "Hpark") as "Hpark".
+                     with "Hslot") as "[Hvc Htag]".
+        iDestruct (hart_at_any_elim jj Hjj with "Htag") as (hold) "Htag".
+        (* RETAG: the tag came out of the not-running guard, where its value
+           is meaningless.  Stamp this hart on it; it then crosses WHOLE to
+           the dispatched thread, which splits it between [run_slot] and its
+           own [cpu_claim] at the release. *)
+        iApply fupd_wp.
+        iMod (hart_update jj hold cpu_id with "Htag") as "Htag".
+        iModIntro.
         (* THE CLAIM IS ISSUED HERE.  RUNNABLE is [unclaimed], so the lock's
            share is the whole mirror; moving it to RUNNING needs no premise,
            and the result is [proc_held]'s whole share -- out of which the
@@ -1201,30 +1195,17 @@ Section ProofScheduler.
         assert (HM2s4r : add_vec (rget M2 Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12))
                          = a_cpu_proc cid_word) by (rgne; exact HM2s4).
         iDestruct (cpu_own_set_proc 1 ebc zero_reg (proc_addr jj) emp with "Hcpu") as "[Hproc Hback]".
-        (* DISPATCH: c->proc : 0 -> &proc[jj].  The slot enters its
-           "checked out" state and the receipt splits -- one half stays in
-           the invariant, the other travels to the dispatched thread inside
-           the swtch payload ([SchedCtx.proc_held]). *)
-        iApply (wp_store_s_sconf_au 8 false (mword_of_int (KernelSyms.scheduler + 0x68))
+        (* DISPATCH: c->proc : 0 -> &proc[jj].  A PLAIN STORE to memory this
+           hart already owns whole -- no invariant, no mask change. *)
+        assert (HM2s1rr : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
+        iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.scheduler + 0x68))
                   Rs1 Rs4 (mword_of_int 48 : mword 12)
-                  M2 (av - 10)%nat (rget M2 Rs1)
-                  (cpu_proc_half cpu_id (proc_addr jj) ∗ park_hlf jj false)
-                  (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
-                  ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity)
-                  ltac:(vm_compute; reflexivity)
-                  exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
-                  with "Hcg Hpc Hi68 [Hproc Hpark] [-]").
-        { iMod (scheds_dispatch γs (⊤ ∖ ↑minstretN) cpu_id jj
-                  ltac:(solve_ndisj) Hjj with "Hsched Hproc Hpark")
-            as "[Hcell Hclose]".
-          iModIntro. iExists zero_reg.
-          iSplitL "Hcell"; [ iEval (rewrite HM2s4r); iExact "Hcell" |].
-          iIntros "Hcell".
-          assert (HM2s1rr : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
-          iEval (rewrite HM2s1rr HM2s4r) in "Hcell".
-          iMod ("Hclose" with "Hcell") as "[$ $]". iModIntro. iPureIntro. exact I. }
+                  M2 (av - 10)%nat zero_reg false
+                  with "Hcg Hpc Hi68 [Hproc] [-]").
+        { iEval (rewrite HM2s4r). iExact "Hproc". }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc [Hproc Hpark]".
+        iIntros "Hcg Hpc Hproc".
+        iEval (rewrite HM2s4r HM2s1rr) in "Hproc".
         iDestruct ("Hback" with "Hproc") as "Hcpu".
         assert (Hr6c : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x68) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x6c))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1291,8 +1272,8 @@ Section ProofScheduler.
            dispatched thread's own intena retune runs under THIS hart's
            (now canonical) SIE ghost. *)
         iPoseProof (p_sched_to_proc γs cpu_id jj γl ch Hjj Hgl
-                      with "Hcsrs Havail [Hlocked Hstate Hpg Hchan Hpub Hpark]") as "HP".
-        { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub Hpark". }
+                      with "Hcsrs Havail [Hlocked Hstate Hpg Hchan Hpub] Htag") as "HP".
+        { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
         (* the TARGET is proc jj's record, which is MIGRATABLE ([None]) -- any
            hart may dispatch any RUNNABLE proc, so its stored continuation is
            good at every hart, and this hart's [adm] obligation is trivial.
@@ -1318,11 +1299,11 @@ Section ProofScheduler.
         iDestruct (p_sched_at_cpu γs cpu_id A' jj cret (rget m' Rtp) Hjj with "Hpay2")
           as "(%Htpv & %Hcret & %HA' & Hcsrs & Hpay3)".
         subst A'.
-        iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts [Hheld' Hppay]]".
+        iDestruct "Hpay3" as (γl' st' ch') "[%Hfacts (Hheld' & Htag' & Hppay)]".
         destruct Hfacts as [Hgl' Hneeds'].
         assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
         iEval (rewrite /proc_held) in "Hheld'".
-        iDestruct "Hheld'" as "(Hlocked & Hstate & Hpg & Hchan & Hpub & Hpark)".
+        iDestruct "Hheld'" as "(Hlocked & Hstate & Hpg & Hchan & Hpub)".
         (* the callee-saved image equalities *)
         unfold callee_img, ctx_regs in Hcallee. simpl in Hcallee.
         injection Hcallee as Hm1 Hm2 Hm8 Hm9 Hm18 Hm19 Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.
@@ -1345,33 +1326,17 @@ Section ProofScheduler.
         assert (Hm's4r : add_vec (rget m' Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12))
                          = a_cpu_proc cid_word) by (rgne; exact Hm's4).
         iDestruct (cpu_own_set_proc 1 eb' (proc_addr jj) zero_reg emp with "Hcpu") as "[Hproc Hback]".
-        (* RECLAIM: c->proc : &proc[jj] -> 0.  The slot is provably
-           record-free (the parking proc checked its record out before its
-           own swtch), so the two receipt halves rejoin and go back into
-           proc jj's lock below. *)
-        iDestruct (sie_cap_gpr_x0 m' (av - 10)%nat false (proc_addr jj)
-                     (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
-                     with "Hcg") as "[%Hx076 Hcg]".
-        assert (Hx076r : rget m' (mword_of_int 0 : mword 5) = zero_reg)
-          by (rgne; exact Hx076).
-        iApply (wp_store_s_sconf_au 8 false (mword_of_int (KernelSyms.scheduler + 0x76))
-                  (mword_of_int 0 : mword 5) Rs4 (mword_of_int 48 : mword 12)
-                  m' (av - 10)%nat (rget m' (mword_of_int 0 : mword 5))
-                  (cpu_proc_half cpu_id zero_reg ∗ park_full jj false)
-                  (⊤ ∖ ↑minstretN ∖ ↑schedsN) false
-                  ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity)
-                  ltac:(vm_compute; reflexivity)
-                  exec_write_ram_plain_8 (store_ext_8 _) ltac:(solve_ndisj)
-                  with "Hcg Hpc Hi76 [Hproc Hpark] [-]").
-        { iMod (scheds_reclaim γs (⊤ ∖ ↑minstretN) cpu_id jj
-                  ltac:(solve_ndisj) Hjj with "Hsched Hproc Hpark")
-            as "[Hcell Hclose]".
-          iModIntro. iExists (proc_addr jj).
-          iSplitL "Hcell"; [ iEval (rewrite Hm's4r); iExact "Hcell" |].
-          iIntros "Hcell". iEval (rewrite Hx076r Hm's4r) in "Hcell".
-          iMod ("Hclose" with "Hcell") as "[$ $]". iModIntro. iPureIntro. exact I. }
+        (* RECLAIM: c->proc : &proc[jj] -> 0.  A PLAIN STORE, for the same
+           reason the dispatch one is.  The hart tag came back WHOLE in the
+           park payload and goes into proc jj's lock below. *)
+        iApply (wp_sd_zero_s_sconf (mword_of_int (KernelSyms.scheduler + 0x76))
+                  Rs4 (mword_of_int 48 : mword 12)
+                  m' (av - 10)%nat (proc_addr jj) false
+                  with "Hcg Hpc Hi76 [Hproc] [-]").
+        { iEval (rewrite Hm's4r). iExact "Hproc". }
         first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
-        iIntros "Hcg Hpc [Hproc Hpark]".
+        iIntros "Hcg Hpc Hproc".
+        iEval (rewrite Hm's4r) in "Hproc".
         iDestruct ("Hback" with "Hproc") as "Hcpu".
         assert (Hr7a : add_vec_int (mword_of_int (KernelSyms.scheduler + 0x76) : mword 64) 4 = mword_of_int (KernelSyms.scheduler + 0x7a))
           by (apply bv_eq; vm_compute; reflexivity).
@@ -1430,9 +1395,9 @@ Section ProofScheduler.
            [ElimModal] instance for a bare [WP] goal here. *)
         iApply fupd_wp.
         iMod (proc_slots_park_gen γs ⊤ (proc_addr jj) st' Hneeds'
-                with "[Hvc'] [Hpark] Hppay") as "Hsl".
+                with "[Hvc'] [Htag'] Hppay") as "Hsl".
         { iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'". }
-        { iApply (park_at_full_intro jj false Hjj with "Hpark"). }
+        { iApply (hart_at_any_intro jj cpu_id Hjj with "Htag'"). }
         (* the park state is [unclaimed] ([park_ok_unclaimed]), so the whole
            mirror the swtch payload carried is the lock's share again. *)
         iDestruct (pstate_whole_split (proc_addr jj) st') as "[Hwk _]".

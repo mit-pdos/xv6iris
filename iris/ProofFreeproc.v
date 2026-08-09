@@ -206,7 +206,7 @@ Section ProofFreeproc.
     iIntros "Hcg Hcpu #Htext Hpc Hheld Hrest Hpg Htf #Henv Hcont".
     iDestruct "Hrest" as "(%Hpure & Hpid & Hfields & Hof & Hunits & Hspare & Hctx)".
     destruct Hpure as (Hofv & Hcwdv & Hszb).
-    iDestruct "Hheld" as "(Hlk & Hstate & Hpsg & Hchan & Hpub & Hpark)".
+    iDestruct "Hheld" as "(Hlk & Hstate & Hpsg & Hchan & Hpub)".
     (* THE MIRROR FOLLOWS THE CELL.  freeproc's caller holds p->lock for the
        whole call, so it holds the WHOLE variable and the move needs no side
        condition; doing it up front rather than at the store keeps it out of
@@ -371,7 +371,7 @@ Section ProofFreeproc.
         p_sz pa ↦₈ pv_sz V -∗
         WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid Hpid2
-             Hcwd Hnm Hof Hunits Hspare Hctx Hpark]" as "ZERO".
+             Hcwd Hnm Hof Hunits Hspare Hctx]" as "ZERO".
     { iIntros (CIDz Hsz0 me pgv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcpu Hpc Hpg Htf Hsz".
       (* the instruction facts must be re-posed INSIDE with FRESH names *)
@@ -567,7 +567,7 @@ Section ProofFreeproc.
       iDestruct (cpu_own_transport CIDz CIDzd ilvl eb pme C false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDzd with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid2 Hpark]
+      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid2]
                                   [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hctx Hpg Htf]").
       { (* callee_saved mm E3 *)
         assert (HE3thr : fr_thr mm E3).
@@ -588,7 +588,7 @@ Section ProofFreeproc.
                 by wp_next_chain;
               exact (Hsh (or_introl eq_refl))).
         rewrite Hcpueq.
-        iFrame "Hlk Hpark".
+        iFrame "Hlk".
         iFrame "Hpsg".
         iEval (rewrite fr_z32) in "Hstate". iFrame "Hstate".
         (* the store leaf already leaves [zero_reg] in the chan cell *)

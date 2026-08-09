@@ -359,18 +359,15 @@ Section BootBssChain.
      (its stack slice and its four [cpus[h]] cells; the image word it also
      takes is PERSISTENT and shared, so it is not here).
 
-     [cpus[h].proc] appears TWICE, i.e. as the whole cell: one half is the
-     one [IntrDefs.cpu_cells] keeps, the other is the SPARE that makes the
-     field writable.  While hart h runs a proc the spare sits in that proc's
-     [p->lock] ([SchedCtx.proc_held]); while it runs the scheduler the
-     scheduler holds it.  It is per-hart both times, so it is carved here
-     with the rest of that hart's share and rides that hart's bridge. *)
+     [cpus[h].proc] is carved WHOLE and stays whole: it is private to hart
+     [h] (no invariant and no lock reads it), so it lives in that hart's
+     [IntrDefs.cpu_cells] and the scheduler's two stores to it are plain
+     stores to memory it already owns. *)
   Definition boot_hart_bss (h : CPU) : iProp Σ :=
     (stack_own_phys (mword_of_int (sp_of (fin_to_nat h))) boot_stack_depth ∗
      a_cpu_noff (cid_word_of h) ↦₄ noff_val 0 ∗
      (∃ iv : mword 32, a_cpu_int (cid_word_of h) ↦₄ iv) ∗
-     cpu_proc_half h (zero_reg : mword 64) ∗
-     cpu_proc_half h (zero_reg : mword 64) ∗
+     a_cpu_proc (cid_word_of h) ↦₈ (zero_reg : mword 64) ∗
      own_ctx (a_cpu_ctx (cid_word_of h)))%I.
 
   (* the two families' per-element outputs, restated in the consumer's
@@ -383,13 +380,10 @@ Section BootBssChain.
   Proof.
     iIntros "Hst (Hp & Hctx & Hnoff & Hint)".
     iEval (rewrite /hart_stack_raw off_of_z sp_of_slice) in "Hst".
-    iAssert (cpu_proc_half h (zero_reg : mword 64) ∗
-             cpu_proc_half h (zero_reg : mword 64))%I with "[Hp]" as "[Hp1 Hp2]".
-    { rewrite -(cpu_proc_halve h (zero_reg : mword 64)) a_cpu_proc_cid.
-      iExact "Hp". }
-    rewrite /boot_hart_bss a_cpu_ctx_cid a_cpu_noff_cid a_cpu_int_cid.
+    rewrite /boot_hart_bss a_cpu_ctx_cid a_cpu_noff_cid a_cpu_int_cid
+            a_cpu_proc_cid.
     iSplitL "Hst"; [iExact "Hst" |].
-    iFrame "Hnoff Hint Hp1 Hp2 Hctx".
+    iFrame "Hnoff Hint Hp Hctx".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -820,7 +814,7 @@ Section BootAlloc.
     rewrite /hart_strans /hart_sie /hart_spp /hart_spie /boot_hart_bss.
     iIntros "#Hcl #Hcert #Hword Hregs [Hs1 Hs2] (Hg2 & Hg4a & Hg4b)
              [Hspp1 Hspp2] [Hspie1 Hspie2]
-             (Hstk & Hnoff & Hint & Hproc & Hspare & Hctx)".
+             (Hstk & Hnoff & Hint & Hproc & Hctx)".
     iMod (boot_entry_pre (CID := h) E (g.(gregs) h)
             (boot_regs_of_facts g Hbf h) with "Hcl Hcert Hregs") as
       "(Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp & Hmede & Hmdl &
@@ -835,7 +829,7 @@ Section BootAlloc.
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
             Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hword Hstk
             Hs1 Hs2 Hg2 Hg4a Hg4b Hspp1 Hspie1 Hspp2 Hspie2 Hnoff Hint Hproc
-            Hspare Hctx".
+            Hctx".
   Qed.
 
   (* ------------------------------------------------------------------ *)

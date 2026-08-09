@@ -46,10 +46,9 @@
        what makes the bridge runnable on every hart at once;
      - the cpus[cid] struct cells ([a_cpu_noff] / [a_cpu_int] /
        [a_cpu_proc] / the 14 context words behind [cpu_ctx_free]): .bss, from
-       the memory image.  [c->proc] arrives as BOTH halves: one goes into
-       [cpu_own], the other passes through as the spare that makes the field
-       writable.  ([stvec] is NOT .bss -- it is a Sail register, and comes
-       from the per-hart register set.)
+       the memory image.  [c->proc] arrives WHOLE and goes into [cpu_own].
+       ([stvec] is NOT .bss -- it is a Sail register, and comes from the
+       per-hart register set.)
 
    [pc_is] is NOT threaded: SpecEntry's post hands back [pc_is pcMain]
    with [pcMain := mword_of_int KernelSyms.main], which is literally the
@@ -347,25 +346,22 @@ Section BootBridge.
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     a_cpu_noff cid_word ↦₄ nv -∗
     a_cpu_int cid_word ↦₄ iv -∗
-    (* [cpus[cid].proc] TWICE, i.e. the whole cell.  One half goes into
-       [cpu_own] ([IntrDefs.cpu_cells]); the other passes through untouched
-       as the SPARE that makes the field writable -- it is what this hart's
-       scheduler starts out holding ([SpecScheduler]). *)
-    cpu_proc_half cpu_id p0 -∗
-    cpu_proc_half cpu_id p0 -∗
+    (* the WHOLE [cpus[cid].proc] cell, which goes into [cpu_own]
+       ([IntrDefs.cpu_cells]).  The field is private to this hart, so
+       nothing else ever holds a fraction of it. *)
+    cur_proc p0 -∗
     cpu_ctx_free
     ==∗
     ∃ mf : regfile,
       sie_cap_gpr mf K false p0 ∗
       cpu_own 0 false p0 cpu_ctx_free false ∗
-      cpu_proc_half cpu_id p0 ∗
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof.
     iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
              Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval
-             Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hspare Hctx".
+             Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hctx".
     (* --- the SIE ghost: 1/2 tied + 1/4 for main + 1/4 = two eighths --- *)
     iAssert (⌜(1/4 = 1/4/2 + 1/4/2)%Qp⌝)%I as %Hq.
     { iPureIntro. apply (bool_decide_unpack _). by compute. }
@@ -428,7 +424,7 @@ Section BootBridge.
     iExists Mf.
     iSplitL "Hhs Hsconf Hcap Hfile".
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
-    iFrame "Hcpu Hspare Hg4a".
+    iFrame "Hcpu Hg4a".
     rewrite /main_hart_raw /trap_csrs.
     iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
     iExists (_get_Mstatus_SPP msf), (_get_Mstatus_SPIE msf). iExact "Hspp2".

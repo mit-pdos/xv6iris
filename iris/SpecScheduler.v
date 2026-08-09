@@ -60,13 +60,6 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (20 <= av)%nat ->
   sie_cap_gpr m av false p0 -∗
   cpu_own 0 false p0 cpu_ctx_free false -∗
-  (* THE SPARE HALF of [cpus[cid].proc].  [cpu_own] keeps the other one, so
-     holding both is what makes the field writable, and the scan writes it
-     twice a round.  On dispatch the scheduler stores [p] and deposits this
-     half in the proc's [p->lock] ([SchedCtx.proc_held]); on reclaim it takes
-     it back out of the lock and stores 0.  So it is in hand exactly while
-     the hart runs no proc -- which is the shape at entry. *)
-  cpu_proc_half cpu_id p0 -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]

@@ -66,25 +66,8 @@ Definition cpu_ctx_free `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} : iProp Σ 
   (∃ vs : list (mword 64),
      ⌜ length vs = 14%nat ⌝ ∗ ctx_cells (a_cpu_ctx cid_word) vs)%I.
 
-(* the namespace of the global parked-scheduler invariant [scheds_inv]. *)
-Definition schedsN : namespace := nroot .@ "scheds".
-
-(* ---------------------------------------------------------------------- *)
-(* Pure plumbing for the [∗ list] over [enum CPU] that [scheds_inv]'s body  *)
-(* is: a hart's own index into the enumeration.                            *)
-(* ---------------------------------------------------------------------- *)
-Lemma fin_enum_lookup (n : nat) (h : fin n) :
-  fin_enum n !! (fin_to_nat h) = Some h.
-Proof.
-  induction h as [|n h IH]; simpl; [done|].
-  by rewrite list_lookup_fmap IH.
-Qed.
-
-Lemma cpu_enum_lookup (h : CPU) : enum CPU !! (fin_to_nat h) = Some h.
-Proof. apply fin_enum_lookup. Qed.
-
-(* [cpus[h].proc = 0] and [cpus[h].proc = &proc[j]] are the invariant's two
-   live states, and they are DISJOINT: proc[] does not start at address 0. *)
+(* [cpus[h].proc = 0] and [cpus[h].proc = &proc[j]] are the two live values
+   of the field, and they are DISJOINT: proc[] does not start at address 0. *)
 Lemma proc_addr_nonzero (j : nat) :
   (j < NPROC)%nat -> proc_addr j <> (zero_reg : mword 64).
 Proof.
@@ -210,7 +193,7 @@ Section SchedCtx.
         ∃ (j : nat) (γl : gname) (st : mword 32) (ch : mword 64),
           ⌜cret = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ park_ok st = true⌝ ∗
-          proc_held h j γl st ch ∗ park_pay (proc_addr j) st)
+          proc_held h j γl st ch ∗ hart_full j h ∗ park_pay (proc_addr j) st)
      ∨ (* c = proc j's context, resumed by THE SCHEDULER [cret] (the
           scheduler's swtch): state already set RUNNING, c->proc = p.  [A']
           is the scheduler's own record, PINNED at [h] -- cpus[h].context
@@ -221,7 +204,7 @@ Section SchedCtx.
           ⌜c = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ cret = a_cpu_ctx (cid_word_of h) /\
            A' = Some h⌝ ∗
-          proc_held h j γl RUNNING ch)))%I.
+          proc_held h j γl RUNNING ch ∗ hart_full j h)))%I.
 
   (* the scheduler-chain valid context, PINNED at hart [h]
      (fixed Phi / P instantiation); [p] = the context's c->proc
@@ -251,11 +234,12 @@ Section SchedCtx.
     (j < NPROC)%nat -> γs !! j = Some γl -> park_ok st = true ->
     trap_csrs (CID := i) -∗
     proc_held i j γl st ch -∗
+    hart_full j i -∗
     park_pay (proc_addr j) st -∗
     p_sched i None (a_cpu_ctx (cid_word_of i))
       (p_context (proc_addr j)) (cid_word_of i) (proc_addr j).
   Proof.
-    iIntros (Hj Hgl Hst) "Htc Hheld Hpay".
+    iIntros (Hj Hgl Hst) "Htc Hheld Htag Hpay".
     iSplit; [done|]. iFrame "Htc". iLeft. iSplit; [done|]. iSplit; [done|].
     iExists j, γl, st, ch. iFrame. done.
   Qed.
@@ -270,10 +254,11 @@ Section SchedCtx.
     trap_csrs (CID := i) -∗
     intr_handler_avail (CID := i) -∗
     proc_held i j γl RUNNING ch -∗
+    hart_full j i -∗
     p_sched i (Some i) (p_context (proc_addr j))
       (a_cpu_ctx (cid_word_of i)) (cid_word_of i) (proc_addr j).
   Proof.
-    iIntros (Hj Hgl) "Htc Havail Hheld".
+    iIntros (Hj Hgl) "Htc Havail Hheld Htag".
     iSplit; [done|]. iFrame "Htc". iRight. iSplitL "Havail"; [iExact "Havail"|].
     iExists j, γl, ch. iFrame. done.
   Qed.
@@ -289,7 +274,7 @@ Section SchedCtx.
     ⌜p = proc_addr j⌝ ∗ ⌜A' = Some i⌝ ∗
     trap_csrs (CID := i) ∗ intr_handler_avail (CID := i) ∗
     ∃ (γl : gname) (ch : mword 64),
-      ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch.
+      ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch ∗ hart_full j i.
   Proof.
     iIntros (Hj) "(%Htp & Htc & Hpay)". iSplit; [done|].
     iDestruct "Hpay" as "[(%Hc & _ & _) | Hpay]".
@@ -320,7 +305,7 @@ Section SchedCtx.
     ⌜A' = None⌝ ∗ trap_csrs (CID := i) ∗
     ∃ (γl : gname) (st : mword 32) (ch : mword 64),
       ⌜γs !! j = Some γl /\ park_ok st = true⌝ ∗
-      proc_held i j γl st ch ∗ park_pay (proc_addr j) st.
+      proc_held i j γl st ch ∗ hart_full j i ∗ park_pay (proc_addr j) st.
   Proof.
     iIntros (Hj) "(%Htp & Htc & Hpay)". iSplit; [done|].
     iDestruct "Hpay" as "[(_ & %HA & Hpay) | Hpay]".
@@ -381,25 +366,22 @@ Section SchedCtx.
   (*     change running-ness, so wakeup and kill are unaffected.            *)
   (* ------------------------------------------------------------------ *)
 
-  (* THE RUNNING ARM.  Three things, and the last two are the whole
+  (* THE RUNNING ARM.  Two things, and the second is the whole
      parked-scheduler protocol -- there is no global box and no receipt:
        - the proc's own context cells, raw, with no resume obligation.  That
          is what lets a TRAP preempt the thread: kerneltrap -> yield ->
          acquire finds the cells here rather than needing them handed down
          from the interrupted frame.
-       - the OTHER half of [c->proc] for the hart running it, which is what
-         lets the scheduler store that field -- it needs the whole cell, and
-         gets it by holding this lock.
        - THAT HART'S PARKED SCHEDULER RECORD, reached by holding p->lock,
          which every parking path does already.
      The hart is existential (the lock is hart-free, the record is not); the
-     tag half collapses it to the ambient hart, timelessly.  See
-     claude-notes/design/proc-struct.md. *)
+     tag half collapses it to the ambient hart, timelessly.  [cpus[h].proc]
+     is NOT here: it is private to hart [h] and stays whole in that hart's
+     [IntrDefs.cpu_cells].  See claude-notes/design/proc-struct.md. *)
   Definition run_slot (pa : mword 64) : iProp Σ :=
     (own_ctx (p_context pa) ∗
      ∃ h : CPU,
        hart_at pa (1/2) h ∗
-       cpu_proc_half h pa ∗
        ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) pa)%I.
 
   Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
@@ -577,7 +559,6 @@ Section SchedCtx.
     hart_hlf j h -∗ proc_slots (proc_addr j) st -∗
     ⌜ st = RUNNING ⌝ ∗ hart_full j h ∗
     own_ctx (p_context (proc_addr j)) ∗
-    cpu_proc_half h (proc_addr j) ∗
     ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j).
   Proof.
     iIntros (Hj) "Hhlf Hslot".
@@ -597,29 +578,28 @@ Section SchedCtx.
     rewrite needs_ctx_RUNNING inv_dormant_RUNNING is_running_RUNNING.
     iDestruct "Hslot" as "(_ & Harm & _ & _)".
     rewrite /run_slot.
-    iDestruct "Harm" as "(Hown & (%h' & Hhlf' & Hph & Hrec))".
+    iDestruct "Harm" as "(Hown & (%h' & Hhlf' & Hrec))".
     iDestruct (hart_at_elim j (1/2) h' Hj with "Hhlf'") as "Hhlf'".
     iDestruct (hart_own_agree j (1/2) (1/2) h h' with "Hhlf Hhlf'") as %Hhh.
     subst h'.
     iSplitR; [done|].
-    rewrite hart_split. iFrame "Hhlf Hhlf' Hown Hph Hrec".
+    rewrite hart_split. iFrame "Hhlf Hhlf' Hown Hrec".
   Qed.
 
   (* the converse, for the release side: what a resumed thread deposits when
-     it re-establishes a RUNNING slot.  Both the record and the spare
-     [c->proc] half came across the dispatching swtch. *)
+     it re-establishes a RUNNING slot.  The record came across the
+     dispatching swtch. *)
   Lemma proc_slots_running_intro (j : nat) (h : CPU) :
     (j < NPROC)%nat ->
     hart_hlf j h -∗
     own_ctx (p_context (proc_addr j)) -∗
-    cpu_proc_half h (proc_addr j) -∗
     ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j) -∗
     proc_slots (proc_addr j) RUNNING.
   Proof.
-    iIntros (Hj) "Hhlf Hown Hph Hrec". rewrite /proc_slots /run_slot.
+    iIntros (Hj) "Hhlf Hown Hrec". rewrite /proc_slots /run_slot.
     rewrite needs_ctx_RUNNING inv_dormant_RUNNING not_running_RUNNING is_running_RUNNING.
     iSplitR; [done|]. iSplitL; [| done].
-    iFrame "Hown". iExists h. iFrame "Hph Hrec".
+    iFrame "Hown". iExists h. iFrame "Hrec".
     by iApply (hart_at_intro j (1/2) h Hj).
   Qed.
 
