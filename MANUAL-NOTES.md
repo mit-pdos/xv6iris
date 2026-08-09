@@ -61,7 +61,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - promise-free weak memory plan; need soundness proof for LB without promises
 - log_write tracks set of blocks, to ensure they fit within MAXOPBLOCKS after absorption
 - ghost var for SPP flag in sstatus: owned when interrupts disabled, otherwise in sie invariant
-- unsynchronized access to ip->ref in ilock, likely invalid under weak memory
+- unsynchronized access to ip->ref in ilock, could be tricky to prove under weak memory
 
 Big things that still need to be done/explored:
 
