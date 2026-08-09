@@ -1711,7 +1711,21 @@ Section ProofKexit.
         iSplitR; [iPureIntro; exact Hj|].
         iSplitR; [iPureIntro; exact Hgl|].
         iSplitR; [iPureIntro; exact Hgeom|].
-        iFrame "Hprocs Hscheds Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl Hpark". }
+        (* Split STRUCTURALLY before framing: a named [iFrame] still walks
+           the whole 11-conjunct goal per hypothesis (the same cost measured
+           for [fileclose_fs_env_split_pid] in SpecFileclose.v); [iSplitL]/
+           [iExact] name both sides, so nothing is searched. *)
+        iSplitL "Hprocs"; [iExact "Hprocs"|].
+        iSplitL "Hscheds"; [iExact "Hscheds"|].
+        iSplitL "Hbio"; [iExact "Hbio"|].
+        iSplitL "Hlog"; [iExact "Hlog"|].
+        iSplitL "Hseam"; [iExact "Hseam"|].
+        iSplitL "Hgen"; [iExact "Hgen"|].
+        iSplitL "Hdev"; [iExact "Hdev"|].
+        iSplitL "Hgeo"; [iExact "Hgeo"|].
+        iSplitL "Hdlk"; [iExact "Hdlk"|].
+        iSplitL "Hbsl"; [iExact "Hbsl"|].
+        iExact "Hpark". }
       iPoseProof (kx_loop (CID0 := CID8) Φ γft γf
                     (MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
                        cov logstart dev pid (DfracOwn (1/4))) j pid
