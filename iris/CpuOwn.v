@@ -201,10 +201,11 @@ Section CpuOwn.
      ≥ 1, hence with interrupts off.
 
      THE ACCESSOR HANDS OUT ONLY THE HALF the bundle owns.  A store needs
-     the FULL cell, so the scheduler must pair this with the OTHER half,
-     which lives in [SchedCtx.scheds_inv]; the two [c->proc] stores are
-     therefore mask-changing, and are exactly [SchedCtx.scheds_dispatch]
-     and [SchedCtx.scheds_reclaim]. *)
+     the FULL cell, so the scheduler must pair this with the OTHER half --
+     the spare, which lives in the running proc's lock
+     ([SchedCtx.run_slot]) and reaches the scheduler through [proc_held].
+     So both [c->proc] stores happen holding a LOCK, not an invariant, and
+     neither is mask-changing. *)
   Lemma cpu_own_set_proc (n : nat) (eb : bool)
       (p p' : mword 64) (C : iProp Σ) :
     cpu_own n eb p C false -∗

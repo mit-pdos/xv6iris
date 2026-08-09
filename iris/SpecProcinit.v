@@ -161,7 +161,7 @@ Section ProcinitSeals.
     proc_ready i -∗
     p_chan (proc_addr i) ↦₈ ch -∗
     proc_pub (proc_addr i) -∗
-    park_at_full (proc_addr i) false -∗
+    hart_at_any (proc_addr i) -∗
     (* the slot's state mirror, whole, at the UNUSED procinit just stored *)
     pstate_lock (proc_addr i) UNUSED -∗
     lk_fresh (proc_addr i) "proc"%string ∗
@@ -218,12 +218,12 @@ Section ProcinitProcsInv.
      (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
      proc_pub (proc_addr i) ∗
      proc_dormant (proc_addr i) UNUSED ∗
-     park_at_full (proc_addr i) false ∗
+     hart_at_any (proc_addr i) ∗
      pstate_lock (proc_addr i) UNUSED)%I.
 
   Lemma proc_ready_split (i : nat) (ch : mword 64) :
     proc_ready i -∗ p_chan (proc_addr i) ↦₈ ch -∗ proc_pub (proc_addr i) -∗
-    park_at_full (proc_addr i) false -∗ pstate_lock (proc_addr i) UNUSED -∗
+    hart_at_any (proc_addr i) -∗ pstate_lock (proc_addr i) UNUSED -∗
     lk_fresh (proc_addr i) "proc"%string ∗ proc_res i.
   Proof.
     rewrite /proc_ready /proc_res.
@@ -267,7 +267,7 @@ Section ProcinitProcsInv.
   Lemma procs_inv_alloc (E : coPset) :
     ([∗ list] i ∈ seq 0 NPROC,
        ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-         proc_pub (proc_addr i)) ∗ park_full i false) ∗
+         proc_pub (proc_addr i)) ∗ (∃ h : CPU, hart_full i h)) ∗
        pstate_full i UNUSED)
     ={E}=∗ ∃ γs : list gname, procs_inv γs.
   Proof.
@@ -275,15 +275,16 @@ Section ProcinitProcsInv.
     (* 1. peel [lk_fresh] out of each [proc_ready] *)
     iDestruct (big_sepL_impl
                  (fun _ i => (((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-                                proc_pub (proc_addr i)) ∗ park_full i false) ∗
+                                proc_pub (proc_addr i)) ∗ (∃ h : CPU, hart_full i h)) ∗
                               pstate_full i UNUSED)%I)
                  (fun _ i => (lk_fresh (proc_addr i) "proc"%string ∗ proc_res i)%I)
                  (seq 0 NPROC) with "Hin []") as "Hin".
     { iIntros "!>" (k i Hk) "(((Hrdy & Hch & Hpub) & Hpark) & Hg)".
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
       iDestruct "Hch" as (ch) "Hch".
+      iDestruct "Hpark" as (hb) "Hpark".
       iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg]").
-      { iApply (park_at_full_intro k false Hlt with "Hpark"). }
+      { iApply (hart_at_any_intro k hb Hlt with "Hpark"). }
       (* UNUSED is [unclaimed], so the whole variable is the lock's share *)
       rewrite /pstate_lock unclaimed_UNUSED.
       iDestruct (pstate_split k UNUSED with "Hg") as "[Hg1 Hg2]".
