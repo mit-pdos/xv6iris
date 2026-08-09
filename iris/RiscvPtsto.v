@@ -297,7 +297,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
-  riscvF_parkGS :: ghost_varG Σ bool;
+  riscvF_parkGS :: ghost_varG Σ CPU;
   (* the per-proc state mirror's typing (the NAME is per-era, above).  A
      [mword 32] instance of its own -- no other ghost_var in the record
      carries one, so nothing else can be confused with it. *)
@@ -402,7 +402,7 @@ Definition riscv_kmapGS `{!riscvGS Σ} :
     (@SailStdpp.Instances.Decidable_eq_mword 27)
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
-Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ bool := riscvF_parkGS.
+Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ CPU := riscvF_parkGS.
 Definition riscv_pstateGS `{!riscvGS Σ} : ghost_varG Σ (SailStdpp.Values.mword 32) :=
   riscvF_pstateGS.
 Definition era_memGS_of `{!riscvFixedGS Σ} (E : riscvEraGS) : gen_heapGS Arch.pa (bv 8) Σ :=

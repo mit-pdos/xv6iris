@@ -310,11 +310,11 @@ Lemma needs_ctx_RUNNING : needs_ctx RUNNING = false.
 Proof. vm_compute. reflexivity. Qed.
 
 (* THE THIRD flat state predicate the proc-lock invariant keys on (beside
-   [needs_ctx] and [inv_dormant]): the states in which this slot's PARK
-   RECEIPT ([park_own] below) is not out on loan.  While the proc is
-   RUNNING its two receipt halves are elsewhere -- one in
-   [SchedCtx.scheds_inv]'s slot for the hart running it, one with the
-   running thread -- and at every other state both sit in [p->lock]. *)
+   [needs_ctx] and [inv_dormant]): the states in which this slot's HART TAG
+   ([hart_own] below) is whole in the lock, its value meaningless because
+   nothing is running the proc.  While the proc IS running the tag is split
+   -- half in the lock beside that hart's parked scheduler record
+   ([SchedCtx.run_slot]), half with the running thread, in the SIE arm. *)
 Definition not_running (st : mword 32) : bool :=
   negb (bool_decide (st = RUNNING)).
 
@@ -812,32 +812,45 @@ Section CurProc.
 End CurProc.
 
 (* ===================================================================== *)
-(* THE SHARED HALF OF [cpus[h].proc], AND THE PER-PROC PARK RECEIPT.      *)
+(* THE SHARED HALF OF [cpus[h].proc], AND THE PER-PROC HART TAG.           *)
 (*                                                                        *)
-(* Both belong to the global parked-scheduler protocol [SchedCtx.         *)
-(* scheds_inv], but they are stated HERE, at the bottom of the proc/cpu   *)
-(* geometry, because [IntrDefs.cpu_cells] (far below SchedCtx) has to     *)
-(* name the half, and [SchedCtx.proc_lock_res] the receipt.               *)
+(* Both belong to the parked-scheduler protocol, which lives entirely in   *)
+(* the running proc's own lock ([SchedCtx.run_slot]).  They are stated     *)
+(* HERE, at the bottom of the proc/cpu geometry, because                   *)
+(* [IntrDefs.cpu_cells] (far below SchedCtx) has to name the half and      *)
+(* [IntrDefs.cpu_claim] the tag.                                          *)
 (*                                                                        *)
-(* [cpu_proc_half h p]: HALF of [cpus[h].proc], holding [p].  The other   *)
-(* half is permanently owned by [scheds_inv]'s slot for hart [h].  This    *)
-(* is the ONLY channel by which the logic can learn "the proc running on  *)
-(* hart h is p" -- exactly the fact myproc() reads -- and halving the     *)
-(* cell is MANDATORY rather than cosmetic: stated against a FULL cell the *)
-(* take-out move is vacuous (fractions 1 + 1/2), which                    *)
-(* [SchedCtx.cpu_own_full_is_vacuous] proves outright.                    *)
+(* [cpu_proc_half h p]: HALF of [cpus[h].proc], holding [p].  The thread   *)
+(* running on hart [h] carries one half inside [cpu_cells]; the other sits *)
+(* in the lock of the proc it is running, and is what lets the SCHEDULER   *)
+(* store [c->proc] (it needs the whole cell, and gets it by acquiring that *)
+(* lock).  This is also the only channel by which the logic can learn      *)
+(* "the proc running on hart h is p" -- exactly the fact myproc() reads.   *)
 (*                                                                        *)
-(* [park_own j q r]: fraction [q] of proc j's park receipt, at value [r].  *)
-(*   [r = true]  -- hart h's scheduler record is RESIDENT in slot h;       *)
-(*   [r = false] -- it is checked out by the thread running proc j (or     *)
-(*                  not yet deposited by a freshly dispatched one).        *)
-(* KEYED BY THE PROC, NOT BY THE HART, which is what makes the            *)
-(* entitlement hart-free: proc j is dispatched by whatever hart's         *)
-(* scheduler picked it up, and after a migration it is still proc j.  The *)
-(* name is CANONICAL ([RiscvPtsto.park_name]) for the same reason         *)
-(* [sie_name] is: the receipt is named inside [proc_lock_res], hence      *)
-(* inside [procs_inv], and a [γk] parameter there would have to be        *)
-(* threaded through every file that mentions [procs_inv].                 *)
+(* [hart_own j q h]: fraction [q] of proc j's HART TAG -- "proc j is        *)
+(* running on hart h".  Split while j runs: half in j's lock beside that   *)
+(* hart's parked scheduler record ([SchedCtx.run_slot]), half riding       *)
+(* [IntrDefs.cpu_claim] in the SIE arm, which is what a preempting         *)
+(* kerneltrap is handed.  Whole in the lock at every other state, value    *)
+(* then meaningless.  It appears in no function contract.                  *)
+(*                                                                        *)
+(* WHAT IT IS FOR.  The record is pinned to [cpus[h].context] but the lock *)
+(* holding it is hart-free, so the lock states it under an [∃ h], and a    *)
+(* thread must collapse that to its own hart or the [swtch] operand        *)
+(* address does not match.  The [cpu_proc_half] beside it cannot do that:  *)
+(* two harts each holding half of THEIR OWN c->proc cell, both reading     *)
+(* [&proc[j]], is consistent as far as separation logic can see, and "at   *)
+(* most one hart runs proc j" is a global fact.  The tag states it         *)
+(* locally, and [hart_own_agree] is timeless, so the collapse happens      *)
+(* inside the acquire's fancy update with no program step.                 *)
+(*                                                                        *)
+(* The two halves move at the two [p->state] writes that change running-   *)
+(* ness, both under the lock, so they never disagree with the world.       *)
+(*                                                                        *)
+(* The name is CANONICAL ([RiscvPtsto.park_name]) for the same reason      *)
+(* [sie_name] is: the tag is named inside [proc_lock_res], hence inside    *)
+(* [procs_inv], and a [γk] parameter there would have to be threaded       *)
+(* through every file that mentions it.                                   *)
 (* ===================================================================== *)
 Section ParkGhost.
   Context `{!riscvGS Σ}.
@@ -869,17 +882,20 @@ Section ParkGhost.
     iDestruct (mem_pointsto_ne with "Hc1 Hc2") as %Hne. done.
   Qed.
 
-  Definition park_own (j : nat) (q : Qp) (r : bool) : iProp Σ :=
-    ghost_var (park_name j) q r.
+  Definition hart_own (j : nat) (q : Qp) (h : CPU) : iProp Σ :=
+    ghost_var (park_name j) q h.
 
-  Definition park_hlf (j : nat) (r : bool) : iProp Σ := park_own j (1/2) r.
-  Definition park_full (j : nat) (r : bool) : iProp Σ := park_own j 1 r.
+  Definition hart_hlf (j : nat) (h : CPU) : iProp Σ := hart_own j (1/2) h.
+  Definition hart_full (j : nat) (h : CPU) : iProp Σ := hart_own j 1 h.
 
-  Global Instance park_own_timeless j q r : Timeless (park_own j q r).
-  Proof. rewrite /park_own. apply _. Qed.
+  Global Instance hart_own_timeless j q h : Timeless (hart_own j q h).
+  Proof. rewrite /hart_own. apply _. Qed.
 
-  Lemma park_own_agree (j : nat) (q1 q2 : Qp) (r1 r2 : bool) :
-    park_own j q1 r1 -∗ park_own j q2 r2 -∗ ⌜r1 = r2⌝.
+  (* THE COLLAPSE.  This is the whole point of the tag: it turns the lock's
+     existential hart into the ambient one, and it is a [ghost_var]
+     agreement, hence timeless. *)
+  Lemma hart_own_agree (j : nat) (q1 q2 : Qp) (h1 h2 : CPU) :
+    hart_own j q1 h1 -∗ hart_own j q2 h2 -∗ ⌜h1 = h2⌝.
   Proof.
     iIntros "Hg1 Hg2".
     by iDestruct (ghost_var_agree with "Hg1 Hg2") as %->.
@@ -895,48 +911,55 @@ Section ParkGhost.
       try rewrite Qp.half_half. iExact "H".
   Qed.
 
-  Lemma park_split (j : nat) (r : bool) :
-    park_full j r ⊣⊢ park_hlf j r ∗ park_hlf j r.
-  Proof. rewrite /park_full /park_hlf /park_own ghost_var_halve //. Qed.
+  Lemma hart_split (j : nat) (h : CPU) :
+    hart_full j h ⊣⊢ hart_hlf j h ∗ hart_hlf j h.
+  Proof. rewrite /hart_full /hart_hlf /hart_own ghost_var_halve //. Qed.
 
-  Lemma park_update (j : nat) (r r' : bool) :
-    park_hlf j r -∗ park_hlf j r ==∗ park_hlf j r' ∗ park_hlf j r'.
+  (* RETAGGING, at dispatch: the scheduler holds the whole tag (it came out of
+     the lock's not-running guard, where the value is meaningless) and stamps
+     its own hart on it before splitting. *)
+  Lemma hart_update (j : nat) (h h' : CPU) :
+    hart_full j h ==∗ hart_full j h'.
   Proof.
-    rewrite /park_hlf /park_own. iIntros "Hg1 Hg2".
-    iMod (ghost_var_update_halves r' with "Hg1 Hg2") as "[$ $]". done.
+    rewrite /hart_full /hart_own. iIntros "Hg".
+    by iMod (ghost_var_update h' with "Hg") as "$".
   Qed.
 
-  (* THE RECEIPT SPELLED AT A PROC ADDRESS.  [SchedCtx.proc_slots] is keyed
-     on the proc's ADDRESS, not on its array index, so the receipt's home in
+  (* THE TAG SPELLED AT A PROC ADDRESS.  [SchedCtx.proc_slots] is keyed
+     on the proc's ADDRESS, not on its array index, so the tag's home in
      the lock has to be too -- and giving [proc_slots] / [proc_lock_res] an
      extra index argument would change the arity of [procs_inv] and of every
      file that mentions it.  [proc_addr] is injective on the array range
      ([proc_addr_inj]), so the two spellings are interchangeable there. *)
-  Definition park_at (pa : mword 64) (q : Qp) (r : bool) : iProp Σ :=
-    (∃ j : nat, ⌜pa = proc_addr j /\ (j < NPROC)%nat⌝ ∗ park_own j q r)%I.
+  Definition hart_at (pa : mword 64) (q : Qp) (h : CPU) : iProp Σ :=
+    (∃ j : nat, ⌜pa = proc_addr j /\ (j < NPROC)%nat⌝ ∗ hart_own j q h)%I.
 
-  Definition park_at_full (pa : mword 64) (r : bool) : iProp Σ :=
-    park_at pa 1 r.
+  (* the not-running guard's form: SOME tag exists, value unconstrained. *)
+  Definition hart_at_any (pa : mword 64) : iProp Σ :=
+    (∃ h : CPU, hart_at pa 1 h)%I.
 
-  Lemma park_at_intro (j : nat) (q : Qp) (r : bool) :
-    (j < NPROC)%nat -> park_own j q r -∗ park_at (proc_addr j) q r.
+  Lemma hart_at_intro (j : nat) (q : Qp) (h : CPU) :
+    (j < NPROC)%nat -> hart_own j q h -∗ hart_at (proc_addr j) q h.
   Proof. iIntros (Hj) "Hg". iExists j. iFrame "Hg". done. Qed.
 
-  Lemma park_at_elim (j : nat) (q : Qp) (r : bool) :
-    (j < NPROC)%nat -> park_at (proc_addr j) q r -∗ park_own j q r.
+  Lemma hart_at_elim (j : nat) (q : Qp) (h : CPU) :
+    (j < NPROC)%nat -> hart_at (proc_addr j) q h -∗ hart_own j q h.
   Proof.
     iIntros (Hj) "(%j' & [%Hpa %Hj'] & Hg)".
     rewrite (_ : j' = j); [iExact "Hg"|].
     exact (proc_addr_inj j' j Hj' Hj (eq_sym Hpa)).
   Qed.
 
-  Lemma park_at_full_intro (j : nat) (r : bool) :
-    (j < NPROC)%nat -> park_full j r -∗ park_at_full (proc_addr j) r.
-  Proof. exact (park_at_intro j 1 r). Qed.
+  Lemma hart_at_any_intro (j : nat) (h : CPU) :
+    (j < NPROC)%nat -> hart_full j h -∗ hart_at_any (proc_addr j).
+  Proof. iIntros (Hj) "Hg". iExists h. by iApply (hart_at_intro j 1 h). Qed.
 
-  Lemma park_at_full_elim (j : nat) (r : bool) :
-    (j < NPROC)%nat -> park_at_full (proc_addr j) r -∗ park_full j r.
-  Proof. exact (park_at_elim j 1 r). Qed.
+  Lemma hart_at_any_elim (j : nat) :
+    (j < NPROC)%nat -> hart_at_any (proc_addr j) -∗ ∃ h : CPU, hart_full j h.
+  Proof.
+    iIntros (Hj) "(%h & Hg)". iExists h.
+    by iApply (hart_at_elim j 1 h).
+  Qed.
   (* ==================================================================== *)
   (* THE PER-PROC STATE MIRROR (design/proc-struct.md, the state ghost).    *)
   (*                                                                       *)
@@ -981,7 +1004,7 @@ Section ParkGhost.
     iMod (ghost_var_update_halves st' with "Hg1 Hg2") as "[$ $]". done.
   Qed.
 
-  (* the address-keyed spelling, for the same reason [park_at] has one:
+  (* the address-keyed spelling, for the same reason [hart_at] has one:
      [SchedCtx.proc_slots] is keyed on the proc's ADDRESS, not its index. *)
   Definition pstate_at (pa : mword 64) (q : Qp) (st : mword 32) : iProp Σ :=
     (∃ j : nat, ⌜pa = proc_addr j /\ (j < NPROC)%nat⌝ ∗ pstate_own j q st)%I.
@@ -1031,35 +1054,18 @@ Section ParkGhost.
   Qed.
 
   (* ==================================================================== *)
-  (* THE RUNNING CLAIM: what a thread carries to say "I am proc j, running". *)
+  (* WHAT A RUNNING THREAD CARRIES to say "I am proc j, on this hart", and   *)
+  (* it is not a function argument anywhere: [hart_hlf j cpu_id] and half    *)
+  (* #2 of j's state mirror, both riding [IntrDefs.cpu_claim] inside the SIE *)
+  (* arm.  A preempting kerneltrap holds no frame of the thread it           *)
+  (* interrupted, so anything a park needs must be reachable from the arm.   *)
   (*                                                                       *)
-  (* The park receipt: the scheduler's record for the hart running j is in   *)
-  (* its box.  Issued at dispatch, spent at a park, and it must reach        *)
-  (* yield / sleep / exit -- and so, eventually, a PREEMPTING kerneltrap.    *)
-  (*                                                                        *)
-  (* HALF #2 OF j'S STATE MIRROR USED TO RIDE HERE TOO, and no longer does.  *)
-  (* Its home is [IntrDefs.cpu_claim], a conjunct of [sie_arm true p]        *)
-  (* (design/proc-struct.md): while interrupts are ON the arm owns it, and   *)
-  (* the seam forms [cpu_claim_pay] / [cpu_claim_ext] move it in and out.    *)
-  (* Keeping it here was not merely redundant but UNSATISFIABLE at the       *)
-  (* release that ends a resumed thread's critical section: the holder has   *)
-  (* [pstate_whole], the release returns [pstate_lock] to the invariant, and *)
-  (* at [RUNNING] ([unclaimed = false]) that consumes ONE half -- so exactly *)
-  (* one half #2 is left over, and it is owed to the arm.  A [running_claim] *)
-  (* that also demanded it would have needed a second copy that cannot exist.*)
-  (*                                                                        *)
-  (* Left as a NAMED wrapper rather than inlined to [park_hlf j true] so     *)
-  (* that the ~200 sites which merely pass it through keep naming the        *)
-  (* concept: deleting the receipt outright (once the scheduler's saved      *)
-  (* record moves into the arm as well) then changes this definition and the *)
-  (* handful of places that OPEN it, not the ~60 files that thread it.       *)
+  (* The parked scheduler record is NOT among them: it lives in the running  *)
+  (* proc's own lock ([SchedCtx.run_slot]), and the entitlement to it is     *)
+  (* holding p->lock, which yield / sleep / exit all do already -- they are  *)
+  (* about to write [p->state].  It leaves the lock only while the lock is   *)
+  (* held, hence only with interrupts off, so no migration can intervene.    *)
   (* ==================================================================== *)
-  Definition running_claim (j : nat) : iProp Σ :=
-    park_hlf j true.
-
-  Lemma running_claim_park (j : nat) :
-    running_claim j ⊣⊢ park_hlf j true.
-  Proof. done. Qed.
 
   (* WHAT A LOCK HOLDER HAS: the WHOLE variable, at every state.  On an
      unclaimed state that is just [pstate_lock]; on a claimed one it is the

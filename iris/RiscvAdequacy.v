@@ -100,7 +100,7 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      hands all of them to the boot client, which spends them in
      [SpecProcinit.procs_inv_alloc] as the third guarded slot of every
      proc's lock resource. *)
-  riscv_pre_parkGS :: ghost_varG Σ bool;
+  riscv_pre_parkGS :: ghost_varG Σ CPU;
   (* every proc slot's STATE MIRROR (design/proc-struct.md, the state ghost):
      capacity only, one name per slot minted at boot at UNUSED.  Spent in
      [SpecProcinit.procs_inv_alloc] alongside the park receipt. *)
@@ -134,7 +134,7 @@ Definition riscvΣ : gFunctors :=
      @ghost_mapΣ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
      GFunctor kptR;
-     ghost_varΣ bool;
+     ghost_varΣ CPU;
      ghost_varΣ (SailStdpp.Values.mword 32);
      ghost_varΣ log_mirror;
      mono_natΣ;
@@ -420,7 +420,7 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
        (* EVERY proc slot's PARK RECEIPT, minted at [false] -- nobody is
           dispatched at boot.  Both halves of each: they sit in the proc's
           own p->lock until its first dispatch (SchedCtx.proc_slots). *)
-       ([∗ list] j ∈ seq 0 nproc, ghost_var (park_name j) 1 false) ∗
+       ([∗ list] j ∈ seq 0 nproc, ghost_var (park_name j) 1 (0%fin : CPU)) ∗
        (* ... and every slot's STATE MIRROR, minted at UNUSED, which is what
           procinit stores into every p->state.  Both halves, in the proc's
           own p->lock: at UNUSED nobody has claimed the slot. *)
@@ -795,7 +795,7 @@ Section power.
      ([∗ list] c ∈ enum CPU,
         ghost_var (era_spie_name HE c) (1/2)%Qp sie_bit_off ∗
         ghost_var (era_spie_name HE c) (1/2)%Qp sie_bit_off) ∗
-     ([∗ list] j ∈ seq 0 nproc, ghost_var (era_park_name HE j) 1 false) ∗
+     ([∗ list] j ∈ seq 0 nproc, ghost_var (era_park_name HE j) 1 (0%fin : CPU)) ∗
      ([∗ list] j ∈ seq 0 nproc,
         ghost_var (era_pstate_name HE j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
      ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
