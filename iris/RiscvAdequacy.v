@@ -95,10 +95,10 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      boot client spends it in main's kvm assembly, where the tree kvminit
      actually built is known. *)
   riscv_pre_kptGS :: inG Σ kptR;
-  (* the PER-PROC park receipt (ProcGeom.park_own): capacity only -- the
-     theorem below mints one [ghost_var bool] per proc slot, at [false], and
-     hands all of them to the boot client, which spends them in
-     [SpecProcinit.procs_inv_alloc] as the third guarded slot of every
+  (* the PER-PROC HART TAG (ProcGeom.hart_own): capacity only -- the theorem
+     below mints one [ghost_var CPU] per proc slot, at hart 0, and hands all
+     of them to the boot client, which spends them in
+     [SpecProcinit.procs_inv_alloc] as the fourth guarded slot of every
      proc's lock resource. *)
   riscv_pre_parkGS :: ghost_varG Σ CPU;
   (* every proc slot's STATE MIRROR (design/proc-struct.md, the state ghost):
@@ -341,9 +341,9 @@ Definition cpu_pool `{GEN : GenId} (cs : list CPU) : list (expr riscv_lang) :=
 Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
     (cs : list CPU) (g : gstate) (D : CPU -> gset register)
     (* how many proc slots the kernel's proc[] array has: the boot client is
-       handed one park receipt per slot ([ProcGeom.park_own], minted at
-       [false]).  A hart client passes [NPROC]; the device-only corollary
-       below passes 0. *)
+       handed one hart tag per slot ([ProcGeom.hart_own], minted at hart 0).
+       A hart client passes [NPROC]; the device-only corollary below passes
+       0. *)
     (nproc : nat)
     (* THE CRASH PREDICATE (claude-notes/design/crash.md): the client's
        durability property, sealed into [crash_inv] here and handed back in
@@ -491,7 +491,7 @@ Proof.
   (* the shared kernel table's one-shot agreement, unset *)
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
   (* EVERY proc slot's park receipt, minted at [false] *)
-  iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
+  iMod (ghost_var_alloc_nats (0%fin : CPU) nproc) as (γpark) "Hpark".
   iMod (ghost_var_alloc_nats (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32) nproc) as (γpst) "Hpst".
   iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgenauth #Hbornlb]".
   iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hstartauth #Hstartlb]".
@@ -933,7 +933,7 @@ Section power.
               (NoDup_enum CPU)) as (γspp) "Hspp".
       iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU)
               (NoDup_enum CPU)) as (γspie) "Hspie".
-      iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
+      iMod (ghost_var_alloc_nats (0%fin : CPU) nproc) as (γpark) "Hpark".
       iMod (ghost_var_alloc_nats (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32) nproc) as (γpst) "Hpst".
       (* THE BOOT MINT: a BRAND-NEW image map at the disk content the reset
          machine still carries ([boot_shape] preserves [v_disk]), together

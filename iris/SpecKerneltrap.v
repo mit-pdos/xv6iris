@@ -237,29 +237,6 @@ Definition kerneltrap_stack : nat := 46%nat.
 Lemma kt_carve_fits : (32 + kerneltrap_stack <= kv_frame_slots)%nat.
 Proof. unfold kerneltrap_stack, kv_frame_slots. lia. Qed.
 
-Section KtProcRes.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-
-  (* THE YIELD ARM'S RESOURCES, UNDER THE DISJUNCTION THAT DECIDES WHETHER
-     THE ARM RUNS AT ALL.  yield parks the CURRENT PROCESS, so it wants that
-     process's saved-context cells and its half of the park bit; kerneltrap
-     reaches yield only when [myproc() != 0].  Keying the disjunction on
-     [p = zero_reg] is therefore not a convenience -- it is the same test the
-     C makes, and the same one [wp_next]'s second escape hatch uses to
-     conclude that a hart with no current proc cannot migrate.
-
-     Threaded and handed back unchanged: neither conjunct is hart-indexed
-     (both are indexed by the PROCESS), so both cross a migration for free.
-     They are required unconditionally rather than only on the timer path --
-     a running kernel thread holds them anyway, and making the precondition
-     depend on scause would buy nothing and cost a case split at every
-     caller. *)
-  Definition kt_proc_res (p : mword 64) : iProp Σ :=
-    (⌜ p = zero_reg ⌝ ∨
-     ∃ j : nat, ⌜ (j < NPROC)%nat ⌝ ∗ ⌜ proc_addr j = p ⌝ ∗
-End KtProcRes.
-
 Definition wp_kerneltrap_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
@@ -285,7 +262,6 @@ Definition wp_kerneltrap_sconf_body
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
   devintr_caps γu γv γtx γdk γtl γs pd pav pu -∗
-  kt_proc_res p -∗
   (* THE RUNNING CLAIM, handed over by the TRAP: taking the trap cleared SIE
      and so dismantled [sie_arm true p], and the claim was one of its
      conjuncts.  This is what a preempting kerneltrap spends on [yield] --
@@ -308,8 +284,7 @@ Definition wp_kerneltrap_sconf_body
          resuming hart, so their values are existential *)
       sepc ↦ᵣ ep -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ tv' -∗
       pc_is ret_tgt -∗
-      kt_proc_res p -∗
-      cpu_claim p -∗
+          cpu_claim p -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

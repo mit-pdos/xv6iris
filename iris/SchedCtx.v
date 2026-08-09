@@ -132,14 +132,6 @@ Section SchedCtx.
      [cpu_id]; the parameter is the seam the hart-generic protocol
      (claude-notes/completed/sched-hart-generic.md) moves into the payload's
      own binder. *)
-  (* [cpu_proc_half i (proc_addr j)] rides here on BOTH directions of a
-     crossing, and it has to: the SPARE half of [c->proc] is what makes that
-     field writable, and each side of a swtch is the one that writes it.  A
-     parking thread takes it out of the running arm it is dismantling and
-     hands it to the scheduler, which needs the whole cell to store 0;
-     symmetrically the dispatching scheduler hands it to the thread it
-     resumes, which deposits it in the running arm it rebuilds at its
-     release. *)
   Definition proc_held (i : CPU) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64) : iProp Σ :=
     (locked γl i ∗
      p_state (proc_addr j) ↦₄ st ∗
@@ -151,8 +143,7 @@ Section SchedCtx.
         ([ProcGeom.pstate_whole_split]). *)
      pstate_whole (proc_addr j) st ∗
      p_chan (proc_addr j) ↦₈ ch ∗
-     proc_pub (proc_addr j) ∗
-     cpu_proc_half i (proc_addr j))%I.
+     proc_pub (proc_addr j))%I.
 
   (* ------------------------------------------------------------------ *)
   (* WHAT A PARKING THREAD OWES ITS SLOT BESIDES ITS SAVED CONTEXT.       *)
@@ -615,8 +606,8 @@ Section SchedCtx.
   Qed.
 
   (* the converse, for the release side: what a resumed thread deposits when
-     it re-establishes a RUNNING slot.  The record is the one its own swtch
-     manufactured; the spare [c->proc] half came across in [proc_held]. *)
+     it re-establishes a RUNNING slot.  Both the record and the spare
+     [c->proc] half came across the dispatching swtch. *)
   Lemma proc_slots_running_intro (j : nat) (h : CPU) :
     (j < NPROC)%nat ->
     hart_hlf j h -∗

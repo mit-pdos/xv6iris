@@ -212,13 +212,12 @@ Record riscvEraGS := RiscvEraGS {
      a pair only because [sieG]'s [ghost_varG (mword 1)] then serves both
      with no new class. *)
   era_spie_name : CPU -> gname;
-  (* THE PARK RECEIPT, CANONICALLY per proc slot.  One [ghost_var bool] per
-     entry of the proc[] array, recording whether hart-h's parked scheduler
-     record is RESIDENT in the global [SchedCtx.scheds_inv] slot of the hart
-     that is running that proc ([true]) or CHECKED OUT by the running thread
-     ([false]).  Two halves: one in the invariant, one with the thread --
-     and while the proc is not RUNNING both sit in its [p->lock]
-     ([SchedCtx.proc_slots]).
+  (* THE HART TAG, CANONICALLY per proc slot.  One [ghost_var CPU] per entry
+     of the proc[] array, naming the hart that a RUNNING proc is running on.
+     Two halves: while the proc is RUNNING one sits in its [p->lock]'s
+     running arm ([SchedCtx.run_slot]) and the other rides the running
+     thread's [IntrDefs.cpu_claim]; otherwise both sit whole in the lock
+     ([SchedCtx.proc_slots]) and the value is meaningless.
 
      KEYED BY THE PROC, NOT BY THE HART: that is what makes the entitlement
      HART-FREE, so a thread carries it across a migration as a plain frame

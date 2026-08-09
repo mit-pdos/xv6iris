@@ -288,11 +288,14 @@ Section SpecMain.
        makes it live, and its config half [c0] is how main knows so *)
     virtio_live c0 = false ->
     (* main has no current proc, and neither does the scheduler() it tail-
-       calls; [SchedCtx.scheds_inv]'s slot for every hart is allocated at
-       that literal index below. *)
+       calls. *)
     p0 = zero_reg ->
     sie_cap_gpr m K false p0 -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
+    (* THE SPARE HALF of [cpus[cid].proc], passed through to the scheduler()
+       this arm tail-calls: [cpu_own] keeps the other half, and holding both
+       is what makes the field writable ([SpecScheduler]). *)
+    cpu_proc_half cpu_id p0 -∗
     (* the SIE live-bit ghost's INVARIANT quarter, still raw: main is the only
        code that ever allocates [IntrDefs.intr_inv] (out of trapinithart's
        [stvec ↦ᵣ kernelvec]), and that is what consumes it. *)
@@ -324,20 +327,13 @@ Section SpecMain.
     (* the boot supply *)
     main_locks_raw -∗
     main_globals_raw -∗
-    (* HALF of EVERY hart's [cpus[h].proc] cell, at 0.  [IntrDefs.cpu_cells]
-       keeps the other half; these eight are what main hands to
-       [SchedCtx.scheds_alloc] once γs exists.  They are a boot-time split of
-       the .bss cells performed by the BOOT CLIENT's carve, which routes one
-       half of each cell into that hart's [BootBridge.boot_bridge] and the
-       other eight here -- the split cannot happen in the bridges, since each
-       runs inside its own hart's WP and hart 0 would never see the other
-       seven.  main is the natural collector: it is the only code that runs
-       before any scheduler. *)
-    ([∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg) -∗
-    (* every proc slot's PARK RECEIPT, minted at adequacy
-       ([RiscvAdequacy.riscv_system_adequacy]) at [false]: main spends them
-       in [SpecProcinit.procs_inv_alloc], one per proc lock. *)
-    ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
+    (* every proc slot's HART TAG, minted at adequacy
+       ([RiscvAdequacy.riscv_system_adequacy]) at hart 0: main spends them in
+       [SpecProcinit.procs_inv_alloc], one per proc lock.  The tag names the
+       hart a RUNNING proc is running on; while the proc is not running it
+       sits whole in its [p->lock] and its value is meaningless, which is why
+       boot can mint them all at the same arbitrary hart. *)
+    ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)

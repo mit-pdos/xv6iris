@@ -141,6 +141,10 @@ Section SpecMainSecondary.
        needs no [wp_next] wrapper: it diverges, there is no continuation. *)
     sie_cap_gpr m K false p0 -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
+    (* THE SPARE HALF of [cpus[cid].proc], passed through to the scheduler()
+       this arm tail-calls: [cpu_own] keeps the other half, and holding both
+       is what makes the field writable ([SpecScheduler]). *)
+    cpu_proc_half cpu_id p0 -∗
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its
        own [intr_inv] out of its own trapinithart's [stvec ↦ᵣ kernelvec].
        The ghost is this hart's canonical [sie_gname] now, not a parameter. *)

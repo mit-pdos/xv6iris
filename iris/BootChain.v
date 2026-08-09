@@ -387,6 +387,10 @@ Section BootRun.
      sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
      a_cpu_noff cid_word ↦₄ noff_val 0 ∗
      a_cpu_int cid_word ↦₄ iv ∗
+     (* BOTH halves of [cpus[cid].proc] -- see [BootShared.boot_hart_bss].
+        One is [IntrDefs.cpu_cells]'s, the other is the spare that makes the
+        field writable and that this hart's scheduler starts out holding. *)
+     cpu_proc_half cpu_id zero_reg ∗
      cpu_proc_half cpu_id zero_reg ∗
      cpu_ctx_free ∗
      True)%I.
@@ -537,9 +541,9 @@ End BootSecondary.
 (*                                                                        *)
 (* [boot_hart_primary]: for the hart with [fin_to_nat c = 0], §3 composed   *)
 (* with [Main.wp_main_boot_sconf] -- the same shape as §4, but this arm      *)
-(* consumes the WHOLE BOOT SUPPLY (the carved .bss bundles, the eight       *)
-(* [cpu_proc_half]s, the park receipts, the device tokens, the two global    *)
-(* one-shots, the free-page run), so the supply is what the statement is    *)
+(* consumes the WHOLE BOOT SUPPLY (the carved .bss bundles, the hart tags,   *)
+(* the proc-state variables, the device tokens, the two global one-shots,    *)
+(* the free-page run), so the supply is what the statement is               *)
 (* mostly made of.                                                        *)
 (*                                                                        *)
 (* THE DEPOSIT WAND IS DISCHARGED HERE, not taken.  [SpecMain]'s boot arm    *)
@@ -578,8 +582,7 @@ Section BootPrimary.
     (* --- the boot supply --- *)
     main_locks_raw -∗
     main_globals_raw -∗
-    ([∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg) -∗
-    ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
+    ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     dev_inv γd γv -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
