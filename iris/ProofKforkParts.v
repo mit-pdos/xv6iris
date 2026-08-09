@@ -509,6 +509,47 @@ Section KforkRes.
     iFrame "Hws Htail".
   Qed.
 
+  (* ---- the WRITE twin of [ProcInv.proc_priv_tf] --------------------- *)
+  (* [proc_priv_tf]'s wand rebuilds the block at the CONTENTS it lent out,
+     which is right for a syscall-argument read and useless for a copy: the
+     child's trapframe is 36 words of new data by the time the loop is done.
+     This lends the same two things and takes back a DIFFERENT [ws'].
+
+     It hands the [p_trapframe] cell out WHOLE rather than at the quarter
+     [proc_priv_tf] splits off, for two reasons: the [ld a5,88(s4)] at +0x66
+     wants a fraction and does not care which, and [ProcInv]'s
+     [word_split14] / [word_join14] are [Local], so a quarter cannot be
+     split here at all.  No length side condition is needed on the way back:
+     [tf_page] carries [length ws = TFWORDS] itself. *)
+  Lemma proc_priv_tf_upd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) ∗
+    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+    (∀ ws' : list (mword 64),
+       p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) -∗
+       tf_page (ud_tfp (pv_upt V)) ws' -∗
+       proc_priv γf pa pid (upd_pt V (pv_upt V) ws')).
+  Proof.
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iFrame "Htfc Htfp".
+    iIntros (ws') "Htfc Htfp".
+    rewrite /proc_priv /proc_priv_core /proc_pt_at.
+    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR "Ho"; [| iFrame "Ho"].
+    iSplitR; [iPureIntro; exact Hszb|].
+    iSplitR; [iPureIntro; exact Hbel|].
+    iFrame "Hpid Hf Hpg Htfc Hptt Htfp Hc".
+  Qed.
+
+  (* [upd_pt] at the SAME descriptor and the SAME contents is the identity --
+     the record eta the two accessors above need to close a round trip that
+     changed nothing. *)
+  Lemma upd_pt_id (V : pprivate) :
+    upd_pt V (pv_upt V) (pv_tf V) = V.
+  Proof. by destruct V. Qed.
+
   (* The trapframe page is a kalloc page, and the fact is a projection of the
      block rather than a premise on it: [ProcPtOwn.proc_pt_wf]'s last
      conjunct.  The trapframe-copy loop's exit test needs it (see
