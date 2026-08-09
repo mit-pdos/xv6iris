@@ -1160,6 +1160,31 @@ the evidence for every offset. This file is only the worklist.
       so that landing them does not rebuild the whole tree; each is a
       candidate to be lifted the next time someone is in that file anyway.
 
+      **Two rules the block proofs paid for, both general:**
+
+      * **A BLOCK'S "agrees with the entry map" PREMISE MUST EXCLUDE EVERY
+        REGISTER THE FUNCTION HAS REPURPOSED BY THAT POINT, and getting it
+        wrong COMPILES.**  `ProofKforkB1`'s tail runs with s4 = the child,
+        not the caller's s4 (the prologue spilled it at +0x1a and +0x1c
+        overwrote it), so a premise `forall r, is_cs_idx r -> r ∉
+        {sp,s0,s1,s5} -> Mt r = m r` together with `Mt s4 = proc_addr j`
+        forces `proc_addr j = m s4` — unsatisfiable at the only call site.
+        The block proves fine, because its own body never uses the premise
+        at s4; the defect surfaces only when the capstone tries to apply it.
+        **Check each such premise against the block's own register
+        assignment, not against the epilogue's.**
+      * **"A release at level >= 1 must be closed with `wp_next_off_intro`"
+        IS ONLY TRUE AT A LITERAL LEVEL.**  `SpecRelease`'s exit index is
+        `match n with O => eb | S _ => false end`, so at a SYMBOLIC `n` the
+        goal's index is a `match` on a variable and `wp_next_off_intro :
+        K CID0 -∗ wp_next false p K` cannot apply at all.  Close it with
+        ordinary `iIntros (CID Hs mr)` and reconcile with the caller's own
+        `b` through **`IntrDefs.cpu_own_eb_agree`**, which reads
+        `b = match lvl with O => eb | S _ => false end` off `sie_cap_gpr` +
+        `cpu_own`.  `ProofKkill.v` (its `Hbmatch`), `ProofWakeup.v` and
+        `ProofAllocproc.v` all do exactly this.  The `wp_next_off_intro`
+        rule still holds for the stretches pinned at the literal `false`.
+
       **What is left**, in the order it should be written (bottom up, each
       a separately-`Qed`'d block, per the argraw lesson in S3a):
       1. the uvmcopy-failure tail (+0x7c..+0x8c) -- `freeproc` then
