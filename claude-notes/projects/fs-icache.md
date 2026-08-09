@@ -142,6 +142,39 @@ instead of the block+`ds !!! islot inum = dn` premise — which DISAPPEARS,
 against the new seam (Opus; the instruction-level work is untouched —
 only where the block resources come from moves).
 
+**C3b — the contract flips (orchestrator writes these; deltas worked
+out 2026-08-09):**
+
+- **SpecIlock v2**: the entry is named by its SLOT (`k < NINODE`,
+  `ip := ientry k`), not a free pointer. DROP: `refv` + its bounds
+  (the guard read is `IcacheInv.iref_load_au` against `itable_inv`),
+  `vv`/`dn`/`bm`/`ds`/`dqr`/`dqd`/`dqn`, `inode_key`, the `i_ref`
+  fraction, the `fsblock` + `diblk_wf ds` + conditional-slot premises
+  (all §11.3/§13.1). ADD: `cn : ic_names`, `γi`, `nib`, premise
+  `bv_unsigned inum < 16 * Z.of_nat nib`; resources `itable_inv
+  (icn_ref cn)`, `ic_escrow cn γfs γi cov logstart k`, `ireg_inv γi
+  γfs inodestart nib`, the caller's reference `inode_ref (icn_ref cn)
+  k q dev inum` (subsumes the old dev/inum fractions), and the
+  sleeplock now over `ic_tok cn k`. POST: `sleeplocked` + `sl_pid` +
+  half the reference back (checkout deposits the other half) + the
+  loaded bundle at ∃-bound `(dn, bm, dn0)`: valid cell at 1,
+  `inode_meta`/`inode_addrs`/`ind_res`/`inode_blocks` + `dinode_at γi
+  inum dn0` + the arm's inum-cell half. THE "no type" PANIC IS LIVE
+  on the free-inode arm (§13.1) — say so in the header; the null/ref
+  panic stays refuted.
+- **SpecIunlock v2**: symmetric — consumes the bundle (at whatever
+  `dn'/bm'/dn0'` the holder ended with, valid still 1), parks it,
+  returns `ic_tok`-release via releasesleep and the reunited
+  reference.
+- **SpecIdup flip**: `is_itable γl γic` → `is_itable2 γl cn …` with
+  `γic := icn_ref cn`; the ref++ interior is untouched (ProofIdup
+  frames the pool/ci through its critical section).
+- **SpecFileread v2**: the `frn_*` FD_INODE environment swaps
+  `inode_key` + `fsblock` + `diblk_wf` for the reference + the three
+  persistent invariants + `nib`-bound, mirroring SpecIlock v2's
+  premise set; `ProofFileread` repairs at its ilock/iunlock call
+  sites.
+
 ## C4–C6 — idup ripple check, iget, iput
 
 - C4: `idup` never touches dinode blocks or the sleeplock payload —
