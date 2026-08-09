@@ -1289,33 +1289,18 @@ the evidence for every offset. This file is only the worklist.
       duplicate — so the ledger closes per iteration and nothing has to be
       routed outside the loop after all.
 
-- [ ] **S5 — `cwd_ref`. THE INODE MODEL EXISTS NOW, SO THIS IS UNBLOCKED —
-      AND S11 MADE IT URGENT.** Currently `emp`, a deliberate hole with
-      `file_ref`'s shape. Two consumers are written against it and neither
-      will need restating: `ProcInv.proc_priv_cwd` (borrow the cell AND the
-      reference, put back a matching pair — sys_chdir's move as well as
-      kexit's) and `SpecIput.v`'s precondition.
-
-      **What changed:** the missing per-slot fractional auth over `itable` is
-      `IcacheInv.v` (`inode_ref γ k q dev inum`, `is_itable`, `itable_inv`,
-      `IrefSlots.iref_slot`), landed with the icache work. So `cwd_ref v` can
-      become `∃ k q dev inum, ⌜v = ientry k⌝ ∗ inode_ref γi k q dev inum` —
-      note the fraction must be EXISTENTIAL, not 1 as today: fork halves it
-      (`SpecIdup.v`), exactly as `ofile_slot` already hides a descriptor's
-      `file_ref` fraction and for the same reason.
-
-      **The cost is a `γi` parameter on `proc_priv` / `proc_dormant` and an
-      `icacheG Σ` in every file that mentions them** — the note "fill it and
-      no caller restates" was too optimistic about that. Weigh it against
-      what it buys: kfork (S11) currently carries five icache premises and a
-      `pv_cwd Vp = ientry ck` side condition purely because `cwd_ref` cannot
-      supply idup's argument, and no caller of kfork can discharge them. It
-      also ends the present inconsistency where `iput` is stated over the
-      placeholder and `idup` over the real model.
-
-      When it lands, `proc_dormant` should park the process's `iref_slot`
-      allowance beside its `fd_slots FDSPARE` (`IrefSlots.IREFSPARE` is
-      sized for exactly this), so kfork's unit stops being a premise.
+- [ ] **S5 — `cwd_ref`. UNBLOCKED (the inode model exists), URGENT (S11 has
+      to carry five premises no caller can discharge), and PLANNED IN ITS
+      OWN FILE: [`cwd-ref.md`](cwd-ref.md).** Read that before touching
+      `ProcInv.v`. The short version: `cwd_ref` becomes `ofile_slot`'s
+      disjunction with the fraction existential and an `iref_slot` unit
+      parked on the null arm; the `IrefSlots -> FileInv` dependency cycle is
+      one edge wide (it exists for `NFILE`) and is broken by factoring the
+      reference out of the invariant into a new low `InodeRef.v`; the itable
+      gname goes CANONICAL (the class carries it, as `FdSlots`/`IrefSlots`
+      already do) so `proc_priv` grows a class constraint and not a
+      parameter. **Do it AFTER kfork's proof lands**, with kfork's contract
+      simplification as the acceptance test.
 
 - [x] **S6 — `kexit` PROVEN AND LINKED**, and with it **`sys_exit`** — its own
       file, [`kexit.md`](../completed/kexit.md). What it forced into this
