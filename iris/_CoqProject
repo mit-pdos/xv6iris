@@ -930,6 +930,7 @@ WeakLeafCsrrM.v
 WkStackOwn.v
 WkGprAcc.v
 WeakKpt.v
+WkStartedLoad.v
 SpecReadi.v
 IcacheInv.v
 InodeLock.v

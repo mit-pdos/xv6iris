@@ -1921,9 +1921,68 @@ numbers come from; the prices below replace M4-prep's).
 | 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | **COMPLETE — all five leaves**: `ld` 472 (`WeakLeafLd8.v`), `sd` 433 (`WeakLeafSd8.v`), `lw`/`lwu` 439 (`WeakLeafLw4.v`, one parametric leaf), `sw` 406 (`WeakLeafSw4.v`), `amoswap.w.aq` ≈685/leaf + ~400 one-time (`WeakLeafAmo4Leaf.v` — the invariant-form lock leaf, slots under `wwp_acquire_loop_real` DEFINITIONALLY). All five green on the FIRST compile. See the per-leaf blocks + "THE FIFTH LEAF" | consolidation hoists DONE (see the fifth-leaf block); batch 3 opens |
 | 3 | `WpLock` clients | ≈ 0 — **but the payoff is GATED ON 6c** (2026-08 tier audit): the kernel's real acquire/release are SCONF functions (`wp_amoswap_lockopen_s_sconf` & co.); the M3b/M3c lock library validated the SHAPE at M-mode altitude, not the kernel's lock code. The tier-agnostic halves (`wlock_inv`/`wis_lock`/`wlocked`, `wacquire_core`/`wrelease_core`) transfer now | `iris/WeakWord8.v` covers `cpu`/`name` |
 | 4 | the straight-line M-mode function proofs | **THE VERTICAL SLICE IS IN: `wwp_entry`** (`iris/WkEntryNew.v` + `WkEntryEff.v` — the whole 8-instruction `_entry` chain, one Qed, statement = the SC statement under the porting-table swaps, footprint byte-identical to SC `wp_entry`; first consumer of all FOUR fetch-alignment arms). **Price: 2073 lines ≈ 9.8× the SC proof file** — see "THE FIRST FUNCTION PORT" block; the ~150–220-per-register-only-instruction inline cost is the argument for hoisting weak register-leaf lemmas before any bigger sweep. `start`/`timerinit` BLOCKED on three named seams (same block) | the M-mode tier is ONLY the boot path (tier audit); everything else = batch 6c. `sie_cap_gpr`-threading specs do NOT transfer (contain `stack_own` → `↦w₈` respell, `strans_inv` → P4) |
-| 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | small, then a cone | the racy-load rule is landed; the escrow is not |
+| 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | **FIRST HALF DONE (2026-08)** — the escrow conjunct, the reader, the WP rule and the wait smoke test; see the "BATCH 5 FIRST HALF" block below. Remaining: the racy `lw` leaf's `wstarted_gain` discharge from the model, the pred-R fence generalization, then `ProofMainSecondary` — which is a PURE-SCONF file, so the cone itself is gated on 6c | the racy-load rule was landed; the escrow now is too |
 | 6 | the sconf tier | **DESIGNED (block below); no decision pending** | see "BATCH 6 — THE sconf/WALK DESIGN" |
 | 7 | the virtio cone | M5 | |
+
+### BATCH 5 FIRST HALF — THE STARTED ESCROW (2026-08, DONE)
+
+`WeakStarted.v` (+ the new `WkStartedLoad.v`) make the `started` one-shot
+handoff provable end to end: mint → set → racy read → collapse → fence →
+payload. Every σ-altitude lemma is CLOSED; the three WP-level lemmas
+carry exactly the 5 platform axioms. Design record:
+
+- **The escrow's history conjunct is a LOWER BOUND, not an exact
+  timestamp** (`wstarted_lb log0 a T`: every non-clear write to the flag
+  window in the snapshot is ≥ T and writes `lock_one`'s bytes). The
+  exact-timestamp form is NOT an invariant: nothing rations
+  `wwp_started_set`, so the body must be stable under a SECOND set, and
+  the LB form keeps the FIRST deposit (the stronger fact). Consequence:
+  `WeakRacy.wadm_started_lw4`'s exact-timestamp premise is not
+  dischargeable from the escrow; the reader goes through
+  `wstarted_two_valued` instead — and does not need value-exactness
+  anyway (the hardware's own `bnez` branches on the loaded word).
+- **Clipped against a `wlog_lb` snapshot, WeakKpt §1 style** (a whole-log
+  fact cannot sit in an iProp); coverage is `t ≤ S (length log0)` — one
+  MORE than WeakKpt's bound, which is what lets the setter refresh the
+  snapshot at the PRE-state's log (free from `wmstate_interp`), the one
+  missed write being the setter's own, whose value the element names.
+  The setter's σ-altitude lemma gained a `wlog_lb (wm_log σ)` premise
+  (supplied by the new `wmstate_interp_log_lb`); `wwp_started_set`'s
+  public statement is UNCHANGED.
+- **The flag's era-image clearness travels as a PURE fact**
+  (`wstarted_img_clear`, stable since `wm_img` is constant along steps).
+  It cannot be a stored element: the element at the flag window is
+  exactly the one the setter retargets, and handing the reader a
+  `wpt_img` there would make the reader path vacuous. The mint
+  (`wstarted_alloc`) consumes the four timestamp-0 elements boot already
+  gets from `WeakAdequacy` (a `.bss` word: cleared image, latest_ts = 0)
+  and hands the pure fact out.
+- **The reader rides the landed `WeakRacy.wp_wracy_load` UNCHANGED.**
+  The one thing that rule cannot supply — its `Q` is a relation on
+  states, so it cannot name the read WORD — is `wstarted_gain rak a σ σ'
+  w`: "the timestamp at which the byte I read was admissible is covered
+  by my `w_vrOld`", tied to `Q`'s existential word by the DESTINATION
+  REGISTER. It is a per-instruction ISA obligation of exactly §2c's kind
+  and is taken as a leaf premise; discharging it from the model is batch
+  5's SECOND half (the racy `lw` leaf). Re-indexing `wracy_cert`'s `Q`
+  by the read word was considered and rejected (a real change to landed
+  bridge lemmas).
+- **The receipt** `wstarted_rcpt P ws := ∃ T, ⌜T ≤ w_vrOld ws⌝ ∗
+  monPred_at P (view_scl T)` — persistent when P is, `ws_le`-monotone,
+  delivered by the (pred-RW) fence. **KNOWN GAP, small and concrete:
+  main's spin exit uses `fence r,rw`** (pred R only), and every delivery
+  lemma is stated at `Barrier_RISCV_rw_rw` because `acq_view`'s identity
+  needs pred-RW — but the scalar bound the delivery actually uses already
+  holds at `pw = false`, so generalizing scalar delivery to a pred-R
+  fence is a short self-contained job. Not done; do it with the racy lw
+  leaf.
+- **`ProofMainSecondary` is a pure-sconf file** (every instruction is a
+  `*_s_sconf` lemma; the weak funnel is M-mode only). Its weak port needs
+  batch 6c's S-funnel + leaves, an sconf-tier racy load (the racy
+  machinery generalizes — walker reads are `ak_coh`, disjoint from the
+  flag window; what is missing is only `wwp_instr_s` to re-base on), and
+  the seven sconf callee specs. No new weak-memory DESIGN is needed.
 
 ### BATCH 6 — THE sconf/WALK DESIGN (2026-08; DECIDED: faithful, no kernel patch)
 

@@ -368,6 +368,10 @@ Section wp_lock.
     iApply (wp_winstr pc P (wQ_store (Some (fin_to_nat cpu_id)) a lock_one)
               Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
+    (* the escrow's one-shot conjunct is stored against a log SNAPSHOT, and
+       the setter refreshes it to the PRE-state's log — [wlog_lb] is
+       persistent and every state interpretation hands one out for free *)
+    iDestruct (wmstate_interp_log_lb σ with "Hσ") as "[Hσ #Hlbσ]".
     iDestruct (wmstate_interp_split σ with "Hσ") as "[Hlat Hrest]".
     iDestruct (wmstate_rest_facts with "Hrest") as %[Hbnd Hwf].
     iInv wstartedN as "Hbody" "Hclose".
@@ -379,7 +383,7 @@ Section wp_lock.
     iExists t0, t1. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iNext. iIntros (tick σ') "%Hpost %HQ".
     iMod (wstarted_set a Pl (Some (fin_to_nat cpu_id)) σ σ' HQ Hbnd
-            with "Hlat Hbody HP0") as "[Hlat Hat]".
+            with "Hlbσ Hlat Hbody HP0") as "[Hlat Hat]".
     iMod ("Hcont" $! tick σ' with "[%]") as "[Hrest $]"; [exact Hpost|].
     iMod ("Hclose" with "[Hat]") as "_".
     { iNext. iExists (S (length (wm_log σ))), lock_one. iExact "Hat". }
