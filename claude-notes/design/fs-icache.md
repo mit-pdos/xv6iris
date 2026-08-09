@@ -780,3 +780,148 @@ not.
   the entry's reference share" and attributes the parked-arm argument to it
   generally. Accurate for the authority-side opener, wrong for the sleeplock
   winner -- see 10.3.
+
+---
+
+## 11. THE INODE REGION: refine the block half into per-inum fragments
+
+§10.5 left one thing open: who owns the dinode blocks, so that `ilock` can
+conclude the pool entry it takes describes the dinode the block actually
+holds. This section answers it. The answer is not "a bigger pool" -- it is
+a CHANGE OF GRANULARITY, and it makes an owed premise disappear rather than
+be discharged.
+
+### 11.1 The mismatch, stated exactly
+
+`FsBlocks.fsblock γ b bs` is `b ↪[fs_L γ]{#(1/2)} bs` -- HALF a ghost_map
+element, the other half riding in the bio handle. Two consequences the
+whole problem follows from:
+
+* it is the WRITE PERMISSION. `log_write` consumes `fsblock γfs bno bsl`
+  and returns `fsblock γfs bno bs` at the new content (`SpecLogWrite.v:140,
+  156`). An update needs the half; there is no writing without it.
+* it is PER BLOCK, and a dinode block holds SIXTEEN inodes (`IPB = 16`).
+
+But every inode-layer contract's EFFECT is already per-slot. `iupdate`
+takes the block at `diblk_bytes ds` and returns it at
+`diblk_bytes (<[islot inum := dn]> ds)` (`SpecIupdate.v:176, 203`) -- one
+slot changed, fifteen untouched. The resource is coarser than the effect,
+and that gap is the bug.
+
+It is a real conflict, not a bookkeeping annoyance. Two locked inodes in
+the same block both calling `iupdate` each need the half for their whole
+call. Nothing serializes them: xv6 has NO lock over a dinode block except
+the buffer's sleeplock, which is held only across `bread`..`brelse`. So a
+contract that takes the half for the duration of the call is unsatisfiable
+by two such callers, and threading it up to the caller (which is what every
+contract does today, and what `SpecIlock.v:175` calls "deferred exactly as
+it is for iupdate") only moves the unsatisfiability.
+
+### 11.2 The fix: a per-inum dinode map, coupled to the block
+
+Introduce a ghost map at the granularity the effects already have:
+
+```coq
+  Definition dinode_at (γi : gname) (inum : bv 32) (dn : dinode) : iProp Σ
+    := inum ↪[γi] dn.            (* EXCLUSIVE, one per inum *)
+```
+
+and a per-block coupling that owns the coarse half and pins it to the
+sixteen fragments:
+
+```coq
+  Definition iblk_body γfs γi (inodestart : Z) (b : Z) : iProp Σ :=
+    (∃ ds : list dinode, ⌜diblk_wf ds⌝ ∗
+       fsblock γfs b (diblk_bytes ds) ∗
+       [∗ list] i ∈ seq 0 IPB, dinode_auth_frag γi (inum_of b i) (ds !!! i))%I.
+```
+
+The coarse half NEVER LEAVES the region. Sixteen callers coexist because
+their fragments are disjoint. The coupling is what turns "slot `islot inum`
+now holds `dn`" into "the block's bytes are `diblk_bytes (<[islot inum :=
+dn]> ds)`" -- i.e. exactly `iupdate`'s existing postcondition, now derived
+instead of assumed.
+
+### 11.3 What this does to the contracts, and to the owed premise
+
+`SpecIupdate`, `SpecIlock`, `SpecWritei`, `SpecItrunc` and `SpecFileread`
+swap
+
+      fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds)
+
+for
+
+      dinode_at γi inum dn
+
+and `iupdate`'s postcondition collapses from `<[islot inum := dn]> ds` to
+`dinode_at γi inum dn`. Five landed contracts, but each is strictly
+simpler afterwards.
+
+**And `SpecIlock`'s `vv = false -> ds !!! islot inum = dn` DISAPPEARS.** It
+does not get discharged by a new invariant; it stops being expressible,
+because the caller no longer supplies a block and a claim about its slot --
+it supplies the inum's dinode directly, and the fragment IS the fact. That
+is the test this design should be judged by: §10.5's question was "what
+makes the premise derivable", and the right answer turned out to be "state
+the resource at the granularity of the effect and there is no premise".
+
+The pool of §10.4 then carries, per uncached inum, `dinode_at γi inum dn`
+alongside the `ind_res`/`inode_blocks` bundle, with `inode_ok` tying them.
+`iget`'s recycle moves the whole triple into the escrow; `ilock` finds it
+parked. C1, the pool, and the region become one coherent object.
+
+### 11.4 The borrow, and where it hangs -- SETTLED
+
+The coupling must be OPENED to write: `iupdate` swaps the block's bytes at
+its `log_write`. An invariant cannot be held open across a call, so the
+swap has to be two GHOST OPERATIONS at two single instructions, with the
+half travelling with the thread in between -- exactly `escrow_swap_checkout`
+/ `escrow_swap_park`, and exactly why `ProofBrelse` hangs a swap on an
+otherwise unrelated frame store (`ProofBrelse.v:605-638`).
+
+The instructions exist, and they could not be more convenient. iupdate's
+tail, read off the image:
+
+      +0x62  jal  memmove
+      +0x66  mv   a0,s2        <-- bp into a0 for the next call
+      +0x68  jal  log_write
+      +0x6c  mv   a0,s2        <-- bp into a0 again
+      +0x6e  jal  brelse
+
+Two plain register moves bracketing the `log_write`, each doing nothing but
+reloading `bp`. So:
+
+* at **+0x66**, swap the region's escrow for `IBLOCK inum` to CHECKED OUT,
+  taking `fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds)` out;
+* `log_write` at +0x68 consumes it at the old content and returns it at the
+  new, with its contract COMPLETELY UNCHANGED;
+* at **+0x6c**, swap back to PARKED at the new bytes and retag
+  `dinode_at γi inum dn` in the same ghost step -- which is where the
+  coupling `diblk_bytes ds` vs the sixteen fragments is re-established.
+
+`SpecLogWrite` does not move. That was the thing worth checking before
+starting, because it has many callers; the answer is that it is untouched.
+
+The checkout is justified the way bio's is: the thread holds the BUFFER for
+that block (from the `bread` at +0x20, still held at +0x66 and +0x6c), and
+the buffer is exclusive, so no other thread can be mid-swap on the same
+block. The region nests the bio protocol rather than duplicating it.
+
+`ilock`'s read side has them too. Its `bread` is at +0x4a and its `brelse`
+at +0x90, and between them:
+
+      +0x4a  jal  bread
+      +0x4e  mv   s2,a0        <-- bp saved
+      ...    the dinode field reads and the addrs memmove
+      +0x8e  mv   a0,s2        <-- bp into a0 for brelse
+      +0x90  jal  brelse
+
+so the OPEN hangs on +0x4e and the CLOSE on +0x8e. ilock only READS, so it
+takes the half, learns the bytes by agreement against the handle's payload
+half, and puts it back unchanged -- no `log_write`, no retag.
+
+Both functions therefore have two plain register moves in exactly the right
+places, and neither needs an instruction invented for it. That is the last
+thing §10.5 was waiting on: the region is fully determined and the escrow
+can be written.
+
