@@ -61,7 +61,6 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import PipeInv.
-Require Import SwtchCtx.
 Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyin SpecRelease.
 Require Import CodePipewrite.
 Require Import SpecPipewrite.

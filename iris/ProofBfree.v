@@ -71,7 +71,6 @@ Require Import ByteBuf.
 Require Import PrintintArith.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SwtchCtx.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.

@@ -42,15 +42,13 @@ Require Import WpGprCsrwCommon WpGprCsrwA.
 Require Import StackOwn CalleeSaved KernelText.
 Require Import WpLock.
 Require Import FdSlots.
-Require Import ProcGeom CpuOwn.
+Require Import CpuOwn.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import VcGen KernelRvcDecode.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype WpSconfCsr.
-Require Import WpSmodeIntr.
 Require Import ProofPushOff.
 Require Import CodeKerneltrap.
-Require Import SpecKerneltrap.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 

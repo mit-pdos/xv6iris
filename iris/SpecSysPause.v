@@ -77,7 +77,7 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import SwtchCtx SchedCtx.
+Require Import SchedCtx.
 Require Import ProcPtOwn.
 Require Import TicksInv.
 Require Import SpecPanic.

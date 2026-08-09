@@ -87,7 +87,6 @@ Require Import ProcGeom.
 Require Import FdSlots.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SwtchCtx.
 Require Import WpLock.
 Require Import SleepLock.
 Require Import CodeSleeplock.

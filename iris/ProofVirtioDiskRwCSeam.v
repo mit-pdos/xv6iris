@@ -50,7 +50,6 @@ Require Import CpuOwn FdSlots.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
-Require Import SwtchCtx.
 Require Import ProofVirtioDiskRwB.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

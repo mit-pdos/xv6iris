@@ -53,7 +53,6 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import FdSlots.
-Require Import SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
 Require Import RegFile InstrBytes.

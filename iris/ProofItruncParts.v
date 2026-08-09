@@ -42,16 +42,12 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import InstrBytes.
 Require Import RegFile.
-Require Import KernelText.
-Require Import BlockWords.
 Require Import FsBlocks.
-Require Import DinodeEnc.
 Require Import InodeInv.
-Require Import ProofBmapParts.
 From Kernel Require KernelSyms.
 Import Defs.
 
@@ -338,22 +334,13 @@ Qed.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
-Require Import BufOwn.
-Require Import CalleeSaved.
-Require Import IntrDefs.
-Require Import WpNext.
 Require Import WpLock.
-Require Import SpecPanic.
 Require Import FdSlots.
-Require Import ProcGeom.
-Require Import CpuOwn.
-Require Import SchedCtx.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import LogInv.
-Require Import FsCrash.
-Require Import BitmapEnc BitmapInv.
+Require Import BitmapInv.
 Require Import SpecItrunc.
 
 Notation Rra := (mword_of_int 1 : mword 5).

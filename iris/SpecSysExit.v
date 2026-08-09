@@ -63,12 +63,10 @@ Require Import KernelText KernelDataInv.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
-Require Import SwtchCtx.
 Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.

@@ -58,7 +58,6 @@ Require Import DiskPtsto VirtioProto DiskInv.
 Require Import WpUart.
 Require Import PermInv.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
-Require Import SwtchCtx.
 Require Import VirtioDiskRwDefs.
 Require Import ProofVirtioDiskRwCSeam.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

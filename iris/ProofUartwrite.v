@@ -91,7 +91,7 @@ Require Import DiskPtsto WpUart.
 Require Import SpecUart WpSconfUartAccess.
 Require Import UartTxInv.
 Require Import SpecPanic.
-Require Import SchedCtx SwtchCtx.
+Require Import SchedCtx.
 Require Import FdSlots.
 Require Import SpecAcquire SpecRelease SpecSleep.
 Require Import CodeUartwrite.

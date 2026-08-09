@@ -117,7 +117,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import PageGeom.
 Require Import FdSlots FileInv ProcInv.
-Require Import SwtchCtx SchedCtx.
+Require Import SchedCtx.
 Require Import TicksInv.
 Require Import CodeSysPause.
 Require Import SpecPanic.

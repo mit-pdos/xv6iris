@@ -49,11 +49,8 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
-Require Import SwtchCtx SchedCtx.
-Require Import SpecPanic.
-Require Import DiskPtsto WpUart DiskInv.
-Require Import UartTxInv.
-Require Import TimerCap.
+Require Import SchedCtx.
+Require Import DiskPtsto WpUart.
 Require Import SpecDevintr.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
