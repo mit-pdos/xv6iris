@@ -1081,9 +1081,179 @@ trick has nothing left to do. The checked-out arm still carries the
 count fragment, and `iget`'s valid store still refutes it by
 `iref_lookup` at `M !! k = None` — §10.3 stands verbatim.
 
-VERIFY WHEN C3 STARTS: read iget's actual store/branch stream off the
-image (both the hit arm and the recycle arm) and confirm no escrow-owned
-cell is touched twice between stable states; then build the two-armed
-escrow and let a stuck proof, if any, resurrect the mid arm with
-evidence.
+VERIFIED (2026-08-09, against a full-generator scratch decode of iget —
+170 bytes, `igi_` prefix): the only non-frame stores are the hit arm's
+`sw a5,8(s1)` at +0x58 (ref++, one `itable_inv` opening) and the recycle
+quad +0x6e/+0x72/+0x78/+0x7c. No escrow-owned cell is touched twice
+between stable states. The escrow is TWO-armed — **SUPERSEDED: §13's
+inum-cell tie makes the payload swap at +0x72 outrun the valid store at
++0x7c, and the mid arm resurrects with a different discriminator than
+bio's; read §13.1c.** Three consequences the verification turned up
+(all still true):
+
+* **§10.3's refutation story is wrong at the `valid = 0` store.** By
+  +0x7c the ref store at +0x78 has already run, so `M !! k` is
+  `Some (q, 1)`, not `None`. The checked-out arm is refuted there by the
+  recycler's own just-minted token against the arm's: two fragments'
+  fraction components sum past 1, invalid with no authority in sight
+  (`iref_tok_frac_excl`, to be added — fragment-only validity). The
+  `M !! k = None` reading applies only to openings BEFORE +0x78.
+* **`iref_alloc_step` mints at `q = 1`, and that cannot stand.** A full
+  first fraction leaves `islot_rest` empty, and a later cache-HIT iget
+  has no retained share to mint a new reference from (iget's hit arm has
+  no caller token to split — `iref_dup_step` is idup's shape, not
+  iget's). Alloc must mint at `q = 1/2` (table keeps 1/2), and the hit
+  arm needs a `bio_incr_step` mirror (`iref_incr_step`: mint `qn` with
+  `✓(qt + qn)` from the retained share, count++) plus its store_au
+  wrapper. `BioInv.bio_incr_step` is the worked precedent.
+* iget takes NO sleeplock (ilock does); its whole body runs under
+  itable.lock, so every escrow opening it makes is authority-side.
+
+---
+
+## 13. THE ESCROW AND POOL, FULLY DETERMINED (C3's definitional layer)
+
+Working §10.4 against the landed files forced three decisions §10 left
+open. Recorded before the code, in the §12 discipline.
+
+### 13.1 The shadow RETIRES — and ilock's "no type" panic stays LIVE
+
+§11.3's promise holds fully: the parked content's record is pinned by
+the arm's own `dinode_at` fragment, so `inode_key`/`ghost_var` has no
+coupling job left. Its one remaining candidate job — letting a caller
+refute ilock's "no type" panic on a never-loaded entry — turns out to
+need NO ghost at all: **the panic arm simply stays live.** This is a
+partial-correctness WP; a reachable panic diverges through
+`panic_wp_any` and the postcondition then speaks only for successful
+loads. A caller premise ("this inum is allocated") would be
+undischargeable today anyway — allocatedness is directory-structure
+knowledge (namei/ialloc, future work) — and v1's conditional premise
+existed only because the lock's ∃-bound payload had no other tie to the
+disk; the region IS that tie now. Consequences: `SpecIlock` v2 has NO
+shadow premise, NO `ds`-slot premise, and one live panic arm (a first
+for this tree — note it in the spec header; precedent for the pattern:
+the contract still refutes the `ip == 0 || ip->ref < 1` panic, so only
+the free-inode load diverges). `ilock`'s postcondition ∃-binds
+`(dn, bm)`; readi/writei instantiate from it, exactly as they already
+do from `inode_locked`'s existential `data`.
+
+An ishadow ghost_var was drafted and rejected: with N reference holders
+only two halves exist, so "the caller supplies the shadow half" is
+unsatisfiable for the second holder — the same multi-holder trap as
+§4's `i_ref` premise. Nothing that must be suppliable by EVERY
+reference holder can be a ghost_var half.
+
+### 13.1b The arm ties its dinode_at to the entry by an INUM-CELL
+### fraction, and the identity mass is re-budgeted
+
+The escrow is per-slot; its content's `dinode_at γi inum' dn0` must be
+for THE inum the entry's identity cells name, or a winner cannot fire
+`ireg_read` for its own inode. The tie is bio's (buf_parked holds
+`b_dev ↦{½}`): **the escrow permanently owns HALF of the `i_inum` cell**
+(the dev cell needs no arm tie — `dinode_at` is inum-keyed). The other
+half is shared by the references and the table exactly as before, so
+the reference algebra's identity fractions now range in `(0, ½]`:
+`islot_rest k qt` becomes `(½ − qt)`-shaped, and `iref_alloc_step`'s
+successor mints at `q = ¼`-style fractions (see §12.5's alloc note —
+already forced to move off `q = 1` for the incr-step reason).
+`IcacheInv.islot`/`islot_rest`/`islot_rest_join` change; nothing proven
+consumes them yet except ProofIdup's pass-through frame.
+
+### 13.2 The pool's domain is a pure slot→inum map in `itable_res`
+
+"The pool holds every uncached inum" needs the cached set to be
+speakable. `M : gmap nat (Qp * positive)` is slot-keyed and value-blind,
+and the inum lives in identity CELLS. So `itable_res` gains a pure
+`ci : gmap nat (mword 32 * mword 32)` (live slot → (dev, inum)) with
+three wf clauses: `dom ci = dom M`; `ci` is INJECTIVE on inums (xv6's
+own guarantee — iget recycles only after a full scan misses, and the
+scan's loop invariant is what proves it); and each live slot's identity
+cells sit at `ci !! k`'s values (i.e. `islot` takes its dev/inum from
+`ci` instead of ∃-binding them). The pool is then
+
+    ipool γfs γi P := [∗ set] z ∈ P, ipool_entry γfs γi z
+    with  P = region_inums nib ∖ (uint ∘ snd <$> ci)
+
+### 13.3 A pool entry has TWO shapes, because free inodes exist
+
+`inode_ok` demands `di_type ≠ 0`, and the pool must also hold the
+type-0 inums (a free inode owns no blocks — itrunc returned them):
+
+    ipool_entry γfs γi z :=
+        (∃ dn0 bm0 data0, ⌜inode_ok … dn0 bm0 data0 ∧ …⌝ ∗
+           dinode_at γi z dn0 ∗ ind_res γfs bm0 ∗ inode_blocks γfs bm0 data0)
+      ∨ (∃ dn0, ⌜bv_unsigned (di_type dn0) = 0⌝ ∗ dinode_at γi z dn0)
+
+iget's recycle moves whichever shape the inum has into the escrow's
+unloaded arm; §13.1's caller premise is what keeps ilock off the free
+shape. ialloc (future) is the function that flips an entry free→allocated,
+and it will do it through `dinode_at` + `wp_log_write_au` like iupdate;
+nothing here prejudges it.
+
+### 13.1c THE MID ARM RESURRECTS — with design-time evidence, and a
+### different reason than §10.2 gave
+
+§12.5's two-armed conclusion dies on the inum-cell tie of §13.1b.
+Trace iget's recycle against the parked arm's coupling (valid word keys
+the payload's shape; the arm's `dinode_at` is keyed by the inum cell):
+
+    +0x6e  sw dev    — cells: table ½ only; no escrow coupling. Fine.
+    +0x72  sw inum   — needs the arm's inum-cell ½ joined in, and the
+                       arm's dinode_at must retag to the NEW inum: this
+                       opening also swaps the payload (new inum's pool
+                       bundle in, old bundle out to the pool). BUT the
+                       valid cell may still read 1 — the arm's
+                       valid↔shape coupling cannot be re-established.
+    +0x7c  sw valid  — only here does the coupling hold again.
+
+So the window `[+0x72, +0x7c)` is a real mid state after all: **valid
+stale at 1, payload already the incoming unloaded bundle, recycle token
+out in the recycler's hand.** §10.2's instinct was right; its REASON
+(the dev store) was wrong — the dev store needs nothing, and it is the
+inum-store-to-valid-store gap that cannot be bridged by two arms. The
+arms are bio's exactly:
+
+    PARKED : ∃ inum sh-payload, i_inum ↦₄{½} inum ∗
+             i_valid ↦₄ (valid word keying the payload shape) ∗
+             payload(inum) ∗ ic_mid k
+    OUT    : ic_tok k ∗ (∃ q dev inum, inode_ref γic k q dev inum) ∗
+             ic_mid k
+    MID    : ∃ inum, i_inum ↦₄{½} inum ∗ i_valid ↦₄ (∃ stale word) ∗
+             unloaded-payload(inum)      (token out with the recycler)
+
+Refutations: a sleeplock winner refutes OUT by its own `ic_tok`
+(lock_tok_excl) and MID by holding... the winner holds no valid-cell
+fraction — MID is refuted authority-side only: the recycler holds
+itable.lock, and a winner's checkout happens with no itable.lock, so
+the winner refutes MID by `ic_mid`? No — the winner does not hold
+`ic_mid`. The winner refutes MID the way bio's does: MID can only exist
+while the recycler is between its two stores, and the recycler holds
+the lock — but locks are not visible to the escrow. THE HONEST ANSWER:
+the winner's checkout must present a resource MID excludes, and the
+only candidate is the count fragment: MID exists only at a slot whose
+`M`-entry the recycler has just minted at count 1 holding the whole
+minted fraction, so a winner's OWN `iref_tok` at that slot makes the
+outstanding count ≥ 2 against... `M` is not visible inside the escrow
+either. RESOLUTION (bio's, verbatim): MID holds the i_valid cell FULL
+(it does, see above) and so does PARKED — the winner cannot distinguish
+them by cells; bio's winner refutes the mid arm by a fraction of an
+identity cell against the mid arm's FULL one (`BioInv.buf_mid` holds
+`b_dev` full). Mirror it: **MID holds the inum cell FULL** (the
+recycler joins the table's ½ in at +0x72 and keeps it there through
++0x7c), so a winner — which always holds `inode_ident k q`, a real
+inum-cell fraction, from its reference — refutes MID by fraction
+overflow on the inum cell. PARKED keeps ½ so the winner's fraction
+composes fine there. This is why the identity re-budget of §13.1b is
+not optional bookkeeping: the ½/full split of the inum cell IS the
+parked/mid discriminator.
+
+### 13.4 What breaks and what stays
+
+`ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
+map and the pool ride through its critical section untouched (it moves
+only the ref word and `M`), so its repair is re-framing, not re-proving.
+`InodeLock.inode_parked`/`inode_key`/`inode_locked` retire once
+`ProofIlock` is re-proven; `inode_ok`, `inode_raw`, `valid_word` and the
+two guard lemmas survive unchanged. The escrow file is ADDITIVE
+(`IcacheEscrow.v`), so the tree stays green until the SpecIlock flip.
 

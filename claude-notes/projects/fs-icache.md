@@ -113,13 +113,25 @@ swaps with SpecIlock in C3, and `ProofFileread` repairs there.
 
 ## C3 — the per-entry escrow, the pool, and ilock/iunlock (branch)
 
-Design §10 stands, EXCEPT §12.5: the escrow is probably TWO-armed
-(parked / checked out) — the mid arm's job evaporates because iget's four
-stores hit four different homes in the landed architecture. Verify
-against the image first (§12.5 has the obligation), then build two-armed.
-The work: the escrow over `i_valid` + the sleeplock payload (the entry's
-sleeplock keeps only the checkout token, and the SLEEPLOCK credential
-makes this escrow statable where the region's was not); the uncached
+**The definitional design is now §13 (read it in full — it went through
+three corrections on 2026-08-09 and supersedes §10.2/§10.3/§12.5 in
+places):** THREE arms after all (the mid window is `[+0x72, +0x7c)`,
+inum-store to valid-store, and its discriminator is the inum cell held
+FULL in the mid arm vs ½ in parked — §13.1c); NO shadow (`inode_key`
+retires; ilock's "no type" panic stays LIVE on the free-inode arm — a
+first for this tree, closes by panic_wp_any); the escrow permanently
+owns ½ of the `i_inum` cell, so the reference algebra's identity
+fractions re-budget to (0, ½] and `islot_rest` becomes `(½ − qt)`
+(§13.1b); pool domain via the pure `ci` slot→inum map with injectivity
+(§13.2); two pool-entry shapes for allocated vs free inums (§13.3).
+Also needed in IcacheInv: `iref_tok_two_lookup` (two fragments against
+either half force count ≥ 2 — the +0x7c and iput-read refuter) and the
+`iref_incr_step` family (§12.5's alloc/incr note — iget's hit arm mints
+from the retained share, `BioInv.bio_incr_step` is the precedent).
+The work: the escrow over `i_valid` + `i_inum ↦{½}` + the payload (the
+entry's sleeplock keeps only the checkout token, and the SLEEPLOCK
+credential makes this escrow statable where the region's was not); the
+uncached
 pool inside `itable_res` carrying, per uncached inum, `dinode_at + 
 ind_res + inode_blocks + inode_ok`; InodeLock C1 (unloaded arm owns
 nothing; two-state shadow `option (dinode * blkmap)`) and C2; SpecIlock/
