@@ -110,7 +110,7 @@ Section ProofKilled.
     assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (kli_00 with "Htext") as "Hi00".
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m av 4 b ltac:(lia) Hpush
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 b ltac:(lia) Hpush
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
@@ -133,28 +133,28 @@ Section ProofKilled.
     assert (Hb4a := Hslot 4%nat 0%nat ltac:(lia) ltac:(lia)).
     (* +0x02..+0x08: save ra/s0/s1/s2 *)
     iPoseProof (kli_02 with "Htext") as "Hi02".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x02)) (mword_of_int 3 : mword 6) kl_ra M1 (av - 4)%nat v1 b
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.killed + 0x02)) (mword_of_int 3 : mword 6) kl_ra M1 (av - 4)%nat v1 b
               with "Hcg Hpc Hi02 [Hb1] [-]").
     { iEval (rewrite HcspM1 -Hb1a). iExact "Hb1". }
     iIntros (CID2 Hs2) "Hcg Hpc Hb1".
     assert (Hp04 : add_vec_int (mword_of_int (KernelSyms.killed + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.killed + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp04) in "Hpc".
     iPoseProof (kli_04 with "Htext") as "Hi04".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x04)) (mword_of_int 2 : mword 6) kl_s0 M1 (av - 4)%nat v2 b
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.killed + 0x04)) (mword_of_int 2 : mword 6) kl_s0 M1 (av - 4)%nat v2 b
               with "Hcg Hpc Hi04 [Hb2] [-]").
     { iEval (rewrite HcspM1 -Hb2a). iExact "Hb2". }
     iIntros (CID3 Hs3) "Hcg Hpc Hb2".
     assert (Hp06 : add_vec_int (mword_of_int (KernelSyms.killed + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.killed + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp06) in "Hpc".
     iPoseProof (kli_06 with "Htext") as "Hi06".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x06)) (mword_of_int 1 : mword 6) kl_s1 M1 (av - 4)%nat v3 b
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.killed + 0x06)) (mword_of_int 1 : mword 6) kl_s1 M1 (av - 4)%nat v3 b
               with "Hcg Hpc Hi06 [Hb3] [-]").
     { iEval (rewrite HcspM1 -Hb3a). iExact "Hb3". }
     iIntros (CID4 Hs4) "Hcg Hpc Hb3".
     assert (Hp08 : add_vec_int (mword_of_int (KernelSyms.killed + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.killed + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp08) in "Hpc".
     iPoseProof (kli_08 with "Htext") as "Hi08".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x08)) (mword_of_int 0 : mword 6) kl_s2 M1 (av - 4)%nat v4 b
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.killed + 0x08)) (mword_of_int 0 : mword 6) kl_s2 M1 (av - 4)%nat v4 b
               with "Hcg Hpc Hi08 [Hb4] [-]").
     { iEval (rewrite HcspM1 -Hb4a). iExact "Hb4". }
     iIntros (CID5 Hs5) "Hcg Hpc Hb4".
@@ -171,7 +171,7 @@ Section ProofKilled.
     iEval (rgne; rewrite HcspM1 Hs2M1) in "Hb4".
     (* +0x0a: c.addi4spn s0,sp,32 *)
     iPoseProof (kli_0a with "Htext") as "Hi0a".
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x0a)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) kl_s0
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.killed + 0x0a)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) kl_s0
               M1 (av - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a [-]").
@@ -184,7 +184,7 @@ Section ProofKilled.
     iEval (rewrite Hp0c) in "Hpc".
     (* +0x0c: c.mv s1,a0 -- park [p] in a callee-saved register *)
     iPoseProof (kli_0c with "Htext") as "Hi0c".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x0c)) kl_s1 kl_a0 A1 (av - 4)%nat b
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.killed + 0x0c)) kl_s1 kl_a0 A1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
@@ -203,7 +203,7 @@ Section ProofKilled.
       rewrite /M1 upd_ne; [| vm_compute; discriminate]. exact Ha0. }
     (* +0x0e: jal ra,acquire *)
     iPoseProof (kli_0e with "Htext") as "Hi0e".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x0e)) kl_ra (mword_of_int 2091694 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.killed + 0x0e)) kl_ra (mword_of_int 2091694 : mword 21)
               A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0e [-]").
@@ -222,7 +222,7 @@ Section ProofKilled.
        at [CID8]. *)
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf Φ γl "proc"%string
+    iApply (Acquire.wp_acquire_sconf γl "proc"%string
               (proc_lock_res Φ γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic [-]").
@@ -243,7 +243,7 @@ Section ProofKilled.
                       (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))))
                     = p_killed (proc_addr j))
       by (rewrite Hmacq_s1; apply kl_killed_off).
-    iApply (wp_clw_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x12)) kl_a5 kl_s1
+    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.killed + 0x12)) kl_a5 kl_s1
               (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) macq (av - 4)%nat kl false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -257,7 +257,7 @@ Section ProofKilled.
     iEval (rewrite Hp14) in "Hpc".
     (* +0x14: c.mv s2,a5 -- park the value across release *)
     iPoseProof (kli_14 with "Htext") as "Hi14".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x14)) kl_s2 kl_a5 C1 (av - 4)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.killed + 0x14)) kl_s2 kl_a5 C1 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iApply wp_next_off_intro.
@@ -271,7 +271,7 @@ Section ProofKilled.
     { rewrite /C2 upd_eq add_vec_zero_l /C1 upd_eq. reflexivity. }
     (* +0x16: c.mv a0,s1 *)
     iPoseProof (kli_16 with "Htext") as "Hi16".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x16)) kl_a0 kl_s1 C2 (av - 4)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.killed + 0x16)) kl_a0 kl_s1 C2 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
     iApply wp_next_off_intro.
@@ -288,7 +288,7 @@ Section ProofKilled.
       by (rewrite /C3 upd_eq add_vec_zero_l; exact HC2s1).
     (* +0x18: jal ra,release *)
     iPoseProof (kli_18 with "Htext") as "Hi18".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x18)) kl_ra (mword_of_int 2091820 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.killed + 0x18)) kl_ra (mword_of_int 2091820 : mword 21)
               C3 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
@@ -312,7 +312,7 @@ Section ProofKilled.
     { iApply (proc_lock_res_intro Φ γs γl (proc_addr j) st ch with "Hstate Hpg Hchan [-Hslot] Hslot").
       iExists kl, xs, pid. iFrame "Hkilled Hxstate Hpidhalf". }
     (* ===================== release(&p->lock) ===================== *)
-    iApply (Release.wp_release_sconf Φ γl (proc_addr j) "proc"%string
+    iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res Φ γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay [-]").
@@ -331,7 +331,7 @@ Section ProofKilled.
       rewrite /C4 upd_ne; [| vm_compute; discriminate].
       rewrite /C3 upd_ne; [| vm_compute; discriminate]. exact HC2s2. }
     iPoseProof (kli_1c with "Htext") as "Hi1c".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x1c)) kl_a0 kl_s2 mrel (av - 4)%nat b
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.killed + 0x1c)) kl_a0 kl_s2 mrel (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
     iIntros (CIDe1 Hse1) "Hcg Hpc".
@@ -353,7 +353,7 @@ Section ProofKilled.
       rewrite /A2 upd_ne; [| vm_compute; discriminate].
       rewrite /A1 upd_ne; [| vm_compute; discriminate]. exact HcspM1. }
     iPoseProof (kli_1e with "Htext") as "Hi1e".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x1e)) (mword_of_int 3 : mword 6) kl_ra
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.killed + 0x1e)) (mword_of_int 3 : mword 6) kl_ra
               E0 (av - 4)%nat (m !!! Regidx kl_ra) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hb1] [-]").
@@ -365,7 +365,7 @@ Section ProofKilled.
     iEval (rewrite Hp20) in "Hpc".
     assert (HE1csp : E1 !!! Regidx csp_rs1 = spd) by (rewrite /E1 upd_ne; [exact HE0csp | vm_compute; discriminate]).
     iPoseProof (kli_20 with "Htext") as "Hi20".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x20)) (mword_of_int 2 : mword 6) kl_s0
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.killed + 0x20)) (mword_of_int 2 : mword 6) kl_s0
               E1 (av - 4)%nat (m !!! Regidx kl_s0) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [Hb2] [-]").
@@ -377,7 +377,7 @@ Section ProofKilled.
     iEval (rewrite Hp22) in "Hpc".
     assert (HE2csp : E2 !!! Regidx csp_rs1 = spd) by (rewrite /E2 upd_ne; [exact HE1csp | vm_compute; discriminate]).
     iPoseProof (kli_22 with "Htext") as "Hi22".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x22)) (mword_of_int 1 : mword 6) kl_s1
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.killed + 0x22)) (mword_of_int 1 : mword 6) kl_s1
               E2 (av - 4)%nat (m !!! Regidx kl_s1) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [Hb3] [-]").
@@ -389,7 +389,7 @@ Section ProofKilled.
     iEval (rewrite Hp24) in "Hpc".
     assert (HE3csp : E3 !!! Regidx csp_rs1 = spd) by (rewrite /E3 upd_ne; [exact HE2csp | vm_compute; discriminate]).
     iPoseProof (kli_24 with "Htext") as "Hi24".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x24)) (mword_of_int 0 : mword 6) kl_s2
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.killed + 0x24)) (mword_of_int 0 : mword 6) kl_s2
               E3 (av - 4)%nat (m !!! Regidx kl_s2) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [Hb4] [-]").
@@ -417,7 +417,7 @@ Section ProofKilled.
       iSplitL "Hb4". { iExists _. iEval (rewrite Hb4a -HE3csp). iExact "Hb4". }
       done. }
     iEval (rewrite -Hwv) in "Hframe4".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x26)) (mword_of_int 2 : mword 6) E4 (av - 4)%nat 4 b Hpop
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.killed + 0x26)) (mword_of_int 2 : mword 6) E4 (av - 4)%nat 4 b Hpop
               with "Hcg Hpc Hi26 Hframe4 [-]").
     iIntros (CIDe6 Hse6) "Hcg Hpc".
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
@@ -436,7 +436,7 @@ Section ProofKilled.
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1. apply upd_eq. }
     iPoseProof (kli_28 with "Htext") as "Hi28".
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.killed + 0x28)) kl_ra E5 av b
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.killed + 0x28)) kl_ra E5 av b
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi28 [-]").
     iIntros (CIDe7 Hse7) "Hcg Hpc".
     iEval (rgne) in "Hpc".

@@ -29,7 +29,7 @@ Section WpSmodePtAlu.
 
 
 
-  Lemma wp_caddi4spn_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_caddi4spn_gpr_s_config_r (R : s_regime)
       (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -60,7 +60,7 @@ Section WpSmodePtAlu.
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrdc Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_regime R Φ pc rd csp_rs1 csp_rs1
+    unshelve iApply (wp_gpr_write_s_config_regime R pc rd csp_rs1 csp_rs1
               (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))
               m mstatus0 mie_v mdv0 menvcfg0
@@ -76,7 +76,7 @@ Section WpSmodePtAlu.
 
 
 
-  Lemma wp_caddi_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_caddi_gpr_s_config_r (R : s_regime)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -106,7 +106,7 @@ Section WpSmodePtAlu.
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_regime R Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_config_regime R pc rd rd rd
               (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI))
               (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)))
               m mstatus0 mie_v mdv0 menvcfg0
@@ -123,7 +123,7 @@ Section WpSmodePtAlu.
   (* c.addi16sp sp, imm6: the frame alloc/dealloc.  Raw-config form for the
      VCgen block executor (rd is always sp, so no rd<>0 arg); mirrors
      [wp_caddi_gpr_s_config_pt] with [rd := csp_rs1] and [caddi16sp_imm imm6]. *)
-  Lemma wp_caddi16sp_gpr_s_config_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_caddi16sp_gpr_s_config_r (R : s_regime)
       (pc : mword 64) (imm6 : mword 6)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -153,7 +153,7 @@ Section WpSmodePtAlu.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_gpr_write_s_config_regime R Φ pc csp_rs1 csp_rs1 csp_rs1
+    unshelve iApply (wp_gpr_write_s_config_regime R pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
               m mstatus0 mie_v mdv0 menvcfg0
@@ -214,7 +214,7 @@ Section WpSmodePtAlu.
 
   (* ---- from WpSmodeAddiw.v ---- *)
 
-  Lemma wp_caddiw_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_caddiw_s_r (R : s_regime)
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -245,7 +245,7 @@ Section WpSmodePtAlu.
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_config_regime R Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_config_regime R pc rd rd rd
               (ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd))
               (sign_extend' 64 (subrange_vec_dec
                  (add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm))) 31 0))

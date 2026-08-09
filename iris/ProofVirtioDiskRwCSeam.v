@@ -146,7 +146,7 @@ Section ProofVirtioDiskRwCSeam.
     destruct Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8).
     cbn in Hh8, Hm8, Ht8.
     iDestruct "Hgeom" as "(Hdp & _)".
-    iApply (wp_vdrw_p3 (CID := CIDx) Φ (proc_addr j) M (K - 12)%nat pd sp0 b wr sector h m2 t dsk0
+    iApply (wp_vdrw_p3 (CID := CIDx) (proc_addr j) M (K - 12)%nat pd sp0 b wr sector h m2 t dsk0
               Hh8 Hm8 Ht8 Hregs
               with "Hcg Htext Hpc Hdp Hidx Hbh Hbm Hbt Hbd [-]").
     iIntros (M1) "%F Hcg Hpc Hidx Hchain".

@@ -1,7 +1,7 @@
 (* WpSconfTimer.v -- the two Sstc timer leaves over [sconf]+[sie_cap]:
 
-     wp_csrr_time_s_sconf      rdtime rd        (csrr rd, time     -- 0xC01)
-     wp_csrw_stimecmp_s_sconf  csrw stimecmp,rs1                   (-- 0x14D)
+     wp_csrr_time_s_sconf rd        (csrr rd, time     -- 0xC01)
+     wp_csrw_stimecmp_s_sconf stimecmp,rs1                   (-- 0x14D)
 
    Both take the PERSISTENT [timer_cap] (TimerCap.v) and nothing else: it
    carries the mcounteren.TM = 1 pin that Supervisor access to both CSRs is
@@ -209,7 +209,7 @@ Section WpSconfTimer.
   Context {p : mword 64}.
 
   (* ---- rdtime rd: rd := (an arbitrary) mtime reading ---- *)
-  Lemma wp_csrr_time_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_time_s_sconf
       (pc : mword 64) (rd : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -230,7 +230,7 @@ Section WpSconfTimer.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iDestruct "Htcap" as "[Hen _]".
     iDestruct "Hen" as (mcen) "[#Hmcen %HTM]".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRReg (csr_time, zreg, Regidx rd, CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -281,7 +281,7 @@ Section WpSconfTimer.
      [timer_cap]'s invariant, opened across this one instruction step and
      resealed at the new deadline, so the whole precondition is persistent and
      the postcondition says nothing about the timer at all. ---- *)
-  Lemma wp_csrw_stimecmp_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrw_stimecmp_s_sconf
       (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -298,7 +298,7 @@ Section WpSconfTimer.
     iIntros (Hrs1) "#Htcap Hcg Hpc Hinstr Hcont".
     iDestruct "Htcap" as "[Hen #Hsinv]".
     iDestruct "Hen" as (mcen) "[#Hmcen %HTM]".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".

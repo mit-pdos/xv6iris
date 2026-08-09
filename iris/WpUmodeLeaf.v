@@ -97,8 +97,7 @@ Section WpUmodeLeaf.
   (* to [C_LI]).  Every real call site discharges it by [vm_compute].       *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uv_cli (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (rd : mword 5) (wval : mword 64)
-      (Φ : mval -> iProp Σ) :
+      (pc : mword 64) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
     uinstr pt M pc true (C_LI (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = add_vec zero_reg (sign_extend' 64 (sign_extend' 12 imm)) ->
@@ -115,7 +114,7 @@ Section WpUmodeLeaf.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc true (C_LI (imm, Regidx rd))
               (Some (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)))
-              None (Some (rd, wval)) Φ Hui
+              None (Some (rd, wval)) Hui
               ltac:(intro s; apply exec_execute_C_LI)
               eq_refl Hrd
               with "Hcg Hpc Hcont").
@@ -141,8 +140,7 @@ Section WpUmodeLeaf.
   (* just an arithmetic write.                                            *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uv_caddi (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 6) (rd : mword 5) (wval : mword 64)
-      (Φ : mval -> iProp Σ) :
+      (pc : mword 64) (imm : mword 6) (rd : mword 5) (wval : mword 64) :
     uinstr pt M pc true (C_ADDI (imm, Regidx rd)) ->
     uint rd <> 0 ->
     wval = add_vec (m !!! Regidx rd) (sign_extend' 64 (sign_extend' 12 imm)) ->
@@ -159,7 +157,7 @@ Section WpUmodeLeaf.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc true (C_ADDI (imm, Regidx rd))
               (Some (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI)))
-              None (Some (rd, wval)) Φ Hui
+              None (Some (rd, wval)) Hui
               ltac:(intro s; apply exec_execute_C_ADDI)
               eq_refl Hrd
               with "Hcg Hpc Hcont").
@@ -184,7 +182,7 @@ Section WpUmodeLeaf.
   (* ------------------------------------------------------------------- *)
   Lemma wp_uv_caddi4spn (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (cr : mword 3) (nzimm : mword 8) (rd : mword 5)
-      (wval : mword 64) (Φ : mval -> iProp Σ) :
+      (wval : mword 64) :
     uinstr pt M pc true (C_ADDI4SPN (Cregidx cr, nzimm)) ->
     creg2reg_idx (Cregidx cr) = Regidx rd ->
     uint rd <> 0 ->
@@ -203,7 +201,7 @@ Section WpUmodeLeaf.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc true (C_ADDI4SPN (Cregidx cr, nzimm))
               (Some (ITYPE (caddi4spn_imm nzimm, Regidx csp_rs1, Regidx rd, ADDI)))
-              None (Some (rd, wval)) Φ Hui
+              None (Some (rd, wval)) Hui
               ltac:(intro s;
                     rewrite (exec_execute_C_ADDI4SPN (Cregidx cr) nzimm s);
                     rewrite Hcr; reflexivity)
@@ -229,8 +227,7 @@ Section WpUmodeLeaf.
   (* every call site discharges by [vm_compute]).                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uv_jal (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (imm : mword 21) (rd : mword 5) (tgt wval : mword 64)
-      (Φ : mval -> iProp Σ) :
+      (pc : mword 64) (imm : mword 21) (rd : mword 5) (tgt wval : mword 64) :
     uinstr pt M pc false (JAL (imm, Regidx rd)) ->
     uint rd <> 0 ->
     tgt = add_vec pc (sign_extend' 64 imm) ->
@@ -248,7 +245,7 @@ Section WpUmodeLeaf.
     intros Hui Hrd Htgt Hwval Hal0.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc false (JAL (imm, Regidx rd)) None
-              (Some tgt) (Some (rd, wval)) Φ Hui
+              (Some tgt) (Some (rd, wval)) Hui
               ltac:(intro s; exact I)
               eq_refl Hrd
               with "Hcg Hpc Hcont").
@@ -271,8 +268,7 @@ Section WpUmodeLeaf.
   (* Zca for [jump_to]) come off the funnel's config agreement.            *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_uv_cjr (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (rs1 : mword 5) (tgt : mword 64)
-      (Φ : mval -> iProp Σ) :
+      (pc : mword 64) (rs1 : mword 5) (tgt : mword 64) :
     uinstr pt M pc true (C_JR (Regidx rs1)) ->
     uint rs1 <> 0 ->
     tgt = ret_pc (m !!! Regidx rs1) ->
@@ -288,7 +284,7 @@ Section WpUmodeLeaf.
     iIntros "Hcg Hpc Hcont".
     iApply (wp_uv_retire C pt Ψ M m pc true (C_JR (Regidx rs1))
               (Some (JALR (zeros' 12, Regidx rs1, zreg)))
-              (Some tgt) None Φ Hui
+              (Some tgt) None Hui
               ltac:(intro s; apply exec_execute_C_JR)
               eq_refl I
               with "Hcg Hpc Hcont").

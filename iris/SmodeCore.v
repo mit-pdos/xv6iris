@@ -1098,7 +1098,7 @@ Section SmodeCoreIris.
   Qed.
 
   (* =================================================================== *)
-  (* Fraction choreography (the wp_start recipe): full raw cells <->     *)
+  (* Fraction choreography (the wp_start): full raw cells <->     *)
   (* smode_config(1/2) + retained halves with the values pinned outside. *)
   (* Shared by every S-mode function that calls mycpu (kernelvec,        *)
   (* push_off, pop_off); lives here beside smode_config_split/rebuild.   *)
@@ -1230,10 +1230,10 @@ Section SmodeCoreIris.
   (* post-fetch state THREADED: the caller supplies fetch = Some (r, σf)  *)
   (* (σf = σ on a TLB hit; σf = the TLB-filled state on a walk), decode   *)
   (* at σf, and the execute obligations from σf.  The M-mode              *)
-  (* wp_exec_step_decode_execute_inv is (semantically) the p := Machine,  *)
+  (* wp_exec_step_decode_execute_inv (semantically) the p := Machine,  *)
   (* σf := σ instance.                                                    *)
   (* =================================================================== *)
-  Lemma wp_exec_step_decode_execute_inv_priv (p : Privilege) (Φ : mval -> iProp Σ) {dq : dfrac} :
+  Lemma wp_exec_step_decode_execute_inv_priv (p : Privilege) {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
@@ -1270,7 +1270,7 @@ Section SmodeCoreIris.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hinv Hhs H".
-    iApply (wp_exec_step_hart_active_inv Φ with "Hinv Hhs").
+    iApply (wp_exec_step_hart_active_inv with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iMod ("H" $! σ with "Hsi") as (r i σf s_exec)
       "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".

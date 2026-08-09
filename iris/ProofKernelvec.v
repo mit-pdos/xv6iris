@@ -377,7 +377,7 @@ Section KernelvecCore.
 
   (* the 17-instruction register-save run, as ONE block; STRENGTHENED to
      return the CONCRETE input register file [m] (stores don't touch it). *)
-  Lemma wp_kv_store_block_vc (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_kv_store_block_vc (root_ppn : mword 44) (γ : gname)
       (m : regfile)
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 : bv 64)
       {dq : dfrac} :
@@ -511,7 +511,7 @@ Section KernelvecCore.
     assert (HVr30 : ρ 30%nat = m !!! Regidx (mword_of_int 30 : mword 5)) by reflexivity.
     assert (HVr31 : ρ 31%nat = m !!! Regidx (mword_of_int 31 : mword 5)) by reflexivity.
     iDestruct (kv_store_instrs with "Htext") as "Hbi".
-    iApply (wp_vc_block_s root_ppn kv_store_prog Φ
+    iApply (wp_vc_block_s root_ppn kv_store_prog
               (VSt (KernelSyms.kernelvec + 0x2) kv_store_regs0 kv_store_heap0 [])
               (VSt (KernelSyms.kernelvec + 0x24) kv_store_regs0 kv_store_heap1 [])
               ρ m γ
@@ -542,7 +542,7 @@ Section KernelvecCore.
 
   (* the 17-instruction register-restore run, as ONE block; STRENGTHENED to
      return the CONCRETE result file [kv_load_result m w1..w17]. *)
-  Lemma wp_kv_load_block_vc (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_kv_load_block_vc (root_ppn : mword 44) (γ : gname)
       (m : regfile)
       (w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 : bv 64)
       {dq : dfrac} :
@@ -642,7 +642,7 @@ Section KernelvecCore.
     assert (HVw16 : ρ 48%nat = (w16 : mword 64)) by reflexivity.
     assert (HVw17 : ρ 49%nat = (w17 : mword 64)) by reflexivity.
     iDestruct (kv_load_instrs with "Htext") as "Hbi".
-    iApply (wp_vc_block_s root_ppn kv_load_prog Φ
+    iApply (wp_vc_block_s root_ppn kv_load_prog
               (VSt (KernelSyms.kernelvec + 0x28) kv_load_regs0 kv_store_heap0 [])
               (VSt (KernelSyms.kernelvec + 0x4a) kv_load_regs1 kv_store_heap0 [])
               ρ m γ
@@ -791,8 +791,7 @@ Section KernelvecCore.
   Lemma wp_kv_prologue (root_ppn : mword 44) (γ : gname)
       (m : regfile)
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12
-       vold13 vold14 vold15 vold16 vold17 : bv 64)
-      (Φ : mval -> iProp Σ) :
+       vold13 vold14 vold15 vold16 vold17 : bv 64) :
     smode_config γ (DfracOwn (1/2)) -∗
     tlb_res_pt root_ppn -∗
     pc_is (mword_of_int (KernelSyms.kernelvec) : mword 64) -∗
@@ -846,7 +845,7 @@ Section KernelvecCore.
     iPoseProof (kv_instr1 with "Htext") as "Hi1".
     assert (Hpc1 : add_vec_int (mword_of_int (KernelSyms.kernelvec) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x2) : mword 64))
       by (vm_compute; reflexivity).
-    iApply (wp_caddi16sp_gpr_s_pt root_ppn γ Φ (mword_of_int (KernelSyms.kernelvec)) kv_imm1 m
+    iApply (wp_caddi16sp_gpr_s_pt root_ppn γ (mword_of_int (KernelSyms.kernelvec)) kv_imm1 m
               (1/2)%Qp
 
               with "Hsm Htlbinv Hpc Hfile Hi1").
@@ -941,7 +940,7 @@ Section KernelvecCore.
     iEval (rewrite Heqw15) in "Hw15".
     iEval (rewrite Heqw16) in "Hw16".
     iEval (rewrite Heqw17) in "Hw17".
-    iApply (wp_kv_store_block_vc root_ppn γ Φ (kv_m1 m)
+    iApply (wp_kv_store_block_vc root_ppn γ (kv_m1 m)
               vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17
               (dq := DfracOwn (1/2))
 
@@ -971,7 +970,7 @@ Section KernelvecCore.
     assert (Hal19 : eq_vec (access_vec_dec (add_vec (mword_of_int (KernelSyms.kernelvec + 0x24) : mword 64)
                       (sign_extend' 64 (mword_of_int 0x1fd242 : mword 21))) 0) ('b"0") = true)
       by (vm_compute; reflexivity).
-    iApply (wp_jal_gpr_s_zca_pt root_ppn γ Φ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd242)
+    iApply (wp_jal_gpr_s_zca_pt root_ppn γ (mword_of_int (KernelSyms.kernelvec + 0x24)) (mword_of_int 1) (mword_of_int 0x1fd242)
               (kv_m1 m) (1/2)%Qp
  Hrd19 Hal19
               with "Hsm Htlbinv Hpc Hfile Hi19").
@@ -989,8 +988,7 @@ Section KernelvecCore.
       (mt : regfile) (spv : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
 
-      (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64)
-      (Φ : mval -> iProp Σ) :
+      (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64) :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
     _get_Mstatus_SXL mstatus0 = 'b"10" ->
@@ -1117,7 +1115,7 @@ Section KernelvecCore.
     iEval (rewrite Heqv15) in "Hv15".
     iEval (rewrite Heqv16) in "Hv16".
     iEval (rewrite Heqv17) in "Hv17".
-    iApply (wp_kv_load_block_vc root_ppn γ Φ mt
+    iApply (wp_kv_load_block_vc root_ppn γ mt
               v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17
               (dq := DfracOwn (1/2))
 
@@ -1148,7 +1146,7 @@ Section KernelvecCore.
     iPoseProof (kv_i37 with "Htext") as "Hi37".
     assert (Hpc37 : add_vec_int (mword_of_int (KernelSyms.kernelvec + 0x4a) : mword 64) 2 = (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64))
       by (vm_compute; reflexivity).
-    iApply (wp_caddi16sp_gpr_s_pt root_ppn γ Φ (mword_of_int (KernelSyms.kernelvec + 0x4a)) (mword_of_int 16) mt17
+    iApply (wp_caddi16sp_gpr_s_pt root_ppn γ (mword_of_int (KernelSyms.kernelvec + 0x4a)) (mword_of_int 16) mt17
               (1/2)%Qp
 
               with "Hsm Htlbinv Hpc Hfile Hi37").
@@ -1160,7 +1158,7 @@ Section KernelvecCore.
     iEval (rewrite Hsp17) in "Hfile".
     (* ---- #38: sret @ 0x8000542c ---- *)
     iPoseProof (kv_i38 with "Htext") as "Hi38".
-    iApply (wp_sret_gpr_pt root_ppn Φ (mword_of_int (KernelSyms.kernelvec + 0x4c))
+    iApply (wp_sret_gpr_pt root_ppn (mword_of_int (KernelSyms.kernelvec + 0x4c))
               mstatus0 mie_v mdv0 menvcfg0 sepc0
               (<[Regidx csp_rs1 := regval_into_reg (add_vec spv (sign_extend' 64 (caddi16sp_imm (mword_of_int 16 : mword 6))))]> mt17)
              
@@ -1182,8 +1180,7 @@ Section KernelvecCore.
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
       
       (vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12
-       vold13 vold14 vold15 vold16 vold17 : bv 64)
-      (Φ : mval -> iProp Σ) :
+       vold13 vold14 vold15 vold16 vold17 : bv 64) :
     (* S-mode config facts *)
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
     eq_vec (_get_Mstatus_MPRV mstatus0) ('b"1") = false ->
@@ -1284,7 +1281,7 @@ Section KernelvecCore.
       as "(Hsm & Hhs2 & Hpriv2 & Hms2 & Hmie2 & Hmdl2 & Hmenv2)".
     (* ---- instrs #1..#19: prologue (fills + saves + jal) ---- *)
     iApply (wp_kv_prologue root_ppn γ m
-              vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17 Φ
+              vold1 vold2 vold3 vold4 vold5 vold6 vold7 vold8 vold9 vold10 vold11 vold12 vold13 vold14 vold15 vold16 vold17
 
               with "Hsm Htlbinv Hpc Hfile
                     Htext Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
@@ -1308,7 +1305,7 @@ Section KernelvecCore.
               satp0 tlbmid
               ((((kv_sp1 m)))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 9 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 10 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 11 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 12 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 14 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 15 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 16 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 27 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))))))
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))
-              Φ Hsp_l Hra_l
+              Hsp_l Hra_l
               with "Hsm Hsatp Htlb Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17").
     iNext.
     iIntros (m') "%Hpres Hsm Hsatp Htlb Hpc Hfile Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17".
@@ -1326,7 +1323,6 @@ Section KernelvecCore.
     iApply (wp_kv_epilogue root_ppn γ m' (kv_sp1 m) mstatus0 mie_v mdv0 menvcfg0 sepc0
 
               (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 3 : mword 5)) (m !!! Regidx (mword_of_int 5 : mword 5)) (m !!! Regidx (mword_of_int 6 : mword 5)) (m !!! Regidx (mword_of_int 7 : mword 5)) (m !!! Regidx (mword_of_int 10 : mword 5)) (m !!! Regidx (mword_of_int 11 : mword 5)) (m !!! Regidx (mword_of_int 12 : mword 5)) (m !!! Regidx (mword_of_int 13 : mword 5)) (m !!! Regidx (mword_of_int 14 : mword 5)) (m !!! Regidx (mword_of_int 15 : mword 5)) (m !!! Regidx (mword_of_int 16 : mword 5)) (m !!! Regidx (mword_of_int 17 : mword 5)) (m !!! Regidx (mword_of_int 28 : mword 5)) (m !!! Regidx (mword_of_int 29 : mword 5)) (m !!! Regidx (mword_of_int 30 : mword 5)) (m !!! Regidx (mword_of_int 31 : mword 5))
-              Φ
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               Hsp'' HTSR Hsup Hlpe0
               with "Hhw Hinv Hsm Hhs2 Hpriv2 Hms2 Hmie2 Hmdl2 Hmenv2 Htlbinv Hsepc Hpc Hfile
@@ -1477,7 +1473,7 @@ Section KernelvecHandler.
     cbv beta delta [kernelvec_handler_spec_body].
     iIntros "#Hhw #Hinv #Htext".
     iModIntro.
-    iIntros (root_ppn elp_v ms pc0 mie_v mdv0 m Φ)
+    iIntros (root_ppn elp_v ms pc0 mie_v mdv0 m)
       "%Hfacts %Hpc0 %Hmm Hhs Hpriv Hms Hmie Hmdl Hsepc Hpc Hfile HF Hcont".
     pose proof Hfacts as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     assert (HPBMTE : eq_vec (_get_MEnvcfg_PBMTE MENVCFG_S) ('b"0") = true)
@@ -1573,7 +1569,7 @@ Section KernelvecHandler.
     iEval (rewrite -Qp.half_half) in "Hg".
     iDestruct (ghost_var_split with "Hg") as "[Hsie _]".
     iApply (wp_kernelvec root_ppn γk m (trap_ms elp_v ms) mie_v mdv0 MENVCFG_S pc0
-              w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17 Φ
+              w1 w2 w3 w4 w5 w6 w7 w8 w9 w10 w11 w12 w13 w14 w15 w16 w17
               (trap_ms_SIE_false elp_v ms)
               (trap_ms_MPRV_false elp_v ms HMPRV0)
               (trap_ms_SXL_eq elp_v ms HSXL)

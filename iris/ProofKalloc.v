@@ -47,11 +47,11 @@ Section ProofKalloc.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Lemma wp_kalloc_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_kalloc_sconf
       (γl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile)
       (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool)
-    : wp_kalloc_sconf_body Φ γl γk fl m on n eb p C K b.
+    : wp_kalloc_sconf_body γl γk fl m on n eb p C K b.
   Proof.
     cbv beta delta [wp_kalloc_sconf_body].
     intros pcE ret_tgt HK Hfl Hnoffpos.
@@ -76,7 +76,7 @@ Section ProofKalloc.
     assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     (* +0x00 c.addi sp,-32 -- the frame trade (push k := 4) *)
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m K 4 b ltac:(lia) Hpush
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m K 4 b ltac:(lia) Hpush
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
@@ -101,21 +101,21 @@ Section ProofKalloc.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     (* +0x02 c.sdsp ra,24(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
               R1 (K - 4)%nat vr24 b with "Hcg Hpc Hi02 Hr24 [-]").
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
     iEval (rgne) in "Hr24".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* +0x04 c.sdsp s0,16(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
               R1 (K - 4)%nat vr16 b with "Hcg Hpc Hi04 Hr16 [-]").
     iIntros (CID3 Hs3) "Hcg Hpc Hr16".
     iEval (rgne) in "Hr16".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     (* +0x06 c.sdsp s1,8(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
               R1 (K - 4)%nat vr8 b with "Hcg Hpc Hi06 Hr8 [-]").
     iIntros (CID4 Hs4) "Hcg Hpc Hr8".
     iEval (rgne) in "Hr8".
@@ -124,7 +124,7 @@ Section ProofKalloc.
     assert (Hra0v : m !!! Regidx (mword_of_int 1 : mword 5) = R1 !!! Regidx (mword_of_int 1 : mword 5))
       by (rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]).
     (* +0x08 c.addi4spn s0,sp,32 *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.kalloc + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
               R1 (K - 4)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
     iIntros (CID5 Hs5) "Hcg Hpc".
@@ -132,7 +132,7 @@ Section ProofKalloc.
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x08) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     (* +0x0a auipc a0,0x11 *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x0a)) (mword_of_int 10 : mword 5) (mword_of_int 0x11 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kalloc + 0x0a)) (mword_of_int 10 : mword 5) (mword_of_int 0x11 : mword 20)
               R2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a [-]").
     iIntros (CID6 Hs6) "Hcg Hpc".
@@ -140,7 +140,7 @@ Section ProofKalloc.
     assert (Hpp0e : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x0a) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
     (* +0x0e addi a0,a0,2046  (a0 := &kmem) *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x0e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7f0 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x0e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7f0 : mword 12)
               R3 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
@@ -152,7 +152,7 @@ Section ProofKalloc.
     iEval (rewrite Hpp12) in "Hpc".
     (* ===== ACQUIRE call (intr_count n -> S n, deep-10 lent) ===== *)
     (* +0x12 jal ra,acquire *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 0xc8 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kalloc + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 0xc8 : mword 21)
               R4 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi12 [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
@@ -175,7 +175,7 @@ Section ProofKalloc.
        acquire wants it at CID8. *)
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf Φ γl "kmem"%string (kmem_res γk fl) mA
+    iApply (Acquire.wp_acquire_sconf γl "kmem"%string (kmem_res γk fl) mA
               n eb p C (K - 4)%nat b
               Hnoffpos
               ltac:(lia)
@@ -191,7 +191,7 @@ Section ProofKalloc.
     iPoseProof (kai_1e with "Htext") as "Hi1e".
     (* ===== +0x16 auipc s1,0x11 ; +0x1a ld s1,head ; +0x1e beqz s1 ===== *)
     (* +0x16 auipc s1,0x11 *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x16)) (mword_of_int 9 : mword 5) (mword_of_int 0x11 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kalloc + 0x16)) (mword_of_int 9 : mword 5) (mword_of_int 0x11 : mword 20)
               macq (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
     iApply wp_next_off_intro.
@@ -205,7 +205,7 @@ Section ProofKalloc.
     iDestruct "HRres" as (head pages) "(Hflw & Hchain & Hauth)".
     assert (Hldaddr : add_vec (R6 !!! Regidx (mword_of_int 9 : mword 5)) (sign_extend' 64 (mword_of_int 0x7fc : mword 12)) = fl).
     { rewrite Hs1R6 Hfl. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_ld_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x1a)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x7fc : mword 12)
+    iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.kalloc + 0x1a)) (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 0x7fc : mword 12)
               R6 (K - 4)%nat head false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [Hflw] [-]").
     { iEval (rewrite -Hldaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
@@ -222,7 +222,7 @@ Section ProofKalloc.
     destruct pages as [|pg ps].
     - (* ===== EMPTY: head=nullp, taken to +0x4c ===== *)
       iDestruct "Hchain" as %Hhead.
-      iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x1e)) (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 1)) (mword_of_int 9 : mword 5)
+      iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KernelSyms.kalloc + 0x1e)) (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 1)) (mword_of_int 9 : mword 5)
                 R7 (K - 4)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite Hs1R7 Hhead; vm_compute; reflexivity)
                 ltac:(vm_compute; reflexivity)
@@ -241,7 +241,7 @@ Section ProofKalloc.
       iPoseProof (kai_50 with "Htext") as "Hi50".
       iPoseProof (kai_54 with "Htext") as "Hi54".
       (* +0x4c auipc a0,0x11 *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x4c)) (mword_of_int 10 : mword 5) (mword_of_int 0x11 : mword 20)
+      iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kalloc + 0x4c)) (mword_of_int 10 : mword 5) (mword_of_int 0x11 : mword 20)
                 R7 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi4c [-]").
       iApply wp_next_off_intro.
@@ -250,7 +250,7 @@ Section ProofKalloc.
       assert (Hpp50 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x4c) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp50) in "Hpc".
       (* +0x50 addi a0,a0,1980  (a0 := &kmem) *)
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x50)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7ae : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x50)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7ae : mword 12)
                 E1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi50 [-]").
       iApply wp_next_off_intro.
@@ -261,7 +261,7 @@ Section ProofKalloc.
       assert (Hpp54 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x50) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x54)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp54) in "Hpc".
       (* +0x54 jal ra,release *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x54)) (mword_of_int 1 : mword 5) (mword_of_int 0x10e : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kalloc + 0x54)) (mword_of_int 1 : mword 5) (mword_of_int 0x10e : mword 21)
                 E2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi54 [-]").
       iApply wp_next_off_intro.
@@ -281,7 +281,7 @@ Section ProofKalloc.
       { rewrite /E3 upd_ne; [| vm_compute; discriminate]. exact Ha0kmem2. }
       assert (HE3ra : E3 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.kalloc + 0x54) : mword 64) 4)
         by (rewrite /E3; apply upd_eq).
-      iApply (Release.wp_release_sconf Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3
+      iApply (Release.wp_release_sconf γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) E3
                 n eb p C (K - 4)%nat
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -309,7 +309,7 @@ Section ProofKalloc.
       iPoseProof (kai_48 with "Htext") as "Hi48".
       iPoseProof (kai_4a with "Htext") as "Hi4a".
       (* +0x58 c.j +0x40 *)
-      iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x58))
+      iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.kalloc + 0x58))
                 (sign_extend' 21 (concat_vec (mword_of_int 2036 : mword 11) ('b"0")))
                 mr (K - 4)%nat b ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi58 [-]").
@@ -319,7 +319,7 @@ Section ProofKalloc.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgtj) in "Hpc".
       (* +0x40 c.mv a0,s1  (a0 := s1 = nullp) *)
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x40)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kalloc + 0x40)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                 mr (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi40 [-]").
       iIntros (CIDe2 Hse2) "Hcg Hpc".
@@ -332,7 +332,7 @@ Section ProofKalloc.
       iEval (rewrite Hpp42) in "Hpc".
       iEval (rewrite HspR1) in "Hr24". iEval (rewrite HspR1) in "Hr16". iEval (rewrite HspR1) in "Hr8". iEval (rewrite HspR1) in "Hg4".
       (* +0x42 c.ldsp ra,24(sp) *)
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x42)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x42)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
                 P41 (K - 4)%nat (R1 !!! Regidx (mword_of_int 1 : mword 5)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi42 [Hr24] [-]").
@@ -344,7 +344,7 @@ Section ProofKalloc.
       assert (Hpp44 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x42) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x44)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp44) in "Hpc".
       (* +0x44 c.ldsp s0,16(sp) *)
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x44)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x44)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
                 P42 (K - 4)%nat (R1 !!! Regidx (mword_of_int 8 : mword 5)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi44 [Hr16] [-]").
@@ -356,7 +356,7 @@ Section ProofKalloc.
       assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x44) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp46) in "Hpc".
       (* +0x46 c.ldsp s1,8(sp) *)
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x46)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x46)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
                 P43 (K - 4)%nat (R1 !!! Regidx (mword_of_int 9 : mword 5)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi46 [Hr8] [-]").
@@ -383,7 +383,7 @@ Section ProofKalloc.
         iSplitL "Hg4";  [iEval (rewrite -Hb4 HspR1); iExists _; iExact "Hg4"|].
         done. }
       iEval (rewrite -Hwv) in "Hframe4".
-      iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x48)) (mword_of_int 2 : mword 6) P44 (K - 4)%nat 4 b Hpop
+      iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.kalloc + 0x48)) (mword_of_int 2 : mword 6) P44 (K - 4)%nat 4 b Hpop
                 with "Hcg Hpc Hi48 Hframe4 [-]").
       iIntros (CIDe6 Hse6) "Hcg Hpc".
       assert (Hnk : ((K - 4) + 4)%nat = K) by lia.
@@ -405,7 +405,7 @@ Section ProofKalloc.
         rewrite /P42 upd_ne; [| vm_compute; discriminate].
         rewrite /P41 upd_eq.
         rewrite Hmrs1 HE3s1. apply add_vec_zero_l. }
-      iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x4a)) (mword_of_int 1 : mword 5) P45 K b
+      iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.kalloc + 0x4a)) (mword_of_int 1 : mword 5) P45 K b
                 ltac:(vm_compute; discriminate)
                 with "Hcg Hpc Hi4a [-]").
       iIntros (CIDe7 Hse7) "Hcg Hpc".
@@ -452,7 +452,7 @@ Section ProofKalloc.
       (* the pop's ghost step: count S (length ps) -> length ps *)
       iEval (cbn [length]) in "Hauth".
       iMod (kmem_avail_dec γk on (length ps) with "Havail Hauth") as "[Havail Hauth]".
-      iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x1e)) (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 1)) (mword_of_int 9 : mword 5)
+      iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.kalloc + 0x1e)) (mword_of_int 23 : mword 8) (Cregidx (mword_of_int 1)) (mword_of_int 9 : mword 5)
                 R7 (K - 4)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite Hs1R7; apply eq_vec_false_iff; intro Hpz;
                       apply (page_valid_ne_null pg Hpv); rewrite Hpz; apply bv_eq; vm_compute; reflexivity)
@@ -470,7 +470,7 @@ Section ProofKalloc.
       { replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000"))) : mword 64)
           with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
         rewrite Hs1R7. apply kv_addv_zero. }
-      iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.kalloc + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                 (zero_extend' 12 (concat_vec (mword_of_int 0 : mword 5) ('b"000")))
                 R7 (K - 4)%nat nxt false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi20 [Hpnext] [-]").
@@ -482,7 +482,7 @@ Section ProofKalloc.
       assert (Hpp22 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x20) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x22)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp22) in "Hpc".
       (* +0x22 auipc a4,0x11 *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x22)) (mword_of_int 14 : mword 5) (mword_of_int 0x11 : mword 20)
+      iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kalloc + 0x22)) (mword_of_int 14 : mword 5) (mword_of_int 0x11 : mword 20)
                 R8 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi22 [-]").
       iApply wp_next_off_intro.
@@ -497,7 +497,7 @@ Section ProofKalloc.
       (* +0x26 sd a5,2046(a4) : kmem.freelist := nxt *)
       assert (Hstaddr : add_vec (R9 !!! Regidx (mword_of_int 14 : mword 5)) (sign_extend' 64 (mword_of_int 0x7f0 : mword 12)) = fl).
       { rewrite Ha4R9 Hfl. apply bv_eq; vm_compute; reflexivity. }
-      iApply (wp_sd_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x26)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0x7f0 : mword 12)
+      iApply (wp_sd_s_sconf (mword_of_int (KernelSyms.kalloc + 0x26)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0x7f0 : mword 12)
                 R9 (K - 4)%nat pg false with "Hcg Hpc Hi26 [Hflw] [-]").
       { iEval (rewrite -Hstaddr) in "Hflw". rewrite /word_at. iExact "Hflw". }
       iApply wp_next_off_intro.
@@ -513,7 +513,7 @@ Section ProofKalloc.
       iPoseProof (kai_2a with "Htext") as "Hi2a".
       iPoseProof (kai_2e with "Htext") as "Hi2e".
       (* +0x2a auipc a0,0x11 ; +0x2e addi a0,a0,2000 (a0 := &kmem) *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x2a)) (mword_of_int 10 : mword 5) (mword_of_int 0x11 : mword 20)
+      iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.kalloc + 0x2a)) (mword_of_int 10 : mword 5) (mword_of_int 0x11 : mword 20)
                 R9 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2a [-]").
       iApply wp_next_off_intro.
@@ -521,7 +521,7 @@ Section ProofKalloc.
       set (R10 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (KernelSyms.kalloc + 0x2a) : mword 64) (auipc_off (mword_of_int 0x11 : mword 20)))]> R9).
       assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x2a) : mword 64) 4 = mword_of_int (KernelSyms.kalloc + 0x2e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2e) in "Hpc".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x2e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7d0 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.kalloc + 0x2e)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 0x7d0 : mword 12)
                 R10 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2e [-]").
       iApply wp_next_off_intro.
@@ -534,7 +534,7 @@ Section ProofKalloc.
       iEval (rewrite Hpp32) in "Hpc".
       iPoseProof (kai_32 with "Htext") as "Hi32".
       (* +0x32 jal ra,release *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x32)) (mword_of_int 1 : mword 5) (mword_of_int 0x130 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kalloc + 0x32)) (mword_of_int 1 : mword 5) (mword_of_int 0x130 : mword 21)
                 R11 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi32 [-]").
       iApply wp_next_off_intro.
@@ -553,7 +553,7 @@ Section ProofKalloc.
       assert (HR12s1 : R12 !!! Regidx (mword_of_int 9 : mword 5) = pg).
       { rewrite /R12 /R11 /R10 /R9 /R8;
         repeat (rewrite upd_ne; [| vm_compute; discriminate]); exact Hs1R7. }
-      iApply (Release.wp_release_sconf Φ γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12
+      iApply (Release.wp_release_sconf γl (mword_of_int KernelSyms.kmem) "kmem"%string (kmem_res γk fl) R12
                 n eb p C (K - 4)%nat
                 ltac:(rewrite HR12a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -572,7 +572,7 @@ Section ProofKalloc.
       iPoseProof (kai_38 with "Htext") as "Hi38".
       iPoseProof (kai_3a with "Htext") as "Hi3a".
       (* +0x36 c.lui a2,0x1 (a2:=4096) *)
-      iApply (wp_clui_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x36)) (mword_of_int 12 : mword 5)
+      iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.kalloc + 0x36)) (mword_of_int 12 : mword 5)
                 (sign_extend' 20 (mword_of_int 1 : mword 6)) (mword_of_int 4096 : mword 64)
                 mr (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(unfold luival; apply bv_eq; vm_compute; reflexivity)
@@ -582,7 +582,7 @@ Section ProofKalloc.
       assert (Hpp38 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x36) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x38)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
       (* +0x38 c.li a1,5 *)
-      iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x38)) (mword_of_int 11 : mword 5)
+      iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kalloc + 0x38)) (mword_of_int 11 : mword 5)
                 (mword_of_int 5 : mword 6) (mword_of_int 5 : mword 64)
                 Mlui (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -592,7 +592,7 @@ Section ProofKalloc.
       assert (Hpp3a : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x38) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
       (* +0x3a c.mv a0,s1 (a0 := p) *)
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x3a)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kalloc + 0x3a)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                 Mli (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3a [-]").
       iIntros (CIDf3 Hsf3) "Hcg Hpc".
@@ -602,7 +602,7 @@ Section ProofKalloc.
       iEval (rewrite Hpp3c) in "Hpc".
       iPoseProof (kai_3c with "Htext") as "Hi3c".
       (* +0x3c jal ra,memset *)
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x3c)) (mword_of_int 1 : mword 5) (mword_of_int 0x15e : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kalloc + 0x3c)) (mword_of_int 1 : mword 5) (mword_of_int 0x15e : mword 21)
                 M3a (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3c [-]").
       iIntros (CIDf4 Hsf4) "Hcg Hpc".
@@ -639,7 +639,7 @@ Section ProofKalloc.
         rewrite /Mli upd_ne; [| vm_compute; discriminate].
         rewrite /Mlui upd_ne; [| vm_compute; discriminate].
         rewrite Hmrcsp. exact HR12csp. }
-      iApply (MemsetPage.wp_memset_page_sconf Φ Mms (K - 4)%nat (mword_of_int 5 : mword 64) b p
+      iApply (MemsetPage.wp_memset_page_sconf Mms (K - 4)%nat (mword_of_int 5 : mword 64) b p
                 ltac:(lia)
                 ltac:(rewrite HMmsa0; exact Hpv) HMmsa1 HMmsa2
                 with "Hcg Htext Hpc [Hpage] [-]").
@@ -660,7 +660,7 @@ Section ProofKalloc.
       iPoseProof (kai_48 with "Htext") as "Hi48".
       iPoseProof (kai_4a with "Htext") as "Hi4a".
       (* +0x40 c.mv a0,s1 (a0 := p) *)
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x40)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.kalloc + 0x40)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                 mfp (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi40 [-]").
       iIntros (CIDg1 Hsg1) "Hcg Hpc".
@@ -671,7 +671,7 @@ Section ProofKalloc.
       iEval (rewrite Hpp42) in "Hpc".
       iEval (rewrite HspR1) in "Hr24". iEval (rewrite HspR1) in "Hr16". iEval (rewrite HspR1) in "Hr8". iEval (rewrite HspR1) in "Hg4".
       (* +0x42 c.ldsp ra,24(sp) *)
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x42)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x42)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
                 Q41 (K - 4)%nat (R1 !!! Regidx (mword_of_int 1 : mword 5)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi42 [Hr24] [-]").
@@ -683,7 +683,7 @@ Section ProofKalloc.
       assert (Hpp44 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x42) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x44)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp44) in "Hpc".
       (* +0x44 c.ldsp s0,16(sp) *)
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x44)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x44)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
                 Q42 (K - 4)%nat (R1 !!! Regidx (mword_of_int 8 : mword 5)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi44 [Hr16] [-]").
@@ -695,7 +695,7 @@ Section ProofKalloc.
       assert (Hpp46 : add_vec_int (mword_of_int (KernelSyms.kalloc + 0x44) : mword 64) 2 = mword_of_int (KernelSyms.kalloc + 0x46)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp46) in "Hpc".
       (* +0x46 c.ldsp s1,8(sp) *)
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x46)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.kalloc + 0x46)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
                 Q43 (K - 4)%nat (R1 !!! Regidx (mword_of_int 9 : mword 5)) b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi46 [Hr8] [-]").
@@ -722,7 +722,7 @@ Section ProofKalloc.
         iSplitL "Hg4";  [iEval (rewrite -Hb4 HspR1); iExists _; iExact "Hg4"|].
         done. }
       iEval (rewrite -Hwv) in "Hframe4".
-      iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x48)) (mword_of_int 2 : mword 6) Q44 (K - 4)%nat 4 b Hpop
+      iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.kalloc + 0x48)) (mword_of_int 2 : mword 6) Q44 (K - 4)%nat 4 b Hpop
                 with "Hcg Hpc Hi48 Hframe4 [-]").
       iIntros (CIDg5 Hsg5) "Hcg Hpc".
       assert (Hnk : ((K - 4) + 4)%nat = K) by lia.
@@ -744,7 +744,7 @@ Section ProofKalloc.
         rewrite /Q42 upd_ne; [| vm_compute; discriminate].
         rewrite /Q41 upd_eq.
         rewrite Hfs1 HMmss1. apply add_vec_zero_l. }
-      iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.kalloc + 0x4a)) (mword_of_int 1 : mword 5) Q45 K b
+      iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.kalloc + 0x4a)) (mword_of_int 1 : mword 5) Q45 K b
                 ltac:(vm_compute; discriminate)
                 with "Hcg Hpc Hi4a [-]").
       iIntros (CIDg6 Hsg6) "Hcg Hpc".

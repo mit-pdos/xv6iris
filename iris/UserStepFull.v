@@ -41,7 +41,7 @@ Section UserStepFull.
   (* Produces the [wp_exec_step_minstret] payload (inlining the minstret   *)
   (* prelude + exec_riscv_step_interrupt + the trap tower + PC tick).      *)
   (* ------------------------------------------------------------------- *)
-  Lemma interrupt_branch (Ei : coPset) (Φ : mval -> iProp Σ)
+  Lemma interrupt_branch (Ei : coPset)
       (σ : mstate) (i : InterruptType)
       (ms_v sc_v stval_v sepc_v va : mword 64) (g : regfile)
       (mst : mword 64) (mi : bool) (misa0 : type_of_register misa) (elpv : mword 1)
@@ -211,7 +211,7 @@ Section UserStepFull.
   Proof.
     iIntros "#Hhw #Hmin #Hwinv #Hclass".
     iIntros "!>" (ms_v sc_v stval_v sepc_v va g) "%Hmsok Hregs Hupt Hcfg Hk".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ with "Hmin").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) with "Hmin").
     iIntros (σ) "Hint Hbody".
     (* borrow the wires: open [wire_inv] (E∖minstretN -> E∖minstretN∖wireN)
        and peel the ambient hart's pin cells *)
@@ -247,7 +247,7 @@ Section UserStepFull.
     - (* pending interrupt: trap to stvec *)
       pose proof (u_dispatch_Supervisor _ _ _ _ _ _ _ Hd) as ->.
       iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-      iMod (interrupt_branch (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ σ i
+      iMod (interrupt_branch (⊤ ∖ ↑minstretN ∖ ↑wireN) σ i
               ms_v sc_v stval_v sepc_v va g mst mi misa0 elp0 meip seip
               Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
               Lmip Lmeip Lseip Lmie Lmdl Hd

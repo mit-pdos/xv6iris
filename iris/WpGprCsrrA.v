@@ -217,7 +217,7 @@ Section WpCsrrMhartidGpr.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_csrr_mhartid_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_mhartid_gpr (pc : mword 64) (rd : mword 5)
       (mhartid_in : mword 64) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -247,7 +247,7 @@ Section WpCsrrMhartidGpr.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -325,7 +325,7 @@ Section WpCsrrGprA.
      chain can only ever hand this WP a FRACTION of the cell (the half it
      kept outside its working bundle to pin the value).  Only the value is
      read, so any fraction works. *)
-  Lemma wp_csrr_mstatus_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_mstatus_gpr (pc : mword 64) (rd : mword 5)
       (mstatus_in : mword 64) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) {dqm : dfrac} :
     pmp_allows_all pmpcfg0 ->
@@ -355,7 +355,7 @@ Section WpCsrrGprA.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_mstatus, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_mstatus, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -407,7 +407,7 @@ Section WpCsrrGprA.
   Qed.
 
   (* mcounteren (0x306): Ext_U-gated; misa.U recovered from hw_config. *)
-  Lemma wp_csrr_mcounteren_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_mcounteren_gpr (pc : mword 64) (rd : mword 5)
       (mcen_in : mword 32) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -436,7 +436,7 @@ Section WpCsrrGprA.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

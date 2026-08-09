@@ -132,7 +132,7 @@ Section WpMulGpr.
      run the register-generic execute, and rebuild the file.  Sources may be x0
      ([gpr_pt_value] reads them uniformly); [rd <> 0] is kept (write to x0 is a
      no-op, and [exec_execute_MUL_gpr] assumes it). *)
-  Lemma wp_mul_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 rd : mword 5)
+  Lemma wp_mul_gpr (pc : mword 64) (rs2 rs1 rd : mword 5)
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
@@ -156,7 +156,7 @@ Section WpMulGpr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hcont".
-    iApply (wp_instr Φ pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) pmpcfg0
+    iApply (wp_instr pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) pmpcfg0
               Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

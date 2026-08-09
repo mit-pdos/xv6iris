@@ -91,7 +91,6 @@ Definition K_log_write : nat := 18%nat.
 Definition wp_log_write_gen_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -165,7 +164,6 @@ Definition wp_log_write_gen_body
 Definition wp_log_write_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names) (γd : disk_names)
     (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -231,9 +229,7 @@ Module Type LOG_WRITE.
      neither knows nor cares which blocks this op has logged -- is unchanged. *)
   Parameter wp_log_write_gen :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (bn : bio_names)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
@@ -241,20 +237,18 @@ Module Type LOG_WRITE.
       (cr : bool) (Sb : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
-      wp_log_write_gen_body Φ bn γ γfs γd cov logstart dev k pidv bno
+      wp_log_write_gen_body bn γ γfs γd cov logstart dev k pidv bno
                             bs bsl bsd d u cr Sb m n eb p C K b.
 
   Parameter wp_log_write_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (bn : bio_names)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names)
       (γ : log_names) (γfs : fs_names) (γd : disk_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (k : nat) (pidv bno : mword 32)
       (bs bsl bsd : list (bv 8)) (d : bool) (u : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
-      wp_log_write_sconf_body Φ bn γ γfs γd cov logstart dev k pidv bno
+      wp_log_write_sconf_body bn γ γfs γd cov logstart dev k pidv bno
                               bs bsl bsd d u m n eb p C K b.
 End LOG_WRITE.

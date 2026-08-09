@@ -609,8 +609,7 @@ Section VdrwdLeaves.
      for the USED index is run alongside (read-only, immediately closed) to
      export the window fact [nr <= np], which [disk_res] does not carry and
      the ring-slot freshness argument needs. ---- *)
-  Lemma wp_vdrwd_lhu_avail (γu : uart_names) (γd : disk_names) (pme : Arch.pa)
-      (Φ : mval -> iProp Σ) (pd pav pu : mword 64)
+  Lemma wp_vdrwd_lhu_avail (γu : uart_names) (γd : disk_names) (pme : Arch.pa) (pd pav pu : mword 64)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (np nr : nat) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pav 2%nat : mword 64) ->
@@ -643,7 +642,7 @@ Section VdrwdLeaves.
     assert (Hcan2 : forall j, (j < 2)%nat ->
               (uint (pa_add (pa_add pav 2%nat) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add. exact (Hcana (2 + j)%nat (vdrwd_two_add_lt j Hj)). }
-    iApply (wp_load_s_sconf_au 2 false true Φ pc rd rs1 imm m n
+    iApply (wp_load_s_sconf_au 2 false true pc rd rs1 imm m n
               (fun w => zero_extend' 64 w)
               (fun w => (⌜w = wrap16 np⌝ ∗ ⌜(nr <= np)%nat⌝ ∗ disk_pub γd np)%I)
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false (dqm := DfracOwn 1)
@@ -686,8 +685,7 @@ Section VdrwdLeaves.
      writable footprint go into the DMA lease, the disk fragments become the
      slot's pending resource, and what comes back is the bumped publisher
      credential plus the RECEIPT. ---- *)
-  Lemma wp_vdrwd_sh_publish (γu : uart_names) (γd : disk_names) (pme : Arch.pa)
-      (Φ : mval -> iProp Σ) (pd pav pu : mword 64)
+  Lemma wp_vdrwd_sh_publish (γu : uart_names) (γd : disk_names) (pme : Arch.pa) (pd pav pu : mword 64)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (np : nat) (sl : vslot) (pin wrb : _) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pav 2%nat : mword 64) ->
@@ -721,7 +719,7 @@ Section VdrwdLeaves.
     assert (Hcan2 : forall j, (j < 2)%nat ->
               (uint (pa_add (pa_add pav 2%nat) j : SailStdpp.Values.mword 64) < 274877906944)%Z).
     { intros j Hj. rewrite pa_add_add. exact (Hcana (2 + j)%nat (vdrwd_two_add_lt j Hj)). }
-    iApply (wp_store_s_sconf_au 2 false Φ pc rs2 rs1 imm m n
+    iApply (wp_store_s_sconf_au 2 false pc rs2 rs1 imm m n
               (wrap16 (S np) : SailStdpp.Values.mword 16)
               (disk_pub γd (S np) ∗ disk_receipt γd np sl pin)%I
               (⊤ ∖ ↑minstretN ∖ ↑diskN) false
@@ -1426,7 +1424,7 @@ Section VdrwdP4.
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
 
   Lemma wp_vdrw_p4 (kq : nat * positive)
-      (γu : uart_names) (γd : disk_names) (Φ : mval -> iProp Σ) (pme : Arch.pa)
+      (γu : uart_names) (γd : disk_names) (pme : Arch.pa)
       (M : regfile) (av : nat)
       (pd pav pu : SailStdpp.Values.mword 64) (b : Arch.pa)
       (wr sector : SailStdpp.Values.mword 64)
@@ -1507,7 +1505,7 @@ Section VdrwdP4.
     assert (Hava : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
                    = (d_avail_ptr : SailStdpp.Values.mword 64))
       by (rewrite Ha5; apply vdrwd_avail_ptr_addr).
-    iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) Ra3 Ra5
+    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) Ra3 Ra5
               (mword_of_int 8 : mword 12) M av pav false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi162 [] [-]").
@@ -1529,7 +1527,7 @@ Section VdrwdP4.
     assert (Hidxa : add_vec (rget N1 Ra3) (sign_extend' 64 (mword_of_int 2 : mword 12))
                     = (pa_add pav 2%nat : SailStdpp.Values.mword 64))
       by (rgall; rewrite HN1a3; apply vdrwd_idx_addr).
-    iApply (wp_vdrwd_lhu_avail γu γd pme Φ pd pav pu
+    iApply (wp_vdrwd_lhu_avail γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x164) : mword 64) Ra4 Ra3
               (mword_of_int 2 : mword 12) N1 av np nr Hidxa
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1563,7 +1561,7 @@ Section VdrwdP4.
                  with "Hring") as "[Hcell Hring]".
     iDestruct "Hcell" as (w0) "Hcell".
     (* ---- +0x168  c.andi a4,a4,7 ---- *)
-    iApply (wp_candi_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x168) : mword 64) Ra4
+    iApply (wp_candi_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x168) : mword 64) Ra4
               (mword_of_int 7 : mword 6) N2 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi168 [-]").
@@ -1589,7 +1587,7 @@ Section VdrwdP4.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x16a)) by pcstep.
     iEval (rewrite Hp16a) in "Hpc".
     (* ---- +0x16a  c.slli a4,a4,1 ---- *)
-    iApply (wp_cslli_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x16a) : mword 64)
+    iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x16a) : mword 64)
               (Regidx Ra4) Ra4 (mword_of_int 1 : mword 6) N3 av false
               eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16a [-]").
@@ -1616,7 +1614,7 @@ Section VdrwdP4.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x16c)) by pcstep.
     iEval (rewrite Hp16c) in "Hpc".
     (* ---- +0x16c  c.add a3,a3,a4 ---- *)
-    iApply (wp_cadd_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x16c) : mword 64) Ra3 Ra4 N4 av false
+    iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x16c) : mword 64) Ra3 Ra4 N4 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16c [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1641,7 +1639,7 @@ Section VdrwdP4.
                       (sign_extend' 64 (mword_of_int 4 : mword 12))
                     = (d_ring pav (np `mod` 8) : SailStdpp.Values.mword 64))
       by (rewrite HN5a3; apply vdrwd_ring_addr).
-    iApply (wp_sh_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x16e) : mword 64) Ra0 Ra3
+    iApply (wp_sh_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x16e) : mword 64) Ra0 Ra3
               (mword_of_int 4 : mword 12) N5 av w0 false with "Hcg Hpc Hi16e [Hcell] [-]").
     { rgall. iEval (rewrite Hring). iExact "Hcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell". rgall.
@@ -1650,7 +1648,7 @@ Section VdrwdP4.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x172)) by pcstep.
     iEval (rewrite Hp172) in "Hpc".
     (* ---- +0x172  fence rw,rw ---- *)
-    iApply (wp_fence_gen_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x172) : mword 64)
+    iApply (wp_fence_gen_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x172) : mword 64)
               (mword_of_int 0) (mword_of_int 15) (mword_of_int 15)
               (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) N5 av false
               with "Hcg Hpc Hi172 [-]").
@@ -1662,7 +1660,7 @@ Section VdrwdP4.
     assert (Hava2 : add_vec (N5 !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 8 : mword 12))
                     = (d_avail_ptr : SailStdpp.Values.mword 64))
       by (rewrite HN5a5; apply vdrwd_avail_ptr_addr).
-    iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) Ra4 Ra5
+    iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x176) : mword 64) Ra4 Ra5
               (mword_of_int 8 : mword 12) N5 av pav false (dqm := DfracDiscarded)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi176 [] [-]").
@@ -1680,7 +1678,7 @@ Section VdrwdP4.
                        (sign_extend' 64 (mword_of_int 2 : mword 12))
                      = (pa_add pav 2%nat : SailStdpp.Values.mword 64))
       by (rgall; rewrite HN6a4; apply vdrwd_idx_addr).
-    iApply (wp_vdrwd_lhu_avail γu γd pme Φ pd pav pu
+    iApply (wp_vdrwd_lhu_avail γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x178) : mword 64) Ra5 Ra4
               (mword_of_int 2 : mword 12) N6 av np nr Hidxa2
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1700,7 +1698,7 @@ Section VdrwdP4.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x17c)) by pcstep.
     iEval (rewrite Hp17c) in "Hpc".
     (* ---- +0x17c  c.addiw a5,a5,1 ---- *)
-    iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x17c) : mword 64) Ra5
+    iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x17c) : mword 64) Ra5
               (mword_of_int 1 : mword 6) N7 av false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi17c [-]").
@@ -1737,7 +1735,7 @@ Section VdrwdP4.
                        (sign_extend' 64 (mword_of_int 2 : mword 12))
                      = (pa_add pav 2%nat : SailStdpp.Values.mword 64))
       by (rgall; rewrite HN8a4; apply vdrwd_idx_addr).
-    iApply (wp_vdrwd_sh_publish γu γd pme Φ pd pav pu
+    iApply (wp_vdrwd_sh_publish γu γd pme pd pav pu
               (mword_of_int (KernelSyms.virtio_disk_rw + 0x17e) : mword 64) Ra5 Ra4
               (mword_of_int 2 : mword 12) N8 av np
               (vdrwd_slot kq b h wr sector (vdrwd_sldata wr bs_buf bs_disk)) pin wrb
@@ -1763,7 +1761,7 @@ Section VdrwdP4.
                     = mword_of_int (KernelSyms.virtio_disk_rw + 0x182)) by pcstep.
     iEval (rewrite Hp182) in "Hpc".
     (* ---- +0x182  fence rw,rw ---- *)
-    iApply (wp_fence_gen_s_sconf Φ (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64)
+    iApply (wp_fence_gen_s_sconf (mword_of_int (KernelSyms.virtio_disk_rw + 0x182) : mword 64)
               (mword_of_int 0) (mword_of_int 15) (mword_of_int 15)
               (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) N8 av false
               with "Hcg Hpc Hi182 [-]").

@@ -650,7 +650,7 @@ Section WpCsrwGprNewC.
      receives the same raw cells with mstatus at the EXPLICIT legalized
      value -- no re-quantification over a hidden old value, so the chain
      keeps a single mstatus symbol end-to-end. ---- *)
-  Lemma wp_csrw_mstatus_raw (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_mstatus_raw (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (ms0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
@@ -675,7 +675,7 @@ Section WpCsrwGprNewC.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_config Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
+    iApply (wp_instr_config pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 Hpmp HmIE Hstat
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
@@ -731,7 +731,7 @@ Section WpCsrwGprNewC.
      touch mstatus), so a chain that pins the value across the write keeps
      it without a fresh existential.  pmpcfg_n itself is FULL (it is the
      written cell); the continuation receives the concrete written value. ---- *)
-  Lemma wp_csrw_pmpcfg0_raw (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_pmpcfg0_raw (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (ms0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
@@ -756,7 +756,7 @@ Section WpCsrwGprNewC.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_config Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
+    iApply (wp_instr_config pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 Hpmp HmIE Hstat
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".

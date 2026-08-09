@@ -85,8 +85,7 @@ Definition ssc_post (f g s : nat -> bv 8) (n k : nat) : Prop :=
   ((k + 1 < n)%nat -> s (k + 1)%nat = (mword_of_int 0 : mword 8)) /\
   (forall j, (k + 1 < j)%nat -> (j < n)%nat -> s j = g j).
 
-Definition wp_safestrcpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (mm : regfile)
+Definition wp_safestrcpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
     (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.safestrcpy in
   let s := mm !!! Regidx (mword_of_int 10 : mword 5) in
@@ -116,8 +115,7 @@ Definition wp_safestrcpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CI
 
 Module Type SAFESTRCPY.
   Parameter wp_safestrcpy_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (mm : regfile)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
-      wp_safestrcpy_sconf_body Φ mm n f g K dq b p.
+      wp_safestrcpy_sconf_body mm n f g K dq b p.
 End SAFESTRCPY.

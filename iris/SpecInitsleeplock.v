@@ -34,7 +34,6 @@ Import Defs.
 Definition sl_str_addr : mword 64 := mword_of_int 0x80007548.
 
 Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (m : regfile) (s : string)
     (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
     (av : nat) (b : bool) (p : mword 64) :=
@@ -75,10 +74,8 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN
 
 Module Type INITSLEEPLOCK.
   Parameter wp_initsleeplock_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (m : regfile) (s : string)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (s : string)
       (vlocked vlk vpid : mword 32) (vlkname vcpu vname : mword 64)
       (av : nat) (b : bool) (p : mword 64),
-      wp_initsleeplock_sconf_body Φ m s vlocked vlk vpid vlkname vcpu vname av b p.
+      wp_initsleeplock_sconf_body m s vlocked vlk vpid vlkname vcpu vname av b p.
 End INITSLEEPLOCK.

@@ -90,7 +90,7 @@ Section ProofKerneltrap.
     intros pcE ret_tgt Hlen Hav Hsc Hepal.
     iIntros "Hcg Hmir Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps #Hscheds Hproc Hclm Hcont".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
-    iApply (kt_pro Φ m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
+    iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
               with "Hcg Hmir Htext Hpc Hsepc Hscause [-]").
     iIntros (M ms0) "%HMsp %HMs2 %HMs1 %Hms0f %Hsie0 %Hspp0 %Hspie0 %Hthr
                      Hcg Hmir Hsepc Hscause Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6".
@@ -100,7 +100,7 @@ Section ProofKerneltrap.
     iDestruct "Hb6" as (v6) "Hb6".
     (* ---- +0x2a: jal devintr ---- *)
     iPoseProof (kti_2a with "Htext") as "Hi2a".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x2a)) ra_idx
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x2a)) ra_idx
               (mword_of_int 2096730 : mword 21) M (av - 6)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi2a [-]").
@@ -148,7 +148,7 @@ Section ProofKerneltrap.
     (* ---- +0x2e: c.beqz a0 -> printk/panic.  DEAD: devintr recognised the
        cause, so its return value is nonzero. ---- *)
     iPoseProof (kti_2e with "Htext") as "Hi2e".
-    iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x2e))
+    iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x2e))
               (mword_of_int 27 : mword 8) (Cregidx (mword_of_int 2)) a0_idx
               mdi (av - 6)%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -162,7 +162,7 @@ Section ProofKerneltrap.
     iEval (rewrite Hpc30) in "Hpc".
     (* ---- +0x30: c.li a5,2 ---- *)
     iPoseProof (kti_30 with "Htext") as "Hi30".
-    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x30)) a5_idx
+    iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x30)) a5_idx
               (mword_of_int 2 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6))))
               mdi (av - 6)%nat false
@@ -197,7 +197,7 @@ Section ProofKerneltrap.
     iPoseProof (kti_32 with "Htext") as "Hi32".
     destruct (decide (eq_vec (rget D1 a0_idx) (rget D1 a5_idx) = true)) as [Htim|Htim].
     - (* ===== the TIMER path ===== *)
-      iApply (wp_beq_taken_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x32))
+      iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x32))
                 (mword_of_int 84 : mword 13) a5_idx a0_idx D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Htim ltac:(vm_compute; reflexivity)
@@ -209,7 +209,7 @@ Section ProofKerneltrap.
       iEval (rewrite Hpc86) in "Hpc".
       (* ---- +0x86: jal myproc ---- *)
       iPoseProof (kti_86 with "Htext") as "Hi86".
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x86)) ra_idx
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x86)) ra_idx
                 (mword_of_int 2093546 : mword 21) D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi86 [-]").
@@ -234,7 +234,7 @@ Section ProofKerneltrap.
       assert (HD2thr : kt_thr m D2).
       { intros r Hr Hsp Hs0 Hs1 Hs2 Hs3.
         rewrite /D2 upd_ne; [| ktne_ra ]. apply HD1thr; assumption. }
-      iApply (Myproc.wp_myproc_sconf Φ D2 (av - 6)%nat 0 false p C false
+      iApply (Myproc.wp_myproc_sconf D2 (av - 6)%nat 0 false p C false
                 ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
                 with "Hcg Hcpu Htext Hpc [-]").
@@ -255,7 +255,7 @@ Section ProofKerneltrap.
       iPoseProof (kti_8a with "Htext") as "Hi8a".
       destruct (decide (eq_vec (rget mmp a0_idx) zero_reg = true)) as [Hp0|Hp0].
       + (* ----- no current proc: straight to the epilogue ----- *)
-        iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x8a))
+        iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x8a))
                   (mword_of_int 214 : mword 8) (Cregidx (mword_of_int 2)) a0_idx
                   mmp (av - 6)%nat false
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -266,7 +266,7 @@ Section ProofKerneltrap.
                          (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 214 : mword 8) ('b"0"))))
                        = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
         iEval (rewrite Hpcb) in "Hpc".
-        iApply (kt_epi Φ m mmp (m !!! Regidx csp_rs1)
+        iApply (kt_epi m mmp (m !!! Regidx csp_rs1)
                   (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s1_idx)
                   (m !!! Regidx s2_idx) (m !!! Regidx s3_idx) v6
                   ep ep ms0 (av - 6)%nat 0 C ('b"1") ('b"1")
@@ -285,7 +285,7 @@ Section ProofKerneltrap.
         { exact Hcsf. }
         { exact Hsppf. } { exact Hspief. } { exact Hsief. }
       + (* ----- there IS a current proc: yield, then the epilogue ----- *)
-        iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x8a))
+        iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x8a))
                   (mword_of_int 214 : mword 8) (Cregidx (mword_of_int 2)) a0_idx
                   mmp (av - 6)%nat false
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -308,7 +308,7 @@ Section ProofKerneltrap.
         iEval (rewrite -Hpj) in "Hcpu".
         (* ---- +0x8c: jal yield ---- *)
         iPoseProof (kti_8c with "Htext") as "Hi8c".
-        iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x8c)) ra_idx
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x8c)) ra_idx
                   (mword_of_int 2095042 : mword 21) mmp (av - 6)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi8c [-]").
@@ -375,7 +375,7 @@ Section ProofKerneltrap.
         assert (Hydthr : kt_thr m myd) by (apply (kt_thr_cs m Y0 myd HY0thr Hcs_yd)).
         (* ---- +0x90: c.j -> the epilogue ---- *)
         iPoseProof (kti_90 with "Htext") as "Hi90".
-        iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x90))
+        iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x90))
                   (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0")))
                   myd (av - 6)%nat false ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi90 [-]").
@@ -384,7 +384,7 @@ Section ProofKerneltrap.
                          (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2003 : mword 11) ('b"0"))))
                        = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
         iEval (rewrite Hpcj) in "Hpc".
-        iApply (kt_epi Φ m myd (m !!! Regidx csp_rs1)
+        iApply (kt_epi m myd (m !!! Regidx csp_rs1)
                   (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s1_idx)
                   (m !!! Regidx s2_idx) (m !!! Regidx s3_idx) v6
                   ep ep' ms0 (av - 6)%nat 0 C va vb
@@ -412,7 +412,7 @@ Section ProofKerneltrap.
            whole: the resumed thread is RUNNING again and holds half #2. *)
         { rewrite /cpu_claim_ext -Hpj. iExact "Hclm". }
     - (* ===== the NON-timer path: straight to the epilogue ===== *)
-      iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x32))
+      iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x32))
                 (mword_of_int 84 : mword 13) a5_idx a0_idx D1 (av - 6)%nat false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(apply not_true_iff_false; exact Htim)
@@ -421,7 +421,7 @@ Section ProofKerneltrap.
       assert (Hpc36 : add_vec_int (mword_of_int (KernelSyms.kerneltrap + 0x32) : mword 64) 4
                       = mword_of_int (KernelSyms.kerneltrap + 0x36)) by pcw.
       iEval (rewrite Hpc36) in "Hpc".
-      iApply (kt_epi Φ m D1 (m !!! Regidx csp_rs1)
+      iApply (kt_epi m D1 (m !!! Regidx csp_rs1)
                 (m !!! Regidx ra_idx) (m !!! Regidx s0_idx) (m !!! Regidx s1_idx)
                 (m !!! Regidx s2_idx) (m !!! Regidx s3_idx) v6
                 ep ep ms0 (av - 6)%nat 0 C ('b"1") ('b"1")

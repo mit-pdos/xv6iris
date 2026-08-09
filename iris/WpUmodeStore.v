@@ -440,7 +440,7 @@ Section UvRetirePostState.
      [translateAddr] may have filled the TLB -- so the caller establishes
      it, hands over [mstate_interp s_x] and the pinned cells, and this
      lemma does only the PC tick and the minstret bump. *)
-  Lemma uv_retire_post_state (CIDp : CpuId) (Phi : mval -> iProp Σ) (P : iProp Σ)
+  Lemma uv_retire_post_state (CIDp : CpuId) (P : iProp Σ)
       (sg s_x : mstate) (b : bool) (mst pc npc : mword 64) (ib : mword 32) :
     exec (should_inc_minstret (register_lookup cur_privilege sg.(sregs))) sg
       = Some (b, sg) ->
@@ -507,7 +507,7 @@ Section WpUmodeStore.
      assembly.  [Hprog] is the [uv_prog_rvc] / [uv_prog_base] witness the
      caller's geometry produced -- exactly the seam
      [uv_retire_post_fetch] uses. *)
-  Lemma uv_store_post_fetch (CIDp : CpuId) (Phi : mval -> iProp Σ) (P : iProp Σ)
+  Lemma uv_store_post_fetch (CIDp : CpuId) (P : iProp Σ)
       (sg sf : mstate) (b : bool) (mst pc : mword 64) (k : Z) (ib : mword 32)
       (m : regfile) (M : gmap Z (bv 8))
       (i : instruction) (o : option instruction)
@@ -642,7 +642,7 @@ Section WpUmodeStore.
     assert (Lnpcx : register_lookup nextPC s_x.(sregs) = add_vec_int pc k).
     { unfold s_x; cbn [sregs].
       rewrite (Tr2 nextPC ltac:(vm_compute; reflexivity)). exact Lnpcp. }
-    iApply (uv_retire_post_state CIDp Phi
+    iApply (uv_retire_post_state CIDp
               (P ∗ utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
                umem pt (uM_store8 M (uint tgt) wval) ∗ gpr_file m)%I
               sg s_x b mst pc (add_vec_int pc k) ib
@@ -668,7 +668,7 @@ Section WpUmodeStore.
   (* ------------------------------------------------------------------- *)
   Lemma wp_uv_csdsp (Psi : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
-      (w_st tgt wval : mword 64) (Phi : mval -> iProp Σ) :
+      (w_st tgt wval : mword 64) :
     uinstr pt M pc true (C_SDSP (uimm, Regidx rs2)) ->
     tgt = add_vec (m !!! Regidx csp_rs1)
             (sign_extend' 64 (zero_extend' 12 (concat_vec uimm ('b"000")))) ->
@@ -695,7 +695,7 @@ Section WpUmodeStore.
     iDestruct "Hcg" as "(#Hcap & Hlin & Hgprc)".
     iAssert (uv_cap_gpr C pt Psi M m) with "[Hlin Hgprc]" as "Hcg".
     { rewrite /uv_cap_gpr. iFrame "Hcap Hlin Hgprc". }
-    iApply (wp_uv_step C pt Psi M m pc Phi with "Hcg Hpc [Hcont]").
+    iApply (wp_uv_step C pt Psi M m pc with "Hcg Hpc [Hcont]").
     rewrite /uv_step_obl.
     iIntros (CID0 sg ms_v sc_v stval_v sepc_v)
       "%Hmsok %Lpriv %Lms %Lpc %Hdisp #Hamb Hhs Hpriv Hms Hsc Hstval Hsepc
@@ -812,7 +812,7 @@ Section WpUmodeStore.
       { rewrite ?mem_set_reg. iExact "Hmem". }
       destruct (Hsf sf Tr)
         as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
-      iApply (uv_store_post_fetch CID0 Phi True%I sg sf b mst pc 2
+      iApply (uv_store_post_fetch CID0 True%I sg sf b mst pc 2
                 (zero_extend' 32 h) m M
                 (C_SDSP (uimm, Regidx rs2))
                 (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),
@@ -849,7 +849,7 @@ Section WpUmodeStore.
       { rewrite ?mem_set_reg. iExact "Hmem". }
       destruct (Hsf sf Tr)
         as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lhtiff & Lmsf & Hpmaf).
-      iApply (uv_store_post_fetch CID0 Phi True%I sg sf b mst pc 2
+      iApply (uv_store_post_fetch CID0 True%I sg sf b mst pc 2
                 (zero_extend' 32 h) m M
                 (C_SDSP (uimm, Regidx rs2))
                 (Some (STORE (zero_extend' 12 (concat_vec uimm ('b"000")),

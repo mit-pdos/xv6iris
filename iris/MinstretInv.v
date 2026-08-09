@@ -432,7 +432,7 @@ Section MinstretInv.
          NOT needed for the witness, only for the post-step [state_interp] update);
        - fold the minstret bump into [state_interp σ'] and return a fresh
          [minstret_inv_body] to close the invariant. *)
-  Lemma wp_exec_step_minstret Ei (Φ : mval -> iProp Σ) :
+  Lemma wp_exec_step_minstret Ei :
     minstret_inv -∗
     (∀ σ, mstate_interp σ -∗ minstret_inv_body
          ={⊤ ∖ ↑minstretN, Ei}=∗
@@ -490,7 +490,7 @@ Section MinstretInv.
      [▷ WP Loop] hypothesis -- BEFORE the single [iNext] that discharges
      [wp_exec_step_minstret]'s [▷]; that [iNext] then strips the [Hcont]-produced
      later in lock-step with the step's, so no second later is needed. *)
-  Lemma wp_exec_step_hart_active_inv (Φ : mval -> iProp Σ) {dq : dfrac} :
+  Lemma wp_exec_step_hart_active_inv {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ,
@@ -506,7 +506,7 @@ Section MinstretInv.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
     iIntros (σ) "[Hreg Hmem] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.

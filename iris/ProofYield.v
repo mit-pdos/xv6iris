@@ -222,7 +222,7 @@ Section YieldPostSched.
     (* +0x1c: c.mv a0,s1 : a0 := s1 = proc_addr j -- lock still held, so the
        hart is PINNED and [wp_next_off] collapses the binder. *)
     iPoseProof (ydi_1c with "Htext") as "Hi1c".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.yield + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
               msch (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
     iApply wp_next_off_intro.
@@ -236,7 +236,7 @@ Section YieldPostSched.
     iEval (rewrite Hpc1e) in "Hpc".
     (* +0x1e: jal release *)
     iPoseProof (ydi_1e with "Htext") as "Hi1e".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2092430 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2092430 : mword 21)
               D0 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1e [-]").
@@ -281,7 +281,7 @@ Section YieldPostSched.
     iDestruct (cpu_claim_proc j Hj with "Hclm") as "Hclm".
     iEval (rewrite -(cpu_claim_ext_split eb pj)) in "Hclm".
     iDestruct "Hclm" as "[Hclmp Hclmx]".
-    iApply (Release.wp_release_sconf Φ γl (proc_addr j) "proc"%string
+    iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res Φ γs γl (proc_addr j)) D1 0 eb pj C (av - 4)%nat
               Hlka
               ltac:(lia)
@@ -309,7 +309,7 @@ Section YieldPostSched.
     iEval (rewrite Hb3) in "Hr8".
     (* +0x22: c.ldsp ra,24 *)
     iPoseProof (ydi_22 with "Htext") as "Hi22".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x22)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.yield + 0x22)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
               mrel (av - 4)%nat (m !!! Regidx (mword_of_int 1 : mword 5)) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [Hr24] [-]").
@@ -323,7 +323,7 @@ Section YieldPostSched.
       by (rewrite /E1 upd_ne; [exact Hcsp_mrel | vm_compute; discriminate]).
     (* +0x24: c.ldsp s0,16 *)
     iPoseProof (ydi_24 with "Htext") as "Hi24".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x24)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.yield + 0x24)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
               E1 (av - 4)%nat (m !!! Regidx (mword_of_int 8 : mword 5)) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [Hr16] [-]").
@@ -337,7 +337,7 @@ Section YieldPostSched.
       by (rewrite /E2 upd_ne; [exact HcspE1 | vm_compute; discriminate]).
     (* +0x26: c.ldsp s1,8 *)
     iPoseProof (ydi_26 with "Htext") as "Hi26".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x26)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.yield + 0x26)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
               E2 (av - 4)%nat (m !!! Regidx (mword_of_int 9 : mword 5)) eb
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26 [Hr8] [-]").
@@ -374,7 +374,7 @@ Section YieldPostSched.
       iSplitL "Hgap". { iExists _. iExact "Hgap". }
       done. }
     iEval (rewrite -Hwv) in "Hframe4".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x28)) (mword_of_int 2 : mword 6) E3 (av - 4)%nat 4 eb Hpop
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.yield + 0x28)) (mword_of_int 2 : mword 6) E3 (av - 4)%nat 4 eb Hpop
               with "Hcg Hpc Hi28 Hframe4 [-]").
     iIntros (CIDe4 Hse4) "Hcg Hpc".
     assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
@@ -390,7 +390,7 @@ Section YieldPostSched.
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1. apply upd_eq. }
     iPoseProof (ydi_2a with "Htext") as "Hi2a".
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x2a)) (mword_of_int 1 : mword 5) E4 av eb
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.yield + 0x2a)) (mword_of_int 1 : mword 5) E4 av eb
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi2a [-]").
     iIntros (CIDe5 Hse5) "Hcg Hpc".
@@ -489,7 +489,7 @@ Section ProofYield.
     assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (ydi_00 with "Htext") as "Hi00".
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m av 4 eb ltac:(lia) Hpush
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 eb ltac:(lia) Hpush
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
@@ -517,7 +517,7 @@ Section ProofYield.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* +0x02/0x04/0x06: c.sdsp ra/s0/s1 *)
     iPoseProof (ydi_02 with "Htext") as "Hi02".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.yield + 0x02)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
               A0 (av - 4)%nat vr24 eb with "Hcg Hpc Hi02 [Hr24] [-]").
     { iEval (rewrite HcspA0 -Hb1). iExact "Hr24". }
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
@@ -525,7 +525,7 @@ Section ProofYield.
     assert (Hpc04 : add_vec_int (mword_of_int (KernelSyms.yield + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.yield + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc04) in "Hpc".
     iPoseProof (ydi_04 with "Htext") as "Hi04".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.yield + 0x04)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
               A0 (av - 4)%nat vr16 eb with "Hcg Hpc Hi04 [Hr16] [-]").
     { iEval (rewrite HcspA0 -Hb2). iExact "Hr16". }
     iIntros (CID3 Hs3) "Hcg Hpc Hr16".
@@ -533,7 +533,7 @@ Section ProofYield.
     assert (Hpc06 : add_vec_int (mword_of_int (KernelSyms.yield + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.yield + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc06) in "Hpc".
     iPoseProof (ydi_06 with "Htext") as "Hi06".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.yield + 0x06)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
               A0 (av - 4)%nat vr8 eb with "Hcg Hpc Hi06 [Hr8] [-]").
     { iEval (rewrite HcspA0 -Hb3). iExact "Hr8". }
     iIntros (CID4 Hs4) "Hcg Hpc Hr8".
@@ -542,7 +542,7 @@ Section ProofYield.
     iEval (rewrite Hpc08) in "Hpc".
     (* +0x08: c.addi4spn s0,sp,32 *)
     iPoseProof (ydi_08 with "Htext") as "Hi08".
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.yield + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) (mword_of_int 8 : mword 5)
               A0 (av - 4)%nat eb
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
@@ -557,7 +557,7 @@ Section ProofYield.
     (* +0x0a: jal myproc -> a0 = proc_addr j; noff/intena/cur_proc round.  *)
     (* ------------------------------------------------------------------ *)
     iPoseProof (ydi_0a with "Htext") as "Hi0a".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095640 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x0a)) (mword_of_int 1 : mword 5) (mword_of_int 2095640 : mword 21)
               A1 (av - 4)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0a [-]").
@@ -571,7 +571,7 @@ Section ProofYield.
       by (rewrite /A2 upd_eq; reflexivity).
     iDestruct (cpu_own_transport CID CID6 0 eb pj C eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Myproc.wp_myproc_sconf Φ A2 (av - 4)%nat 0 eb pj C eb
+    iApply (Myproc.wp_myproc_sconf A2 (av - 4)%nat 0 eb pj C eb
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
@@ -582,7 +582,7 @@ Section ProofYield.
     iEval (rewrite Hpc0e) in "Hpc".
     (* +0x0e: c.mv s1,a0 : s1 := a0 = proc_addr j *)
     iPoseProof (ydi_0e with "Htext") as "Hi0e".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x0e)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.yield + 0x0e)) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
               mp (av - 4)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
@@ -595,7 +595,7 @@ Section ProofYield.
     iEval (rewrite Hpc10) in "Hpc".
     (* +0x10: jal acquire *)
     iPoseProof (ydi_10 with "Htext") as "Hi10".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x10)) (mword_of_int 1 : mword 5) (mword_of_int 2092308 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x10)) (mword_of_int 1 : mword 5) (mword_of_int 2092308 : mword 21)
               B0 (av - 4)%nat eb
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi10 [-]").
@@ -616,7 +616,7 @@ Section ProofYield.
     iPoseProof (procs_inv_lookup Φ γs j γl Hgl with "Hprocs") as "#Hislock".
     iDestruct (cpu_own_transport CID7 CID9 0 eb pj C eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Acquire.wp_acquire_sconf Φ γl "proc"%string
+    iApply (Acquire.wp_acquire_sconf γl "proc"%string
               (proc_lock_res Φ γs γl (proc_addr j)) B1 0 eb pj C (av - 4)%nat eb
               ltac:(lia)
               ltac:(lia)
@@ -650,7 +650,7 @@ Section ProofYield.
     { rewrite unclaimed_RUNNING. iFrame "Hpg Hclm". }
     (* +0x14: c.li a5,3 *)
     iPoseProof (ydi_14 with "Htext") as "Hi14".
-    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 3 : mword 6)
+    iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.yield + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 3 : mword 6)
               (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6)))) macq (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
               with "Hcg Hpc Hi14 [-]").
@@ -680,7 +680,7 @@ Section ProofYield.
       by (rgne; exact Hsv).
     (* +0x16: c.sw a5,24(s1) : p->state := RUNNABLE *)
     iPoseProof (ydi_16 with "Htext") as "Hi16".
-    iApply (wp_csw_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
+    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.yield + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
               (mword_of_int 24 : mword 12) C0 (av - 4)%nat RUNNING false
               with "Hcg Hpc Hi16 [Hstate] [-]").
     { iEval (rewrite Hrec_state_g). iExact "Hstate". }
@@ -691,7 +691,7 @@ Section ProofYield.
     iEval (rewrite Hpc18) in "Hpc".
     (* +0x18: jal sched *)
     iPoseProof (ydi_18 with "Htext") as "Hi18".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.yield + 0x18)) (mword_of_int 1 : mword 5) (mword_of_int 2096940 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x18)) (mword_of_int 1 : mword 5) (mword_of_int 2096940 : mword 21)
               C0 (av - 4)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").

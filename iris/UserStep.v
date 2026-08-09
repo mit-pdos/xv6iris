@@ -370,7 +370,7 @@ Section UserStepIris.
   (* axiom -- both branches step, so the arm is total.  The continuation   *)
   (* is an ADDITIVE conjunction: stay / wake.                              *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_user_step_waiting (Φ : mval -> iProp Σ) (wr : WaitReason) (ib : mword 32)
+  Lemma wp_user_step_waiting (wr : WaitReason) (ib : mword 32)
       (mip_v mie_v : mword 64) (va va' : mword 64) {dqp dqi : dfrac} :
     wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO ->
     minstret_inv -∗
@@ -388,7 +388,7 @@ Section UserStepIris.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hwr) "#Hinv Hhs Hpc Hnpc Hmip Hmie Hcont".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
     iIntros (σ) "[Hreg Hmd] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
@@ -544,7 +544,7 @@ Section UserStepObligation.
       iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
                              Hpc & Hnpc & Hgpr)".
       iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
-      iApply (wp_user_step_waiting Φ wr ib (uc_mip C) (uc_mie C) va va' Hhs
+      iApply (wp_user_step_waiting wr ib (uc_mip C) (uc_mie C) va va' Hhs
                 with "Hminstret Hhs Hpc Hnpc Hmip Hmie [-]").
       iNext. iSplit.
       + (* STAY: re-enter [user_inv] with the same waiting machine *)

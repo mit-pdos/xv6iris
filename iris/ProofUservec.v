@@ -45,14 +45,13 @@ Section UservecAllPt.
   Qed.
 
   Lemma wp_uservec_pt (C : ucfg) (pt : uptd) (kroot : mword 44)
-      (Φ : mval -> iProp Σ)
       (sscr0 : mword 64)
       (vksat vksp vktr vkhart : bv 64)
       (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
        w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
        w272 w280 w112 : bv 64)
       (dqk : dfrac) :
-    wp_uservec_pt_body C pt kroot Φ sscr0 vksat vksp vktr vkhart
+    wp_uservec_pt_body C pt kroot sscr0 vksat vksp vktr vkhart
       w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
         w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
         w272 w280 w112 dqk.
@@ -139,7 +138,7 @@ Section UservecAllPt.
     iPoseProof (uvi_sfence2 with "Hkt") as "Hi_sf2".
     iPoseProof (uvi_cjalr_t0 with "Hkt") as "Hi_cjalr".
     (* ---- csrw sscratch, a0 @ 0x00 ---- *)
-    iApply (wp_ucsrw_sscratch_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x00 false (mword_of_int 10) g sscr0
+    iApply (wp_ucsrw_sscratch_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x00 false (mword_of_int 10) g sscr0
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -159,7 +158,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x00) in "Hpc".
     (* ---- lui a0, 0x2000 @ 0x04 ---- *)
-    iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x04 false ai_lui g
+    iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x04 false ai_lui g
               (g !!! Regidx (mword_of_int 10) : mword 64)
               (mword_of_int 33554432 : mword 64)
               (fun _ : mstate => luival (mword_of_int 0x2000))
@@ -189,7 +188,7 @@ Section UservecAllPt.
                     = regval_into_reg (mword_of_int 33554432 : mword 64))
       by (apply upd_eq).
     (* ---- c.addiw a0, -1 @ 0x08 ---- *)
-    iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x08 true ai_addiw (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> g)
+    iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x08 true ai_addiw (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> g)
               (regval_into_reg (mword_of_int 33554432 : mword 64))
               (mword_of_int 33554431 : mword 64)
               (gpr_addiw_val (mword_of_int 10) (sign_extend' 12 (mword_of_int 63 : mword 6)))
@@ -222,7 +221,7 @@ Section UservecAllPt.
                     = regval_into_reg (mword_of_int 33554431 : mword 64))
       by (apply upd_eq).
     (* ---- c.slli a0, 13 @ 0x0a ---- *)
-    iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x0a true ai_slli (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> g))
+    iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x0a true ai_slli (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> g))
               (regval_into_reg (mword_of_int 33554431 : mword 64))
               (mword_of_int TRAPFRAME : mword 64)
               (gpr_slli_val (mword_of_int 10) (mword_of_int 13))
@@ -351,7 +350,7 @@ Section UservecAllPt.
     { unfold M2. rewrite upd_ne; [reflexivity |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- sd x1, 40(a0) @ 0x0c ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x0c 40 (mword_of_int 1) false M2 (w40 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x0c 40 (mword_of_int 1) false M2 (w40 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -378,7 +377,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x0c) in "Hpc".
     (* ---- sd x2, 48(a0) @ 0x10 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x10 48 (mword_of_int 2) false M2 (w48 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x10 48 (mword_of_int 2) false M2 (w48 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -405,7 +404,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x10) in "Hpc".
     (* ---- sd x3, 56(a0) @ 0x14 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x14 56 (mword_of_int 3) false M2 (w56 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x14 56 (mword_of_int 3) false M2 (w56 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -432,7 +431,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x14) in "Hpc".
     (* ---- sd x4, 64(a0) @ 0x18 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x18 64 (mword_of_int 4) false M2 (w64 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x18 64 (mword_of_int 4) false M2 (w64 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -459,7 +458,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x18) in "Hpc".
     (* ---- sd x5, 72(a0) @ 0x1c ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x1c 72 (mword_of_int 5) false M2 (w72 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x1c 72 (mword_of_int 5) false M2 (w72 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -486,7 +485,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x1c) in "Hpc".
     (* ---- sd x6, 80(a0) @ 0x20 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x20 80 (mword_of_int 6) false M2 (w80 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x20 80 (mword_of_int 6) false M2 (w80 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -513,7 +512,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x20) in "Hpc".
     (* ---- sd x7, 88(a0) @ 0x24 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x24 88 (mword_of_int 7) false M2 (w88 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x24 88 (mword_of_int 7) false M2 (w88 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -541,7 +540,7 @@ Section UservecAllPt.
     iEval (rewrite Hpcx_0x24) in "Hpc".
     iEval (change (uvai_csd_tgt 0 12) with (uvai_sd 8 96)) in "Hi_csd_s0".
     (* ---- sd x8, 96(a0) @ 0x28 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x28 96 (mword_of_int 8) true M2 (w96 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x28 96 (mword_of_int 8) true M2 (w96 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -569,7 +568,7 @@ Section UservecAllPt.
     iEval (rewrite Hpcx_0x28) in "Hpc".
     iEval (change (uvai_csd_tgt 1 13) with (uvai_sd 9 104)) in "Hi_csd_s1".
     (* ---- sd x9, 104(a0) @ 0x2a ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x2a 104 (mword_of_int 9) true M2 (w104 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x2a 104 (mword_of_int 9) true M2 (w104 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -597,7 +596,7 @@ Section UservecAllPt.
     iEval (rewrite Hpcx_0x2a) in "Hpc".
     iEval (change (uvai_csd_tgt 3 15) with (uvai_sd 11 120)) in "Hi_csd_a1".
     (* ---- sd x11, 120(a0) @ 0x2c ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x2c 120 (mword_of_int 11) true M2 (w120 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x2c 120 (mword_of_int 11) true M2 (w120 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -625,7 +624,7 @@ Section UservecAllPt.
     iEval (rewrite Hpcx_0x2c) in "Hpc".
     iEval (change (uvai_csd_tgt 4 16) with (uvai_sd 12 128)) in "Hi_csd_a2".
     (* ---- sd x12, 128(a0) @ 0x2e ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x2e 128 (mword_of_int 12) true M2 (w128 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x2e 128 (mword_of_int 12) true M2 (w128 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -653,7 +652,7 @@ Section UservecAllPt.
     iEval (rewrite Hpcx_0x2e) in "Hpc".
     iEval (change (uvai_csd_tgt 5 17) with (uvai_sd 13 136)) in "Hi_csd_a3".
     (* ---- sd x13, 136(a0) @ 0x30 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x30 136 (mword_of_int 13) true M2 (w136 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x30 136 (mword_of_int 13) true M2 (w136 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -681,7 +680,7 @@ Section UservecAllPt.
     iEval (rewrite Hpcx_0x30) in "Hpc".
     iEval (change (uvai_csd_tgt 6 18) with (uvai_sd 14 144)) in "Hi_csd_a4".
     (* ---- sd x14, 144(a0) @ 0x32 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x32 144 (mword_of_int 14) true M2 (w144 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x32 144 (mword_of_int 14) true M2 (w144 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -709,7 +708,7 @@ Section UservecAllPt.
     iEval (rewrite Hpcx_0x32) in "Hpc".
     iEval (change (uvai_csd_tgt 7 19) with (uvai_sd 15 152)) in "Hi_csd_a5".
     (* ---- sd x15, 152(a0) @ 0x34 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x34 152 (mword_of_int 15) true M2 (w152 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x34 152 (mword_of_int 15) true M2 (w152 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -736,7 +735,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x34) in "Hpc".
     (* ---- sd x16, 160(a0) @ 0x36 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x36 160 (mword_of_int 16) false M2 (w160 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x36 160 (mword_of_int 16) false M2 (w160 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -763,7 +762,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x36) in "Hpc".
     (* ---- sd x17, 168(a0) @ 0x3a ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x3a 168 (mword_of_int 17) false M2 (w168 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x3a 168 (mword_of_int 17) false M2 (w168 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -790,7 +789,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x3a) in "Hpc".
     (* ---- sd x18, 176(a0) @ 0x3e ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x3e 176 (mword_of_int 18) false M2 (w176 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x3e 176 (mword_of_int 18) false M2 (w176 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -817,7 +816,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x3e) in "Hpc".
     (* ---- sd x19, 184(a0) @ 0x42 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x42 184 (mword_of_int 19) false M2 (w184 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x42 184 (mword_of_int 19) false M2 (w184 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -844,7 +843,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x42) in "Hpc".
     (* ---- sd x20, 192(a0) @ 0x46 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x46 192 (mword_of_int 20) false M2 (w192 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x46 192 (mword_of_int 20) false M2 (w192 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -871,7 +870,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x46) in "Hpc".
     (* ---- sd x21, 200(a0) @ 0x4a ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x4a 200 (mword_of_int 21) false M2 (w200 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x4a 200 (mword_of_int 21) false M2 (w200 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -898,7 +897,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x4a) in "Hpc".
     (* ---- sd x22, 208(a0) @ 0x4e ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x4e 208 (mword_of_int 22) false M2 (w208 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x4e 208 (mword_of_int 22) false M2 (w208 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -925,7 +924,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x4e) in "Hpc".
     (* ---- sd x23, 216(a0) @ 0x52 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x52 216 (mword_of_int 23) false M2 (w216 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x52 216 (mword_of_int 23) false M2 (w216 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -952,7 +951,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x52) in "Hpc".
     (* ---- sd x24, 224(a0) @ 0x56 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x56 224 (mword_of_int 24) false M2 (w224 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x56 224 (mword_of_int 24) false M2 (w224 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -979,7 +978,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x56) in "Hpc".
     (* ---- sd x25, 232(a0) @ 0x5a ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x5a 232 (mword_of_int 25) false M2 (w232 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x5a 232 (mword_of_int 25) false M2 (w232 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -1006,7 +1005,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x5a) in "Hpc".
     (* ---- sd x26, 240(a0) @ 0x5e ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x5e 240 (mword_of_int 26) false M2 (w240 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x5e 240 (mword_of_int 26) false M2 (w240 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -1033,7 +1032,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x5e) in "Hpc".
     (* ---- sd x27, 248(a0) @ 0x62 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x62 248 (mword_of_int 27) false M2 (w248 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x62 248 (mword_of_int 27) false M2 (w248 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -1060,7 +1059,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x62) in "Hpc".
     (* ---- sd x28, 256(a0) @ 0x66 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x66 256 (mword_of_int 28) false M2 (w256 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x66 256 (mword_of_int 28) false M2 (w256 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -1087,7 +1086,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x66) in "Hpc".
     (* ---- sd x29, 264(a0) @ 0x6a ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x6a 264 (mword_of_int 29) false M2 (w264 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x6a 264 (mword_of_int 29) false M2 (w264 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -1114,7 +1113,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x6a) in "Hpc".
     (* ---- sd x30, 272(a0) @ 0x6e ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x6e 272 (mword_of_int 30) false M2 (w272 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x6e 272 (mword_of_int 30) false M2 (w272 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -1141,7 +1140,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x6e) in "Hpc".
     (* ---- sd x31, 280(a0) @ 0x72 ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x72 280 (mword_of_int 31) false M2 (w280 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x72 280 (mword_of_int 31) false M2 (w280 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_2
@@ -1168,7 +1167,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x72) in "Hpc".
     (* ---- csrr t0, sscratch @ 0x76 ---- *)
-    iApply (wp_ucsrr_sscratch_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x76 false (mword_of_int 5) M2
+    iApply (wp_ucsrr_sscratch_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x76 false (mword_of_int 5) M2
               (g !!! Regidx (mword_of_int 10) : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
               ltac:(vm_compute; lia)
@@ -1196,7 +1195,7 @@ Section UservecAllPt.
     assert (Hg112 : M3 !!! Regidx (mword_of_int 5) = (g !!! Regidx (mword_of_int 10) : mword 64)).
     { unfold M3. rewrite upd_eq. reflexivity. }
     (* ---- sd t0, 112(a0) @ 0x7a ---- *)
-    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x7a 112 (mword_of_int 5) false M3 (w112 : mword 64)
+    iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x7a 112 (mword_of_int 5) false M3 (w112 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
               Ha0_3
@@ -1223,7 +1222,7 @@ Section UservecAllPt.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x7a) in "Hpc".
     (* ---- ld x2, 8(a0) @ 0x7e ---- *)
-    iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x7e 8 (mword_of_int 2) false M3 vksp
+    iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x7e 8 (mword_of_int 2) false M3 vksp
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
               ltac:(vm_compute; lia)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1254,7 +1253,7 @@ Section UservecAllPt.
     { unfold M4. rewrite upd_ne; [exact Ha0_3 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x4, 32(a0) @ 0x82 ---- *)
-    iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x82 32 (mword_of_int 4) false M4 vkhart
+    iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x82 32 (mword_of_int 4) false M4 vkhart
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
               ltac:(vm_compute; lia)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1285,7 +1284,7 @@ Section UservecAllPt.
     { unfold M5. rewrite upd_ne; [exact Ha0_4 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x5, 16(a0) @ 0x86 ---- *)
-    iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x86 16 (mword_of_int 5) false M5 vktr
+    iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x86 16 (mword_of_int 5) false M5 vktr
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
               ltac:(vm_compute; lia)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1316,7 +1315,7 @@ Section UservecAllPt.
     { unfold M6. rewrite upd_ne; [exact Ha0_5 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
     (* ---- ld x6, 0(a0) @ 0x8a ---- *)
-    iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) Φ 0x8a 0 (mword_of_int 6) false M6 vksat
+    iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x8a 0 (mword_of_int 6) false M6 vksat
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
               ltac:(vm_compute; lia)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1351,7 +1350,7 @@ Section UservecAllPt.
       - unfold M6. rewrite upd_eq. reflexivity.
       - intro He. injection He as He2. vm_compute in He2. congruence. }
     iDestruct (uv_utlb_map_wf with "Hutlb") as %Hwfu.
-    iApply (wp_uservec_exit_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) Φ M7
+    iApply (wp_uservec_exit_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) M7
               (vksat : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
               HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwfu Ht1v HkMode Hkasid Hkppn

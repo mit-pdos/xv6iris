@@ -27,7 +27,7 @@ Section WpMretGpr.
      The continuation receives the RAW post-MRET cells: privilege [newpriv],
      mstatus [cms5 ms_cur], pc at the aligned mepc target [ret_pc mepc0]; pmpcfg,
      mepc and the GPR file are unchanged. *)
-  Lemma wp_mret_gpr (Φ : mval -> iProp Σ) (pc : mword 64)
+  Lemma wp_mret_gpr (pc : mword 64)
       (newpriv : Privilege)
       (ms_cur mepc0 menvcfg1 : mword 64)
       (m : regfile)
@@ -65,7 +65,7 @@ Section WpMretGpr.
       "#Hhw #Hinv Hhs Hpriv Hms Hpmpc Hmenv [Hpc Hnpc] Hfile Hmepc Hinstr Hcont".
     assert (Hnpm : generic_neq newpriv Machine = true)
       by (rewrite Hsup; vm_compute; reflexivity).
-    iApply (wp_instr_config Φ pc false (MRET tt) pmpcfg0 ms_cur Hpmp HmIE Hstat
+    iApply (wp_instr_config pc false (MRET tt) pmpcfg0 ms_cur Hpmp HmIE Hstat
               with "Hhw Hinv Hhs Hpriv Hms Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
     iPoseProof "Hhw" as "#Hhwc".

@@ -71,11 +71,11 @@ Section ProofArgstr.
   Notation Ra1 := (mword_of_int 11 : mword 5).
   Notation Ra2 := (mword_of_int 12 : mword 5).
 
-  Lemma wp_argstr_sconf (γf : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_argstr_sconf (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool)
-    : wp_argstr_sconf_body γf Φ m av n eb p C i v pid V maxn buf_olds b.
+    : wp_argstr_sconf_body γf m av n eb p C i v pid V maxn buf_olds b.
   Proof.
     cbv beta delta [wp_argstr_sconf_body].
     intros pcE buf ret_tgt Hi Ha0 Hargs Hn Hav Hmax Hmax31.
@@ -108,7 +108,7 @@ Section ProofArgstr.
     iPoseProof (asi_24 with "Htext") as "Hi24".
     iPoseProof (asi_26 with "Htext") as "Hi26".
     (* ---- +0x00: c.addi sp,-32 (frame push) ---- *)
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m av 4 b
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 b
               ltac:(lia) (stk_push_32 (m !!! Regidx csp_rs1))
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hk1) "Hcg Hframe Hpc".
@@ -139,7 +139,7 @@ Section ProofArgstr.
     { rewrite HM1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa1) in "Hs1".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x02))
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.argstr + 0x02))
               (mword_of_int 3 : mword 6) Rra M1 (av - 4)%nat u1 b
               with "Hcg Hpc Hi02 Hs1 [-]").
     iIntros (CID2 Hk2) "Hcg Hpc Hs1".
@@ -148,7 +148,7 @@ Section ProofArgstr.
                     = mword_of_int (KernelSyms.argstr + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     iEval (rewrite -Hpa2) in "Hs2".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x04))
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.argstr + 0x04))
               (mword_of_int 2 : mword 6) Rs0 M1 (av - 4)%nat u2 b
               with "Hcg Hpc Hi04 Hs2 [-]").
     iIntros (CID3 Hk3) "Hcg Hpc Hs2".
@@ -157,7 +157,7 @@ Section ProofArgstr.
                     = mword_of_int (KernelSyms.argstr + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     iEval (rewrite -Hpa3) in "Hs3".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x06))
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.argstr + 0x06))
               (mword_of_int 1 : mword 6) Rs1 M1 (av - 4)%nat u3 b
               with "Hcg Hpc Hi06 Hs3 [-]").
     iIntros (CID4 Hk4) "Hcg Hpc Hs3".
@@ -166,7 +166,7 @@ Section ProofArgstr.
                     = mword_of_int (KernelSyms.argstr + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     iEval (rewrite -Hpa4) in "Hs4".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x08))
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.argstr + 0x08))
               (mword_of_int 0 : mword 6) Rs2 M1 (av - 4)%nat u4 b
               with "Hcg Hpc Hi08 Hs4 [-]").
     iIntros (CID5 Hk5) "Hcg Hpc Hs4".
@@ -187,7 +187,7 @@ Section ProofArgstr.
     iEval (rewrite Hpa3 HM1s1) in "Hs3".
     iEval (rewrite Hpa4 HM1s2) in "Hs4".
     (* ---- +0x0a: c.addi4spn s0,sp,32 (s0's VALUE is never read) ---- *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x0a))
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.argstr + 0x0a))
               (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) Rs0
               M1 (av - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -201,7 +201,7 @@ Section ProofArgstr.
                     = mword_of_int (KernelSyms.argstr + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     (* ---- +0x0c: c.mv s2,a1 -- s2 := buf ---- *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x0c))
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.argstr + 0x0c))
               Rs2 Ra1 M2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
@@ -213,7 +213,7 @@ Section ProofArgstr.
                     = mword_of_int (KernelSyms.argstr + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0e) in "Hpc".
     (* ---- +0x0e: c.mv s1,a2 -- s1 := max ---- *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x0e))
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.argstr + 0x0e))
               Rs1 Ra2 M3 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e [-]").
@@ -243,7 +243,7 @@ Section ProofArgstr.
     { rewrite /M4 upd_ne; [| reg_neq]. rewrite /M3 upd_ne; [| reg_neq].
       rewrite /M2 upd_ne; [| reg_neq]. exact HM1sp. }
     (* ---- +0x10: jal ra,argraw ---- *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x10))
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.argstr + 0x10))
               Rra (mword_of_int 2096846 : mword 21) M4 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi10 [-]").
@@ -281,7 +281,7 @@ Section ProofArgstr.
     (* ---- the FIRST borrow: argraw wants the trapframe page ---- *)
     iDestruct (proc_priv_tf with "Hpriv") as "(Htfp & Htfa & Hpbacktf)".
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Argraw.wp_argraw_sconf Φ M5 (av - 4)%nat n eb p C
+    iApply (Argraw.wp_argraw_sconf M5 (av - 4)%nat n eb p C
               i (ud_tfp (pv_upt V)) (pv_tf V) v (DfracOwn (1/4)) b
               Hi HM5a0 Hargs Hn ltac:(lia)
               with "Hcg Hcpu Htext Hdata Hpc Htfp Htfa [-]").
@@ -301,7 +301,7 @@ Section ProofArgstr.
     { intros r Hr Ncsp N8 N9 N18.
       rewrite (callee_saved_lookup HcsA r Hr). apply HthrM5; assumption. }
     (* ---- +0x14: c.mv a2,s1 -- a2 := max ---- *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x14))
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.argstr + 0x14))
               Ra2 Rs1 A (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
@@ -313,7 +313,7 @@ Section ProofArgstr.
                     = mword_of_int (KernelSyms.argstr + 0x16)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp16) in "Hpc".
     (* ---- +0x16: c.mv a1,s2 -- a1 := buf ---- *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x16))
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.argstr + 0x16))
               Ra1 Rs2 A1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
@@ -333,7 +333,7 @@ Section ProofArgstr.
     assert (HA2sp : A2 !!! Regidx csp_rs1 = pa_stk sp0 4).
     { rewrite /A2 upd_ne; [| reg_neq]. rewrite /A1 upd_ne; [exact HAsp | reg_neq]. }
     (* ---- +0x18: jal ra,fetchstr ---- *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x18))
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.argstr + 0x18))
               Rra (mword_of_int 2097008 : mword 21) A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
@@ -371,7 +371,7 @@ Section ProofArgstr.
     iEval (rewrite -HA3a1) in "Hbuf".
     (* ---- fetchstr(addr, buf, max) ---- *)
     iDestruct (cpu_own_transport CID10 CID13 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Fetchstr.wp_fetchstr_sconf γf Φ A3 (av - 4)%nat n eb p C pid V maxn buf_olds b
+    iApply (Fetchstr.wp_fetchstr_sconf γf A3 (av - 4)%nat n eb p C pid V maxn buf_olds b
               Hn HKfs HA3a2 Hmax31
               with "Hcg Hcpu Htext Hpc Hpriv Hbuf [-]").
     iIntros (CID14 Hk14 mr buf_new) "%Hcsr Hcg Hcpu Hpc Hpriv Hbuf %Hret".
@@ -392,7 +392,7 @@ Section ProofArgstr.
     { rewrite Hrsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hqa1) in "Hs1".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x1c))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.argstr + 0x1c))
               (mword_of_int 3 : mword 6) Rra mr (av - 4)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c Hs1 [-]").
@@ -411,7 +411,7 @@ Section ProofArgstr.
     { rewrite HT1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hqa2) in "Hs2".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x1e))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.argstr + 0x1e))
               (mword_of_int 2 : mword 6) Rs0 T1 (av - 4)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e Hs2 [-]").
@@ -430,7 +430,7 @@ Section ProofArgstr.
     { rewrite HT2sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hqa3) in "Hs3".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x20))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.argstr + 0x20))
               (mword_of_int 1 : mword 6) Rs1 T2 (av - 4)%nat s10 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 Hs3 [-]").
@@ -449,7 +449,7 @@ Section ProofArgstr.
     { rewrite HT3sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hqa4) in "Hs4".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x22))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.argstr + 0x22))
               (mword_of_int 0 : mword 6) Rs2 T3 (av - 4)%nat s20 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 Hs4 [-]").
@@ -472,7 +472,7 @@ Section ProofArgstr.
       by (rewrite Hwv; exact HT4sp).
     iDestruct (stack_own_4_intro sp0 ra0 s00 s10 s20 with "Hs1 Hs2 Hs3 Hs4") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x24))
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.argstr + 0x24))
               (mword_of_int 2 : mword 6) T4 (av - 4)%nat 4 b Hpop
               with "Hcg Hpc Hi24 Hframe [-]").
     iIntros (CID19 Hk19) "Hcg Hpc".
@@ -492,7 +492,7 @@ Section ProofArgstr.
       rewrite /T3 upd_ne; [| reg_neq].
       rewrite /T2 upd_ne; [| reg_neq].
       rewrite /T1 upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.argstr + 0x26))
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.argstr + 0x26))
               Rra T5 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi26 [-]").
     iIntros (CID20 Hk20) "Hcg Hpc".

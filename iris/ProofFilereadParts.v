@@ -401,7 +401,7 @@ Section ProofFilereadParts.
   (* =================================================================== *)
   (*  +0x58 .. +0x62 -- THE EPILOGUE.  Every exit reaches it.             *)
   (* =================================================================== *)
-  Lemma fr_epi `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Lemma fr_epi `{GEN : GenId} `{CID0 : CpuId}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s20 : mword 64) (rv : mword 64) (w3 w5 w6 : mword 64)
       (p : mword 64) (b : bool) :
@@ -443,7 +443,7 @@ Section ProofFilereadParts.
     iPoseProof (fri_60 with "Htext") as "Hi60".
     iPoseProof (fri_62 with "Htext") as "Hi62".
     (* ---- +0x58: c.mv a0,s2 ---- *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (FR + 0x58)) Ra0 Rs2 Mt (K - 6)%nat b
+    iApply (wp_cmv_s_sconf (mword_of_int (FR + 0x58)) Ra0 Rs2 Mt (K - 6)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi58 [-]").
     iIntros (CID1 Hs1) "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -461,7 +461,7 @@ Section ProofFilereadParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
                    = pa_stk sp0 1) by (rewrite HT0sp; apply fr_frm1).
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (FR + 0x5a)) (mword_of_int 5 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x5a)) (mword_of_int 5 : mword 6) Rra
               T0 (K - 6)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5a Hb1 [-]").
@@ -477,7 +477,7 @@ Section ProofFilereadParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
                    = pa_stk sp0 2) by (rewrite HT1sp; apply fr_frm2).
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (FR + 0x5c)) (mword_of_int 4 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x5c)) (mword_of_int 4 : mword 6) Rs0
               T1 (K - 6)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5c Hb2 [-]").
@@ -493,7 +493,7 @@ Section ProofFilereadParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
                    = pa_stk sp0 4) by (rewrite HT2sp; apply fr_frm4).
     iEval (rewrite -Hpa4) in "Hb4".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (FR + 0x5e)) (mword_of_int 2 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf (mword_of_int (FR + 0x5e)) (mword_of_int 2 : mword 6) Rs2
               T2 (K - 6)%nat s20 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi5e Hb4 [-]").
@@ -522,7 +522,7 @@ Section ProofFilereadParts.
       iSplitL "Hb6"; [iExists _; iExact "Hb6"|].
       done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (FR + 0x60)) (mword_of_int 3 : mword 6)
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (FR + 0x60)) (mword_of_int 3 : mword 6)
               T3 (K - 6)%nat 6 b Hpop with "Hcg Hpc Hi60 Hframe [-]").
     iIntros (CID5 Hs5) "Hcg Hpc".
     assert (Hnk : ((K - 6) + 6)%nat = K) by exact (fr_frame_back K HK).
@@ -542,7 +542,7 @@ Section ProofFilereadParts.
       rewrite /T3 upd_ne; [| vm_compute; discriminate].
       rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1; apply upd_eq. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (FR + 0x62)) Rra T4 K b
+    iApply (wp_cret_s_sconf (mword_of_int (FR + 0x62)) Rra T4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi62 [-]").
     iIntros (CID6 Hs6) "Hcg Hpc".
     iEval (rgne) in "Hpc".
@@ -581,7 +581,7 @@ Section ProofFilereadParts.
   (*  [c.ldsp s1,24(sp); c.ldsp s3,8(sp)] -- five copies, one lemma over  *)
   (*  the block's pcs as LITERALS.                                        *)
   (* =================================================================== *)
-  Lemma fr_rest2 `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Lemma fr_rest2 `{GEN : GenId} `{CID0 : CpuId}
       (Mt : regfile) (K : nat) (sp0 : mword 64) (v1 v3 : mword 64)
       (za zb zc : Z) (p : mword 64) (b : bool) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 6 ->
@@ -617,7 +617,7 @@ Section ProofFilereadParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
                    = pa_stk sp0 3) by (rewrite Hmtsp; apply fr_frm3).
     iEval (rewrite -Hpa3) in "Hb3".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int za) (mword_of_int 3 : mword 6) Rs1
+    iApply (wp_cldsp_s_sconf (mword_of_int za) (mword_of_int 3 : mword 6) Rs1
               Mt K v1 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hia Hb3 [-]").
     iIntros (CID1 Hs1) "Hcg Hpc Hb3". iEval (rewrite Hpa3) in "Hb3".
@@ -630,7 +630,7 @@ Section ProofFilereadParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                    = pa_stk sp0 5) by (rewrite HU1sp; apply fr_frm5).
     iEval (rewrite -Hpa5) in "Hb5".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int zb) (mword_of_int 1 : mword 6) Rs3
+    iApply (wp_cldsp_s_sconf (mword_of_int zb) (mword_of_int 1 : mword 6) Rs3
               U1 K v3 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib Hb5 [-]").
     iIntros (CID2 Hs2) "Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
@@ -655,7 +655,7 @@ Section ProofFilereadParts.
   (*  FD_DEVICE arm's TWO -1 exits (+0xb0 the out-of-range major, +0xba    *)
   (*  the null devsw slot).  Same block, so one lemma over its five pcs.   *)
   (* =================================================================== *)
-  Lemma fr_m1j `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Lemma fr_m1j `{GEN : GenId} `{CID0 : CpuId}
       (Mt : regfile) (K : nat) (sp0 : mword 64) (v1 v3 : mword 64)
       (za zb zc zd ze : Z) (jimm : mword 21) (p : mword 64) (b : bool) :
     Mt !!! Regidx csp_rs1 = pa_stk sp0 6 ->
@@ -697,7 +697,7 @@ Section ProofFilereadParts.
     intros Hmtsp Hab Hbc Hcd Hde Hjt.
     iIntros "Hcg Hpc Hia Hib Hic Hid Hie Hb3 Hb5 Hcont".
     (* c.li a5,-1 *)
-    iApply (wp_cli_s_sconf Φ (mword_of_int za) Ra5 (mword_of_int 63 : mword 6)
+    iApply (wp_cli_s_sconf (mword_of_int za) Ra5 (mword_of_int 63 : mword 6)
               (mword_of_int (-1) : mword 64) Mt K b
               ltac:(vm_compute; discriminate) ltac:(rdok) fr_lim1
               with "Hcg Hpc Hia [-]").
@@ -705,7 +705,7 @@ Section ProofFilereadParts.
     set (W1 := <[Regidx Ra5 := regval_into_reg (mword_of_int (-1) : mword 64)]> Mt).
     iEval (rewrite Hab) in "Hpc".
     (* c.mv s2,a5 *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int zb) Rs2 Ra5 W1 K b
+    iApply (wp_cmv_s_sconf (mword_of_int zb) Rs2 Ra5 W1 K b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib [-]").
     iIntros (CID2 Hs2) "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -718,13 +718,13 @@ Section ProofFilereadParts.
       rewrite /W1 upd_ne; [exact Hmtsp | vm_compute; discriminate]. }
     iEval (rewrite Hbc) in "Hpc".
     (* the s1/s3 restore *)
-    iApply (fr_rest2 (CID0 := CID2) Φ W2 K sp0 v1 v3 zc zd ze p b HW2sp Hcd Hde
+    iApply (fr_rest2 (CID0 := CID2) W2 K sp0 v1 v3 zc zd ze p b HW2sp Hcd Hde
               with "Hcg Hpc Hic Hid Hb3 Hb5 [-]").
     iIntros (CID3 Hs3 Mr) "%Hmr Hcg Hpc Hb3 Hb5".
     destruct Hmr as (Hmrsp & Hmrs1 & Hmrs3 & Hmrthr).
     (* the c.j into the epilogue: the alignment side condition is about the
        TARGET, so the equation is rewritten BEFORE [vm_compute]. *)
-    iApply (wp_cj_s_sconf Φ (mword_of_int ze) jimm Mr K b
+    iApply (wp_cj_s_sconf (mword_of_int ze) jimm Mr K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hie [-]").
     iIntros (CID4 Hs4). iNext. iIntros "Hcg Hpc".

@@ -97,7 +97,7 @@ Definition satp_rooted (v : mword 64) (root : mword 44) : Prop :=
    type instantiates it with its own [usertrap_res]. *)
 Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (R : uptd -> mword 64 -> iProp Σ)
-    (C : ucfg) (pt : uptd) (kroot : mword 44) (Φ : mval -> iProp Σ)
+    (C : ucfg) (pt : uptd) (kroot : mword 44)
     (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
     (w0 w8 w16 w24 w32 : bv 64)
     (u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160
@@ -264,13 +264,12 @@ Module Type USERTRAP.
       uptd -> mword 64 -> iProp Σ.
   Parameter wp_usertrap :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (kroot : mword 44) (Φ : mval -> iProp Σ)
-      (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
+      (C : ucfg) (pt : uptd) (kroot : mword 44) (m : regfile) (ms_v sc_v stval_v sepc_v ksp : mword 64)
       (w0 w8 w16 w24 w32 : bv 64)
       (u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160
        u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264
        u272 u280 u112 : bv 64),
-      wp_usertrap_body usertrap_res C pt kroot Φ m ms_v sc_v stval_v sepc_v ksp
+      wp_usertrap_body usertrap_res C pt kroot m ms_v sc_v stval_v sepc_v ksp
         w0 w8 w16 w24 w32
         u40 u48 u56 u64 u72 u80 u88 u96 u104 u120 u128 u136 u144 u152 u160
         u168 u176 u184 u192 u200 u208 u216 u224 u232 u240 u248 u256 u264

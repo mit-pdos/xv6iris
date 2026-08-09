@@ -487,7 +487,7 @@ Section WpIntrEngine.
   Qed.
 
 
-  Lemma wp_exec_step_interrupt_inv (Φ : mval -> iProp Σ) {dq : dfrac} :
+  Lemma wp_exec_step_interrupt_inv {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ,
@@ -503,7 +503,7 @@ Section WpIntrEngine.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
     iIntros (σ) "[Hreg Hmem] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.

@@ -172,7 +172,7 @@ Section ProofSwtch.
     iDestruct (swtch_code with "Ht") as "Hcode".
     iEval (rewrite -Hden) in "Hfile".
     (* ---- run the 28-instruction straight-line block (regime-blind engine) ---- *)
-    iApply (wp_vc_block_s_den_r strans_regime swtch_prog Φ
+    iApply (wp_vc_block_s_den_r strans_regime swtch_prog
               (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
               (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
               rho ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
@@ -247,7 +247,7 @@ Section ProofSwtch.
                      = nth 1 new_vs (mword_of_int 0)).
     { rewrite <- Hcallee_new. exact (eq_sym (callee_img_nth1 _ (mword_of_int 0))). }
     iDestruct (swi_68 with "Ht") as "Hret".
-    iApply (wp_cret_s_zca_r_later strans_regime Φ
+    iApply (wp_cret_s_zca_r_later strans_regime
               (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
               (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
               ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)

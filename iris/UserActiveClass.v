@@ -274,7 +274,7 @@ Section UserActiveClass.
     { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
     iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmsten Hssten]"
       as "Hcfg". { iFrame. }
-    iApply (active_step_branch C pt Ei Φ σ ms_v sc_v stval_v sepc_v va g mst mi
+    iApply (active_step_branch C pt Ei σ ms_v sc_v stval_v sepc_v va g mst mi
               Hmsok Lpriv Lms Lpc Hdisp
               with "Hhw Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr
                     Hupt Hcfg Hob Hcont").

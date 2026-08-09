@@ -138,7 +138,7 @@ Definition K_virtio_disk_init : nat := 18%nat.
    while [rewrite /vdi_post] at the return still does. *)
 Definition vdi_post
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
+    (γv : disk_names) (γa : gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
     (ret_tgt c_cpu : mword 64) : iProp Σ :=
@@ -186,7 +186,7 @@ Global Typeclasses Opaque vdi_post.
    its own [b] parameter for the same reason. *)
 Definition wp_virtio_disk_init_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
+    (γv : disk_names) (γa : gname)
     (m : regfile) (K : nat)
     (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
     (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
@@ -224,18 +224,17 @@ Definition wp_virtio_disk_init_sconf_body
   disk_avail ↦₈ pav0 -∗
   disk_used ↦₈ pu0 -∗
   ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) -∗
-  vdi_post γv γa Φ m K eb pp C on ret_tgt c_cpu -∗
+  vdi_post γv γa m K eb pp C on ret_tgt c_cpu -∗
   WP (Loop : expr riscv_lang).
 
 Module Type VIRTIODISKINIT.
   Parameter wp_virtio_disk_init_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !diskGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γv : disk_names) (γa : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (K : nat)
+      (γv : disk_names) (γa : gname) (m : regfile) (K : nat)
       (eb : bool) (pp : mword 64) (C : iProp Σ) (on : option nat)
       (c0 : virtio_cfg) (vlock : bv 32) (vname vcpu : bv 64)
       (pd0 pav0 pu0 : mword 64) (free0 : nat -> bv 8),
-      wp_virtio_disk_init_sconf_body γv γa Φ m K eb pp C on c0 vlock vname vcpu
+      wp_virtio_disk_init_sconf_body γv γa m K eb pp C on c0 vlock vname vcpu
                                      pd0 pav0 pu0 free0.
 End VIRTIODISKINIT.

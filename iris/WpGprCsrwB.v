@@ -746,7 +746,7 @@ Section WpCsrwGprNewB.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* ---- mideleg ---- *)
-  Lemma wp_csrw_mideleg_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_mideleg_gpr (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (mideleg0 : type_of_register mideleg)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -775,7 +775,7 @@ Section WpCsrwGprNewB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_mideleg, Regidx rs1, zreg, CSRRW)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_mideleg, Regidx rs1, zreg, CSRRW)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -826,7 +826,7 @@ Section WpCsrwGprNewB.
   Qed.
 
   (* ---- stimecmp ---- *)
-  Lemma wp_csrw_stimecmp_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_stimecmp_gpr (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (stimecmp0 : type_of_register stimecmp)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -855,7 +855,7 @@ Section WpCsrwGprNewB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -918,7 +918,7 @@ Section WpCsrwGprNewB.
   Qed.
 
   (* ---- sie (Ext_S): writes mie; value reads old mie + old mideleg ---- *)
-  Lemma wp_csrw_sie_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_sie_gpr (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (mie0 mideleg0 : type_of_register mie)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -949,7 +949,7 @@ Section WpCsrwGprNewB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_sie, Regidx rs1, zreg, CSRRW)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_sie, Regidx rs1, zreg, CSRRW)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -1004,7 +1004,7 @@ Section WpCsrwGprNewB.
 
   (* ---- satp (Ext_S, mstatus.SXL=SXLEN64): the SXL fact is drawn from the
      kept-half [mstatus] (mstatus.SXL is part of the mmode_config mstatus). ---- *)
-  Lemma wp_csrw_satp_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_satp_gpr (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (satp0 : type_of_register satp)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -1033,7 +1033,7 @@ Section WpCsrwGprNewB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_satp, Regidx rs1, zreg, CSRRW)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -1090,7 +1090,7 @@ Section WpCsrwGprNewB.
   (* ---- pmpaddr0 (pure): writes pmpaddr_n; value reads old pmpaddr_n AND
      pmpcfg_n.  pmpcfg_n is held (read-only) by [wp_instr] at the split
      fraction; we recover its value at the execute state via a kept half. ---- *)
-  Lemma wp_csrw_pmpaddr0_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_pmpaddr0_gpr (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (pmpaddr0 : type_of_register pmpaddr_n)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -1118,7 +1118,7 @@ Section WpCsrwGprNewB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_pmpaddr0, Regidx rs1, zreg, CSRRW)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_pmpaddr0, Regidx rs1, zreg, CSRRW)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

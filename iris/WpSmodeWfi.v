@@ -427,7 +427,7 @@ Section WpSmodeWfi.
   (* step's own later; the WAKE step's later is spent on the continuation. *)
   (* Partial correctness makes "never wakes" a perfectly good outcome.     *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_wfi_wait (Φ : mval -> iProp Σ) (pc : mword 64) (instbits : mword 32)
+  Lemma wp_wfi_wait (pc : mword 64) (instbits : mword 32)
       (R : iProp Σ) :
     minstret_inv -∗
     hart_state ↦ᵣ HART_WAITING (WAIT_WFI, instbits) -∗
@@ -444,7 +444,7 @@ Section WpSmodeWfi.
     iRevert "Hhs Hpcr Hnpc HR Hcont".
     iLöb as "IH".
     iIntros "Hhs Hpcr Hnpc HR Hcont".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hminv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hminv").
     iIntros (σ) "[Hreg Hmem] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid with "Hreg Hhs")  as %Lhs.
@@ -512,7 +512,7 @@ Section WpSmodeWfi.
   (* later pays for it, which is what lets an outer iLöb loop (scheduler's *)
   (* 0x1e00 head) strip its IH across the wfi.                            *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_wfi_s_sconf (Φ : mval -> iProp Σ) (pc : mword 64)
+  Lemma wp_wfi_s_sconf (pc : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
     intr_count 0 false -∗
@@ -550,7 +550,7 @@ Section WpSmodeWfi.
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
     destruct r as [e | w | h | erx]; [ done | | cbn [fetch_is_rvc] in Hrvc; discriminate | done ].
     iDestruct "Hpc" as "[Hpcr Hnpc]".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hminv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hminv").
     iIntros (σ) "Hsi Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -630,7 +630,7 @@ Section WpSmodeWfi.
     iSplitL "Hmst Hmi". { iExists mst, mib. iFrame. }
     (* ---- and now the WAIT phase, with everything the client is owed
        riding through as [R] ---- *)
-    iApply (wp_wfi_wait Φ pc (zero_extend' 32 w)
+    iApply (wp_wfi_wait pc (zero_extend' 32 w)
               (sconf ∗ sie_cap m n b p ∗ gpr_file (tp_pin m) ∗ intr_count 0 false)%I
               with "Hminv Hhs Hpcr Hnpc
                     [Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv Hstk Htr Harm Hfile Hcnt]

@@ -45,7 +45,7 @@
    [tp_pin m] as THEIR map; [sie_cap] / [intr_frame] stay stated at [m]
    (they depend on it only through sp, which the pin does not move).
 
-   On top: the agnostic gpr-write engines [wp_gpr_write_s_sconf{,_base}]
+   On top: the agnostic gpr-write engines [wp_gpr_write_s_sconf]
    (premise [rd_ok rd], which replaces the old [rd <> csp_rs1] in the
    same slot: [sie_cap] is keyed on sp and transported by
    [sie_cap_retarget], sp-moving instructions re-carve their stack
@@ -85,7 +85,7 @@ Section WpSmodeIntr.
   (* [m] is the map the register file is held at -- the CALLER passes
      [tp_pin m] (HartTp.v); nothing here needs to know that. *)
   Lemma wp_instr_s_intr (handler : mword 64) (root_ppn : mword 44)
-      (m : regfile) (Φ : mval -> iProp Σ)
+      (m : regfile)
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     ret_pc pc = pc ->
     intr_inv handler -∗
@@ -119,7 +119,7 @@ Section WpSmodeIntr.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_intr handler pc root_ppn m Φ Hpc0
+    iApply (wp_exec_step_intr handler pc root_ppn m Hpc0
               with "Hintr Hhs Hcfg Hpc Hfile HF").
     iIntros (σ) "%Hdisp Hcfg Hpc Hfile HF Hsi".
     (* unbundle the config for the σ-level fetch lookups *)
@@ -215,7 +215,7 @@ Section WpSmodeIntr.
   (* same σf-callback.                                                     *)
   (* =================================================================== *)
   Lemma wp_instr_s_sconf
-      (m : regfile) (n : nat) (b : bool) (Φ : mval -> iProp Σ)
+      (m : regfile) (n : nat) (b : bool)
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
@@ -287,7 +287,7 @@ Section WpSmodeIntr.
       iAssert (intr_frame root_ppn (tp_pin m)) with "[Hmenv Htlbinv Hstk]" as "HF".
       { iApply (intr_frame_retarget root_ppn m (tp_pin m) (eq_sym Hsppin)).
         iFrame "Hmenv Htlbinv Hstk". }
-      iApply (wp_instr_s_intr handler root_ppn (tp_pin m) Φ pc is_rvc i
+      iApply (wp_instr_s_intr handler root_ppn (tp_pin m) pc is_rvc i
                 Hpc0
                 with "Hintr Hhs Hic Hpc Hfile HF Hinstr").
       iIntros (σ Hpceq) "Hic Hfile HF Hnpc Hsi".
@@ -318,7 +318,7 @@ Section WpSmodeIntr.
       iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
       iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
       iDestruct "Hpc" as "[Hpcr Hnpc]".
-      iApply (wp_instr_s_config_regime strans_regime Φ pc is_rvc i
+      iApply (wp_instr_s_config_regime strans_regime pc is_rvc i
                 ms mie_v mdv0 menvcfg0 (dq := DfracOwn 1)
                 HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
                 with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpcr Hinstr").
@@ -352,7 +352,7 @@ Section WpSmodeIntr.
   (* thread resumed on a DIFFERENT hart, and every resource inside the     *)
   (* lambda is then about THAT hart (the binder is named [CID]).           *)
   (* =================================================================== *)
-  Lemma wp_gpr_write_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_sconf
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -379,7 +379,7 @@ Section WpSmodeIntr.
       "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b Φ pc true base
+    iApply (wp_instr_s_sconf m n b pc true base
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -426,7 +426,7 @@ Section WpSmodeIntr.
   Qed.
 
   (* the 4-byte (base-encoding) variant: pc advances by 4 *)
-  Lemma wp_gpr_write_s_sconf_base (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_sconf_base
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -453,7 +453,7 @@ Section WpSmodeIntr.
       "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b Φ pc false base
+    iApply (wp_instr_s_sconf m n b pc false base
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -506,7 +506,7 @@ Section WpSmodeIntr.
   (* menvcfg premises (both derived inside the funnel).                   *)
   (* =================================================================== *)
 
-  Lemma wp_cli_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cli_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 6) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -522,7 +522,7 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd
+    unshelve iApply (wp_gpr_write_s_sconf pc rd
               (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
               (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) wval m n b
               Hrd Hrdok _

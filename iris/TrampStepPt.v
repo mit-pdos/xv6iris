@@ -419,7 +419,7 @@ Section TrampFetchPt.
   (* the trampoline-page STEP ENGINE over [INV]: one S-mode instruction at
      virtual [pc] whose bytes live at physical [pa] on the trampoline page.
      The invariant is threaded WHOLE into the σ-callback. *)
-  Lemma wp_instr_tramp_pt (Φ : mval -> iProp Σ)
+  Lemma wp_instr_tramp_pt
       (pc pa : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -487,7 +487,7 @@ Section TrampFetchPt.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
                  HmisaS Hmm HSIE with "Hsi Hmisa Hmstatus Hmiec Hmdlc") as %Hdisp.

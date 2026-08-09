@@ -393,7 +393,7 @@ Section IntrDefs.
      root its translation slot ([strans_inv]) is currently holding. *)
   Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
     (□ ∀ (root_ppn : mword 44) (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
-         (m : regfile) (Φ : mval -> iProp Σ),
+         (m : regfile),
         ⌜ intr_ms_facts ms ⌝ -∗
         ⌜ ret_pc pc0 = pc0 ⌝ -∗
         ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝ -∗

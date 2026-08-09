@@ -34,7 +34,6 @@ Import Defs.
    2-slot frame, so it needs 2 of the [n] available stack slots and returns
    them (avail [n] preserved). *)
 Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
@@ -62,8 +61,6 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
 
 Module Type MEMSET.
   Parameter wp_memset_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
-      wp_memset_sconf_body Φ m0 n len cval olds b pcur.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat) (cval : mword 64) (olds : nat -> bv 8) (b : bool) (pcur : mword 64),
+      wp_memset_sconf_body m0 n len cval olds b pcur.
 End MEMSET.

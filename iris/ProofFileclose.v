@@ -157,7 +157,7 @@ Section ProofFileclose.
                       (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6)))
                     = pa_stk (m !!! Regidx csp_rs1) 8).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 60 : mword 6) m K 8 b
+    iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 60 : mword 6) m K 8 b
               ltac:(lia) Hpush with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
@@ -187,21 +187,21 @@ Section ProofFileclose.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (FC + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (FC + 0x02)) (mword_of_int 7 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (mword_of_int (FC + 0x02)) (mword_of_int 7 : mword 6) Rra
               R1 (K - 8)%nat u1 b with "Hcg Hpc Hi02 Hb1 [-]").
     iIntros (CID2 Hs2) "Hcg Hpc Hb1". iEval (rgne) in "Hb1".
     iEval (rewrite Hf1) in "Hb1".
     assert (Hpp04 : add_vec_int (mword_of_int (FC + 0x02) : mword 64) 2
                     = mword_of_int (FC + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (FC + 0x04)) (mword_of_int 6 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (mword_of_int (FC + 0x04)) (mword_of_int 6 : mword 6) Rs0
               R1 (K - 8)%nat u2 b with "Hcg Hpc Hi04 Hb2 [-]").
     iIntros (CID3 Hs3) "Hcg Hpc Hb2". iEval (rgne) in "Hb2".
     iEval (rewrite Hf2) in "Hb2".
     assert (Hpp06 : add_vec_int (mword_of_int (FC + 0x04) : mword 64) 2
                     = mword_of_int (FC + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (FC + 0x06)) (mword_of_int 5 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (mword_of_int (FC + 0x06)) (mword_of_int 5 : mword 6) Rs1
               R1 (K - 8)%nat u3 b with "Hcg Hpc Hi06 Hb3 [-]").
     iIntros (CID4 Hs4) "Hcg Hpc Hb3". iEval (rgne) in "Hb3".
     iEval (rewrite Hf3) in "Hb3".
@@ -209,7 +209,7 @@ Section ProofFileclose.
                     = mword_of_int (FC + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
     (* +0x08 c.addi4spn s0,sp,64 : the frame pointer *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (FC + 0x08)) (Cregidx (mword_of_int 0))
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (FC + 0x08)) (Cregidx (mword_of_int 0))
               (mword_of_int 16 : mword 8) Rs0 R1 (K - 8)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
@@ -221,7 +221,7 @@ Section ProofFileclose.
                     = mword_of_int (FC + 0x0a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0a) in "Hpc".
     (* +0x0a c.mv s1,a0 : the cursor takes the argument *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (FC + 0x0a)) Rs1 Ra0
+    iApply (wp_cmv_s_sconf (mword_of_int (FC + 0x0a)) Rs1 Ra0
               R2 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a [-]").
     iIntros (CID6 Hs6) "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -234,7 +234,7 @@ Section ProofFileclose.
                     = mword_of_int (FC + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     (* +0x0c/+0x10 a0 := &ftable *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (FC + 0x0c)) Ra0 (mword_of_int 0x1e : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (FC + 0x0c)) Ra0 (mword_of_int 0x1e : mword 20)
               R3 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
@@ -244,7 +244,7 @@ Section ProofFileclose.
     assert (Hpp10 : add_vec_int (mword_of_int (FC + 0x0c) : mword 64) 4
                     = mword_of_int (FC + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (FC + 0x10)) Ra0 Ra0 (mword_of_int 996 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x10)) Ra0 Ra0 (mword_of_int 996 : mword 12)
               R4 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
     iIntros (CID8 Hs8) "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -257,7 +257,7 @@ Section ProofFileclose.
                     = mword_of_int (FC + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 jal ra,acquire ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (FC + 0x14)) Rra (mword_of_int 2083716 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (FC + 0x14)) Rra (mword_of_int 2083716 : mword 21)
               R5 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi14 [-]").
     iIntros (CID9 Hs9) "Hcg Hpc".
@@ -296,7 +296,7 @@ Section ProofFileclose.
       rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf Φ γfl "ftable"%string (ftable_res γf) mA
+    iApply (Acquire.wp_acquire_sconf γfl "ftable"%string (ftable_res γf) mA
               n eb p C (K - 8)%nat b
               HnZ ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic [-]").
@@ -338,7 +338,7 @@ Section ProofFileclose.
                   = a_fref k).
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
     iEval (rewrite -Hpa) in "Hcell".
-    iApply (wp_clw_s_sconf Φ (mword_of_int (FC + 0x18)) Ra5 Rs1 (mword_of_int 4 : mword 12)
+    iApply (wp_clw_s_sconf (mword_of_int (FC + 0x18)) Ra5 Rs1 (mword_of_int 4 : mword 12)
               macq (K - 8)%nat (mword_of_int (Z.pos cnt) : mword 32) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hcell [-]").
@@ -357,7 +357,7 @@ Section ProofFileclose.
                     = mword_of_int (FC + 0x1a)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a blez a5 -- the panic arm, DEAD *)
-    iApply (wp_bge_x0_fall_s_sconf Φ (mword_of_int (FC + 0x1a)) (mword_of_int 84 : mword 13)
+    iApply (wp_bge_x0_fall_s_sconf (mword_of_int (FC + 0x1a)) (mword_of_int 84 : mword 13)
               Ra5 D1 (K - 8)%nat false ltac:(vm_compute; discriminate)
               ltac:(rgne; rewrite HD1a5; apply fref_word_spos; exact Hcnt)
               with "Hcg Hpc Hi1a [-]").
@@ -366,7 +366,7 @@ Section ProofFileclose.
                     = mword_of_int (FC + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1e) in "Hpc".
     (* +0x1e c.addiw a5,a5,-1 *)
-    iApply (wp_caddiw_s_sconf Φ (mword_of_int (FC + 0x1e)) Ra5 (mword_of_int 63 : mword 6)
+    iApply (wp_caddiw_s_sconf (mword_of_int (FC + 0x1e)) Ra5 (mword_of_int 63 : mword 6)
               D1 (K - 8)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -386,7 +386,7 @@ Section ProofFileclose.
                    = a_fref k).
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
     iEval (rewrite -Hpa2) in "Hcell".
-    iApply (wp_csw_s_sconf Φ (mword_of_int (FC + 0x20)) Ra5 Rs1 (mword_of_int 4 : mword 12)
+    iApply (wp_csw_s_sconf (mword_of_int (FC + 0x20)) Ra5 Rs1 (mword_of_int 4 : mword 12)
               D2 (K - 8)%nat (mword_of_int (Z.pos cnt) : mword 32) false
               with "Hcg Hpc Hi20 Hcell [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hcell".
@@ -431,7 +431,7 @@ Section ProofFileclose.
                          (sign_extend' 64 (mword_of_int 96 : mword 13))
                        = mword_of_int (FC + 0x82))
         by (apply bv_eq; vm_compute; reflexivity).
-      iApply (wp_bgtz_taken_s_sconf Φ (mword_of_int (FC + 0x22))
+      iApply (wp_bgtz_taken_s_sconf (mword_of_int (FC + 0x22))
                 (mword_of_int 96 : mword 13) Ra5 D2 (K - 8)%nat false
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hregv; apply fc_pred_gtz; lia)
@@ -464,7 +464,7 @@ Section ProofFileclose.
         destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
         apply Hdom. by rewrite lookup_insert_ne in Hj. }
       (* ---- +0x82/+0x86 a0 := &ftable ; +0x8a jal release ---- *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (FC + 0x82)) Ra0
+      iApply (wp_auipc_s_sconf (mword_of_int (FC + 0x82)) Ra0
                 (mword_of_int 0x1e : mword 20) D2 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi82 [-]").
@@ -475,7 +475,7 @@ Section ProofFileclose.
       assert (Hpp86 : add_vec_int (mword_of_int (FC + 0x82) : mword 64) 4
                       = mword_of_int (FC + 0x86)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp86) in "Hpc".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (FC + 0x86)) Ra0 Ra0
+      iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x86)) Ra0 Ra0
                 (mword_of_int 878 : mword 12) E1 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi86 [-]").
@@ -489,7 +489,7 @@ Section ProofFileclose.
       assert (Hpp8a : add_vec_int (mword_of_int (FC + 0x86) : mword 64) 4
                       = mword_of_int (FC + 0x8a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp8a) in "Hpc".
-      iApply (wp_jal_s_sconf Φ (mword_of_int (FC + 0x8a)) Rra
+      iApply (wp_jal_s_sconf (mword_of_int (FC + 0x8a)) Rra
                 (mword_of_int 2083734 : mword 21) E2 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi8a [-]").
@@ -516,7 +516,7 @@ Section ProofFileclose.
         rewrite /D1 upd_ne; [reflexivity | regne]. }
       assert (HE3sp : E3 !!! Regidx csp_rs1 = spr)
         by (rewrite (HE3thr csp_rs1 ltac:(vm_compute; reflexivity)); exact Hmsp).
-      iApply (Release.wp_release_sconf Φ γfl ftable_addr "ftable"%string
+      iApply (Release.wp_release_sconf γfl ftable_addr "ftable"%string
                 (ftable_res γf) E3 n eb p C (K - 8)%nat
                 ltac:(rewrite HE3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -547,7 +547,7 @@ Section ProofFileclose.
         by (rewrite /R1 upd_ne; [reflexivity | vm_compute; discriminate]).
       iEval (rewrite HR1ra) in "Hb1". iEval (rewrite HR1s0) in "Hb2".
       iEval (rewrite HR1s1) in "Hb3".
-      iApply (fc_epi (CID0 := CIDr) Φ m mr K sp0 (m !!! Regidx Rra)
+      iApply (fc_epi (CID0 := CIDr) m mr K sp0 (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) u4 u5 u6 u7 u8 p b
                 ltac:(lia) eq_refl eq_refl eq_refl eq_refl Hmrsp Hmrthr
                 with "Hcg Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 [-]").
@@ -565,7 +565,7 @@ Section ProofFileclose.
       subst cnt.
       specialize (Hn1 eq_refl). subst qt.
       (* +0x22 bgtz a5 -- FALLS: the count reached zero *)
-      iApply (wp_bgtz_fall_s_sconf Φ (mword_of_int (FC + 0x22))
+      iApply (wp_bgtz_fall_s_sconf (mword_of_int (FC + 0x22))
                 (mword_of_int 96 : mword 13) Ra5 D2 (K - 8)%nat false
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hregv; exact fc_pred_ngtz)
@@ -616,7 +616,7 @@ Section ProofFileclose.
                       (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                     = pa_stk sp0 7) by (rewrite HD2sp HsprS; apply fc_frm7).
       iEval (rewrite -Hg4) in "Hb4".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (FC + 0x26)) (mword_of_int 4 : mword 6) Rs2
+      iApply (wp_csdsp_s_sconf (mword_of_int (FC + 0x26)) (mword_of_int 4 : mword 6) Rs2
                 D2 (K - 8)%nat u4 false with "Hcg Hpc Hi26 Hb4 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hb4".
       iEval (rgne) in "Hb4". iEval (rewrite Hg4) in "Hb4".
@@ -624,7 +624,7 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp28) in "Hpc".
       iEval (rewrite -Hg5) in "Hb5".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (FC + 0x28)) (mword_of_int 3 : mword 6) Rs3
+      iApply (wp_csdsp_s_sconf (mword_of_int (FC + 0x28)) (mword_of_int 3 : mword 6) Rs3
                 D2 (K - 8)%nat u5 false with "Hcg Hpc Hi28 Hb5 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hb5".
       iEval (rgne) in "Hb5". iEval (rewrite Hg5) in "Hb5".
@@ -632,7 +632,7 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2a) in "Hpc".
       iEval (rewrite -Hg6) in "Hb6".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (FC + 0x2a)) (mword_of_int 2 : mword 6) Rs4
+      iApply (wp_csdsp_s_sconf (mword_of_int (FC + 0x2a)) (mword_of_int 2 : mword 6) Rs4
                 D2 (K - 8)%nat u6 false with "Hcg Hpc Hi2a Hb6 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hb6".
       iEval (rgne) in "Hb6". iEval (rewrite Hg6) in "Hb6".
@@ -640,7 +640,7 @@ Section ProofFileclose.
                       = mword_of_int (FC + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp2c) in "Hpc".
       iEval (rewrite -Hg7) in "Hb7".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (FC + 0x2c)) (mword_of_int 1 : mword 6) Rs5
+      iApply (wp_csdsp_s_sconf (mword_of_int (FC + 0x2c)) (mword_of_int 1 : mword 6) Rs5
                 D2 (K - 8)%nat u7 false with "Hcg Hpc Hi2c Hb7 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hb7".
       iEval (rgne) in "Hb7". iEval (rewrite Hg7) in "Hb7".
@@ -653,7 +653,7 @@ Section ProofFileclose.
       { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1.
         rewrite /a_ftype. apply addv_sext0. }
       iEval (rewrite -Hat) in "Hcty".
-      iApply (wp_lw_s_sconf Φ (mword_of_int (FC + 0x2e)) Rs2 Rs1
+      iApply (wp_lw_s_sconf (mword_of_int (FC + 0x2e)) Rs2 Rs1
                 (mword_of_int 0 : mword 12) D2 (K - 8)%nat (fc_type Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2e Hcty [-]").
@@ -671,7 +671,7 @@ Section ProofFileclose.
                     = a_fwritable k).
       { rewrite (rget_ne F1 Rs1 ltac:(vm_compute; discriminate)) HF1s1. reflexivity. }
       iEval (rewrite -Haw) in "Hcwr".
-      iApply (wp_lbu_s_sconf Φ (mword_of_int (FC + 0x32)) Ra5 Rs1
+      iApply (wp_lbu_s_sconf (mword_of_int (FC + 0x32)) Ra5 Rs1
                 (mword_of_int 9 : mword 12) F1 (K - 8)%nat (fc_writable Cf : mword 8) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi32 Hcwr [-]").
@@ -686,7 +686,7 @@ Section ProofFileclose.
       assert (Hpp36 : add_vec_int (mword_of_int (FC + 0x32) : mword 64) 4
                       = mword_of_int (FC + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp36) in "Hpc".
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (FC + 0x36)) Rs3 Ra5 F2 (K - 8)%nat false
+      iApply (wp_cmv_s_sconf (mword_of_int (FC + 0x36)) Rs3 Ra5 F2 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36 [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -701,7 +701,7 @@ Section ProofFileclose.
                     = a_fpipe k).
       { rewrite (rget_ne F3 Rs1 ltac:(vm_compute; discriminate)) HF3s1. reflexivity. }
       iEval (rewrite -Hap) in "Hcpp".
-      iApply (wp_cld_s_sconf Φ (mword_of_int (FC + 0x38)) Ra5 Rs1
+      iApply (wp_cld_s_sconf (mword_of_int (FC + 0x38)) Ra5 Rs1
                 (mword_of_int 16 : mword 12) F3 (K - 8)%nat (fc_pipe Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 Hcpp [-]").
@@ -713,7 +713,7 @@ Section ProofFileclose.
       assert (Hpp3a : add_vec_int (mword_of_int (FC + 0x38) : mword 64) 2
                       = mword_of_int (FC + 0x3a)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3a) in "Hpc".
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (FC + 0x3a)) Rs4 Ra5 F4 (K - 8)%nat false
+      iApply (wp_cmv_s_sconf (mword_of_int (FC + 0x3a)) Rs4 Ra5 F4 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3a [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -728,7 +728,7 @@ Section ProofFileclose.
                     = a_fip k).
       { rewrite (rget_ne F5 Rs1 ltac:(vm_compute; discriminate)) HF5s1. reflexivity. }
       iEval (rewrite -Hai) in "Hcip".
-      iApply (wp_cld_s_sconf Φ (mword_of_int (FC + 0x3c)) Ra5 Rs1
+      iApply (wp_cld_s_sconf (mword_of_int (FC + 0x3c)) Ra5 Rs1
                 (mword_of_int 24 : mword 12) F5 (K - 8)%nat (fc_ip Cf) false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3c Hcip [-]").
@@ -740,7 +740,7 @@ Section ProofFileclose.
       assert (Hpp3e : add_vec_int (mword_of_int (FC + 0x3c) : mword 64) 2
                       = mword_of_int (FC + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp3e) in "Hpc".
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (FC + 0x3e)) Rs5 Ra5 F6 (K - 8)%nat false
+      iApply (wp_cmv_s_sconf (mword_of_int (FC + 0x3e)) Rs5 Ra5 F6 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi3e [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -758,7 +758,7 @@ Section ProofFileclose.
                     = a_fref k).
       { rewrite (rget_ne F7 Rs1 ltac:(vm_compute; discriminate)) HF7s1. reflexivity. }
       iEval (rewrite -Har) in "Hcell".
-      iApply (wp_sw_zero_s_sconf Φ (mword_of_int (FC + 0x40)) Rs1
+      iApply (wp_sw_zero_s_sconf (mword_of_int (FC + 0x40)) Rs1
                 (mword_of_int 4 : mword 12) F7 (K - 8)%nat
                 (mword_of_int 0 : mword 32) false
                 with "Hcg Hpc Hi40 Hcell [-]").
@@ -772,7 +772,7 @@ Section ProofFileclose.
       { rewrite (rget_ne F7 Rs1 ltac:(vm_compute; discriminate)) HF7s1.
         rewrite /a_ftype. apply addv_sext0. }
       iEval (rewrite -Hat2) in "Hcty".
-      iApply (wp_sw_zero_s_sconf Φ (mword_of_int (FC + 0x44)) Rs1
+      iApply (wp_sw_zero_s_sconf (mword_of_int (FC + 0x44)) Rs1
                 (mword_of_int 0 : mword 12) F7 (K - 8)%nat (fc_type Cf) false
                 with "Hcg Hpc Hi44 Hcty [-]").
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hcty".
@@ -808,7 +808,7 @@ Section ProofFileclose.
           [rewrite lookup_delete in Hj; by destruct Hj as [? Hx]|].
         apply Hdom. by rewrite lookup_delete_ne in Hj. }
       (* ---- +0x48/+0x4c a0 := &ftable ; +0x50 jal release ---- *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (FC + 0x48)) Ra0
+      iApply (wp_auipc_s_sconf (mword_of_int (FC + 0x48)) Ra0
                 (mword_of_int 0x1e : mword 20) F7 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi48 [-]").
@@ -819,7 +819,7 @@ Section ProofFileclose.
       assert (Hpp4c : add_vec_int (mword_of_int (FC + 0x48) : mword 64) 4
                       = mword_of_int (FC + 0x4c)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp4c) in "Hpc".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (FC + 0x4c)) Ra0 Ra0
+      iApply (wp_addi4_s_sconf (mword_of_int (FC + 0x4c)) Ra0 Ra0
                 (mword_of_int 936 : mword 12) G1 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi4c [-]").
@@ -833,7 +833,7 @@ Section ProofFileclose.
       assert (Hpp50 : add_vec_int (mword_of_int (FC + 0x4c) : mword 64) 4
                       = mword_of_int (FC + 0x50)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp50) in "Hpc".
-      iApply (wp_jal_s_sconf Φ (mword_of_int (FC + 0x50)) Rra
+      iApply (wp_jal_s_sconf (mword_of_int (FC + 0x50)) Rra
                 (mword_of_int 2083792 : mword 21) G2 (K - 8)%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi50 [-]").
@@ -887,7 +887,7 @@ Section ProofFileclose.
         rewrite /F3 upd_ne; [| vm_compute; discriminate].
         rewrite /F2 upd_ne; [| vm_compute; discriminate].
         rewrite /F1 upd_ne; [exact HD2sp | vm_compute; discriminate]. }
-      iApply (Release.wp_release_sconf Φ γfl ftable_addr "ftable"%string
+      iApply (Release.wp_release_sconf γfl ftable_addr "ftable"%string
                 (ftable_res γf) G3 n eb p C (K - 8)%nat
                 ltac:(rewrite HG3a0; apply bv_eq; vm_compute; reflexivity)
                 ltac:(lia)
@@ -919,7 +919,7 @@ Section ProofFileclose.
       { rewrite (callee_saved_lookup Hrel2_cs csp_rs1 ltac:(vm_compute; reflexivity)).
         rewrite HG3sp. exact HsprS. }
       (* ---- +0x54 c.li a5,1 ---- *)
-      iApply (wp_cli_s_sconf Φ (mword_of_int (FC + 0x54)) Ra5
+      iApply (wp_cli_s_sconf (mword_of_int (FC + 0x54)) Ra5
                 (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64)
                 mr2 (K - 8)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok) fc_li1_val
@@ -972,7 +972,7 @@ Section ProofFileclose.
       iEval (rewrite HR1s1) in "Hb3".
       destruct (decide (fc_type Cf = FD_PIPE)) as [Hpipe | Hnpipe].
       + (* ============ FD_PIPE: pipeclose(ff.pipe, ff.writable) ======= *)
-        iApply (wp_beq_taken_s_sconf Φ (mword_of_int (FC + 0x56))
+        iApply (wp_beq_taken_s_sconf (mword_of_int (FC + 0x56))
                   (mword_of_int 66 : mword 13) Ra5 Rs2 H1 (K - 8)%nat b
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   ltac:(rewrite Hcmp56 Hpipe; by vm_compute)
@@ -996,7 +996,7 @@ Section ProofFileclose.
         assert (HH1sp : H1 !!! Regidx csp_rs1 = pa_stk sp0 8)
           by (rewrite /H1 upd_ne; [exact Hmr2sp | vm_compute; discriminate]).
         (* +0x98 c.mv a1,s3 *)
-        iApply (wp_cmv_s_sconf Φ (mword_of_int (FC + 0x98)) Ra1 Rs3 H1 (K - 8)%nat b
+        iApply (wp_cmv_s_sconf (mword_of_int (FC + 0x98)) Ra1 Rs3 H1 (K - 8)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi98 [-]").
         iIntros (CIDp2 Hsp2) "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -1006,7 +1006,7 @@ Section ProofFileclose.
                         = mword_of_int (FC + 0x9a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp9a) in "Hpc".
         (* +0x9a c.mv a0,s4 *)
-        iApply (wp_cmv_s_sconf Φ (mword_of_int (FC + 0x9a)) Ra0 Rs4 P1 (K - 8)%nat b
+        iApply (wp_cmv_s_sconf (mword_of_int (FC + 0x9a)) Ra0 Rs4 P1 (K - 8)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi9a [-]").
         iIntros (CIDp3 Hsp3) "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -1016,7 +1016,7 @@ Section ProofFileclose.
                         = mword_of_int (FC + 0x9c)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp9c) in "Hpc".
         (* +0x9c jal pipeclose *)
-        iApply (wp_jal_s_sconf Φ (mword_of_int (FC + 0x9c)) Rra
+        iApply (wp_jal_s_sconf (mword_of_int (FC + 0x9c)) Rra
                   (mword_of_int 840 : mword 21) P2 (K - 8)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi9c [-]").
@@ -1088,7 +1088,7 @@ Section ProofFileclose.
                               (concat_vec (mword_of_int 2035 : mword 11) ('b"0"))))
                          = mword_of_int (FC + 0x8e))
           by (apply bv_eq; vm_compute; reflexivity).
-        iApply (fc_restore4 (CID0 := CIDp5) Φ mp (K - 8)%nat sp0
+        iApply (fc_restore4 (CID0 := CIDp5) mp (K - 8)%nat sp0
                   (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4)
                   (m !!! Regidx Rs5)
                   (FC + 0xa0) (FC + 0xa2) (FC + 0xa4) (FC + 0xa6) (FC + 0xa8)
@@ -1125,7 +1125,7 @@ Section ProofFileclose.
           rewrite /D2 upd_ne; [| regne].
           rewrite /D1 upd_ne; [| regne].
           exact (Hmthr r Hr N2 N8 N9). }
-        iApply (fc_epi (CID0 := CIDp6) Φ m Mr K sp0 (m !!! Regidx Rra)
+        iApply (fc_epi (CID0 := CIDp6) m Mr K sp0 (m !!! Regidx Rra)
                   (m !!! Regidx Rs0) (m !!! Regidx Rs1)
                   (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4)
                   (m !!! Regidx Rs5) u8 p b
@@ -1141,7 +1141,7 @@ Section ProofFileclose.
         { rewrite /fileclose_env_out Hpipe bool_decide_eq_true_2; [|reflexivity].
           rewrite /fileclose_pipe_out. iExact "Hav". }
       + (* ============ not a pipe: the inode test at +0x5a ============ *)
-        iApply (wp_beq_fall_s_sconf Φ (mword_of_int (FC + 0x56))
+        iApply (wp_beq_fall_s_sconf (mword_of_int (FC + 0x56))
                   (mword_of_int 66 : mword 13) Ra5 Rs2 H1 (K - 8)%nat b
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   ltac:(rewrite Hcmp56; apply eq_vec_false_iff; exact Hnpipe)
@@ -1159,7 +1159,7 @@ Section ProofFileclose.
         iPoseProof (fci_6a with "Htext") as "Hi6a".
         iPoseProof (fci_6c with "Htext") as "Hi6c".
         (* +0x5a addiw a5,s2,-2 *)
-        iApply (wp_addiw_s_sconf Φ (mword_of_int (FC + 0x5a)) Ra5 Rs2
+        iApply (wp_addiw_s_sconf (mword_of_int (FC + 0x5a)) Ra5 Rs2
                   (mword_of_int 4094 : mword 12) H1 (K - 8)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi5a [-]").
@@ -1178,7 +1178,7 @@ Section ProofFileclose.
                         = mword_of_int (FC + 0x5e)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp5e) in "Hpc".
         (* +0x5e c.li a4,1 *)
-        iApply (wp_cli_s_sconf Φ (mword_of_int (FC + 0x5e)) Ra4
+        iApply (wp_cli_s_sconf (mword_of_int (FC + 0x5e)) Ra4
                   (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64)
                   Q1 (K - 8)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok) fc_li1_val
@@ -1234,7 +1234,7 @@ Section ProofFileclose.
           (* with no lock held and the parking premise, the SIE arm is fixed:
              [Houtb] reads [b = eb] at [noff = 0]. *)
           subst b.
-          iApply (wp_bgeu_taken_s_sconf Φ (mword_of_int (FC + 0x60))
+          iApply (wp_bgeu_taken_s_sconf (mword_of_int (FC + 0x60))
                     (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat true
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rewrite Hcmp60; by apply fc_ty_inode_iff)
@@ -1252,7 +1252,7 @@ Section ProofFileclose.
           iPoseProof (fci_be with "Htext") as "Hibe".
           iPoseProof (fci_c0 with "Htext") as "Hic0".
           (* ---- +0xaa jal begin_op ---- *)
-          iApply (wp_jal_s_sconf Φ (mword_of_int (FC + 0xaa)) Rra
+          iApply (wp_jal_s_sconf (mword_of_int (FC + 0xaa)) Rra
                     (mword_of_int 2095828 : mword 21) Q2 (K - 8)%nat true
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiaa [-]").
@@ -1289,7 +1289,7 @@ Section ProofFileclose.
             rewrite (HQ2cs Rs5 ltac:(vm_compute; reflexivity)).
             rewrite /H1 upd_ne; [exact Hmr2s5 | vm_compute; discriminate]. }
           (* ---- +0xae c.mv a0,s5 ---- *)
-          iApply (wp_cmv_s_sconf Φ (mword_of_int (FC + 0xae)) Ra0 Rs5 mb (K - 8)%nat true
+          iApply (wp_cmv_s_sconf (mword_of_int (FC + 0xae)) Ra0 Rs5 mb (K - 8)%nat true
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     with "Hcg Hpc Hiae [-]").
           iIntros (CIDf4 Hsf4) "Hcg Hpc". iEval (rgne) in "Hcg".
@@ -1302,7 +1302,7 @@ Section ProofFileclose.
                           = mword_of_int (FC + 0xb0)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hppb0) in "Hpc".
           (* ---- +0xb0 jal iput ---- *)
-          iApply (wp_jal_s_sconf Φ (mword_of_int (FC + 0xb0)) Rra
+          iApply (wp_jal_s_sconf (mword_of_int (FC + 0xb0)) Rra
                     (mword_of_int 2093630 : mword 21) B2 (K - 8)%nat true
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib0 [-]").
@@ -1342,7 +1342,7 @@ Section ProofFileclose.
           { rewrite HB3ra. apply bv_eq; vm_compute; reflexivity. }
           iEval (rewrite Hpcb4) in "Hpc".
           (* ---- +0xb4 jal end_op ---- *)
-          iApply (wp_jal_s_sconf Φ (mword_of_int (FC + 0xb4)) Rra
+          iApply (wp_jal_s_sconf (mword_of_int (FC + 0xb4)) Rra
                     (mword_of_int 2095930 : mword 21) mi (K - 8)%nat true
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity) with "Hcg Hpc Hib4 [-]").
@@ -1389,7 +1389,7 @@ Section ProofFileclose.
                                 (concat_vec (mword_of_int 2023 : mword 11) ('b"0"))))
                            = mword_of_int (FC + 0x8e))
             by (apply bv_eq; vm_compute; reflexivity).
-          iApply (fc_restore4 (CID0 := CIDf8) Φ me (K - 8)%nat sp0
+          iApply (fc_restore4 (CID0 := CIDf8) me (K - 8)%nat sp0
                     (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4)
                     (m !!! Regidx Rs5)
                     (FC + 0xb8) (FC + 0xba) (FC + 0xbc) (FC + 0xbe) (FC + 0xc0)
@@ -1431,7 +1431,7 @@ Section ProofFileclose.
             rewrite /D2 upd_ne; [| regne].
             rewrite /D1 upd_ne; [| regne].
             exact (Hmthr r Hr N2 N8 N9). }
-          iApply (fc_epi (CID0 := CIDf9) Φ m Mr K sp0 (m !!! Regidx Rra)
+          iApply (fc_epi (CID0 := CIDf9) m Mr K sp0 (m !!! Regidx Rra)
                     (m !!! Regidx Rs0) (m !!! Regidx Rs1)
                     (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4)
                     (m !!! Regidx Rs5) u8 (proc_addr (fcn_j fn)) true
@@ -1447,7 +1447,7 @@ Section ProofFileclose.
           { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib /fileclose_fs_out. iFrame "Hpark Hpid Hbsl". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
-          iApply (wp_bgeu_fall_s_sconf Φ (mword_of_int (FC + 0x60))
+          iApply (wp_bgeu_fall_s_sconf (mword_of_int (FC + 0x60))
                     (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat b
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rewrite Hcmp60;
@@ -1463,7 +1463,7 @@ Section ProofFileclose.
                                 (concat_vec (mword_of_int 17 : mword 11) ('b"0"))))
                            = mword_of_int (FC + 0x8e))
             by (apply bv_eq; vm_compute; reflexivity).
-          iApply (fc_restore4 (CID0 := CIDz1) Φ Q2 (K - 8)%nat sp0
+          iApply (fc_restore4 (CID0 := CIDz1) Q2 (K - 8)%nat sp0
                     (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4)
                     (m !!! Regidx Rs5)
                     (FC + 0x64) (FC + 0x66) (FC + 0x68) (FC + 0x6a) (FC + 0x6c)
@@ -1499,7 +1499,7 @@ Section ProofFileclose.
             rewrite /D2 upd_ne; [| regne].
             rewrite /D1 upd_ne; [| regne].
             exact (Hmthr r Hr N2 N8 N9). }
-          iApply (fc_epi (CID0 := CIDz2) Φ m Mr K sp0 (m !!! Regidx Rra)
+          iApply (fc_epi (CID0 := CIDz2) m Mr K sp0 (m !!! Regidx Rra)
                     (m !!! Regidx Rs0) (m !!! Regidx Rs1)
                     (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4)
                     (m !!! Regidx Rs5) u8 p b

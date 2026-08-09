@@ -123,7 +123,7 @@ Definition sys_sbrk_ok (V : pprivate) (v0 v1 : mword 64)
        szv' = add_vec (pv_sz V) (sbrk_arg v0) ) )).
 
 Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_sbrk in
@@ -154,8 +154,7 @@ Definition wp_sys_sbrk_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 Module Type SYSSBRK.
   Parameter wp_sys_sbrk_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (v0 v1 : mword 64) (b : bool),
-      wp_sys_sbrk_sconf_body γa γf Φ m av eb p C pid V v0 v1 b.
+      wp_sys_sbrk_sconf_body γa γf m av eb p C pid V v0 v1 b.
 End SYSSBRK.

@@ -189,7 +189,7 @@ Proof. rewrite elem_of_set_seq. lia. Qed.
 Section wps.
 Context `{!crashProtoGS Σ}.
 
-Lemma wp_dead (gen : nat) (Φ : pval -> iProp Σ) :
+Lemma wp_dead (gen : nat) :
   dead gen ⊢ WP (WorkE gen : expr proto_lang).
 Proof.
   iIntros "#Hdead". iLöb as "IH".
@@ -223,7 +223,7 @@ Qed.
 (*    step -- the only crash obligation any "kernel code" ever carries.     *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma wp_work (gen : nat) (γm : gname) (n : nat) (Φ : pval -> iProp Σ) :
+Lemma wp_work (gen : nat) (γm : gname) (n : nat) :
   crash_inv -∗ born gen -∗ gen ↪[cp_regname]□ γm -∗ 0 ↪[γm] n -∗
   WP (WorkE gen : expr proto_lang).
 Proof.
@@ -261,7 +261,7 @@ Proof.
     iSplitL "HregA".
     { iExists R. iFrame "HregA". iPureIntro. exact Hdom. }
     iSplitL; [|done].
-    iApply (wp_dead gen (fun _ => True%I)). iExact "Hdead". }
+    iApply (wp_dead gen). iExact "Hdead". }
   destruct pw; last first.
   { (* CURRENT BUT POWERED OFF: impossible -- the registry has no entry for
        a generation whose PowerOn has not happened, yet we hold one. *)
@@ -335,7 +335,7 @@ Qed.
 (*    auth and never open [crash_inv].                                      *)
 (* ---------------------------------------------------------------------- *)
 
-Lemma wp_power (Φ : pval -> iProp Σ)
+Lemma wp_power
     (Hboot : forall (gen : nat) (γm : gname) (n : nat),
        ⊢ crash_inv -∗ born gen -∗ gen ↪[cp_regname]□ γm -∗ 0 ↪[γm] n -∗
          WP (WorkE gen : expr proto_lang)) :
@@ -481,8 +481,8 @@ Proof.
   { (* the pool: just the power thread; the client boot entailment is
        [wp_work] *)
     cbn. iSplitL; [|done].
-    iApply (@wp_power Σ HPG (fun _ : pval => True%I)
-              (fun gen γm n0 => @wp_work Σ HPG gen γm n0 (fun _ : pval => True%I))
+    iApply (@wp_power Σ HPG
+              (fun gen γm n0 => @wp_work Σ HPG gen γm n0)
              with "Hcinv"). }
   (* the final observation: not-stuck (wp_strong_adequacy's own clause) plus
      the crash invariant's pure shadow, read off the final state_interp *)

@@ -115,7 +115,7 @@ Section BallocLeaves.
   (* SRAIW: shift the source's low 32 bits RIGHT ARITHMETICALLY by a 5-bit
      shamt and sign-extend the 32-bit result back.  The [wp_srliw_s_sconf]
      twin, verbatim. *)
-  Lemma wp_sraiw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sraiw_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -132,7 +132,7 @@ Section BallocLeaves.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRAIW)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -146,7 +146,7 @@ Section BallocLeaves.
      FIVE bits, sign-extending the 32-bit result back.  This is C's
      [(int)x << (y & 31)] and is how both allocators form the bit mask
      [1 << (bi % 8)]. *)
-  Lemma wp_sllw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sllw_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (m : regfile) (n : nat) (b : bool) :
     let wval :=
       sign_extend' 64
@@ -163,7 +163,7 @@ Section BallocLeaves.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW))
               wval m n b Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").

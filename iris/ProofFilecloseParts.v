@@ -343,7 +343,7 @@ Section ProofFilecloseParts.
   (* =================================================================== *)
   (*  +0x8e .. +0x96 -- THE EPILOGUE.  Every exit reaches it.             *)
   (* =================================================================== *)
-  Lemma fc_epi `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Lemma fc_epi `{GEN : GenId} `{CID0 : CpuId}
       (m Mt : regfile) (K : nat)
       (sp0 ra0 s00 s10 : mword 64) (w4 w5 w6 w7 w8 : mword 64)
       (p : mword 64) (b : bool) :
@@ -388,7 +388,7 @@ Section ProofFilecloseParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 7 : mword 6) ('b"000")))
                    = pa_stk sp0 1) by (rewrite Hmtsp; apply fc_frm1).
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (FC + 0x8e)) (mword_of_int 7 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf (mword_of_int (FC + 0x8e)) (mword_of_int 7 : mword 6) Rra
               Mt (K - 8)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi8e Hb1 [-]").
@@ -404,7 +404,7 @@ Section ProofFilecloseParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 6 : mword 6) ('b"000")))
                    = pa_stk sp0 2) by (rewrite HT1sp; apply fc_frm2).
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (FC + 0x90)) (mword_of_int 6 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf (mword_of_int (FC + 0x90)) (mword_of_int 6 : mword 6) Rs0
               T1 (K - 8)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi90 Hb2 [-]").
@@ -420,7 +420,7 @@ Section ProofFilecloseParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000")))
                    = pa_stk sp0 3) by (rewrite HT2sp; apply fc_frm3).
     iEval (rewrite -Hpa3) in "Hb3".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (FC + 0x92)) (mword_of_int 5 : mword 6) Rs1
+    iApply (wp_cldsp_s_sconf (mword_of_int (FC + 0x92)) (mword_of_int 5 : mword 6) Rs1
               T2 (K - 8)%nat s10 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi92 Hb3 [-]").
@@ -451,7 +451,7 @@ Section ProofFilecloseParts.
       iSplitL "Hb8"; [iExists _; iExact "Hb8"|].
       done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (FC + 0x94)) (mword_of_int 4 : mword 6)
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (FC + 0x94)) (mword_of_int 4 : mword 6)
               T3 (K - 8)%nat 8 b Hpop with "Hcg Hpc Hi94 Hframe [-]").
     iIntros (CID4 Hs4) "Hcg Hpc".
     assert (Hnk : ((K - 8) + 8)%nat = K) by exact (fc_frame_back K HK).
@@ -471,7 +471,7 @@ Section ProofFilecloseParts.
       rewrite /T3 upd_ne; [| vm_compute; discriminate].
       rewrite /T2 upd_ne; [| vm_compute; discriminate].
       rewrite /T1; apply upd_eq. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (FC + 0x96)) Rra T4 K b
+    iApply (wp_cret_s_sconf (mword_of_int (FC + 0x96)) Rra T4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi96 [-]").
     iIntros (CID5 Hs5) "Hcg Hpc".
     iEval (rgne) in "Hpc".
@@ -509,7 +509,7 @@ Section ProofFilecloseParts.
   (*  gcc emitted this THREE times (+0x64, +0xa0, +0xb8), so it is one    *)
   (*  lemma over the block's pcs as literals.                            *)
   (* =================================================================== *)
-  Lemma fc_restore4 `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Lemma fc_restore4 `{GEN : GenId} `{CID0 : CpuId}
       (Mt : regfile) (K : nat) (sp0 : mword 64)
       (v2 v3 v4 v5 : mword 64)
       (za zb zc zd ze : Z) (jimm : mword 21)
@@ -565,7 +565,7 @@ Section ProofFilecloseParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 4 : mword 6) ('b"000")))
                    = pa_stk sp0 4) by (rewrite Hmtsp; apply fc_frm4).
     iEval (rewrite -Hpa4) in "Hb4".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int za) (mword_of_int 4 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf (mword_of_int za) (mword_of_int 4 : mword 6) Rs2
               Mt K v2 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hia Hb4 [-]").
     iIntros (CID1 Hs1) "Hcg Hpc Hb4". iEval (rewrite Hpa4) in "Hb4".
@@ -578,7 +578,7 @@ Section ProofFilecloseParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
                    = pa_stk sp0 5) by (rewrite HU1sp; apply fc_frm5).
     iEval (rewrite -Hpa5) in "Hb5".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int zb) (mword_of_int 3 : mword 6) Rs3
+    iApply (wp_cldsp_s_sconf (mword_of_int zb) (mword_of_int 3 : mword 6) Rs3
               U1 K v3 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hib Hb5 [-]").
     iIntros (CID2 Hs2) "Hcg Hpc Hb5". iEval (rewrite Hpa5) in "Hb5".
@@ -591,7 +591,7 @@ Section ProofFilecloseParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 2 : mword 6) ('b"000")))
                    = pa_stk sp0 6) by (rewrite HU2sp; apply fc_frm6).
     iEval (rewrite -Hpa6) in "Hb6".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int zc) (mword_of_int 2 : mword 6) Rs4
+    iApply (wp_cldsp_s_sconf (mword_of_int zc) (mword_of_int 2 : mword 6) Rs4
               U2 K v4 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hic Hb6 [-]").
     iIntros (CID3 Hs3) "Hcg Hpc Hb6". iEval (rewrite Hpa6) in "Hb6".
@@ -604,7 +604,7 @@ Section ProofFilecloseParts.
                      (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000")))
                    = pa_stk sp0 7) by (rewrite HU3sp; apply fc_frm7).
     iEval (rewrite -Hpa7) in "Hb7".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int zd) (mword_of_int 1 : mword 6) Rs5
+    iApply (wp_cldsp_s_sconf (mword_of_int zd) (mword_of_int 1 : mword 6) Rs5
               U3 K v5 b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hid Hb7 [-]").
     iIntros (CID4 Hs4) "Hcg Hpc Hb7". iEval (rewrite Hpa7) in "Hb7".
@@ -614,7 +614,7 @@ Section ProofFilecloseParts.
     (* the alignment side condition is about the TARGET, which is closed
        only after [Hjt]: [vm_compute] on the open [add_vec ze jimm] does not
        come back. *)
-    iApply (wp_cj_s_sconf Φ (mword_of_int ze) jimm U4 K b
+    iApply (wp_cj_s_sconf (mword_of_int ze) jimm U4 K b
               ltac:(rewrite Hjt; vm_compute; reflexivity)
               with "Hcg Hpc Hie [-]").
     iIntros (CID5 Hs5). iNext. iIntros "Hcg Hpc".

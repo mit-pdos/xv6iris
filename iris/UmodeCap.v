@@ -151,7 +151,7 @@ Section UmodeCap.
   (* but is spelled as an update of the old).                              *)
   (* ------------------------------------------------------------------- *)
   Definition uv_intr_wp : iProp Σ :=
-    (□ ∀ (CID : CpuId) (Φ : mval -> iProp Σ)
+    (□ ∀ (CID : CpuId)
          (g : regfile) (M : gmap Z (bv 8)) (va : mword 64)
          (i : InterruptType) (sc0 stval_v : mword 64),
        uv_trap_frame C pt (utrap_scause (Interrupt i) sc0) stval_v va g M -∗

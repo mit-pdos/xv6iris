@@ -85,8 +85,7 @@ Definition wp_kerneltrap_returns_body `{!riscvGS Σ} `{GenId} `{CpuId} `{!sieG �
     (satp0 : mword 64)
     (tlbvec : vec (option TLB_Entry) (2 ^ 6))
     (pa1 pa2 pa3 pa4 pa5 pa6 pa7 pa8 pa9 pa10 pa11 pa12 pa13 pa14 pa15 pa16 pa17 : mword 64)
-    (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64)
-    (Phi : mval -> iProp Σ) :=
+    (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64) :=
   m !!! Regidx csp_rs1 = spv ->
   m !!! Regidx (mword_of_int 1 : mword 5) = rava ->
   smode_config γ dq -∗
@@ -122,11 +121,10 @@ Module Type KERNELTRAP_RETURNS.
       (satp0 : mword 64)
       (tlbvec : vec (option TLB_Entry) (2 ^ 6))
       (pa1 pa2 pa3 pa4 pa5 pa6 pa7 pa8 pa9 pa10 pa11 pa12 pa13 pa14 pa15 pa16 pa17 : mword 64)
-      (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64)
-      (Phi : mval -> iProp Σ),
+      (v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 : bv 64),
       wp_kerneltrap_returns_body γ dq m spv rava satp0 tlbvec
         pa1 pa2 pa3 pa4 pa5 pa6 pa7 pa8 pa9 pa10 pa11 pa12 pa13 pa14 pa15 pa16 pa17
-        v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17 Phi.
+        v1 v2 v3 v4 v5 v6 v7 v8 v9 v10 v11 v12 v13 v14 v15 v16 v17.
 End KERNELTRAP_RETURNS.
 
 (* ===================================================================== *)

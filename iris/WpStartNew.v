@@ -739,7 +739,7 @@ Proof.
   split_and!; assumption.
 Qed.
 
-(* THE data-side PMP fact wp_timerinit needs, for a bounded access. *)
+(* THE data-side PMP fact wp_timerinit, for a bounded access. *)
 Lemma st_pmp_tor0_grants (cfg0 : type_of_register pmpcfg_n)
     (pa0 : type_of_register pmpaddr_n) (ea : mword 64) (width : Z) :
   pmp_all_off cfg0 ->
@@ -908,7 +908,7 @@ Section WpStartThm.
 
   (* [wp_start]: the whole-function spec over [stack_own_phys sp0 n] (n >= 4 =
      start's own 2-slot frame plus timerinit's 2-slot child frame). *)
-  Lemma wp_start (Φ : mval -> iProp Σ)
+  Lemma wp_start
       (m : regfile) (sp0 ra0 s00 : mword 64)
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 mhartid_in : mword 64)
       (mcounteren0 : mword 32)
@@ -1143,7 +1143,7 @@ Section WpStartThm.
     pose proof (st_ms1_kernel_facts ms0 HoKF) as HKF1.
 
     (* ---- 30. c.addi sp, -16 ---- *)
-    iApply (wp_addi_gpr Φ st_pc30 true csp_rs1 csp_rs1 (sign_extend' 12 i9) m pmpcfg0 (1/2)%Qp
+    iApply (wp_addi_gpr st_pc30 true csp_rs1 csp_rs1 (sign_extend' 12 i9) m pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_sp
               with "Hmm HpcfA Hpc Hfile Hi30").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P30).
@@ -1158,7 +1158,7 @@ Section WpStartThm.
     assert (Hea31 : add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
               (sign_extend' 64 (zero_extend' 12 (concat_vec u10 ('b"000")))) = ti_ea_ra sp0)
       by (rewrite L31sp; reflexivity).
-    iApply (wp_store_gpr Φ st_pc31 true csp_rs1 ti_ra
+    iApply (wp_store_gpr st_pc31 true csp_rs1 ti_ra
               (zero_extend' 12 (concat_vec u10 ('b"000"))) (st_m30 m sp0) vsra pmpcfg0 (1/2)%Qp
               Hpmp ltac:(boot_static) with "Hmm HpcfA Hpc Hfile Hi31 [Hsra]").
     { rewrite Hea31. iExact "Hsra". }
@@ -1170,7 +1170,7 @@ Section WpStartThm.
     assert (Hea32 : add_vec (st_m30 m sp0 !!! Regidx csp_rs1)
               (sign_extend' 64 (zero_extend' 12 (concat_vec u11 ('b"000")))) = ti_ea_s0 sp0)
       by (rewrite L31sp; reflexivity).
-    iApply (wp_store_gpr Φ st_pc32 true csp_rs1 ti_s0
+    iApply (wp_store_gpr st_pc32 true csp_rs1 ti_s0
               (zero_extend' 12 (concat_vec u11 ('b"000"))) (st_m30 m sp0) vss0 pmpcfg0 (1/2)%Qp
               Hpmp ltac:(boot_static) with "Hmm HpcfA Hpc Hfile Hi32 [Hss0]").
     { rewrite Hea32. iExact "Hss0". }
@@ -1178,21 +1178,21 @@ Section WpStartThm.
     iIntros "Hmm HpcfA Hpc Hfile Hss0".
 
     (* ---- 33. c.addi4spn s0, sp, 16 (s0 := sp0) ---- *)
-    iApply (wp_addi_gpr Φ st_pc33 true csp_rs1 ti_s0 (caddi4spn_imm nz12) (st_m30 m sp0)
+    iApply (wp_addi_gpr st_pc33 true csp_rs1 ti_s0 (caddi4spn_imm nz12) (st_m30 m sp0)
               pmpcfg0 (1/2)%Qp HpmpU ltac:(boot_static) Hnz_s0 with "Hmm HpcfA Hpc Hfile Hi33").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P33 L31sp Hs016). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_s0 := regval_into_reg sp0]> (st_m30 m sp0))
              with (st_m33 m sp0)) in "Hfile".
 
     (* ---- 34. csrr a5, mstatus (reads the PINNED outside half) ---- *)
-    iApply (wp_csrr_mstatus_gpr Φ st_pc34 ti_a5 ms0 (st_m33 m sp0) pmpcfg0 (1/2)%Qp
+    iApply (wp_csrr_mstatus_gpr st_pc34 ti_a5 ms0 (st_m33 m sp0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile HmsK Hi34").
     iEval (rewrite P34). iIntros "Hmm HpcfA Hpc Hfile HmsK".
     iEval (change (<[Regidx ti_a5 := regval_into_reg ms0]> (st_m33 m sp0))
              with (st_m34 m sp0 ms0)) in "Hfile".
 
     (* ---- 35. c.lui a4, 0xffffe ---- *)
-    iApply (wp_lui_gpr Φ st_pc35 true ti_a4 (sign_extend' 20 si35) (st_m34 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_lui_gpr st_pc35 true ti_a4 (sign_extend' 20 si35) (st_m34 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi35").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P35). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si35))]>
@@ -1202,7 +1202,7 @@ Section WpStartThm.
     (* ---- 36. addi a4, a4, 2047 (a4 := 0xffffffffffffe7ff) ---- *)
     assert (L36a4 : st_m35 m sp0 ms0 !!! Regidx ti_a4 = luival (sign_extend' 20 si35))
       by (st_unfold; st_look).
-    iApply (wp_addi_gpr Φ st_pc36 false ti_a4 ti_a4 si36 (st_m35 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_addi_gpr st_pc36 false ti_a4 ti_a4 si36 (st_m35 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi36").
     iEval (change (if false then 2%Z else 4%Z) with 4%Z). iEval (rewrite P36 L36a4 Hm1v). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg st_mask_and]> (st_m35 m sp0 ms0))
@@ -1211,14 +1211,14 @@ Section WpStartThm.
     (* ---- 37. c.and a5, a4 ---- *)
     assert (L37a5 : st_m36 m sp0 ms0 !!! Regidx ti_a5 = ms0) by (st_unfold; st_look).
     assert (L37a4 : st_m36 m sp0 ms0 !!! Regidx ti_a4 = st_mask_and) by (st_unfold; st_look).
-    iApply (wp_and_gpr Φ st_pc37 true ti_a4 ti_a5 ti_a5 (st_m36 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_and_gpr st_pc37 true ti_a4 ti_a5 ti_a5 (st_m36 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi37").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P37 L37a5 L37a4). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg (and_vec ms0 st_mask_and)]> (st_m36 m sp0 ms0))
              with (st_m37 m sp0 ms0)) in "Hfile".
 
     (* ---- 38. c.lui a4, 1 ---- *)
-    iApply (wp_lui_gpr Φ st_pc38 true ti_a4 (sign_extend' 20 si38) (st_m37 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_lui_gpr st_pc38 true ti_a4 (sign_extend' 20 si38) (st_m37 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi38").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P38). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si38))]>
@@ -1228,7 +1228,7 @@ Section WpStartThm.
     (* ---- 39. addi a4, a4, -2048 (a4 := 0x800) ---- *)
     assert (L39a4 : st_m38 m sp0 ms0 !!! Regidx ti_a4 = luival (sign_extend' 20 si38))
       by (st_unfold; st_look).
-    iApply (wp_addi_gpr Φ st_pc39 false ti_a4 ti_a4 si39 (st_m38 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_addi_gpr st_pc39 false ti_a4 ti_a4 si39 (st_m38 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a4 with "Hmm HpcfA Hpc Hfile Hi39").
     iEval (change (if false then 2%Z else 4%Z) with 4%Z). iEval (rewrite P39 L39a4 Hm2v). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a4 := regval_into_reg st_mask_or]> (st_m38 m sp0 ms0))
@@ -1237,7 +1237,7 @@ Section WpStartThm.
     (* ---- 40. c.or a5, a4 (a5 := the mstatus write mask value) ---- *)
     assert (L40a5 : st_m39 m sp0 ms0 !!! Regidx ti_a5 = and_vec ms0 st_mask_and) by (st_unfold; st_look).
     assert (L40a4 : st_m39 m sp0 ms0 !!! Regidx ti_a4 = st_mask_or) by (st_unfold; st_look).
-    iApply (wp_or_gpr Φ st_pc40 true ti_a4 ti_a5 ti_a5 (st_m39 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_or_gpr st_pc40 true ti_a4 ti_a5 ti_a5 (st_m39 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi40").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P40 L40a5 L40a4). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg (or_vec (and_vec ms0 st_mask_and) st_mask_or)]>
@@ -1254,7 +1254,7 @@ Section WpStartThm.
     iDestruct (reg_half_join with "HprivA HprivK") as "Hpriv".
     iDestruct (reg_half_join with "HmsA HmsK") as "Hms".
     iDestruct (reg_half_join with "HpcfA HpcfK") as "Hpcf".
-    iApply (wp_csrw_mstatus_raw Φ st_pc41 ti_a5 (st_m40 m sp0 ms0) ms0 pmpcfg0
+    iApply (wp_csrw_mstatus_raw st_pc41 ti_a5 (st_m40 m sp0 ms0) ms0 pmpcfg0
               HpmpU ltac:(boot_static) HoIE
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hfile Hi41").
     iEval (rewrite P41 L41a5).
@@ -1268,7 +1268,7 @@ Section WpStartThm.
                   with "Hhw Hinv HhsA HprivA HmsA") as "Hmm".
 
     (* ---- 42. auipc a5, 1 ---- *)
-    iApply (wp_auipc_gpr Φ st_pc42 ti_a5 si42 (st_m40 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_auipc_gpr st_pc42 ti_a5 si42 (st_m40 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi42").
     iEval (rewrite P42 Ha42v). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg st_a42v]> (st_m40 m sp0 ms0))
@@ -1276,7 +1276,7 @@ Section WpStartThm.
 
     (* ---- 43. addi a5, a5, -502 (a5 := <main>) ---- *)
     assert (L43a5 : st_m42 m sp0 ms0 !!! Regidx ti_a5 = st_a42v) by (st_unfold; st_look).
-    iApply (wp_addi_gpr Φ st_pc43 false ti_a5 ti_a5 si43 (st_m42 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_addi_gpr st_pc43 false ti_a5 ti_a5 si43 (st_m42 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi43").
     iEval (change (if false then 2%Z else 4%Z) with 4%Z). iEval (rewrite P43 L43a5 Ha43v). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg st_main]> (st_m42 m sp0 ms0))
@@ -1284,14 +1284,14 @@ Section WpStartThm.
 
     (* ---- 44. csrw mepc, a5 ---- *)
     assert (L44a5 : st_m43 m sp0 ms0 !!! Regidx ti_a5 = st_main) by (st_unfold; st_look).
-    iApply (wp_csrw_mepc_gpr Φ st_pc44 ti_a5 (st_m43 m sp0 ms0) mepc0 pmpcfg0 (1/2)%Qp
+    iApply (wp_csrw_mepc_gpr st_pc44 ti_a5 (st_m43 m sp0 ms0) mepc0 pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hmepc Hi44").
     iEval (rewrite P44 L44a5 Hmepcv). iIntros "Hmm HpcfA Hpc Hfile Hmepc".
 
     (* ---- 45. c.li a5, 0 ---- *)
     iDestruct (gpr_file_x0 (st_m43 m sp0 ms0) cli_rs1 ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hx0_45 Hfile]".
-    iApply (wp_addi_gpr Φ st_pc45 true cli_rs1 ti_a5 (sign_extend' 12 si45) (st_m43 m sp0 ms0)
+    iApply (wp_addi_gpr st_pc45 true cli_rs1 ti_a5 (sign_extend' 12 si45) (st_m43 m sp0 ms0)
               pmpcfg0 (1/2)%Qp HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi45").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite sext6_12_64 P45 Hx0_45 add_vec_zero_l Hz45). iIntros "Hmm HpcfA Hpc Hfile".
@@ -1300,12 +1300,12 @@ Section WpStartThm.
 
     (* ---- 46. csrw satp, a5 (Bare) ---- *)
     assert (L46a5 : st_m45 m sp0 ms0 !!! Regidx ti_a5 = (mword_of_int 0 : mword 64)) by (st_unfold; st_look).
-    iApply (wp_csrw_satp_gpr Φ st_pc46 ti_a5 (st_m45 m sp0 ms0) satp0 pmpcfg0 (1/2)%Qp
+    iApply (wp_csrw_satp_gpr st_pc46 ti_a5 (st_m45 m sp0 ms0) satp0 pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hsatp Hi46").
     iEval (rewrite P46 L46a5). iIntros "Hmm HpcfA Hpc Hfile Hsatp".
 
     (* ---- 47. c.lui a5, 0x10 ---- *)
-    iApply (wp_lui_gpr Φ st_pc47 true ti_a5 (sign_extend' 20 si47) (st_m45 m sp0 ms0) pmpcfg0 (1/2)%Qp
+    iApply (wp_lui_gpr st_pc47 true ti_a5 (sign_extend' 20 si47) (st_m45 m sp0 ms0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi47").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P47). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg (luival (sign_extend' 20 si47))]>
@@ -1315,7 +1315,7 @@ Section WpStartThm.
     (* ---- 48. c.addi a5, -1 (a5 := 0xffff) ---- *)
     assert (L48a5 : st_m47 m sp0 ms0 !!! Regidx ti_a5 = luival (sign_extend' 20 si47))
       by (st_unfold; st_look).
-    iApply (wp_addi_gpr Φ st_pc48 true ti_a5 ti_a5 (sign_extend' 12 si48) (st_m47 m sp0 ms0)
+    iApply (wp_addi_gpr st_pc48 true ti_a5 ti_a5 (sign_extend' 12 si48) (st_m47 m sp0 ms0)
               pmpcfg0 (1/2)%Qp HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi48").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite sext6_12_64 P48 L48a5 Hffv). iIntros "Hmm HpcfA Hpc Hfile".
@@ -1324,18 +1324,18 @@ Section WpStartThm.
 
     (* ---- 49. csrw medeleg, a5 ---- *)
     assert (L49a5 : st_m48 m sp0 ms0 !!! Regidx ti_a5 = st_ffff) by (st_unfold; st_look).
-    iApply (wp_csrw_medeleg_gpr Φ st_pc49 ti_a5 (st_m48 m sp0 ms0) medeleg0 pmpcfg0 (1/2)%Qp
+    iApply (wp_csrw_medeleg_gpr st_pc49 ti_a5 (st_m48 m sp0 ms0) medeleg0 pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hmede Hi49").
     iEval (rewrite P49 L49a5). iIntros "Hmm HpcfA Hpc Hfile Hmede".
 
     (* ---- 50. csrw mideleg, a5 ---- *)
-    iApply (wp_csrw_mideleg_gpr Φ st_pc50 ti_a5 (st_m48 m sp0 ms0) mideleg0 pmpcfg0 (1/2)%Qp
+    iApply (wp_csrw_mideleg_gpr st_pc50 ti_a5 (st_m48 m sp0 ms0) mideleg0 pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hmdl Hi50").
     iEval (rewrite P50 L49a5). iIntros "Hmm HpcfA Hpc Hfile Hmdl".
     iEval (change (mideleg_legalized mideleg0 st_ffff) with (st_mdl1 mideleg0)) in "Hmdl".
 
     (* ---- 51. csrr a5, sie (view over mie & mideleg) ---- *)
-    iApply (wp_csrr_sie_gpr Φ st_pc51 ti_a5 mie0 (st_mdl1 mideleg0) (st_m48 m sp0 ms0)
+    iApply (wp_csrr_sie_gpr st_pc51 ti_a5 mie0 (st_mdl1 mideleg0) (st_m48 m sp0 ms0)
               pmpcfg0 (1/2)%Qp HpmpU ltac:(boot_static) Hnz_a5
               with "Hmm HpcfA Hpc Hfile Hmie Hmdl Hi51").
     iEval (rewrite P51). iIntros "Hmm HpcfA Hpc Hfile Hmie Hmdl".
@@ -1346,7 +1346,7 @@ Section WpStartThm.
     (* ---- 52. ori a5, a5, 544 ---- *)
     assert (L52a5 : st_m51 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5
                     = lower_mie mie0 (st_mdl1 mideleg0)) by (st_unfold; st_look).
-    iApply (wp_ori_gpr Φ st_pc52 ti_a5 ti_a5 si52 (st_m51 m sp0 ms0 mie0 mideleg0) pmpcfg0 (1/2)%Qp
+    iApply (wp_ori_gpr st_pc52 ti_a5 ti_a5 si52 (st_m51 m sp0 ms0 mie0 mideleg0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi52").
     iEval (rewrite P52 L52a5). iIntros "Hmm HpcfA Hpc Hfile".
     iEval (change (<[Regidx ti_a5 := regval_into_reg
@@ -1357,7 +1357,7 @@ Section WpStartThm.
     (* ---- 53. csrw sie, a5 ---- *)
     assert (L53a5 : st_m52 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5
                     = st_va5_52 mie0 mideleg0) by (st_unfold; st_look).
-    iApply (wp_csrw_sie_gpr Φ st_pc53 ti_a5 (st_m52 m sp0 ms0 mie0 mideleg0)
+    iApply (wp_csrw_sie_gpr st_pc53 ti_a5 (st_m52 m sp0 ms0 mie0 mideleg0)
               mie0 (st_mdl1 mideleg0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hmie Hmdl Hi53").
     iEval (rewrite P53 L53a5). iIntros "Hmm HpcfA Hpc Hfile Hmie Hmdl".
@@ -1367,7 +1367,7 @@ Section WpStartThm.
     (* ---- 54. c.li a5, -1 ---- *)
     iDestruct (gpr_file_x0 (st_m52 m sp0 ms0 mie0 mideleg0) cli_rs1 ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hx0_54 Hfile]".
-    iApply (wp_addi_gpr Φ st_pc54 true cli_rs1 ti_a5 (sign_extend' 12 si54)
+    iApply (wp_addi_gpr st_pc54 true cli_rs1 ti_a5 (sign_extend' 12 si54)
               (st_m52 m sp0 ms0 mie0 mideleg0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi54").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
@@ -1379,7 +1379,7 @@ Section WpStartThm.
     (* ---- 55. c.srli a5, 10 (a5 := 0x3fffffffffffff) ---- *)
     assert (L55a5 : st_m54 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5 = cli_wval si54)
       by (st_unfold; st_look).
-    iApply (wp_srli_gpr Φ st_pc55 true ti_a5 ti_a5 ssh55 (st_m54 m sp0 ms0 mie0 mideleg0)
+    iApply (wp_srli_gpr st_pc55 true ti_a5 ti_a5 ssh55 (st_m54 m sp0 ms0 mie0 mideleg0)
               pmpcfg0 (1/2)%Qp HpmpU ltac:(boot_static) Hnz_a5
               with "Hmm HpcfA Hpc Hfile Hi55").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z). iEval (rewrite P55 L55a5 Hshv). iIntros "Hmm HpcfA Hpc Hfile".
@@ -1389,7 +1389,7 @@ Section WpStartThm.
     (* ---- 56. csrw pmpaddr0, a5 ---- *)
     assert (L56a5 : st_m55 m sp0 ms0 mie0 mideleg0 !!! Regidx ti_a5 = st_pmpw)
       by (st_unfold; st_look).
-    iApply (wp_csrw_pmpaddr0_gpr Φ st_pc56 ti_a5 (st_m55 m sp0 ms0 mie0 mideleg0)
+    iApply (wp_csrw_pmpaddr0_gpr st_pc56 ti_a5 (st_m55 m sp0 ms0 mie0 mideleg0)
               pmpaddr00 pmpcfg0 (1/2)%Qp HpmpU ltac:(boot_static) Hnz_a5
               with "Hmm HpcfA Hpc Hfile Hpaddr Hi56").
     iEval (rewrite P56 L56a5). iIntros "Hmm HpcfA Hpc Hfile Hpaddr".
@@ -1399,7 +1399,7 @@ Section WpStartThm.
     (* ---- 57. c.li a5, 15 ---- *)
     iDestruct (gpr_file_x0 (st_m55 m sp0 ms0 mie0 mideleg0) cli_rs1 ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hx0_57 Hfile]".
-    iApply (wp_addi_gpr Φ st_pc57 true cli_rs1 ti_a5 (sign_extend' 12 si57)
+    iApply (wp_addi_gpr st_pc57 true cli_rs1 ti_a5 (sign_extend' 12 si57)
               (st_m55 m sp0 ms0 mie0 mideleg0) pmpcfg0 (1/2)%Qp
               HpmpU ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hi57").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
@@ -1418,7 +1418,7 @@ Section WpStartThm.
     iDestruct (reg_half_join with "HprivA HprivK") as "Hpriv".
     iDestruct (reg_half_join with "HmsA HmsK") as "Hms".
     iDestruct (reg_half_join with "HpcfA HpcfK") as "Hpcf".
-    iApply (wp_csrw_pmpcfg0_raw Φ st_pc58 ti_a5 (st_m57 m sp0 ms0 mie0 mideleg0)
+    iApply (wp_csrw_pmpcfg0_raw st_pc58 ti_a5 (st_m57 m sp0 ms0 mie0 mideleg0)
               (st_ms1 ms0) pmpcfg0 HpmpU ltac:(boot_static) HmIE1
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hfile Hi58").
     iEval (rewrite P58 L58a5).
@@ -1433,7 +1433,7 @@ Section WpStartThm.
 
     (* ---- ADUE write: [menvcfg |= 1<<61] (start+0x58..0x62) ---- *)
     (* ae0: csrr a5, menvcfg  (a5 := menvcfg0) *)
-    iApply (wp_csrr_menvcfg_gpr Φ st_pc_ae0 ti_a5 menvcfg0 (st_m57 m sp0 ms0 mie0 mideleg0)
+    iApply (wp_csrr_menvcfg_gpr st_pc_ae0 ti_a5 menvcfg0 (st_m57 m sp0 ms0 mie0 mideleg0)
               (st_pmpcfg1 pmpcfg0) (1/2)%Qp Hpmp1 ltac:(boot_static) Hnz_a5
               with "Hmm HpcfA Hpc Hfile Hmenv Hiae0").
     iEval (rewrite Pae0). iIntros "Hmm HpcfA Hpc Hfile Hmenv".
@@ -1442,7 +1442,7 @@ Section WpStartThm.
     (* ae1: c.li a4, 1  (a4 := 1) *)
     iDestruct (gpr_file_x0 (st_m_ae0 m sp0 ms0 mie0 mideleg0 menvcfg0) cli_rs1 ltac:(vm_compute; reflexivity)
                  with "Hfile") as "[%Hx0_ae1 Hfile]".
-    iApply (wp_addi_gpr Φ st_pc_ae1 true cli_rs1 ti_a4 (sign_extend' 12 sae_li)
+    iApply (wp_addi_gpr st_pc_ae1 true cli_rs1 ti_a4 (sign_extend' 12 sae_li)
               (st_m_ae0 m sp0 ms0 mie0 mideleg0 menvcfg0) (st_pmpcfg1 pmpcfg0) (1/2)%Qp
               Hpmp1 ltac:(boot_static) Hnz_a4 with "Hmm HpcfA Hpc Hfile Hiae1").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
@@ -1452,7 +1452,7 @@ Section WpStartThm.
     (* ae2: c.slli a4, 0x3d  (a4 := 1<<61) *)
     assert (L_ae2a4 : st_m_ae1 m sp0 ms0 mie0 mideleg0 menvcfg0 !!! Regidx ti_a4 = cli_wval sae_li)
       by (st_unfold; st_look).
-    iApply (wp_slli_gpr Φ st_pc_ae2 true ti_a4 ti_a4 sae_slli (st_m_ae1 m sp0 ms0 mie0 mideleg0 menvcfg0)
+    iApply (wp_slli_gpr st_pc_ae2 true ti_a4 ti_a4 sae_slli (st_m_ae1 m sp0 ms0 mie0 mideleg0 menvcfg0)
               (st_pmpcfg1 pmpcfg0) (1/2)%Qp Hpmp1 ltac:(boot_static) Hnz_a4 with "Hmm HpcfA Hpc Hfile Hiae2").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite Pae2 L_ae2a4 st_Hb61). iIntros "Hmm HpcfA Hpc Hfile".
@@ -1463,7 +1463,7 @@ Section WpStartThm.
       by (st_unfold; st_look).
     assert (L_ae3a4 : st_m_ae2 m sp0 ms0 mie0 mideleg0 menvcfg0 !!! Regidx ti_a4 = st_adue_bit)
       by (st_unfold; st_look).
-    iApply (wp_or_gpr Φ st_pc_ae3 true ti_a4 ti_a5 ti_a5 (st_m_ae2 m sp0 ms0 mie0 mideleg0 menvcfg0)
+    iApply (wp_or_gpr st_pc_ae3 true ti_a4 ti_a5 ti_a5 (st_m_ae2 m sp0 ms0 mie0 mideleg0 menvcfg0)
               (st_pmpcfg1 pmpcfg0) (1/2)%Qp Hpmp1 ltac:(boot_static) Hnz_a5 with "Hmm HpcfA Hpc Hfile Hiae3").
     iEval (change (if true then 2%Z else 4%Z) with 2%Z).
     iEval (rewrite Pae3 L_ae3a5 L_ae3a4). iIntros "Hmm HpcfA Hpc Hfile".
@@ -1472,7 +1472,7 @@ Section WpStartThm.
     (* ae4: csrw menvcfg, a5  (menvcfg := st_menv_adue menvcfg0) *)
     assert (L_ae4a5 : st_m_ae3 m sp0 ms0 mie0 mideleg0 menvcfg0 !!! Regidx ti_a5 = or_vec menvcfg0 st_adue_bit)
       by (st_unfold; st_look).
-    iApply (wp_csrw_menvcfg_gpr Φ st_pc_ae4 ti_a5 (st_m_ae3 m sp0 ms0 mie0 mideleg0 menvcfg0) menvcfg0
+    iApply (wp_csrw_menvcfg_gpr st_pc_ae4 ti_a5 (st_m_ae3 m sp0 ms0 mie0 mideleg0 menvcfg0) menvcfg0
               (st_pmpcfg1 pmpcfg0) (1/2)%Qp Hpmp1 ltac:(boot_static) Hnz_a5
               with "Hmm HpcfA Hpc Hfile Hmenv Hiae4").
     iEval (rewrite Pae4 L_ae4a5). iIntros "Hmm HpcfA Hpc Hfile Hmenv".
@@ -1480,7 +1480,7 @@ Section WpStartThm.
              with (st_menv_adue menvcfg0)) in "Hmenv".
 
     (* ---- 59. jal ra, timerinit (PC := timerinit entry) ---- *)
-    iApply (wp_jal_gpr Φ st_pc59 ti_ra sjimm59 (st_m_ae3 m sp0 ms0 mie0 mideleg0 menvcfg0)
+    iApply (wp_jal_gpr st_pc59 ti_ra sjimm59 (st_m_ae3 m sp0 ms0 mie0 mideleg0 menvcfg0)
               (st_pmpcfg1 pmpcfg0) (1/2)%Qp Hpmp1 ltac:(boot_static) Hnz_ra Hjal_al
               with "Hmm HpcfA Hpc Hfile Hi59").
     iEval (rewrite P59 Hlinkv). iIntros "Hmm HpcfA Hpc Hfile".
@@ -1503,7 +1503,7 @@ Section WpStartThm.
     { unfold ti_ea_s0, ti_sp1, pa_stk, add_vec_int. rewrite !pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite Htb1) in "Htra". iEval (rewrite Htb2) in "Hts0".
     iDestruct (stack_own_phys_2_intro with "Htra Hts0") as "Htistk".
-    iApply (wp_timerinit Φ (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0 menvcfg0) (ti_sp1 sp0)
+    iApply (wp_timerinit (1/2)%Qp (st_m59 m sp0 ms0 mie0 mideleg0 menvcfg0) (ti_sp1 sp0)
               st_ra_link sp0 (st_menv_adue menvcfg0) stimecmp0 mcounteren0
               (st_pmpcfg1 pmpcfg0) (st_pmpaddr1 pmpcfg0 pmpaddr00) 2
               ltac:(lia) Hpmp1 Htor_ra Htor_s0 L59sp L59ra L59s0
@@ -1518,7 +1518,7 @@ Section WpStartThm.
     iDestruct (reg_half_join with "HpaA HpaK") as "Hpaddr".
 
     (* ---- 60. csrr a5, mhartid ---- *)
-    iApply (wp_csrr_mhartid_gpr Φ st_pc60 ti_a5 mhartid_in
+    iApply (wp_csrr_mhartid_gpr st_pc60 ti_a5 mhartid_in
               (st_mti m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv)
               (st_pmpcfg1 pmpcfg0) (1/2)%Qp Hpmp1 ltac:(boot_static) Hnz_a5
               with "Hmm HpcfA Hpc Hfile Hmh Hi60").
@@ -1530,7 +1530,7 @@ Section WpStartThm.
     (* ---- 61. c.addiw a5, 0 (sext.w) ---- *)
     assert (L61a5 : st_m60 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in
                       !!! Regidx ti_a5 = mhartid_in) by (st_unfold; st_look).
-    iApply (wp_addiw_gpr Φ st_pc61 true ti_a5 ti_a5 (sign_extend' 12 si61)
+    iApply (wp_addiw_gpr st_pc61 true ti_a5 ti_a5 (sign_extend' 12 si61)
               (st_m60 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in)
               (st_pmpcfg1 pmpcfg0) (1/2)%Qp Hpmp1 ltac:(boot_static) Hnz_a5
               with "Hmm HpcfA Hpc Hfile Hi61").
@@ -1548,7 +1548,7 @@ Section WpStartThm.
     iDestruct (gpr_file_x0
                  (st_m61 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in)
                  cli_rs1 ltac:(vm_compute; reflexivity) with "Hfile") as "[%Hx0_62 Hfile]".
-    iApply (wp_add_gpr Φ st_pc62 true ti_a5 cli_rs1 st_tp
+    iApply (wp_add_gpr st_pc62 true ti_a5 cli_rs1 st_tp
               (st_m61 m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in)
               (st_pmpcfg1 pmpcfg0) (1/2)%Qp Hpmp1 ltac:(boot_static) Hnz_tp
               with "Hmm HpcfA Hpc Hfile Hi62").
@@ -1570,7 +1570,7 @@ Section WpStartThm.
                   = returnM Supervisor) by (apply st_mret_priv).
     assert (HlpeF : _get_MEnvcfg_LPE (menvcfg_legalized (st_menv_adue menvcfg0) (ti_menv1 (st_menv_adue menvcfg0))) = ('b"0"))
       by (apply st_menvcfg_LPE_final; apply st_menv_adue_LPE; exact HlpeE).
-    iApply (wp_mret_gpr Φ st_pc63 Supervisor (st_ms1 ms0) st_main
+    iApply (wp_mret_gpr st_pc63 Supervisor (st_ms1 ms0) st_main
               (menvcfg_legalized (st_menv_adue menvcfg0) (ti_menv1 (st_menv_adue menvcfg0)))
               (st_mout m sp0 ms0 mie0 mideleg0 menvcfg0 mcounteren0 tv mhartid_in)
               (st_pmpcfg1 pmpcfg0)

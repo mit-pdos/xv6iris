@@ -325,7 +325,7 @@ Section WpCsrrGprB.
      instruction reads: the continuation is ∀-quantified over the read value
      [tv].  (No clock_inv opening is needed either -- the exec witness reads
      mtime straight off the abstract step state σ.) *)
-  Lemma wp_csrr_time_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_time_gpr (pc : mword 64) (rd : mword 5)
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -353,7 +353,7 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -401,7 +401,7 @@ Section WpCsrrGprB.
   Qed.
 
   (* menvcfg (0x30A): Ext_U-gated; misa.U recovered from hw_config. *)
-  Lemma wp_csrr_menvcfg_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_menvcfg_gpr (pc : mword 64) (rd : mword 5)
       (menvcfg_in : mword 64) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -431,7 +431,7 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -487,7 +487,7 @@ Section WpCsrrGprB.
   (* sie (0x104): Ext_S-gated; misa.S recovered from hw_config.  The read
      value is a VIEW over TWO registers ([lower_mie mie mideleg]), so both
      cells are threaded (returned unchanged). *)
-  Lemma wp_csrr_sie_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_sie_gpr (pc : mword 64) (rd : mword 5)
       (mie_in mideleg_in : mword 64) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -519,7 +519,7 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

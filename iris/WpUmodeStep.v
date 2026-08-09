@@ -87,7 +87,7 @@ Section UvInterruptBranch.
      payload-generic core over an opaque [P : iProp Σ] plus two
      restatements); they are kept apart here so that landing this file
      touches no already-built file. *)
-  Lemma uv_interrupt_branch (Ei : coPset) (Φ : mval -> iProp Σ)
+  Lemma uv_interrupt_branch (Ei : coPset)
       (σ : mstate) (i : InterruptType)
       (ms_v sc_v stval_v sepc_v va : mword 64) (g : regfile)
       (M : gmap Z (bv 8))
@@ -207,7 +207,7 @@ Section UvStepEngine.
      real step -- possibly after any number of absorbed interrupts and
      migrations, which is why the hart is quantified INSIDE. *)
   Definition uv_step_obl (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
-      (m : regfile) (pc : mword 64) (Φ : mval -> iProp Σ) : iProp Σ :=
+      (m : regfile) (pc : mword 64) : iProp Σ :=
     (∀ (CID : CpuId) (σ : mstate) (ms_v sc_v stval_v sepc_v : mword 64),
        ⌜user_mstatus_ok ms_v⌝ -∗
        ⌜register_lookup cur_privilege σ.(sregs) = User⌝ -∗
@@ -237,11 +237,11 @@ Section UvStepEngine.
      binder, so the induction hypothesis can be re-applied at the RESUMING
      hart after a migration. *)
   Lemma wp_uv_step_gen (Ψ : usys_protocol Σ) (M : gmap Z (bv 8))
-      (m : regfile) (pc : mword 64) (Φ : mval -> iProp Σ) :
+      (m : regfile) (pc : mword 64) :
     ⊢ ∀ CID : CpuId,
         uv_cap_gpr (CID := CID) C pt Ψ M m -∗
         pc_is pc -∗
-        uv_step_obl Ψ M m pc Φ -∗
+        uv_step_obl Ψ M m pc -∗
         WP (Loop : expr riscv_lang).
   Proof.
     iLöb as "IH".
@@ -252,7 +252,7 @@ Section UvStepEngine.
     iDestruct "Hamb" as "(#Hhw & #Hmin & #Hwinv)".
     iDestruct "Hregs" as (ms_v sc_v stval_v sepc_v)
       "(%Hmsok & Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc)".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ with "Hmin").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) with "Hmin").
     iIntros (σ) "Hint Hbody".
     (* borrow the wires for this step *)
     iInv "Hwinv" as ">Hwbody" "Hclosew".
@@ -284,7 +284,7 @@ Section UvStepEngine.
     - (* ---- a pending delegated interrupt: absorb it ---- *)
       pose proof (u_dispatch_Supervisor _ _ _ _ _ _ _ Hd) as ->.
       iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-      iMod (uv_interrupt_branch C pt (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ σ i
+      iMod (uv_interrupt_branch C pt (⊤ ∖ ↑minstretN ∖ ↑wireN) σ i
               ms_v sc_v stval_v sepc_v pc m M mst mi misa0 elp0 meip seip
               Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
               Lmip Lmeip Lseip Lmie Lmdl Hd
@@ -292,7 +292,7 @@ Section UvStepEngine.
                     Hutlb Humem Hcfg [Hobl]")
         as (s') "[%Hexec Hrest]".
       { iNext. iIntros "Hframe".
-        iApply ("Hintr" $! CID Φ m M pc i sc_v (tval None) with "Hframe").
+        iApply ("Hintr" $! CID m M pc i sc_v (tval None) with "Hframe").
         iIntros (CID') "Hrun".
         iDestruct (uv_run_cap_gpr (CID := CID') C pt Ψ M m pc
                      with "[$Hintr $Hsys] Hrun") as "[Hcg Hpc']".
@@ -577,12 +577,12 @@ Section UvStepAt.
 
   (* the engine at the ambient hart *)
   Lemma wp_uv_step (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (Φ : mval -> iProp Σ) :
-    uv_cap_gpr C pt Ψ M m -∗ pc_is pc -∗ uv_step_obl C pt Ψ M m pc Φ -∗
+      (pc : mword 64) :
+    uv_cap_gpr C pt Ψ M m -∗ pc_is pc -∗ uv_step_obl C pt Ψ M m pc -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hobl".
-    iPoseProof (wp_uv_step_gen C pt Ψ M m pc Φ) as "H".
+    iPoseProof (wp_uv_step_gen C pt Ψ M m pc) as "H".
     iApply ("H" $! CID with "Hcg Hpc Hobl").
   Qed.
 
@@ -642,7 +642,7 @@ Section UvRetirePost.
   (* Geometry-agnostic: the [run_hart_active] witness enters as the pure   *)
   (* implication [Hprog] that [uv_prog_rvc] / [uv_prog_base] produce.      *)
   (* ------------------------------------------------------------------- *)
-  Lemma uv_retire_post_fetch (CIDp : CpuId) (Φ : mval -> iProp Σ) (P : iProp Σ)
+  Lemma uv_retire_post_fetch (CIDp : CpuId) (P : iProp Σ)
       (sg sf : mstate) (b : bool) (mst pc : mword 64) (k : Z) (ib : mword 32)
       (m : regfile) (i : instruction) (o : option instruction)
       (jt : option (mword 64)) (wr : option (mword 5 * mword 64)) :
@@ -775,8 +775,7 @@ Section UvRetireFunnel.
   (* ------------------------------------------------------------------- *)
   Lemma wp_uv_retire (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (is_rvc : bool) (i : instruction) (o : option instruction)
-      (jt : option (mword 64)) (wr : option (mword 5 * mword 64))
-      (Φ : mval -> iProp Σ) :
+      (jt : option (mword 64)) (wr : option (mword 5 * mword 64)) :
     uinstr pt M pc is_rvc i ->
     uv_redirect i o ->
     is_lpad_instruction i = false ->
@@ -808,7 +807,7 @@ Section UvRetireFunnel.
     iDestruct "Hcg" as "(#Hcap & Hlin & Hgprc)".
     iAssert (uv_cap_gpr C pt Ψ M m) with "[Hlin Hgprc]" as "Hcg".
     { rewrite /uv_cap_gpr. iFrame "Hcap Hlin Hgprc". }
-    iApply (wp_uv_step C pt Ψ M m pc Φ with "Hcg Hpc [Hcont]").
+    iApply (wp_uv_step C pt Ψ M m pc with "Hcg Hpc [Hcont]").
     rewrite /uv_step_obl.
     iIntros (CID0 sg ms_v sc_v stval_v sepc_v)
       "%Hmsok %Lpriv %Lms %Lpc %Hdisp #Hamb Hhs Hpriv Hms Hsc Hstval Hsepc
@@ -919,7 +918,7 @@ Section UvRetireFunnel.
         { rewrite ?sregs_set_reg. iExact "Hreg". }
         { rewrite ?mem_set_reg. iExact "Hmem". }
         destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
-        iApply (uv_retire_post_fetch CID0 Φ
+        iApply (uv_retire_post_fetch CID0
                   (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
                    umem pt M ∗ user_cfg C)%I sg sf b mst pc 2 (zero_extend' 32 h) m i o jt wr
                   Hsi Hhart_a Lpcf Lprivf Hagree Hwrok
@@ -943,7 +942,7 @@ Section UvRetireFunnel.
         { rewrite ?sregs_set_reg. iExact "Hreg". }
         { rewrite ?mem_set_reg. iExact "Hmem". }
         destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
-        iApply (uv_retire_post_fetch CID0 Φ
+        iApply (uv_retire_post_fetch CID0
                   (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
                    umem pt M ∗ user_cfg C)%I sg sf b mst pc 2 (zero_extend' 32 h) m i o jt wr
                   Hsi Hhart_a Lpcf Lprivf Hagree Hwrok
@@ -969,7 +968,7 @@ Section UvRetireFunnel.
         { rewrite ?sregs_set_reg. iExact "Hreg". }
         { rewrite ?mem_set_reg. iExact "Hmem". }
         destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
-        iApply (uv_retire_post_fetch CID0 Φ
+        iApply (uv_retire_post_fetch CID0
                   (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
                    umem pt M ∗ user_cfg C)%I sg sf b mst pc 4 (zero_extend' 32 w) m i o jt wr
                   Hsi Hhart_a Lpcf Lprivf Hagree Hwrok
@@ -989,7 +988,7 @@ Section UvRetireFunnel.
         { rewrite ?sregs_set_reg. iExact "Hreg". }
         { rewrite ?mem_set_reg. iExact "Hmem". }
         destruct (Hsf sf Tr) as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree).
-        iApply (uv_retire_post_fetch CID0 Φ
+        iApply (uv_retire_post_fetch CID0
                   (utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) ∗
                    umem pt M ∗ user_cfg C)%I sg sf b mst pc 4 (zero_extend' 32 w) m i o jt wr
                   Hsi Hhart_a Lpcf Lprivf Hagree Hwrok
@@ -1196,7 +1195,7 @@ Section UvEcall.
     iDestruct "Hcap" as "[#Hintr #Hsys]".
     iAssert (uv_cap_gpr C pt Ψ M m) with "[Hlin Hgprc]" as "Hcg".
     { rewrite /uv_cap_gpr /uv_cap. iFrame "Hintr Hsys Hlin Hgprc". }
-    iApply (wp_uv_step C pt Ψ M m pc Φ with "Hcg Hpc [HPsi]").
+    iApply (wp_uv_step C pt Ψ M m pc with "Hcg Hpc [HPsi]").
     rewrite /uv_step_obl.
     iIntros (CID0 sg ms_v sc_v stval_v sepc_v)
       "%Hmsok %Lpriv %Lms %Lpc %Hdisp #Hamb Hhs Hpriv Hms Hsc Hstval Hsepc

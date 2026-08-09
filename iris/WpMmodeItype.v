@@ -26,7 +26,7 @@ Section WpAddiGpr.
      register-generic execute, and rebuild the file.  [wp_instr] discharges
      fetch / decode / dispatchInterrupt / minstret and hands [mmode_config]
      back to the continuation. *)
-  Lemma wp_addi_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
+  Lemma wp_addi_gpr (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -45,7 +45,7 @@ Section WpAddiGpr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hgf Hinstr Hcont".
-    iApply (wp_instr Φ pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) pmpcfg0
+    iApply (wp_instr pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) pmpcfg0
               Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -102,7 +102,7 @@ Section WpLogicITypeGpr.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
-  Lemma wp_ori_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 rd : mword 5)
+  Lemma wp_ori_gpr (pc : mword 64) (rs1 rd : mword 5)
       (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -121,7 +121,7 @@ Section WpLogicITypeGpr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hgf Hinstr Hcont".
-    iApply (wp_instr Φ pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) pmpcfg0
+    iApply (wp_instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) pmpcfg0
               Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

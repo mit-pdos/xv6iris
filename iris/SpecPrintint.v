@@ -56,7 +56,7 @@ From Kernel Require KernelSyms.
 
 
 Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+    (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
     (l : list (bv 8)) (pv pkv : mword 32) (dqm dqm2 : dfrac) (b : bool) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let a1_idx : mword 5 := mword_of_int 11 in
@@ -87,7 +87,7 @@ Definition wp_printint_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !di
 Module Type PRINTINT.
   Parameter wp_printint_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ) (m0 : regfile) (K : nat)
+      (γd : uart_names) (γv : disk_names) (m0 : regfile) (K : nat)
       (l : list (bv 8)) (pv pkv : mword 32) {dqm dqm2 : dfrac} (b : bool) (p : mword 64),
-      wp_printint_sconf_body γd γv Φ m0 K l pv pkv dqm dqm2 b p.
+      wp_printint_sconf_body γd γv m0 K l pv pkv dqm dqm2 b p.
 End PRINTINT.

@@ -826,7 +826,6 @@ Section power.
      gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
 
   Lemma wp_power_loop (D : CPU -> gset register) (nproc ndisk : nat)
-      (Φ : mval -> iProp Σ)
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
@@ -1106,7 +1105,7 @@ Proof.
     rewrite Hpow. done. }
   iSplitL.
   { cbn. iSplitL; [|done].
-    iApply (@wp_power_loop Σ F _ D nproc ndisk (fun _ => True%I) (Hboot F)
+    iApply (@wp_power_loop Σ F _ D nproc ndisk (Hboot F)
               with "Hcinv"). }
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".

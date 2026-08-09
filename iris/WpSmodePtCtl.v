@@ -164,7 +164,7 @@ Section WpSmodePtCtl.
   (* ---- from WpSmodeJal.v ---- *)
 
 
-  Lemma wp_jal_gpr_s_zca_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_jal_gpr_s_zca_r (R : s_regime) (γ : gname)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (m : regfile)
       (q : Qp) :
@@ -197,7 +197,7 @@ Section WpSmodePtCtl.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_s_regime R γ Φ pc false (JAL (imm, Regidx rd))
+    iApply (wp_instr_s_regime R γ pc false (JAL (imm, Regidx rd))
 
 
               with "Hsm Htlbinv Hpc Hinstr").
@@ -256,7 +256,7 @@ Section WpSmodePtCtl.
     iEval (rewrite -rf_to_gmap_upd) in "Hfmap". iExact "Hfmap".
   Qed.
 
-  Lemma wp_jal_gpr_s_zca_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_jal_gpr_s_zca_pt (root_ppn : mword 44) (γ : gname)
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (m : regfile)
       (q : Qp) :
@@ -274,13 +274,13 @@ Section WpSmodePtCtl.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_jal_gpr_s_zca_r (kpt_share_regime root_ppn) γ Φ pc rd imm m q).
+    exact (wp_jal_gpr_s_zca_r (kpt_share_regime root_ppn) γ pc rd imm m q).
   Qed.
 
   (* ---- from WpSmodeJalr.v ---- *)
 
 
-  Lemma wp_cret_s_zca_r_later (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_cret_s_zca_r_later (R : s_regime)
       (pc : mword 64) (ra : mword 5)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -324,7 +324,7 @@ Section WpSmodePtCtl.
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & _)".
-    iApply (wp_instr_s_config_regime R Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
+    iApply (wp_instr_s_config_regime R pc true (JALR (zeros' 12, Regidx ra, zreg))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -383,7 +383,7 @@ Section WpSmodePtCtl.
     iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"].
   Qed.
 
-  Lemma wp_cret_s_zca_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_cret_s_zca_r (R : s_regime)
       (pc : mword 64) (ra : mword 5)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -423,7 +423,7 @@ Section WpSmodePtCtl.
   Proof.
     intros tgt HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe.
     iIntros "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr Hcont".
-    iApply (wp_cret_s_zca_r_later R Φ pc ra m mstatus0 mie_v mdv0 menvcfg0
+    iApply (wp_cret_s_zca_r_later R pc ra m mstatus0 mie_v mdv0 menvcfg0
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hra Hlpe
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hfile Hinstr [Hcont]").
     iNext. iExact "Hcont".
@@ -435,7 +435,7 @@ Section WpSmodePtCtl.
 
   (* ---- from WpSmodeSret.v ---- *)
 
-  Lemma wp_sret_gpr_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_sret_gpr_r (R : s_regime)
       (pc : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
       (m : regfile)
@@ -491,7 +491,7 @@ Section WpSmodePtCtl.
               register_lookup menvcfg sz.(sregs) = menvcfg0 ->
               exec (get_xLPE (sret_newpriv mstatus0)) sz = Some (false, sz)).
     { intros sz Hm. rewrite Hsup. apply exec_get_xLPE_S. rewrite Hm. exact Hlpe0. }
-    iApply (wp_instr_s_config_regime R Φ pc false (SRET tt)
+    iApply (wp_instr_s_config_regime R pc false (SRET tt)
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -570,7 +570,7 @@ Section WpSmodePtCtl.
                           [$Hpc' $Hnpc] Hfile").
   Qed.
 
-  Lemma wp_sret_gpr_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_sret_gpr_pt (root_ppn : mword 44)
       (pc : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 sepc0 : mword 64)
       (m : regfile)
@@ -614,7 +614,7 @@ Section WpSmodePtCtl.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_sret_gpr_r (kpt_share_regime root_ppn) Φ pc mstatus0 mie_v mdv0 menvcfg0 sepc0 m).
+    exact (wp_sret_gpr_r (kpt_share_regime root_ppn) pc mstatus0 mie_v mdv0 menvcfg0 sepc0 m).
   Qed.
 
 End WpSmodePtCtl.

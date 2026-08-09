@@ -74,26 +74,26 @@ Section ConsoleinitBody.
      own generic [b] hypothesis (it is still callable at any index by other
      callers) but is applied here at [false]. *)
   Hypothesis wp_initlock :
-    forall `{CID : CpuId} (Φ : mval -> iProp Σ) (m : regfile) (vlock : bv 32)
+    forall `{CID : CpuId} (m : regfile) (vlock : bv 32)
       (vname vcpu : bv 64) (s : string) (K : nat) (b : bool) (p : mword 64),
-      wp_initlock_sconf_body Φ m vlock vname vcpu s K b p.
+      wp_initlock_sconf_body m vlock vname vcpu s K b p.
 
   Hypothesis wp_uartinit :
-    forall `{CID : CpuId} (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    forall `{CID : CpuId} (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64),
-      wp_uartinit_sconf_body γd Φ m K l b0 vlock vname vcpu p.
+      wp_uartinit_sconf_body γd m K l b0 vlock vname vcpu p.
 
   Ltac reg_neq :=
     lazymatch goal with
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
-  Lemma wp_consoleinit_sconf_gen (γd : uart_names) (Φ : mval -> iProp Σ)
+  Lemma wp_consoleinit_sconf_gen (γd : uart_names)
       (m : regfile) (K : nat) (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (vtlock : bv 32) (vtname vtcpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64) :
-    wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p.
+    wp_consoleinit_sconf_body γd m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p.
   Proof.
     cbv beta delta [wp_consoleinit_sconf_body].
     intros pcE ret_tgt clk c_cname c_ccpu tlk c_tname c_tcpu HK.
@@ -141,7 +141,7 @@ Section ConsoleinitBody.
     iPoseProof (cii_42 with "Htext") as "Hi42".
     (* ===== PROLOGUE (0x00..0x06) ===== *)
     (* +0x00 addi sp,sp,-16 : 2-slot frame push *)
-    iApply (wp_caddi_sp_push_s_sconf Φ (mword_of_int KernelSyms.consoleinit) (mword_of_int 48 : mword 6) m K 2 false Hc2 Hpush
+    iApply (wp_caddi_sp_push_s_sconf (mword_of_int KernelSyms.consoleinit) (mword_of_int 48 : mword 6) m K 2 false Hc2 Hpush
               with "Hcg Hpc Hi00 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hframe Hpc".
@@ -154,7 +154,7 @@ Section ConsoleinitBody.
     assert (Hp02 : add_vec_int (mword_of_int KernelSyms.consoleinit : mword 64) 2 = mword_of_int (KernelSyms.consoleinit + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp02) in "Hpc".
     (* +0x02 sd ra,8(sp) -> slot 1 *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               W1 (K - 2)%nat v1 false with "Hcg Hpc Hi02 [Hc1] [-]").
     { iEval (rewrite HspW1 Hb1). iExact "Hc1". }
     iApply wp_next_off_intro.
@@ -165,7 +165,7 @@ Section ConsoleinitBody.
     assert (Hp04 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.consoleinit + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp04) in "Hpc".
     (* +0x04 sd s0,0(sp) -> slot 2 *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               W1 (K - 2)%nat v2 false with "Hcg Hpc Hi04 [Hc2] [-]").
     { iEval (rewrite HspW1 Hb2). iExact "Hc2". }
     iApply wp_next_off_intro.
@@ -176,7 +176,7 @@ Section ConsoleinitBody.
     assert (Hp06 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.consoleinit + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp06) in "Hpc".
     (* +0x06 addi s0,sp,16 (value unused; s0 reloaded at the epilogue) *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
               W1 (K - 2)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
     iApply wp_next_off_intro.
@@ -186,7 +186,7 @@ Section ConsoleinitBody.
     iEval (rewrite Hp08) in "Hpc".
     (* ===== initlock(&cons.lock, "cons") (0x08..0x18) ===== *)
     (* +0x08 auipc a1,0x7 *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x08)) (mword_of_int 11 : mword 5) (mword_of_int 7 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x08)) (mword_of_int 11 : mword 5) (mword_of_int 7 : mword 20)
               W2 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
     iApply wp_next_off_intro.
@@ -195,7 +195,7 @@ Section ConsoleinitBody.
     assert (Hp0c : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x08) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x0c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp0c) in "Hpc".
     (* +0x0c addi a1,a1,-1066 : a1 := &"cons" *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x0c)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 3030 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x0c)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) (mword_of_int 3030 : mword 12)
               W3 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iApply wp_next_off_intro.
@@ -206,7 +206,7 @@ Section ConsoleinitBody.
     assert (Hp10 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x0c) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
     (* +0x10 auipc a0,0x12 *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 20)
               W4 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
     iApply wp_next_off_intro.
@@ -215,7 +215,7 @@ Section ConsoleinitBody.
     assert (Hp14 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x10) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x14)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp14) in "Hpc".
     (* +0x14 addi a0,a0,-482 : a0 := &cons (= &cons.lock) *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 3614 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) (mword_of_int 3614 : mword 12)
               W5 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iApply wp_next_off_intro.
@@ -228,7 +228,7 @@ Section ConsoleinitBody.
     assert (Hp18 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x14) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x18)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp18) in "Hpc".
     (* +0x18 jal initlock *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x18)) (mword_of_int 1 : mword 5) (mword_of_int 1870 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x18)) (mword_of_int 1 : mword 5) (mword_of_int 1870 : mword 21)
               W6 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
@@ -255,7 +255,7 @@ Section ConsoleinitBody.
        at [m7] automatically since [W7] is part of the current goal. *)
     iAssert (sie_cap_gpr W7 (K - 2)%nat false p) with "Hcg" as "Hcg".
     remember W7 as m7 eqn:Heqm7.
-    iApply (wp_initlock Φ m7 vclock vcname vccpu "cons"%string (K - 2)%nat false p
+    iApply (wp_initlock m7 vclock vcname vccpu "cons"%string (K - 2)%nat false p
               ltac:(lia) with "Hcg Htext Hpc [] [Hclock] [Hcname] [Hccpu]").
     { iEval (rewrite HW7a1). iExact "Hstr". }
     { iEval (rewrite HW7a0). iExact "Hclock". }
@@ -271,7 +271,7 @@ Section ConsoleinitBody.
     assert (Hmilsp : mil !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)))).
     { rewrite (callee_saved_lookup Hilcs csp_rs1 ltac:(vm_compute; reflexivity)). exact HW7sp. }
     (* ===== uartinit() (0x1c) ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x1c)) (mword_of_int 1 : mword 5) (mword_of_int 1096 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x1c)) (mword_of_int 1 : mword 5) (mword_of_int 1096 : mword 21)
               mil (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1c [-]").
     iApply wp_next_off_intro.
@@ -281,7 +281,7 @@ Section ConsoleinitBody.
     iEval (rewrite Htgtua) in "Hpc".
     assert (HU0sp : U0 !!! Regidx csp_rs1 = add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
       by (rewrite /U0 upd_ne; [exact Hmilsp | reg_neq]).
-    iApply (wp_uartinit γd Φ U0 (K - 2)%nat l b0 vtlock vtname vtcpu p
+    iApply (wp_uartinit γd U0 (K - 2)%nat l b0 vtlock vtname vtcpu p
               ltac:(lia) with "Hcg Htext Hkdata Hpc Huinv Htx Hlb Hsent Hdlab [Htlock] [Htname] [Htcpu]").
     { iExact "Htlock". } { iExact "Htname". } { iExact "Htcpu". }
     iIntros (mu) "Hcg Hpc %Huacs Htx #Hsent' #Hdoff Htlock #Htnm Htcpu".
@@ -292,7 +292,7 @@ Section ConsoleinitBody.
     { rewrite (callee_saved_lookup Huacs csp_rs1 ltac:(vm_compute; reflexivity)). exact HU0sp. }
     (* ===== devsw[CONSOLE].read = consoleread (0x20..0x30) ===== *)
     (* +0x20 auipc a5,0x22 *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 34 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x20)) (mword_of_int 15 : mword 5) (mword_of_int 34 : mword 20)
               mu (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
     iApply wp_next_off_intro.
@@ -301,7 +301,7 @@ Section ConsoleinitBody.
     assert (Hp24 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x20) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x24)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp24) in "Hpc".
     (* +0x24 addi a5,a5,-130 : a5 := &devsw *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x24)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 3966 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x24)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 3966 : mword 12)
               D1 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi24 [-]").
     iApply wp_next_off_intro.
@@ -312,7 +312,7 @@ Section ConsoleinitBody.
     assert (Hp28 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x24) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp28) in "Hpc".
     (* +0x28 auipc a4,0x0 *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x28)) (mword_of_int 14 : mword 5) (mword_of_int 0 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x28)) (mword_of_int 14 : mword 5) (mword_of_int 0 : mword 20)
               D2 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi28 [-]").
     iApply wp_next_off_intro.
@@ -321,7 +321,7 @@ Section ConsoleinitBody.
     assert (Hp2c : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x28) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x2c)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp2c) in "Hpc".
     (* +0x2c addi a4,a4,-722 : a4 := consoleread *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x2c)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3374 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x2c)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3374 : mword 12)
               D3 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2c [-]").
     iApply wp_next_off_intro.
@@ -346,7 +346,7 @@ Section ConsoleinitBody.
     (* +0x30 sd a4,16(a5) : devsw[CONSOLE].read = consoleread *)
     assert (Hdra : forall (CID' : CpuId), add_vec (rget (CID := CID') D4 (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 16 : mword 12)) = devsw_console_read).
     { intros CID'. rewrite HD4a5. unfold devsw_console_read. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_csd_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 16 : mword 12)
+    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x30)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 16 : mword 12)
               D4 (K - 2)%nat dread0 false with "Hcg Hpc Hi30 [Hdr] [-]").
     { iEval (rewrite Hdra). iExact "Hdr". }
     iApply wp_next_off_intro.
@@ -355,7 +355,7 @@ Section ConsoleinitBody.
     iEval (rewrite Hp32) in "Hpc".
     (* ===== devsw[CONSOLE].write = consolewrite (0x32..0x3a) ===== *)
     (* +0x32 auipc a4,0x0 *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x32)) (mword_of_int 14 : mword 5) (mword_of_int 0 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x32)) (mword_of_int 14 : mword 5) (mword_of_int 0 : mword 20)
               D4 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi32 [-]").
     iApply wp_next_off_intro.
@@ -364,7 +364,7 @@ Section ConsoleinitBody.
     assert (Hp36 : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x32) : mword 64) 4 = mword_of_int (KernelSyms.consoleinit + 0x36)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp36) in "Hpc".
     (* +0x36 addi a4,a4,-894 : a4 := consolewrite *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x36)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3202 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x36)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 3202 : mword 12)
               D5 (K - 2)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi36 [-]").
     iApply wp_next_off_intro.
@@ -383,7 +383,7 @@ Section ConsoleinitBody.
     (* +0x3a sd a4,24(a5) : devsw[CONSOLE].write = consolewrite *)
     assert (Hdwa : forall (CID' : CpuId), add_vec (rget (CID := CID') D6 (mword_of_int 15 : mword 5)) (sign_extend' 64 (mword_of_int 24 : mword 12)) = devsw_console_write).
     { intros CID'. rewrite HD6a5. unfold devsw_console_write. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_csd_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x3a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 24 : mword 12)
+    iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x3a)) (mword_of_int 14 : mword 5) (mword_of_int 15 : mword 5) (mword_of_int 24 : mword 12)
               D6 (K - 2)%nat dwrite0 false with "Hcg Hpc Hi3a [Hdw] [-]").
     { iEval (rewrite Hdwa). iExact "Hdw". }
     iApply wp_next_off_intro.
@@ -396,7 +396,7 @@ Section ConsoleinitBody.
       rewrite /D4 upd_ne; [| reg_neq]. rewrite /D3 upd_ne; [| reg_neq].
       rewrite /D2 upd_ne; [| reg_neq]. rewrite /D1 upd_ne; [| reg_neq]. exact Hmusp. }
     (* +0x3c ld ra,8(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x3c)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x3c)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               D6 (K - 2)%nat (m !!! Regidx (mword_of_int 1)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3c [Hc1] [-]").
@@ -408,7 +408,7 @@ Section ConsoleinitBody.
     assert (Hp3e : add_vec_int (mword_of_int (KernelSyms.consoleinit + 0x3c) : mword 64) 2 = mword_of_int (KernelSyms.consoleinit + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp3e) in "Hpc".
     (* +0x3e ld s0,0(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x3e)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x3e)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               E1 (K - 2)%nat (m !!! Regidx (mword_of_int 8)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3e [Hc2] [-]").
@@ -430,7 +430,7 @@ Section ConsoleinitBody.
       iSplitL "Hc2". { iExists (m !!! Regidx (mword_of_int 8)). iExact "Hc2". }
       done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x40)) (mword_of_int 16 : mword 6)
+    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x40)) (mword_of_int 16 : mword 6)
               E2 (K - 2)%nat 2 false Hpop with "Hcg Hpc Hi40 Hframe [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -443,7 +443,7 @@ Section ConsoleinitBody.
     { rewrite /E3 upd_ne; [| reg_neq]. rewrite /E2 upd_ne; [| reg_neq]. rewrite /E1 upd_eq. reflexivity. }
     assert (Hrt : forall (CID' : CpuId), ret_pc (rget (CID := CID') E3 (mword_of_int 1 : mword 5)) = ret_pc (m !!! Regidx (mword_of_int 1)))
       by (intros CID'; rgne; rewrite HE3ra; reflexivity).
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.consoleinit + 0x42)) (mword_of_int 1 : mword 5) E3 K false
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.consoleinit + 0x42)) (mword_of_int 1 : mword 5) E3 K false
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi42 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc". iEval (rewrite Hrt) in "Hpc".
@@ -495,12 +495,12 @@ End ConsoleinitBody.
 (* ===================================================================== *)
 Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINIT.
   Definition wp_consoleinit_sconf `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+      (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (vtlock : bv 32) (vtname vtcpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64)
-      : wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p :=
+      : wp_consoleinit_sconf_body γd m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p :=
     (* Passed bare, [Initlock.wp_initlock_sconf]'s own implicit [CID] gets
        EAGERLY specialized to THIS definition's [CID] (typeclass-style
        implicit resolution fires on a bare reference), which is strictly
@@ -510,9 +510,9 @@ Module ConsoleinitProof (Initlock : INITLOCK) (Uartinit : UARTINIT) : CONSOLEINI
        genuinely fresh per application, the same technique ProofConsputc.v
        uses to keep a dfrac argument's implicit explicit. *)
     wp_consoleinit_sconf_gen
-      (fun `(CID' : CpuId) Φ' m' vlock' vname' vcpu' s' K' b' p' =>
-         Initlock.wp_initlock_sconf (CID:=CID') Φ' m' vlock' vname' vcpu' s' K' b' p')
-      (fun `(CID' : CpuId) γd' Φ' m' K' l' b0' vlock' vname' vcpu' p' =>
-         Uartinit.wp_uartinit_sconf (CID:=CID') γd' Φ' m' K' l' b0' vlock' vname' vcpu' p')
-      γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p.
+      (fun `(CID' : CpuId) m' vlock' vname' vcpu' s' K' b' p' =>
+         Initlock.wp_initlock_sconf (CID:=CID') m' vlock' vname' vcpu' s' K' b' p')
+      (fun `(CID' : CpuId) γd' m' K' l' b0' vlock' vname' vcpu' p' =>
+         Uartinit.wp_uartinit_sconf (CID:=CID') γd' m' K' l' b0' vlock' vname' vcpu' p')
+      γd m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p.
 End ConsoleinitProof.

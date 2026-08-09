@@ -691,7 +691,7 @@ Section InstrBytes.
      [ExecuteAs other] which is then run to [RETIRE_SUCCESS].  The pure
      [exec_hart_active_progress] / [exec_hart_active_progress_RVC] assemble the
      run_hart_active fact, forwarded to [wp_exec_step_hart_active_inv]. *)
-  Lemma wp_exec_step_decode_execute_inv (Φ : mval -> iProp Σ) {dq : dfrac} :
+  Lemma wp_exec_step_decode_execute_inv {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
@@ -728,7 +728,7 @@ Section InstrBytes.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hinv Hhs H".
-    iApply (wp_exec_step_hart_active_inv Φ with "Hinv Hhs").
+    iApply (wp_exec_step_hart_active_inv with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iMod ("H" $! σ with "Hsi") as (r i s_exec)
       "(%Hpriv & %Hdisp & %Hfetch & %Hdec & %Hlpad & Hrest & Hpc & Hsi_exec & Hcont)".
@@ -903,7 +903,7 @@ Section InstrBytes.
      never sees [ExecuteAs].  [PC] is owned here (read for the fetch, returned
      to the underlying WP), and [mmode_config] is handed back to the
      continuation. *)
-  Lemma wp_instr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (i : instruction)
+  Lemma wp_instr (pc : mword 64) (is_rvc : bool) (i : instruction)
       (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac} :
     pmp_allows_all pmpcfg0 ->
     (forall j, (j < 4)%nat -> kmap_static (svpn_of (pa_add pc j)) KP_rx) ->
@@ -932,7 +932,7 @@ Section InstrBytes.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_exec_step_decode_execute_inv Φ with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0 mseccfg0
                  Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0 Hstat
@@ -1010,7 +1010,7 @@ Section InstrBytes.
          that re-establishes the invariant facts on its final mstatus value can
          rebuild [mmode_config (DfracOwn 1)] via [mmode_config_rebuild]
          (hw_config / minstret_inv are persistent, hence re-derivable). *)
-  Lemma wp_instr_config (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (i : instruction)
+  Lemma wp_instr_config (pc : mword 64) (is_rvc : bool) (i : instruction)
       (pmpcfg0 : type_of_register pmpcfg_n) (ms0 : mword 64) :
     pmp_allows_all pmpcfg0 ->
     eq_vec (_get_Mstatus_MIE ms0) ('b"1") = false ->
@@ -1044,7 +1044,7 @@ Section InstrBytes.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_exec_step_decode_execute_inv Φ with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (instr_lift σ pc is_rvc i pmpcfg0 pmar0 misa0 mseccfg0
                  Hpmp Hpma_all HmisaC HmisaA Hmisa_val0 Hmseccfg_val0 Hstat

@@ -44,8 +44,7 @@ Definition strncmp_res (f g : nat -> bv 8) (n : nat) (res : mword 64) : Prop :=
     ((forall j, (j < n)%nat -> f j = g j /\ f j <> (mword_of_int 0 : mword 8)) /\
      res = (mword_of_int 0 : mword 64)))).
 
-Definition wp_strncmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (mm : regfile)
+Definition wp_strncmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
     (n : nat) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.strncmp in
   let s1 := mm !!! Regidx (mword_of_int 10 : mword 5) in
@@ -73,8 +72,7 @@ Definition wp_strncmp_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
 
 Module Type STRNCMP.
   Parameter wp_strncmp_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (mm : regfile)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq1 dq2 : dfrac) (b : bool) (p : mword 64),
-      wp_strncmp_sconf_body Φ mm n f g K dq1 dq2 b p.
+      wp_strncmp_sconf_body mm n f g K dq1 dq2 b p.
 End STRNCMP.

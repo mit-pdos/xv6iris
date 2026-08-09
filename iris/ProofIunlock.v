@@ -151,7 +151,7 @@ Section ProofIunlockMain.
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                     = pa_stk (m !!! Regidx csp_rs1 : mword 64) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. pcw. }
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m K 4 b
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m K 4 b
               ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CID1 Hq1) "Hcg Hframe Hpc".
     set (R1 := <[Regidx csp_rs1 := regval_into_reg
@@ -188,25 +188,25 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x02)) by pcw.
     iEval (rewrite Hpp02) in "Hpc".
     (* ===== +0x02 .. +0x08 : the four saves ===== *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x02)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iunlock + 0x02)) (mword_of_int 3 : mword 6) Rra
               R1 (K - 4)%nat v1 b with "Hcg Hpc Hi02 Hf1").
     iIntros (CID2 Hq2) "Hcg Hpc Hf1".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.iunlock + 0x02) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlock + 0x04)) by pcw.
     iEval (rewrite Hpp04) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x04)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iunlock + 0x04)) (mword_of_int 2 : mword 6) Rs0
               R1 (K - 4)%nat v2 b with "Hcg Hpc Hi04 Hf2").
     iIntros (CID3 Hq3) "Hcg Hpc Hf2".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.iunlock + 0x04) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlock + 0x06)) by pcw.
     iEval (rewrite Hpp06) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x06)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iunlock + 0x06)) (mword_of_int 1 : mword 6) Rs1
               R1 (K - 4)%nat v3 b with "Hcg Hpc Hi06 Hf3").
     iIntros (CID4 Hq4) "Hcg Hpc Hf3".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.iunlock + 0x06) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlock + 0x08)) by pcw.
     iEval (rewrite Hpp08) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x08)) (mword_of_int 0 : mword 6) Rs2
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.iunlock + 0x08)) (mword_of_int 0 : mword 6) Rs2
               R1 (K - 4)%nat v4 b with "Hcg Hpc Hi08 Hf4").
     iIntros (CID5 Hq5) "Hcg Hpc Hf4".
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.iunlock + 0x08) : mword 64) 2
@@ -229,7 +229,7 @@ Section ProofIunlockMain.
       iSplitL "Hf1"; [iExact "Hf1" |]. iSplitL "Hf2"; [iExact "Hf2" |].
       iSplitL "Hf3"; [iExact "Hf3" |]. iExact "Hf4". }
     (* ===== +0x0a c.addi4spn s0,sp,32 ===== *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x0a)) (Cregidx (mword_of_int 0))
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.iunlock + 0x0a)) (Cregidx (mword_of_int 0))
               (mword_of_int 8 : mword 8) Rs0 R1 (K - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi0a").
@@ -248,7 +248,7 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x0c)) by pcw.
     iEval (rewrite Hpp0c) in "Hpc".
     (* ===== +0x0c c.beqz a0 : DEAD panic arm, ip <> 0 ===== *)
-    iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x0c))
+    iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.iunlock + 0x0c))
               (mword_of_int 20 : mword 8) (Cregidx (mword_of_int 2)) Ra0
               R2 (K - 4)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
               ltac:(rgne; rewrite HR2a0; exact (inode_ptr_nonzero ip Hipnz))
@@ -258,7 +258,7 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x0e)) by pcw.
     iEval (rewrite Hpp0e) in "Hpc".
     (* ===== +0x0e c.mv s1,a0 ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x0e)) Rs1 Ra0
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iunlock + 0x0e)) Rs1 Ra0
               R2 (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi0e").
     iIntros (CID8 Hq8) "Hcg Hpc".
     set (R3 := <[Regidx Rs1 := regval_into_reg
@@ -276,7 +276,7 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x10)) by pcw.
     iEval (rewrite Hpp10) in "Hpc".
     (* ===== +0x10 addi s2,a0,16 : s2 := &ip->lock ===== *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x10)) Rs2 Ra0
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iunlock + 0x10)) Rs2 Ra0
               (mword_of_int 16 : mword 12) R3 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi10").
     iIntros (CID9 Hq9) "Hcg Hpc".
@@ -296,7 +296,7 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x14)) by pcw.
     iEval (rewrite Hpp14) in "Hpc".
     (* ===== +0x14 c.mv a0,s2 ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x14)) Ra0 Rs2
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iunlock + 0x14)) Ra0 Rs2
               R4 (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi14").
     iIntros (CID10 Hq10) "Hcg Hpc".
     set (R5 := <[Regidx Ra0 := regval_into_reg
@@ -316,7 +316,7 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x16)) by pcw.
     iEval (rewrite Hpp16) in "Hpc".
     (* ===== +0x16 jal ra,holdingsleep ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x16)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iunlock + 0x16)) Rra
               (mword_of_int 3262 : mword 21) R5 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi16").
@@ -345,7 +345,7 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (HS.wp_holdingsleep_sconf (dq := dq) Φ gil gisl "inode"%string
+    iApply (HS.wp_holdingsleep_sconf (dq := dq) gil gisl "inode"%string
               (inode_parked gfs gi cov logstart ip) R6 p pidv (K - 4)%nat eb C b
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
@@ -380,7 +380,7 @@ Section ProofIunlockMain.
     iPoseProof (iui2_24 with "Htext") as "Hi24".
     assert (Hbeqz : eq_vec (mH !!! Regidx Ra0 : mword 64) (zero_reg : mword 64) = false)
       by (rewrite Hha0; vm_compute; reflexivity).
-    iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x1a))
+    iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.iunlock + 0x1a))
               (mword_of_int 13 : mword 8) (Cregidx (mword_of_int 2)) Ra0
               mH (K - 4)%nat b ltac:(vm_compute; reflexivity) ltac:(nz)
               ltac:(rgne; exact Hbeqz) with "Hcg Hpc Hi1a").
@@ -393,7 +393,7 @@ Section ProofIunlockMain.
                       = i_ref ip).
     { rgne. rewrite HmHs1. reflexivity. }
     iEval (rewrite -Hrefadr) in "Href".
-    iApply (wp_clw_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
+    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) mH (K - 4)%nat refv b
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1c Href").
     iIntros (CID14 Hq14) "Hcg Hpc Href".
@@ -412,7 +412,7 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x1e)) by pcw.
     iEval (rewrite Hpp1e) in "Hpc".
     (* ===== +0x1e bge x0,a5 : DEAD panic arm, ref >= 1 ===== *)
-    iApply (wp_bge_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x1e))
+    iApply (wp_bge_x0_fall_s_sconf (mword_of_int (KernelSyms.iunlock + 0x1e))
               (mword_of_int 22 : mword 13) Ra5 R7 (K - 4)%nat b ltac:(nz)
               ltac:(rgne; rewrite HR7a5; exact (inode_ref_spos refv Href))
               with "Hcg Hpc Hi1e").
@@ -421,7 +421,7 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x22)) by pcw.
     iEval (rewrite Hpp22) in "Hpc".
     (* ===== +0x22 c.mv a0,s2 ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x22)) Ra0 Rs2
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.iunlock + 0x22)) Ra0 Rs2
               R7 (K - 4)%nat b ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi22").
     iIntros (CID16 Hq16) "Hcg Hpc".
     set (R8 := <[Regidx Ra0 := regval_into_reg
@@ -437,7 +437,7 @@ Section ProofIunlockMain.
                     = mword_of_int (KernelSyms.iunlock + 0x24)) by pcw.
     iEval (rewrite Hpp24) in "Hpc".
     (* ===== +0x24 jal ra,releasesleep ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x24)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.iunlock + 0x24)) Rra
               (mword_of_int 3192 : mword 21) R8 (K - 4)%nat b
               ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi24").
@@ -521,7 +521,7 @@ Section ProofIunlockMain.
                   = pa_stk (m !!! Regidx csp_rs1 : mword 64) 4).
     { rewrite HmRsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try pcw. }
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x28)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iunlock + 0x28)) (mword_of_int 3 : mword 6) Rra
               mR (K - 4)%nat (m !!! Regidx Rra : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi28 [Hf1]").
     { iEval (rewrite Hc1). iExact "Hf1". }
@@ -538,7 +538,7 @@ Section ProofIunlockMain.
     assert (Hpp2a : add_vec_int (mword_of_int (KernelSyms.iunlock + 0x28) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlock + 0x2a)) by pcw.
     iEval (rewrite Hpp2a) in "Hpc".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x2a)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iunlock + 0x2a)) (mword_of_int 2 : mword 6) Rs0
               P1 (K - 4)%nat (m !!! Regidx Rs0 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi2a [Hf2]").
     { iEval (rewrite HP1sp -HmRsp Hc2). iExact "Hf2". }
@@ -555,7 +555,7 @@ Section ProofIunlockMain.
     assert (Hpp2c : add_vec_int (mword_of_int (KernelSyms.iunlock + 0x2a) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlock + 0x2c)) by pcw.
     iEval (rewrite Hpp2c) in "Hpc".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x2c)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iunlock + 0x2c)) (mword_of_int 1 : mword 6) Rs1
               P2 (K - 4)%nat (m !!! Regidx Rs1 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi2c [Hf3]").
     { iEval (rewrite HP2sp -HmRsp Hc3). iExact "Hf3". }
@@ -572,7 +572,7 @@ Section ProofIunlockMain.
     assert (Hpp2e : add_vec_int (mword_of_int (KernelSyms.iunlock + 0x2c) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlock + 0x2e)) by pcw.
     iEval (rewrite Hpp2e) in "Hpc".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x2e)) (mword_of_int 0 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.iunlock + 0x2e)) (mword_of_int 0 : mword 6) Rs2
               P3 (K - 4)%nat (m !!! Regidx Rs2 : mword 64) b ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi2e [Hf4]").
     { iEval (rewrite HP3sp -HmRsp Hc4). iExact "Hf4". }
@@ -625,7 +625,7 @@ Section ProofIunlockMain.
       iSplitL "Hf4"; [iExists _; iExact "Hf4" |].
       done. }
     iEval (rewrite -Hwv) in "Hstk".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x30))
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.iunlock + 0x30))
               (mword_of_int 2 : mword 6) P4 (K - 4)%nat 4 b Hpop
               with "Hcg Hpc Hi30 Hstk").
     iIntros (CID23 Hq23) "Hcg Hpc".
@@ -640,7 +640,7 @@ Section ProofIunlockMain.
     (* ===== +0x32 c.ret ===== *)
     assert (HP5ra : P5 !!! Regidx Rra = (m !!! Regidx Rra : mword 64))
       by (rewrite /P5 upd_ne; [exact HP4ra | nz]).
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.iunlock + 0x32)) Rra P5 K b ltac:(nz)
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.iunlock + 0x32)) Rra P5 K b ltac:(nz)
               with "Hcg Hpc Hi32").
     iIntros (CID24 Hq24) "Hcg Hpc".
     iEval (rgne) in "Hpc".

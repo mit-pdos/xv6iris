@@ -150,7 +150,6 @@ Section WpUsdPt.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_usd_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
-      (Φ : mval -> iProp Σ)
       (off immz : Z) (rs2 : mword 5) (is_rvc : bool)
       (m : regfile) (wold : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
@@ -233,7 +232,7 @@ Section WpUsdPt.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (pma_all_ram Hpma_all tfpa 8
                  (pma_access_ram _ _ _ Hram_tf Hram_tf7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region_st & Hmatch_st0 & _ & _ & Hwrite_st & _).
-    iApply (wp_instr_u_pt uroot tfp um Φ va pa is_rvc
+    iApply (wp_instr_u_pt uroot tfp um va pa is_rvc
               (STORE (imm, Regidx rs2, Regidx (mword_of_int 10), 8))
               mstatus0 mie_v mdv0 menvcfg0 dq
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -544,7 +543,6 @@ Section WpUCsrPt.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ucsrw_sscratch_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
-      (Φ : mval -> iProp Σ)
       (off : Z) (is_rvc : bool) (rs1 : mword 5)
       (m : regfile) (sscr0 : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
@@ -607,7 +605,7 @@ Section WpUCsrPt.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_u_pt uroot tfp um Φ va pa is_rvc
+    iApply (wp_instr_u_pt uroot tfp um va pa is_rvc
               (CSRReg (csr_sscratch, Regidx rs1, zreg, CSRRW))
               mstatus0 mie_v mdv0 menvcfg0 dq
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -652,7 +650,6 @@ Section WpUCsrPt.
   Qed.
 
   Lemma wp_ucsrr_sscratch_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
-      (Φ : mval -> iProp Σ)
       (off : Z) (is_rvc : bool) (rd : mword 5)
       (m : regfile) (sv : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq dqs : dfrac} :
@@ -716,7 +713,7 @@ Section WpUCsrPt.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_u_pt uroot tfp um Φ va pa is_rvc
+    iApply (wp_instr_u_pt uroot tfp um va pa is_rvc
               (CSRReg (csr_sscratch, zreg, Regidx rd, CSRRS))
               mstatus0 mie_v mdv0 menvcfg0 dq
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0

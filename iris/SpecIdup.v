@@ -70,8 +70,7 @@ Local Open Scope Z_scope.
 Definition K_idup : nat := 14%nat.
 
 Definition wp_idup_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile)
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile)
     (ip : mword 64) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
@@ -97,9 +96,8 @@ Definition wp_idup_sconf_body
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile)
       (ip : mword 64) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
-      wp_idup_sconf_body Φ m ip n eb p C K b.
+      wp_idup_sconf_body m ip n eb p C K b.
 End IDUP.

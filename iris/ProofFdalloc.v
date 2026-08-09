@@ -39,7 +39,7 @@
    pulled out to its own fresh `{CID0 : CpuId}` binder (the "decomposed
    helper" recipe) and wraps its own continuation in [wp_next]; it does NOT
    carry [cpu_own] (fdalloc's epilogue never touches it, exactly as before
-   the sweep), so a caller transports ["Hcpu"] AFTER fda_tail returns, not
+   the sweep), so a caller transports ["Hcpu"] AFTER fda_tail, not
    before.  THE LOOP additionally needs the "decomposed proof" recipe for a
    fuel induction: the entry hart [CID0] rides the SAME universal as
    fuel/fd/M so [iInduction] auto-generalizes it, and both exits plus the
@@ -239,12 +239,12 @@ Section ProofFdalloc.
   (*  The shared tail at +0x28: the epilogue, entered by BOTH arms.       *)
   (*  A DECOMPOSED helper (porting guide): its own fresh `{CID0} binder,  *)
   (*  its own [(b : bool)] and [(p : mword 64)] (sie_cap_gpr's explicit   *)
-  (*  process-pointer argument -- fda_tail has no Section-level [p] to    *)
+  (*  process-pointer argument -- fda_tail no Section-level [p] to    *)
   (*  inherit), and its trailing continuation wrapped in [wp_next].  It   *)
   (*  does NOT carry [cpu_own]: fdalloc's epilogue never touches it, so   *)
   (*  (as before the sweep) that resource stays entirely with the caller. *)
   (* =================================================================== *)
-  Lemma fda_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Lemma fda_tail `{CID0 : CpuId}
       (m Mt : regfile) (av : nat) (rv : mword 64)
       (sp0 ra0 s00 s10 gapv : mword 64) (p : mword 64) (b : bool) :
     (4 <= av)%nat ->
@@ -284,7 +284,7 @@ Section ProofFdalloc.
     { rewrite Hmtsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x28))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x28))
               (mword_of_int 3 : mword 6) Rra Mt (av - 4)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi28 Hb1 [-]").
@@ -303,7 +303,7 @@ Section ProofFdalloc.
     { rewrite HT1sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x2a))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x2a))
               (mword_of_int 2 : mword 6) Rs0 T1 (av - 4)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a Hb2 [-]").
@@ -322,7 +322,7 @@ Section ProofFdalloc.
     { rewrite HT2sp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite -Hpa3) in "Hb3".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x2c))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x2c))
               (mword_of_int 1 : mword 6) Rs1 T2 (av - 4)%nat s10 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2c Hb3 [-]").
@@ -350,7 +350,7 @@ Section ProofFdalloc.
     iDestruct (stack_own_4_intro sp0 ra0 s00 s10 gapv with "Hb1 Hb2 Hb3 Hb4") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
     iPoseProof (fdi_2e with "Htext") as "Hi2e'".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x2e))
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x2e))
               (mword_of_int 2 : mword 6) T3 (av - 4)%nat 4 b Hpop
               with "Hcg Hpc Hi2e' Hframe [-]").
     iIntros (CID4 Hs4) "Hcg Hpc".
@@ -369,7 +369,7 @@ Section ProofFdalloc.
       rewrite /T3 upd_ne; [| reg_neq].
       rewrite /T2 upd_ne; [| reg_neq].
       rewrite /T1 upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x30))
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x30))
               Rra T4 av b ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi30 [-]").
     iIntros (CID5 Hs5) "Hcg Hpc".
@@ -420,11 +420,11 @@ Section ProofFdalloc.
   (* =================================================================== *)
   (*  The whole function.                                                 *)
   (* =================================================================== *)
-  Lemma wp_fdalloc_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_fdalloc_sconf
       (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_fdalloc_sconf_body Φ γf k D m av n eb p C pid V b.
+    : wp_fdalloc_sconf_body γf k D m av n eb p C pid V b.
   Proof.
     cbv beta delta [wp_fdalloc_sconf_body].
     intros pcE ret_tgt Ha0 Hk Hn Hav.
@@ -443,7 +443,7 @@ Section ProofFdalloc.
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m av 4 b ltac:(lia) Hpush
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m av 4 b ltac:(lia) Hpush
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
@@ -471,7 +471,7 @@ Section ProofFdalloc.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* +0x02/+0x04/+0x06: c.sdsp ra/s0/s1 *)
     iPoseProof (fdi_02 with "Htext") as "Hi02".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x02)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x02)) (mword_of_int 3 : mword 6) Rra
               A0 (av - 4)%nat vr24 b with "Hcg Hpc Hi02 [Hr24] [-]").
     { iEval (rewrite HcspA0 -Hb1). iExact "Hr24". }
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
@@ -479,7 +479,7 @@ Section ProofFdalloc.
     assert (Hpc04 : add_vec_int (mword_of_int (KernelSyms.fdalloc + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.fdalloc + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc04) in "Hpc".
     iPoseProof (fdi_04 with "Htext") as "Hi04".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x04)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x04)) (mword_of_int 2 : mword 6) Rs0
               A0 (av - 4)%nat vr16 b with "Hcg Hpc Hi04 [Hr16] [-]").
     { iEval (rewrite HcspA0 -Hb2). iExact "Hr16". }
     iIntros (CID3 Hs3) "Hcg Hpc Hr16".
@@ -487,7 +487,7 @@ Section ProofFdalloc.
     assert (Hpc06 : add_vec_int (mword_of_int (KernelSyms.fdalloc + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.fdalloc + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc06) in "Hpc".
     iPoseProof (fdi_06 with "Htext") as "Hi06".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x06)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x06)) (mword_of_int 1 : mword 6) Rs1
               A0 (av - 4)%nat vr8 b with "Hcg Hpc Hi06 [Hr8] [-]").
     { iEval (rewrite HcspA0 -Hb3). iExact "Hr8". }
     iIntros (CID4 Hs4) "Hcg Hpc Hr8".
@@ -508,7 +508,7 @@ Section ProofFdalloc.
     iEval (rewrite -Hb3) in "Hr8".
     (* +0x08: c.addi4spn s0,sp,32 *)
     iPoseProof (fdi_08 with "Htext") as "Hi08".
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) Rs0
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x08)) (Cregidx (mword_of_int 0)) (mword_of_int 8 : mword 8) Rs0
               A0 (av - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
@@ -521,7 +521,7 @@ Section ProofFdalloc.
     iEval (rewrite Hpc0a) in "Hpc".
     (* +0x0a: c.mv s1,a0 -- park [f] in a callee-saved register *)
     iPoseProof (fdi_0a with "Htext") as "Hi0a".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x0a)) Rs1 Ra0
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x0a)) Rs1 Ra0
               A1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a [-]").
@@ -539,7 +539,7 @@ Section ProofFdalloc.
       rewrite /A1 upd_ne; [| reg_neq]. exact HcspA0. }
     (* +0x0c: jal ra,myproc *)
     iPoseProof (fdi_0c with "Htext") as "Hi0c".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x0c)) Rra (mword_of_int 2084488 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x0c)) Rra (mword_of_int 2084488 : mword 21)
               A2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0c [-]").
@@ -569,7 +569,7 @@ Section ProofFdalloc.
        transporting to [CID7] before myproc wants it. *)
     iDestruct (cpu_own_transport CID CID7 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     (* ===================== myproc() ===================== *)
-    iApply (Myproc.wp_myproc_sconf Φ A3 (av - 4)%nat n eb p C b
+    iApply (Myproc.wp_myproc_sconf A3 (av - 4)%nat n eb p C b
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
     iIntros (CID8 Hs8 ms MP) "%Hms Hcg Hcpu Hpc %HcsMP".
@@ -589,7 +589,7 @@ Section ProofFdalloc.
       rewrite (callee_saved_lookup HcsMP r Hr). apply HA3cs; assumption. }
     (* +0x10: c.mv a2,a0 -- a2 := p, and it stays there across the loop *)
     iPoseProof (fdi_10 with "Htext") as "Hi10".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x10)) Ra2 Ra0
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x10)) Ra2 Ra0
               MP (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
@@ -604,7 +604,7 @@ Section ProofFdalloc.
       by (rewrite /B1 upd_ne; [exact HMPa0 | reg_neq]).
     (* +0x12: addi a5,a0,208 -- a5 := &p->ofile[0] *)
     iPoseProof (fdi_12 with "Htext") as "Hi12".
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x12)) Ra5 Ra0 (mword_of_int 208 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x12)) Ra5 Ra0 (mword_of_int 208 : mword 12)
               B1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [-]").
@@ -619,7 +619,7 @@ Section ProofFdalloc.
     { rewrite /B2 upd_eq. rgne. rewrite HB1a0. apply p_ofile_zero. }
     (* +0x16: c.li a0,0 -- fd := 0 *)
     iPoseProof (fdi_16 with "Htext") as "Hi16".
-    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x16)) Ra0 (mword_of_int 0 : mword 6)
+    iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x16)) Ra0 (mword_of_int 0 : mword 6)
               (mword_of_int (Z.of_nat 0%nat) : mword 64) B2 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -631,7 +631,7 @@ Section ProofFdalloc.
     iEval (rewrite Hpc18) in "Hpc".
     (* +0x18: c.li a3,16 -- the loop bound *)
     iPoseProof (fdi_18 with "Htext") as "Hi18".
-    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x18)) Ra3 (mword_of_int 16 : mword 6)
+    iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x18)) Ra3 (mword_of_int 16 : mword 6)
               (mword_of_int 16 : mword 64) B3 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -732,7 +732,7 @@ Section ProofFdalloc.
       iDestruct (proc_ofiles_owe_read _ _ _ _ fd w Hw with "Hpv") as "[Hcell Hpvback]".
       assert (Haddr : add_vec (M !!! Regidx Ra5) (sign_extend' 64 (mword_of_int 0 : mword 12))
                       = p_ofile p fd) by (rewrite HMa5; apply addv_sext0).
-      iApply (wp_cld_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
+      iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x1a)) Ra4 Ra5 (mword_of_int 0 : mword 12)
                 M (av - 4)%nat w b (dqm := DfracOwn 1)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1a [Hcell] [-]").
@@ -766,7 +766,7 @@ Section ProofFdalloc.
       (* ---- +0x1c: c.beqz a4 -- the free-slot test ---- *)
       destruct (decide (w = (zero_reg : mword 64))) as [Hwz | Hwnz].
       - (* ============ FOUND: install [f] at descriptor [fd] ============ *)
-        iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x1c))
+        iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x1c))
                   (mword_of_int 11 : mword 8) (Cregidx (mword_of_int 6)) Ra4
                   L1 (av - 4)%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -785,7 +785,7 @@ Section ProofFdalloc.
         iPoseProof (fdi_3c with "Htext") as "Hi3c".
         iPoseProof (fdi_3e with "Htext") as "Hi3e".
         (* +0x32: slli a5,a0,3 *)
-        iApply (wp_slli_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x32)) Ra5 Ra0
+        iApply (wp_slli_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x32)) Ra5 Ra0
                   (mword_of_int 3 : mword 6) (mword_of_int (Z.of_nat fd * 8) : mword 64)
                   L1 (av - 4)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -799,7 +799,7 @@ Section ProofFdalloc.
         assert (HG1a5 : G1 !!! Regidx Ra5 = (mword_of_int (Z.of_nat fd * 8) : mword 64))
           by (rewrite /G1 upd_eq; reflexivity).
         (* +0x36: addi a5,a5,208 *)
-        iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x36)) Ra5 Ra5 (mword_of_int 208 : mword 12)
+        iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x36)) Ra5 Ra5 (mword_of_int 208 : mword 12)
                   G1 (av - 4)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi36 [-]").
@@ -815,7 +815,7 @@ Section ProofFdalloc.
         assert (HG2a2 : G2 !!! Regidx Ra2 = p).
         { rewrite /G2 upd_ne; [| reg_neq]. rewrite /G1 upd_ne; [exact HL1a2 | reg_neq]. }
         (* +0x3a: c.add a2,a2,a5 -- a2 := &p->ofile[fd] *)
-        iApply (wp_cadd_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x3a)) Ra2 Ra5
+        iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x3a)) Ra2 Ra5
                   G2 (av - 4)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi3a [-]").
@@ -840,7 +840,7 @@ Section ProofFdalloc.
           as "(Hcell & Hfdslot & Hpvback)".
         assert (Haddr3c : add_vec (G3 !!! Regidx Ra2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                           = p_ofile p fd) by (rewrite HG3a2; apply addv_sext0).
-        iApply (wp_csd_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
+        iApply (wp_csd_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x3c)) Rs1 Ra2 (mword_of_int 0 : mword 12)
                   G3 (av - 4)%nat (zero_reg : mword 64) b
                   with "Hcg Hpc Hi3c [Hcell] [-]").
         { iEval (rgne; rewrite Haddr3c). iExact "Hcell". }
@@ -851,7 +851,7 @@ Section ProofFdalloc.
         assert (Hpc3e : add_vec_int (mword_of_int (KernelSyms.fdalloc + 0x3c) : mword 64) 2 = mword_of_int (KernelSyms.fdalloc + 0x3e)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc3e) in "Hpc".
         (* +0x3e: c.j -> the epilogue, with fd still in a0 *)
-        iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x3e))
+        iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x3e))
                   (sign_extend' 21 (concat_vec (mword_of_int 2037 : mword 11) ('b"0")))
                   G3 (av - 4)%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi3e [-]").
@@ -878,7 +878,7 @@ Section ProofFdalloc.
           rewrite /G1 upd_ne; [| congruence]. apply HL1cs; assumption. }
         assert (Hshiftexit1 : b = false \/ p = zero_reg -> (CIDcj : CPU) = (CID0 : CPU)) by wp_next_chain.
         iDestruct (wp_next_shift Hshiftexit1 with "Hcont") as "Hcont".
-        iApply (fda_tail (CID0 := CIDcj) Φ m G3 av (mword_of_int (Z.of_nat fd)) sp0
+        iApply (fda_tail (CID0 := CIDcj) m G3 av (mword_of_int (Z.of_nat fd)) sp0
                   (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1) vgap p b
                   ltac:(lia) eq_refl eq_refl eq_refl eq_refl HG3sp HG3a0 HG3cs
                   with "Hcg Htext Hpc Hc1 Hc2 Hc3 Hc4 [-]").
@@ -892,7 +892,7 @@ Section ProofFdalloc.
         iSplitR; [iPureIntro; split; [exact Hfa0 | exact Hfrees]|].
         iFrame "Hpv Hfdslot".
       - (* ============ BUSY: advance, and either loop or give up ======== *)
-        iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x1c))
+        iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x1c))
                   (mword_of_int 11 : mword 8) (Cregidx (mword_of_int 6)) Ra4
                   L1 (av - 4)%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
@@ -902,7 +902,7 @@ Section ProofFdalloc.
         assert (Hpc1e : add_vec_int (mword_of_int (KernelSyms.fdalloc + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.fdalloc + 0x1e)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpc1e) in "Hpc".
         (* +0x1e: c.addiw a0,a0,1 *)
-        iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x1e)) Ra0 (mword_of_int 1 : mword 6)
+        iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x1e)) Ra0 (mword_of_int 1 : mword 6)
                   L1 (av - 4)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi1e [-]").
@@ -918,7 +918,7 @@ Section ProofFdalloc.
         assert (HN1a5 : N1 !!! Regidx Ra5 = p_ofile p fd)
           by (rewrite /N1 upd_ne; [exact HL1a5 | reg_neq]).
         (* +0x20: c.addi a5,a5,8 *)
-        iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x20)) Ra5 (mword_of_int 8 : mword 6)
+        iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x20)) Ra5 (mword_of_int 8 : mword 6)
                   N1 (av - 4)%nat b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi20 [-]").
@@ -964,7 +964,7 @@ Section ProofFdalloc.
         + (* the array is full: fall through to [c.li a0,-1] *)
           assert (Hfall : neq_vec (N2 !!! Regidx Ra0) (N2 !!! Regidx Ra3) = false).
           { rewrite Hcmp. rewrite (proj2 (Nat.eqb_eq (S fd) NOFILE) Hend). reflexivity. }
-          iApply (wp_bne_fall_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x22)) (mword_of_int 8184 : mword 13) Ra3 Ra0
+          iApply (wp_bne_fall_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x22)) (mword_of_int 8184 : mword 13) Ra3 Ra0
                     N2 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rgne; rgne; exact Hfall) with "Hcg Hpc Hi22 [-]").
           iIntros (CIDbnf HsBnf) "Hcg Hpc".
@@ -972,7 +972,7 @@ Section ProofFdalloc.
           iEval (rewrite Hpc26) in "Hpc".
           (* +0x26: c.li a0,-1 *)
           iPoseProof (fdi_26 with "Htext") as "Hi26".
-          iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x26)) Ra0 (mword_of_int 63 : mword 6)
+          iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x26)) Ra0 (mword_of_int 63 : mword 6)
                     (mword_of_int (-1) : mword 64) N2 (av - 4)%nat b
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -994,7 +994,7 @@ Section ProofFdalloc.
             rewrite /F1 upd_ne; [| congruence]. apply HN2cs; assumption. }
           assert (Hshiftexit2 : b = false \/ p = zero_reg -> (CIDli : CPU) = (CID0 : CPU)) by wp_next_chain.
           iDestruct (wp_next_shift Hshiftexit2 with "Hcont") as "Hcont".
-          iApply (fda_tail (CID0 := CIDli) Φ m F1 av (mword_of_int (-1)) sp0
+          iApply (fda_tail (CID0 := CIDli) m F1 av (mword_of_int (-1)) sp0
                     (m !!! Regidx Rra) (m !!! Regidx Rs0) (m !!! Regidx Rs1) vgap p b
                     ltac:(lia) eq_refl eq_refl eq_refl eq_refl HF1sp HF1a0 HF1cs
                     with "Hcg Htext Hpc Hc1 Hc2 Hc3 Hc4 [-]").
@@ -1016,7 +1016,7 @@ Section ProofFdalloc.
                              (sign_extend' 64 (mword_of_int 8184 : mword 13))
                            = mword_of_int (KernelSyms.fdalloc + 0x1a))
             by (apply bv_eq; vm_compute; reflexivity).
-          iApply (wp_bne_taken_s_sconf Φ (mword_of_int (KernelSyms.fdalloc + 0x22)) (mword_of_int 8184 : mword 13) Ra3 Ra0
+          iApply (wp_bne_taken_s_sconf (mword_of_int (KernelSyms.fdalloc + 0x22)) (mword_of_int 8184 : mword 13) Ra3 Ra0
                     N2 (av - 4)%nat b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rgne; rgne; exact Htaken)
                     ltac:(rewrite Htgt1a; vm_compute; reflexivity)

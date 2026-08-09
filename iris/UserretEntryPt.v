@@ -43,7 +43,7 @@ Section UserretEntryPt.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_userret_entry_pt (kroot uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
+      (um : gmap (mword 27) (mword 64))
       (m : regfile) (usatp : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     (* S-mode config *)
@@ -111,7 +111,7 @@ Section UserretEntryPt.
        Unlike the sfence below this touches no architectural state: the
        Sail model retires it as the identity, so there is no TLB cell to
        re-seal and no privilege side condition to discharge. ============ *)
-    iApply (wp_instr_ktramp_pt kroot Φ (uva 0x9c) (upa 0x9c) false ai_fencei
+    iApply (wp_instr_ktramp_pt kroot (uva 0x9c) (upa 0x9c) false ai_fencei
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -145,7 +145,7 @@ Section UserretEntryPt.
     iEval (rewrite Lnpc0) in "Hpc".
     iNext.
     (* ============ STEP 1: sfence.vma under the kernel invariant ======== *)
-    iApply (wp_instr_ktramp_pt kroot Φ (uva 0xa0) (upa 0xa0) false ai_sfence
+    iApply (wp_instr_ktramp_pt kroot (uva 0xa0) (upa 0xa0) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -194,7 +194,7 @@ Section UserretEntryPt.
     iEval (rewrite Lnpc1) in "Hpc".
     iNext.
     (* ============ STEP 2: csrw satp,a0 -- ENTER the window ============= *)
-    iApply (wp_instr_ktramp_pt kroot Φ (uva 0xa4) (upa 0xa4) false ai_csrw
+    iApply (wp_instr_ktramp_pt kroot (uva 0xa4) (upa 0xa4) false ai_csrw
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -265,7 +265,7 @@ Section UserretEntryPt.
     iApply (wp_instr_pt2_tramp uroot (kpt_tree_spec_gen kroot M2) (upt_tree_spec uroot tfp um)
               (kpt_pt2_tramp_spec_gen kroot M2 HMtramp) (upt_pt2_tramp_spec uroot tfp um Hwf)
               (upt_pt2_base uroot tfp um)
-              Φ (uva 0xa8) (upa 0xa8) false ai_sfence
+              (uva 0xa8) (upa 0xa8) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)

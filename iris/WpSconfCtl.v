@@ -103,7 +103,7 @@ Section WpSconfCtl.
   (* [__sync_synchronize] (the virtio driver), and both are this leaf.    *)
   (* [wp_fence_s_sconf] below is the rw,w restatement (WRAPPER RECIPE).   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_fence_gen_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_fence_gen_s_sconf
       (pc : mword 64) (fm pred succ : mword 4) (rs rd : regidx)
       (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
@@ -116,7 +116,7 @@ Section WpSconfCtl.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (FENCE (fm, pred, succ, rs, rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -150,7 +150,7 @@ Section WpSconfCtl.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_fencei_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_fencei_s_sconf
       (pc : mword 64) (imm : mword 12) (rs rd : regidx)
       (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
@@ -163,7 +163,7 @@ Section WpSconfCtl.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false (FENCEI (imm, rs, rd))
+    iApply (wp_instr_s_sconf m n b pc false (FENCEI (imm, rs, rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -190,7 +190,7 @@ Section WpSconfCtl.
   (* the rw,w instance -- [release]'s [__sync_lock_release] barrier.  A
      restatement of the generic leaf (WRAPPER RECIPE), so the existing call
      sites do not change. *)
-  Lemma wp_fence_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_fence_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
@@ -202,7 +202,7 @@ Section WpSconfCtl.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    exact (wp_fence_gen_s_sconf Φ pc (mword_of_int 0) (mword_of_int 3) (mword_of_int 1)
+    exact (wp_fence_gen_s_sconf pc (mword_of_int 0) (mword_of_int 3) (mword_of_int 1)
              (Regidx (mword_of_int 0)) (Regidx (mword_of_int 0)) m n b).
   Qed.
 
@@ -223,7 +223,7 @@ Section WpSconfCtl.
   (* reading the proof wants is that the fence is where [▷ P] becomes [P].   *)
   (* See claude-notes/projects/main-boot.md (G4).                            *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_fence_gen_later_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_fence_gen_later_s_sconf
       (pc : mword 64) (fm pred succ : mword 4) (rs rd : regidx)
       (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
@@ -236,7 +236,7 @@ Section WpSconfCtl.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (FENCE (fm, pred, succ, rs, rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -277,7 +277,7 @@ Section WpSconfCtl.
   (* c.j -- unconditional jump; a backward jump is a loop back edge, so   *)
   (* the continuation is UNDER A LATER (straight-line callers [iNext]).   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cj_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cj_s_sconf
       (pc : mword 64) (jimm : mword 21)
       (m : regfile) (n : nat) (b : bool) :
     let tgt := add_vec pc (sign_extend' 64 jimm) in
@@ -292,7 +292,7 @@ Section WpSconfCtl.
   Proof.
     intros tgt Hal0.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc true (JAL (jimm, zreg))
+    iApply (wp_instr_s_sconf m n b pc true (JAL (jimm, zreg))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
@@ -339,7 +339,7 @@ Section WpSconfCtl.
   (* ------------------------------------------------------------------- *)
   (* jal rd -- link write + jump.                                         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_jal_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_jal_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -356,7 +356,7 @@ Section WpSconfCtl.
     iIntros (Hrd Hrdok Hal0) "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b Φ pc false (JAL (imm, Regidx rd))
+    iApply (wp_instr_s_sconf m n b pc false (JAL (imm, Regidx rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
@@ -430,7 +430,7 @@ Section WpSconfCtl.
   (* c.ret (jalr x0, 0(ra)) -- no register write; the bundle is opened    *)
   (* for the LPE/priv/misa side conditions and reassembled.               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cret_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cret_s_sconf
       (pc : mword 64) (ra : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let tgt := ret_pc (rget m ra) in
@@ -445,7 +445,7 @@ Section WpSconfCtl.
   Proof.
     intros tgt Hra.
     iIntros "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
+    iApply (wp_instr_s_sconf m n b pc true (JALR (zeros' 12, Regidx ra, zreg))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -516,7 +516,7 @@ Section WpSconfCtl.
   (* NO alignment side condition -- and the link value is pc+2.           *)
   (* Who needs it: fileread's FD_DEVICE arm calls devsw[major].read.      *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cjalr_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cjalr_s_sconf
       (pc : mword 64) (rs1 rd : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let tgt := ret_pc (rget m rs1) in
@@ -535,7 +535,7 @@ Section WpSconfCtl.
     iIntros "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b Φ pc true (JALR (zeros' 12, Regidx rs1, Regidx rd))
+    iApply (wp_instr_s_sconf m n b pc true (JALR (zeros' 12, Regidx rs1, Regidx rd))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".

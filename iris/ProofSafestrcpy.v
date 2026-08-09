@@ -420,7 +420,7 @@ Section ProofSafestrcpy.
   (* ================================================================== *)
   (*  THE EPILOGUE (+0x2e .. +0x34), entered by all three arms.          *)
   (* ================================================================== *)
-  Local Lemma ssc_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma ssc_tail `{CID0 : CpuId}
       (mm Mt : regfile) (K : nat) (rv sp0 ra0 s00 : mword 64) (b : bool) (p : mword 64) :
     (2 <= K)%nat ->
     mm !!! Regidx csp_rs1 = sp0 ->
@@ -456,7 +456,7 @@ Section ProofSafestrcpy.
     { rewrite Hmtsp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite -Hpa1) in "Hb1".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x2e))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x2e))
               (mword_of_int 1 : mword 6) Rra Mt (K - 2)%nat ra0 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2e Hb1 [-]").
@@ -477,7 +477,7 @@ Section ProofSafestrcpy.
     { rewrite HT1sp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iEval (rewrite -Hpa2) in "Hb2".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x30))
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x30))
               (mword_of_int 0 : mword 6) Rs0 T1 (K - 2)%nat s00 b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi30 Hb2 [-]").
@@ -501,7 +501,7 @@ Section ProofSafestrcpy.
       by (rewrite Hwv; exact HT2sp).
     iDestruct (stack_own_2_intro sp0 ra0 s00 with "Hb1 Hb2") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x32))
+    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x32))
               (mword_of_int 16 : mword 6) T2 (K - 2)%nat 2 b Hpop
               with "Hcg Hpc Hi32 Hframe [-]").
     iIntros (CID3 Hs3) "Hcg Hpc".
@@ -523,7 +523,7 @@ Section ProofSafestrcpy.
       rewrite /T1 upd_eq. reflexivity. }
     assert (HT3ra' : forall CID' : CpuId, rget (CID := CID') T3 Rra = ra0)
       by (intros CID'; rgne; exact HT3ra).
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x34)) Rra T3 K b
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x34)) Rra T3 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi34 [-]").
     iIntros (CID4 Hs4) "Hcg Hpc".
     iEval (rewrite HT3ra') in "Hpc".
@@ -560,7 +560,7 @@ Section ProofSafestrcpy.
   (* ================================================================== *)
   (*  THE COPY LOOP (+0x18 head), by induction on the remaining fuel.     *)
   (* ================================================================== *)
-  Local Lemma ssc_loop (Φ : mval -> iProp Σ)
+  Local Lemma ssc_loop
       (mm : regfile) (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac)
       (t s sp0 : mword 64) (b : bool) (p : mword 64) (CIDh : CpuId) :
     (0 < n)%nat ->
@@ -607,7 +607,7 @@ Section ProofSafestrcpy.
     - (* ---- rem = 0: [d = n - 1], the [beq] is TAKEN ---- *)
       pose proof (ssc_d_eq_nm1 n d Hsum) as Hdk.
       iPoseProof (sscp_18 with "Htext") as "Hi18".
-      iApply (wp_beq_taken_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x18))
+      iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x18))
                 (mword_of_int 18 : mword 13) Ra3 Ra1 M (K - 2)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; rewrite Ha1 Ha3;
@@ -629,7 +629,7 @@ Section ProofSafestrcpy.
         by (intros CID'; rgne; exact Ha5).
       iDestruct (sie_cap_gpr_x0 M (K - 2)%nat b p Rz
                    ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
-      iApply (wp_sb_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x2a)) Rz Ra5
+      iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x2a)) Rz Ra5
                 (mword_of_int 0 : mword 12) M (K - 2)%nat (h d) b
                 with "Hcg Hpc Hi2a [Hdb] [-]").
       { iEval (rewrite (Ha5' _) addv_sext0). iExact "Hdb". }
@@ -656,7 +656,7 @@ Section ProofSafestrcpy.
     - (* ---- rem = S rem': [d < n - 1], the [beq] FALLS THROUGH ---- *)
       pose proof (ssc_d_lt_nm1 n d rem Hsum) as Hdlt1.
       iPoseProof (sscp_18 with "Htext") as "Hi18".
-      iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x18))
+      iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x18))
                 (mword_of_int 18 : mword 13) Ra3 Ra1 M (K - 2)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rgne; rewrite Ha1 Ha3;
@@ -677,7 +677,7 @@ Section ProofSafestrcpy.
          reduced to a [rget]-free form BEFORE it is named. *)
       assert (Ha1' : forall CID' : CpuId, rget (CID := CID') M Ra1 = pa_add t d)
         by (intros CID'; rgne; exact Ha1).
-      iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x1c)) Ra1
+      iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x1c)) Ra1
                 (mword_of_int 1 : mword 6) M (K - 2)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1c [-]").
@@ -694,7 +694,7 @@ Section ProofSafestrcpy.
       assert (HQ1a5 : Q1 !!! Regidx Ra5 = pa_add s d) by (rewrite /Q1 upd_ne; [exact Ha5 | reg_neq]).
       assert (HQ1a5' : forall CID' : CpuId, rget (CID := CID') Q1 Ra5 = pa_add s d)
         by (intros CID'; rgne; exact HQ1a5).
-      iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x1e)) Ra5
+      iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x1e)) Ra5
                 (mword_of_int 1 : mword 6) Q1 (K - 2)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi1e [-]").
@@ -727,7 +727,7 @@ Section ProofSafestrcpy.
       (* ---- +0x20: lbu a4,-1(a1) ---- *)
       pose proof (ssc_d_lt_n n d (S rem) Hn0 Hsum) as Hdn.
       iDestruct (bb_byte_acc t n d f dq Hdn with "Hsrc") as "[Hsb Hsback]".
-      iApply (wp_lbu_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x20)) Ra4 Ra1
+      iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x20)) Ra4 Ra1
                 (mword_of_int 4095 : mword 12) Q2 (K - 2)%nat (f d : mword 8) b (dqm := dq)
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi20 [Hsb] [-]").
@@ -750,7 +750,7 @@ Section ProofSafestrcpy.
       iPoseProof (sscp_24 with "Htext") as "Hi24".
       (* ---- +0x24: sb a4,-1(a5) ---- *)
       iDestruct (bb_byte_acc s n d h (DfracOwn 1) Hdn with "Hdst") as "[Hdb Hdback]".
-      iApply (wp_sb_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x24)) Ra4 Ra5
+      iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x24)) Ra4 Ra5
                 (mword_of_int 4095 : mword 12) Q3 (K - 2)%nat (h d) b
                 with "Hcg Hpc Hi24 [Hdb] [-]").
       { iEval (rewrite (HQ3a5' _) (ssc_back1 s d)). iExact "Hdb". }
@@ -777,7 +777,7 @@ Section ProofSafestrcpy.
       (* ---- +0x28: c.bnez a4 -- is the copied byte the terminator? ---- *)
       destruct (decide (f d = (mword_of_int 0 : mword 8))) as [Hz | Hnz].
       + (* ============ terminator found: fall through to +0x2a ============ *)
-        iApply (wp_cbnez_fall_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x28))
+        iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x28))
                   (mword_of_int 248 : mword 8) (Cregidx (mword_of_int 6)) Ra4 Q3 (K - 2)%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   ltac:(rgne; unfold neq_vec; rewrite HQ3a4 Hz bc_zext8_iszero; reflexivity)
@@ -795,7 +795,7 @@ Section ProofSafestrcpy.
           by (intros CID'; rgne; exact HQ3a5).
         iDestruct (sie_cap_gpr_x0 Q3 (K - 2)%nat b p Rz
                      ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
-        iApply (wp_sb_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x2a)) Rz Ra5
+        iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x2a)) Rz Ra5
                   (mword_of_int 0 : mword 12) Q3 (K - 2)%nat (h' (S d)) b
                   with "Hcg Hpc Hi2a [Hdb2] [-]").
         { iEval (rewrite (HQ3a5'' _) addv_sext0). iExact "Hdb2". }
@@ -819,7 +819,7 @@ Section ProofSafestrcpy.
         * exact HQ3a0.
         * exact HQ3thr.
       + (* ============ not the terminator: take the back edge ============ *)
-        iApply (wp_cbnez_taken_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x28))
+        iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x28))
                   (mword_of_int 248 : mword 8) (Cregidx (mword_of_int 6)) Ra4 Q3 (K - 2)%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   ltac:(rgne; unfold neq_vec; rewrite HQ3a4 (bc_zext8_nonzero _ Hnz); reflexivity)
@@ -845,10 +845,9 @@ Section ProofSafestrcpy.
   (* ================================================================== *)
   (*  THE WHOLE FUNCTION.                                                *)
   (* ================================================================== *)
-  Lemma wp_safestrcpy_sconf
-      (Φ : mval -> iProp Σ) (mm : regfile)
+  Lemma wp_safestrcpy_sconf (mm : regfile)
       (n : nat) (f g : nat -> bv 8) (K : nat) (dq : dfrac) (b : bool) (p : mword 64)
-    : wp_safestrcpy_sconf_body Φ mm n f g K dq b p.
+    : wp_safestrcpy_sconf_body mm n f g K dq b p.
   Proof.
     cbv beta delta [wp_safestrcpy_sconf_body].
     intros pcE s t ret_tgt HK Hn2 Hn31.
@@ -860,7 +859,7 @@ Section ProofSafestrcpy.
     iPoseProof (sscp_06 with "Htext") as "Hi06".
     iPoseProof (sscp_08 with "Htext") as "Hi08".
     (* ---- +0x00: c.addi sp,sp,-16 (frame push) ---- *)
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 48 : mword 6) mm K 2 b
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 48 : mword 6) mm K 2 b
               HK (ssc_push (mm !!! Regidx csp_rs1))
               with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
@@ -887,7 +886,7 @@ Section ProofSafestrcpy.
     { rewrite HR1sp. unfold pa_stk, add_vec_int. rewrite !pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* ---- +0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x02))
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x02))
               (mword_of_int 1 : mword 6) Rra R1 (K - 2)%nat u1 b
               with "Hcg Hpc Hi02 [Hb1] [-]").
     { iEval (rewrite Hpa1). iExact "Hb1". }
@@ -902,7 +901,7 @@ Section ProofSafestrcpy.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp04) in "Hpc".
     (* ---- +0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x04))
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x04))
               (mword_of_int 0 : mword 6) Rs0 R1 (K - 2)%nat u2 b
               with "Hcg Hpc Hi04 [Hb2] [-]").
     { iEval (rewrite Hpa2). iExact "Hb2". }
@@ -917,7 +916,7 @@ Section ProofSafestrcpy.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp06) in "Hpc".
     (* ---- +0x06: c.addi4spn s0,sp,16 ---- *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x06))
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x06))
               (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) Rs0 R1 (K - 2)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rdok)
@@ -957,7 +956,7 @@ Section ProofSafestrcpy.
     - (* ==== n = 0: the [bge] is TAKEN, jump straight to the epilogue ==== *)
       assert (Hn0geb : zopz0zKzJ_s (zero_reg : mword 64) (mword_of_int (Z.of_nat n) : mword 64) = true).
       { rewrite (ssc_geb0 n Hnval63). apply Nat.eqb_eq. exact Hn0. }
-      iApply (wp_bge_x0_taken_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x08))
+      iApply (wp_bge_x0_taken_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x08))
                 (mword_of_int 38 : mword 13) Ra2 R2 (K - 2)%nat b
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (HR2a2' _); exact Hn0geb)
@@ -969,7 +968,7 @@ Section ProofSafestrcpy.
                 = mword_of_int (KernelSyms.safestrcpy + 0x2e))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Ht2e) in "Hpc".
-      iApply (ssc_tail Φ mm R2 K s sp0 (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
+      iApply (ssc_tail mm R2 K s sp0 (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 HR2sp HR2a0 HR2thr
                 with "Hcg Htext Hpc Hb1 Hb2 [-]").
@@ -982,7 +981,7 @@ Section ProofSafestrcpy.
     - (* ==== n > 0: fall through, set up a3/a5, and run the copy loop ==== *)
       assert (Hn0geb : zopz0zKzJ_s (zero_reg : mword 64) (mword_of_int (Z.of_nat n) : mword 64) = false).
       { rewrite (ssc_geb0 n Hnval63). apply Nat.eqb_neq. exact Hnz. }
-      iApply (wp_bge_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x08))
+      iApply (wp_bge_x0_fall_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x08))
                 (mword_of_int 38 : mword 13) Ra2 R2 (K - 2)%nat b
                 ltac:(vm_compute; discriminate)
                 ltac:(rewrite (HR2a2' _); exact Hn0geb)
@@ -995,7 +994,7 @@ Section ProofSafestrcpy.
       iPoseProof (sscp_0c with "Htext") as "Hi0c".
       pose proof (ssc_ge1_of_ne n Hnz) as Hn1.
       (* ---- +0x0c: addiw a3,a2,-1 ---- *)
-      iApply (wp_addiw_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x0c)) Ra3 Ra2
+      iApply (wp_addiw_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x0c)) Ra3 Ra2
                 (mword_of_int 4095 : mword 12) R2 (K - 2)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi0c [-]").
@@ -1014,7 +1013,7 @@ Section ProofSafestrcpy.
       assert (HR3a3' : forall CID' : CpuId,
                  rget (CID := CID') R3 Ra3 = (mword_of_int (Z.of_nat n - 1) : mword 64))
         by (intros CID'; rgne; exact HR3a3).
-      iApply (wp_cslli_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x10)) (Regidx Ra3) Ra3
+      iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x10)) (Regidx Ra3) Ra3
                 (mword_of_int 32 : mword 6) R3 (K - 2)%nat b
                 eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi10 [-]").
@@ -1034,7 +1033,7 @@ Section ProofSafestrcpy.
                  = shift_bits_left (mword_of_int (Z.of_nat n - 1) : mword 64)
                      (subrange_vec_dec (mword_of_int 32 : mword 6) (Z.sub log2_xlen 1) 0))
         by (intros CID'; rgne; rewrite /R4 upd_eq; reflexivity).
-      iApply (wp_csrli_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x12)) (Cregidx (mword_of_int 5)) Ra3
+      iApply (wp_csrli_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x12)) (Cregidx (mword_of_int 5)) Ra3
                 (mword_of_int 32 : mword 6) R4 (K - 2)%nat b
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi12 [-]").
@@ -1060,7 +1059,7 @@ Section ProofSafestrcpy.
         by (intros CID'; rgne; exact HR5a3).
       assert (HR5a1' : forall CID' : CpuId, rget (CID := CID') R5 Ra1 = t)
         by (intros CID'; rgne; exact HR5a1).
-      iApply (wp_cadd_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x14)) Ra3 Ra1 R5 (K - 2)%nat b
+      iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x14)) Ra3 Ra1 R5 (K - 2)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi14 [-]").
       iIntros (CID9 Hs9) "Hcg Hpc".
@@ -1079,7 +1078,7 @@ Section ProofSafestrcpy.
         rewrite /R3 upd_ne; [| reg_neq]. exact HR2a0. }
       assert (HR6a0' : forall CID' : CpuId, rget (CID := CID') R6 Ra0 = s)
         by (intros CID'; rgne; exact HR6a0).
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.safestrcpy + 0x16)) Ra5 Ra0 R6 (K - 2)%nat b
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.safestrcpy + 0x16)) Ra5 Ra0 R6 (K - 2)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi16 [-]").
       iIntros (CID10 Hs10) "Hcg Hpc".
@@ -1109,7 +1108,7 @@ Section ProofSafestrcpy.
         rewrite /R3 upd_ne; [| apply cs_ne; [vm_compute; reflexivity | exact Hr]].
         apply HR2thr; assumption. }
       (* ---- the loop, entered with d = 0 ---- *)
-      iApply (ssc_loop Φ mm n f g K dq t s sp0 b p CID10
+      iApply (ssc_loop mm n f g K dq t s sp0 b p CID10
                 (ssc_pos_of_ne n Hnz) Hn31 (n - 1)%nat 0%nat g R7 CID10
                 ltac:(intros _; reflexivity)
                 (ssc_sum_init n)
@@ -1120,7 +1119,7 @@ Section ProofSafestrcpy.
                 HR7thr
                 with "Hcg Htext Hpc Hsrc Hdst [-]").
       iIntros (CID11 Hs11 Mt hf) "%Hex %Htsp %Hta0 %Htthr Hcg Hpc Hsrc Hdst".
-      iApply (ssc_tail Φ mm Mt K s sp0 (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
+      iApply (ssc_tail mm Mt K s sp0 (mm !!! Regidx Rra) (mm !!! Regidx Rs0) b p
                 HK ltac:(reflexivity) ltac:(reflexivity) ltac:(reflexivity)
                 Htsp Hta0 Htthr
                 with "Hcg Htext Hpc Hb1 Hb2 [-]").

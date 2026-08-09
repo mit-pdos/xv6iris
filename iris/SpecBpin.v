@@ -45,8 +45,7 @@ Local Open Scope Z_scope.
 
 Definition wp_bpin_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
-    `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
+    `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bpin in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -77,8 +76,7 @@ Definition wp_bpin_sconf_body
 Module Type BPIN.
   Parameter wp_bpin_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
-      wp_bpin_sconf_body Φ bn V k m n eb p C K b.
+      wp_bpin_sconf_body bn V k m n eb p C K b.
 End BPIN.

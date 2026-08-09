@@ -371,7 +371,6 @@ Section VcGenSIris.
   (* block, under the standard S-mode machine configuration.             *)
   (* ================================================================== *)
   Lemma wp_vc_block_s_den_r (R : s_regime) (prog : list vop_s)
-      (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
@@ -428,7 +427,7 @@ Section VcGenSIris.
         destruct (vregs st !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
-        iApply (wp_caddi_gpr_s_config_r R Φ (mword_of_int (vpc st)) rd imm
+        iApply (wp_caddi_gpr_s_config_r R (mword_of_int (vpc st)) rd imm
                   (vregs_den ρ (vregs st))
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd0
@@ -459,7 +458,7 @@ Section VcGenSIris.
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
-        iApply (wp_caddi4spn_gpr_s_config_r R Φ (mword_of_int (vpc st))
+        iApply (wp_caddi4spn_gpr_s_config_r R (mword_of_int (vpc st))
                   rdc nzimm rd (vregs_den ρ (vregs st))
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrdc Hrd0
@@ -499,7 +498,7 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csdsp_gpr_s_r R Φ (mword_of_int (vpc st)) uimm rs2
+        iApply (wp_csdsp_gpr_s_r R (mword_of_int (vpc st)) uimm rs2
                   (vregs_den ρ (vregs st)) (sval_den ρ vold)
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -532,7 +531,7 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_cldsp_gpr_s_r R Φ (mword_of_int (vpc st)) uimm rd
+        iApply (wp_cldsp_gpr_s_r R (mword_of_int (vpc st)) uimm rd
                   (vregs_den ρ (vregs st)) (sval_den ρ vv)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq) (dqm:=DfracOwn 1)
@@ -570,7 +569,7 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_clw_s_r R Φ (mword_of_int (vpc st)) rd rs1 imm
+        iApply (wp_clw_s_r R (mword_of_int (vpc st)) rd rs1 imm
                   (vregs_den ρ (vregs st)) (sval32_den ρ w32)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
@@ -609,7 +608,7 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csw_s_r R Φ (mword_of_int (vpc st)) rs2 rs1 imm
+        iApply (wp_csw_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
                   (vregs_den ρ (vregs st)) (sval32_den ρ wold)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
@@ -632,7 +631,7 @@ Section VcGenSIris.
         apply Z.eqb_neq in Hrd0.
         destruct (vregs st !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
         injection Hstep as <-.
-        iApply (wp_caddiw_s_r R Φ (mword_of_int (vpc st)) rd imm
+        iApply (wp_caddiw_s_r R (mword_of_int (vpc st)) rd imm
                   (vregs_den ρ (vregs st))
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd0
@@ -680,7 +679,7 @@ Section VcGenSIris.
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
         destruct rvc.
-        * iApply (wp_csd_s_r R Φ (mword_of_int (vpc st)) rs2 rs1 imm
+        * iApply (wp_csd_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -693,7 +692,7 @@ Section VcGenSIris.
             as "Hheap"; [iExact "Hcell"|].
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                   Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
-        * iApply (wp_sd_s_r R Φ (mword_of_int (vpc st)) rs2 rs1 imm
+        * iApply (wp_sd_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -731,7 +730,7 @@ Section VcGenSIris.
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
         destruct rvc.
-        * iApply (wp_cld_s_r R Φ (mword_of_int (vpc st)) rd rs1 imm
+        * iApply (wp_cld_s_r R (mword_of_int (vpc st)) rd rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -744,7 +743,7 @@ Section VcGenSIris.
           iEval (rewrite Egpr) in "Hgpr".
           iApply (IH _ Hblk with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                                   Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
-        * iApply (wp_ld_s_r R Φ (mword_of_int (vpc st)) rd rs1 imm
+        * iApply (wp_ld_s_r R (mword_of_int (vpc st)) rd rs1 imm
                     (vregs_den ρ (vregs st)) (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -761,7 +760,7 @@ Section VcGenSIris.
         destruct (vregs st !! Regidx csp_rs1) as [v1|] eqn:Hrs1; [|discriminate].
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
-        iApply (wp_caddi16sp_gpr_s_config_r R Φ (mword_of_int (vpc st)) imm6
+        iApply (wp_caddi16sp_gpr_s_config_r R (mword_of_int (vpc st)) imm6
                   (vregs_den ρ (vregs st))
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -785,7 +784,6 @@ Section VcGenSIris.
   Qed.
 
   Lemma wp_vc_block_s_den (root_ppn : mword 44) (prog : list vop_s)
-      (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
       {dq : dfrac} :
@@ -819,7 +817,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_vc_block_s_den_r (kpt_share_regime root_ppn) prog Φ st st' ρ mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
+    exact (wp_vc_block_s_den_r (kpt_share_regime root_ppn) prog st st' ρ mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
   Qed.
 
 
@@ -854,7 +852,6 @@ Section VcGenSIris.
   Qed.
 
   Lemma wp_vc_block_s_aux_r (R : s_regime) (prog : list vop_s)
-      (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
       (m m0 : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -917,7 +914,7 @@ Section VcGenSIris.
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
-        iApply (wp_caddi_gpr_s_config_r R Φ (mword_of_int (vpc st)) rd imm m
+        iApply (wp_caddi_gpr_s_config_r R (mword_of_int (vpc st)) rd imm m
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -944,7 +941,7 @@ Section VcGenSIris.
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
-        iApply (wp_caddi4spn_gpr_s_config_r R Φ (mword_of_int (vpc st))
+        iApply (wp_caddi4spn_gpr_s_config_r R (mword_of_int (vpc st))
                   rdc nzimm rd m
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrdc Hrd0
@@ -981,7 +978,7 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csdsp_gpr_s_r R Φ (mword_of_int (vpc st)) uimm rs2
+        iApply (wp_csdsp_gpr_s_r R (mword_of_int (vpc st)) uimm rs2
                   m (sval_den ρ vold)
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1015,7 +1012,7 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_cldsp_gpr_s_r R Φ (mword_of_int (vpc st)) uimm rd
+        iApply (wp_cldsp_gpr_s_r R (mword_of_int (vpc st)) uimm rd
                   m (sval_den ρ vv)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq) (dqm:=DfracOwn 1)
@@ -1050,7 +1047,7 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_clw_s_r R Φ (mword_of_int (vpc st)) rd rs1 imm
+        iApply (wp_clw_s_r R (mword_of_int (vpc st)) rd rs1 imm
                   m (sval32_den ρ w32)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
@@ -1085,7 +1082,7 @@ Section VcGenSIris.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csw_s_r R Φ (mword_of_int (vpc st)) rs2 rs1 imm
+        iApply (wp_csw_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
                   m (sval32_den ρ wold)
                   mstatus0 mie_v mdv0 menvcfg0
                   (dq:=dq)
@@ -1109,7 +1106,7 @@ Section VcGenSIris.
         destruct (vregs st !! Regidx rd) as [v1|] eqn:Hrs1; [|discriminate].
         injection Hstep as <-.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
-        iApply (wp_caddiw_s_r R Φ (mword_of_int (vpc st)) rd imm m
+        iApply (wp_caddiw_s_r R (mword_of_int (vpc st)) rd imm m
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -1151,7 +1148,7 @@ Section VcGenSIris.
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
         destruct rvc.
-        * iApply (wp_csd_s_r R Φ (mword_of_int (vpc st)) rs2 rs1 imm
+        * iApply (wp_csd_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
                     m (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1165,7 +1162,7 @@ Section VcGenSIris.
           iApply (IH _ _ Hblk Hmatch Hao
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
-        * iApply (wp_sd_s_r R Φ (mword_of_int (vpc st)) rs2 rs1 imm
+        * iApply (wp_sd_s_r R (mword_of_int (vpc st)) rs2 rs1 imm
                     m (sval_den ρ vold)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1200,7 +1197,7 @@ Section VcGenSIris.
         iEval (rewrite Hea) in "Hcell".
         assert (Hval : regval_into_reg (sval_den ρ vv) = sval_den ρ vv) by reflexivity.
         destruct rvc.
-        * iApply (wp_cld_s_r R Φ (mword_of_int (vpc st)) rd rs1 imm
+        * iApply (wp_cld_s_r R (mword_of_int (vpc st)) rd rs1 imm
                     m (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1213,7 +1210,7 @@ Section VcGenSIris.
           iApply (IH _ _ Hblk (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch) (agree_off_step Hao)
                     with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv
                           Htlbinv Hpc Hgpr Hbi Hheap Hheap4 Hcont").
-        * iApply (wp_ld_s_r R Φ (mword_of_int (vpc st)) rd rs1 imm
+        * iApply (wp_ld_s_r R (mword_of_int (vpc st)) rd rs1 imm
                     m (sval_den ρ vv)
                     mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=DfracOwn 1)
  Hrd0 HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0
@@ -1231,7 +1228,7 @@ Section VcGenSIris.
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
-        iApply (wp_caddi16sp_gpr_s_config_r R Φ (mword_of_int (vpc st)) imm6 m
+        iApply (wp_caddi16sp_gpr_s_config_r R (mword_of_int (vpc st)) imm6 m
                   mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
                   with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -1250,7 +1247,6 @@ Section VcGenSIris.
   Qed.
 
   Lemma wp_vc_block_s_aux (root_ppn : mword 44) (prog : list vop_s)
-      (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
       (m m0 : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -1289,7 +1285,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_vc_block_s_aux_r (kpt_share_regime root_ppn) prog Φ st st' ρ m m0 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
+    exact (wp_vc_block_s_aux_r (kpt_share_regime root_ppn) prog st st' ρ m m0 mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
   Qed.
 
   (* Thin wrapper over [wp_vc_block_s_aux]: instantiate the auxiliary
@@ -1298,7 +1294,6 @@ Section VcGenSIris.
      pure fact now also carries [agree_off st'.(vregs) mf m] -- untouched
      registers keep their input values. *)
   Lemma wp_vc_block_s_r (R : s_regime) (prog : list vop_s)
-      (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
       (m : regfile)
       (γ : gname) {dq : dfrac} :
@@ -1329,7 +1324,7 @@ Section VcGenSIris.
     iDestruct "Hmst" as (mstatus0) "(Hms & Hsie & %HSIE & %HMPRV & %HSXL & %HMXR & %Hleg)".
     iDestruct "Hmieb" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvb" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
-    iApply (wp_vc_block_s_aux_r R prog Φ st st' ρ m m mstatus0 mie_v mdv0 menvcfg0
+    iApply (wp_vc_block_s_aux_r R prog st st' ρ m m mstatus0 mie_v mdv0 menvcfg0
               (dq:=dq) HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Hblk Hmatch
               (fun r _ => eq_refl)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hgpr Hbi Hheap Hheap4 [Hcont Hsie]").
@@ -1341,7 +1336,6 @@ Section VcGenSIris.
   Qed.
 
   Lemma wp_vc_block_s (root_ppn : mword 44) (prog : list vop_s)
-      (Φ : mval -> iProp Σ)
       (st st' : vstate) (ρ : nat -> mword 64)
       (m : regfile)
       (γ : gname) {dq : dfrac} :
@@ -1365,7 +1359,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_vc_block_s_r (kpt_share_regime root_ppn) prog Φ st st' ρ m γ (dq:=dq)).
+    exact (wp_vc_block_s_r (kpt_share_regime root_ppn) prog st st' ρ m γ (dq:=dq)).
   Qed.
 
   (* ================================================================== *)
@@ -1390,7 +1384,7 @@ Section VcGenSIris.
 
 
 
-  Lemma wp_bne_split_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_bne_split_s_r (R : s_regime)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile)
       (γ : gname) {dq : dfrac} :
@@ -1413,19 +1407,19 @@ Section VcGenSIris.
     intros Hrs1 Hrs2 Hal.
     iIntros "Hsm Htlbinv Hpc Hgpr Hinstr Htaken Hfall".
     destruct (neq_vec (m !!! Regidx rs1) (m !!! Regidx rs2)) eqn:Hcmp.
-    - iApply (wp_bne_taken_s_config_scfg_r R γ Φ pc imm rs2 rs1 m (dq:=dq)
+    - iApply (wp_bne_taken_s_config_scfg_r R γ pc imm rs2 rs1 m (dq:=dq)
  Hrs1 Hrs2 Hcmp Hal
                 with "Hsm Htlbinv Hpc Hgpr Hinstr").
       iIntros "Hsm Htlbinv Hpc Hgpr".
       iApply ("Htaken" with "[//] Hsm Htlbinv Hpc Hgpr").
-    - iApply (wp_bne_fall_s_config_scfg_r R γ Φ pc imm rs2 rs1 m (dq:=dq)
+    - iApply (wp_bne_fall_s_config_scfg_r R γ pc imm rs2 rs1 m (dq:=dq)
  Hrs1 Hrs2 Hcmp
                 with "Hsm Htlbinv Hpc Hgpr Hinstr").
       iIntros "Hsm Htlbinv Hpc Hgpr".
       iApply ("Hfall" with "[//] Hsm Htlbinv Hpc Hgpr").
   Qed.
 
-  Lemma wp_bne_split_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_bne_split_s (root_ppn : mword 44)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile)
       (γ : gname) {dq : dfrac} :
@@ -1445,10 +1439,10 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_bne_split_s_r (kpt_share_regime root_ppn) Φ pc imm rs2 rs1 m γ (dq:=dq)).
+    exact (wp_bne_split_s_r (kpt_share_regime root_ppn) pc imm rs2 rs1 m γ (dq:=dq)).
   Qed.
 
-  Lemma wp_beq_split_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_beq_split_s_r (R : s_regime)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile)
       (γ : gname) {dq : dfrac} :
@@ -1471,19 +1465,19 @@ Section VcGenSIris.
     intros Hrs1 Hrs2 Hal.
     iIntros "Hsm Htlbinv Hpc Hgpr Hinstr Htaken Hfall".
     destruct (eq_vec (m !!! Regidx rs1) (m !!! Regidx rs2)) eqn:Hcmp.
-    - iApply (wp_beq_taken_s_config_scfg_r R γ Φ pc imm rs2 rs1 m (dq:=dq)
+    - iApply (wp_beq_taken_s_config_scfg_r R γ pc imm rs2 rs1 m (dq:=dq)
  Hrs1 Hrs2 Hcmp Hal
                 with "Hsm Htlbinv Hpc Hgpr Hinstr").
       iIntros "Hsm Htlbinv Hpc Hgpr".
       iApply ("Htaken" with "[//] Hsm Htlbinv Hpc Hgpr").
-    - iApply (wp_beq_fall_s_config_scfg_r R γ Φ pc imm rs2 rs1 m (dq:=dq)
+    - iApply (wp_beq_fall_s_config_scfg_r R γ pc imm rs2 rs1 m (dq:=dq)
  Hrs1 Hrs2 Hcmp
                 with "Hsm Htlbinv Hpc Hgpr Hinstr").
       iIntros "Hsm Htlbinv Hpc Hgpr".
       iApply ("Hfall" with "[//] Hsm Htlbinv Hpc Hgpr").
   Qed.
 
-  Lemma wp_beq_split_s (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_beq_split_s (root_ppn : mword 44)
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile)
       (γ : gname) {dq : dfrac} :
@@ -1503,7 +1497,7 @@ Section VcGenSIris.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_beq_split_s_r (kpt_share_regime root_ppn) Φ pc imm rs2 rs1 m γ (dq:=dq)).
+    exact (wp_beq_split_s_r (kpt_share_regime root_ppn) pc imm rs2 rs1 m γ (dq:=dq)).
   Qed.
 
 End VcGenSIris.

@@ -171,8 +171,7 @@ Existing Instance riscv_memGS.
    the register value out of the state.
    [wp_lw_virtio_dev_s_sconf] below is the bundle-taking, pure-premise
    restatement for the live driver, whose reads are state-independent. *)
-Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names)
-    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
+Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
     (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 32 -> iProp Σ) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -204,7 +203,7 @@ Proof.
   pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
   pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
   iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
-  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
@@ -362,8 +361,7 @@ Qed.
    ([virtio_proto_intro] pays in the DMA lease and mints the publisher token).
    [wp_sw_virtio_dev_s_sconf] below is the bundle-taking, pure-premise
    restatement for the first kind. *)
-Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names)
-    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -390,7 +388,7 @@ Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names)
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn.
   iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
-  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
@@ -542,8 +540,7 @@ Qed.
    the state it was opened at (a virtio read does not advance the device) --
    what the caller gets is the property [P] it proved of the loaded word at
    EVERY state the invariant admits. *)
-Lemma wp_lw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
-    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
+Lemma wp_lw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
     (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -572,7 +569,7 @@ Proof.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   (* only the DISK half of the fabric is touched, and [↑diskN ⊆ ↑devN] *)
   iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
-  iApply (wp_lw_virtio_dinv_s_sconf γd Φ pc is_rvc is_unsigned rd rs1 imm m n
+  iApply (wp_lw_virtio_dinv_s_sconf γd pc is_rvc is_unsigned rd rs1 imm m n
             emp%I (fun w => ⌜P w⌝%I) b
             Hrange Halign Hcanon Hdevvpn Hrdnz Hrdok
             with "Hcg Hpc Hinstr Hvinv [] [] [-]").
@@ -596,8 +593,7 @@ Qed.
    alone, which is exactly what [VirtioProto.virtio_proto_stable] needs to
    carry the driver protocol across the store.  §0's
    [virtio_ack_write_ok] / [virtio_notify_write_ok] discharge it. *)
-Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
-    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -624,7 +620,7 @@ Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
-  iApply (wp_sw_virtio_dinv_s_sconf γd Φ pc is_rvc rs2 rs1 imm m n
+  iApply (wp_sw_virtio_dinv_s_sconf γd pc is_rvc rs2 rs1 imm m n
             emp%I emp%I b Hrange Halign Hcanon Hdevvpn
             with "Hcg Hpc Hinstr Hvinv [] [] [-]").
   { done. }

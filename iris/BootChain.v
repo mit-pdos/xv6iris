@@ -391,7 +391,7 @@ Section BootRun.
      cpu_ctx_free ∗
      True)%I.
 
-  Lemma boot_entry_bridge (Φ : mval -> iProp Σ) (rs : regstate)
+  Lemma boot_entry_bridge (rs : regstate)
       (iv : mword 32) (dq : dfrac) :
     (* [reset_regs] alone: the mie / mideleg facts [boot_bridge] needs ("no
        non-delegated interrupt is enabled") are now PINS of the reset machine
@@ -431,7 +431,7 @@ Section BootRun.
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".
     (* The contract takes sp0 as a PARAMETER, so it runs at §1's concrete
        address throughout and there is no rewriting to do on either side. *)
-    iApply (Entry.wp_entry_boot Φ (boot_regfile rs) v_stack0
+    iApply (Entry.wp_entry_boot (boot_regfile rs) v_stack0
               (boot_w64 (Z.of_nat (fin_to_nat cpu_id)))
               (register_lookup mepc rs) (register_lookup satp rs)
               (register_lookup medeleg rs) (register_lookup mideleg rs)
@@ -520,7 +520,7 @@ Section BootSecondary.
     intros Hreset Hnz.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
-    iApply (boot_entry_bridge Φ rs iv dq Hreset with "Htext Hres").
+    iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
     iApply (MainSecondary.wp_main_secondary_sconf Φ mf K_main zero_reg γd γv
               (register_lookup tlb rs)
@@ -595,7 +595,7 @@ Section BootPrimary.
     intros Hreset Hz Hprun Hlen Hlive.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hprocs Hpark Hpst
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
-    iApply (boot_entry_bridge Φ rs iv dq Hreset with "Htext Hres").
+    iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
     iApply (Main.wp_main_boot_sconf Φ mf K_main zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)

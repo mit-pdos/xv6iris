@@ -504,7 +504,7 @@ Section WpSconfCsr.
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
 
-  Lemma wp_csrr_sstatus_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_sstatus_s_sconf
       (pc : mword 64) (rd : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -536,7 +536,7 @@ Section WpSconfCsr.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRReg (csr_sstatus, Regidx (mword_of_int 0), Regidx rd, CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -697,7 +697,7 @@ Section WpSconfCsr.
   (* (trap CSRs + stack bound + a persistent intr_inv copy).  The '0'     *)
   (* arm is the idempotent write, ghosts untouched.                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_csrci_sstatus_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrci_sstatus_s_sconf
       (pc : mword 64) (rd : mword 5) (k : nat) (eb : bool)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -722,7 +722,7 @@ Section WpSconfCsr.
     iIntros (Hrd Hrdok) "Hcg Hcnt Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx rd, CSRRC))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -961,7 +961,7 @@ Section WpSconfCsr.
      p] would ask it for that eighth at '1' while its own bundle still pins
      it at '0'.)  The already-enabled branch of [sie_cap] is refuted by
      sepc-cell exclusivity (the payload and a '1' arm can't coexist). *)
-  Lemma wp_csrsi_sstatus_x0_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrsi_sstatus_x0_s_sconf
       (pc : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
@@ -982,7 +982,7 @@ Section WpSconfCsr.
     iIntros "Hcg Hcnt Hcsrs Hcells Hclm Hpc Hinstr Hcont".
     iDestruct "Hcnt" as "[Htok Hhx]".
     iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx & Hsppc)".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -1149,7 +1149,7 @@ Section WpSconfCsr.
      through untouched, and every one of the caller's [if eb then emp else _]
      premises is [emp] -- at [eb = true] all of that is ALREADY in the arm,
      which is exactly why the counting token is one of them. *)
-  Lemma wp_csrsi_sstatus_x0_enable_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrsi_sstatus_x0_enable_s_sconf
       (pc : mword 64) (eb : bool) (m : regfile) (n : nat) :
     sie_cap_gpr m n eb p -∗
     (if eb then emp else intr_count 0 false) -∗
@@ -1170,12 +1170,12 @@ Section WpSconfCsr.
     destruct eb.
     2:{ (* ---- base state DISABLED: the real flip, via the restore leaf ---- *)
         iIntros "Hcg Hcnt Hcsrs Hcells Hclm #Havail Hpc Hinstr Hcont".
-        iApply (wp_csrsi_sstatus_x0_s_sconf Φ pc m n false
+        iApply (wp_csrsi_sstatus_x0_s_sconf pc m n false
                   with "Hcg [Hcnt] Hcsrs Hcells Hclm Hpc Hinstr Hcont").
         iApply (intr_count_pack_S_on 0 with "Hcnt Havail"). }
     (* ---- base state ENABLED: idempotent on SIE, ghosts stand still ---- *)
     iIntros "Hcg _ _ _ _ #Havail Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n true Φ pc false
+    iApply (wp_instr_s_sconf m n true pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -1263,7 +1263,7 @@ Section WpSconfCsr.
      returns the freed cells as [cpu_cells_pay b p], exactly like its
      sibling [wp_csrci_sstatus_s_sconf]: the flip's second eighth is taken
      out of the arm's own [cpu_hart], not out of the caller. *)
-  Lemma wp_csrci_sstatus_x0_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrci_sstatus_x0_s_sconf
       (pc : mword 64) (m : regfile) (n : nat) (b : bool) :
     sie_cap_gpr m n b p -∗
     intr_count_pre b 0 true -∗
@@ -1281,7 +1281,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hcnt Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRC))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
@@ -1380,7 +1380,7 @@ Section WpSconfCsr.
      [legalize_tvec] would otherwise silently rewrite.  Taking the value as
      an explicit [wval] (rather than leaving [m !!! Regidx rs1] in the
      post) keeps the stored term closed at the call site. ---- *)
-  Lemma wp_csrw_stvec_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrw_stvec_s_sconf
       (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) (tv0 wval : mword 64) :
     uint rs1 <> 0 ->
@@ -1398,7 +1398,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval Hmode) "Hcg Hstv Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1467,7 +1467,7 @@ Section WpSconfCsr.
      flavour (IntrDefs) -- because SPP and SPIE are the entire point: they
      are what kernelvec's [sret] reads.  Close it with
      [sie_cap_gpr_at_close] as soon as they have been recorded. ---- *)
-  Lemma wp_csrw_sstatus_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrw_sstatus_s_sconf
       (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) (ms0 : mword 64) (vspp vspie : mword 1) :
     uint rs1 <> 0 ->
@@ -1496,7 +1496,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval Hms0f Hsie0) "Hcg Hsppc Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1604,7 +1604,7 @@ Section WpSconfCsr.
      Unlike stvec's, the written word does NOT land verbatim: sepc's write
      legalizes through [mepc_val], so the post-value carries the wrapper --
      a caller writing back a 2-aligned epc collapses it. ---- *)
-  Lemma wp_csrw_sepc_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrw_sepc_s_sconf
       (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) (ep0 wval : mword 64) :
     uint rs1 <> 0 ->
@@ -1621,7 +1621,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval) "Hcg Hsepc Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1697,7 +1697,7 @@ Section WpSconfCsr.
   (* never opens it -- so a caller at that arm must be lending a share it  *)
   (* got from somewhere else.                                              *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_csrr_ro_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_ro_s_sconf
       (pc : mword 64) (csrn : mword 12) (rg : register_bitvector_64)
       (f : mword 64 -> mword 64) (rd : mword 5)
       (m : regfile) (n : nat) (b : bool) (dq : dfrac) (v : mword 64) :
@@ -1727,7 +1727,7 @@ Section WpSconfCsr.
     iIntros (Hrd Hrdok Hne Hexec) "Hcg Hcell Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (CSRReg (csrn, zreg, Regidx rd, CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1781,7 +1781,7 @@ Section WpSconfCsr.
   (* ---- the three instances.  scause and stval read their cell verbatim;
      sepc's read runs [align_pc], so its value carries [mepc_val]. ---- *)
 
-  Lemma wp_csrr_scause_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_scause_s_sconf
       (pc : mword 64) (rd : mword 5)
       (m : regfile) (n : nat) (b : bool) (dq : dfrac) (sc : mword 64) :
     uint rd <> 0 ->
@@ -1798,13 +1798,13 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf Φ pc csr_scause scause (fun x => x) rd m n b dq sc
+    iApply (wp_csrr_ro_s_sconf pc csr_scause scause (fun x => x) rd m n b dq sc
               Hrd Hrdok ltac:(vm_compute; reflexivity)).
     intros s Hpriv HS _.
     exact (exec_execute_csrr_scause_gpr_S rd s Hrd Hpriv HS).
   Qed.
 
-  Lemma wp_csrr_stval_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_stval_s_sconf
       (pc : mword 64) (rd : mword 5)
       (m : regfile) (n : nat) (b : bool) (dq : dfrac) (tv : mword 64) :
     uint rd <> 0 ->
@@ -1821,7 +1821,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf Φ pc csr_stval stval (fun x => x) rd m n b dq tv
+    iApply (wp_csrr_ro_s_sconf pc csr_stval stval (fun x => x) rd m n b dq tv
               Hrd Hrdok ltac:(vm_compute; reflexivity)).
     intros s Hpriv HS _.
     exact (exec_execute_csrr_stval_gpr_S rd s Hrd Hpriv HS).
@@ -1831,7 +1831,7 @@ Section WpSconfCsr.
      caller that knows its saved epc is 2-aligned (every write to the cell
      went through [legalize_xepc], and every trap writes an aligned pc)
      collapses the wrapper itself; the leaf does not assume it. *)
-  Lemma wp_csrr_sepc_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrr_sepc_s_sconf
       (pc : mword 64) (rd : mword 5)
       (m : regfile) (n : nat) (b : bool) (dq : dfrac) (ep : mword 64) :
     uint rd <> 0 ->
@@ -1848,7 +1848,7 @@ Section WpSconfCsr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf Φ pc csr_sepc sepc mepc_val rd m n b dq ep
+    iApply (wp_csrr_ro_s_sconf pc csr_sepc sepc mepc_val rd m n b dq ep
               Hrd Hrdok ltac:(vm_compute; reflexivity)).
     intros s Hpriv HS HC.
     exact (exec_execute_csrr_sepc_gpr_S rd s Hrd Hpriv HS HC).

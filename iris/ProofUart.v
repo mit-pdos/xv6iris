@@ -42,10 +42,10 @@ Context `{!uartGhostG Σ, !diskGhostG Σ}.
 Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sb_uart_uinv_s_sconf (γd : uart_names)
-    (off : Z) (Φ : mval -> iProp Σ)
+    (off : Z)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64)
-    : wp_sb_uart_uinv_s_sconf_body γd off Φ pc is_rvc rs2 rs1 imm m n R S b p.
+    : wp_sb_uart_uinv_s_sconf_body γd off pc is_rvc rs2 rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_sb_uart_uinv_s_sconf_body].
   intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
@@ -60,7 +60,7 @@ Context `{GEN : GenId} `{CID : CpuId}.
   { assert (Hds : kmap_static (svpn_of a8) KP_rw) by (apply kmap_class_rw; right; exact Hdevvpn).
     pose proof (pa_of_id a8 (static_canon_lo a8 KP_rw Hds Hcanon)) as Hpid.
     unfold pa_of in Hpid. exact Hpid. }
-  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 1))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
@@ -199,25 +199,25 @@ Qed.
   (* The bundle-taking RESTATEMENT of the accessor leaf above, statement
      verbatim, proof one projection out of [dev_inv]. *)
   Lemma wp_sb_uart_s_sconf (γd : uart_names) (γv : disk_names)
-    (off : Z) (Φ : mval -> iProp Σ)
+    (off : Z)
     (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64)
-    : wp_sb_uart_s_sconf_body γd γv off Φ pc is_rvc rs2 rs1 imm m n R S b p.
+    : wp_sb_uart_s_sconf_body γd γv off pc is_rvc rs2 rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_sb_uart_s_sconf_body].
     intros ea a8 storebyte lppn Hoff Hcanon Hvpn_def Hpa.
     iIntros "Hcg Hpc Hinstr #Hdinv HR Hacc Hcont".
     iDestruct (dev_inv_uart with "Hdinv") as "#Huinv".
-    iApply (wp_sb_uart_uinv_s_sconf γd off Φ pc is_rvc rs2 rs1 imm m n R S b p
+    iApply (wp_sb_uart_uinv_s_sconf γd off pc is_rvc rs2 rs1 imm m n R S b p
               Hoff Hcanon Hvpn_def Hpa
               with "Hcg Hpc Hinstr Huinv HR Hacc Hcont").
   Qed.
 
   Lemma wp_lb_uart_s_sconf (γd : uart_names) (γv : disk_names)
-    (off : Z) (Φ : mval -> iProp Σ)
+    (off : Z)
     (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64)
-    : wp_lb_uart_s_sconf_body γd γv off Φ pc is_rvc is_unsigned rd rs1 imm m n R S b p.
+    : wp_lb_uart_s_sconf_body γd γv off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
   Proof.
     cbv beta delta [wp_lb_uart_s_sconf_body].
   intros ea a8 ldval lppn Hoff Hrd Hrdok Hcanon Hvpn_def Hpa.
@@ -234,7 +234,7 @@ Qed.
   { assert (Hds : kmap_static (svpn_of a8) KP_rw) by (apply kmap_class_rw; right; exact Hdevvpn).
     pose proof (pa_of_id a8 (static_canon_lo a8 KP_rw Hds Hcanon)) as Hpid.
     unfold pa_of in Hpid. exact Hpid. }
-  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 1))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".

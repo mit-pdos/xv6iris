@@ -588,7 +588,7 @@ Section WpSconfVc.
   (* 4. THE block lemma: one symbolic run = one WP, sp moves included.     *)
   (* ==================================================================== *)
   Lemma wp_vc_block_s_sconf_aux
-      (prog : list vop_s) (Φ : mval -> iProp Σ)
+      (prog : list vop_s)
       (st st' : vsstate) (ρ : nat -> mword 64)
       (m m0 : regfile) (n : nat) (b : bool) :
     vc_block_sp_s st prog = Some st' ->
@@ -676,7 +676,7 @@ Section WpSconfVc.
                                       (sign_extend' 64 (sign_extend' 12 imm))) k)
               by (rewrite -Hm1; exact Hw).
             iDestruct (stack_of_absorbed ρ v _ k Hb' with "Hslots") as "Hframe".
-            iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (vpc vb)) imm
+            iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (vpc vb)) imm
                       m (n - u) k b Hw
                       with "Hcg Hpc Hi Hframe").
             iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hpc".
@@ -703,7 +703,7 @@ Section WpSconfVc.
                                  (sign_extend' 64 (sign_extend' 12 imm))
                          = pa_stk (m !!! Regidx csp_rs1) k).
             { apply push_addr_eq. rewrite Hek. unfold d, zimm12. reflexivity. }
-            iApply (wp_caddi_sp_push_s_sconf Φ (mword_of_int (vpc vb)) imm
+            iApply (wp_caddi_sp_push_s_sconf (mword_of_int (vpc vb)) imm
                       m (n - u) k b Hkle0 Hw
                       with "Hcg Hpc Hi").
             iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hframe Hpc".
@@ -745,7 +745,7 @@ Section WpSconfVc.
             rewrite (rget_ne m rd (rd_ok_tp _ Hrdok)) Hm1
               (sval_den_add_imm ρ v1 (sign_extend' 12 imm) H64).
             reflexivity. }
-          iApply (wp_caddi_s_sconf Φ (mword_of_int (vpc vb)) rd imm m (n - u) b
+          iApply (wp_caddi_s_sconf (mword_of_int (vpc vb)) rd imm m (n - u) b
                     Hrd0 Hrdok
                     with "Hcg Hpc Hi").
           iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hcg Hpc".
@@ -771,7 +771,7 @@ Section WpSconfVc.
         destruct (sval_is64 v1) eqn:H64; [|discriminate].
         injection Hstep as <-.
         pose proof (Hmatch _ _ Hrs1) as Hm1.
-        iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (vpc vb))
+        iApply (wp_caddi4spn_s_sconf (mword_of_int (vpc vb))
                   rdc nzimm rd m (n - u) b Hrdc Hrd0 Hrdok
                   with "Hcg Hpc Hi").
         iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hcg Hpc".
@@ -810,7 +810,7 @@ Section WpSconfVc.
             as "[Hcell Hheapk]".
           iEval (cbn [fst snd]) in "Hcell".
           iEval (rewrite Hea) in "Hcell".
-          iApply (wp_csdsp_s_sconf Φ (mword_of_int (vpc vb)) uimm rs2
+          iApply (wp_csdsp_s_sconf (mword_of_int (vpc vb)) uimm rs2
                     m (n - u) (sval_den ρ vold) b
                     with "Hcg Hpc Hi Hcell").
           iEval (rewrite /wp_next). iIntros (CID5 Hs5) "Hcg Hpc Hcell".
@@ -829,7 +829,7 @@ Section WpSconfVc.
           iDestruct "Hfr" as "[Hslot Hfr]".
           iDestruct "Hslot" as (wold) "Hslot".
           iEval (rewrite Hea) in "Hslot".
-          iApply (wp_csdsp_s_sconf Φ (mword_of_int (vpc vb)) uimm rs2
+          iApply (wp_csdsp_s_sconf (mword_of_int (vpc vb)) uimm rs2
                     m (n - u) wold b
                     with "Hcg Hpc Hi Hslot").
           iEval (rewrite /wp_next). iIntros (CID6 Hs6) "Hcg Hpc Hslot".
@@ -865,7 +865,7 @@ Section WpSconfVc.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_cldsp_s_sconf Φ (mword_of_int (vpc vb)) uimm rd
+        iApply (wp_cldsp_s_sconf (mword_of_int (vpc vb)) uimm rd
                   m (n - u) (sval_den ρ vv) b (dqm:=DfracOwn 1) Hrd0 Hrdok
                   with "Hcg Hpc Hi Hcell").
         iEval (rewrite /wp_next). iIntros (CID7 Hs7) "Hcg Hpc Hcell".
@@ -904,7 +904,7 @@ Section WpSconfVc.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_clw_s_sconf Φ (mword_of_int (vpc vb)) rd rs1 imm
+        iApply (wp_clw_s_sconf (mword_of_int (vpc vb)) rd rs1 imm
                   m (n - u) (sval32_den ρ w32) b (dqm:=DfracOwn 1) Hrd0 Hrdok
                   with "Hcg Hpc Hi Hcell").
         iEval (rewrite /wp_next). iIntros (CID8 Hs8) "Hcg Hpc Hcell".
@@ -944,7 +944,7 @@ Section WpSconfVc.
           as "[Hcell Hheapk]".
         iEval (cbn [fst snd]) in "Hcell".
         iEval (rewrite Hea) in "Hcell".
-        iApply (wp_csw_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+        iApply (wp_csw_s_sconf (mword_of_int (vpc vb)) rs2 rs1 imm
                   m (n - u) (sval32_den ρ wold) b
                   with "Hcg Hpc Hi Hcell").
         iEval (rewrite /wp_next). iIntros (CID9 Hs9) "Hcg Hpc Hcell".
@@ -978,7 +978,7 @@ Section WpSconfVc.
           unfold zimm32. rewrite mword_of_int_uint32.
           rewrite -trunc32_add.
           rewrite trunc32_subrange. reflexivity. }
-        iApply (wp_caddiw_s_sconf Φ (mword_of_int (vpc vb)) rd imm m (n - u) b
+        iApply (wp_caddiw_s_sconf (mword_of_int (vpc vb)) rd imm m (n - u) b
                   Hrd0 Hrdok
                   with "Hcg Hpc Hi").
         iEval (rewrite /wp_next). iIntros (CID10 Hs10) "Hcg Hpc".
@@ -1016,7 +1016,7 @@ Section WpSconfVc.
           iEval (cbn [fst snd]) in "Hcell".
           iEval (rewrite Hea) in "Hcell".
           destruct rvc.
-          -- iApply (wp_csd_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+          -- iApply (wp_csd_s_sconf (mword_of_int (vpc vb)) rs2 rs1 imm
                        m (n - u) (sval_den ρ vold) b
                        with "Hcg Hpc Hi Hcell").
              iEval (rewrite /wp_next). iIntros (CID11 Hs11) "Hcg Hpc Hcell".
@@ -1027,7 +1027,7 @@ Section WpSconfVc.
              iDestruct (wp_next_shift Hs11 with "Hcont") as "Hcont".
              iApply (IH _ _ CID11 Hblk Hux1 Hxn Hmatch Hao
                        with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
-          -- iApply (wp_sd_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+          -- iApply (wp_sd_s_sconf (mword_of_int (vpc vb)) rs2 rs1 imm
                        m (n - u) (sval_den ρ vold) b
                        with "Hcg Hpc Hi Hcell").
              iEval (rewrite /wp_next). iIntros (CID12 Hs12) "Hcg Hpc Hcell".
@@ -1047,7 +1047,7 @@ Section WpSconfVc.
           iDestruct "Hslot" as (wold) "Hslot".
           iEval (rewrite Hea) in "Hslot".
           destruct rvc.
-          -- iApply (wp_csd_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+          -- iApply (wp_csd_s_sconf (mword_of_int (vpc vb)) rs2 rs1 imm
                        m (n - u) wold b
                        with "Hcg Hpc Hi Hslot").
              iEval (rewrite /wp_next). iIntros (CID13 Hs13) "Hcg Hpc Hslot".
@@ -1059,7 +1059,7 @@ Section WpSconfVc.
              iDestruct (wp_next_shift Hs13 with "Hcont") as "Hcont".
              iApply (IH _ _ CID13 Hblk Hux1 Hxn Hmatch Hao
                        with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
-          -- iApply (wp_sd_s_sconf Φ (mword_of_int (vpc vb)) rs2 rs1 imm
+          -- iApply (wp_sd_s_sconf (mword_of_int (vpc vb)) rs2 rs1 imm
                        m (n - u) wold b
                        with "Hcg Hpc Hi Hslot").
              iEval (rewrite /wp_next). iIntros (CID14 Hs14) "Hcg Hpc Hslot".
@@ -1099,7 +1099,7 @@ Section WpSconfVc.
         iEval (rewrite Hea) in "Hcell".
         assert (Hval : regval_into_reg (sval_den ρ vv) = sval_den ρ vv) by reflexivity.
         destruct rvc.
-        * iApply (wp_cld_s_sconf Φ (mword_of_int (vpc vb)) rd rs1 imm
+        * iApply (wp_cld_s_sconf (mword_of_int (vpc vb)) rd rs1 imm
                     m (n - u) (sval_den ρ vv) b (dqm:=DfracOwn 1) Hrd0 Hrdok
                     with "Hcg Hpc Hi Hcell").
           iEval (rewrite /wp_next). iIntros (CID15 Hs15) "Hcg Hpc Hcell".
@@ -1110,7 +1110,7 @@ Section WpSconfVc.
           iApply (IH _ _ CID15 Hblk Hux1 Hxn (gpr_matches_insert _ _ _ _ _ _ Hval Hmatch)
                     (agree_off_step Hao)
                     with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
-        * iApply (wp_ld_s_sconf Φ (mword_of_int (vpc vb)) rd rs1 imm
+        * iApply (wp_ld_s_sconf (mword_of_int (vpc vb)) rd rs1 imm
                     m (n - u) (sval_den ρ vv) b (dqm:=DfracOwn 1) Hrd0 Hrdok
                     with "Hcg Hpc Hi Hcell").
           iEval (rewrite /wp_next). iIntros (CID16 Hs16) "Hcg Hpc Hcell".
@@ -1152,7 +1152,7 @@ Section WpSconfVc.
                                     (sign_extend' 64 (caddi16sp_imm imm6))) k)
             by (rewrite -Hm1; exact Hw).
           iDestruct (stack_of_absorbed ρ v _ k Hb' with "Hslots") as "Hframe".
-          iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (vpc vb)) imm6
+          iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (vpc vb)) imm6
                     m (n - u) k b Hw
                     with "Hcg Hpc Hi Hframe").
           iEval (rewrite /wp_next). iIntros (CID17 Hs17) "Hcg Hpc".
@@ -1174,7 +1174,7 @@ Section WpSconfVc.
                                (sign_extend' 64 (caddi16sp_imm imm6))
                        = pa_stk (m !!! Regidx csp_rs1) k).
           { apply push_addr_eq. rewrite Hek. unfold d, zimm12. reflexivity. }
-          iApply (wp_caddi16sp_push_s_sconf Φ (mword_of_int (vpc vb)) imm6
+          iApply (wp_caddi16sp_push_s_sconf (mword_of_int (vpc vb)) imm6
                     m (n - u) k b Hkle0 Hw
                     with "Hcg Hpc Hi").
           iEval (rewrite /wp_next). iIntros (CID18 Hs18) "Hcg Hframe Hpc".
@@ -1206,7 +1206,7 @@ Section WpSconfVc.
      concrete literal vs the spec's stack bound, and [Nat.sub_0_r] to read
      [n - 0] back as [n]. *)
   Lemma wp_vc_block_s_sconf
-      (prog : list vop_s) (Φ : mval -> iProp Σ)
+      (prog : list vop_s)
       (st st' : vsstate) (ρ : nat -> mword 64)
       (m : regfile) (n : nat) (b : bool) :
     vc_block_sp_s st prog = Some st' ->
@@ -1232,7 +1232,7 @@ Section WpSconfVc.
   Proof.
     intros Hblk Hux Hxn Hmatch.
     iIntros "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont".
-    iApply (wp_vc_block_s_sconf_aux prog Φ st st' ρ m m n b
+    iApply (wp_vc_block_s_sconf_aux prog st st' ρ m m n b
               Hblk Hux Hxn Hmatch (fun r _ => eq_refl)
               with "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont").
   Qed.

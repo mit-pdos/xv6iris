@@ -53,8 +53,7 @@ Section USpecSync.
   (* sync @0x368: li a7,22; ecall; ret.  RETURNS to [m !!! ra] with
      a7 = 22, a0 = the (arbitrary) syscall return value, everything else
      -- registers, image, pc discipline -- intact, on an arbitrary hart. *)
-  Definition wp_sync_stub_body (M : gmap Z (bv 8)) (m : regfile)
-      (Φ : mval -> iProp Σ) :=
+  Definition wp_sync_stub_body (M : gmap Z (bv 8)) (m : regfile) :=
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
@@ -68,8 +67,7 @@ Section USpecSync.
     WP (Loop : expr riscv_lang).
 
   (* exit @0x2c8: li a7,2; ecall.  DIVERGES (the trailing ret is dead). *)
-  Definition wp_exit_stub_body (M : gmap Z (bv 8)) (m : regfile)
-      (Φ : mval -> iProp Σ) :=
+  Definition wp_exit_stub_body (M : gmap Z (bv 8)) (m : regfile) :=
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M),
     UVG m M -∗
@@ -85,7 +83,7 @@ Section USpecSync.
 
   (* main @0x0: prologue (16-byte frame), jal sync, li a0,0, jal exit. *)
   Definition wp_sync_main_body (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (Φ : mval -> iProp Σ) :=
+      (sp0 : mword 64) :=
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M)
       (Hsp : m !!! Regidx sp_idx = sp0)
@@ -99,7 +97,7 @@ Section USpecSync.
      sync process: from the loaded image and the entry registers, the
      machine runs safely forever under the kernel's trap services. *)
   Definition wp_sync_start_body (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (Φ : mval -> iProp Σ) :=
+      (sp0 : mword 64) :=
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M)
       (Hsp : m !!! Regidx sp_idx = sp0)

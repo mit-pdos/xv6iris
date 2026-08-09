@@ -74,7 +74,7 @@ Section WpSconfSrliw.
   (* SRLIW: shift the source's low 32 bits RIGHT (logically) by a 5-bit
      shamt, sign-extend the 32-bit result back.  The [wp_slliw_s_sconf]
      twin, verbatim. *)
-  Lemma wp_srliw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_srliw_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -90,7 +90,7 @@ Section WpSconfSrliw.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRLIW)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").

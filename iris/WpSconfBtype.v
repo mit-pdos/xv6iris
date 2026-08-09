@@ -281,7 +281,7 @@ Section WpSconfBtype.
   (* ------------------------------------------------------------------- *)
   (* FALL-THROUGH leaves: [sconf]/[sie_cap] pass through untouched.       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_beq_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_beq_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -295,7 +295,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -321,7 +321,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_bne_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bne_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -335,7 +335,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -361,7 +361,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_bltu_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bltu_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -375,7 +375,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -404,7 +404,7 @@ Section WpSconfBtype.
   (* BLT-fall, the SIGNED twin of [wp_bltu_fall_s_sconf] at two general
      registers (free_desc's `i >= NUM` bound check).  The x0-specialized
      [wp_blt_x0_fall_s_sconf] below is the same leaf against zero. *)
-  Lemma wp_blt_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_blt_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -418,7 +418,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -446,7 +446,7 @@ Section WpSconfBtype.
 
   (* ...and the TAKEN arm of the same two-register BLT (a copy loop's back
      edge).  The general twin of [wp_blt_x0_taken_s_sconf] below. *)
-  Lemma wp_blt_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_blt_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -461,7 +461,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -508,7 +508,7 @@ Section WpSconfBtype.
   Qed.
 
   (* BGEU-fall (the freerange loop exit: no more full pages fit). *)
-  Lemma wp_bgeu_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bgeu_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -522,7 +522,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -550,7 +550,7 @@ Section WpSconfBtype.
 
   (* BLTU-taken (the freerange empty-page-list path skips the loop to the
      epilogue). *)
-  Lemma wp_bltu_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bltu_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -565,7 +565,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -612,7 +612,7 @@ Section WpSconfBtype.
   Qed.
 
   (* BGEU-taken (the freerange loop back-edge: another full page still fits). *)
-  Lemma wp_bgeu_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bgeu_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -627,7 +627,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -678,7 +678,7 @@ Section WpSconfBtype.
      the copy is done when the signed index reaches the signed count).  The
      [_x0_] forms below are the [rs1 = x0] specializations gcc emits for
      [blez]; neither covers a general rs1. *)
-  Lemma wp_bge_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bge_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -692,7 +692,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -718,7 +718,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_bge_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bge_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -733,7 +733,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -779,7 +779,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_bge_x0_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bge_x0_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs2 <> 0 ->
@@ -793,7 +793,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -823,7 +823,7 @@ Section WpSconfBtype.
      mappages / kvmmap).  x0 is not in the register file, so this is the
      x0-specialized twin of [wp_bltu_fall_s_sconf], as [wp_bge_x0_fall_s_sconf]
      is of [wp_bgeu_fall_s_sconf]. *)
-  Lemma wp_blt_x0_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_blt_x0_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -837,7 +837,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -866,7 +866,7 @@ Section WpSconfBtype.
   (* ...and its TAKEN twin: the [bltz rs1] error test that DID fire (the
      [argfd(...) < 0] arm of a syscall).  x0 is not in the register file, so
      this is the x0-specialized twin of [wp_bltu_taken_s_sconf]. *)
-  Lemma wp_blt_x0_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_blt_x0_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -881,7 +881,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -933,7 +933,7 @@ Section WpSconfBtype.
   (* [bltz]; the operand order is the whole difference and neither can     *)
   (* serve for the other, so both pairs exist.                             *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_bgtz_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bgtz_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs2 <> 0 ->
@@ -947,7 +947,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -974,7 +974,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_bgtz_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bgtz_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs2 <> 0 ->
@@ -989,7 +989,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BLT))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1044,7 +1044,7 @@ Section WpSconfBtype.
   (* the operand order is the whole difference and neither can serve for   *)
   (* the other, so both pairs exist.                                       *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_bgez_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bgez_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -1058,7 +1058,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1084,7 +1084,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_bgez_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bgez_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -1099,7 +1099,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1147,7 +1147,7 @@ Section WpSconfBtype.
 
   (* BGE against x0 in the rs1 slot -- a [blez rs2] loop-guard (printint's
      [while (--i >= 0)]).  The taken twin of [wp_bge_x0_fall_s_sconf]. *)
-  Lemma wp_bge_x0_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bge_x0_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs2 <> 0 ->
@@ -1162,7 +1162,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1208,7 +1208,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_cbeqz_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cbeqz_fall_s_sconf
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     creg2reg_idx rs = Regidx rd1 ->
@@ -1224,7 +1224,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs Hrd1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc true
+    iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1252,7 +1252,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_cbnez_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cbnez_fall_s_sconf
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     creg2reg_idx rs = Regidx rd1 ->
@@ -1268,7 +1268,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs Hrd1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc true
+    iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1302,7 +1302,7 @@ Section WpSconfBtype.
   (* weaken with [iNext].  All four go through the Zca jump helper, so    *)
   (* only bit-0 alignment of the target is demanded.                      *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_beq_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_beq_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -1317,7 +1317,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1363,7 +1363,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_bne_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bne_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 -> uint rs2 <> 0 ->
@@ -1378,7 +1378,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1424,7 +1424,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_cbeqz_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cbeqz_taken_s_sconf
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let imm : mword 13 := sign_extend' 13 (concat_vec imm8 ('b"0")) in
@@ -1442,7 +1442,7 @@ Section WpSconfBtype.
   Proof.
     intros imm.
     iIntros (Hrs Hrd1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc true
+    iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (imm, zreg, creg2reg_idx rs, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1489,7 +1489,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_cbnez_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cbnez_taken_s_sconf
       (pc : mword 64) (imm8 : mword 8) (rs : cregidx) (rd1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let imm : mword 13 := sign_extend' 13 (concat_vec imm8 ('b"0")) in
@@ -1507,7 +1507,7 @@ Section WpSconfBtype.
   Proof.
     intros imm.
     iIntros (Hrs Hrd1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc true
+    iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (imm, zreg, creg2reg_idx rs, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1559,7 +1559,7 @@ Section WpSconfBtype.
      instruction width differs -- the branch target's 2-alignment is what Zca
      licenses, and that is a fact about the TARGET, not about the size of the
      branch. *)
-  Lemma wp_beqz_x0_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_beqz_x0_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -1574,7 +1574,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, zreg, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1622,7 +1622,7 @@ Section WpSconfBtype.
   Qed.
 
   (* beqz (x0) fall-through -- moved here from ProofWalk.v. *)
-  Lemma wp_beqz_x0_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_beqz_x0_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -1636,7 +1636,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, zreg, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc [Hreg Hmem]".
@@ -1671,7 +1671,7 @@ Section WpSconfBtype.
      hex loop, whose counter is a full-width [addiw].  The [zreg] twins of
      [wp_bne_taken]/[wp_bne_fall]: with rs2 = x0 the model reads no second
      register, so the [uint rs2 <> 0] side condition of those cannot be met. *)
-  Lemma wp_bnez_x0_taken_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bnez_x0_taken_s_sconf
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -1686,7 +1686,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, zreg, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1733,7 +1733,7 @@ Section WpSconfBtype.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_bnez_x0_fall_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bnez_x0_fall_s_sconf
       (pc : mword 64) (imm : mword 13) (rs1 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     uint rs1 <> 0 ->
@@ -1747,7 +1747,7 @@ Section WpSconfBtype.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, zreg, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc [Hreg Hmem]".

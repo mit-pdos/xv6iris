@@ -629,7 +629,7 @@ Section SmodeCorePt.
   (* [wp_instr_s_tlbinv] with the tree invariant threaded, and NO A/D     *)
   (* premise -- the Svadu write-back is absorbed inside the fetch.        *)
   (* =================================================================== *)
-  Lemma wp_instr_s_regime (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_instr_s_regime (R : s_regime) (γ : gname)
       (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
     smode_config γ dq -∗
     sr_inv R -∗
@@ -664,7 +664,7 @@ Section SmodeCorePt.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor with "Hinv Hhs").
     iIntros (σ) "Hsi".
     (* interrupt dispatch decision at σ (before the fetch moves the state) *)
     iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
@@ -756,7 +756,7 @@ Section SmodeCorePt.
   (* inside the fupd) and stashes the returned invariant in its           *)
   (* continuation.  No A/D premise anywhere.                              *)
   (* =================================================================== *)
-  Lemma wp_instr_s_config_regime (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_instr_s_config_regime (R : s_regime)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -807,7 +807,7 @@ Section SmodeCorePt.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
                  HmisaS Hmm HSIE with "Hsi Hmisa Hmstatus Hmiec Hmdlc") as %Hdisp.
@@ -907,7 +907,7 @@ Section SmodeCorePt.
       tlb_res_pt root_ppn.
   Proof. exact (s_regime_fetch (kpt_share_regime root_ppn) σ pc r E). Qed.
 
-  Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44) (Φ : mval -> iProp Σ)
+  Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -946,7 +946,7 @@ Section SmodeCorePt.
           ▷ WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    exact (wp_instr_s_config_regime (kpt_share_regime root_ppn) Φ pc is_rvc i
+    exact (wp_instr_s_config_regime (kpt_share_regime root_ppn) pc is_rvc i
              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
   Qed.
 

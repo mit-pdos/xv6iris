@@ -1,7 +1,7 @@
 (* WpSconfAlu.v -- the SIE-AGNOSTIC ALU leaf layer (interrupt-sweep
    stage 5, first family file): the [sconf]+[sie_cap] twins of
    WpSmodePtAlu.v's leaves, over the agnostic gpr-write engines
-   [wp_gpr_write_s_sconf{,_base}] (WpSmodeIntr.v).
+   [wp_gpr_write_s_sconf] (WpSmodeIntr.v).
 
    Uniform transform vs the `_pt` originals:
      - resources: everything is bundled into `sie_cap_gpr m n b`
@@ -59,7 +59,7 @@ Section WpSconfAlu.
 
   (* addi rd, rs1, imm (base width) is [wp_addi_s_sconf] (WpSmodeIntr.v). *)
 
-  Lemma wp_caddi4spn_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddi4spn_s_sconf
       (pc : mword 64) (rdc : cregidx) (nzimm : mword 8) (rd : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     creg2reg_idx rdc = Regidx rd ->
@@ -75,7 +75,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrdc Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd csp_rs1 csp_rs1
+    unshelve iApply (wp_gpr_write_s_sconf pc rd csp_rs1 csp_rs1
               (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))
               m n b Hrd Hrdok _
@@ -87,7 +87,7 @@ Section WpSconfAlu.
       unfold gpr_addi_val. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_caddi_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddi_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : regfile) (n : nat) (b : bool) :
     let wval := add_vec (rget m rd) (sign_extend' 64 (sign_extend' 12 imm)) in
@@ -103,7 +103,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI))
               wval
               m n b Hrd Hrdok _
@@ -114,7 +114,7 @@ Section WpSconfAlu.
       unfold gpr_addi_val. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_candi_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_candi_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : regfile) (n : nat) (b : bool) :
     let wval := and_vec (rget m rd) (sign_extend' 64 (sign_extend' 12 imm)) in
@@ -130,7 +130,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ANDI))
               wval
               m n b Hrd Hrdok _
@@ -143,7 +143,7 @@ Section WpSconfAlu.
 
   (* c.li rd, imm is [wp_cli_s_sconf] (WpSmodeIntr.v). *)
 
-  Lemma wp_sltiu_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sltiu_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -158,7 +158,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -170,7 +170,7 @@ Section WpSconfAlu.
 
   (* ---- RTYPE family ---------------------------------------------------- *)
 
-  Lemma wp_cadd_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cadd_s_sconf
       (pc : mword 64) (rd rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let wval := add_vec (rget m rd) (rget m rs2) in
@@ -186,7 +186,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rs2
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rs2
               (RTYPE (Regidx rs2, Regidx rd, Regidx rd, ADD))
               wval
               m n b Hrd Hrdok _
@@ -199,7 +199,7 @@ Section WpSconfAlu.
       unfold gpr_rd_val. rewrite Hva Hvb. reflexivity.
   Qed.
 
-  Lemma wp_cmv_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cmv_s_sconf
       (pc : mword 64) (rd rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let wval := add_vec zero_reg (rget m rs2) in
@@ -215,7 +215,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rs2 rs2
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rs2 rs2
               (RTYPE (Regidx rs2, zreg, Regidx rd, ADD))
               wval
               m n b Hrd Hrdok _
@@ -231,7 +231,7 @@ Section WpSconfAlu.
       rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_sltu_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sltu_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -246,7 +246,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -255,7 +255,7 @@ Section WpSconfAlu.
       unfold gpr_sltu_val. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
-  Lemma wp_cor_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cor_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -270,7 +270,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -282,7 +282,7 @@ Section WpSconfAlu.
   (* c.and rd,rd,rs2 (register-register AND; the freerange PGROUNDUP mask
      step -- homed here since it is an ordinary c.and leaf like [wp_cor_s_sconf]
      above, not freerange-specific). *)
-  Lemma wp_cand_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cand_s_sconf
       (pc : mword 64) (rd rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let wval := and_vec (rget m rd) (rget m rs2) in
@@ -298,7 +298,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rs2
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rs2
               (RTYPE (Regidx rs2, Regidx rd, Regidx rd, AND))
               wval
               m n b Hrd Hrdok _
@@ -312,7 +312,7 @@ Section WpSconfAlu.
      [wp_cand_s_sconf] above cannot express: vmfault's [and s4,s2,a5] and both
      copy loops' PGROUNDDOWN mask a virtual address with -4096 into a
      DIFFERENT register. *)
-  Lemma wp_and_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_and_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -327,7 +327,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -340,7 +340,7 @@ Section WpSconfAlu.
      compressed [wp_caddiw_s_sconf] above only covers [c.addiw rd,rd,imm].
      [sext.w rd,rs1] is this instruction at imm = 0, which is how both copy
      loops narrow the chunk length to 32 bits for memmove. *)
-  Lemma wp_addiw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_addiw_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let wval :=
@@ -357,7 +357,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ADDIW (imm, Regidx rs1, Regidx rd))
               wval
               m n b Hrd Hrdok _
@@ -368,7 +368,7 @@ Section WpSconfAlu.
       unfold gpr_addiw_val. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_sub_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sub_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -383,7 +383,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -402,7 +402,7 @@ Section WpSconfAlu.
      derailment in claude-notes/durable-notes.md.  [wp_csub_s_sconf] below is
      the encoding's own shape (c.sub can only encode rd = rs1) as a
      restatement of this one. *)
-  Lemma wp_csub_wval_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csub_wval_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -417,7 +417,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -431,7 +431,7 @@ Section WpSconfAlu.
   Qed.
 
   (* the shape the C.SUB encoding actually has, at the stored value inline. *)
-  Lemma wp_csub_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csub_s_sconf
       (pc : mword 64) (rd rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let wval := sub_vec (rget m rd) (rget m rs2) in
@@ -447,12 +447,12 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     intros Hrd Hrdok.
-    exact (wp_csub_wval_s_sconf Φ pc rd rd rs2
+    exact (wp_csub_wval_s_sconf pc rd rd rs2
              (sub_vec (rget m rd) (rget m rs2)) m n b
              Hrd Hrdok eq_refl).
   Qed.
 
-  Lemma wp_csubw_wval_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csubw_wval_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -469,7 +469,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -482,7 +482,7 @@ Section WpSconfAlu.
       unfold gpr_subw_val, gpr_src. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
-  Lemma wp_csubw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csubw_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5)
       (m : regfile) (n : nat) (b : bool) :
     let wval := sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
@@ -497,12 +497,12 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval Hrd Hrdok.
-    exact (wp_csubw_wval_s_sconf Φ pc rd rs1 rs2
+    exact (wp_csubw_wval_s_sconf pc rd rs1 rs2
              (sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32))) m n b
              Hrd Hrdok eq_refl).
   Qed.
 
-  Lemma wp_add_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_add_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -517,7 +517,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -532,7 +532,7 @@ Section WpSconfAlu.
   (* ---- UTYPE / ADDIW / SHIFTIOP families ------------------------------- *)
 
   (* base (32-bit) SLLI: [slli rd,rs1,shamt] with rd <> rs1 (not compressible). *)
-  Lemma wp_slli_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_slli_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 6) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -547,7 +547,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -557,7 +557,7 @@ Section WpSconfAlu.
       unfold gpr_slli_val, gpr_src. rewrite Hva Hwval. reflexivity.
   Qed.
 
-  Lemma wp_clui_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_clui_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 20) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -572,7 +572,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (UTYPE (imm, Regidx rd, LUI)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -583,7 +583,7 @@ Section WpSconfAlu.
   Qed.
 
   (* base (4-byte) LUI: same value function as [wp_clui_s_sconf], 4-byte pc bump. *)
-  Lemma wp_lui_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_lui_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 20) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -598,7 +598,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rd rd
               (UTYPE (imm, Regidx rd, LUI)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -609,7 +609,7 @@ Section WpSconfAlu.
   Qed.
 
   (* SLLIW: shift the source's low 32 bits by a 5-bit shamt, sign-extend back. *)
-  Lemma wp_slliw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_slliw_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -624,7 +624,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -634,7 +634,7 @@ Section WpSconfAlu.
       unfold gpr_slliw_val, gpr_src. rewrite Hva Hwval. reflexivity.
   Qed.
 
-  Lemma wp_caddiw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddiw_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 6)
       (m : regfile) (n : nat) (b : bool) :
     let wval :=
@@ -651,7 +651,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd))
               wval
               m n b Hrd Hrdok _
@@ -662,7 +662,7 @@ Section WpSconfAlu.
       unfold gpr_addiw_val. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_cslli_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cslli_s_sconf
       (pc : mword 64) (rsd : regidx) (rd : mword 5) (shamt : mword 6)
       (m : regfile) (n : nat) (b : bool) :
     let wval :=
@@ -680,7 +680,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrsd Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (SHIFTIOP (shamt, Regidx rd, Regidx rd, SLLI))
               wval
               m n b Hrd Hrdok _
@@ -691,7 +691,7 @@ Section WpSconfAlu.
       unfold gpr_slli_val, gpr_src. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_csrli_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csrli_s_sconf
       (pc : mword 64) (crsd : cregidx) (rd : mword 5) (shamt : mword 6)
       (m : regfile) (n : nat) (b : bool) :
     let wval :=
@@ -709,7 +709,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hcrsd Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI))
               wval
               m n b Hrd Hrdok _
@@ -720,7 +720,7 @@ Section WpSconfAlu.
       unfold gpr_srli_val, gpr_src. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_srli4_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_srli4_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 6)
       (m : regfile) (n : nat) (b : bool) :
     let wval :=
@@ -737,7 +737,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))
               wval
               m n b Hrd Hrdok _
@@ -751,7 +751,7 @@ Section WpSconfAlu.
 
   (* base-width addi (rd != x0, rd != sp): [wval] is the model's
      [gpr_addi_val] at map-form operands. *)
-  Lemma wp_addi4_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_addi4_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let wval := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -767,7 +767,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
               wval
               m n b Hrd Hrdok _
@@ -784,7 +784,7 @@ Section WpSconfAlu.
      written value is the sign-extended immediate outright -- which is why this
      cannot be an instance of [wp_addi4_s_sconf], whose post would read
      [m !!! Regidx zreg]. *)
-  Lemma wp_li4_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_li4_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -799,7 +799,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd
               (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
               (ITYPE (imm, zreg, Regidx rd, ADDI)) wval m n b Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -819,7 +819,7 @@ Section WpSconfAlu.
   (* The PC-READING 4-byte gpr-write engine (auipc): the base engine      *)
   (* with [register_lookup PC s_pc = pc] handed to the exec hypothesis.   *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_gpr_write_s_sconf_base_pc (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_sconf_base_pc
       (pc : mword 64) (rd rsa rsb : mword 5) (i : instruction) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -845,7 +845,7 @@ Section WpSconfAlu.
   Proof.
     iIntros (Hrd Hrdok Hbexec) "Hcg Hpc Hinstr Hcont".
     rdok_split Hrdok.
-    iApply (wp_instr_s_sconf m n b Φ pc false i with "Hcg Hpc Hinstr").
+    iApply (wp_instr_s_sconf m n b pc false i with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
@@ -892,7 +892,7 @@ Section WpSconfAlu.
     iPureIntro. done.
   Qed.
 
-  Lemma wp_auipc_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_auipc_s_sconf
       (pc : mword 64) (rd : mword 5) (imm : mword 20)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
@@ -906,7 +906,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base_pc Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf_base_pc pc rd rd rd
               (UTYPE (imm, Regidx rd, AUIPC))
               (add_vec pc (auipc_off imm)) m n b
               Hrd Hrdok _
@@ -930,7 +930,7 @@ Section WpSconfAlu.
   (* is what [tp_refold] needs to restate the engine's output write as a  *)
   (* write under the pin.  (Both call sites below are at rd = sp.)        *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_gpr_write_s_sconf_cap (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_sconf_cap
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
     uint rd <> 0 ->
@@ -957,7 +957,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdtp Hbexec) "Hcg Hpc Hinstr Hrecap Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc true base with "Hcg Hpc Hinstr").
+    iApply (wp_instr_s_sconf m n b pc true base with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
@@ -1004,7 +1004,7 @@ Section WpSconfAlu.
      exactly where function proofs already do their stack bookkeeping.
      The moved value is [let]-bound OUTSIDE the [wp_next] lambda: it is a
      word read off the ENTRY map, at the hart we came from. *)
-  Lemma wp_caddi_sp_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddi_sp_s_sconf
       (pc : mword 64) (imm : mword 6)
       (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
     let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm)) in
@@ -1022,7 +1022,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros "Hcg Hpc Hinstr Hrecap Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_cap Φ pc csp_rs1 csp_rs1 csp_rs1
+    unshelve iApply (wp_gpr_write_s_sconf_cap pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) wval m n n' P b
               ltac:(vm_compute; discriminate)
               ltac:(intro He; injection He as He2; vm_compute in He2; congruence) _
@@ -1033,7 +1033,7 @@ Section WpSconfAlu.
     unfold gpr_addi_val. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_caddi16sp_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddi16sp_s_sconf
       (pc : mword 64) (imm6 : mword 6)
       (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
     let wval := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)) in
@@ -1051,7 +1051,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros "Hcg Hpc Hinstr Hrecap Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_cap Φ pc csp_rs1 csp_rs1 csp_rs1
+    unshelve iApply (wp_gpr_write_s_sconf_cap pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) wval m n n' P b
               ltac:(vm_compute; discriminate)
               ltac:(intro He; injection He as He2; vm_compute in He2; congruence) _
@@ -1073,7 +1073,7 @@ Section WpSconfAlu.
   (* Note the post-pop count is (n - k) + k after a matching push --      *)
   (* callers restore the syntactic n with a [replace ... by lia].         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_caddi_sp_push_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddi_sp_push_s_sconf
       (pc : mword 64) (imm : mword 6)
       (m : regfile) (n k : nat) (b : bool) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -1095,7 +1095,7 @@ Section WpSconfAlu.
     assert (Hsp' : <[Regidx csp_rs1 := regval_into_reg wval]> m !!! Regidx csp_rs1
                    = pa_stk (m !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
-    iApply (wp_caddi_sp_s_sconf Φ pc imm m n (n - k) (stack_own sp0 k) b
+    iApply (wp_caddi_sp_s_sconf pc imm m n (n - k) (stack_own sp0 k) b
               with "Hcg Hpc Hinstr [] [Hcont]").
     { iIntros "Hcap".
       iDestruct (sie_cap_push m _ n k b Hk Hsp' with "Hcap")
@@ -1106,7 +1106,7 @@ Section WpSconfAlu.
     iPureIntro. exact Hs1.
   Qed.
 
-  Lemma wp_caddi_sp_pop_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddi_sp_pop_s_sconf
       (pc : mword 64) (imm : mword 6)
       (m : regfile) (n k : nat) (b : bool) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -1128,7 +1128,7 @@ Section WpSconfAlu.
                   = pa_stk (<[Regidx csp_rs1 := regval_into_reg wval]> m
                             !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
-    iApply (wp_caddi_sp_s_sconf Φ pc imm m n (n + k) emp%I b
+    iApply (wp_caddi_sp_s_sconf pc imm m n (n + k) emp%I b
               with "Hcg Hpc Hinstr [Hframe] [Hcont]").
     { iIntros "Hcap".
       iSplitL; [| done].
@@ -1139,7 +1139,7 @@ Section WpSconfAlu.
     iPureIntro. exact Hs1.
   Qed.
 
-  Lemma wp_caddi16sp_push_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddi16sp_push_s_sconf
       (pc : mword 64) (imm6 : mword 6)
       (m : regfile) (n k : nat) (b : bool) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -1161,7 +1161,7 @@ Section WpSconfAlu.
     assert (Hsp' : <[Regidx csp_rs1 := regval_into_reg wval]> m !!! Regidx csp_rs1
                    = pa_stk (m !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
-    iApply (wp_caddi16sp_s_sconf Φ pc imm6 m n (n - k) (stack_own sp0 k) b
+    iApply (wp_caddi16sp_s_sconf pc imm6 m n (n - k) (stack_own sp0 k) b
               with "Hcg Hpc Hinstr [] [Hcont]").
     { iIntros "Hcap".
       iDestruct (sie_cap_push m _ n k b Hk Hsp' with "Hcap")
@@ -1172,7 +1172,7 @@ Section WpSconfAlu.
     iPureIntro. exact Hs1.
   Qed.
 
-  Lemma wp_caddi16sp_pop_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_caddi16sp_pop_s_sconf
       (pc : mword 64) (imm6 : mword 6)
       (m : regfile) (n k : nat) (b : bool) :
     let sp0 := m !!! Regidx csp_rs1 in
@@ -1194,7 +1194,7 @@ Section WpSconfAlu.
                   = pa_stk (<[Regidx csp_rs1 := regval_into_reg wval]> m
                             !!! Regidx csp_rs1) k).
     { rewrite upd_eq. exact Hw. }
-    iApply (wp_caddi16sp_s_sconf Φ pc imm6 m n (n + k) emp%I b
+    iApply (wp_caddi16sp_s_sconf pc imm6 m n (n + k) emp%I b
               with "Hcg Hpc Hinstr [Hframe] [Hcont]").
     { iIntros "Hcap".
       iSplitL; [| done].
@@ -1207,7 +1207,7 @@ Section WpSconfAlu.
 
 
   (* srl/ori/andi -- moved here from ProofWalk.v (leaves belong in the leaf file). *)
-  Lemma wp_srl_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_srl_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> rd_ok rd ->
@@ -1222,7 +1222,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SRL)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -1231,7 +1231,7 @@ Section WpSconfAlu.
       unfold gpr_srl_val. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
-  Lemma wp_ori_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_ori_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> rd_ok rd ->
@@ -1245,7 +1245,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -1257,7 +1257,7 @@ Section WpSconfAlu.
 
   (* [xori rd,rs1,imm].  copyinstr flips its [got_null] flag with
      [xori a5,a5,1] on its way to the return value. *)
-  Lemma wp_xori_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_xori_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> rd_ok rd ->
@@ -1271,7 +1271,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, XORI)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -1281,7 +1281,7 @@ Section WpSconfAlu.
       unfold gpr_xori_val. rewrite Hva Hwval. reflexivity.
   Qed.
 
-  Lemma wp_andi_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_andi_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> rd_ok rd ->
@@ -1295,7 +1295,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs1
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -1307,7 +1307,7 @@ Section WpSconfAlu.
 
 
   (* base-width OR -- moved here from ProofMappages.v (dedup: leaf belongs in the leaf file). *)
-  Lemma wp_or_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_or_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> rd_ok rd ->
@@ -1321,7 +1321,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) wval m n b
               Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
@@ -1337,7 +1337,7 @@ Section WpSconfAlu.
      same address, so these are now two-user leaves; the exec bridges they
      rest on are in WpMmodeLeafBase beside the others. *)
 
-  Lemma wp_srai_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_srai_s_sconf
       (pc : mword 64) (rd : mword 5) (shamt : mword 6) (m : regfile) (n : nat) (b : bool) :
     let wval :=
       shift_bits_right_arith (rget m rd) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) in
@@ -1352,7 +1352,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rd
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRAI))
               wval
               m n b Hrd Hrdok _
@@ -1363,7 +1363,7 @@ Section WpSconfAlu.
       unfold gpr_srai_val, gpr_src. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_mul_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_mul_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> rd_ok rd ->
     mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1)) (mulop_mul.(mul_op_signed_rs2))
@@ -1377,7 +1377,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) wval m n b Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
@@ -1390,7 +1390,7 @@ Section WpSconfAlu.
      quotient/remainder at the map-form operands), so a call site that knows
      its divisor is nonzero closes the [Z.eqb .. 0] test by [vm_compute]
      instead of carrying the architectural divide-by-zero case around. *)
-  Lemma wp_divu_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_divu_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> rd_ok rd ->
     to_bits_truncate 64
@@ -1405,7 +1405,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (DIV (Regidx rs2, Regidx rs1, Regidx rd, true)) wval m n b Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
@@ -1413,7 +1413,7 @@ Section WpSconfAlu.
       unfold gpr_divu_val, gpr_uint_src. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
-  Lemma wp_remu_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_remu_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 -> rd_ok rd ->
     to_bits_truncate 64
@@ -1428,7 +1428,7 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (REM (Regidx rs2, Regidx rs1, Regidx rd, true)) wval m n b Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
@@ -1436,7 +1436,7 @@ Section WpSconfAlu.
       unfold gpr_remu_val, gpr_uint_src. rewrite Hva Hvb Hwval. reflexivity.
   Qed.
 
-  Lemma wp_addw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_addw_s_sconf
       (pc : mword 64) (rd rs2 : mword 5) (m : regfile) (n : nat) (b : bool) :
     let wval :=
       sign_extend' 64 (add_vec (subrange_vec_dec (rget m rd) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
@@ -1451,7 +1451,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf Φ pc rd rd rs2
+    unshelve iApply (wp_gpr_write_s_sconf pc rd rd rs2
               (RTYPEW (Regidx rs2, Regidx rd, Regidx rd, ADDW))
               wval
               m n b Hrd Hrdok _
@@ -1465,7 +1465,7 @@ Section WpSconfAlu.
   (* subw rd,rs1,rs2 -- the 4-byte (base-encoding) 32-bit subtract whose
      result is sign-extended into rd.  Unlike [wp_addw_s_sconf] (the
      compressed 2-operand [c.addw]) the three registers are independent. *)
-  Lemma wp_subw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_subw_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (m : regfile) (n : nat) (b : bool) :
     let wval :=
       sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
@@ -1480,7 +1480,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))
               wval
               m n b Hrd Hrdok _
@@ -1495,7 +1495,7 @@ Section WpSconfAlu.
      is sign-extended into rd.  Unlike [wp_addw_s_sconf] (the compressed
      two-operand [c.addw], rd = rs1) the three registers are independent;
      this is the ADDW twin of [wp_subw_s_sconf]. *)
-  Lemma wp_addw4_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_addw4_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (m : regfile) (n : nat) (b : bool) :
     let wval :=
       sign_extend' 64 (add_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
@@ -1511,7 +1511,7 @@ Section WpSconfAlu.
   Proof.
     intros wval.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
-    unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
+    unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))
               wval m n b Hrd Hrdok _
               with "Hcg Hpc Hinstr Hcont").

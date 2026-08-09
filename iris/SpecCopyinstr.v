@@ -76,8 +76,7 @@ Definition copyinstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
   (r = (mword_of_int 0 : mword 64) /\ exists k, (k < maxn)%nat /\ bb_cstr f k)
   \/ r = (mword_of_int (-1) : mword 64).
 
-Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (mm : regfile)
+Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
     (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyinstr in
   let dst := mm !!! Regidx (mword_of_int 11 : mword 5) in
@@ -106,8 +105,7 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID
 
 Module Type COPYINSTR.
   Parameter wp_copyinstr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (mm : regfile)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
       (P : uptd) (maxn : nat) (dst_olds : nat -> bv 8) (K : nat) (b : bool) (p : mword 64),
-      wp_copyinstr_sconf_body Φ mm P maxn dst_olds K b p.
+      wp_copyinstr_sconf_body mm P maxn dst_olds K b p.
 End COPYINSTR.

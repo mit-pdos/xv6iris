@@ -202,7 +202,7 @@ Section ProofVirtioDiskRwDSeam.
     (* the sector arithmetic P1 deferred *)
     assert (Hoff : (bv_unsigned (vdrw_sector_raw bno) * 512)%Z = (1024 * uint bno)%Z).
     { rewrite (vdrwd_sector_raw_val bno Hbno). lia. }
-    iApply (wp_vdrw_p4 (CID := CIDx) kq γu γd Φ (proc_addr jp) M (K - 12)%nat pd pav pu b wr (vdrw_sector_raw bno)
+    iApply (wp_vdrw_p4 (CID := CIDx) kq γu γd (proc_addr jp) M (K - 12)%nat pd pav pu b wr (vdrw_sector_raw bno)
               np nr h m2 t fl pk tr
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false)
               bs_buf bs_disk (1024 * uint bno)%Z

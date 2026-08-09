@@ -40,7 +40,6 @@ Import Defs.
 
 
 Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.holdingsleep in
@@ -73,9 +72,7 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
 
 Module Type HOLDINGSLEEP.
   Parameter wp_holdingsleep_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (γl γsl : gname) (s : string) (R : iProp Σ)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (p : mword 64) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool),
-      wp_holdingsleep_sconf_body Φ γl γsl s R m p pidv av eb C dq b.
+      wp_holdingsleep_sconf_body γl γsl s R m p pidv av eb C dq b.
 End HOLDINGSLEEP.

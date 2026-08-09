@@ -73,7 +73,7 @@ Section BreadEscrowLeaves.
   (* [lw rd, imm(rs1)] with the cell produced and returned inside the
      engine's callback -- the tail's [c.lw a5,0(s1)] opens [buf_escrow]
      around exactly this step. *)
-  Lemma wp_lw_au_s_sconf (Φ : mval -> iProp Σ) (cmp : bool)
+  Lemma wp_lw_au_s_sconf (cmp : bool)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (av : nat) (Ψ : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
       {dqm : dfrac} :
@@ -97,7 +97,7 @@ Section BreadEscrowLeaves.
   Proof.
     intros Hrd Hrdok HkptEm.
     iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au 4 cmp false Φ pc rd rs1 imm m av
+    iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
               (fun w => sign_extend' 64 w) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)
@@ -107,7 +107,7 @@ Section BreadEscrowLeaves.
 
   (* [sw rs2, imm(rs1)], same discipline -- the recycle block's three field
      stores each open [buf_escrow] around one of these. *)
-  Lemma wp_sw_au_s_sconf (Φ : mval -> iProp Σ) (cmp : bool)
+  Lemma wp_sw_au_s_sconf (cmp : bool)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
     ↑kptN ⊆ Em ->
@@ -127,7 +127,7 @@ Section BreadEscrowLeaves.
   Proof.
     intro HkptEm.
     iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_store_s_sconf_au 4 cmp Φ pc rs2 rs1 imm m av
+    iApply (wp_store_s_sconf_au 4 cmp pc rs2 rs1 imm m av
               (trunc32 (rget m rs2)) Ψ Em b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity)

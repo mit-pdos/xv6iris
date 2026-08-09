@@ -31,8 +31,7 @@ From Kernel Require KernelSyms.
 Import Defs.
 
 
-Definition wp_ismapped_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+Definition wp_ismapped_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (t : ptree)
     (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.ismapped in
   let va := mm !!! Regidx (mword_of_int 11) in
@@ -61,8 +60,7 @@ Definition wp_ismapped_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
 
 Module Type ISMAPPED.
   Parameter wp_ismapped_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
-      wp_ismapped_sconf_body Φ mm t m K dq b p.
+      wp_ismapped_sconf_body mm t m K dq b p.
 End ISMAPPED.

@@ -203,7 +203,7 @@ Section ProofWakeup.
         (* 0x30 addi s1,s1,360 : s1 := &proc[k+1] *)
         assert (Hrgt9 : rget (CID := CIDt) Mt (mword_of_int 9 : mword 5)
                         = Mt !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
-        iApply (wp_addi4_s_sconf (CID := CIDt) Φ (mword_of_int (KernelSyms.wakeup + 0x30))
+        iApply (wp_addi4_s_sconf (CID := CIDt) (mword_of_int (KernelSyms.wakeup + 0x30))
                   (mword_of_int 9 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 360 : mword 12)
                   Mt av b ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi30 [-]").
@@ -229,7 +229,7 @@ Section ProofWakeup.
           assert (Hcmpr : eq_vec (rget (CID := CIDt1) Mt30 (mword_of_int 9 : mword 5))
                                  (rget (CID := CIDt1) Mt30 (mword_of_int 18 : mword 5)) = true)
             by (rewrite Hrg30_9 Hrg30_18; exact Hcmp).
-          iApply (wp_beq_taken_s_sconf (CID := CIDt1) Φ (mword_of_int (KernelSyms.wakeup + 0x34))
+          iApply (wp_beq_taken_s_sconf (CID := CIDt1) (mword_of_int (KernelSyms.wakeup + 0x34))
                     (mword_of_int 36 : mword 13) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5)
                     Mt30 av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmpr ltac:(vm_compute; reflexivity)
@@ -256,7 +256,7 @@ Section ProofWakeup.
           assert (Hcmpr : eq_vec (rget (CID := CIDt1) Mt30 (mword_of_int 9 : mword 5))
                                  (rget (CID := CIDt1) Mt30 (mword_of_int 18 : mword 5)) = false)
             by (rewrite Hrg30_9 Hrg30_18; exact Hcmp).
-          iApply (wp_beq_fall_s_sconf (CID := CIDt1) Φ (mword_of_int (KernelSyms.wakeup + 0x34))
+          iApply (wp_beq_fall_s_sconf (CID := CIDt1) (mword_of_int (KernelSyms.wakeup + 0x34))
                     (mword_of_int 36 : mword 13) (mword_of_int 18 : mword 5) (mword_of_int 9 : mword 5)
                     Mt30 av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmpr with "Hcg Hpc Hi34 [-]").
@@ -295,7 +295,7 @@ Section ProofWakeup.
       (* ==================== loop body [0x38 .. 0x30] ==================== *)
       iPoseProof (wki_38 with "Htext") as "Hi38".
       (* ---- 0x38: jal ra, myproc (base JAL, 2-aligned target) ---- *)
-      iApply (wp_jal_s_sconf (CID := CIDk) Φ (mword_of_int (KernelSyms.wakeup + 0x38))
+      iApply (wp_jal_s_sconf (CID := CIDk) (mword_of_int (KernelSyms.wakeup + 0x38))
                 (mword_of_int 1 : mword 5) (mword_of_int 2095474 : mword 21) M av b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 ltac:(vm_compute; reflexivity)
@@ -316,7 +316,7 @@ Section ProofWakeup.
          callee-saved preserved.  cpu_own [lvl] round-trips unchanged. ---- *)
       iDestruct (cpu_own_transport CIDk CIDa lvl eb pme C b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
-      iApply (Myproc.wp_myproc_sconf (CID := CIDa) Φ Mj av lvl eb pme C b
+      iApply (Myproc.wp_myproc_sconf (CID := CIDa) Mj av lvl eb pme C b
                 ltac:(lia)
                 ltac:(lia)
                 with "Hcg Hown Htext Hpc [-]").
@@ -343,7 +343,7 @@ Section ProofWakeup.
         assert (Hcmp3r : eq_vec (rget (CID := CIDb) mret (mword_of_int 10 : mword 5))
                                 (rget (CID := CIDb) mret (mword_of_int 9 : mword 5)) = true)
           by (rewrite Hrgb10 Hrgb9; exact Hcmp3).
-        iApply (wp_beq_taken_s_sconf (CID := CIDb) Φ (mword_of_int (KernelSyms.wakeup + 0x3c))
+        iApply (wp_beq_taken_s_sconf (CID := CIDb) (mword_of_int (KernelSyms.wakeup + 0x3c))
                   (mword_of_int 8180 : mword 13) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
                   mret av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp3r ltac:(vm_compute; reflexivity)
@@ -386,7 +386,7 @@ Section ProofWakeup.
         assert (Hcmp3r : eq_vec (rget (CID := CIDb) mret (mword_of_int 10 : mword 5))
                                 (rget (CID := CIDb) mret (mword_of_int 9 : mword 5)) = false)
           by (rewrite Hrgb10 Hrgb9; exact Hcmp3).
-        iApply (wp_beq_fall_s_sconf (CID := CIDb) Φ (mword_of_int (KernelSyms.wakeup + 0x3c))
+        iApply (wp_beq_fall_s_sconf (CID := CIDb) (mword_of_int (KernelSyms.wakeup + 0x3c))
                   (mword_of_int 8180 : mword 13) (mword_of_int 9 : mword 5) (mword_of_int 10 : mword 5)
                   mret av b ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp3r with "Hcg Hpc Hi3c [-]").
@@ -404,7 +404,7 @@ Section ProofWakeup.
         (* 0x40 c.mv a0,s1 : a0 := &proc[k] *)
         assert (Hrgc9 : rget (CID := CIDc) mret (mword_of_int 9 : mword 5)
                         = mret !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
-        iApply (wp_cmv_s_sconf (CID := CIDc) Φ (mword_of_int (KernelSyms.wakeup + 0x40))
+        iApply (wp_cmv_s_sconf (CID := CIDc) (mword_of_int (KernelSyms.wakeup + 0x40))
                   (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                   mret av b ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi40 [-]").
@@ -417,7 +417,7 @@ Section ProofWakeup.
         iEval (rewrite Hpp42) in "Hpc".
         iPoseProof (wki_42 with "Htext") as "Hi42".
         (* 0x42 jal ra,acquire *)
-        iApply (wp_jal_s_sconf (CID := CIDd) Φ (mword_of_int (KernelSyms.wakeup + 0x42))
+        iApply (wp_jal_s_sconf (CID := CIDd) (mword_of_int (KernelSyms.wakeup + 0x42))
                   (mword_of_int 1 : mword 5) (mword_of_int 2092138 : mword 21) M40 av b
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
@@ -440,7 +440,7 @@ Section ProofWakeup.
         (* acquire(&proc[k]->lock): cpu_own lvl -> S lvl; returns locked + proc_lock_res + pay. *)
         iDestruct (cpu_own_transport CIDb CIDe lvl eb pme C b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
-        iApply (Acquire.wp_acquire_sconf (CID := CIDe) Φ γk "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) M42
+        iApply (Acquire.wp_acquire_sconf (CID := CIDe) γk "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) M42
                   lvl eb pme C av b
                   ltac:(lia)
                   ltac:(lia)
@@ -493,7 +493,7 @@ Section ProofWakeup.
           (* 0x2a c.mv a0,s1 : a0 := &proc[k] *)
           assert (Hrgr9 : rget (CID := CIDf) Mr (mword_of_int 9 : mword 5)
                           = Mr !!! Regidx (mword_of_int 9 : mword 5)) by (rgne; reflexivity).
-          iApply (wp_cmv_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x2a))
+          iApply (wp_cmv_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x2a))
                     (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
                     Mr av false ltac:(vm_compute; discriminate) ltac:(rdok)
                     with "Hcg Hpc Hi2a [-]").
@@ -506,7 +506,7 @@ Section ProofWakeup.
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hpp2c) in "Hpc".
           (* 0x2c jal ra,release *)
-          iApply (wp_jal_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x2c))
+          iApply (wp_jal_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x2c))
                     (mword_of_int 1 : mword 5) (mword_of_int 2092296 : mword 21) Mr2a av false
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(vm_compute; reflexivity)
@@ -533,7 +533,7 @@ Section ProofWakeup.
           (* release(&proc[k]->lock): cpu_own S lvl -> lvl (pay consumed).  Its
              exit index is the very [match] [b] is equal to, so the back edge
              lands on the loop invariant unchanged. *)
-          iApply (Release.wp_release_sconf (CID := CIDf) Φ γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) Mr2c
+          iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) Mr2c
                     lvl eb pme C av
                     Hlka2
                     ltac:(lia)
@@ -641,7 +641,7 @@ Section ProofWakeup.
           replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00"))))
              with (mword_of_int 24 : mword 64) by (apply bv_eq; vm_compute; reflexivity).
           reflexivity. }
-        iApply (wp_clw_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x46))
+        iApply (wp_clw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x46))
                   (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
                   (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"00")))
                   Macq av st false ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -694,7 +694,7 @@ Section ProofWakeup.
           assert (Hcmp48r : neq_vec (rget (CID := CIDf) M48 (mword_of_int 15 : mword 5))
                                     (rget (CID := CIDf) M48 (mword_of_int 19 : mword 5)) = true)
             by (rewrite Hrg48_15 Hrg48_19; exact Hcmp48).
-          iApply (wp_bne_taken_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x48))
+          iApply (wp_bne_taken_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x48))
                     (mword_of_int 8162 : mword 13) (mword_of_int 19 : mword 5) (mword_of_int 15 : mword 5)
                     M48 av false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmp48r ltac:(vm_compute; reflexivity)
@@ -714,7 +714,7 @@ Section ProofWakeup.
           assert (Hcmp48r : neq_vec (rget (CID := CIDf) M48 (mword_of_int 15 : mword 5))
                                     (rget (CID := CIDf) M48 (mword_of_int 19 : mword 5)) = false)
             by (rewrite Hrg48_15 Hrg48_19; exact Hcmp48).
-          iApply (wp_bne_fall_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x48))
+          iApply (wp_bne_fall_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x48))
                     (mword_of_int 8162 : mword 13) (mword_of_int 19 : mword 5) (mword_of_int 15 : mword 5)
                     M48 av false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmp48r with "Hcg Hpc Hi48 [-]").
@@ -735,7 +735,7 @@ Section ProofWakeup.
             replace (sign_extend' 64 (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 5) ('b"000")))) with (mword_of_int 32 : mword 64)
               by (apply bv_eq; vm_compute; reflexivity).
             reflexivity. }
-          iApply (wp_cld_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x4c))
+          iApply (wp_cld_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4c))
                     (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 4 : mword 5) ('b"000")))
                     M48 av ch false ltac:(vm_compute; discriminate) ltac:(rdok)
                     with "Hcg Hpc Hi4c [Hpch] [-]").
@@ -787,7 +787,7 @@ Section ProofWakeup.
             assert (Hcmp4er : neq_vec (rget (CID := CIDf) M4e (mword_of_int 15 : mword 5))
                                       (rget (CID := CIDf) M4e (mword_of_int 20 : mword 5)) = true)
               by (rewrite Hrg4e_15 Hrg4e_20; exact Hcmp4e).
-            iApply (wp_bne_taken_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x4e))
+            iApply (wp_bne_taken_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4e))
                       (mword_of_int 8156 : mword 13) (mword_of_int 20 : mword 5) (mword_of_int 15 : mword 5)
                       M4e av false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                       Hcmp4er ltac:(vm_compute; reflexivity)
@@ -807,7 +807,7 @@ Section ProofWakeup.
             assert (Hcmp4er : neq_vec (rget (CID := CIDf) M4e (mword_of_int 15 : mword 5))
                                       (rget (CID := CIDf) M4e (mword_of_int 20 : mword 5)) = false)
               by (rewrite Hrg4e_15 Hrg4e_20; exact Hcmp4e).
-            iApply (wp_bne_fall_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x4e))
+            iApply (wp_bne_fall_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x4e))
                       (mword_of_int 8156 : mword 13) (mword_of_int 20 : mword 5) (mword_of_int 15 : mword 5)
                       M4e av false ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                       Hcmp4er with "Hcg Hpc Hi4e [-]").
@@ -824,7 +824,7 @@ Section ProofWakeup.
               replace (sign_extend' 64 (mword_of_int 24 : mword 12)) with (mword_of_int 24 : mword 64)
                 by (apply bv_eq; vm_compute; reflexivity).
               reflexivity. }
-            iApply (wp_sw_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x52))
+            iApply (wp_sw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x52))
                       (mword_of_int 21 : mword 5) (mword_of_int 9 : mword 5) (mword_of_int 24 : mword 12)
                       M4e av st false with "Hcg Hpc Hi52 [Hpst] [-]").
             { iEval (rewrite Hea52). iExact "Hpst". }
@@ -849,7 +849,7 @@ Section ProofWakeup.
             assert (H56tgt : add_vec (mword_of_int (KernelSyms.wakeup + 0x56) : mword 64)
                               (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0"))))
                             = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
-            iApply (wp_cj_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.wakeup + 0x56))
+            iApply (wp_cj_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x56))
                       (sign_extend' 21 (concat_vec (mword_of_int 2026 : mword 11) ('b"0")))
                       M4e av false ltac:(rewrite H56tgt; vm_compute; reflexivity)
                       with "Hcg Hpc Hi56 [-]").
@@ -887,7 +887,7 @@ Section ProofWakeup.
     intros sp0 spF rettgt HK Hdom Hlen Hmycpu Hmycpu_nz Hlvl.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv Hcont".
     (* ---- prologue: save frame (carve 8 from the cap's avail), set up loop regs ---- *)
-    iApply (WakeupParts.wp_wakeup_prologue_sconf (CID := CID0) Φ m K b pme ltac:(lia) Hdom
+    iApply (WakeupParts.wp_wakeup_prologue_sconf (CID := CID0) m K b pme ltac:(lia) Hdom
               with "Hcg Htext Hpc [-]").
     iIntros (CIDpro Hspro M vpad) "%Hpro Hcg Hpc Hf7 Hf6 Hf5 Hf4 Hf3 Hf2 Hf1 Hf0".
     destruct Hpro as (HM9 & HM18 & HM19 & HM21 & HM20 & HMcsp & HM1 & HM22 & HM23 & HM24 & HM25 & HM26 & HM27 & HMdom).
@@ -911,7 +911,7 @@ Section ProofWakeup.
       iIntros (CIDex Hsex Mexit) "(%Hecsp & %He22 & %He23 & %He24 & %He25 & %He26 & %He27 & %Hedom)
                        Hcg Hown Htextx Hpc Hframe".
       iDestruct "Hframe" as "(Hf7 & Hf6 & Hf5 & Hf4 & Hf3 & Hf2 & Hf1)".
-      iApply (WakeupParts.wp_wakeup_epilogue_sconf (CID := CIDex) Φ Mexit K
+      iApply (WakeupParts.wp_wakeup_epilogue_sconf (CID := CIDex) Mexit K
                 (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
                 (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))
                 (m !!! Regidx (mword_of_int 19 : mword 5)) (m !!! Regidx (mword_of_int 20 : mword 5))
