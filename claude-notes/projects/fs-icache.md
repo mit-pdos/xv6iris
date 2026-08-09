@@ -114,12 +114,24 @@ only where the block resources come from moves).
   Retires `LinkIput.v`'s axiom and the last fs-side assumption in
   kexit's cone.
 
-## Deferred / owed
+## C7 — the boot wiring (`ireg_alloc` + pool stocking)
 
-- `ireg_alloc` (boot): building the initial region map from the mkfs
-  image's dinode blocks and minting every `dinode_at` — FsBoot wiring,
-  stated as owed in `InodeRegion.v`'s header. The pool's stocking and
-  `ireclaim` belong to the same seam.
+IN SCOPE (user-confirmed 2026-08-09), after C6. One seam, two halves:
+
+- `ireg_alloc`: from the boot-time `fsblock` big-op over the inode
+  blocks (out of `FsBoot.fs_alloc`'s partition), build the initial
+  region map and mint every `dinode_at`, allocating `ireg_inv`. The
+  caller must exhibit `dss : list (list dinode)` with `Forall diblk_wf`
+  and the image bytes AT `diblk_bytes` of them — i.e. a pure decode of
+  the mkfs image's inode blocks; that existence layer is part of this
+  cycle. Stated as owed in `InodeRegion.v`'s header.
+- Pool stocking: `itable_res`'s uncached-inum bundles (`dinode_at +
+  ind_res + inode_blocks + inode_ok`) come from the same partition, at
+  iinit's `newlock` — which is what lets iinit link into main. Read
+  `ireclaim` before designing the initial contents (it is fsinit's
+  single-threaded orphan sweep, the one caller that can establish them).
+
+## Deferred / owed
 - The `fsblock`-carries-its-length fold (design §6(ii), better home) —
   whoever next touches `FsBlocks.v`.
 - `FileInv.inode_ref`/`ProcInv.cwd_ref` placeholders → `IcacheInv.inode_ref`
