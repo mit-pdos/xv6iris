@@ -55,7 +55,7 @@
      [FDSPARE] allowance travels beside it (FdSlots.v) and is retired the
      same way.
 
-   * [own_ctx] and [park_hlf] go in and do not come back either, for the
+   * [own_ctx] and the hart tag go in and do not come back either, for the
      same reason they come BACK from yield and sleep: the difference between
      a park you return from and a park you do not is entirely in whether the
      resume ever happens, and kexit's does not.  Its saved context is

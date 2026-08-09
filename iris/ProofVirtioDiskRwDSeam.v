@@ -183,7 +183,7 @@ Section ProofVirtioDiskRwDSeam.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".
     rewrite /vdrw_p3_exit_x.
     iIntros (CIDx Hsx M np nr fl pk tr fr h m2 t) "%Hrh %Hpin %Hfacts %Hdisj0 %Hal
-             Hcg Hown Hpay Hpc Hpark Htok Hbody Hchain Hidx".
+             Hcg Hown Hpay Hpc Htok Hbody Hchain Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hpin as (Ha0 & Ha1 & Ha5).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
@@ -215,7 +215,7 @@ Section ProofVirtioDiskRwDSeam.
                                (h, m2, t) pin ]> fl) pk
               (<[ np := (h, m2, t) ]> tr)
               (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) h m2 t pin
-              with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hpark Htok Hbody
+              with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Htok Hbody
                     Hclaim Hrm Hrt Hidx").
     - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
       destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).

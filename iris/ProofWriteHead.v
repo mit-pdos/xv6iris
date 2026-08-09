@@ -578,7 +578,7 @@ Section WriteHeadBlocks.
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1.
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hpark
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
     iPoseProof (whi_46 with "Htext") as "Hi46".
@@ -658,7 +658,7 @@ Section WriteHeadBlocks.
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat true C
               (f <$> seq 0 1024) bsd0 b Q
               HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hhold [Hperm] [-]").
     (* THE CALLER'S OWN PERMIT, at the header image this function assembled
        (phase C2b/D1 stage 3).  [Hbnou] is what makes the two spellings of
@@ -668,7 +668,7 @@ Section WriteHeadBlocks.
       { iPureIntro. rewrite length_fmap length_seq. reflexivity. }
       { iPureIntro. exact Hhn_early. }
       iPureIntro. exact Hdec_early. }
-    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hpark Hppid Hhold HQ".
+    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hppid Hhold HQ".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x4c)).
     { rewrite HT2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc4c) in "Hpc".
@@ -976,7 +976,7 @@ Section WriteHeadBlocks.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /wh_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hpc Hpark Hppid
+    iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hpc Hppid
                      Hncell HW HLauth Hfsb [%] [%] Hslot HQ").
     { unfold callee_saved. repeat split; assumption. }
     { exact Hhn. }
@@ -1058,7 +1058,7 @@ Section WriteHeadBlocks.
       iIntros (i M f Hi Hfuel Hf4 Henc Hregs HMs1 HMa4 HMa5 HMa2);
       [ exfalso; lia |].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hpark
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
     iPoseProof (whi_3a with "Htext") as "Hi3a".
@@ -1234,7 +1234,7 @@ Section WriteHeadBlocks.
                 HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
                 ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
                 HS3regs HS3s1
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* more entries: branch back to +0x3a *)
@@ -1263,8 +1263,7 @@ Section WriteHeadBlocks.
                  with "Hcont") as "Hcont".
       iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' Henc' HS3regs HS3s1
                      HS3a4 HS3a5 HS3a2).
-      iApply ("IH" with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds
-                         Hpark Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
+      iApply ("IH" with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
                          Hextra HLauth Hfsb Hncell HW Hperm Hcont").
   Qed.
 
@@ -1297,7 +1296,7 @@ Section ProofWriteHead.
     destruct Hbatch as [HnW HnB].
     subst eb.
     unfold K_write_head in HK.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs #Hscheds Hpark
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs
               #Hdevi #Hdgeom #Hdlock Hncell HW HLauth Hhdr Hslot Hperm Hcont".
     iDestruct "Hhdr" as (bsh) "Hfsb".
     iDestruct "Hfroz" as "(#Hdevc & #Hstc)".
@@ -1557,9 +1556,9 @@ Section ProofWriteHead.
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               mA (K - 4)%nat true C b
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
                     Hdevi Hdgeom Hdlock Hslot [-]").
-    iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hpark Hppid Hheld".
+    iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x20)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
@@ -1716,7 +1715,7 @@ Section ProofWriteHead.
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB2regs HB2s1
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* ---- n > 0: set the cursors up and enter the loop ---- *)
@@ -1878,7 +1877,7 @@ Section ProofWriteHead.
                 ltac:(lia) ltac:(lia) Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB7regs HB7s1 HB7a4 HB7a5 HB7a2
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
   Qed.

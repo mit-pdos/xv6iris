@@ -297,7 +297,7 @@ Section ProofVirtioDiskRwB.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hj Hjl Hlen Heb Hregs Hhi0.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv #Hscheds Hpark
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv
              #Hgeom #Hlk Htok HR Hscr Hexit".
     iPoseProof (rwi_036 with "Htext") as "Hi036".
     iPoseProof (rwi_038 with "Htext") as "Hi038".
@@ -406,7 +406,7 @@ Section ProofVirtioDiskRwB.
     iAssert (vdrw_p2_loop CID γk γs j γd pd pav pu K eb C sp0 b wr sector m0)
       with "[]" as "Hloop".
     { iLöb as "IH". rewrite /vdrw_p2_loop.
-      iIntros (CIDlp Hslp M) "%Hinv Hcg Hown Hpay Hpc Hpark Htok HR Hscr Hexit".
+      iIntros (CIDlp Hslp M) "%Hinv Hcg Hown Hpay Hpc Htok HR Hscr Hexit".
       destruct Hinv as (Hregs' & Hs1 & Hs4 & Hs5 & Hhi).
       iPoseProof (rwi_07a with "Htext") as "Hi07a".
       iPoseProof (rwi_07e with "Htext") as "Hi07e".
@@ -444,7 +444,7 @@ Section ProofVirtioDiskRwB.
         rewrite /vdrw_p2_exit.
         iSpecialize ("Hexit" $! CIDlp with "[%]"); [wp_next_chain|].
         iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t with
-                  "[%] [%] [%] [%] Hcg Hown Hpay Hpc Hpark Htok
+                  "[%] [%] [%] [%] Hcg Hown Hpay Hpc Htok
                    [Hpub Hlb Hcl Huidx Hflight Hparked Hbun Hring] Hbh Hbm Hbt Hidx").
         - split;
             [| exact (vdrw_hi_frame1 M M1 m0 Rs2 ltac:(vm_compute; reflexivity) Hcs1 Hhi)].
@@ -507,7 +507,7 @@ Section ProofVirtioDiskRwB.
                   vdrw_p2_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
                   WP (Loop : expr riscv_lang))%I
         with "[Hpub Hlb Hcl Huidx Hflight Hparked Hring IH]" as "Hsleep".
-      { iIntros (Mz) "%Hcsz Hcg Hown Hpay Hpc Hpark Htok Hbun Hscr Hexit".
+      { iIntros (Mz) "%Hcsz Hcg Hown Hpay Hpc Htok Hbun Hscr Hexit".
         assert (Hhiz : vdrw_hi Mz m0)
           by (exact (vdrw_hi_frame M1 Mz m0 Hcsz
                        (vdrw_hi_frame1 M M1 m0 Rs2 ltac:(vm_compute; reflexivity)
@@ -629,14 +629,14 @@ Section ProofVirtioDiskRwB.
         iApply (Sleep.wp_sleep_sconf γs j γl γk d_lock "virtio_disk"%string
                   (disk_res γd pd pav pu) B5 (K - 12)%nat eb C
                   Hj Hjl HB5a1 Heb (vdrw_K22 K HK)
-                  with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hlk Htok HR Hpanic Hpark [-]").
-        iIntros (CIDsl Hssl Mf) "%Hcsf Hcg Hown Hpay Hpc Htok HR Hpark". rgall.
+                  with "Hcg Hown Hpay Htext Hpc Hpinv Hlk Htok HR Hpanic [-]").
+        iIntros (CIDsl Hssl Mf) "%Hcsf Hcg Hown Hpay Hpc Htok HR". rgall.
         assert (Hret : ret_pc (B5 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x0a8))
           by (rewrite HB5ra; apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hret) in "Hpc".
         (* ---- the back edge ---- *)
         iSpecialize ("IH" $! CIDsl with "[%]"); [wp_next_chain|].
-        iApply ("IH" $! Mf with "[%] Hcg Hown Hpay Hpc Hpark Htok HR Hscr Hexit").
+        iApply ("IH" $! Mf with "[%] Hcg Hown Hpay Hpc Htok HR Hscr Hexit").
         unfold vdrw_regs. split_and!.
         - rewrite (proj1 Hcsf).
           rewrite /B5 upd_ne; [| reg_neq]. rewrite /B4 upd_ne; [| reg_neq].
@@ -690,7 +690,7 @@ Section ProofVirtioDiskRwB.
         iEval (rewrite Hb094) in "Hpc".
         iDestruct "Hidx" as (v0 v1 v2) "Hidx".
         iApply ("Hsleep" $! M1 with
-                  "[%] Hcg Hown Hpay Hpc Hpark Htok Hbun
+                  "[%] Hcg Hown Hpay Hpc Htok Hbun
                    [Hidx] Hexit").
         { intros r Hr. reflexivity. }
         iApply (vdrw_idx_join sp0 v0 v1 v2 Hal11 Hal12 with "Hidx").
@@ -753,7 +753,7 @@ Section ProofVirtioDiskRwB.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hb094') in "Hpc".
         iApply ("Hsleep" $! F1 with
-                  "[%] Hcg Hown Hpay Hpc Hpark Htok [Hbun] [Hx0 Hx1 Hx2 Hxp] Hexit").
+                  "[%] Hcg Hown Hpay Hpc Htok [Hbun] [Hx0 Hx1 Hx2 Hxp] Hexit").
         { intros r Hr. rewrite /F1 upd_ne;
             [| apply not_eq_sym, is_cs_idx_true_neq;
                [vm_compute; reflexivity | exact Hr]].
@@ -847,7 +847,7 @@ Section ProofVirtioDiskRwB.
                   with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hi08c Hi090 Hx1 Hbun Hbm [-]").
         iIntros (M3) "%Hcs3 Hcg Hown Hpc Hx1 Hbun".
         iApply ("Hsleep" $! M3 with
-                  "[%] Hcg Hown Hpay Hpc Hpark Htok [Hbun] [Hx0 Hx1 Hx2 Hxp] Hexit").
+                  "[%] Hcg Hown Hpay Hpc Htok [Hbun] [Hx0 Hx1 Hx2 Hxp] Hexit").
         { intros r Hr. rewrite (Hcs3 r Hr).
           rewrite /G1 upd_ne;
             [| apply not_eq_sym, is_cs_idx_true_neq;
@@ -881,7 +881,7 @@ Section ProofVirtioDiskRwB.
     iEval (rewrite Hj0a8) in "Hpc".
     rewrite /vdrw_p2_loop.
     iSpecialize ("Hloop" $! CID with "[%]"); [wp_next_chain|].
-    iApply ("Hloop" $! A5 with "[%] Hcg Hown Hpay Hpc Hpark Htok HR Hscr Hexit").
+    iApply ("Hloop" $! A5 with "[%] Hcg Hown Hpay Hpc Htok HR Hscr Hexit").
     split_and!; [ exact HA5regs | exact HA5s1 | exact HA5s4 | exact HA5s5
                 | vdrw_hi_peel; exact Hhi0 ].
   Qed.

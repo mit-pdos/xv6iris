@@ -22,10 +22,11 @@
    USER memory by the running thread.  So this contract is stated in
    [SpecPiperead.v]'s shape, conjunct for conjunct, minus the pipe:
 
-   * it SLEEPS, so it threads the full running-thread bundle
-     ([procs_inv]/[scheds_inv]/[own_ctx]/[park_hlf]) and takes the
-     hart-generic parking premise [eb = true] at [noff = 0] -- cons.lock is
-     the only lock it holds and sleep demands that;
+   * it SLEEPS, so it threads the running-thread bundle ([procs_inv]) and
+     takes the hart-generic parking premise [eb = true] at [noff = 0] --
+     cons.lock is the only lock it holds and sleep demands that.  The parked
+     scheduler record is NOT threaded: it lives in the running proc's own
+     [p->lock] ([SchedCtx.run_slot]), which sleep reaches by holding it;
    * it copies out, so it takes [proc_priv] and [kalloc_env] (copyout reaches
      vmfault, hence kalloc) and gives the block back at an EXTENDED page
      table ([uptd_ext]), exactly as readi's user arm does;

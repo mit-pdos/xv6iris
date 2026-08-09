@@ -284,7 +284,7 @@ Definition wp_kerneltrap_sconf_body
          resuming hart, so their values are existential *)
       sepc ↦ᵣ ep -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ tv' -∗
       pc_is ret_tgt -∗
-          cpu_claim p -∗
+      cpu_claim p -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

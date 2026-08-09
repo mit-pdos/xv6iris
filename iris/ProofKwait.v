@@ -519,7 +519,7 @@ Section ProofKwait.
   (* ------------------------------------------------------------------ *)
   (* Every block below +0xca hands the caller's continuation on unchanged,
      so it is worth naming: [R] is the frame the continuation still wants
-     back (the running-thread bundle -- the [park_hlf] receipt -- which
+     back (the running-thread bundle -- the hart tag half -- which
      nothing between the prologue and the exit touches, and which therefore
      rides through the scan rather than being packaged into the closure).
      Packaging it in would be unsound in the other direction: the +0xca
@@ -540,10 +540,13 @@ Section ProofKwait.
         R -∗
         WP (Loop : expr riscv_lang)))%I.
 
-  (* The running-thread bundle kwait carries from the prologue to the exit
-     and touches nowhere in between: it is [R] for every block below, and
-     the two resources sleep wants back at the outer loop's foot. *)
-  Definition kw_rt (pme : mword 64) (jj : nat) : iProp Σ :=
+  (* What kwait carries from the prologue to the exit and touches nowhere in
+     between -- [R] for every block below.  It used to be the running-thread
+     receipt; with the parked record living in the running proc's own lock
+     there is nothing left to carry, so it is EMPTY.  [R] itself is kept
+     because the scan's exit/function-exit split is stated over it; retiring
+     the parameter is a cleanup, not a change of content. *)
+  Definition kw_rt (pme : mword 64) (jj : nat) : iProp Σ := emp%I.
 
   (* ------------------------------------------------------------------ *)
   (* THE OUTER LOOP, +0xdc.  Unbounded (every wakeup re-scans), so this   *)
@@ -573,11 +576,11 @@ Section ProofKwait.
 
   (* [SchedCtx.proc_slots_unused]'s ZOMBIE twin: a ZOMBIE is not RUNNING and
      needs no context, so its slot holds exactly the dormant block and the
-     whole park receipt.  Stated here rather than in SchedCtx.v because
+     whole hart tag.  Stated here rather than in SchedCtx.v because
      kwait is its first (and so far only) consumer; it belongs beside
      [proc_slots_unused] the moment kexit wants it too. *)
   Lemma kw_slots_zombie `{GEN : GenId} `{CIDz : CpuId} (gs : list gname) (pa : mword 64) :
-    proc_slots gs pa ZOMBIE -∗ proc_dormant pa ZOMBIE ∗ park_at_full pa false.
+    proc_slots gs pa ZOMBIE -∗ proc_dormant pa ZOMBIE ∗ hart_at_any pa.
   Proof.
     rewrite /proc_slots inv_dormant_ZOMBIE not_running_ZOMBIE is_running_ZOMBIE.
     rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
@@ -1237,7 +1240,7 @@ Section ProofKwait.
     p_chan (proc_addr k) ↦₈ ch -∗
     proc_pub (proc_addr k) -∗
     proc_dormant (proc_addr k) ZOMBIE -∗
-    park_at_full (proc_addr k) false -∗
+    hart_at_any (proc_addr k) -∗
     (* wait_lock, contents out *)
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     locked γw CIDp -∗
@@ -1335,14 +1338,12 @@ Section ProofKwait.
     (* the ZOMBIE block, in freeproc's own vocabulary *)
     iDestruct (fp_of_dormant_zombie (proc_addr k) with "Hdorm")
       as (Vc pidz) "(Hrest & Hpt & Htf)".
-    iDestruct (park_at_full_elim k false Hk with "Hpark") as "Hpark".
-    rewrite park_split. iDestruct "Hpark" as "[Hparka Hparkb]".
     iApply (Freeproc.wp_freeproc_sconf γa R1 k γk Vc pidz ZOMBIE ch
               (Some (pv_upt Vc)) (Some (ud_tfp (pv_upt Vc), pv_tf Vc))
               (K - 10)%nat eb pme C 2%nat
               (kw_K44 K HK) kw_ilvl2 HR1a0
-              with "Hcg Hown Htext Hpc [Htokk Hstate Hpsg Hchan Hpub Hparka] Hrest Hpt Htf Henv [-]").
-    { rewrite /proc_held. iFrame "Htokk Hstate Hpsg Hchan Hpub Hparka". }
+              with "Hcg Hown Htext Hpc [Htokk Hstate Hpsg Hchan Hpub] Hrest Hpt Htf Henv [-]").
+    { rewrite /proc_held. iFrame "Htokk Hstate Hpsg Hchan Hpub". }
     iApply wp_next_off_intro.
     iIntros (mfp) "Hcg Hown Hpc %Hcsfp Hheld Hdorm".
     assert (Hp66 : ret_pc (R1 !!! Regidx Rra) = mword_of_int (KW + 0x66))
@@ -1401,11 +1402,9 @@ Section ProofKwait.
     assert (Hlkk2 : add_vec (R3 !!! Regidx Ra0)
                       (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k)
       by (rewrite HR3a0; apply addv_sext0).
-    (* the emptied slot goes back into the lock at UNUSED; the park receipt
-       rejoins from the half freeproc handed back inside [proc_held]. *)
-    iDestruct "Hheld" as "(Htokk & Hstate & Hpsg & Hchan & Hpub & Hparkc)".
-    iAssert (park_at_full (proc_addr k) false) with "[Hparkb Hparkc]" as "Hpark".
-    { iApply (park_at_full_intro k false Hk). rewrite park_split. iFrame "Hparkb Hparkc". }
+    (* the emptied slot goes back into the lock at UNUSED; the hart tag never
+       left this frame -- [proc_held] does not carry it. *)
+    iDestruct "Hheld" as "(Htokk & Hstate & Hpsg & Hchan & Hpub)".
     (* UNUSED is unclaimed, so the whole mirror freeproc handed back becomes
        the lock's share again. *)
     iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwu _]".
@@ -1548,7 +1547,7 @@ Section ProofKwait.
     p_chan (proc_addr k) ↦₈ ch -∗
     proc_pub (proc_addr k) -∗
     proc_dormant (proc_addr k) ZOMBIE -∗
-    park_at_full (proc_addr k) false -∗
+    hart_at_any (proc_addr k) -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     locked γw CIDf -∗
     parents_own ps -∗
@@ -2419,7 +2418,7 @@ Section ProofKwait.
   Proof.
     intros sp0 HK Heb Hjj Hgl Hpme Hanch Hregs Ha4.
     subst pme.
-    iIntros "#Htext #Hpinv #Hscheds #Hpanic #Hlk IH Hqfn Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe Hrt".
+    iIntros "#Htext #Hpinv #Hpanic #Hlk IH Hqfn Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe Hrt".
     pose proof Hregs as Hregs2.
     destruct Hregs2 as (Hsp & Hcs1 & Hcs2 & Hcs3 & Hcs4 & Hcs5 & Hcs6 & Hcs7 & Hcs).
     iPoseProof (kwi_ca with "Htext") as "Hica".
@@ -2591,13 +2590,12 @@ Section ProofKwait.
         assert (Hlka : add_vec (T4 !!! Regidx Ra1)
                          (sign_extend' 64 (mword_of_int 0 : mword 12)) = wait_lock_addr)
           by (rewrite HT4a1; apply addv_sext0).
-        iEval (rewrite /kw_rt) in "Hrt". iRename "Hrt" into "Hpark".
         iApply (Sleep.wp_sleep_sconf γs jj γl γw wait_lock_addr "wait_lock"%string
                   wait_res T4 (K - 10)%nat eb C Hjj Hgl Hlka Heb (kw_K22 K HK)
-                  with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hlk Htok [Hps] Hpanic Hpark [-]").
+                  with "Hcg Hown Hpay Htext Hpc Hpinv Hlk Htok [Hps] Hpanic [-]").
         { rewrite /wait_res. iExists px. iExact "Hps". }
         (* SLEEP RETURNS ON HART [CIDs]: the outer loop's one crossing. *)
-        iIntros (CIDs Hss mfs) "%Hscs Hcg Hown Hpay Hpc Htok Hres Hpark".
+        iIntros (CIDs Hss mfs) "%Hscs Hcg Hown Hpay Hpc Htok Hres".
         assert (Hpdc : ret_pc (T4 !!! Regidx Rra) = mword_of_int (KW + 0xdc))
           by (rewrite HT4ra; pcstep).
         iEval (rewrite Hpdc) in "Hpc".
@@ -2608,9 +2606,9 @@ Section ProofKwait.
         rewrite /kw_round.
         iSpecialize ("IH" $! CIDs with "[%]"); [wp_next_chain |].
         iApply ("IH" $! mfs with "[%] Hcg Hown Hpay Hpc Htok Hres Hpriv Hframe
-                                   [Hpark] [Hqfn]").
+                                   [Hrt] [Hqfn]").
         { exact Hrfs. }
-        { rewrite /kw_rt. iFrame "Hpark". }
+        { iExact "Hrt". }
         { rewrite /kw_exit_fn.
           iApply (kw_next_reanchor CIDt CIDs eb (proc_addr jj) with "[Hqfn]");
             [ exact (kw_chain_eb eb (proc_addr jj) CIDs CIDt Heb Hss) |].
@@ -2648,7 +2646,7 @@ Section ProofKwait.
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 HK Heb Hjj Hgl Hlen Hpme Hanch Hregs.
-    iIntros "#Htext #Hpinv #Hscheds #Hpanic #Henv #Hlk IH Hqfn Hcg Hown Hpay Hpc
+    iIntros "#Htext #Hpinv #Hpanic #Henv #Hlk IH Hqfn Hcg Hown Hpay Hpc
              Htok Hres Hpriv Hframe Hrt".
     iDestruct "Hres" as (ps) "Hps".
     iPoseProof (kwi_dc with "Htext") as "Hidc".
@@ -2743,7 +2741,7 @@ Section ProofKwait.
     { iIntros (Mx hx px) "%Hrx %Hax Hcgx Hownx Hpayx Hpcx Htokx Hpsx Hprivx Hframex Hrtx Hqfnx".
       iApply (kw_round_tail (CIDt := CIDy) CID0 γs γf γw γl jj mm Mx pme addr K eb C
                 pid V hx px HK Heb Hjj Hgl Hpme Hanch Hrx Hax
-                with "Htext Hpinv Hscheds Hpanic Hlk IH Hqfnx Hcgx Hownx Hpayx Hpcx
+                with "Htext Hpinv Hpanic Hlk IH Hqfnx Hcgx Hownx Hpayx Hpcx
                       Htokx Hpsx Hprivx Hframex Hrtx"). }
     iDestruct (kw_scan (CID0 := CIDy)  γs γa γf γw mm pme addr K eb C pid V
                  (kw_rt pme jj) HK Hlen with "Hpinv Hpanic Htext Henv Hlk") as "Hscan".
@@ -2788,7 +2786,7 @@ Section ProofKwaitMain.
   Proof.
     cbv beta delta [wp_kwait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hav Heb.
-    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hscheds #Hpanic Hpark #Hlk #Henv Hpriv Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpinv #Hpanic #Hlk #Henv Hpriv Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX (sys_pause's
        rule): the [b <> eb] instances of this contract are vacuous. *)
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbm.
@@ -3267,7 +3265,7 @@ Section ProofKwaitMain.
     { rewrite /kw_exit_fn.
       iIntros (CIDx Hsx mf P' rv) "%Hcsx %Ha0x %Hextx Hcgx Hownx Hpcx Hprivx Hparkx".
       iSpecialize ("Hcont" $! CIDx with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf P' rv with "[%] [%] Hcgx Hownx Hpcx Hparkx Hprivx").
+      iApply ("Hcont" $! mf P' rv with "[%] [%] Hcgx Hownx Hpcx Hprivx").
       { split; [exact Hcsx | exact Ha0x]. }
       { exact Hextx. } }
     (* ==================== THE OUTER LOOP (iLöb) ==================== *)
@@ -3276,7 +3274,7 @@ Section ProofKwaitMain.
       iIntros (CIDz Hsz N) "%Hrz Hcgz Hownz Hpayz Hpcz Htokz Hresz Hprivz Hframez Hrtz Hqfnz".
       iApply (kw_round_body (CIDy := CIDz) CID γs γa γf γw γl j m N pj adr av eb C pid V
                 Hav Heb Hj Hgl Hlen Hpjv Hsz Hrz
-                with "Htext Hpinv Hscheds Hpanic Henv Hlk IH Hqfnz Hcgz Hownz Hpayz Hpcz
+                with "Htext Hpinv Hpanic Henv Hlk IH Hqfnz Hcgz Hownz Hpayz Hpcz
                       Htokz Hresz Hprivz Hframez Hrtz"). }
     rewrite /kw_round.
     (* the loop's own index is the literal [true] (sleep's crossing), while
@@ -3285,9 +3283,9 @@ Section ProofKwaitMain.
     iSpecialize ("Hround" $! CID19 with "[%]");
       [ apply (kw_chain_true eb pj CID19 CID Heb); wp_next_chain |].
     iApply ("Hround" $! Q5 with "[%] Hcg Hown Hpay Hpc Htok Hres Hpriv Hkframe
-                                 [Hpark] Hqfn").
+                                 [] Hqfn").
     { exact HQ5. }
-    { rewrite /kw_rt. iFrame "Hpark". }
+    { rewrite /kw_rt. done. }
   Qed.
 
 End ProofKwaitMain.
