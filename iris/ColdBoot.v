@@ -61,7 +61,7 @@
 (* back; what holds the table to the model's own CONFIG is §3b's                *)
 (* [board_regs_after_sim], which shows the board's eight value writes are a     *)
 (* no-op after the simulator's own initializers.  Two things made the swap possible, both recorded in  *)
-(* claude-notes/projects/crash.md: the tower's PMA obligation is stated PER     *)
+(* claude-notes/completed/crash.md: the tower's PMA obligation is stated PER    *)
 (* ADDRESS CLASS ([RiscvFetchExec.pma_allows_ram] / [pma_allows_io]), since the *)
 (* real table has HOLES; and the RAM class's atomic conjunct asks for what an   *)
 (* AMO leaf consumes ("every op at every width up to 16 is permitted") instead  *)
@@ -370,7 +370,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
    per-entry read-modify-write, so [pmp_all_off] becomes a 64-way symbolic
    index resolution over a [vec_update_dec] tower plus two generic bitvector
    facts, none of it [vm_compute]-able.  That belongs to the ∀-garbage
-   anchoring task (claude-notes/projects/crash.md, "PMPCFG PATCH
+   anchoring task (claude-notes/completed/crash.md, "PMPCFG PATCH
    RETIREMENT" / "NO PATCH CHAIN LEFT"). *)
 Lemma cold_boot_pmpcfg (hid : mword 64) :
   register_lookup pmpcfg_n (cold_regs hid) = pmpcfg_boot.

@@ -90,7 +90,7 @@
        trap-CSR-balanced and its own contract does not mention them.
      * the parked-scheduler record is NOT threaded here.  It lives in the
        global [SchedCtx.scheds_inv]; what a sleeping thread carries is the
-       persistent [scheds_inv] plus the per-PROC receipt [park_hlf j true],
+       persistent [scheds_inv] plus the per-PROC receipt [running_claim j],
        both HART-FREE.  sys_pause does nothing with them but frame them
        through sleep and back out.
      * [panic_wp_any] is what acquire, killed and sleep take.
@@ -117,7 +117,7 @@ Require Import WpLock.
 Require Import ProcGeom CpuOwn.
 Require Import PageGeom.
 Require Import FdSlots FileInv ProcInv.
-Require Import SwtchCtx SchedCtx.
+Require Import SchedCtx.
 Require Import TicksInv.
 Require Import CodeSysPause.
 Require Import SpecPanic.
@@ -300,8 +300,7 @@ Section SpProps.
         sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
         sie_cap_gpr M (av - 8) true pj -∗
         cpu_own 0 eb pj C true -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x7e)) -∗
         WP (Loop : expr riscv_lang) {{ Φ }}))%I.
 
@@ -318,8 +317,7 @@ Section SpProps.
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
         cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x70)) -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
         WP (Loop : expr riscv_lang) {{ Φ }}))%I.
@@ -342,8 +340,7 @@ Section SpProps.
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
         cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x8c)) -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
         WP (Loop : expr riscv_lang) {{ Φ }}))%I.
@@ -365,8 +362,7 @@ Section SpProps.
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
         cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
         sp_exit0 CID0 Φ γt j m av eb C sp0 pj -∗
         sp_exitk CID0 Φ γt j m av eb C sp0 pj tk -∗
@@ -388,8 +384,7 @@ Section SpProps.
         pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
         sie_cap_gpr M (av - 8) true pj -∗
         cpu_own 0 eb pj C true -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
         WP (Loop : expr riscv_lang) {{ Φ }}))%I.
@@ -437,8 +432,7 @@ Section SpBodies.
     cpu_own 0 eb pj C true -∗
     p_trapframe pj ↦₈{dqt} page_base tfp -∗
     tf_page tfp ws -∗
-    own_ctx (p_context pj) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x7e)) -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile) (rr : mword 64),
@@ -450,14 +444,13 @@ Section SpBodies.
         pc_is ret_tgt -∗
         p_trapframe pj ↦₈{dqt} page_base tfp -∗
         tf_page tfp ws -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros ret_tgt Hav Hanch Hbase Hsav Hra0 Hrv Hsp0.
     destruct Hbase as (Hsp & Hs0M & Hhi).
-    iIntros "#Htext Hs1 Hs2 Hfree Hs7 Hcg Hown Htf Hpage Hctx Hpark Hpc Hcont".
+    iIntros "#Htext Hs1 Hs2 Hfree Hs7 Hcg Hown Htf Hpage Hpark Hpc Hcont".
     destruct Hsav as (Hv9 & Hv18 & Hv19).
     rewrite /sp_free.
     iDestruct "Hfree" as "(Hf3 & Hf4 & Hf5 & Hf6 & Hf8)".
@@ -561,7 +554,7 @@ Section SpBodies.
     iDestruct (cpu_own_transport CID CIDe4 0 eb pj C true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe4 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E3 r with "[%] Hcg Hown Hpc Htf Hpage Hctx Hpark").
+    iApply ("Hcont" $! E3 r with "[%] Hcg Hown Hpc Htf Hpage Hpark").
     split; [| split; [exact HE3a0 | exact Hrv]].
     unfold callee_saved.
     split. { rewrite /E3 upd_eq. unfold regval_into_reg. rewrite Hwv. exact Hsp0. }
@@ -596,14 +589,13 @@ Section SpBodies.
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (av - 8) false pj -∗
     cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
-    own_ctx (p_context pj) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x70)) -∗
     sp_tail CID0 Φ j m av eb C sp0 pj -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Hav Heb Hanch Hbn Hsn. subst eb.
-    iIntros "#Htext #Hlkt Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htail".
+    iIntros "#Htext #Hlkt Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpark Hpc Htail".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
     iPoseProof (spi_70 with "Htext") as "Hi70".
     iPoseProof (spi_74 with "Htext") as "Hi74".
@@ -685,7 +677,7 @@ Section SpBodies.
     rewrite /sp_tail.
     iSpecialize ("Htail" $! CIDl with "[%]"); [wp_next_chain|].
     iApply ("Htail" $! X3 (zero_reg : mword 64)
-              with "[%] Hx1 Hx2 Hfree Hx7 Hcg Hown Hctx Hpark Hpc").
+              with "[%] Hx1 Hx2 Hfree Hx7 Hcg Hown Hpark Hpc").
     split; [exact (sp_base_cs m mrl X3 sp0 HcsRlX3 HbRl) |].
     split; [exact (sp_saved_cs m mrl X3 HcsRlX3 HsRl) |].
     split; [rewrite /X3; apply upd_eq | left; reflexivity].
@@ -712,14 +704,13 @@ Section SpBodies.
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (av - 8) false pj -∗
     cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
-    own_ctx (p_context pj) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x8c)) -∗
     sp_tail CID0 Φ j m av eb C sp0 pj -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Hav Heb Hanch Hbn Hln. subst eb.
-    iIntros "#Htext #Hlkt Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htail".
+    iIntros "#Htext #Hlkt Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpark Hpc Htail".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
     pose proof Hbn as Hbn'. destruct Hbn as (HNsp & HNs0 & HNhi).
     iPoseProof (spi_8c with "Htext") as "Hi8c".
@@ -866,7 +857,7 @@ Section SpBodies.
     rewrite /sp_tail.
     iSpecialize ("Htail" $! CIDk5 with "[%]"); [wp_next_chain|].
     iApply ("Htail" $! K6 (mword_of_int (-1) : mword 64)
-              with "[%] Hy1 Hy2 [Hy3 Hy4 Hy5 Hy6 Hy8] Hy7 Hcg Hown Hctx Hpark Hpc").
+              with "[%] Hy1 Hy2 [Hy3 Hy4 Hy5 Hy6 Hy8] Hy7 Hcg Hown Hpark Hpc").
     { split.
       { unfold sp_base. split; [| split].
         - rewrite (HK6thr csp_rs1 ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)). exact HRksp.
@@ -921,8 +912,7 @@ Section SpBodies.
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (av - 8)%nat false pj -∗
     cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
-    own_ctx (p_context pj) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x5c)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -932,7 +922,7 @@ Section SpBodies.
        which the resource can no longer be folded back to [cpu_own]. *)
     intros Hav Heb Hanch Hbs Hls.
     iIntros "#Htext IH Hex0 Hexk Htl Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7
-              Htok HR Hcg Hown Hpay Hctx Hpark Hpc".
+              Htok HR Hcg Hown Hpay Hpark Hpc".
     pose proof Hbs as HbSl. pose proof Hls as HlSl.
     destruct Hls as (Hs9 & Hs18 & Hs19).
     iPoseProof (spi_5c with "Htext") as "Hi5c".
@@ -1014,7 +1004,7 @@ Section SpBodies.
       iEval (rewrite Htg4a) in "Hpc".
       rewrite /sp_loop.
       iSpecialize ("IH" $! CID with "[%]"); [wp_next_chain|].
-      iApply ("IH" $! L7 with "[%] Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Hex0 Hexk Htl").
+      iApply ("IH" $! L7 with "[%] Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpark Hpc Hex0 Hexk Htl").
       split; [exact HbL7 | exact HlL7].
     - (* enough ticks: fall through, restore s1/s2/s3, take the 0 exit *)
       iApply (wp_bltu_fall_s_sconf Φ (mword_of_int (KernelSyms.sys_pause + 0x66)) (mword_of_int 8164 : mword 13)
@@ -1083,7 +1073,7 @@ Section SpBodies.
         rewrite /L8 upd_ne; [reflexivity | congruence]. }
       rewrite /sp_exit0.
       iSpecialize ("Hex0" $! CID with "[%]"); [wp_next_chain|].
-      iApply ("Hex0" $! L10 with "[%] Hy1 Hy2 [Hy3 Hy4 Hy5 Hy6 Hy8] Hy7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htl").
+      iApply ("Hex0" $! L10 with "[%] Hy1 Hy2 [Hy3 Hy4 Hy5 Hy6 Hy8] Hy7 Htok HR Hcg Hown Hpay Hpark Hpc Htl").
       { split.
         { unfold sp_base. split; [| split].
           - rewrite (HL10thr csp_rs1 ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)). exact HL7sp.
@@ -1137,8 +1127,7 @@ Section SpBodies.
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (av - 8)%nat false pj -∗
     cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
-    own_ctx (p_context pj) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -1146,7 +1135,7 @@ Section SpBodies.
        the caller's [pj] has to be spelled that way before the crossing. *)
     intros Hav Heb Hj Hjl Hpjv Hanch Hbn Hln. subst pj.
     iIntros "#Htext #Hlkt #Hpinv #Hscheds #Hpanic IH Hex0 Hexk Htl
-              Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc".
+              Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpark Hpc".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
     assert (Hn1 : (Z.of_nat 1 + 1 < 2 ^ 31)%Z) by (vm_compute; reflexivity).
     pose proof Hbn as Hbn'. pose proof Hln as Hln'.
@@ -1231,7 +1220,7 @@ Section SpBodies.
       iDestruct ("Hjoin7" with "Hnc") as "Hy7".
       rewrite /sp_exitk.
       iSpecialize ("Hexk" $! CID with "[%]"); [wp_next_chain|].
-      iApply ("Hexk" $! mfk with "[%] Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htl").
+      iApply ("Hexk" $! mfk with "[%] Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpark Hpc Htl").
       split; [exact HbKl | exact HlKl].
     - (* not killed: fall through to the sleep *)
       iApply (wp_cbnez_fall_s_sconf Φ (mword_of_int (KernelSyms.sys_pause + 0x52)) (mword_of_int 29 : mword 8)
@@ -1298,10 +1287,10 @@ Section SpBodies.
         by (rewrite HL4a1; apply sp_add_vec_0).
       iApply (Sleep.wp_sleep_sconf Φ γs j γl γt a_tickslock "time"%string ticks_res L4
                 (av - 8)%nat eb C Hj Hjl Hlka Heb ltac:(lia)
-                with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hlk2 Htok HR Hpanic Hctx Hpark [-]").
+                with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hlk2 Htok HR Hpanic Hpark [-]").
       (* SLEEP RETURNS ON HART [CIDs].  Everything after the park runs there,
          inside [sp_post_sleep_body] at [(CID := CIDs)]. *)
-      iIntros (CIDs Hss mfs) "%Hscs Hcg Hown Hpay Hpc Htok HR Hctx Hpark".
+      iIntros (CIDs Hss mfs) "%Hscs Hcg Hown Hpay Hpc Htok HR Hpark".
       assert (Hl5c : ret_pc (L4 !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_pause + 0x5c))
         by (rewrite HL4ra; pcstep).
       iEval (rewrite Hl5c) in "Hpc".
@@ -1310,7 +1299,7 @@ Section SpBodies.
       iApply (sp_post_sleep_body (CID := CIDs) CID0 Φ γt j m mfs av eb C sp0 (proc_addr j) tk nv
                 Hav Heb ltac:(wp_next_chain) HbSl HlSl
                 with "Htext IH Hex0 Hexk Htl Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7
-                      Htok HR Hcg Hown Hpay Hctx Hpark Hpc").
+                      Htok HR Hcg Hown Hpay Hpark Hpc").
   Qed.
 
   (* ---- +0x1a: a0 := &tickslock, acquire, the [n == 0] dispatch, the loop
@@ -1337,15 +1326,14 @@ Section SpBodies.
     pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
     sie_cap_gpr M (av - 8)%nat true pj -∗
     cpu_own 0 eb pj C true -∗
-    own_ctx (p_context pj) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
     sp_tail CID0 Φ j m av eb C sp0 pj -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Hav Heb Hj Hjl Hpjv Hanch Hb Hsv.
     iIntros "#Htext #Hlkt #Hpinv #Hscheds #Hpanic Hs1 Hs2 Hfree Hnc Hjoin7
-              Hcg Hown Hctx Hpark Hpc Htail".
+              Hcg Hown Hpark Hpc Htail".
     iPoseProof (is_tickslock_lock with "Hlkt") as "#Hlk2".
     assert (Hn0 : (Z.of_nat 0 + 1 < 2 ^ 31)%Z) by (vm_compute; reflexivity).
     pose proof Hb as Hbq. destruct Hbq as (HMsp & HMs0 & HMhi).
@@ -1456,7 +1444,7 @@ Section SpBodies.
       iDestruct ("Hjoin7" with "Hnc") as "Hx7".
       iApply (sp_exit0_body (CID := CIDa) CID0 Φ γt j m Qe av eb C sp0 pj
                 Hav Heb ltac:(wp_next_chain) HbQe HsQe
-                with "Htext Hlkt Hs1 Hs2 Hfree Hx7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htail").
+                with "Htext Hlkt Hs1 Hs2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpark Hpc Htail").
     - (* n <> 0: spill s1/s2/s3 and enter the wait loop *)
       iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.sys_pause + 0x2a)) (mword_of_int 35 : mword 8)
                 (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5) Qe (av - 8)%nat false
@@ -1625,37 +1613,37 @@ Section SpBodies.
       iAssert (sp_exitk CID0 Φ γt j m av eb C sp0 pj (sign_extend' 64 (t0 : mword 32)))
         with "[]" as "Hexitk".
       { rewrite /sp_exitk.
-        iIntros (CIDx Hsx N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htl".
+        iIntros (CIDx Hsx N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpark Hpc Htl".
         destruct Hg as (Hbn & Hln).
         iApply (sp_exitk_body (CID := CIDx) CID0 Φ γt j m N av eb C sp0 pj (sign_extend' 64 (t0 : mword 32))
                   Hav Heb Hsx Hbn Hln
-                  with "Htext Hlkt Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htl"). }
+                  with "Htext Hlkt Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpark Hpc Htl"). }
 
       (* ==================== the WAIT LOOP (iLöb) ==================== *)
       iAssert (sp_loop CID0 Φ γt j m av eb C sp0 pj (sign_extend' 64 (t0 : mword 32)) nv)
         with "[]" as "Hloop".
       { iLöb as "IH". rewrite /sp_loop.
-        iIntros (CIDy Hsy N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Hex0 Hexk Htl".
+        iIntros (CIDy Hsy N) "%Hg Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpark Hpc Hex0 Hexk Htl".
         destruct Hg as (Hbn & Hln).
         iApply (sp_loop_body (CID := CIDy) CID0 Φ γs γt γl j m N av eb C sp0 pj
                   (sign_extend' 64 (t0 : mword 32)) nv
                   Hav Heb Hj Hjl Hpjv Hsy Hbn Hln
                   with "Htext Hlkt Hpinv Hscheds Hpanic IH Hex0 Hexk Htl
-                        Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc"). }
+                        Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpark Hpc"). }
 
       (* ============ the normal (return 0) exit at +0x70, anchored ============ *)
       iAssert (sp_exit0 CID0 Φ γt j m av eb C sp0 pj) with "[]" as "Hexit0".
       { rewrite /sp_exit0.
-        iIntros (CIDz Hsz N) "%Hg Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htl".
+        iIntros (CIDz Hsz N) "%Hg Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpark Hpc Htl".
         destruct Hg as (Hbn & Hsn).
         iApply (sp_exit0_body (CID := CIDz) CID0 Φ γt j m N av eb C sp0 pj
                   Hav Heb Hsz Hbn Hsn
-                  with "Htext Hlkt Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Htl"). }
+                  with "Htext Hlkt Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpark Hpc Htl"). }
 
       (* enter the loop *)
       rewrite /sp_loop.
       iSpecialize ("Hloop" $! CIDa with "[%]"); [wp_next_chain|].
-      iApply ("Hloop" $! P5 with "[%] Hs1 Hs2 Hs3 Hs4 Hs5 Hf6 Hf8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hctx Hpark Hpc Hexit0 Hexitk Htail").
+      iApply ("Hloop" $! P5 with "[%] Hs1 Hs2 Hs3 Hs4 Hs5 Hf6 Hf8 Hnc Hjoin7 Htok HR Hcg Hown Hpay Hpark Hpc Hexit0 Hexitk Htail").
       split; [exact HbP5 | exact HlP5].
   Qed.
 
@@ -1677,7 +1665,7 @@ Section ProofSysPause.
     intros pcE pj ret_tgt Hj Hjl Hi0 Hws Hav Heb.
     subst i.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hown #Htext #Hdata Hpc Htf Hpage #Hlkt #Hpinv #Hscheds #Hpanic Hctx Hpark Hcont".
+    iIntros "Hcg Hown #Htext #Hdata Hpc Htf Hpage #Hlkt #Hpinv #Hscheds #Hpanic Hpark Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX: the [b = false]
        instance of this contract is vacuous, and pinning [b] here is what makes
        every crossing in the function speak the same index. *)
@@ -1886,20 +1874,20 @@ Section ProofSysPause.
     (* ================ the shared epilogue continuation ================ *)
     iAssert (sp_tail CID Φ j m av eb C sp0 pj) with "[Hcont Htf Hpage]" as "Htail".
     { rewrite /sp_tail.
-      iIntros (CIDt Hst M r) "%Hfacts Hx1 Hx2 Hfree Hx7 Hcg Hown Hctx Hpark Hpc".
+      iIntros (CIDt Hst M r) "%Hfacts Hx1 Hx2 Hfree Hx7 Hcg Hown Hpark Hpc".
       destruct Hfacts as (Hbase & Hsav & Hra0 & Hrv).
       iApply (sp_tail_body (CID := CIDt) CID Φ j m M r av eb C sp0 pj tfp ws dqt
                 Hav Hst Hbase Hsav Hra0 Hrv Hsp0v
-                with "Htext Hx1 Hx2 Hfree Hx7 Hcg Hown Htf Hpage Hctx Hpark Hpc Hcont"). }
+                with "Htext Hx1 Hx2 Hfree Hx7 Hcg Hown Htf Hpage Hpark Hpc Hcont"). }
 
     (* ===================== the acquire continuation ===================== *)
     iAssert (sp_acq CID Φ γt j m av eb C sp0 pj) with "[]" as "Hacq".
     { rewrite /sp_acq.
-      iIntros (CIDq Hsq M nv) "%Hf Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hctx Hpark Hpc Htl".
+      iIntros (CIDq Hsq M nv) "%Hf Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hpark Hpc Htl".
       destruct Hf as (Hbb & Hss).
       iApply (sp_acq_body (CID := CIDq) CID Φ γs γt γl j m M nv av eb C sp0 pj
                 Hav Heb Hj Hjl Hpjv Hsq Hbb Hss
-                with "Htext Hlkt Hpinv Hscheds Hpanic Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hctx Hpark Hpc Htl"). }
+                with "Htext Hlkt Hpinv Hscheds Hpanic Hx1 Hx2 Hfree Hnc Hjoin7 Hcg Hown Hpark Hpc Htl"). }
 
     (* ====================== the [n < 0] dispatch ====================== *)
     iPoseProof (spi_16 with "Htext") as "Hi16".
@@ -1945,7 +1933,7 @@ Section ProofSysPause.
       rewrite /sp_acq.
       iSpecialize ("Hacq" $! CID12 with "[%]"); [wp_next_chain|].
       iApply ("Hacq" $! A1 (mword_of_int 0 : mword 32)
-                with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hctx Hpark Hpc Htail").
+                with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hpark Hpc Htail").
       { split; [exact HbaseA1 | exact HsavA1]. }
       { rewrite /sp_free. iFrame "S3 S4 S5 S6 S8". }
     - (* n >= 0: fall through to +0x1a *)
@@ -1962,7 +1950,7 @@ Section ProofSysPause.
       rewrite /sp_acq.
       iSpecialize ("Hacq" $! CID10 with "[%]"); [wp_next_chain|].
       iApply ("Hacq" $! A1 (arg_int32 v)
-                with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hctx Hpark Hpc Htail").
+                with "[%] Hs1 Hs2 [S3 S4 S5 S6 S8] Hs7hi Hjoin7 Hcg Hown Hpark Hpc Htail").
       { split; [exact HbaseA1 | exact HsavA1]. }
       { rewrite /sp_free. iFrame "S3 S4 S5 S6 S8". }
   Qed.

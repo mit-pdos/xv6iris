@@ -162,18 +162,16 @@ Section ProcinitSeals.
     p_chan (proc_addr i) ↦₈ ch -∗
     proc_pub (proc_addr i) -∗
     park_at_full (proc_addr i) false -∗
+    (* the slot's state mirror, whole, at the UNUSED procinit just stored *)
+    pstate_lock (proc_addr i) UNUSED -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
     proc_lock_res Φ γs γl (proc_addr i).
   Proof.
-    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark".
+    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg".
     iFrame "Hlk Hks".
-    iExists UNUSED, ch. iFrame "Hst Hch Hpub".
-    rewrite /proc_slots.
-    rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-    rewrite (_ : inv_dormant UNUSED = true); [| vm_compute; reflexivity].
-    rewrite not_running_UNUSED.
-    iSplitR; [done|]. iFrame "Hdorm Hpark".
+    iExists UNUSED, ch. iFrame "Hst Hg Hch Hpub".
+    iApply (proc_slots_unused_intro with "Hdorm Hpark").
   Qed.
 
 End ProcinitSeals.
@@ -220,16 +218,17 @@ Section ProcinitProcsInv.
      (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
      proc_pub (proc_addr i) ∗
      proc_dormant (proc_addr i) UNUSED ∗
-     park_at_full (proc_addr i) false)%I.
+     park_at_full (proc_addr i) false ∗
+     pstate_lock (proc_addr i) UNUSED)%I.
 
   Lemma proc_ready_split (i : nat) (ch : mword 64) :
     proc_ready i -∗ p_chan (proc_addr i) ↦₈ ch -∗ proc_pub (proc_addr i) -∗
-    park_at_full (proc_addr i) false -∗
+    park_at_full (proc_addr i) false -∗ pstate_lock (proc_addr i) UNUSED -∗
     lk_fresh (proc_addr i) "proc"%string ∗ proc_res i.
   Proof.
     rewrite /proc_ready /proc_res.
-    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark".
-    iFrame "Hks Hst Hpub Hdorm Hpark". iExists ch. iExact "Hch".
+    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg".
+    iFrame "Hks Hst Hpub Hdorm Hpark Hg". iExists ch. iExact "Hch".
   Qed.
 
   (* PASS ONE, generic: pick [n] lock ghost names, each with the wand that
@@ -267,22 +266,28 @@ Section ProcinitProcsInv.
      consumes) becomes the scheduler's [procs_inv]. *)
   Lemma procs_inv_alloc (E : coPset) :
     ([∗ list] i ∈ seq 0 NPROC,
-       (proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-        proc_pub (proc_addr i)) ∗ park_full i false)
+       ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+         proc_pub (proc_addr i)) ∗ park_full i false) ∗
+       pstate_full i UNUSED)
     ={E}=∗ ∃ γs : list gname, procs_inv Φ γs.
   Proof.
     iIntros "Hin".
     (* 1. peel [lk_fresh] out of each [proc_ready] *)
     iDestruct (big_sepL_impl
-                 (fun _ i => ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-                               proc_pub (proc_addr i)) ∗ park_full i false)%I)
+                 (fun _ i => (((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+                                proc_pub (proc_addr i)) ∗ park_full i false) ∗
+                              pstate_full i UNUSED)%I)
                  (fun _ i => (lk_fresh (proc_addr i) "proc"%string ∗ proc_res i)%I)
                  (seq 0 NPROC) with "Hin []") as "Hin".
-    { iIntros "!>" (k i Hk) "((Hrdy & Hch & Hpub) & Hpark)".
+    { iIntros "!>" (k i Hk) "(((Hrdy & Hch & Hpub) & Hpark) & Hg)".
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
       iDestruct "Hch" as (ch) "Hch".
-      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark]").
-      iApply (park_at_full_intro k false Hlt with "Hpark"). }
+      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg]").
+      { iApply (park_at_full_intro k false Hlt with "Hpark"). }
+      (* UNUSED is [unclaimed], so the whole variable is the lock's share *)
+      rewrite /pstate_lock unclaimed_UNUSED.
+      iDestruct (pstate_split k UNUSED with "Hg") as "[Hg1 Hg2]".
+      iSplitL "Hg1"; iApply (pstate_at_intro k _ UNUSED Hlt); iFrame. }
     (* 2. choose the 64 ghost names; the resources are still owed *)
     iMod (delayed_locks_alloc E "proc"%string proc_addr proc_res NPROC with "Hin")
       as (γs) "[%Hlen Hmk]".
@@ -295,18 +300,14 @@ Section ProcinitProcsInv.
                                         (proc_lock_res Φ γs g (proc_addr i)) ∗
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
-    { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark)]".
+    { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg)]".
       iMod (word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
       iMod ("Hmk" $! (proc_lock_res Φ γs g (proc_addr i))
-              with "[Hst Hch Hpub Hdorm Hpark]") as "#Hlk".
+              with "[Hst Hg Hch Hpub Hdorm Hpark]") as "#Hlk".
       { iApply (proc_lock_res_intro Φ γs g (proc_addr i) UNUSED ch
-                  with "Hst Hch Hpub [Hdorm Hpark]").
-        rewrite /proc_slots.
-        rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-        rewrite (_ : inv_dormant UNUSED = true); [| vm_compute; reflexivity].
-        rewrite not_running_UNUSED.
-        iSplitR; [done|]. iFrame "Hdorm Hpark". }
+                  with "Hst Hg Hch Hpub [Hdorm Hpark]").
+        iApply (proc_slots_unused_intro with "Hdorm Hpark"). }
       iModIntro. iFrame "Hlk". iExists (kstack_va i). iExact "Hksp". }
     iMod (big_sepL_fupd with "Hmk") as "Hmk".
     rewrite (big_sepL_sep (PROP:=iPropI Σ)).

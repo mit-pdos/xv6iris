@@ -69,7 +69,6 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
@@ -106,8 +105,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
   panic_wp_any -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   kalloc_env γa None -∗
   proc_priv γf pj pid V -∗
@@ -119,8 +117,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       sie_cap_gpr mf av b pj -∗
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

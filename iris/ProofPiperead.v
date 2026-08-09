@@ -67,7 +67,6 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import PipeInv.
-Require Import SwtchCtx.
 Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyout SpecRelease.
 Require Import CodePiperead.
 Require Import SpecPiperead.
@@ -414,7 +413,7 @@ Section ProofPiperead.
     set (chaddr := add_vec s0v (sign_extend' 64 (mword_of_int 4015 : mword 12))).
     assert (Hcpune : eq_vec (zero_reg : mword 64) (mycpu_ret cid_word) = false)
       by (apply mycpu_ret_nonzero; apply tp_ok_cid).
-    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hscheds #Hpanic Hctx Hpark Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hscheds #Hpanic Hpark Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX: the [b = false]
        instance of this contract is vacuous, so every crossing below speaks the
        same index and the entry stretch is hart-GENERIC. *)
@@ -593,8 +592,7 @@ Section ProofPiperead.
                cpu_own 0%nat true pj C true -∗
                pipe_ref γp w q -∗
                proc_priv γf pj pid (upd_upt V P') -∗
-               own_ctx (p_context pj) -∗
-               park_hlf j true -∗
+               running_claim j -∗
                pa_stk sp0 1 ↦₈ vra -∗ pa_stk sp0 2 ↦₈ vs0 -∗ pa_stk sp0 3 ↦₈ vs1 -∗
                pa_stk sp0 4 ↦₈ vs2 -∗ pa_stk sp0 5 ↦₈ vs3 -∗ pa_stk sp0 6 ↦₈ vs4 -∗
                pa_stk sp0 7 ↦₈ vs5 -∗
@@ -606,7 +604,7 @@ Section ProofPiperead.
                WP (Loop : expr riscv_lang) {{ Φ }})%I)) : iProp Σ)).
     iAssert EPIP with "[Hcont]" as "EPI".
     { rewrite /EPIP.
-      iIntros (CIDe Hse M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hctx Hpark Hg1 Hg2 Hg3 Hg4 Hg5 Hg6 Hg7 Hg8 Hg9 Hg10 Hg11 Hg12".
+      iIntros (CIDe Hse M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hpark Hg1 Hg2 Hg3 Hg4 Hg5 Hg6 Hg7 Hg8 Hg9 Hg10 Hg11 Hg12".
       destruct Hrg as (Hcsp & Hrv & HMs6 & HMs7 & HMs8 & HMs9 & HMs10 & HMs11).
       (* 0xd6 c.mv a0,s3 *)
       iPoseProof (pri_d6 with "Htext") as "Hid6".
@@ -785,7 +783,7 @@ Section ProofPiperead.
       iEval (rewrite Hrafin) in "Hpc".
       clear Hrafin.
       iSpecialize ("Hcont" $! CIDp18 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! F8 P' with "[%] [%] [%] Hcg Hown Hpc Href Hpriv Hctx Hpark").
+      iApply ("Hcont" $! F8 P' with "[%] [%] [%] Hcg Hown Hpc Href Hpriv Hpark").
       { unfold callee_saved. split_and!.
         - exact HF8sp.
         - rewrite /F8 upd_ne; [| reg_neq]. rewrite /F7 upd_ne; [| reg_neq].
@@ -1135,8 +1133,7 @@ Section ProofPiperead.
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
         proc_priv γf pj pid V -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         pa_stk sp0 8 ↦₈ vs6 -∗
         pa_stk sp0 9 ↦₈ vs7 -∗
         pa_stk sp0 10 ↦₈ vs8 -∗
@@ -1160,8 +1157,7 @@ Section ProofPiperead.
                cpu_own 0%nat true pj C true -∗
                pipe_ref γp w q -∗
                proc_priv γf pj pid (upd_upt V P') -∗
-               own_ctx (p_context pj) -∗
-               park_hlf j true -∗
+               running_claim j -∗
                (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
@@ -1171,15 +1167,15 @@ Section ProofPiperead.
     iAssert ((EPIC ∧ CPP)%I) with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7]" as "EXITS".
     { iSplit.
       { rewrite /EPIC. iEval (rewrite /EPIP) in "EPI".
-        iIntros (CIDx Hsx M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hctx Hpark Hz8 Hz9 Hz10 Hz11 Hz12".
+        iIntros (CIDx Hsx M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hpark Hz8 Hz9 Hz10 Hz11 Hz12".
         iSpecialize ("EPI" $! CIDx with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! M P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hctx Hpark
+        iApply ("EPI" $! M P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hpark
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hz8 Hz9 Hz10 Hz11 Hz12").
         { exact Hrg. }
         { exact Hext. }
         { exact Hret. } }
       rewrite /CPP.
-      iIntros (CIDc Hsc M) "%Hrg Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hc8 Hc9 Hc10 Hq11 Hq12".
+      iIntros (CIDc Hsc M) "%Hrg Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hc8 Hc9 Hc10 Hq11 Hq12".
       destruct Hrg as (HMcsp & HMs0 & HMs1 & HMs2 & HMs4 & HMs5 & HMs9 & HMs10 & HMs11).
       (* ---- 0x76 c.li s3,0 ---- *)
       iPoseProof (pri_76 with "Htext") as "Hi76".
@@ -1293,13 +1289,12 @@ Section ProofPiperead.
           pipe_res γp pi -∗
           pipe_ref γp w q -∗
           proc_priv γf pj pid (upd_upt V P') -∗
-          own_ctx (p_context pj) -∗
-          park_hlf j true -∗
+          running_claim j -∗
           (∃ b : bv 8, chaddr ↦ₘ b) -∗
           WP (Loop : expr riscv_lang) {{ Φ }})%I : iProp Σ)).
       iAssert WXP with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hc8 Hc9 Hc10 Hq12 Hchback]" as "HWX".
       { rewrite /WXP. iEval (rewrite /EPIP) in "EPI".
-        iIntros (M2 P' rv) "%Hxg %Hxext %Hxret Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx".
+        iIntros (M2 P' rv) "%Hxg %Hxext %Hxret Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx".
         destruct Hxg as (HXcsp & HXs1 & HXs3 & HXs9 & HXs10 & HXs11).
         (* 0xc2 addi a0,s1,540 *)
         iPoseProof (pri_c2 with "Htext") as "Hic2".
@@ -1461,7 +1456,7 @@ Section ProofPiperead.
           rewrite /X7 upd_ne; [| congruence]. rewrite /X6 upd_ne; [| congruence].
           rewrite /X5 upd_ne; [| congruence]. apply HthrX; exact Hr. }
         iSpecialize ("EPI" $! CIDp29 with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! X7 P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hctx Hpark
+        iApply ("EPI" $! X7 P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hpark
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 [Hc8] [Hc9] [Hc10] [Hc11] Hq12").
         { split_and!.
           - rewrite (HthrX7 csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)).
@@ -1505,7 +1500,7 @@ Section ProofPiperead.
         iAssert (∃ b : bv 8, chaddr ↦ₘ b)%I with "[Hch]" as "Hchx"; [by iExists chb0|].
         iEval (rewrite /WXP) in "HWX".
         iApply ("HWX" $! G3 (pv_upt V) (mword_of_int 0 : mword 64)
-                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
         { split_and!; try assumption. }
         { apply uptd_ext_refl. }
         { apply pr_ret_cnt. split; [lia | apply Z.le_max_l]. } }
@@ -1554,13 +1549,12 @@ Section ProofPiperead.
              p_pagetable pj ↦₈ page_base (ud_root (pv_upt V)) -∗ proc_pt P'' -∗
              proc_priv γf pj pid (upd_upt V P'')) -∗
           chaddr ↦ₘ chb -∗
-          own_ctx (p_context pj) -∗
-          park_hlf j true -∗
+          running_claim j -∗
           WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "CLOOP".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-        { iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hpark".
+        { iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark".
           exfalso. lia. }
-        iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hpark".
+        iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark".
         destruct Hrg3 as (H3csp & H3s0 & H3s1 & H3s2 & H3s3 & H3s4 & H3s5 & H3s6 & H3s7 & H3s8 & H3s9 & H3s10 & H3s11).
         assert (HZi : (0 <= Z.of_nat i < n)%Z) by lia.
         assert (Hroot : ud_root P' = ud_root (pv_upt V))
@@ -1625,7 +1619,7 @@ Section ProofPiperead.
           iAssert (∃ b : bv 8, chaddr ↦ₘ b)%I with "[Hch]" as "Hchx"; [by iExists chb|].
           iEval (rewrite /WXP) in "HWX".
           iApply ("HWX" $! K2 P' (mword_of_int (Z.of_nat i))
-                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
           { split_and!.
             - rewrite (HthrK2 csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
             - rewrite (HthrK2 Rs1 ltac:(vm_compute; reflexivity)). exact H3s1.
@@ -1989,7 +1983,7 @@ Section ProofPiperead.
               [by iExists (trunc8 (K5 !!! Regidx Ra5))|].
             iEval (rewrite /WXP) in "HWX".
             iApply ("HWX" $! D4 P'' (mword_of_int (Z.of_nat (S i)))
-                      with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                      with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
             { split_and!.
               - rewrite (HthrD csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3csp.
               - rewrite (HthrD Rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s1.
@@ -2015,7 +2009,7 @@ Section ProofPiperead.
             clear Hbk.
             iApply ("IHf" $! (S i) (add_vec cur (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
                       D4 P'' (trunc8 (K5 !!! Regidx Ra5))
-                      with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hpark").
+                      with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark").
             { lia. }
             { exact HSilt. }
             { split_and!.
@@ -2088,7 +2082,7 @@ Section ProofPiperead.
           iEval (rewrite Hjf0) in "Hpc".
           clear Hjf0.
           iApply ("HWX" $! E1 P'' (mword_of_int (-1))
-                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
           { split_and!.
             - rewrite /E1 upd_ne; [| reg_neq].
               rewrite (HthrMr csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
@@ -2115,7 +2109,7 @@ Section ProofPiperead.
         iEval (rewrite Hjeac) in "Hpc".
         clear Hjeac.
         iApply ("HWX" $! mrc P'' (mword_of_int (Z.of_nat i))
-                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
         { split_and!.
           - rewrite (HthrMr csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
           - rewrite (HthrMr Rs1 ltac:(vm_compute; reflexivity)). exact H3s1.
@@ -2127,7 +2121,7 @@ Section ProofPiperead.
         { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. } }
       (* enter the copy loop at i = 0 *)
       iApply ("CLOOP" $! Nn 0%nat addrv G3 (pv_upt V) chb0
-                with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hpark").
+                with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark").
       { lia. }
       { lia. }
       { split_and!; try assumption. }
@@ -2145,8 +2139,7 @@ Section ProofPiperead.
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
         proc_priv γf pj pid V -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
@@ -2154,7 +2147,7 @@ Section ProofPiperead.
         (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
         WP (Loop : expr riscv_lang) {{ Φ }})))%I with "[]" as "WLOOP".
     { iLöb as "IH".
-      iIntros (CIDl Hsl M) "%HcsM HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hq8 Hq9 Hq10 Hq11 Hq12".
+      iIntros (CIDl Hsl M) "%HcsM HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hq8 Hq9 Hq10 Hq11 Hq12".
       assert (HMcsp : M !!! Regidx csp_rs1 = spr)
         by (rewrite (callee_saved_lookup HcsM csp_rs1 ltac:(vm_compute; reflexivity)); exact HW0csp).
       assert (HMs0 : M !!! Regidx Rs0 = s0v)
@@ -2260,7 +2253,7 @@ Section ProofPiperead.
         clear Hw76.
         iDestruct "HEX" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
         iSpecialize ("HCP" $! CIDl with "[%]"); [wp_next_chain|].
-        iApply ("HCP" $! L1 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hc8 Hc9 Hc10 Hq11 Hq12").
+        iApply ("HCP" $! L1 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hc8 Hc9 Hc10 Hq11 Hq12").
         split_and!.
         - exact HL1csp.
         - rewrite (HthrL1 Rs0 ltac:(vm_compute; reflexivity)). exact HMs0.
@@ -2429,7 +2422,7 @@ Section ProofPiperead.
         iDestruct "HEX" as "[HEPI _]". iEval (rewrite /EPIC) in "HEPI".
         iSpecialize ("HEPI" $! CIDp31 with "[%]"); [wp_next_chain|].
         iApply ("HEPI" $! N3 (pv_upt V) (mword_of_int (-1))
-                  with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hctx Hpark
+                  with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hpark
                        Hq8 Hq9 Hq10 Hq11 Hq12").
         { split_and!.
           - rewrite /N3 upd_ne; [| reg_neq].
@@ -2516,8 +2509,8 @@ Section ProofPiperead.
                 Hj Hjl HL6lka eq_refl ltac:(lia)
                 ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_dead)
                 ltac:(intros ?i; iApply locked_pre_dead)
-                with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hopen Href Hlocked Hres Hpanic Hctx Hpark").
-      iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Hpay Hpc Href Hlocked Hres Hctx Hpark". rgall.
+                with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hopen Href Hlocked Hres Hpanic Hpark").
+      iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Hpay Hpc Href Hlocked Hres Hpark". rgall.
       iEval (rewrite HL6ra) in "Hpc".
       clear HL6ra.
       assert (Hw4a : ret_pc (add_vec_int (mword_of_int (KernelSyms.piperead + 0x46) : mword 64) 4)
@@ -2599,7 +2592,7 @@ Section ProofPiperead.
         iEval (rewrite Hbk34) in "Hpc".
         clear Hbk34.
         iSpecialize ("IH" $! CIDsl with "[%]"); [wp_next_chain|].
-        iApply ("IH" $! L8 with "[%] HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hq8 Hq9 Hq10 Hq11 Hq12").
+        iApply ("IH" $! L8 with "[%] HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hq8 Hq9 Hq10 Hq11 Hq12").
         exact HcsWL8. }
       (* data arrived: fall to +0x56, save s6..s8 and jump to the copy phase *)
       iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x52)) (mword_of_int 8162 : mword 13)
@@ -2659,7 +2652,7 @@ Section ProofPiperead.
       clear Hj76.
       iDestruct "HEX" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
       iSpecialize ("HCP" $! CIDsl with "[%]"); [wp_next_chain|].
-      iApply ("HCP" $! L8 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hc8 Hc9 Hc10 Hq11 Hq12").
+      iApply ("HCP" $! L8 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hc8 Hc9 Hc10 Hq11 Hq12").
       split_and!.
       - exact HL8csp.
       - rewrite (HthrL8 Rs0 ltac:(vm_compute; reflexivity)). exact HMs0.
@@ -2728,7 +2721,7 @@ Section ProofPiperead.
       clear Hj76b.
       iDestruct "EXITS" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
       iSpecialize ("HCP" $! CIDaq with "[%]"); [wp_next_chain|].
-      iApply ("HCP" $! W0 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hc8 Hc9 Hc10 Q11 Q12").
+      iApply ("HCP" $! W0 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hc8 Hc9 Hc10 Q11 Q12").
       split_and!; try assumption. }
     (* the pipe is empty: fall into the wait loop *)
     iApply (wp_bne_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x30)) (mword_of_int 46 : mword 13)
@@ -2740,7 +2733,7 @@ Section ProofPiperead.
     iEval (rewrite Hd34) in "Hpc".
     clear Hd34.
     iSpecialize ("WLOOP" $! CIDaq with "[%]"); [wp_next_chain|].
-    iApply ("WLOOP" $! W0 with "[%] EXITS Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Q8 Q9 Q10 Q11 Q12").
+    iApply ("WLOOP" $! W0 with "[%] EXITS Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Q8 Q9 Q10 Q11 Q12").
     apply callee_saved_refl.
   Qed.
 

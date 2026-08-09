@@ -171,8 +171,7 @@ Definition wp_bfree_gen_body
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -191,8 +190,7 @@ Definition wp_bfree_gen_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       (* THE FREE: bit [bno] is clear, and the block's content half and its
@@ -272,8 +270,7 @@ Definition wp_bfree_sconf_body
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -289,8 +286,7 @@ Definition wp_bfree_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       (* THE FREE: bit [bno] is clear, and the block's content half and its

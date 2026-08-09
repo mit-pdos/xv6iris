@@ -37,7 +37,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SwtchCtx.
 Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -71,8 +70,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   (* the running-thread bundle threaded through to sleep() *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
@@ -84,8 +82,7 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
       sl_pid slk ↦₄ pidv -∗
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

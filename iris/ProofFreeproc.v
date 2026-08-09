@@ -206,7 +206,14 @@ Section ProofFreeproc.
     iIntros "Hcg Hcpu #Htext Hpc Hheld Hrest Hpg Htf #Henv Hcont".
     iDestruct "Hrest" as "(%Hpure & Hpid & Hfields & Hof & Hunits & Hspare & Hctx)".
     destruct Hpure as (Hofv & Hcwdv & Hszb).
-    iDestruct "Hheld" as "(Hlk & Hstate & Hchan & Hpub & Hpark)".
+    iDestruct "Hheld" as "(Hlk & Hstate & Hpsg & Hchan & Hpub & Hpark)".
+    (* THE MIRROR FOLLOWS THE CELL.  freeproc's caller holds p->lock for the
+       whole call, so it holds the WHOLE variable and the move needs no side
+       condition; doing it up front rather than at the store keeps it out of
+       the non-modal goal the postcondition is assembled in. *)
+    iApply fupd_wp.
+    iMod (pstate_whole_update (proc_addr j) st UNUSED with "Hpsg") as "Hpsg".
+    iModIntro.
     iDestruct "Hpub" as (kl xs pid2) "(Hkilled & Hxstate & Hpid2)".
     iDestruct "Hfields" as "(Hsz & Hcwd & %Hnmlen & Hnm)".
     (* [proc_held] is stated at [proc_addr j] and the block at the [let]-bound
@@ -363,7 +370,7 @@ Section ProofFreeproc.
            for proc_freepagetable before this block stores 0 into it. *)
         p_sz pa ↦₈ pv_sz V -∗
         WP (Loop : expr riscv_lang) {{ Φ }}))%I
-      with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hchan Hkilled Hxstate Hpid Hpid2
+      with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid Hpid2
              Hcwd Hnm Hof Hunits Hspare Hctx Hpark]" as "ZERO".
     { iIntros (CIDz Hsz0 me pgv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcpu Hpc Hpg Htf Hsz".
@@ -560,7 +567,7 @@ Section ProofFreeproc.
       iDestruct (cpu_own_transport CIDz CIDzd ilvl eb pme C false ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iSpecialize ("Hcont" $! CIDzd with "[]"); [ iPureIntro; wp_next_chain | ].
-      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hchan Hkilled Hxstate Hpid2 Hpark]
+      iApply ("Hcont" $! E3 with "Hcg Hcpu Hpc [%] [Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid2 Hpark]
                                   [Hpid Hsz Hcwd Hnm Hof Hunits Hspare Hctx Hpg Htf]").
       { (* callee_saved mm E3 *)
         assert (HE3thr : fr_thr mm E3).
@@ -582,6 +589,7 @@ Section ProofFreeproc.
               exact (Hsh (or_introl eq_refl))).
         rewrite Hcpueq.
         iFrame "Hlk Hpark".
+        iFrame "Hpsg".
         iEval (rewrite fr_z32) in "Hstate". iFrame "Hstate".
         (* the store leaf already leaves [zero_reg] in the chan cell *)
         iFrame "Hchan".

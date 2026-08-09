@@ -135,11 +135,7 @@ Qed.
    private field block for.  (Case on the two [needs_ctx] disjuncts.) *)
 Lemma sc_needs_ctx_not_dormant (st : mword 32) :
   needs_ctx st = true -> inv_dormant st = false.
-Proof.
-  intro H. unfold needs_ctx in H. apply orb_prop in H.
-  destruct H as [H|H]; apply bool_decide_eq_true in H; subst st;
-    vm_compute; reflexivity.
-Qed.
+Proof. exact (inv_dormant_of_needs_ctx st). Qed.
 
 Lemma sc_neq_vec_false (n : Z) (x y : mword n) : neq_vec x y = false -> x = y.
 Proof.
@@ -1076,7 +1072,7 @@ Section ProofScheduler.
         by (rewrite (Hmq Rs1 ltac:(vm_compute; reflexivity)); exact Hp1).
       (* unpack the lock resource *)
       iDestruct (proc_lock_res_elim Φ γs γl (proc_addr jj) with "HR")
-        as (st ch) "(Hstate & Hchan & Hpub & Hslot)".
+        as (st ch) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
       (* +0x5e c.lw a5,24(s1) : read p->state *)
       assert (Hrec_st : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 24 : mword 12))
                         = p_state (proc_addr jj)) by (rgne; rewrite Hq1; apply sc_state_addr).
@@ -1128,8 +1124,8 @@ Section ProofScheduler.
                        = mword_of_int (KernelSyms.scheduler + 0x4a)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hr4a) in "Hpc".
         (* the slot goes back UNTOUCHED *)
-        iAssert (proc_lock_res Φ γs γl (proc_addr jj)) with "[Hstate Hchan Hpub Hslot]" as "HR".
-        { rewrite /proc_lock_res. iExists st, ch. iFrame "Hstate Hchan Hpub Hslot". }
+        iAssert (proc_lock_res Φ γs γl (proc_addr jj)) with "[Hstate Hpg Hchan Hpub Hslot]" as "HR".
+        { rewrite /proc_lock_res. iExists st, ch. iFrame "Hstate Hpg Hchan Hpub Hslot". }
         iApply ("Tail" $! jj γl M2 ebc with "[%] [%] [%] [%] Hcg Hpc Hlocked HR Hcpu Hcsrs Hown [-]").
         { exact Hjj. }
         { exact Hgl. }
@@ -1167,11 +1163,22 @@ Section ProofScheduler.
         iPoseProof (schi_76 with "Htext") as "Hi76".
         iPoseProof (schi_7a with "Htext") as "Hi7a".
         iPoseProof (schi_7c with "Htext") as "Hi7c".
-        (* the RUNNABLE slot carries the parked context; the dormant half is emp *)
-        iEval (rewrite /proc_slots needs_ctx_RUNNABLE inv_dormant_RUNNABLE
-                       not_running_RUNNABLE) in "Hslot".
-        iDestruct "Hslot" as "[Hvc [_ Hpark]]".
+        (* the RUNNABLE slot carries the parked context and the receipt; the
+           running and dormant arms are both [emp]. *)
+        iDestruct (proc_slots_dispatch _ _ (proc_addr jj) RUNNABLE needs_ctx_RUNNABLE
+                     with "Hslot") as "[Hvc Hpark]".
         iDestruct (park_at_full_elim jj false Hjj with "Hpark") as "Hpark".
+        (* THE CLAIM IS ISSUED HERE.  RUNNABLE is [unclaimed], so the lock's
+           share is the whole mirror; moving it to RUNNING needs no premise,
+           and the result is [proc_held]'s whole share -- out of which the
+           dispatched thread's half #2 comes at the release. *)
+        iApply fupd_wp.
+        iMod (pstate_lock_claim (proc_addr jj) RUNNABLE RUNNING
+                unclaimed_RUNNABLE unclaimed_RUNNING with "Hpg") as "[Hpl Hph]".
+        iDestruct (pstate_whole_split (proc_addr jj) RUNNING) as "[_ Hwj]".
+        iDestruct ("Hwj" with "[Hpl Hph]") as "Hpg".
+        { rewrite unclaimed_RUNNING. iFrame "Hpl Hph". }
+        iModIntro.
         (* +0x64 sw s8,24(s1) : p->state = RUNNING.  Both the base and the
            stored value are read through [rget], so both need respelling. *)
         assert (HM2s1r : rget M2 Rs1 = proc_addr jj) by (rgne; exact HM2s1).
@@ -1279,8 +1286,8 @@ Section ProofScheduler.
            dispatched thread's own intena retune runs under THIS hart's
            (now canonical) SIE ghost. *)
         iPoseProof (p_sched_to_proc γs cpu_id jj γl ch Hjj Hgl
-                      with "Hcsrs Havail [Hlocked Hstate Hchan Hpub Hpark]") as "HP".
-        { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hpub Hpark". }
+                      with "Hcsrs Havail [Hlocked Hstate Hpg Hchan Hpub Hpark]") as "HP".
+        { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub Hpark". }
         (* the TARGET is proc jj's record, which is MIGRATABLE ([None]) -- any
            hart may dispatch any RUNNABLE proc, so its stored continuation is
            good at every hart, and this hart's [adm] obligation is trivial.
@@ -1310,7 +1317,7 @@ Section ProofScheduler.
         destruct Hfacts as [Hgl' Hneeds'].
         assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
         iEval (rewrite /proc_held) in "Hheld'".
-        iDestruct "Hheld'" as "(Hlocked & Hstate & Hchan & Hpub & Hpark)".
+        iDestruct "Hheld'" as "(Hlocked & Hstate & Hpg & Hchan & Hpub & Hpark)".
         (* the callee-saved image equalities *)
         unfold callee_img, ctx_regs in Hcallee. simpl in Hcallee.
         injection Hcallee as Hm1 Hm2 Hm8 Hm9 Hm18 Hm19 Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.
@@ -1421,11 +1428,15 @@ Section ProofScheduler.
                 with "[Hvc'] [Hpark] Hppay") as "Hsl".
         { iEval (rewrite Hcret) in "Hvc'". iExact "Hvc'". }
         { iApply (park_at_full_intro jj false Hjj with "Hpark"). }
+        (* the park state is [unclaimed] ([park_ok_unclaimed]), so the whole
+           mirror the swtch payload carried is the lock's share again. *)
+        iDestruct (pstate_whole_split (proc_addr jj) st') as "[Hwk _]".
+        iDestruct ("Hwk" with "Hpg") as "[Hpg _]".
         iModIntro.
         iAssert (proc_lock_res Φ γs γl (proc_addr jj))
-          with "[Hstate Hchan Hpub Hsl]" as "HR".
+          with "[Hstate Hpg Hchan Hpub Hsl]" as "HR".
         { rewrite /proc_lock_res. iExists st', ch'.
-          iFrame "Hstate Hchan Hpub Hsl". }
+          iFrame "Hstate Hpg Hchan Hpub Hsl". }
         (* c->proc is 0 again, so re-tag the bundle back to the idle index --
            this is what keeps [wp_next_idle] available at the loop head. *)
         iEval (rewrite (sc_retag_p M5 (av - 10)%nat (proc_addr jj) zero_reg)) in "Hcg".

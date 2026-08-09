@@ -200,7 +200,6 @@ Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FileInv ProcInv.
-Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -361,8 +360,7 @@ Definition wp_writei_sconf_body
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -422,8 +420,7 @@ Definition wp_writei_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗

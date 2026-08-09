@@ -125,6 +125,7 @@ NAME_IMPORTS = [
     ('decode_bridge_ms', 'Require Import WpDecodeBridge.'),
     ('rvc_oneshot', 'Require Import WpRvcBridge.'),
     ('mulop_mul', 'Require Import ExecCommon.'),
+    ('exec_execute_C_SUBW', 'Require Import UserExecFacts.'),
 ]
 
 

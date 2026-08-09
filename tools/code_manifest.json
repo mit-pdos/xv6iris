@@ -636,6 +636,12 @@
   2
  ],
  [
+  "CodeStrncmp.v",
+  "strncmp",
+  "snci_",
+  2
+ ],
+ [
   "CodeSwtch.v",
   "swtch",
   "swi_",

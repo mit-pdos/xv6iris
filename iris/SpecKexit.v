@@ -110,12 +110,10 @@ Require Import KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
-Require Import SwtchCtx.
 Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.
@@ -175,8 +173,7 @@ Definition wp_kexit_sconf_body
   scheds_inv Φ γs -∗
   panic_wp_any -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)

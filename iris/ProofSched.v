@@ -930,8 +930,8 @@ Section ProofSched.
       by (rewrite /C9 upd_eq; reflexivity).
     assert (Hbeq : eq_vec (sign_extend' 64 st) (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 4 : mword 6)))) = false).
     { apply park_ok_cases in Hneeds as [Hn | ->].
-      - unfold needs_ctx in Hn. apply orb_prop in Hn. destruct Hn as [H|H];
-          apply bool_decide_eq_true in H; subst st; vm_compute; reflexivity.
+      - apply needs_ctx_cases in Hn as [H|[H|H]]; subst st;
+          vm_compute; reflexivity.
       - vm_compute; reflexivity. }
     assert (Hbeqr : eq_vec (rget C9 (mword_of_int 14 : mword 5)) (rget C9 (mword_of_int 15 : mword 5)) = false)
       by (rgne; rgne; rewrite Ha4C9 Ha5C9; exact Hbeq).
@@ -956,6 +956,7 @@ Section ProofSched.
     iIntros (ms2) "%Hmsf2 Hhs Hsc Htlbinv Hpc Hfile Hcapdisj".
     iDestruct "Hcapdisj" as "(Hstk & %HSIE0 & Harm)".
     set (C10 := <[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sstatus_read ms2)]> C9).
+    iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join C10 (av - 6)%nat false pj with "Hhs Hsc [Hstk Htlbinv Harm] Hfile") as "Hcg".
     { rewrite /sie_cap. iFrame "Hstk Htlbinv Harm". }
     assert (Hpc40 : add_vec_int (mword_of_int (KernelSyms.sched + 0x3c) : mword 64) 4 = mword_of_int (KernelSyms.sched + 0x40)) by (apply bv_eq; vm_compute; reflexivity).

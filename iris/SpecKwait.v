@@ -116,7 +116,6 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
@@ -153,8 +152,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
   scheds_inv Φ γs -∗
   panic_wp_any -∗
   (* the running-thread bundle sleep needs *)
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   (* copyout's lazy faulting and freeproc's kfree chain both live here *)
@@ -169,8 +167,7 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
       sie_cap_gpr mf av b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

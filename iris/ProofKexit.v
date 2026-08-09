@@ -68,7 +68,6 @@ Require Import IntrDefs HartTp WpNext.
 Require Import CpuOwn.
 Require Import WpLock.
 Require Import ProcGeom.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
@@ -738,8 +737,7 @@ Section KexitPark.
     cpu_own 0 eb pj C b -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x60)) -∗
     procs_inv Φ γs -∗ scheds_inv Φ γs -∗ panic_wp_any -∗
-    own_ctx (p_context pj) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
@@ -748,7 +746,7 @@ Section KexitPark.
   Proof.
     intros pj Hj Hgl Heb Hav Hregs Hof Hcwd. subst eb.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
-    iIntros "Hcg Hown #Htext Hpc #Hprocs #Hscheds #Hpanic Hoc Hpark #Hwl Hinit Hsp Hpriv".
+    iIntros "Hcg Hown #Htext Hpc #Hprocs #Hscheds #Hpanic Hpark #Hwl Hinit Hsp Hpriv".
     iDestruct (procs_inv_len with "Hprocs") as "%Hlen".
     iPoseProof (kxi_60 with "Htext") as "Hi60".
     iPoseProof (kxi_64 with "Htext") as "Hi64".
@@ -1007,10 +1005,19 @@ Section KexitPark.
     assert (Hlk_s4 : mlk !!! Regidx (mword_of_int 20 : mword 5) = sv).
     { rewrite (callee_saved_lookup Hcsl (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity)).
       exact HP8s4. }
-    (* unpack p->lock.  The detachable slots go: the process is RUNNING, so
-       all three are [emp], and nothing here has to know that. *)
-    iDestruct (proc_lock_res_elim Φ γs γl pj with "HR") as (st0 ch0) "(Hstate & Hchan & Hpub & Hslot)".
-    iClear "Hslot".
+    (* unpack p->lock.  The park receipt this thread carries refutes the
+       slot's [not_running] arm, so the state under the lock is RUNNING --
+       and the RUNNING arm is the raw context cells sched wants.  That is
+       why exit needs no [own_ctx] premise. *)
+    iDestruct (proc_lock_res_elim Φ γs γl pj with "HR") as (st0 ch0) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
+    iDestruct "Hpark" as "[Hpark Hclm]".
+    iDestruct (proc_slots_running Φ γs j st0 Hj with "Hpark Hslot") as "(Hpark & -> & Hoc)".
+    (* the claim joins the lock's tie: kexit's store of ZOMBIE below moves
+       the whole mirror, and ZOMBIE is unclaimed, so the claim is spent. *)
+    iDestruct (pstate_at_intro j (1/2) RUNNING Hj with "Hclm") as "Hclm".
+    iDestruct (pstate_whole_split pj RUNNING) as "[_ Hwe]".
+    iDestruct ("Hwe" with "[Hpg Hclm]") as "Hpg".
+    { rewrite unclaimed_RUNNING. iFrame "Hpg Hclm". }
     iDestruct "Hpub" as (kl xs pidv) "(Hkilled & Hxstate & Hpidh)".
     iPoseProof (kxi_80 with "Htext") as "Hi80".
     iPoseProof (kxi_84 with "Htext") as "Hi84".
@@ -1056,7 +1063,7 @@ Section KexitPark.
       rewrite /P9 upd_eq. unfold ZOMBIE. exact kx_zombie. }
     iApply (wp_sw_s_sconf (CID := CIDa) Φ (mword_of_int (KX + 0x86))
               (mword_of_int 15 : mword 5) (mword_of_int 19 : mword 5) (mword_of_int 24 : mword 12)
-              P9 av st0 false with "Hcg Hpc Hi86 [Hstate] [-]").
+              P9 av RUNNING false with "Hcg Hpc Hi86 [Hstate] [-]").
     { iEval (rewrite Hsaddr). iExact "Hstate". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hstate".
     iEval (rewrite Hsaddr Hsval) in "Hstate".
@@ -1144,15 +1151,19 @@ Section KexitPark.
     iDestruct (kx_cpu_own_ctx_take with "Hown") as "[HC Hcpuemp]".
     iDestruct (cpu_own_set_proc 1%nat true pj pj emp with "Hcpuemp") as "[Hph Hback]".
     iApply fupd_wp.
+    (* the store of ZOMBIE moved the cell; the mirror follows.  ZOMBIE is
+       unclaimed, so this is the claim being spent for good -- kexit never
+       comes back. *)
+    iMod (pstate_whole_update (proc_addr j) RUNNING ZOMBIE with "Hpg") as "Hpg".
     iMod (SchedCtx.scheds_take Φ γs ⊤ CIDa j with "Hscheds Hph Hpark")
       as "(Hvc & Hph & Hpark)"; [solve_ndisj|exact Hj|].
     iModIntro.
     iDestruct ("Hback" with "Hph") as "Hcpuemp".
     iApply (Sched.wp_sched_sconf (CID := CIDa) Φ γs j γl ZOMBIE ch0 PD av true
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
-              with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hchan Hkilled Hxstate Hpidh Hpark]
+              with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh Hpark]
                     [Hpriv Hsp] Hpay Hcpuemp Hoc Hvc [-]").
-    { rewrite /proc_held. iFrame "Hlkp Hstate Hchan Hpark".
+    { rewrite /proc_held. iFrame "Hlkp Hstate Hpg Hchan Hpark".
       iExists kl, (trunc32 (rget (CID := CIDa) mlk (mword_of_int 20 : mword 5))), pidv.
       iFrame "Hkilled Hxstate Hpidh". }
     { iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp"). }
@@ -1233,8 +1244,7 @@ Section KexitRest.
     cpu_own 0 eb pj C b -∗
     kernel_text -∗ pc_is (mword_of_int (KX + 0x4c)) -∗
     procs_inv Φ γs -∗ scheds_inv Φ γs -∗ panic_wp_any -∗
-    own_ctx (p_context pj) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
@@ -1251,7 +1261,7 @@ Section KexitRest.
   Proof.
     intros pj Hj Hgl Heb Hav Hgeom Hregs Hof. subst eb.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
-    iIntros "Hcg Hown #Htext Hpc #Hprocs #Hscheds #Hpanic Hoc Hpark #Hwl".
+    iIntros "Hcg Hown #Htext Hpc #Hprocs #Hscheds #Hpanic Hpark #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl Hinit Hsp Hpriv".
     (* the cwd cell, its reference, and the pid quarter -- all three out at
        once; see the header. *)
@@ -1285,8 +1295,8 @@ Section KexitRest.
     iApply (BeginOp.wp_begin_op_sconf (CID := CID1) Φ γs j γl bn γ γfs cov logstart dev
               pid (DfracOwn (1/4)) Q0 av true C b
               ltac:(unfold K_begin_op; lia) Hj Hgl eq_refl
-              with "Hcg Hown Htext Hpc Hpanic Hlog Hpidq Hprocs Hscheds Hoc Hpark [-]").
-    iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown Hpc Hoc Hpark Hpidq Hop".
+              with "Hcg Hown Htext Hpc Hpanic Hlog Hpidq Hprocs Hscheds Hpark [-]").
+    iIntros (CID2 Hs2 mbo) "%Hcsbo Hcg Hown Hpc Hpark Hpidq Hop".
     assert (Hpc50 : ret_pc (Q0 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x50))
       by (rewrite HQ0ra; apply bv_eq; vm_compute; reflexivity).
@@ -1343,9 +1353,9 @@ Section KexitRest.
     iApply (Iput.wp_iput_sconf (CID := CID4) Φ γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart dev (pv_cwd V) MAXOPBLOCKS pid (DfracOwn (1/4)) Q2 av true C b
               ltac:(unfold K_iput; lia) Hgeom ltac:(unfold iput_units; lia) Hj Hgl HQ2a0 eq_refl
-              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hpidq Hprocs Hscheds Hoc Hpark
+              with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hpidq Hprocs Hscheds Hpark
                     Hdev Hgeo Hdlk Hbsl Href Hop [-]").
-    iIntros (CID5 Hs5 mip n') "%Hcsip Hcg Hown Hpc Hoc Hpark Hpidq Hbsl %Hn' Hop".
+    iIntros (CID5 Hs5 mip n') "%Hcsip Hcg Hown Hpc Hpark Hpidq Hbsl %Hn' Hop".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x58))
       by (rewrite HQ2ra; apply bv_eq; vm_compute; reflexivity).
@@ -1381,8 +1391,8 @@ Section KexitRest.
               cov logstart dev n' pid (DfracOwn (1/4)) Q3 av true C b
               ltac:(unfold K_end_op; lia) Hgeom Hj Hgl eq_refl
               with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hseam Hgen Hpidq Hprocs Hscheds
-                    Hoc Hpark Hdev Hgeo Hdlk Hop [-]").
-    iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Hpc Hoc Hpark Hpidq".
+                    Hpark Hdev Hgeo Hdlk Hop [-]").
+    iIntros (CID7 Hs7 meo) "%Hcseo Hcg Hown Hpc Hpark Hpidq".
     assert (Hpc5c : ret_pc (Q3 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x5c))
       by (rewrite HQ3ra; apply bv_eq; vm_compute; reflexivity).
@@ -1416,7 +1426,7 @@ Section KexitRest.
               ltac:(split; [exact Heo_s3 | split; [exact Heo_s4 | intro r; apply rf_to_gmap_dom]])
               ltac:(cbn [upd_cwd pv_ofile]; exact Hof)
               ltac:(cbn [upd_cwd pv_cwd]; reflexivity)
-              with "Hcg Hown Htext Hpc Hprocs Hscheds Hpanic Hoc Hpark Hwl Hinit Hsp Hpriv").
+              with "Hcg Hown Htext Hpc Hprocs Hscheds Hpanic Hpark Hwl Hinit Hsp Hpriv").
   Qed.
 
 End KexitRest.
@@ -1449,7 +1459,7 @@ Section ProofKexit.
     cbv beta delta [wp_kexit_sconf_body].
     intros pcE pj Hfn Hj Hgl HK Hgeom Heb. subst eb. subst fn.
     unfold K_kexit in HK.
-    iIntros "Hcg Hown #Htext Hpc #Hprocs #Hscheds #Hpanic Hoc Hpark #Hwl #Hft".
+    iIntros "Hcg Hown #Htext Hpc #Hprocs #Hscheds #Hpanic Hpark #Hwl #Hft".
     iIntros "#Hkmem Hav0".
     iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl Hinit Hsp Hpriv".
     assert (Hdom : forall r : regidx, r ∈ dom (rf_to_gmap m))
@@ -1689,7 +1699,7 @@ Section ProofKexit.
         iFrame "Hprocs Hkmem Hav0". }
       iAssert (fileclose_fs_env_nopid Φ (MkFCloseNames γs j γl γkl γka γu γd γk
                  pd pav pu bn γ γfs cov logstart dev pid (DfracOwn (1/4)))
-                 0%nat true pj)%I with "[Hbsl Hoc Hpark]" as "Hfenv".
+                 0%nat true pj)%I with "[Hbsl Hpark]" as "Hfenv".
       { rewrite /fileclose_fs_env_nopid.
         cbn [fcn_procs fcn_j fcn_plock fcn_uart fcn_disk fcn_dlock fcn_pd fcn_pav
              fcn_pu fcn_bio fcn_log fcn_fs fcn_cov fcn_logstart fcn_dev].
@@ -1697,7 +1707,7 @@ Section ProofKexit.
         iSplitR; [iPureIntro; exact Hj|].
         iSplitR; [iPureIntro; exact Hgl|].
         iSplitR; [iPureIntro; exact Hgeom|].
-        iFrame "Hprocs Hscheds Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl Hoc Hpark". }
+        iFrame "Hprocs Hscheds Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl Hpark". }
       iPoseProof (kx_loop (CID0 := CID8) Φ γft γf
                     (MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
                        cov logstart dev pid (DfracOwn (1/4))) j pid
@@ -1708,12 +1718,12 @@ Section ProofKexit.
       iSpecialize ("Hloop" with "[Hinit Hsp Hframe]").
       { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof Hcg Hown Hpc Hpriv Hpenv Hfenv".
         iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-                               _ & _ & _ & Hbsl & Hoc & Hpark)".
+                               _ & _ & _ & Hbsl & Hpark)".
         iApply (kx_rest (CID0 := CIDx) Φ γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart dev ip (m !!! Regidx (mword_of_int 10 : mword 5)) dqi
                   Mx (av - 6)%nat true C b pid Vx
                   Hj Hgl eq_refl ltac:(lia) Hgeom Hxregs Hxof
-                  with "Hcg Hown Htext Hpc Hprocs Hscheds Hpanic Hoc Hpark Hwl
+                  with "Hcg Hown Htext Hpc Hprocs Hscheds Hpanic Hpark Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl Hinit Hsp Hpriv"). }
       iApply ("Hloop" $! 0%nat A5 V with "[%] [%] [%] Hcg Hown Hpc Hpriv Hpenv Hfenv").
       + unfold NOFILE. lia.

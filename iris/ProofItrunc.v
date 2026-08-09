@@ -23,23 +23,19 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
-Require Import RiscvModelBytes.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import RegFile HartTp WpNext WpGpr.
+Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
-Require Import BufOwn.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
-Require Import WpSmodeHalf.
-Require Import ByteCursor ByteBuf.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -49,8 +45,7 @@ Require Import WpUart.
 Require Import BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BitmapEnc BitmapInv.
-Require Import BlockWords.
+Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import SpecBread SpecBrelse SpecBfree SpecIupdate.
@@ -99,8 +94,7 @@ Section ItruncCont.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        own_ctx (p_context (proc_addr j)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         i_inum ip ↦₄{dqn} inum -∗
@@ -189,8 +183,7 @@ Section ItruncTail.
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
     it_frame m -∗
-    own_ctx (p_context (proc_addr j)) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -213,7 +206,7 @@ Section ItruncTail.
     intros HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl Hsp Hthr Hs3.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs #Hscheds Hframe
-              Hoctx Hpark Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
+              Hpark Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
               Hfsb #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iPoseProof (iti_38 with "Htext") as "Hi38".
     iPoseProof (iti_3c with "Htext") as "Hi3c".
@@ -304,9 +297,9 @@ Section ItruncTail.
               HKiu Hgeom Hist Hicov Hilog Hdswf (di_trunc_addrs dn) Hdirlen
               Hj Hgl HT1a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
-                    Hsbi Hfsb Hppid Hprocs Hscheds Hoctx Hpark Hdevi Hdgeom
+                    Hsbi Hfsb Hppid Hprocs Hscheds Hpark Hdevi Hdgeom
                     Hdlock Hsl Hop").
-    iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hidev Hinum
+    iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hpc Hpark Hppid Hidev Hinum
                            Hmeta Hmap Hsbi Hfsb Hsl Hop".
     assert (Hpc42 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x42)) by (rewrite HT1ra; pcw).
@@ -565,7 +558,7 @@ Section ItruncTail.
     assert (Cs11 : P6 !!! Regidx (mword_of_int 27 : mword 5)
                    = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; itidx).
-    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hidev Hinum
+    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hpark Hppid Hidev Hinum
                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hsl [Hop]").
     { unfold callee_saved. split_and!; assumption. }
     { iExists u. iSplitR; [iPureIntro; lia|]. iExact "Hop". }

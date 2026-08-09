@@ -56,7 +56,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SwtchCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
@@ -103,8 +102,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   Rk -∗
   (* the running-thread bundle *)
   panic_wp_any -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -116,8 +114,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       locked γk cpu_id -∗
       Rk -∗
       (* the running-thread bundle, refreshed *)
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -188,8 +185,7 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   Rk -∗
   (* the running-thread bundle *)
   panic_wp_any -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -203,8 +199,7 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       locked γk cpu_id -∗
       Rk -∗
       (* the running-thread bundle, refreshed *)
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

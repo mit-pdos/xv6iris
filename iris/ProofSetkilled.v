@@ -193,7 +193,7 @@ Section ProofSetkilled.
       by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp10) in "Hpc".
     (* ---- open the lock: p->killed is in the ALWAYS-RESIDENT row ---- *)
-    iDestruct (proc_lock_res_elim Φ γs γl (proc_addr j) with "HR") as (st ch) "(Hstate & Hchan & Hpub & Hslot)".
+    iDestruct (proc_lock_res_elim Φ γs γl (proc_addr j) with "HR") as (st ch) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
     iDestruct "Hpub" as (kl xs pid) "(Hkilled & Hxstate & Hpidhalf)".
     assert (Hmacq_s1 : macq !!! Regidx sk_s1 = proc_addr j).
     { rewrite (callee_saved_lookup Hcs_acq sk_s1 ltac:(vm_compute; reflexivity)).
@@ -263,8 +263,8 @@ Section ProofSetkilled.
       apply kv_addv_zero. }
     (* reassemble the lock resource: [proc_pub] quantifies [killed], so the
        stored value need never be named. *)
-    iAssert (proc_lock_res Φ γs γl (proc_addr j)) with "[Hstate Hchan Hkilled Hxstate Hpidhalf Hslot]" as "HR2".
-    { iApply (proc_lock_res_intro Φ γs γl (proc_addr j) st ch with "Hstate Hchan [-Hslot] Hslot").
+    iAssert (proc_lock_res Φ γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hkilled Hxstate Hpidhalf Hslot]" as "HR2".
+    { iApply (proc_lock_res_intro Φ γs γl (proc_addr j) st ch with "Hstate Hpg Hchan [-Hslot] Hslot").
       iExists _, xs, pid. iFrame "Hkilled Hxstate Hpidhalf". }
     (* ===================== release(&p->lock) ===================== *)
     iApply (Release.wp_release_sconf Φ γl (proc_addr j) "proc"%string

@@ -315,7 +315,7 @@ Section IntrDefs.
   (*                                                                       *)
   (* [intr_frame] is THE per-trap frame the interrupt handler consumes     *)
   (* and re-establishes: THE KERNEL MUST MAINTAIN [stack_own] OF DEPTH AT  *)
-  (* LEAST [kv_frame_slots] (32 slots = 256 bytes, kernelvec's c.addi16sp  *)
+  (* LEAST [kv_frame_slots] (78 slots: kernelvec's 32-slot c.addi16sp     *)
   (* frame) BELOW SP AT EVERY INTERRUPTS-ENABLED INSTRUCTION -- the trap   *)
   (* saves its 17 caller-saved registers into the top of that region --    *)
   (* plus the allocation-fixed menvcfg cell and tlb_inv_pt.  The depth is  *)
@@ -341,7 +341,19 @@ Section IntrDefs.
   (* the handler run; the handler never touches it).  [s_dispatch] reads   *)
   (* mie/mideleg, so the handler spec owns them explicitly.                *)
   (* =================================================================== *)
-  Definition kv_frame_slots : nat := 32.
+  (* THE RESERVED CARVE MUST COVER THE WHOLE TRAP PATH, not just
+     kernelvec's own frame.  A trap taken at an interrupts-enabled
+     instruction runs kernelvec (32 slots = 256 bytes, its c.addi16sp frame)
+     AND everything kernelvec calls, which is kerneltrap and its cone
+     ([SpecKerneltrap.kerneltrap_stack] = 46: its own 6-slot frame plus
+     devintr's 40).  So 32 + 46 = 78.
+
+     The literal is written out because [kerneltrap_stack] lives ABOVE this
+     file; [SpecKerneltrap.kt_carve_fits] ties the two together so the pair
+     cannot drift silently -- growing kerneltrap's cone without growing this
+     would otherwise still compile and only fail deep inside the handler
+     proof. *)
+  Definition kv_frame_slots : nat := 78.
 
   (* menvcfg is pinned to [MENVCFG_S] here rather than parameterized: the
      handler contract below is only PROVABLE at that value (its own fetches
@@ -545,6 +557,19 @@ Section IntrDefs.
   Lemma sconf_at_facts (ms : mword 64) :
     sconf_at ms -∗ ⌜ sconf_ms_facts ms ⌝.
   Proof. iIntros "[(_ & _ & _ & %H) _]". iPureIntro. exact H. Qed.
+
+  (* READING THE TWO sret BITS OFF THE BUNDLE.  A holder of the travelling
+     half turns it into a fact about the LIVE mstatus by agreement with the
+     tie -- which is the whole point of the mirror: it is what survives the
+     instruction funnel's [exists ms], and so it is how a trap handler
+     entered from S-mode still knows SPP = 1 several instructions later. *)
+  Lemma sconf_at_sret (ms : mword 64) (a b : mword 1) :
+    sconf_at ms -∗ sret_bits a b -∗
+    ⌜ _get_Mstatus_SPP ms = a /\ _get_Mstatus_SPIE ms = b ⌝.
+  Proof.
+    iIntros "[(_ & _ & Htie & _) _] Hc".
+    iDestruct (sret_bits_agree with "Htie Hc") as %[-> ->]. done.
+  Qed.
 
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
      its index [b], backed by the ghost QUARTER's value (agreement with

@@ -5,7 +5,7 @@ Base layers this sits on: [`../completed/bio.md`](../completed/bio.md) (the
 physical buffer cache — this design is the "bio_cell / coherent client view"
 that file deferred), [`../completed/virtio-disk.md`](../completed/virtio-disk.md)
 (the driver; **unchanged** by stages 1–3 below), and
-[`crash.md`](crash.md) / [`../projects/crash.md`](../projects/crash.md) M5b
+[`crash.md`](crash.md) / [`../completed/crash.md`](../completed/crash.md) M5b
 (the crash invariant `Pc` and the write-permit seam that stage 4 instantiates
 as `P_fs`).
 
@@ -110,7 +110,7 @@ Plus the **cache overlay invariant** tying L to the machine:
   record fields** (`bv_clean_tl`/`bv_dirty_tl`): they ride the escrow,
   whose every open happens inside a store's atomic update with no step
   left to absorb a `▷` — the same constraint that shaped `disk_inv`
-  (projects/crash.md M5b). An arbitrary-iProp payload breaks every
+  (completed/crash.md M5b). An arbitrary-iProp payload breaks every
   opener, and on the checkout path the withdrawn bundle IS the payload,
   so no opener-local workaround exists. No real client is constrained:
   "bs is the logical content" is ghost state (the log instance is two
@@ -297,7 +297,7 @@ locks — matching the code); re-acquires, deposits, cmt := 0.
 - **initlog / recovery**: staged. Stages 1–3 give initlog a clean-image
   precondition (⌜on-disk header n = 0⌝ — true after mkfs) and construct
   log_res + bio_init's pool inputs from the boot-side disk_block mint (the
-  recorded-open mkfs-image mint, projects/crash.md). Real recovery
+  recorded-open mkfs-image mint, completed/crash.md). Real recovery
   (install from a committed on-disk log) is stage 4 — it is the consumer
   of `P_fs`'s crash-receipt.
 - **sys_sync**: deferred with stage 4 (its spec is a durability receipt:

@@ -68,7 +68,6 @@ Require Import WpSconfSrliw.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SwtchCtx.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
@@ -141,8 +140,7 @@ Section IupdateDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        own_ctx (p_context (proc_addr j)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         i_inum ip ↦₄{dqn} inum -∗
@@ -201,8 +199,7 @@ Section IupdateTail.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv Φ γs -∗
     iu_frame m -∗
-    own_ctx (p_context (proc_addr j)) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -220,7 +217,7 @@ Section IupdateTail.
   Proof.
     intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog.
     pose proof HK as HK'. unfold K_iupdate in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hoctx
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe 
               Hpark Hppid Hidev Hinum Hmeta Hmap Hsb Hsl Hop Hfsb Hheld Hcont".
     iPoseProof (iui_66 with "Htext") as "Hi66".
     iPoseProof (iui_68 with "Htext") as "Hi68".
@@ -565,7 +562,7 @@ Section IupdateTail.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /iu_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hidev Hinum
+    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hpark Hppid Hidev Hinum
                      Hmeta Hmap Hsb Hfsb Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
@@ -631,7 +628,7 @@ Section ProofIupdateMain.
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
       by (rewrite /bm_cells length_app Hdirlen; reflexivity).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
-              Hsb Hfsb Hppid #Hprocs #Hscheds Hoctx Hpark #Hdevi #Hdgeom
+              Hsb Hfsb Hppid #Hprocs #Hscheds Hpark #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
     iAssert (iu_cont (CID0 := CID) Φ γfs bn γ inodestart ip inum dn bm ds u
                dev pidv dq dqd dqn dqs j m K C b)%I with "[Hcont]" as "Hcont";
@@ -963,9 +960,9 @@ Section ProofIupdateMain.
               (fs_view γfs γd dev cov) pidv dev bno dq
               RA (K - 4)%nat true C b
               HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                     Hdevi Hdgeom Hdlock Hsl1").
-    iIntros (CID15 Hq15 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hoctx Hpark Hppid Hheld".
+    iIntros (CID15 Hq15 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hpark Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc24 : ret_pc (RA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x24)) by (rewrite HRAra; pcw).
@@ -1539,7 +1536,7 @@ Section ProofIupdateMain.
     iApply (iu_tail (CID0 := CID36) Φ γs j γfs γd bn γ cov logstart inodestart dev
               ip inum dn bm ds u kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K C b
               HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe Hoctx Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe Hpark
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
                     Hsl Hop Hfsb Hheld [Hcont]").
     { rewrite /inode_meta.

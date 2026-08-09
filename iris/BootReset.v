@@ -8,7 +8,7 @@
 (* clause a statement about a RUN of the boot program rather than a table of   *)
 (* pinned values written over the dying generation's registers.               *)
 (*                                                                          *)
-(* WHY IT CANNOT BE COMPUTED (measured; claude-notes/projects/crash.md).      *)
+(* WHY IT CANNOT BE COMPUTED (measured; claude-notes/completed/crash.md).     *)
 (* [regstate]'s twenty fields are FUNCTIONS and [register_set] wraps one in a *)
 (* fresh [fun r' => if r' =? r then v else <old> r'], so over an OPEN base    *)
 (* the chain's ~300 writes are a tower of stuck matches whose READBACK        *)
@@ -388,7 +388,7 @@ Lemma bv_extract_full l (v : bv l) : bv_extract 0 l v = v.
 Proof. apply bv_eq. by rewrite bv_extract_0_unsigned, bv_wrap_bv_unsigned. Qed.
 
 (* ---- the two model-level facts, over an OPEN entry.  These are the ones
-       claude-notes/projects/crash.md named as the blockers: bitvector equality
+       claude-notes/completed/crash.md named as the blockers: bitvector equality
        does not reduce under the lazy evaluator, so neither is a computation --
        each is the [bv_extract]/[bv_concat] algebra above, applied. ---- *)
 

@@ -580,6 +580,7 @@ Section BootPrimary.
     main_globals_raw -∗
     ([∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg) -∗
     ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
+    ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     dev_inv γd γv -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
@@ -592,7 +593,7 @@ Section BootPrimary.
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
     intros Hreset Hz Hprun Hlen Hlive.
-    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hprocs Hpark
+    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hprocs Hpark Hpst
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge Φ rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
@@ -604,7 +605,7 @@ Section BootPrimary.
               (cid_word_of_zero _ Hz) (le_n K_main) eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
               with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
-                    Hprocs Hpark Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
+                    Hprocs Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
                     Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, so the wand

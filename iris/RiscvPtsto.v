@@ -232,6 +232,17 @@ Record riscvEraGS := RiscvEraGS {
      every one of the ~50 files that mention [procs_inv].  The function is
      total; only indices below [NPROC] are ever owned. *)
   era_park_name : nat -> gname;
+  (* THE PER-PROC STATE MIRROR (design/proc-struct.md, the state ghost).
+     Two halves of a [ghost_var] carrying [p->state]'s value: the proc lock
+     invariant owns one, tied to the cell, and the other is lock-resident
+     except at the two states where a THREAD has claimed the proc (RUNNING,
+     USED).  Since a ghost_var cannot move on half alone and the cell cannot
+     move without the ghost, the right to WRITE [p->state] is exactly
+     ownership of the second half.
+
+     Canonical for the same reason as [era_park_name] directly above: it is
+     named inside [SchedCtx.proc_lock_res], hence inside [procs_inv]. *)
+  era_pstate_name : nat -> gname;
   (* THE DISK IMAGE MAP (claude-notes/design/crash.md, design/fs-log.md
      stage 4): a byte-granularity ghost map mirroring [v_disk], tied to the
      state by [disk_dur_interp] below -- ONE conjunct of this era's
@@ -287,12 +298,16 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
   riscvF_parkGS :: ghost_varG Σ bool;
+  (* the per-proc state mirror's typing (the NAME is per-era, above).  A
+     [mword 32] instance of its own -- no other ghost_var in the record
+     carries one, so nothing else can be confused with it. *)
+  riscvF_pstateGS :: ghost_varG Σ (SailStdpp.Values.mword 32);
   (* the FS log-region mirror's typing (the NAME is per-era, above) *)
   riscvF_mirrorGS :: ghost_varG Σ log_mirror;
   (* the byte memory's PRE-class: the era layer stores only the two heap
      GNAMES (a [gen_heapGS] bundle would drag Σ into the era record, and
      the era record must be Σ-FREE so it can be a [ghost_map] VALUE in
-     the generation registry -- claude-notes/projects/crash.md); the
+     the generation registry -- claude-notes/completed/crash.md); the
      full [gen_heapGS] is reconstructed below as [riscv_memGS]. *)
   riscvF_memGpreS :: gen_heapGpreS Arch.pa (bv 8) Σ;
   (* the power/crash layer (claude-notes/design/crash.md): the GENERATION
@@ -388,6 +403,8 @@ Definition riscv_kmapGS `{!riscvGS Σ} :
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
 Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ bool := riscvF_parkGS.
+Definition riscv_pstateGS `{!riscvGS Σ} : ghost_varG Σ (SailStdpp.Values.mword 32) :=
+  riscvF_pstateGS.
 Definition era_memGS_of `{!riscvFixedGS Σ} (E : riscvEraGS) : gen_heapGS Arch.pa (bv 8) Σ :=
   GenHeapGS _ _ _ (era_heap_name E) (era_meta_name E).
 Global Instance riscv_memGS `{!riscvGS Σ} : gen_heapGS Arch.pa (bv 8) Σ :=
@@ -403,6 +420,7 @@ Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
 Definition spp_name `{!riscvGS Σ} : CPU -> gname := era_spp_name riscv_eraGS.
 Definition spie_name `{!riscvGS Σ} : CPU -> gname := era_spie_name riscv_eraGS.
 Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
+Definition pstate_name `{!riscvGS Σ} : nat -> gname := era_pstate_name riscv_eraGS.
 (* the AMBIENT era's disk-image gname: what [DiskPtsto.disk_names]'s [dn_img]
    field is always constructed at ([VirtioProto.disk_ghosts_alloc]), and what
    [RiscvExec.wp_disk_step] hands the disk thread.  The seam equation the
@@ -1946,4 +1964,3 @@ Proof. rewrite /phys_pointsto. apply _. Qed.
 Global Instance phys_word_pointsto_timeless `{!riscvGS Σ} a dq w :
   Timeless (phys_word_pointsto a dq w).
 Proof. rewrite /phys_word_pointsto. apply _. Qed.
-

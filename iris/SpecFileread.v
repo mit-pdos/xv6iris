@@ -140,7 +140,6 @@ Require Import ProcPtOwn.
 Require Import PipeInv.
 Require Import FileInv FileOff ProcInv.
 Require Import SpecReadi.
-Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -445,8 +444,7 @@ Definition wp_fileread_sconf_body
   kalloc_env γa None -∗
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* ...and what the file's TYPE selects *)
   fileread_env Φ γf k fn Cf -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -460,8 +458,7 @@ Definition wp_fileread_sconf_body
       pc_is ret_tgt -∗
       file_ref γf k q Cf -∗
       proc_priv γf pj pidv (upd_upt V P') -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       fileread_env_out fn Cf -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

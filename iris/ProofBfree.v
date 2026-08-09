@@ -71,7 +71,6 @@ Require Import ByteBuf.
 Require Import PrintintArith.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SwtchCtx.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
@@ -572,8 +571,7 @@ Section BfreeDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        own_ctx (p_context (proc_addr j)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
         bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bi ]}) -∗
@@ -629,8 +627,7 @@ Section BfreeTail.
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv Φ γs -∗
     bf_frame m -∗
-    own_ctx (p_context (proc_addr j)) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
     bslots bn 1 -∗
@@ -646,7 +643,7 @@ Section BfreeTail.
   Proof.
     intros HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel Hcredit.
     pose proof HK as HK'. unfold K_bfree in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hoctx
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe 
               Hpark Hppid Hsb Hsl Hop Hfsb Hpool Hheld Hcont".
     iPoseProof (bfi_4a with "Htext") as "Hi4a".
     iPoseProof (bfi_4e with "Htext") as "Hi4e".
@@ -984,7 +981,7 @@ Section BfreeTail.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /bf_cont.
     iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hsb Hbmr
+    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hpark Hppid Hsb Hbmr
                      Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
@@ -1046,7 +1043,7 @@ Section ProofBfreeMain.
     assert (HbnoBcov : uint bnoB ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite HbnoB; exact Hbmcov).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
-              #Hprocs #Hscheds Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+              #Hprocs #Hscheds Hpark #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iAssert (bf_cont (CID0 := CID) Φ γfs bn γ cov logstart bmapstart size used bi
                (log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]}))
                pidv dq dqb j m K C b)%I with "[Hcont]" as "Hcont";
@@ -1346,9 +1343,9 @@ Section ProofBfreeMain.
               (fs_view γfs γd dev cov) pidv dev bnoB dq
               RA (K - 4)%nat true C b
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                     Hdevi Hdgeom Hdlock Hsl1").
-    iIntros (CID13 Hq13 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hoctx Hpark Hppid Hheld".
+    iIntros (CID13 Hq13 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hpark Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc20 : ret_pc (RA !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.bfree + 0x20)) by (rewrite HRAra; pcw).
@@ -1787,7 +1784,7 @@ Section ProofBfreeMain.
               dev used bi u cr Sb kk bnoB bsd0 d0 pidv dq dqb m B11 K C b
               HK HB11sp HB11thr HB11a0' HB11s2 Hkk HbnoB Hbmcov Hbmlog Hokdel
               Hcredit
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe Hoctx Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe Hpark
                     Hppid Hsb Hsl Hop Hfsbm Hpool Hheld [Hcont]").
     { iApply (wp_next_shift (CIDa := CID12) (CIDb := CID27) ltac:(wp_next_chain)
                 with "Hcont"). }
@@ -1816,7 +1813,7 @@ Section ProofBfreeMain.
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
            Hbirange Hbicov Hbilog Hbslen Hj Hgl Ha0 Ha1 Heb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hsb Hbmr Hfsb Hown Hppid
-              #Hprocs #Hscheds Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+              #Hprocs #Hscheds Hpark #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     rewrite /log_op. iDestruct "Hop" as (Sb) "Hop".
     iApply (wp_bfree_gen Φ γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart bmapstart size dev used bno bs u false Sb
@@ -1824,11 +1821,11 @@ Section ProofBfreeMain.
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog
               Hbirange Hbicov Hbilog Hbslen ltac:(discriminate) Hj Hgl Ha0 Ha1 Heb
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsb Hbmr Hfsb Hown Hppid
-                    Hprocs Hscheds Hoctx Hpark Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
+                    Hprocs Hscheds Hpark Hdevi Hdgeom Hdlock Hsl Hop [Hcont]").
     iIntros (CIDx) "%Hchain". iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hchain|].
-    iIntros (mf) "%Hcs Hsie Hcnt Hpc Hoctx Hpark Hppid Hsb Hbmr Hsl HopS".
+    iIntros (mf) "%Hcs Hsie Hcnt Hpc Hpark Hppid Hsb Hbmr Hsl HopS".
     iDestruct (log_opS_op with "HopS") as "Hop".
-    iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hoctx Hpark Hppid Hsb Hbmr Hsl Hop").
+    iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hpark Hppid Hsb Hbmr Hsl Hop").
     exact Hcs.
   Qed.
 

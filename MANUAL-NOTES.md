@@ -59,6 +59,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - Sail model represents A/D page table flushes as regular reads/writes, but actual RISC-V spec doc says they should be atomic w.r.t. other PTE accesses.  problem with model: uvmunmap clears PTE entry, another HART writes it back with A|D.  not possible on HW, but Sail allows this.
 - gen_code.py generates CodeF.v, helps with updating proofs after xv6 source changes.
 - promise-free weak memory plan; need soundness proof for LB without promises
+- log_write tracks set of blocks, to ensure they fit within MAXOPBLOCKS after absorption
+- ghost var for SPP flag in sstatus: owned when interrupts disabled, otherwise in sie invariant
 
 Big things that still need to be done/explored:
 

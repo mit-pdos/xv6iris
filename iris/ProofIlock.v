@@ -76,7 +76,6 @@ Require Import WpSconfSrliw.
 Require Import ByteBuf.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SwtchCtx.
 Require Import SchedCtx.
 Require Import SleepLock.
 Require Import WpUart.
@@ -238,8 +237,7 @@ Section IlockDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        own_ctx (p_context (proc_addr j)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         i_inum ip ↦₄{dqn} inum -∗
@@ -276,8 +274,7 @@ Section IlockEpilogue.
     kernel_text -∗
     pc_is (mword_of_int (KernelSyms.ilock + 0x1e) : mword 64) -∗
     il_frame m -∗
-    own_ctx (p_context (proc_addr j)) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -294,7 +291,7 @@ Section IlockEpilogue.
   Proof.
     intros HK Hsp Hthr.
     pose proof HK as HK'. unfold K_ilock in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hoctx Hpark Hppid Hidev Hinum Href Hsb
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hpark Hppid Hidev Hinum Href Hsb
               Hfsb Hsl Hstok Hpid Hlk Hcont".
     iPoseProof (ili_1e with "Htext") as "Hi1e".
     iPoseProof (ili_20 with "Htext") as "Hi20".
@@ -481,7 +478,7 @@ Section IlockEpilogue.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /il_cont.
     iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid Hidev Hinum
+    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hpark Hppid Hidev Hinum
                      Href Hsb Hfsb Hsl Hstok Hpid Hlk").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
@@ -530,8 +527,7 @@ Section IlockLoad.
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
     il_frame m -∗
-    own_ctx (p_context (proc_addr j)) -∗
-    park_hlf j true -∗
+    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -588,7 +584,7 @@ Section IlockLoad.
       by (apply Hthr; iuidx).
     pose proof (il_thr6_of_5 m M Hthr) as Hthr6.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hprocs #Hscheds #Hdevi #Hdgeom
-              #Hdlock Hframe Hoctx Hpark Hppid Hidev Hinumc Hrefc Hsb Hfsb Hsl
+              #Hdlock Hframe Hpark Hppid Hidev Hinumc Hrefc Hsb Hfsb Hsl
               Hstok Hpid Hkeys Hvalid Hindres Hblocks Hraw Hcont".
     iDestruct "Hraw" as "[Hmeta0 Haddrs0]".
     iDestruct "Hmeta0" as (d0) "(Hmty & Hmmaj & Hmmin & Hmnl & Hmsz)".
@@ -800,9 +796,9 @@ Section IlockLoad.
               (fs_view gfs gd dev cov) pidv dev bno dq
               L7 (K - 4)%nat true C b
               HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                     Hdevi Hdgeom Hdlock Hsl").
-    iIntros (CID9 Hq9 mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hpc Hoctx Hpark Hppid Hheld".
+    iIntros (CID9 Hq9 mB kk bs0 bsd0 d0b) "%Hfacts Hcg Hcnt Hpc Hpark Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc4e : ret_pc (L7 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x4e)) by (rewrite HL7ra; pcw).
@@ -1556,7 +1552,7 @@ Section IlockLoad.
     iApply (il_epilogue (CID0 := CID39) Φ j gfs gi gisl bn cov logstart inodestart
               ip inum refv dn bm ds dev pidv dq dqd dqn dqr dqs m Z0 K C b
               HK HZ0sp HZ0thr
-              with "Hcg Hcnt Htext Hpc Hframe Hoctx Hpark Hppid Hidev Hinumc
+              with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hidev Hinumc
                     Hrefc Hsb Hfsb Hsl Hstok Hpid
                     [Hkeys Hvalid Hmty Hmmaj Hmmin Hmnl Hmsz Haddrs Hindres Hblocks]
                     [Hcont]").
@@ -1605,7 +1601,7 @@ Section ProofIlockMain.
     subst eb.
     pose proof HK as HK'. unfold K_ilock in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hslk Hkey Hidev Hinumc Hrefc Hsb
-              Hfsb Hppid #Hprocs #Hscheds Hoctx Hpark #Hdevi #Hdgeom #Hdlock Hsl Hcont".
+              Hfsb Hppid #Hprocs #Hscheds Hpark #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iAssert (il_cont (CID0 := CID) Φ gfs gi gisl bn cov logstart inodestart ip inum refv
                dn bm ds dev pidv dq dqd dqn dqr dqs j m K C b)%I
       with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
@@ -1823,10 +1819,10 @@ Section ProofIlockMain.
     iApply (ASL.wp_acquiresleep_sconf (dq := dq) Φ gs j gil gisl "inode"%string
               (inode_parked gfs gi cov logstart ip) R6 pidv (K - 4)%nat true C b
               Hj ltac:(lia) eq_refl
-              with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs Hscheds Hoctx Hpark").
+              with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs Hscheds Hpark").
     { iEval (rewrite HR6a0). iExact "Hslk". }
     (* acquiresleep PARKS: it returns on hart [CIDa]. *)
-    iIntros (CIDa Hqa mf) "%Hcs1 Hcg Hcnt Hpc Hstok Hpid Hparked Hppid Hoctx Hpark".
+    iIntros (CIDa Hqa mf) "%Hcs1 Hcg Hcnt Hpc Hstok Hpid Hparked Hppid Hpark".
     iEval (rewrite HR6a0) in "Hpid".
     assert (Hpc1a : ret_pc (R6 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.ilock + 0x1a)) by (rewrite HR6ra; pcw).
@@ -1896,7 +1892,7 @@ Section ProofIlockMain.
       iApply (il_epilogue (CID0 := CID13) Φ j gfs gi gisl bn cov logstart inodestart
                 ip inum refv dn bm ds dev pidv dq dqd dqn dqr dqs m Q1 K C b
                 HK HQ1sp HQ1thr
-                with "Hcg Hcnt Htext Hpc Hframe Hoctx Hpark Hppid Hidev Hinumc
+                with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hidev Hinumc
                       Hrefc Hsb Hfsb Hsl Hstok Hpid [Hkeys Hvalid Hmeta Haddrs Hindres Hblocks] Hcont").
       rewrite /inode_locked. iExists datap.
       iSplitR; [iPureIntro; exact Hok |].
@@ -1929,7 +1925,7 @@ Section ProofIlockMain.
                 pidv dq dqd dqn dqr dqs m Q1 K C b
                 HK HQ1sp HQ1thr HQ1s1 Hgeom Hst Hcov Hdswf (Hagr eq_refl) Hok Hj Hgl
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hprocs Hscheds Hdevi Hdgeom
-                      Hdlock Hframe Hoctx Hpark Hppid Hidev Hinumc Hrefc Hsb Hfsb
+                      Hdlock Hframe Hpark Hppid Hidev Hinumc Hrefc Hsb Hfsb
                       Hsl Hstok Hpid Hkeys Hvalid Hindres Hblocks Hcells Hcont").
   Qed.
 

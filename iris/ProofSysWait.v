@@ -101,7 +101,7 @@ Section ProofSysWait.
     cbv beta delta [wp_sys_wait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hv0 Hav Heb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hscheds #Hpanic Hctx Hpark
+    iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hscheds #Hpanic Hpark
              #Hlk #Henv Hpriv Hcont".
     iPoseProof (swi_00 with "Htext") as "Hi00".
     iPoseProof (swi_02 with "Htext") as "Hi02".
@@ -289,8 +289,8 @@ Section ProofSysWait.
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Kwait.wp_kwait_sconf γa γf γw Φ γs j γl B2 (av - 4)%nat eb C b pid V
               Hj Hgl (sw_Kkw av Hav) Heb
-              with "Hcg Hcpu Htext Hpc Hprocs Hscheds Hpanic Hctx Hpark Hlk Henv Hpriv [-]").
-    iIntros (CID11 Hk11 Mkw P' rv) "%Hkw %Hext Hcg Hcpu Hpc Hctx Hpark Hpriv".
+              with "Hcg Hcpu Htext Hpc Hprocs Hscheds Hpanic Hpark Hlk Henv Hpriv [-]").
+    iIntros (CID11 Hk11 Mkw P' rv) "%Hkw %Hext Hcg Hcpu Hpc Hpark Hpriv".
     destruct Hkw as (HcsKw & HKwa0).
     assert (Hpp1a : ret_pc (B2 !!! Regidx Rra) = mword_of_int (SW + 0x1a))
       by (rewrite HB2ra; pcstep).
@@ -404,7 +404,7 @@ Section ProofSysWait.
       rewrite /M1 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID11 CID15 0%nat eb pj C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iSpecialize ("Hcont" $! CID15 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E2 P' rv with "[%] [%] Hcg Hcpu Hpc Hctx Hpark Hpriv").
+    iApply ("Hcont" $! E2 P' rv with "[%] [%] Hcg Hcpu Hpc Hpark Hpriv").
     { split; [| exact HE2a0].
       unfold callee_saved.
       split; [exact HE2sp|]. split; [exact HE2s0|].

@@ -1327,6 +1327,7 @@ Section ProofPushOff.
     iDestruct "Hrep" as "[%HSIEr Hq0]".
     iAssert (sie_cap P3 (av - 2)%nat false p) with "[Hstk Htr Hq0]" as "Hcapsc".
     { iFrame "Hstk Htr". iExact "Hq0". }
+    iDestruct (sconf_at_close with "Hsc") as "Hsc".
     iDestruct (sie_cap_gpr_join with "Hhs Hsc Hcapsc Hfile") as "Hcg".
     assert (Hsst2 : neq_vec (and_vec (sstatus_read msr)
               (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6)))) zero_reg = false).

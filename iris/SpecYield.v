@@ -32,6 +32,14 @@
    (dismantling the enabled SIE arm) and [trap_csrs_ext true = emp]; at
    [eb = false] there is no arm to dismantle and the caller brings them.
 
+   THE RAW CONTEXT CELLS ARE NOT A PREMISE.  They live in p->lock, under
+   the RUNNING arm of [SchedCtx.proc_slots], and yield reads them out of the
+   lock it acquires -- the park receipt half it already carries refutes the
+   lock's [not_running] arm, which is the proof that the state under the
+   lock IS RUNNING ([SchedCtx.proc_slots_running]).  Demanding [own_ctx] up
+   front would have made this contract unusable from kerneltrap, which
+   PREEMPTED the thread and so cannot be holding the thread's own frames.
+
    THE CROSSING INDEX IS THE LITERAL [true], as for [sched]: a parking
    function migrates whatever the SIE state was, because a [swtch] moves the
    hart with interrupts off.  Threading [eb] there would have claimed, at
@@ -66,7 +74,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SwtchCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
@@ -88,8 +95,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
   panic_wp_any -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   trap_csrs_ext eb -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
@@ -97,8 +103,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       sie_cap_gpr mf av eb pj -∗
       cpu_own 0 eb pj C eb -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       trap_csrs_ext eb -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.

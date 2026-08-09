@@ -289,7 +289,7 @@ Section ProofKkill.
         by (rewrite HM22ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc26) in "Hpc".
       iDestruct (proc_lock_res_elim Φ γs γk (proc_addr k) with "HR")
-        as (st ch) "(Hpst & Hpch & Hpub & Hslots)".
+        as (st ch) "(Hpst & Hpg & Hpch & Hpub & Hslots)".
       iDestruct "Hpub" as (kl xs pidc) "(Hkilled & Hxstate & Hpidhalf)".
       (* register facts through acquire *)
       assert (HcsMacq : callee_saved M Macq) by (eapply callee_saved_trans; [exact HcsM22 | exact Hpins]).
@@ -577,8 +577,10 @@ Section ProofKkill.
           (* reassemble: SLEEPING -> RUNNABLE keeps both guards fixed *)
           iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
           { iExists _, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
-          iDestruct (proc_lock_res_wakeup Φ γs γk (proc_addr k) st ch Hst_sl
-                       with "Hpst Hpch Hpub Hslots") as "HR".
+          iApply fupd_wp.
+          iMod (proc_lock_res_wakeup Φ γs γk (proc_addr k) st ch Hst_sl
+                  with "Hpst Hpg Hpch Hpub Hslots") as "HR".
+          iModIntro.
           (* +0x64 c.j -> +0x4a *)
           assert (Htgt4a : add_vec (mword_of_int (KernelSyms.kkill + 0x64) : mword 64)
                              (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0"))))
@@ -606,7 +608,7 @@ Section ProofKkill.
           iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
           { iExists _, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
           iDestruct (proc_lock_res_intro Φ γs γk (proc_addr k) st ch
-                       with "Hpst Hpch Hpub Hslots") as "HR".
+                       with "Hpst Hpg Hpch Hpub Hslots") as "HR".
           iApply ("Hret0" $! M44 with "[%] Hcg Hpc Htok HR").
           split; [exact HD9|]. split; [exact HDsp|]. exact HDcs.
       - (* ============ FALL: no match -> release, p++, loop ============ *)
@@ -624,7 +626,7 @@ Section ProofKkill.
         iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
         { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
         iDestruct (proc_lock_res_intro Φ γs γk (proc_addr k) st ch
-                     with "Hpst Hpch Hpub Hslots") as "HR".
+                     with "Hpst Hpg Hpch Hpub Hslots") as "HR".
         iPoseProof (kki_2c with "Htext") as "Hi2c".
         iPoseProof (kki_2e with "Htext") as "Hi2e".
         iPoseProof (kki_32 with "Htext") as "Hi32".

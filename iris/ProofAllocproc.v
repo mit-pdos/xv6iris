@@ -796,7 +796,7 @@ Section ProofAllocproc.
       assert (Hp22 : ret_pc (L2 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x22))
         by (rewrite HL2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp22) in "Hpc".
-      iDestruct (proc_lock_res_elim Φ γs γl (proc_addr k) with "HR") as (st ch) "(Hstate & Hchan & Hpub & Hslots)".
+      iDestruct (proc_lock_res_elim Φ γs γl (proc_addr k) with "HR") as (st ch) "(Hstate & Hpg & Hchan & Hpub & Hslots)".
       assert (Hacq_s1 : macq !!! Regidx ap_s1 = proc_addr k).
       { rewrite (callee_saved_lookup Hcsacq ap_s1 ltac:(vm_compute; reflexivity)). exact HL2s1. }
       assert (Hacq_s2 : macq !!! Regidx ap_s2 = proc_addr NPROC).
@@ -860,6 +860,14 @@ Section ProofAllocproc.
         iEval (rewrite Htgt38) in "Hpc".
         (* the dormant block comes out of the invariant *)
         iDestruct (proc_slots_unused Φ γs (proc_addr k) with "Hslots") as "[Hdorm Hpark]".
+        (* UNUSED is unclaimed, so the lock's share IS the whole mirror; the
+           store of USED below claims the slot, and the whole variable rides
+           out on [proc_held]. *)
+        iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[_ Hwa]".
+        iDestruct ("Hwa" with "[Hpg]") as "Hpg"; [rewrite unclaimed_UNUSED; iFrame "Hpg"|].
+        iApply fupd_wp.
+        iMod (pstate_whole_update (proc_addr k) UNUSED USED with "Hpg") as "Hpg".
+        iModIntro.
         iDestruct (park_at_full_elim k false Hk with "Hpark") as "Hpark".
         rewrite park_split. iDestruct "Hpark" as "[Hparka Hparkb]".
         iDestruct (proc_dormant_unused γf (proc_addr k) with "Hdorm")
@@ -1124,8 +1132,8 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa Φ T2 k γl V pidn USED ch None None
                     (K - 4)%nat eb pme C (S lvl)
                     (ap_K44 K HK) (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hchan Hkilled Hxstate Hpidinv Hparka] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell] Henv [-]").
-          { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hparka".
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hparka] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell] Henv [-]").
+          { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hparka".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
@@ -1194,12 +1202,17 @@ Section ProofAllocproc.
           (* the emptied slot goes back into the lock at UNUSED.  The park
              receipt rejoins here: allocproc's found arm kept both halves, and
              a not-RUNNING proc's whole receipt lives in its lock. *)
-          iDestruct "Hheld" as "(Hlocked & Hstate & Hchan & Hpub & Hparkc)".
+          iDestruct "Hheld" as "(Hlocked & Hstate & Hpg & Hchan & Hpub & Hparkc)".
           iAssert (park_at_full (proc_addr k) false) with "[Hparkb Hparkc]" as "Hpark".
           { iApply (park_at_full_intro k false Hk). rewrite park_split. iFrame "Hparkb Hparkc". }
-          iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hchan Hpub Hdorm Hpark]" as "HR".
+          iApply fupd_wp.
+          iMod (pstate_whole_update (proc_addr k) _ UNUSED with "Hpg") as "Hpg".
+          iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwb _]".
+          iDestruct ("Hwb" with "Hpg") as "[Hpg _]".
+          iModIntro.
+          iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hdorm Hpark]" as "HR".
           { iApply (proc_lock_res_intro Φ γs γl (proc_addr k) UNUSED (zero_reg : mword 64)
-                      with "Hstate Hchan Hpub [Hdorm Hpark]").
+                      with "Hstate Hpg Hchan Hpub [Hdorm Hpark]").
             iApply (proc_slots_unused_intro Φ γs (proc_addr k) with "Hdorm Hpark"). }
           assert (Hlka1 : add_vec (T4 !!! Regidx ap_a0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k).
           { rewrite HT4a0.
@@ -1466,8 +1479,8 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa Φ U2 k γl V pidn USED ch None (Some (tfp, tfws))
                     (K - 4)%nat eb pme C (S lvl)
                     (ap_K44 K HK) (ap_lvlS lvl Hlvl) HU2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hchan Hkilled Hxstate Hpidinv Hparka] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell Htfpage] Henv [-]").
-          { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hparka".
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hparka] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell Htfpage] Henv [-]").
+          { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hparka".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
@@ -1535,12 +1548,17 @@ Section ProofAllocproc.
             rewrite /U4 upd_ne; [| congruence].
             rewrite /U3 upd_ne; [| congruence].
             exact (Hfp_rest r Hr Ncsp N8 N9 N18). }
-          iDestruct "Hheld" as "(Hlocked & Hstate & Hchan & Hpub & Hparkc)".
+          iDestruct "Hheld" as "(Hlocked & Hstate & Hpg & Hchan & Hpub & Hparkc)".
           iAssert (park_at_full (proc_addr k) false) with "[Hparkb Hparkc]" as "Hpark".
           { iApply (park_at_full_intro k false Hk). rewrite park_split. iFrame "Hparkb Hparkc". }
-          iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hchan Hpub Hdorm Hpark]" as "HR".
+          iApply fupd_wp.
+          iMod (pstate_whole_update (proc_addr k) _ UNUSED with "Hpg") as "Hpg".
+          iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwb _]".
+          iDestruct ("Hwb" with "Hpg") as "[Hpg _]".
+          iModIntro.
+          iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hdorm Hpark]" as "HR".
           { iApply (proc_lock_res_intro Φ γs γl (proc_addr k) UNUSED (zero_reg : mword 64)
-                      with "Hstate Hchan Hpub [Hdorm Hpark]").
+                      with "Hstate Hpg Hchan Hpub [Hdorm Hpark]").
             iApply (proc_slots_unused_intro Φ γs (proc_addr k) with "Hdorm Hpark"). }
           assert (Hlka2 : add_vec (U4 !!! Regidx ap_a0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k).
           { rewrite HU4a0.
@@ -1903,8 +1921,8 @@ Section ProofAllocproc.
           cbn [upd_pt pv_ofile pv_cwd].
           split; [exact Hof|]. split; [exact Hcwd|].
           split; [exact Hrestlen|]. exact (ap_nodes_le (pt_nodes t) Hnodes). }
-        iSplitL "Hlocked Hstate Hchan Hkilled Hxstate Hpidinv Hparka".
-        { rewrite /proc_held. iFrame "Hlocked Hstate Hchan Hparka".
+        iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hparka".
+        { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hparka".
           iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
         iFrame "Hparkb Hpriv Hspare Hks".
         iSplitL "Hc0 Hc1 Hcrest".
@@ -1925,8 +1943,8 @@ Section ProofAllocproc.
         assert (Hp26 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x24) : mword 64) 2 = mword_of_int (KernelSyms.allocproc + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp26) in "Hpc".
         (* rebuild the lock resource: nothing moved *)
-        iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hchan Hpub Hslots]" as "HR".
-        { iApply (proc_lock_res_intro Φ γs γl (proc_addr k) st ch with "Hstate Hchan Hpub Hslots"). }
+        iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hslots]" as "HR".
+        { iApply (proc_lock_res_intro Φ γs γl (proc_addr k) st ch with "Hstate Hpg Hchan Hpub Hslots"). }
         (* +0x26 c.mv a0,s1 *)
         iPoseProof (api_26 with "Htext") as "Hi26".
         iApply (wp_cmv_s_sconf (CID := CIDf) Φ (mword_of_int (KernelSyms.allocproc + 0x26)) ap_a0 ap_s1 L3 (K - 4)%nat false

@@ -2750,4 +2750,3 @@ flip would NOT help:
   change while the pin itself must stay either way. Possibly still worth
   an upstream report (`is_pmm_applicable` arguably should gate on the
   extension).
-

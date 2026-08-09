@@ -1523,8 +1523,16 @@ Section KernelvecHandler.
       by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
     assert (Hb2 : add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000"))) = pa_stk (m !!! Regidx csp_rs1) 2)
       by (apply kv_slot_addr; apply bv_eq; vm_compute; reflexivity).
+    (* SPLIT THE CARVE.  [kv_frame_slots] is 78: kernelvec's own 32-slot
+       frame on top, and 46 below it that belong to what kernelvec CALLS
+       (kerneltrap's cone).  Only the top 32 hold the 17 save windows, so
+       split first and frame the lower 46 across untouched -- they are the
+       stack budget the handler hands onward. *)
+    assert (Hkvs : kv_frame_slots = (32 + 46)%nat) by reflexivity.
+    iEval (rewrite Hkvs stack_own_app) in "Hstk".
+    iDestruct "Hstk" as "[Hstk Hdeep]".
     (* open the 32-slot frame and pull out the 17 save slots *)
-    iEval (rewrite /kv_frame_slots stack_own_slots; cbn [seq]) in "Hstk".
+    iEval (rewrite stack_own_slots; cbn [seq]) in "Hstk".
     iDestruct "Hstk" as "(S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 & S10 &
       S11 & S12 & S13 & S14 & S15 & S16 & S17 & S18 & S19 & S20 & S21 & S22 &
       S23 & S24 & S25 & S26 & S27 & S28 & S29 & S30 & S31 & S32 & _)".
@@ -1601,14 +1609,19 @@ Section KernelvecHandler.
     iEval (rewrite Hb4) in "Hw15".
     iEval (rewrite Hb3) in "Hw16".
     iEval (rewrite Hb2) in "Hw17".
-    iAssert (stack_own (m !!! Regidx csp_rs1) kv_frame_slots)
+    iAssert (stack_own (m !!! Regidx csp_rs1) 32)
       with "[S1 S6 S7 S8 S9 S10 S11 S12 S13 S14 S15 S24 S25 S29 S31
             Hw1 Hw2 Hw3 Hw4 Hw5 Hw6 Hw7 Hw8 Hw9 Hw10 Hw11 Hw12 Hw13 Hw14 Hw15 Hw16 Hw17]"
       as "Hstk".
-    2:{ iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl [Hsepc] Hpc Hfile [Hmenv Htlbinv Hstk]").
+    2:{ (* hand the carve back WHOLE: kernelvec's 32 on top, the callee
+           budget underneath, exactly as it arrived. *)
+        iAssert (stack_own (m !!! Regidx csp_rs1) kv_frame_slots)
+          with "[Hstk Hdeep]" as "Hstk".
+        { iEval (rewrite Hkvs). iApply stack_own_app. iFrame "Hstk Hdeep". }
+        iApply ("Hcont" with "Hhs Hpriv Hms Hmie Hmdl [Hsepc] Hpc Hfile [Hmenv Htlbinv Hstk]").
         { iExists pc0. iFrame "Hsepc". }
         iFrame "Hmenv Htlbinv". iExact "Hstk". }
-    rewrite /kv_frame_slots stack_own_slots. cbn [seq].
+    rewrite stack_own_slots. cbn [seq].
     iSplitL "S1"; [iExact "S1" |].
     iSplitL "Hw17"; [by iExists _ |].
     iSplitL "Hw16"; [by iExists _ |].

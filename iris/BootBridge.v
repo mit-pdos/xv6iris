@@ -219,9 +219,11 @@ Qed.
    so entry's [stack_own_phys sp0 n] covers it with room to spare. *)
 Definition boot_stack_slots (K : nat) : nat := (2 + (kv_frame_slots + K))%nat.
 
-(* at main's own budget: 86 slots = 688 bytes, well inside _entry's
-   4096-byte per-hart [stack0] slice. *)
-Lemma boot_stack_slots_main : boot_stack_slots K_main = 86%nat.
+(* at main's own budget: 132 slots = 1056 bytes, still well inside _entry's
+   4096-byte per-hart [stack0] slice.  It grew from 86 when
+   [kv_frame_slots] did (32 -> 78, to cover the whole trap path and not just
+   kernelvec's own frame). *)
+Lemma boot_stack_slots_main : boot_stack_slots K_main = 132%nat.
 Proof. reflexivity. Qed.
 
 (* ------------------------------------------------------------------- *)

@@ -339,6 +339,7 @@ Section SpecMain.
        ([RiscvAdequacy.riscv_system_adequacy]) at [false]: main spends them
        in [SpecProcinit.procs_inv_alloc], one per proc lock. *)
     ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
+    ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)
     dev_inv γd γv -∗

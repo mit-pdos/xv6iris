@@ -4,7 +4,7 @@
 (* the DMA COMPLETION, and the receipt back.                                *)
 (*                                                                          *)
 (* (claude-notes/design/fs-log.md stage 4 item 2; the M5b option (a) of      *)
-(*  claude-notes/projects/crash.md.)                                        *)
+(*  claude-notes/completed/crash.md.)                                       *)
 (*                                                                          *)
 (* WHY A SECOND INVARIANT EXISTS AT ALL.  The natural home for the permit    *)
 (* is the request slot the driver protocol already keys on                   *)

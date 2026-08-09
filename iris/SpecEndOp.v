@@ -136,8 +136,7 @@ Definition wp_end_op_sconf_body
   (* the running-thread bundle *)
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -150,8 +149,7 @@ Definition wp_end_op_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* nothing log-specific comes back: the token is retired *)
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
