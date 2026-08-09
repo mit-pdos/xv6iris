@@ -1,6 +1,6 @@
 Some high-level ideas that might be interesting for some eventual paper:
 
-- loop language, no real expr
+- loop language, no real expr; WP has no postcondition Φ
 - vcgen
 - predicates capturing config registers (mmode_config, smode_config)
 - ghost_var to track interesting config register bits (SIE)
