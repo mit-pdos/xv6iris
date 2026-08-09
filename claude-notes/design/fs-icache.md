@@ -1377,6 +1377,49 @@ no-two-`dinode_at`-for-one-inum consistency is maintained by the moves
 asserted as an invariant — the pool formula over `ci` plus the arms'
 shapes is all the proofs need.
 
+### 13.8 The virgin state is a FOURTH ARM with the dev cell FULL, the
+### `icn_id` agreement ghost, and `islot_rest_at`'s None arm is False
+### (C5's two confirmed blockers, both fixed here)
+
+§13.7's clause 3 (virgin as a payload disjunct) is UNREFUTABLE by an
+ilock winner: same arm, same cells as the ordinary unloaded payload,
+and the only distinguishing ghost (`M !! k = None`) is authority-side.
+Confirmed empirically (ProofIlock:2162). The fix — and where §13.7's
+"dev cell FULL" actually belonged:
+
+* **VIRGIN is a fourth arm of `ic_escrow_body`**, not a payload shape:
+  `∃ dev inum w, i_dev ↦₄ dev (FULL — the virgin discriminator) ∗
+  i_inum ↦₄{½} inum ∗ i_valid ↦₄ w ∗ inode_raw ∗ ic_mid`. `islot2`'s
+  never-identified (None, None) arm keeps ONLY the inum half — the
+  virgin arm's full dev IS the table's missing share. The
+  (None, Some) identified-ref-0 arm is `islot_free_at` (both cells at
+  ½) — §13.7's asymmetric budget there was unsatisfiable against
+  `ic_parked`'s permanent dev half.
+* Refuters, each from what its opener already holds: ilock's checkout
+  and iput's `ic_open_auth_ref` — the opener's reference carries a dev
+  fraction vs virgin's full cell; park/`ic_open_out` — full valid vs
+  full valid; +0x7c — `ic_mid` exclusivity.
+* **The residual** (a recycler at `ci !! k = None` cannot tell virgin
+  from an anomalous identified-parked state) closes with a per-slot
+  two-state agreement ghost: `icn_id : nat -> gname` in `ic_names`,
+  `ghost_var (icn_id cn k) (1/2) (b : bool)` — the escrow-side half
+  rides the arms (virgin: false; parked/out/mid: true), the table-side
+  half rides `islot2` ((None,None): false; the two identified arms:
+  true). The lock holder proves identification state by agreement; the
+  recycle-from-virgin flips both halves (it holds both at that
+  opening). Identification is monotone in the code but the ghost does
+  not need to know that.
+
+And independently (C5's blocker B): **`islot_rest_at`'s `(1/2 − q) =
+None` arm becomes `False`**, not `emp`. At `emp`, the state `qt = ½`
+(all retained identity gone) is permitted though unreachable, and the
+hit arm's mint — a positive identity fraction out of the retained
+share — is unprovable there, as is any plain read of the identity
+cells under the lock. With `False` the positivity is resource-carried
+and re-established automatically at every split; `iref_alloc_step`'s
+mint at ¼ (the worklist's choice) respects it, and IcacheInv's header
+comment "(0, ½]" must be corrected to "(0, ½)".
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
