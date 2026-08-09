@@ -276,6 +276,12 @@
   2
  ],
  [
+  "CodeIget.v",
+  "iget",
+  "igi_",
+  2
+ ],
+ [
   "CodeIinit.v",
   "iinit",
   "iii_",

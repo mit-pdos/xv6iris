@@ -216,12 +216,41 @@ out 2026-08-09):**
 
 - C4: `idup` never touches dinode blocks or the sleeplock payload —
   expect zero ripple; verify by build.
-- C5: regenerate `CodeIget.v` (FULL generator into a scratch dir, copy
-  out, verify byte-identical siblings + addition-only shard diffs, add
-  the manifest row), then `SpecIget`/`ProofIget`: the scan
-  (`ientry_step`/`ientry_sentinel`), `iref_alloc_step`, the recycle
-  window (escrow mid arm), and the pool hand-off of the recycled inum's
-  bundle.
+- C5: `CodeIget.v` LANDED (2026-08-09: scratch-verified — 17 shards
+  addition-only, siblings byte-identical except CodeStrncmp's
+  pre-existing import-position quirk; manifest row `["CodeIget.v",
+  "iget", "igi_", 2]`). SpecIget's worked design (statement is
+  orchestrator's to write, SpecIdup v2 is the skeleton):
+  * args a0/a1 = dev/inum, sign-extended (bread's ABI convention; the
+    scan's 64-bit compares at +0x4c/+0x52 read the cells sign-extending);
+  * premises: `uint inum < 16 * Z.of_nat nib` only — no dev constraint
+    (iget writes dev into a recycled entry; only ilock's bread later
+    cares);
+  * resources: SpecIdup v2's lock/invariant set (`is_itable2`,
+    `itable_inv`) PLUS the escrows of all slots (define a persistent
+    `ic_escrows cn … := [∗ list] k ∈ seq 0 NINODE, ic_escrow … k`) and
+    ONE `iref_slot` unit (spent on both arms: the hit's ref++ and the
+    recycle's count-1 mint both park one);
+  * POST, uniform across hit and recycle: `∃ k q, ⌜a0' = ientry k ∧ (k
+    < NINODE)%nat⌝ ∗ inode_ref (icn_ref cn) k q dev inum`;
+  * the "iget: no inodes" panic (+0x6a) is LIVE — the table may be
+    full, no caller premise can refute it; ilock's live panic is the
+    precedent;
+  * proof notes: the scan's loop invariant ("no slot in [0, cursor)
+    matches (dev, inum)") is what re-establishes ci-injectivity at the
+    recycle AND derives `uint inum ∉ ci_inums` (with ci-wf), which is
+    the pool-membership fact the bundle extraction needs; the recycle's
+    ghost choreography is +0x6e `ic_open_parked_free_dev`, +0x72
+    `ic_open_parked_free`+`ic_close_mid` (pool bundle in, old payload
+    out to the pool via `ipool_insert` — the eviction argument uses
+    PARKED-MEANS-FLUSHED, §13.1d), +0x78 `iref_alloc_step` at q = 1/4
+    (or any q ≤ 1/2) inside the `itable_inv` opening, +0x7c
+    `ic_open_mid`+`ic_close_mid_to_parked`; the hit arm is
+    `iref_incr_step` + the idup-style store AU (NOTE: IcacheInv has
+    `iref_dup_store_au` for the CALLER-token shape; the hit arm needs
+    an incr-shaped store AU — add `iref_incr_store_au` beside it,
+    same proof shape over `iref_incr_step`);
+  * ProofIget → Opus.
 - C6: `SpecIput`/`ProofIput`: REF-1 (`iref_lookup`), both close steps,
   the escrow opening for the two lock-free loads, the truncate arm.
   Retires `LinkIput.v`'s axiom and the last fs-side assumption in
