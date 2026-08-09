@@ -194,8 +194,13 @@ are working on that effort — the relevant `projects/` file.
   hole (S5 of the above, promoted to its own file). `cwd_ref` is still `emp`
   while `SpecIdup.v` is now stated over the REAL inode cache, so the tree is
   inconsistent about the hole and `kfork` has to carry five icache premises
-  no caller can discharge. Has the target shape (`ofile_slot`'s disjunction,
-  fraction existential, an `iref_slot` unit parked on the null arm), the
+  no caller can discharge. Has the target shape (NO null arm, so
+  `cwd_ref v ⊢ ⌜v ≠ 0⌝` and a live process's non-null cwd is a free
+  projection of `proc_priv` that no `proc_slots_recast` ever re-establishes;
+  the fraction existential, because fork halves it; and a
+  `proc_priv_nocwd` split for the construction window between allocproc's
+  return and kfork's `sd a0,336(s4)`, which is the only place a LIVE process
+  has a null cwd), the
   measured layering fix (the `IrefSlots -> FileInv` cycle is one edge wide
   and exists for `NFILE`; factor the reference out of the invariant into a
   new low `InodeRef.v`), why the itable gname must be CANONICAL rather than
