@@ -244,6 +244,29 @@ Proof.
   intros Hz. rewrite bm_ent_freed_step Hz. set_solver.
 Qed.
 
+(* The pure set algebra behind "the pool grew by exactly the block just
+   freed", common to both loops' step lemmas and to [bm_blocks_split]'s
+   assembly: adding a nonzero block [c] to whatever is already excluded
+   ([S]) is a plain set union.  Proved once, over abstract [used]/[S]/[c],
+   so the itrunc instruction-chain proof discharges it with [exact] instead
+   of paying [set_solver]'s [naive_solver] search over a whole-function
+   proof's huge hypothesis context (see optimization.md's "never set_solver
+   inside a whole-function proof" rule). *)
+Lemma freed_pool_grow (used S : gset Z) (c : Z) :
+  c <> 0 ->
+  used ∖ S ∖ {[c]} = used ∖ (S ∪ ({[c]} ∖ {[0]})).
+Proof. intros Hc. set_solver. Qed.
+
+(* Same fact, stated for the shape [bm_ent_freed_step] leaves when [S] is
+   itself already a two-piece union [A ∪ B] and the freed step lands on
+   [B]'s side: substituting [bm_ent_freed bm (S j)] regroups the new block
+   into [B], not onto the whole union, so the call site needs this
+   associativity spelled out rather than [freed_pool_grow]'s flat form. *)
+Lemma freed_pool_grow2 (used A B : gset Z) (c : Z) :
+  c <> 0 ->
+  used ∖ (A ∪ B) ∖ {[c]} = used ∖ (A ∪ (B ∪ ({[c]} ∖ {[0]}))).
+Proof. intros Hc. set_solver. Qed.
+
 (* THE TOTAL.  [bm_blocks] runs over [bm_slot] on [seq 0 (S MAXFILE)]; the
    two partial sums run over the direct list and the entry list.  This is
    the bridge -- the direct entries are slots [0, NDIRECT), the entries are
@@ -533,7 +556,7 @@ Section ItruncDefs.
     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) -∗
     bm_paid γ bmapstart w -∗
     it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn w k.
-  Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame. Qed.
+  Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame "A B C D". Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  THE INDIRECT LOOP'S STATE, at cursor q                             *)
@@ -715,7 +738,7 @@ Section ItruncDefs.
       (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) -∗
     bm_paid γ bmapstart w -∗
     it_ent_state γ γfs bm data cov logstart bmapstart size used w q.
-  Proof. iIntros "A B C". rewrite /it_ent_state. iFrame. Qed.
+  Proof. iIntros "A B C". rewrite /it_ent_state. iFrame "A B C". Qed.
 
   (* THE HANDOFF from the direct loop to the indirect one.  After the direct
      loop every direct slot of the map is zero, so [inode_blocks] at that

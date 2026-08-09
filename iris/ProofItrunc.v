@@ -1046,7 +1046,7 @@ Section ItruncDLoop.
       assert (Hfstep : used ∖ bm_dir_freed bm k
                        ∖ {[ bv_unsigned (bm_dir bm !!! k : mword 32) ]}
                        = used ∖ bm_dir_freed bm (S k)).
-      { rewrite bm_dir_freed_step. clear -Hnzero. set_solver. }
+      { rewrite bm_dir_freed_step. exact (freed_pool_grow _ _ _ Hnzero). }
       iEval (rewrite Hfstep) in "Hbmr".
       iDestruct ("Hback" with "[Hop]") as "Hpaid";
         [ rewrite Hbud; iExact "Hop" |].
@@ -1552,7 +1552,7 @@ Section ItruncELoop.
                        ∖ {[ bv_unsigned (bm_ent bm !!! q : mword 32) ]}
                        = used ∖ (bm_dir_freed bm NDIRECT
                                  ∪ bm_ent_freed bm (S q))).
-      { rewrite bm_ent_freed_step. clear -Hnzero. set_solver. }
+      { rewrite bm_ent_freed_step. exact (freed_pool_grow2 _ _ _ _ Hnzero). }
       iEval (rewrite Hfstep) in "Hbmr".
       iDestruct ("Hback" with "[Hop]") as "Hpaid";
         [ rewrite Hbud; iExact "Hop" |].
@@ -2007,7 +2007,7 @@ Section ItruncIArm.
        inode_blocks happens in the assembly, not here *)
     assert (Hfz : used ∖ bm_dir_freed bm NDIRECT
                   = used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm 0)).
-    { rewrite bm_ent_freed_0. set_solver. }
+    { rewrite bm_ent_freed_0 union_empty_r_L. reflexivity. }
     iEval (rewrite Hfz) in "Hbmr".
     iAssert (it_ent_state γ γfs bm data cov logstart bmapstart size used w 0)
       with "[Hres Hbmr Hpaid]" as "Hst".
@@ -2251,7 +2251,8 @@ Section ItruncIArm.
     assert (Hpool : used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm NINDIRECT)
                     ∖ {[ bv_unsigned (bm_ind bm : mword 32) ]}
                     = used ∖ bm_blocks bm).
-    { rewrite (bm_blocks_split bm Hdirlen Hentlen). set_solver. }
+    { rewrite (bm_blocks_split bm Hdirlen Hentlen).
+      exact (freed_pool_grow _ _ _ Hindnz). }
     iEval (rewrite Hpool) in "Hbmr".
     iDestruct ("Hback" with "[Hop]") as "Hpaid";
       [ rewrite Hbud; iExact "Hop" |].
@@ -2612,7 +2613,7 @@ Section ItruncMain.
     (* the loop's state at cursor 0: the map is [bm] itself *)
     assert (Hz0 : bm_dir_zeroed bm 0 = bm) by apply bm_dir_zeroed_0.
     assert (Hf0 : used ∖ bm_dir_freed bm 0 = used)
-      by (rewrite bm_dir_freed_0; set_solver).
+      by (rewrite bm_dir_freed_0 difference_empty_L; reflexivity).
     iDestruct (bm_paid_intro γ bmapstart u with "Hop") as "Hpaid".
     iAssert (it_dir_state γ γfs ip bm data cov logstart bmapstart size used
                           bn u 0)
@@ -2703,10 +2704,11 @@ Section ItruncMain.
       assert (Hblkempty : bm_blocks bm = bm_dir_freed bm NDIRECT).
       { rewrite (bm_blocks_split bm Hdirlen Hentlen).
         assert (He0 : bm_ent_freed bm NINDIRECT = ∅).
-        { apply set_eq. intros z. rewrite bm_ent_freed_spec. split; [|set_solver].
+        { apply set_eq. intros z. rewrite bm_ent_freed_spec.
+          split; [|intros Hc; exfalso; exact (not_elem_of_empty _ Hc)].
           intros (Hnz & q & Hq & Hz). exfalso. apply Hnz. rewrite -Hz Hentzero.
           rewrite lookup_total_replicate_2; [reflexivity | lia]. }
-        rewrite He0 Hnoind. set_solver. }
+        rewrite He0 Hnoind difference_diag_L !union_empty_r_L. reflexivity. }
       (* the test is BNE, so "no indirect block" FALLS THROUGH to the tail *)
       iApply (wp_cbnez_fall_s_sconf (mword_of_int (IT + 0x36))
                 (mword_of_int 13 : mword 8) (Cregidx (mword_of_int 3)) Ra1
