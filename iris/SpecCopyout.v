@@ -65,7 +65,7 @@ Import Defs.
 
 
 Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
     (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.copyout in
@@ -105,14 +105,14 @@ Definition wp_copyout_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
     ⌜uptd_ext_sz szv P P'⌝ -∗
     ⌜ mr !!! Regidx (mword_of_int 10) = mword_of_int 0
       \/ mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type COPYOUT.
   Parameter wp_copyout_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (len : nat) (src_bytes : nat -> bv 8)
       (K lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (dqs dqp : dfrac) (b : bool),
-      wp_copyout_sconf_body γa Φ mm P szv len src_bytes K lvl eb p C dqs dqp b.
+      wp_copyout_sconf_body γa mm P szv len src_bytes K lvl eb p C dqs dqp b.
 End COPYOUT.

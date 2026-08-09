@@ -33,7 +33,6 @@ Require Import UserPtTree.
 Require Import UserMemPt.
 Require Import SmodePte.
 Require Import SRegime.
-Require Import WpLoad.
 Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import MemAccessGen.
 Local Open Scope Z_scope.

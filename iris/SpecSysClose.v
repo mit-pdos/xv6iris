@@ -62,14 +62,11 @@ Require Import ProcGeom CpuOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import SpecArgfd.
 Require Import KallocInv.
-Require Import PipeInv.
-Require Import SchedCtx.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecIput.
 Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -101,7 +98,7 @@ End SpecSysClose.
 Definition wp_sys_close_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl γf : gname) (fn : fclose_names) (on : option nat)
+     (γl γf : gname) (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
@@ -124,8 +121,8 @@ Definition wp_sys_close_sconf_body
      untouched and comes straight back.  This is what a syscall that can
      close ANY [struct file] costs, and there is no honest way to make it
      smaller: closing an inode file writes the disk and sleeps. *)
-  fileclose_pipe_env Φ fn on n -∗
-  fileclose_fs_env Φ fn n eb p -∗
+  fileclose_pipe_env fn on n -∗
+  fileclose_fs_env fn n eb p -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
@@ -136,17 +133,17 @@ Definition wp_sys_close_sconf_body
       (* the whole environment back: the page count may have moved (the
          descriptor may have held a pipe's last end), which is why the pipe
          bundle returns under an existential *)
-      (∃ on', fileclose_pipe_env Φ fn on' n) -∗
-      fileclose_fs_env Φ fn n eb p -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      (∃ on', fileclose_pipe_env fn on' n) -∗
+      fileclose_fs_env fn n eb p -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl γf : gname) (fn : fclose_names) (on : option nat)
+       (γl γf : gname) (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
-      wp_sys_close_sconf_body Φ γl γf fn on m av n eb p C v pid V b.
+      wp_sys_close_sconf_body γl γf fn on m av n eb p C v pid V b.
 End SYSCLOSE.

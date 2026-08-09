@@ -18,7 +18,7 @@
    The execute reduction [exec_execute_SRET_menv] is the archived
    WpGprSret.v reduction with the un-dischargeable [forall sz, get_xLPE ..]
    premise replaced by the menvcfg-pinned per-state form (the same repair
-   wp_mret_gpr applied to MRET): get_xLPE is read at ONE intermediate state
+   wp_mret_gpr to MRET): get_xLPE is read at ONE intermediate state
    of the tower, where menvcfg is untouched by the preceding set_regs. *)
 From Stdlib Require Import ZArith.
 From stdpp Require Import gmap.

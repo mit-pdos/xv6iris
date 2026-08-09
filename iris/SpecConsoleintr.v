@@ -53,7 +53,7 @@ From Kernel Require KernelSyms.
 Definition consoleintr_stack : nat := 32%nat.
 
 Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname)
+     (m : regfile) (γs : list gname)
     (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (consoleintr_stack <= K)%nat ->
@@ -65,20 +65,20 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sie
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.consoleintr) -∗
-  panic_wp_any -∗ procs_inv Φ γs -∗
+  panic_wp_any -∗ procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sie_cap_gpr Mf K b pme -∗
       cpu_own lvl eb pme C b -∗
       kernel_text -∗ pc_is rettgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname)
+       (m : regfile) (γs : list gname)
       (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_consoleintr_sconf_body Φ m γs pme lvl K eb C b.
+      wp_consoleintr_sconf_body m γs pme lvl K eb C b.
 End CONSOLEINTR.

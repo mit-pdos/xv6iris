@@ -84,7 +84,7 @@ Definition fetchstr_ret (maxn : nat) (f : nat -> bv 8) (r : mword 64) : Prop :=
   \/ r = (mword_of_int (-1) : mword 64).
 
 Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γf : gname) (Φ : mval -> iProp Σ)
+    (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fetchstr in
@@ -109,14 +109,13 @@ Definition wp_fetchstr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
       proc_priv γf p pid V -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add buf j) ↦ₘ buf_new j) -∗
       ⌜fetchstr_ret maxn buf_new (mf !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FETCHSTR.
   Parameter wp_fetchstr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γf : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (γf : gname) (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (maxn : nat) (buf_olds : nat -> bv 8) (b : bool),
-      wp_fetchstr_sconf_body γf Φ m av n eb p C pid V maxn buf_olds b.
+      wp_fetchstr_sconf_body γf m av n eb p C pid V maxn buf_olds b.
 End FETCHSTR.

@@ -69,8 +69,7 @@ Section WpUartgetc.
   (* -------------------------------------------------------------------- *)
   (*  uartgetc, inlined.                                                    *)
   (* -------------------------------------------------------------------- *)
-  Lemma wp_uartgetc_inline (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m : regfile) (n : nat)
+  Lemma wp_uartgetc_inline (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
       (rs_lsr rs_rhr : mword 5) (imm8 : mword 8)
       (pcL pcA pcB pcR pcK pcNo : mword 64) (b : bool) :
     (* the two bases: the LSR and the RHR, each already in a register --
@@ -108,15 +107,15 @@ Section WpUartgetc.
             ⌜ rx_empty bt = true ⌝ -∗
             sie_cap_gpr (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b p -∗
             pc_is pcNo -∗
-            WP (Loop : expr riscv_lang) {{ Φ }})
+            WP (Loop : expr riscv_lang))
         ∧ (* "return the byte": it is in a0, zero-extended *)
         ( ∀ bt c : bv 8,
             ⌜ rx_empty bt = false ⌝ -∗
             sie_cap_gpr (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
                            (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m)) n b p -∗
             pc_is pcK -∗
-            WP (Loop : expr riscv_lang) {{ Φ }}) )) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+            WP (Loop : expr riscv_lang)) )) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hlsr Hrhr Hne Hrtp HA HB HR HK HNo Hal) "Hcg Hpc HiL HiA HiB HiR #Hdinv Hk".
     (* Ra5 (x15) is never tp (x4): the one register-index fact the a5-side
@@ -130,14 +129,14 @@ Section WpUartgetc.
     assert (Hrhr0 : m !!! Regidx rs_rhr = uart_pa 0).
     { rewrite -(rget_ne m rs_rhr ltac:(congruence)). exact Hrhr. }
     (* --- the rx-ready poll: [lbu a5,0(s1)] --- *)
-    iApply (UAcc.wp_uart_read_free_s_sconf γd γv 5 Φ pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)
+    iApply (UAcc.wp_uart_read_free_s_sconf γd γv 5 pcL Ra5 rs_lsr (mword_of_int 0 : mword 12)
               m n b ltac:(unfold uart_size; lia) ltac:(vm_compute; discriminate)
               ltac:(rdok)
               ltac:(rewrite Hlsr; apply bv_eq; vm_compute; reflexivity)
               with "Hcg Hpc HiL Hdinv [-]").
     iIntros (CID1 Hs1 bt) "Hcg Hpc". iEval (rewrite HA) in "Hpc".
     (* --- [c.andi a5,a5,1] --- *)
-    iApply (wp_candi_s_sconf Φ pcA Ra5 (mword_of_int 1 : mword 6)
+    iApply (wp_candi_s_sconf pcA Ra5 (mword_of_int 1 : mword 6)
               (<[Regidx Ra5 := regval_into_reg (lsr_ldval_of bt)]> m) n b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc HiA [-]").
@@ -156,7 +155,7 @@ Section WpUartgetc.
     { rewrite (rget_ne _ Ra5 HR5tp) upd_eq. reflexivity. }
     destruct (rx_empty bt) eqn:Hempty.
     - (* no input *)
-      iApply (wp_cbeqz_taken_s_sconf (CID:=CID2) Φ pcB imm8 (Cregidx (mword_of_int 7)) Ra5
+      iApply (wp_cbeqz_taken_s_sconf (CID:=CID2) pcB imm8 (Cregidx (mword_of_int 7)) Ra5
                 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b
                 ug_cr7 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hlk; exact Hempty)
@@ -167,13 +166,13 @@ Section WpUartgetc.
       iDestruct "Hk" as "[Hno _]".
       iApply ("Hno" $! bt with "[%] Hcg Hpc"). exact Hempty.
     - (* a byte is waiting: [lbu a0,0(s2)] pops it *)
-      iApply (wp_cbeqz_fall_s_sconf (CID:=CID2) Φ pcB imm8 (Cregidx (mword_of_int 7)) Ra5
+      iApply (wp_cbeqz_fall_s_sconf (CID:=CID2) pcB imm8 (Cregidx (mword_of_int 7)) Ra5
                 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b
                 ug_cr7 ltac:(vm_compute; discriminate)
                 ltac:(rewrite Hlk; exact Hempty)
                 with "Hcg Hpc HiB [-]").
       iIntros (CID3 Hs3) "Hcg Hpc". iEval (rewrite HR) in "Hpc".
-      iApply (UAcc.wp_uart_read_free_s_sconf (CID:=CID3) γd γv 0 Φ pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
+      iApply (UAcc.wp_uart_read_free_s_sconf (CID:=CID3) γd γv 0 pcR Ra0 rs_rhr (mword_of_int 0 : mword 12)
                 (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b
                 ltac:(unfold uart_size; lia) ltac:(vm_compute; discriminate)
                 ltac:(rdok)

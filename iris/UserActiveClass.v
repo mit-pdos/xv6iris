@@ -238,10 +238,10 @@ Section UserActiveClass.
   (* ------------------------------------------------------------------- *)
   (* §4  active_class, from hw_config + the two totalities.                *)
   (* ------------------------------------------------------------------- *)
-  Lemma active_class_intro (Ei : coPset) (Φ : mval -> iProp Σ) :
+  Lemma active_class_intro (Ei : coPset) :
     (forall E s v h, ⊢ base_exec_total_u C pt E s v h) ->
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
-    hw_config -∗ active_class C pt Ei Φ.
+    hw_config -∗ active_class C pt Ei.
   Proof.
     intros Hbase Hrvc.
     iIntros "#Hhw". iModIntro.
@@ -274,7 +274,7 @@ Section UserActiveClass.
     { iFrame "Hutlb Hudata". iPureIntro; split; assumption. }
     iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmsten Hssten]"
       as "Hcfg". { iFrame. }
-    iApply (active_step_branch C pt Ei Φ σ ms_v sc_v stval_v sepc_v va g mst mi
+    iApply (active_step_branch C pt Ei σ ms_v sc_v stval_v sepc_v va g mst mi
               Hmsok Lpriv Lms Lpc Hdisp
               with "Hhw Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr
                     Hupt Hcfg Hob Hcont").
@@ -285,28 +285,28 @@ Section UserActiveClass.
   (* ------------------------------------------------------------------- *)
 
   (* the ACTIVE-residue step obligation, from the two totalities. *)
-  Lemma user_step_obligation_active_holds (Φ : mval -> iProp Σ) :
+  Lemma user_step_obligation_active_holds :
     (forall E s v h, ⊢ base_exec_total_u C pt E s v h) ->
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
-    hw_config -∗ minstret_inv -∗ wire_inv -∗ user_step_obligation_active C pt Φ.
+    hw_config -∗ minstret_inv -∗ wire_inv -∗ user_step_obligation_active C pt.
   Proof.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv".
-    iApply (wp_user_step_active C pt Φ with "Hhw Hmin Hwinv").
-    iApply (active_class_intro (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ Hbase Hrvc with "Hhw").
+    iApply (wp_user_step_active C pt with "Hhw Hmin Hwinv").
+    iApply (active_class_intro (⊤ ∖ ↑minstretN ∖ ↑wireN) Hbase Hrvc with "Hhw").
   Qed.
 
   (* THE CAPSTONE: safety of arbitrary user-mode execution, parametrized on
      the two execute totalities. *)
-  Theorem wp_user_exec_full (Φ : mval -> iProp Σ) :
+  Theorem wp_user_exec_full :
     (forall E s v h, ⊢ base_exec_total_u C pt E s v h) ->
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
     hw_config -∗ minstret_inv -∗ wire_inv -∗
-    user_inv C pt -∗ stvec_handler_wp C pt Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    user_inv C pt -∗ stvec_handler_wp C pt -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv Hinv Htrap".
-    iApply (wp_user_exec_active C pt Φ with "Hmin [] Hinv Htrap").
-    iApply (user_step_obligation_active_holds Φ Hbase Hrvc with "Hhw Hmin Hwinv").
+    iApply (wp_user_exec_active C pt with "Hmin [] Hinv Htrap").
+    iApply (user_step_obligation_active_holds Hbase Hrvc with "Hhw Hmin Hwinv").
   Qed.
 
 End UserActiveClass.

@@ -122,9 +122,9 @@ Qed.
   (*  stripping it internally), that later strips [IH] and closes the    *)
   (*  loop back onto [pc_spin] with every resource unchanged.           *)
   (* ================================================================= *)
-  Lemma wp_spin (Φ : mval -> iProp Σ) (m : regfile)
+  Lemma wp_spin (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
-    wp_spin_body Φ m pmpcfg0 q.
+    wp_spin_body m pmpcfg0 q.
   Proof.
     cbv beta delta [wp_spin_body].
     assert (Hbit0 : eq_vec (access_vec_dec pc_spin 0) ('b"0") = true)
@@ -154,7 +154,7 @@ Qed.
       destruct j as [|[|[|[|k]]]]; try lia;
         (split; [vm_compute; discriminate | vm_compute; reflexivity]). }
     (* one leaf step of [c.j spin]; [wp_instr] hands back [▷ WP Loop] *)
-    iApply (wp_instr Φ pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 Hpmp Hspin_static
+    iApply (wp_instr pc_spin true (JAL (jimm_spin, zreg)) pmpcfg0 Hpmp Hspin_static
               with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

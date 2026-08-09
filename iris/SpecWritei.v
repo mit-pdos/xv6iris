@@ -45,6 +45,30 @@
 
    -- which covers a full write, a short write and a zero write uniformly.
 
+   ==== ...PLUS A BOUNDED DISTURBED REGION ==============================
+
+   The clause above is NOT the whole truth, and the reason is the fix to
+   kernel defect D1 (claude-notes/kernel-defects.md).  When either_copyin
+   fails part-way it has already copied a PREFIX of the chunk into the
+   buffer, and writei now does
+
+       log_write(bp);  brelse(bp);  break;
+
+   -- i.e. it COMMITS the partial chunk rather than stranding it in the
+   buffer cache.  That is the consistent thing to do (the alternative is a
+   block whose contents depend on cache state), but it means the file
+   genuinely changes OUTSIDE [off, off+tot): the return value [tot] is not
+   advanced over the failed chunk, while the chunk's bytes are logged.
+
+   So the postcondition admits a DISTURBED REGION immediately after the
+   written range: [dist] bytes at [off+tot], with [dist <= BSIZE] because
+   one chunk never crosses a block boundary, holding unspecified bytes
+   [dstb].  Everything at or beyond [off+tot+dist] is unchanged, and
+   [dist = 0] whenever no copy failed -- which a caller reads off
+   [tot = n].  Both the bound and the [tot = n] tie are what make the
+   clause usable: without them "the rest of the file is untouched" would be
+   unavailable at every offset.
+
    WHAT THE "BYTE WRITTEN" IS, AND WHY IT IS AN EXISTENTIAL.  On the KERNEL
    arm the source bytes are the caller's own and the clause pins them.  On
    the USER arm they are copied out of user memory, about which the kernel
@@ -55,15 +79,34 @@
    that fires only on the kernel arm.  A contract that named the source
    bytes unconditionally would be UNPROVABLE.
 
-   HOLES READ AS ZEROS ([blk_holes_zero]).  [inode_blocks] leaves [data i]
-   unconstrained at an UNALLOCATED index [i], and bmap deposits a freshly
-   allocated block into the bundle at [replicate BSIZE 0] -- so without a
-   normalisation of the unallocated indices the clause above is false the
-   moment writei extends the file.  [blk_holes_zero] is that normalisation,
-   threaded in and back out; it is also the xv6 file semantics (a hole reads
-   as zeros) and readi will want it too.  It belongs next to [inode_blocks]
-   in InodeInv.v and is parked here only because editing that file
-   invalidates the whole bmap/iupdate cone.
+   HOLES READ AS ZEROS ([InodeInv.blk_holes_zero]).  [inode_blocks] leaves
+   [data i] unconstrained at an UNALLOCATED index [i], and bmap deposits a
+   freshly allocated block into the bundle at [replicate BSIZE 0] -- so
+   without a normalisation of the unallocated indices the clause above is
+   false the moment writei extends the file.  [blk_holes_zero] is that
+   normalisation, threaded in and back out; it is also the xv6 file semantics
+   (a hole reads as zeros).  It lives next to [inode_blocks] in InodeInv.v,
+   as does the flat view [file_byte] the clause above is stated on.
+
+   ==== COVERAGE IS PRESERVED ===========================================
+
+   [InodeInv.bm_covers bm sz] -- every file block whose first byte is below
+   [sz] is allocated -- is what keeps readi out of the log entirely
+   (SpecReadi.v's header).  writei EXTENDS the file, so a caller that writes
+   and then reads could never re-establish it unless writei promised it: the
+   predicate is therefore a PREMISE at the old size and a POSTCONDITION at
+   the new one.
+
+   It is provable rather than merely desirable because writei allocates every
+   block it writes -- through bmap, BEFORE [tot] is advanced over the chunk --
+   and installs [size' = max(size, off + tot)].  So a block below the new size
+   is either below the OLD size (the premise, carried across each bmap call by
+   [InodeInv.bm_covers_keep], whose hypothesis is exactly the "never
+   un-allocates" clause SpecBmap already carries) or was allocated by the loop
+   itself, which is the loop invariant [bm_covers bmI (off + tot)].  Neither
+   break arm needs a special case: both stop [tot] early, and the DISTURBED
+   REGION below lies at or above [off + tot], hence at or above the new size,
+   where coverage claims nothing.
 
    ==== A SHORT WRITE IS A NORMAL RETURN ================================
 
@@ -75,9 +118,10 @@
 
    The -1 arm additionally reports WHY (off past the end, or the range past
    MAXFILE*BSIZE), so a caller that has checked those knows it will not be
-   taken.  The overflow test at +0x02e is DEAD given the two numeric
-   premises below: [off + n] cannot both survive the [lui a4,0x43] compare
-   and wrap.
+   taken.  The overflow test at +0x02e is DEAD BY THE JOINT NUMERIC PREMISE
+   [off + n < 2^31] below -- NOT by two separate bounds on [off] and [n],
+   which would let the [addw] at +0x022 wrap.  See that premise's comment,
+   including the coverage note it carries.
 
    ==== SIZE AND FLUSH ==================================================
 
@@ -148,12 +192,14 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import BitmapInv.
+Require Import KernelDataInv.
+Require Import SpecPrintkGen.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
 Require Import ProcPtOwn.
 Require Import FileInv ProcInv.
-Require Import SpecIupdate.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -165,24 +211,9 @@ Local Open Scope Z_scope.
    log_write 18. *)
 Definition K_writei : nat := 70%nat.
 
-(* ===================================================================== *)
-(*  THE FLAT FILE-BYTE VIEW                                              *)
-(* ===================================================================== *)
-
-Definition file_byte (data : nat -> list (bv 8)) (k : nat) : bv 8 :=
-  data (k `div` BSIZE)%nat !!! (k `mod` BSIZE)%nat.
-
-(* Two [data]s that agree block by block agree byte by byte -- the step
-   every "nothing else moved" argument in the proof takes. *)
-Lemma file_byte_block (data data' : nat -> list (bv 8)) (k : nat) :
-  data' (k `div` BSIZE)%nat = data (k `div` BSIZE)%nat ->
-  file_byte data' k = file_byte data k.
-Proof. intros H. rewrite /file_byte H. reflexivity. Qed.
-
-(* A HOLE READS AS ZEROS.  See the header. *)
-Definition blk_holes_zero (bm : blkmap) (data : nat -> list (bv 8)) : Prop :=
-  forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) = 0 ->
-    data i = replicate BSIZE (bv_0 8).
+(* [file_byte], [file_byte_block] and [blk_holes_zero] live in InodeInv.v,
+   next to [inode_blocks] whose flat view they are.  They were parked here
+   while editing InodeInv.v was too expensive; both are shared with readi. *)
 
 (* ===================================================================== *)
 (*  THE ITERATION BOUND AND THE BUDGET                                    *)
@@ -212,20 +243,22 @@ Definition wp_writei_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
+    (cov : gset Z) (logstart : Z) (inodestart : Z)
+    (bmapstart : Z) (size : Z) (dev : mword 32)
+    (used : gset Z) (γpr : gname)
     (ip : mword 64) (inum : mword 32)
     (bm : blkmap) (data : nat -> list (bv 8))
     (dn : dinode) (ds : list dinode)
     (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
     (V : pprivate) (ncount : nat)
-    (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+    (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
     (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.writei in
@@ -247,13 +280,32 @@ Definition wp_writei_sconf_body
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->
-  (* the two uint arguments and the current size are honest 32-bit
-     quantities.  With these the [bltu a5,a3] overflow test at +0x02e is
-     DEAD: a sum that survives the MAXFILE*BSIZE compare cannot have
-     wrapped. *)
-  (Z.of_nat off < 2 ^ 31) ->
-  (Z.of_nat n < 2 ^ 31) ->
+  (* EVERY BLOCK BELOW THE FILE'S SIZE IS ALLOCATED.  Threaded in and back
+     out at the NEW size -- see the header. *)
+  bm_covers bm (bv_unsigned (di_size dn)) ->
+  (* THE JOINT NUMERIC PREMISE.  [off] and [n] are uints whose SUM stays in
+     int range -- not two separate bounds.  It is what makes the
+     [addw a5,a3,a4] at +0x022 non-wrapping, and hence what makes the
+     [bltu a5,a3] overflow test at +0x02e DEAD.  Two separate 2^31 bounds
+     do NOT suffice: their sum can reach 2^32, the 32-bit add wraps, the
+     sign-extended result is huge, and the MAXFILE*BSIZE compare at +0x02a
+     is then taken -- a live arm whose proof would need a wrapping-[addw]
+     reading that this tree does not have.
+
+     Every caller can discharge it: filewrite's [off] is bounded by the
+     file size (<= MAXFILE*BSIZE = 274432) and its [n] is chunked, and the
+     in-kernel callers (dirlink, the create path) pass small constants.
+
+     COVERAGE NOTE: this means xv6's own [off + n < off] overflow check is
+     not exercised by the proof -- the premise makes that arm dead rather
+     than proving what the code does when it fires. *)
+  (Z.of_nat off + Z.of_nat n < 2 ^ 31) ->
   bv_unsigned (di_size dn) < 2 ^ 31 ->
+  (* the bitmap's geometry, forwarded through bmap to balloc *)
+  bitmap_geom_ok cov logstart bmapstart size ->
+  (* balloc's out-of-blocks arm calls the GENERAL printk path; carried as a
+     hypothesis, never a functor.  See SpecBalloc.v's header. *)
+  printk_gen_contract γpr γu γd ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* a0 = ip *)
@@ -272,6 +324,9 @@ Definition wp_writei_sconf_body
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
+  (* the two PERSISTENT printk credentials, forwarded through bmap to balloc *)
+  kernel_data -∗
+  printk_env γpr γu γd -∗
   bio_ctx bn (fs_view γfs γd dev cov) -∗
   log_ctx γ bn γfs cov logstart dev -∗
   (* either_copyin's user arm reaches copyin, which reaches vmfault/kalloc *)
@@ -286,6 +341,11 @@ Definition wp_writei_sconf_body
   inode_blocks γfs bm data -∗
   (* sb.inodestart, read once inside iupdate *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+  (* sb.size and sb.bmapstart, and THE BITMAP: bmap's interior balloc needs
+     all three, and writei calls bmap once per straddled block *)
+  sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+  sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+  bitmap_res γfs bmapstart cov logstart size used -∗
   (* THE INODE BLOCK, as sixteen pure dinodes *)
   fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
   (* THE SOURCE.  On the user arm a virtual address into the running
@@ -298,10 +358,9 @@ Definition wp_writei_sconf_body
      this is [proc_priv]'s own quarter (ProcInv.proc_priv_pid). *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -314,19 +373,32 @@ Definition wp_writei_sconf_body
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
     (dn' : dinode) (ds' : list dinode) (n' : nat)
-    (wrote : nat -> bv 8) (P' : uptd),
+    (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
+    (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
+      (* THE ALLOCATOR NEVER UN-MARKS: [used] only grows, across every bmap
+         the loop performs. *)
+      ⌜used ⊆ used'⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       ⌜blk_holes_zero bm' data'⌝ -∗
       ⌜diblk_wf ds'⌝ -∗
       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
       ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
+      (* COVERAGE IS PRESERVED, AT THE NEW SIZE.  See the header. *)
+      ⌜bm_covers bm' (bv_unsigned (di_size dn'))⌝ -∗
+      (* THE DISTURBED REGION: at most one block, immediately after the
+         written range, and EMPTY unless a copy failed part-way.  See the
+         header. *)
+      ⌜(dist <= BSIZE)%nat⌝ -∗
+      ⌜(tot = n)%nat -> dist = 0%nat⌝ -∗
       (* THE RANGE CLAUSE -- the whole effect of the write, in one line *)
       ⌜forall k : nat,
          file_byte data' k
          = if decide ((off <= k)%nat /\ (k < off + tot)%nat)
            then wrote (k - off)%nat
-           else file_byte data k⌝ -∗
+           else if decide ((off + tot <= k)%nat /\ (k < off + tot + dist)%nat)
+                then dstb (k - (off + tot))%nat
+                else file_byte data k⌝ -∗
       (* ...and, on the KERNEL arm only, what those bytes were *)
       ⌜user = false -> forall i : nat, (i < tot)%nat -> wrote i = src_bytes i⌝ -∗
       (* THE TWO ARMS, on the returned a0.  A SHORT WRITE IS THE SECOND
@@ -334,7 +406,8 @@ Definition wp_writei_sconf_body
       ⌜(mf !!! Regidx (mword_of_int 10 : mword 5) = (mword_of_int (-1) : mword 64)
         /\ (bv_unsigned (di_size dn) < Z.of_nat off
             \/ (MAXFILE * BSIZE < off + n)%nat)
-        /\ tot = 0%nat /\ bm' = bm /\ data' = data /\ dn' = dn /\ ds' = ds
+        /\ tot = 0%nat /\ dist = 0%nat
+        /\ bm' = bm /\ data' = data /\ dn' = dn /\ ds' = ds
         /\ n' = ncount)
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (Z.of_nat tot) : mword 64)
@@ -347,8 +420,7 @@ Definition wp_writei_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
@@ -356,38 +428,44 @@ Definition wp_writei_sconf_body
       inode_map γfs ip bm' -∗
       inode_blocks γfs bm' data' -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
+      sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
+      sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
+      bitmap_res γfs bmapstart cov logstart size used' -∗
       fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds') -∗
       (if user
        then proc_priv γf pj pidv (upd_upt V P')
        else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
       bslots bn 3 -∗
       log_op γ n' -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WRITEI.
   Parameter wp_writei_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
+      (cov : gset Z) (logstart : Z) (inodestart : Z)
+      (bmapstart : Z) (size : Z) (dev : mword 32)
+      (used : gset Z) (γpr : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
       (dn : dinode) (ds : list dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
       (V : pprivate) (ncount : nat)
-      (pidv : mword 32) (dq dqd dqn dqs : dfrac)
+      (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_writei_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs γa γf
-                           cov logstart inodestart dev ip inum bm data dn ds
+      wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γa γf
+                           cov logstart inodestart bmapstart size dev used γpr
+                           ip inum bm data dn ds
                            user off n src_bytes V ncount
-                           pidv dq dqd dqn dqs m K eb C b.
+                           pidv dq dqd dqn dqs dqb dqbs m K eb C b.
 End WRITEI.

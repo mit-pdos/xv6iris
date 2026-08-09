@@ -37,8 +37,7 @@ Import Defs.
    ([= trap_csrs] at the only index reachable from [b = true], n = 0 and
    eb = true) below.  At [b = false] nothing moves and the statement reads
    exactly as it always did. *)
-Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   (* push_off's mstatus0-dependent register chain N2..N8 + storeval32 (which
      read [sstatus_read mstatus0]) are reconstructed inside the proof over the
@@ -58,11 +57,11 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
     ⌜ sconf_ms_facts ms ⌝ -∗
     sie_cap_gpr mfin av false p -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     pc_is caller_ret -∗
     ⌜ callee_saved m mfin ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 (* pop_off is the mirror: [cpu_own]'s own structure (the [S _] arm of
    [intr_count]) already PINS entry at [false] -- level [S n ≥ 1] means SIE
@@ -83,8 +82,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
    indexed by [bexit] rather than [false]: at [bexit = true] the caller keeps
    only its frame [C] and the pure fact, and reaches the cells through the
    bundle, at whatever hart it resumes on. *)
-Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.pop_off in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -95,7 +93,7 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
   (4 <= av)%nat ->
   sie_cap_gpr m av false p -∗
   cpu_own (S n) eb p C false -∗
-  trap_csrs_pay n eb -∗
+  arm_pay n eb p -∗
   kernel_text -∗ pc_is pcE -∗
   wp_next bexit p (fun (CID : CpuId) =>
     ∀ mf,
@@ -103,18 +101,16 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
     cpu_own n eb p C bexit -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mf ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PUSHOFF.
   Parameter wp_push_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
-      wp_push_off_sconf_body Φ m av n eb p C b.
+      wp_push_off_sconf_body m av n eb p C b.
   Parameter wp_pop_off_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (av : nat)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ),
-      wp_pop_off_sconf_body Φ m av n eb p C.
+      wp_pop_off_sconf_body m av n eb p C.
 End PUSHOFF.

@@ -31,8 +31,7 @@ Require Import ProcGeom.
 Definition wk_fcell (spF : mword 64) (u : Z) : mword 64 :=
   add_vec spF (zero_extend' 64 (concat_vec (mword_of_int u : mword 6) ('b"000"))).
 
-Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
+Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   (8 <= K)%nat ->
@@ -65,11 +64,10 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{G
       wk_fcell spF 2 ↦₈ (m !!! Regidx (mword_of_int 20)) -∗
       wk_fcell spF 1 ↦₈ (m !!! Regidx (mword_of_int 21)) -∗
       wk_fcell spF 0 ↦₈ vpad -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
-Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64) :=
+Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64) :=
   let spF := M !!! Regidx csp_rs1 in
   let sp0 := add_vec spF (sign_extend' 64 (caddi16sp_imm (mword_of_int 4 : mword 6))) in
   let rettgt := ret_pc vra in
@@ -99,16 +97,14 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{G
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sie_cap_gpr Mf K b p -∗
       pc_is rettgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WAKEUPPARTS.
   Parameter wp_wakeup_prologue_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64),
-      wp_wakeup_prologue_sconf_body Φ m K b p.
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64),
+      wp_wakeup_prologue_sconf_body m K b p.
   Parameter wp_wakeup_epilogue_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64),
-      wp_wakeup_epilogue_sconf_body Φ M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b p.
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64),
+      wp_wakeup_epilogue_sconf_body M K vra vs0 vs1 vs2 vs3 vs4 vs5 vpad b p.
 End WAKEUPPARTS.

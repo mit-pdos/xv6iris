@@ -422,9 +422,7 @@ End wP_eff_half.
 Section leaf.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
-
-  Lemma wwp_sd8_leaf Φ
+  Lemma wwp_sd8_leaf
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 rs2 : mword 5) (imm : mword 12)
       (ea : Arch.pa) (vold : bv 64) (R : vProp Σ) (q : Qp)
@@ -479,8 +477,8 @@ Section leaf.
        hart_ws cpu_id ws' -∗
        vwp_hold (wpt8 ea (DfracOwn 1) rs2v) ws' -∗
        monPred_at R (view_scl T) -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal4 Hrs1nz Hrs2nz Hea Hram8 Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrs1c Hrs2c #Hbs Hhws Hpt HR Hcont".
@@ -490,7 +488,7 @@ Section leaf.
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
     (* THE WHOLE config goes to the funnel: it hands the reads back. *)
-    iApply (wwp_instr Φ pc false (STORE (imm, Regidx rs2, Regidx rs1, 8))
+    iApply (wwp_instr pc false (STORE (imm, Regidx rs2, Regidx rs1, 8))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  ([WEread wak_plain pc 4] ++ [WEwrite wak_plain ea 8 rs2v]))

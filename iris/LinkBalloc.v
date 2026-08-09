@@ -1,52 +1,28 @@
-(* LinkBalloc.v -- the one place balloc's contract is ASSUMED.
+(* LinkBalloc.v -- the only file where balloc's proof meets its callees'.
+   All four (bread, log_write, brelse, memset -- the last two of which are
+   what the INLINED bzero at +0x4c runs) are PROVEN, so nothing here is
+   assumed: [ProofBalloc.v] replaced the [Axiom] this file used to carry,
+   and it is the single file the bmap cone's one assumption lived in.
 
-   Most link files instantiate a proof functor against its callees' PROOFS;
-   balloc has none yet, so this link supplies the interface with an [Axiom]
-   instead -- the single assumption the bmap cone rests on
-   ([tools/proof_coverage.py] reports it as such).  Isolating it here means
-   [ProofBmap.v] itself is axiom-free: it is a functor over [BALLOC], and
-   proving balloc later replaces this file and nothing else.
+   balloc's two dead arms -- the [beqz a5,+0xf6] at +0x12 (refuted from
+   [0 < size]) and the second outer iteration at +0x98 (refuted from
+   [size <= BPB]) -- are refuted inside the proof, so no panic contract is
+   instantiated here either.
 
-   What proving balloc needs is the BITMAP INVARIANT -- which agent holds a
-   free block's [fsblock] half and its exclusive [blk_own] token while the
-   block is free, tied to bit b of the bitmap block.  [FsBlocks.fs_alloc]
-   already mints both per covered block at boot, so the material exists; the
-   design decision does not (claude-notes/design/fs-inode.md, "balloc's
-   contract -- ASSUMED for now").
+   *** READ THIS BEFORE TRUSTING "THE STANDING SIX". ***  balloc's
+   out-of-blocks arm IS LIVE and calls printk on its GENERAL path, and
+   [PRINTK_GEN]'s only instance is [LinkPrintkGen]'s own [Axiom].
+   Instantiating that functor -- here or in [ProofBalloc.v] -- would put a
+   SEVENTH entry in [Print Assumptions Balloc.wp_balloc_sconf] and, through
+   the ripple, in bmap's and writei's too.  [SpecBalloc.v] therefore takes
+   printk's contract as a PURE HYPOTHESIS ([SpecPrintkGen.printk_gen_contract]),
+   which keeps all three at the standing six -- but that is NOT
+   self-containment: balloc's six are modulo a THREADED printk obligation
+   that its callers must eventually discharge, exactly the standing that
+   [SpecPanic.panic_wp_any] already has throughout this tree.  A reader who
+   takes the six for "depends on nothing else" is misreading it.          *)
+Require Import LinkBread LinkLogWrite LinkBrelse LinkMemsetArray ProofBalloc.
 
-   Written out with an explicit [Axiom] rather than a [Declare Module]: both
-   are visible to [Print Assumptions], but only the keyword is visible to the
-   coverage tool's textual axiom scan.                                       *)
-From stdpp Require Import gmap bitvector.definitions.
-From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import ghost_var.
-From iris.program_logic Require Import language lifting.
-Require Import SailStdpp.Values.
-Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import RiscvLang RiscvPtsto SmodeCore.
-Require Import RegFile.
-Require Import WpLock FdSlots WpUart.
-Require Import DiskPtsto.
-Require Import BioInv.
-Require Import FsBlocks LogInv.
-Require Import SpecBalloc.
-
-Module Balloc : BALLOC.
-  Axiom wp_balloc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
-      (u : nat)
-      (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
-      wp_balloc_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart dev u pidv dq m K eb C b.
-End Balloc.
+(* the whole-function memset spec [MEMSET] is [MemsetArray] (LinkMemsetArray),
+   not the [MEMSET_PARTS] module [Memset] *)
+Module Balloc := BallocProof Bread LogWrite Brelse MemsetArray.

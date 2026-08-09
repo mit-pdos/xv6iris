@@ -56,7 +56,7 @@ Definition K_brelse : nat := 26%nat.
 Definition wp_brelse_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname)
     (bn : bio_names) (V : bio_view Σ) (k : nat)
     (pidv dev bno : mword 32) (dq : dfrac)
@@ -76,7 +76,7 @@ Definition wp_brelse_sconf_body
   (* the caller's own pid cell, agreeing with the handle's *)
   p_pid p ↦₄{dq} pidv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   (* the locked buffer being released.  [bio_locked] -- not [bio_held] --
      is THE brelse obligation: the bytes must be the block's logical
      content (unmodified since bread, or re-indexed by log_write), or the
@@ -91,18 +91,18 @@ Definition wp_brelse_sconf_body
       p_pid p ↦₄{dq} pidv -∗
       (* the reference's slot unit comes back *)
       bslot bn -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BRELSE.
   Parameter wp_brelse_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (bs bsd : list (bv 8)) (d : bool) (b : bool),
-      wp_brelse_sconf_body Φ γs bn V k pidv dev bno dq m K eb p C bs bsd d b.
+      wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b.
 End BRELSE.

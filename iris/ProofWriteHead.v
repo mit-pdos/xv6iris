@@ -81,7 +81,6 @@ Require Import ByteBuf.
 Require Import KstackArith.
 Require Import FdSlots.
 Require Import ProcGeom.
-Require Import SwtchCtx.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import BufOwn BcacheInv BioInv.
@@ -469,7 +468,7 @@ Section WriteHeadDefs.
   (* ---------------------------------------------------------------- *)
   (*  the continuation, the frame and the register threading            *)
   (* ---------------------------------------------------------------- *)
-  Definition wh_cont `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Definition wh_cont `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (logstart : Z) (n : nat)
       (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac) (j : nat)
@@ -481,8 +480,7 @@ Section WriteHeadDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 eb (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        own_ctx (p_context (proc_addr j)) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
         ([∗ list] i ↦ w ∈ W, lh_block i ↦₄ w) -∗
@@ -492,7 +490,7 @@ Section WriteHeadDefs.
         ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
         bslot bn -∗
         ▷ Q -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
   Definition wh_frame (m : regfile) : iProp Σ :=
@@ -525,7 +523,7 @@ Section WriteHeadBlocks.
   (*  +0x46 .. +0x5c : bwrite, the logged-view move, brelse, epilogue.   *)
   (*  Entered from the loop's exit AND from the [blez] shortcut (n = 0). *)
   (* ================================================================== *)
-  Local Lemma wh_tail `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wh_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -560,10 +558,9 @@ Section WriteHeadBlocks.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
-    own_ctx (p_context (proc_addr j)) -∗
-    park_hlf j true -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
+    running_claim j -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -579,12 +576,12 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
-    wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K true C b Q -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1.
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hoctx Hpark
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hpark
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
     iPoseProof (whi_46 with "Htext") as "Hi46".
@@ -592,7 +589,7 @@ Section WriteHeadBlocks.
     iPoseProof (whi_4c with "Htext") as "Hi4c".
     iPoseProof (whi_4e with "Htext") as "Hi4e".
     (* ===== +0x46 c.mv a0,s1 ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x46)) Ra0 Rs1
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.write_head + 0x46)) Ra0 Rs1
               M (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi46 [-]").
     iIntros (CID1 Hs1) "Hcg Hpc".
@@ -616,7 +613,7 @@ Section WriteHeadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp48) in "Hpc".
     (* ===== +0x48 jal ra,bwrite ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x48)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.write_head + 0x48)) Rra
               (mword_of_int 2093456 : mword 21) T1 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi48 [-]").
@@ -660,11 +657,11 @@ Section WriteHeadBlocks.
       change (2 ^ 32)%Z with 4294967296%Z. lia. }
     assert (Hdec_early : hdr_dec (f <$> seq 0 1024) = (n, map uint W))
       by exact (wh_hdr_dec f n W HnW HnB Hf4 Henc).
-    iApply (BW.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat true C
               (f <$> seq 0 1024) bsd0 b Q
               HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                     Hdevi Hdgeom Hdlock Hhold [Hperm] [-]").
     (* THE CALLER'S OWN PERMIT, at the header image this function assembled
        (phase C2b/D1 stage 3).  [Hbnou] is what makes the two spellings of
@@ -674,7 +671,7 @@ Section WriteHeadBlocks.
       { iPureIntro. rewrite length_fmap length_seq. reflexivity. }
       { iPureIntro. exact Hhn_early. }
       iPureIntro. exact Hdec_early. }
-    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hoctx Hpark Hppid Hhold HQ".
+    iIntros (CID3 Hs3 mB) "%Hcs1 Hcg Hcnt Hpc Hpark Hppid Hhold HQ".
     assert (Hpc4c : ret_pc (T2 !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x4c)).
     { rewrite HT2ra. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hpc4c) in "Hpc".
@@ -705,7 +702,7 @@ Section WriteHeadBlocks.
     { rewrite /bio_locked bio_held_split.
       iSplitL "Hhold"; [iExact "Hhold" | iExact "Hpay"]. }
     (* ===== +0x4c c.mv a0,s1 ===== *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x4c)) Ra0 Rs1
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.write_head + 0x4c)) Ra0 Rs1
               mB (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi4c [-]").
     iIntros (CID4 Hs4) "Hcg Hpc".
@@ -727,7 +724,7 @@ Section WriteHeadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp4e) in "Hpc".
     (* ===== +0x4e jal ra,brelse ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x4e)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.write_head + 0x4e)) Rra
               (mword_of_int 2093500 : mword 21) T3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi4e [-]").
@@ -759,7 +756,7 @@ Section WriteHeadBlocks.
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat)
       by (unfold K_brelse, K_write_head in *; lia).
-    iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
               T4 (K - 4)%nat true (proc_addr j) C
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
               HKbl Hk HT4a0
@@ -809,7 +806,7 @@ Section WriteHeadBlocks.
     { rewrite HmRsp. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* +0x52 c.ldsp ra,24(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x52)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.write_head + 0x52)) (mword_of_int 3 : mword 6) Rra
               mR (K - 4)%nat (m !!! Regidx Rra : mword 64) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi52 [Hr24] [-]").
@@ -826,7 +823,7 @@ Section WriteHeadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp54) in "Hpc".
     (* +0x54 c.ldsp s0,16(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x54)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.write_head + 0x54)) (mword_of_int 2 : mword 6) Rs0
               P1 (K - 4)%nat (m !!! Regidx Rs0 : mword 64) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi54 [Hr16] [-]").
@@ -843,7 +840,7 @@ Section WriteHeadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp56) in "Hpc".
     (* +0x56 c.ldsp s1,8(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x56)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.write_head + 0x56)) (mword_of_int 1 : mword 6) Rs1
               P2 (K - 4)%nat (m !!! Regidx Rs1 : mword 64) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi56 [Hr8] [-]").
@@ -860,7 +857,7 @@ Section WriteHeadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp58) in "Hpc".
     (* +0x58 c.ldsp s2,0(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x58)) (mword_of_int 0 : mword 6) Rs2
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.write_head + 0x58)) (mword_of_int 0 : mword 6) Rs2
               P3 (K - 4)%nat (m !!! Regidx Rs2 : mword 64) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi58 [Hr0] [-]").
@@ -895,7 +892,7 @@ Section WriteHeadBlocks.
       iSplitL "Hr0";  [iExists _; iExact "Hr0"|].
       done. }
     iEval (rewrite -Hwv) in "Hframe4".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x5a))
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.write_head + 0x5a))
               (mword_of_int 2 : mword 6) P4 (K - 4)%nat 4 b Hpop
               with "Hcg Hpc Hi5a Hframe4 [-]").
     iIntros (CID11 Hs11) "Hcg Hpc".
@@ -915,7 +912,7 @@ Section WriteHeadBlocks.
       rewrite /P3 upd_ne; [| vm_compute; discriminate].
       rewrite /P2 upd_ne; [| vm_compute; discriminate].
       rewrite /P1 upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x5c)) Rra P5 K b
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.write_head + 0x5c)) Rra P5 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi5c [-]").
     iIntros (CID12 Hs12) "Hcg Hpc".
     iEval (rgne) in "Hpc".
@@ -982,7 +979,7 @@ Section WriteHeadBlocks.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /wh_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hpc Hoctx Hpark Hppid
+    iApply ("Hcont" $! P5 (f <$> seq 0 1024) with "[%] Hcg Hcnt Hpc Hpark Hppid
                      Hncell HW HLauth Hfsb [%] [%] Hslot HQ").
     { unfold callee_saved. repeat split; assumption. }
     { exact Hhn. }
@@ -999,7 +996,7 @@ Section WriteHeadBlocks.
   (*  A fuel induction on the entries still to copy; the exit test is a  *)
   (*  POINTER compare read back as an index compare.                    *)
   (* ================================================================== *)
-  Local Lemma wh_loop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wh_loop `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1038,10 +1035,9 @@ Section WriteHeadBlocks.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
-    own_ctx (p_context (proc_addr j)) -∗
-    park_hlf j true -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
+    running_claim j -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -1057,8 +1053,8 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
-    wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K true C b Q -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk.
     (* CID0 is GENERALIZED: the loop body crosses [wp_next]s, so the hart the
@@ -1067,7 +1063,7 @@ Section WriteHeadBlocks.
       iIntros (i M f Hi Hfuel Hf4 Henc Hregs HMs1 HMa4 HMa5 HMa2);
       [ exfalso; lia |].
     pose proof Hregs as (Hsp & Hthr).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hoctx Hpark
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hppid #Hprocs #Hscheds Hpark
               #Hdevi #Hdgeom #Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
               Hncell HW Hperm Hcont".
     iPoseProof (whi_3a with "Htext") as "Hi3a".
@@ -1083,7 +1079,7 @@ Section WriteHeadBlocks.
                    = lh_block i).
     { rgne. rewrite HMa4 wh_s0. apply wh_blk_at. }
     iEval (rewrite -Hsrc) in "Hcell".
-    iApply (wp_clw_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x3a)) Ra3 Ra4
+    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.write_head + 0x3a)) Ra3 Ra4
               (mword_of_int 0 : mword 12) M (K - 4)%nat w b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3a Hcell [-]").
@@ -1125,7 +1121,7 @@ Section WriteHeadBlocks.
     iDestruct (bb_word4_acc (b_data (bnode kk)) 1024 (4 * S i)%nat
                  (1016 - 4 * i)%nat f Hsum Hal with "Hby") as "[Hcell Hback2]".
     iEval (rewrite -Hdst) in "Hcell".
-    iApply (wp_csw_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x3c)) Ra3 Ra5
+    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.write_head + 0x3c)) Ra3 Ra5
               (mword_of_int 92 : mword 12) S1 (K - 4)%nat
               (bb_mk f (4 * S i)%nat) b
               with "Hcg Hpc Hi3c Hcell [-]").
@@ -1166,7 +1162,7 @@ Section WriteHeadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp3e) in "Hpc".
     (* ===== +0x3e c.addi a4,a4,4 ===== *)
-    iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x3e)) Ra4 (mword_of_int 4 : mword 6)
+    iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.write_head + 0x3e)) Ra4 (mword_of_int 4 : mword 6)
               S1 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3e [-]").
     iIntros (CID3 Hs3) "Hcg Hpc".
@@ -1186,7 +1182,7 @@ Section WriteHeadBlocks.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp40) in "Hpc".
     (* ===== +0x40 c.addi a5,a5,4 ===== *)
-    iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x40)) Ra5 (mword_of_int 4 : mword 6)
+    iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.write_head + 0x40)) Ra5 (mword_of_int 4 : mword 6)
               S2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi40 [-]").
     iIntros (CID4 Hs4) "Hcg Hpc".
@@ -1225,7 +1221,7 @@ Section WriteHeadBlocks.
         replace (Nat.eqb (4 * S i) (4 * n)) with true
           by (symmetry; apply Nat.eqb_eq; clear -Hdone; lia).
         reflexivity. }
-      iApply (wp_bne_fall_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x42))
+      iApply (wp_bne_fall_s_sconf (mword_of_int (KernelSyms.write_head + 0x42))
                 (mword_of_int 8184 : mword 13) Ra2 Ra5 S3 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp with "Hcg Hpc Hi42 [-]").
@@ -1238,12 +1234,12 @@ Section WriteHeadBlocks.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-      iApply (wh_tail (CID0 := CID5) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
+      iApply (wh_tail (CID0 := CID5)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K C b Q
                 HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
                 ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
                 HS3regs HS3s1
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* more entries: branch back to +0x3a *)
@@ -1253,7 +1249,7 @@ Section WriteHeadBlocks.
         replace (Nat.eqb (4 * S i) (4 * n)) with false
           by (symmetry; apply Nat.eqb_neq; clear -Hmore; lia).
         reflexivity. }
-      iApply (wp_bne_taken_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x42))
+      iApply (wp_bne_taken_s_sconf (mword_of_int (KernelSyms.write_head + 0x42))
                 (mword_of_int 8184 : mword 13) Ra2 Ra5 S3 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp ltac:(vm_compute; reflexivity)
@@ -1273,7 +1269,7 @@ Section WriteHeadBlocks.
       iSpecialize ("IH" $! CID5 (S i) S3 f' Hi' Hf' Hf4' Henc' HS3regs HS3s1
                      HS3a4 HS3a5 HS3a2).
       iApply ("IH" with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds
-                         Hoctx Hpark Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
+                         Hpark Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD
                          Hextra HLauth Hfsb Hncell HW Hperm Hcont").
   Qed.
 
@@ -1286,7 +1282,7 @@ Section ProofWriteHead.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_write_head_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_write_head_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1297,7 +1293,7 @@ Section ProofWriteHead.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool) (Q : iProp Σ)
-    : wp_write_head_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
+    : wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb C b Q.
   Proof.
     cbv beta delta [wp_write_head_sconf_body].
@@ -1306,7 +1302,7 @@ Section ProofWriteHead.
     destruct Hbatch as [HnW HnB].
     subst eb.
     unfold K_write_head in HK.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs #Hscheds Hoctx Hpark
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hfroz Hppid #Hprocs #Hscheds Hpark
               #Hdevi #Hdgeom #Hdlock Hncell HW HLauth Hhdr Hslot Hperm Hcont".
     iDestruct "Hhdr" as (bsh) "Hfsb".
     iDestruct "Hfroz" as "(#Hdevc & #Hstc)".
@@ -1324,7 +1320,7 @@ Section ProofWriteHead.
     assert (Hcovin : uint (mword_of_int logstart : mword 32)
                      ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Huint; exact Hhdrcov).
-    iAssert (wh_cont (CID0 := CID) Φ γfs bn logstart n W L pidv dq j m K true C b Q)%I
+    iAssert (wh_cont (CID0 := CID)  γfs bn logstart n W L pidv dq j m K true C b Q)%I
       with "[Hcont]" as "Hcont"; [rewrite /wh_cont; iExact "Hcont"|].
     iPoseProof (whi_00 with "Htext") as "Hi00".
     iPoseProof (whi_02 with "Htext") as "Hi02".
@@ -1345,7 +1341,7 @@ Section ProofWriteHead.
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                     = pa_stk (m !!! Regidx csp_rs1 : mword 64) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) m K 4 b
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) m K 4 b
               ltac:(lia) Hpush with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     change (<[Regidx csp_rs1 := regval_into_reg
@@ -1384,28 +1380,28 @@ Section ProofWriteHead.
     assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.write_head + 0x02))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x02)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.write_head + 0x02)) (mword_of_int 3 : mword 6) Rra
               R1 (K - 4)%nat vr24 b with "Hcg Hpc Hi02 Hr24 [-]").
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.write_head + 0x02) : mword 64) 2
                     = mword_of_int (KernelSyms.write_head + 0x04))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x04)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.write_head + 0x04)) (mword_of_int 2 : mword 6) Rs0
               R1 (K - 4)%nat vr16 b with "Hcg Hpc Hi04 Hr16 [-]").
     iIntros (CID3 Hs3) "Hcg Hpc Hr16".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.write_head + 0x04) : mword 64) 2
                     = mword_of_int (KernelSyms.write_head + 0x06))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x06)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.write_head + 0x06)) (mword_of_int 1 : mword 6) Rs1
               R1 (K - 4)%nat vr8 b with "Hcg Hpc Hi06 Hr8 [-]").
     iIntros (CID4 Hs4) "Hcg Hpc Hr8".
     assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.write_head + 0x06) : mword 64) 2
                     = mword_of_int (KernelSyms.write_head + 0x08))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp08) in "Hpc".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x08)) (mword_of_int 0 : mword 6) Rs2
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.write_head + 0x08)) (mword_of_int 0 : mword 6) Rs2
               R1 (K - 4)%nat vr0 b with "Hcg Hpc Hi08 Hr0 [-]").
     iIntros (CID5 Hs5) "Hcg Hpc Hr0".
     assert (Hpp0a : add_vec_int (mword_of_int (KernelSyms.write_head + 0x08) : mword 64) 2
@@ -1429,7 +1425,7 @@ Section ProofWriteHead.
       iEval (rewrite Hb4; rgne; rewrite HR1s2) in "Hr0".
       iFrame. }
     (* +0x0a c.addi4spn s0,sp,32 *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x0a)) (Cregidx (mword_of_int 0))
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.write_head + 0x0a)) (Cregidx (mword_of_int 0))
               (mword_of_int 8 : mword 8) Rs0 R1 (K - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a [-]").
@@ -1442,7 +1438,7 @@ Section ProofWriteHead.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp0c) in "Hpc".
     (* +0x0c auipc s2,0x1f *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x0c)) Rs2 (mword_of_int 31 : mword 20)
+    iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.write_head + 0x0c)) Rs2 (mword_of_int 31 : mword 20)
               R2 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
@@ -1454,7 +1450,7 @@ Section ProofWriteHead.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp10) in "Hpc".
     (* +0x10 addi s2,s2,-1826 *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x10)) Rs2 Rs2
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.write_head + 0x10)) Rs2 Rs2
               (mword_of_int 2250 : mword 12) R3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
@@ -1474,7 +1470,7 @@ Section ProofWriteHead.
                      = l_start).
     { rgne. rewrite HR4s2 wh_s24. apply wh_l_start. }
     iEval (rewrite -Hstart) in "Hstc".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x14)) Ra1 Rs2
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x14)) Ra1 Rs2
               (mword_of_int 24 : mword 12) R4 (K - 4)%nat
               (mword_of_int logstart : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1496,7 +1492,7 @@ Section ProofWriteHead.
                     = l_dev).
     { rgne. rewrite HR5s2 wh_s36. apply wh_l_dev. }
     iEval (rewrite -Hdvad) in "Hdevc".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x18)) Ra0 Rs2
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x18)) Ra0 Rs2
               (mword_of_int 36 : mword 12) R5 (K - 4)%nat dev b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hdevc [-]").
@@ -1514,7 +1510,7 @@ Section ProofWriteHead.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== +0x1c jal ra,bread ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x1c)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.write_head + 0x1c)) Rra
               (mword_of_int 2093286 : mword 21) R6 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi1c [-]").
@@ -1562,13 +1558,13 @@ Section ProofWriteHead.
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
-    iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               mA (K - 4)%nat true C b
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                     Hdevi Hdgeom Hdlock Hslot [-]").
-    iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hoctx Hpark Hppid Hheld".
+    iIntros (CID12 Hs12 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hpark Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc20 : ret_pc (mA !!! Regidx Rra : mword 64) = mword_of_int (KernelSyms.write_head + 0x20)).
     { rewrite HmAra. apply bv_eq; vm_compute; reflexivity. }
@@ -1603,7 +1599,7 @@ Section ProofWriteHead.
     iPoseProof (whi_22 with "Htext") as "Hi22".
     iPoseProof (whi_26 with "Htext") as "Hi26".
     iPoseProof (whi_28 with "Htext") as "Hi28".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x20)) Rs1 Ra0
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.write_head + 0x20)) Rs1 Ra0
               mB (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
     iIntros (CID13 Hs13) "Hcg Hpc".
@@ -1629,7 +1625,7 @@ Section ProofWriteHead.
                    = lh_n_pa).
     { rgne. rewrite HB1s2 wh_s44. apply wh_l_lhn. }
     iEval (rewrite -Hlhn) in "Hncell".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x22)) Ra2 Rs2
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.write_head + 0x22)) Ra2 Rs2
               (mword_of_int 44 : mword 12) B1 (K - 4)%nat
               (mword_of_int (Z.of_nat n) : mword 32) b
               ltac:(vm_compute; discriminate) ltac:(rdok)
@@ -1666,7 +1662,7 @@ Section ProofWriteHead.
     iDestruct (bb_word4_acc (b_data (bnode kk)) 1024 (4 * 0)%nat 1020
                  (fun jj => bs0 !!! jj) Hsum0 Hal0 with "Hby") as "[Hcell Hback]".
     iEval (rewrite -Hhaddr) in "Hcell".
-    iApply (wp_csw_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x26)) Ra2 Ra0
+    iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.write_head + 0x26)) Ra2 Ra0
               (mword_of_int 88 : mword 12) B2 (K - 4)%nat
               (bb_mk (fun jj => bs0 !!! jj) (4 * 0)%nat) b
               with "Hcg Hpc Hi26 Hcell [-]").
@@ -1705,7 +1701,7 @@ Section ProofWriteHead.
     - (* ---- n = 0: the loop is skipped entirely ---- *)
       assert (Hcmp : zopz0zKzJ_s (zero_reg : mword 64) (rget B2 Ra2) = true).
       { rewrite HB2a2v. rewrite (wh_geb_s0 (Z.of_nat 0%nat) Hnb31). reflexivity. }
-      iApply (wp_bge_x0_taken_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x28))
+      iApply (wp_bge_x0_taken_s_sconf (mword_of_int (KernelSyms.write_head + 0x28))
                 (mword_of_int 30 : mword 13) Ra2 B2 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) Hcmp ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi28 [-]").
@@ -1719,13 +1715,13 @@ Section ProofWriteHead.
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID16) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-      iApply (wh_tail (CID0 := CID16) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
+      iApply (wh_tail (CID0 := CID16)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev 0%nat W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 f1 m B2 K C b Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB2regs HB2s1
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
     - (* ---- n > 0: set the cursors up and enter the loop ---- *)
@@ -1734,7 +1730,7 @@ Section ProofWriteHead.
         destruct (Z.geb 0 (Z.of_nat (S n'))) eqn:Hgb; [| reflexivity].
         exfalso. rewrite Z.geb_leb in Hgb. apply Z.leb_le in Hgb.
         clear -Hgb. lia. }
-      iApply (wp_bge_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x28))
+      iApply (wp_bge_x0_fall_s_sconf (mword_of_int (KernelSyms.write_head + 0x28))
                 (mword_of_int 30 : mword 13) Ra2 B2 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) Hcmp
                 with "Hcg Hpc Hi28 [-]").
@@ -1749,7 +1745,7 @@ Section ProofWriteHead.
       iPoseProof (whi_36 with "Htext") as "Hi36".
       iPoseProof (whi_38 with "Htext") as "Hi38".
       (* +0x2c auipc a4,0x1f *)
-      iApply (wp_auipc_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x2c)) Ra4
+      iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.write_head + 0x2c)) Ra4
                 (mword_of_int 31 : mword 20) B2 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi2c [-]").
@@ -1762,7 +1758,7 @@ Section ProofWriteHead.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp30) in "Hpc".
       (* +0x30 addi a4,a4,-1810 : a4 := &log.lh.block[0] *)
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x30)) Ra4 Ra4
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.write_head + 0x30)) Ra4 Ra4
                 (mword_of_int 2266 : mword 12) B3 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi30 [-]").
@@ -1789,7 +1785,7 @@ Section ProofWriteHead.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp34) in "Hpc".
       (* +0x34 c.mv a5,a0 *)
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x34)) Ra5 Ra0
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.write_head + 0x34)) Ra5 Ra0
                 B4 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi34 [-]").
       iIntros (CID19 Hs19) "Hcg Hpc".
@@ -1813,7 +1809,7 @@ Section ProofWriteHead.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp36) in "Hpc".
       (* +0x36 c.slli a2,a2,2 *)
-      iApply (wp_cslli_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x36)) (Regidx Ra2) Ra2
+      iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.write_head + 0x36)) (Regidx Ra2) Ra2
                 (mword_of_int 2 : mword 6) B5 (K - 4)%nat b
                 eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi36 [-]").
@@ -1840,7 +1836,7 @@ Section ProofWriteHead.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
       (* +0x38 c.add a2,a2,a0 : a2 := buf + 4n *)
-      iApply (wp_cadd_s_sconf Φ (mword_of_int (KernelSyms.write_head + 0x38)) Ra2 Ra0
+      iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.write_head + 0x38)) Ra2 Ra0
                 B6 (K - 4)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 [-]").
       iIntros (CID21 Hs21) "Hcg Hpc".
@@ -1880,14 +1876,14 @@ Section ProofWriteHead.
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-      iApply (wh_loop (CID0 := CID21) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
+      iApply (wh_loop (CID0 := CID21)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 m K C b (S n') Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA 0%nat B7 f1
                 ltac:(lia) ltac:(lia) Hf14
                 ltac:(intros i' jj Hi' Hjj; exfalso; lia)
                 HB7regs HB7s1 HB7a4 HB7a5 HB7a2
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hoctx Hpark
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hpark
                       Hdevi Hdgeom Hdlock Hframe Hhold HpL HpD Hextra HLauth Hfsb
                       Hncell HW Hperm Hcont").
   Qed.

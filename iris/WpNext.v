@@ -123,11 +123,25 @@ End WpNext.
    [split] here: since the SIE ghost went canonical the per-step fact is a
    bare equation, not a conjunction, and a [split] on an equation is
    [constructor 1] = [eq_refl] and would fail on the first chained step.) *)
+(* THE GOAL'S INDEX AND THE CHAIN'S NEED NOT BE THE SAME TERM.  A PARKING
+   function's own [wp_next] index is the literal [true] (a swtch moves the
+   hart whatever SIE was doing), while the leaves it ran carry its caller's
+   [eb] -- so the hypothesis to discharge and the chain facts are
+   disjunctions with DIFFERENT left components, and a plain [specialize]
+   does not typecheck.  The fallback keeps only the RIGHT disjunct (the
+   left one is [true = false], absurd) and re-injects it at whatever index
+   the chain fact carries.  At a matching index the first branch fires and
+   nothing changes. *)
 Ltac wp_next_chain :=
   let Hd := fresh "Hd" in
   intros Hd;
   repeat match goal with
-         | H : _ = false \/ _ = _ -> _ = _ |- _ => specialize (H Hd)
+         | H : _ = false \/ _ = _ -> _ = _ |- _ =>
+             first
+               [ specialize (H Hd)
+               | specialize (H (or_intror
+                   ltac:(destruct Hd as [Hbad | Hgood];
+                         [ discriminate Hbad | exact Hgood ]))) ]
          end;
   solve [ congruence
         | repeat match goal with

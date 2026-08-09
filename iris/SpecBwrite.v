@@ -61,7 +61,7 @@ Definition K_bwrite : nat := 38%nat.
 Definition wp_bwrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -93,7 +93,7 @@ Definition wp_bwrite_sconf_body
   cpu_own 0 eb pj C b -∗
   (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
      before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
-     [acquire] mints the [trap_csrs_pay 0 eb] its interior sleep needs and its
+     [acquire] mints the [arm_pay 0 eb _] its interior sleep needs and its
      [release] spends it.  A CALLER-held level-0 pay would be a second one, and
      a second one is UNIMPLEMENTABLE above a park -- sleep carries exactly the
      one the pushing acquire minted, so the extra copy would be [trap_csrs] at
@@ -106,10 +106,9 @@ Definition wp_bwrite_sconf_body
   (* the caller's own pid cell, agreeing with the handle's (holdingsleep) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle rw's sleeps thread through *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -139,8 +138,7 @@ Definition wp_bwrite_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the write-through: the handle's disk value is now its bytes *)
       bio_hold0 bn V k pidv dev bno bs bs -∗
@@ -148,14 +146,14 @@ Definition wp_bwrite_sconf_body
          permit invariant is not timeless, and the saved-proposition
          agreement costs the other later, which rw's epilogue pays off). *)
       ▷ Q -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BWRITE.
   Parameter wp_bwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -164,6 +162,6 @@ Module Type BWRITE.
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bs bsd : list (bv 8)) (b : bool)
       (Q : iProp Σ),
-      wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
+      wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
                            pidv dev bno dq m K eb C bs bsd b Q.
 End BWRITE.

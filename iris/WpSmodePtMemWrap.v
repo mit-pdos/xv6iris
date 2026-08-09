@@ -24,7 +24,7 @@ Section WpSmodePtMemWrap.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_cldsp_gpr_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_cldsp_gpr_s_r (R : s_regime)
       (pc : mword 64) (uimm : mword 6) (rd : mword 5)
       (m : regfile) (v : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -57,20 +57,20 @@ Section WpSmodePtMemWrap.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     unfold pa, a8, ea.
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
-    exact (wp_cld_s_r R Φ pc rd csp_rs1 imm m v
+    exact (wp_cld_s_r R pc rd csp_rs1 imm m v
              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq) (dqm:=dqm)
              Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0).
   Qed.
 
 
-  Lemma wp_csdsp_gpr_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_csdsp_gpr_s_r (R : s_regime)
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
       (m : regfile) (vold : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
@@ -101,14 +101,14 @@ Section WpSmodePtMemWrap.
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       pa ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     unfold pa, a8, ea.
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
-    exact (wp_csd_s_r R Φ pc rs2 csp_rs1 imm m vold
+    exact (wp_csd_s_r R pc rs2 csp_rs1 imm m vold
              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)
              HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0).
   Qed.

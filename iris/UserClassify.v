@@ -54,7 +54,7 @@ Section UserClassify.
   (* SHARED trap-delivery tail: given the whole-step reduction lands in the
      canonical [utrap_state], run the ghost update + assemble the frame.
      Reused by the trap / illegal / fetch-fault outcome cases. *)
-  Lemma deliver_user_trap (Ei : coPset) (Φ : mval -> iProp Σ)
+  Lemma deliver_user_trap (Ei : coPset)
       (σ s_x : mstate) (c : TrapCause) (info : option (mword 64))
       (pcx ms_v sc_v stval_v sepc_v va va' : mword 64)
       (elp0 : mword 1) (mst : mword 64) (b : bool) (g : regfile) :
@@ -69,10 +69,10 @@ Section UserClassify.
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va' -∗
     gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
-    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang)) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
-      ▷ (mstate_interp s' ∗ minstret_inv_body ∗ WP (Loop : expr riscv_lang) {{ Φ }}).
+      ▷ (mstate_interp s' ∗ minstret_inv_body ∗ WP (Loop : expr riscv_lang)).
   Proof.
     intros Hmsok Lelp_x Help_ne Hstep.
     iIntros "Hint Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont".
@@ -108,7 +108,7 @@ Section UserClassify.
   (* THE UNIFIED ACTIVE-STEP ARM: run the obligation, dispatch on the
      outcome (retire / trap / illegal / enter-wait / fetch-fault).  The three
      trap-family outcomes share [deliver_user_trap]. *)
-  Lemma active_step_branch (Ei : coPset) (Φ : mval -> iProp Σ)
+  Lemma active_step_branch (Ei : coPset)
       (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
       (g : regfile) (mst : mword 64) (mi : bool) :
     user_mstatus_ok ms_v ->
@@ -126,11 +126,11 @@ Section UserClassify.
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
     gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
     (∀ b : bool, active_step_obligation Ei (set_reg σ (R_bool minstret_increment) b) va g) -∗
-    ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
-       (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+    ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang)) ∧
+       (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang))) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
-      ▷ (mstate_interp s' ∗ minstret_inv_body ∗ WP (Loop : expr riscv_lang) {{ Φ }}).
+      ▷ (mstate_interp s' ∗ minstret_inv_body ∗ WP (Loop : expr riscv_lang)).
   Proof.
     iIntros (Hmsok Lpriv Lms Lpc Hdisp)
       "#Hhw [Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hob Hcont".
@@ -232,7 +232,7 @@ Section UserClassify.
           by (unfold s_trap, s9x; reflexivity).
         rewrite Hs' in Hstep.
         iDestruct "Hcont" as "[_ Hcont]".
-        iApply (deliver_user_trap Ei Φ σ s_x (rv64d_types.Exception e)
+        iApply (deliver_user_trap Ei σ s_x (rv64d_types.Exception e)
                   (xtval_exception_value e xv) pcx ms_v sc_v stval_v sepc_v va va' elp0 mst b g'
                   Hmsok Lelp_x Help_ne Hstep
                   with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont").
@@ -264,7 +264,7 @@ Section UserClassify.
           by (unfold s_trap; reflexivity).
         rewrite Hs' in Hstep.
         iDestruct "Hcont" as "[_ Hcont]".
-        iApply (deliver_user_trap Ei Φ σ s_x (rv64d_types.Exception (E_Illegal_Instr tt))
+        iApply (deliver_user_trap Ei σ s_x (rv64d_types.Exception (E_Illegal_Instr tt))
                   (xtval_exception_value (E_Illegal_Instr tt) (zero_extend' 64 ib)) va ms_v sc_v stval_v sepc_v va va' elp0 mst b g'
                   Hmsok Lelp_x Help_ne Hstep
                   with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont").
@@ -312,7 +312,7 @@ Section UserClassify.
         by (unfold s_trap; reflexivity).
       rewrite Hs' in Hstep.
       iDestruct "Hcont" as "[_ Hcont]".
-      iApply (deliver_user_trap Ei Φ σ s_x (rv64d_types.Exception e)
+      iApply (deliver_user_trap Ei σ s_x (rv64d_types.Exception e)
                 (xtval_exception_value e xv) va ms_v sc_v stval_v sepc_v va va' elp0 mst b g'
                 Hmsok Lelp_x Help_ne Hstep
                 with "[Hreg Hmd] Hmst Hmi Hhs Hpriv Hms Hsc Hstval Hsepc Hpc Hnpc Hgpr Hupt Hcfg Hcont").

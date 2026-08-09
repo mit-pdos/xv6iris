@@ -405,7 +405,8 @@ statements tiny. Iris 4.4's monPred + proofmode support is battle-tested
   acquire/release once; **lock clients are untouched in statement**. The
   same pattern reworks the escrows that carry memory (`StartedInv`'s
   payload becomes `@V`-frozen with `⊒V` delivered by the spin-read + fence).
-- WP: `vProp`-level `WP Loop {{ Φ }}` defined over the base WP à la Cosmo
+- WP: `vProp`-level `WWP Loop` (Φ-free since main's postcondition removal;
+  `WeakGhost.wwp_triv`) defined over the base WP à la Cosmo
   (`wp e := λ V, ∀ V' ⊒ V, seen V' -∗ base_wp …`). The `wp_exec_step`
   layering, masks-at-⊤ discipline, and `iInv` patterns survive with
   objectivity side conditions where invariants open.

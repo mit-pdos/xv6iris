@@ -120,9 +120,8 @@ Qed.
 Section leaf_medeleg.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_csrw_medeleg_leaf Φ (al4 : bool)
+  Lemma wwp_csrw_medeleg_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 : mword 5) (medeleg0 rs1v npc0 : SailStdpp.Values.mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp)
@@ -167,8 +166,8 @@ Section leaf_medeleg.
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        medeleg ↦ᵣ legalize_medeleg medeleg0 rs1v -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrs1nz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrs1c Hcsr #Hbs Hhws Hcont".
@@ -182,7 +181,7 @@ Section leaf_medeleg.
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
     (* the funnel: certificate = nowrite at the fetch-only trace *)
-    iApply (wwp_instr Φ pc false (CSRReg (csr_medeleg, Regidx rs1, zreg, CSRRW))
+    iApply (wwp_instr pc false (CSRReg (csr_medeleg, Regidx rs1, zreg, CSRRW))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -511,9 +510,8 @@ Qed.
 Section leaf_mideleg.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_csrw_mideleg_leaf Φ (al4 : bool)
+  Lemma wwp_csrw_mideleg_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 : mword 5) (mideleg0 : type_of_register mideleg)
       (rs1v npc0 : SailStdpp.Values.mword 64)
@@ -559,8 +557,8 @@ Section leaf_mideleg.
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        mideleg ↦ᵣ mideleg_legalized mideleg0 rs1v -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrs1nz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrs1c Hcsr #Hbs Hhws Hcont".
@@ -574,7 +572,7 @@ Section leaf_mideleg.
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
     (* the funnel: certificate = nowrite at the fetch-only trace *)
-    iApply (wwp_instr Φ pc false (CSRReg (csr_mideleg, Regidx rs1, zreg, CSRRW))
+    iApply (wwp_instr pc false (CSRReg (csr_mideleg, Regidx rs1, zreg, CSRRW))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -852,9 +850,8 @@ Qed.
 Section leaf_mepc.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_csrw_mepc_leaf Φ (al4 : bool)
+  Lemma wwp_csrw_mepc_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 : mword 5) (mepc0 : type_of_register mepc)
       (rs1v npc0 : SailStdpp.Values.mword 64)
@@ -900,8 +897,8 @@ Section leaf_mepc.
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        mepc ↦ᵣ mepc_val rs1v -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrs1nz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrs1c Hcsr #Hbs Hhws Hcont".
@@ -915,7 +912,7 @@ Section leaf_mepc.
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
     (* the funnel: certificate = nowrite at the fetch-only trace *)
-    iApply (wwp_instr Φ pc false (CSRReg (csr_mepc, Regidx rs1, zreg, CSRRW))
+    iApply (wwp_instr pc false (CSRReg (csr_mepc, Regidx rs1, zreg, CSRRW))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -1166,9 +1163,8 @@ Qed.
 Section leaf_mcounteren.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_csrw_mcounteren_leaf Φ (al4 : bool)
+  Lemma wwp_csrw_mcounteren_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 : mword 5) (mcounteren0 : type_of_register mcounteren)
       (rs1v npc0 : SailStdpp.Values.mword 64)
@@ -1214,8 +1210,8 @@ Section leaf_mcounteren.
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        mcounteren ↦ᵣ legalize_mcounteren mcounteren0 rs1v -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrs1nz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrs1c Hcsr #Hbs Hhws Hcont".
@@ -1229,7 +1225,7 @@ Section leaf_mcounteren.
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
     (* the funnel: certificate = nowrite at the fetch-only trace *)
-    iApply (wwp_instr Φ pc false (CSRReg (csr_mcounteren, Regidx rs1, zreg, CSRRW))
+    iApply (wwp_instr pc false (CSRReg (csr_mcounteren, Regidx rs1, zreg, CSRRW))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -1741,9 +1737,8 @@ Qed.
 Section leaf_menvcfg.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_csrw_menvcfg_leaf Φ (al4 : bool)
+  Lemma wwp_csrw_menvcfg_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 : mword 5) (menvcfg0 : type_of_register menvcfg)
       (rs1v npc0 : SailStdpp.Values.mword 64)
@@ -1789,8 +1784,8 @@ Section leaf_menvcfg.
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        menvcfg ↦ᵣ menvcfg_legalized menvcfg0 rs1v -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrs1nz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrs1c Hcsr #Hbs Hhws Hcont".
@@ -1804,7 +1799,7 @@ Section leaf_menvcfg.
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
     (* the funnel: certificate = nowrite at the fetch-only trace *)
-    iApply (wwp_instr Φ pc false (CSRReg (csr_menvcfg, Regidx rs1, zreg, CSRRW))
+    iApply (wwp_instr pc false (CSRReg (csr_menvcfg, Regidx rs1, zreg, CSRRW))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp

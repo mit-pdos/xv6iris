@@ -1114,6 +1114,88 @@ the evidence for every offset. This file is only the worklist.
       is empty because `proc_pub` quantifies the state a SLEEPING->RUNNABLE
       move changes.
 
+- [ ] **S11 — `kfork`. CONTRACT LANDED, PROOF NOT WRITTEN.**  The last
+      function of the process-lifetime cone (allocproc / kexit / kwait are
+      done).  `SpecKfork.v` + `CodeKfork.v` are in and compiling; what is
+      left is `ProofKforkParts.v` / `ProofKfork.v` / `LinkKfork.v`.
+
+      **What landed alongside, all of it reusable and none of it
+      kfork-specific:**
+      * **`SpecUvmcopy` is GENERIC IN `ilvl` now.**  It was pinned at
+        `cpu_own 0%nat` — an artifact of having had no caller that holds a
+        lock — and kfork calls uvmcopy with the CHILD'S LOCK HELD (allocproc
+        returns lock-held), i.e. at `S lvl`.  The sweep is the one
+        `SpecUvmfree`/`SpecUvmunmap`/`SpecFreewalk` already had; the only
+        non-mechanical part was three call sites that discharged the
+        callee's `Z.of_nat _ + 1 < 2^31` premise with an inline
+        `ltac:(vm_compute; reflexivity)` against the literal `0` — fine at a
+        literal, a grind on a symbolic `ilvl` (durable-notes' "`vm_compute`
+        on a symbolic term does not fail fast").  Pass such premises BY NAME.
+      * **`SpecSafestrcpy.v`** — the bounded NUL-terminating copy, stated
+        over `ByteBuf`'s naming functions.  Its postcondition is `ssc_stop`
+        (ONE stop index covering both exits: t's own NUL strictly inside the
+        budget, or the truncation sentinel `n-1`) plus `ssc_post`.  The
+        subtlety worth keeping: on the NUL-found arm the loop's own
+        `(*s++ = *t++)` copies the NUL to index `k` AND the unconditional
+        `*s = 0` after the loop writes a SECOND one at `k+1`, because both
+        cursors were already bumped by the assignment; on the truncation arm
+        only the trailing store fires, at `n-1`.  Verified against a literal
+        simulation of the disassembly over 55992 cases before the proof was
+        attempted — cheap, and it retired the off-by-one question outright.
+      * **`SpecIdup.v` / `LinkIdup.v`** — ASSUMED, `SpecIput.v`'s pattern and
+        `SpecIput.v`'s reason: `ProcInv.cwd_ref` is `FileInv.inode_ref`,
+        which is `emp`, so nothing about `ip->ref`/`itable.lock` is statable
+        until the inode layer exists.
+      * **`SpecForkretPark.v` / `LinkForkretPark.v` — a NEW assumption, and
+        the one worth arguing about.**  Parking a fresh process at RUNNABLE
+        needs `SchedCtx.proc_slots pa RUNNABLE`, hence `▷ proc_ctx pa`, hence
+        a Löb argument about `forkret` — and NOTHING IN THE TREE PRODUCES A
+        FRESH `proc_ctx`.  `SpecAllocproc.v`'s header already said so ("a Löb
+        argument about forkret, which belongs to the caller that parks the
+        process, not here"), and `userinit` — the only other function that
+        parks a process from scratch — dodges it by being assumed WHOLESALE
+        (there is no `ProofUserinit.v`).  kfork cannot dodge it the same way:
+        its body is ordinary provable code, and axiomatising all of it to
+        avoid one step would throw the proof away.  So the step is isolated
+        as its own `Module Type` + `Axiom`, and `ProofKfork.v` is a functor
+        over it.  **Proving `forkret`/`usertrapret` (projects/uservec.md)
+        retires this file and nothing else.**  USED→RUNNABLE is a
+        guard-class crossing, so `proc_slots_recast` cannot help — that is
+        exactly why the assumption is needed rather than merely convenient.
+
+      **What the contract says** (three arms, keyed by the returned a0, all
+      reached through ONE shrink-wrapped epilogue at +0xfc): allocproc found
+      no slot (`-1`, the caller's `on` untouched, or a resealed `None` with
+      allocproc's own out-of-memory witness); uvmcopy failed (`-1`, freeproc
+      reclaimed the child, `kalloc_env None`); success (the child's pid,
+      sign-extended, `kalloc_env None`).  **The count dies at the uvmcopy
+      call on every path past "found a slot"** — uvmcopy and freeproc are
+      both stated only at `kalloc_env γa None` — which is why only the first
+      arm can still report `on`.  The PARENT is read-only on every path and
+      is handed back verbatim.  Nothing about the CHILD comes back: on the
+      failure arm freeproc returns it to `procs_inv`, on the success arm the
+      RUNNABLE park swallows it (design/proc-struct.md's "USED/RUNNING maps
+      to `emp`" is what licenses that).
+
+      **Frame:** byte-identical to `fileclose`'s 8-slot frame, so
+      `ProofFilecloseParts.v` is the structural template.  s2/s3/s4 are
+      LAZILY spilled, so `callee_saved` is a PREMISE of the epilogue and the
+      three arms reach it in three different register states — the
+      `completed/fileclose.md` shape, and the first thing to get right.
+
+      **The fd-slot ledger balances** (checked before building on it): the
+      child's 16 null `ofile_slot`s each own one unit (`ofile_slot_null`),
+      and each `filedup`+install pair consumes exactly one, so the `NOFILE`
+      units cover the worst case and `FDSPARE` is untouched.  Route the
+      supply OUTSIDE the loop, procinit-style.
+
+      **Two loops, both bounded fuel inductions** (`ProofFdalloc.v`'s
+      `Hloop` is the shape; `ProofKexit.v`'s fd loop is the content twin):
+      the trapframe copy (+0x4a..+0x62, 9 iterations x 4 words, end pointer
+      `p->tf + 288`) and the ROTATED fd scan (+0x8e..+0xa2 — increment at the
+      TOP, entry jumps to +0x96, exit `beq s1,s3` at `&p->ofile[16]`).
+      `ProcInv` wants a WRITE twin of `tf_page_word` for the first.
+
 - [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
       shape. Needs an inode model (per-slot fractional auth over `itable`)
       that does not exist yet. Fill it and no caller restates. Two consumers
@@ -1122,14 +1204,35 @@ the evidence for every offset. This file is only the worklist.
       matching pair — sys_chdir's move as well as kexit's) and
       `SpecIput.v`'s precondition.
 
-- [ ] **S6 — `kexit`.** CONTRACT LANDED, PROOF NOT WRITTEN — its own file,
-      [`kexit.md`](kexit.md). What it forced into this layer: parking at
-      ZOMBIE is a different kind of park (the private block cannot ride a
-      closure that never resumes), so `SchedCtx.park_pay` /
+- [x] **S6 — `kexit` PROVEN AND LINKED**, and with it **`sys_exit`** — its own
+      file, [`kexit.md`](../completed/kexit.md). What it forced into this
+      layer: parking at ZOMBIE is a different kind of park (the private block
+      cannot ride a closure that never resumes), so `SchedCtx.park_pay` /
       `proc_slots_park_gen` / `ProcInv.proc_dormant_noctx` now carry it across
       the crossing and the reclaiming scheduler reassembles it.
       `ProcInv.proc_priv_to_dormant_zombie` is the producer of a ZOMBIE block
       and the mirror of kwait's `SpecFreeproc.fp_of_dormant_zombie` consumer.
+
+      **`sys_exit` PROVEN AND LINKED** (`SpecSysExit.v` / `CodeSysExit.v` /
+      `ProofSysExit.v` / `LinkSysExit.v`, over ARGINT + KEXIT;
+      `proof_coverage` reads it `proven`; `Print Assumptions
+      SysExit.wp_sys_exit_sconf` is the 5 `rv64d.*` platform axioms + funext
+      + the one sanctioned `Iput` axiom kexit's cone already rested on —
+      sys_exit adds no axiom of its own).  It is `sys_wait`'s shape (the
+      syscall argument is borrowed out of `proc_priv` via `ProcInv.proc_priv_tf`
+      for the `argint` call and handed back whole before the second callee),
+      with one simplification `sys_wait` does not get: **kexit DIVERGES, so
+      there is no epilogue to prove at all.** gcc does not know `kexit` is
+      `noreturn` and still emits a dead `li a0,0`/pop/`ret` tail after the
+      `jal kexit`, but kexit's own contract has no continuation — its
+      conclusion IS `WP Loop {{Φ}}` — so applying it discharges sys_exit's
+      goal outright; the dead tail is decoded by nobody's proof, and
+      sys_exit's own frame slots are simply framed away into the call rather
+      than rejoined. The other simplification: kexit's contract takes no
+      `status` argument at all (nothing downstream of `p->xstate` is
+      observable from inside its diverging body), so the only thing sys_exit
+      needs from argint is that argument 0 EXISTS in the trapframe — the
+      loaded value itself is never named in the postcondition.
 
 ## The unlinked chain: `fileclose` is the only blocker
 

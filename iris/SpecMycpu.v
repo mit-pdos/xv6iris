@@ -26,8 +26,7 @@ Import Defs.
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64) :=
+Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let a0_idx : mword 5 := mword_of_int 10 in
@@ -42,8 +41,8 @@ Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
       m' !!! Regidx a0_idx = mycpu_ret (rget m0 tp_idx) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
   (* INTERRUPTS MUST BE DISABLED -- xv6 says so in as many words above
      mycpu() ("Interrupts must be disabled"), and the explicit-cpuid refactor
@@ -54,8 +53,7 @@ Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
      it.  At [b = false] no trap is taken, the hart cannot move, and the id is
      the entry hart's -- so the contract is stated at [false] and needs no
      [wp_next] at all (it would collapse by [wp_next_off] anyway). *)
-Definition wp_call_mycpu_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
+Definition wp_call_mycpu_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let m0 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int P 4)]> m in
   let pcE := mword_of_int KernelSyms.mycpu in
@@ -73,16 +71,14 @@ Definition wp_call_mycpu_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `
     ⌜ callee_saved m mo /\
       mo !!! Regidx (mword_of_int 10 : mword 5)
         = mycpu_ret (rget m (mword_of_int 4 : mword 5)) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type MYCPU.
   Parameter wp_mycpu_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64),
-      wp_mycpu_sconf_body Φ m0 n p.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64),
+      wp_mycpu_sconf_body m0 n p.
   Parameter wp_call_mycpu_sconf_cs :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
-      wp_call_mycpu_sconf_cs_body Φ P jimm m n p.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (P : mword 64) (jimm : mword 21) (m : regfile) (n : nat) (p : mword 64),
+      wp_call_mycpu_sconf_cs_body P jimm m n p.
 End MYCPU.

@@ -187,9 +187,47 @@ Global Instance fpnames_inhabited : Inhabited fpnames :=
 Definition fpayUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO fpnames))).
 
-(* the table's ONE ghost: the reference-count authority and the payload names,
-   under a single [γ] -- the [γf] every consumer already threads. *)
-Definition fileUR : ucmra := prodUR frefUR fpayUR.
+(* ------------------------------------------------------------------ *)
+(*  The off-borrow LIVENESS COUNTER (third component)                   *)
+(* ------------------------------------------------------------------ *)
+
+(* [off] lives in a per-slot borrow invariant ([FileOff.v]) whose checked-out
+   disjunct parks a token.  The EXCLUSIVE holder of a slot ([q = 1]) has to be
+   able to refute a STALE checked-out state -- fileclose and sys_open reach
+   [f->off] holding no inode lock at all, so they have nothing to contradict
+   the borrower's marker with.  What contradicts it is a COUNT: one fungible
+   unit per outstanding reference, with the authority riding beside the
+   reference-count authority inside ftable.lock.  At the last reference the
+   authority records ONE, so a second unit -- the parked one -- is impossible,
+   and the cell must be resident.
+
+   The unit is [◯ {[k := 1%positive]}], a CLOSED element: that is what makes it
+   FUNGIBLE, i.e. what lets a borrower prove that the token it takes back on
+   return is the token it parked.  A slice of the borrower's own fraction is
+   not fungible (the invariant hands it back existentially quantified) which is
+   exactly why the marker cannot be one.
+
+   [positiveR], not [natR], for the same reason the reference count uses it: a
+   unit-free count has no zero fragment, so the entry can be DELETED when the
+   last reference goes.  With [natR] a stale [◯ {[k := 0]}] is a legal frame
+   and blocks the deallocating local update. *)
+Definition fliveUR : ucmra := authUR (gmapUR nat positiveR).
+
+(* the table's ONE ghost: the reference-count authority, the payload names and
+   the off-borrow liveness counter, under a single [γ] -- the [γf] every
+   consumer already threads. *)
+Definition fileUR : ucmra := prodUR frefUR (prodUR fpayUR fliveUR).
+
+(* the liveness authority's map is the reference-count map's COUNT column: one
+   unit per outstanding reference, by construction. *)
+Definition Mcount (M : gmap nat (Qp * positive)) : gmap nat positive := snd <$> M.
+
+Lemma Mcount_lookup M k : Mcount M !! k = snd <$> (M !! k).
+Proof. rewrite /Mcount lookup_fmap. reflexivity. Qed.
+Lemma Mcount_insert M k e : Mcount (<[k := e]> M) = <[k := e.2]> (Mcount M).
+Proof. rewrite /Mcount fmap_insert. reflexivity. Qed.
+Lemma Mcount_delete M k : Mcount (delete k M) = delete k (Mcount M).
+Proof. rewrite /Mcount fmap_delete. reflexivity. Qed.
 
 (* [pipeG] is a SUPERCLASS rather than a sibling context assumption, so that
    the ~100 files that merely mention [proc_priv] do not have to name the
@@ -204,15 +242,23 @@ Definition fileΣ : gFunctors := #[GFunctor fileUR; pipeΣ].
 Global Instance subG_fileΣ {Σ} : subG fileΣ Σ -> fileG Σ.
 Proof. solve_inG. Qed.
 
-(* the immutable-while-referenced content of a [struct file]: every field but
-   [ref].  [fc_off] is here for now -- see the "off" note at the bottom. *)
+(* The immutable-while-referenced content of a [struct file]: every field but
+   [ref] AND [off].
+
+   [off] is deliberately NOT here.  It is neither ftable-protected nor
+   immutable-while-referenced: it is mutable under ip->lock, by a holder of an
+   arbitrarily SMALL fraction of the reference (fileread does [f->off += r]
+   holding whatever share its descriptor has).  A fractional content field
+   cannot express that, so [off] lives in its own per-slot borrow invariant --
+   [FileOff.v] -- and the only thing FileInv keeps of it is the CELL ADDRESS
+   [a_foff] and the liveness counter the borrow protocol needs.  See the "off"
+   note at the bottom of this file and design/file-table.md. *)
 Record fcontent := MkFContent {
   fc_type     : mword 32;
   fc_readable : bv 8;
   fc_writable : bv 8;
   fc_pipe     : mword 64;
   fc_ip       : mword 64;
-  fc_off      : mword 32;
   fc_major    : bv 16;
 }.
 
@@ -288,15 +334,30 @@ Proof. lia. Qed.
 Section FileInv.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
 
-  (* ---- the content cells, at an arbitrary dfrac ---- *)
-  Definition file_fields (k : nat) (dq : dfrac) (C : fcontent) : iProp Σ :=
-    (a_ftype k     ↦₄{dq} fc_type C ∗
-     a_freadable k ↦ₘ{dq} fc_readable C ∗
-     a_fwritable k ↦ₘ{dq} fc_writable C ∗
-     a_fpipe k     ↦₈{dq} fc_pipe C ∗
-     a_fip k       ↦₈{dq} fc_ip C ∗
-     a_foff k      ↦₄{dq} fc_off C ∗
-     a_fmajor k    ↦₂{dq} fc_major C)%I.
+  (* ---- the content cells, at an arbitrary fraction ----
+
+     SIX fields: [off] is gone (it is FileOff.v's), and [ref] was never here.
+
+     [a_fip] is held at HALF the nominal fraction, and that is the one piece of
+     asymmetry in this predicate.  The other half is held, PERMANENTLY, by the
+     off-borrow invariant -- which is how that invariant knows WHICH INODE
+     governs this slot's offset.  It has to know: [off] is protected by
+     [ip->lock], so the mutual exclusion between two borrowers of slot [k] is
+     the exclusivity of one inode's lock, and an invariant that cannot name the
+     inode cannot appeal to it.  Points-to agreement then hands a reference
+     holder "the invariant's inode is MY inode" for nothing, with no ghost and
+     no redundant copy of the pointer.  See FileOff.v.
+
+     A [Qp] rather than a [dfrac]: every use is [DfracOwn], the half above is
+     not definable on a discarded share, and the whole design turns on
+     fractions adding back up to one. *)
+  Definition file_fields (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
+    (a_ftype k     ↦₄{DfracOwn q} fc_type C ∗
+     a_freadable k ↦ₘ{DfracOwn q} fc_readable C ∗
+     a_fwritable k ↦ₘ{DfracOwn q} fc_writable C ∗
+     a_fpipe k     ↦₈{DfracOwn q} fc_pipe C ∗
+     a_fip k       ↦₈{DfracOwn (q/2)} fc_ip C ∗
+     a_fmajor k    ↦₂{DfracOwn q} fc_major C)%I.
 
   (* ---- the two components of the table's ghost ----
 
@@ -345,13 +406,75 @@ Section FileInv.
     iDestruct (own_valid_2 with "Ha Hb") as %[Hv _]. done.
   Qed.
 
-  (* the authoritative element, held by [ftable_res] inside ftable.lock *)
+  (* ------------------------------------------------------------------ *)
+  (*  The off-borrow liveness counter                                    *)
+  (* ------------------------------------------------------------------ *)
+
+  (* "own this much of the liveness component and none of the other two" --
+     the same shape as [fref_own], so the counter's laws are stated without
+     the product ever showing. *)
+  Definition flive_own (γ : gname) (a : fliveUR) : iProp Σ :=
+    own γ ((ε, (ε, a)) : fileUR).
+
+  Lemma flive_own_op γ a b : flive_own γ (a ⋅ b) ⊣⊢ flive_own γ a ∗ flive_own γ b.
+  Proof.
+    rewrite /flive_own -own_op.
+    assert (H : (((ε, (ε, a)) : fileUR) ⋅ (ε, (ε, b)))
+                ≡ ((ε, (ε, a ⋅ b)) : fileUR)).
+    { rewrite -!pair_op !left_id. reflexivity. }
+    by rewrite H.
+  Qed.
+
+  Lemma flive_own_update γ a b : (a ~~> b) -> flive_own γ a ==∗ flive_own γ b.
+  Proof.
+    intros Hup. rewrite /flive_own. iApply own_update.
+    apply prod_update; [done|]. cbn [fst snd].
+    apply prod_update; [done | exact Hup].
+  Qed.
+
+  Lemma flive_own_update_2 γ a b a' b' :
+    (a ⋅ b ~~> a' ⋅ b') ->
+    flive_own γ a -∗ flive_own γ b ==∗ flive_own γ a' ∗ flive_own γ b'.
+  Proof.
+    intros Hup. iIntros "Ha Hb".
+    iDestruct (flive_own_op γ a b with "[$Ha $Hb]") as "H".
+    iMod (flive_own_update _ _ (a' ⋅ b') Hup with "H") as "H".
+    by iApply flive_own_op.
+  Qed.
+
+  Lemma flive_own_update_2' γ a b c :
+    (a ⋅ b ~~> c) -> flive_own γ a -∗ flive_own γ b ==∗ flive_own γ c.
+  Proof.
+    intros Hup. iIntros "Ha Hb".
+    iDestruct (flive_own_op γ a b with "[$Ha $Hb]") as "H".
+    by iApply (flive_own_update with "H").
+  Qed.
+
+  Lemma flive_own_valid_2 γ a b :
+    flive_own γ a -∗ flive_own γ b -∗ ⌜✓ (a ⋅ b)⌝.
+  Proof.
+    rewrite /flive_own. iIntros "Ha Hb".
+    iDestruct (own_valid_2 with "Ha Hb") as %[_ [_ Hv]]. done.
+  Qed.
+
+  (* ONE unit of "there is an outstanding reference on slot k".  A closed
+     element, hence fungible: what comes back out of the borrow invariant is
+     provably what went in. *)
+  Definition flive_tok (γ : gname) (k : nat) : iProp Σ :=
+    flive_own γ (◯ {[ k := 1%positive ]}).
+
+  (* the authoritative element, held by [ftable_res] inside ftable.lock.  It is
+     BOTH authorities -- the reference-count one and the off-borrow liveness
+     one, whose map is the count column of the same [M].  Bundling them here
+     rather than adding a conjunct to [ftable_res] keeps every ghost step's
+     statement, and hence every caller, unchanged. *)
   Definition ftable_auth (γ : gname) (M : gmap nat (Qp * positive)) : iProp Σ :=
-    fref_own γ (● M).
+    (fref_own γ (● M) ∗ flive_own γ (● Mcount M))%I.
 
   (* ---- one reference's ghost fragment ---- *)
   Definition fref_tok (γ : gname) (k : nat) (q : Qp) : iProp Σ :=
     fref_own γ (◯ {[ k := (q, 1%positive) ]}).
+
 
   (* ------------------------------------------------------------------ *)
   (*  The payload: the thing a [struct file] is a reference TO            *)
@@ -372,17 +495,17 @@ Section FileInv.
   (* the per-slot payload-names ghost: fractional, agreeing, and updatable
      by whoever holds the whole of it.  See the header above [fpnames]. *)
   Definition fpay_tok (γ : gname) (k : nat) (q : Qp) (pn : fpnames) : iProp Σ :=
-    own γ ((ε, {[ k := (q, to_agree (pn : leibnizO fpnames)) ]}) : fileUR).
+    own γ ((ε, ({[ k := (q, to_agree (pn : leibnizO fpnames)) ]}, ε)) : fileUR).
 
   Lemma fpay_tok_split γ k q1 q2 pn :
     fpay_tok γ k (q1 + q2) pn ⊣⊢ fpay_tok γ k q1 pn ∗ fpay_tok γ k q2 pn.
   Proof.
     rewrite /fpay_tok -own_op.
-    assert (H : (((ε, {[ k := (q1, to_agree (pn : leibnizO fpnames)) ]}) : fileUR)
-                 ⋅ (ε, {[ k := (q2, to_agree (pn : leibnizO fpnames)) ]}))
-                ≡ ((ε, {[ k := ((q1 + q2)%Qp, to_agree (pn : leibnizO fpnames)) ]})
+    assert (H : (((ε, ({[ k := (q1, to_agree (pn : leibnizO fpnames)) ]}, ε)) : fileUR)
+                 ⋅ (ε, ({[ k := (q2, to_agree (pn : leibnizO fpnames)) ]}, ε)))
+                ≡ ((ε, ({[ k := ((q1 + q2)%Qp, to_agree (pn : leibnizO fpnames)) ]}, ε))
                    : fileUR)).
-    { rewrite -pair_op left_id singleton_op -pair_op frac_op agree_idemp.
+    { rewrite -!pair_op !left_id singleton_op -pair_op frac_op agree_idemp.
       reflexivity. }
     by rewrite H.
   Qed.
@@ -391,7 +514,7 @@ Section FileInv.
     fpay_tok γ k q1 pn1 -∗ fpay_tok γ k q2 pn2 -∗ ⌜pn1 = pn2⌝.
   Proof.
     rewrite /fpay_tok. iIntros "H1 H2".
-    iDestruct (own_valid_2 with "H1 H2") as %[_ Hv]. iPureIntro.
+    iDestruct (own_valid_2 with "H1 H2") as %[_ [Hv _]]. iPureIntro.
     simpl in Hv. rewrite singleton_op in Hv. apply singleton_valid in Hv.
     destruct Hv as [_ Hv]; simpl in Hv.
     by apply to_agree_op_valid_L in Hv.
@@ -405,6 +528,7 @@ Section FileInv.
   Proof.
     rewrite /fpay_tok. iIntros "H". iApply (own_update with "H").
     apply prod_update; [done|]. cbn [fst snd].
+    apply prod_update; [|done]. cbn [fst snd].
     apply singleton_update, cmra_update_exclusive. done.
   Qed.
 
@@ -470,7 +594,7 @@ Section FileInv.
      it is filedup, which must run under ftable.lock and bump the physical
      count.  [file_ref γ k 1 C] is the exclusive (writable) state. *)
   Definition file_ref (γ : gname) (k : nat) (q : Qp) (C : fcontent) : iProp Σ :=
-    (fref_tok γ k q ∗ file_fields k (DfracOwn q) C ∗ file_pay γ k q C)%I.
+    (fref_tok γ k q ∗ file_fields k q C ∗ file_pay γ k q C ∗ flive_tok γ k)%I.
 
   (* ---- the ftable lock's resource ----
 
@@ -481,7 +605,7 @@ Section FileInv.
      why fileread can read f->type / f->ip holding no lock. *)
   Definition file_rest (γ : gname) (k : nat) (q : Qp) : iProp Σ :=
     match (1 - q)%Qp with
-    | Some q' => (∃ C, file_fields k (DfracOwn q') C ∗ file_pay γ k q' C)%I
+    | Some q' => (∃ C, file_fields k q' C ∗ file_pay γ k q' C)%I
     | None    => emp%I
     end.
 
@@ -507,7 +631,7 @@ Section FileInv.
     match M !! k with
     | None =>
         (a_fref k ↦₄ (mword_of_int 0 : mword 32) ∗
-         ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k (DfracOwn 1) C ∗
+         ∃ C, ⌜fc_type C = FD_NONE⌝ ∗ file_fields k 1 C ∗
               file_pay γ k 1 C)%I
     | Some (q, n) =>
         (⌜Z.pos n < 2 ^ 31⌝ ∗
@@ -539,21 +663,27 @@ Section FileInv.
 
   (* Two fds onto the same file agree on its content -- for free, because a
      reference carries genuine points-to fractions.  No [agree] ghost. *)
-  Lemma file_fields_agree k dq1 C1 dq2 C2 :
-    file_fields k dq1 C1 -∗ file_fields k dq2 C2 -∗ ⌜C1 = C2⌝.
+  Lemma file_fields_agree k q1 C1 q2 C2 :
+    file_fields k q1 C1 -∗ file_fields k q2 C2 -∗ ⌜C1 = C2⌝.
   Proof.
     rewrite /file_fields.
-    iIntros "(Ht1 & Hr1 & Hw1 & Hp1 & Hi1 & Ho1 & Hm1)".
-    iIntros "(Ht2 & Hr2 & Hw2 & Hp2 & Hi2 & Ho2 & Hm2)".
+    iIntros "(Ht1 & Hr1 & Hw1 & Hp1 & Hi1 & Hm1)".
+    iIntros "(Ht2 & Hr2 & Hw2 & Hp2 & Hi2 & Hm2)".
     iDestruct (word4_pointsto_agree with "Ht1 Ht2") as %E1.
     iDestruct (mem_pointsto_agree with "Hr1 Hr2") as %E2.
     iDestruct (mem_pointsto_agree with "Hw1 Hw2") as %E3.
     iDestruct (word_pointsto_agree with "Hp1 Hp2") as %E4.
     iDestruct (word_pointsto_agree with "Hi1 Hi2") as %E5.
-    iDestruct (word4_pointsto_agree with "Ho1 Ho2") as %E6.
     iDestruct (word2_pointsto_agree with "Hm1 Hm2") as %E7.
     iPureIntro. destruct C1, C2; cbn in *. congruence.
   Qed.
+
+  (* THE FILE'S INODE, read out of a reference at ANY fraction.  This is the
+     bridge the off-borrow invariant is opened with: the invariant holds the
+     OTHER half of the same cell, so agreement identifies the two. *)
+  Lemma file_fields_ip k q C :
+    file_fields k q C -∗ a_fip k ↦₈{DfracOwn (q/2)} fc_ip C.
+  Proof. iIntros "(_ & _ & _ & _ & $ & _)". Qed.
 
   Lemma file_ref_agree γ k q1 C1 q2 C2 :
     file_ref γ k q1 C1 -∗ file_ref γ k q2 C2 -∗ ⌜C1 = C2⌝.
@@ -564,21 +694,20 @@ Section FileInv.
 
   (* the split filedup performs and fileclose undoes. *)
   Lemma file_fields_frac_split k q1 q2 C :
-    file_fields k (DfracOwn (q1 + q2)) C ⊣⊢
-    file_fields k (DfracOwn q1) C ∗ file_fields k (DfracOwn q2) C.
+    file_fields k (q1 + q2) C ⊣⊢ file_fields k q1 C ∗ file_fields k q2 C.
   Proof.
     rewrite /file_fields.
     rewrite (word4_pointsto_frac_split (a_ftype k)).
     rewrite (mem_pointsto_frac_split (a_freadable k)).
     rewrite (mem_pointsto_frac_split (a_fwritable k)).
     rewrite (word_pointsto_frac_split (a_fpipe k)).
-    rewrite (word_pointsto_frac_split (a_fip k)).
-    rewrite (word4_pointsto_frac_split (a_foff k)).
     rewrite (word2_pointsto_frac_split (a_fmajor k)).
+    (* the ip cell is at HALF, and halving distributes over the sum *)
+    rewrite Qp.div_add_distr (word_pointsto_frac_split (a_fip k)).
     iSplit.
-    - iIntros "([A1 B1] & [A2 B2] & [A3 B3] & [A4 B4] & [A5 B5] & [A6 B6] & [A7 B7])".
+    - iIntros "([A1 B1] & [A2 B2] & [A3 B3] & [A4 B4] & [A5 B5] & [A6 B6])".
       iFrame.
-    - iIntros "[(A1 & A2 & A3 & A4 & A5 & A6 & A7) (B1 & B2 & B3 & B4 & B5 & B6 & B7)]".
+    - iIntros "[(A1 & A2 & A3 & A4 & A5 & A6) (B1 & B2 & B3 & B4 & B5 & B6)]".
       iFrame.
   Qed.
 
@@ -624,26 +753,159 @@ Section FileInv.
      sys_open's unlocked initialization and fileclose's [type = FD_NONE]. *)
   Lemma fref_tok_lookup γ M k q :
     ftable_auth γ M -∗ fref_tok γ k q -∗
-    ⌜∃ qt n, M !! k = Some (qt, n) /\
-       (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive)⌝.
+    ⌜∃ qt n, M !! k = Some (qt, n) /\ (qt ≤ 1)%Qp /\
+       (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive) /\
+       (n <> 1%positive -> (q < qt)%Qp)⌝.
   Proof.
-    rewrite /ftable_auth /fref_tok. iIntros "Ha Hf".
+    rewrite /ftable_auth /fref_tok. iIntros "[Ha _] Hf".
     iDestruct (fref_own_valid_2 with "Ha Hf")
-      as %[Hincl _]%auth_both_valid_discrete.
+      as %[Hincl Hval]%auth_both_valid_discrete.
     iPureIntro.
     apply singleton_included_l in Hincl as [y [Hy Hle]].
     apply leibniz_equiv in Hy. destruct y as [qt n]. exists qt, n.
     split; [exact Hy|].
+    (* the authority's own validity bounds the OUTSTANDING total, which is
+       what the [n >= 2] close needs before it may subtract from it. *)
+    split.
+    { specialize (Hval k). rewrite Hy in Hval.
+      destruct Hval as [Hvq _]; simpl in Hvq. by apply frac_valid in Hvq. }
     apply Some_included in Hle as [Heq | Hlt].
     - (* the fragment IS the whole entry: same fraction, count 1 *)
       destruct Heq as [Hq Hn]; cbn in Hq, Hn.
-      split; intros _; [exact Hq | by rewrite -Hn].
-    - (* strictly included, so BOTH components strictly grow *)
+      split; [by intros _|]. split; [by intros _; rewrite -Hn|].
+      intros Hne. exfalso. apply Hne. by rewrite -Hn.
+    - (* strictly included, so BOTH components strictly grow -- and the
+         fraction one is what the [n >= 2] close needs to SUBTRACT. *)
       apply pair_included in Hlt as [Hq Hn]; cbn in Hq, Hn.
       apply frac_included in Hq. apply pos_included in Hn.
-      split; intros Hc.
-      + exfalso. rewrite Hc in Hn. lia.
-      + exfalso. rewrite Hc in Hq. by apply (irreflexivity Qp.lt qt).
+      split; [|split].
+      + intros Hc. exfalso. rewrite Hc in Hn. lia.
+      + intros Hc. exfalso. rewrite Hc in Hq. by apply (irreflexivity Qp.lt qt).
+      + by intros _.
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  The liveness counter's four steps                                   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* They mirror the reference count exactly -- the counter IS the count
+     column of [M] -- so each one is the corresponding [file_*_step]'s local
+     update with the fraction component dropped.  They are separate lemmas
+     rather than inlined so that the reason the counter exists (the borrow
+     protocol, FileOff.v) stays legible here. *)
+
+  Lemma flive_alloc γ (m : gmap nat positive) k :
+    m !! k = None ->
+    flive_own γ (● m) ==∗
+    flive_own γ (● (<[k := 1%positive]> m)) ∗ flive_tok γ k.
+  Proof.
+    intros Hm. iIntros "Ha". rewrite /flive_tok.
+    iMod (flive_own_update _ _
+            (● (<[k := 1%positive]> m) ⋅ ◯ {[k := 1%positive]}) with "Ha") as "H".
+    { apply auth_update_alloc.
+      apply (alloc_singleton_local_update _ k 1%positive); done. }
+    rewrite flive_own_op. by iDestruct "H" as "[$ $]".
+  Qed.
+
+  Lemma flive_dup γ (m : gmap nat positive) k (n : positive) :
+    m !! k = Some n ->
+    flive_own γ (● m) -∗ flive_tok γ k ==∗
+    flive_own γ (● (<[k := Pos.succ n]> m)) ∗ flive_tok γ k ∗ flive_tok γ k.
+  Proof.
+    intros Hm. iIntros "Ha Hf". rewrite /flive_tok.
+    iMod (flive_own_update_2 _ _ _ (● (<[k := Pos.succ n]> m))
+            (◯ {[k := 2%positive]}) with "Ha Hf") as "[$ Hfrag]".
+    { apply auth_update.
+      apply (singleton_local_update _ k n 1%positive (Pos.succ n) 2%positive Hm).
+      apply local_update_discrete. intros mz Hv Hz.
+      split; [done|].
+      destruct mz as [nf|]; simpl in Hz |- *.
+      - rewrite pos_op_add in Hz. rewrite pos_op_add. rewrite Hz.
+        apply pos_succ_1_add.
+      - by rewrite Hz. }
+    assert (Hsp : ({[k := 2%positive]} : gmap nat positive)
+                  = {[k := 1%positive]} ⋅ {[k := 1%positive]}).
+    { rewrite singleton_op. reflexivity. }
+    rewrite Hsp auth_frag_op flive_own_op.
+    by iDestruct "Hfrag" as "[$ $]".
+  Qed.
+
+  Lemma flive_close γ (m : gmap nat positive) k (n : positive) :
+    m !! k = Some (Pos.succ n) ->
+    flive_own γ (● m) -∗ flive_tok γ k ==∗ flive_own γ (● (<[k := n]> m)).
+  Proof.
+    intros Hm. iIntros "Ha Hf". rewrite /flive_tok.
+    iMod (flive_own_update_2' γ (● m) (◯ {[k := 1%positive]})
+            (● (<[k := n]> m)) with "Ha Hf") as "$"; [|done].
+    apply auth_update_dealloc, gmap_local_update. intros i.
+    destruct (decide (i = k)) as [->|Hne]; last first.
+    { assert (Hki : k <> i) by auto.
+      pose proof (lookup_singleton_ne (M:=gmap nat) k i 1%positive Hki) as Hs.
+      pose proof (lookup_insert_ne m k i n Hki) as Hmi.
+      apply local_update_discrete. intros mz Hv Hz.
+      rewrite Hs in Hz. rewrite Hmi. split; [exact Hv | exact Hz]. }
+    pose proof (lookup_singleton (M:=gmap nat) k 1%positive) as Hs.
+    pose proof (lookup_insert m k n) as Hmi.
+    apply local_update_discrete. intros mz Hv Hz.
+    rewrite Hm in Hz, Hv. rewrite Hs in Hz. rewrite Hmi.
+    destruct mz as [[nf|]|]; simpl in Hz.
+    - apply Some_equiv_inj in Hz. rewrite pos_op_add in Hz.
+      assert (Hn' : Pos.succ n = (1 + nf)%positive) by exact Hz.
+      assert (Hnf : nf = n) by lia. subst nf.
+      split; [done | reflexivity].
+    - exfalso. rewrite right_id in Hz. apply Some_equiv_inj in Hz.
+      assert (Hn' : Pos.succ n = 1%positive) by exact Hz. lia.
+    - exfalso. apply Some_equiv_inj in Hz.
+      assert (Hn' : Pos.succ n = 1%positive) by exact Hz. lia.
+  Qed.
+
+  Lemma flive_close_last γ (m : gmap nat positive) k :
+    m !! k = Some 1%positive ->
+    flive_own γ (● m) -∗ flive_tok γ k ==∗ flive_own γ (● (delete k m)).
+  Proof.
+    intros Hm. iIntros "Ha Hf". rewrite /flive_tok.
+    iMod (flive_own_update_2' γ (● m) (◯ {[k := 1%positive]})
+            (● (delete k m)) with "Ha Hf") as "$"; [|done].
+    apply auth_update_dealloc, gmap_local_update. intros i.
+    destruct (decide (i = k)) as [->|Hne]; last first.
+    { assert (Hki : k <> i) by auto.
+      pose proof (lookup_singleton_ne (M:=gmap nat) k i 1%positive Hki) as Hs.
+      pose proof (lookup_delete_ne m k i Hki) as Hmi.
+      apply local_update_discrete. intros mz Hv Hz.
+      rewrite Hs in Hz. rewrite Hmi. split; [exact Hv | exact Hz]. }
+    pose proof (lookup_singleton (M:=gmap nat) k 1%positive) as Hs.
+    pose proof (lookup_delete m k) as Hmi.
+    apply local_update_discrete. intros mz Hv Hz.
+    rewrite Hm in Hz. rewrite Hs in Hz. rewrite Hmi.
+    destruct mz as [[nf|]|]; simpl in Hz.
+    - exfalso. apply Some_equiv_inj in Hz. rewrite pos_op_add in Hz.
+      assert (Hn' : 1%positive = (1 + nf)%positive) by exact Hz. lia.
+    - split; done.
+    - split; done.
+  Qed.
+
+  (* OBLIGATION (b), the ghost half: at the LAST reference the authority
+     records ONE unit, so a second one -- the one a stale checked-out state
+     would be parking -- cannot exist.  This is what lets the exclusive holder
+     of a slot reclaim [f->off] holding NO inode lock. *)
+  Lemma flive_excl_last γ (m : gmap nat positive) k :
+    m !! k = Some 1%positive ->
+    flive_own γ (● m) -∗ flive_tok γ k -∗ flive_tok γ k -∗ False.
+  Proof.
+    intros Hm. iIntros "Ha H1 H2". rewrite /flive_tok.
+    iDestruct (flive_own_valid_2 γ (● m)
+                 (◯ {[k := 1%positive]} ⋅ ◯ {[k := 1%positive]})
+                 with "Ha [H1 H2]") as %Hv.
+    { iApply flive_own_op. iFrame. }
+    iPureIntro.
+    rewrite -auth_frag_op singleton_op pos_op_add in Hv.
+    apply auth_both_valid_discrete in Hv as [Hincl _].
+    apply singleton_included_l in Hincl as [y [Hy Hle]].
+    rewrite Hm in Hy. apply Some_equiv_inj in Hy.
+    assert (Hy' : 1%positive = y) by exact Hy. subst y.
+    apply Some_included in Hle as [Heq | Hlt].
+    - assert (Hc : (1 + 1)%positive = 1%positive) by exact Heq. lia.
+    - apply pos_included in Hlt. lia.
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -655,11 +917,14 @@ Section FileInv.
      exclusive reference. *)
   Lemma file_alloc_step γ M k C :
     M !! k = None ->
-    ftable_auth γ M -∗ file_fields k (DfracOwn 1) C -∗ file_pay γ k 1 C ==∗
+    ftable_auth γ M -∗ file_fields k 1 C -∗ file_pay γ k 1 C ==∗
     ftable_auth γ (<[k := (1%Qp, 1%positive)]> M) ∗ file_ref γ k 1 C.
   Proof.
-    iIntros (HM) "Ha Hf Hp".
+    iIntros (HM) "[Ha Hl] Hf Hp".
     rewrite /ftable_auth /fref_tok.
+    assert (Hml : Mcount M !! k = None)
+      by (rewrite Mcount_lookup HM; reflexivity).
+    iMod (flive_alloc γ (Mcount M) k Hml with "Hl") as "[Hl Hlv]".
     iMod (fref_own_update _ _
             (● (<[k := (1%Qp, 1%positive)]> M) ⋅ ◯ {[k := (1%Qp, 1%positive)]})
             with "Ha") as "H".
@@ -667,7 +932,8 @@ Section FileInv.
       apply (alloc_singleton_local_update _ k (1%Qp, 1%positive)); [done|].
       split; done. }
     rewrite fref_own_op. iDestruct "H" as "[Ha Hfrag]".
-    iModIntro. iFrame "Ha". rewrite /file_ref /fref_tok. iFrame.
+    rewrite Mcount_insert. cbn [snd].
+    iModIntro. iFrame "Ha Hl". rewrite /file_ref /fref_tok. iFrame.
   Qed.
 
   (* filedup: [ref++].  The new reference's fraction comes out of the
@@ -679,8 +945,12 @@ Section FileInv.
     ftable_auth γ (<[k := (qt, Pos.succ n)]> M) ∗
     file_ref γ k (q/2)%Qp C ∗ file_ref γ k (q/2)%Qp C.
   Proof.
-    iIntros (HM) "Ha (Hf & Hc & Hp)".
+    iIntros (HM) "[Ha Hl] (Hf & Hc & Hp & Hlv)".
     rewrite /ftable_auth /fref_tok.
+    assert (Hml : Mcount M !! k = Some n)
+      by (rewrite Mcount_lookup HM; reflexivity).
+    iMod (flive_dup γ (Mcount M) k n Hml with "Hl Hlv") as "(Hl & Hlv1 & Hlv2)".
+    rewrite Mcount_insert. cbn [snd].
     iMod (fref_own_update_2 _ _ _ (● (<[k := (qt, Pos.succ n)]> M))
             (◯ {[k := (q, 2%positive)]}) with "Ha Hf") as "[Ha Hfrag]".
     { apply auth_update.
@@ -691,7 +961,7 @@ Section FileInv.
       destruct mz as [[qf nf]|]; destruct Hz as [Hq Hn]; simpl in Hq, Hn.
       - split; simpl; [exact Hq|]. rewrite Hn !pos_op_add. apply pos_succ_1_add.
       - split; simpl; [exact Hq|]. by rewrite Hn. }
-    iModIntro. iFrame "Ha".
+    iModIntro. iFrame "Ha Hl".
     (* split the fragment: (q/2,1) ⋅ (q/2,1) = (q,2) *)
     rewrite /file_ref /fref_tok.
     assert (Hsp : ({[k := (q, 2%positive)]} : gmap nat (Qp * positive))
@@ -715,13 +985,19 @@ Section FileInv.
     M !! k = Some (qt, Pos.succ n) ->
     (qt - q)%Qp = Some qr ->
     ftable_auth γ M -∗ file_ref γ k q C ==∗
-    ftable_auth γ (<[k := (qr, n)]> M) ∗ file_fields k (DfracOwn q) C ∗
+    ftable_auth γ (<[k := (qr, n)]> M) ∗ file_fields k q C ∗
     file_pay γ k q C.
   Proof.
-    iIntros (HM Hsub) "Ha (Hf & $ & $)".
+    iIntros (HM Hsub) "[Ha Hl] (Hf & Hc & Hp & Hlv)".
     rewrite /ftable_auth /fref_tok.
+    assert (Hml : Mcount M !! k = Some (Pos.succ n))
+      by (rewrite Mcount_lookup HM; reflexivity).
+    iMod (flive_close γ (Mcount M) k n Hml with "Hl Hlv") as "Hl".
+    rewrite Mcount_insert. cbn [snd].
     apply Qp.sub_Some in Hsub.       (* qt = q + qr *)
-    iMod (fref_own_update_2' with "Ha Hf") as "$"; [|done].
+    iMod (fref_own_update_2' γ (● M) (◯ {[k := (q, 1%positive)]})
+            (● (<[k := (qr, n)]> M)) with "Ha Hf") as "Ha"; last first.
+    { iModIntro. iFrame. }
     apply auth_update_dealloc, gmap_local_update. intros i.
     destruct (decide (i = k)) as [->|Hne]; last first.
     { (* untouched slot: the fragment is absent on both sides *)
@@ -773,12 +1049,18 @@ Section FileInv.
   Lemma file_close_last_step γ M k C (qt : Qp) :
     M !! k = Some (qt, 1%positive) ->
     ftable_auth γ M -∗ file_ref γ k qt C ==∗
-    ftable_auth γ (delete k M) ∗ file_fields k (DfracOwn qt) C ∗
+    ftable_auth γ (delete k M) ∗ file_fields k qt C ∗
     file_pay γ k qt C.
   Proof.
-    iIntros (HM) "Ha (Hf & $ & $)".
+    iIntros (HM) "[Ha Hl] (Hf & Hc & Hp & Hlv)".
     rewrite /ftable_auth /fref_tok.
-    iMod (fref_own_update_2' with "Ha Hf") as "$"; [|done].
+    assert (Hml : Mcount M !! k = Some 1%positive)
+      by (rewrite Mcount_lookup HM; reflexivity).
+    iMod (flive_close_last γ (Mcount M) k Hml with "Hl Hlv") as "Hl".
+    rewrite Mcount_delete.
+    iMod (fref_own_update_2' γ (● M) (◯ {[k := (qt, 1%positive)]})
+            (● (delete k M)) with "Ha Hf") as "Ha"; last first.
+    { iModIntro. iFrame. }
     apply auth_update_dealloc, gmap_local_update. intros i.
     destruct (decide (i = k)) as [->|Hne]; last first.
     { (* untouched slot: the fragment is absent on both sides *)
@@ -810,8 +1092,8 @@ Section FileInv.
      licenses [pipeclose(ff.pipe, ff.writable)]. *)
   Lemma file_rest_join γ k (qt : Qp) C :
     (qt ≤ 1)%Qp ->
-    file_fields k (DfracOwn qt) C -∗ file_pay γ k qt C -∗ file_rest γ k qt -∗
-    file_fields k (DfracOwn 1) C ∗ file_pay γ k 1 C.
+    file_fields k qt C -∗ file_pay γ k qt C -∗ file_rest γ k qt -∗
+    file_fields k 1 C ∗ file_pay γ k 1 C.
   Proof.
     intros Hle. rewrite /file_rest.
     destruct (1 - qt)%Qp as [q'|] eqn:Et.
@@ -830,7 +1112,7 @@ Section FileInv.
      tracks OUTSTANDING fraction rather than being pinned at 1. *)
   Lemma file_rest_absorb γ k (qt q qr : Qp) C :
     (qt - q)%Qp = Some qr -> (qt ≤ 1)%Qp ->
-    file_rest γ k qt -∗ file_fields k (DfracOwn q) C -∗ file_pay γ k q C -∗
+    file_rest γ k qt -∗ file_fields k q C -∗ file_pay γ k q C -∗
     file_rest γ k qr.
   Proof.
     intros Hsub Hle. apply Qp.sub_Some in Hsub.   (* qt = q + qr *)
@@ -895,16 +1177,17 @@ Section FileGhostAlloc.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
 
   Lemma fpay_map0_split (γ : gname) (n : nat) :
-    own γ ((ε, fpay_map0 n) : fileUR) ⊢
-    [∗ list] k ∈ seq 0 n, own γ ((ε, {[ k := fpay_v0 ]}) : fileUR).
+    own γ ((ε, (fpay_map0 n, ε)) : fileUR) ⊢
+    [∗ list] k ∈ seq 0 n, own γ ((ε, ({[ k := fpay_v0 ]}, ε)) : fileUR).
   Proof.
     induction n as [|n IH]; [by iIntros "_"|].
     rewrite seq_S big_sepL_app. iIntros "H". cbn [fpay_map0].
     rewrite (insert_singleton_op (fpay_map0 n) n fpay_v0);
       [|apply fpay_map0_none; lia].
-    assert (Hsp : ((ε, {[n := fpay_v0]} ⋅ fpay_map0 n) : fileUR)
-                  ≡ ((ε, {[n := fpay_v0]}) : fileUR) ⋅ ((ε, fpay_map0 n) : fileUR)).
-    { rewrite -pair_op left_id. reflexivity. }
+    assert (Hsp : ((ε, ({[n := fpay_v0]} ⋅ fpay_map0 n, ε)) : fileUR)
+                  ≡ ((ε, ({[n := fpay_v0]}, ε)) : fileUR)
+                    ⋅ ((ε, (fpay_map0 n, ε)) : fileUR)).
+    { rewrite -!pair_op !left_id. reflexivity. }
     rewrite Hsp own_op. iDestruct "H" as "[Hk Hm]".
     iSplitL "Hm"; [by iApply IH | by iFrame].
   Qed.
@@ -913,18 +1196,31 @@ Section FileGhostAlloc.
     ⊢ |==> ∃ γ, ftable_auth γ ∅ ∗
                 [∗ list] k ∈ seq 0 NFILE, ∃ pn, fpay_tok γ k 1 pn.
   Proof.
-    iMod (own_alloc (((● (∅ : gmap nat (Qp * positive))), fpay_map0 NFILE)
+    iMod (own_alloc (((● (∅ : gmap nat (Qp * positive))),
+                      (fpay_map0 NFILE, ● (∅ : gmap nat positive)))
                      : fileUR)) as (γ) "H".
     { split; cbn [fst snd].
       - apply auth_auth_valid. intros i. rewrite lookup_empty. done.
-      - apply fpay_map0_valid. }
+      - split; cbn [fst snd].
+        + apply fpay_map0_valid.
+        + apply auth_auth_valid. intros i. rewrite lookup_empty. done. }
     iModIntro. iExists γ.
-    assert (Hsp : ((● (∅ : gmap nat (Qp * positive)), fpay_map0 NFILE) : fileUR)
-                  ≡ ((● (∅ : gmap nat (Qp * positive)), ε) : fileUR)
-                    ⋅ ((ε, fpay_map0 NFILE) : fileUR)).
-    { rewrite -pair_op right_id left_id. reflexivity. }
+    assert (Hsp : ((● (∅ : gmap nat (Qp * positive)),
+                    (fpay_map0 NFILE, ● (∅ : gmap nat positive))) : fileUR)
+                  ≡ ((● (∅ : gmap nat (Qp * positive)),
+                      (ε, ● (∅ : gmap nat positive))) : fileUR)
+                    ⋅ ((ε, (fpay_map0 NFILE, ε)) : fileUR)).
+    { rewrite -!pair_op !right_id !left_id. reflexivity. }
     rewrite Hsp own_op. iDestruct "H" as "[Ha Hm]".
-    iSplitL "Ha"; [iExact "Ha"|].
+    iSplitL "Ha".
+    { rewrite /ftable_auth /fref_own /flive_own /Mcount fmap_empty.
+      rewrite -own_op.
+      assert (He : (((● (∅ : gmap nat (Qp * positive)), ε) : fileUR)
+                    ⋅ (ε, (ε, ● (∅ : gmap nat positive))))
+                   ≡ ((● (∅ : gmap nat (Qp * positive)),
+                       (ε, ● (∅ : gmap nat positive))) : fileUR)).
+      { rewrite -!pair_op !left_id !right_id. reflexivity. }
+      rewrite He. iExact "Ha". }
     iDestruct (fpay_map0_split with "Hm") as "Hm".
     iApply (big_sepL_mono with "Hm"). intros ? k ?. iIntros "H".
     iExists inhabitant. iExact "H".

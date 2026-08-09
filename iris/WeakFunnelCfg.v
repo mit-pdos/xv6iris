@@ -77,7 +77,7 @@ Section funnelcfg.
       the raw [hart_state] cell and the stepped PC.  The device-frame seam
       [⌜mdev t = mdev s_exec⌝] and the [wstep_post]/[wmstate_norg] plumbing
       are [wwp_cb]'s, verbatim. *)
-  Definition wwp_cb_config Φ (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Definition wwp_cb_config (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (i : instruction) (pmpcfg0 : type_of_register pmpcfg_n)
       (ms0 : SailStdpp.Values.mword 64)
       (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) : iProp Σ :=
@@ -109,9 +109,9 @@ Section funnelcfg.
                  (|={∅, ⊤ ∖ ↑minstretN}=>
                     (wlat_interp (wm_img σ') (wm_log σ') ∗
                      wmstate_norg σ' ∗
-                     WP (Loop : expr weak_riscv_lang) {{ Φ }})))))%I.
+                     WWP Loop)))))%I.
 
-  Lemma wwp_instr_config Φ (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Lemma wwp_instr_config (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (i : instruction) (pmpcfg0 : type_of_register pmpcfg_n)
       (ms0 : SailStdpp.Values.mword 64)
       (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) :
@@ -129,8 +129,8 @@ Section funnelcfg.
     pmpcfg_n ↦ᵣ pmpcfg0 -∗
     PC ↦ᵣ pc -∗
     winstr pc is_rvc i -∗
-    wwp_cb_config Φ pc is_rvc i pmpcfg0 ms0 P Q -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wwp_cb_config pc is_rvc i pmpcfg0 ms0 P Q -∗
+    WWP Loop.
   Proof.
     rewrite /wwp_cb_config.
     iIntros (Hgid Haccpc Hpmp HmIE HMPRV Hcert)
@@ -143,7 +143,7 @@ Section funnelcfg.
         %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct "Hinstr" as "[%Hnlpad Hinstr]".
     iDestruct "Hinstr" as (r) "(%Hrvc & #Hb & %Hdec)".
-    iApply (wp_winstr Φ pc P Q Hgid Haccpc Hcert).
+    iApply (wp_winstr pc P Q Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     iDestruct (wmstate_interp_split_regs σ with "Hσ") as "(Hreg & Hlat & Hnorg)".
     iDestruct (wmstate_norg_facts with "Hnorg") as %[Hbnd Hwf].

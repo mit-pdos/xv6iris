@@ -137,7 +137,6 @@ Section wp_lock.
   Context `{!riscvGS Σ, !weakGS Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Implicit Types R : vProp Σ.
-  Implicit Types Φ : mval → iProp Σ.
 
 (* ====================================================================== *)
 (** ** 3. THE ACQUIRE ATTEMPT — one [amoswap.w.aq] through the invariant
@@ -159,7 +158,7 @@ Section wp_lock.
     writing 1 to the lock word, and the [.aq] raised the scalar floor to the
     timestamp the read half took". *)
 
-  Definition wacq_cb Φ (γ : gname) (lk : Arch.pa) R
+  Definition wacq_cb (γ : gname) (lk : Arch.pa) R
       (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) : iProp Σ :=
     (∀ (σ : wmstate) (v : bv 32),
        ⌜∀ j : nat, (j < 4)%nat →
@@ -178,9 +177,9 @@ Section wp_lock.
                 ((⌜v = lock_zero⌝ ∗ vwp_hold R (wm_ws σ') ∗ locked γ cpu_id)
                  ∨ ⌜v ≠ lock_zero⌝) -∗
                 |={∅, ⊤ ∖ ↑wlockN}=> wmstate_rest σ' ∗
-                  WP (Loop : expr weak_riscv_lang) {{ Φ }}))%I.
+                  WWP Loop))%I.
 
-  Lemma wwp_acquire_swap Φ (γ : gname) (lk : Arch.pa) R
+  Lemma wwp_acquire_swap (γ : gname) (lk : Arch.pa) R
       (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) :
     gen_id = 0%nat →
     acc_wf pc 4 →
@@ -188,11 +187,11 @@ Section wp_lock.
     wstep_cert (fin_to_nat cpu_id) pc P
       (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one) →
     inv wlockN (wlock_inv γ lk R) -∗
-    wacq_cb Φ γ lk R pc P -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wacq_cb γ lk R pc P -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hacclk Hcert) "#Hinv Hk". rewrite /wacq_cb.
-    iApply (wp_winstr Φ pc P (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one)
+    iApply (wp_winstr pc P (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one)
               Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     iDestruct (wmstate_interp_split σ with "Hσ") as "[Hlat Hrest]".
@@ -242,10 +241,10 @@ Section wp_lock.
     with the retry edge an abstract premise of exactly the shape a branch
     leaf has.  Nothing about the LOCK is abstracted. *)
 
-  Lemma wwp_spin_loop Φ (K : iProp Σ) :
-    □ (K -∗ ▷ (K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+  Lemma wwp_spin_loop (K : iProp Σ) :
+    □ (K -∗ ▷ (K -∗ WWP Loop) -∗
+         WWP Loop) -∗
+    K -∗ WWP Loop.
   Proof.
     iIntros "#Hbody HK". iLöb as "IH" forall (K) "Hbody HK".
     iApply ("Hbody" with "HK"). iNext. iIntros "HK".
@@ -258,7 +257,7 @@ Section wp_lock.
       i.e. the [▷] the instruction's own step provides, spent on the branch
       back.  The success branch is inside the caller's callback, where the
       payload and the holder token arrive. *)
-  Lemma wwp_acquire_loop Φ (γ : gname) (lk : Arch.pa) R
+  Lemma wwp_acquire_loop (γ : gname) (lk : Arch.pa) R
       (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) (K : iProp Σ) :
     gen_id = 0%nat →
     acc_wf pc 4 →
@@ -266,14 +265,14 @@ Section wp_lock.
     wstep_cert (fin_to_nat cpu_id) pc P
       (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one) →
     inv wlockN (wlock_inv γ lk R) -∗
-    □ (K -∗ ▷ (K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         wacq_cb Φ γ lk R pc P) -∗
-    K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    □ (K -∗ ▷ (K -∗ WWP Loop) -∗
+         wacq_cb γ lk R pc P) -∗
+    K -∗ WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hacclk Hcert) "#Hinv #Hatt HK".
-    iApply (wwp_spin_loop Φ K with "[] HK").
+    iApply (wwp_spin_loop K with "[] HK").
     iModIntro. iIntros "HK Hrec".
-    iApply (wwp_acquire_swap Φ γ lk R pc P Hgid Haccpc Hacclk Hcert with "Hinv").
+    iApply (wwp_acquire_swap γ lk R pc P Hgid Haccpc Hacclk Hcert with "Hinv").
     iApply ("Hatt" with "HK Hrec").
   Qed.
 
@@ -292,7 +291,7 @@ Section wp_lock.
     (§6); the namespace is a parameter because they are different
     invariants. *)
 
-  Definition wrel_cb Φ R (pc : SailStdpp.Values.mword 64)
+  Definition wrel_cb R (pc : SailStdpp.Values.mword 64)
       (P : wmstate → Prop) (N : namespace) : iProp Σ :=
     (∀ σ : wmstate,
        wlat_interp (wm_img σ) (wm_log σ) -∗
@@ -308,9 +307,9 @@ Section wp_lock.
            ▷ (∀ (tick : bool) (σ' : wmstate),
                 ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
                 |={∅, ⊤ ∖ ↑N}=> wmstate_rest σ' ∗
-                  WP (Loop : expr weak_riscv_lang) {{ Φ }}))%I.
+                  WWP Loop))%I.
 
-  Lemma wwp_release_store Φ (γ : gname) (lk : Arch.pa) R
+  Lemma wwp_release_store (γ : gname) (lk : Arch.pa) R
       (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) :
     gen_id = 0%nat →
     acc_wf pc 4 →
@@ -318,11 +317,11 @@ Section wp_lock.
       (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero) →
     inv wlockN (wlock_inv γ lk R) -∗
     locked γ cpu_id -∗
-    wrel_cb Φ R pc P wlockN -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wrel_cb R pc P wlockN -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hcert) "#Hinv Htok Hk". rewrite /wrel_cb.
-    iApply (wp_winstr Φ pc P (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero)
+    iApply (wp_winstr pc P (wQ_store (Some (fin_to_nat cpu_id)) lk lock_zero)
               Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     iDestruct (wmstate_interp_split σ with "Hσ") as "[Hlat Hrest]".
@@ -355,18 +354,18 @@ Section wp_lock.
     certifiable for any hart, and it is the whole reader-side content of the
     handoff ([WeakStarted.wstarted_deliver] over [WeakInstr.wwp_fence_scl]). *)
 
-  Lemma wwp_started_set Φ (a : Arch.pa) (Pl : vProp Σ)
+  Lemma wwp_started_set (a : Arch.pa) (Pl : vProp Σ)
       (pc : SailStdpp.Values.mword 64) (P : wmstate → Prop) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     wstep_cert (fin_to_nat cpu_id) pc P
       (wQ_store (Some (fin_to_nat cpu_id)) a lock_one) →
     inv wstartedN (wstarted_body a Pl) -∗
-    wrel_cb Φ Pl pc P wstartedN -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wrel_cb Pl pc P wstartedN -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hcert) "#Hinv Hk". rewrite /wrel_cb.
-    iApply (wp_winstr Φ pc P (wQ_store (Some (fin_to_nat cpu_id)) a lock_one)
+    iApply (wp_winstr pc P (wQ_store (Some (fin_to_nat cpu_id)) a lock_one)
               Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     iDestruct (wmstate_interp_split σ with "Hσ") as "[Hlat Hrest]".
@@ -398,7 +397,7 @@ Section wp_lock.
     [wwp_fence_rw_w] (the release fence, which in a promise-free machine
     carries no view content — the STORE publishes). *)
 
-  Lemma wwp_fence_step Φ (pc : SailStdpp.Values.mword 64) (b : barrier_kind)
+  Lemma wwp_fence_step (pc : SailStdpp.Values.mword 64) (b : barrier_kind)
       (P : wmstate → Prop) :
     gen_id = 0%nat →
     acc_wf pc 4 →
@@ -414,11 +413,11 @@ Section wp_lock.
               ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
               ⌜wV_fence b σ (wm_ws σ')⌝
               ={∅,⊤}=∗ wmstate_interp σ' ∗
-                       WP (Loop : expr weak_riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+                       WWP Loop)) -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hcert) "Hk".
-    iApply (wp_winstr Φ pc P (wQ_fence b) Hgid Haccpc Hcert).
+    iApply (wp_winstr pc P (wQ_fence b) Hgid Haccpc Hcert).
     iIntros (σ) "Hσ". iMod ("Hk" $! σ with "Hσ") as "(%Hpc & %Ht & %HP & Hc)".
     iDestruct "Hc" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
@@ -452,7 +451,7 @@ Section wp_lock.
     (It is an [Example], not a theorem of record: what it checks is that the
     two rules' interfaces meet with no adapter.) *)
 
-  Example wwp_release_seq Φ (γ : gname) (lk : Arch.pa) R
+  Example wwp_release_seq (γ : gname) (lk : Arch.pa) R
       (pcf pcs : SailStdpp.Values.mword 64) (Pf Ps : wmstate → Prop) :
     gen_id = 0%nat →
     acc_wf pcf 4 →
@@ -472,11 +471,11 @@ Section wp_lock.
          ▷ (∀ (tick : bool) (σ' : wmstate),
               ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
               ⌜wV_fence Barrier_RISCV_rw_w σ (wm_ws σ')⌝
-              ={∅,⊤}=∗ wmstate_interp σ' ∗ wrel_cb Φ R pcs Ps wlockN)) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+              ={∅,⊤}=∗ wmstate_interp σ' ∗ wrel_cb R pcs Ps wlockN)) -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid Haccf Haccs Hcertf Hcerts) "#Hinv Htok Hk".
-    iApply (wwp_fence_step Φ pcf Barrier_RISCV_rw_w Pf Hgid Haccf Hcertf).
+    iApply (wwp_fence_step pcf Barrier_RISCV_rw_w Pf Hgid Haccf Hcertf).
     iIntros (σ) "Hσ".
     iMod ("Hk" $! σ with "Hσ") as "(%Hpc & %Htext & %HP & Hc)".
     iDestruct "Hc" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
@@ -487,7 +486,7 @@ Section wp_lock.
     iMod ("Hcont" $! tick σ' with "[%] [%]") as "[$ Hrel]";
       [exact Hpost|exact HQ|].
     iModIntro.
-    iApply (wwp_release_store Φ γ lk R pcs Ps Hgid Haccs Hcerts
+    iApply (wwp_release_store γ lk R pcs Ps Hgid Haccs Hcerts
               with "Hinv Htok Hrel").
   Qed.
 
@@ -508,7 +507,7 @@ Section wp_lock.
     own access(es).  The fetch is left generic in kind/address/width, so a
     compressed 2-byte fetch instantiates these too. *)
 
-  Corollary wwp_acquire_swap_cert Φ (γ : gname) (lk : Arch.pa) R
+  Corollary wwp_acquire_swap_cert (γ : gname) (lk : Arch.pa) R
       (pc : SailStdpp.Values.mword 64)
       (akf : akinfo) (pf : Arch.pa) (nf : N) (aka akw : akinfo) :
     gen_id = 0%nat →
@@ -517,54 +516,54 @@ Section wp_lock.
     ak_coh aka = false →
     ak_sync aka = true →
     inv wlockN (wlock_inv γ lk R) -∗
-    wacq_cb Φ γ lk R pc
+    wacq_cb γ lk R pc
       (wP_eff (Some (fin_to_nat cpu_id))
          [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one]) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    WWP Loop.
   Proof.
     intros Hgid Haccpc Hacclk Hcoh Hsync. iIntros "#Hinv Hk".
-    iApply (wwp_acquire_swap Φ γ lk R pc _ Hgid Haccpc Hacclk
+    iApply (wwp_acquire_swap γ lk R pc _ Hgid Haccpc Hacclk
               (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
                  Hcoh Hsync) with "Hinv Hk").
   Qed.
 
-  Corollary wwp_release_store_cert Φ (γ : gname) (lk : Arch.pa) R
+  Corollary wwp_release_store_cert (γ : gname) (lk : Arch.pa) R
       (pc : SailStdpp.Values.mword 64)
       (akf : akinfo) (pf : Arch.pa) (nf : N) (akw : akinfo) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     inv wlockN (wlock_inv γ lk R) -∗
     locked γ cpu_id -∗
-    wrel_cb Φ R pc
+    wrel_cb R pc
       (wP_eff (Some (fin_to_nat cpu_id))
          [WEread akf pf nf; WEwrite akw lk 4 lock_zero]) wlockN -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    WWP Loop.
   Proof.
     intros Hgid Haccpc. iIntros "#Hinv Htok Hk".
-    iApply (wwp_release_store Φ γ lk R pc _ Hgid Haccpc
+    iApply (wwp_release_store γ lk R pc _ Hgid Haccpc
               (wcert_store (fin_to_nat cpu_id) pc akf pf nf akw lk lock_zero)
               with "Hinv Htok Hk").
   Qed.
 
-  Corollary wwp_started_set_cert Φ (a : Arch.pa) (Pl : vProp Σ)
+  Corollary wwp_started_set_cert (a : Arch.pa) (Pl : vProp Σ)
       (pc : SailStdpp.Values.mword 64)
       (akf : akinfo) (pf : Arch.pa) (nf : N) (akw : akinfo) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     inv wstartedN (wstarted_body a Pl) -∗
-    wrel_cb Φ Pl pc
+    wrel_cb Pl pc
       (wP_eff (Some (fin_to_nat cpu_id))
          [WEread akf pf nf; WEwrite akw a 4 lock_one]) wstartedN -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    WWP Loop.
   Proof.
     intros Hgid Haccpc. iIntros "#Hinv Hk".
-    iApply (wwp_started_set Φ a Pl pc _ Hgid Haccpc
+    iApply (wwp_started_set a Pl pc _ Hgid Haccpc
               (wcert_store (fin_to_nat cpu_id) pc akf pf nf akw a lock_one)
               with "Hinv Hk").
   Qed.
 
   (** ... and the loop, whose only premise is now the caller's retry edge. *)
-  Corollary wwp_acquire_loop_cert Φ (γ : gname) (lk : Arch.pa) R
+  Corollary wwp_acquire_loop_cert (γ : gname) (lk : Arch.pa) R
       (pc : SailStdpp.Values.mword 64)
       (akf : akinfo) (pf : Arch.pa) (nf : N) (aka akw : akinfo) (K : iProp Σ) :
     gen_id = 0%nat →
@@ -573,14 +572,14 @@ Section wp_lock.
     ak_coh aka = false →
     ak_sync aka = true →
     inv wlockN (wlock_inv γ lk R) -∗
-    □ (K -∗ ▷ (K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         wacq_cb Φ γ lk R pc
+    □ (K -∗ ▷ (K -∗ WWP Loop) -∗
+         wacq_cb γ lk R pc
            (wP_eff (Some (fin_to_nat cpu_id))
               [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one])) -∗
-    K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    K -∗ WWP Loop.
   Proof.
     intros Hgid Haccpc Hacclk Hcoh Hsync. iIntros "#Hinv #Hatt HK".
-    iApply (wwp_acquire_loop Φ γ lk R pc _ K Hgid Haccpc Hacclk
+    iApply (wwp_acquire_loop γ lk R pc _ K Hgid Haccpc Hacclk
               (wcert_amo_aq (fin_to_nat cpu_id) pc akf pf nf aka akw lk lock_one
                  Hcoh Hsync) with "Hinv Hatt HK").
   Qed.

@@ -73,7 +73,7 @@ Import Defs.
 
 
 Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (ilvl : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmunmap in
@@ -110,16 +110,16 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_del_run P vpn0 npages) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMUNMAP.
   Parameter wp_uvmunmap_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (P : uptd) (npages : nat) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (ilvl : nat) (b : bool),
-      wp_uvmunmap_sconf_body γa Φ mm P npages K eb p C ilvl b.
+      wp_uvmunmap_sconf_body γa mm P npages K eb p C ilvl b.
 End UVMUNMAP.
 
 (* --------------------------------------------------------------------- *)
@@ -136,7 +136,7 @@ End UVMUNMAP.
 (* --------------------------------------------------------------------- *)
 
 Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (uroot : mword 44) (um : gmap (mword 27) (mword 64))
     (npages : nat) (K : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (ilvl : nat) (b : bool) :=
@@ -167,17 +167,17 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     bare_pt uroot (um_del_run um vpn0 npages) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMUNMAP_BARE.
   Parameter wp_uvmunmap_bare_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (uroot : mword 44) (um : gmap (mword 27) (mword 64))
       (npages : nat) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (ilvl : nat) (b : bool),
-      wp_uvmunmap_bare_sconf_body γa Φ mm uroot um npages K eb p C ilvl b.
+      wp_uvmunmap_bare_sconf_body γa mm uroot um npages K eb p C ilvl b.
 End UVMUNMAP_BARE.
 
 (* --------------------------------------------------------------------- *)
@@ -214,7 +214,7 @@ End UVMUNMAP_BARE.
 (* --------------------------------------------------------------------- *)
 
 Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
     (um : gmap (mword 27) (mword 64)) (v : mword 27)
     (K : nat) (eb : bool) (p : mword 64)
@@ -251,16 +251,16 @@ Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     uptg (delete v fx) uroot um -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMUNMAP_FIXED.
   Parameter wp_uvmunmap_fixed_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (fx : gmap (mword 27) (mword 64)) (uroot : mword 44)
       (um : gmap (mword 27) (mword 64)) (v : mword 27)
       (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (ilvl : nat) (b : bool),
-      wp_uvmunmap_fixed_sconf_body γa Φ mm fx uroot um v K eb p C ilvl b.
+      wp_uvmunmap_fixed_sconf_body γa mm fx uroot um v K eb p C ilvl b.
 End UVMUNMAP_FIXED.

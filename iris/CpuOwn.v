@@ -99,7 +99,7 @@ Section CpuOwn.
       (C : iProp Σ) :
     sie_arm true p -∗ cpu_own n' eb' p' C false -∗ False.
   Proof.
-    iIntros "(_ & _ & _ & _ & _ & Hh) [Hh' _]".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & Hh) [Hh' _]".
     iApply (cpu_hart_excl with "Hh Hh'").
   Qed.
 

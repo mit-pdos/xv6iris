@@ -96,9 +96,9 @@ Import Defs.
 
 
 Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-    (C : iProp Σ) (b : bool) :=
+    (C : iProp Σ) (ilvl : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmcopy in
   let sz := mm !!! Regidx (mword_of_int 12) in
   let vpn0 := svpn_of (mword_of_int 0 : mword 64) in
@@ -107,6 +107,10 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   (* 10-slot frame + mappages' 32 (kalloc 14, uvmunmap 22, walk-noalloc 8,
      memmove 2 all fit inside it) *)
   (42 <= K)%nat ->
+  (* [ilvl] is the interrupt nesting level: kfree's acquire/release keep the
+     transient noff increment in int range.  It used to be pinned at 0 --
+     an artifact of the boot-time callers. *)
+  (Z.of_nat ilvl + 1 < 2 ^ 31)%Z ->
   mm !!! Regidx (mword_of_int 4 : mword 5) = cid_word ->
   mm !!! Regidx (mword_of_int 10) = page_base Pold.(ud_root) ->
   mm !!! Regidx (mword_of_int 11) = page_base Pnew.(ud_root) ->
@@ -116,7 +120,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
      it is what makes the failure arm's rollback exact) *)
   (forall i, (i < n)%nat -> Pnew.(ud_um) !! vpn_at vpn0 i = None) ->
   sie_cap_gpr mm K b p -∗
-  cpu_own 0%nat eb p C b -∗
+  cpu_own ilvl eb p C b -∗
   kernel_text -∗
   pc_is pcE -∗
   proc_pt Pold -∗
@@ -125,7 +129,7 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mr : regfile),
     sie_cap_gpr mr K b p -∗
-    cpu_own 0%nat eb p C b -∗
+    cpu_own ilvl eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     (* the parent's table comes back verbatim *)
@@ -149,14 +153,14 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
                 w' = pte_set_ad (uvm_pte (pte_flags10 w) r) a d
             end⌝ ∗
          proc_pt P') ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMCOPY.
   Parameter wp_uvmcopy_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (Pold Pnew : uptd) (K : nat) (eb : bool) (p : mword 64)
-      (C : iProp Σ) (b : bool),
-      wp_uvmcopy_sconf_body γa Φ mm Pold Pnew K eb p C b.
+      (C : iProp Σ) (ilvl : nat) (b : bool),
+      wp_uvmcopy_sconf_body γa mm Pold Pnew K eb p C ilvl b.
 End UVMCOPY.

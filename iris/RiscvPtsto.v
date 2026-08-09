@@ -181,6 +181,37 @@ Record riscvEraGS := RiscvEraGS {
      parameterized.  The functor instance comes from [sieG] at the use sites,
      for the same reason spelled out for [strans_name] above. *)
   era_sie_name : CPU -> gname;
+  (* mstatus.SPP's ghost MIRROR, canonically per hart -- the same shape as
+     [sie_name], and needed for a reason the other trap-scribbled state does
+     not have.  A trap writes sepc / scause / stval AND mstatus.SPP; the
+     first three are whole registers, so ownership of them moves by moving
+     the cell (they sit in [IntrDefs.trap_csrs], inside [sie_arm true] while
+     interrupts are enabled and in the code's hands while they are off).
+     SPP is a BIT INSIDE mstatus, and mstatus cannot leave [sconf] -- SIE
+     lives there too, and so do the well-formedness facts -- so its
+     ownership has to move as a ghost instead.
+
+     Hence TWO halves, exactly as SIE has: one TIED inside [sconf] to
+     [_get_Mstatus_SPP ms], and one that travels with [trap_csrs], held at
+     an EXISTENTIAL value by the enabled arm (a trap can rewrite SPP between
+     any two instructions) and at a PINNED value by interrupts-off code.
+     That is what lets a trap handler entered from S-mode still know, four
+     instructions later, that SPP = 1 -- the fact the funnel's [exists ms]
+     would otherwise destroy.
+
+     The [ghost_varG Σ (mword 1)] functor instance comes from [sieG] at the
+     use sites, NOT from a field here, for the same reason spelled out for
+     [strans_name]: a second instance of that class would make resolution
+     ambiguous.  SPP is one bit, so [sieG]'s instance already fits. *)
+  era_spp_name : CPU -> gname;
+  (* mstatus.SPIE's mirror, the twin of [spp_name] and travelling with it.
+     SPIE is the OTHER bit an [sret] reads (it restores SIE from it), it is
+     written by the same trap, and it is preserved by the same SIE flips --
+     so it obeys the identical discipline and the two are always held
+     together, as [IntrDefs.sret_bits].  Two names rather than one ghost over
+     a pair only because [sieG]'s [ghost_varG (mword 1)] then serves both
+     with no new class. *)
+  era_spie_name : CPU -> gname;
   (* THE PARK RECEIPT, CANONICALLY per proc slot.  One [ghost_var bool] per
      entry of the proc[] array, recording whether hart-h's parked scheduler
      record is RESIDENT in the global [SchedCtx.scheds_inv] slot of the hart
@@ -201,6 +232,17 @@ Record riscvEraGS := RiscvEraGS {
      every one of the ~50 files that mention [procs_inv].  The function is
      total; only indices below [NPROC] are ever owned. *)
   era_park_name : nat -> gname;
+  (* THE PER-PROC STATE MIRROR (design/proc-struct.md, the state ghost).
+     Two halves of a [ghost_var] carrying [p->state]'s value: the proc lock
+     invariant owns one, tied to the cell, and the other is lock-resident
+     except at the two states where a THREAD has claimed the proc (RUNNING,
+     USED).  Since a ghost_var cannot move on half alone and the cell cannot
+     move without the ghost, the right to WRITE [p->state] is exactly
+     ownership of the second half.
+
+     Canonical for the same reason as [era_park_name] directly above: it is
+     named inside [SchedCtx.proc_lock_res], hence inside [procs_inv]. *)
+  era_pstate_name : nat -> gname;
   (* THE DISK IMAGE MAP (claude-notes/design/crash.md, design/fs-log.md
      stage 4): a byte-granularity ghost map mirroring [v_disk], tied to the
      state by [disk_dur_interp] below -- ONE conjunct of this era's
@@ -256,12 +298,16 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
   riscvF_parkGS :: ghost_varG Σ bool;
+  (* the per-proc state mirror's typing (the NAME is per-era, above).  A
+     [mword 32] instance of its own -- no other ghost_var in the record
+     carries one, so nothing else can be confused with it. *)
+  riscvF_pstateGS :: ghost_varG Σ (SailStdpp.Values.mword 32);
   (* the FS log-region mirror's typing (the NAME is per-era, above) *)
   riscvF_mirrorGS :: ghost_varG Σ log_mirror;
   (* the byte memory's PRE-class: the era layer stores only the two heap
      GNAMES (a [gen_heapGS] bundle would drag Σ into the era record, and
      the era record must be Σ-FREE so it can be a [ghost_map] VALUE in
-     the generation registry -- claude-notes/projects/crash.md); the
+     the generation registry -- claude-notes/completed/crash.md); the
      full [gen_heapGS] is reconstructed below as [riscv_memGS]. *)
   riscvF_memGpreS :: gen_heapGpreS Arch.pa (bv 8) Σ;
   (* the power/crash layer (claude-notes/design/crash.md): the GENERATION
@@ -357,6 +403,8 @@ Definition riscv_kmapGS `{!riscvGS Σ} :
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
 Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ bool := riscvF_parkGS.
+Definition riscv_pstateGS `{!riscvGS Σ} : ghost_varG Σ (SailStdpp.Values.mword 32) :=
+  riscvF_pstateGS.
 Definition era_memGS_of `{!riscvFixedGS Σ} (E : riscvEraGS) : gen_heapGS Arch.pa (bv 8) Σ :=
   GenHeapGS _ _ _ (era_heap_name E) (era_meta_name E).
 Global Instance riscv_memGS `{!riscvGS Σ} : gen_heapGS Arch.pa (bv 8) Σ :=
@@ -369,7 +417,10 @@ Definition kmap_name `{!riscvGS Σ} : gname := era_kmap_name riscv_eraGS.
 Definition kpt_name `{!riscvGS Σ} : gname := era_kpt_name riscv_eraGS.
 Definition strans_name `{!riscvGS Σ} : CPU -> gname := era_strans_name riscv_eraGS.
 Definition sie_name `{!riscvGS Σ} : CPU -> gname := era_sie_name riscv_eraGS.
+Definition spp_name `{!riscvGS Σ} : CPU -> gname := era_spp_name riscv_eraGS.
+Definition spie_name `{!riscvGS Σ} : CPU -> gname := era_spie_name riscv_eraGS.
 Definition park_name `{!riscvGS Σ} : nat -> gname := era_park_name riscv_eraGS.
+Definition pstate_name `{!riscvGS Σ} : nat -> gname := era_pstate_name riscv_eraGS.
 (* the AMBIENT era's disk-image gname: what [DiskPtsto.disk_names]'s [dn_img]
    field is always constructed at ([VirtioProto.disk_ghosts_alloc]), and what
    [RiscvExec.wp_disk_step] hands the disk thread.  The seam equation the
@@ -1398,6 +1449,27 @@ Global Program Instance riscv_irisGS `{!riscvFixedGS Σ} : irisGS riscv_lang Σ 
 }.
 Next Obligation. intros. iIntros "H". by iModIntro. Qed.
 
+(* [to_val] is unconditionally [None] for every [expr riscv_lang] (there are
+   no values -- [mval := Empty_set]), so the [Some v] case of [wp_pre] is
+   dead code and a WP never actually inspects its postcondition: any two
+   postconditions give provably equivalent WPs ([wp_mono] discharged by a
+   vacuous case analysis on [Empty_set]). [wp_triv] pins the postcondition to
+   the canonical [True], and the notations below drop the now-pointless
+   [{{ Φ }}] clause entirely -- every WP in this project is over riscv_lang,
+   so a postcondition position never needs to be written at all. *)
+Lemma wp_post_irrel `{!irisGS riscv_lang Σ} s E (e : expr riscv_lang) (Φ1 Φ2 : mval -> iProp Σ) :
+  WP e @ s; E {{ Φ1 }} ⊢ WP e @ s; E {{ Φ2 }}.
+Proof. iApply wp_mono. iIntros ([]). Qed.
+
+Definition wp_triv `{!irisGS riscv_lang Σ} (E : coPset) (e : expr riscv_lang) : iProp Σ :=
+  WP e @ E {{ _, True%I }}.
+
+Lemma wp_triv_eq `{!irisGS riscv_lang Σ} E e Φ : wp_triv E e ⊣⊢ WP e @ E {{ Φ }}.
+Proof. rewrite /wp_triv. iSplit; iApply wp_post_irrel. Qed.
+
+Notation "'WP' e @ E" := (wp_triv E e%E) (at level 20, e at level 20) : bi_scope.
+Notation "'WP' e" := (wp_triv ⊤ e%E) (at level 20, e at level 20) : bi_scope.
+
 (* Focus the ambient hart's register bridge out of the global one, with a
    frame-preserving update handle to put an updated bridge back.  This is the
    single point where per-hart framing happens; leaf WPs never see it. *)
@@ -1913,4 +1985,3 @@ Proof. rewrite /phys_pointsto. apply _. Qed.
 Global Instance phys_word_pointsto_timeless `{!riscvGS Σ} a dq w :
   Timeless (phys_word_pointsto a dq w).
 Proof. rewrite /phys_word_pointsto. apply _. Qed.
-

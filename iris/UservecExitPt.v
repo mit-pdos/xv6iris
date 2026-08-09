@@ -121,7 +121,7 @@ Section UservecExitPt.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_uservec_exit_pt (kroot uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
+      (um : gmap (mword 27) (mword 64))
       (m : regfile) (ksatp : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     (* S-mode config *)
@@ -167,8 +167,8 @@ Section UservecExitPt.
       pt_frame (upt_tree_spec uroot tfp um) -∗
       pc_is (ret_pc (m !!! Regidx (mword_of_int 5))) -∗
       gpr_file (<[Regidx (mword_of_int 1) := regval_into_reg (uva 0x9c)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM Hmm HPBMTE Hmenvval0 Hwf Ht1 HkMode Hkasid Hkppn.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv #Hclaim Hutlb Hkfr [Hpc Hnpc]
@@ -186,7 +186,7 @@ Section UservecExitPt.
     assert (Hva04 : add_vec_int (uva 0x9a) 2 = uva 0x9c)
       by (apply bv_eq; vm_compute; reflexivity).
     (* ============ STEP 1: sfence.vma under the USER invariant ========== *)
-    iApply (wp_instr_u_pt uroot tfp um Φ (uva 0x8e) (upa 0x8e) false ai_sfence
+    iApply (wp_instr_u_pt uroot tfp um (uva 0x8e) (upa 0x8e) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -234,7 +234,7 @@ Section UservecExitPt.
     iEval (rewrite Lnpc1) in "Hpc".
     iNext.
     (* ============ STEP 2: csrw satp,t1 -- ENTER the window ============= *)
-    iApply (wp_instr_u_pt uroot tfp um Φ (uva 0x92) (upa 0x92) false
+    iApply (wp_instr_u_pt uroot tfp um (uva 0x92) (upa 0x92) false
               (CSRReg (csr_satp, Regidx (mword_of_int 6 : mword 5), zreg, CSRRW))
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -304,7 +304,7 @@ Section UservecExitPt.
     iApply (wp_instr_pt2_tramp kroot (upt_tree_spec uroot tfp um) (kpt_tree_spec_gen kroot M)
               (upt_pt2_tramp_spec uroot tfp um Hwf) (kpt_pt2_tramp_spec_gen kroot M HMtramp)
               ltac:(intros t Ht; exact (proj1 Ht))
-              Φ (uva 0x96) (upa 0x96) false ai_sfence
+              (uva 0x96) (upa 0x96) false ai_sfence
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)
@@ -352,7 +352,7 @@ Section UservecExitPt.
     iEval (rewrite Lnpc3) in "Hpc".
     iNext.
     (* ============ STEP 4: c.jalr t0 under the KERNEL invariant ========= *)
-    iApply (wp_instr_ktramp_pt kroot Φ (uva 0x9a) (upa 0x9a) true
+    iApply (wp_instr_ktramp_pt kroot (uva 0x9a) (upa 0x9a) true
               (JALR (zeros' 12, Regidx (mword_of_int 5 : mword 5), ra))
               mstatus0 mie_v mdv0 menvcfg0 dq
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0

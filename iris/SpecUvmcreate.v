@@ -59,7 +59,7 @@ Definition uvmcreate_post `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN
        kalloc_env γa (avail_sub on 1)))%I.
 
 Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
+    (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
   (18 <= K)%nat ->
@@ -77,12 +77,12 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
     ⌜callee_saved mm mr⌝ -∗
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4))
       (mr !!! Regidx (mword_of_int 10)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMCREATE.
   Parameter wp_uvmcreate_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_uvmcreate_sconf_body γa Φ mm lvl K eb p C on b.
+      (γa : gname) (mm : regfile) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_uvmcreate_sconf_body γa mm lvl K eb p C on b.
 End UVMCREATE.

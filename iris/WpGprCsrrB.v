@@ -246,6 +246,54 @@ Proof.
   rewrite H. apply exec_returnm.
 Qed.
 
+(* ===== stval (0x143): the second of the three trap-scratch CSRs, and    *)
+(* character-for-character scause's twin -- Ext_S-gated, read = the        *)
+(* register itself, no subrange and no lowering. ===== *)
+Definition csr_stval : mword 12 := Ox"143".
+
+Lemma exec_read_CSR_stval s :
+  exec (read_CSR (Ox"143")) s = Some (register_lookup stval s.(sregs), s).
+Proof. drive_csr. reflexivity. Qed.
+
+Lemma exec_csr_id_read_callback_stval s d :
+  exec (csr_id_read_callback csr_stval d) s = Some (tt, s).
+Proof.
+  assert (H : csr_id_read_callback csr_stval d = returnM tt) by (vm_compute; reflexivity).
+  rewrite H. apply exec_returnm.
+Qed.
+
+(* ===== sepc (0x141): the third, and the one that is NOT its cell.  The   *)
+(* read is [get_xepc Supervisor], which runs the raw word through          *)
+(* [align_pc]; with Zca enabled -- misa.C = 1 on this platform, hence the  *)
+(* premise -- that clears bit 0.  Every WRITE goes through [legalize_xepc],*)
+(* which clears the same bit, so the cell can only ever hold an aligned    *)
+(* word and the wrapper is the identity in practice; nothing here assumes  *)
+(* that, and a caller who knows it collapses the wrapper itself.  The      *)
+(* wrapper term is spelled out rather than named: it is definitionally     *)
+(* [WpGprCsrwA.mepc_val], the legalizer shared with mepc, and introducing  *)
+(* a second name for it here would be the duplication, not the fix. ===== *)
+Definition csr_sepc : mword 12 := Ox"141".
+
+Lemma exec_read_CSR_sepc s :
+  eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (read_CSR (Ox"141")) s
+    = Some (update_vec_dec (register_lookup sepc s.(sregs)) 0 ('b"0"), s).
+Proof.
+  intro HmisaC. drive_csr.
+  unfold get_xepc. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg sepc s)).
+  unfold align_pc.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_currentlyEnabled_Zca s HmisaC)).
+  cbn zeta match. apply exec_returnM.
+Qed.
+
+Lemma exec_csr_id_read_callback_sepc s d :
+  exec (csr_id_read_callback csr_sepc d) s = Some (tt, s).
+Proof.
+  assert (H : csr_id_read_callback csr_sepc d = returnM tt) by (vm_compute; reflexivity).
+  rewrite H. apply exec_returnm.
+Qed.
+
 Lemma menvcfg_rdval_set_nextPC (s : mstate) (v : mword 64) :
   menvcfg_rdval (set_reg s nextPC v) = menvcfg_rdval s.
 Proof. unfold menvcfg_rdval; rewrite ?sregs_set_reg.
@@ -277,7 +325,7 @@ Section WpCsrrGprB.
      instruction reads: the continuation is ∀-quantified over the read value
      [tv].  (No clock_inv opening is needed either -- the exec witness reads
      mtime straight off the abstract step state σ.) *)
-  Lemma wp_csrr_time_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_time_gpr (pc : mword 64) (rd : mword 5)
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -293,8 +341,8 @@ Section WpCsrrGprB.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg tv]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -305,7 +353,7 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -353,7 +401,7 @@ Section WpCsrrGprB.
   Qed.
 
   (* menvcfg (0x30A): Ext_U-gated; misa.U recovered from hw_config. *)
-  Lemma wp_csrr_menvcfg_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_menvcfg_gpr (pc : mword 64) (rd : mword 5)
       (menvcfg_in : mword 64) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -371,8 +419,8 @@ Section WpCsrrGprB.
       gpr_file (<[Regidx rd :=
         regval_into_reg (menvcfg_in)]> m) -∗
       menvcfg ↦ᵣ menvcfg_in -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -383,7 +431,7 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -439,7 +487,7 @@ Section WpCsrrGprB.
   (* sie (0x104): Ext_S-gated; misa.S recovered from hw_config.  The read
      value is a VIEW over TWO registers ([lower_mie mie mideleg]), so both
      cells are threaded (returned unchanged). *)
-  Lemma wp_csrr_sie_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_csrr_sie_gpr (pc : mword 64) (rd : mword 5)
       (mie_in mideleg_in : mword 64) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -459,8 +507,8 @@ Section WpCsrrGprB.
         regval_into_reg (lower_mie mie_in mideleg_in)]> m) -∗
       mie ↦ᵣ mie_in -∗
       mideleg ↦ᵣ mideleg_in -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hmie Hmdl Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -471,7 +519,7 @@ Section WpCsrrGprB.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr Φ pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) pmpcfg0
+    iApply (wp_instr pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

@@ -69,7 +69,7 @@ Import Defs.
 
 
 Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (ilvl : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freewalk in
@@ -98,14 +98,14 @@ Definition wp_freewalk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
     cpu_own ilvl eb p C b -∗
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FREEWALK.
   Parameter wp_freewalk_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (t : ptree) (lvl : nat) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (ilvl : nat) (b : bool),
-      wp_freewalk_sconf_body γa Φ mm t lvl K eb p C ilvl b.
+      wp_freewalk_sconf_body γa mm t lvl K eb p C ilvl b.
 End FREEWALK.

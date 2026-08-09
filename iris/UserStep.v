@@ -370,7 +370,7 @@ Section UserStepIris.
   (* axiom -- both branches step, so the arm is total.  The continuation   *)
   (* is an ADDITIVE conjunction: stay / wake.                              *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_user_step_waiting Φ (wr : WaitReason) (ib : mword 32)
+  Lemma wp_user_step_waiting (wr : WaitReason) (ib : mword 32)
       (mip_v mie_v : mword 64) (va va' : mword 64) {dqp dqi : dfrac} :
     wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO ->
     minstret_inv -∗
@@ -381,14 +381,14 @@ Section UserStepIris.
     mie ↦ᵣ{ dqi } mie_v -∗
     ▷ ((hart_state ↦ᵣ HART_WAITING (wr, ib) -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va' -∗
         mip ↦ᵣ{ dqp } mip_v -∗ mie ↦ᵣ{ dqi } mie_v -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})
+        WP (Loop : expr riscv_lang))
      ∧ (hart_state ↦ᵣ HART_ACTIVE tt -∗ PC ↦ᵣ va' -∗ nextPC ↦ᵣ va' -∗
         mip ↦ᵣ{ dqp } mip_v -∗ mie ↦ᵣ{ dqi } mie_v -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hwr) "#Hinv Hhs Hpc Hnpc Hmip Hmie Hcont".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
     iIntros (σ) "[Hreg Hmd] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
@@ -525,10 +525,10 @@ Section UserStepObligation.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
-  Theorem user_step_obligation_holds (Φ : mval -> iProp Σ) :
+  Theorem user_step_obligation_holds :
     minstret_inv -∗
-    user_step_obligation_active C pt Φ -∗
-    user_step_obligation C pt Φ.
+    user_step_obligation_active C pt -∗
+    user_step_obligation C pt.
   Proof.
     iIntros "#Hminstret #Hactive".
     iIntros "!> Hinv Hk".
@@ -544,7 +544,7 @@ Section UserStepObligation.
       iDestruct "Hregs" as "(Hhs & Hpriv & Hms & Hsc & Hstval & Hsepc &
                              Hpc & Hnpc & Hgpr)".
       iDestruct "Hcfg" as "(Hstvec & Hmie & Hmdl & Hmedl & Hmip & Hcfgrest)".
-      iApply (wp_user_step_waiting Φ wr ib (uc_mip C) (uc_mie C) va va' Hhs
+      iApply (wp_user_step_waiting wr ib (uc_mip C) (uc_mie C) va va' Hhs
                 with "Hminstret Hhs Hpc Hnpc Hmip Hmie [-]").
       iNext. iSplit.
       + (* STAY: re-enter [user_inv] with the same waiting machine *)
@@ -567,16 +567,16 @@ Section UserStepObligation.
 
   (* the capstone, over the ACTIVE residue only: what remains of the whole
      user-execution theorem is [user_step_obligation_active] *)
-  Corollary wp_user_exec_active (Φ : mval -> iProp Σ) :
+  Corollary wp_user_exec_active :
     minstret_inv -∗
-    user_step_obligation_active C pt Φ -∗
+    user_step_obligation_active C pt -∗
     user_inv C pt -∗
-    stvec_handler_wp C pt Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    stvec_handler_wp C pt -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hminstret #Hactive Hinv Htrap".
     iApply (wp_user_exec with "[] Hinv Htrap").
-    iApply (user_step_obligation_holds Φ with "Hminstret Hactive").
+    iApply (user_step_obligation_holds with "Hminstret Hactive").
   Qed.
 
 End UserStepObligation.

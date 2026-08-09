@@ -25,8 +25,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 
 
-Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
+Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kalloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (14 <= K)%nat ->
@@ -45,12 +44,11 @@ Definition wp_kalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ}
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_post γk on (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type KALLOC.
   Parameter wp_kalloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
-      wp_kalloc_sconf_body Φ γl γk fl m on n eb p C K b.
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (fl : mword 64) (m : regfile) (on : option nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
+      wp_kalloc_sconf_body γl γk fl m on n eb p C K b.
 End KALLOC.

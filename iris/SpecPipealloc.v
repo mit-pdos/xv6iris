@@ -67,14 +67,13 @@ Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import FdSlots FileInv.
 Require Import KallocInv.
-Require Import PipeInv.
 Require Import WpLock.
 Require Import WpNext.
 Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
@@ -139,7 +138,6 @@ End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)
@@ -182,8 +180,8 @@ Definition wp_pipealloc_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 (* The FS ghost CLASSES appear in the interface below although nothing in
    pipealloc's contract mentions the file system.  They are there because
@@ -195,10 +193,8 @@ Definition wp_pipealloc_sconf_body
    derived lemma's statement. *)
 Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
-      wp_pipealloc_sconf_body Φ γfl γf γkl γk fl m v0 v1 on n eb p C K b.
+      wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b.
 End PIPEALLOC.

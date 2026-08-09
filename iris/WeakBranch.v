@@ -65,7 +65,6 @@ Section branch.
   Context `{!riscvGS Σ, !weakGS Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Implicit Types R : vProp Σ.
-  Implicit Types Φ : mval → iProp Σ.
 
 (* ====================================================================== *)
 (** ** 1. THE LEAF
@@ -79,7 +78,7 @@ Section branch.
       predicate abstracted, so ONE rule serves the branch ([wQ_pure] — or
       [wQ_quiet], when the trace's write-freedom is only known up to
       [WeakEff]'s zero-width residue), the jump, and any ALU instruction. *)
-  Definition wbr_cb Φ (pc : SailStdpp.Values.mword 64)
+  Definition wbr_cb (pc : SailStdpp.Values.mword 64)
       (P : wmstate → Prop) (Q : wmstate → wmstate → Prop) : iProp Σ :=
     (∀ σ : wmstate, wmstate_interp σ ={⊤,∅}=∗
        ⌜register_lookup PC (wm_regs σ) = pc⌝ ∗
@@ -92,18 +91,18 @@ Section branch.
               ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
               ⌜Q σ σ'⌝
               ={∅,⊤}=∗ wmstate_interp σ' ∗
-                       WP (Loop : expr weak_riscv_lang) {{ Φ }}))%I.
+                       WWP Loop))%I.
 
-  Lemma wwp_branch_step Φ (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_branch_step (pc : SailStdpp.Values.mword 64)
       (P : wmstate → Prop) (Q : wmstate → wmstate → Prop) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     wstep_cert (fin_to_nat cpu_id) pc P Q →
-    wbr_cb Φ pc P Q -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wbr_cb pc P Q -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hcert) "Hk". rewrite /wbr_cb.
-    iApply (wp_winstr Φ pc P Q Hgid Haccpc Hcert).
+    iApply (wp_winstr pc P Q Hgid Haccpc Hcert).
     iIntros (σ) "Hσ". iMod ("Hk" $! σ with "Hσ") as "(%Hpc & %Ht & %HP & Hc)".
     iDestruct "Hc" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
@@ -130,15 +129,15 @@ Section branch.
       the trace contain no write — so the caller is left with the [exec_eff]
       fact inside its own σ-callback and nothing more, exactly as for the
       three sync instructions of [WeakAcquire] §9. *)
-  Corollary wwp_branch_step_cert Φ (pc : SailStdpp.Values.mword 64)
+  Corollary wwp_branch_step_cert (pc : SailStdpp.Values.mword 64)
       (akf : akinfo) (pf : Arch.pa) (nf : N) :
     gen_id = 0%nat →
     acc_wf pc 4 →
-    wbr_cb Φ pc (wP_eff (Some (fin_to_nat cpu_id)) [WEread akf pf nf]) wQ_pure -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wbr_cb pc (wP_eff (Some (fin_to_nat cpu_id)) [WEread akf pf nf]) wQ_pure -∗
+    WWP Loop.
   Proof.
     intros Hgid Haccpc. iIntros "Hk".
-    iApply (wwp_branch_step Φ pc _ _ Hgid Haccpc
+    iApply (wwp_branch_step pc _ _ Hgid Haccpc
               (wcert_nowrite (fin_to_nat cpu_id) pc [WEread akf pf nf]
                  (nowrite_trace_read akf pf nf)) with "Hk").
   Qed.
@@ -148,16 +147,16 @@ Section branch.
       empty-memory detector gives for an opaque memory-free sub-run), the
       effect predicate is [WeakEff.wQ_quiet] and the state interpretation is
       re-established through [WeakEff.wlat_interp_wQ_quiet] instead. *)
-  Corollary wwp_branch_step_quiet Φ (pc : SailStdpp.Values.mword 64)
+  Corollary wwp_branch_step_quiet (pc : SailStdpp.Values.mword 64)
       (es : list weff) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     quiet_trace es →
-    wbr_cb Φ pc (wP_eff (Some (fin_to_nat cpu_id)) es) wQ_quiet -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wbr_cb pc (wP_eff (Some (fin_to_nat cpu_id)) es) wQ_quiet -∗
+    WWP Loop.
   Proof.
     intros Hgid Haccpc Hq. iIntros "Hk".
-    iApply (wwp_branch_step Φ pc _ _ Hgid Haccpc
+    iApply (wwp_branch_step pc _ _ Hgid Haccpc
               (wcert_quiet (fin_to_nat cpu_id) pc es Hq) with "Hk").
   Qed.
 
@@ -184,7 +183,7 @@ Section branch.
     so the branch's own [▷] is never needed for the induction.  That is why
     adding the second instruction does not change the loop's shape. *)
 
-  Lemma wwp_acquire_loop_real Φ (γ : gname) (lk : Arch.pa) R
+  Lemma wwp_acquire_loop_real (γ : gname) (lk : Arch.pa) R
       (pca pcb : SailStdpp.Values.mword 64)
       (Pa Pb : wmstate → Prop) (Qb : wmstate → wmstate → Prop)
       (K Kb : iProp Σ) :
@@ -196,29 +195,29 @@ Section branch.
       (wQ_amo_aq (Some (fin_to_nat cpu_id)) lk lock_one) →
     wstep_cert (fin_to_nat cpu_id) pcb Pb Qb →
     inv wlockN (wlock_inv γ lk R) -∗
-    □ (K -∗ ▷ (Kb -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         wacq_cb Φ γ lk R pca Pa) -∗
-    □ (Kb -∗ (K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         wbr_cb Φ pcb Pb Qb) -∗
-    K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    □ (K -∗ ▷ (Kb -∗ WWP Loop) -∗
+         wacq_cb γ lk R pca Pa) -∗
+    □ (Kb -∗ (K -∗ WWP Loop) -∗
+         wbr_cb pcb Pb Qb) -∗
+    K -∗ WWP Loop.
   Proof.
     iIntros (Hgid Hacca Haccb Hacclk Hcerta Hcertb) "#Hinv #Hatt #Hbr HK".
-    iApply (wwp_spin_loop Φ K with "[] HK").
+    iApply (wwp_spin_loop K with "[] HK").
     iModIntro. iIntros "HK Hrec".
-    iApply (wwp_acquire_swap Φ γ lk R pca Pa Hgid Hacca Hacclk Hcerta
+    iApply (wwp_acquire_swap γ lk R pca Pa Hgid Hacca Hacclk Hcerta
               with "Hinv").
     iApply ("Hatt" with "HK [Hrec]").
     (* the retry edge, under the AMO's own later: from [Kb], the branch step
        returns to the loop head, where the (now stripped) induction
        hypothesis closes it *)
     iNext. iIntros "HKb".
-    iApply (wwp_branch_step Φ pcb Pb Qb Hgid Haccb Hcertb).
+    iApply (wwp_branch_step pcb Pb Qb Hgid Haccb Hcertb).
     iApply ("Hbr" with "HKb Hrec").
   Qed.
 
   (** ... and the same with BOTH certificates discharged: what remains, per
       instruction, is the [exec_eff] fact in the caller's own σ-callback. *)
-  Corollary wwp_acquire_loop_real_cert Φ (γ : gname) (lk : Arch.pa) R
+  Corollary wwp_acquire_loop_real_cert (γ : gname) (lk : Arch.pa) R
       (pca pcb : SailStdpp.Values.mword 64)
       (akf : akinfo) (pf : Arch.pa) (nf : N) (aka akw : akinfo)
       (akf2 : akinfo) (pf2 : Arch.pa) (nf2 : N)
@@ -230,17 +229,17 @@ Section branch.
     ak_coh aka = false →
     ak_sync aka = true →
     inv wlockN (wlock_inv γ lk R) -∗
-    □ (K -∗ ▷ (Kb -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         wacq_cb Φ γ lk R pca
+    □ (K -∗ ▷ (Kb -∗ WWP Loop) -∗
+         wacq_cb γ lk R pca
            (wP_eff (Some (fin_to_nat cpu_id))
               [WEread akf pf nf; WEread aka lk 4; WEwrite akw lk 4 lock_one])) -∗
-    □ (Kb -∗ (K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         wbr_cb Φ pcb
+    □ (Kb -∗ (K -∗ WWP Loop) -∗
+         wbr_cb pcb
            (wP_eff (Some (fin_to_nat cpu_id)) [WEread akf2 pf2 nf2]) wQ_pure) -∗
-    K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    K -∗ WWP Loop.
   Proof.
     intros Hgid Hacca Haccb Hacclk Hcoh Hsync. iIntros "#Hinv #Hatt #Hbr HK".
-    iApply (wwp_acquire_loop_real Φ γ lk R pca pcb _ _ _ K Kb
+    iApply (wwp_acquire_loop_real γ lk R pca pcb _ _ _ K Kb
               Hgid Hacca Haccb Hacclk
               (wcert_amo_aq (fin_to_nat cpu_id) pca akf pf nf aka akw lk lock_one
                  Hcoh Hsync)

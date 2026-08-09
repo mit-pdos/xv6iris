@@ -69,7 +69,6 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
@@ -87,7 +86,7 @@ Import Defs.
 Definition sys_wait_stack : nat := (4 + K_kwait)%nat.
 
 Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa γf γw : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+    (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
     (pid : mword 32) (V : pprivate) (v0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_wait in
@@ -103,11 +102,10 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
   sie_cap_gpr m av b pj -∗
   cpu_own 0%nat eb pj C b -∗
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   panic_wp_any -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   kalloc_env γa None -∗
   proc_priv γf pj pid V -∗
@@ -119,17 +117,16 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       sie_cap_gpr mf av b pj -∗
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       proc_priv γf pj pid (upd_upt V P') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSWAIT.
   Parameter wp_sys_wait_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa γf γw : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64),
-      wp_sys_wait_sconf_body γa γf γw Φ γs j γl m av eb C b pid V v0.
+      wp_sys_wait_sconf_body γa γf γw γs j γl m av eb C b pid V v0.
 End SYSWAIT.

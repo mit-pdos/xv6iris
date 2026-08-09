@@ -125,6 +125,7 @@ NAME_IMPORTS = [
     ('decode_bridge_ms', 'Require Import WpDecodeBridge.'),
     ('rvc_oneshot', 'Require Import WpRvcBridge.'),
     ('mulop_mul', 'Require Import ExecCommon.'),
+    ('exec_execute_C_SUBW', 'Require Import UserExecFacts.'),
 ]
 
 
@@ -269,7 +270,7 @@ def _decode_lemmas(w, width, exp, cast, op, L):
         # the word while the AST states them as [mword_of_int n]; only bv_eq
         # closes that pair, so those words need the _bv bridge.
         bridge = ('decode_bridge_ms_bv'
-                  if exp.startswith(('FENCE (', 'FENCEI (', 'CSRReg (', 'CSRImm ('))
+                  if exp.startswith(('FENCE (', 'FENCEI (', 'CSRReg (', 'CSRImm (', 'SHIFTIWOP ('))
                   else 'decode_bridge_ms')
         L.append('Proof. %s. Qed.' % bridge)
     L.append('')

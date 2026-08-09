@@ -33,8 +33,7 @@ Definition pr_name_str : Z := 0x80007028%Z.
    lock then becomes an [is_lock] over some printk resource is the caller's
    ghost step, not printkinit's -- it need only add the invariant
    ([is_lock_intro]).  The "pr" literal itself is read out of [kernel_data]. *)
-Definition wp_printkinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
+Definition wp_printkinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.printkinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   let lk : mword 64 := mword_of_int KernelSyms.pr in
@@ -54,12 +53,11 @@ Definition wp_printkinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name lk "pr"%string -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PRINTKINIT.
   Parameter wp_printkinit_sconf :
-    forall `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
-      wp_printkinit_sconf_body Φ m K vlock vname vcpu b p.
+    forall `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64),
+      wp_printkinit_sconf_body m K vlock vname vcpu b p.
 End PRINTKINIT.

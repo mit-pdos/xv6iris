@@ -57,7 +57,7 @@ Definition K_virtio_disk_rw : nat := 34%nat.
 Definition wp_virtio_disk_rw_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* fabric + lock ghosts *)
     (pd pav pu : mword 64)
@@ -107,7 +107,7 @@ Definition wp_virtio_disk_rw_sconf_body
   cpu_own 0 eb pj C b -∗
   (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
      before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
-     [acquire] mints the [trap_csrs_pay 0 eb] its interior sleep needs and its
+     [acquire] mints the [arm_pay 0 eb _] its interior sleep needs and its
      [release] spends it.  A CALLER-held level-0 pay would be a second one, and
      a second one is UNIMPLEMENTABLE above a park -- sleep carries exactly the
      one the pushing acquire minted, so the extra copy would be [trap_csrs] at
@@ -116,10 +116,9 @@ Definition wp_virtio_disk_rw_sconf_body
      See claude-notes/completed/sched-hart-generic.md. *)
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -152,8 +151,7 @@ Definition wp_virtio_disk_rw_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       (* the exchange: a read fills the buffer from the block, a write
          moves the buffer's bytes onto the disk; b->disk ends at 0 *)
       buf_own bp bno (mword_of_int 0 : mword 32)
@@ -164,20 +162,20 @@ Definition wp_virtio_disk_rw_sconf_body
          client view shifts) plus the saved-proposition agreement's, and the
          epilogue's instruction stream pays one of the two off. *)
       ▷ Q -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type VIRTIODISKRW.
   Parameter wp_virtio_disk_rw_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool)
       (Q : iProp Σ),
-      wp_virtio_disk_rw_sconf_body Φ γs j γl γu γd γk pd pav pu
+      wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
                                    m K eb C bno dsk0 bs_buf bs_disk b Q.
 End VIRTIODISKRW.

@@ -57,9 +57,11 @@ Require Import ByteBuf.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import LogInv.
+Require Import FsCrash.   (* [BSIZE]: the block size [bm_covers] divides by *)
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+From Kernel Require KernelSyms.
 
 Local Open Scope Z_scope.
 
@@ -163,6 +165,23 @@ Proof.
   rewrite /pa_add /add_vec_int /i_addr.
   rewrite iv_addv_assoc iv_moi_add (ia_off_arith j). reflexivity.
 Qed.
+
+(* ---------------------------------------------------------------------- *)
+(*  THE ONE SUPERBLOCK FIELD THE INODE LAYER READS                         *)
+(*                                                                          *)
+(*  [sb.inodestart] is at [sb + 24] -- the [lw a1,<off>(a1)] off the        *)
+(*  [auipc a1,0x1d] in iupdate (+0x14) and in ilock (+0x3e) both resolve to *)
+(*  0x80020868, i.e. KernelSyms.sb + 0x18.  It rides through every contract *)
+(*  as a plain FRACTIONAL cell, the way SpecInitlog.v takes [sb + 20] for   *)
+(*  logstart: read once, handed straight back.  There is deliberately no    *)
+(*  superblock abstraction for one field.                                   *)
+(*                                                                          *)
+(*  It lives HERE rather than in a Spec file because iupdate and ilock both *)
+(*  state their contracts on it and a Spec file must not require another    *)
+(*  function's Spec (the [file_byte] relocation, same rule).                *)
+(* ---------------------------------------------------------------------- *)
+Definition sb_inodestart : mword 64 :=
+  pa_add (mword_of_int KernelSyms.sb : mword 64) 24.
 
 (* ===================================================================== *)
 (*  The pure model: a file's block map                                    *)
@@ -286,6 +305,23 @@ Proof.
   lia.
 Qed.
 
+(* An ALLOCATED indirect ENTRY forces the indirect BLOCK to exist.  This is
+   the "no indirect block => no entries" conjunct read backwards, and it is
+   what saves a no-allocation caller from having to carry a second premise:
+   [bv_unsigned (blkmap_get bm i) <> 0] at an indirect index ALREADY says
+   [bm_ind bm <> 0], so bmap's no-alloc contract needs only the one. *)
+Lemma blkmap_wf_ind_nz cov ls bm (i : nat) :
+  blkmap_wf cov ls bm -> (NDIRECT <= i)%nat -> (i < MAXFILE)%nat ->
+  bv_unsigned (blkmap_get bm i) <> 0 -> bv_unsigned (bm_ind bm) <> 0.
+Proof.
+  intros Hwf Hge Hlt Hnz Hiz.
+  apply Hnz. unfold blkmap_get.
+  case_decide; [lia|].
+  rewrite (blkmap_wf_no_ind cov ls bm Hwf Hiz).
+  rewrite lookup_total_replicate_2; [reflexivity|].
+  unfold MAXFILE, NDIRECT, NINDIRECT in *; lia.
+Qed.
+
 (* ---- reading blkmap_get off the two components ------------------------ *)
 
 Lemma blkmap_get_dir (bm : blkmap) (i : nat) :
@@ -298,6 +334,212 @@ Lemma blkmap_get_ent (bm : blkmap) (i : nat) :
   (NDIRECT <= i)%nat -> blkmap_get bm i = bm_ent bm !!! (i - NDIRECT)%nat.
 Proof.
   intros Hi. unfold blkmap_get. destruct (decide ((i < NDIRECT)%nat)); [lia|reflexivity].
+Qed.
+
+(* ===================================================================== *)
+(*  THE COVERAGE INVARIANT: every file block below the SIZE is allocated  *)
+(* ===================================================================== *)
+
+(* [bm_covers bm sz] is the missing fact that makes a READ never allocate.
+   readi runs OUTSIDE a transaction (fileread has no begin_op/end_op), so an
+   allocating bmap would hit panic("log_write outside of trans"); it never
+   happens because writei allocates as it extends, but nothing in the block
+   map itself said so.  This is that statement, and the whole point is that
+   it is preserved by everything below (see [bm_covers_keep]) and consumed
+   by exactly one lemma ([bm_covers_off]).
+
+   The bound is stated on the BYTE offset of the block's first byte, which
+   is the shape both producers and consumers have: a file of size [sz]
+   occupies file blocks 0 .. (sz-1)/BSIZE, i.e. exactly those [i] with
+   [i * BSIZE < sz].  Design: claude-notes/design/fs-inode.md, "readi, and
+   why it forced a no-alloc bmap". *)
+Definition bm_covers (bm : blkmap) (sz : Z) : Prop :=
+  forall i : nat, (i < MAXFILE)%nat -> Z.of_nat i * Z.of_nat BSIZE < sz ->
+    bv_unsigned (blkmap_get bm i) <> 0.
+
+(* the direct reading: the block-index form the design doc states *)
+Lemma bm_covers_get (bm : blkmap) (sz : Z) (i : nat) :
+  bm_covers bm sz -> (i < MAXFILE)%nat ->
+  Z.of_nat i * Z.of_nat BSIZE < sz ->
+  bv_unsigned (blkmap_get bm i) <> 0.
+Proof. intros Hc Hi Hlt. exact (Hc i Hi Hlt). Qed.
+
+(* THE FORM readi ACTUALLY USES.  Its loop holds a byte offset [o] with
+   [off <= o < off + n <= size] and calls bmap at [o / BSIZE]; both the
+   index bound and the nonzero conclusion come out in one step.  Keeping the
+   division inside this lemma is what stops every caller from re-deriving
+   [o / BSIZE * BSIZE <= o]. *)
+Lemma bm_covers_off (bm : blkmap) (sz o : Z) :
+  bm_covers bm sz -> 0 <= o -> o < sz ->
+  o < Z.of_nat MAXFILE * Z.of_nat BSIZE ->
+  (Z.to_nat (o / Z.of_nat BSIZE) < MAXFILE)%nat
+  /\ bv_unsigned (blkmap_get bm (Z.to_nat (o / Z.of_nat BSIZE))) <> 0.
+Proof.
+  intros Hc Ho0 Hosz Homax.
+  assert (HB : Z.of_nat BSIZE = 1024) by (vm_compute; reflexivity).
+  assert (Hdiv0 : 0 <= o / Z.of_nat BSIZE)
+    by (apply Z.div_pos; [exact Ho0 | rewrite HB; lia]).
+  assert (Hdivlt : o / Z.of_nat BSIZE < Z.of_nat MAXFILE).
+  { apply Z.div_lt_upper_bound;
+      [rewrite HB; lia | rewrite Z.mul_comm; exact Homax]. }
+  assert (Hidx : (Z.to_nat (o / Z.of_nat BSIZE) < MAXFILE)%nat)
+    by (unfold MAXFILE in *; lia).
+  split; [exact Hidx|].
+  apply (Hc _ Hidx).
+  rewrite (Z2Nat.id _ Hdiv0).
+  assert (Hle : o / Z.of_nat BSIZE * Z.of_nat BSIZE <= o).
+  { rewrite Z.mul_comm. apply Z.mul_div_le. rewrite HB; lia. }
+  lia.
+Qed.
+
+(* the file only ever gets SHORTER at a reader: readi clamps n to the size *)
+Lemma bm_covers_mono (bm : blkmap) (sz sz' : Z) :
+  bm_covers bm sz -> sz' <= sz -> bm_covers bm sz'.
+Proof. intros Hc Hle i Hi Hlt. exact (Hc i Hi ltac:(lia)). Qed.
+
+Lemma bm_covers_nonpos (bm : blkmap) (sz : Z) : sz <= 0 -> bm_covers bm sz.
+Proof.
+  intros Hsz i Hi Hlt. exfalso.
+  assert (0 <= Z.of_nat i * Z.of_nat BSIZE)
+    by (apply Z.mul_nonneg_nonneg; apply Nat2Z.is_nonneg).
+  lia.
+Qed.
+
+(* COVERAGE SURVIVES ANY MAP CHANGE THAT NEVER UN-ALLOCATES -- which is
+   precisely the clause bmap's own postcondition already carries, so a
+   caller can thread [bm_covers] straight across a bmap call. *)
+Lemma bm_covers_keep (bm bm' : blkmap) (sz : Z) :
+  (forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) <> 0 ->
+     blkmap_get bm' i = blkmap_get bm i) ->
+  bm_covers bm sz -> bm_covers bm' sz.
+Proof.
+  intros Hkeep Hc i Hi Hlt.
+  rewrite (Hkeep i Hi (Hc i Hi Hlt)). exact (Hc i Hi Hlt).
+Qed.
+
+(* ===================================================================== *)
+(*  THE FLAT FILE-BYTE VIEW, AND HOLES READ AS ZEROS                      *)
+(* ===================================================================== *)
+
+(* [inode_blocks γfs bm data] is indexed by file BLOCK, but every whole-file
+   operation is about a byte RANGE that straddles blocks.  Stating an effect
+   per block would force every caller to redo the straddle arithmetic, so the
+   flat view is defined ONCE, here beside [inode_blocks] itself, and both
+   writei's range clause and readi's delivered-bytes clause are stated on it.
+
+   It lives in InodeInv.v rather than in either function's spec file because a
+   Spec file must not depend on another function's Spec: [SpecReadi.v] used to
+   require [SpecWritei.v] for this definition alone, which coupled readi's
+   contract to writei's. *)
+Definition file_byte (data : nat -> list (bv 8)) (k : nat) : bv 8 :=
+  data (k `div` BSIZE)%nat !!! (k `mod` BSIZE)%nat.
+
+(* Two [data]s that agree block by block agree byte by byte -- the step every
+   "nothing else moved" argument takes. *)
+Lemma file_byte_block (data data' : nat -> list (bv 8)) (k : nat) :
+  data' (k `div` BSIZE)%nat = data (k `div` BSIZE)%nat ->
+  file_byte data' k = file_byte data k.
+Proof. intros H. rewrite /file_byte H. reflexivity. Qed.
+
+(* A HOLE READS AS ZEROS.  [inode_blocks] leaves [data i] unconstrained at an
+   UNALLOCATED index [i], and bmap deposits a freshly allocated block into the
+   bundle at [replicate BSIZE 0] -- so without a normalisation of the
+   unallocated indices, "the bytes outside my range are the bytes that were
+   there" is FALSE the moment writei extends the file.  This is that
+   normalisation, and it is also the xv6 file semantics.  It is threaded in
+   and back out by writei; it belongs next to [inode_blocks], which is why it
+   is here rather than in SpecWritei.v. *)
+Definition blk_holes_zero (bm : blkmap) (data : nat -> list (bv 8)) : Prop :=
+  forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) = 0 ->
+    data i = replicate BSIZE (bv_0 8).
+
+(* ===================================================================== *)
+(*  THE EMPTIED MAP: what itrunc leaves behind                            *)
+(* ===================================================================== *)
+
+(* Every direct entry, every indirect entry, and the indirect block itself
+   at zero.  itrunc's postcondition is stated at this ONE closed value
+   rather than at "some map whose slots are all zero", because the caller
+   that matters (iput) then needs no reasoning at all to see that the inode
+   names no blocks: the resources below collapse definitionally. *)
+Definition bm_empty : blkmap :=
+  MkBlkmap (replicate NDIRECT (bv_0 32)) (bv_0 32)
+           (replicate NINDIRECT (bv_0 32)).
+
+Lemma bm_empty_get (i : nat) : blkmap_get bm_empty i = bv_0 32.
+Proof.
+  rewrite /blkmap_get /bm_empty. cbn [bm_dir bm_ind bm_ent].
+  destruct (decide (i < NDIRECT)%nat) as [Hlt|Hge].
+  - apply list_lookup_total_correct, lookup_replicate_2. lia.
+  - destruct (decide ((i - NDIRECT) < NINDIRECT)%nat) as [Hlt2|Hge2].
+    + apply list_lookup_total_correct, lookup_replicate_2. lia.
+    + rewrite list_lookup_total_alt lookup_ge_None_2; [reflexivity|].
+      rewrite length_replicate. lia.
+Qed.
+
+Lemma bm_empty_slot (i : nat) : bm_slot bm_empty i = bv_0 32.
+Proof.
+  rewrite /bm_slot. destruct (decide (i = MAXFILE)) as [->|_];
+    [reflexivity | apply bm_empty_get].
+Qed.
+
+Lemma bm_empty_slot0 (i : nat) : bv_unsigned (bm_slot bm_empty i) = 0.
+Proof. rewrite bm_empty_slot. reflexivity. Qed.
+
+(* WELL-FORMED FOR FREE.  Both of [blkmap_wf]'s interesting clauses --
+   coverage and injectivity -- are guarded by "this slot is nonzero", and
+   no slot is; the lengths and the no-indirect-no-entries clause are
+   immediate from the [replicate]s. *)
+Lemma bm_empty_wf (cov : gset Z) (ls : Z) : blkmap_wf cov ls bm_empty.
+Proof.
+  rewrite /blkmap_wf /bm_empty. cbn [bm_dir bm_ind bm_ent].
+  split; [apply length_replicate|].
+  split; [apply length_replicate|].
+  split; [reflexivity|].
+  split.
+  - intros i _ Hnz. exfalso. apply Hnz. apply bm_empty_slot0.
+  - intros i j _ _ Hnz _. exfalso. apply Hnz. apply bm_empty_slot0.
+Qed.
+
+(* the truncated file reads as all zeros at every index -- the normalisation
+   [blk_holes_zero] wants, at the map itrunc produces *)
+Lemma bm_empty_holes (data : nat -> list (bv 8)) :
+  (forall i : nat, data i = replicate BSIZE (bv_0 8)) ->
+  blk_holes_zero bm_empty data.
+Proof. intros H i _ _. exact (H i). Qed.
+
+(* THE BLOCKS AN INODE NAMES, as a set: what itrunc returns to the free
+   pool.  Indexed over [S MAXFILE] so the indirect block -- slot MAXFILE --
+   is included; it is freed too. *)
+Definition bm_blocks (bm : blkmap) : gset Z :=
+  list_to_set (map (fun i => bv_unsigned (bm_slot bm i)) (seq 0 (S MAXFILE)))
+  ∖ {[ 0 ]}.
+
+Lemma bm_blocks_spec (bm : blkmap) (b : Z) :
+  b ∈ bm_blocks bm <->
+  (b <> 0 /\ exists i : nat, (i <= MAXFILE)%nat /\ bv_unsigned (bm_slot bm i) = b).
+Proof.
+  rewrite /bm_blocks elem_of_difference elem_of_singleton elem_of_list_to_set.
+  split.
+  - intros [Hin Hnz]. split; [exact Hnz|].
+    apply elem_of_list_fmap in Hin as (i & -> & Hi).
+    exists i. split; [|reflexivity].
+    apply elem_of_seq in Hi. lia.
+  - intros (Hnz & i & Hi & <-). split; [|exact Hnz].
+    apply elem_of_list_fmap. exists i. split; [reflexivity|].
+    apply elem_of_seq. lia.
+Qed.
+
+Lemma bm_blocks_empty : bm_blocks bm_empty = ∅.
+Proof.
+  apply set_eq. intros b. split.
+  - rewrite bm_blocks_spec. intros (Hnz & i & _ & Hb).
+    exfalso. apply Hnz. rewrite -Hb. apply bm_empty_slot0.
+  - (* [set_solver] here forced [set_unfold] to normalise [bm_blocks
+       bm_empty] -- a [list_to_set] over [seq 0 (S MAXFILE)], 269 entries --
+       even though the premise [b ∈ ∅] alone refutes the goal: 14.6 s.
+       [not_elem_of_empty] is the one fact this direction needs. *)
+    intros Hb. exfalso. exact (not_elem_of_empty b Hb).
 Qed.
 
 (* ===================================================================== *)

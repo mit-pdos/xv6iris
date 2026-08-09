@@ -61,8 +61,7 @@ Section SpecAllocpid.
 
 End SpecAllocpid.
 
-Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γp : gname)
+Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocpid in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -80,13 +79,12 @@ Definition wp_allocpid_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Ge
       sie_cap_gpr mf av b p -∗
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ALLOCPID.
   Parameter wp_allocpid_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γp : gname)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γp : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
-      wp_allocpid_sconf_body Φ γp m av n eb p C b.
+      wp_allocpid_sconf_body γp m av n eb p C b.
 End ALLOCPID.

@@ -974,7 +974,7 @@ Section WpSmodePtMemLeaves.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
-  Lemma wp_clw_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_clw_s_r (R : s_regime)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (v : mword 32)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -1014,8 +1014,8 @@ Section WpSmodePtMemLeaves.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) -∗
       pa ↦₄{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -1026,7 +1026,7 @@ Section WpSmodePtMemLeaves.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_s_config_regime R Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
+    iApply (wp_instr_s_config_regime R pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 4))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -1180,7 +1180,7 @@ Section WpSmodePtMemLeaves.
 
 
 
-  Lemma wp_ld_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_ld_s_r (R : s_regime)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (v : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -1220,8 +1220,8 @@ Section WpSmodePtMemLeaves.
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -1232,7 +1232,7 @@ Section WpSmodePtMemLeaves.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_s_config_regime R Φ pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
+    iApply (wp_instr_s_config_regime R pc false (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -1385,7 +1385,7 @@ Section WpSmodePtMemLeaves.
   Qed.
 
 
-  Lemma wp_csw_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_csw_s_r (R : s_regime)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (vold : bv 32)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -1425,8 +1425,8 @@ Section WpSmodePtMemLeaves.
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       pa ↦₄ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa storeval HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -1437,7 +1437,7 @@ Section WpSmodePtMemLeaves.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_s_config_regime R Φ pc true (STORE (imm, Regidx rs2, Regidx rs1, 4))
+    iApply (wp_instr_s_config_regime R pc true (STORE (imm, Regidx rs2, Regidx rs1, 4))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -1587,7 +1587,7 @@ Section WpSmodePtMemLeaves.
 
 
 
-  Lemma wp_sd_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_sd_s_r (R : s_regime)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (vold : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -1626,8 +1626,8 @@ Section WpSmodePtMemLeaves.
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
       pa ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -1638,7 +1638,7 @@ Section WpSmodePtMemLeaves.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_s_config_regime R Φ pc false (STORE (imm, Regidx rs2, Regidx rs1, 8))
+    iApply (wp_instr_s_config_regime R pc false (STORE (imm, Regidx rs2, Regidx rs1, 8))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").

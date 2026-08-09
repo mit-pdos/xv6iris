@@ -65,7 +65,7 @@ Definition K_bread : nat := 40%nat.
 Definition wp_bread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -101,7 +101,7 @@ Definition wp_bread_sconf_body
   cpu_own 0 eb pj C b -∗
   (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
      before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
-     [acquire] mints the [trap_csrs_pay 0 eb] its interior sleep needs and its
+     [acquire] mints the [arm_pay 0 eb _] its interior sleep needs and its
      [release] spends it.  A CALLER-held level-0 pay would be a second one, and
      a second one is UNIMPLEMENTABLE above a park -- sleep carries exactly the
      one the pushing acquire minted, so the extra copy would be [trap_csrs] at
@@ -114,10 +114,9 @@ Definition wp_bread_sconf_body
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through acquiresleep and rw *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -131,20 +130,19 @@ Definition wp_bread_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the locked buffer, keyed to the request: its bytes ARE the
          block's logical content (the payload inside indexes them) *)
       bio_locked bn V k pidv dev bno bs bsd d -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BREAD.
   Parameter wp_bread_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -152,6 +150,6 @@ Module Type BREAD.
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_bread_sconf_body Φ γs j γl γu γd γk pd pav pu bn V
+      wp_bread_sconf_body γs j γl γu γd γk pd pav pu bn V
                           pidv dev bno dq m K eb C b.
 End BREAD.

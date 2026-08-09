@@ -218,7 +218,6 @@ Section SpecFdalloc.
 End SpecFdalloc.
 
 Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (γf : gname) (k : nat) (D : gset nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (b : bool) :=
@@ -245,15 +244,13 @@ Definition wp_fdalloc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
       pc_is ret_tgt -∗
       proc_priv_core p pid V -∗
       fdalloc_post γf p V D k (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FDALLOC.
   Parameter wp_fdalloc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (γf : gname) (k : nat) (D : gset nat)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname) (k : nat) (D : gset nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (b : bool),
-      wp_fdalloc_sconf_body Φ γf k D m av n eb p C pid V b.
+      wp_fdalloc_sconf_body γf k D m av n eb p C pid V b.
 End FDALLOC.

@@ -162,6 +162,59 @@ Section IntrDefs.
      the section closes it over exactly [riscvGS] and [CpuId] regardless.) *)
   Definition sie_gname : gname := sie_name cpu_id.
 
+  (* mstatus.SPP's ghost MIRROR (RiscvPtsto.era_spp_name), canonical per hart
+     for the same reason [sie_gname] is.  TWO halves: one TIED inside [sconf]
+     to [_get_Mstatus_SPP ms], one travelling with [trap_csrs] -- existential
+     while the enabled arm holds it (a trap rewrites SPP whenever it likes)
+     and PINNED while interrupts-off code does.  [spp_agree] is what turns
+     the held half into a fact about the live bit, and it is what lets a trap
+     handler still know SPP = 1 several instructions after entry, which the
+     instruction funnel's [exists ms] would otherwise have destroyed. *)
+  Definition spp_gname : gname := spp_name cpu_id.
+  Definition spie_gname : gname := spie_name cpu_id.
+
+  (* THE TWO BITS AN [sret] READS, as one resource.  SPP decides the
+     privilege it returns to and SPIE the SIE it restores; both are written
+     by the trap, neither is touched by an SIE flip, and no consumer ever
+     wants one without the other -- so they are held together and the whole
+     tier sees ONE conjunct rather than two. *)
+  Definition sret_bits (spp spie : mword 1) : iProp Σ :=
+    (ghost_var spp_gname (1/2) spp ∗ ghost_var spie_gname (1/2) spie)%I.
+
+  Lemma sret_bits_agree (a b a' b' : mword 1) :
+    sret_bits a b -∗ sret_bits a' b' -∗ ⌜ a = a' /\ b = b' ⌝.
+  Proof.
+    iIntros "[H1 H2] [H1' H2']".
+    iDestruct (ghost_var_agree with "H1 H1'") as %->.
+    iDestruct (ghost_var_agree with "H2 H2'") as %->.
+    done.
+  Qed.
+
+  Lemma sret_bits_update (a b a' b' wa wb : mword 1) :
+    sret_bits a b -∗ sret_bits a' b' ==∗ sret_bits wa wb ∗ sret_bits wa wb.
+  Proof.
+    iIntros "[H1 H2] [H1' H2']".
+    iMod (ghost_var_update_2 wa with "H1 H1'") as "[Ha Ha']";
+      [ rewrite Qp.half_half // |].
+    iMod (ghost_var_update_2 wb with "H2 H2'") as "[Hb Hb']";
+      [ rewrite Qp.half_half // |].
+    iModIntro. iFrame "Ha Hb Ha' Hb'".
+  Qed.
+
+  (* the tie, as it sits inside [sconf] *)
+  Definition sret_tie (ms : mword 64) : iProp Σ :=
+    sret_bits (_get_Mstatus_SPP ms) (_get_Mstatus_SPIE ms).
+
+  (* MOVING THE TIE ACROSS AN mstatus CHANGE THAT LEAVES BOTH BITS ALONE --
+     which is every SIE flip (the mask is bit 1; SPP is bit 8 and SPIE bit
+     5).  This is why push_off / pop_off need no ghost movement at all: the
+     tie is merely re-expressed at the new mstatus. *)
+  Lemma sret_tie_congr (ms ms' : mword 64) :
+    _get_Mstatus_SPP ms' = _get_Mstatus_SPP ms ->
+    _get_Mstatus_SPIE ms' = _get_Mstatus_SPIE ms ->
+    sret_tie ms -∗ sret_tie ms'.
+  Proof. intros H1 H2. rewrite /sret_tie H1 H2. iIntros "$". Qed.
+
   (* [sie_ghost_alloc] / [sie_ghost_flip]* stay GHOST-GENERIC: they are
      statements about a raw [ghost_var], with no sconf-tier resource in
      sight, and one of their consumers (the per-trap tie ProofKernelvec.v
@@ -262,7 +315,7 @@ Section IntrDefs.
   (*                                                                       *)
   (* [intr_frame] is THE per-trap frame the interrupt handler consumes     *)
   (* and re-establishes: THE KERNEL MUST MAINTAIN [stack_own] OF DEPTH AT  *)
-  (* LEAST [kv_frame_slots] (32 slots = 256 bytes, kernelvec's c.addi16sp  *)
+  (* LEAST [kv_frame_slots] (78 slots: kernelvec's 32-slot c.addi16sp     *)
   (* frame) BELOW SP AT EVERY INTERRUPTS-ENABLED INSTRUCTION -- the trap   *)
   (* saves its 17 caller-saved registers into the top of that region --    *)
   (* plus the allocation-fixed menvcfg cell and tlb_inv_pt.  The depth is  *)
@@ -288,7 +341,19 @@ Section IntrDefs.
   (* the handler run; the handler never touches it).  [s_dispatch] reads   *)
   (* mie/mideleg, so the handler spec owns them explicitly.                *)
   (* =================================================================== *)
-  Definition kv_frame_slots : nat := 32.
+  (* THE RESERVED CARVE MUST COVER THE WHOLE TRAP PATH, not just
+     kernelvec's own frame.  A trap taken at an interrupts-enabled
+     instruction runs kernelvec (32 slots = 256 bytes, its c.addi16sp frame)
+     AND everything kernelvec calls, which is kerneltrap and its cone
+     ([SpecKerneltrap.kerneltrap_stack] = 46: its own 6-slot frame plus
+     devintr's 40).  So 32 + 46 = 78.
+
+     The literal is written out because [kerneltrap_stack] lives ABOVE this
+     file; [SpecKerneltrap.kt_carve_fits] ties the two together so the pair
+     cannot drift silently -- growing kerneltrap's cone without growing this
+     would otherwise still compile and only fail deep inside the handler
+     proof. *)
+  Definition kv_frame_slots : nat := 78.
 
   (* menvcfg is pinned to [MENVCFG_S] here rather than parameterized: the
      handler contract below is only PROVABLE at that value (its own fetches
@@ -328,7 +393,7 @@ Section IntrDefs.
      root its translation slot ([strans_inv]) is currently holding. *)
   Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
     (□ ∀ (root_ppn : mword 44) (elp_v : mword 1) (ms pc0 mie_v mdv0 : mword 64)
-         (m : regfile) (Φ : mval -> iProp Σ),
+         (m : regfile),
         ⌜ intr_ms_facts ms ⌝ -∗
         ⌜ ret_pc pc0 = pc0 ⌝ -∗
         ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝ -∗
@@ -350,8 +415,8 @@ Section IntrDefs.
           pc_is pc0 -∗
           gpr_file m -∗
           intr_frame root_ppn m -∗
-          WP (Loop : expr riscv_lang) {{ Φ }} ) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+          WP (Loop : expr riscv_lang) ) -∗
+        WP (Loop : expr riscv_lang))%I.
 
   Global Instance intr_handler_spec_persistent handler :
     Persistent (intr_handler_spec handler).
@@ -427,6 +492,7 @@ Section IntrDefs.
      (∃ ms : mword 64,
         mstatus ↦ᵣ ms ∗
         ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
+        sret_tie ms ∗
         ⌜ sconf_ms_facts ms ⌝) ∗
      (∃ mie_v mdv0 : mword 64,
         mie ↦ᵣ mie_v ∗ mideleg ↦ᵣ mdv0 ∗
@@ -438,6 +504,72 @@ Section IntrDefs.
         ⌜ bool_bit_backwards (_get_MEnvcfg_LPE menvcfg0) = false ⌝ ∗
         ⌜ eq_vec (_get_MEnvcfg_FIOM menvcfg0) ('b"1") = false ⌝ ∗
         ⌜ menvcfg0 = MENVCFG_S ⌝))%I.
+
+  (* ------------------------------------------------------------------- *)
+  (* §6' THE mstatus-EXPOSING FLAVOUR [sconf_at].                          *)
+  (*                                                                       *)
+  (* [sconf] hides mstatus behind an existential, which is right for       *)
+  (* almost everything -- no leaf and no whole-function spec cares WHICH   *)
+  (* mstatus it is running at, only that the fact set holds.  Two places   *)
+  (* do care: a leaf that WRITES sstatus (what the instruction did to      *)
+  (* SPP/SPIE is its entire content), and the trap handler's own contract, *)
+  (* because kernelvec's [sret] reads exactly those two fields.            *)
+  (* [sconf_at ms] is [sconf] with the mstatus cell pulled OUT at a named  *)
+  (* value.                                                                *)
+  (*                                                                       *)
+  (* IT IS AN ACCESSOR, NOT A SECOND COPY OF [sconf]'s BODY: the payload   *)
+  (* is the mstatus triple plus a wand that swallows any REPLACEMENT       *)
+  (* triple and gives [sconf] back.  So there is nothing to keep in sync   *)
+  (* when [sconf] grows a conjunct, and [sconf] itself is untouched --     *)
+  (* every existing destructuring of it still works.                       *)
+  (*                                                                       *)
+  (* USE IT ONLY AT BOUNDARIES.  A function threads plain [sie_cap_gpr]    *)
+  (* through its body and switches to the [_at] flavour on the OUTPUT side *)
+  (* of the one instruction (or the one contract) whose mstatus effect is  *)
+  (* the point.  Giving every leaf an [_at] twin would be the leaf x       *)
+  (* mstatus cross-product the guiding principle exists to prevent.        *)
+  (* ------------------------------------------------------------------- *)
+  Definition sconf_msown (ms : mword 64) : iProp Σ :=
+    (mstatus ↦ᵣ ms ∗
+     ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
+     sret_tie ms ∗
+     ⌜ sconf_ms_facts ms ⌝)%I.
+
+  Definition sconf_at (ms : mword 64) : iProp Σ :=
+    (sconf_msown ms ∗ (∀ ms' : mword 64, sconf_msown ms' -∗ sconf))%I.
+
+  Lemma sconf_at_close (ms : mword 64) : sconf_at ms -∗ sconf.
+  Proof. iIntros "[Hown Hcl]". iApply ("Hcl" with "Hown"). Qed.
+
+  Lemma sconf_at_open : sconf -∗ ∃ ms : mword 64, sconf_at ms.
+  Proof.
+    iIntros "(#Hhw & #Hminv & Hpriv & Hmsx & Hmie & Hmenv)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
+    iExists ms. iSplitL "Hms Hhalf Hspp".
+    { iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
+    iIntros (ms') "(Hms' & Hhalf' & Hspp' & %Hmsf')".
+    iFrame "Hhw Hminv Hpriv Hmie Hmenv".
+    iExists ms'. iFrame "Hms' Hhalf' Hspp'". iPureIntro. exact Hmsf'.
+  Qed.
+
+  (* the mstatus facts are readable straight off the flavour, without
+     closing it -- what a caller reasoning about SPP/SPIE needs. *)
+  Lemma sconf_at_facts (ms : mword 64) :
+    sconf_at ms -∗ ⌜ sconf_ms_facts ms ⌝.
+  Proof. iIntros "[(_ & _ & _ & %H) _]". iPureIntro. exact H. Qed.
+
+  (* READING THE TWO sret BITS OFF THE BUNDLE.  A holder of the travelling
+     half turns it into a fact about the LIVE mstatus by agreement with the
+     tie -- which is the whole point of the mirror: it is what survives the
+     instruction funnel's [exists ms], and so it is how a trap handler
+     entered from S-mode still knows SPP = 1 several instructions later. *)
+  Lemma sconf_at_sret (ms : mword 64) (a b : mword 1) :
+    sconf_at ms -∗ sret_bits a b -∗
+    ⌜ _get_Mstatus_SPP ms = a /\ _get_Mstatus_SPIE ms = b ⌝.
+  Proof.
+    iIntros "[(_ & _ & Htie & _) _] Hc".
+    iDestruct (sret_bits_agree with "Htie Hc") as %[-> ->]. done.
+  Qed.
 
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
      its index [b], backed by the ghost QUARTER's value (agreement with
@@ -492,16 +624,50 @@ Section IntrDefs.
      pop_off, acquire's post / release's pre, the flip leaves), via
      [trap_csrs_pay]: owed exactly at a level-0 boundary with an enabled
      base.  Push/pop-balanced functions never mention them. *)
+  (* WHAT A TRAP SCRIBBLES.  sepc / scause / stval are whole registers, so
+     they move as cells; mstatus.SPP is a BIT inside a register [sconf] has
+     to keep, so its travelling half moves as the ghost mirror [sret_bits].
+     All four belong to the same discipline and travel together: existential
+     inside [sie_arm true] (a trap can rewrite any of them between two
+     instructions), pinned in the hands of interrupts-off code. *)
   Definition trap_csrs : iProp Σ :=
     ((∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
-     (∃ v : mword 64, stval ↦ᵣ v))%I.
+     (∃ v : mword 64, stval ↦ᵣ v) ∗
+     (∃ a b : mword 1, sret_bits a b))%I.
 
   Definition trap_csrs_pay (n : nat) (eb : bool) : iProp Σ :=
     (match n with
      | O => if eb then trap_csrs else emp
      | S _ => emp
      end)%I.
+
+  (* THE COMPLEMENT OF [trap_csrs_pay] AT LEVEL 0: what a caller has to
+     BRING because the bundle does not already own it.  At level 0 the arm
+     index and the saved base coincide, so at [eb = true] the enabled arm
+     owns the trap CSRs and the caller brings nothing, while at
+     [eb = false] nothing in the bundle owns them and the caller brings the
+     whole set.
+
+     A function that PARKS needs the set unconditionally -- sched's crossing
+     takes it and re-delivers the RESUMING hart's, because sepc/scause/stval
+     are PER-HART registers and framing them around a migration would be
+     unsound.  So yield takes [trap_csrs_pay 0 eb] out of its own push_off
+     and [trap_csrs_ext eb] from its caller, and exactly one of the two is
+     [emp].  The [eb = false] case is kerneltrap's: the trap cleared SIE, so
+     the pushing acquire records intena = 0 and hands out nothing, and the
+     handler is holding the trap CSRs itself because the TRAP gave them to
+     it. *)
+  Definition trap_csrs_ext (eb : bool) : iProp Σ :=
+    (if eb then emp else trap_csrs)%I.
+
+  Lemma trap_csrs_ext_split (eb : bool) :
+    trap_csrs_pay 0 eb ∗ trap_csrs_ext eb ⊣⊢ trap_csrs.
+  Proof.
+    destruct eb; rewrite /trap_csrs_pay /trap_csrs_ext.
+    - by rewrite bi.sep_emp.
+    - by rewrite bi.emp_sep.
+  Qed.
 
   Definition intr_restore : iProp Σ :=
     (intr_handler_avail ∗ trap_csrs)%I.
@@ -521,8 +687,8 @@ Section IntrDefs.
   (*                                                                      *)
   (* [proc] is held at HALF ([ProcGeom.cpu_proc_half]): the other half is *)
   (* permanently owned by [SchedCtx.scheds_inv]'s slot for this hart, so  *)
-  (* that the global parked-scheduler protocol can read "the proc running *)
-  (* on hart h is p".  Keeping the FULL cell here would make that         *)
+  (* that the global parked-scheduler protocol can read: the proc running *)
+  (* on hart h is p.  Keeping the FULL cell here would make that          *)
   (* protocol's take-out move vacuous -- see                              *)
   (* [SchedCtx.cpu_own_full_is_vacuous].  The two [c->proc] STORES the    *)
   (* scheduler makes therefore have to reassemble the cell out of the     *)
@@ -576,6 +742,112 @@ Section IntrDefs.
      caller frame that crosses for free.  This matches the C: a thread
      touches c->noff / c->intena / c->proc only with interrupts disabled,
      which is precisely what push_off exists for. *)
+  (* ==================================================================== *)
+  (* THE RUNNING CLAIM: half #2 of the state mirror of whichever proc this   *)
+  (* hart is running -- the right to change that proc's state               *)
+  (* (design/proc-struct.md).  [zero_reg] means the SCHEDULER is running and *)
+  (* there is no proc to claim.                                              *)
+  (*                                                                        *)
+  (* A CONJUNCT OF THE ENABLED ARM, not of [cpu_cells].  [cpu_cells] is      *)
+  (* inside this arm (as [cpu_hart 0 true p]), so putting it there looks     *)
+  (* equivalent and far cheaper -- but [cpu_hart] is ALSO what the thread    *)
+  (* carries once interrupts are OFF, and the claim cannot hold across that  *)
+  (* window: after yield's [p->state = RUNNABLE] the state is [unclaimed],   *)
+  (* so [pstate_lock] owns both halves and no spare half exists, while       *)
+  (* [c->proc] still names p.  Here the obligation exists only while         *)
+  (* interrupts are on: push_off hands it to the code, the thread moves it   *)
+  (* freely while off, pop_off takes it back -- by then the thread has been  *)
+  (* dispatched again and is RUNNING, so it has one.                        *)
+  (* ==================================================================== *)
+  (* THE STATE IS PINNED AT [RUNNING], NOT EXISTENTIAL.  The claim is about  *)
+  (* [c->proc]: if that field names a real proc while interrupts are ON,     *)
+  (* then that proc IS the one executing on this hart, so its state is       *)
+  (* RUNNING.  No reachable configuration has an arm naming a non-RUNNING    *)
+  (* proc --                                                                 *)
+  (*   - at a park, interrupts are OFF (the thread holds p->lock), so no arm *)
+  (*     exists and the claim is in the thread's hands, spent into           *)
+  (*     [pstate_lock] alongside the [p->state] store;                       *)
+  (*   - the scheduler rebuilds the arm at [zero_reg], never with the proc   *)
+  (*     it just parked;                                                     *)
+  (*   - kfork's USED window is the CHILD's state, never [c->proc]'s.        *)
+  (*                                                                        *)
+  (* An existential [st] would be sound but useless: [pstate_lock_claimed]   *)
+  (* only yields [unclaimed st = false], i.e. [st ∈ {RUNNING, USED}], and    *)
+  (* those two arms of [proc_slots] hand out DIFFERENT resources             *)
+  (* ([own_ctx] vs [▷ proc_ctx]).  Pinning RUNNING here is what lets yield   *)
+  (* take the raw context cells from the lock without a park receipt to      *)
+  (* refute USED for it.                                                     *)
+  Definition cpu_claim (p : mword 64) : iProp Σ :=
+    (⌜ p = zero_reg ⌝ ∨
+     ∃ j : nat,
+       ⌜ proc_addr j = p /\ (j < NPROC)%nat ⌝ ∗ pstate_hlf j RUNNING)%I.
+
+  Lemma cpu_claim_idle : ⊢ cpu_claim zero_reg.
+  Proof. iLeft. done. Qed.
+
+  Lemma cpu_claim_proc (j : nat) :
+    (j < NPROC)%nat -> pstate_hlf j RUNNING -∗ cpu_claim (proc_addr j).
+  Proof. iIntros (Hj) "H". iRight. iExists j. by iFrame. Qed.
+
+  Lemma cpu_claim_elim (j : nat) :
+    (j < NPROC)%nat -> cpu_claim (proc_addr j) -∗ pstate_hlf j RUNNING.
+  Proof.
+    iIntros (Hj) "[%Hz | (%j' & [%Hpa %Hj'] & Hh)]".
+    - exfalso. exact (proc_addr_nonzero j Hj Hz).
+    - assert (Hjj : j' = j) by exact (proc_addr_inj j' j Hj' Hj Hpa).
+      subst j'. iExact "Hh".
+  Qed.
+
+  (* The claim rides the arm seam exactly as the trap CSRs do, and with the
+     same two-sided split.  [cpu_claim_pay n eb p] is what push_off HANDS OUT
+     when it dismantles the arm and what pop_off TAKES BACK when it rebuilds
+     it -- non-[emp] only at the one index where an arm existed (level 0 with
+     an enabled base).  [cpu_claim_ext eb p] is the complement: what a caller
+     must BRING because no arm owned it.  At [eb = false] -- kerneltrap's
+     case, where the trap itself cleared SIE -- the handler holds the claim
+     because the trap gave it to it. *)
+  Definition cpu_claim_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (match n with
+     | O => if eb then cpu_claim p else emp
+     | S _ => emp
+     end)%I.
+
+  Definition cpu_claim_ext (eb : bool) (p : mword 64) : iProp Σ :=
+    (if eb then emp else cpu_claim p)%I.
+
+  Lemma cpu_claim_ext_split (eb : bool) (p : mword 64) :
+    cpu_claim_pay 0 eb p ∗ cpu_claim_ext eb p ⊣⊢ cpu_claim p.
+  Proof.
+    destruct eb; rewrite /cpu_claim_pay /cpu_claim_ext.
+    - by rewrite bi.sep_emp.
+    - by rewrite bi.emp_sep.
+  Qed.
+
+  (* ==================================================================== *)
+  (* WHAT THE ARM HANDS OUT AT THIS INDEX.  The trap CSRs and the running   *)
+  (* claim are DIFFERENT resources -- yield spends the claim (surrendering  *)
+  (* both state halves to [pstate_lock]) while keeping the trap CSRs, and   *)
+  (* it is the SCHEDULER that later rebuilds the arm, at [zero_reg] -- but  *)
+  (* they enter and leave the arm at the same index, so they travel as one  *)
+  (* carrier.  Bundling is transport only: [arm_pay_parts] takes them apart *)
+  (* again by definition, and anyone who needs just one half says so.       *)
+  (*                                                                        *)
+  (* The SIE-flip leaves below deal in the components (they build and tear  *)
+  (* down the arm piecewise); the function-level specs deal in the bundle,  *)
+  (* which is what keeps a single hypothesis threading through the whole    *)
+  (* push_off / acquire / release / pop_off cone.                           *)
+  (* ==================================================================== *)
+  Definition arm_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (trap_csrs_pay n eb ∗ cpu_claim_pay n eb p)%I.
+
+  Lemma arm_pay_parts (n : nat) (eb : bool) (p : mword 64) :
+    arm_pay n eb p ⊣⊢ trap_csrs_pay n eb ∗ cpu_claim_pay n eb p.
+  Proof. reflexivity. Qed.
+
+  Lemma arm_pay_on (p : mword 64) :
+    arm_pay 0 true p ⊣⊢ trap_csrs ∗ cpu_claim p.
+  Proof. reflexivity. Qed.
+
   Definition sie_arm (b : bool) (p : mword 64) : iProp Σ :=
     (if b
      then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
@@ -583,8 +855,26 @@ Section IntrDefs.
            (∃ v : mword 64, sepc ↦ᵣ v) ∗
            (∃ v : mword 64, scause ↦ᵣ v) ∗
            (∃ v : mword 64, stval ↦ᵣ v) ∗
+           (∃ a b : mword 1, sret_bits a b) ∗
+           cpu_claim p ∗
            cpu_hart 0 true p)
      else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
+
+  (* THE ARM INDEX IS THE LIVE BIT, at either index and without a case split
+     at the call site.  [sconf]'s tied half and the arm's eighth are
+     fragments of the same ghost, so agreement reads the live SIE off the
+     index -- which is what every leaf that has to know whether interrupts
+     are on (the sstatus reads, the sstatus RESTORE) actually needs. *)
+  Lemma sie_arm_half_agree (b : bool) (px : mword 64) (ms : mword 64) :
+    ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) -∗
+    sie_arm b px -∗
+    ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝.
+  Proof.
+    iIntros "Hhalf Harm". rewrite /sie_arm. destruct b.
+    - iDestruct "Harm" as "(Hq & _ & _ & _ & _ & _ & _)".
+      iDestruct (ghost_var_agree with "Hhalf Hq") as %H. iPureIntro. exact H.
+    - iDestruct (ghost_var_agree with "Hhalf Harm") as %H. iPureIntro. exact H.
+  Qed.
 
   Lemma sie_arm_of_ex (p : mword 64) :
     (∃ b : bool, sie_arm b p) ⊣⊢
@@ -594,6 +884,8 @@ Section IntrDefs.
       (∃ v : mword 64, sepc ↦ᵣ v) ∗
       (∃ v : mword 64, scause ↦ᵣ v) ∗
       (∃ v : mword 64, stval ↦ᵣ v) ∗
+      (∃ a b : mword 1, sret_bits a b) ∗
+      cpu_claim p ∗
       cpu_hart 0 true p)).
   Proof.
     iSplit.
@@ -611,16 +903,18 @@ Section IntrDefs.
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
     (∃ handler : mword 64, intr_inv handler) ∗
     trap_csrs ∗
+    cpu_claim p ∗
     cpu_hart 0 true p.
-  Proof. iIntros "(Hbit & Hinv & Hsep & Hsca & Hstv & Hcpu)". iFrame. Qed.
+  Proof. iIntros "(Hbit & Hinv & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
 
   Lemma sie_arm_on_in (p : mword 64) :
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
     (∃ handler : mword 64, intr_inv handler) -∗
     trap_csrs -∗
+    cpu_claim p -∗
     cpu_hart 0 true p -∗
     sie_arm true p.
-  Proof. iIntros "Hbit Hinv (Hsep & Hsca & Hstv) Hcpu". iFrame. Qed.
+  Proof. iIntros "Hbit Hinv (Hsep & Hsca & Hstv & Hspp) Hclm Hcpu". iFrame. Qed.
 
   (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
      S-mode translation invariant, regime and root hidden.  Clients thread
@@ -884,6 +1178,32 @@ Section IntrDefs.
      sconf ∗
      sie_cap m avail b p ∗
      gpr_file (tp_pin m))%I.
+
+  (* the [sie_cap_gpr] flavour with mstatus exposed -- see [sconf_at].
+     Boundary use only; [sie_cap_gpr_at_close] is how it rejoins the
+     ordinary threading. *)
+  Definition sie_cap_gpr_at (ms : mword 64)
+      (m : regfile) (avail : nat) (b : bool) (p : mword 64) : iProp Σ :=
+    (hart_state ↦ᵣ HART_ACTIVE tt ∗
+     sconf_at ms ∗
+     sie_cap m avail b p ∗
+     gpr_file (tp_pin m))%I.
+
+  Lemma sie_cap_gpr_at_close (ms : mword 64) m avail b p :
+    sie_cap_gpr_at ms m avail b p -∗ sie_cap_gpr m avail b p.
+  Proof.
+    iIntros "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (sconf_at_close with "Hsc") as "Hsc".
+    rewrite /sie_cap_gpr. iFrame "Hhs Hsc Hcap Hfile".
+  Qed.
+
+  Lemma sie_cap_gpr_at_open m avail b p :
+    sie_cap_gpr m avail b p -∗ ∃ ms : mword 64, sie_cap_gpr_at ms m avail b p.
+  Proof.
+    iIntros "(Hhs & Hsc & Hcap & Hfile)".
+    iDestruct (sconf_at_open with "Hsc") as (ms) "Hsc".
+    iExists ms. iFrame "Hhs Hsc Hcap Hfile".
+  Qed.
 
   Global Instance sie_cap_gpr_into_sep m avail b p :
     IntoSep (sie_cap_gpr m avail b p)
@@ -1164,9 +1484,11 @@ Section IntrDefs.
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
+    (∃ a b : mword 1, sret_bits a b) -∗
     intr_restore.
   Proof.
-    iIntros "#Hi #Hs Hsep Hsca Hstv". iFrame "Hsep Hsca Hstv".
+    iIntros "#Hi #Hs Hsep Hsca Hstv Hspp".
+    iFrame "Hsep Hsca Hstv Hspp".
     iExists h. iFrame "Hi". iNext. iExact "Hs".
   Qed.
 
@@ -1196,41 +1518,83 @@ Section IntrDefs.
     (∃ v : mword 64, sepc ↦ᵣ v) -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
-    intr_config ∗ ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S.
+    intr_config ∗ ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗ menvcfg ↦ᵣ MENVCFG_S ∗
+    (* THE SPP TIE COMES OUT.  [intr_config] carries no SPP tie, and it must
+       not: a trap sets SPP := 1 and the matching sret sets it back to 0, so
+       across the engine the bit MOVES.  The funnel holds this half and the
+       travelling one (out of [sie_arm true]) and re-ties both to the final
+       mstatus when it converts back -- which is the whole reason the enabled
+       arm holds SPP at an EXISTENTIAL value. *)
+    (∃ a b : mword 1, sret_bits a b).
   Proof.
     iIntros "Hsc Hq Hsepc Hscause Hstval".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     iDestruct (ghost_var_agree with "Hhalf Hq") as %Hb1.
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & _ & _ & _ & _ & %Hval)".
     subst menvcfg0.
     iFrame "Hq Hmenv Hhw Hminv Hpriv Hmiex Hsepc Hscause Hstval".
+    iSplitR "Hspp"; [| iExists (_get_Mstatus_SPP ms), (_get_Mstatus_SPIE ms); iExact "Hspp" ].
     iExists ms. iFrame "Hms Hhalf".
     iPureIntro. apply intr_ms_facts_iff. split; [ | exact Hmsf ].
     rewrite Hb1. vm_compute. reflexivity.
   Qed.
 
-  Lemma v2_of_intr_config :
+  Lemma v2_of_intr_config (vta vtb vca vcb : mword 1) :
     intr_config -∗
     menvcfg ↦ᵣ MENVCFG_S -∗
+    (* BOTH SPP halves, at ARBITRARY values -- the tie one this conversion's
+       dual handed out, and the travelling one from [sie_arm true].  A trap
+       and its sret move SPP, so neither is about the mstatus coming back;
+       holding both is what lets this re-tie them to it.  That is also why
+       the enabled arm holds SPP existentially: while interrupts are on, its
+       value is not the client's to know. *)
+    sret_bits vta vtb -∗ sret_bits vca vcb ==∗
     sconf ∗
+    (∃ a b : mword 1, sret_bits a b) ∗
     (∃ v : mword 64, sepc ↦ᵣ v) ∗
     (∃ v : mword 64, scause ↦ᵣ v) ∗
     (∃ v : mword 64, stval ↦ᵣ v).
   Proof.
-    iIntros "Hic Hmenv".
+    iIntros "Hic Hmenv Ht Hc".
     iDestruct "Hic" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepc & Hscause & Hstval)".
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
     pose proof (proj1 (intr_ms_facts_iff ms) Hmsf) as [_ Hcommon].
-    iFrame "Hsepc Hscause Hstval Hhw Hminv Hpriv Hmiex".
-    iSplitL "Hms Hhalf".
-    { iExists ms. iFrame "Hms Hhalf". iPureIntro. exact Hcommon. }
-    iExists MENVCFG_S. iFrame "Hmenv".
-    iPureIntro.
-    repeat split; vm_compute; reflexivity.
+    iMod (sret_bits_update vta vtb vca vcb
+            (_get_Mstatus_SPP ms) (_get_Mstatus_SPIE ms) with "Ht Hc") as "[Ht Hc]".
+    iModIntro.
+    iSplitR "Hc Hsepc Hscause Hstval".
+    { iFrame "Hhw Hminv Hpriv Hmiex".
+      iSplitL "Hms Hhalf Ht".
+      { iExists ms. iFrame "Hms Hhalf Ht". iPureIntro. exact Hcommon. }
+      iExists MENVCFG_S. iFrame "Hmenv".
+      iPureIntro. repeat split; vm_compute; reflexivity. }
+    iFrame "Hsepc Hscause Hstval".
+    iExists (_get_Mstatus_SPP ms), (_get_Mstatus_SPIE ms). iExact "Hc".
   Qed.
 
 End IntrDefs.
+
+(* ===================================================================== *)
+(* TRANSPORTING [trap_csrs_ext] ACROSS A MIGRATION -- the [cpu_own]       *)
+(* transport's twin, and needed for the same reason.  sepc/scause/stval   *)
+(* are PER-HART registers, so [trap_csrs_ext] is hart-indexed and cannot  *)
+(* simply be framed around a step that can move the hart.  It transports  *)
+(* anyway, by the two halves of what such a step gives you: at            *)
+(* [eb = true] the proposition is [emp], which mentions no hart at all;   *)
+(* at [eb = false] no trap can have been taken, so [wp_next]'s            *)
+(* conditional equality pins the hart.  Chain the per-step equalities     *)
+(* with [wp_next_chain] and apply this once, exactly as for [cpu_own].    *)
+(* ===================================================================== *)
+Lemma trap_csrs_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+    (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
+  (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+  trap_csrs_ext (CID := CID0) eb -∗ trap_csrs_ext (CID := CID1) eb.
+Proof.
+  intros Heq. destruct eb.
+  - (* [emp]: no hart in the term *) rewrite /trap_csrs_ext. iIntros "$".
+  - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
+Qed.
 
 (* ==================================================================== *)
 (* THE PORT'S STANDARD TACTICS (outside the section: an [Ltac] defined   *)

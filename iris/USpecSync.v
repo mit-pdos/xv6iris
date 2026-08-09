@@ -53,8 +53,7 @@ Section USpecSync.
   (* sync @0x368: li a7,22; ecall; ret.  RETURNS to [m !!! ra] with
      a7 = 22, a0 = the (arbitrary) syscall return value, everything else
      -- registers, image, pc discipline -- intact, on an arbitrary hart. *)
-  Definition wp_sync_stub_body (M : gmap Z (bv 8)) (m : regfile)
-      (Φ : mval -> iProp Σ) :=
+  Definition wp_sync_stub_body (M : gmap Z (bv 8)) (m : regfile) :=
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M)
       (Hret2 : is_aligned_vaddr (Virtaddr (m !!! Regidx ra_idx)) 2 = true),
@@ -64,17 +63,16 @@ Section USpecSync.
        UVG (<[Regidx a0_idx := ret]>
               (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m)) M -∗
        pc_is (m !!! Regidx ra_idx) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
 
   (* exit @0x2c8: li a7,2; ecall.  DIVERGES (the trailing ret is dead). *)
-  Definition wp_exit_stub_body (M : gmap Z (bv 8)) (m : regfile)
-      (Φ : mval -> iProp Σ) :=
+  Definition wp_exit_stub_body (M : gmap Z (bv 8)) (m : regfile) :=
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M),
     UVG m M -∗
     pc_is (mword_of_int SyncSyms.exit) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
   (* ------------------------------------------------------------------- *)
   (* §2 main and start.  Both DIVERGE (their final call is exit, and       *)
@@ -85,21 +83,21 @@ Section USpecSync.
 
   (* main @0x0: prologue (16-byte frame), jal sync, li a0,0, jal exit. *)
   Definition wp_sync_main_body (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (Φ : mval -> iProp Σ) :=
+      (sp0 : mword 64) :=
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M)
       (Hsp : m !!! Regidx sp_idx = sp0)
       (Hfr : uv_frame16 pt M sp0),
     UVG m M -∗
     pc_is (mword_of_int SyncSyms.main) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
   (* start @0x12 -- the ELF entry [exec()] jumps to: prologue, jal main,
      jal exit.  The top-level verified-execution statement for the whole
      sync process: from the loaded image and the entry registers, the
      machine runs safely forever under the kernel's trap services. *)
   Definition wp_sync_start_body (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (Φ : mval -> iProp Σ) :=
+      (sp0 : mword 64) :=
     forall (Hlay : sync_layout pt)
       (Htext : uimg_sub SyncInstrs.sync_bytes M)
       (Hsp : m !!! Regidx sp_idx = sp0)
@@ -107,6 +105,6 @@ Section USpecSync.
       (Hfr' : uv_frame16 pt M (add_vec_int sp0 (-16))),    (* main's frame *)
     UVG m M -∗
     pc_is (mword_of_int SyncSyms.start) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
 End USpecSync.

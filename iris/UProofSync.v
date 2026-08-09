@@ -269,9 +269,8 @@ Section UProofSync.
   (* [UsysNoRet] arm ([emp]) -- the syscall never comes back, so the WP is *)
   (* absorbed and there is nothing after it.                               *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sync_exit_stub (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile)
-      (Φ : mval -> iProp Σ) :
-    wp_exit_stub_body (CID := CIDp) C pt M m Φ.
+  Lemma wp_sync_exit_stub (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile) :
+    wp_exit_stub_body (CID := CIDp) C pt M m.
   Proof.
     intros Hlay Htext.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
@@ -282,7 +281,7 @@ Section UProofSync.
                   = add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 2 : mword 6))))
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_uv_cli C pt Ψxv6 M m (mword_of_int 0x2c8)
-              (mword_of_int 2 : mword 6) a7_idx (mword_of_int 2 : mword 64) Φ
+              (mword_of_int 2 : mword 6) a7_idx (mword_of_int 2 : mword 64)
               (ui_sync_2c8 pt M Hlay Htext)
               ltac:(vm_compute; discriminate) Hw2
               with "Hcg Hpc").
@@ -294,7 +293,7 @@ Section UProofSync.
     (* 0x2ca  ecall *)
     assert (Ha7 : uint (m1 !!! Regidx a7_idx) = 2)
       by (rewrite /m1; reg_lookup).
-    iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x2ca) Φ
+    iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x2ca)
               (ui_sync_2ca pt M Hlay Htext) with "Hcg Hpc").
     rewrite /xv6_sys_protocol /usys_protocol_of.
     rewrite Ha7.
@@ -308,9 +307,8 @@ Section UProofSync.
   (* a0 set to an arbitrary value on an arbitrary hart; the c.jr then      *)
   (* returns to the caller's ra (2-aligned, so [ret_pc] is the identity).  *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sync_sync_stub (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile)
-      (Φ : mval -> iProp Σ) :
-    wp_sync_stub_body (CID := CIDp) C pt M m Φ.
+  Lemma wp_sync_sync_stub (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile) :
+    wp_sync_stub_body (CID := CIDp) C pt M m.
   Proof.
     intros Hlay Htext Hret2.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
@@ -326,7 +324,7 @@ Section UProofSync.
                        (sign_extend' 64 (sign_extend' 12 (mword_of_int 22 : mword 6))))
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_uv_cli C pt Ψxv6 M m (mword_of_int 0x368)
-              (mword_of_int 22 : mword 6) a7_idx (mword_of_int 22 : mword 64) Φ
+              (mword_of_int 22 : mword 6) a7_idx (mword_of_int 22 : mword 64)
               (ui_sync_368 pt M Hlay Htext)
               ltac:(vm_compute; discriminate) Hw22
               with "Hcg Hpc").
@@ -343,7 +341,7 @@ Section UProofSync.
     iEval (rewrite Epc1) in "Hpc".
     (* 0x36a  ecall -- SYS_sync, the returning arm *)
     assert (Ha7 : uint (m1 !!! Regidx a7_idx) = 22) by (rewrite /m1; reg_lookup).
-    iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x36a) Φ
+    iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x36a)
               (ui_sync_36a pt M Hlay Htext) with "Hcg Hpc").
     rewrite /xv6_sys_protocol /usys_protocol_of.
     rewrite Ha7.
@@ -369,7 +367,7 @@ Section UProofSync.
     { rewrite Hra2. unfold ret_pc. symmetry.
       exact (update_bit0_zero_of_aligned2 _ Hret2). }
     iApply (wp_uv_cjr C pt Ψxv6 M m2 (mword_of_int 0x36e)
-              (mword_of_int 1 : mword 5) (m !!! Regidx ra_idx) Φ
+              (mword_of_int 1 : mword 5) (m !!! Regidx ra_idx)
               (ui_sync_36e pt M Hlay Htext)
               ltac:(vm_compute; discriminate) Htgt
               with "Hcg Hpc").
@@ -384,8 +382,8 @@ Section UProofSync.
   (* 0x12.. is dead code and gets no [uinstr] fact.                        *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_sync_main (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (Φ : mval -> iProp Σ) :
-    wp_sync_main_body (CID := CIDp) C pt M m sp0 Φ.
+      (sp0 : mword 64) :
+    wp_sync_main_body (CID := CIDp) C pt M m sp0.
   Proof.
     intros Hlay Htext Hsp Hfr.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
@@ -411,7 +409,7 @@ Section UProofSync.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite Hc. reflexivity. }
     iApply (wp_uv_caddi C pt Ψxv6 M m (mword_of_int 0x00)
-              (mword_of_int 48 : mword 6) sp_idx (add_vec_int sp0 (-16)) Φ
+              (mword_of_int 48 : mword 6) sp_idx (add_vec_int sp0 (-16))
               (ui_sync_00 pt M Hlay Htext)
               ltac:(vm_compute; discriminate) Hwsp
               with "Hcg Hpc").
@@ -438,7 +436,7 @@ Section UProofSync.
                           ltac:(vm_compute; discriminate))).
     iApply (wp_uv_csdsp C pt Ψxv6 M m1 (mword_of_int 0x02)
               (mword_of_int 1 : mword 6) ra_idx
-              w8 (add_vec_int (add_vec_int sp0 (-16)) 8) (m !!! Regidx ra_idx) Φ
+              w8 (add_vec_int (add_vec_int sp0 (-16)) 8) (m !!! Regidx ra_idx)
               (ui_sync_02 pt M Hlay Htext)
               Htg8 Hwra Hl8 Hok8 Hcanon8 Hpg8 Hal8 Hb8
               with "Hcg Hpc").
@@ -474,7 +472,7 @@ Section UProofSync.
     iApply (wp_uv_csdsp C pt Ψxv6 M2 m1 (mword_of_int 0x04)
               (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               w0 (add_vec_int (add_vec_int sp0 (-16)) 0)
-              (m !!! Regidx (mword_of_int 8 : mword 5)) Φ
+              (m !!! Regidx (mword_of_int 8 : mword 5))
               (ui_sync_04 pt M2 Hlay Htext2)
               Htg0 Hws0 Hl0 Hok0 Hcanon0 Hpg0 Hal0 Hb0'
               with "Hcg Hpc").
@@ -497,7 +495,7 @@ Section UProofSync.
       rewrite Hc. reflexivity. }
     iApply (wp_uv_caddi4spn C pt Ψxv6 M3 m1 (mword_of_int 0x06)
               (mword_of_int 0 : mword 3) (mword_of_int 4 : mword 8)
-              (mword_of_int 8 : mword 5) (add_vec_int (add_vec_int sp0 (-16)) 16) Φ
+              (mword_of_int 8 : mword 5) (add_vec_int (add_vec_int sp0 (-16)) 16)
               (ui_sync_06 pt M3 Hlay Htext3)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hw16
               with "Hcg Hpc").
@@ -517,7 +515,7 @@ Section UProofSync.
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_uv_jal C pt Ψxv6 M3 m2 (mword_of_int 0x08)
               (mword_of_int 864 : mword 21) ra_idx
-              (mword_of_int SyncSyms.sync) (mword_of_int 0x0c) Φ
+              (mword_of_int SyncSyms.sync) (mword_of_int 0x0c)
               (ui_sync_08 pt M3 Hlay Htext3)
               ltac:(vm_compute; discriminate) Htj Hwj
               ltac:(vm_compute; reflexivity)
@@ -529,7 +527,7 @@ Section UProofSync.
       by exact (upd_eq m2 (Regidx ra_idx) (regval_into_reg (mword_of_int 0x0c : mword 64))).
     assert (Hret2 : is_aligned_vaddr (Virtaddr (m3 !!! Regidx ra_idx)) 2 = true)
       by (rewrite Hra3; vm_compute; reflexivity).
-    iApply (wp_sync_sync_stub CID5 M3 m3 Φ Hlay Htext3 Hret2 with "Hcg Hpc").
+    iApply (wp_sync_sync_stub CID5 M3 m3 Hlay Htext3 Hret2 with "Hcg Hpc").
     iIntros (CID6 ret) "Hcg Hpc".
     set (m4 := <[Regidx a0_idx := ret]>
                  (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m3)).
@@ -540,7 +538,7 @@ Section UProofSync.
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 0 : mword 6))))
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_uv_cli C pt Ψxv6 M3 m4 (mword_of_int 0x0c)
-              (mword_of_int 0 : mword 6) a0_idx (mword_of_int 0 : mword 64) Φ
+              (mword_of_int 0 : mword 6) a0_idx (mword_of_int 0 : mword 64)
               (ui_sync_0c pt M3 Hlay Htext3)
               ltac:(vm_compute; discriminate) Hw0
               with "Hcg Hpc").
@@ -559,13 +557,13 @@ Section UProofSync.
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_uv_jal C pt Ψxv6 M3 m5 (mword_of_int 0x0e)
               (mword_of_int 698 : mword 21) ra_idx
-              (mword_of_int SyncSyms.exit) (mword_of_int 0x12) Φ
+              (mword_of_int SyncSyms.exit) (mword_of_int 0x12)
               (ui_sync_0e pt M3 Hlay Htext3)
               ltac:(vm_compute; discriminate) Htj2 Hwj2
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc").
     iIntros (CID8) "Hcg Hpc".
-    iApply (wp_sync_exit_stub CID8 M3 _ Φ Hlay Htext3 with "Hcg Hpc").
+    iApply (wp_sync_exit_stub CID8 M3 _ Hlay Htext3 with "Hcg Hpc").
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -574,8 +572,8 @@ Section UProofSync.
   (* dead code: it is never decoded and needs no fact.                     *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_sync_start (CIDp : CpuId) (M : gmap Z (bv 8)) (m : regfile)
-      (sp0 : mword 64) (Φ : mval -> iProp Σ) :
-    wp_sync_start_body (CID := CIDp) C pt M m sp0 Φ.
+      (sp0 : mword 64) :
+    wp_sync_start_body (CID := CIDp) C pt M m sp0.
   Proof.
     intros Hlay Htext Hsp Hfr Hfr'.
     destruct sync_syms_pins as (Hsmain & Hsstart & Hsexit & Hssync).
@@ -600,7 +598,7 @@ Section UProofSync.
         by (apply bv_eq; vm_compute; reflexivity).
       rewrite Hc. reflexivity. }
     iApply (wp_uv_caddi C pt Ψxv6 M m (mword_of_int 0x12)
-              (mword_of_int 48 : mword 6) sp_idx (add_vec_int sp0 (-16)) Φ
+              (mword_of_int 48 : mword 6) sp_idx (add_vec_int sp0 (-16))
               (ui_sync_12 pt M Hlay Htext)
               ltac:(vm_compute; discriminate) Hwsp
               with "Hcg Hpc").
@@ -627,7 +625,7 @@ Section UProofSync.
                           ltac:(vm_compute; discriminate))).
     iApply (wp_uv_csdsp C pt Ψxv6 M m1 (mword_of_int 0x14)
               (mword_of_int 1 : mword 6) ra_idx
-              w8 (add_vec_int (add_vec_int sp0 (-16)) 8) (m !!! Regidx ra_idx) Φ
+              w8 (add_vec_int (add_vec_int sp0 (-16)) 8) (m !!! Regidx ra_idx)
               (ui_sync_14 pt M Hlay Htext)
               Htg8 Hwra Hl8 Hok8 Hcanon8 Hpg8 Hal8 Hb8
               with "Hcg Hpc").
@@ -664,7 +662,7 @@ Section UProofSync.
     iApply (wp_uv_csdsp C pt Ψxv6 M2 m1 (mword_of_int 0x16)
               (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               w0 (add_vec_int (add_vec_int sp0 (-16)) 0)
-              (m !!! Regidx (mword_of_int 8 : mword 5)) Φ
+              (m !!! Regidx (mword_of_int 8 : mword 5))
               (ui_sync_16 pt M2 Hlay Htext2)
               Htg0 Hws0 Hl0 Hok0 Hcanon0 Hpg0 Hal0 Hb0'
               with "Hcg Hpc").
@@ -689,7 +687,7 @@ Section UProofSync.
       rewrite Hc. reflexivity. }
     iApply (wp_uv_caddi4spn C pt Ψxv6 M3 m1 (mword_of_int 0x18)
               (mword_of_int 0 : mword 3) (mword_of_int 4 : mword 8)
-              (mword_of_int 8 : mword 5) (add_vec_int (add_vec_int sp0 (-16)) 16) Φ
+              (mword_of_int 8 : mword 5) (add_vec_int (add_vec_int sp0 (-16)) 16)
               (ui_sync_18 pt M3 Hlay Htext3)
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) Hw16
               with "Hcg Hpc").
@@ -709,7 +707,7 @@ Section UProofSync.
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_uv_jal C pt Ψxv6 M3 m2 (mword_of_int 0x1a)
               (mword_of_int 2097126 : mword 21) ra_idx
-              (mword_of_int SyncSyms.main) (mword_of_int 0x1e) Φ
+              (mword_of_int SyncSyms.main) (mword_of_int 0x1e)
               (ui_sync_1a pt M3 Hlay Htext3)
               ltac:(vm_compute; discriminate) Htj Hwj
               ltac:(vm_compute; reflexivity)
@@ -731,7 +729,7 @@ Section UProofSync.
     assert (Hfr3 : uv_frame16 pt M3 (add_vec_int sp0 (-16)))
       by exact (uv_frame16_dom pt M2 M3 _ Hdom3
                   (uv_frame16_dom pt M M2 _ Hdom2 Hfr')).
-    iApply (wp_sync_main CID5 M3 m3 (add_vec_int sp0 (-16)) Φ
+    iApply (wp_sync_main CID5 M3 m3 (add_vec_int sp0 (-16))
               Hlay Htext3 Hsp3 Hfr3 with "Hcg Hpc").
   Qed.
 

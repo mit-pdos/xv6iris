@@ -33,7 +33,7 @@ Section RvcRet.
      held by [mmode_config]'s [hw_config]) the model's jalr accepts a 2-aligned
      target, which [ret_pc] is by construction ([ret_pc_aligned]) -- so, unlike
      the 4-aligned leaf, this needs no alignment premise at all. *)
-  Lemma wp_cret_gpr_zca (Φ : mval -> iProp Σ) (pc : mword 64) (ra : mword 5)
+  Lemma wp_cret_gpr_zca (pc : mword 64) (ra : mword 5)
       (m : regfile) (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
     (forall j, (j < 4)%nat -> KptPt.kmap_static (svpn_of (RiscvModelBytes.pa_add pc j)) KP_rx) ->
@@ -47,8 +47,8 @@ Section RvcRet.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (ret_pc (m !!! Regidx ra)) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hra) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hinstr Hcont".
     pose proof (ret_pc_aligned (m !!! Regidx ra)) as Hal0.
@@ -59,7 +59,7 @@ Section RvcRet.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hmlpe & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct "Hpmpc" as "[Hpmpc_wp Hpmpc_k]".
-    iApply (wp_instr Φ pc true (JALR (zeros' 12, Regidx ra, zreg)) pmpcfg0
+    iApply (wp_instr pc true (JALR (zeros' 12, Regidx ra, zreg)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

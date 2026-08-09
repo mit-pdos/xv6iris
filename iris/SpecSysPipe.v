@@ -109,15 +109,12 @@ Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
-Require Import PipeInv.
 Require Import SpecFdalloc.
-Require Import SchedCtx.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import SpecIput.
 Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -162,7 +159,7 @@ End SpecSysPipe.
 Definition wp_sys_pipe_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
+    (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
@@ -201,8 +198,8 @@ Definition wp_sys_pipe_sconf_body
      it only ever closes pipes is true and unusable: the knowledge of what a
      descriptor names is going to be per-[ofile] ghost state, not something
      recoverable from the file table. *)
-  fileclose_pipe_env Φ fn on 0%nat -∗
-  fileclose_fs_env Φ fn 0%nat eb p -∗
+  fileclose_pipe_env fn on 0%nat -∗
+  fileclose_fs_env fn 0%nat eb p -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -214,18 +211,18 @@ Definition wp_sys_pipe_sconf_body
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
       (* the environment back; the page count has moved if either close was
          the pipe's last end *)
-      (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
-      fileclose_fs_env Φ fn 0%nat eb p -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
+      fileclose_fs_env fn 0%nat eb p -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
+      (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
-      wp_sys_pipe_sconf_body γa Φ γfl γf fn on m av eb p C v pid V b.
+      wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p C v pid V b.
 End SYSPIPE.

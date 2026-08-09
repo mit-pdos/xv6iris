@@ -15,7 +15,7 @@ Import Defs.
 Section WpAddiwGpr.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Lemma wp_addiw_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (immv : mword 12)
+  Lemma wp_addiw_gpr (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5) (immv : mword 12)
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -32,11 +32,11 @@ Section WpAddiwGpr.
       gpr_file (<[Regidx rd :=
         regval_into_reg (sign_extend' 64
           (subrange_vec_dec (add_vec (m !!! Regidx rs1) (sign_extend' 64 immv)) 31 0))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hcont".
-    iApply (wp_instr Φ pc is_rvc (ADDIW (immv, Regidx rs1, Regidx rd)) pmpcfg0
+    iApply (wp_instr pc is_rvc (ADDIW (immv, Regidx rs1, Regidx rd)) pmpcfg0
               Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

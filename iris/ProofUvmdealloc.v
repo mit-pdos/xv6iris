@@ -114,7 +114,7 @@ Section ProofUvmdealloc.
      tie, or the post-uvmunmap-and-cj join), never necessarily the section's
      own entry hart -- same reasoning as ProofConsputc.v's
      [wp_consputc_epi]. *)
-  Lemma wp_uvmdealloc_epi `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Lemma wp_uvmdealloc_epi `{CID0 : CpuId}
       (mm mj : regfile) (P : uptd) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (b : bool) (oldsz newsz res ret_tgt : mword 64) :
     (4 <= K)%nat ->
@@ -160,8 +160,8 @@ Section ProofUvmdealloc.
       ⌜ ((uint newsz >= uint oldsz)%Z /\ mr !!! Regidx Ra0 = oldsz)
         \/ ((uint newsz < uint oldsz)%Z /\ mr !!! Regidx Ra0 = newsz) ⌝ -∗
       proc_pt (uptd_del_run P (svpn_of (pgroundup newsz)) (uvmd_np oldsz newsz)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK4 Hcross Hrettgt Hjsp Hjs1 Hjthr Hpay.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).
@@ -190,7 +190,7 @@ Section ProofUvmdealloc.
     { rewrite /spd. unfold sp0, pa_stk, add_vec_int. rewrite pa_stk_off2.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     (* +0x26 c.mv a0,s1 *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x26)) Ra0 Rs1 mj (K - 4)%nat b
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x26)) Ra0 Rs1 mj (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26 [-]").
     iIntros (CID1 Hs1) "Hcg Hpc".
@@ -205,7 +205,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc28) in "Hpc".
     (* +0x28 c.ldsp ra,24(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x28)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x28)) (mword_of_int 3 : mword 6) Rra
               E0 (K - 4)%nat (mm !!! Regidx Rra) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi28 [Hr24] [-]").
@@ -220,7 +220,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2a) in "Hpc".
     (* +0x2a c.ldsp s0,16(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x2a)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x2a)) (mword_of_int 2 : mword 6) Rs0
               E1 (K - 4)%nat (mm !!! Regidx Rs0) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a [Hr16] [-]").
@@ -235,7 +235,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc2c) in "Hpc".
     (* +0x2c c.ldsp s1,8(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x2c)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x2c)) (mword_of_int 1 : mword 6) Rs1
               E2 (K - 4)%nat (mm !!! Regidx Rs1) b (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2c [Hr8] [-]").
@@ -275,7 +275,7 @@ Section ProofUvmdealloc.
       iSplitL "Hgap". { iExists _. iExact "Hgap". }
       done. }
     iEval (rewrite -Hwv) in "Hframe4".
-    iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x2e))
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x2e))
               (mword_of_int 2 : mword 6) E3 (K - 4)%nat 4 b Hpop
               with "Hcg Hpc Hi2e Hframe4 [-]").
     iIntros (CID5 Hs5) "Hcg Hpc".
@@ -318,7 +318,7 @@ Section ProofUvmdealloc.
       rewrite /E0 upd_ne;
         [| intros Hx; injection Hx as Hx2; subst c; vm_compute in Hc; discriminate].
       apply Hjthr; assumption. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x30)) Rra E4 K b
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x30)) Rra E4 K b
               ltac:(vm_compute; discriminate) with "Hcg Hpc Hi30 [-]").
     iIntros (CID6 Hs6) "Hcg Hpc".
     iEval (rgne) in "Hpc".
@@ -335,9 +335,9 @@ Section ProofUvmdealloc.
   Qed.
 
   Lemma wp_uvmdealloc_sconf
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (P : uptd) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_uvmdealloc_sconf_body γa Φ mm P K eb p C b.
+    : wp_uvmdealloc_sconf_body γa mm P K eb p C b.
   Proof.
     cbv beta delta [wp_uvmdealloc_sconf_body].
     intros pcE oldsz newsz ret_tgt HK Hroot Hob.
@@ -383,7 +383,7 @@ Section ProofUvmdealloc.
                       (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))
                     = pa_stk (mm !!! Regidx csp_rs1) 4).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE (mword_of_int 32 : mword 6) mm K 4 b
+    iApply (wp_caddi_sp_push_s_sconf pcE (mword_of_int 32 : mword 6) mm K 4 b
               ltac:(lia) Hpush with "Hcg Hpc Hi00 [-]").
     iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
@@ -416,7 +416,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc02) in "Hpc".
     (* +0x02 c.sdsp ra,24(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x02)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x02)) (mword_of_int 3 : mword 6) Rra
               A0 (K - 4)%nat vr24 b with "Hcg Hpc Hi02 [Hr24] [-]").
     { iEval (rewrite HA0sp -Hb1). iExact "Hr24". }
     iIntros (CID2 Hs2) "Hcg Hpc Hr24".
@@ -424,7 +424,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc04) in "Hpc".
     (* +0x04 c.sdsp s0,16(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x04)) (mword_of_int 2 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x04)) (mword_of_int 2 : mword 6) Rs0
               A0 (K - 4)%nat vr16 b with "Hcg Hpc Hi04 [Hr16] [-]").
     { iEval (rewrite HA0sp -Hb2). iExact "Hr16". }
     iIntros (CID3 Hs3) "Hcg Hpc Hr16".
@@ -432,7 +432,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc06) in "Hpc".
     (* +0x06 c.sdsp s1,8(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x06)) (mword_of_int 1 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x06)) (mword_of_int 1 : mword 6) Rs1
               A0 (K - 4)%nat vr8 b with "Hcg Hpc Hi06 [Hr8] [-]").
     { iEval (rewrite HA0sp -Hb3). iExact "Hr8". }
     iIntros (CID4 Hs4) "Hcg Hpc Hr8".
@@ -454,7 +454,7 @@ Section ProofUvmdealloc.
     iEval (rgne) in "Hr16". iEval (rewrite HA0sp HA0s0) in "Hr16".
     iEval (rgne) in "Hr8". iEval (rewrite HA0sp HA0s1) in "Hr8".
     (* +0x08 c.addi4spn s0,sp,32 *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x08)) (Cregidx (mword_of_int 0))
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x08)) (Cregidx (mword_of_int 0))
               (mword_of_int 8 : mword 8) Rs0 A0 (K - 4)%nat b
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
               ltac:(rdok)
@@ -472,7 +472,7 @@ Section ProofUvmdealloc.
     assert (HA1a1 : A1 !!! Regidx Ra1 = oldsz).
     { rewrite /A1 upd_ne; [| reg_neq]. rewrite /A0 upd_ne; [| reg_neq]. reflexivity. }
     (* +0x0a c.mv s1,a1 : s1 := oldsz *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x0a)) Rs1 Ra1 A1 (K - 4)%nat b
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x0a)) Rs1 Ra1 A1 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a [-]").
     iIntros (CID6 Hs6) "Hcg Hpc".
@@ -529,7 +529,7 @@ Section ProofUvmdealloc.
                  ltac:(rewrite Hnp0; reflexivity)
                  ltac:(rewrite Hnp0; reflexivity))) in "Hpt".
         iExact "Hpt". }
-      iApply (wp_bgeu_taken_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x0c))
+      iApply (wp_bgeu_taken_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x0c))
                 (mword_of_int 26 : mword 13) Ra1 Ra2 A2 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp1' ltac:(vm_compute; reflexivity)
@@ -542,7 +542,7 @@ Section ProofUvmdealloc.
       iEval (rewrite Htgt26) in "Hpc".
       iDestruct (cpu_own_transport CID CID7a 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (wp_uvmdealloc_epi Φ mm A2 P K eb p C b oldsz newsz oldsz ret_tgt
+      iApply (wp_uvmdealloc_epi mm A2 P K eb p C b oldsz newsz oldsz ret_tgt
                 ltac:(lia) ltac:(wp_next_chain) eq_refl HA2sp HA2s1 HA2thr
                 ltac:(left; split; [apply Z.le_ge; exact Hge | reflexivity])
                 with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
@@ -569,7 +569,7 @@ Section ProofUvmdealloc.
     { apply uvmd_np_lt. rewrite -!uint_unsigned. exact Hlt. }
     assert (Hcmp1' : zopz0zKzJ_u (rget A2 Ra2) (rget A2 Ra1) = false).
     { rgne. rgne. rewrite HA2a2 HA2a1. exact Hcmp1. }
-    iApply (wp_bgeu_fall_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x0c))
+    iApply (wp_bgeu_fall_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x0c))
               (mword_of_int 26 : mword 13) Ra1 Ra2 A2 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hcmp1'
               with "Hcg Hpc Hi0c [-]").
@@ -592,7 +592,7 @@ Section ProofUvmdealloc.
     iPoseProof (udi_20 with "Htext") as "Hi20".
     iPoseProof (udi_22 with "Htext") as "Hi22".
     (* +0x10 c.mv s1,a2 : s1 := newsz *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x10)) Rs1 Ra2 A2 (K - 4)%nat b
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x10)) Rs1 Ra2 A2 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
@@ -621,7 +621,7 @@ Section ProofUvmdealloc.
         [| intros Hx; injection Hx as Hx2; subst c; apply H9; reflexivity].
       apply HA2thr; assumption. }
     (* +0x12 c.lui a5,0x1 : a5 := 4096 *)
-    iApply (wp_clui_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x12)) Ra5
+    iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x12)) Ra5
               (sign_extend' 20 (mword_of_int 1 : mword 6)) (mword_of_int 4096 : mword 64)
               A3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) lui_4096
@@ -636,7 +636,7 @@ Section ProofUvmdealloc.
     assert (HA4a5 : A4 !!! Regidx Ra5 = (mword_of_int 4096 : mword 64))
       by (rewrite /A4 upd_eq; reflexivity).
     (* +0x14 c.addi a5,a5,-1 : a5 := 4095 *)
-    iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x14)) Ra5 (mword_of_int 63 : mword 6)
+    iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x14)) Ra5 (mword_of_int 63 : mword 6)
               A4 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
@@ -660,7 +660,7 @@ Section ProofUvmdealloc.
     assert (HA5a1 : A5 !!! Regidx Ra1 = oldsz).
     { rewrite /A5 upd_ne; [| reg_neq]. rewrite /A4 upd_ne; [| reg_neq]. exact HA3a1. }
     (* +0x16 add a4,a2,a5 : a4 := newsz + 4095 *)
-    iApply (wp_add_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x16)) Ra4 Ra2 Ra5
+    iApply (wp_add_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x16)) Ra4 Ra2 Ra5
               (add_vec newsz (mword_of_int 4095)) A5 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rgne; rgne; rewrite HA5a2 HA5a5; reflexivity)
@@ -673,7 +673,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1a) in "Hpc".
     (* +0x1a c.lui a3,0xfffff : a3 := -4096 *)
-    iApply (wp_clui_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x1a)) Ra3
+    iApply (wp_clui_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x1a)) Ra3
               (sign_extend' 20 (mword_of_int 63 : mword 6)) (mword_of_int (-4096) : mword 64)
               A6 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) lui_m4096
@@ -694,7 +694,7 @@ Section ProofUvmdealloc.
     assert (HA7a1 : A7 !!! Regidx Ra1 = oldsz).
     { rewrite /A7 upd_ne; [| reg_neq]. rewrite /A6 upd_ne; [| reg_neq]. exact HA5a1. }
     (* +0x1c c.and a4,a4,a3 : a4 := PGROUNDUP(newsz) *)
-    iApply (wp_cand_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x1c)) Ra4 Ra3 A7 (K - 4)%nat b
+    iApply (wp_cand_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x1c)) Ra4 Ra3 A7 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
     iIntros (CID13 Hs13) "Hcg Hpc".
@@ -715,7 +715,7 @@ Section ProofUvmdealloc.
     assert (HA8a3 : A8 !!! Regidx Ra3 = (mword_of_int (-4096) : mword 64))
       by (rewrite /A8 upd_ne; [exact HA7a3 | reg_neq]).
     (* +0x1e c.add a5,a5,a1 : a5 := 4095 + oldsz *)
-    iApply (wp_cadd_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x1e)) Ra5 Ra1 A8 (K - 4)%nat b
+    iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x1e)) Ra5 Ra1 A8 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
     iIntros (CID14 Hs14) "Hcg Hpc".
@@ -735,7 +735,7 @@ Section ProofUvmdealloc.
     assert (HA9a3 : A9 !!! Regidx Ra3 = (mword_of_int (-4096) : mword 64))
       by (rewrite /A9 upd_ne; [exact HA8a3 | reg_neq]).
     (* +0x20 c.and a5,a5,a3 : a5 := PGROUNDUP(oldsz) *)
-    iApply (wp_cand_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x20)) Ra5 Ra3 A9 (K - 4)%nat b
+    iApply (wp_cand_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x20)) Ra5 Ra3 A9 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
     iIntros (CID15 Hs15) "Hcg Hpc".
@@ -810,7 +810,7 @@ Section ProofUvmdealloc.
         iExact "Hpt". }
       assert (Hcmp2' : zopz0zI_u (rget A10 Ra4) (rget A10 Ra5) = false).
       { rgne. rgne. rewrite HA10a4 HA10a5. exact Hcmp2. }
-      iApply (wp_bltu_fall_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x22))
+      iApply (wp_bltu_fall_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x22))
                 (mword_of_int 16 : mword 13) Ra5 Ra4 A10 (K - 4)%nat b
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) Hcmp2'
                 with "Hcg Hpc Hi22 [-]").
@@ -821,7 +821,7 @@ Section ProofUvmdealloc.
       iEval (rewrite Hpc26) in "Hpc".
       iDestruct (cpu_own_transport CID CID16 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (wp_uvmdealloc_epi Φ mm A10 P K eb p C b oldsz newsz newsz ret_tgt
+      iApply (wp_uvmdealloc_epi mm A10 P K eb p C b oldsz newsz newsz ret_tgt
                 ltac:(lia) ltac:(wp_next_chain) eq_refl HA10sp HA10s1 HA10thr
                 ltac:(right; split; [exact Hlt | reflexivity])
                 with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").
@@ -833,7 +833,7 @@ Section ProofUvmdealloc.
       rewrite -!uint_unsigned. exact (proj1 (Z.ltb_lt _ _) Hcmp2). }
     assert (Hcmp2' : zopz0zI_u (rget A10 Ra4) (rget A10 Ra5) = true).
     { rgne. rgne. rewrite HA10a4 HA10a5. exact Hcmp2. }
-    iApply (wp_bltu_taken_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x22))
+    iApply (wp_bltu_taken_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x22))
               (mword_of_int 16 : mword 13) Ra5 Ra4 A10 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
               Hcmp2' ltac:(vm_compute; reflexivity)
@@ -873,7 +873,7 @@ Section ProofUvmdealloc.
                                      - bv_unsigned (pgroundup newsz)) : mword 64)).
     { rgne. rgne. rewrite HA10a5 HA10a4. apply bv_eq.
       rewrite sub_vec64_unsigned. symmetry. apply moi64_unsigned. }
-    iApply (wp_csub_wval_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x32)) Ra5 Ra5 Ra4
+    iApply (wp_csub_wval_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x32)) Ra5 Ra5 Ra4
               (mword_of_int (bv_unsigned (pgroundup oldsz)
                              - bv_unsigned (pgroundup newsz)) : mword 64)
               A10 (K - 4)%nat b
@@ -895,7 +895,7 @@ Section ProofUvmdealloc.
                                      - bv_unsigned (pgroundup newsz)) : mword 64))
       by (rewrite /B1 upd_eq; reflexivity).
     (* +0x34 c.srli a5,a5,0xc : a5 := npages *)
-    iApply (wp_csrli_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x34)) (Cregidx (mword_of_int 7)) Ra5
+    iApply (wp_csrli_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x34)) (Cregidx (mword_of_int 7)) Ra5
               (mword_of_int 12 : mword 6) B1 (K - 4)%nat b
               udl_cr7 ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi34 [-]").
@@ -924,7 +924,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc36) in "Hpc".
     (* +0x36 c.li a3,1 : do_free = 1 *)
-    iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x36)) Ra3 (mword_of_int 1 : mword 6)
+    iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x36)) Ra3 (mword_of_int 1 : mword 6)
               (mword_of_int 1 : mword 64) B2 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(apply bv_eq; vm_compute; reflexivity)
@@ -940,7 +940,7 @@ Section ProofUvmdealloc.
                     = (mword_of_int (Z.of_nat (uvmd_np oldsz newsz)) : mword 64)).
     { rewrite /B3 upd_ne; [| reg_neq]. rewrite /B2 upd_eq. reflexivity. }
     (* +0x38 sext.w a2,a5 : the count is small, so this is the identity *)
-    iApply (wp_addiw_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x38)) Ra2 Ra5
+    iApply (wp_addiw_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x38)) Ra2 Ra5
               (mword_of_int 0 : mword 12) B3 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi38 [-]").
@@ -964,7 +964,7 @@ Section ProofUvmdealloc.
     { rewrite /B4 upd_ne; [| reg_neq]. rewrite /B3 upd_ne; [| reg_neq].
       rewrite /B2 upd_ne; [| reg_neq]. rewrite /B1 upd_ne; [| reg_neq]. exact HA10a4. }
     (* +0x3c c.mv a1,a4 : a1 := PGROUNDUP(newsz) *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x3c)) Ra1 Ra4 B4 (K - 4)%nat b
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x3c)) Ra1 Ra4 B4 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi3c [-]").
     iIntros (CID22 Hs22) "Hcg Hpc".
@@ -977,7 +977,7 @@ Section ProofUvmdealloc.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc3e) in "Hpc".
     (* +0x3e jal ra,uvmunmap *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x3e)) Rra
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x3e)) Rra
               (mword_of_int 2096952 : mword 21) B5 (K - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
@@ -1057,7 +1057,7 @@ Section ProofUvmdealloc.
        hart crossing). *)
     iDestruct (cpu_own_transport CID CID23 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (Uvmunmap.wp_uvmunmap_sconf γa Φ B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p C 0%nat b
+    iApply (Uvmunmap.wp_uvmunmap_sconf γa B6 P (uvmd_np oldsz newsz) (K - 4)%nat eb p C 0%nat b
               ltac:(lia) ltac:(vm_compute; reflexivity) HB6a0 Halign HB6a2 Hdofree Hrange
               with "Hcg Hcpu Htext Hpc Hpt Henv [-]").
     iIntros (CID24 Hs24 mr) "Hcg Hcpu Hpc %Hcs Hpt".
@@ -1077,7 +1077,7 @@ Section ProofUvmdealloc.
               mr !!! Regidx c = mm !!! Regidx c).
     { intros c Hc H2 H8 H9.
       rewrite (callee_saved_lookup Hcs c Hc). apply HB6thr; assumption. }
-    iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.uvmdealloc + 0x42))
+    iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.uvmdealloc + 0x42))
               (sign_extend' 21 (concat_vec (mword_of_int 2034 : mword 11) ('b"0")))
               mr (K - 4)%nat b ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi42 [-]").
@@ -1090,7 +1090,7 @@ Section ProofUvmdealloc.
     iEval (rewrite Htgt26') in "Hpc".
     iDestruct (cpu_own_transport CID24 CID25 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iApply (wp_uvmdealloc_epi Φ mm mr P K eb p C b oldsz newsz newsz ret_tgt
+    iApply (wp_uvmdealloc_epi mm mr P K eb p C b oldsz newsz newsz ret_tgt
               ltac:(lia) ltac:(wp_next_chain) eq_refl Hmrsp Hmrs1 Hmrthr
               ltac:(right; split; [exact Hlt | reflexivity])
               with "Hcg Hcpu Htext Hpc Hr24 Hr16 Hr8 [Hgap] Hpt Hcont").

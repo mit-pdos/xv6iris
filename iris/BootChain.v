@@ -380,13 +380,18 @@ Section BootRun.
      ghost_var sie_gname (1/2) ('b"0" : mword 1) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
      ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
+     (* BOTH halves of the SPP mirror.  Adequacy mints them at an arbitrary
+        value; the M->S bridge is what ties them to the mstatus it installs,
+        so nothing here depends on which value that is. *)
+     sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
+     sret_bits ('b"0" : mword 1) ('b"0" : mword 1) ∗
      a_cpu_noff cid_word ↦₄ noff_val 0 ∗
      a_cpu_int cid_word ↦₄ iv ∗
      cpu_proc_half cpu_id zero_reg ∗
      cpu_ctx_free ∗
      True)%I.
 
-  Lemma boot_entry_bridge (Φ : mval -> iProp Σ) (rs : regstate)
+  Lemma boot_entry_bridge (rs : regstate)
       (iv : mword 32) (dq : dfrac) :
     (* [reset_regs] alone: the mie / mideleg facts [boot_bridge] needs ("no
        non-delegated interrupt is enabled") are now PINS of the reset machine
@@ -408,8 +413,8 @@ Section BootRun.
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
        main_hart_raw (register_lookup tlb rs) -∗
        pc_is (mword_of_int KernelSyms.main) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset.
     pose proof (reset_regs_mie _ _ Hreset) as Hmie0.
@@ -420,13 +425,13 @@ Section BootRun.
     iIntros "#Htext (Hmm & Hpmpc & Hpmpa & Hpc & Hfile & Hmh & Hmepc & Hsatp &
               Hmede & Hmdl & Hmie & Hmenv & Hmcen & Hstc & Htlb & Hstvec &
               Hsepc & Hscause & Hstval & Hgot & Hstk & Hbit & Hbit2 & Hg2 &
-              Hg4a & Hg4b & Hnoff & Hint & Hproc & Hctx & _) Hcont".
+              Hg4a & Hg4b & Hspp1 & Hspp2 & Hnoff & Hint & Hproc & Hctx & _) Hcont".
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     (* the two persistent halves of the config bundle, kept for the bridge *)
     iDestruct (mmode_config_persist with "Hmm") as "[[#Hhw #Hmin] Hmm]".
     (* The contract takes sp0 as a PARAMETER, so it runs at §1's concrete
        address throughout and there is no rewriting to do on either side. *)
-    iApply (Entry.wp_entry_boot Φ (boot_regfile rs) v_stack0
+    iApply (Entry.wp_entry_boot (boot_regfile rs) v_stack0
               (boot_w64 (Z.of_nat (fin_to_nat cpu_id)))
               (register_lookup mepc rs) (register_lookup satp rs)
               (register_lookup medeleg rs) (register_lookup mideleg rs)
@@ -463,7 +468,7 @@ Section BootRun.
               msf satpf midelegf mief menvcfgf
               (mb_tpv (boot_w64 (Z.of_nat (fin_to_nat cpu_id))))
               pmpcfgf pmpaddrf (register_lookup tlb rs)
-              (noff_val 0) iv zero_reg
+              (noff_val 0) iv zero_reg _ _ _ _
               Hsp Htpf (mstatus_kernel_SIE _ Hkf) (sconf_ms_facts_of_kernel _ Hkf)
               Hmenvl Hmiez Hsatpm Hpmpo
               ltac:(exact (st_tpv_of_nat _ Hn))
@@ -472,7 +477,7 @@ Section BootRun.
               eq_refl
               with "Hhw Hmin Hhs Hpriv Hmst Hpmpc Hpmpa Hfile Hsatp Hmdl Hmie
                     Hmenv Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause
-                    Hstval Hstvec Hnoff Hint Hproc Hctx")
+                    Hstval Hspp1 Hspp2 Hstvec Hnoff Hint Hproc Hctx")
       as (mf) "(Hcap & Hcpu & Hg & Hraw)".
     iApply ("Hcont" $! mf with "Hcap Hcpu Hg Hraw Hpc").
   Qed.
@@ -500,7 +505,7 @@ Section BootSecondary.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma boot_hart_secondary (Φ : mval -> iProp Σ) (rs : regstate)
+  Lemma boot_hart_secondary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names) :
     reset_regs cpu_id rs ->
     (* a SECONDARY hart: this is what makes main's [beqz a0] fall through *)
@@ -509,15 +514,15 @@ Section BootSecondary.
     kernel_data -∗
     boot_hart_res rs iv dq -∗
     panic_wp_any -∗
-    started_inv (main_deposit γd γv Φ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    started_inv (main_deposit γd γv) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hnz.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
-    iApply (boot_entry_bridge Φ rs iv dq Hreset with "Htext Hres").
+    iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
-    iApply (MainSecondary.wp_main_secondary_sconf Φ mf K_main zero_reg γd γv
+    iApply (MainSecondary.wp_main_secondary_sconf mf K_main zero_reg γd γv
               (register_lookup tlb rs)
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
@@ -551,7 +556,7 @@ Section BootPrimary.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma boot_hart_primary (Φ : mval -> iProp Σ) (rs : regstate)
+  Lemma boot_hart_primary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)
       (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg) :
     reset_regs cpu_id rs ->
@@ -569,12 +574,13 @@ Section BootPrimary.
     kernel_data -∗
     boot_hart_res rs iv dq -∗
     panic_wp_any -∗
-    started_inv (main_deposit γd γv Φ) -∗
+    started_inv (main_deposit γd γv) -∗
     (* --- the boot supply --- *)
     main_locks_raw -∗
     main_globals_raw -∗
     ([∗ list] h ∈ enum CPU, cpu_proc_half h zero_reg) -∗
     ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
+    ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     dev_inv γd γv -∗
     uart_tx_own γd l0 -∗ uart_sent γd l0 -∗ uart_out_lb γd l0 -∗
     uart_dlab_is γd (DfracOwn (1/2)) b0 -∗
@@ -584,22 +590,22 @@ Section BootPrimary.
     kpt_unset -∗
     kmap_auth kmap_M0 -∗
     ([∗ list] p ∈ ps, page_own p) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive.
-    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hprocs Hpark
+    iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hprocs Hpark Hpst
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
-    iApply (boot_entry_bridge Φ rs iv dq Hreset with "Htext Hres").
+    iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
-    iApply (Main.wp_main_boot_sconf Φ mf K_main zero_reg ps
+    iApply (Main.wp_main_boot_sconf mf K_main zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
-              (register_lookup tlb rs) (main_deposit γd γv Φ)
+              (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) (le_n K_main) eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
               with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
-                    Hprocs Hpark Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
+                    Hprocs Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone
                     Hraw Hkpt Hkmap Hpages").
     (* THE DEPOSIT WAND: main's boot arm hands over exactly [main_deposit]'s
        nine conjuncts at exactly its eight existential witnesses, so the wand

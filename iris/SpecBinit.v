@@ -49,8 +49,7 @@ Local Open Scope Z_scope.
 Definition bcache_name_str : Z := 0x80007390.
 Definition buffer_name_str : Z := 0x80007398.
 
-Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
     (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.binit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -78,13 +77,12 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
     c_cpu ↦₈ (zero_reg : mword 64) -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BINIT.
   Parameter wp_binit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64),
-      wp_binit_sconf_body Φ m K vlock vname vcpu b p.
+      wp_binit_sconf_body m K vlock vname vcpu b p.
 End BINIT.

@@ -555,10 +555,9 @@ Qed.
 Section leaves_csrr.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
   (** *** 5a. [csrr rd, menvcfg] — plain funnel, Ext_U-gated *)
-  Lemma wwp_csrr_menvcfg_leaf Φ (al4 : bool)
+  Lemma wwp_csrr_menvcfg_leaf (al4 : bool)
       (pc : mword 64) (w : mword 32) (rd : mword 5)
       (menvcfg_in rd0 npc0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp)
@@ -603,8 +602,8 @@ Section leaves_csrr.
        R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg menvcfg_in -∗
        menvcfg ↦ᵣ menvcfg_in -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hcsr Hrdc #Hbs Hhws Hcont".
@@ -617,7 +616,7 @@ Section leaves_csrr.
     { iDestruct "Hbs" as "(_ & _ & _ & Hbw)".
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
-    iApply (wwp_instr Φ pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS))
+    iApply (wwp_instr pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -771,7 +770,7 @@ Section leaves_csrr.
 
   (** *** 5b. [csrr rd, mcounteren] — plain funnel, Ext_U-gated, 32-bit CSR
       (the read value is [zero_extend' 64] of the cell). *)
-  Lemma wwp_csrr_mcounteren_leaf Φ (al4 : bool)
+  Lemma wwp_csrr_mcounteren_leaf (al4 : bool)
       (pc : mword 64) (w : mword 32) (rd : mword 5)
       (mcen_in : mword 32) (rd0 npc0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp)
@@ -816,8 +815,8 @@ Section leaves_csrr.
          regval_into_reg (zero_extend' 64 mcen_in) -∗
        mcounteren ↦ᵣ mcen_in -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hcsr Hrdc #Hbs Hhws Hcont".
@@ -830,7 +829,7 @@ Section leaves_csrr.
     { iDestruct "Hbs" as "(_ & _ & _ & Hbw)".
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
-    iApply (wwp_instr Φ pc false
+    iApply (wwp_instr pc false
               (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
@@ -982,7 +981,7 @@ Section leaves_csrr.
   (** *** 5c. [csrr rd, sie] — plain funnel, Ext_S-gated.  sie is a VIEW of
       [mie] and [mideleg], so the leaf carries BOTH cells and the read value
       is [lower_mie mie_in mideleg_in]. *)
-  Lemma wwp_csrr_sie_leaf Φ (al4 : bool)
+  Lemma wwp_csrr_sie_leaf (al4 : bool)
       (pc : mword 64) (w : mword 32) (rd : mword 5)
       (mie_in mideleg_in rd0 npc0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp)
@@ -1029,8 +1028,8 @@ Section leaves_csrr.
        mie ↦ᵣ mie_in -∗
        mideleg ↦ᵣ mideleg_in -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hmie Hmdl Hrdc #Hbs Hhws Hcont".
@@ -1043,7 +1042,7 @@ Section leaves_csrr.
     { iDestruct "Hbs" as "(_ & _ & _ & Hbw)".
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
-    iApply (wwp_instr Φ pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS))
+    iApply (wwp_instr pc false (CSRReg (csr_sie, zreg, Regidx rd, CSRRS))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -1196,7 +1195,7 @@ Section leaves_csrr.
 
   (** *** 5d. [csrr rd, mhartid] — plain funnel, no gate.  This is the leaf
       form of [WkEntryNew]'s INLINE csrr-mhartid funnel block. *)
-  Lemma wwp_csrr_mhartid_leaf Φ (al4 : bool)
+  Lemma wwp_csrr_mhartid_leaf (al4 : bool)
       (pc : mword 64) (w : mword 32) (rd : mword 5)
       (mhartid_in rd0 npc0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp)
@@ -1240,8 +1239,8 @@ Section leaves_csrr.
        R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg mhartid_in -∗
        mhartid ↦ᵣ mhartid_in -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hmh Hrdc #Hbs Hhws Hcont".
@@ -1254,7 +1253,7 @@ Section leaves_csrr.
     { iDestruct "Hbs" as "(_ & _ & _ & Hbw)".
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
-    iApply (wwp_instr Φ pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS))
+    iApply (wwp_instr pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -1393,7 +1392,7 @@ Section leaves_csrr.
       surrendered config cells, which the continuation gives back per the
       config-funnel contract.  The leaf itself writes ONLY [rd]; mstatus is
       unchanged. *)
-  Lemma wwp_csrr_mstatus_leaf Φ (al4 : bool)
+  Lemma wwp_csrr_mstatus_leaf (al4 : bool)
       (pc : mword 64) (w : mword 32) (rd : mword 5)
       (ms0 rd0 npc0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n)
@@ -1443,8 +1442,8 @@ Section leaves_csrr.
        pc_is (add_vec_int pc 4) -∗
        R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg ms0 -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz HmIE0 HMPRV Hdecf Hagree HDmi Hgood Hdec.
     iIntros "#Hhw #Hmiv Hhs Hpriv Hms0 Hpmpc Hpc Hnpc Hrdc #Hbs Hhws Hcont".
@@ -1457,7 +1456,7 @@ Section leaves_csrr.
     { iDestruct "Hbs" as "(_ & _ & _ & Hbw)".
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
-    iApply (wwp_instr_config Φ pc false
+    iApply (wwp_instr_config pc false
               (CSRReg (csr_mstatus, zreg, Regidx rd, CSRRS)) pmpcfg0 ms0
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp HmIE0 HMPRV

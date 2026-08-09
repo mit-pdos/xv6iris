@@ -47,7 +47,6 @@ Import Defs.
    so it needs 2 of the [n] available stack slots and returns them (avail [n]
    preserved). *)
 Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64) :=
   let a0_idx : mword 5 := mword_of_int 10 in
   let a1_idx : mword 5 := mword_of_int 11 in
@@ -72,13 +71,11 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
     ⌜ mfin !!! Regidx a0_idx = p_dst ⌝ -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type MEMMOVE.
   Parameter wp_memmove_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64),
-      wp_memmove_sconf_body Φ m0 n len src_bytes dst_olds b p.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (p : mword 64),
+      wp_memmove_sconf_body m0 n len src_bytes dst_olds b p.
 End MEMMOVE.

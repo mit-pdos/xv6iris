@@ -82,8 +82,7 @@ Existing Instance riscv_memGS.
    only the PLIC ([plicinit]) can use it directly.  The bundle-taking form is
    the restatement [wp_sw_plic_dev_s_sconf] below, kept verbatim for the
    existing consumers. *)
-Lemma wp_sw_plic_pinv_s_sconf
-    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -100,18 +99,18 @@ Lemma wp_sw_plic_pinv_s_sconf
   wp_next b p (fun (CID : CpuId) =>
     sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
   iIntros "Hcg Hpc Hinstr #Hpinv Hcont".
-  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-  iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & %Hmsf)".
+  iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & Hspp & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
   iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
   iPoseProof "Hhw" as "#Hhwc".
@@ -228,10 +227,10 @@ Proof.
     rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
     unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
   iEval (rewrite Lnpc) in "Hpc'".
-  iAssert (sconf) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
+  iAssert (sconf) with "[Hpriv Hmiex Hms Hhalf Hspp Hmenv]" as "Hsc".
   { iFrame "Hhw Hminv Hpriv Hmiex".
-    iSplitL "Hms Hhalf".
-    { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+    iSplitL "Hms Hhalf Hspp".
+    { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
   iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
@@ -245,8 +244,7 @@ Qed.
 (* The bundle-taking RESTATEMENT of the leaf above, for the consumers written
    before the device invariant was split per device ([plicinithart],
    [plic_complete]): statement verbatim, proof one projection. *)
-Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
-    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
     (m : regfile) (n : nat) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -263,13 +261,13 @@ Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
   wp_next b p (fun (CID : CpuId) =>
     sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
-  iApply (wp_sw_plic_pinv_s_sconf Φ pc is_rvc rs2 rs1 imm m n b
+  iApply (wp_sw_plic_pinv_s_sconf pc is_rvc rs2 rs1 imm m n b
             Hrange Halign Hcanon Hdevvpn Hwrite
             with "Hcg Hpc Hinstr Hpinv Hcont").
 Qed.
@@ -281,8 +279,7 @@ Qed.
    kernel's plan admits, and in exchange it may name a property [P] of the value
    read that holds at all of them -- that is how [plic_claim] learns its result
    is one of the machine's own interrupt ids. *)
-Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
-    (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
+Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
     (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -304,20 +301,20 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names)
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval v)]> m) n b p -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang))) -∗
+  WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrd Hrdok Hread.
   pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
   pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
-  iApply (wp_instr_s_sconf m n b Φ pc is_rvc
+  iApply (wp_instr_s_sconf m n b pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
             with "Hcg Hpc Hinstr").
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-  iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & %Hmsf)".
+  iDestruct "Hmsx" as (mstatus0) "(Hms & Hhalf & Hspp & %Hmsf)".
   pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
   iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
   iPoseProof "Hhw" as "#Hhwc".
@@ -440,10 +437,10 @@ Proof.
   assert (Hsp : m !!! Regidx csp_rs1
                 = <[Regidx rd := regval_into_reg (ldval v)]> m !!! Regidx csp_rs1)
     by (symmetry; apply upd_ne; congruence).
-  iAssert (sconf) with "[Hpriv Hmiex Hms Hhalf Hmenv]" as "Hsc".
+  iAssert (sconf) with "[Hpriv Hmiex Hms Hhalf Hspp Hmenv]" as "Hsc".
   { iFrame "Hhw Hminv Hpriv Hmiex".
-    iSplitL "Hms Hhalf".
-    { iExists mstatus0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+    iSplitL "Hms Hhalf Hspp".
+    { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
   iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }

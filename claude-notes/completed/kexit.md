@@ -10,18 +10,27 @@ protocol this extends).
 
 ## Status
 
-**kexit IS PROVEN — `ProofKexit.v` declares no `Axiom` and contains no
-`admit` — but it is NOT LINKED, and cannot be until `fileclose` has a
-proof.** (What the *cone* will assume once linked is what its callees
-assume: iput via `LinkIput.v`, plus panic. The proof file itself adds
-nothing.) `proof_coverage.py`
-therefore still prints `~ kexit … assumed`: its rule is "proven once a
-`Link*.v` instantiates the functor sealed by its `Module Type`", and
-`LinkFileclose.v` does not exist. This is the same state `sys_pipe` is in,
-for the same one missing callee — see
-[`sys-pipe.md`](sys-pipe.md). Nothing about kexit is left to do; the next
-move on this cone is file.c's `fileclose` (194 bytes, no `CodeFileclose.v`
-yet), after which **one** `LinkKexit.v` closes both.
+**kexit IS PROVEN AND LINKED** — `ProofKexit.v` / `LinkKexit.v` declare no
+`Axiom` and contain no `admit`; the cone's one assumption is what its callees
+assume, iput via `LinkIput.v`. `proof_coverage.py` prints it `proven`.
+
+**`sys_exit` IS PROVEN AND LINKED TOO** (`SpecSysExit.v` / `CodeSysExit.v` /
+`ProofSysExit.v` / `LinkSysExit.v`, over ARGINT + KEXIT — same axiom
+footprint). Since kexit diverges, sys_exit's proof has no epilogue to prove:
+applying `Kexit.wp_kexit_sconf` after the `jal kexit` discharges the whole
+function, and the dead `li a0,0`/pop/`ret` tail gcc emits (not knowing kexit
+is `noreturn`) is decoded by nobody's proof. Detail in
+[`proc-struct-resources.md`](../projects/proc-struct-resources.md)'s S6.
+
+The callee it waited on, `fileclose`, is proven
+([`../completed/fileclose.md`](../completed/fileclose.md)). Landing it moved
+one thing here: kexit's fd loop needs the caller's pid cell while it is
+walking `proc_priv` descriptor by descriptor, and the two one-at-a-time
+accessors each swallow the whole block — so `ProcInv.proc_priv_pid_ofile`
+lends the pid quarter and one descriptor TOGETHER, and the loop carries
+`SpecFileclose.fileclose_fs_env_nopid` between iterations. The page count
+rides the loop existentially, because closing a descriptor may or may not
+free a pipe's page.
 
 What compiles today:
 

@@ -469,6 +469,33 @@ Proof. qu_disj. Qed.
 Lemma qSXL_uMPELP (w : mword 64) x : _get_Mstatus_SXL (_update_Mstatus_MPELP w x) = _get_Mstatus_SXL w.
 Proof. qu_disj. Qed.
 
+(* rows SPP (bit 8) and SPIE (bit 5).  Only the setters that sit OUTSIDE
+   them in [mstatus_legalized] / [lift_sstatus] are needed -- the chains
+   stop at the field's own setter -- which is why these two rows are short
+   next to MPRV's or SXL's.  Both fields are what an [sret] reads, so the
+   trap-handler contract ([projects/kerneltrap.md]) is what wants them. *)
+Lemma qSPP_uSD (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_SD w x) = _get_Mstatus_SPP w.
+Proof. qu_disj. Qed.
+Lemma qSPP_uSIE (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_SIE w x) = _get_Mstatus_SPP w.
+Proof. qu_disj. Qed.
+Lemma qSPP_uMIE (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_MIE w x) = _get_Mstatus_SPP w.
+Proof. qu_disj. Qed.
+Lemma qSPP_uSPIE (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_SPIE w x) = _get_Mstatus_SPP w.
+Proof. qu_disj. Qed.
+Lemma qSPP_uMPIE (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_MPIE w x) = _get_Mstatus_SPP w.
+Proof. qu_disj. Qed.
+Lemma qSPP_uSPP (w : mword 64) x : _get_Mstatus_SPP (_update_Mstatus_SPP w x) = x.
+Proof. qu_same. Qed.
+
+Lemma qSPIE_uSD (w : mword 64) x : _get_Mstatus_SPIE (_update_Mstatus_SD w x) = _get_Mstatus_SPIE w.
+Proof. qu_disj. Qed.
+Lemma qSPIE_uSIE (w : mword 64) x : _get_Mstatus_SPIE (_update_Mstatus_SIE w x) = _get_Mstatus_SPIE w.
+Proof. qu_disj. Qed.
+Lemma qSPIE_uMIE (w : mword 64) x : _get_Mstatus_SPIE (_update_Mstatus_MIE w x) = _get_Mstatus_SPIE w.
+Proof. qu_disj. Qed.
+Lemma qSPIE_uSPIE (w : mword 64) x : _get_Mstatus_SPIE (_update_Mstatus_SPIE w x) = x.
+Proof. qu_same. Qed.
+
 (* ---- L4: fields of [mstatus_legalized o v] ---- *)
 Lemma mstatus_legalized_MIE (o v : mword 64) :
   _get_Mstatus_MIE (mstatus_legalized o v) = _get_Mstatus_MIE v.
@@ -486,6 +513,17 @@ Lemma mstatus_legalized_MPRV (o v : mword 64) :
 Proof. unfold mstatus_legalized. cbn zeta.
   rewrite qMPRV_uSD qMPRV_uSIE qMPRV_uMIE qMPRV_uSPIE qMPRV_uMPIE qMPRV_uSPP
           qMPRV_uMPP qMPRV_uVS qMPRV_uFS qMPRV_uXS qMPRV_uMPRV. reflexivity. Qed.
+
+Lemma mstatus_legalized_SPP (o v : mword 64) :
+  _get_Mstatus_SPP (mstatus_legalized o v) = _get_Mstatus_SPP v.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qSPP_uSD qSPP_uSIE qSPP_uMIE qSPP_uSPIE qSPP_uMPIE qSPP_uSPP.
+  reflexivity. Qed.
+
+Lemma mstatus_legalized_SPIE (o v : mword 64) :
+  _get_Mstatus_SPIE (mstatus_legalized o v) = _get_Mstatus_SPIE v.
+Proof. unfold mstatus_legalized. cbn zeta.
+  rewrite qSPIE_uSD qSPIE_uSIE qSPIE_uMIE qSPIE_uSPIE. reflexivity. Qed.
 
 Lemma mstatus_legalized_SXL (o v : mword 64) :
   _get_Mstatus_SXL (mstatus_legalized o v) = _get_Mstatus_SXL o.
@@ -612,7 +650,7 @@ Section WpCsrwGprNewC.
      receives the same raw cells with mstatus at the EXPLICIT legalized
      value -- no re-quantification over a hidden old value, so the chain
      keeps a single mstatus symbol end-to-end. ---- *)
-  Lemma wp_csrw_mstatus_raw (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_mstatus_raw (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (ms0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
@@ -633,11 +671,11 @@ Section WpCsrwGprNewC.
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_config Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
+    iApply (wp_instr_config pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 Hpmp HmIE Hstat
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".
@@ -693,7 +731,7 @@ Section WpCsrwGprNewC.
      touch mstatus), so a chain that pins the value across the write keeps
      it without a fresh existential.  pmpcfg_n itself is FULL (it is the
      written cell); the continuation receives the concrete written value. ---- *)
-  Lemma wp_csrw_pmpcfg0_raw (Φ : mval -> iProp Σ) (pc : mword 64) (rs1 : mword 5)
+  Lemma wp_csrw_pmpcfg0_raw (pc : mword 64) (rs1 : mword 5)
       (m : regfile) (ms0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     pmp_allows_all pmpcfg0 ->
@@ -714,11 +752,11 @@ Section WpCsrwGprNewC.
       pmpcfg_n ↦ᵣ pmpcfg_written (m !!! Regidx rs1) pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_config Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
+    iApply (wp_instr_config pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))
               pmpcfg0 ms0 Hpmp HmIE Hstat
               with "Hhw Hinv Hhs Hpriv0 Hms0 Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hpriv Hms Hpmpc Hsi".

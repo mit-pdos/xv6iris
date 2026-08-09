@@ -178,7 +178,7 @@ Section WeakHart.
       that must re-establish the hart interpretation at EVERY relational
       successor.  [wp_lift_step]'s tick nondeterminism rides in the
       continuation's [tick] binder exactly as in [RiscvExec.wp_exec_step]. *)
-  Lemma wp_wrun_step Φ :
+  Lemma wp_wrun_step :
     gen_id = 0%nat ->
     (∀ σ, wmstate_interp σ ={⊤,∅}=∗
        ⌜∃ χ σ0 χ', wexec (Some (fin_to_nat cpu_id)) (riscv_step false) χ σ
@@ -186,8 +186,8 @@ Section WeakHart.
        ▷ (∀ (tick : bool) (σ' : wmstate),
             ⌜wrun (Some (fin_to_nat cpu_id)) (riscv_step tick) σ tt σ'⌝
             ={∅,⊤}=∗ wmstate_interp σ' ∗
-                     WP (Loop : expr weak_riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+                     WWP Loop)) -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid) "H".
     iApply (wp_lift_step (Λ := weak_riscv_lang)); first done.
@@ -247,7 +247,7 @@ Section WeakHart.
       over the ORACLE and [wexec]'s successors.  [Hcov] is the bridge
       obligation discussed in the header — dischargeable by
       [wexec_covers_choice_free] on the choice-free fragment. *)
-  Lemma wp_wexec_step Φ :
+  Lemma wp_wexec_step :
     gen_id = 0%nat ->
     (∀ σ, wmstate_interp σ ={⊤,∅}=∗
        ⌜∀ tick : bool, wexec_covers (Some (fin_to_nat cpu_id))
@@ -259,8 +259,8 @@ Section WeakHart.
             ⌜wexec (Some (fin_to_nat cpu_id)) (riscv_step tick) χ σ
              = Some (tt, σ', χ')⌝
             ={∅,⊤}=∗ wmstate_interp σ' ∗
-                     WP (Loop : expr weak_riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+                     WWP Loop)) -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid) "H". iApply (wp_wrun_step with "[H]"); [exact Hgid|].
     iIntros (σ) "Hσ". iMod ("H" $! σ with "Hσ") as "(%Hcov & %Hred & Hk)".
@@ -285,13 +285,13 @@ Section WeakDev.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId}.
 
-  Lemma wp_wuart_step Φ :
+  Lemma wp_wuart_step :
     gen_id = 0%nat ->
     (∀ g, weak_state_interp g ={⊤,∅}=∗
        ▷ (∀ d', ⌜uart_step (wgdev g) d'⌝ ={∅,⊤}=∗
             weak_state_interp (wg_dev g d') ∗
-            WP (UartLoop : expr weak_riscv_lang) {{ Φ }})) -∗
-    WP (UartLoop : expr weak_riscv_lang) {{ Φ }}.
+            WWP UartLoop)) -∗
+    WWP UartLoop.
   Proof.
     iIntros (Hgid) "H".
     iApply (wp_lift_step (Λ := weak_riscv_lang)); first done.
@@ -312,13 +312,13 @@ Section WeakDev.
     iModIntro. iFrame "HWP". iSplitL; [|done]. iExact "Hsi".
   Qed.
 
-  Lemma wp_wplic_step Φ :
+  Lemma wp_wplic_step :
     gen_id = 0%nat ->
     (∀ g, weak_state_interp g ={⊤,∅}=∗
        ▷ (∀ gr', ⌜plic_step (wgdev g) (wgregs g) gr'⌝ ={∅,⊤}=∗
             weak_state_interp (wg_regs g gr') ∗
-            WP (PlicLoop : expr weak_riscv_lang) {{ Φ }})) -∗
-    WP (PlicLoop : expr weak_riscv_lang) {{ Φ }}.
+            WWP PlicLoop)) -∗
+    WWP PlicLoop.
   Proof.
     iIntros (Hgid) "H".
     iApply (wp_lift_step (Λ := weak_riscv_lang)); first done.
@@ -346,13 +346,13 @@ Section WeakDev.
     iModIntro. iFrame "HWP". iSplitL; [|done]. iExact "Hsi".
   Qed.
 
-  Lemma wp_wdisk_step Φ :
+  Lemma wp_wdisk_step :
     gen_id = 0%nat ->
     (∀ g, weak_state_interp g ={⊤,∅}=∗
        ▷ (∀ d' w, ⌜wdisk_step (wgdev g) (wflat (wgimg g) (wglog g)) d' w⌝
             ={∅,⊤}=∗ weak_state_interp (wg_dma g d' w) ∗
-                     WP (DiskLoop : expr weak_riscv_lang) {{ Φ }})) -∗
-    WP (DiskLoop : expr weak_riscv_lang) {{ Φ }}.
+                     WWP DiskLoop)) -∗
+    WWP DiskLoop.
   Proof.
     iIntros (Hgid) "H".
     iApply (wp_lift_step (Λ := weak_riscv_lang)); first done.

@@ -83,13 +83,13 @@ Section ProofSwtch.
     nth 1 (callee_img m) d = m !!! Regidx csp_rs1.
   Proof. unfold callee_img, ctx_regs, csp_rs1. cbn [map nth]. reflexivity. Qed.
 
-  Lemma wp_swtch_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_swtch_sconf
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) :
-    wp_swtch_sconf_body Φ P An Ao oldc newc m0 old_vs av eb p.
+    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hadm)
@@ -103,7 +103,7 @@ Section ProofSwtch.
     iEval (rewrite /sie_cap) in "Hcap".
     iDestruct "Hcap" as "(Hstk & Htr & Hsiearm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
     destruct Hmsf' as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
@@ -131,7 +131,7 @@ Section ProofSwtch.
        and its resume wand demands cpu_own at that SAME index p -- so the
        cpu_own we already hold fits with no retune, no equation. ---- *)
     iApply fupd_wp.
-    iEval (rewrite (valid_context_unfold Φ P An newc p)
+    iEval (rewrite (valid_context_unfold P An newc p)
                    /valid_context_pre !bi.later_exist) in "Hvalidnew".
     iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
     iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
@@ -172,7 +172,7 @@ Section ProofSwtch.
     iDestruct (swtch_code with "Ht") as "Hcode".
     iEval (rewrite -Hden) in "Hfile".
     (* ---- run the 28-instruction straight-line block (regime-blind engine) ---- *)
-    iApply (wp_vc_block_s_den_r strans_regime swtch_prog Φ
+    iApply (wp_vc_block_s_den_r strans_regime swtch_prog
               (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
               (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
               rho ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
@@ -202,9 +202,9 @@ Section ProofSwtch.
        wand.  Pack p := the spec's [p] param; the caller continuation [Hwold]
        is already [∀ m eb', … cpu_own γ 1 eb' p emp …], matching the record's
        [∀ m eb'] wand at that same p. ---- *)
-    iAssert (valid_context Φ P Ao oldc p)
+    iAssert (valid_context P Ao oldc p)
       with "[Holdpart Hstk Hwold]" as "Hvoldc".
-    { rewrite (valid_context_unfold Φ P Ao oldc p) /valid_context_pre.
+    { rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
       iExists (callee_img m0), av.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
@@ -247,7 +247,7 @@ Section ProofSwtch.
                      = nth 1 new_vs (mword_of_int 0)).
     { rewrite <- Hcallee_new. exact (eq_sym (callee_img_nth1 _ (mword_of_int 0))). }
     iDestruct (swi_68 with "Ht") as "Hret".
-    iApply (wp_cret_s_zca_r_later strans_regime Φ
+    iApply (wp_cret_s_zca_r_later strans_regime
               (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
               (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
               ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
@@ -255,15 +255,15 @@ Section ProofSwtch.
               ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hret
-                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hq0 Hcpuown Hstk_t]").
+                    [Hnewwand Hvoldc Hnewpart HP Hhalf Hspp Hq0 Hcpuown Hstk_t]").
     (* ---- the ▷ continuation: iNext strips it AND the record's ▷'d pieces ---- *)
     iNext.
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpc Hfile".
     (* ---- rebuild sconf ---- *)
-    iAssert sconf with "[Hpriv Hms Hhalf Hmie Hmdl Hmenv]" as "Hsc".
+    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmie Hmdl Hmenv]" as "Hsc".
     { rewrite /sconf. iFrame "Hhw Hminv Hpriv".
-      iSplitL "Hms Hhalf".
-      { iExists ms. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+      iSplitL "Hms Hhalf Hspp".
+      { iExists ms. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iSplitL "Hmie Hmdl".
       { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }

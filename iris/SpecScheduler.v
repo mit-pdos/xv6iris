@@ -48,7 +48,7 @@ Import Defs.
 
 
 Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.scheduler in
   (* scheduler() runs with NO current proc -- that is the fact [wp_next_idle]
@@ -60,12 +60,12 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   sie_cap_gpr m av false p0 -∗
   cpu_own 0 false p0 cpu_ctx_free false -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   (* the global parked-scheduler invariant (SchedCtx.v): this hart's slot of
      it holds HALF of [cpus[cid].proc], so the two [c->proc] stores the scan
      makes are mask-changing steps ([scheds_dispatch] / [scheds_reclaim]).
      Persistent and hart-free, like [procs_inv]; main allocates it. *)
-  scheds_inv Φ γs -∗
+  scheds_inv γs -∗
   (* HART-GENERIC.  scheduler() never migrates -- that is what [wp_next_idle]
      and its [p = zero_reg] hatch express -- but that is not the point: the
      [acquire] it calls in the scan asks for [panic_wp_any], a resource
@@ -74,12 +74,12 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   panic_wp_any -∗
   trap_csrs -∗
   intr_handler_avail -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang).
 
 Module Type SCHEDULER.
   Parameter wp_scheduler_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (m : regfile) (av : nat) (p0 : mword 64),
-      wp_scheduler_sconf_body Φ γs m av p0.
+      wp_scheduler_sconf_body γs m av p0.
 End SCHEDULER.

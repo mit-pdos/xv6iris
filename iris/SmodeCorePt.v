@@ -629,7 +629,7 @@ Section SmodeCorePt.
   (* [wp_instr_s_tlbinv] with the tree invariant threaded, and NO A/D     *)
   (* premise -- the Svadu write-back is absorbed inside the fetch.        *)
   (* =================================================================== *)
-  Lemma wp_instr_s_regime (R : s_regime) (γ : gname) Φ
+  Lemma wp_instr_s_regime (R : s_regime) (γ : gname)
       (pc : mword 64) (is_rvc : bool) (i : instruction) {dq : dfrac} :
     smode_config γ dq -∗
     sr_inv R -∗
@@ -646,8 +646,8 @@ Section SmodeCorePt.
          (smode_config γ dq -∗
           sr_inv R -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hsm Htlbinv Hpc Hinstr H".
     iDestruct "Hsm" as "(#Hhw & #Hinv & Hhs & Hpriv & Hmst & Hmie & Hmenv)".
@@ -664,7 +664,7 @@ Section SmodeCorePt.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor with "Hinv Hhs").
     iIntros (σ) "Hsi".
     (* interrupt dispatch decision at σ (before the fetch moves the state) *)
     iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
@@ -711,7 +711,7 @@ Section SmodeCorePt.
     iDestruct (reg_valid with "Hreg' Hpc") as %Lpc_exec.
     iAssert (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
              PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-             ▷ WP (Loop : expr riscv_lang) {{ Φ }})%I
+             ▷ WP (Loop : expr riscv_lang))%I
       with "[Hcont Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc Htlbinv]" as "Hcont'".
     { iIntros "Hhs' Hpc'".
       iApply ("Hcont" with "[Hhs' Hpriv Hmstatus Hsie Hmiec Hmdlc Hmenvc] Htlbinv Hpc'").
@@ -756,7 +756,7 @@ Section SmodeCorePt.
   (* inside the fupd) and stashes the returned invariant in its           *)
   (* continuation.  No A/D premise anywhere.                              *)
   (* =================================================================== *)
-  Lemma wp_instr_s_config_regime (R : s_regime) Φ
+  Lemma wp_instr_s_config_regime (R : s_regime)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -792,8 +792,8 @@ Section SmodeCorePt.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0)
       "#Hhw #Hinv Hhs Hpriv Hmstatus Hmiec Hmdlc Hmenvc Htlbinv Hpc Hinstr H".
@@ -807,7 +807,7 @@ Section SmodeCorePt.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_decode_execute_inv_priv Supervisor Φ with "Hinv Hhs").
+    iApply (wp_exec_step_decode_execute_inv_priv Supervisor with "Hinv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (dispatchInterrupt_none_S_from_regs σ misa0 mstatus0 mie_v mdv0
                  HmisaS Hmm HSIE with "Hsi Hmisa Hmstatus Hmiec Hmdlc") as %Hdisp.
@@ -907,7 +907,7 @@ Section SmodeCorePt.
       tlb_res_pt root_ppn.
   Proof. exact (s_regime_fetch (kpt_share_regime root_ppn) σ pc r E). Qed.
 
-  Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44) Φ
+  Lemma wp_instr_s_config_tlbinv_pt (root_ppn : mword 44)
       (pc : mword 64) (is_rvc : bool) (i : instruction)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq : dfrac} :
     eq_vec (_get_Mstatus_SIE mstatus0) ('b"1") = false ->
@@ -943,10 +943,10 @@ Section SmodeCorePt.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
-    exact (wp_instr_s_config_regime (kpt_share_regime root_ppn) Φ pc is_rvc i
+    exact (wp_instr_s_config_regime (kpt_share_regime root_ppn) pc is_rvc i
              mstatus0 mie_v mdv0 menvcfg0 (dq:=dq)).
   Qed.
 

@@ -53,7 +53,7 @@ Section WpJalGpr.
      [wp_instr] hands the continuation [PC := target].  The two target-alignment
      side conditions ([bit0 = 0], [bit1 = false]) are JAL-specific (AUIPC has
      none). *)
-  Lemma wp_jal_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (rd : mword 5)
+  Lemma wp_jal_gpr (pc : mword 64) (rd : mword 5)
       (imm : mword 21) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -69,12 +69,12 @@ Section WpJalGpr.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec_int pc 4)]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd Halign) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hinstr Hcont".
     destruct (aligned4_jump_bits _ Halign) as [Hal0 Hal1].
-    iApply (wp_instr Φ pc false (JAL (imm, Regidx rd)) pmpcfg0
+    iApply (wp_instr pc false (JAL (imm, Regidx rd)) pmpcfg0
               Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

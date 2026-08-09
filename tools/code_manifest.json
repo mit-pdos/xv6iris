@@ -48,9 +48,21 @@
   2
  ],
  [
+  "CodeBalloc.v",
+  "balloc",
+  "bai_",
+  3
+ ],
+ [
   "CodeBeginOp.v",
   "begin_op",
   "boi_",
+  2
+ ],
+ [
+  "CodeBfree.v",
+  "bfree",
+  "bfi_",
   2
  ],
  [
@@ -210,6 +222,12 @@
   2
  ],
  [
+  "CodeFileread.v",
+  "fileread",
+  "fri_",
+  2
+ ],
+ [
   "CodeFreeDesc.v",
   "free_desc",
   "fdi_",
@@ -258,6 +276,12 @@
   2
  ],
  [
+  "CodeIlock.v",
+  "ilock",
+  "ili_",
+  2
+ ],
+ [
   "CodeInitlock.v",
   "initlock",
   "ini_",
@@ -282,6 +306,18 @@
   2
  ],
  [
+  "CodeItrunc.v",
+  "itrunc",
+  "iti_",
+  2
+ ],
+ [
+  "CodeIunlock.v",
+  "iunlock",
+  "iui2_",
+  2
+ ],
+ [
   "CodeIupdate.v",
   "iupdate",
   "iui_",
@@ -300,10 +336,22 @@
   2
  ],
  [
+  "CodeKerneltrap.v",
+  "kerneltrap",
+  "kti_",
+  2
+ ],
+ [
   "CodeKexit.v",
   "kexit",
   "kxi_",
   2
+ ],
+ [
+  "CodeKfork.v",
+  "kfork",
+  "kfk_",
+  3
  ],
  [
   "CodeKilled.v",
@@ -369,6 +417,12 @@
   "CodeMappages.v",
   "mappages",
   "mi_",
+  2
+ ],
+ [
+  "CodeStrncpy.v",
+  "strncpy",
+  "sncp_",
   2
  ],
  [
@@ -498,6 +552,12 @@
   2
  ],
  [
+  "CodeReadi.v",
+  "readi",
+  "rdi_",
+  3
+ ],
+ [
   "CodeRelease.v",
   "release",
   "rli_",
@@ -507,6 +567,12 @@
   "CodeReparent.v",
   "reparent",
   "rpi_",
+  2
+ ],
+ [
+  "CodeSafestrcpy.v",
+  "safestrcpy",
+  "sscp_",
   2
  ],
  [
@@ -570,6 +636,12 @@
   2
  ],
  [
+  "CodeStrncmp.v",
+  "strncmp",
+  "snci_",
+  2
+ ],
+ [
   "CodeSwtch.v",
   "swtch",
   "swi_",
@@ -585,6 +657,12 @@
   "CodeSysDup.v",
   "sys_dup",
   "sdi_",
+  2
+ ],
+ [
+  "CodeSysExit.v",
+  "sys_exit",
+  "se_",
   2
  ],
  [

@@ -75,7 +75,7 @@ Definition userinit_pages : nat := 8%nat.
 Definition wp_userinit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+    (γa : gname)  (γs : list gname)
     (m0 : regfile) (K : nat)
     (eb : bool) (pj : mword 64) (C : iProp Σ)
     (on : option nat) (v0 : mword 64) (b : bool) :=
@@ -94,7 +94,7 @@ Definition wp_userinit_sconf_body
   cpu_own 0%nat eb pj C b -∗
   (* the proc array's lock invariant: allocproc scans it, and release gives
      back the slot userinit found.  Persistent, so threading it is free. *)
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   kalloc_env γa on -∗
   (* the one global cell userinit writes *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0 -∗
@@ -106,16 +106,16 @@ Definition wp_userinit_sconf_body
     cpu_own 0%nat eb pj C b -∗
     kalloc_env γa (avail_sub on userinit_pages) -∗
     (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+      (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)
       (eb : bool) (pj : mword 64) (C : iProp Σ)
       (on : option nat) (v0 : mword 64) (b : bool),
-      wp_userinit_sconf_body γa Φ γs m0 K eb pj C on v0 b.
+      wp_userinit_sconf_body γa γs m0 K eb pj C on v0 b.
 End USERINIT.

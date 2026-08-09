@@ -66,9 +66,9 @@ Section ProofPrintkinit.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_printkinit_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_printkinit_sconf
       (m : regfile) (K : nat) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64)
-    : wp_printkinit_sconf_body Φ m K vlock vname vcpu b p.
+    : wp_printkinit_sconf_body m K vlock vname vcpu b p.
   Proof.
     cbv beta delta [wp_printkinit_sconf_body].
     intros pcE ret_tgt lk c_name c_cpu HK.
@@ -85,7 +85,7 @@ Section ProofPrintkinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string pr_name_str "pr"%string name eq_refl ltac:(unfold text_end, pr_name_str; lia) Hpr
                   with "Hkdata") as "#Hstr".
-    iApply (ILW.wp_initlock_wrapper_sconf Φ m K KernelSyms.printkinit
+    iApply (ILW.wp_initlock_wrapper_sconf m K KernelSyms.printkinit
               (mword_of_int 6) (mword_of_int 18) (mword_of_int 1982) (mword_of_int 2694)
               (mword_of_int 782) lk name "pr"%string vlock vname vcpu b p HK
               ltac:(vm_compute; reflexivity)

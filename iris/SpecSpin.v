@@ -25,8 +25,7 @@ Local Open Scope Z_scope.
    self-jump, so the two coincide). *)
 Definition pc_spin : mword 64 := mword_of_int KernelSyms.spin.
 
-Definition wp_spin_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile)
+Definition wp_spin_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile)
     (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :=
   pmp_allows_all pmpcfg0 ->
   mmode_config (DfracOwn q) -∗
@@ -34,12 +33,11 @@ Definition wp_spin_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
   pc_is pc_spin -∗
   gpr_file m -∗
   kernel_text -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang).
 
 Module Type SPIN.
   Parameter wp_spin :
-    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile)
+    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp),
-      wp_spin_body Φ m pmpcfg0 q.
+      wp_spin_body m pmpcfg0 q.
 End SPIN.

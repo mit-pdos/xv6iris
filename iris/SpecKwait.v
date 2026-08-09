@@ -81,7 +81,7 @@
      found arm returns [pp->pid] through an [lw] (hence sign-extended) and
      the three failure arms return [li -1].
 
-   NOT here: [trap_csrs_pay].  kwait's own acquire(&wait_lock) produces the
+   NOT here: [arm_pay].  kwait's own acquire(&wait_lock) produces the
    level-0 pay that sleep wants, and every exit's release consumes it, so
    kwait as a whole is balanced and must not ask the caller for one -- the
    sys_pause rule (a second [trap_csrs] makes the eb = true precondition
@@ -116,7 +116,6 @@ Require Import KallocInv.
 Require Import KvmSpec.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
@@ -133,7 +132,7 @@ Import Defs.
 Definition K_kwait : nat := 60%nat.
 
 Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa γf γw : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+    (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
     (pid : mword 32) (V : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kwait in
@@ -149,12 +148,11 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain sleep parks into *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   panic_wp_any -∗
   (* the running-thread bundle sleep needs *)
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   (* copyout's lazy faulting and freeproc's kfree chain both live here *)
@@ -169,17 +167,16 @@ Definition wp_kwait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, 
       sie_cap_gpr mf av b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       proc_priv γf pj pid (upd_upt V P') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type KWAIT.
   Parameter wp_kwait_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa γf γw : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate),
-      wp_kwait_sconf_body γa γf γw Φ γs j γl m av eb C b pid V.
+      wp_kwait_sconf_body γa γf γw γs j γl m av eb C b pid V.
 End KWAIT.

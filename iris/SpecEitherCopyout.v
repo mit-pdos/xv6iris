@@ -102,7 +102,7 @@ Section SpecEitherCopyout.
 End SpecEitherCopyout.
 
 Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γf : gname)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
     (src_bytes dst_olds : nat -> bv 8) (b : bool) :=
@@ -136,16 +136,15 @@ Definition wp_either_copyout_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kal
       ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
       either_copyout_post user γf p pid V dst len src_bytes
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type EITHER_COPYOUT.
   Parameter wp_either_copyout_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (γa : gname) (γf : gname) (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (user : bool) (len : nat)
       (src_bytes dst_olds : nat -> bv 8) (b : bool),
-      wp_either_copyout_sconf_body γa γf Φ m av lvl eb p C pid V user len
+      wp_either_copyout_sconf_body γa γf m av lvl eb p C pid V user len
         src_bytes dst_olds b.
 End EITHER_COPYOUT.

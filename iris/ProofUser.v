@@ -64,11 +64,11 @@ Section ProofUser.
 
   (* THE FINAL THEOREM: safety of arbitrary user-mode execution, with NO
      totality hypotheses -- the two totalities are now unconditional. *)
-  Theorem wp_user_exec_closed (Φ : mval -> iProp Σ) :
-    wp_user_exec_closed_body C pt Φ.
+  Theorem wp_user_exec_closed :
+    wp_user_exec_closed_body C pt.
   Proof.
     cbv beta delta [wp_user_exec_closed_body].
-    apply (wp_user_exec_full C pt Φ
+    apply (wp_user_exec_full C pt
              base_exec_total_u_closed rvc_exec_total_u_closed).
   Qed.
 

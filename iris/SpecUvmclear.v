@@ -70,8 +70,7 @@ From Kernel Require KernelSyms.
 Import Defs.
 
 
-Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (mm : regfile)
+Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
     (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmclear in
   let va := mm !!! Regidx (mword_of_int 11) in
@@ -96,13 +95,12 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_set P vpn (pte_clear_u w)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMCLEAR.
   Parameter wp_uvmclear_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (mm : regfile)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile)
       (P : uptd) (w : mword 64) (K : nat) (b : bool) (p : mword 64),
-      wp_uvmclear_sconf_body Φ mm P w K b p.
+      wp_uvmclear_sconf_body mm P w K b p.
 End UVMCLEAR.

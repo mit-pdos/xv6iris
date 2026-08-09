@@ -75,7 +75,6 @@ From iris.base_logic.lib Require Import ghost_var invariants gen_heap ghost_map.
 From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import InstrBytes.
 Require Import RegFile.
@@ -107,19 +106,14 @@ Local Open Scope Z_scope.
    log_write 18 and memmove 2. *)
 Definition K_iupdate : nat := 44%nat.
 
-(* THE SUPERBLOCK FIELD.  [sb.inodestart] is at [sb + 24] -- the [lw
-   a1,1850(a1)] off the [auipc a1,0x1d] at +0x14 resolves to 0x80020868,
-   i.e. KernelSyms.sb + 0x18.  Named here (spec vocabulary belongs in the
-   Spec file) so a caller can state its fraction without recomputing the
-   offset. *)
-Definition sb_inodestart : mword 64 :=
-  pa_add (mword_of_int KernelSyms.sb : mword 64) 24.
+(* [sb_inodestart] -- the [sb + 24] cell iupdate reads at +0x18 -- now
+   lives in InodeInv.v, where ilock's contract can also name it. *)
 
 Definition wp_iupdate_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -183,10 +177,9 @@ Definition wp_iupdate_sconf_body
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -202,8 +195,7 @@ Definition wp_iupdate_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗
@@ -215,15 +207,15 @@ Definition wp_iupdate_sconf_body
               (diblk_bytes (<[islot inum := dn]> ds)) -∗
       bslots bn 2 -∗
       log_op γ u -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -236,7 +228,7 @@ Module Type IUPDATE.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_iupdate_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
+      wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                             cov logstart inodestart dev ip inum dn bm ds u
                             pidv dq dqd dqn dqs m K eb C b.
 End IUPDATE.

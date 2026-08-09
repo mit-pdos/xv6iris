@@ -24,7 +24,7 @@ Section WpLdGpr.
      caller supplies the loaded bytes ([pa..pa+7] ↦ₘ) and alignment facts; the
      config the load's translation / PMP checks read is recovered from the KEPT
      half of [mmode_config] + [hw_config].  [rs1<>0] (base) / [rd<>0] (dest). *)
-  Lemma wp_ld_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
+  Lemma wp_ld_gpr (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : regfile) (v : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) {dq : dfrac} :
     let offset := sign_extend' 64 imm in
@@ -47,8 +47,8 @@ Section WpLdGpr.
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       phys_word_pointsto ea dq v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros offset ea Hpmp Hstat Hrd.
     iIntros "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbw Hcont".
@@ -65,7 +65,7 @@ Section WpLdGpr.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (pma_all_ram Hpma_all ea 8
                (pma_access_ram _ _ _ Hram_ea Hram_ea7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch & _ & Hread & _).
-    iApply (wp_instr Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
+    iApply (wp_instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
  (pmp_all_off_allows_all _ Hpmp) Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
@@ -192,7 +192,7 @@ Section MmodeLoadTor.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_ld_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
+  Lemma wp_ld_gpr_tor (pc : mword 64) (is_rvc : bool) (rs1 rd : mword 5)
       (imm : mword 12) (m : regfile) (v : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) {dq : dfrac} :
@@ -215,8 +215,8 @@ Section MmodeLoadTor.
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       ea ↦ₚ₈{ dq } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros offset ea Hpmp Hstat Htor Hrd.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hbytes Hcont".
@@ -233,7 +233,7 @@ Section MmodeLoadTor.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (pma_all_ram Hpma_all ea 8
                (pma_access_ram _ _ _ Hram_ea Hram_ea7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region & Hmatch & _ & Hread & _).
-    iApply (wp_instr Φ pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
+    iApply (wp_instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) pmpcfg0
               Hpmp Hstat with "Hmm_wp Hpmpc_wp Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg [Hmem Hdev]]".
@@ -360,7 +360,7 @@ Section MmodeLoadTor.
   Qed.
 
 
-  Lemma wp_cldsp_gpr_tor (Φ : mval -> iProp Σ) (pc : mword 64) (uimm : mword 6)
+  Lemma wp_cldsp_gpr_tor (pc : mword 64) (uimm : mword 6)
       (rd : mword 5) (m : regfile) (v : bv 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddrs : type_of_register pmpaddr_n)
       (q : Qp) {dq : dfrac} :
@@ -380,12 +380,12 @@ Section MmodeLoadTor.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       ea ↦ₚ₈{ dq } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm ea Hpmp Hstat Htor Hrd.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".
-    iApply (wp_ld_gpr_tor Φ pc true csp_rs1 rd imm m v
+    iApply (wp_ld_gpr_tor pc true csp_rs1 rd imm m v
               pmpcfg0 pmpaddrs q Hpmp Hstat Htor Hrd
               with "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont").
   Qed.

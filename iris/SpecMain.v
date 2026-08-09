@@ -264,7 +264,7 @@ Section SpecMain.
   (* main(), entered on the BOOT hart.                                    *)
   (* ------------------------------------------------------------------- *)
   Definition wp_main_boot_sconf_body
-      (Φ : mval -> iProp Σ)
+      
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
@@ -312,8 +312,8 @@ Section SpecMain.
     □ (∀ (γpr : gname) (γs : list gname) (γk : gname) (pd pav pu : mword 64)
          (root : mword 44) (pas : nat -> mword 44),
          printk_env γpr γd γv -∗
-         procs_inv Φ γs -∗
-         scheds_inv Φ γs -∗
+         procs_inv γs -∗
+         scheds_inv γs -∗
          is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
          disk_geom γv pd pav pu -∗
          kpt_inv root -∗
@@ -339,6 +339,7 @@ Section SpecMain.
        ([RiscvAdequacy.riscv_system_adequacy]) at [false]: main spends them
        in [SpecProcinit.procs_inv_alloc], one per proc lock. *)
     ([∗ list] i ∈ seq 0 NPROC, park_full i false) -∗
+    ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     (* the device fabric, which exists from time 0 (allocated in adequacy), and
        the boot hart's tokens over it *)
     dev_inv γd γv -∗
@@ -374,7 +375,7 @@ Section SpecMain.
        cannot build: the proc-lock names are chosen when main allocates the
        64 locks out of procinit's output, so [γs] is quantified in the
        statement inside the proof and [procs_inv] is NOT a precondition. *)
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
 End SpecMain.
 
@@ -382,7 +383,7 @@ Module Type MAIN.
   Parameter wp_main_boot_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
@@ -390,6 +391,6 @@ Module Type MAIN.
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P},
-      wp_main_boot_sconf_body Φ m K p0 ps s1entry phystop
+      wp_main_boot_sconf_body m K p0 ps s1entry phystop
         γd γv l0 b0 c0 tlbvec0 P.
 End MAIN.

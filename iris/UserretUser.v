@@ -56,7 +56,6 @@ Section UserretUser.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_userret_user (C : ucfg) (pt : uptd) (kroot : mword 44)
-      (Φ : mval -> iProp Σ)
       (m : regfile) (usatp : mword 64)
       (mstatus0 sepc0 : mword 64)
       (sc_v stval_v : mword 64)
@@ -143,8 +142,8 @@ Section UserretUser.
     sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) -∗
     udata_own (ud_data pt) -∗
     (* ---- the (still assumed) kernel re-entry contract ---- *)
-    stvec_handler_wp C pt Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    stvec_handler_wp C pt -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
       HFS HVS Hdqc Hcov Hacc.
@@ -155,7 +154,7 @@ Section UserretUser.
              Htf200 Htf208 Htf216 Htf224 Htf232 Htf240 Htf248 Htf256 Htf264
              Htf272 Htf280 Htf112
              Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata Hhandler".
-    iApply (R.wp_userret_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) Φ m usatp
+    iApply (R.wp_userret_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) m usatp
               mstatus0 (uc_mie C) (uc_mideleg C) MENVCFG_S (mword_of_int 0) sepc0
               vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
               vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm
@@ -190,7 +189,7 @@ Section UserretUser.
                  with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc
                        Hfile Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata")
       as "Hinv".
-    iApply (U.wp_user_exec_closed C pt Φ with "Hhw Hmi Hwi Hinv Hhandler").
+    iApply (U.wp_user_exec_closed C pt with "Hhw Hmi Hwi Hinv Hhandler").
   Qed.
 
 End UserretUser.

@@ -340,9 +340,8 @@ Qed.
 Section leaf.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_csrw_mstatus_leaf Φ
+  Lemma wwp_csrw_mstatus_leaf
       (pc : mword 64) (w : mword 32) (rs1 : mword 5)
       (ms0 rs1v npc0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n)
@@ -392,8 +391,8 @@ Section leaf.
        pc_is (add_vec_int pc 4) -∗
        R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal4 Hrs1nz HmIE HMPRV Hdecf Hagree HDmi Hgood Hdec.
     iIntros "#Hhw #Hmiv Hhs Hpriv Hms0 Hpmpc Hpc Hnpc Hrs1c #Hbs Hhws Hcont".
@@ -407,7 +406,7 @@ Section leaf.
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
     (* the funnel: certificate = nowrite at the fetch-only trace *)
-    iApply (wwp_instr_config Φ pc false
+    iApply (wwp_instr_config pc false
               (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW)) pmpcfg0 ms0
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc 4])
               wQ_pure Hgid Haccpc Hpmp HmIE HMPRV

@@ -82,7 +82,7 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
   (<[Regidx (mword_of_int 10) := mword_of_int TRAPFRAME]> g)))))).
 
 Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (C : ucfg) (pt : uptd) (kroot : mword 44) (Φ : mval -> iProp Σ)
+    (C : ucfg) (pt : uptd) (kroot : mword 44)
     (sscr0 : mword 64)
     (vksat vksp vktr vkhart : bv 64)
     (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
@@ -203,20 +203,19 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
     tf_pa tfp 272 ↦ₚ₈ (g !!! Regidx (mword_of_int 30) : mword 64) -∗
     tf_pa tfp 280 ↦ₚ₈ (g !!! Regidx (mword_of_int 31) : mword 64) -∗
     tf_pa tfp 112 ↦ₚ₈ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type USERVEC.
   Parameter wp_uservec_pt :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (C : ucfg) (pt : uptd) (kroot : mword 44) (Φ : mval -> iProp Σ)
-      (sscr0 : mword 64)
+      (C : ucfg) (pt : uptd) (kroot : mword 44) (sscr0 : mword 64)
       (vksat vksp vktr vkhart : bv 64)
       (w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
        w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
        w272 w280 w112 : bv 64)
       (dqk : dfrac),
-      wp_uservec_pt_body C pt kroot Φ sscr0 vksat vksp vktr vkhart
+      wp_uservec_pt_body C pt kroot sscr0 vksat vksp vktr vkhart
         w40 w48 w56 w64 w72 w80 w88 w96 w104 w120 w128 w136 w144 w152 w160
         w168 w176 w184 w192 w200 w208 w216 w224 w232 w240 w248 w256 w264
         w272 w280 w112 dqk.

@@ -29,7 +29,7 @@ Import Defs.
 
 
 Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
+    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let va := mm !!! Regidx (mword_of_int 11) in
   let vpn := svpn_of va in
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
@@ -68,14 +68,14 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
       \/ (exists p2 p1 w0,
            ptree_level0 t' vpn p2 p1 w0 /\
            mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WALK.
   Parameter wp_walk_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_walk_sconf_body γa Φ mm t m K lvl eb p C on b.
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (K : nat) (lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_walk_sconf_body γa mm t m K lvl eb p C on b.
 End WALK.
 
 (* --------------------------------------------------------------------- *)
@@ -89,8 +89,7 @@ End WALK.
 (* either the map's leaf (mapped) or the literal zero (unmapped).         *)
 (* --------------------------------------------------------------------- *)
 
-Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (t : ptree)
     (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.walk in
   let va := mm !!! Regidx (mword_of_int 11) in
@@ -118,13 +117,12 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{
            mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn /\
            (m !! vpn = Some w0
             \/ (w0 = mword_of_int 0 /\ m !! vpn = None))) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WALK_NOALLOC.
   Parameter wp_walk_noalloc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (t : ptree)
       (m : gmap (mword 27) (mword 64)) (K : nat) (dq : dfrac) (b : bool) (p : mword 64),
-      wp_walk_noalloc_sconf_body Φ mm t m K dq b p.
+      wp_walk_noalloc_sconf_body mm t m K dq b p.
 End WALK_NOALLOC.

@@ -80,7 +80,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
    [wp_next_off] anyway, since the hart cannot move). *)
 Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -115,13 +115,13 @@ Definition wp_uartinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
        the persistent [lock_name], ready to be sealed into [is_lock]. *)
     lock_name lk "uart"%string -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UARTINIT.
   Parameter wp_uartinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+      (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool) (vlock : bv 32) (vname vcpu : bv 64) (p : mword 64),
-      wp_uartinit_sconf_body γd Φ m K l b0 vlock vname vcpu p.
+      wp_uartinit_sconf_body γd m K l b0 vlock vname vcpu p.
 End UARTINIT.

@@ -222,7 +222,7 @@ Section SpecFreeproc.
      holds p->lock, and holding a spinlock in xv6 means interrupts are off on
      this hart.  So [false] is what the callers actually have. *)
   Definition wp_freeproc_sconf_body
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
@@ -253,8 +253,8 @@ Section SpecFreeproc.
       ⌜callee_saved mm mr⌝ -∗
       proc_held cpu_id j γl UNUSED (zero_reg : mword 64) -∗
       proc_dormant pa UNUSED -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
 
 End SpecFreeproc.
 
@@ -265,10 +265,10 @@ Module Type FREEPROC.
        Parameter must not re-introduce it. *)
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fdslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)
       (opt : option uptd) (otf : option (mword 44 * list (mword 64)))
       (K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (ilvl : nat),
-      wp_freeproc_sconf_body γa Φ mm j γl V pid st ch opt otf K eb pme C ilvl.
+      wp_freeproc_sconf_body γa mm j γl V pid st ch opt otf K eb pme C ilvl.
 End FREEPROC.

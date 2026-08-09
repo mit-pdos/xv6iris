@@ -14,19 +14,17 @@ From iris.base_logic.lib Require Import invariants gen_heap.
 From iris.program_logic Require Import language lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d.
-Require Import MemAccessGen.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import RegFile PtAdBits.
 Require Import WpGpr UserBits.
 Require Import SmodeCore.
-Require Import UptTree UserPtTree UserExec UserCompute UserClassify.
-Require Import UserExecFacts UserMemArms WpMmodeLeafBase.
+Require Import UptTree UserPtTree UserExec UserCompute.
+Require Import UserMemArms WpMmodeLeafBase.
 Require Import WpGprCsrwC.
-Require Import UserMemAccess UserMemPt UserMemMis.
-Require Import TrampPt KptTree UserTranslate.
-Require Import UserTotalU Pt4kWalk.
-Require Import RiscvModelBytes CommonWalk WpLoad MemAmo4.
+Require Import UserMemAccess UserMemPt.
+Require Import UserTotalU.
+Require Import RiscvModelBytes CommonWalk MemAmo4.
 Require Import UserMemClassify.
 Local Open Scope Z_scope.
 Import Defs.

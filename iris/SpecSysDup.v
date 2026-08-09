@@ -110,8 +110,7 @@ Section SpecSysDup.
 
 End SpecSysDup.
 
-Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl γf : gname)
+Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_dup in
@@ -136,14 +135,13 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       sys_dup_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSDUP.
   Parameter wp_sys_dup_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl γf : gname)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
-      wp_sys_dup_sconf_body Φ γl γf m av n eb p C v pid V b.
+      wp_sys_dup_sconf_body γl γf m av n eb p C v pid V b.
 End SYSDUP.

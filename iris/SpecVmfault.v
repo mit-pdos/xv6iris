@@ -50,7 +50,7 @@ From Kernel Require KernelSyms.
 
 
 Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (dqs dqp : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.vmfault in
@@ -93,14 +93,14 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
            ⌜(uint va < uint szv)%Z⌝ ∗
            ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
            proc_pt (uptd_insert P (svpn_of va0) r)) ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (P : uptd) (szv : mword 64) (K lvl : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (dqs dqp : dfrac) (b : bool),
-      wp_vmfault_sconf_body γa Φ mm P szv K lvl eb p C dqs dqp b.
+      wp_vmfault_sconf_body γa mm P szv K lvl eb p C dqs dqp b.
 End VMFAULT.

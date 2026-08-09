@@ -101,6 +101,10 @@ Class riscvGpreS (Σ : gFunctors) := RiscvGpreS {
      [SpecProcinit.procs_inv_alloc] as the third guarded slot of every
      proc's lock resource. *)
   riscv_pre_parkGS :: ghost_varG Σ bool;
+  (* every proc slot's STATE MIRROR (design/proc-struct.md, the state ghost):
+     capacity only, one name per slot minted at boot at UNUSED.  Spent in
+     [SpecProcinit.procs_inv_alloc] alongside the park receipt. *)
+  riscv_pre_pstateGS :: ghost_varG Σ (SailStdpp.Values.mword 32);
   (* the FS log-region mirror (crash/power layer): capacity only *)
   riscv_pre_mirrorGS :: ghost_varG Σ log_mirror;
   (* the generation counter (crash/power layer) *)
@@ -131,6 +135,7 @@ Definition riscvΣ : gFunctors :=
        (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
      GFunctor kptR;
      ghost_varΣ bool;
+     ghost_varΣ (SailStdpp.Values.mword 32);
      ghost_varΣ log_mirror;
      mono_natΣ;
      ghost_mapΣ nat riscvEraGS;
@@ -416,6 +421,11 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
           dispatched at boot.  Both halves of each: they sit in the proc's
           own p->lock until its first dispatch (SchedCtx.proc_slots). *)
        ([∗ list] j ∈ seq 0 nproc, ghost_var (park_name j) 1 false) ∗
+       (* ... and every slot's STATE MIRROR, minted at UNUSED, which is what
+          procinit stores into every p->state.  Both halves, in the proc's
+          own p->lock: at UNUSED nobody has claimed the slot. *)
+       ([∗ list] j ∈ seq 0 nproc,
+          ghost_var (pstate_name j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
        uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
        virtio_frag (g.(gdev).(dvirtio)) ∗
        (* the crash-spanning invariant, allocated over [Pc] below: the client
@@ -427,10 +437,10 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
           allocate [minstret_inv] *)
        gen_cert
        ={⊤}=∗
-       ([∗ list] c ∈ cs, WP (LoopE gen_id c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
-       WP (UartLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
-       WP (DiskLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
-       WP (PlicLoop : expr riscv_lang) @ ⊤ {{ _, True }}) ->
+       ([∗ list] c ∈ cs, WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
+       WP (UartLoop : expr riscv_lang) @ ⊤ ∗
+       WP (DiskLoop : expr riscv_lang) @ ⊤ ∗
+       WP (PlicLoop : expr riscv_lang) @ ⊤) ->
   forall t2 g2 e2,
     rtc erased_step (cpu_pool cs, g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -470,10 +480,19 @@ Proof.
      three pieces of the choreography *)
   iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
     as (γsie) "Hsie".
+  (* the SPP mirror, TWO halves like the translation bit.  The value here is
+     arbitrary: nothing is tied to it until the M->S bridge builds [sconf],
+     and that site holds BOTH halves and sets them to the mstatus it is
+     about to install ([BootBridge.sconf_intro]). *)
+  iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
+    as (γspp) "Hspp".
+  iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU) (NoDup_enum CPU))
+    as (γspie) "Hspie".
   (* the shared kernel table's one-shot agreement, unset *)
   iMod kpt_ghost_alloc as (γkpt) "Hkpt".
   (* EVERY proc slot's park receipt, minted at [false] *)
   iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
+  iMod (ghost_var_alloc_nats (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32) nproc) as (γpst) "Hpst".
   iMod (mono_nat_own_alloc g.(ggen)) as (γgen) "[Hgenauth #Hbornlb]".
   iMod (mono_nat_own_alloc (start_count g)) as (γstart) "[Hstartauth #Hstartlb]".
   (* THE ERA's disk image, EMPTY: this single-generation theorem hands its
@@ -486,7 +505,7 @@ Proof.
      single-generation theorem hands its client no FS custody, and the first
      real one is minted by [initlog]'s swap. *)
   iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => []))) as (γmir) "_".
-  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γpark γdisk γmir).
+  set (E0 := RiscvEraGS f Hhn Hmn γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir).
   iMod (ghost_map_alloc_empty (K := nat) (V := riscvEraGS)) as (γreg) "HRauth".
   (* THE FS TIE, minted at the machine's own disk image and split: one half
      goes into [state_interp]'s fixed conjunct below, the other into
@@ -516,7 +535,7 @@ Proof.
   iMod (ghost_map_insert 0%nat E0 Hemp0 with "HRauth") as "[HRauth HRelem]".
   iMod (ghost_map_elem_persist with "HRelem") as "#HRelem".
   set (HR := RiscvGS Σ
-               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
+               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ Hmpre _ γgen γstart _ γreg
                   _ _ γtie (Pc γswap γreg γstart) γswap)
                E0).
   (* THE CARVING, all four steps out of BootCarve.v (one copy; the crash
@@ -532,7 +551,7 @@ Proof.
   iDestruct (@boot_data_own Σ HR g Hram with "Hkbundle Hdata") as "Hdata".
   (* run the caller's proof to obtain the WPs *)
   iPoseProof (Hwp HR) as "Hwand".
-  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt Hpark HuF HpF HvF]")
+  iMod ("Hwand" with "[Helems Htext Hdata Hkauth Hs Hsie Hkpt Hpark Hpst HuF HpF HvF]")
     as "[Hwps (Hwpu & Hwpd & Hwpp)]".
   { iSplitL "Helems".
     { iApply big_sepL_enum_to_set. iExact "Helems". }
@@ -545,6 +564,7 @@ Proof.
     { iApply big_sepL_enum_to_set. iExact "Hsie". }
     iSplitL "Hkpt"; [iExact "Hkpt" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
+    iSplitL "Hpst"; [iExact "Hpst" |].
     iSplitL "HuF"; [iExact "HuF"|].
     iSplitL "HpF"; [iExact "HpF"|].
     iSplitL "HvF"; [iExact "HvF"|].
@@ -662,7 +682,7 @@ Proof.
            Hpow Hgen0 Hgid).
   { iIntros (γsw γreg γst) "_". iModIntro. done. }
   intros HR.
-  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
+  iIntros "(Hwires & _ & _ & _ & _ & _ & _ & _ & _ & _ & Huf & Hpf & Hvf &
             #Hcinv & #Hcert)".
   (* allocate the four UART ghosts at the initial device state.  The
      caller-side outputs -- the transmitter token, the accepted-trace receipt
@@ -705,7 +725,7 @@ Proof.
   iSplitL.
   { iApply (wp_uart_loop γ with "Hcert Huinv Hpinv"). }
   iSplitL.
-  { iApply (wp_disk_loop γv _ Himg with "Hcert Hcinv Hqinv Hvinv Hpinv"). }
+  { iApply (wp_disk_loop γv Himg with "Hcert Hcinv Hqinv Hvinv Hpinv"). }
   iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
 Qed.
 
@@ -766,7 +786,18 @@ Section power.
         ghost_var (era_sie_name HE c) (1/2)%Qp sie_bit_off ∗
         ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off ∗
         ghost_var (era_sie_name HE c) (1/4)%Qp sie_bit_off) ∗
+     (* BOTH halves of the SPP mirror.  The value is arbitrary here -- the
+        M->S bridge holds both and sets them to the mstatus it installs --
+        which is why this is not stated at any particular bit. *)
+     ([∗ list] c ∈ enum CPU,
+        ghost_var (era_spp_name HE c) (1/2)%Qp sie_bit_off ∗
+        ghost_var (era_spp_name HE c) (1/2)%Qp sie_bit_off) ∗
+     ([∗ list] c ∈ enum CPU,
+        ghost_var (era_spie_name HE c) (1/2)%Qp sie_bit_off ∗
+        ghost_var (era_spie_name HE c) (1/2)%Qp sie_bit_off) ∗
      ([∗ list] j ∈ seq 0 nproc, ghost_var (era_park_name HE j) 1 false) ∗
+     ([∗ list] j ∈ seq 0 nproc,
+        ghost_var (era_pstate_name HE j) 1 (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32)) ∗
      ghost_var (era_uart_name HE) (1/2)%Qp (g'.(gdev).(duart)) ∗
      ghost_var (era_plic_name HE) (1/2)%Qp (g'.(gdev).(dplic)) ∗
      ghost_var (era_virtio_name HE) (1/2)%Qp (g'.(gdev).(dvirtio)) ∗
@@ -795,7 +826,6 @@ Section power.
      gen_born gen ∗ gen_started gen ∗ era_registered gen HE)%I.
 
   Lemma wp_power_loop (D : CPU -> gset register) (nproc ndisk : nat)
-      (Φ : mval -> iProp Σ)
       (* the boot client is handed the WHOLE fact set a reset machine has
          ([RiscvLang.boot_facts]: RAM total and holding the loaded image, the
          per-hart reset registers, the reset devices, power on) -- everything
@@ -805,11 +835,11 @@ Section power.
          boot_facts g' ->
          ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
-               WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
-            WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
-            WP (DiskLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
-            WP (PlicLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }}) :
-    crash_inv -∗ WP (PowerLoopE : expr riscv_lang) {{ Φ }}.
+               WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
+            WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+            WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
+            WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
+    crash_inv -∗ WP (PowerLoopE : expr riscv_lang).
   Proof.
     iIntros "#Hcinv".
     iLöb as "IH".
@@ -899,7 +929,12 @@ Section power.
               (NoDup_enum CPU)) as (γs) "Hs".
       iMod (ghost_var_alloc_sie_cpus sie_bit_off (enum CPU)
               (NoDup_enum CPU)) as (γsie) "Hsie".
+      iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU)
+              (NoDup_enum CPU)) as (γspp) "Hspp".
+      iMod (ghost_var_alloc_halves_cpus sie_bit_off (enum CPU)
+              (NoDup_enum CPU)) as (γspie) "Hspie".
       iMod (ghost_var_alloc_nats false nproc) as (γpark) "Hpark".
+      iMod (ghost_var_alloc_nats (SailStdpp.Values.mword_of_int 0 : SailStdpp.Values.mword 32) nproc) as (γpst) "Hpst".
       (* THE BOOT MINT: a BRAND-NEW image map at the disk content the reset
          machine still carries ([boot_shape] preserves [v_disk]), together
          with its full fragments over [[0, ndisk)] -- which go to the boot
@@ -912,7 +947,7 @@ Section power.
          checked-out arm at [initlog]'s swap. *)
       iMod (ghost_var_alloc (MkLogMirror (0%nat, []) (fun _ => [])))
         as (γmir) "Hmir".
-      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γpark γdisk γmir).
+      set (HE := RiscvEraGS f γh γm γu γp γv γk γkpt γs γsie γspp γspie γpark γpst γdisk γmir).
       (* the started counter ticks (PowerOff had already bumped [ggen], so
          the count moves from [ggen + 0] to [ggen + 1]) *)
       iMod (mono_nat_own_update (n := start_count g) (g.(ggen) + 1)%nat
@@ -928,11 +963,11 @@ Section power.
       (* run the client's boot entailment over the fresh era *)
       iMod "Hback" as "_".
       iMod (Hboot HE g.(ggen) g2 Hbf with
-              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF
+              "[Helems Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hpark Hpst HuF HpF HvF
                 Hdfrags Hmir]")
         as "(Hwps & Hwpu & Hwpd & Hwpp)".
       { rewrite /power_boot_res.
-        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hpark HuF HpF HvF Hdfrags Hmir".
+        iFrame "Hbytes Hkauth Hkfrags Hkpt Hs Hsie Hspp Hspie Hpark Hpst HuF HpF HvF Hdfrags Hmir".
         iFrame "Helems".
         iSplitR; [iExact "Hcinv"|].
         iSplitR; [iExact "Hbornlb"|].
@@ -1006,10 +1041,10 @@ Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        boot_facts g' ->
        ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
-             WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
-          WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
-          WP (DiskLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
-          WP (PlicLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }}) :
+             WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
+          WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+          WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
+          WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
   forall t2 g2 e2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -1047,7 +1082,7 @@ Proof.
   (* no disk image map is allocated here: the machine starts POWERED OFF, so
      there is no era, hence no image conjunct in [state_interp].  The first
      boot mints the first one ([wp_power_loop]'s PowerOn arm). *)
-  set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
+  set (F := RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ γgen γstart _ γreg
               _ _ γtie (Pc γswap γreg γstart) γswap).
   iModIntro.
   iExists
@@ -1070,7 +1105,7 @@ Proof.
     rewrite Hpow. done. }
   iSplitL.
   { cbn. iSplitL; [|done].
-    iApply (@wp_power_loop Σ F _ D nproc ndisk (fun _ => True%I) (Hboot F)
+    iApply (@wp_power_loop Σ F _ D nproc ndisk (Hboot F)
               with "Hcinv"). }
   iIntros (es' t2') "%Heq %Hlen %Hns Hsi Hes Hts".
   iApply fupd_mask_intro; [set_solver|]. iIntros "_".

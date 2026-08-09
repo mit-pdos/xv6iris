@@ -582,7 +582,7 @@ Section funnel.
       owns the [execute] fact, so it knows [mdev s_exec] outright (one line
       for a RAM instruction, whose [execute] moves no device), and a future
       MMIO leaf — whose [execute] DOES move [mdev] — can still use it. *)
-  Definition wwp_cb Φ (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Definition wwp_cb (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (i : instruction) (pmpcfg0 : type_of_register pmpcfg_n) (dq : dfrac)
       (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) : iProp Σ :=
     (∀ (σ : wmstate) (b : bool),
@@ -610,9 +610,9 @@ Section funnel.
                  (|={∅, ⊤ ∖ ↑minstretN}=>
                     (wlat_interp (wm_img σ') (wm_log σ') ∗
                      wmstate_norg σ' ∗
-                     WP (Loop : expr weak_riscv_lang) {{ Φ }})))))%I.
+                     WWP Loop)))))%I.
 
-  Lemma wwp_instr Φ (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Lemma wwp_instr (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (i : instruction) (pmpcfg0 : type_of_register pmpcfg_n) {dq : dfrac}
       (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) :
     gen_id = 0%nat ->
@@ -623,8 +623,8 @@ Section funnel.
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     PC ↦ᵣ pc -∗
     winstr pc is_rvc i -∗
-    wwp_cb Φ pc is_rvc i pmpcfg0 dq P Q -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wwp_cb pc is_rvc i pmpcfg0 dq P Q -∗
+    WWP Loop.
   Proof.
     rewrite /wwp_cb.
     iIntros (Hgid Haccpc Hpmp Hcert) "Hmm Hpmpc Hpc Hinstr H".
@@ -639,7 +639,7 @@ Section funnel.
         %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     iDestruct "Hinstr" as "[%Hnlpad Hinstr]".
     iDestruct "Hinstr" as (r) "(%Hrvc & #Hb & %Hdec)".
-    iApply (wp_winstr Φ pc P Q Hgid Haccpc Hcert).
+    iApply (wp_winstr pc P Q Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     iDestruct (wmstate_interp_split_regs σ with "Hσ") as "(Hreg & Hlat & Hnorg)".
     iDestruct (wmstate_norg_facts with "Hnorg") as %[Hbnd Hwf].
@@ -866,7 +866,7 @@ Section smoke.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wwp_instr_conf Φ (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Lemma wwp_instr_conf (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (i : instruction) (pmpcfg0 : type_of_register pmpcfg_n) (dq : dfrac) :
     gen_id = 0%nat ->
     acc_wf pc 4 ->
@@ -875,11 +875,11 @@ Section smoke.
     pmpcfg_n ↦ᵣ{ dq } pmpcfg0 -∗
     PC ↦ᵣ pc -∗
     winstr pc is_rvc i -∗
-    wwp_cb Φ pc is_rvc i pmpcfg0 dq wP_conf wQ_none -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    wwp_cb pc is_rvc i pmpcfg0 dq wP_conf wQ_none -∗
+    WWP Loop.
   Proof.
     intros Hgid Hacc Hpmp.
-    exact (wwp_instr Φ pc is_rvc i pmpcfg0 (dq := dq) wP_conf wQ_none
+    exact (wwp_instr pc is_rvc i pmpcfg0 (dq := dq) wP_conf wQ_none
              Hgid Hacc Hpmp (wstep_cert_conf_none (fin_to_nat cpu_id) pc)).
   Qed.
 

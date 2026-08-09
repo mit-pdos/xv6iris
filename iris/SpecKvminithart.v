@@ -70,8 +70,7 @@ From Kernel Require KernelSyms.
 
 
 (* kvminithart(): the Bare->Sv39 kernel-page-table switch.  See the header. *)
-Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
+Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (lvl K : nat)
     (root : mword 44)
     (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kvminithart in
@@ -96,14 +95,13 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
     ⌜callee_saved mm mr⌝ -∗
     strans_bit strans_bit_kpt -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type KVMINITHART.
   Parameter wp_kvminithart_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (mm : regfile) (lvl K : nat)
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (mm : regfile) (lvl K : nat)
       (root : mword 44)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) (p : mword 64),
-      wp_kvminithart_sconf_body Φ mm lvl K root tlbvec0 p.
+      wp_kvminithart_sconf_body mm lvl K root tlbvec0 p.
 End KVMINITHART.

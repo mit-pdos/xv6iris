@@ -41,7 +41,7 @@ Section UserStepFull.
   (* Produces the [wp_exec_step_minstret] payload (inlining the minstret   *)
   (* prelude + exec_riscv_step_interrupt + the trap tower + PC tick).      *)
   (* ------------------------------------------------------------------- *)
-  Lemma interrupt_branch (Ei : coPset) (Φ : mval -> iProp Σ)
+  Lemma interrupt_branch (Ei : coPset)
       (σ : mstate) (i : InterruptType)
       (ms_v sc_v stval_v sepc_v va : mword 64) (g : regfile)
       (mst : mword 64) (mi : bool) (misa0 : type_of_register misa) (elpv : mword 1)
@@ -68,11 +68,11 @@ Section UserStepFull.
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
     gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
-    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang)) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang) {{ Φ }}).
+         WP (Loop : expr riscv_lang)).
   Proof.
     iIntros (Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
              Lmip Lmeip Lseip Lmie Lmdl Hd)
@@ -172,7 +172,7 @@ Section UserStepFull.
      minstret_increment, so the wrapper proves it uniformly.  This is the
      shape the payload arms ([retire_branch] / [execute_trap_branch] /
      the fetch-fault arms, UserArms.v) consume. *)
-  Definition active_class (Ei : coPset) (Φ : mval -> iProp Σ) : iProp Σ :=
+  Definition active_class (Ei : coPset)  : iProp Σ :=
     (□ (∀ (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
           (g : regfile),
         ⌜user_mstatus_ok ms_v⌝ -∗
@@ -185,12 +185,12 @@ Section UserStepFull.
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
         user_pt_inv pt -∗ user_cfg C -∗
         mstate_interp σ -∗ minstret_inv_body -∗
-        ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
-           (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+        ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang)) ∧
+           (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang))) -∗
         |={Ei}=> ∃ s' : mstate,
           ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
           ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-             WP (Loop : expr riscv_lang) {{ Φ }})))%I.
+             WP (Loop : expr riscv_lang))))%I.
 
   (* ------------------------------------------------------------------- *)
   (* THE UNIFIED STEP WRAPPER: borrow the wires once, decide dispatch,     *)
@@ -202,16 +202,16 @@ Section UserStepFull.
   (* [reg_pointsto_at cpu_id] definitionally); the step only READS them,    *)
   (* so the invariant re-closes with the same witnesses.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_user_step_active Φ :
+  Lemma wp_user_step_active :
     hw_config -∗
     minstret_inv -∗
     wire_inv -∗
-    active_class (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ -∗
-    user_step_obligation_active C pt Φ.
+    active_class (⊤ ∖ ↑minstretN ∖ ↑wireN) -∗
+    user_step_obligation_active C pt.
   Proof.
     iIntros "#Hhw #Hmin #Hwinv #Hclass".
     iIntros "!>" (ms_v sc_v stval_v sepc_v va g) "%Hmsok Hregs Hupt Hcfg Hk".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ with "Hmin").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN ∖ ↑wireN) with "Hmin").
     iIntros (σ) "Hint Hbody".
     (* borrow the wires: open [wire_inv] (E∖minstretN -> E∖minstretN∖wireN)
        and peel the ambient hart's pin cells *)
@@ -247,7 +247,7 @@ Section UserStepFull.
     - (* pending interrupt: trap to stvec *)
       pose proof (u_dispatch_Supervisor _ _ _ _ _ _ _ Hd) as ->.
       iDestruct "Hbody" as (mst mi) "[Hmst Hmi]".
-      iMod (interrupt_branch (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ σ i
+      iMod (interrupt_branch (⊤ ∖ ↑minstretN ∖ ↑wireN) σ i
               ms_v sc_v stval_v sepc_v va g mst mi misa0 elp0 meip seip
               Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
               Lmip Lmeip Lseip Lmie Lmdl Hd

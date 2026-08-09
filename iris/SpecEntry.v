@@ -81,7 +81,6 @@ Local Open Scope Z_scope.
 (* The whole M-mode boot as one WP: [_entry] -> start() -> timerinit() ->
    MRET -> <main> in Supervisor mode. *)
 Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)
     (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 : mword 64)
     (mcounteren0 : mword 32)
@@ -156,18 +155,16 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
     stimecmp ↦ᵣ stimecmpf -∗
     mb_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
     stack_own_phys sp0 n -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ENTRY.
   Parameter wp_entry_boot :
-    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
-      (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)
+    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 : mword 64)
       (mcounteren0 : mword 32)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (sp0 : mword 64) (n : nat) {dq : dfrac},
-      wp_entry_boot_body Φ m v_stack0 mhartid_in mepc0 satp0 medeleg0 mideleg0
+      wp_entry_boot_body m v_stack0 mhartid_in mepc0 satp0 medeleg0 mideleg0
         mie0 menvcfg0 stimecmp0 mcounteren0 pmpcfg0 pmpaddr00 sp0 n dq.
 End ENTRY.

@@ -804,7 +804,7 @@ Section rule.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_wracy_load Φ (pc : SailStdpp.Values.mword 64)
+  Lemma wp_wracy_load (pc : SailStdpp.Values.mword 64)
       (ra : Arch.pa) (rn : N) (rak : akinfo)
       (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) :
     gen_id = 0%nat ->
@@ -825,8 +825,8 @@ Section rule.
             ⌜wstep_post_racy σ σ'⌝ -∗
             ⌜Q σ σ'⌝
             ={∅,⊤}=∗ wmstate_interp σ' ∗
-                     WP (Loop : expr weak_riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+                     WWP Loop)) -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hracc Hcert) "H".
     iApply (wp_wrun_step with "[H]"); [exact Hgid|].

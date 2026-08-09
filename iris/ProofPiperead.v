@@ -67,7 +67,6 @@ Require Import UserPtTree.
 Require Import ProcPtOwn.
 Require Import FdSlots FileInv ProcInv.
 Require Import PipeInv.
-Require Import SwtchCtx.
 Require Import SpecMyproc SpecAcquire SpecKilled SpecWakeup SpecSleep SpecCopyout SpecRelease.
 Require Import CodePiperead.
 Require Import SpecPiperead.
@@ -384,12 +383,12 @@ Section ProofPiperead.
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
-  Lemma wp_piperead_sconf (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_piperead_sconf (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool)
-    : wp_piperead_sconf_body γa γf Φ γs j γlp γl γp w q m av eb C pid V n b.
+    : wp_piperead_sconf_body γa γf γs j γlp γl γp w q m av eb C pid V n b.
   Proof.
     cbv beta delta [wp_piperead_sconf_body].
     intros pcE pj pi ret_tgt Hj Hjl Hlen Ha2 Hnrng Hav Heb. subst eb.
@@ -414,7 +413,7 @@ Section ProofPiperead.
     set (chaddr := add_vec s0v (sign_extend' 64 (mword_of_int 4015 : mword 12))).
     assert (Hcpune : eq_vec (zero_reg : mword 64) (mycpu_ret cid_word) = false)
       by (apply mycpu_ret_nonzero; apply tp_ok_cid).
-    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hscheds #Hpanic Hctx Hpark Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hscheds #Hpanic Hpark Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX: the [b = false]
        instance of this contract is vacuous, so every crossing below speaks the
        same index and the entry stretch is hart-GENERIC. *)
@@ -430,7 +429,7 @@ Section ProofPiperead.
                     = pa_stk (m !!! Regidx csp_rs1) 12).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
     iPoseProof (pri_00 with "Htext") as "Hi00".
-    iApply (wp_caddi16sp_push_s_sconf Φ pcE (mword_of_int 58 : mword 6) m av 12 true
+    iApply (wp_caddi16sp_push_s_sconf pcE (mword_of_int 58 : mword 6) m av 12 true
               ltac:(lia) Hpush with "Hcg Hpc Hi00").
     iIntros (CIDp1 Hsp1) "Hcg Hframe Hpc". rgall.
     iEval (rewrite Hspm) in "Hframe".
@@ -492,7 +491,7 @@ Section ProofPiperead.
     iDestruct "Q7" as (u7) "Hf7".
     (* ---- 0x02..0x0e: save ra,s0..s5 ---- *)
     iPoseProof (pri_02 with "Htext") as "Hi02".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x02)) (mword_of_int 11 : mword 6) Rra
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x02)) (mword_of_int 11 : mword 6) Rra
               P0 (av - 12)%nat u1 true with "Hcg Hpc Hi02 [Hf1]").
     { rgall. iEval (rewrite HcspP0 -Hb1). iExact "Hf1". }
     iIntros (CIDp2 Hsp2) "Hcg Hpc Hf1". rgall.
@@ -504,7 +503,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc04) in "Hpc".
     clear Hpc04.
     iPoseProof (pri_04 with "Htext") as "Hi04".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x04)) (mword_of_int 10 : mword 6) Rs0
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x04)) (mword_of_int 10 : mword 6) Rs0
               P0 (av - 12)%nat u2 true with "Hcg Hpc Hi04 [Hf2]").
     { rgall. iEval (rewrite HcspP0 -Hb2). iExact "Hf2". }
     iIntros (CIDp3 Hsp3) "Hcg Hpc Hf2". rgall.
@@ -516,7 +515,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc06) in "Hpc".
     clear Hpc06.
     iPoseProof (pri_06 with "Htext") as "Hi06".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x06)) (mword_of_int 9 : mword 6) Rs1
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x06)) (mword_of_int 9 : mword 6) Rs1
               P0 (av - 12)%nat u3 true with "Hcg Hpc Hi06 [Hf3]").
     { rgall. iEval (rewrite HcspP0 -Hb3). iExact "Hf3". }
     iIntros (CIDp4 Hsp4) "Hcg Hpc Hf3". rgall.
@@ -528,7 +527,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc08) in "Hpc".
     clear Hpc08.
     iPoseProof (pri_08 with "Htext") as "Hi08".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x08)) (mword_of_int 8 : mword 6) Rs2
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x08)) (mword_of_int 8 : mword 6) Rs2
               P0 (av - 12)%nat u4 true with "Hcg Hpc Hi08 [Hf4]").
     { rgall. iEval (rewrite HcspP0 -Hb4). iExact "Hf4". }
     iIntros (CIDp5 Hsp5) "Hcg Hpc Hf4". rgall.
@@ -540,7 +539,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc0a) in "Hpc".
     clear Hpc0a.
     iPoseProof (pri_0a with "Htext") as "Hi0a".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x0a)) (mword_of_int 7 : mword 6) Rs3
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x0a)) (mword_of_int 7 : mword 6) Rs3
               P0 (av - 12)%nat u5 true with "Hcg Hpc Hi0a [Hf5]").
     { rgall. iEval (rewrite HcspP0 -Hb5). iExact "Hf5". }
     iIntros (CIDp6 Hsp6) "Hcg Hpc Hf5". rgall.
@@ -552,7 +551,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc0c) in "Hpc".
     clear Hpc0c.
     iPoseProof (pri_0c with "Htext") as "Hi0c".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x0c)) (mword_of_int 6 : mword 6) Rs4
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x0c)) (mword_of_int 6 : mword 6) Rs4
               P0 (av - 12)%nat u6 true with "Hcg Hpc Hi0c [Hf6]").
     { rgall. iEval (rewrite HcspP0 -Hb6). iExact "Hf6". }
     iIntros (CIDp7 Hsp7) "Hcg Hpc Hf6". rgall.
@@ -564,7 +563,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc0e) in "Hpc".
     clear Hpc0e.
     iPoseProof (pri_0e with "Htext") as "Hi0e".
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x0e)) (mword_of_int 5 : mword 6) Rs5
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x0e)) (mword_of_int 5 : mword 6) Rs5
               P0 (av - 12)%nat u7 true with "Hcg Hpc Hi0e [Hf7]").
     { rgall. iEval (rewrite HcspP0 -Hb7). iExact "Hf7". }
     iIntros (CIDp8 Hsp8) "Hcg Hpc Hf7". rgall.
@@ -593,8 +592,7 @@ Section ProofPiperead.
                cpu_own 0%nat true pj C true -∗
                pipe_ref γp w q -∗
                proc_priv γf pj pid (upd_upt V P') -∗
-               own_ctx (p_context pj) -∗
-               park_hlf j true -∗
+               running_claim j -∗
                pa_stk sp0 1 ↦₈ vra -∗ pa_stk sp0 2 ↦₈ vs0 -∗ pa_stk sp0 3 ↦₈ vs1 -∗
                pa_stk sp0 4 ↦₈ vs2 -∗ pa_stk sp0 5 ↦₈ vs3 -∗ pa_stk sp0 6 ↦₈ vs4 -∗
                pa_stk sp0 7 ↦₈ vs5 -∗
@@ -603,14 +601,14 @@ Section ProofPiperead.
                (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I)) : iProp Σ)).
+               WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
     iAssert EPIP with "[Hcont]" as "EPI".
     { rewrite /EPIP.
-      iIntros (CIDe Hse M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hctx Hpark Hg1 Hg2 Hg3 Hg4 Hg5 Hg6 Hg7 Hg8 Hg9 Hg10 Hg11 Hg12".
+      iIntros (CIDe Hse M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hpark Hg1 Hg2 Hg3 Hg4 Hg5 Hg6 Hg7 Hg8 Hg9 Hg10 Hg11 Hg12".
       destruct Hrg as (Hcsp & Hrv & HMs6 & HMs7 & HMs8 & HMs9 & HMs10 & HMs11).
       (* 0xd6 c.mv a0,s3 *)
       iPoseProof (pri_d6 with "Htext") as "Hid6".
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xd6)) Ra0 Rs3
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0xd6)) Ra0 Rs3
                 M (av - 12)%nat true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hid6").
       iIntros (CIDp9 Hsp9) "Hcg Hpc". rgall.
       pose (F0 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (M !!! Regidx Rs3))]> M).
@@ -622,7 +620,7 @@ Section ProofPiperead.
       assert (HF0csp : F0 !!! Regidx csp_rs1 = spr) by (rewrite /F0 upd_ne; [exact Hcsp | reg_neq]).
       (* 0xd8 c.ldsp ra,88(sp) *)
       iPoseProof (pri_d8 with "Htext") as "Hid8".
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xd8)) (mword_of_int 11 : mword 6) Rra
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xd8)) (mword_of_int 11 : mword 6) Rra
                 F0 (av - 12)%nat vra true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hid8 [Hg1]").
       { rgall. iEval (rewrite HF0csp -Hb1). iExact "Hg1". }
       iIntros (CIDp10 Hsp10) "Hcg Hpc Hg1". rgall. iEval (rewrite HF0csp -Hb1) in "Hg1".
@@ -635,7 +633,7 @@ Section ProofPiperead.
       assert (HF1csp : F1 !!! Regidx csp_rs1 = spr) by (rewrite /F1 upd_ne; [exact HF0csp | reg_neq]).
       (* 0xda c.ldsp s0,80(sp) *)
       iPoseProof (pri_da with "Htext") as "Hida".
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xda)) (mword_of_int 10 : mword 6) Rs0
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xda)) (mword_of_int 10 : mword 6) Rs0
                 F1 (av - 12)%nat vs0 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hida [Hg2]").
       { rgall. iEval (rewrite HF1csp -Hb2). iExact "Hg2". }
       iIntros (CIDp11 Hsp11) "Hcg Hpc Hg2". rgall. iEval (rewrite HF1csp -Hb2) in "Hg2".
@@ -648,7 +646,7 @@ Section ProofPiperead.
       assert (HF2csp : F2 !!! Regidx csp_rs1 = spr) by (rewrite /F2 upd_ne; [exact HF1csp | reg_neq]).
       (* 0xdc c.ldsp s1,72(sp) *)
       iPoseProof (pri_dc with "Htext") as "Hidc".
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xdc)) (mword_of_int 9 : mword 6) Rs1
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xdc)) (mword_of_int 9 : mword 6) Rs1
                 F2 (av - 12)%nat vs1 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hidc [Hg3]").
       { rgall. iEval (rewrite HF2csp -Hb3). iExact "Hg3". }
       iIntros (CIDp12 Hsp12) "Hcg Hpc Hg3". rgall. iEval (rewrite HF2csp -Hb3) in "Hg3".
@@ -661,7 +659,7 @@ Section ProofPiperead.
       assert (HF3csp : F3 !!! Regidx csp_rs1 = spr) by (rewrite /F3 upd_ne; [exact HF2csp | reg_neq]).
       (* 0xde c.ldsp s2,64(sp) *)
       iPoseProof (pri_de with "Htext") as "Hide".
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xde)) (mword_of_int 8 : mword 6) Rs2
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xde)) (mword_of_int 8 : mword 6) Rs2
                 F3 (av - 12)%nat vs2 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hide [Hg4]").
       { rgall. iEval (rewrite HF3csp -Hb4). iExact "Hg4". }
       iIntros (CIDp13 Hsp13) "Hcg Hpc Hg4". rgall. iEval (rewrite HF3csp -Hb4) in "Hg4".
@@ -674,7 +672,7 @@ Section ProofPiperead.
       assert (HF4csp : F4 !!! Regidx csp_rs1 = spr) by (rewrite /F4 upd_ne; [exact HF3csp | reg_neq]).
       (* 0xe0 c.ldsp s3,56(sp) *)
       iPoseProof (pri_e0 with "Htext") as "Hie0".
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xe0)) (mword_of_int 7 : mword 6) Rs3
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xe0)) (mword_of_int 7 : mword 6) Rs3
                 F4 (av - 12)%nat vs3 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hie0 [Hg5]").
       { rgall. iEval (rewrite HF4csp -Hb5). iExact "Hg5". }
       iIntros (CIDp14 Hsp14) "Hcg Hpc Hg5". rgall. iEval (rewrite HF4csp -Hb5) in "Hg5".
@@ -687,7 +685,7 @@ Section ProofPiperead.
       assert (HF5csp : F5 !!! Regidx csp_rs1 = spr) by (rewrite /F5 upd_ne; [exact HF4csp | reg_neq]).
       (* 0xe2 c.ldsp s4,48(sp) *)
       iPoseProof (pri_e2 with "Htext") as "Hie2".
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xe2)) (mword_of_int 6 : mword 6) Rs4
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xe2)) (mword_of_int 6 : mword 6) Rs4
                 F5 (av - 12)%nat vs4 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hie2 [Hg6]").
       { rgall. iEval (rewrite HF5csp -Hb6). iExact "Hg6". }
       iIntros (CIDp15 Hsp15) "Hcg Hpc Hg6". rgall. iEval (rewrite HF5csp -Hb6) in "Hg6".
@@ -700,7 +698,7 @@ Section ProofPiperead.
       assert (HF6csp : F6 !!! Regidx csp_rs1 = spr) by (rewrite /F6 upd_ne; [exact HF5csp | reg_neq]).
       (* 0xe4 c.ldsp s5,40(sp) *)
       iPoseProof (pri_e4 with "Htext") as "Hie4".
-      iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xe4)) (mword_of_int 5 : mword 6) Rs5
+      iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xe4)) (mword_of_int 5 : mword 6) Rs5
                 F6 (av - 12)%nat vs5 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hie4 [Hg7]").
       { rgall. iEval (rewrite HF6csp -Hb7). iExact "Hg7". }
       iIntros (CIDp16 Hsp16) "Hcg Hpc Hg7". rgall. iEval (rewrite HF6csp -Hb7) in "Hg7".
@@ -737,7 +735,7 @@ Section ProofPiperead.
         iSplitL "Hg12"; [iExact "Hg12"|]. done. }
       iEval (rewrite -Hwv) in "Hfr12".
       iPoseProof (pri_e6 with "Htext") as "Hie6".
-      iApply (wp_caddi16sp_pop_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xe6)) (mword_of_int 6 : mword 6)
+      iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.piperead + 0xe6)) (mword_of_int 6 : mword 6)
                 F7 (av - 12)%nat 12 true Hpop with "Hcg Hpc Hie6 Hfr12").
       iIntros (CIDp17 Hsp17) "Hcg Hpc". rgall.
       assert (Hnk : ((av - 12) + 12)%nat = av) by lia.
@@ -778,14 +776,14 @@ Section ProofPiperead.
         rewrite /F2 upd_ne; [| congruence]. rewrite /F1 upd_ne; [| congruence].
         rewrite /F0 upd_ne; [| congruence]. reflexivity. }
       iPoseProof (pri_e8 with "Htext") as "Hie8".
-      iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xe8)) Rra F8 av true ltac:(nz)
+      iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.piperead + 0xe8)) Rra F8 av true ltac:(nz)
                 with "Hcg Hpc Hie8").
       iIntros (CIDp18 Hsp18) "Hcg Hpc". rgall.
       assert (Hrafin : ret_pc (F8 !!! Regidx Rra) = ret_tgt) by (rewrite HF8ra; reflexivity).
       iEval (rewrite Hrafin) in "Hpc".
       clear Hrafin.
       iSpecialize ("Hcont" $! CIDp18 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! F8 P' with "[%] [%] [%] Hcg Hown Hpc Href Hpriv Hctx Hpark").
+      iApply ("Hcont" $! F8 P' with "[%] [%] [%] Hcg Hown Hpc Href Hpriv Hpark").
       { unfold callee_saved. split_and!.
         - exact HF8sp.
         - rewrite /F8 upd_ne; [| reg_neq]. rewrite /F7 upd_ne; [| reg_neq].
@@ -825,7 +823,7 @@ Section ProofPiperead.
       { rewrite HF8a0. exact Hret. } }
     (* ============ 0x10: c.addi4spn s0,sp,96 ============ *)
     iPoseProof (pri_10 with "Htext") as "Hi10".
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x10)) (Cregidx (mword_of_int 0))
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.piperead + 0x10)) (Cregidx (mword_of_int 0))
               (mword_of_int 24 : mword 8) Rs0 P0 (av - 12)%nat true
               ltac:(vm_compute; reflexivity) ltac:(nz) ltac:(rdok)
               with "Hcg Hpc Hi10").
@@ -840,7 +838,7 @@ Section ProofPiperead.
     clear Hpc12.
     (* ============ 0x12/0x14/0x16: s1:=a0, s2:=a1, s5:=a2 ============ *)
     iPoseProof (pri_12 with "Htext") as "Hi12".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x12)) Rs1 Ra0 P1 (av - 12)%nat true
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x12)) Rs1 Ra0 P1 (av - 12)%nat true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi12").
     iIntros (CIDp20 Hsp20) "Hcg Hpc". rgall.
     pose (P2 := <[Regidx Rs1 := regval_into_reg (add_vec zero_reg (P1 !!! Regidx Ra0))]> P1).
@@ -850,7 +848,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc14) in "Hpc".
     clear Hpc14.
     iPoseProof (pri_14 with "Htext") as "Hi14".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x14)) Rs2 Ra1 P2 (av - 12)%nat true
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x14)) Rs2 Ra1 P2 (av - 12)%nat true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi14").
     iIntros (CIDp21 Hsp21) "Hcg Hpc". rgall.
     pose (P3 := <[Regidx Rs2 := regval_into_reg (add_vec zero_reg (P2 !!! Regidx Ra1))]> P2).
@@ -860,7 +858,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc16) in "Hpc".
     clear Hpc16.
     iPoseProof (pri_16 with "Htext") as "Hi16".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x16)) Rs5 Ra2 P3 (av - 12)%nat true
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x16)) Rs5 Ra2 P3 (av - 12)%nat true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi16").
     iIntros (CIDp22 Hsp22) "Hcg Hpc". rgall.
     pose (P4 := <[Regidx Rs5 := regval_into_reg (add_vec zero_reg (P3 !!! Regidx Ra2))]> P3).
@@ -871,7 +869,7 @@ Section ProofPiperead.
     clear Hpc18.
     (* ============ 0x18: jal ra,myproc ============ *)
     iPoseProof (pri_18 with "Htext") as "Hi18".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x18)) Rra (mword_of_int 2085700 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.piperead + 0x18)) Rra (mword_of_int 2085700 : mword 21)
               P4 (av - 12)%nat true ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18").
     iIntros (CIDp23 Hsp23) "Hcg Hpc". rgall.
@@ -918,7 +916,7 @@ Section ProofPiperead.
       rewrite /P1 upd_ne; [| congruence]. rewrite /P0 upd_ne; [| congruence]. reflexivity. }
     iDestruct (cpu_own_transport CID CIDp23 0 true pj C true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (Myproc.wp_myproc_sconf Φ P5 (av - 12)%nat 0%nat true pj C true
+    iApply (Myproc.wp_myproc_sconf P5 (av - 12)%nat 0%nat true pj C true
               pr_lvl0 ltac:(lia) with "Hcg Hown Htext Hpc").
     iIntros (CIDmp Hsmp ms1 A0) "%Hms1 Hcg Hown Hpc %HcsA0d". rgall.
     destruct HcsA0d as [HcsA0 HA0a0].
@@ -928,7 +926,7 @@ Section ProofPiperead.
     clear Hpc1c.
     (* ============ 0x1c: s4 := a0 (= pj);  0x1e: a0 := s1 ============ *)
     iPoseProof (pri_1c with "Htext") as "Hi1c".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x1c)) Rs4 Ra0 A0 (av - 12)%nat true
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x1c)) Rs4 Ra0 A0 (av - 12)%nat true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1c").
     iIntros (CIDp24 Hsp24) "Hcg Hpc". rgall.
     pose (A1 := <[Regidx Rs4 := regval_into_reg (add_vec zero_reg (A0 !!! Regidx Ra0))]> A0).
@@ -938,7 +936,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc1e) in "Hpc".
     clear Hpc1e.
     iPoseProof (pri_1e with "Htext") as "Hi1e".
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x1e)) Ra0 Rs1 A1 (av - 12)%nat true
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x1e)) Ra0 Rs1 A1 (av - 12)%nat true
               ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1e").
     iIntros (CIDp25 Hsp25) "Hcg Hpc". rgall.
     pose (A2 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (A1 !!! Regidx Rs1))]> A1).
@@ -949,7 +947,7 @@ Section ProofPiperead.
     clear Hpc20.
     (* ============ 0x20: jal ra,acquire ============ *)
     iPoseProof (pri_20 with "Htext") as "Hi20".
-    iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x20)) Rra (mword_of_int 2082366 : mword 21)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.piperead + 0x20)) Rra (mword_of_int 2082366 : mword 21)
               A2 (av - 12)%nat true ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi20").
     iIntros (CIDp26 Hsp26) "Hcg Hpc". rgall.
@@ -1000,7 +998,7 @@ Section ProofPiperead.
       rewrite (callee_saved_lookup HcsA0 Rs5 ltac:(vm_compute; reflexivity)). exact HP5s5. }
     iDestruct (cpu_own_transport CIDmp CIDp26 0 true pj C true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (AcquireGen.wp_acquire_gen_sconf Φ γl (pipe_res γp pi)
+    iApply (AcquireGen.wp_acquire_gen_sconf γl (pipe_res γp pi)
               (pipe_ref γp w q) (pipe_dead γl γp) A3 0%nat true pj C (av - 12)%nat true
               pr_lvl0 ltac:(lia)
               ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_pre_dead)
@@ -1021,7 +1019,7 @@ Section ProofPiperead.
     assert (Hnra0 : add_vec (M0 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 536 : mword 12)) = a_pnread pi)
       by (rewrite HM0s1; reflexivity).
     iPoseProof (pri_24 with "Htext") as "Hi24".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x24)) Ra4 Rs1 (mword_of_int 536 : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x24)) Ra4 Rs1 (mword_of_int 536 : mword 12)
               M0 (av - 12)%nat nr0 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi24 [Hnr]").
     { rgall. iEval (rewrite Hnra0). iExact "Hnr". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra0) in "Hnr".
@@ -1035,7 +1033,7 @@ Section ProofPiperead.
     assert (Hnwa1 : add_vec (W1 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 540 : mword 12)) = a_pnwrite pi)
       by (rewrite HW1s1; reflexivity).
     iPoseProof (pri_28 with "Htext") as "Hi28".
-    iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x28)) Ra5 Rs1 (mword_of_int 540 : mword 12)
+    iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x28)) Ra5 Rs1 (mword_of_int 540 : mword 12)
               W1 (av - 12)%nat nw0 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi28 [Hnw]").
     { rgall. iEval (rewrite Hnwa1). iExact "Hnw". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa1) in "Hnw".
@@ -1046,7 +1044,7 @@ Section ProofPiperead.
     iEval (rewrite Hpc2c) in "Hpc".
     clear Hpc2c.
     iPoseProof (pri_2c with "Htext") as "Hi2c".
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x2c)) Rs3 Rs1 (mword_of_int 536 : mword 12)
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.piperead + 0x2c)) Rs3 Rs1 (mword_of_int 536 : mword 12)
               W2 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi2c").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
     pose (W0 := <[Regidx Rs3 := regval_into_reg
@@ -1130,19 +1128,18 @@ Section ProofPiperead.
         sie_cap_gpr M (av - 12)%nat false pj -∗
         pc_is (mword_of_int (KernelSyms.piperead + 0x76) : mword 64) -∗
         cpu_own 1%nat true pj C false -∗
-        trap_csrs_pay 0 true -∗
+        arm_pay 0 true pj -∗
         locked γl cpu_id -∗
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
         proc_priv γf pj pid V -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         pa_stk sp0 8 ↦₈ vs6 -∗
         pa_stk sp0 9 ↦₈ vs7 -∗
         pa_stk sp0 10 ↦₈ vs8 -∗
         (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I)) : iProp Σ)).
+        WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
     pose (EPIC := (wp_next (CID0 := CID) true pj (fun (CIDx : CpuId) =>
                ((∀ (M : regfile) (P' : uptd) (rv : mword 64),
                ⌜ M !!! Regidx csp_rs1 = spr
@@ -1160,30 +1157,29 @@ Section ProofPiperead.
                cpu_own 0%nat true pj C true -∗
                pipe_ref γp w q -∗
                proc_priv γf pj pid (upd_upt V P') -∗
-               own_ctx (p_context pj) -∗
-               park_hlf j true -∗
+               running_claim j -∗
                (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I)) : iProp Σ)).
+               WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
     iAssert ((EPIC ∧ CPP)%I) with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7]" as "EXITS".
     { iSplit.
       { rewrite /EPIC. iEval (rewrite /EPIP) in "EPI".
-        iIntros (CIDx Hsx M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hctx Hpark Hz8 Hz9 Hz10 Hz11 Hz12".
+        iIntros (CIDx Hsx M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hpark Hz8 Hz9 Hz10 Hz11 Hz12".
         iSpecialize ("EPI" $! CIDx with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! M P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hctx Hpark
+        iApply ("EPI" $! M P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hpark
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hz8 Hz9 Hz10 Hz11 Hz12").
         { exact Hrg. }
         { exact Hext. }
         { exact Hret. } }
       rewrite /CPP.
-      iIntros (CIDc Hsc M) "%Hrg Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hc8 Hc9 Hc10 Hq11 Hq12".
+      iIntros (CIDc Hsc M) "%Hrg Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hc8 Hc9 Hc10 Hq11 Hq12".
       destruct Hrg as (HMcsp & HMs0 & HMs1 & HMs2 & HMs4 & HMs5 & HMs9 & HMs10 & HMs11).
       (* ---- 0x76 c.li s3,0 ---- *)
       iPoseProof (pri_76 with "Htext") as "Hi76".
-      iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x76)) Rs3 (mword_of_int 0 : mword 6)
+      iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.piperead + 0x76)) Rs3 (mword_of_int 0 : mword 6)
                 (mword_of_int 0 : mword 64) M (av - 12)%nat false ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi76").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1196,7 +1192,7 @@ Section ProofPiperead.
       assert (HG0s0 : G0 !!! Regidx Rs0 = s0v) by (rewrite /G0 upd_ne; [exact HMs0 | reg_neq]).
       (* ---- 0x78 addi s8,s0,-81 : s8 := &ch ---- *)
       iPoseProof (pri_78 with "Htext") as "Hi78".
-      iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x78)) Rs8 Rs0 (mword_of_int 4015 : mword 12)
+      iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.piperead + 0x78)) Rs8 Rs0 (mword_of_int 4015 : mword 12)
                 G0 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi78").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       iEval (rewrite HG0s0) in "Hcg".
@@ -1210,7 +1206,7 @@ Section ProofPiperead.
       clear Hp7c.
       (* ---- 0x7c c.li s7,1 ; 0x7e c.li s6,-1 ---- *)
       iPoseProof (pri_7c with "Htext") as "Hi7c".
-      iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x7c)) Rs7 (mword_of_int 1 : mword 6)
+      iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.piperead + 0x7c)) Rs7 (mword_of_int 1 : mword 6)
                 (mword_of_int 1 : mword 64) G1 (av - 12)%nat false ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi7c").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1221,7 +1217,7 @@ Section ProofPiperead.
       iEval (rewrite Hp7e) in "Hpc".
       clear Hp7e.
       iPoseProof (pri_7e with "Htext") as "Hi7e".
-      iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x7e)) Rs6 (mword_of_int 63 : mword 6)
+      iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.piperead + 0x7e)) Rs6 (mword_of_int 63 : mword 6)
                 (mword_of_int (-1) : mword 64) G2 (av - 12)%nat false ltac:(nz) ltac:(rdok)
                 ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi7e").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1288,22 +1284,21 @@ Section ProofPiperead.
           sie_cap_gpr M2 (av - 12)%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0xc2) : mword 64) -∗
           cpu_own 1%nat true pj C false -∗
-          trap_csrs_pay 0 true -∗
+          arm_pay 0 true pj -∗
           locked γl cpu_id -∗
           pipe_res γp pi -∗
           pipe_ref γp w q -∗
           proc_priv γf pj pid (upd_upt V P') -∗
-          own_ctx (p_context pj) -∗
-          park_hlf j true -∗
+          running_claim j -∗
           (∃ b : bv 8, chaddr ↦ₘ b) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})%I : iProp Σ)).
+          WP (Loop : expr riscv_lang))%I : iProp Σ)).
       iAssert WXP with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hc8 Hc9 Hc10 Hq12 Hchback]" as "HWX".
       { rewrite /WXP. iEval (rewrite /EPIP) in "EPI".
-        iIntros (M2 P' rv) "%Hxg %Hxext %Hxret Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx".
+        iIntros (M2 P' rv) "%Hxg %Hxext %Hxret Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx".
         destruct Hxg as (HXcsp & HXs1 & HXs3 & HXs9 & HXs10 & HXs11).
         (* 0xc2 addi a0,s1,540 *)
         iPoseProof (pri_c2 with "Htext") as "Hic2".
-        iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xc2)) Ra0 Rs1 (mword_of_int 540 : mword 12)
+        iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.piperead + 0xc2)) Ra0 Rs1 (mword_of_int 540 : mword 12)
                   M2 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hic2").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         pose (X1 := <[Regidx Ra0 := regval_into_reg
@@ -1316,7 +1311,7 @@ Section ProofPiperead.
         clear Hpc6.
         (* 0xc6 jal wakeup *)
         iPoseProof (pri_c6 with "Htext") as "Hic6".
-        iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xc6)) Rra (mword_of_int 2087148 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.piperead + 0xc6)) Rra (mword_of_int 2087148 : mword 21)
                   X1 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hic6").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1337,7 +1332,7 @@ Section ProofPiperead.
           by (rewrite rget_tp; reflexivity).
         assert (Hwnz : eq_vec (zero_reg : mword 64) (mycpu_ret (rget X2 Rtp)) = false)
           by (rewrite rget_tp; apply mycpu_ret_nonzero; apply tp_ok_cid).
-        iApply (Wakeup.wp_wakeup_sconf Φ X2 γs (mycpu_ret cid_word) pj 1%nat (av - 12)%nat true C false
+        iApply (Wakeup.wp_wakeup_sconf X2 γs (mycpu_ret cid_word) pj 1%nat (av - 12)%nat true C false
                   HwK HwdomX Hlen Hwa0f Hwnz pr_lvl1
                   with "Hcg Hown Htext Hpc Hpanic Hpinv").
         iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
@@ -1357,7 +1352,7 @@ Section ProofPiperead.
           by (rewrite (HthrW2 Rs1 ltac:(vm_compute; reflexivity)); exact HXs1).
         (* 0xca c.mv a0,s1 *)
         iPoseProof (pri_ca with "Htext") as "Hica".
-        iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xca)) Ra0 Rs1 Mw (av - 12)%nat false
+        iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0xca)) Ra0 Rs1 Mw (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hica").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         pose (X3 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mw !!! Regidx Rs1))]> Mw).
@@ -1368,7 +1363,7 @@ Section ProofPiperead.
         clear Hpcc.
         (* 0xcc jal release *)
         iPoseProof (pri_cc with "Htext") as "Hicc".
-        iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xcc)) Rra (mword_of_int 2082330 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.piperead + 0xcc)) Rra (mword_of_int 2082330 : mword 21)
                   X3 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hicc").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1391,7 +1386,7 @@ Section ProofPiperead.
           replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
             by (apply bv_eq; vm_compute; reflexivity).
           apply kv_addv_zero. }
-        iApply (ReleaseGen.wp_release_gen_sconf Φ γl pi (pipe_res γp pi) (pipe_dead γl γp) emp%I
+        iApply (ReleaseGen.wp_release_gen_sconf γl pi (pipe_res γp pi) (pipe_dead γl γp) emp%I
                   X4 0%nat true pj C (av - 12)%nat HX4lka ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -1414,7 +1409,7 @@ Section ProofPiperead.
           by (rewrite (HthrX csp_rs1 ltac:(vm_compute; reflexivity)); exact HXcsp).
         (* 0xd0/0xd2/0xd4: reload s6, s7, s8 *)
         iPoseProof (pri_d0 with "Htext") as "Hid0".
-        iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xd0)) (mword_of_int 4 : mword 6) Rs6
+        iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xd0)) (mword_of_int 4 : mword 6) Rs6
                   mrx (av - 12)%nat vs6 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hid0 [Hc8]").
         { rgall. iEval (rewrite Hmrxcsp -Hb8). iExact "Hc8". }
         iIntros (CIDp27 Hsp27) "Hcg Hpc Hc8". rgall. iEval (rewrite Hmrxcsp -Hb8) in "Hc8".
@@ -1427,7 +1422,7 @@ Section ProofPiperead.
         assert (HX5csp : X5 !!! Regidx csp_rs1 = spr)
           by (rewrite /X5 upd_ne; [exact Hmrxcsp | reg_neq]).
         iPoseProof (pri_d2 with "Htext") as "Hid2".
-        iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xd2)) (mword_of_int 3 : mword 6) Rs7
+        iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xd2)) (mword_of_int 3 : mword 6) Rs7
                   X5 (av - 12)%nat vs7 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hid2 [Hc9]").
         { rgall. iEval (rewrite HX5csp -Hb9). iExact "Hc9". }
         iIntros (CIDp28 Hsp28) "Hcg Hpc Hc9". rgall. iEval (rewrite HX5csp -Hb9) in "Hc9".
@@ -1440,7 +1435,7 @@ Section ProofPiperead.
         assert (HX6csp : X6 !!! Regidx csp_rs1 = spr)
           by (rewrite /X6 upd_ne; [exact HX5csp | reg_neq]).
         iPoseProof (pri_d4 with "Htext") as "Hid4".
-        iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xd4)) (mword_of_int 2 : mword 6) Rs8
+        iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.piperead + 0xd4)) (mword_of_int 2 : mword 6) Rs8
                   X6 (av - 12)%nat vs8 true ltac:(nz) ltac:(rdok) with "Hcg Hpc Hid4 [Hc10]").
         { rgall. iEval (rewrite HX6csp -Hb10). iExact "Hc10". }
         iIntros (CIDp29 Hsp29) "Hcg Hpc Hc10". rgall. iEval (rewrite HX6csp -Hb10) in "Hc10".
@@ -1461,7 +1456,7 @@ Section ProofPiperead.
           rewrite /X7 upd_ne; [| congruence]. rewrite /X6 upd_ne; [| congruence].
           rewrite /X5 upd_ne; [| congruence]. apply HthrX; exact Hr. }
         iSpecialize ("EPI" $! CIDp29 with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! X7 P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hctx Hpark
+        iApply ("EPI" $! X7 P' rv with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hpark
                   Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 [Hc8] [Hc9] [Hc10] [Hc11] Hq12").
         { split_and!.
           - rewrite (HthrX7 csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq) ltac:(reg_neq)).
@@ -1491,7 +1486,7 @@ Section ProofPiperead.
       iPoseProof (pri_80 with "Htext") as "Hi80".
       destruct (Z.geb 0 n) eqn:Hbz.
       { (* n <= 0: nothing to copy, return 0 *)
-        iApply (wp_bge_x0_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x80)) (mword_of_int 66 : mword 13)
+        iApply (wp_bge_x0_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0x80)) (mword_of_int 66 : mword 13)
                   Rs5 G3 (av - 12)%nat false ltac:(nz) ltac:(rgall; exact Hblez)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi80").
         iApply bi.later_intro. iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1505,7 +1500,7 @@ Section ProofPiperead.
         iAssert (∃ b : bv 8, chaddr ↦ₘ b)%I with "[Hch]" as "Hchx"; [by iExists chb0|].
         iEval (rewrite /WXP) in "HWX".
         iApply ("HWX" $! G3 (pv_upt V) (mword_of_int 0 : mword 64)
-                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
         { split_and!; try assumption. }
         { apply uptd_ext_refl. }
         { apply pr_ret_cnt. split; [lia | apply Z.le_max_l]. } }
@@ -1514,7 +1509,7 @@ Section ProofPiperead.
       { rewrite Z.geb_leb in Hbz. apply Z.leb_gt in Hbz. lia. }
       pose (Nn := Z.to_nat n).
       assert (HNn : Z.of_nat Nn = n) by (rewrite /Nn; apply Z2Nat.id; lia).
-      iApply (wp_bge_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x80)) (mword_of_int 66 : mword 13)
+      iApply (wp_bge_x0_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x80)) (mword_of_int 66 : mword 13)
                 Rs5 G3 (av - 12)%nat false ltac:(nz) ltac:(rgall; exact Hblez)
                 with "Hcg Hpc Hi80").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1543,7 +1538,7 @@ Section ProofPiperead.
           sie_cap_gpr M3 (av - 12)%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) -∗
           cpu_own 1%nat true pj C false -∗
-          trap_csrs_pay 0 true -∗
+          arm_pay 0 true pj -∗
           locked γl cpu_id -∗
           pipe_res γp pi -∗
           pipe_ref γp w q -∗
@@ -1554,13 +1549,12 @@ Section ProofPiperead.
              p_pagetable pj ↦₈ page_base (ud_root (pv_upt V)) -∗ proc_pt P'' -∗
              proc_priv γf pj pid (upd_upt V P'')) -∗
           chaddr ↦ₘ chb -∗
-          own_ctx (p_context pj) -∗
-          park_hlf j true -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "CLOOP".
+          running_claim j -∗
+          WP (Loop : expr riscv_lang))%I with "[]" as "CLOOP".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
-        { iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hpark".
+        { iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark".
           exfalso. lia. }
-        iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hpark".
+        iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark".
         destruct Hrg3 as (H3csp & H3s0 & H3s1 & H3s2 & H3s3 & H3s4 & H3s5 & H3s6 & H3s7 & H3s8 & H3s9 & H3s10 & H3s11).
         assert (HZi : (0 <= Z.of_nat i < n)%Z) by lia.
         assert (Hroot : ud_root P' = ud_root (pv_upt V))
@@ -1571,7 +1565,7 @@ Section ProofPiperead.
           by (rewrite H3s1; reflexivity).
         (* 0x84 lw a5,536(s1) *)
         iPoseProof (pri_84 with "Htext") as "Hi84".
-        iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x84)) Ra5 Rs1 (mword_of_int 536 : mword 12)
+        iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x84)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                   M3 (av - 12)%nat nr false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi84 [Hnr]").
         { rgall. iEval (rewrite Hnra). iExact "Hnr". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra) in "Hnr".
@@ -1586,7 +1580,7 @@ Section ProofPiperead.
           by (rewrite HK1s1; reflexivity).
         (* 0x88 lw a4,540(s1) *)
         iPoseProof (pri_88 with "Htext") as "Hi88".
-        iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x88)) Ra4 Rs1 (mword_of_int 540 : mword 12)
+        iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x88)) Ra4 Rs1 (mword_of_int 540 : mword 12)
                   K1 (av - 12)%nat nw false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi88 [Hnw]").
         { rgall. iEval (rewrite Hnwa). iExact "Hnw". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa) in "Hnw".
@@ -1607,7 +1601,7 @@ Section ProofPiperead.
         iPoseProof (pri_8c with "Htext") as "Hi8c".
         destruct (eq_vec (sign_extend' 64 nw : mword 64) (sign_extend' 64 nr)) eqn:Hemp.
         { (* the pipe is EMPTY: break with the current count *)
-          iApply (wp_beq_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x8c)) (mword_of_int 54 : mword 13)
+          iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0x8c)) (mword_of_int 54 : mword 13)
                     Ra5 Ra4 K2 (av - 12)%nat false ltac:(nz) ltac:(nz)
                     ltac:(rgall; rewrite HK2a4 HK2a5; exact Hemp) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi8c").
@@ -1625,7 +1619,7 @@ Section ProofPiperead.
           iAssert (∃ b : bv 8, chaddr ↦ₘ b)%I with "[Hch]" as "Hchx"; [by iExists chb|].
           iEval (rewrite /WXP) in "HWX".
           iApply ("HWX" $! K2 P' (mword_of_int (Z.of_nat i))
-                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
           { split_and!.
             - rewrite (HthrK2 csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
             - rewrite (HthrK2 Rs1 ltac:(vm_compute; reflexivity)). exact H3s1.
@@ -1637,7 +1631,7 @@ Section ProofPiperead.
           { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. } }
         (* the pipe is NOT empty: nr <> nw *)
         assert (Hne : nr <> nw) by (apply (pr_sext_neq nw nr); exact Hemp).
-        iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x8c)) (mword_of_int 54 : mword 13)
+        iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x8c)) (mword_of_int 54 : mword 13)
                   Ra5 Ra4 K2 (av - 12)%nat false ltac:(nz) ltac:(nz)
                   ltac:(rgall; rewrite HK2a4 HK2a5; exact Hemp) with "Hcg Hpc Hi8c").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1657,7 +1651,7 @@ Section ProofPiperead.
                       = (mword_of_int (Z.of_nat idx) : mword 64))
           by (rewrite HK2a5; exact Hidxw).
         iPoseProof (pri_90 with "Htext") as "Hi90".
-        iApply (wp_andi_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x90)) Ra5 Ra5 (mword_of_int 511 : mword 12)
+        iApply (wp_andi_s_sconf (mword_of_int (KernelSyms.piperead + 0x90)) Ra5 Ra5 (mword_of_int 511 : mword 12)
                   (mword_of_int (Z.of_nat idx) : mword 64) K2 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) Hwv with "Hcg Hpc Hi90").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1673,7 +1667,7 @@ Section ProofPiperead.
         assert (HK3s1 : K3 !!! Regidx Rs1 = pi) by (rewrite /K3 upd_ne; [exact HK2s1 | reg_neq]).
         (* 0x94 c.add a5,a5,s1 *)
         iPoseProof (pri_94 with "Htext") as "Hi94".
-        iApply (wp_cadd_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x94)) Ra5 Rs1 K3 (av - 12)%nat false
+        iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.piperead + 0x94)) Ra5 Rs1 K3 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi94").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         iEval (rewrite HK3a5 HK3s1) in "Hcg".
@@ -1694,7 +1688,7 @@ Section ProofPiperead.
           as [db Hlk].
         iDestruct (pr_data_acc pi bs idx db Hlk with "Hdat") as "[Hbyte Hdback]".
         iPoseProof (pri_96 with "Htext") as "Hi96".
-        iApply (wp_lbu_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x96)) Ra5 Ra5 (mword_of_int 24 : mword 12)
+        iApply (wp_lbu_s_sconf (mword_of_int (KernelSyms.piperead + 0x96)) Ra5 Ra5 (mword_of_int 24 : mword 12)
                   K4 (av - 12)%nat (db : mword 8) false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi96 [Hbyte]").
         { rgall. iEval (rewrite HK4a5 pr_dataddr). iExact "Hbyte". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hbyte". rgall. iEval (rewrite HK4a5 pr_dataddr) in "Hbyte".
@@ -1717,7 +1711,7 @@ Section ProofPiperead.
           by reflexivity.
         (* 0x9a sb a5,-81(s0) : store the byte into [ch] *)
         iPoseProof (pri_9a with "Htext") as "Hi9a".
-        iApply (wp_sb_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x9a)) Ra5 Rs0 (mword_of_int 4015 : mword 12)
+        iApply (wp_sb_s_sconf (mword_of_int (KernelSyms.piperead + 0x9a)) Ra5 Rs0 (mword_of_int 4015 : mword 12)
                   K5 (av - 12)%nat chb false with "Hcg Hpc Hi9a [Hch]").
         { rgall. iEval (rewrite HK5s0 Hchd). iExact "Hch". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hch". rgall. iEval (rewrite HK5s0 Hchd) in "Hch".
@@ -1727,7 +1721,7 @@ Section ProofPiperead.
         clear Hq9e.
         (* 0x9e/0xa0/0xa2: a3 := 1, a2 := &ch, a1 := cursor *)
         iPoseProof (pri_9e with "Htext") as "Hi9e".
-        iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x9e)) Ra3 Rs7 K5 (av - 12)%nat false
+        iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x9e)) Ra3 Rs7 K5 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi9e").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         pose (K6 := <[Regidx Ra3 := regval_into_reg (add_vec zero_reg (K5 !!! Regidx Rs7))]> K5).
@@ -1737,7 +1731,7 @@ Section ProofPiperead.
         iEval (rewrite Hqa0) in "Hpc".
         clear Hqa0.
         iPoseProof (pri_a0 with "Htext") as "Hia0".
-        iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xa0)) Ra2 Rs8 K6 (av - 12)%nat false
+        iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0xa0)) Ra2 Rs8 K6 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia0").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         pose (K7 := <[Regidx Ra2 := regval_into_reg (add_vec zero_reg (K6 !!! Regidx Rs8))]> K6).
@@ -1747,7 +1741,7 @@ Section ProofPiperead.
         iEval (rewrite Hqa2) in "Hpc".
         clear Hqa2.
         iPoseProof (pri_a2 with "Htext") as "Hia2".
-        iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xa2)) Ra1 Rs2 K7 (av - 12)%nat false
+        iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0xa2)) Ra1 Rs2 K7 (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hia2").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         pose (K8 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (K7 !!! Regidx Rs2))]> K7).
@@ -1765,7 +1759,7 @@ Section ProofPiperead.
         (* 0xa4 ld a0,80(s4) : a0 := p->pagetable *)
         iEval (rewrite -Hroot) in "Hptc".
         iPoseProof (pri_a4 with "Htext") as "Hia4".
-        iApply (wp_ld_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xa4)) Ra0 Rs4 (mword_of_int 80 : mword 12)
+        iApply (wp_ld_s_sconf (mword_of_int (KernelSyms.piperead + 0xa4)) Ra0 Rs4 (mword_of_int 80 : mword 12)
                   K8 (av - 12)%nat (page_base (ud_root P')) false ltac:(nz) ltac:(rdok)
                   with "Hcg Hpc Hia4 [Hptc]").
         { rgall. iEval (rewrite Hpta). iExact "Hptc". }
@@ -1778,7 +1772,7 @@ Section ProofPiperead.
         clear Hqa8.
         (* 0xa8 jal copyout *)
         iPoseProof (pri_a8 with "Htext") as "Hia8".
-        iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xa8)) Rra (mword_of_int 2084820 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.piperead + 0xa8)) Rra (mword_of_int 2084820 : mword 21)
                   K9 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hia8").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -1815,7 +1809,7 @@ Section ProofPiperead.
           rewrite (HthrK5 Rs7 ltac:(vm_compute; reflexivity)) H3s7.
           rewrite add_vec_zero_l. reflexivity. }
         assert (HK50 : (50 <= av - 12)%nat) by lia.
-        iApply (Copyout.wp_copyout_sconf γa Φ K10 P' (pv_sz V) 1%nat
+        iApply (Copyout.wp_copyout_sconf γa K10 P' (pv_sz V) 1%nat
                   (fun _ => trunc8 (K5 !!! Regidx Ra5)) (av - 12)%nat 1%nat true pj C
                   (DfracOwn 1) (DfracOwn 1) false
                   HK50 HK10a0 HK10a3 pr_len1_64 Hszb pr_lvl1
@@ -1844,7 +1838,7 @@ Section ProofPiperead.
         iPoseProof (pri_ac with "Htext") as "Hiac".
         destruct Hret as [Hr0 | Hrm1].
         { (* copyout SUCCEEDED: fall through and bump nread / i / the cursor *)
-          iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xac)) (mword_of_int 62 : mword 13)
+          iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0xac)) (mword_of_int 62 : mword 13)
                     Rs6 Ra0 mrc (av - 12)%nat false ltac:(nz) ltac:(nz)
                     ltac:(rgall; rewrite Hr0 Hmrcs6; vm_compute; reflexivity)
                     with "Hcg Hpc Hiac").
@@ -1859,7 +1853,7 @@ Section ProofPiperead.
                           = a_pnread pi) by (rewrite Hmrcs1; reflexivity).
           (* 0xb0 lw a5,536(s1) *)
           iPoseProof (pri_b0 with "Htext") as "Hib0".
-          iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xb0)) Ra5 Rs1 (mword_of_int 536 : mword 12)
+          iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0xb0)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                     mrc (av - 12)%nat nr false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib0 [Hnr]").
           { rgall. iEval (rewrite Hnra2). iExact "Hnr". }
           iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra2) in "Hnr".
@@ -1872,7 +1866,7 @@ Section ProofPiperead.
           assert (HD1a5 : D1 !!! Regidx Ra5 = sign_extend' 64 nr) by (rewrite /D1; apply upd_eq).
           (* 0xb4 c.addiw a5,a5,1 *)
           iPoseProof (pri_b4 with "Htext") as "Hib4".
-          iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xb4)) Ra5 (mword_of_int 1 : mword 6)
+          iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.piperead + 0xb4)) Ra5 (mword_of_int 1 : mword 6)
                     D1 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hib4").
           iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           iEval (rewrite HD1a5) in "Hcg".
@@ -1893,7 +1887,7 @@ Section ProofPiperead.
                           = a_pnread pi) by (rewrite HD2s1; reflexivity).
           (* 0xb6 sw a5,536(s1) : nread++ *)
           iPoseProof (pri_b6 with "Htext") as "Hib6".
-          iApply (wp_sw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xb6)) Ra5 Rs1 (mword_of_int 536 : mword 12)
+          iApply (wp_sw_s_sconf (mword_of_int (KernelSyms.piperead + 0xb6)) Ra5 Rs1 (mword_of_int 536 : mword 12)
                     D2 (av - 12)%nat nr false with "Hcg Hpc Hib6 [Hnr]").
           { rgall. iEval (rewrite Hnra3). iExact "Hnr". }
           iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall.
@@ -1911,7 +1905,7 @@ Section ProofPiperead.
           { rewrite /D2 upd_ne; [| reg_neq]. rewrite /D1 upd_ne; [| reg_neq]. exact Hmrcs3. }
           (* 0xba c.addiw s3,s3,1 : i++ *)
           iPoseProof (pri_ba with "Htext") as "Hiba".
-          iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xba)) Rs3 (mword_of_int 1 : mword 6)
+          iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.piperead + 0xba)) Rs3 (mword_of_int 1 : mword 6)
                     D2 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hiba").
           iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           iEval (rewrite HD2s3) in "Hcg".
@@ -1936,7 +1930,7 @@ Section ProofPiperead.
             rewrite (HthrMr Rs2 ltac:(vm_compute; reflexivity)). exact H3s2. }
           (* 0xbc c.addi s2,s2,1 : the user cursor *)
           iPoseProof (pri_bc with "Htext") as "Hibc".
-          iApply (wp_caddi_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xbc)) Rs2 (mword_of_int 1 : mword 6)
+          iApply (wp_caddi_s_sconf (mword_of_int (KernelSyms.piperead + 0xbc)) Rs2 (mword_of_int 1 : mword 6)
                     D3 (av - 12)%nat false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hibc").
           iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           iEval (rewrite HD3s2) in "Hcg".
@@ -1974,7 +1968,7 @@ Section ProofPiperead.
           destruct (decide (S i = Nn)) as [Hlast | Hmore].
           - (* i+1 = n: the loop is done *)
             assert (HZs : Z.of_nat (S i) = n) by (rewrite Hlast; exact HNn).
-            iApply (wp_bne_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xbe)) (mword_of_int 8134 : mword 13)
+            iApply (wp_bne_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0xbe)) (mword_of_int 8134 : mword 13)
                       Rs3 Rs5 D4 (av - 12)%nat false ltac:(nz) ltac:(nz)
                       ltac:(rgall; rewrite HD4s5 HD4s3 HZs; apply pr_moi_eqself)
                       with "Hcg Hpc Hibe").
@@ -1989,7 +1983,7 @@ Section ProofPiperead.
               [by iExists (trunc8 (K5 !!! Regidx Ra5))|].
             iEval (rewrite /WXP) in "HWX".
             iApply ("HWX" $! D4 P'' (mword_of_int (Z.of_nat (S i)))
-                      with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                      with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
             { split_and!.
               - rewrite (HthrD csp_rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3csp.
               - rewrite (HthrD Rs1 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s1.
@@ -2002,7 +1996,7 @@ Section ProofPiperead.
           - (* i+1 < n: the back edge *)
             assert (HSilt : (S i < Nn)%nat) by lia.
             assert (HZs : (Z.of_nat (S i) < n)%Z) by lia.
-            iApply (wp_bne_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xbe)) (mword_of_int 8134 : mword 13)
+            iApply (wp_bne_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0xbe)) (mword_of_int 8134 : mword 13)
                       Rs3 Rs5 D4 (av - 12)%nat false ltac:(nz) ltac:(nz)
                       ltac:(rgall; rewrite HD4s5 HD4s3; apply pr_moi_neq; lia)
                       ltac:(vm_compute; reflexivity)
@@ -2015,7 +2009,7 @@ Section ProofPiperead.
             clear Hbk.
             iApply ("IHf" $! (S i) (add_vec cur (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6))))
                       D4 P'' (trunc8 (K5 !!! Regidx Ra5))
-                      with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hpark").
+                      with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark").
             { lia. }
             { exact HSilt. }
             { split_and!.
@@ -2034,7 +2028,7 @@ Section ProofPiperead.
               - rewrite (HthrD Rs11 ltac:(vm_compute; reflexivity) ltac:(reg_neq) ltac:(reg_neq)). exact H3s11. }
             { exact Hext'. } }
         (* copyout FAILED: break, returning -1 only if nothing was copied *)
-        iApply (wp_beq_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xac)) (mword_of_int 62 : mword 13)
+        iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0xac)) (mword_of_int 62 : mword 13)
                   Rs6 Ra0 mrc (av - 12)%nat false ltac:(nz) ltac:(nz)
                   ltac:(rgall; rewrite Hrm1 Hmrcs6; apply eq_vec_true_iff; reflexivity)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiac").
@@ -2055,7 +2049,7 @@ Section ProofPiperead.
         iPoseProof (pri_ea with "Htext") as "Hiea".
         destruct (decide (i = 0%nat)) as [Hi0 | Hinz].
         { (* nothing copied yet: s3 := -1 *)
-          iApply (wp_bnez_x0_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xea)) (mword_of_int 8152 : mword 13)
+          iApply (wp_bnez_x0_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0xea)) (mword_of_int 8152 : mword 13)
                     Rs3 mrc (av - 12)%nat false ltac:(nz)
                     ltac:(rgall; rewrite Hmrcs3 Hi0; exact pr_moi0_z) with "Hcg Hpc Hiea").
           iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -2065,7 +2059,7 @@ Section ProofPiperead.
           clear Hqee.
           (* 0xee c.mv s3,a0 *)
           iPoseProof (pri_ee with "Htext") as "Hiee".
-          iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xee)) Rs3 Ra0 mrc (av - 12)%nat false
+          iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0xee)) Rs3 Ra0 mrc (av - 12)%nat false
                     ltac:(nz) ltac:(rdok) with "Hcg Hpc Hiee").
           iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
           pose (E1 := <[Regidx Rs3 := regval_into_reg (add_vec zero_reg (mrc !!! Regidx Ra0))]> mrc).
@@ -2078,7 +2072,7 @@ Section ProofPiperead.
           { rewrite /E1 upd_eq. unfold regval_into_reg. rewrite Hrm1. apply add_vec_zero_l. }
           (* 0xf0 c.j -> +0xc2 *)
           iPoseProof (pri_f0 with "Htext") as "Hif0".
-          iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xf0))
+          iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.piperead + 0xf0))
                     (sign_extend' 21 (concat_vec (mword_of_int 2025 : mword 11) ('b"0")))
                     E1 (av - 12)%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hif0").
           iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
@@ -2088,7 +2082,7 @@ Section ProofPiperead.
           iEval (rewrite Hjf0) in "Hpc".
           clear Hjf0.
           iApply ("HWX" $! E1 P'' (mword_of_int (-1))
-                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                    with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
           { split_and!.
             - rewrite /E1 upd_ne; [| reg_neq].
               rewrite (HthrMr csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
@@ -2104,7 +2098,7 @@ Section ProofPiperead.
           { exact (uptd_ext_sz_ext _ _ _ Hext'). }
           { apply pr_ret_neg1. } }
         (* something WAS copied: keep the partial count *)
-        iApply (wp_bnez_x0_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0xea)) (mword_of_int 8152 : mword 13)
+        iApply (wp_bnez_x0_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0xea)) (mword_of_int 8152 : mword 13)
                   Rs3 mrc (av - 12)%nat false ltac:(nz)
                   ltac:(rgall; rewrite Hmrcs3; apply pr_moi_nz; lia)
                   ltac:(vm_compute; reflexivity) with "Hcg Hpc Hiea").
@@ -2115,7 +2109,7 @@ Section ProofPiperead.
         iEval (rewrite Hjeac) in "Hpc".
         clear Hjeac.
         iApply ("HWX" $! mrc P'' (mword_of_int (Z.of_nat i))
-                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hchx").
+                  with "[%] [%] [%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx").
         { split_and!.
           - rewrite (HthrMr csp_rs1 ltac:(vm_compute; reflexivity)). exact H3csp.
           - rewrite (HthrMr Rs1 ltac:(vm_compute; reflexivity)). exact H3s1.
@@ -2127,7 +2121,7 @@ Section ProofPiperead.
         { apply pr_ret_cnt. rewrite Z.max_r; [| lia]. lia. } }
       (* enter the copy loop at i = 0 *)
       iApply ("CLOOP" $! Nn 0%nat addrv G3 (pv_upt V) chb0
-                with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hctx Hpark").
+                with "[%] [%] [%] [%] HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark").
       { lia. }
       { lia. }
       { split_and!; try assumption. }
@@ -2140,21 +2134,20 @@ Section ProofPiperead.
         sie_cap_gpr M (av - 12)%nat false pj -∗
         pc_is (mword_of_int (KernelSyms.piperead + 0x34) : mword 64) -∗
         cpu_own 1%nat true pj C false -∗
-        trap_csrs_pay 0 true -∗
+        arm_pay 0 true pj -∗
         locked γl cpu_id -∗
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
         proc_priv γf pj pid V -∗
-        own_ctx (p_context pj) -∗
-        park_hlf j true -∗
+        running_claim j -∗
         (∃ z : mword 64, pa_stk sp0 8 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 9 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})))%I with "[]" as "WLOOP".
+        WP (Loop : expr riscv_lang))))%I with "[]" as "WLOOP".
     { iLöb as "IH".
-      iIntros (CIDl Hsl M) "%HcsM HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hq8 Hq9 Hq10 Hq11 Hq12".
+      iIntros (CIDl Hsl M) "%HcsM HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hq8 Hq9 Hq10 Hq11 Hq12".
       assert (HMcsp : M !!! Regidx csp_rs1 = spr)
         by (rewrite (callee_saved_lookup HcsM csp_rs1 ltac:(vm_compute; reflexivity)); exact HW0csp).
       assert (HMs0 : M !!! Regidx Rs0 = s0v)
@@ -2187,7 +2180,7 @@ Section ProofPiperead.
       assert (Hwoa : add_vec (M !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 548 : mword 12))
                      = a_popen pi true) by (rewrite HMs1; reflexivity).
       iPoseProof (pri_34 with "Htext") as "Hi34".
-      iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x34)) Ra5 Rs1 (mword_of_int 548 : mword 12)
+      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x34)) Ra5 Rs1 (mword_of_int 548 : mword 12)
                 M (av - 12)%nat wo1 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi34 [Hwo]").
       { rgall. iEval (rewrite Hwoa). iExact "Hwo". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hwo". rgall. iEval (rewrite Hwoa) in "Hwo".
@@ -2210,7 +2203,7 @@ Section ProofPiperead.
       iPoseProof (pri_38 with "Htext") as "Hi38".
       destruct (eq_vec (sign_extend' 64 wo1 : mword 64) (zero_reg : mword 64)) eqn:Hwoz.
       { (* ==== the write end is CLOSED: c.beqz taken -> +0x70 ==== *)
-        iApply (wp_cbeqz_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x38)) (mword_of_int 28 : mword 8)
+        iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0x38)) (mword_of_int 28 : mword 8)
                   (Cregidx (mword_of_int 7)) Ra5 L1 (av - 12)%nat false
                   ltac:(vm_compute; reflexivity) ltac:(nz)
                   ltac:(rgall; rewrite HL1a5; exact Hwoz) ltac:(vm_compute; reflexivity)
@@ -2232,7 +2225,7 @@ Section ProofPiperead.
         iDestruct "Hq8" as (y8) "Hc8". iDestruct "Hq9" as (y9) "Hc9".
         iDestruct "Hq10" as (y10) "Hc10".
         iPoseProof (pri_70 with "Htext") as "Hi70".
-        iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x70)) (mword_of_int 4 : mword 6) Rs6
+        iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x70)) (mword_of_int 4 : mword 6) Rs6
                   L1 (av - 12)%nat y8 false with "Hcg Hpc Hi70 [Hc8]").
         { rgall. iEval (rewrite HL1csp -Hb8). iExact "Hc8". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HL1csp -Hb8 HL1s6) in "Hc8".
@@ -2241,7 +2234,7 @@ Section ProofPiperead.
         iEval (rewrite Hw72) in "Hpc".
         clear Hw72.
         iPoseProof (pri_72 with "Htext") as "Hi72".
-        iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x72)) (mword_of_int 3 : mword 6) Rs7
+        iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x72)) (mword_of_int 3 : mword 6) Rs7
                   L1 (av - 12)%nat y9 false with "Hcg Hpc Hi72 [Hc9]").
         { rgall. iEval (rewrite HL1csp -Hb9). iExact "Hc9". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HL1csp -Hb9 HL1s7) in "Hc9".
@@ -2250,7 +2243,7 @@ Section ProofPiperead.
         iEval (rewrite Hw74) in "Hpc".
         clear Hw74.
         iPoseProof (pri_74 with "Htext") as "Hi74".
-        iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x74)) (mword_of_int 2 : mword 6) Rs8
+        iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x74)) (mword_of_int 2 : mword 6) Rs8
                   L1 (av - 12)%nat y10 false with "Hcg Hpc Hi74 [Hc10]").
         { rgall. iEval (rewrite HL1csp -Hb10). iExact "Hc10". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HL1csp -Hb10 HL1s8) in "Hc10".
@@ -2260,7 +2253,7 @@ Section ProofPiperead.
         clear Hw76.
         iDestruct "HEX" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
         iSpecialize ("HCP" $! CIDl with "[%]"); [wp_next_chain|].
-        iApply ("HCP" $! L1 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hc8 Hc9 Hc10 Hq11 Hq12").
+        iApply ("HCP" $! L1 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hc8 Hc9 Hc10 Hq11 Hq12").
         split_and!.
         - exact HL1csp.
         - rewrite (HthrL1 Rs0 ltac:(vm_compute; reflexivity)). exact HMs0.
@@ -2272,7 +2265,7 @@ Section ProofPiperead.
         - rewrite (HthrL1 Rs10 ltac:(vm_compute; reflexivity)). exact HMs10.
         - rewrite (HthrL1 Rs11 ltac:(vm_compute; reflexivity)). exact HMs11. }
       (* ==== the write end is still OPEN: fall to +0x3a, test killed ==== *)
-      iApply (wp_cbeqz_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x38)) (mword_of_int 28 : mword 8)
+      iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x38)) (mword_of_int 28 : mword 8)
                 (Cregidx (mword_of_int 7)) Ra5 L1 (av - 12)%nat false
                 ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgall; rewrite HL1a5; exact Hwoz) with "Hcg Hpc Hi38").
@@ -2283,7 +2276,7 @@ Section ProofPiperead.
       clear Hw3a.
       (* 0x3a c.mv a0,s4 *)
       iPoseProof (pri_3a with "Htext") as "Hi3a".
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x3a)) Ra0 Rs4 L1 (av - 12)%nat false
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x3a)) Ra0 Rs4 L1 (av - 12)%nat false
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi3a").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       pose (L2 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (L1 !!! Regidx Rs4))]> L1).
@@ -2294,7 +2287,7 @@ Section ProofPiperead.
       clear Hw3c.
       (* 0x3c jal killed *)
       iPoseProof (pri_3c with "Htext") as "Hi3c".
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x3c)) Rra (mword_of_int 2087782 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.piperead + 0x3c)) Rra (mword_of_int 2087782 : mword 21)
                 L2 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3c").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -2318,7 +2311,7 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
-      iApply (Killed.wp_killed_sconf Φ γs j γlp L3 (av - 12)%nat 1%nat true pj C false
+      iApply (Killed.wp_killed_sconf γs j γlp L3 (av - 12)%nat 1%nat true pj C false
                 HL3a0 Hj Hjl pr_lvl1 ltac:(lia)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
       iApply wp_next_off_intro. iIntros (mk kl) "[%Hkcs %Hka0] Hcg Hown Hpc". rgall.
@@ -2336,7 +2329,7 @@ Section ProofPiperead.
       iPoseProof (pri_40 with "Htext") as "Hi40".
       destruct (neq_vec (sign_extend' 64 kl : mword 64) (zero_reg : mword 64)) eqn:Hkz.
       { (* ==== KILLED: c.bnez taken -> +0x66, release and return -1 ==== *)
-        iApply (wp_cbnez_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x40)) (mword_of_int 19 : mword 8)
+        iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0x40)) (mword_of_int 19 : mword 8)
                   (Cregidx (mword_of_int 2)) Ra0 mk (av - 12)%nat false
                   ltac:(vm_compute; reflexivity) ltac:(nz)
                   ltac:(rgall; rewrite Hka0; exact Hkz) ltac:(vm_compute; reflexivity)
@@ -2349,7 +2342,7 @@ Section ProofPiperead.
         clear Hj66.
         (* 0x66 c.mv a0,s1 *)
         iPoseProof (pri_66 with "Htext") as "Hi66".
-        iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x66)) Ra0 Rs1 mk (av - 12)%nat false
+        iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x66)) Ra0 Rs1 mk (av - 12)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi66").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
         pose (N1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (mk !!! Regidx Rs1))]> mk).
@@ -2360,7 +2353,7 @@ Section ProofPiperead.
         clear Hw68.
         (* 0x68 jal release *)
         iPoseProof (pri_68 with "Htext") as "Hi68".
-        iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x68)) Rra (mword_of_int 2082430 : mword 21)
+        iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.piperead + 0x68)) Rra (mword_of_int 2082430 : mword 21)
                   N1 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi68").
         iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -2387,7 +2380,7 @@ Section ProofPiperead.
         { rewrite /N2 /N1.
           apply callee_saved_insert_r; [vm_compute; reflexivity|].
           apply callee_saved_insert_r; [vm_compute; reflexivity|]. exact HcsMmk. }
-        iApply (ReleaseGen.wp_release_gen_sconf Φ γl pi (pipe_res γp pi) (pipe_dead γl γp) emp%I
+        iApply (ReleaseGen.wp_release_gen_sconf γl pi (pipe_res γp pi) (pipe_dead γl γp) emp%I
                   N2 0%nat true pj C (av - 12)%nat HN2lka ltac:(lia)
                   ltac:(iApply locked_dead) ltac:(iApply locked_pre_dead)
                   with "Hcg Htext Hpc Hopen Hlocked Hres [] Hown Hpay").
@@ -2402,7 +2395,7 @@ Section ProofPiperead.
         assert (HcsMmrl : callee_saved M mrl) by (apply (callee_saved_trans M N2 mrl HcsMN2 Hcsrl)).
         (* 0x6c c.li s3,-1 *)
         iPoseProof (pri_6c with "Htext") as "Hi6c".
-        iApply (wp_cli_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x6c)) Rs3 (mword_of_int 63 : mword 6)
+        iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.piperead + 0x6c)) Rs3 (mword_of_int 63 : mword 6)
                   (mword_of_int (-1) : mword 64) mrl (av - 12)%nat true ltac:(nz) ltac:(rdok)
                   ltac:(apply bv_eq; vm_compute; reflexivity) with "Hcg Hpc Hi6c").
         iIntros (CIDp30 Hsp30) "Hcg Hpc". rgall.
@@ -2414,7 +2407,7 @@ Section ProofPiperead.
         clear Hw6e.
         (* 0x6e c.j -> the epilogue at +0xd6 *)
         iPoseProof (pri_6e with "Htext") as "Hi6e".
-        iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x6e))
+        iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.piperead + 0x6e))
                   (sign_extend' 21 (concat_vec (mword_of_int 52 : mword 11) ('b"0")))
                   N3 (av - 12)%nat true ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi6e").
         iIntros (CIDp31 Hsp31). iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
@@ -2429,7 +2422,7 @@ Section ProofPiperead.
         iDestruct "HEX" as "[HEPI _]". iEval (rewrite /EPIC) in "HEPI".
         iSpecialize ("HEPI" $! CIDp31 with "[%]"); [wp_next_chain|].
         iApply ("HEPI" $! N3 (pv_upt V) (mword_of_int (-1))
-                  with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hctx Hpark
+                  with "[%] [%] [%] Hcg Hpc Hown Href Hpriv Hpark
                        Hq8 Hq9 Hq10 Hq11 Hq12").
         { split_and!.
           - rewrite /N3 upd_ne; [| reg_neq].
@@ -2450,7 +2443,7 @@ Section ProofPiperead.
         { apply uptd_ext_refl. }
         { apply pr_ret_neg1. } }
       (* ==== NOT killed: sleep on &pi->nread ==== *)
-      iApply (wp_cbnez_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x40)) (mword_of_int 19 : mword 8)
+      iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x40)) (mword_of_int 19 : mword 8)
                 (Cregidx (mword_of_int 2)) Ra0 mk (av - 12)%nat false
                 ltac:(vm_compute; reflexivity) ltac:(nz)
                 ltac:(rgall; rewrite Hka0; exact Hkz) with "Hcg Hpc Hi40").
@@ -2461,7 +2454,7 @@ Section ProofPiperead.
       clear Hw42.
       (* 0x42 c.mv a1,s1 ; 0x44 c.mv a0,s3 *)
       iPoseProof (pri_42 with "Htext") as "Hi42".
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x42)) Ra1 Rs1 mk (av - 12)%nat false
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x42)) Ra1 Rs1 mk (av - 12)%nat false
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi42").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       pose (L4 := <[Regidx Ra1 := regval_into_reg (add_vec zero_reg (mk !!! Regidx Rs1))]> mk).
@@ -2471,7 +2464,7 @@ Section ProofPiperead.
       iEval (rewrite Hw44) in "Hpc".
       clear Hw44.
       iPoseProof (pri_44 with "Htext") as "Hi44".
-      iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x44)) Ra0 Rs3 L4 (av - 12)%nat false
+      iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.piperead + 0x44)) Ra0 Rs3 L4 (av - 12)%nat false
                 ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi44").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
       pose (L5 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (L4 !!! Regidx Rs3))]> L4).
@@ -2482,7 +2475,7 @@ Section ProofPiperead.
       clear Hw46.
       (* 0x46 jal sleep *)
       iPoseProof (pri_46 with "Htext") as "Hi46".
-      iApply (wp_jal_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x46)) Rra (mword_of_int 2087200 : mword 21)
+      iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.piperead + 0x46)) Rra (mword_of_int 2087200 : mword 21)
                 L5 (av - 12)%nat false ltac:(nz) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi46").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -2511,13 +2504,13 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
-      iApply (SleepGen.wp_sleep_gen_sconf Φ γs j γlp γl pi (pipe_res γp pi)
+      iApply (SleepGen.wp_sleep_gen_sconf γs j γlp γl pi (pipe_res γp pi)
                 (pipe_ref γp w q) (pipe_dead γl γp) L6 (av - 12)%nat true C
                 Hj Hjl HL6lka eq_refl ltac:(lia)
                 ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_dead)
                 ltac:(intros ?i; iApply locked_pre_dead)
-                with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hopen Href Hlocked Hres Hpanic Hctx Hpark").
-      iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Hpay Hpc Href Hlocked Hres Hctx Hpark". rgall.
+                with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hopen Href Hlocked Hres Hpanic Hpark").
+      iIntros (CIDsl Hssl mfs) "%Hscs Hcg Hown Hpay Hpc Href Hlocked Hres Hpark". rgall.
       iEval (rewrite HL6ra) in "Hpc".
       clear HL6ra.
       assert (Hw4a : ret_pc (add_vec_int (mword_of_int (KernelSyms.piperead + 0x46) : mword 64) 4)
@@ -2535,7 +2528,7 @@ Section ProofPiperead.
       assert (Hnra4 : add_vec (mfs !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 536 : mword 12))
                       = a_pnread pi) by (rewrite Hmfss1; reflexivity).
       iPoseProof (pri_4a with "Htext") as "Hi4a".
-      iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x4a)) Ra4 Rs1 (mword_of_int 536 : mword 12)
+      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x4a)) Ra4 Rs1 (mword_of_int 536 : mword 12)
                 mfs (av - 12)%nat nr2 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4a [Hnr]").
       { rgall. iEval (rewrite Hnra4). iExact "Hnr". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hnr". rgall. iEval (rewrite Hnra4) in "Hnr".
@@ -2549,7 +2542,7 @@ Section ProofPiperead.
       assert (Hnwa4 : add_vec (L7 !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 540 : mword 12))
                       = a_pnwrite pi) by (rewrite HL7s1; reflexivity).
       iPoseProof (pri_4e with "Htext") as "Hi4e".
-      iApply (wp_lw_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x4e)) Ra5 Rs1 (mword_of_int 540 : mword 12)
+      iApply (wp_lw_s_sconf (mword_of_int (KernelSyms.piperead + 0x4e)) Ra5 Rs1 (mword_of_int 540 : mword 12)
                 L7 (av - 12)%nat nw2 false ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi4e [Hnw]").
       { rgall. iEval (rewrite Hnwa4). iExact "Hnw". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hnw". rgall. iEval (rewrite Hnwa4) in "Hnw".
@@ -2581,7 +2574,7 @@ Section ProofPiperead.
       iPoseProof (pri_52 with "Htext") as "Hi52".
       destruct (eq_vec (sign_extend' 64 nr2 : mword 64) (sign_extend' 64 nw2)) eqn:Hstill.
       { (* still empty: the BACK EDGE to +0x34 *)
-        iApply (wp_beq_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x52)) (mword_of_int 8162 : mword 13)
+        iApply (wp_beq_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0x52)) (mword_of_int 8162 : mword 13)
                   Ra5 Ra4 L8 (av - 12)%nat false ltac:(nz) ltac:(nz)
                   ltac:(rgall; rewrite HL8a4 HL8a5; exact Hstill) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi52").
@@ -2599,10 +2592,10 @@ Section ProofPiperead.
         iEval (rewrite Hbk34) in "Hpc".
         clear Hbk34.
         iSpecialize ("IH" $! CIDsl with "[%]"); [wp_next_chain|].
-        iApply ("IH" $! L8 with "[%] HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hq8 Hq9 Hq10 Hq11 Hq12").
+        iApply ("IH" $! L8 with "[%] HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hq8 Hq9 Hq10 Hq11 Hq12").
         exact HcsWL8. }
       (* data arrived: fall to +0x56, save s6..s8 and jump to the copy phase *)
-      iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x52)) (mword_of_int 8162 : mword 13)
+      iApply (wp_beq_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x52)) (mword_of_int 8162 : mword 13)
                 Ra5 Ra4 L8 (av - 12)%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HL8a4 HL8a5; exact Hstill) with "Hcg Hpc Hi52").
       iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -2621,7 +2614,7 @@ Section ProofPiperead.
       iDestruct "Hq8" as (z8) "Hc8". iDestruct "Hq9" as (z9) "Hc9".
       iDestruct "Hq10" as (z10) "Hc10".
       iPoseProof (pri_56 with "Htext") as "Hi56".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x56)) (mword_of_int 4 : mword 6) Rs6
+      iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x56)) (mword_of_int 4 : mword 6) Rs6
                 L8 (av - 12)%nat z8 false with "Hcg Hpc Hi56 [Hc8]").
       { rgall. iEval (rewrite HL8csp -Hb8). iExact "Hc8". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HL8csp -Hb8 HL8s6) in "Hc8".
@@ -2630,7 +2623,7 @@ Section ProofPiperead.
       iEval (rewrite Hw58) in "Hpc".
       clear Hw58.
       iPoseProof (pri_58 with "Htext") as "Hi58".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x58)) (mword_of_int 3 : mword 6) Rs7
+      iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x58)) (mword_of_int 3 : mword 6) Rs7
                 L8 (av - 12)%nat z9 false with "Hcg Hpc Hi58 [Hc9]").
       { rgall. iEval (rewrite HL8csp -Hb9). iExact "Hc9". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HL8csp -Hb9 HL8s7) in "Hc9".
@@ -2639,7 +2632,7 @@ Section ProofPiperead.
       iEval (rewrite Hw5a) in "Hpc".
       clear Hw5a.
       iPoseProof (pri_5a with "Htext") as "Hi5a".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x5a)) (mword_of_int 2 : mword 6) Rs8
+      iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x5a)) (mword_of_int 2 : mword 6) Rs8
                 L8 (av - 12)%nat z10 false with "Hcg Hpc Hi5a [Hc10]").
       { rgall. iEval (rewrite HL8csp -Hb10). iExact "Hc10". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HL8csp -Hb10 HL8s8) in "Hc10".
@@ -2648,7 +2641,7 @@ Section ProofPiperead.
       iEval (rewrite Hw5c) in "Hpc".
       clear Hw5c.
       iPoseProof (pri_5c with "Htext") as "Hi5c".
-      iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x5c))
+      iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.piperead + 0x5c))
                 (sign_extend' 21 (concat_vec (mword_of_int 13 : mword 11) ('b"0")))
                 L8 (av - 12)%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi5c").
       iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
@@ -2659,7 +2652,7 @@ Section ProofPiperead.
       clear Hj76.
       iDestruct "HEX" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
       iSpecialize ("HCP" $! CIDsl with "[%]"); [wp_next_chain|].
-      iApply ("HCP" $! L8 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hc8 Hc9 Hc10 Hq11 Hq12").
+      iApply ("HCP" $! L8 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hc8 Hc9 Hc10 Hq11 Hq12").
       split_and!.
       - exact HL8csp.
       - rewrite (HthrL8 Rs0 ltac:(vm_compute; reflexivity)). exact HMs0.
@@ -2677,7 +2670,7 @@ Section ProofPiperead.
     iPoseProof (pri_30 with "Htext") as "Hi30".
     destruct (neq_vec (sign_extend' 64 nr0 : mword 64) (sign_extend' 64 nw0)) eqn:Hdisp.
     { (* data already available: taken -> +0x5e *)
-      iApply (wp_bne_taken_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x30)) (mword_of_int 46 : mword 13)
+      iApply (wp_bne_taken_s_sconf (mword_of_int (KernelSyms.piperead + 0x30)) (mword_of_int 46 : mword 13)
                 Ra5 Ra4 W0 (av - 12)%nat false ltac:(nz) ltac:(nz)
                 ltac:(rgall; rewrite HW0a4 HW0a5; exact Hdisp) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi30").
@@ -2690,7 +2683,7 @@ Section ProofPiperead.
       iDestruct "Q8" as (z8) "Hc8". iDestruct "Q9" as (z9) "Hc9".
       iDestruct "Q10" as (z10) "Hc10".
       iPoseProof (pri_5e with "Htext") as "Hi5e".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x5e)) (mword_of_int 4 : mword 6) Rs6
+      iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x5e)) (mword_of_int 4 : mword 6) Rs6
                 W0 (av - 12)%nat z8 false with "Hcg Hpc Hi5e [Hc8]").
       { rgall. iEval (rewrite HW0csp -Hb8). iExact "Hc8". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hc8". rgall. iEval (rewrite HW0csp -Hb8 HW0s6) in "Hc8".
@@ -2699,7 +2692,7 @@ Section ProofPiperead.
       iEval (rewrite Hd60) in "Hpc".
       clear Hd60.
       iPoseProof (pri_60 with "Htext") as "Hi60".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x60)) (mword_of_int 3 : mword 6) Rs7
+      iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x60)) (mword_of_int 3 : mword 6) Rs7
                 W0 (av - 12)%nat z9 false with "Hcg Hpc Hi60 [Hc9]").
       { rgall. iEval (rewrite HW0csp -Hb9). iExact "Hc9". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hc9". rgall. iEval (rewrite HW0csp -Hb9 HW0s7) in "Hc9".
@@ -2708,7 +2701,7 @@ Section ProofPiperead.
       iEval (rewrite Hd62) in "Hpc".
       clear Hd62.
       iPoseProof (pri_62 with "Htext") as "Hi62".
-      iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x62)) (mword_of_int 2 : mword 6) Rs8
+      iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.piperead + 0x62)) (mword_of_int 2 : mword 6) Rs8
                 W0 (av - 12)%nat z10 false with "Hcg Hpc Hi62 [Hc10]").
       { rgall. iEval (rewrite HW0csp -Hb10). iExact "Hc10". }
       iApply wp_next_off_intro. iIntros "Hcg Hpc Hc10". rgall. iEval (rewrite HW0csp -Hb10 HW0s8) in "Hc10".
@@ -2717,7 +2710,7 @@ Section ProofPiperead.
       iEval (rewrite Hd64) in "Hpc".
       clear Hd64.
       iPoseProof (pri_64 with "Htext") as "Hi64".
-      iApply (wp_cj_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x64))
+      iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.piperead + 0x64))
                 (sign_extend' 21 (concat_vec (mword_of_int 9 : mword 11) ('b"0")))
                 W0 (av - 12)%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi64").
       iApply wp_next_off_intro. iApply bi.later_intro. iIntros "Hcg Hpc". rgall.
@@ -2728,10 +2721,10 @@ Section ProofPiperead.
       clear Hj76b.
       iDestruct "EXITS" as "[_ HCP]". iEval (rewrite /CPP) in "HCP".
       iSpecialize ("HCP" $! CIDaq with "[%]"); [wp_next_chain|].
-      iApply ("HCP" $! W0 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Hc8 Hc9 Hc10 Q11 Q12").
+      iApply ("HCP" $! W0 with "[%] Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hc8 Hc9 Hc10 Q11 Q12").
       split_and!; try assumption. }
     (* the pipe is empty: fall into the wait loop *)
-    iApply (wp_bne_fall_s_sconf Φ (mword_of_int (KernelSyms.piperead + 0x30)) (mword_of_int 46 : mword 13)
+    iApply (wp_bne_fall_s_sconf (mword_of_int (KernelSyms.piperead + 0x30)) (mword_of_int 46 : mword 13)
               Ra5 Ra4 W0 (av - 12)%nat false ltac:(nz) ltac:(nz)
               ltac:(rgall; rewrite HW0a4 HW0a5; exact Hdisp) with "Hcg Hpc Hi30").
     iApply wp_next_off_intro. iIntros "Hcg Hpc". rgall.
@@ -2740,7 +2733,7 @@ Section ProofPiperead.
     iEval (rewrite Hd34) in "Hpc".
     clear Hd34.
     iSpecialize ("WLOOP" $! CIDaq with "[%]"); [wp_next_chain|].
-    iApply ("WLOOP" $! W0 with "[%] EXITS Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hctx Hpark Q8 Q9 Q10 Q11 Q12").
+    iApply ("WLOOP" $! W0 with "[%] EXITS Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Q8 Q9 Q10 Q11 Q12").
     apply callee_saved_refl.
   Qed.
 

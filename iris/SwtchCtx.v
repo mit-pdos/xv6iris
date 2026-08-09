@@ -128,7 +128,7 @@ Section SwtchCtx.
   Proof. rewrite /own_ctx. apply _. Qed.
 
   (* -------------------------------------------------------------------- *)
-  (* valid_context Phi P A c : the context saved at [c] admits a WP to       *)
+  (* valid_context P A c : the context saved at [c] admits a WP to       *)
   (* run.  It owns c's 14 saved-register cells and its parked stack, and is    *)
   (* the wand from (the resuming hart's bundle + pc at c.ra + a gpr file       *)
   (* whose callee-saved regs are c's saved values, caller-saved arbitrary)     *)
@@ -136,7 +136,7 @@ Section SwtchCtx.
   (* admissibility index (top of file): which harts may                        *)
   (* resume it.  On resumption the continuation is handed, for the             *)
   (* (existentially quantified) context [cret] that resumed c and ITS OWN      *)
-  (* index [A'], [▷ valid_context Phi P A' cret] together with                 *)
+  (* index [A'], [▷ valid_context P A' cret] together with                 *)
   (* [P h A' c cret tpv p] -- a caller-chosen SIX-place payload:               *)
   (*   [h]    the RESUMING hart -- the payload is                              *)
   (*          the only channel that can tell the resumed party which hart it   *)
@@ -205,7 +205,6 @@ Section SwtchCtx.
      rebinding [h] rebinds it -- and a MIGRATABLE record still names no
      hart, which is what lets [SchedCtx.procs_inv] store one. *)
   Definition valid_context_pre
-      (Phi : mval -> iProp Σ)
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (rec : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ)
@@ -225,12 +224,12 @@ Section SwtchCtx.
          (∃ (A' : ctx_adm) (cret : mword 64),
             ▷ rec A' cret p ∗
             P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
-         WP (LoopE gen_id h : expr riscv_lang) {{ Phi }}))%I.
+         WP (LoopE gen_id h : expr riscv_lang)))%I.
 
-  Global Instance valid_context_pre_contractive Phi
+  Global Instance valid_context_pre_contractive
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ) :
-    Contractive (valid_context_pre Phi P).
+    Contractive (valid_context_pre P).
   (* [solve_contractive] gets all the way to the recursive occurrence and
      stops: the residual goal is [x A' cret p ≡{m}≡ y A' cret p] against a
      [dist] on the THREE-argument discrete function, which is pointwise by
@@ -241,19 +240,19 @@ Section SwtchCtx.
     all: apply H.
   Qed.
 
-  Definition valid_context (Phi : mval -> iProp Σ)
+  Definition valid_context
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       : ctx_adm -d> mword 64 -d> mword 64 -d> iPropO Σ :=
-    fixpoint (valid_context_pre Phi P).
+    fixpoint (valid_context_pre P).
 
-  Lemma valid_context_unfold (Phi : mval -> iProp Σ)
+  Lemma valid_context_unfold
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (A : ctx_adm) (c p : mword 64) :
-    valid_context Phi P A c p ⊣⊢
-      valid_context_pre Phi P (valid_context Phi P) A c p.
-  Proof. apply (fixpoint_unfold (valid_context_pre Phi P) A c p). Qed.
+    valid_context P A c p ⊣⊢
+      valid_context_pre P (valid_context P) A c p.
+  Proof. apply (fixpoint_unfold (valid_context_pre P) A c p). Qed.
 
 End SwtchCtx.
 

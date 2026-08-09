@@ -24,6 +24,44 @@ sweep's unit price.
 [`weak-memory-porting.md`](weak-memory-porting.md) first (§2g is the leaf
 recipe at its post-fix shape), then the batch blocks below.
 
+## MERGED WITH MAIN'S Φ REMOVAL (2026-08)
+
+Main dropped the WP postcondition tree-wide: `to_val` is unconditionally
+`None` for every WP'd expr, so `{{ Φ }}` was canonicalized to `True`
+(`RiscvPtsto.wp_triv`) and a new `WP e @ E` / `WP e` notation replaced
+the brace forms — whose prefix makes iris's old `WP e {{ Φ }}` spelling
+UNPARSEABLE in any file importing `RiscvPtsto`, so the weak port was
+forced, not stylistic. What to know:
+
+- **`WeakGhost.v` §5 is the weak twin**: `wwp_post_irrel` / `wwp_triv` /
+  `wwp_triv_eq` + notations **`WWP e` / `WWP e @ E`** — a DISTINCT token,
+  deliberately. Both languages' `expr` convert to `mexpr` and every weak
+  file carries SC's `irisGS riscv_lang` instance in scope, so a
+  same-syntax `WP` twin would let a weak statement elaborate at the WRONG
+  LANGUAGE (and still compile) whenever import order put `RiscvPtsto`
+  last — which is exactly the leaf files' import order.  The
+  `(Loop : expr weak_riscv_lang)` annotations went with the braces:
+  `wwp_triv`'s argument type pins the language.
+- **The wrong-language instance trap bites PROOFS too**: in
+  `wwp_post_irrel`, a bare `iApply (wp_mono …)` resolved the lemma's
+  `irisGS` at `riscv_lang` and failed to unify with the weak goal — pin
+  `(Λ := weak_riscv_lang)` on any generic iris wp lemma that misbehaves.
+- **The port is mechanical** (~130 sites / 29 files, statements otherwise
+  byte-identical): drop the `Φ` binder from `Lemma`/`Definition` heads
+  (`Implicit Types Φ` lines too), drop the positional `Φ` argument at
+  every call site (`wp_winstr`, `wwp_instr`, `wwp_instr_config`,
+  `wwp_cb`/`wwp_cb_config`, `wacq_cb`/`wrel_cb`, the whole `WeakAcquire`
+  loop family), respell `WP (X : expr weak_riscv_lang) {{ Φ }}` → `WWP X`.
+- **Record knock-on**: `riscvEraGS` gained `era_spp_name` /
+  `era_spie_name` / `era_pstate_name` and `riscvFixedGS` gained
+  `riscvF_pstateGS` (main's kerneltrap / per-proc state-ghost work), so
+  `WeakAdequacy`'s positional constructor calls gained placeholder
+  arguments.  Any future era-record change lands there first.
+- Main deleted the stray root-level `SpecFileclose.v` copy and the
+  superseded `ProtoCpuid.v`/`ProtoSchedsInv.v`; `tools/spec_vacuity.py`
+  is KEPT on this branch (the `--lemmas` mode the per-batch hygiene
+  uses).
+
 ## SAIL BUMP CROSSED (2026-08)
 
 The branch is merged with main's sail model bump (fork pin +
@@ -1497,7 +1535,7 @@ they unlock.
 ### THE BATCH-2 UNIT PRICE, FINAL (read before batch 2)
 
 `iris/WeakLeafLd8.v` is the FIRST COMPLETE WEAK LEAF — the `ld`-class 8-byte
-load, from the `↦w₈` resource to `WP (Loop) {{ Φ }}` — and it exists to
+load, from the `↦w₈` resource to `WWP Loop` — and it exists to
 produce this number. It landed at 967 lines / 43.7 s and, after the two
 funnel seams below were fixed, is 791 lines / 35 s.
 

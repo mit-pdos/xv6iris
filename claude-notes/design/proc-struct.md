@@ -143,9 +143,16 @@ Unlocked is sound because only the running thread reaches them — but "the
 running thread" is not the same as "state == RUNNING". Three other parties
 touch this group:
 
-- **`fork()`** mutates the *child's* `sz`/`pagetable`/`trapframe`/`ofile`/`cwd`/
+- **`kfork()`** mutates the *child's* `sz`/`pagetable`/`trapframe`/`ofile`/`cwd`/
   `name` while the child is `USED` and the parent holds the child's lock.
   `allocproc` likewise writes `trapframe`/`pagetable`/`context` under the lock.
+  But kfork then **releases** the child's lock while it is still `USED`, to
+  take `wait_lock` and set `p->parent` (taking `wait_lock` under `p->lock`
+  inverts the lock order), and only re-acquires to store `RUNNABLE`
+  (`proc.c:294-302`).  So `USED`-with-lock-released is a reachable state and
+  the slot's resources must be IN the invariant across that window, not in
+  kfork's frame — every table scan (`wakeup`, `kill`, `wait`) acquires each
+  proc's lock and can land there.
 - **`freeproc()`** (called from `wait()` by the *parent*) frees a `ZOMBIE`
   child's `trapframe` and `pagetable` under the child's lock.
 - **`procdump()`** reads `p->name` and `p->pid` with no lock, for any p. This
@@ -156,31 +163,47 @@ whoever last took the slot out of the lock invariant.** The lock invariant must
 therefore be able to hold it back — conditionally on state, exactly the way it
 already conditionally holds `proc_ctx` on `needs_ctx st`.
 
-And crucially, for the two *parked* states it does **not** need to: a
-`RUNNABLE`/`SLEEPING` process's private bundle is captured inside its parked
-`valid_context`'s continuation closure, the same way `stack_own` is. Nothing in
-`valid_context` or `p_sched` has to change to carry it — the closure captures
-whatever the parking thread happened to own. That is the single biggest reason
-this design is cheap to land.
+And for the three *parked* states it does **not** need to hold the private
+group separately: their bundle is captured inside the parked `valid_context`'s
+continuation closure, the same way `stack_own` is. Nothing in `valid_context`
+or `p_sched` has to change to carry it — the closure captures whatever the
+parking thread happened to own.
 
 Which gives the state-keyed table:
 
 | `state` | who holds the private group | who holds the second `pid` half | context |
 |---|---|---|---|
 | `UNUSED` | lock invariant (free/zeroed shape) | lock invariant | lock invariant (`own_ctx`) |
-| `USED` | the lock holder (allocproc/fork mid-flight) | the lock holder | the lock holder |
+| `USED` | the parked closure | the parked closure | lock invariant, `▷ proc_ctx` |
 | `RUNNABLE` | the parked closure | the parked closure | lock invariant, `▷ proc_ctx` |
 | `SLEEPING` | the parked closure | the parked closure | lock invariant, `▷ proc_ctx` |
-| `RUNNING` | the running thread | the running thread | the running thread (`own_ctx`) |
+| `RUNNING` | the running thread | the running thread | lock invariant (`own_ctx`) |
 | `ZOMBIE` | lock invariant (post-`exit` shape) | lock invariant | lock invariant (dead, `own_ctx`) |
 
-Read the columns rather than the rows and the table collapses to **two
+Read the columns rather than the rows and the table collapses to **flat
 booleans**, which is what keeps the invariant flat (Layer 2 below): the private
 group and the second `pid` half move together and are invariant-resident
 exactly on `UNUSED ∨ ZOMBIE`; the context is invariant-resident either as a
-live `▷ proc_ctx` on `RUNNABLE ∨ SLEEPING` — already exactly the existing
-`needs_ctx` — or as dead cells inside the first bundle. Six states, two
-independent guards, no nesting.
+live `▷ proc_ctx` on `needs_ctx` — `RUNNABLE ∨ SLEEPING ∨ USED` — or as cells,
+bare on `RUNNING` and inside the dormant bundle on `UNUSED ∨ ZOMBIE`. Six
+states, independent guards, no nesting.
+
+### Why `needs_ctx USED = true`
+
+`USED` sits with the parked states, not with the mid-flight ones. A `USED`
+proc's saved context genuinely *is* a resumable record: `allocproc` writes
+`context.ra = forkret` and `context.sp = ` the kstack top, which is exactly
+why kfork can go live with a single store to `p->state`. Putting the record in
+the invariant is what makes the released-lock window above safe.
+
+The "almost" against `RUNNABLE` is that the scheduler must not dispatch a
+`USED` proc. That is enforced by the C's `if (p->state == RUNNABLE)`, not by
+this guard, so the record can sit unclaimed until kfork flips the state.
+
+The obligation to *build* the record therefore lands on kfork at
+`proc.c:294`, where the child is fully set up. `allocproc` itself returns with
+the lock still held (`proc_held cpu_id j γl USED ch`), so it never releases at
+`USED` and never has to produce one.
 
 ## The resources
 
@@ -509,19 +532,319 @@ allocation/parking transitions:
 
 ```coq
 Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
-  ((if needs_ctx st   then ▷ proc_ctx pa       else emp) ∗
-   (if inv_dormant st then proc_dormant pa else emp))%I.
+  ((if needs_ctx st   then ▷ proc_ctx pa            else emp) ∗
+   (if is_running st  then own_ctx (p_context pa)   else emp) ∗
+   (if inv_dormant st then proc_dormant pa st       else emp) ∗
+   (if not_running st then park_at_full pa false    else emp))%I
 
 Lemma proc_slots_recast pa st st' :
-  needs_ctx st' = needs_ctx st -> inv_dormant st' = inv_dormant st ->
+  needs_ctx st' = needs_ctx st -> not_running st' = not_running st ->
+  inv_dormant st = false -> inv_dormant st' = false ->
   proc_slots pa st -∗ proc_slots pa st'.
 ```
 
-Both side conditions are `vm_compute`, and the proof is `destruct` on two
-booleans. Because `proc_dormant` is not `st`-indexed, this holds in *both*
-directions for every pair of states in the same guard class — it subsumes the
-existing `proc_lock_res_wakeup` (SLEEPING → RUNNABLE) and covers `kill`'s
-SLEEPING → RUNNABLE identically, with no guard ever opened.
+`is_running` is `negb ∘ not_running`, so `recast` needs no extra premise for
+the running arm.
+
+The side conditions are all `vm_compute`, and the proof is `destruct` on
+booleans. It holds in *both* directions for every pair of states in the same
+guard class — it subsumes `proc_lock_res_wakeup` (SLEEPING → RUNNABLE), covers
+`kill`'s SLEEPING → RUNNABLE identically, and now also covers kfork's
+USED → RUNNABLE, with no guard ever opened.
+
+### Where the context cells live
+
+The context cells are **never** a running thread's frame. They live in
+`p->lock` in one of three forms, and the state field says which: a resumable
+`proc_ctx` record on `needs_ctx` (`RUNNABLE ∨ SLEEPING ∨ USED`), the bare
+`own_ctx` cells on `RUNNING`, and inside the dormant bundle on
+`UNUSED ∨ ZOMBIE`.
+
+`sched` is the only consumer — its `swtch` is what writes them. `yield`,
+`sleep` and `exit` each acquire `p->lock` before touching `p->state`, read the
+cells out of the lock they just took, hand them to `sched`, and deposit them
+back at release (`proc_slots_running_intro`).
+
+This is forced by `kerneltrap`, which **preempts**: a timer interrupt calls
+`yield` on behalf of a thread whose frames it has no access to, so anything
+`yield` needs must be reachable from the trap rather than from the caller's
+frame. The same requirement drives the state ghost below.
+
+### The state ghost
+
+A per-proc `ghost_var` carrying the state value. It lives in `proc_lock_res`
+beside the cell, **not** in a `proc_slots` arm — putting it in a slot arm
+would make `proc_slots_recast`, the resource-free state change, have to move
+a ghost.
+
+```coq
+Definition unclaimed (st : mword 32) : bool := not_running st && not_used st.
+
+(* what the LOCK owns: half #1 always -- the tie -- plus half #2 exactly on
+   [unclaimed] *)
+Definition pstate_lock (pa : mword 64) (st : mword 32) : iProp Σ :=
+  (pstate_at_hlf pa st ∗ (if unclaimed st then pstate_at_hlf pa st else emp))%I.
+
+(* what a lock HOLDER has: the whole variable, at every state.  A claimed
+   proc is claimed BY the holder, so [proc_held] carries this and the split
+   happens at release. *)
+Definition pstate_whole (pa : mword 64) (st : mword 32) : iProp Σ :=
+  pstate_at pa 1 st.
+
+Lemma pstate_whole_split pa st :
+  pstate_whole pa st ⊣⊢
+  pstate_lock pa st ∗ (if unclaimed st then emp else pstate_at_hlf pa st).
+```
+
+So half #2 is lock-resident everywhere except the two states in which a
+thread has **claimed** the proc.
+
+So the right to write `p->state` belongs to the claimant: a `ghost_var` cannot
+move on half alone, and the tie means the cell cannot move without the ghost.
+`yield`/`sleep`/`exit` carry half #2 at `RUNNING`; kfork carries it at `USED`
+across the released-lock window, which is what tells it on re-acquire that the
+slot did not drift.
+
+Half #2 does **not** travel with the park receipt. `running_claim j` is now
+just the receipt:
+
+```coq
+Definition running_claim (j : nat) : iProp Σ := park_hlf j true.
+```
+
+Bundling them was not merely redundant but unsatisfiable at the release that
+ends a resumed thread's critical section: the holder has `pstate_whole`, the
+release returns `pstate_lock` to the invariant, and at `RUNNING`
+(`unclaimed = false`) that consumes **one** half — so exactly one half #2 is
+left over, and it is owed to the arm. Half #2's home is `cpu_claim` below.
+
+Every function between here and `sleep` names the bundle rather than its
+parts, so re-homing the pieces changes this definition and the handful of
+places that OPEN it, not the ~60 files that pass it through.
+
+`park_ok` excludes `USED` explicitly (`(needs_ctx st || st = ZOMBIE) &&
+not_used st`): `needs_ctx` covers `USED`, but a thread cannot *park* at
+`USED`, and without the cut-out sched's premise would admit a park at a
+claimed state, where the reclaiming scheduler could not put the mirror back
+whole.
+
+The lifecycle closes: half #2 is **issued** by the scheduler at dispatch — it
+reads the cell, the tie gives it `RUNNABLE`, so it owns both halves and can
+move to `RUNNING` — and **returned** to the lock at park, when `RUNNING →
+RUNNABLE` puts the state back in the lock-resident class.
+
+Every `p->state` write in the kernel is consistent with this: `procinit` runs
+before any invariant exists; `allocproc`, `freeproc`, `userinit`, kfork,
+`kexit`, `yield` and `sleep` all write as the claimant; and the three
+non-claimant writes — the scheduler's `RUNNABLE → RUNNING`, `wakeup`'s and
+`kill`'s `SLEEPING → RUNNABLE` — each **read the cell first** and only write at
+a state in the lock-resident class, so the lock holder owns both halves there.
+
+Presenting half #2 at value `RUNNING` is what gets the cells out of the lock:
+
+```coq
+Lemma proc_slots_running (j : nat) (st : mword 32) :
+  (j < NPROC)%nat ->
+  pstate_hlf j RUNNING -∗ proc_slots (proc_addr j) st -∗
+  pstate_hlf j RUNNING ∗ ⌜ st = RUNNING ⌝ ∗ own_ctx (p_context (proc_addr j)).
+```
+
+### Half #2's home while interrupts are on
+
+It is a conjunct of `sie_arm true p` — **not** of `cpu_cells`.
+
+That distinction is the whole point and is easy to get wrong, because
+`cpu_cells` sits *inside* `sie_arm true p` (via `cpu_hart 0 true p`), so
+putting the claim there looks like the same thing for a fraction of the
+cost. It isn't:
+
+```coq
+Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
+    (C : iProp Σ) (b : bool) : iProp Σ :=
+  ((if b then ⌜ n = 0%nat /\ eb = true ⌝ else cpu_hart n eb p) ∗ C)%I.
+```
+
+`cpu_hart` is *also* what the thread carries once interrupts are off, so a
+claim placed in `cpu_cells` must hold **continuously**, across the whole
+interrupts-off window. It cannot. In `yield`:
+
+```c
+acquire(&p->lock);     // push_off: arm dismantled, thread holds the payload
+p->state = RUNNABLE;   // c->proc still &p, but the state is now unclaimed
+sched();               // swtch away; the scheduler releases p->lock
+```
+
+After that store the state is `RUNNABLE`, which is `unclaimed`, so
+`pstate_lock` owns *both* halves and there is no spare half for the hart to
+be holding — while `c->proc` still names `p`. A `cpu_cells` conjunct is
+unsatisfiable there. `pstate_whole_split` at an unclaimed state returns
+`emp` for the second component, which is exactly this fact.
+
+In `sie_arm true p` the obligation is the right shape: it exists only while
+interrupts are on. `push_off` hands it to the code, the thread spends and
+moves it freely while off, and `pop_off` demands it back — by which point
+the thread has been dispatched again and is `RUNNING`, so it has it.
+
+The conjunct itself, and its two seam forms:
+
+```coq
+Definition cpu_claim (p : mword 64) : iProp Σ :=
+  (⌜ p = zero_reg ⌝ ∨
+   ∃ (j : nat) (st : mword 32),
+     ⌜ proc_addr j = p /\ (j < NPROC)%nat ⌝ ∗ pstate_hlf j st)%I.
+```
+
+The state is **pinned at `RUNNING`**, not existential. The claim is about
+`c->proc`: if that field names a real proc while interrupts are on, that proc
+*is* the one executing on this hart. No reachable configuration has an arm
+naming a non-`RUNNING` proc — at a park interrupts are off (the thread holds
+`p->lock`), so no arm exists and the claim is in the thread's hands; the
+scheduler rebuilds the arm at `zero_reg`; and kfork's `USED` window is the
+*child*'s state, never `c->proc`'s.
+
+An existential `st` would be sound but useless. `pstate_lock_claimed` only
+yields `unclaimed st = false`, i.e. `st ∈ {RUNNING, USED}`, and those two arms
+of `proc_slots` hand out **different** resources (`own_ctx` vs `▷ proc_ctx`).
+Pinning is what lets yield take the raw context cells from the lock without a
+park receipt to refute `USED` for it — and so retires that job of `park_hlf`.
+
+The `zero_reg` disjunct is the scheduler — no proc to claim — and
+`proc_addr_nonzero` refutes it when `p` names a real slot.
+
+At the seam the claim rides exactly the `trap_csrs_pay` / `trap_csrs_ext`
+pattern, indexed by the level at which an arm exists:
+
+```coq
+Definition cpu_claim_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+  (match n with O => if eb then cpu_claim p else emp | S _ => emp end)%I.
+Definition cpu_claim_ext (eb : bool) (p : mword 64) : iProp Σ :=
+  (if eb then emp else cpu_claim p)%I.
+```
+
+`_pay` is what `push_off` hands out when it dismantles the arm and what
+`pop_off` takes back when it rebuilds it; `_ext` is the complement a caller
+must bring because no arm owned it. At `eb = false` — kerneltrap's case, where
+the trap itself cleared SIE — the handler holds the claim because the trap gave
+it to it. That is what makes the claim reachable from `kerneltrap`.
+
+### The transport carrier
+
+The trap CSRs and the claim enter and leave the arm at the same index, so they
+travel as one carrier:
+
+```coq
+Definition arm_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+  (trap_csrs_pay n eb ∗ cpu_claim_pay n eb p)%I.
+Lemma arm_pay_parts n eb p :
+  arm_pay n eb p ⊣⊢ trap_csrs_pay n eb ∗ cpu_claim_pay n eb p.
+```
+
+Bundling is **transport only**. They are different resources with different
+lifetimes — `yield` spends the claim (surrendering both state halves to
+`pstate_lock`) while keeping the trap CSRs, and it is the *scheduler*, at
+`zero_reg`, that later rebuilds the arm. `arm_pay_parts` takes them apart by
+definition, and anyone needing one half says so.
+
+The reason to bundle is the cone: `trap_csrs_pay` already threads through
+push_off / acquire / release / pop_off and their ~40 dependents. A single
+carrier keeps that a **rename** — one hypothesis threads as before, and no
+proof body changes. Two separate premises would have meant a new name in
+~114 `iIntros`/`iApply` patterns.
+
+The SIE-flip leaves (`wp_csrci_…`, `wp_csrsi_…`) deal in the *components*,
+since they build and tear the arm down piecewise; the function-level specs deal
+in the bundle. `push_off` joins at its exit, `pop_off` splits at its entry.
+
+### The scheduler's saved context — PLANNED, and where it goes
+
+The parked scheduler record `sched_vc_at h (a_cpu_ctx (cid_word_of h)) pa`
+currently lives in the global box `SchedCtx.scheds_inv`, one slot per hart,
+guarded by the two-valued per-proc receipt `park_hlf j r`. Both the box and
+the receipt are to be deleted. Getting the replacement right took three
+attempts; the two dead ends are recorded because each looks obviously correct
+until you check one specific thing.
+
+**Why the bit is not bookkeeping.** `park_hlf`'s `r` is the *timeless
+discriminator* that an `inv` forces. Both moves see the slot under `▷`, and
+`scheds_put` has to refute "a record is already resident" — two copies of a
+`valid_context` give only `▷ False`, which is useless inside a bare fancy
+update, with no program step and no later credit to strip it. Any global box
+with two states needs such a flip-flop. **So the box has to go, not just the
+bit.** Deleting `r` while keeping `scheds_inv` — replacing `if r then rec else
+emp` with `rec ∨ tok` for an exclusive one-shot `tok` — dies exactly here: the
+take-out direction discriminates fine (the thread's `tok` refutes the slot's by
+exclusivity, timelessly), but the deposit direction cannot.
+
+**Why not the SIE arm.** Putting the record in `sie_arm true p` — the arm owns
+it when `c->proc ≠ 0`, `emp` when it is `0` — is correct and needs no
+discriminator at all, since there is then no disjunction to case on. It costs
+`Φ` and `γs` on `sie_arm`, hence on `sie_cap`, hence on `sie_cap_gpr`: **1580
+sites across 294 files.** `Φ` is in scope at every one of them as the WP's
+postcondition and `γs` is not, so it is a mechanical but very large sweep.
+
+**Where it actually goes: `proc_slots`' `is_running` arm.** The lock of the
+proc that is running already owns that proc's raw context cells on exactly
+this guard. The record and the invariant's half of `c->proc` join them:
+
+```coq
+Definition run_slot (pa : mword 64) : iProp Σ :=
+  (own_ctx (p_context pa) ∗
+   ∃ h : CPU,
+     hart_hlf_at pa h ∗
+     cpu_proc_half h pa ∗
+     ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) pa)%I.
+```
+
+`proc_slots` is already `Φ`/`γs`-parameterized, so nothing changes arity. The
+entitlement to the record becomes **holding `p->lock`**, which `yield`, `sleep`
+and `exit` all do already — they are about to write `p->state` — so nothing is
+threaded: `running_claim` disappears from the ~60 files that only pass it down.
+
+The migration argument that motivated the global box in the first place (the
+record owns fourteen exclusive words of *its* hart's context slot, so it cannot
+cross `wp_next`) is satisfied for free: the record is out of the lock only
+while the lock is held, hence only with interrupts off, hence with no `wp_next`
+in between.
+
+**The one new ghost, and why a resource tie will not do.** The lock is
+hart-free and the record is not, so the slot quantifies its hart
+existentially, and the thread must collapse that `∃ h` to its own hart —
+otherwise it holds a record for `a_cpu_ctx (cid_word_of h)` while the `swtch`
+operand is `a_cpu_ctx cid_word`, and the proof is stuck. Agreeing the slot's
+`cpu_proc_half h pa` against the thread's own half **does not do it**: two
+halves of two *different* harts' `c->proc` cells both holding `pa` is
+perfectly satisfiable separation-logic-wise. "At most one hart has `c->proc =
+pa`" is a global fact, and re-introducing an invariant to state it is
+re-introducing the box.
+
+So the tie is a per-proc ghost recording *which* hart a running proc is on:
+`hart_own j q h`, half in `run_slot` and half in `IntrDefs.cpu_claim` beside
+`pstate_hlf j RUNNING`. Agreement is a `ghost_var` agreement, timeless, so it
+lands inside the acquire's fancy update with no program step. It replaces
+`park_hlf` one-for-one in count but differs in every way that mattered: it
+tracks no transient window, needs no invariant, and is threaded through **zero**
+files, because it rides `cpu_claim` in the arm — which is hart-pinned and
+interrupts-conditional already, and is exactly the resource a preempting
+`kerneltrap` is handed.
+
+It can reuse the existing `era_park_name : nat -> gname` family. The carrier
+type must stay one `Σ` already has: `ghost_varG Σ (mword 32)` (the state
+mirror's) works, storing `cid_word_of h` truncated, provided
+`cid_word_of` is proven injective — there is no such lemma today.
+
+**Deletions this enables:** `scheds_inv`, `sched_slot`, `scheds_take`,
+`scheds_put`, `scheds_put_take`, `scheds_dispatch`, `scheds_reclaim`,
+`scheds_idle`, `scheds_alloc`, `cpu_own_full_is_vacuous`, `ProtoSchedsInv.v`,
+the whole `park_own`/`park_hlf`/`park_full`/`park_at`/`park_at_full` family,
+`running_claim`, `proc_slots`' `not_running` guard, and `proc_held`'s park
+conjunct (which becomes `cpu_proc_half i pa` — the spare half the scheduler
+needs to store `c->proc`, carried on both crossing directions exactly where
+the receipt used to be). The scheduler's two `c->proc` stores stop being
+mask-changing steps, since no invariant holds a fraction of the cell any more.
+
+**Scope:** ~80 files. Most edits are premise deletions (`running_claim j -∗`,
+`scheds_inv Φ γs -∗`), but `ProofScheduler.v` needs real surgery where the
+mask-changing stores collapse to ordinary ones.
 
 ## What moves where, and when
 
@@ -559,7 +882,7 @@ SLEEPING → RUNNABLE identically, with no guard ever opened.
   scheduler reassembles the two (`SchedCtx.proc_slots_park_gen`), forgetting
   the parked record down to its cells: nothing ever resumes a zombie. That is
   the whole of what makes ZOMBIE a different kind of park from RUNNABLE and
-  SLEEPING — see [`../projects/kexit.md`](../projects/kexit.md).
+  SLEEPING — see [`../completed/kexit.md`](../completed/kexit.md).
 - **`wait`/`freeproc`** opens `inv_dormant` on a `ZOMBIE` child, frees the
   trapframe page and pagetable, and closes it again at `UNUSED` — the *same*
   `proc_dormant`, no recasting needed, which is the payoff for not indexing

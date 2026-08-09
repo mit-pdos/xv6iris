@@ -109,7 +109,7 @@ Section WpSmodeHalf.
   (* lhu rd, imm(rs1) -- ZERO-extended halfword load.  [dq]-parametric:
      a shared/read-only halfword (a persistent [↦₂□] snapshot, or a
      fractional share of a virtq index) loads exactly as an owned one. *)
-  Lemma wp_lhu_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_lhu_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -119,12 +119,12 @@ Section WpSmodeHalf.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen_u 2 false true Φ pc rd rs1 imm m n v (zero_extend' 64 v) b
+    iApply (wp_load_s_sconf_gen_u 2 false true pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2_unsigned v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
@@ -132,7 +132,7 @@ Section WpSmodeHalf.
 
   (* lh rd, imm(rs1) -- SIGN-extended halfword load (falls out of the same
      generic; xv6's virtio driver only uses lhu). *)
-  Lemma wp_lh_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_lh_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 16) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -142,12 +142,12 @@ Section WpSmodeHalf.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen_u 2 false false Φ pc rd rs1 imm m n v (sign_extend' 64 v) b
+    iApply (wp_load_s_sconf_gen_u 2 false false pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_2 (data2_ext_2 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
@@ -157,7 +157,7 @@ Section WpSmodeHalf.
      [wp_sw_s_sconf]) there are no rd premises and no [sie_cap] retarget;
      the committed value is [trunc16] of rs2, definitionally the model's
      storeval. *)
-  Lemma wp_sh_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sh_s_sconf
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 16) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -167,12 +167,12 @@ Section WpSmodeHalf.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_store_s_sconf_gen 2 false Φ pc rs2 rs1 imm m n vold (trunc16 (rget m rs2)) b
+    iApply (wp_store_s_sconf_gen 2 false pc rs2 rs1 imm m n vold (trunc16 (rget m rs2)) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 2048; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_2 (store_ext_2 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").

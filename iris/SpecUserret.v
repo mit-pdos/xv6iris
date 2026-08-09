@@ -59,7 +59,7 @@ Definition userret_gpr (m : regfile)
 
 Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (kroot uroot tfp : mword 44)
-    (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
+    (um : gmap (mword 27) (mword 64))
     (m : regfile) (usatp : mword 64)
     (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64)
     (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
@@ -178,20 +178,19 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
     tf_pa tfp 280 ↦ₚ₈{ dqm } vt6 -∗
     tf_pa tfp 112 ↦ₚ₈{ dqm } va0f -∗
     kpt_frame kroot -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type USERRET.
   Parameter wp_userret_pt :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
       (kroot uroot tfp : mword 44)
-      (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
-      (m : regfile) (usatp : mword 64)
+      (um : gmap (mword 27) (mword 64)) (m : regfile) (usatp : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64)
       (vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
        vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f : bv 64)
       (dqm : dfrac),
-      wp_userret_pt_body kroot uroot tfp um Φ m usatp
+      wp_userret_pt_body kroot uroot tfp um m usatp
         mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0
         vra vsp vgp vtp vt0 vt1 vt2 vs0 vs1 va1 va2 va3 va4 va5 va6 va7
         vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm.

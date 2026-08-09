@@ -75,7 +75,7 @@ Definition devsw_console_write : mword 64 := mword_of_int (KernelSyms.devsw + 24
    SpecPlicClaim.v. *)
 Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    (γd : uart_names) (m : regfile) (K : nat)
     (l : list (bv 8)) (b0 : bool)
     (vclock : bv 32) (vcname vccpu : bv 64)
     (vtlock : bv 32) (vtname vtcpu : bv 64)
@@ -130,16 +130,16 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
     c_tcpu ↦₈ (zero_reg : mword 64) -∗
     devsw_console_read ↦₈ (mword_of_int KernelSyms.consoleread : mword 64) -∗
     devsw_console_write ↦₈ (mword_of_int KernelSyms.consolewrite : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :
     forall `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+      (γd : uart_names) (m : regfile) (K : nat)
       (l : list (bv 8)) (b0 : bool)
       (vclock : bv 32) (vcname vccpu : bv 64)
       (vtlock : bv 32) (vtname vtcpu : bv 64)
       (dread0 dwrite0 : mword 64) (p : mword 64),
-      wp_consoleinit_sconf_body γd Φ m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p.
+      wp_consoleinit_sconf_body γd m K l b0 vclock vcname vccpu vtlock vtname vtcpu dread0 dwrite0 p.
 End CONSOLEINIT.

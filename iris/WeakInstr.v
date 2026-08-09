@@ -516,7 +516,7 @@ Section rule.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_winstr Φ (pc : SailStdpp.Values.mword 64)
+  Lemma wp_winstr (pc : SailStdpp.Values.mword 64)
       (P : wmstate → Prop) (Q : wmstate → wmstate → Prop) :
     gen_id = 0%nat →
     acc_wf pc 4 →
@@ -532,8 +532,8 @@ Section rule.
               ⌜wstep_post σ σ' (if tick then t1 else t0)⌝ -∗
               ⌜Q σ σ'⌝
               ={∅,⊤}=∗ wmstate_interp σ' ∗
-                       WP (Loop : expr weak_riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+                       WWP Loop)) -∗
+    WWP Loop.
   Proof.
     iIntros (Hgid Haccpc Hcert) "H".
     iApply (wp_wexec_step with "[H]"); [exact Hgid|].

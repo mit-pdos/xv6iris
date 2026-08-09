@@ -53,9 +53,9 @@ Section ProofMycpu.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_mycpu_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_mycpu_sconf
       (m0 : regfile) (n : nat) (p : mword 64)
-    : wp_mycpu_sconf_body Φ m0 n p.
+    : wp_mycpu_sconf_body m0 n p.
   Proof.
     cbv beta delta [wp_mycpu_sconf_body].
     intros ra_idx tp_idx a0_idx pcE ra0 ret_tgt Hn.
@@ -113,7 +113,7 @@ Section ProofMycpu.
     assert (Hsp1 : m1 !!! Regidx csp_rs1 = pa_stk (m0 !!! Regidx csp_rs1) 2).
     { rewrite Hcsp1. exact Hpush. }
     (* ---- 0x00: c.addi sp,-16 -- the frame push ---- *)
-    iApply (wp_caddi_sp_push_s_sconf Φ pcE imm_entry m0 n 2 false Hn Hpush
+    iApply (wp_caddi_sp_push_s_sconf pcE imm_entry m0 n 2 false Hn Hpush
               with "Hcg Hpc Hi00 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hframe Hpc".
@@ -130,21 +130,21 @@ Section ProofMycpu.
     iEval (rewrite -Hpa1) in "Hbra".
     iEval (rewrite -Hpa2) in "Hbs0".
     (* ---- 0x02: c.sdsp ra,8(sp) ---- *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr24 false
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mycpu + 0x02)) (mword_of_int 1 : mword 6) ra_idx m1 (n - 2)%nat vr24 false
               with "Hcg Hpc Hi02 Hbra [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hbra".
     assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.mycpu + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.mycpu + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp04) in "Hpc".
     (* ---- 0x04: c.sdsp s0,0(sp) ---- *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs16 false
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.mycpu + 0x04)) (mword_of_int 0 : mword 6) s0_idx m1 (n - 2)%nat vs16 false
               with "Hcg Hpc Hi04 Hbs0 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc Hbs0".
     assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.mycpu + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.mycpu + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp06) in "Hpc".
     (* ---- 0x06: c.addi4spn s0,sp,4 ---- *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1 (n - 2)%nat false
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.mycpu + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 s0_idx m1 (n - 2)%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
     iApply wp_next_off_intro.
@@ -154,7 +154,7 @@ Section ProofMycpu.
     change (<[Regidx s0_idx := regval_into_reg (add_vec (m1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> m1) with m2.
     (* ---- 0x08: c.mv a5,tp -- THE tp READ.  The leaf's value is [rget m2
        tp_idx], which is this hart's id; nothing special is needed for it. ---- *)
-    iApply (wp_cmv_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x08)) a5_idx tp_idx m2 (n - 2)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.mycpu + 0x08)) a5_idx tp_idx m2 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
     iApply wp_next_off_intro.
@@ -163,7 +163,7 @@ Section ProofMycpu.
     iEval (rewrite Hpp0a) in "Hpc".
     change (<[Regidx a5_idx := regval_into_reg (add_vec zero_reg (rget m2 tp_idx))]> m2) with m3.
     (* ---- 0x0a: c.addiw a5,0 ---- *)
-    iApply (wp_caddiw_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x0a)) a5_idx imm_addiw m3 (n - 2)%nat false
+    iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.mycpu + 0x0a)) a5_idx imm_addiw m3 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a [-]").
     iApply wp_next_off_intro.
@@ -172,7 +172,7 @@ Section ProofMycpu.
     iEval (rewrite Hpp0c) in "Hpc".
     change (<[Regidx a5_idx := regval_into_reg (sign_extend' 64 (subrange_vec_dec (add_vec (rget m3 a5_idx) (sign_extend' 64 (sign_extend' 12 imm_addiw))) 31 0))]> m3) with m4.
     (* ---- 0x0c: c.slli a5,7 ---- *)
-    iApply (wp_cslli_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x0c)) (Regidx a5_idx) a5_idx shamt_slli m4 (n - 2)%nat false
+    iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.mycpu + 0x0c)) (Regidx a5_idx) a5_idx shamt_slli m4 (n - 2)%nat false
               eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iApply wp_next_off_intro.
@@ -185,7 +185,7 @@ Section ProofMycpu.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc0e) in "Hpc".
     iEval (rewrite Hpc0e) in "Hi0e".
-    iApply (wp_auipc_s_sconf Φ (add_vec_int (mword_of_int KernelSyms.mycpu : mword 64) 14) a0_idx imm_auipc m5 (n - 2)%nat false
+    iApply (wp_auipc_s_sconf (add_vec_int (mword_of_int KernelSyms.mycpu : mword 64) 14) a0_idx imm_auipc m5 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e [-]").
     iApply wp_next_off_intro.
@@ -194,7 +194,7 @@ Section ProofMycpu.
     iEval (rewrite Hpp12) in "Hpc".
     change (<[Regidx a0_idx := regval_into_reg (add_vec (add_vec_int (mword_of_int KernelSyms.mycpu : mword 64) 14) (auipc_off imm_auipc))]> m5) with m6.
     (* ---- 0x12: addi a0,a0,0xa86 ---- *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x12)) a0_idx a0_idx imm_addi m6 (n - 2)%nat false
+    iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.mycpu + 0x12)) a0_idx a0_idx imm_addi m6 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [-]").
     iApply wp_next_off_intro.
@@ -203,7 +203,7 @@ Section ProofMycpu.
     iEval (rewrite Hpp16) in "Hpc".
     change (<[Regidx a0_idx := regval_into_reg (add_vec (rget m6 a0_idx) (sign_extend' 64 imm_addi))]> m6) with m7.
     (* ---- 0x16: c.add a0,a5 ---- *)
-    iApply (wp_cadd_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x16)) a0_idx a5_idx m7 (n - 2)%nat false
+    iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.mycpu + 0x16)) a0_idx a5_idx m7 (n - 2)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
     iApply wp_next_off_intro.
@@ -228,7 +228,7 @@ Section ProofMycpu.
       by (rgne; unfold m1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite Hpa1 -Hpa1' Hra0v) in "Hbra".
     iEval (rewrite Hpa2 -Hpa2' Hs00v) in "Hbs0".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x18)) (mword_of_int 1 : mword 6) ra_idx m8 (n - 2)%nat ra0 false
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mycpu + 0x18)) (mword_of_int 1 : mword 6) ra_idx m8 (n - 2)%nat ra0 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 Hbra [-]").
     iApply wp_next_off_intro.
@@ -240,7 +240,7 @@ Section ProofMycpu.
     assert (Hm9sp : m9 !!! Regidx csp_rs1 = m8 !!! Regidx csp_rs1)
       by (unfold m9; rewrite upd_ne; [reflexivity | vm_compute; discriminate]).
     iEval (rewrite -Hm9sp) in "Hbs0".
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x1a)) (mword_of_int 0 : mword 6) s0_idx m9 (n - 2)%nat s00 false
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.mycpu + 0x1a)) (mword_of_int 0 : mword 6) s0_idx m9 (n - 2)%nat s00 false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a Hbs0 [-]").
     iApply wp_next_off_intro.
@@ -261,7 +261,7 @@ Section ProofMycpu.
     iEval (rewrite Hm9sp Hpa2') in "Hbs0".
     iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x1c)) imm_dealloc m10
+    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.mycpu + 0x1c)) imm_dealloc m10
               (n - 2)%nat 2 false Hpop
               with "Hcg Hpc Hi1c Hframe [-]").
     iApply wp_next_off_intro.
@@ -275,7 +275,7 @@ Section ProofMycpu.
     assert (Hm11ra : m11 !!! Regidx ra_idx = ra0).
     { unfold m11, m10; repeat (rewrite upd_ne; [| vm_compute; discriminate]).
       unfold m9. rewrite upd_eq. reflexivity. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (KernelSyms.mycpu + 0x1e)) ra_idx m11 n false
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.mycpu + 0x1e)) ra_idx m11 n false
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi1e [-]").
     iApply wp_next_off_intro.
@@ -318,22 +318,22 @@ Section ProofMycpu.
   (* jal-callable form: writes ra := P+4, runs mycpu, returns to P+4.
      The capability count n rides through unchanged (the jal moves no
      sp), and callee_saved composes across the ra write. *)
-  Lemma wp_call_mycpu_sconf_cs (Φ : mval -> iProp Σ)
+  Lemma wp_call_mycpu_sconf_cs
       (P : mword 64) (jimm : mword 21)
       (m : regfile) (n : nat) (p : mword 64)
-    : wp_call_mycpu_sconf_cs_body Φ P jimm m n p.
+    : wp_call_mycpu_sconf_cs_body P jimm m n p.
   Proof.
     cbv beta delta [wp_call_mycpu_sconf_cs_body].
     intros ra_idx m0 pcE ra0 ret_tgt Htarget Halpce Hn.
     iIntros "Hcg #Htext Hpc Hjal Hcont".
-    iApply (wp_jal_s_sconf Φ P (mword_of_int 1) jimm m n false
+    iApply (wp_jal_s_sconf P (mword_of_int 1) jimm m n false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Htarget; exact Halpce)
               with "Hcg Hpc Hjal [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
     iEval (rewrite Htarget) in "Hpc".
-    iApply (wp_mycpu_sconf Φ m0 n p Hn
+    iApply (wp_mycpu_sconf m0 n p Hn
               with "Hcg Htext Hpc [-]").
     iIntros (m') "Hcg Hpc %Hcs".
     iApply ("Hcont" $! m' with "Hcg Hpc [%]").

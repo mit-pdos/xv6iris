@@ -41,8 +41,7 @@ Local Open Scope Z_scope.
 
 Definition wp_bunpin_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
-    `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
+    `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
     (q : Qp) (dev bno : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.bunpin in
@@ -67,15 +66,14 @@ Definition wp_bunpin_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     bslot bn -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BUNPIN.
   Parameter wp_bunpin_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (bn : bio_names) (V : bio_view Σ) (k : nat)
+      `{GEN : GenId} `{CID : CpuId} (bn : bio_names) (V : bio_view Σ) (k : nat)
       (q : Qp) (dev bno : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
-      wp_bunpin_sconf_body Φ bn V k q dev bno m n eb p C K b.
+      wp_bunpin_sconf_body bn V k q dev bno m n eb p C K b.
 End BUNPIN.

@@ -41,7 +41,7 @@ Definition K_free_desc : nat := 20%nat.
 
 Definition wp_free_desc_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γs : list gname)
+     (γs : list gname)
     (pd : mword 64) (i : nat)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
     (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool) :=
@@ -56,7 +56,7 @@ Definition wp_free_desc_sconf_body
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗ procs_inv Φ γs -∗
+  panic_wp_any -∗ procs_inv γs -∗
   (* the descriptor-page pointer cell: free_desc RE-READS [disk.desc] (twice)
      to reach entry [i], so it needs the persistent half of [disk_geom] that
      names the page [pd] the four descriptor words below live on. *)
@@ -79,15 +79,15 @@ Definition wp_free_desc_sconf_body
       pa_add pd (16 * i + 8)  ↦₄ (mword_of_int 0 : mword 32) -∗
       pa_add pd (16 * i + 12) ↦₂ (mword_of_int 0 : mword 16) -∗
       pa_add pd (16 * i + 14) ↦₂ (mword_of_int 0 : mword 16) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FREEDESC.
   Parameter wp_free_desc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname)
+       (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool),
-      wp_free_desc_sconf_body Φ γs pd i m K lvl eb pme C va vl vf vn b.
+      wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b.
 End FREEDESC.

@@ -47,11 +47,11 @@ Section WpInitlockWrapper.
   Context `{!sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_initlock_wrapper_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_initlock_wrapper_sconf
       (m : regfile) (K : nat)
       (F : Z) (uname ulk : mword 20) (iname ilk : mword 12) (j : mword 21)
       (lk name : mword 64) (s : string) (vlock : bv 32) (vname vcpu : bv 64) (b : bool) (p : mword 64)
-    : wp_initlock_wrapper_sconf_body Φ m K F uname ulk iname ilk j lk name s vlock vname vcpu b p.
+    : wp_initlock_wrapper_sconf_body m K F uname ulk iname ilk j lk name s vlock vname vcpu b p.
   Proof.
     cbv beta delta [wp_initlock_wrapper_sconf_body].
     intros ret_tgt c_name c_cpu HK Halign Hnamerel Hlkrel Hjrel.
@@ -71,7 +71,7 @@ Section WpInitlockWrapper.
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     assert (Hpush : add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))) = pa_stk (m !!! Regidx csp_rs1) 2).
     { unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
-    iApply (wp_caddi_sp_push_s_sconf Φ (mword_of_int F : mword 64) (mword_of_int 48 : mword 6) m K 2 b ltac:(lia) Hpush
+    iApply (wp_caddi_sp_push_s_sconf (mword_of_int F : mword 64) (mword_of_int 48 : mword 6) m K 2 b ltac:(lia) Hpush
               with "Hcg Hpc Hi00 [-]").
     iEval (rewrite /wp_next). iIntros (CID1 Hs1) "Hcg Hframe Hpc".
     iEval (rewrite Hspm) in "Hframe".
@@ -82,7 +82,7 @@ Section WpInitlockWrapper.
     iDestruct "S1" as (vra0) "Hras". iDestruct "S2" as (vs00) "Hs0s".
     iEval (rewrite (avi_mword F 2)) in "Hpc".
     (* +0x02 c.sdsp ra,8(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (F + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (F + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               R1 (K - 2)%nat vra0 b with "Hcg Hpc Hi02 [Hras] [-]").
     { iEval (rewrite HspR1 Hb1). iExact "Hras". }
     iEval (rewrite /wp_next). iIntros (CID2 Hs2) "Hcg Hpc Hras".
@@ -94,7 +94,7 @@ Section WpInitlockWrapper.
     iEval (rewrite Hrav) in "Hras".
     iEval (rewrite (pc_step F 0x02 2 0x04 eq_refl)) in "Hpc".
     (* +0x04 c.sdsp s0,0(sp) *)
-    iApply (wp_csdsp_s_sconf Φ (mword_of_int (F + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_csdsp_s_sconf (mword_of_int (F + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               R1 (K - 2)%nat vs00 b with "Hcg Hpc Hi04 [Hs0s] [-]").
     { iEval (rewrite HspR1 Hb2). iExact "Hs0s". }
     iEval (rewrite /wp_next). iIntros (CID3 Hs3) "Hcg Hpc Hs0s".
@@ -106,7 +106,7 @@ Section WpInitlockWrapper.
     iEval (rewrite Hs0v) in "Hs0s".
     iEval (rewrite (pc_step F 0x04 2 0x06 eq_refl)) in "Hpc".
     (* +0x06 c.addi4spn s0,sp,16 *)
-    iApply (wp_caddi4spn_s_sconf Φ (mword_of_int (F + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (F + 0x06)) (Cregidx (mword_of_int 0)) (mword_of_int 4 : mword 8) (mword_of_int 8 : mword 5)
               R1 (K - 2)%nat b ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi06 [-]").
     iEval (rewrite /wp_next). iIntros (CID4 Hs4) "Hcg Hpc".
@@ -114,14 +114,14 @@ Section WpInitlockWrapper.
     iEval (rewrite (pc_step F 0x06 2 0x08 eq_refl)) in "Hpc".
     (* ===== compute a1 = &"name", a0 = &lock (0x08..0x14) ===== *)
     (* +0x08 auipc a1,<uname> *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (F + 0x08)) (mword_of_int 11 : mword 5) uname
+    iApply (wp_auipc_s_sconf (mword_of_int (F + 0x08)) (mword_of_int 11 : mword 5) uname
               R2 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi08 [-]").
     iEval (rewrite /wp_next). iIntros (CID5 Hs5) "Hcg Hpc".
     set (R3 := <[Regidx (mword_of_int 11 : mword 5) := regval_into_reg (add_vec (mword_of_int (F + 0x08) : mword 64) (auipc_off uname))]> R2).
     iEval (rewrite (pc_step F 0x08 4 0x0c eq_refl)) in "Hpc".
     (* +0x0c addi a1,a1,<iname> *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (F + 0x0c)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) iname
+    iApply (wp_addi4_s_sconf (mword_of_int (F + 0x0c)) (mword_of_int 11 : mword 5) (mword_of_int 11 : mword 5) iname
               R3 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0c [-]").
     iEval (rewrite /wp_next). iIntros (CID6 Hs6) "Hcg Hpc".
@@ -130,14 +130,14 @@ Section WpInitlockWrapper.
     assert (HR4a1 : R4 !!! Regidx (mword_of_int 11 : mword 5) = name).
     { rewrite /R4 upd_eq. rewrite /R3 upd_eq. exact Hnamerel. }
     (* +0x10 auipc a0,<ulk> *)
-    iApply (wp_auipc_s_sconf Φ (mword_of_int (F + 0x10)) (mword_of_int 10 : mword 5) ulk
+    iApply (wp_auipc_s_sconf (mword_of_int (F + 0x10)) (mword_of_int 10 : mword 5) ulk
               R4 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
     iEval (rewrite /wp_next). iIntros (CID7 Hs7) "Hcg Hpc".
     set (R5 := <[Regidx (mword_of_int 10 : mword 5) := regval_into_reg (add_vec (mword_of_int (F + 0x10) : mword 64) (auipc_off ulk))]> R4).
     iEval (rewrite (pc_step F 0x10 4 0x14 eq_refl)) in "Hpc".
     (* +0x14 addi a0,a0,<ilk>  (a0 := &lock) *)
-    iApply (wp_addi4_s_sconf Φ (mword_of_int (F + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) ilk
+    iApply (wp_addi4_s_sconf (mword_of_int (F + 0x14)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5) ilk
               R5 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iEval (rewrite /wp_next). iIntros (CID8 Hs8) "Hcg Hpc".
@@ -155,7 +155,7 @@ Section WpInitlockWrapper.
       rewrite /R3 upd_ne; [| vm_compute; discriminate].
       rewrite /R2 upd_ne; [| vm_compute; discriminate]. exact HspR1. }
     (* ===== jal initlock ===== *)
-    iApply (wp_jal_s_sconf Φ (mword_of_int (F + 0x18)) (mword_of_int 1 : mword 5) j
+    iApply (wp_jal_s_sconf (mword_of_int (F + 0x18)) (mword_of_int 1 : mword 5) j
               R6 (K - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(rewrite Hjrel; vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
@@ -171,7 +171,7 @@ Section WpInitlockWrapper.
     assert (HR7ra : R7 !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (F + 0x1c)).
     { rewrite /R7 upd_eq. exact (pc_step F 0x18 4 0x1c eq_refl). }
     (* initlock(&lock, "name") : owns lk's 3 struct fields, returns them init'd *)
-    iApply (Initlock.wp_initlock_sconf Φ R7 vlock vname vcpu s (K - 2) b p
+    iApply (Initlock.wp_initlock_sconf R7 vlock vname vcpu s (K - 2) b p
               ltac:(lia)
               with "Hcg Htext Hpc [] [Hlock] [Hname] [Hcpu]").
     { iEval (rewrite HR7a1). iExact "Hstr". }
@@ -191,7 +191,7 @@ Section WpInitlockWrapper.
     assert (Hmilsp : mil !!! Regidx csp_rs1 = spr) by (rewrite Hilsp; exact HR7sp).
     (* ===== EPILOGUE (0x1c..0x22): restore ra/s0, frame trade back, ret ===== *)
     (* +0x1c c.ldsp ra,8(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (F + 0x1c)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
+    iApply (wp_cldsp_s_sconf (mword_of_int (F + 0x1c)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5)
               mil (K - 2)%nat (m !!! Regidx (mword_of_int 1 : mword 5)) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [Hras] [-]").
@@ -202,7 +202,7 @@ Section WpInitlockWrapper.
     assert (HE1sp : E1 !!! Regidx csp_rs1 = spr) by (rewrite /E1 upd_ne; [exact Hmilsp | vm_compute; discriminate]).
     iEval (rewrite (pc_step F 0x1c 2 0x1e eq_refl)) in "Hpc".
     (* +0x1e c.ldsp s0,0(sp) *)
-    iApply (wp_cldsp_s_sconf Φ (mword_of_int (F + 0x1e)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
+    iApply (wp_cldsp_s_sconf (mword_of_int (F + 0x1e)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5)
               E1 (K - 2)%nat (m !!! Regidx (mword_of_int 8 : mword 5)) b (dqm:=DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hs0s] [-]").
@@ -227,7 +227,7 @@ Section WpInitlockWrapper.
       iSplitL "Hras"; [iExists _; iExact "Hras"|].
       iSplitL "Hs0s"; [iExists _; iExact "Hs0s"|]. done. }
     iEval (rewrite -Hwv) in "Hframe".
-    iApply (wp_caddi_sp_pop_s_sconf Φ (mword_of_int (F + 0x20)) (mword_of_int 16 : mword 6) E2 (K - 2)%nat 2 b Hpop
+    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (F + 0x20)) (mword_of_int 16 : mword 6) E2 (K - 2)%nat 2 b Hpop
               with "Hcg Hpc Hi20 Hframe [-]").
     iEval (rewrite /wp_next). iIntros (CID13 Hs13) "Hcg Hpc".
     assert (Hnk : ((K - 2) + 2)%nat = K) by lia.
@@ -239,7 +239,7 @@ Section WpInitlockWrapper.
     { rewrite /E3 upd_ne; [| vm_compute; discriminate].
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1 upd_eq; reflexivity. }
-    iApply (wp_cret_s_sconf Φ (mword_of_int (F + 0x22)) (mword_of_int 1 : mword 5) E3 K b
+    iApply (wp_cret_s_sconf (mword_of_int (F + 0x22)) (mword_of_int 1 : mword 5) E3 K b
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi22 [-]").
     iEval (rewrite /wp_next). iIntros (CID14 Hs14) "Hcg Hpc".

@@ -42,7 +42,7 @@ Import Defs.
 
 
 Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
@@ -61,22 +61,22 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   R -∗
   panic_wp_any -∗
   (* wakeup's resources *)
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av b pme -∗
       cpu_own 0 eb pme C b -∗
       pc_is ret_tgt -∗
-          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+          WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type RELEASESLEEP.
   Parameter wp_releasesleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_releasesleep_sconf_body Φ γs γl γsl s R m pd pme av eb C b.
+      wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b.
 End RELEASESLEEP.

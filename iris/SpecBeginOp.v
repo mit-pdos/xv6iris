@@ -35,7 +35,7 @@
 
    It DOES sleep (both arms of the retry loop), so it threads the full
    running-process bundle exactly as SpecBread.v does and enters/returns at
-   noff 0: its own acquire mints the [trap_csrs_pay 0 eb] the interior sleep
+   noff 0: its own acquire mints the [arm_pay 0 eb _] the interior sleep
    needs and its release spends it, so no caller-held pay crosses the
    interface (see SpecBread.v's note on why a second one is
    unimplementable).
@@ -82,7 +82,6 @@ Definition wp_begin_op_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
@@ -107,30 +106,27 @@ Definition wp_begin_op_sconf_body
   (* threaded, never read: see the header note *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through the two sleeps *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
+  running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* THE reservation: a full-budget operation *)
       log_op γ MAXOPBLOCKS -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BEGIN_OP.
   Parameter wp_begin_op_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
@@ -138,6 +134,6 @@ Module Type BEGIN_OP.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_begin_op_sconf_body Φ γs j γl bn γ γfs cov logstart dev
+      wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev
                              pidv dq m K eb C b.
 End BEGIN_OP.

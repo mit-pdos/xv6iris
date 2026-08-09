@@ -47,13 +47,13 @@ Require Import UmodeMem.
 Local Open Scope Z_scope.
 Import Defs.
 
-(* the per-process syscall protocol: [Ψ n g va M Φ] is what the process
+(* the per-process syscall protocol: [Ψ n g va M] is what the process
    supplies -- and relies on -- when it executes [ecall] with a7 = [n],
    register file [g], at pc [va], with image [M].  (For a syscall that
    returns, it is the resume continuation; for one that never returns
    (exit), [emp]; [False] for numbers the process never invokes.) *)
 Definition usys_protocol (Σ : gFunctors) : Type :=
-  Z -> regfile -> mword 64 -> gmap Z (bv 8) -> (mval -> iProp Σ) -> iProp Σ.
+  Z -> regfile -> mword 64 -> gmap Z (bv 8) -> iProp Σ.
 
 (* a7 = x17, the syscall-number register *)
 Definition a7_idx : mword 5 := mword_of_int 17.
@@ -151,13 +151,13 @@ Section UmodeCap.
   (* but is spelled as an update of the old).                              *)
   (* ------------------------------------------------------------------- *)
   Definition uv_intr_wp : iProp Σ :=
-    (□ ∀ (CID : CpuId) (Φ : mval -> iProp Σ)
+    (□ ∀ (CID : CpuId)
          (g : regfile) (M : gmap Z (bv 8)) (va : mword 64)
          (i : InterruptType) (sc0 stval_v : mword 64),
        uv_trap_frame C pt (utrap_scause (Interrupt i) sc0) stval_v va g M -∗
        (∀ CID : CpuId, uv_run C pt M g va -∗
-          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }})%I.
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
   (* The kernel's SYSCALL service: an [ecall] from User (cause             *)
@@ -165,13 +165,13 @@ Section UmodeCap.
   (* according to the process's protocol [Ψ] at the number in a7.          *)
   (* ------------------------------------------------------------------- *)
   Definition uv_sys_wp (Ψ : usys_protocol Σ) : iProp Σ :=
-    (□ ∀ (CID : CpuId) (Φ : mval -> iProp Σ)
+    (□ ∀ (CID : CpuId)
          (g : regfile) (M : gmap Z (bv 8)) (va : mword 64)
          (sc0 stval_v : mword 64),
        uv_trap_frame C pt (utrap_scause (rv64d_types.Exception (E_U_EnvCall tt)) sc0)
          stval_v va g M -∗
-       Ψ (uint (g !!! Regidx a7_idx)) g va M Φ -∗
-       WP (Loop : expr riscv_lang) {{ Φ }})%I.
+       Ψ (uint (g !!! Regidx a7_idx)) g va M -∗
+       WP (Loop : expr riscv_lang))%I.
 
   (* THE CAPABILITY: both services, persistent, hart-free. *)
   Definition uv_cap (Ψ : usys_protocol Σ) : iProp Σ :=

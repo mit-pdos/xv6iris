@@ -18,7 +18,7 @@ Section WpLogicRTypeGpr.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {dqc : dfrac}.
 
-  Lemma wp_or_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
+  Lemma wp_or_gpr (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -33,11 +33,11 @@ Section WpLogicRTypeGpr.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (or_vec (m !!! Regidx rs1) (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr Φ pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) pmpcfg0
+    iApply (wp_instr pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) pmpcfg0
               Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -92,7 +92,7 @@ Section WpLogicRTypeGpr.
     rewrite rf_to_gmap_upd. iExact "Hfmap".
   Qed.
 
-  Lemma wp_and_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
+  Lemma wp_and_gpr (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -107,11 +107,11 @@ Section WpLogicRTypeGpr.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (and_vec (m !!! Regidx rs1) (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr Φ pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) pmpcfg0
+    iApply (wp_instr pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) pmpcfg0
               Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".
@@ -169,7 +169,7 @@ Section WpLogicRTypeGpr.
   (* wp_add_gpr -- the RTYPE ADD member of the family (the ExecuteAs target of
      c.mv / c.add, hence [is_rvc]-generic like its siblings).  Uses WpGpr's
      [exec_execute_RTYPE_ADD_gpr] / [gpr_rd_val]. *)
-  Lemma wp_add_gpr (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
+  Lemma wp_add_gpr (pc : mword 64) (is_rvc : bool) (rs2 rs1 rd : mword 5)
       (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     pmp_allows_all pmpcfg0 ->
@@ -184,11 +184,11 @@ Section WpLogicRTypeGpr.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (add_vec (m !!! Regidx rs1) (m !!! Regidx rs2))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr Φ pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) pmpcfg0
+    iApply (wp_instr pc is_rvc (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) pmpcfg0
               Hpmp Hstat with "Hmm Hpmpc Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
     iDestruct "Hsi" as "[Hreg Hmem]".

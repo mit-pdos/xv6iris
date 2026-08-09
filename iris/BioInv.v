@@ -141,7 +141,7 @@ Record bio_view (Σ : gFunctors) := MkBioView {
   bv_dirty : Z -> list (bv 8) -> iProp Σ;
   (* the payloads must be TIMELESS: they ride the escrow, whose every open
      happens inside a store's atomic update with no step left to absorb a
-     ▷ (the disk_inv precedent -- projects/crash.md M5b).  No real client
+     ▷ (the disk_inv precedent -- completed/crash.md M5b).  No real client
      payload is hurt: "bs is the logical content" is ghost state. *)
   bv_clean_tl : forall b bs, Timeless (bv_clean b bs);
   bv_dirty_tl : forall b bs, Timeless (bv_dirty b bs);

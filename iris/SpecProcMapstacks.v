@@ -38,7 +38,7 @@ From Kernel Require KernelSyms.
    kvmmap-fail branch is DEAD and the success-only post is honest -- NO panic_wp.
    stack_own bound 44 = own 10-slot frame + kvmmap's 34 (PROVISIONAL). *)
 Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
+    (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let ret_tgt := ret_pc (mm !!! Regidx (mword_of_int 1)) in
   (* the kalloc chain below keeps its transient noff increment in int
      range; [lvl] is otherwise generic (the identity pin this replaced was
@@ -70,12 +70,12 @@ Definition wp_proc_mapstacks_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
     ⌜(g <= kstacks_missing t)%nat⌝ -∗
     ([∗ list] i ∈ seq 0 64,
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PROC_MAPSTACKS.
   Parameter wp_proc_mapstacks_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_proc_mapstacks_sconf_body γa Φ mm t m lvl K eb p C on b.
+      (γa : gname) (mm : regfile) (t : ptree) (m : gmap (mword 27) (mword 64)) (lvl K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
+      wp_proc_mapstacks_sconf_body γa mm t m lvl K eb p C on b.
 End PROC_MAPSTACKS.

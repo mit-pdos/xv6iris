@@ -73,8 +73,7 @@ Definition inode_name_str : Z := 0x80007428.
 
 (* ------------------------------------------------------------------ *)
 
-Definition wp_iinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+Definition wp_iinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
     (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.iinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -99,13 +98,12 @@ Definition wp_iinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
     lock_name lk "itable"%string -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
     ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type IINIT.
   Parameter wp_iinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (K : nat)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat)
       (vlock : mword 32) (vname vcpu : mword 64) (b : bool) (p : mword 64),
-      wp_iinit_sconf_body Φ m K vlock vname vcpu b p.
+      wp_iinit_sconf_body m K vlock vname vcpu b p.
 End IINIT.

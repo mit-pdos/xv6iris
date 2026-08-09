@@ -76,8 +76,7 @@ Section WpSconfUartAccess.
      [lbu a5,0(a4)] off a base register already holding UART0+5
      (uartputc_sync) or as [lbu a5,5(a5)] off one holding UART0 (uartintr).
      The [imm = 0] restatement below keeps the original callers unchanged. *)
-  Lemma wp_uart_lsr_read_ea_s_sconf (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  Lemma wp_uart_lsr_read_ea_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
@@ -91,11 +90,11 @@ Section WpSconfUartAccess.
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
-    iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv 5 Φ pc false true rd rs1 imm
+    iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv 5 pc false true rd rs1 imm
               m n (uart_tx_own γd l)
               (fun bt => uart_tx_own γd l ∗ (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l))%I b p
               ltac:(unfold uart_size; lia) Hrd Hrdok
@@ -118,8 +117,7 @@ Section WpSconfUartAccess.
   Qed.
 
   (* the original, zero-displacement form (uartputc_sync's call site). *)
-  Lemma wp_uart_lsr_read_s_sconf (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5)
+  Lemma wp_uart_lsr_read_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rd rs1 : mword 5)
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     uint rd <> 0 ->
     rd_ok rd ->
@@ -133,11 +131,11 @@ Section WpSconfUartAccess.
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hrd Hrdok Haddr.
-    exact (wp_uart_lsr_read_ea_s_sconf γd γv Φ pc rd rs1 (mword_of_int 0 : mword 12)
+    exact (wp_uart_lsr_read_ea_s_sconf γd γv pc rd rs1 (mword_of_int 0 : mword 12)
              m n l b Hrd Hrdok
              ltac:(rewrite Haddr; apply bv_eq; vm_compute; reflexivity)).
   Qed.
@@ -179,7 +177,7 @@ Section WpSconfUartAccess.
   Qed.
 
   Lemma wp_uart_read_free_s_sconf (γd : uart_names) (γv : disk_names)
-      (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (off : Z) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     (0 <= off < uart_size)%Z ->
     uint rd <> 0 ->
@@ -192,12 +190,12 @@ Section WpSconfUartAccess.
       ∀ bt : bv 8,
       sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hoff Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
     destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
-    iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv off Φ pc false true rd rs1 imm
+    iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv off pc false true rd rs1 imm
               m n emp%I (fun _ => emp%I) b p
               Hoff Hrd Hrdok
               ltac:(rewrite Haddr; exact Hg1)
@@ -219,8 +217,7 @@ Section WpSconfUartAccess.
      [uart_tx_ready_persists] turns them into [uart_write_thr_acc]'s two
      premises at the write's own state, so the byte provably lands in the FIFO.
      Postcondition: the grown token plus a permanent [uart_sent] record. *)
-  Lemma wp_uart_thr_write_s_sconf (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5)
+  Lemma wp_uart_thr_write_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (rs2 rs1 : mword 5)
       (m : regfile) (n : nat) (l : list (bv 8)) (b : bool) :
     (* the stored byte reads [rs2] at the hart we ENTER on, so it must be
        bound OUTSIDE the [wp_next] lambda (which rebinds [CID], and would
@@ -235,12 +232,12 @@ Section WpSconfUartAccess.
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd (l ++ [sb]) -∗
       uart_sent γd (l ++ [sb]) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sb.
     iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".
-    iApply (Uart.wp_sb_uart_s_sconf (CID:=CID) γd γv 0 Φ pc false rs2 rs1 (mword_of_int 0 : mword 12)
+    iApply (Uart.wp_sb_uart_s_sconf (CID:=CID) γd γv 0 pc false rs2 rs1 (mword_of_int 0 : mword 12)
               m n (uart_tx_own γd l)
               (uart_tx_own γd (l ++ [sb]) ∗ uart_sent γd (l ++ [sb]))%I b p
               ltac:(unfold uart_size; lia)

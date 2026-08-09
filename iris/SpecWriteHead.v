@@ -86,7 +86,7 @@ Definition wp_write_head_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -118,10 +118,9 @@ Definition wp_write_head_sconf_body
   log_frozen logstart dev -∗
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
+  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -154,8 +153,7 @@ Definition wp_write_head_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
+      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       (* the in-memory header, unchanged *)
       lh_n_pa ↦₄ (mword_of_int (Z.of_nat n) : mword 32) -∗
@@ -170,15 +168,15 @@ Definition wp_write_head_sconf_body
       bslot bn -∗
       (* the permit's RECEIPT, back from the DMA completion *)
       ▷ Q -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WRITE_HEAD.
   Parameter wp_write_head_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -189,6 +187,6 @@ Module Type WRITE_HEAD.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool) (Q : iProp Σ),
-      wp_write_head_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
+      wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb C b Q.
 End WRITE_HEAD.

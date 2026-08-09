@@ -57,7 +57,7 @@ Section WpSmodePtGprEngine.
   (* ------------------------------------------------------------------- *)
   (* The generic RVC (2-byte) gpr-write engine over [tlb_inv_pt].         *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_gpr_write_s_config_regime (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_gpr_write_s_config_regime (R : s_regime)
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -99,13 +99,13 @@ Section WpSmodePtGprEngine.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrd Hbexec)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
        [Hpc Hnpc] Hfile Hinstr Hcont".
-    iApply (wp_instr_s_config_regime R Φ pc true base
+    iApply (wp_instr_s_config_regime R pc true base
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -355,7 +355,7 @@ Section WpSmodePtLoad.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_cld_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_cld_s_r (R : s_regime)
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (v : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -395,8 +395,8 @@ Section WpSmodePtLoad.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -407,7 +407,7 @@ Section WpSmodePtLoad.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_s_config_regime R Φ pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
+    iApply (wp_instr_s_config_regime R pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -760,7 +760,7 @@ Section WpSmodePtStore.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_csd_s_r (R : s_regime) (Φ : mval -> iProp Σ)
+  Lemma wp_csd_s_r (R : s_regime)
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (vold : mword 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64)
@@ -799,8 +799,8 @@ Section WpSmodePtStore.
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       pa ↦₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros ea a8 pa HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -811,7 +811,7 @@ Section WpSmodePtStore.
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iApply (wp_instr_s_config_regime R Φ pc true (STORE (imm, Regidx rs2, Regidx rs1, 8))
+    iApply (wp_instr_s_config_regime R pc true (STORE (imm, Regidx rs2, Regidx rs1, 8))
               mstatus0 mie_v mdv0 menvcfg0
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv Hpc Hinstr").
@@ -977,7 +977,7 @@ Section WpSmodePtGprGamma.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_rvc_gpr_write_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_rvc_gpr_write_s_r (R : s_regime) (γ : gname)
       (pc : mword 64) (rd rsa rsb : mword 5)
       (base : instruction) (wval : mword 64)
       (m : regfile)
@@ -1001,12 +1001,12 @@ Section WpSmodePtGprGamma.
       sr_inv R -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd := regval_into_reg wval]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hbexec)
       "Hsm Htlbinv [Hpc Hnpc] Hfile Hinstr Hcont".
-    iApply (wp_instr_s_regime R γ Φ pc true base
+    iApply (wp_instr_s_regime R γ pc true base
 
               with "Hsm Htlbinv Hpc Hinstr").
     iIntros (σ Hpceq) "Hsi".
@@ -1046,7 +1046,7 @@ Section WpSmodePtGprGamma.
   Qed.
 
 
-  Lemma wp_caddi16sp_gpr_s_r (R : s_regime) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_caddi16sp_gpr_s_r (R : s_regime) (γ : gname)
       (pc : mword 64) (imm6 : mword 6)
       (m : regfile)
       (q : Qp) :
@@ -1060,13 +1060,13 @@ Section WpSmodePtGprGamma.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros
       "Hsm Htlbinv Hpc Hfile Hinstr Hcont".
     assert (Hsp : uint csp_rs1 <> 0) by (vm_compute; discriminate).
-    unshelve iApply (wp_rvc_gpr_write_s_r R γ Φ pc csp_rs1 csp_rs1 csp_rs1
+    unshelve iApply (wp_rvc_gpr_write_s_r R γ pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))
               m q
@@ -1079,7 +1079,7 @@ Section WpSmodePtGprGamma.
     unfold gpr_addi_val. rewrite Hva. reflexivity.
   Qed.
 
-  Lemma wp_caddi16sp_gpr_s_pt (root_ppn : mword 44) (γ : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_caddi16sp_gpr_s_pt (root_ppn : mword 44) (γ : gname)
       (pc : mword 64) (imm6 : mword 6)
       (m : regfile)
       (q : Qp) :
@@ -1093,10 +1093,10 @@ Section WpSmodePtGprGamma.
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm imm6)))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
     Proof.
-    exact (wp_caddi16sp_gpr_s_r (kpt_share_regime root_ppn) γ Φ pc imm6 m q).
+    exact (wp_caddi16sp_gpr_s_r (kpt_share_regime root_ppn) γ pc imm6 m q).
   Qed.
 
 

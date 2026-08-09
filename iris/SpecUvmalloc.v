@@ -73,7 +73,7 @@ Import Defs.
 
 
 Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+    (γa : gname) (mm : regfile)
     (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
     (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uvmalloc in
@@ -124,14 +124,14 @@ Definition wp_uvmalloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
            \/ ((uint oldsz <= uint newsz)%Z /\
                mr !!! Regidx (mword_of_int 10) = newsz) ⌝ ∗
          proc_pt P') ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMALLOC.
   Parameter wp_uvmalloc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (Φ : mval -> iProp Σ) (mm : regfile)
+      (γa : gname) (mm : regfile)
       (P : uptd) (xperm : Z) (K : nat) (eb : bool) (p : mword 64)
       (C : iProp Σ) (b : bool),
-      wp_uvmalloc_sconf_body γa Φ mm P xperm K eb p C b.
+      wp_uvmalloc_sconf_body γa mm P xperm K eb p C b.
 End UVMALLOC.

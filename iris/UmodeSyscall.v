@@ -83,19 +83,19 @@ Section UmodeSyscall.
      for a returning syscall, the resume continuation (hart re-bound, a0
      arbitrary, pc+4); for a non-returning one, nothing. *)
   Definition usys_arm (s : usys_sem) (g : regfile) (va : mword 64)
-      (M : gmap Z (bv 8)) (Φ : mval -> iProp Σ) : iProp Σ :=
+      (M : gmap Z (bv 8)) : iProp Σ :=
     match s with
     | UsysPureRet =>
         (∀ (CID : CpuId) (ret : mword 64),
            uv_run C pt M (<[Regidx a0_idx := ret]> g) (add_vec_int va 4) -∗
-           WP (Loop : expr riscv_lang) {{ Φ }})%I
+           WP (Loop : expr riscv_lang))%I
     | UsysNoRet => emp%I
     | UsysUnused => False%I
     end.
 
   (* a protocol from a number -> shape table *)
   Definition usys_protocol_of (tbl : Z -> usys_sem) : usys_protocol Σ :=
-    fun n g va M Φ => usys_arm (tbl n) g va M Φ.
+    fun n g va M => usys_arm (tbl n) g va M.
 
 End UmodeSyscall.
 

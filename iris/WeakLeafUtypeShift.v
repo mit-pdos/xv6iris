@@ -145,9 +145,8 @@ Qed.
 Section leaf_lui.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_lui_leaf Φ (al4 : bool)
+  Lemma wwp_lui_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rd : mword 5) (imm : mword 20) (m : regfile)
       (npc0 : SailStdpp.Values.mword 64)
@@ -190,14 +189,14 @@ Section leaf_lui.
        pc_is (add_vec_int pc 4) -∗
        gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hfile #Hbs Hhws Hcont".
     iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
     assert (Hacc0 : acc_wf pc 0) by (unfold acc_wf in Haccpc |- *; lia).
-    iApply (wwp_instr Φ pc false (UTYPE (imm, Regidx rd, LUI))
+    iApply (wwp_instr pc false (UTYPE (imm, Regidx rd, LUI))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -332,9 +331,8 @@ End leaf_lui.
 Section leaf_lui_rvc.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_lui_rvc_leaf Φ (al4 : bool)
+  Lemma wwp_lui_rvc_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
       (rd : mword 5) (imm : mword 20) (i0 : instruction) (m : regfile)
       (npc0 : SailStdpp.Values.mword 64)
@@ -382,14 +380,14 @@ Section leaf_lui_rvc.
        pc_is (add_vec_int pc 2) -∗
        gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec Hgood0 Hexp.
     iIntros "Hmm Hpmpc Hpc Hnpc Hfile #Hbs Hhws Hcont".
     iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
     assert (Hacc0 : acc_wf pc 0) by (unfold acc_wf in Haccpc |- *; lia).
-    iApply (wwp_instr Φ pc true (UTYPE (imm, Regidx rd, LUI))
+    iApply (wwp_instr pc true (UTYPE (imm, Regidx rd, LUI))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])
@@ -528,9 +526,8 @@ End leaf_lui_rvc.
 Section leaf_auipc.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_auipc_leaf Φ (al4 : bool)
+  Lemma wwp_auipc_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rd : mword 5) (imm : mword 20) (m : regfile)
       (npc0 : SailStdpp.Values.mword 64)
@@ -573,14 +570,14 @@ Section leaf_auipc.
        gpr_file (<[Regidx rd :=
                      regval_into_reg (add_vec pc (auipc_off imm))]> m) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hfile #Hbs Hhws Hcont".
     iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
     assert (Hacc0 : acc_wf pc 0) by (unfold acc_wf in Haccpc |- *; lia).
-    iApply (wwp_instr Φ pc false (UTYPE (imm, Regidx rd, AUIPC))
+    iApply (wwp_instr pc false (UTYPE (imm, Regidx rd, AUIPC))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -728,9 +725,8 @@ End leaf_auipc.
 Section leaf_slli_rvc.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_slli_rvc_leaf Φ (al4 : bool)
+  Lemma wwp_slli_rvc_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
       (rs1 rd : mword 5) (shamt : mword 6) (i0 : instruction) (m : regfile)
       (npc0 : SailStdpp.Values.mword 64)
@@ -781,14 +777,14 @@ Section leaf_slli_rvc.
                      regval_into_reg (shift_bits_left (m !!! Regidx rs1)
                        (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec Hgood0 Hexp.
     iIntros "Hmm Hpmpc Hpc Hnpc Hfile #Hbs Hhws Hcont".
     iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
     assert (Hacc0 : acc_wf pc 0) by (unfold acc_wf in Haccpc |- *; lia).
-    iApply (wwp_instr Φ pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI))
+    iApply (wwp_instr pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])
@@ -961,9 +957,8 @@ End leaf_slli_rvc.
 Section leaf_srli_rvc.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_srli_rvc_leaf Φ (al4 : bool)
+  Lemma wwp_srli_rvc_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
       (rs1 rd : mword 5) (shamt : mword 6) (i0 : instruction) (m : regfile)
       (npc0 : SailStdpp.Values.mword 64)
@@ -1014,14 +1009,14 @@ Section leaf_srli_rvc.
                      regval_into_reg (shift_bits_right (m !!! Regidx rs1)
                        (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Hdecf Hagree HDmi Hgood Hdec Hgood0 Hexp.
     iIntros "Hmm Hpmpc Hpc Hnpc Hfile #Hbs Hhws Hcont".
     iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
     assert (Hacc0 : acc_wf pc 0) by (unfold acc_wf in Haccpc |- *; lia).
-    iApply (wwp_instr Φ pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))
+    iApply (wwp_instr pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])

@@ -466,3 +466,46 @@ Global Program Instance weak_irisGS `{!riscvGS Σ, !weakGS Σ}
   num_laters_per_step _ := 0%nat;
 }.
 Next Obligation. intros. iIntros "H". by iModIntro. Qed.
+
+(* ====================================================================== *)
+(** ** 5. The Φ-free weak WP
+
+    The weak twin of [RiscvPtsto.wp_triv]: [to_val] is unconditionally
+    [None] for every [expr weak_riscv_lang] (the language reuses
+    [RiscvLang.mval := Empty_set]), so a WP never inspects its
+    postcondition and any two postconditions give provably equivalent WPs.
+    [wwp_triv] pins the postcondition to the canonical [True]; the
+    notations below drop the [{{ Φ }}] clause, which SC's new [WP e @ E]
+    notation (RiscvPtsto) made unparseable in any importing file anyway.
+
+    THE NOTATION IS [WWP], NOT [WP], DELIBERATELY.  [expr weak_riscv_lang]
+    and [expr riscv_lang] are both [mexpr] up to conversion, and the weak
+    files have [riscvGS] (hence SC's [irisGS riscv_lang]) in scope — so if
+    the weak notation reused the [WP] syntax, whichever notation was
+    imported LAST would win silently ([-notation-overridden] is on
+    project-wide), and a weak statement could elaborate at the WRONG
+    LANGUAGE and still compile.  A distinct token makes the language
+    visible at every use site, and matches the tree's [wwp_*] naming;
+    the [(Loop : expr weak_riscv_lang)] annotations become redundant
+    ([wwp_triv]'s argument type pins the language) and are dropped. *)
+
+Lemma wwp_post_irrel `{!riscvGS Σ, !weakGS Σ} s E (e : expr weak_riscv_lang)
+    (Φ1 Φ2 : val weak_riscv_lang -> iProp Σ) :
+  wp s E e Φ1 ⊢ wp s E e Φ2.
+Proof.
+  (* [wp_mono]'s [irisGS] instance must be PINNED: TC search may otherwise
+     resolve it at [riscv_lang] (both languages' [expr] convert to [mexpr])
+     and the conclusion then fails to unify with the weak-instance goal. *)
+  iApply (wp_mono (Λ := weak_riscv_lang)). iIntros ([]).
+Qed.
+
+Definition wwp_triv `{!riscvGS Σ, !weakGS Σ}
+    (E : coPset) (e : expr weak_riscv_lang) : iProp Σ :=
+  wp NotStuck E e (fun _ => True%I).
+
+Lemma wwp_triv_eq `{!riscvGS Σ, !weakGS Σ} E (e : expr weak_riscv_lang) Φ :
+  wwp_triv E e ⊣⊢ wp NotStuck E e Φ.
+Proof. rewrite /wwp_triv. iSplit; iApply wwp_post_irrel. Qed.
+
+Notation "'WWP' e @ E" := (wwp_triv E e%E) (at level 20, e at level 20) : bi_scope.
+Notation "'WWP' e" := (wwp_triv ⊤ e%E) (at level 20, e at level 20) : bi_scope.

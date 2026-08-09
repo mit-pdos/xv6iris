@@ -105,10 +105,10 @@ Theorem weak_system_adequacy Σ `{!riscvGpreS Σ, !weakGpreS Σ, !sieG Σ}
        virtio_frag (wgdev g).(dvirtio)
        ={⊤}=∗
        ([∗ list] c ∈ cs,
-          WP (LoopE gen_id c : expr weak_riscv_lang) @ ⊤ {{ _, True }}) ∗
-       WP (UartLoop : expr weak_riscv_lang) @ ⊤ {{ _, True }} ∗
-       WP (DiskLoop : expr weak_riscv_lang) @ ⊤ {{ _, True }} ∗
-       WP (PlicLoop : expr weak_riscv_lang) @ ⊤ {{ _, True }}) ->
+          WWP (LoopE gen_id c) @ ⊤) ∗
+       WWP UartLoop @ ⊤ ∗
+       WWP DiskLoop @ ⊤ ∗
+       WWP PlicLoop @ ⊤) ->
   forall t2 g2 e2,
     rtc erased_step (wcpu_pool cs, g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -147,9 +147,11 @@ Proof.
   (* ---- assemble the two instances ---- *)
   set (E0 := RiscvEraGS f 1%positive 1%positive γu γp γv 1%positive 1%positive
                (fun _ => 1%positive) (fun _ => 1%positive)
-               (fun _ => 1%positive) 1%positive 1%positive).
+               (fun _ => 1%positive) (fun _ => 1%positive)
+               (fun _ => 1%positive) (fun _ => 1%positive)
+               1%positive 1%positive).
   set (HR := RiscvGS Σ
-               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ 1%positive 1%positive _
+               (RiscvFixedGS Σ Hinv _ _ _ _ _ _ _ _ _ _ _ 1%positive 1%positive _
                   1%positive _ _ 1%positive (fun _ => True%I) 1%positive)
                E0).
   set (HW := WeakGS Σ _ γlog γlat γws).

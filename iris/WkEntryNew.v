@@ -123,9 +123,7 @@ Qed.
 Section leaf_same.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
-
-  Lemma wwp_ld8_leaf_same Φ
+  Lemma wwp_ld8_leaf_same
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rsd : mword 5) (imm : mword 12)
       (ea : Arch.pa) (v : bv 64) (dqv : dfrac) (q : Qp)
@@ -172,8 +170,8 @@ Section leaf_same.
        R_bitvector_64 (gpr_of_Z (uint rsd)) ↦ᵣ (regval_into_reg v) -∗
        hart_ws cpu_id ws' -∗
        vwp_hold (wpt8 ea dqv v) ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal4 Hrsdnz Hea Hram8 Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrsdc #Hbs Hhws Hpt Hcont".
@@ -182,7 +180,7 @@ Section leaf_same.
     { iDestruct "Hbs" as "(_ & _ & _ & Hbw)".
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
-    iApply (wwp_instr Φ pc false (LOAD (imm, Regidx rsd, Regidx rsd, false, 8))
+    iApply (wwp_instr pc false (LOAD (imm, Regidx rsd, Regidx rsd, false, 8))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  ([WEread wak_plain pc 4] ++ [WEread wak_plain ea 8]))
@@ -287,7 +285,7 @@ Section entry.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wwp_entry (Φ : mval -> iProp Σ)
+  Lemma wwp_entry
       (m : regfile) (v_stack0 : bv 64)
       (mhartid_in : SailStdpp.Values.mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (kbs : _)
@@ -312,8 +310,8 @@ Section entry.
       mhartid ↦ᵣ mhartid_in -∗
       hart_ws cpu_id ws' -∗
       vwp_hold (wpt8 entry_ld_ea dq v_stack0) ws' -∗
-      WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+      WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hcov.
     iIntros "Hmm Hpmpc [Hpc Hnpc] Hfile Hmh Hhws Hpt #Htext Hcont".
@@ -340,7 +338,7 @@ Section entry.
     { iApply (winstr_intro pc_e0 false (UTYPE (imm_auipc, Regidx i_auipc, AUIPC))
                 (F_Base w_auipc) lpad_e0 eq_refl
                 (fun t _ _ _ Hm Hc => kd_0000a117 t Hm Hc) with "Hbs0"). }
-    iApply (wwp_instr Φ pc_e0 false (UTYPE (imm_auipc, Regidx i_auipc, AUIPC))
+    iApply (wwp_instr pc_e0 false (UTYPE (imm_auipc, Regidx i_auipc, AUIPC))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e0 4])
               wQ_pure Hgid Hacc_0 (pmp_all_off_allows_all _ Hpmp)
@@ -500,7 +498,7 @@ Section entry.
     iDestruct (gpr_file_insert_acc (m_auipc m) (Regidx i_ld)
                  (regval_into_reg v_stack0) with "Hfile") as "[Hspc Hfins]".
     iEval (rewrite (gpr_pt_nz i_ld _ Hrd_1)) in "Hspc".
-    iApply (wwp_ld8_leaf_same Φ pc_e1 w_ld i_ld imm_ld entry_ld_ea v_stack0 dq
+    iApply (wwp_ld8_leaf_same pc_e1 w_ld i_ld imm_ld entry_ld_ea v_stack0 dq
               1%Qp pmpcfg0 (m_auipc m !!! Regidx i_ld) pc_e1 D_m dstateM
               (wm_ws σ1')
               Hgid Hpmp Hal4_1 Hrd_1 Hea1 Hram8_1
@@ -543,7 +541,7 @@ Section entry.
                      (conj (kd_6505 t HC)
                         (conj lpad_i0_e2 (exec_execute_C_LUI imm_clui rd_clui))))
                 with "Hbs2"). }
-    iApply (wwp_instr Φ pc_e2 true (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI))
+    iApply (wwp_instr pc_e2 true (UTYPE (sign_extend' 20 imm_clui, rd_clui, LUI))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e2 4])
               wQ_pure Hgid Hacc_2 (pmp_all_off_allows_all _ Hpmp)
@@ -702,7 +700,7 @@ Section entry.
                 (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS))
                 (F_Base w_csrr) lpad_e3 eq_refl
                 (fun t _ _ _ Hm Hc => kd_f14025f3 t Hm Hc) with "Hbs3"). }
-    iApply (wwp_instr Φ pc_e3 false
+    iApply (wwp_instr pc_e3 false
               (CSRReg (csr_csrr, zreg, Regidx i_rd_csrr, CSRRS))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id))
@@ -882,7 +880,7 @@ Section entry.
                         (conj lpad_i0_e4
                            (exec_execute_C_ADDI imm_caddi rsd_caddi))))
                 with "Hbs4"). }
-    iApply (wwp_instr Φ pc_e4 true
+    iApply (wwp_instr pc_e4 true
               (ITYPE (sign_extend' 12 imm_caddi, rsd_caddi, rsd_caddi, ADDI))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e4 2])
@@ -1088,7 +1086,7 @@ Section entry.
                 (F_Base w_mul) lpad_e5 eq_refl
                 (fun t _ _ _ Hm Hc => kd_02b50533 t Hm Hc)
                 with "Hbs5"). }
-    iApply (wwp_instr Φ pc_e5 false
+    iApply (wwp_instr pc_e5 false
               (MUL (Regidx i_mul_rs2, Regidx i_mul_rs1, Regidx i_mul_rd,
                     mulop_mul))
               pmpcfg0 (dq := DfracOwn 1)
@@ -1308,7 +1306,7 @@ Section entry.
                      (conj (kd_912a t HC)
                         (conj lpad_i0_e6 (exec_execute_C_ADD rsd_cadd rs2_cadd))))
                 with "Hbs6"). }
-    iApply (wwp_instr Φ pc_e6 true (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD))
+    iApply (wwp_instr pc_e6 true (RTYPE (rs2_cadd, rsd_cadd, rsd_cadd, ADD))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id)) [WEread wak_plain pc_e6 4])
               wQ_pure Hgid Hacc_6 (pmp_all_off_allows_all _ Hpmp)
@@ -1527,7 +1525,7 @@ Section entry.
     { iApply (winstr_intro pc_e7 false (JAL (imm_jal, Regidx i_jal))
                 (F_Base w_jal) lpad_e7 eq_refl
                 (fun t _ _ _ Hm Hc => kd_042000ef t Hm Hc) with "Hbs7"). }
-    iApply (wwp_instr Φ pc_e7 false (JAL (imm_jal, Regidx i_jal))
+    iApply (wwp_instr pc_e7 false (JAL (imm_jal, Regidx i_jal))
               pmpcfg0 (dq := DfracOwn 1)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc_e7 2;

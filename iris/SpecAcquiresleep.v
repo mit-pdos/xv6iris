@@ -37,7 +37,6 @@ Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
 Require Import SchedCtx.
-Require Import SwtchCtx.
 Require Import SleepLock.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -45,7 +44,7 @@ Import Defs.
 
 
 Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat)
     (γl γsl : gname) (s : string) (R : iProp Σ)
     (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) (dq : dfrac) (b : bool) :=
@@ -69,10 +68,9 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
   (* the caller's own pid (read-only fraction) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through to sleep() *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
+  running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜ callee_saved m mf ⌝ -∗
@@ -84,17 +82,16 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
       sl_pid slk ↦₄ pidv -∗
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
-      own_ctx (p_context pj) -∗
-      park_hlf j true -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      running_claim j -∗
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ACQUIRESLEEP.
   Parameter wp_acquiresleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac} (b : bool),
-      wp_acquiresleep_sconf_body Φ γs j γl γsl s R m pidv av eb C dq b.
+      wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb C dq b.
 End ACQUIRESLEEP.

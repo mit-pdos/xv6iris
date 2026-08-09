@@ -82,6 +82,31 @@ are working on that effort — the relevant `projects/` file.
   returned, `BlockWords.v`'s word-in-a-block vocabulary, and the
   SPEND-AT-MOST budget rule — why any function above the log that does not
   take `log.lock` can only promise to spend at most N units, never exactly N.
+- **[`fs-icache.md`](design/fs-icache.md)** — the inode CACHE (`itable`,
+  `iget`/`idup`/`iput`), the chokepoint under most of `sysfile.c`: the
+  itable's geometry read off iget's own scan (24-byte lock, 136-byte
+  stride, and a loop bound that IS the next symbol's address), the Arc
+  reference algebra reused from `file-table.md`, why the `ref` WORDS must
+  live in an Iris invariant rather than in `itable.lock` (and why
+  `SpecIlock`'s `i_ref` premise is therefore unsatisfiable as written),
+  the REF-1 exclusivity theorem behind xv6's "`ip->ref == 1` means no
+  other process can have `ip` locked" — what part of it is free from the
+  algebra, what part needs a bio-style escrow, and what part needs no
+  theorem at all — and **where `itrunc`'s two owed premises belong**: the
+  block-range one is a pure `cov`-vs-`size` geometry premise (NOT a
+  `blkmap_wf` or `ilock` invariant, correcting `fs-inode.md`'s guess),
+  the BSIZE one an `inode_ok` conjunct, better folded into `fsblock`.
+  Definitional layer landed in `iris/IcacheInv.v`.
+- **[`fs-bitmap.md`](design/fs-bitmap.md)** — the block bitmap: the
+  bits-in-a-block vocabulary (`BitmapEnc.v`, the third after `BlockWords`'
+  words and `DinodeEnc`'s records), the `bitmap_res` resource and the FREE
+  POOL that parks a free block's `fsblock` half and its exclusive
+  `blk_own` token (`BitmapInv.v`), why that token's exclusivity is what
+  makes the alloc/free handshake sound AND what refutes `bfree`'s
+  `panic("freeing free block")`, `bfree`'s contract, the single-bitmap-block
+  simplification (`FSSIZE = 2000 < BPB`), and the recorded finding that the
+  existing `Module Type BALLOC` is UNPROVABLE as written — with the minimal
+  delta and its ripple into `bmap`/`writei`.
 - **[`virtio-driver.md`](design/virtio-driver.md)** — the virtio driver's
   own design notes.
 - **[`file-table.md`](design/file-table.md)** — the open-file table: `struct
@@ -117,21 +142,6 @@ are working on that effort — the relevant `projects/` file.
 
 ### `projects/` — ongoing worklists & plans (one per effort)
 
-- **[`crash.md`](projects/crash.md)** — the crash/power-cycling layer.
-  **DONE through M6: the SYSTEM THEOREM is proven.**
-  `SystemAdequacy.xv6_power_adequacy` — a machine that starts powered off at
-  generation 0 never gets stuck: every configuration reachable from
-  `[PowerLoopE]` under any interleaving of power cycles, hart steps and device
-  steps is reducible, with no hypothesis about the software and none about the
-  machine beyond "off at generation 0" (`boot_shape` supplies the rest per
-  era). Its footprint is the 5 `rv64d.*` platform axioms + funext + the four
-  sanctioned assumed kernel contracts (printk-general, kerneltrap, userinit,
-  panic). All six milestones landed: fixed/era split → language + GenId sweep
-  → death machinery → `wp_power_loop` + minimal adequacy → durable disk layer
-  → the ∀-era boot composition (`BootCarve`/`BootCarveMain` → `BootChain` →
-  `BootShared` → `SystemAdequacy`). Remaining is future work only: the FS
-  instantiation of `P_fs`/`Pc` (the theorem passes `True` today) and the
-  torn-write knob. Design in [`design/crash.md`](design/crash.md).
 - **[`fs-log.md`](projects/fs-log.md)** — the FS block layer, STAGE 4 (the
   crash instantiation) only; stages 1–3 are finished and archived in
   [`completed/fs-log-bio-and-logc.md`](completed/fs-log-bio-and-logc.md).
@@ -156,7 +166,8 @@ are working on that effort — the relevant `projects/` file.
   `struct proc` resource split: what has landed (`ProcInv.v`, `procinit`,
   `argraw`/`argint`/`argaddr`, `argfd`, the whole `p->killed` cone
   (`killed`/`setkilled`/`kkill`/`sys_kill`), `sys_getpid`, `sys_close`,
-  `sys_pause`, `fetchaddr`, `fdalloc`, **`kwait` + `sys_wait`**) and what is
+  `sys_pause`, `fetchaddr`, `fdalloc`, `kwait` + `sys_wait`,
+  **`kexit` + `sys_exit`**) and what is
   next (the remaining syscalls, and `cwd_ref`). `kwait` is the
   entry to read before writing any loop that can RETURN from inside itself:
   the function exit is one linear resource the inner loop takes as a premise
@@ -177,34 +188,6 @@ are working on that effort — the relevant `projects/` file.
   worklist spells out the exact chain that makes it work in `kfork`'s
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
-- **[`kexit.md`](projects/kexit.md)** — `kexit()`, the process-lifetime cone's
-  other half (kwait reclaims a zombie; kexit makes one). **PROVEN** —
-  `ProofKexit.v`, no `Axiom` and no `admit` of its own — **but NOT LINKED**, and it
-  cannot be until file.c's `fileclose` has a proof, which is the same single
-  callee `sys_pipe` waits on; until then `proof_coverage.py` prints it
-  `assumed`. The protocol change it needed is the interesting part: parking
-  at ZOMBIE is a different kind of park, because a zombie's private block
-  cannot ride the parked closure — wait()/freeproc, running on another
-  process, must find the user page table in `p->lock`. So the crossing
-  carries the block MINUS its context cells (`ProcInv.proc_dormant_noctx`)
-  and the reclaiming scheduler puts the two back together
-  (`SchedCtx.park_pay` / `proc_slots_park_gen`), FORGETTING the zombie's
-  record down to its cells rather than claiming it resumable. Also:
-  `SpecIput.v` (assumed, one isolated axiom), the diverging-contract shape,
-  why having no epilogue makes the frame existential and keeps it out of the
-  loop, and `ProcInv.proc_priv_cwd_pid` (the accessor the three FS calls
-  forced). kwait's own worklist is item S10 of
-  [`proc-struct-resources.md`](projects/proc-struct-resources.md), not here.
-- **[`fileclose.md`](projects/fileclose.md)** — `fileclose`, the single
-  unproven callee behind THREE unlinked proved functions (sys_pipe,
-  sys_close, kexit). Everything below it has LANDED: the payload link (a
-  `file_ref` now carries the pipe end / inode reference it names, so the
-  last closer has a whole `pipe_ref` to hand `pipeclose`),
-  `CodeFileclose.v`, the CONTRACT — a TYPE-INDEXED callee environment, so
-  pipealloc is not made to own a file system — and all four callers ported
-  onto it, including the `ProcInv.proc_priv_pid_ofile` accessor kexit's loop
-  needed. What is left is `ProofFileclose.v` and the four `Link` files.
-  Design in [`design/file-table.md`](design/file-table.md).
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a
@@ -234,6 +217,18 @@ are working on that effort — the relevant `projects/` file.
   split (catalog / store+CSR leaves / reverse pt2 switch / chain) with its
   reusable lessons, and the remaining work: prove usertrap(), then the
   whole-trap-loop Löb theorem that discharges `stvec_handler_wp`.
+- **[`kerneltrap.md`](projects/kerneltrap.md)** — **`kerneltrap()` IS
+  PROVEN.** `Print Assumptions` gives the 5 platform axioms + funext +
+  consoleintr (inherited through devintr/uartintr) and nothing else: no
+  printk-general, no `kerneltrap_returns`. All three panic arms are refuted
+  from the contract's premises, which is what keeps printk out. Records the
+  SPP/SPIE ghost mirror (`sret_bits`) on the trap-payload discipline, the
+  `eb` generalization of `SpecYield`/`SpecSched` it forced, and three durable
+  lessons (state postconditions absolutely; never leave an `_` for a frame
+  word at a block boundary — it cost 141 s per `iExact`; `subst p` picks the
+  wrong equation when two hypotheses define `p`). ONE thing remains: the
+  `intr_handler_spec` upgrade that rewires `ProofKernelvec` off the legacy
+  `KERNELTRAP_RETURNS` axiom (= explicit-cpuid Stage 2).
 - **[`printk.md`](projects/printk.md)** — the formatted-output cone (printk →
   printint → consputc → uartputc_sync), ALL PROVEN and linked on the PANIC
   path (`panicking ≠ 0`, so no lock and no `intr_count` anywhere in it).
@@ -244,14 +239,6 @@ are working on that effort — the relevant `projects/` file.
   and the loop-assembly architecture (one-turn lemma at 0x86 with its two
   futures as an `∧`-conjunction). Only the general (non-panic) path remains,
   blocked on uartputc_sync's.
-- **[`sys-pipe.md`](projects/sys-pipe.md)** — sys_pipe, PROVEN (unlinked): the
-  syscall where the file/proc model has to balance — two `fd_slot`s in, two out
-  on all four exits, which is what forced filealloc's and pipealloc's failure
-  arms to start returning their units. Keeps `SpecFdalloc.v`'s `fd_frees` pure
-  layer (what makes two successive fdalloc calls compose), the two
-  shared-block lemmas, what the contract deliberately does not say, and the one
-  thing standing between sys_pipe and a `LinkSysPipe.v`: `fileclose`, its only
-  callee without a proof.
 - **[`user-verified.md`](projects/user-verified.md)** — VERIFIED user-mode
   execution (the Umode tier): the `uv_cap` capability (the sie-cap analog
   carrying the kernel's interrupt + syscall trap services as assumed
@@ -288,6 +275,10 @@ are working on that effort — the relevant `projects/` file.
 
 ### `completed/` — finished projects, archived for reference
 
+- **[`crash.md`](completed/crash.md)** — the completed crash/power-cycling
+  layer through M6. `SystemAdequacy.xv6_power_adequacy` proves reducibility
+  across arbitrary power cycles, hart scheduling, and device steps; the FS
+  durability instantiation and torn-write model are separate future work.
 - **[`sail-model-bump.md`](completed/sail-model-bump.md)** — the sail-riscv
   model bump: the model now comes from the `zeldovich/sail-riscv` FORK (pinned
   by `SAIL_RISCV_REV`), whose delta is the ATOMIC PTE A/D-bit update, and whose
@@ -359,6 +350,36 @@ are working on that effort — the relevant `projects/` file.
 Projects with no outstanding steps, tasks, or cleanup. Kept (not deleted) for
 their durable design notes, gotchas, and reusable recipes.
 
+- **[`fileclose.md`](completed/fileclose.md)** — `fileclose`, PROVEN and
+  LINKED, and with it the four functions that were waiting on it: pipealloc,
+  sys_close, sys_pipe and kexit are all linked now too. Keeps the payload
+  link's design (a `file_ref` carries the pipe end / inode reference it
+  names, so the last closer has a whole `pipe_ref` to hand `pipeclose`), the
+  TYPE-INDEXED callee environment that keeps pipealloc from being made to
+  own a file system, the `ProcInv.proc_priv_pid_ofile` accessor kexit's loop
+  needed, and two gotchas worth reading before any block lemma with a branch
+  in it: `vm_compute` on a jump target that is still open does not come back,
+  and a lazily-spilled callee-saved register makes `callee_saved` a PREMISE
+  of the epilogue rather than a consequence of its loads. Design in
+  [`design/file-table.md`](design/file-table.md).
+- **[`kexit.md`](completed/kexit.md)** — `kexit()`, the process-lifetime
+  cone's other half, PROVEN and LINKED. Keeps the protocol change it needed:
+  parking at ZOMBIE is a different kind of park, because a zombie's private
+  block cannot ride the parked closure — wait()/freeproc, running on another
+  process, must find the user page table in `p->lock` — so the crossing
+  carries the block MINUS its context cells and the reclaiming scheduler puts
+  the two back together, FORGETTING the zombie's record down to its cells
+  rather than claiming it resumable. Also `SpecIput.v` (the cone's one
+  assumption), the diverging-contract shape, why having no epilogue keeps the
+  frame out of the loop, and the `proc_priv_pid_ofile` accessor its fd loop
+  needed once fileclose's file-system arm wanted a pid cell out of the very
+  block the loop walks.
+- **[`sys-pipe.md`](completed/sys-pipe.md)** — sys_pipe, PROVEN and LINKED:
+  the syscall where the file/proc model has to balance — two `fd_slot`s in,
+  two out on all four exits, which is what forced filealloc's and pipealloc's
+  failure arms to start returning their units. Keeps `SpecFdalloc.v`'s
+  `fd_frees` pure layer (what makes two successive fdalloc calls compose), the
+  two shared-block lemmas, and what the contract deliberately does not say.
 - **[`bio.md`](completed/bio.md)** — the buffer cache: the settled ownership
   design (the per-buffer content ESCROW — a namespace invariant with a
   parked arm and a checked-out arm — over a sleeplock that protects only a

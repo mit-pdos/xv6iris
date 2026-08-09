@@ -171,8 +171,7 @@ Section WpSconfMem.
   (* it first ([iIntros (v CID1 Hs1) "..."]) and the engine discharges     *)
   (* both quantifiers in one [iApply ... $! v cpu_id].                     *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_load_s_sconf_au (width : Z) (c uns : bool)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  Lemma wp_load_s_sconf_au (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (ext : mword (8*width) -> mword 64)
       (Ψ : mword (8*width) -> iProp Σ) (Em : coPset) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
@@ -209,8 +208,8 @@ Section WpSconfMem.
         sie_cap_gpr (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
         pc_is (add_vec_int pc (if c then 2 else 4)) -∗
         Ψ v -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext pa Hrd Hrdok HkptEm.
     rdok_split Hrdok.
@@ -218,13 +217,13 @@ Section WpSconfMem.
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast; lia).
     iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc c
+    iApply (wp_instr_s_sconf m n b pc c
               (LOAD (imm, Regidx rs1, Regidx rd, uns, width))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc Hsi".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -385,10 +384,10 @@ Section WpSconfMem.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
+    iAssert (sconf) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
-      iSplitL "Hms Hhalf".
-      { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+      iSplitL "Hms Hhalf Hspp".
+      { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
@@ -412,8 +411,7 @@ Section WpSconfMem.
      in the tree (lb/lbu/lh/lhu/lw/lwu/ld and the RVC twins) is one line off
      it.  [wp_load_s_sconf_gen] / [wp_load_s_sconf_ugen] below are its
      [uns = false] / [uns = true] restatements (WRAPPER RECIPE). *)
-  Lemma wp_load_s_sconf_gen_u (width : Z) (c uns : bool)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  Lemma wp_load_s_sconf_gen_u (width : Z) (c uns : bool) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
     (* the vmem level splits on a PAGE boundary now, which needs the width to
@@ -440,12 +438,12 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_au width c uns Φ pc rd rs1 imm m n
+    iApply (wp_load_s_sconf_au width c uns pc rd rs1 imm m n
               (fun w => extend_value uns w)
               (fun w => (⌜w = v⌝ ∗ wordw_pointsto width pa dqm v)%I) (⊤ ∖ ↑minstretN) b
               Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain (fun w => eq_refl) Hrd Hrdok
@@ -458,8 +456,7 @@ Section WpSconfMem.
   Qed.
 
   (* the SIGNED restatement. *)
-  Lemma wp_load_s_sconf_gen (width : Z) (c : bool)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  Lemma wp_load_s_sconf_gen (width : Z) (c : bool) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
     (* the vmem level splits on a PAGE boundary now, which needs the width to
@@ -485,18 +482,17 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
-    exact (wp_load_s_sconf_gen_u width c false Φ pc rd rs1 imm m n v lv b (dqm := dqm)).
+    exact (wp_load_s_sconf_gen_u width c false pc rd rs1 imm m n v lv b (dqm := dqm)).
   Qed.
 
   (* The UNSIGNED restatement.  [wp_load_s_sconf_gen_u] is generic in the
      extension ([uns]), so the two differ in exactly that flag -- which is why
      the width-1 [lbu] and the width-4 [lwu] are one-line instances of THIS
      rather than two hand-rolled copies of the same 190-line argument. *)
-  Lemma wp_load_s_sconf_ugen (width : Z) (c : bool)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+  Lemma wp_load_s_sconf_ugen (width : Z) (c : bool) (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword (8*width)) (lv : mword 64) (b : bool) {dqm : dfrac} :
     0 < width -> width <= 8 ->
     (* the vmem level splits on a PAGE boundary now, which needs the width to
@@ -522,10 +518,10 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
-    exact (wp_load_s_sconf_gen_u width c true Φ pc rd rs1 imm m n v lv b (dqm := dqm)).
+    exact (wp_load_s_sconf_gen_u width c true pc rd rs1 imm m n v lv b (dqm := dqm)).
   Qed.
 
 
@@ -569,7 +565,7 @@ Section WpSconfMem.
      [wp_load_s_sconf_ugen].  [dqm]-parametric: the byte may be owned outright
      (a stack buffer) or held at [DfracDiscarded] (a read-only image byte out
      of [kernel_data], which is how printint reads the [digits] table). *)
-  Lemma wp_lbu_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_lbu_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 8) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -583,12 +579,12 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦ₘ{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbyte Hcont".
-    iApply (wp_load_s_sconf_ugen 1 false Φ pc rd rs1 imm m n v (zero_extend' 64 v) b
+    iApply (wp_load_s_sconf_ugen 1 false pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 4096; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_1 (data2_ext_1_unsigned v) Hrd Hrdok
               with "Hcg Hpc Hinstr [Hbyte] [-]").
@@ -623,7 +619,7 @@ Section WpSconfMem.
   (* lwu rd, imm(rs1) -- the width-4 UNSIGNED load (printk's %u and %x read
      their [uint32] argument with it).  One line off [wp_load_s_sconf_ugen],
      exactly as [wp_lw_s_sconf] is off the signed twin. *)
-  Lemma wp_lwu_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_lwu_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -633,18 +629,18 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_ugen 4 false Φ pc rd rs1 imm m n v (zero_extend' 64 v) b
+    iApply (wp_load_s_sconf_ugen 4 false pc rd rs1 imm m n v (zero_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4_unsigned v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
-  Lemma wp_cld_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cld_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -654,18 +650,18 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen 8 true Φ pc rd rs1 imm m n v v b
+    iApply (wp_load_s_sconf_gen 8 true pc rd rs1 imm m n v v b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
-  Lemma wp_ld_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_ld_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -675,18 +671,18 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen 8 false Φ pc rd rs1 imm m n v v b
+    iApply (wp_load_s_sconf_gen 8 false pc rd rs1 imm m n v v b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_8 (data2_ext_8 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
-  Lemma wp_clw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_clw_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -696,18 +692,18 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₄{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen 4 true Φ pc rd rs1 imm m n v (sign_extend' 64 v) b
+    iApply (wp_load_s_sconf_gen 4 true pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
-  Lemma wp_lw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_lw_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (v : mword 32) (b : bool) {dqm : dfrac} :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -717,12 +713,12 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_load_s_sconf_gen 4 false Φ pc rd rs1 imm m n v (sign_extend' 64 v) b
+    iApply (wp_load_s_sconf_gen 4 false pc rd rs1 imm m n v (sign_extend' 64 v) b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_read_ram_plain_4 (data2_ext_4 v) Hrd Hrdok
               with "Hcg Hpc Hinstr Hbytes Hcont").
@@ -739,8 +735,7 @@ Section WpSconfMem.
   (* engine callback's mask and takes the WRITTEN cell back there, so a    *)
   (* lock leaf can open [is_lock] around exactly this step.                *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_store_s_sconf_au (width : Z) (c : bool)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+  Lemma wp_store_s_sconf_au (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (sv : mword (8*width)) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
     0 < width -> width <= 8 -> vmem_width width ->
     (width | 4096) -> uint (to_bits 64 width) = width ->
@@ -764,21 +759,21 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       Ψ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv HkptEm pa.
     set (wlast := (Z.to_nat width - 1)%nat).
     assert (Hwn : Z.of_nat wlast = width - 1) by (unfold wlast; rewrite Nat2Z.inj_sub; [ rewrite Z2Nat.id; lia | lia ]).
     assert (Hwlt : (wlast < Z.to_nat width)%nat) by (unfold wlast; lia).
     iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc c
+    iApply (wp_instr_s_sconf m n b pc c
               (STORE (imm, Regidx rs2, Regidx rs1, width))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc Hsi".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -936,10 +931,10 @@ Section WpSconfMem.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
+    iAssert (sconf) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
-      iSplitL "Hms Hhalf".
-      { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+      iSplitL "Hms Hhalf Hspp".
+      { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
@@ -952,8 +947,7 @@ Section WpSconfMem.
 
 
   (* the non-atomic instance: the caller owns the cell throughout. *)
-  Lemma wp_store_s_sconf_gen (width : Z) (c : bool)
-      (Φ : mval -> iProp Σ) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+  Lemma wp_store_s_sconf_gen (width : Z) (c : bool) (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold sv : mword (8*width)) (b : bool) :
     0 < width -> width <= 8 -> vmem_width width ->
     (width | 4096) -> uint (to_bits 64 width) = width ->
@@ -973,12 +967,12 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa (DfracOwn 1) sv -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv pa.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_store_s_sconf_au width c Φ pc rs2 rs1 imm m n sv
+    iApply (wp_store_s_sconf_au width c pc rs2 rs1 imm m n sv
               (wordw_pointsto width pa (DfracOwn 1) sv) (⊤ ∖ ↑minstretN) b
               Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv
               ltac:(solve_ndisj) with "Hcg Hpc Hinstr [Hbytes]").
@@ -1009,7 +1003,7 @@ Section WpSconfMem.
     (autocast (T := mword) (subrange_vec_dec r (4*8-1) 0) : mword (8*4)) = trunc32 r.
   Proof. unfold trunc32. reflexivity. Qed.
 
-  Lemma wp_csd_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csd_s_sconf
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -1019,19 +1013,19 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_store_s_sconf_gen 8 true Φ pc rs2 rs1 imm m n vold storeval b
+    iApply (wp_store_s_sconf_gen 8 true pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
 
-  Lemma wp_sd_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sd_s_sconf
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -1041,18 +1035,18 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_store_s_sconf_gen 8 false Φ pc rs2 rs1 imm m n vold storeval b
+    iApply (wp_store_s_sconf_gen 8 false pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 512; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_8 (store_ext_8 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
-  Lemma wp_csw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csw_s_sconf
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -1062,18 +1056,18 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₄ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_store_s_sconf_gen 4 true Φ pc rs2 rs1 imm m n vold storeval b
+    iApply (wp_store_s_sconf_gen 4 true pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
   Qed.
 
-  Lemma wp_sw_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sw_s_sconf
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -1083,12 +1077,12 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
-    iApply (wp_store_s_sconf_gen 4 false Φ pc rs2 rs1 imm m n vold storeval b
+    iApply (wp_store_s_sconf_gen 4 false pc rs2 rs1 imm m n vold storeval b
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity) ltac:(vm_compute; reflexivity)
               exec_write_ram_plain_4 (store_ext_4 (rget m rs2))
               with "Hcg Hpc Hinstr Hbytes Hcont").
@@ -1156,7 +1150,7 @@ Section WpSconfMem.
   Lemma trunc8_zero : trunc8 (zero_reg : mword 64) = (mword_of_int 0 : mword 8).
   Proof. apply bv_eq. vm_compute. reflexivity. Qed.
 
-  Lemma wp_sb_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sb_s_sconf
       (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : bv 8) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -1169,18 +1163,18 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦ₘ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbyte Hcont".
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (STORE (imm, Regidx rs2, Regidx rs1, 1))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc Hsi".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -1311,10 +1305,10 @@ Section WpSconfMem.
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iEval (rewrite nth_byte0_id) in "Hbyte".
-    iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
+    iAssert (sconf) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
-      iSplitL "Hms Hhalf".
-      { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+      iSplitL "Hms Hhalf Hspp".
+      { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
@@ -1330,7 +1324,7 @@ Section WpSconfMem.
   (* c.ldsp / c.sdsp -- the sp-relative immediate forms, bridged onto     *)
   (* the c.ld / c.sd leaves by [sext9_12_64] (pure immediate rewrite).    *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_cldsp_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_cldsp_s_sconf
       (pc : mword 64) (uimm : mword 6) (rd : mword 5)
       (m : regfile) (n : nat) (v : mword 64) (b : bool) {dqm : dfrac} :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
@@ -1345,17 +1339,17 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm pa Hrd Hrdok.
     unfold pa.
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
-    exact (wp_cld_s_sconf Φ pc rd csp_rs1 imm m n v b (dqm:=dqm) Hrd Hrdok).
+    exact (wp_cld_s_sconf pc rd csp_rs1 imm m n v b (dqm:=dqm) Hrd Hrdok).
   Qed.
 
-  Lemma wp_csdsp_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_csdsp_s_sconf
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let imm := zero_extend' 12 (concat_vec uimm ('b"000")) in
@@ -1369,21 +1363,21 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗
       pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm pa storeval.
     unfold pa.
     rewrite <- sext9_12_64.
     change sp with (Regidx csp_rs1).
-    exact (wp_csd_s_sconf Φ pc rs2 csp_rs1 imm m n vold b).
+    exact (wp_csd_s_sconf pc rs2 csp_rs1 imm m n vold b).
   Qed.
 
 
   (* ------------------------------------------------------------------- *)
   (* sd zero, imm(rs1) -- release's unconditional zero store.             *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_sd_zero_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sd_zero_s_sconf
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : mword 64) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -1396,20 +1390,20 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iDestruct (word_pointsto_aligned_p with "Hbytes") as %Hpalign4.
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 8 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 8))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc Hsi".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -1554,10 +1548,10 @@ Section WpSconfMem.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
+    iAssert (sconf) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
-      iSplitL "Hms Hhalf".
-      { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+      iSplitL "Hms Hhalf Hspp".
+      { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
@@ -1570,7 +1564,7 @@ Section WpSconfMem.
 
   (* c.sw x0 store (width-4 sibling of wp_sd_zero_s_sconf); moved here from
      ProofInitlock.v -- a store leaf belongs in the leaf file. *)
-  Lemma wp_sw_zero_s_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sw_zero_s_sconf
       (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
       (m : regfile) (n : nat) (vold : bv 32) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
@@ -1583,20 +1577,20 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦₄ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
     iDestruct "Hbytes" as "(%Hpalign4 & Hbytes)".
     assert (Halign4 : is_aligned_vaddr (Virtaddr pa) 4 = true) by exact Hpalign4.
-    iApply (wp_instr_s_sconf m n b Φ pc false
+    iApply (wp_instr_s_sconf m n b pc false
               (STORE (imm, Regidx (mword_of_int 0 : mword 5), Regidx rs1, 4))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc Hsi".
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
-    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & %Hmsf)".
+    iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -1740,10 +1734,10 @@ Section WpSconfMem.
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
     iAssert (pa ↦₄ storeval)%I with "[Hbytes]" as "Hbw"; [ iExact "Hbytes" |].
-    iAssert (sconf) with "[Hpriv Hms Hhalf Hmiex Hmenv]" as "Hsc".
+    iAssert (sconf) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
-      iSplitL "Hms Hhalf".
-      { iExists ms0. iFrame "Hms Hhalf". iPureIntro. exact Hmsf. }
+      iSplitL "Hms Hhalf Hspp".
+      { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }

@@ -41,13 +41,13 @@ Section ProofEntry.
   Context `{!riscvGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_entry_boot (Φ : mval -> iProp Σ)
+  Lemma wp_entry_boot
       (m : regfile) (v_stack0 : bv 64) (mhartid_in : mword 64)
       (mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 : mword 64)
       (mcounteren0 : mword 32)
       (pmpcfg0 : type_of_register pmpcfg_n) (pmpaddr00 : type_of_register pmpaddr_n)
       (sp0 : mword 64) (n : nat) {dq : dfrac} :
-    wp_entry_boot_body Φ m v_stack0 mhartid_in mepc0 satp0 medeleg0 mideleg0
+    wp_entry_boot_body m v_stack0 mhartid_in mepc0 satp0 medeleg0 mideleg0
       mie0 menvcfg0 stimecmp0 mcounteren0 pmpcfg0 pmpaddr00 sp0 n dq.
   Proof.
     cbv beta delta [wp_entry_boot_body].
@@ -64,7 +64,7 @@ Section ProofEntry.
     iEval (rewrite <- entry_ld_ea_mb) in "Hstk".
     (* ---- _entry: reset -> jal start (PC = 0x80000058) ---- *)
     iEval (change pcE with pc_e0) in "Hpc".
-    iApply (wp_entry Φ m v_stack0 mhartid_in pmpcfg0 (dq := dq) Hpmp
+    iApply (wp_entry m v_stack0 mhartid_in pmpcfg0 (dq := dq) Hpmp
               with "Hmm Hpcf Hpc Hfile Hmh Hstk Htext").
     iIntros "Hmm Hpcf Hpc Hfile Hmh Hstk".
     iEval (change pc_start with st_pc30) in "Hpc".
@@ -80,7 +80,7 @@ Section ProofEntry.
                   vm_compute in H; discriminate H ]).
       reflexivity. }
     (* ---- start(): jal-entry -> MRET (Supervisor mode at <main>) ---- *)
-    iApply (wp_start Φ (m_jal m v_stack0 mhartid_in) sp0 (add_vec_int pc_e7 4)
+    iApply (wp_start (m_jal m v_stack0 mhartid_in) sp0 (add_vec_int pc_e7 4)
               (m !!! Regidx ti_s0)
               mepc0 satp0 medeleg0 mideleg0 mie0 menvcfg0 stimecmp0 mhartid_in
               mcounteren0 pmpcfg0 pmpaddr00 n

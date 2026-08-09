@@ -41,8 +41,7 @@ Fixpoint prun (pa_end s1 : mword 64) (ps : list (mword 64)) : Prop :=
       /\ prun pa_end (add_vec s1 PGSIZEv) rest
   end.
 
-Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) :=
+Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.freerange in
   let pa_start := m !!! Regidx (mword_of_int 10 : mword 5) in
   let pa_end := m !!! Regidx (mword_of_int 11 : mword 5) in
@@ -67,12 +66,11 @@ Definition wp_freerange_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     kalloc_avail γk (Some (length ps)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FREERANGE.
   Parameter wp_freerange_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool),
-      wp_freerange_sconf_body Φ γl γk lk fl m ps K ncnt eb pcur C b.
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname) (γk : gname * gname) (lk fl : mword 64) (m : regfile) (ps : list (mword 64)) (K ncnt : nat) (eb : bool) (pcur : mword 64) (C : iProp Σ) (b : bool),
+      wp_freerange_sconf_body γl γk lk fl m ps K ncnt eb pcur C b.
 End FREERANGE.

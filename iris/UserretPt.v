@@ -265,7 +265,6 @@ Section WpUldPt.
      the absorption theorem handles the data translation, the invariant
      absorbs whatever the walk did. *)
   Lemma wp_uld_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
-      (Φ : mval -> iProp Σ)
       (off immz : Z) (rd : mword 5) (is_rvc : bool)
       (m : regfile) (v : bv 64)
       (mstatus0 mie_v mdv0 menvcfg0 : mword 64) {dq dqm : dfrac} :
@@ -332,8 +331,8 @@ Section WpUldPt.
       pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg v]> m) -∗
       tfpa ↦ₚ₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va pa imm iva tfpa Hrd HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 Ha0
       Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
@@ -349,7 +348,7 @@ Section WpUldPt.
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     destruct (pma_all_ram Hpma_all tfpa 8
                  (pma_access_ram _ _ _ Hram_tf Hram_tf7 (pma_width_ok 8 eq_refl eq_refl) eq_refl eq_refl)) as (region_ld & Hmatch_ld0 & _ & Hread_ld & _).
-    iApply (wp_instr_u_pt uroot tfp um Φ va pa is_rvc
+    iApply (wp_instr_u_pt uroot tfp um va pa is_rvc
               (LOAD (imm, Regidx (mword_of_int 10), Regidx rd, false, 8))
               mstatus0 mie_v mdv0 menvcfg0 dq
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
@@ -744,7 +743,7 @@ Section WpUaluUsretPt.
   Context `{!riscvGS Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_ualu_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
+  Lemma wp_ualu_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (off : Z) (is_rvc : bool) (ast : instruction)
       (m : regfile) (a0v vnew : mword 64)
       (vf : mstate -> mword 64)
@@ -810,13 +809,13 @@ Section WpUaluUsretPt.
       utlb_inv_pt uroot tfp um -∗
       pc_is (add_vec_int va (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx (mword_of_int 10) := regval_into_reg vnew]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va pa HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hexec Hval Ha0
       Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
-    iApply (wp_instr_u_pt uroot tfp um Φ va pa is_rvc ast
+    iApply (wp_instr_u_pt uroot tfp um va pa is_rvc ast
               mstatus0 mie_v mdv0 menvcfg0 dq
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               Hcanon Hvpn Hident Hcanon2 Hvpn2 Hident2 Hva2 Hpa4va4 Hpa2al Hpa2al2 Hpa4al
@@ -878,7 +877,7 @@ Section WpUaluUsretPt.
     iExact "Hfmap".
   Qed.
 
-  Lemma wp_usret_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64)) (Φ : mval -> iProp Σ)
+  Lemma wp_usret_pt (uroot tfp : mword 44) (um : gmap (mword 27) (mword 64))
       (m : regfile)
       (mstatus0 mie_v mdv0 menvcfg0 senvcfg0 sepc0 : mword 64) :
     let va := uva 0x120 in
@@ -919,8 +918,8 @@ Section WpUaluUsretPt.
       utlb_inv_pt uroot tfp um -∗
       pc_is (ret_pc sepc0) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va pa HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hsenvval0 HTSR Hsup.
     iIntros "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb
@@ -930,7 +929,7 @@ Section WpUaluUsretPt.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     pose proof (mword1_not_lp elp0 Help_np) as Help0.
-    iApply (wp_instr_u_pt uroot tfp um Φ va pa false (SRET tt)
+    iApply (wp_instr_u_pt uroot tfp um va pa false (SRET tt)
               mstatus0 mie_v mdv0 menvcfg0 (DfracOwn 1)
  HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(vm_compute; reflexivity)

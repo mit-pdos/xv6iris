@@ -373,12 +373,12 @@ Section MinstretInv.
   (* invariants (we are back at mask [⊤]).                                   *)
   (* ---------------------------------------------------------------------- *)
 
-  Lemma wp_exec_step_clock Φ :
+  Lemma wp_exec_step_clock :
     gen_cert -∗ clock_inv -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ σ', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
-          ▷ (|={∅,⊤}=> mstate_interp σ' ∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          ▷ (|={∅,⊤}=> mstate_interp σ' ∗ WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hcert #Hcinv H".
     iApply (wp_exec_step with "Hcert").
@@ -432,18 +432,18 @@ Section MinstretInv.
          NOT needed for the witness, only for the post-step [state_interp] update);
        - fold the minstret bump into [state_interp σ'] and return a fresh
          [minstret_inv_body] to close the invariant. *)
-  Lemma wp_exec_step_minstret Ei Φ :
+  Lemma wp_exec_step_minstret Ei :
     minstret_inv -∗
     (∀ σ, mstate_interp σ -∗ minstret_inv_body
          ={⊤ ∖ ↑minstretN, Ei}=∗
        ∃ σ', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
           ▷ (|={Ei, ⊤ ∖ ↑minstretN}=>
                mstate_interp σ' ∗ minstret_inv_body ∗
-               WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+               WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#(Hinv & Hcinv & Hcert) H".
-    iApply (wp_exec_step_clock Φ with "Hcert Hcinv").
+    iApply (wp_exec_step_clock with "Hcert Hcinv").
     iIntros (σ) "Hsi".
     (* open the minstret invariant ([={E, E∖↑minstretN}]); the caller's fupd
        supplies [={E∖↑minstretN, Ei}], and a [fupd_mask_intro] bridges [Ei→∅] to
@@ -490,7 +490,7 @@ Section MinstretInv.
      [▷ WP Loop] hypothesis -- BEFORE the single [iNext] that discharges
      [wp_exec_step_minstret]'s [▷]; that [iNext] then strips the [Hcont]-produced
      later in lock-step with the step's, so no second later is needed. *)
-  Lemma wp_exec_step_hart_active_inv Φ {dq : dfrac} :
+  Lemma wp_exec_step_hart_active_inv {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ,
@@ -502,11 +502,11 @@ Section MinstretInv.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
     iIntros (σ) "[Hreg Hmem] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.

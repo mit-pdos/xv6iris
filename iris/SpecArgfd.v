@@ -183,8 +183,7 @@ Section SpecArgfd.
 
 End SpecArgfd.
 
-Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γf : gname)
+Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (v : mword 64)
     (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool) :=
@@ -217,15 +216,14 @@ Definition wp_argfd_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       proc_priv γf p pid V -∗
       argfd_post pfd pf oldfd oldf v (pv_ofile V)
         (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ARGFD.
   Parameter wp_argfd_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γf : gname)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (γf : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (v : mword 64)
       (pid : mword 32) (V : pprivate) (oldfd : mword 32) (oldf : mword 64) (b : bool),
-      wp_argfd_sconf_body Φ γf m av n eb p C i v pid V oldfd oldf b.
+      wp_argfd_sconf_body γf m av n eb p C i v pid V oldfd oldf b.
 End ARGFD.

@@ -283,9 +283,8 @@ Qed.
 Section leaf_jal.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_jal_leaf Φ (al4 : bool)
+  Lemma wwp_jal_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rd : mword 5) (imm : mword 21)
       (rdv0 npc0 : SailStdpp.Values.mword 64)
@@ -329,8 +328,8 @@ Section leaf_jal.
        R_bitvector_64 (gpr_of_Z (uint rd))
          ↦ᵣ (regval_into_reg (add_vec_int pc 4)) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrdnz Halign Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrdc #Hbs Hhws Hcont".
@@ -345,7 +344,7 @@ Section leaf_jal.
       iDestruct "Hbw" as (w0) "[%Hw0 _]". destruct Hw0 as [<- H].
       by iPureIntro. }
     (* the funnel: certificate = nowrite at the fetch-only trace *)
-    iApply (wwp_instr Φ pc false (JAL (imm, Regidx rd))
+    iApply (wwp_instr pc false (JAL (imm, Regidx rd))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -495,9 +494,8 @@ End leaf_jal.
 Section leaf_cjr.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_cjr_rvc_leaf Φ (al4 : bool)
+  Lemma wwp_cjr_rvc_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
       (ra : mword 5) (i0 : instruction)
       (rav npc0 : SailStdpp.Values.mword 64)
@@ -546,8 +544,8 @@ Section leaf_cjr.
        pc_is (ret_pc rav) -∗
        R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hranz Hdecf Hagree HDmi Hgood Hdec Hgood0 Hexp.
     iIntros "Hmm Hpmpc Hpc Hnpc Hrac #Hbs Hhws Hcont".
@@ -556,7 +554,7 @@ Section leaf_cjr.
     iAssert (⌜forall j : nat, (j < 4)%nat -> addr_is_ram (pa_add pc j)⌝)%I
       as %Hram.
     { iDestruct "Hbs" as "(_ & _ & %Hr & _)". by iPureIntro. }
-    iApply (wwp_instr Φ pc true (JALR (zeros' 12, Regidx ra, zreg))
+    iApply (wwp_instr pc true (JALR (zeros' 12, Regidx ra, zreg))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])

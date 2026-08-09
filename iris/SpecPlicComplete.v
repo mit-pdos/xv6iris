@@ -63,8 +63,7 @@ Import Defs.
    [wp_next] wrapper (it would collapse via [wp_next_off] anyway, since the
    hart cannot move). *)
 Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names)
-    (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64) :=
+    (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let tp_idx : mword 5 := mword_of_int 4 in
   let pcE := mword_of_int KernelSyms.plic_complete in
@@ -81,13 +80,12 @@ Definition wp_plic_complete_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ
     sie_cap_gpr m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PLIC_COMPLETE.
   Parameter wp_plic_complete_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (m0 : regfile) (n : nat) (p : mword 64),
-      wp_plic_complete_sconf_body γd γv Φ m0 n p.
+      (γd : uart_names) (γv : disk_names) (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plic_complete_sconf_body γd γv m0 n p.
 End PLIC_COMPLETE.

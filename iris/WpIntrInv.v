@@ -115,7 +115,7 @@ Section WpIntrInv.
   (* directly over [wp_exec_step_minstret]: retire bumps minstret, an      *)
   (* interrupt does not; both continuations come back under the step's ▷.  *)
   (* =================================================================== *)
-  Lemma wp_exec_step_retire_or_intr Φ {dq : dfrac} :
+  Lemma wp_exec_step_retire_or_intr {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ,
@@ -128,7 +128,7 @@ Section WpIntrInv.
            mstate_interp s_exec ∗
            (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
             PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-            ▷ WP (Loop : expr riscv_lang) {{ Φ }}) )
+            ▷ WP (Loop : expr riscv_lang)) )
        ∨
        ( (* a pending interrupt is taken (no fetch, no retire, no bump) *)
          ∃ (i : InterruptType) (p : Privilege) (s_trap : mstate),
@@ -138,11 +138,11 @@ Section WpIntrInv.
            mstate_interp s_trap ∗
            ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
               PC ↦ᵣ (register_lookup nextPC s_trap.(sregs)) -∗
-              WP (Loop : expr riscv_lang) {{ Φ }}) )) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+              WP (Loop : expr riscv_lang)) )) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hinv Hhs H".
-    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
+    iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) with "Hinv").
     iIntros (σ) "[Hreg Hmem] Hbody".
     iDestruct "Hbody" as (mst mi_old) "[Hmst Hmi]".
     iDestruct (reg_valid_dq with "Hreg Hhs") as %Lhs.
@@ -152,7 +152,7 @@ Section WpIntrInv.
     iMod ("H" $! (set_reg σ (R_bool minstret_increment) b) with "[Hreg Hmem]")
       as "[Hret | Hintr]".
     { rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
-    - (* ---- retire: verbatim wp_exec_step_hart_active_inv continuation ---- *)
+    - (* ---- retire: verbatim wp_exec_step_hart_active_inv ---- *)
       iDestruct "Hret" as (retval s_exec) "(%Hha & Hpc & [Hreg Hmem] & Hcont)".
       iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_exec.
       iDestruct (reg_valid with "Hreg Hmi") as %Hmi_exec.
@@ -193,7 +193,7 @@ Section WpIntrInv.
         iSplitL "Hmst Hmi".
         { iExists mst, false. iFrame. }
         iExact "HWP".
-    - (* ---- interrupt: verbatim wp_exec_step_interrupt_inv continuation ---- *)
+    - (* ---- interrupt: verbatim wp_exec_step_interrupt_inv ---- *)
       iDestruct "Hintr" as (i p s_trap) "(%Hha & %Hhi & Hpc & [Hreg Hmem] & Hcont)".
       iDestruct (reg_valid_dq with "Hreg Hhs") as %Hhart_trap.
       assert (Hhart_a :
@@ -225,8 +225,7 @@ Section WpIntrInv.
   (* =================================================================== *)
   Lemma wp_exec_step_intr (handler pc0 : mword 64)
       (root_ppn : mword 44)
-      (m : regfile)
-      (Φ : mval -> iProp Σ) :
+      (m : regfile) :
     ret_pc pc0 = pc0 ->
     intr_inv handler -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
@@ -248,8 +247,8 @@ Section WpIntrInv.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hpc0.
     iIntros "#Hintr Hhs Hcfg Hpc Hfile HF Hbody".
@@ -267,7 +266,7 @@ Section WpIntrInv.
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
     pose proof (elp_no_lp elp0 Help_np) as Help0.
-    iApply (wp_exec_step_retire_or_intr Φ with "Hminv Hhs").
+    iApply (wp_exec_step_retire_or_intr with "Hminv Hhs").
     iIntros (σ) "Hsi".
     iDestruct (dispatch_S_transient σ misa0 mie_v mdv0 ms HmisaS Hmm
                  with "Hsi Hmisa Hmie Hmdl Hms") as %Hdisp0.
@@ -348,7 +347,7 @@ Section WpIntrInv.
       (* ---- the invariant's handler WP discharges the whole handler ---- *)
       iAssert (intr_handler_spec handler) with "[]" as "#Hsp".
       { iApply "Hspec". iPureIntro. exact Hb1. }
-      iApply ("Hsp" $! root_ppn elp0 ms pc0 mie_v mdv0 m Φ
+      iApply ("Hsp" $! root_ppn elp0 ms pc0 mie_v mdv0 m
                 with "[%] [%] [%] Hhs Hpriv Hms Hmie Hmdl Hsepc [$Hpcr $Hnpc] Hfile HF").
       { exact Hmsf. }
       { exact Hpc0. }

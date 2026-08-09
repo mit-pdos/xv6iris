@@ -1,11 +1,18 @@
-(* ProofIupdateParts.v -- iupdate's vocabulary: everything its proof needs
-   that is NOT a step of its instruction chain, so ProofIupdate.v stays
-   about the chain.  (The ProofBmapParts.v / ProofBreadParts.v division of
-   labour.)
+(* DinodeSlot.v -- THE ON-DISK DINODE SLOT: the arithmetic that finds it,
+   the addresses it sits at, and the resource it is.  Shared vocabulary of
+   the two functions that move a dinode between the disk and the icache --
+   iupdate flushes it out, ilock loads it in -- so it lives in the
+   definitional layer rather than in either one's proof: a Proof file may
+   not require another Proof file, and duplicating 450 lines of bitvector
+   arithmetic to work around that is exactly the shape
+   claude-notes/durable-notes.md's guiding principle forbids.
+
+   (It was iupdate's [ProofIupdateParts.v] until ilock needed every line of
+   it; the names are unchanged so that ProofIupdate.v did not move.)
 
    Four groups:
 
-   (1) THE ARITHMETIC.  iupdate computes two things out of ip->inum:
+   (1) THE ARITHMETIC.  Both functions compute two things out of ip->inum:
        IBLOCK(inum, sb) = inum / IPB + sb.inodestart, as
        [srliw a5,a5,0x4] then [addw]; and the slot's byte offset
        (inum % IPB) * 64, as [andi a4,a4,15] then [slli a4,a4,0x6].  Both
@@ -16,7 +23,7 @@
        Also here: [trunc16_sext64], the 16-bit twin of
        [RiscvExtras.trunc32_sext64] -- an [lh] followed by an [sh] of the
        same register is the identity on the halfword, which is what all
-       four metadata copies are.
+       four metadata copies are, in EITHER direction.
 
    (2) THE ADDRESSES.  bp->data, the dinode slot inside it, its five field
        cells, and their alignment (bcache geometry, as in write_head and
@@ -25,14 +32,14 @@
    (3) THE DINODE SLOT AS A RESOURCE.  [dislot a d] is the 64 bytes at [a]
        read as [DinodeEnc.dinode_bytes d] -- four [|->2] cells, one [|->4]
        cell and a 52-byte [ByteBuf] window, i.e. exactly the six pieces the
-       four [sh], the [sw] and the [memmove] touch.  [diblk_slot_acc]
-       borrows slot [k] out of a whole block's byte image and gives it back
-       AT A NEW DINODE, which is the entire content of what iupdate does to
-       the buffer.
+       four halfword copies, the word copy and the [memmove] touch.
+       [diblk_slot_acc] borrows slot [k] out of a whole block's byte image
+       and gives it back AT A NEW DINODE (iupdate's whole effect on the
+       buffer); ilock gives it back UNCHANGED and reads the six pieces
+       instead.
 
    (4) THE HANDLE.  [iu_held_swap] / [iu_held_content] / [iu_held_k] are the
-       bio-handle manipulations, restated here because a Proof file may not
-       import another one (ProofBmapParts has the same three). *)
+       bio-handle manipulations (ProofBmapParts has the same three). *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list functions bitvector.definitions.
 From iris.proofmode Require Import proofmode.

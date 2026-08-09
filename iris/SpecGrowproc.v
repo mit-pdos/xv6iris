@@ -127,7 +127,7 @@ Definition growproc_ok (szv n : mword 64) (P P' : uptd) (szv' r : mword 64) : Pr
      \/ ((uint szv <= uint (add_vec szv n))%Z /\ szv' = szv) )).
 
 Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γf : gname)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.growproc in
@@ -149,14 +149,13 @@ Definition wp_growproc_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       cpu_own 0%nat eb p C b -∗
       pc_is ret_tgt -∗
       proc_priv γf p pid (upd_sz (upd_upt V P') szv') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type GROWPROC.
   Parameter wp_growproc_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
-      (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (γa : gname) (γf : gname) (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (b : bool),
-      wp_growproc_sconf_body γa γf Φ m av eb p C pid V b.
+      wp_growproc_sconf_body γa γf m av eb p C pid V b.
 End GROWPROC.

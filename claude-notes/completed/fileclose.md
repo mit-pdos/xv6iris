@@ -1,12 +1,13 @@
-# fileclose — the last unproven callee of three proved functions
+# fileclose — DONE, and the four Link files it unblocked
 
-`fileclose` is the single function standing between the tree and three `Link`
-files: `sys_pipe`, `sys_close` and `kexit` are all proved and all unlinked
-because their only unproven callee is this one
-([`sys-pipe.md`](sys-pipe.md), [`kexit.md`](kexit.md),
-[`../design/file-table.md`](../design/file-table.md)). One
-`ProofFileclose.v` + `LinkFileclose.v` buys three links and 392 bytes of
-coverage.
+`fileclose` is **proven and linked**.  It was the single function standing
+between the tree and four `Link` files: `pipealloc`, `sys_close`, `sys_pipe`
+and `kexit` were all proved and all unlinked because their one unproven
+callee was this one.  All five now read `proven` in
+`tools/proof_coverage.py`, on the single sanctioned `wp_iput_sconf` axiom
+(`LinkIput.v`) — file.c 4/7, pipe.c 4/4.
+
+Kept for its design record and its gotchas; nothing here is outstanding.
 
 ```c
 void fileclose(struct file *f) {
@@ -212,7 +213,23 @@ compiles in **5.5 s**:
   end_op). One lemma over the block's five pcs as literals, per the
   block-lemma recipe.
 
-**The one performance trap, and it cost an hour:** `wp_cj_s_sconf`'s
+`fc_pred_sub` / `fc_storeval_pred` / `fc_pred_reg` / `fc_pred_gtz` /
+`fc_pred_ngtz` are the arithmetic of `c.addiw a5,a5,-1` on a count: the
+`f->ref--` direction of `VcGen.moi32_storeval_succ`. Three forms are needed,
+because the proof consumes all three — the 32-bit word the `c.sw` stores, the
+64-bit register value the `bgtz` then tests, and the `trunc32` the store leaf
+hands back — and the addend is `mword_of_int 63 : mword 6`, i.e. -1 in the
+compressed immediate, so the 32-bit add WRAPS and the result is `z - 1` only
+because `z >= 1`.
+
+`FileInv.fref_tok_lookup` gained two conjuncts the close needed and the dup
+did not: `(qt <= 1)%Qp` (from the authority's own validity) and
+`n <> 1 -> (q < qt)%Qp`. The second is what lets the `n >= 2` arm SUBTRACT —
+`file_close_step` wants `(qt - q)%Qp = Some qr`, and `Qp.sub` is `Some` only
+below. Both are facts the lemma already had in its proof and was throwing
+away.
+
+**The one performance trap, and it cost an hour:****The one performance trap, and it cost an hour:** `wp_cj_s_sconf`'s
 alignment side condition is about the JUMP TARGET, and in a block lemma the
 pc and the immediate are variables — so the reflex `ltac:(vm_compute;
 reflexivity)` normalizes an open bitvector term and never returns. Rewrite
@@ -220,7 +237,48 @@ the target equation the lemma already takes as a premise FIRST
 (`ltac:(rewrite Hjt; vm_compute; reflexivity)`). Lifted to
 [`../durable-notes.md`](../durable-notes.md).
 
-## What is LEFT: the capstone
+## The capstone: what is proven
+
+`ProofFileclose.v` is at 952 lines and has TWO `admit`s left. Proven:
+
+- the prologue (8-slot push, the three spills, the frame pointer, `s1 := f`,
+  `a0 := &ftable`) and the `jal acquire`;
+- the critical section: the load of `f->ref`, the **dead `blez` panic arm**
+  (`fref_word_spos`, so the panic tail gets no `instr` fact at all), the
+  `c.addiw`, the `c.sw`, and the `bgtz` split;
+- **the whole `--f->ref > 0` fast path**: `file_close_step`, the departing
+  share going home through `file_rest_absorb`, the fd slot coming back out of
+  the slot's own `fd_slots`, the slot closed at the shrunk count, `release`,
+  `fc_epi`, and the postcondition — including `fileclose_env_out_of_env`,
+  which is what lets a path that called nothing still pay the environment
+  back;
+- **the last-reference arm down to the release**: `file_close_last_step` at
+  the closer's `qt` plus `file_rest_join` to reach fraction 1 (done BEFORE
+  the reads, which is what puts every content cell at fraction 1 for both
+  the reads and the stores), the four lazy spills, the four `ff = *f` reads,
+  the two stores that empty the slot, and the slot going back to the table
+  FREE while the payload leaves with the closer — the model's version of
+  "`f->type = FD_NONE` before the release".
+
+- the second `release`, and the FD_PIPE test at `+0x54`/`+0x56`. `s2` holds
+  the SIGN-EXTENDED `ff.type`, so the `beq` compares at 64 bits while the
+  content field is 32; `fc_ty_eq1` says the two tests agree, because sign
+  extension is injective and `trunc32` is its inverse. That is what lets the
+  proof case on `fc_type Cf = FD_PIPE` rather than on a register value.
+
+What the two remaining `admit`s cover: the three arms — `pipeclose`,
+`begin_op`/`iput`/`end_op`, and nothing — each landing in `fc_restore4` and
+then `fc_epi`. The next thing to prove is the arithmetic of the second test:
+`addiw a5,s2,-2; bgeu a4,a5` with `a4 = 1` is exactly "type ∈ {FD_INODE,
+FD_DEVICE}", and it has to hold for an ARBITRARY 32-bit type field — the
+`addiw` wraps, so a type at or above 2^31 sign-extends negative and still has
+to come out of the comparison on the right side.
+
+It stays out of `iris/` until that admit is gone: `proof_coverage.py --check`
+rejects an `iris/*.v` that `_CoqProject` omits, and listing it would put an
+admit in the build.
+
+## Notes for finishing it
 
 Nothing exotic is expected; the shape is `ProofFiledup.v` (acquire, the dead
 `f->ref < 1` panic arm via `FileInv.fref_word_spos`, the ghost step, release)

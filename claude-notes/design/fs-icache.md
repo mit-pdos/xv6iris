@@ -1,0 +1,643 @@
+# Design: the inode cache (`itable`, `iget`/`idup`/`iput`)
+
+STATUS: DESIGN + a landed definitional layer (`iris/IcacheInv.v`, compiles,
+axiom-free). No `Spec<F>.v` for `iget`/`idup`/`iput` exists yet and none is
+written here — this note is what they will be stated over.
+
+The icache is the chokepoint under `iput`, `idup`, `iget`, `namei` and most
+of `sysfile.c`. Layers below: [`fs-inode.md`](fs-inode.md) (the inode
+itself — `struct inode`'s geometry, `blkmap`, `inode_map`/`inode_blocks`,
+`ilock`/`iunlock` and `InodeLock.v`'s seam), [`fs-bitmap.md`](fs-bitmap.md)
+(the free pool `itrunc` hands blocks back to),
+[`fs-log.md`](fs-log.md), [`file-table.md`](file-table.md) (the
+reference-count algebra this reuses verbatim).
+
+Read [`fs-inode.md`](fs-inode.md)'s "`ilock` / `iunlock` — the LOAD, and
+the icache seam" first: the sleeplock-side of an entry is settled there and
+is not restated here.
+
+---
+
+## 1. The `itable`'s geometry
+
+```c
+struct { struct spinlock lock; struct inode inode[NINODE]; } itable;   // NINODE = 50
+```
+
+Every number below is pinned by an instruction in the tracked image
+(`kernel-rocq/KernelSyms.v` + `KernelInstrs.v`), never by transcribing the
+C. `xv6-riscv/kernel/kernel.asm` is a stale local build and was not
+consulted.
+
+| evidence | conclusion |
+|---|---|
+| `iget+0x26`: `addi s1,s1,-1796 # 80020888 <itable+0x18>` — `s1 = &itable.inode[0]` | `lock` at **+0**, `inode[0]` at **+24** |
+| `iget+0x3c`: `addi s1,s1,136` (the scan's stride) | `sizeof(struct inode)` = **136** |
+| `iget+0x2e`: `addi a3,a3,900 # 80022318 <log>`, used as the scan's stop (`iget+0x40`: `beq s1,a3,…`) | `&inode[NINODE]` **is** the address of the next symbol |
+| `iinit+0x26`: `addi s1,s1,-1950 # 80020898 <itable+0x28>` | `&inode[0].lock` = entry + 16 ✓ (`InodeInv.i_lock`) |
+| `iinit+0x2e`: `addi s3,s3,746 # 80022328 <log+0x10>` | `&inode[NINODE].lock`, same stride from the other end |
+
+`24` is `sizeof(struct spinlock)` (`uint locked` + 4 bytes of padding + two
+pointers) and `136` is `sizeof(struct inode)` = 132 rounded up to the 8 the
+embedded sleeplock forces — the same alignment hole that puts `addrs` at
++80 (`fs-inode.md`). Consistency check: `24 + 136*50 = 6824 = 0x1AA8`, and
+`KernelSyms.log − KernelSyms.itable = 0x80022318 − 0x80020870 = 0x1AA8`. ✓
+
+In `IcacheInv.v`:
+
+```coq
+Definition NINODE : nat := 50.
+Definition itable_lock : mword 64 := mword_of_int KernelSyms.itable.
+Definition ISLOTSZ : Z := 136.
+Definition ientry (k : nat) : mword 64 :=
+  mword_of_int (KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k).
+```
+
+with one arithmetic fact — `ientry_unsigned`, "in range, the address is its
+literal offset and does not wrap" — and three corollaries: `ientry_inj`
+(slot ↔ address, so a `struct inode *` determines its slot index and no
+separate ghost mapping is needed), `ientry_step` (the scan's `addi 136`)
+and `ientry_sentinel` (`ientry NINODE = KernelSyms.log`).
+
+**`ientry_sentinel` is worth having as a lemma rather than a `vm_compute`
+at the use site.** The loop bound the compiler emitted is literally the
+address of the *next global*; if a future `XV6_REV` inserts a symbol
+between `itable` and `log`, the scan's proof would silently be about the
+wrong range, and this lemma is the thing that fails instead.
+
+Per-entry field addresses are `InodeInv.i_dev`/`i_inum`/`i_ref`/`i_lock`/…
+applied to `ientry k`; the icache adds no field vocabulary of its own.
+
+---
+
+## 2. What protects what — three disciplines, and one xv6 comment that is
+not the whole truth
+
+`fs.c`'s comment says:
+
+> the `itable.lock` spin-lock protects the allocation of itable entries.
+> Since `ip->ref` indicates whether an entry is free, and `ip->dev` and
+> `ip->inum` indicate which i-node an entry holds, one must hold
+> `itable.lock` while using any of those fields.
+> An `ip->lock` sleep-lock protects all `ip->` fields other than `ref`,
+> `dev`, and `inum`.
+
+Both halves have exceptions that the model has to carry, and each exception
+costs something:
+
+1. **`dev`, `inum`** — written only by `iget` on a free entry, under
+   `itable.lock`; read by any reference holder with no lock (`ilock` does
+   `lw a0,0(a0)` / `lw a5,4(s1)` holding only the sleeplock). This is the
+   ftable's discipline 2 exactly: *immutable while `ref > 0`*, hence
+   **fractional**. No exception, and `SpecIlock`'s existing
+   `i_dev ip ↦₄{dqd} dev` / `i_inum ip ↦₄{dqn} inum` premises fit it
+   unchanged.
+
+2. **`ref`** — read-modify-written under `itable.lock` by
+   `iget`/`idup`/`iput`, but **read with no lock at all** by `ilock`
+   (`ilock+0x0e`: `lw a5,8(a0)`, then `blez` — the `ip->ref < 1` guard) and
+   by `iunlock`. One 4-byte load, so it is a single atomic step and an
+   invariant can be opened around it. See §4: this is why the `ref` words
+   cannot live in the lock's resource.
+
+3. **`valid`, `nlink`** — written under the sleeplock (`ilock`, `iput`),
+   and *read by `iput` under `itable.lock` only*
+   (`iput+0x3c`: `lw a5,64(s1)` then `lh a5,74(s1)`). See §5: this is the
+   real content of the "`ref == 1` means no other process can have `ip`
+   locked" comment.
+
+4. **`valid` again** — written by `iget` (`sw zero,64(s3)`) on a recycled
+   entry under `itable.lock`, with no sleeplock. Same exception as 3.
+
+Discipline 1 is free. Disciplines 2–4 are the whole design problem.
+
+---
+
+## 3. The ghost state, and how it composes with `InodeLock.v`
+
+### The reference algebra: RustBelt's Arc, reused verbatim
+
+```coq
+Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
+Definition iref_tok  γ k q := own γ (◯ {[ k := (q, 1%positive) ]}).
+Definition itable_half γ M := own γ (●{#(1/2)} M).
+```
+
+`M !! k = Some (q, n)`: slot `k` is live, with `n` outstanding references
+holding `q` of its identity between them. `k ∉ dom M`: the slot is free.
+This is `FileInv.frefUR` with the payload and liveness components dropped
+(the icache needs neither: its payload is the sleeplock's, and there is no
+`off`-borrow), so the shape is already validated by the four proven
+`file_*_step` lemmas and by `fileclose`. **Do not invent a second algebra
+for it.**
+
+`IcacheInv.v` ships `iref_alloc_step` / `iref_dup_step` /
+`iref_close_step` / `iref_close_last_step` (algebra level, over the joined
+authority) and `iref_lookup` (§5). The points-to side of each — the
+`dev`/`inum` fractions moving between `islot` and a reference — is one
+lemma per step and belongs with the contracts that consume it, not here.
+
+Why the authority is **split in halves** (`itable_half`, with
+`itable_half_op`/`_join`/`_split` as its laws): one half sits in the
+`ref`-word invariant beside the cells so the counts and the words can never
+disagree, and one half sits in `itable.lock`'s resource. Holding the lock's
+half is what **pins** every count across the `lw; addiw; sw` the code
+performs; holding a reference fragment alone is enough for a lock-free
+reader to conclude its own slot's count is ≥ 1.
+
+### What a reference IS
+
+```coq
+Definition inode_ident k dq dev inum := i_dev (ientry k) ↦₄{dq} dev ∗ i_inum (ientry k) ↦₄{dq} inum.
+Definition inode_ref γ k q dev inum   := iref_tok γ k q ∗ inode_ident k (DfracOwn q) dev inum.
+```
+
+Note it takes no inode *pointer*: `ientry` determines the address from the
+slot and `ientry_inj` determines the slot from the address, so the two are
+interchangeable. `inode_ref_agree` — two references to one entry see the
+same `dev`/`inum` — falls out of fractional points-to agreement with no
+`agree` ghost, exactly as in the ftable.
+
+**This is the predicate `FileInv.inode_ref v q` (today literally `emp`) and
+`ProcInv.cwd_ref v = inode_ref v 1` are placeholders for.** Its signature
+does not match theirs: it needs `γ` (and reads the slot off the address).
+Two ways to close that, both recorded, neither taken here:
+`inode_ref` gains a `γ` parameter (ripples into `FileInv`, `ProcInv`,
+`SpecIput`, `SpecFileclose`, `kexit`), or `icacheG` carries the gname as a
+class field so the predicate's arity is unchanged. The second is cheaper
+and is what the ftable would have done if it had needed it.
+
+### The lock's resource
+
+```coq
+Definition islot_rest k q := match (1-q)%Qp with
+                            | Some q' => ∃ dev inum, inode_ident k (DfracOwn q') dev inum
+                            | None    => emp end.
+Definition islot M k := match M !! k with
+                        | None        => ∃ dev inum, inode_ident k (DfracOwn 1) dev inum
+                        | Some (q, _) => islot_rest k q end.
+Definition itable_res γ := ∃ M, itable_half γ M ∗ ⌜icM_wf M⌝ ∗ [∗ list] k < NINODE, islot M k.
+Definition is_itable γl γ := is_lock γl itable_lock "itable" (itable_res γ).
+```
+
+`icM_wf M` is two clauses: every live slot is in range, and every count is
+`< 2^31`. The count bound is not bookkeeping — it is what makes the `lw` +
+`sext.w` the code performs mean the count, and it is what kills `ilock`'s
+and `iunlock`'s `ref < 1` panic (`iref_word_live`, feeding
+`InodeLock.inode_ref_spos`).
+
+The `Qp.sub`-shaped `islot_rest` is the price of letting a lone holder be
+writable, and `islot_rest_join` is its payoff: a closer holding `q = qt`
+plus whatever the table kept has fraction 1 of the identity, i.e. enough to
+hand the slot back to `iget` as free.
+
+### Composition with `InodeLock.v` — it does not duplicate the seam, and it
+### does not yet compose with it either
+
+`InodeLock.inode_parked` (the sleeplock's payload) and
+`InodeLock.inode_key` (the `ghost_var` shadow that names the parked
+`dn`/`bm`) are **not restated** here, and `IcacheInv.v` deliberately does
+not mention them. Two things have to change in `InodeLock.v` before an
+`itable_res` can carry them, and neither is a change this effort should
+make unilaterally (`ProofIlock.v` is landed and proven):
+
+**(C1) `inode_parked`'s unloaded arm must stop owning a block map.**
+Today:
+
+```coq
+inode_parked γfs γi cov ls ip :=
+  ∃ v dn bm data, ⌜inode_ok cov ls dn bm data⌝ ∗ inode_key γi v dn bm ∗
+    i_valid ip ↦₄ valid_word v ∗ ind_res γfs bm ∗ inode_blocks γfs bm data ∗
+    (if v then inode_meta ip dn ∗ inode_addrs ip (bm_cells bm) else inode_raw ip)
+```
+
+At `v = false` — an entry `iget` has just minted — the sleeplock still owns
+`ind_res γfs bm` and `inode_blocks γfs bm data` for *some* `bm`. When
+`iget` recycles the slot to a **different inum**, those are the *previous*
+inode's blocks, and nothing can change them: the payload is inside a lock
+`iget` does not acquire, and the caller-side `inode_key` half cannot be
+retagged without the lock's half. `SpecIlock`'s premise
+`vv = false → ds !!! islot inum = dn` then asks the disk block of the *new*
+inum to hold the *old* `dn`, which is false. **As `InodeLock.v` stands, an
+icache cannot recycle a slot to a different inode** — i.e. `iget`'s recycle
+arm, which is most of `iget`, is unprovable.
+
+The fix is the one that also matches how xv6 thinks: an *unloaded* entry
+owns nothing. `inode_parked`'s `v = false` arm keeps only `inode_raw ip`
+and `i_valid ip ↦₄ 0`; the shadow becomes two-state
+(`Unloaded` / `Loaded dn bm`, i.e. `ghost_var … (option (dinode * blkmap))`);
+and `ilock`'s uncached arm draws `ind_res`/`inode_blocks` from the FS-level
+inode store (§7) by a fupd rather than from the lock, with
+`ds !!! islot inum = dn` becoming an *output* instead of a matched input.
+Cost: restate `inode_parked`/`inode_key`/`SpecIlock`, and re-prove the
+`il_load` half of `ProofIlock.v` — the instruction-level work is untouched,
+only where the block resources come from moves.
+
+**(C2) `i_valid` must be reachable without the sleeplock** (see §5).
+
+---
+
+## 4. The `ref` words go in an invariant — and `SpecIlock`'s `i_ref`
+## premise is unsatisfiable as written
+
+`SpecIlock.v` and `SpecIunlock.v` both take
+
+```coq
+  i_ref ip ↦₄{dqr} refv  -∗  …          with   0 < bv_unsigned refv < 2 ^ 31
+```
+
+i.e. the caller owns a *fraction of the ref cell at a pinned value* for the
+whole call. **No icache can supply that.** Owning any fraction of a cell
+forbids every other thread from writing it, and `idup(ip)` / `iput(ip)` on
+another core do write it — two processes holding references to one inode,
+one of them `ilock`ing while the other `idup`s, is the ordinary case
+(`sys_open` + `fork`). The premise is not merely awkward; it is
+unimplementable, and the contract compiles only because nothing has ever
+tried to discharge it.
+
+The fix is structural: **the `ref` words live in a shared Iris invariant**,
+not in `itable.lock`'s resource and not in any caller's hands.
+
+```coq
+Definition iref_cells M   := [∗ list] k < NINODE, i_ref (ientry k) ↦₄ iref_word M k.
+Definition itable_body γ  := ∃ M, itable_half γ M ∗ ⌜icM_wf M⌝ ∗ iref_cells M.
+Definition itable_inv γ   := inv icacheN (itable_body γ).      (* persistent *)
+```
+
+and `ilock`'s guard load becomes an atomic-update read:
+
+```coq
+Lemma iref_load_au Eo γ k q :
+  ↑icacheN ⊆ Eo →
+  itable_inv γ -∗ iref_tok γ k q -∗
+  |={Eo, Eo ∖ ↑icacheN}=> ∃ v : mword 32, i_ref (ientry k) ↦₄ v ∗
+     (i_ref (ientry k) ↦₄ v ={Eo ∖ ↑icacheN, Eo}=∗
+        ⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗ iref_tok γ k q)
+```
+
+which is exactly the shape `WpSconfMem.wp_load_s_sconf_au` takes at width
+4, with `StartedInv.started_inv_load_au` as the worked precedent — the
+`started` flag is the same situation (a plain global read lock-free by
+several harts). The delivered bounds are precisely what
+`InodeLock.inode_ref_spos` turns into "`bge x0,a5` falls through", so
+`ilock`'s and `iunlock`'s first panic stays dead with no new bitvector
+work. `iref_load_au` is proven in `IcacheInv.v`.
+
+**Cost of the change**: `SpecIlock.v`/`SpecIunlock.v` swap one premise
+(`i_ref ip ↦₄{dqr} refv` + the two bounds) for two (`itable_inv γic` +
+`iref_tok γic k q`), and `ProofIlock.v`/`ProofIunlock.v` replace one
+ordinary word-load leaf with `wp_load_s_sconf_au` at the guard. Everything
+downstream of the guard is unchanged. It is a half-day, not a rewrite —
+but it is a change to two landed, proven contracts, so it is recorded here
+and left unmade.
+
+Writes to `ref` (`iget`'s `sw a5,8(s1)` / `sw a5,8(s3)`, `idup`'s and
+`iput`'s `addiw ±1` pairs) open the same invariant, join the lock's half
+with the invariant's half into `own γ (● M)` (`itable_half_join`), run the
+matching `iref_*_step`, and re-split. Holding the lock's half between the
+`lw` and the `sw` is what makes the read-modify-write atomic *in the
+proof*: no other thread can move `M`, because moving it needs both halves.
+
+---
+
+## 5. The load-bearing theorem: `ip->ref == 1` ⟹ nobody else has it
+
+xv6 asserts, in a comment, that
+
+> `ip->ref == 1` means no other process can have `ip` locked, so this
+> `acquiresleep()` won't block (or deadlock).
+
+That sentence is doing three different jobs, and only two of them are the
+proof's business. Separating them is the point of this section.
+
+### (a) The deadlock claim is a LIVENESS claim and this logic does not see it
+
+`acquiresleep`'s spec in this tree (`completed/sleeplock.md`) is a partial
+-correctness WP: an iLöb retry loop over `SLEEP` that says *if it returns,
+you hold the lock and its resource*. Blocking forever is not unsound and
+not expressible. So the "won't block" half of the comment needs **no**
+theorem, and any design that spends effort proving it is spending it in the
+wrong place. Say so explicitly, because the comment reads like a
+proof obligation and it is not one.
+
+### (b) REF-1 EXCLUSIVITY — the part that IS load-bearing, and is free
+
+The safety-relevant statement is about *ownership*, not scheduling:
+
+> **Theorem (REF-1).** If a thread holds `iref_tok γ k q`, holds
+> `itable.lock` (hence `itable_half γ M`), and the invariant's `ref` word
+> for slot `k` reads 1, then `M !! k = Some (q, 1)` — the thread's `q` is
+> the entire outstanding share, so **no other reference to slot `k` exists
+> anywhere in the system**, and the thread may take fraction 1 of the
+> slot's identity and retire the entry.
+
+Proof: `iref_lookup` (proven in `IcacheInv.v`). `Some (q,1) ≼ Some (qt,n)`
+in `prodR fracR positiveR` splits into "equal" or "strictly below in both
+components"; `positiveR` has no zero, so `n = 1` rules the second case out,
+giving `q = qt`. The physical side is `iref_word`: the word is
+`mword_of_int (Z.pos n)`, so reading 1 *is* `n = 1`.
+
+**Cost: nothing beyond stating the algebra.** This is the same fact
+`FileInv.fref_tok_lookup` already gives `fileclose`, and it is the whole
+reason to reuse the Arc shape rather than a plain counter.
+
+`iref_lookup` also gives the converse (`q = qt → n = 1`), which is what
+tells a *non*-last closer that it is not the last one — needed so
+`iref_close_step`'s `qt - q = Some qr` side condition is dischargeable.
+
+### (c) The part that is NOT free: `iput` reads sleeplock-protected cells
+
+`iput` reads `ip->valid` and `ip->nlink` **before** it calls
+`acquiresleep`, holding only `itable.lock`:
+
+```
++0x18  lw   a4,8(s1)        ; ref
++0x1c  beq  a4,a5,+0x3c     ; ref == 1 ?          <-- short-circuits
+...
++0x3c  lw   a5,64(s1)       ; valid   (only reached when ref == 1)
++0x40  lh   a5,74(s1)       ; nlink
++0x48  addi a5,s1,16 ; +0x50 jal acquiresleep
+```
+
+The short-circuit is real and visible in the image: `valid` and `nlink` are
+loaded only on the `ref == 1` arm. Both cells are inside
+`InodeLock.inode_parked`, i.e. inside a sleeplock `iput` has not acquired.
+`iget` has the same problem in the other direction (`sw zero,64(s3)` on a
+recycled entry, no sleeplock).
+
+REF-1 says nothing about this. Iris's lock spec makes `is_sleeplock`
+*persistent* — any thread may attempt an acquire — so "no other thread
+holds the lock" is not derivable from any ownership fact, and the
+resource `iput` needs (the points-to for those two cells) is simply not
+reachable from what it holds.
+
+Three ways out were considered.
+
+- **(i) Move `i_valid` (and `nlink`) out of the sleeplock into the
+  reference tier, fractional.** Fails: `ilock` writes `valid = 1` and the
+  five metadata cells while holding possibly *not* the sole reference (two
+  processes can each hold a reference and one of them `ilock`s), so a
+  write would need fraction 1 it does not have.
+
+- **(ii) A second Iris invariant over `i_valid`, with the shadow held in
+  thirds.** Fails for the same reason in ghost clothing: a caller-side
+  third would pin `v`, and another reference holder's `ilock` legitimately
+  changes it.
+
+- **(iii) The bio escrow, and a reference share as the checkout token.**
+  This is the one that works, and it is a shape this tree has already paid
+  for (`completed/bio.md`: "a namespace invariant with a parked arm and a
+  checked-out arm, over a sleeplock that protects only a checkout token").
+  Per entry:
+
+  * a namespace invariant with two arms — **parked** (the entry's cells and
+    payload are inside) and **checked out** (a borrow marker is inside);
+  * the sleeplock protects only the exclusive *checkout token*;
+  * **the checked-out arm holds a slice of the entry's reference share.**
+    `ilock` pays a fraction of its own `iref_tok`/`inode_ident` in when it
+    checks the content out and takes it back at `iunlock`.
+
+  Then `iput`, having established REF-1 (`q = qt`, count 1), opens the
+  escrow invariant for its two loads: the checked-out arm would put a
+  second, disjoint share of slot `k` in existence, contradicting `q = qt`
+  via `iref_lookup`, so the escrow must be **parked** and the cells are
+  readable. `iget`'s `valid = 0` store on a free entry is the same argument
+  at `M !! k = None` (the escrow can hold no share of a slot the authority
+  does not list).
+
+  **This is where REF-1 is actually spent.** The Arc algebra alone proves
+  the exclusivity; the escrow is what converts exclusivity into *access*,
+  and without it xv6's comment has no formal counterpart at all.
+
+**Cost of (iii), honestly:** it is the single most expensive item in the
+icache. `InodeLock.inode_parked` becomes the escrow's parked arm rather
+than the sleeplock's payload (change **C2**), `SpecIlock`/`SpecIunlock`
+gain a reference-share premise and return it, and `ProofIlock.v`'s
+acquire/release seam moves from "the lock hands me `R`" to "the lock hands
+me a token, and the token opens the escrow". Estimate: comparable to the
+bio escrow itself, which is why the plan in §8 does it *last* and only
+because `iput` cannot be written without it.
+
+**Cheaper alternative, if the escrow is too much for a first cut:** state
+`iput`'s contract to take the sleeplock's payload as a *precondition*
+supplied by the caller — i.e. `iput` on an inode the caller has already
+`ilock`ed. That is wrong for `iunlockput` and for `kexit`'s `cwd`, so it is
+not a real option; recorded only so the next reader does not rediscover it
+as one.
+
+---
+
+## 6. HOW THE ICACHE DISCHARGES `itrunc`'S TWO OWED PREMISES
+
+`SpecItrunc.v` takes two hypotheses the model cannot supply
+(`fs-inode.md`, "OWED: an inode names only real block numbers"). They have
+**different** answers, and one of them is not an icache question at all.
+
+### (i) `∀ i ≤ MAXFILE, bm_slot bm i ≠ 0 → bv_unsigned (bm_slot bm i) < size`
+
+`fs-inode.md` says this "wants to live in one of two places: in
+`blkmap_wf`, which would have to take `size` … or in whatever invariant
+`ilock` establishes", and picks the second. **Both are wrong, and neither
+is needed.**
+
+`blkmap_wf cov logstart bm` *already* says every block the inode names is
+in `cov` (that is its fourth conjunct, the one `bread` and `log_write`
+demand). What is missing is one **pure geometry fact relating `cov` to the
+FS size**:
+
+```coq
+Definition cov_below (cov : gset Z) (size : Z) : Prop := ∀ z, z ∈ cov → z < size.
+```
+
+and then the owed premise is a two-line corollary — `IcacheInv.v`'s
+`blkmap_slot_inrange`, with `blkmap_get_inrange` / `blkmap_ind_inrange` as
+the two spellings a `bfree` caller actually has:
+
+```coq
+Lemma blkmap_slot_inrange cov logstart size bm :
+  cov_ok cov → cov_below cov size → blkmap_wf cov logstart bm →
+  ∀ i, (i ≤ MAXFILE)%nat → bv_unsigned (bm_slot bm i) ≠ 0 →
+    0 < bv_unsigned (bm_slot bm i) < size.
+```
+
+The `0 <` half comes free from `cov_ok`, which every caller already holds
+inside `log_geom_ok`. So `itrunc`'s premise (i) is replaced by a **pure
+premise of exactly the same character as `log_geom_ok`**, supplied from the
+same place, and *no invariant moves*: `blkmap_wf` does not change,
+`inode_ok` does not change, `ilock` does not change, and `bmap`/`writei`/
+`readi` are untouched.
+
+It is dischargeable rather than assumed, which is the standard this project
+holds a new premise to. `FsBoot.fs_cov_in cov ndisk` already says every
+covered block lies inside the disk image
+(`0 < b ∧ 1024*(b+1) ≤ ndisk`), and `sb.size` describes that same image, so
+
+```coq
+Lemma cov_below_of_image cov ndisk size :
+  (∀ b, b ∈ cov → 0 < b ∧ 1024 * (b+1) ≤ Z.of_nat ndisk) →
+  Z.of_nat ndisk ≤ 1024 * size → cov_below cov size.
+```
+
+closes it (proven in `IcacheInv.v`; the hypothesis is `fs_cov_in` spelled
+out rather than imported, so the file stays under the boot layer).
+
+**Where it goes in the contract**: `cov_below cov size` alongside
+`log_geom_ok cov logstart` in `SpecItrunc.v`, and thereafter in `SpecIput`
+and every FS contract that reaches `bfree`. The cleanest home is a single
+`fs_geom_ok cov logstart size := log_geom_ok cov logstart ∧ cov_below cov
+size` bundle, but that renames a premise in ~10 landed contracts, so it is
+recorded and not done.
+
+### (ii) `∀ i, length (data i) = BSIZE`
+
+This one really is an inode-layer invariant, and it really does belong in
+what `ilock` establishes — but not for the reason `fs-inode.md` gives.
+
+`bfree` returns the freed block to `BitmapInv.free_blk`, whose conjunct
+`⌜length bs = BSIZE⌝` is the obligation. Nothing above `fsblock` records a
+length: `FsBlocks.fsblock γ b bs` is a bare `ghost_map` half, and its
+authority is inside `log.lock`, so a caller cannot read a length fact out
+of it without taking the log lock. So unlike (i), this is *not* derivable
+from anything the model holds today.
+
+It **is** inductive over the inode layer, which is what makes it carriable:
+
+- `balloc` returns `fsblock γfs b (replicate BSIZE 0)` — sized;
+- `bmap` deposits exactly that into `inode_blocks` — sized;
+- `writei` replaces a block's bytes with a list of the same length;
+- `itrunc` empties to `fun _ => replicate BSIZE 0` — sized;
+- a hole is `replicate BSIZE 0` by `blk_holes_zero`, which is *already* an
+  `inode_ok` conjunct.
+
+So the home is **one more conjunct of `InodeLock.inode_ok`**, beside
+`blk_holes_zero` — the pure record `ilock` mints and `inode_parked` holds,
+and which every consumer of `inode_locked` already receives:
+
+```coq
+Definition inode_sized (data : nat → list (bv 8)) : Prop :=
+  ∀ i, (i < MAXFILE)%nat → length (data i) = BSIZE.
+```
+
+`IcacheInv.v` ships it with the three laws its producers need —
+`inode_sized_zero` (itrunc's and ialloc's output), `inode_sized_insert`
+(bmap's deposit, writei's block update) and `inode_sized_of_alloc` (a hole
+is sized for free, so a producer only reasons about allocated indices).
+Adding the conjunct to `inode_ok` is a one-line change plus one line in
+each of the ~6 places that build an `inode_ok`; it is left unmade because
+`inode_ok` lives in `InodeLock.v`, which this effort must not touch.
+
+**A necessary narrowing of the premise, which is a bug in
+`SpecItrunc.v`'s statement.** It reads `∀ i : nat, length (data i) =
+BSIZE` — *unbounded*. No holder of `inode_locked` can supply that: both
+`inode_blocks` and `blk_holes_zero` stop at `MAXFILE`, and `data` is a
+total function whose values above `MAXFILE` are unconstrained. The premise
+has to be `∀ i, (i < MAXFILE)%nat → …`, which is all itrunc's loops touch.
+As written, `iput` would inherit an undischargeable hypothesis.
+
+**And the better home, recorded and not taken.** The length is a
+*block-layer* truth, not an inode one — `BitmapInv.free_blk` already pairs
+`fsblock` with `⌜length bs = BSIZE⌝` by hand, and every block minted at
+boot is `fs_blocks dk b`, which is 1024 bytes by construction. Folding the
+conjunct into `fsblock` itself
+
+```coq
+Definition fsblock γ bno bs := ⌜length bs = BSIZE⌝ ∗ bno ↪[fs_L γ]{#(1/2)} bs.
+```
+
+retires it from `free_blk`, from `inode_ok`, from `itrunc`'s premise and
+from every future one at a stroke. The ripple is `FsBlocks.fsblock_update`
+gaining a `length bs_new = BSIZE` premise (its only caller is `log_write`'s
+ghost step, which writes a whole buffer) and `fs_alloc`'s per-block bundle
+proving it once from `fs_blocks`'s length. That is a change to
+`FsBlocks.v`, a file far below this one with many consumers, so it is
+recorded here and left unmade — but it is the right answer and whoever
+next touches `FsBlocks.v` should do it.
+
+### Summary
+
+| owed premise | home | cost |
+|---|---|---|
+| (i) blocks are in range | a **pure** `cov_below cov size` premise beside `log_geom_ok`; the per-slot fact is a corollary of the existing `blkmap_wf` | 1 new pure premise in `SpecItrunc`/`SpecIput`; **no invariant changes** |
+| (ii) blocks are BSIZE bytes | a new `inode_sized` conjunct of `InodeLock.inode_ok` — *or*, better, folded into `FsBlocks.fsblock` and then nowhere | one line in `inode_ok` + ~6 producers; the `fsblock` variant is bigger but retires the fact permanently |
+
+Neither is an icache *invariant*. That is the substantive correction to
+`fs-inode.md`'s guess.
+
+---
+
+## 7. What the icache still needs that does not exist: the inode STORE
+
+Falling out of (C1) in §3: when an entry is recycled, the previous inode's
+`ind_res` and `inode_blocks` have to go **somewhere**, and when a
+never-cached inode is `ilock`ed for the first time its blocks have to come
+**from** somewhere. The `fsblock`/`blk_own` for every covered block are
+minted at boot (`FsBoot.fs_alloc`) and today are partitioned between the
+bitmap's free pool (`BitmapInv.free_pool`), the log's own storage, and
+whatever the in-flight proofs hold. **The used data blocks of inodes that
+are not in the icache have no owner in the model.**
+
+That object — call it the inode store, an authoritative `inum ↦ (dinode,
+blkmap, data)` map owning the blocks of every allocated inode — is a
+separate piece of design from the icache, and `ialloc`, `ireclaim` and
+`namei` will all want it. The icache's interface to it is exactly two
+fupds, at `ilock`'s uncached arm (take) and at `iput`'s last close /
+`iget`'s recycle (put). Do not try to build the icache without at least
+fixing that interface, or (C1) comes back as an unprovable arm.
+
+`ireclaim` is worth reading before designing it: it is `fsinit`'s
+single-threaded orphan sweep, so it is the one caller that can establish
+the store's initial contents.
+
+---
+
+## 8. Order of work
+
+1. **`IcacheInv.v`** — done: geometry, algebra, the `ref` invariant, the
+   lock resource, and §6's two pure layers.
+2. **(C2 / §5(iii)) the per-entry escrow.** Everything else waits on it,
+   because `iput`'s first two loads do. Model it on `BioInv.v`.
+3. **(C1) `inode_parked`'s unloaded arm + the two-state shadow**, and the
+   inode store's interface (§7) — one change, since the arm's resources go
+   to the store.
+4. **`SpecIlock`/`SpecIunlock`**: swap the `i_ref` premise for
+   `itable_inv` + `iref_tok` (§4); add the escrow's reference share (§5);
+   re-prove the two guard loads and the acquire/release seam.
+5. **`inode_ok` gains `inode_sized`** (§6 (ii)), and `cov_below` enters
+   `SpecItrunc`/`SpecIput` (§6 (i)). Narrow `SpecItrunc`'s length premise
+   to `i < MAXFILE` at the same time.
+6. **`SpecIdup` / `ProofIdup`** — the smallest of the three, 54 bytes,
+   pure `acquire; ref++; release`, and the one that exercises
+   `iref_dup_step` end to end. Retires `LinkIdup.v`'s axiom.
+7. **`SpecIget` / `ProofIget`** — the scan (`ientry_step`,
+   `ientry_sentinel`), `iref_alloc_step`, and the store hand-off.
+8. **`SpecIput` / `ProofIput`** — REF-1, both close steps, and the whole
+   truncate arm. Retires `LinkIput.v`'s axiom, and with it the last fs-side
+   assumption in `kexit`'s cone.
+
+---
+
+## 9. Findings that contradict, or correct, existing notes
+
+- **`SpecIlock.v` / `SpecIunlock.v`'s `i_ref ip ↦₄{dqr} refv` premise is
+  unsatisfiable** by any icache (§4). Two landed, proven contracts are
+  affected. This is the kind of thing `fs-inode.md` itself warns about
+  ("the fourth time in this effort a contract was nearly written with a
+  premise its only caller could not supply") — here it was written.
+- **`fs-inode.md`'s guess about itrunc's premise (i) is wrong in both
+  branches** (§6): it is neither a `blkmap_wf` conjunct nor an `ilock`
+  invariant, but a pure `cov`-vs-`size` geometry premise, and the per-slot
+  fact then follows from the `blkmap_wf` that already exists.
+- **`SpecItrunc.v`'s second premise is stated unbounded** (`∀ i : nat`) and
+  must be narrowed to `i < MAXFILE`; as written no holder of
+  `inode_locked` can discharge it (§6 (ii)).
+- **`InodeLock.inode_parked`'s unloaded arm blocks slot recycling** (§3
+  C1) — i.e. it makes most of `iget` unprovable. This is the largest
+  structural finding and it is invisible from `ilock`'s own proof, which
+  never recycles anything.
+- **xv6's own comment about `itable.lock` protecting `ref`/`dev`/`inum` is
+  not the whole truth** (§2): `ilock`/`iunlock` read `ref` with no lock,
+  and `iput`/`iget` touch `valid` and `nlink` with no sleeplock. Both
+  exceptions are safe, and both cost real machinery.
+- **The "`acquiresleep()` won't block (or deadlock)" half of `iput`'s
+  comment needs no theorem** in this logic (§5 (a)). The load-bearing part
+  of that comment is an ownership statement, not a scheduling one.

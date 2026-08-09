@@ -130,9 +130,8 @@ Qed.
 Section leaf_addi.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_addi_leaf Φ (al4 : bool)
+  Lemma wwp_addi_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
       (npc0 : SailStdpp.Values.mword 64)
@@ -178,15 +177,15 @@ Section leaf_addi.
                    regval_into_reg (add_vec (m !!! Regidx rs1)
                                       (sign_extend' 64 imm))]> m) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrd Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hgf #Hbs Hhws Hcont".
     iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
     assert (Hacc0 : acc_wf pc 0) by (unfold acc_wf in Haccpc |- *; lia).
     (* the funnel: certificate = nowrite at the fetch-only trace *)
-    iApply (wwp_instr Φ pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
+    iApply (wwp_instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp
@@ -347,9 +346,8 @@ End leaf_addi.
 Section leaf_addi_rvc.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_addi_rvc_leaf Φ (al4 : bool)
+  Lemma wwp_addi_rvc_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (h : SailStdpp.Values.mword 16)
       (rs1 rd : mword 5) (imm : mword 12) (i0 : instruction) (m : regfile)
       (npc0 : SailStdpp.Values.mword 64)
@@ -400,14 +398,14 @@ Section leaf_addi_rvc.
                    regval_into_reg (add_vec (m !!! Regidx rs1)
                                       (sign_extend' 64 imm))]> m) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrd Hdecf Hagree HDmi Hgood Hdec Hgood0 Hexp.
     iIntros "Hmm Hpmpc Hpc Hnpc Hgf #Hbs Hhws Hcont".
     iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
     assert (Hacc0 : acc_wf pc 0) by (unfold acc_wf in Haccpc |- *; lia).
-    iApply (wwp_instr Φ pc true (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
+    iApply (wwp_instr pc true (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id))
                  [WEread wak_plain pc (if al4 then 4%N else 2%N)])
@@ -566,9 +564,8 @@ End leaf_addi_rvc.
 Section leaf_ori.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
 
-  Lemma wwp_ori_leaf Φ (al4 : bool)
+  Lemma wwp_ori_leaf (al4 : bool)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
       (npc0 : SailStdpp.Values.mword 64)
@@ -613,14 +610,14 @@ Section leaf_ori.
                    regval_into_reg (or_vec (m !!! Regidx rs1)
                                       (sign_extend' 64 imm))]> m) -∗
        hart_ws cpu_id ws' -∗
-       WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+       WWP Loop) -∗
+    WWP Loop.
   Proof.
     intros Hgid Hpmp Hal2 Hal4 Hrd Hdecf Hagree HDmi Hgood Hdec.
     iIntros "Hmm Hpmpc Hpc Hnpc Hgf #Hbs Hhws Hcont".
     iDestruct (winstr_bytes_acc_wf with "Hbs") as %Haccpc.
     assert (Hacc0 : acc_wf pc 0) by (unfold acc_wf in Haccpc |- *; lia).
-    iApply (wwp_instr Φ pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI))
+    iApply (wwp_instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI))
               pmpcfg0 (dq := DfracOwn q)
               (wP_eff (Some (fin_to_nat cpu_id)) (regonly_es al4 pc))
               wQ_pure Hgid Haccpc Hpmp

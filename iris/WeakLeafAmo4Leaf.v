@@ -457,9 +457,7 @@ End wP_eff_half.
 Section leaf.
   Context `{!riscvGS Σ, !weakGS Σ, !lockG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Implicit Types Φ : mval -> iProp Σ.
-
-  Lemma wwp_amo4_acq_leaf Φ (γ : gname) (lk : Arch.pa) (R : vProp Σ)
+  Lemma wwp_amo4_acq_leaf (γ : gname) (lk : Arch.pa) (R : vProp Σ)
       (pc : SailStdpp.Values.mword 64) (w : SailStdpp.Values.mword 32)
       (rs1 rs2 rd : mword 5) (q : Qp)
       (pmpcfg0 : type_of_register pmpcfg_n)
@@ -522,8 +520,8 @@ Section leaf.
          hart_ws cpu_id ws' -∗
          ((⌜v = lock_zero⌝ ∗ vwp_hold R ws' ∗ locked γ cpu_id)
           ∨ ⌜v ≠ lock_zero⌝) -∗
-         WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-    wacq_cb Φ γ lk R pc
+         WWP Loop) -∗
+    wacq_cb γ lk R pc
       (wP_eff_pin (Some (fin_to_nat cpu_id))
          ([WEread wak_plain pc 4]
           ++ [WEread (AkInfo false true true) lk 4;
@@ -833,7 +831,7 @@ Section leaf.
       A caller instantiates the attempt premise with [wwp_amo4_acq_leaf]
       (its conclusion IS this [wacq_cb], definitionally) and is left, per
       instruction, with nothing about the weak machine at all. *)
-  Corollary wwp_amo4_acquire_loop Φ (γ : gname) (lk : Arch.pa) (R : vProp Σ)
+  Corollary wwp_amo4_acquire_loop (γ : gname) (lk : Arch.pa) (R : vProp Σ)
       (pca pcb : SailStdpp.Values.mword 64)
       (akf2 : akinfo) (pf2 : Arch.pa) (nf2 : N)
       (K Kb : iProp Σ) :
@@ -842,19 +840,19 @@ Section leaf.
     acc_wf pcb 4 ->
     acc_wf lk 4 ->
     inv wlockN (wlock_inv γ lk R) -∗
-    □ (K -∗ ▷ (Kb -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         wacq_cb Φ γ lk R pca
+    □ (K -∗ ▷ (Kb -∗ WWP Loop) -∗
+         wacq_cb γ lk R pca
            (wP_eff_pin (Some (fin_to_nat cpu_id))
               ([WEread wak_plain pca 4]
                ++ [WEread (AkInfo false true true) lk 4;
                    WEwrite (AkInfo false true false) lk 4 lock_one]))) -∗
-    □ (Kb -∗ (K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}) -∗
-         wbr_cb Φ pcb
+    □ (Kb -∗ (K -∗ WWP Loop) -∗
+         wbr_cb pcb
            (wP_eff (Some (fin_to_nat cpu_id)) [WEread akf2 pf2 nf2]) wQ_pure) -∗
-    K -∗ WP (Loop : expr weak_riscv_lang) {{ Φ }}.
+    K -∗ WWP Loop.
   Proof.
     intros Hgid Hacca Haccb Hacclk. iIntros "#Hinv #Hatt #Hbr HK".
-    iApply (wwp_acquire_loop_real Φ γ lk R pca pcb _ _ _ K Kb
+    iApply (wwp_acquire_loop_real γ lk R pca pcb _ _ _ K Kb
               Hgid Hacca Haccb Hacclk
               (wcert_amo_aq_pin_base4 (fin_to_nat cpu_id) pca
                  (AkInfo false true true) (AkInfo false true false) lk lock_one

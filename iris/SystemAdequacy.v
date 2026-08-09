@@ -112,16 +112,16 @@ Section SystemBoot.
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
-         WP (LoopE gen_id c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
-      WP (UartLoopE gen_id : expr riscv_lang) @ ⊤ {{ _, True }} ∗
-      WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ {{ _, True }} ∗
-      WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤ {{ _, True }}.
+         WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
+      WP (UartLoopE gen_id : expr riscv_lang) @ ⊤ ∗
+      WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ ∗
+      WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
     intro Hbf. iIntros "Hres".
-    iMod (boot_shared_alloc g XV6_DISK_BYTES (fun _ => True%I) Hbf with "Hres")
+    iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
       as (Hfd γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
-        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Huart &
+        #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Hpst & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
     iDestruct "Huart" as (l0) "(Htx & #Hsent & #Hlb)".
     iDestruct "Hdlab" as (b0) "Hdlab".
@@ -134,32 +134,32 @@ Section SystemBoot.
     iDestruct (dev_inv_disk with "Hdev") as "#Hvinv".
     iDestruct (dev_inv_perm with "Hdev") as "#Hqinv".
     iModIntro.
-    iSplitL "Hh0 Hhrest Hlk Hgl Hhalves Hpark Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+    iSplitL "Hh0 Hhrest Hlk Hgl Hhalves Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
-                            {{ _, True }})%I).
-      iSplitL "Hh0 Hlk Hgl Hhalves Hpark Htx Hdlab Hcfg Hclaim Hkpt Hkmap
+)%I).
+      iSplitL "Hh0 Hlk Hgl Hhalves Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         iDestruct "Hh0" as (iv) "Hh0".
-        iApply (boot_hart_primary (CID := 0%fin) (fun _ => True%I)
+        iApply (boot_hart_primary (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
-                  with "Htext Hdata Hh0 Hpanic Hstarted Hlk Hgl Hhalves Hpark
+                  with "Htext Hdata Hh0 Hpanic Hstarted Hlk Hgl Hhalves Hpark Hpst
                         Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone Hkpt Hkmap
                         Hpages"). }
       (* THE SEVEN SECONDARIES: every element of the tail is an [FS]. *)
       iApply (big_sepL_impl with "Hhrest").
       iIntros "!>" (k c _) "Hh".
       iDestruct "Hh" as (iv) "Hh".
-      iApply (boot_hart_secondary (CID := FS c) (fun _ => True%I)
+      iApply (boot_hart_secondary (CID := FS c)
                 (g.(gregs) (FS c)) iv DfracDiscarded γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hpanic Hstarted"). }
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv") |].
     iSplitR;
-      [iApply (wp_disk_loop γv _ Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
+      [iApply (wp_disk_loop γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
     iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
   Qed.
 

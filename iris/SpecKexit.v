@@ -77,7 +77,7 @@
    out the trap CSRs the chain payload demands.  kexit's own
    acquire(&wait_lock) produces that pay and the release(&wait_lock) before
    sched() spends the SECOND acquire's, so kexit is balanced and asks the
-   caller for no [trap_csrs_pay] -- the sys_pause rule.
+   caller for no [arm_pay] -- the sys_pause rule.
 
    [is_lock γw wait_lock_addr ... wait_res] -- kexit is the second consumer
    of the parent table after kwait, and takes it exactly as kwait does.
@@ -110,13 +110,10 @@ Require Import KernelText.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import ProcGeom CpuOwn.
-Require Import SwtchCtx.
 Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
-Require Import PipeInv.
-Require Import SpecIput.
 Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.
@@ -141,7 +138,7 @@ Definition wp_kexit_sconf_body
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
-    (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -172,12 +169,11 @@ Definition wp_kexit_sconf_body
   cpu_own 0 eb pj C b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   panic_wp_any -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
-  own_ctx (p_context pj) -∗
-  park_hlf j true -∗
+  running_claim j -∗
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)
@@ -203,7 +199,7 @@ Definition wp_kexit_sconf_body
   fd_slots FDSPARE -∗
   proc_priv γf pj pid V -∗
   (* NO continuation: kexit does not return.  See the header. *)
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang).
 
 (* ---------------------------------------------------------------------- *)
 (* WHAT THE CONSUMPTION LIST IS FOR, checked here.                          *)
@@ -241,7 +237,7 @@ Module Type KEXIT.
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -252,7 +248,7 @@ Module Type KEXIT.
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate),
-      wp_kexit_sconf_body γft γf γw Φ γs j γl γu γd γk pd pav pu bn γ γfs
+      wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                           cov logstart dev ip dqi γkl γka on fn
                           m av eb C b pid V.
 End KEXIT.

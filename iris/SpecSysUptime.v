@@ -16,7 +16,7 @@
    universally quantified in the continuation -- with an invariant that says
    nothing about ticks, nothing more can be said, and a caller must accept any
    reading.  Interrupt/noff bookkeeping is acquire's: the count returns to [n]
-   and no [trap_csrs_pay] escapes.  Calls no per-process state, but acquire
+   and no [arm_pay] escapes.  Calls no per-process state, but acquire
    pins tp = [cid_word]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -40,8 +40,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 
-Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl : gname)
+Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_uptime in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -62,13 +61,12 @@ Definition wp_sys_uptime_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : 
       sie_cap_gpr mf av b p -∗
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSUPTIME.
   Parameter wp_sys_uptime_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl : gname)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId} (γl : gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) (b : bool),
-      wp_sys_uptime_sconf_body Φ γl m n eb p C av b.
+      wp_sys_uptime_sconf_body γl m n eb p C av b.
 End SYSUPTIME.

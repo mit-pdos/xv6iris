@@ -50,7 +50,6 @@ Require Import CpuOwn FdSlots.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import SpecAcquire SpecRelease SpecSleep SpecFreeDesc.
-Require Import SwtchCtx.
 Require Import ProofVirtioDiskRwB.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -97,7 +96,7 @@ Section ProofVirtioDiskRwCSeam.
   (* The ORIGINAL [fr] facts still travel: P4's window argument needs the  *)
   (* fourth disjoint triple to be free before the allocator cleared it.    *)
   (* ------------------------------------------------------------------- *)
-  Definition vdrw_p3_exit (CID0 : CPU) (γk : gname) (Φ : mval -> iProp Σ)
+  Definition vdrw_p3_exit (CID0 : CPU) (γk : gname) 
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -115,20 +114,19 @@ Section ProofVirtioDiskRwCSeam.
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (K - 12)%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
-       trap_csrs_pay 0 eb -∗
+       arm_pay 0 eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) -∗
-       own_ctx (p_context (proc_addr j)) -∗
-       park_hlf j true -∗
+       running_claim j -∗
        locked γk cpu_id -∗
        vdrw_body γd pd pav np nr fl pk tr
          (fr_upd (fr_upd (fr_upd fr h false) m2 false) t false) -∗
        vdrw_chain pd b h m2 t wr sector -∗
        vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* P3, packaged as the wand P2.3 consumes. *)
-  Lemma wp_vdrw_p3_seam (γk : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_vdrw_p3_seam (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -136,26 +134,26 @@ Section ProofVirtioDiskRwCSeam.
     kernel_text -∗
     disk_geom γd pd pav pu -∗
     b_disk b ↦₄ dsk0 -∗
-    vdrw_p3_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
-    P2.vdrw_p2_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0.
+    vdrw_p3_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
+    P2.vdrw_p2_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector m0.
   Proof.
     iIntros "#Htext #Hgeom Hbd Hexit".
     rewrite /P2.vdrw_p2_exit.
     iIntros (CIDx Hsx M np nr fl pk tr fr h m2 t) "%Hrh %Hfacts %Hdisj0 %Hal
-             Hcg Hown Hpay Hpc Hctx Hpark Htok Hbody Hbh Hbm Hbt Hidx".
+             Hcg Hown Hpay Hpc Hpark Htok Hbody Hbh Hbm Hbt Hidx".
     destruct Hrh as (Hregs & Hhi).
     destruct Hfacts as (Hok & Hfrh & Hfrm & Hfrt).
     destruct Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8).
     cbn in Hh8, Hm8, Ht8.
     iDestruct "Hgeom" as "(Hdp & _)".
-    iApply (wp_vdrw_p3 (CID := CIDx) Φ (proc_addr j) M (K - 12)%nat pd sp0 b wr sector h m2 t dsk0
+    iApply (wp_vdrw_p3 (CID := CIDx) (proc_addr j) M (K - 12)%nat pd sp0 b wr sector h m2 t dsk0
               Hh8 Hm8 Ht8 Hregs
               with "Hcg Htext Hpc Hdp Hidx Hbh Hbm Hbt Hbd [-]").
     iIntros (M1) "%F Hcg Hpc Hidx Hchain".
     destruct F as (Hcs & H1a0 & H1a1 & H1a5).
     iSpecialize ("Hexit" $! CIDx with "[%]"); [wp_next_chain|].
     iApply ("Hexit" $! M1 np nr fl pk tr fr h m2 t
-              with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hctx Hpark Htok Hbody
+              with "[%] [%] [%] [%] [%] Hcg Hown Hpay Hpc Hpark Htok Hbody
                     Hchain Hidx").
     - split; [| exact (vdrw_hi_frame M M1 m0 Hcs Hhi)].
       destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).

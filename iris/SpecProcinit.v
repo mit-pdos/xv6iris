@@ -148,7 +148,7 @@ End SpecProcinit.
 Section ProcinitSeals.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname).
+  Context (γ : gname)  (γs : list gname).
 
   (* ---- what the postcondition is FOR ----
      One [proc_ready i], plus the two public cells procinit does not touch,
@@ -162,18 +162,16 @@ Section ProcinitSeals.
     p_chan (proc_addr i) ↦₈ ch -∗
     proc_pub (proc_addr i) -∗
     park_at_full (proc_addr i) false -∗
+    (* the slot's state mirror, whole, at the UNUSED procinit just stored *)
+    pstate_lock (proc_addr i) UNUSED -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
-    proc_lock_res Φ γs γl (proc_addr i).
+    proc_lock_res γs γl (proc_addr i).
   Proof.
-    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark".
+    iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg".
     iFrame "Hlk Hks".
-    iExists UNUSED, ch. iFrame "Hst Hch Hpub".
-    rewrite /proc_slots.
-    rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-    rewrite (_ : inv_dormant UNUSED = true); [| vm_compute; reflexivity].
-    rewrite not_running_UNUSED.
-    iSplitR; [done|]. iFrame "Hdorm Hpark".
+    iExists UNUSED, ch. iFrame "Hst Hg Hch Hpub".
+    iApply (proc_slots_unused_intro with "Hdorm Hpark").
   Qed.
 
 End ProcinitSeals.
@@ -192,7 +190,7 @@ End ProcinitSeals.
 (*  [γs] is EXISTENTIAL in the conclusion, so this section must not     *)
 (*  have it as a section variable (which is why it is not in            *)
 (*  ProcinitSeals).  That existential is also the whole difficulty:     *)
-(*  every proc lock's resource [proc_lock_res Φ γs _ _] mentions the   *)
+(*  every proc lock's resource [proc_lock_res γs _ _] mentions the   *)
 (*  list of all 64 names (through [p_sched]), so the names have to be    *)
 (*  chosen BEFORE any invariant is allocated -- hence                    *)
 (*  [WpLock.newlock_delayed] and the two passes below.                  *)
@@ -200,7 +198,7 @@ End ProcinitSeals.
 Section ProcinitProcsInv.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (γ : gname) (Φ : mval -> iProp Σ).
+  Context (γ : gname) .
 
   (* [lk_fresh] in the three pieces [newlock]/[newlock_delayed] take.  The
      only content is that [lk_cpu] and [WpLock.lock_cpu] are the same address
@@ -220,16 +218,17 @@ Section ProcinitProcsInv.
      (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
      proc_pub (proc_addr i) ∗
      proc_dormant (proc_addr i) UNUSED ∗
-     park_at_full (proc_addr i) false)%I.
+     park_at_full (proc_addr i) false ∗
+     pstate_lock (proc_addr i) UNUSED)%I.
 
   Lemma proc_ready_split (i : nat) (ch : mword 64) :
     proc_ready i -∗ p_chan (proc_addr i) ↦₈ ch -∗ proc_pub (proc_addr i) -∗
-    park_at_full (proc_addr i) false -∗
+    park_at_full (proc_addr i) false -∗ pstate_lock (proc_addr i) UNUSED -∗
     lk_fresh (proc_addr i) "proc"%string ∗ proc_res i.
   Proof.
     rewrite /proc_ready /proc_res.
-    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark".
-    iFrame "Hks Hst Hpub Hdorm Hpark". iExists ch. iExact "Hch".
+    iIntros "($ & Hst & Hks & Hdorm) Hch Hpub Hpark Hg".
+    iFrame "Hks Hst Hpub Hdorm Hpark Hg". iExists ch. iExact "Hch".
   Qed.
 
   (* PASS ONE, generic: pick [n] lock ghost names, each with the wand that
@@ -267,22 +266,28 @@ Section ProcinitProcsInv.
      consumes) becomes the scheduler's [procs_inv]. *)
   Lemma procs_inv_alloc (E : coPset) :
     ([∗ list] i ∈ seq 0 NPROC,
-       (proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-        proc_pub (proc_addr i)) ∗ park_full i false)
-    ={E}=∗ ∃ γs : list gname, procs_inv Φ γs.
+       ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+         proc_pub (proc_addr i)) ∗ park_full i false) ∗
+       pstate_full i UNUSED)
+    ={E}=∗ ∃ γs : list gname, procs_inv γs.
   Proof.
     iIntros "Hin".
     (* 1. peel [lk_fresh] out of each [proc_ready] *)
     iDestruct (big_sepL_impl
-                 (fun _ i => ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
-                               proc_pub (proc_addr i)) ∗ park_full i false)%I)
+                 (fun _ i => (((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
+                                proc_pub (proc_addr i)) ∗ park_full i false) ∗
+                              pstate_full i UNUSED)%I)
                  (fun _ i => (lk_fresh (proc_addr i) "proc"%string ∗ proc_res i)%I)
                  (seq 0 NPROC) with "Hin []") as "Hin".
-    { iIntros "!>" (k i Hk) "((Hrdy & Hch & Hpub) & Hpark)".
+    { iIntros "!>" (k i Hk) "(((Hrdy & Hch & Hpub) & Hpark) & Hg)".
       apply lookup_seq in Hk. destruct Hk as [-> Hlt].
       iDestruct "Hch" as (ch) "Hch".
-      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark]").
-      iApply (park_at_full_intro k false Hlt with "Hpark"). }
+      iApply (proc_ready_split with "Hrdy Hch Hpub [Hpark] [Hg]").
+      { iApply (park_at_full_intro k false Hlt with "Hpark"). }
+      (* UNUSED is [unclaimed], so the whole variable is the lock's share *)
+      rewrite /pstate_lock unclaimed_UNUSED.
+      iDestruct (pstate_split k UNUSED with "Hg") as "[Hg1 Hg2]".
+      iSplitL "Hg1"; iApply (pstate_at_intro k _ UNUSED Hlt); iFrame. }
     (* 2. choose the 64 ghost names; the resources are still owed *)
     iMod (delayed_locks_alloc E "proc"%string proc_addr proc_res NPROC with "Hin")
       as (γs) "[%Hlen Hmk]".
@@ -292,21 +297,17 @@ Section ProcinitProcsInv.
                  (fun i g => ((∀ R : iProp Σ, R ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
                               ∗ proc_res i)%I)
                  (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string
-                                        (proc_lock_res Φ γs g (proc_addr i)) ∗
+                                        (proc_lock_res γs g (proc_addr i)) ∗
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
-    { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark)]".
+    { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg)]".
       iMod (word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
-      iMod ("Hmk" $! (proc_lock_res Φ γs g (proc_addr i))
-              with "[Hst Hch Hpub Hdorm Hpark]") as "#Hlk".
-      { iApply (proc_lock_res_intro Φ γs g (proc_addr i) UNUSED ch
-                  with "Hst Hch Hpub [Hdorm Hpark]").
-        rewrite /proc_slots.
-        rewrite (_ : needs_ctx UNUSED = false); [| vm_compute; reflexivity].
-        rewrite (_ : inv_dormant UNUSED = true); [| vm_compute; reflexivity].
-        rewrite not_running_UNUSED.
-        iSplitR; [done|]. iFrame "Hdorm Hpark". }
+      iMod ("Hmk" $! (proc_lock_res γs g (proc_addr i))
+              with "[Hst Hg Hch Hpub Hdorm Hpark]") as "#Hlk".
+      { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
+                  with "Hst Hg Hch Hpub [Hdorm Hpark]").
+        iApply (proc_slots_unused_intro with "Hdorm Hpark"). }
       iModIntro. iFrame "Hlk". iExists (kstack_va i). iExact "Hksp". }
     iMod (big_sepL_fupd with "Hmk") as "Hmk".
     rewrite (big_sepL_sep (PROP:=iPropI Σ)).
@@ -318,8 +319,7 @@ Section ProcinitProcsInv.
 
 End ProcinitProcsInv.
 
-Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
+Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.procinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* procinit's own frame is 8 slots (addi sp,sp,-64: ra, s0..s6); initlock
@@ -343,12 +343,11 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
     lk_fresh pid_lock_addr "nextpid"%string -∗
     lk_fresh wait_lock_addr "wait_lock"%string -∗
     ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PROCINIT.
   Parameter wp_procinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (K : nat) (b : bool) (p : mword 64),
-      wp_procinit_sconf_body Φ m K b p.
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64),
+      wp_procinit_sconf_body m K b p.
 End PROCINIT.

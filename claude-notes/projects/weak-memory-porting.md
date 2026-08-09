@@ -51,6 +51,7 @@ These are search-and-replace with a type check, in the order you hit them.
 | `iProp Σ` (a spec's resources) | `vProp Σ` (`WeakVProp`) | only for assertions about mutable RAM; everything else stays an `iProp` and is embedded `⎡·⎤` |
 | `instr pc is_rvc i` | `WeakFunnel.winstr pc is_rvc i` | the DECODE half transfers verbatim (it is a pure fact about an arbitrary `mstate`); the byte half becomes timestamp-0 `wlat_pointsto` text elements — and the footprint is always FOUR bytes, even for a compressed instruction |
 | `InstrBytes.wp_instr` | `WeakFunnel.wwp_instr` | see §2d; same premises, one extra `set_reg` on the caller's execute fact, two fewer register obligations |
+| `WP e` (SC, Φ-free since main's postcondition removal) | `WWP e` / `WWP e @ E` (`WeakGhost.wwp_triv`) | a DISTINCT token, deliberately: both languages' `expr` convert to `mexpr`, so a same-syntax `WP` twin could elaborate a weak statement at the WRONG language and still compile.  No `{{ Φ }}` anywhere; no `(… : expr weak_riscv_lang)` annotation either — `wwp_triv`'s argument type pins the language.  If a generic iris wp lemma fails to `iApply`, pin `(Λ := weak_riscv_lang)` |
 
 **The register/CSR/config tower does not move at all.**  `hw_config`,
 `mmode_config`, the sconf bundles, `kmap_static_claims`, `pc_is`, `↦ᵣ`, all
