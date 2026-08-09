@@ -58,7 +58,7 @@ Two lemmas do the work at the parking seam, both in SchedCtx.v:
 `proc_slots_running` (tag half + slot → `st = RUNNING`, whole tag, `own_ctx`,
 the `c->proc` half, the record) and `proc_slots_running_intro` (the converse).
 
-## The `c->proc` half
+## The `c->proc` half — AND AN OPEN QUESTION, SEE STEP 0 BELOW
 
 `cpus[h].proc` is split in two.  One half is in `IntrDefs.cpu_cells`, i.e. in
 the running thread's `cpu_own`; a thread reads the field with it (`myproc()`).
@@ -74,11 +74,14 @@ passes one half into `cpu_own` and the other straight through, and
 the half in that proc's `run_slot`; reclaim takes it back out of the lock and
 stores 0.  main stops being the collector.
 
+That is the state of the branch as committed.  **Step 0 below argues the split
+should not exist at all any more, and should be tried first.**
+
 NOTE, this was got wrong once: the half must NOT be a conjunct of `proc_held`.
 `proc_held` is the generic lock-holder payload, taken by allocproc and kill on
 procs the holder is not running, and `cpu_proc_half i (proc_addr j)` asserts
-hart `i` IS running proc `j`.  It belongs in `run_slot`, which `is_running`
-guards.
+hart `i` IS running proc `j`.  If the split survives step 0 it belongs in
+`run_slot`, which `is_running` guards, and nowhere else.
 
 ## Deleted
 
@@ -105,6 +108,51 @@ The tree as a whole does not build.
 
 ## Remaining work, in dependency order
 
+### 0. FIRST: does `cpus[h].proc` still need to be split at all?
+
+Probably not.  Try removing the split before writing any of the parking
+proofs, because those are what would bake the assumption in.
+
+The argument that it is now dead weight:
+
+- The tie between "proc `j` is RUNNING" and "hart `h` runs it" is carried by
+  the HART TAG, a ghost variable, not by the memory cell.
+- The tie between a thread's own `c->proc` and its identity is carried by
+  `cpu_own`'s index: `cpu_own n eb p C false` contains `cpu_proc_half cpu_id p`
+  and `cpu_claim p` is indexed by the same `p`, so `myproc()` is provable from
+  the thread's own half alone.
+- `run_slot`'s `∃ h` collapses off the tag, not off the cell.
+- With `scheds_inv` gone, NO invariant reads `cpus[h].proc`.  The field is
+  genuinely private to hart `h`, which is what the C does.
+- The one thing the split provably bought was `SchedCtx.cpu_own_full_is_vacuous`
+  — a thread holding the whole cell contradicted `scheds_inv`'s fraction, which
+  is what forced `scheds_take` to be non-trivial.  That lemma is deleted.  The
+  comment at `IntrDefs.v:688-696` still cites it as the reason for the split;
+  it is a fossil, not a justification.
+
+So: give `cpu_own` the whole cell and see what fails.
+
+- `IntrDefs.cpu_cells`: `cpu_proc_half cpu_id p` → `a_cpu_proc cid_word ↦₈ p`.
+- `SchedCtx.run_slot`: drop the `cpu_proc_half h pa` conjunct, keeping the tag
+  half and the record.  Adjust `proc_slots_running` /
+  `proc_slots_running_intro` (their only consumers — nothing is written
+  against them yet, which is why now is the moment).
+- Revert today's boot plumbing: `BootShared.boot_hart_bss` back to carving one
+  cell rather than two halves, `BootBridge.boot_bridge`'s pass-through premise
+  and output, and the `cpu_proc_half cpu_id p0` premise on `SpecScheduler`,
+  `SpecMain`, `SpecMainSecondary`, `ProofMain.mn_grp_started`.  See commit
+  `4f99b421` for exactly what to undo.
+- Churn it costs: `SpecScheduler.sc_cpu_own_open` / `sc_cpu_own_mk`,
+  `ProofMyproc.v:378`, and whatever else destructures `cpu_cells`.  Strictly
+  less than it deletes.
+
+If it holds, the scheduler's two stores need no lock and no invariant at all —
+they are plain stores to private memory — which is a much better story than the
+one currently written above.  If the scheduler turns out to be unable to
+produce the whole cell at its stores, that surfaces in step 5 and the conjunct
+goes back; better to learn it from a failed obligation than to keep a conjunct
+with no justification.
+
 ### 1. `ProofKwait.v` (7 sites) — mechanical
 
 - `:580` `proc_slots gs pa ZOMBIE -∗ proc_dormant pa ZOMBIE ∗ park_at_full pa false`
@@ -123,6 +171,9 @@ The tree as a whole does not build.
 - `:1161` `scheds_take` — real surgery, same shape as ProofYield below.
 
 ### 3. `ProofYield.v` (7) — DO THIS ONE FIRST of the parking paths
+
+It is also the test for step 0: if dropping the `c->proc` conjunct from
+`run_slot` breaks anything on the parking side, it breaks here.
 
 It exercises the full round trip and validates the design end to end.
 
@@ -161,7 +212,7 @@ rebuilt, not patched.
 
 ### 6. Stale comments only
 
-`IntrDefs.v:688-696`, `SchedCtx.v:69,73` (`schedsN` and the `fin_enum_lookup` /
+`IntrDefs.v:688-696` (see step 0 — this one is a fossil either way), `SchedCtx.v:69,73` (`schedsN` and the `fin_enum_lookup` /
 `cpu_enum_lookup` plumbing are now unused — delete if nothing else wants them),
 `SpecScheduler.v:56`, `SpecConsoleread.v:26`, `SpecIput.v:54-55`,
 `SpecBalloc.v:96-97`, `SpecKexit.v:58`, `ProofBwrite.v:418-419`,
