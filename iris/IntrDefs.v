@@ -777,25 +777,36 @@ Section IntrDefs.
   (* ([own_ctx] vs [▷ proc_ctx]).  Pinning RUNNING here is what lets yield   *)
   (* take the raw context cells from the lock without a park receipt to      *)
   (* refute USED for it.                                                     *)
+  (* TWO HALVES, both keyed on the claimed proc: half #2 of its state mirror,
+     pinned at RUNNING, and its HART TAG at this hart.  The state half is the
+     right to write [p->state] and the tag is what lets the holder collapse
+     the existential hart of [SchedCtx.run_slot], i.e. reach ITS hart's parked
+     scheduler out of the proc lock it takes.  Both are hart-pinned and both
+     are needed by a park, which is why they live in the arm rather than in a
+     caller's frame: a PREEMPTING kerneltrap holds no frame of the thread it
+     interrupted. *)
   Definition cpu_claim (p : mword 64) : iProp Σ :=
     (⌜ p = zero_reg ⌝ ∨
      ∃ j : nat,
-       ⌜ proc_addr j = p /\ (j < NPROC)%nat ⌝ ∗ pstate_hlf j RUNNING)%I.
+       ⌜ proc_addr j = p /\ (j < NPROC)%nat ⌝ ∗
+       pstate_hlf j RUNNING ∗ hart_hlf j cpu_id)%I.
 
   Lemma cpu_claim_idle : ⊢ cpu_claim zero_reg.
   Proof. iLeft. done. Qed.
 
   Lemma cpu_claim_proc (j : nat) :
-    (j < NPROC)%nat -> pstate_hlf j RUNNING -∗ cpu_claim (proc_addr j).
-  Proof. iIntros (Hj) "H". iRight. iExists j. by iFrame. Qed.
+    (j < NPROC)%nat ->
+    pstate_hlf j RUNNING -∗ hart_hlf j cpu_id -∗ cpu_claim (proc_addr j).
+  Proof. iIntros (Hj) "H Ht". iRight. iExists j. by iFrame. Qed.
 
   Lemma cpu_claim_elim (j : nat) :
-    (j < NPROC)%nat -> cpu_claim (proc_addr j) -∗ pstate_hlf j RUNNING.
+    (j < NPROC)%nat ->
+    cpu_claim (proc_addr j) -∗ pstate_hlf j RUNNING ∗ hart_hlf j cpu_id.
   Proof.
-    iIntros (Hj) "[%Hz | (%j' & [%Hpa %Hj'] & Hh)]".
+    iIntros (Hj) "[%Hz | (%j' & [%Hpa %Hj'] & Hh & Ht)]".
     - exfalso. exact (proc_addr_nonzero j Hj Hz).
     - assert (Hjj : j' = j) by exact (proc_addr_inj j' j Hj' Hj Hpa).
-      subst j'. iExact "Hh".
+      subst j'. iFrame "Hh Ht".
   Qed.
 
   (* The claim rides the arm seam exactly as the trap CSRs do, and with the
