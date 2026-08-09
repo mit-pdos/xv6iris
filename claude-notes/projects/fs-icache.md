@@ -35,7 +35,38 @@ recipes below.
       at `Efs := ⊤`; `wp_log_write_sconf` unchanged.
 - [x] Full build green (EC2 -j30, 0 Errors, lemma_diff clean).
 
-## C2 — iupdate onto `dinode_at` (branch)
+## C2 — iupdate onto `dinode_at` (DONE 2026-08-09, six files, clean
+## remote build 906 .vo / 0 errors, lemma_diff clean vs bc377b06)
+
+Findings worth keeping (the recipes below were followed and worked;
+deltas from them):
+
+- **`SpecWritei`'s region record is TWO-armed**: writei's `-1` early
+  return (`off > size` / `off+n > MAXFILE*BSIZE`) never reaches iupdate,
+  so the continuation's existential is `dn0'` with `dn0' = dn0` on the
+  error arm and `dn0' = dn'` on the flush arm. An unconditional
+  `dinode_at γi inum dn'` postcondition is UNPROVABLE — remember this
+  shape for every future contract over a function whose flush is
+  conditional (iput's truncate arm will meet it too).
+- **No opaque receipt binder was needed in ProofIupdate** (unlike C1's
+  `Fb` in ProofLogWrite): the receipt is the concrete
+  `dinode_at γi inum dn`, so the interior continuation bundle names it
+  directly. The binder trick is only for universally-quantified Φ.
+- **`ProofIupdate.iu_held_L`** (lines ~160–186) is the extract/restore
+  pair for the payload's machinery `fs_L` half over both polarities —
+  `ProofLogWrite.lw_pay_split` is sealed inside its module and NOT
+  reusable. C3's ilock read needs the same move: use `iu_held_L` as the
+  model (or lift it somewhere shared).
+- `ProofItrunc` keeps its interior `Hrange` hypothesis verbatim: the
+  main lemma re-derives it from `cov_below` via
+  `IcacheInv.blkmap_slot_inrange` in three lines; the five inner lemmas
+  and the bfree call sites are untouched. Cheaper than threading the new
+  premise down.
+- `SpecItrunc`'s length premise was ALREADY narrowed to `i < MAXFILE`
+  in the landed file — design §6(ii)'s "necessary narrowing" note
+  described its own past. Only the range premise (i) actually moved.
+
+Original plan (kept for the record):
 
 **SpecIupdate v2** (the statement delta, worked out):
 - drop the `(ds : list dinode)` parameter and the `diblk_wf ds` premise —
@@ -114,12 +145,24 @@ only where the block resources come from moves).
   Retires `LinkIput.v`'s axiom and the last fs-side assumption in
   kexit's cone.
 
-## Deferred / owed
+## C7 — the boot wiring (`ireg_alloc` + pool stocking)
 
-- `ireg_alloc` (boot): building the initial region map from the mkfs
-  image's dinode blocks and minting every `dinode_at` — FsBoot wiring,
-  stated as owed in `InodeRegion.v`'s header. The pool's stocking and
-  `ireclaim` belong to the same seam.
+IN SCOPE (user-confirmed 2026-08-09), after C6. One seam, two halves:
+
+- `ireg_alloc`: from the boot-time `fsblock` big-op over the inode
+  blocks (out of `FsBoot.fs_alloc`'s partition), build the initial
+  region map and mint every `dinode_at`, allocating `ireg_inv`. The
+  caller must exhibit `dss : list (list dinode)` with `Forall diblk_wf`
+  and the image bytes AT `diblk_bytes` of them — i.e. a pure decode of
+  the mkfs image's inode blocks; that existence layer is part of this
+  cycle. Stated as owed in `InodeRegion.v`'s header.
+- Pool stocking: `itable_res`'s uncached-inum bundles (`dinode_at +
+  ind_res + inode_blocks + inode_ok`) come from the same partition, at
+  iinit's `newlock` — which is what lets iinit link into main. Read
+  `ireclaim` before designing the initial contents (it is fsinit's
+  single-threaded orphan sweep, the one caller that can establish them).
+
+## Deferred / owed
 - The `fsblock`-carries-its-length fold (design §6(ii), better home) —
   whoever next touches `FsBlocks.v`.
 - `FileInv.inode_ref`/`ProcInv.cwd_ref` placeholders → `IcacheInv.inode_ref`

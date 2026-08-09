@@ -23,15 +23,23 @@
    flush, and its contract is correspondingly a single arm.
 
    THE CONTRACT (claude-notes/design/fs-inode.md, "iupdate -- the flush").
-   Everything goes in and comes back out unchanged EXCEPT the inode block,
-   which comes back at
+   Everything goes in and comes back out unchanged EXCEPT THE INUM'S OWN
+   ON-DISK RECORD, which comes back at [dn] -- the in-memory inode.
 
-     diblk_bytes (<[islot inum := dn]> ds)
+   THE BLOCK PREMISE IS GONE (claude-notes/design/fs-icache.md, §11.3 and
+   §12).  [fsblock] is per BLOCK and a dinode block holds SIXTEEN inodes,
+   so a contract that takes the block's half for the duration of the call
+   is unsatisfiable by two lock holders in the same block.  The inode
+   REGION ([InodeRegion.v]) owns the halves instead and never lets them
+   out; the caller holds the EXCLUSIVE per-inum fragment
+   [dinode_at γi inum dn0] plus the persistent [ireg_inv], and iupdate
+   hands it back retagged at [dn].  The sixteen-dinode list [ds] is now
+   proof-internal: iupdate learns it at its own bread, via
+   [InodeRegion.ireg_read].
 
-   -- the same sixteen on-disk inodes with slot [inum mod IPB] replaced by
-   the in-memory one.  [DinodeEnc.v] keeps the block in the IMAGE of
-   [diblk_bytes] exactly so that this is one insert on a list of pure
-   records and no byte list ever has to be exhibited.
+   [dn0] IS THE STALE ON-DISK RECORD AND NEED NOT EQUAL [dn].  An inode
+   with unflushed changes is the normal caller -- that is what iupdate is
+   for -- so nothing here ties the fragment's value to [inode_meta]'s.
 
    THE FIVE SCALARS AND THE THIRTEEN ADDRS COME FROM DIFFERENT RESOURCES.
    [inode_meta ip dn] owns ip->type/major/minor/nlink/size at [dn]'s scalar
@@ -51,11 +59,8 @@
    log_write, which wants one of its own; brelse returns it.
 
    NO [blk_own].  iupdate establishes no injectivity -- it installs no block
-   number anywhere -- so it needs no exclusive token.  The inode block holds
-   SIXTEEN different inodes' dinodes, and who owns it is deferred exactly as
-   the bitmap is (design doc, "Who owns an inode block"): iupdate takes the
-   whole block's [fsblock] half and hands it back updated at one slot, which
-   is correct and does not prejudge the icache sharing design.
+   number anywhere -- so it needs no exclusive token.  Who owns an inode
+   block is no longer deferred: the region does (see above).
 
    THE SUPERBLOCK FIELD rides as a plain fractional cell, the way
    SpecInitlog.v takes [sb + 20] for logstart -- read once at +0x18 and
@@ -95,6 +100,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import InodeRegion.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
@@ -111,17 +117,17 @@ Definition K_iupdate : nat := 44%nat.
 
 Definition wp_iupdate_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    
+
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names)
-    (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
     (ip : mword 64) (inum : mword 32)
-    (dn : dinode) (bm : blkmap) (ds : list dinode)
+    (dn dn0 : dinode) (bm : blkmap)
     (u : nat)
     (pidv : mword 32) (dq dqd dqn dqs : dfrac)
     (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
@@ -142,8 +148,10 @@ Definition wp_iupdate_sconf_body
      log_write's *)
   IBLOCK inum inodestart ∈ cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
-  (* the block really IS sixteen well-formed dinodes *)
-  diblk_wf ds ->
+  (* the inum is one the region covers: [nib] inode blocks, sixteen inums
+     each.  This replaces the old [diblk_wf ds] premise -- the region owns
+     the well-formedness of every block it holds. *)
+  bv_unsigned inum < 16 * Z.of_nat nib ->
   (* ...and the record whose scalars [inode_meta] owns names exactly the
      thirteen addrs cells [inode_map] owns.  THE tie between the two
      resources; see the header. *)
@@ -172,8 +180,11 @@ Definition wp_iupdate_sconf_body
   inode_map γfs ip bm -∗
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-  (* THE INODE BLOCK, as sixteen pure dinodes *)
-  fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+  (* THE INODE REGION, and THIS INUM'S on-disk record: the exclusive
+     per-inum fragment that replaced the block half (design §11.3/§12).
+     [dn0] is the STALE record -- it need not equal [dn]. *)
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi inum dn0 -∗
   (* the caller's own pid cell (bread's acquiresleep records it) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
@@ -199,9 +210,8 @@ Definition wp_iupdate_sconf_body
       inode_meta ip dn -∗
       inode_map γfs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      (* THE FLUSH: slot [inum mod IPB] now holds the in-memory inode *)
-      fsblock γfs (IBLOCK inum inodestart)
-              (diblk_bytes (<[islot inum := dn]> ds)) -∗
+      (* THE FLUSH: this inum's on-disk record is now the in-memory one *)
+      dinode_at γi inum dn -∗
       bslots bn 2 -∗
       log_op γ u -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -210,22 +220,22 @@ Definition wp_iupdate_sconf_body
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      
+
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
-      (dn : dinode) (bm : blkmap) (ds : list dinode)
+      (dn dn0 : dinode) (bm : blkmap)
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                            cov logstart inodestart dev ip inum dn bm ds u
+      wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                            cov logstart inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb C b.
 End IUPDATE.

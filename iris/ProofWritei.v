@@ -60,6 +60,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import InodeRegion.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
@@ -165,7 +166,7 @@ Local Ltac widx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 (* ===================================================================== *)
 Section WriteiDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   (* writei's 112-byte frame.  Slot k sits at [sp0 - 8k], i.e. at
      [sp_new + (112 - 8k)]:
@@ -242,23 +243,23 @@ Section WriteiDefs.
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
   Definition wi_cont `{GEN : GenId} `{CID0 : CpuId}
-      (γfs : fs_names) (bn : bio_names) (γ : log_names) (γf : gname)
-      (cov : gset Z) (logstart inodestart : Z) (dev : mword 32)
+      (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
+      (γf : gname)
+      (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
-      (dn : dinode) (ds : list dinode)
+      (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
       (V : pprivate) (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
       ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
-        (dn' : dinode) (ds' : list dinode) (n' : nat)
+        (dn' dn0' : dinode) (n' : nat)
         (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd),
         ⌜callee_saved m mf⌝ -∗
         ⌜blkmap_wf cov logstart bm'⌝ -∗
         ⌜blk_holes_zero bm' data'⌝ -∗
-        ⌜diblk_wf ds'⌝ -∗
         ⌜di_addrs dn' = bm_cells bm'⌝ -∗
         ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
         ⌜bm_covers bm' (bv_unsigned (di_size dn'))⌝ -∗
@@ -276,12 +277,12 @@ Section WriteiDefs.
           /\ (bv_unsigned (di_size dn) < Z.of_nat off
               \/ (MAXFILE * BSIZE < off + n)%nat)
           /\ tot = 0%nat /\ dist = 0%nat
-          /\ bm' = bm /\ data' = data /\ dn' = dn /\ ds' = ds
+          /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
           /\ n' = ncount)
          \/ (mf !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
              /\ (tot <= n)%nat
              /\ dn' = wi_dinode dn bm' off tot
-             /\ ds' = <[islot inum := dn']> ds)⌝ -∗
+             /\ dn0' = dn')⌝ -∗
         ⌜((ncount - wi_cost off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
         ⌜uptd_ext (pv_upt V) P'⌝ -∗
         sie_cap_gpr mf K b (proc_addr j) -∗
@@ -295,7 +296,7 @@ Section WriteiDefs.
         inode_blocks γfs bm' data' -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
         bm_alloc_res γfs cov logstart A -∗
-        fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds') -∗
+        dinode_at γi inum dn0' -∗
         (if user
          then proc_priv γf (proc_addr j) pidv (upd_upt V P')
          else [∗ list] i ∈ seq 0 n,
@@ -317,14 +318,15 @@ Definition wi_sp (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section WriteiRet.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma wi_ret `{GEN : GenId} `{CID0 : CpuId} 
-      (γfs : fs_names) (bn : bio_names) (γ : log_names) (γf : gname)
-      (cov : gset Z) (logstart inodestart : Z) (dev : mword 32)
+      (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
+      (γf : gname)
+      (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (bm bm' : blkmap) (data data' : nat -> list (bv 8))
-      (dn dn' : dinode) (ds ds' : list dinode)
+      (dn dn' dn0 dn0' : dinode)
       (user : bool) (off n tot : nat) (src_bytes wrote : nat -> bv 8)
       (dist : nat) (dstb : nat -> bv 8)
       (V : pprivate) (P' : uptd) (ncount n' : nat)
@@ -342,7 +344,6 @@ Section WriteiRet.
     (* ...and the answer is in a0 *)
     blkmap_wf cov logstart bm' ->
     blk_holes_zero bm' data' ->
-    diblk_wf ds' ->
     di_addrs dn' = bm_cells bm' ->
     bv_unsigned (di_size dn') < 2 ^ 31 ->
     bm_covers bm' (bv_unsigned (di_size dn')) ->
@@ -360,12 +361,12 @@ Section WriteiRet.
       /\ (bv_unsigned (di_size dn) < Z.of_nat off
           \/ (MAXFILE * BSIZE < off + n)%nat)
       /\ tot = 0%nat /\ dist = 0%nat
-      /\ bm' = bm /\ data' = data /\ dn' = dn /\ ds' = ds
+      /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
       /\ n' = ncount)
      \/ (M !!! Regidx Ra0 = (mword_of_int (Z.of_nat tot) : mword 64)
          /\ (tot <= n)%nat
          /\ dn' = wi_dinode dn bm' off tot
-         /\ ds' = <[islot inum := dn']> ds)) ->
+         /\ dn0' = dn')) ->
     ((ncount - wi_cost off n)%nat <= n')%nat -> (n' <= ncount)%nat ->
     uptd_ext (pv_upt V) P' ->
     sie_cap_gpr M (K - 14)%nat b (proc_addr j) -∗
@@ -381,23 +382,23 @@ Section WriteiRet.
     inode_blocks γfs bm' data' -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bm_alloc_res γfs cov logstart A -∗
-    fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds') -∗
+    dinode_at γi inum dn0' -∗
     (if user
      then proc_priv γf (proc_addr j) pidv (upd_upt V P')
      else [∗ list] i ∈ seq 0 n,
             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
     bslots bn 3 -∗
     log_op γ n' -∗
-    wi_cont (CID0 := CID0) γfs bn γ γf cov logstart inodestart dev ip inum
-            bm data dn ds user off n src_bytes V ncount pidv dq dqd dqn dqs A j
+    wi_cont (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
+            bm data dn dn0 user off n src_bytes V ncount pidv dq dqd dqn dqs A j
             m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
-           Hwf' Hhz' Hdswf' Hadr' Hsz' Hcov' Hdb Hd0 Hrange Hker Harm Hlo Hhi Hext.
+           Hwf' Hhz' Hadr' Hsz' Hcov' Hdb Hd0 Hrange Hker Harm Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hidev Hinum
-              Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont".
+              Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop Hcont".
     iPoseProof (wri_dc with "Htext") as "Hid6".
     iPoseProof (wri_de with "Htext") as "Hid8".
     iPoseProof (wri_e0 with "Htext") as "Hida".
@@ -648,13 +649,12 @@ Section WriteiRet.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /wi_cont.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P8 tot bm' data' dn' ds' n' wrote dist dstb P'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hfsb
+    iApply ("Hcont" $! P8 tot bm' data' dn' dn0' n' wrote dist dstb P'
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                     Hsrc Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hwf'. }
     { exact Hhz'. }
-    { exact Hdswf'. }
     { exact Hadr'. }
     { exact Hsz'. }
     { exact Hcov'. }
@@ -674,17 +674,18 @@ End WriteiRet.
 (* ===================================================================== *)
 Section WriteiJoin.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma wi_join `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (γfs : fs_names) (bn : bio_names) (γ : log_names) (γf : gname)
-      (cov : gset Z) (logstart inodestart : Z) (dev : mword 32)
+      (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
+      (γf : gname)
+      (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (bm bm' : blkmap) (data data' : nat -> list (bv 8))
-      (dn dn' : dinode) (ds : list dinode)
+      (dn dn' dn0 : dinode)
       (user : bool) (off n tot : nat) (src_bytes wrote : nat -> bv 8)
       (dist : nat) (dstb : nat -> bv 8)
       (V : pprivate) (P' : uptd) (ncount u : nat)
@@ -695,7 +696,7 @@ Section WriteiJoin.
     0 <= inodestart ->
     IBLOCK inum inodestart ∈ cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
-    diblk_wf ds ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
     di_addrs dn' = bm_cells bm' ->
     blkmap_wf cov logstart bm' ->
     blk_holes_zero bm' data' ->
@@ -745,25 +746,26 @@ Section WriteiJoin.
     inode_blocks γfs bm' data' -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bm_alloc_res γfs cov logstart A -∗
-    fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn0 -∗
     (if user
      then proc_priv γf (proc_addr j) pidv (upd_upt V P')
      else [∗ list] i ∈ seq 0 n,
             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
     bslots bn 3 -∗
     log_op γ (S u) -∗
-    wi_cont (CID0 := CID0) γfs bn γ γf cov logstart inodestart dev ip inum
-            bm data dn ds user off n src_bytes V ncount pidv dq dqd dqn dqs A j
+    wi_cont (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
+            bm data dn dn0 user off n src_bytes V ncount pidv dq dqd dqn dqs A j
             m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hdswf Hadr Hwf' Hhz' Hsz' Hcov'
+    intros HK Hgeom Hist Hicov Hilog Hnib Hadr Hwf' Hhz' Hsz' Hcov'
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hrange Hker Htotn Hdneq
            Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev Hinum
-              Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont".
+              Hmeta Hmap Hblocks Hsb Hba #Hireg Hdn Hsrc Hsl Hop Hcont".
     iPoseProof (wri_d2 with "Htext") as "Hicc".
     iPoseProof (wri_d4 with "Htext") as "Hice".
     iPoseProof (wri_d8 with "Htext") as "Hid2".
@@ -830,15 +832,15 @@ Section WriteiJoin.
     assert (Hdirlen : length (bm_dir bm') = NDIRECT)
       by exact (blkmap_wf_dir_len cov logstart bm' Hwf').
     iDestruct (wi_slots_split bn 2 1 with "Hsl") as "[Hsl2 Hsl1]".
-    iApply (IU.wp_iupdate_sconf γs j γl γu γd γk pd pav pu bn γ γfs
-              cov logstart inodestart dev ip inum dn' bm' ds u
+    iApply (IU.wp_iupdate_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi
+              cov logstart inodestart nib dev ip inum dn' dn0 bm' u
               pidv dq dqd dqn dqs T1 (K - 14)%nat true C b
-              HKiu Hgeom Hist Hicov Hilog Hdswf Hadr Hdirlen Hj Hgl HT1a0 eq_refl
+              HKiu Hgeom Hist Hicov Hilog Hnib Hadr Hdirlen Hj Hgl HT1a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
-                    Hsb Hfsb Hppid Hprocs Hdevi Hdgeom
+                    Hsb Hireg Hdn Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl2 Hop").
     iIntros (CID3 Hq3 mI) "%Hcs1 Hcg Hcnt Hpc Hppid Hidev Hinum
-                           Hmeta Hmap Hsb Hfsb Hsl2 Hop".
+                           Hmeta Hmap Hsb Hdn Hsl2 Hop".
     assert (Hpcd2 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (WI + 0xd8)) by (rewrite HT1ra; pcw).
     iEval (rewrite Hpcd2) in "Hpc".
@@ -938,18 +940,19 @@ Section WriteiJoin.
     assert (Hdwf' : dinode_wf dn').
     { rewrite /dinode_wf Hadr /bm_cells length_app Hdirlen /=.
       unfold NDIRECT. lia. }
-    iApply (wi_ret (CID0 := CID5)  γfs bn γ γf cov logstart inodestart dev ip inum
-              bm bm' data data' dn dn' ds (<[islot inum := dn']> ds)
+    iApply (wi_ret (CID0 := CID5) γfs γi bn γ γf cov logstart inodestart nib
+              dev ip inum
+              bm bm' data data' dn dn' dn0 dn'
               user off n tot src_bytes wrote dist dstb V P' ncount u
               pidv dq dqd dqn dqs A j m T3 K C b
               HK HT3sp HT3s1 HT3s3 HT3s8 HT3s9 HT3s10 HT3s11
-              Hwf' Hhz' (diblk_wf_insert ds (islot inum) dn' Hdswf Hdwf')
+              Hwf' Hhz'
               Hadr Hsz' Hcov' Hdb Hd0 Hrange Hker
               ltac:(right; split_and!;
                     [exact HT3a0 | exact Htotn | exact Hdneq | reflexivity])
               Hlo Hhi Hext
               with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hinum
-                    Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
+                    Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
     iApply (wp_next_shift (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
               with "Hcont").
   Qed.
@@ -963,17 +966,18 @@ End WriteiJoin.
 (* ===================================================================== *)
 Section WriteiSize.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma wi_size `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (γfs : fs_names) (bn : bio_names) (γ : log_names) (γf : gname)
-      (cov : gset Z) (logstart inodestart : Z) (dev : mword 32)
+      (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
+      (γf : gname)
+      (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (bm bm' : blkmap) (data data' : nat -> list (bv 8))
-      (dn : dinode) (ds : list dinode)
+      (dn dn0 : dinode)
       (user : bool) (off n tot : nat) (src_bytes wrote : nat -> bv 8)
       (dist : nat) (dstb : nat -> bv 8)
       (V : pprivate) (P' : uptd) (ncount u : nat)
@@ -984,7 +988,7 @@ Section WriteiSize.
     0 <= inodestart ->
     IBLOCK inum inodestart ∈ cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
-    diblk_wf ds ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
     blkmap_wf cov logstart bm' ->
     blk_holes_zero bm' data' ->
     (* COVERAGE, in the two halves the loop leaves it in: at the OLD size
@@ -1034,19 +1038,20 @@ Section WriteiSize.
     inode_blocks γfs bm' data' -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bm_alloc_res γfs cov logstart A -∗
-    fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn0 -∗
     (if user
      then proc_priv γf (proc_addr j) pidv (upd_upt V P')
      else [∗ list] i ∈ seq 0 n,
             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
     bslots bn 3 -∗
     log_op γ (S u) -∗
-    wi_cont (CID0 := CID0) γfs bn γ γf cov logstart inodestart dev ip inum
-            bm data dn ds user off n src_bytes V ncount pidv dq dqd dqn dqs A j
+    wi_cont (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
+            bm data dn dn0 user off n src_bytes V ncount pidv dq dqd dqn dqs A j
             m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hdswf Hwf' Hhz' HcovS HcovT Hszlt Hofflt
+    intros HK Hgeom Hist Hicov Hilog Hnib Hwf' Hhz' HcovS HcovT Hszlt Hofflt
            Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hrange Hker Htotn Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
     change (2 ^ 31)%Z with 2147483648%Z in Hszlt, Hofflt.
@@ -1057,7 +1062,7 @@ Section WriteiSize.
                   ltac:(clear -Hofflt; lia) HcovS HcovT).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev Hinum
-              Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont".
+              Hmeta Hmap Hblocks Hsb Hba #Hireg Hdn Hsrc Hsl Hop Hcont".
     iPoseProof (wri_bc with "Htext") as "Hib6".
     iPoseProof (wri_c0 with "Htext") as "Hiba".
     iPoseProof (wri_c4 with "Htext") as "Hibe".
@@ -1291,11 +1296,11 @@ Section WriteiSize.
         iSplitL "HfD"; [iExists _; iExact "HfD"|]. iExact "HfE". }
       iDestruct (cpu_own_transport CID0 CIDz3 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (wi_join (CID0 := CIDz3)  γs j γl γu γd γk pd pav pu γfs bn γ γf
-                cov logstart inodestart dev ip inum bm bm' data data' dn
-                (wi_dinode dn bm' off tot) ds user off n tot src_bytes wrote
+      iApply (wi_join (CID0 := CIDz3) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
+                cov logstart inodestart nib dev ip inum bm bm' data data' dn
+                (wi_dinode dn bm' off tot) dn0 user off n tot src_bytes wrote
                 dist dstb V P' ncount u pidv dq dqd dqn dqs A m QB5 K C b
-                HK Hgeom Hist Hicov Hilog Hdswf eq_refl Hwf' Hhz'
+                HK Hgeom Hist Hicov Hilog Hnib eq_refl Hwf' Hhz'
                 ltac:(rewrite Hdsz; change (2 ^ 31)%Z with 2147483648%Z; exact Hszlt)
                 Hcovf
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
@@ -1303,7 +1308,7 @@ Section WriteiSize.
                 Hdb Hd0 Hrange Hker Htotn eq_refl Hlo Hhi Hext
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
-                      Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
+                      Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID0) (CIDb := CIDz3) ltac:(wp_next_chain)
                 with "Hcont").
     - (* ---------- IT IS NOT: store the new size, restore, fall through -- *)
@@ -1493,11 +1498,11 @@ Section WriteiSize.
       assert (Hszn : bv_unsigned (di_size (wi_dinode dn bm' off tot)) < 2147483648).
       { rewrite Hdsz. rewrite moi32_small; [lia |].
         change (2 ^ 32)%Z with 4294967296%Z. lia. }
-      iApply (wi_join (CID0 := CIDQA5)  γs j γl γu γd γk pd pav pu γfs bn γ γf
-                cov logstart inodestart dev ip inum bm bm' data data' dn
-                (wi_dinode dn bm' off tot) ds user off n tot src_bytes wrote
+      iApply (wi_join (CID0 := CIDQA5) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
+                cov logstart inodestart nib dev ip inum bm bm' data data' dn
+                (wi_dinode dn bm' off tot) dn0 user off n tot src_bytes wrote
                 dist dstb V P' ncount u pidv dq dqd dqn dqs A m QA5 K C b
-                HK Hgeom Hist Hicov Hilog Hdswf eq_refl Hwf' Hhz'
+                HK Hgeom Hist Hicov Hilog Hnib eq_refl Hwf' Hhz'
                 ltac:(change (2 ^ 31)%Z with 2147483648%Z; exact Hszn)
                 Hcovf
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
@@ -1505,7 +1510,7 @@ Section WriteiSize.
                 Hdb Hd0 Hrange Hker Htotn eq_refl Hlo Hhi Hext
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
-                      Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
+                      Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID0) (CIDb := CIDQA5) ltac:(wp_next_chain)
                 with "Hcont").
   Qed.
@@ -1528,7 +1533,7 @@ End WriteiSize.
 (* ===================================================================== *)
 Section WriteiLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Ltac reg_neq := vm_compute; discriminate.
 
@@ -1548,11 +1553,12 @@ Section WriteiLoop.
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (γfs : fs_names) (bn : bio_names) (γ : log_names) (γf γa : gname)
-      (cov : gset Z) (logstart inodestart : Z) (dev : mword 32)
+      (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
+      (γf γa : gname)
+      (cov : gset Z) (logstart inodestart : Z) (nib : nat) (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
-      (dn : dinode) (ds : list dinode)
+      (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
       (V : pprivate) (ncount : nat) (usv : mword 64)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac) (A : bm_alloc)
@@ -1562,7 +1568,7 @@ Section WriteiLoop.
     0 <= inodestart ->
     IBLOCK inum inodestart ∈ cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
-    diblk_wf ds ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
     bv_unsigned (di_size dn) < 2 ^ 31 ->
     (Z.of_nat off < 2 ^ 31) ->
     (Z.of_nat n < 2 ^ 31) ->
@@ -1629,19 +1635,20 @@ Section WriteiLoop.
     inode_blocks γfs bmI dataI -∗
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bm_alloc_res γfs cov logstart A -∗
-    fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn0 -∗
     (if user
      then proc_priv γf (proc_addr j) pidv (upd_upt V PI)
      else [∗ list] i ∈ seq 0 n,
             pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
     bslots bn 3 -∗
     log_op γ nI -∗
-    wi_cont (CID0 := CID0) γfs bn γ γf cov logstart inodestart dev ip inum
-            bm data dn ds user off n src_bytes V ncount pidv dq dqd dqn dqs A j
+    wi_cont (CID0 := CID0) γfs γi bn γ γf cov logstart inodestart nib dev ip inum
+            bm data dn dn0 user off n src_bytes V ncount pidv dq dqd dqn dqs A j
             m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hdswf Hszdn Hofflt Hnlt Hrng Husv Hj Hgl.
+    intros HK Hgeom Hist Hicov Hilog Hnib Hszdn Hofflt Hnlt Hrng Husv Hj Hgl.
     pose proof HK as HK'. unfold K_writei in HK'.
     change (2 ^ 31)%Z with 2147483648%Z in Hszdn, Hofflt, Hnlt.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
@@ -1664,7 +1671,7 @@ Section WriteiLoop.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
               #Hprocs
               #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev Hinum
-              Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont".
+              Hmeta Hmap Hblocks Hsb Hba #Hireg Hdn Hsrc Hsl Hop Hcont".
     iPoseProof (wri_82 with "Htext") as "Hi82".
     iPoseProof (wri_86 with "Htext") as "Hi86".
     iPoseProof (wri_88 with "Htext") as "Hi88".
@@ -1847,18 +1854,18 @@ Section WriteiLoop.
       iEval (rewrite Htgtbc) in "Hpc".
       iDestruct (cpu_own_transport CIDa4 CIDa6 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (wi_size (CID0 := CIDa6)  γs j γl γu γd γk pd pav pu γfs bn γ γf
-                cov logstart inodestart dev ip inum bm bm2 data data2 dn ds
+      iApply (wi_size (CID0 := CIDa6) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
+                cov logstart inodestart nib dev ip inum bm bm2 data data2 dn dn0
                 user off n tot src_bytes wroteI 0%nat wroteI V PI ncount uX
                 pidv dq dqd dqn dqs A m B1 K C b
-                HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz2 HcovS2 HcovT2
+                HK Hgeom0 Hist Hicov Hilog Hnib Hwf2 Hhz2 HcovS2 HcovT2
                 Hszdn ltac:(lia)
                 Hj Hgl HB1sp HB1s5 HB1s2 HB1s3 ltac:(lia) ltac:(intros; reflexivity)
                 (wi_range_dist0 data data2 off tot wroteI wroteI Hrange2)
                 HkerI ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) HextI
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
-                      Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
+                      Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CIDa3) (CIDb := CIDa6) ltac:(wp_next_chain)
                 with "Hcont").
     - (* ============ bmap found a block: bread it ============ *)
@@ -2118,7 +2125,7 @@ Section WriteiLoop.
           pc_is (mword_of_int (WI + 0x4c) : mword 64) -∗
           WP (Loop : expr riscv_lang))%I
         with "[Hcnt Hcont Hframe Hppid Hidev Hinum Hmeta Hmap Hsb
-               Hba Hfsb Hsrc Hsl2 Hop Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
+               Hba Hdn Hsrc Hsl2 Hop Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
       { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs1 %Hbs4 %Hbs7
                               %Hbs5 %Hbs2 %Hbs6 %Hbs3 %Hbs9 %Hbs8 Hcg Hpc".
         assert (Hmm1 : (1 <= mm)%nat) by (rewrite Hmmd; rewrite Hbsz in Holt |- *; lia).
@@ -2725,13 +2732,13 @@ Section WriteiLoop.
             destruct uX as [| uY]; [exfalso; lia|].
             iDestruct (cpu_own_transport CIDc7 CIDc11 0 true (proc_addr j) C b
                          ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-            iApply (wi_size (CID0 := CIDc11)  γs j γl γu γd γk pd pav pu γfs bn γ γf
-                      cov logstart inodestart dev ip inum bm bm2 data
-                      (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn ds
+            iApply (wi_size (CID0 := CIDc11) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
+                      cov logstart inodestart nib dev ip inum bm bm2 data
+                      (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn dn0
                       user off n (tot + mm)%nat src_bytes wrote2 0%nat wrote2
                       V P2 ncount uY
                       pidv dq dqd dqn dqs A m G3 K C b
-                      HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz3 HcovS2 Hcov3
+                      HK Hgeom0 Hist Hicov Hilog Hnib Hwf2 Hhz3 HcovS2 Hcov3
                       Hszdn ltac:(lia)
                       Hj Hgl HG3sp HG3s5 HG3s2 HG3s3
                       ltac:(lia) ltac:(intros; reflexivity)
@@ -2739,7 +2746,7 @@ Section WriteiLoop.
                       Hker3 ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) Hext2
                       with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                             Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
-                            Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
+                            Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
             iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDc11)
                       ltac:(wp_next_chain) with "Hcont").
           * (* ---------- another block: back to the head at +0x82 ------- *)
@@ -2780,7 +2787,7 @@ Section WriteiLoop.
                       with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx
                             Hkenv Hprocs
                             Hdevi Hdgeom Hdlock Hframe Hppid Hidev Hinum
-                            Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont").
+                            Hmeta Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop Hcont").
 
         + (* ====== THE COPY FAILED PART-WAY (kernel defect D1's fix) ======
              copyin has already memmove'd a PREFIX of the chunk into the
@@ -2936,12 +2943,12 @@ Section WriteiLoop.
           destruct uX as [| uY]; [exfalso; lia|].
           iDestruct (cpu_own_transport CIDd7 CIDd7 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (wi_size (CID0 := CIDd7)  γs j γl γu γd γk pd pav pu γfs bn γ γf
-                    cov logstart inodestart dev ip inum bm bm2 data
-                    (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn ds
+          iApply (wi_size (CID0 := CIDd7) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
+                    cov logstart inodestart nib dev ip inum bm bm2 data
+                    (<[fbn := wi_splice (data2 fbn) o mm g]> data2) dn dn0
                     user off n tot src_bytes wroteI mm g V P2 ncount uY
                     pidv dq dqd dqn dqs A m mR K C b
-                    HK Hgeom0 Hist Hicov Hilog Hdswf Hwf2 Hhz3 HcovS2 HcovT2
+                    HK Hgeom0 Hist Hicov Hilog Hnib Hwf2 Hhz3 HcovS2 HcovT2
                     Hszdn ltac:(lia)
                     Hj Hgl HRsp HRs5 HRs2 HRs3
                     ltac:(rewrite Hbsz in Hmmo |- *; lia)
@@ -2951,7 +2958,7 @@ Section WriteiLoop.
                     HkerI ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) Hext2
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                           Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
-                          Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
+                          Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
           iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDd7)
                     ltac:(wp_next_chain) with "Hcont").
       }
@@ -3060,7 +3067,7 @@ End WriteiLoop.
 (* ===================================================================== *)
 Section WriteiMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq := vm_compute; discriminate.
@@ -3078,27 +3085,27 @@ Section WriteiMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
       (used : gset Z) (γpr : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
-      (dn : dinode) (ds : list dinode)
+      (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
       (V : pprivate) (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γa γf
-                           cov logstart inodestart bmapstart size dev used γpr
-                           ip inum bm data dn ds
+    : wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+                           cov logstart inodestart nib bmapstart size dev used γpr
+                           ip inum bm data dn dn0
                            user off n src_bytes V ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb C b.
   Proof.
     cbv beta delta [wp_writei_sconf_body].
-    intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hdswf Hadr
+    intros pcE pj src ret_tgt HK Hcost Hgeom Hist Hicov Hilog Hnib Hadr
            Hwf Hhz Hcovin Hsum Hszdn Hgok Hprkc Hj Hgl Ha0 Ha1 Ha3 Ha4 Heb.
     (* the whole allocation side travels as ONE record from here down *)
     set (A := MkBmAlloc γ bmapstart size used dqb dqbs γpr).
@@ -3110,7 +3117,7 @@ Section WriteiMain.
     assert (Hgeom0 : log_geom_ok cov logstart) by exact Hgeom.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
               Hidev Hinum
-              Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres Hfsb Hsrc Hppid
+              Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres #Hireg Hdn Hsrc Hppid
               #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iAssert (bm_alloc_res γfs cov logstart A) with "[Hszc Hbmsc Hbmres]" as "Hba".
     { rewrite /bm_alloc_res /A. iSplitR; [iPureIntro; exact Hgok|].
@@ -3121,26 +3128,26 @@ Section WriteiMain.
        contract quantifies the bitmap's FINAL set with [used ⊆ used'], while
        everything below carries the bundle at the fixed entry index.  Written
        once here rather than at every interior continuation. *)
-    iAssert (wi_cont (CID0 := CID) γfs bn γ γf cov logstart inodestart dev
-               ip inum bm data dn ds user off n src_bytes V ncount pidv dq dqd
+    iAssert (wi_cont (CID0 := CID) γfs γi bn γ γf cov logstart inodestart nib dev
+               ip inum bm data dn dn0 user off n src_bytes V ncount pidv dq dqd
                dqn dqs A j m K C b)%I with "[Hcont]" as "Hcont".
     { rewrite /wi_cont. iEval (rewrite /wp_next).
       iIntros (CIDf) "%Hchain".
-      iIntros (mf tot bm2 data2 dn2 ds2 n2 wrote dist dstb P2)
-        "%C1 %C2 %C3 %C4 %C5 %C6 %C7 %C8 %C9 %C10 %C11 %C12 %C13 %C14
+      iIntros (mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2)
+        "%C1 %C2 %C3 %C4 %C5 %C6 %C7 %C8 %C9 %C10 %C11 %C12 %C13
          Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb
-         Hba Hfsb Hsrc Hsl Hop".
+         Hba Hdn Hsrc Hsl Hop".
       iDestruct "Hba" as "(%Hgok2 & Hszc & Hbmsc & Hbmg)".
       iDestruct "Hbmg" as (uOut) "[%HuOut Hbmres]".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
-      iApply ("Hcont" $! mf tot bm2 data2 dn2 ds2 n2 wrote dist dstb P2 uOut
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
+      iApply ("Hcont" $! mf tot bm2 data2 dn2 dn02 n2 wrote dist dstb P2 uOut
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
                       Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap
-                      Hblocks Hsb Hszc Hbmsc Hbmres Hfsb Hsrc Hsl Hop").
-      { exact C1. } { exact HuOut. } { exact C2. } { exact C3. } { exact C4. }
-      { exact C5. } { exact C6. } { exact C7. } { exact C8. } { exact C9. }
-      { exact C10. } { exact C11. } { exact C12. } { exact C13. }
-      { exact C14. } }
+                      Hblocks Hsb Hszc Hbmsc Hbmres Hdn Hsrc Hsl Hop").
+      { exact C1. } { exact HuOut. } { exact C2. } { exact C3. }
+      { exact C4. } { exact C5. } { exact C6. } { exact C7. } { exact C8. }
+      { exact C9. } { exact C10. } { exact C11. } { exact C12. }
+      { exact C13. } }
     iPoseProof (wri_00 with "Htext") as "Hi00".
     iPoseProof (wri_02 with "Htext") as "Hi02".
     iPoseProof (wri_06 with "Htext") as "Hi06".
@@ -3247,14 +3254,13 @@ Section WriteiMain.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       rewrite /wi_cont.
       iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! X1 0%nat bm data dn ds ncount
+      iApply ("Hcont" $! X1 0%nat bm data dn dn0 ncount
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) (pv_upt V)
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hfsb
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hdn
                       [Hsrc] Hsl Hop").
       { unfold callee_saved. split_and!; lkp. }
       { exact Hwf. }
       { exact Hhz. }
-      { exact Hdswf. }
       { exact Hadr. }
       { exact Hszdn. }
       { exact Hcovin. }
@@ -3638,12 +3644,13 @@ Section WriteiMain.
         iSplitL "HfD"; [iExact "HfD"|]. iExact "HfE". }
       iDestruct (cpu_own_transport CID CIDy3 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (wi_ret (CID0 := CIDy3)  γfs bn γ γf cov logstart inodestart dev
-                ip inum bm bm data data dn dn ds ds user off n 0%nat src_bytes
+      iApply (wi_ret (CID0 := CIDy3) γfs γi bn γ γf cov logstart inodestart nib
+                dev
+                ip inum bm bm data data dn dn dn0 dn0 user off n 0%nat src_bytes
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) V (pv_upt V) ncount ncount
                 pidv dq dqd dqn dqs A j m Y1 K C b
                 HK HY1sp ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
-                ltac:(lkp) Hwf Hhz Hdswf Hadr Hszdn Hcovin
+                ltac:(lkp) Hwf Hhz Hadr Hszdn Hcovin
                 ltac:(unfold BSIZE; lia) ltac:(intros; reflexivity)
                 ltac:(intro k; rewrite decide_False; [| lia];
                       rewrite decide_False; [reflexivity | lia])
@@ -3655,7 +3662,7 @@ Section WriteiMain.
                       | reflexivity | reflexivity | reflexivity ])
                 ltac:(lia) ltac:(lia) ltac:(apply uptd_ext_refl)
                 with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hinum
-                      Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
+                      Hmeta Hmap Hblocks Hsb Hba Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID) (CIDb := CIDy3) ltac:(wp_next_chain)
                 with "Hcont").
     }
@@ -3778,12 +3785,12 @@ Section WriteiMain.
         [exfalso; unfold wi_cost in Hcost; lia|].
       iDestruct (cpu_own_transport CID CIDz3 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (wi_join (CID0 := CIDz3)  γs j γl γu γd γk pd pav pu γfs bn γ γf
-                cov logstart inodestart dev ip inum bm bm data data dn dn ds
+      iApply (wi_join (CID0 := CIDz3) γs j γl γu γd γk pd pav pu γfs γi bn γ γf
+                cov logstart inodestart nib dev ip inum bm bm data data dn dn dn0
                 user off 0%nat 0%nat src_bytes (fun _ => bv_0 8)
                 0%nat (fun _ => bv_0 8) V (pv_upt V) (S unc) unc
                 pidv dq dqd dqn dqs A m Z1 K C b
-                HK Hgeom0 Hist Hicov Hilog Hdswf Hadr Hwf Hhz Hszdn Hcovin Hj Hgl
+                HK Hgeom0 Hist Hicov Hilog Hnib Hadr Hwf Hhz Hszdn Hcovin Hj Hgl
                 HZ1sp HZ1s5 HZ1s3 ltac:(lkp) ltac:(lkp) ltac:(lkp) ltac:(lkp)
                 ltac:(lkp) ltac:(unfold BSIZE; lia) ltac:(intros; reflexivity)
                 ltac:(intro k; rewrite decide_False; [| lia];
@@ -3793,7 +3800,7 @@ Section WriteiMain.
                 ltac:(unfold wi_cost; lia) ltac:(lia) ltac:(apply uptd_ext_refl)
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
                       Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
-                      Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
+                      Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID) (CIDb := CIDz3) ltac:(wp_next_chain)
                 with "Hcont").
     }
@@ -3977,11 +3984,11 @@ Section WriteiMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CIDp17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (wi_loop (CID0 := CIDp17)  γs j γl γu γd γk pd pav pu γfs bn γ γf γa
-              cov logstart inodestart dev ip inum bm data dn ds user off n
+    iApply (wi_loop (CID0 := CIDp17) γs j γl γu γd γk pd pav pu γfs γi bn γ γf γa
+              cov logstart inodestart nib dev ip inum bm data dn dn0 user off n
               src_bytes V ncount (m !!! Regidx Ra1 : mword 64)
               pidv dq dqd dqn dqs A m K C b
-              HK Hgeom0 Hist Hicov Hilog Hdswf Hszdn Hofflt Hnlt Hrng Ha1 Hj Hgl
+              HK Hgeom0 Hist Hicov Hilog Hnib Hszdn Hofflt Hnlt Hrng Ha1 Hj Hgl
               (wi_blocks off n) 0%nat bm data (fun _ => bv_0 8) (pv_upt V) ncount U3
               ltac:(lia) Hwf Hhz Hcovin
               ltac:(apply (bm_covers_mono bm (bv_unsigned (di_size dn)) _ Hcovin);
@@ -3995,7 +4002,7 @@ Section WriteiMain.
               with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hkenv
                     Hprocs
                     Hdevi Hdgeom Hdlock Hframe Hppid Hidev Hinum
-                    Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont").
+                    Hmeta Hmap Hblocks Hsb Hba Hireg Hdn Hsrc Hsl Hop Hcont").
   Qed.
 
 End WriteiMain.

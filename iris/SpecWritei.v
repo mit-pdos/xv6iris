@@ -128,8 +128,16 @@
    [ip->size] is raised to the ADVANCED [off] when the write went past the
    old end, and [iupdate] then runs UNCONDITIONALLY on every returning path
    -- including [n = 0].  So writei needs everything iupdate needs
-   ([i_inum], [inode_meta], the [sb + 24] field, the inode block's own
-   [fsblock]) on top of everything bmap needs.
+   ([i_inum], [inode_meta], the [sb + 24] field, and -- since C2 -- the
+   inode REGION's [ireg_inv] plus this inum's own [dinode_at] fragment
+   instead of the block's [fsblock] half) on top of everything bmap needs.
+
+   THE REGION'S RECORD IS NOT [dn].  [dn0] is what the region currently
+   holds for this inum, which is STALE by construction (that is what the
+   flush is for), and the postcondition names the record the call leaves
+   there: [dn'] on the writing arm, [dn0] untouched on the -1 arm, which
+   returns before iupdate is reached.  That existential replaces the old
+   [ds'] one exactly.
 
    [di_addrs dn'] is set to [bm_cells bm']: [inode_meta] owns only the five
    scalar cells, so that field is a phantom index that may be
@@ -192,6 +200,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import InodeRegion.
 Require Import BitmapInv.
 Require Import KernelDataInv.
 Require Import SpecPrintkGen.
@@ -241,21 +250,21 @@ Definition wi_dinode (dn : dinode) (bm' : blkmap) (off tot : nat) : dinode :=
 
 Definition wp_writei_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
-    (γ : log_names) (γfs : fs_names)
+    (γ : log_names) (γfs : fs_names) (γi : gname)
     (γa : gname) (γf : gname)                         (* kalloc, file table  *)
-    (cov : gset Z) (logstart : Z) (inodestart : Z)
+    (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
     (bmapstart : Z) (size : Z) (dev : mword 32)
     (used : gset Z) (γpr : gname)
     (ip : mword 64) (inum : mword 32)
     (bm : blkmap) (data : nat -> list (bv 8))
-    (dn : dinode) (ds : list dinode)
+    (dn dn0 : dinode)
     (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
     (V : pprivate) (ncount : nat)
     (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
@@ -275,7 +284,9 @@ Definition wp_writei_sconf_body
   0 <= inodestart ->
   IBLOCK inum inodestart ∈ cov ->
   ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
-  diblk_wf ds ->
+  (* the inum is one the inode REGION covers -- iupdate's premise, which
+     replaced the block-half premise and its [diblk_wf ds] (design §11.3) *)
+  bv_unsigned inum < 16 * Z.of_nat nib ->
   di_addrs dn = bm_cells bm ->
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
@@ -346,8 +357,10 @@ Definition wp_writei_sconf_body
   sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   bitmap_res γfs bmapstart cov logstart size used -∗
-  (* THE INODE BLOCK, as sixteen pure dinodes *)
-  fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+  (* THE INODE REGION, and this inum's (stale) on-disk record: iupdate's
+     resources, threaded through (design §11.3/§12) *)
+  ireg_inv γi γfs inodestart nib -∗
+  dinode_at γi inum dn0 -∗
   (* THE SOURCE.  On the user arm a virtual address into the running
      process's own space; on the kernel arm the caller's own byte buffer,
      returned unchanged. *)
@@ -370,7 +383,7 @@ Definition wp_writei_sconf_body
   log_op γ ncount -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (tot : nat) (bm' : blkmap) (data' : nat -> list (bv 8))
-    (dn' : dinode) (ds' : list dinode) (n' : nat)
+    (dn' dn0' : dinode) (n' : nat)
     (wrote : nat -> bv 8) (dist : nat) (dstb : nat -> bv 8) (P' : uptd)
     (used' : gset Z),
       ⌜callee_saved m mf⌝ -∗
@@ -379,7 +392,6 @@ Definition wp_writei_sconf_body
       ⌜used ⊆ used'⌝ -∗
       ⌜blkmap_wf cov logstart bm'⌝ -∗
       ⌜blk_holes_zero bm' data'⌝ -∗
-      ⌜diblk_wf ds'⌝ -∗
       ⌜di_addrs dn' = bm_cells bm'⌝ -∗
       ⌜bv_unsigned (di_size dn') < 2 ^ 31⌝ -∗
       (* COVERAGE IS PRESERVED, AT THE NEW SIZE.  See the header. *)
@@ -405,13 +417,13 @@ Definition wp_writei_sconf_body
         /\ (bv_unsigned (di_size dn) < Z.of_nat off
             \/ (MAXFILE * BSIZE < off + n)%nat)
         /\ tot = 0%nat /\ dist = 0%nat
-        /\ bm' = bm /\ data' = data /\ dn' = dn /\ ds' = ds
+        /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
         /\ n' = ncount)
        \/ (mf !!! Regidx (mword_of_int 10 : mword 5)
              = (mword_of_int (Z.of_nat tot) : mword 64)
            /\ (tot <= n)%nat
            /\ dn' = wi_dinode dn bm' off tot
-           /\ ds' = <[islot inum := dn']> ds)⌝ -∗
+           /\ dn0' = dn')⌝ -∗
       (* at most [wi_cost off n] units gone, and none gained *)
       ⌜((ncount - wi_cost off n)%nat <= n')%nat /\ (n' <= ncount)%nat⌝ -∗
       ⌜uptd_ext (pv_upt V) P'⌝ -∗
@@ -428,7 +440,7 @@ Definition wp_writei_sconf_body
       sb_size ↦₄{dqbs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
       bitmap_res γfs bmapstart cov logstart size used' -∗
-      fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds') -∗
+      dinode_at γi inum dn0' -∗
       (if user
        then proc_priv γf pj pidv (upd_upt V P')
        else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
@@ -440,29 +452,29 @@ Definition wp_writei_sconf_body
 Module Type WRITEI.
   Parameter wp_writei_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      
+
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
       (γa : gname) (γf : gname)
-      (cov : gset Z) (logstart : Z) (inodestart : Z)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
       (bmapstart : Z) (size : Z) (dev : mword 32)
       (used : gset Z) (γpr : gname)
       (ip : mword 64) (inum : mword 32)
       (bm : blkmap) (data : nat -> list (bv 8))
-      (dn : dinode) (ds : list dinode)
+      (dn dn0 : dinode)
       (user : bool) (off n : nat) (src_bytes : nat -> bv 8)
       (V : pprivate) (ncount : nat)
       (pidv : mword 32) (dq dqd dqn dqs dqb dqbs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γa γf
-                           cov logstart inodestart bmapstart size dev used γpr
-                           ip inum bm data dn ds
+      wp_writei_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi γa γf
+                           cov logstart inodestart nib bmapstart size dev used γpr
+                           ip inum bm data dn dn0
                            user off n src_bytes V ncount
                            pidv dq dqd dqn dqs dqb dqbs m K eb C b.
 End WRITEI.
