@@ -576,6 +576,11 @@ bitmap's free pool (`BitmapInv.free_pool`), the log's own storage, and
 whatever the in-flight proofs hold. **The used data blocks of inodes that
 are not in the icache have no owner in the model.**
 
+**SUPERSEDED IN PART BY §10.** The shape guessed at below (two fupds, one
+at ilock's uncached arm) is not implementable and is not what the bio escrow
+does; read §10.1 first. What survives is the need for the object, and the
+observation that `ireclaim` is the caller that can establish its contents.
+
 That object — call it the inode store, an authoritative `inum ↦ (dinode,
 blkmap, data)` map owning the blocks of every allocated inode — is a
 separate piece of design from the icache, and `ialloc`, `ireclaim` and
@@ -591,6 +596,12 @@ the store's initial contents.
 ---
 
 ## 8. Order of work
+
+**Items 2 and 3 are superseded by §10**, which merges them: the escrow and
+the pool are ONE edit, made at iget's recycle, and the escrow's design is now
+fully determined. §10.5 records the piece that is NOT determined (the dinode
+blocks' ownership), which has to be settled before item 4.
+
 
 1. **`IcacheInv.v`** — done: geometry, algebra, the `ref` invariant, the
    lock resource, and §6's two pure layers.
@@ -641,3 +652,131 @@ the store's initial contents.
 - **The "`acquiresleep()` won't block (or deadlock)" half of `iput`'s
   comment needs no theorem** in this logic (§5 (a)). The load-bearing part
   of that comment is an ownership statement, not a scheduling one.
+
+---
+
+## 10. THE ESCROW AND THE POOL, worked out against `BioInv.v`
+
+§7 posed the inode store as an object `ilock` would take from by a fupd, and
+§8 ordered the escrow before it as two separate items. Reading the bio
+escrow end to end says both were wrong, and in a way that makes the work
+smaller rather than larger. This section supersedes §7 and §8's items 2-3.
+
+### 10.1 `ilock` never touches the store
+
+§7's shape is not implementable: `ilock` holds neither `itable.lock` nor the
+authority -- only the entry's sleeplock -- and an Iris invariant cannot hold
+resources across `ilock`'s `bread`/`brelse`.
+
+bio does not do that. `bio_pool` lives inside **`bcache.lock`'s resource**
+and the exchange fires in the RECYCLER, under that lock, at the single
+instruction where cache membership moves. The recycler parks the arriving
+block's bundle in the escrow's payload on its way past, and "whoever wins
+the fill race finds it" (`BioInv.v:389-394`).
+
+The icache does the same. The uncached inodes' bundles live in a pool inside
+`itable_res`; the exchange fires at **`iget`'s recycle**, which holds
+`itable.lock` and holds the authority at `M !! k = None`. `ilock` then finds
+the arriving inode's bundle already parked in the escrow it opens anyway.
+C1's fix and the store become the same edit, and §7's problem does not
+arise.
+
+### 10.2 THREE arms, not two -- and `iget` is why
+
+`buf_escrow_body := buf_parked ∨ buf_chain ∨ buf_mid` (`BioInv.v:447`).
+The third is the RECYCLE WINDOW: cells only, decoupled from any payload,
+with the recycle token OUT in the recycler's hand (`BioInv.v:440`).
+
+It is not optional here, and the reason is visible in the image. `iget`'s
+recycle arm writes four fields at four separate instructions:
+
+      +0x6e  sw s2,0(s3)      ip->dev   = dev
+      +0x72  sw s4,4(s3)      ip->inum  = inum
+      +0x78  sw a5,8(s3)      ip->ref   = 1
+      +0x7c  sw zero,64(s3)   ip->valid = 0
+
+Each is its own atomic-update opening, and between them the entry is in
+NEITHER stable state. A two-arm escrow cannot get from `+0x6e` to `+0x72`.
+
+bio refutes its mid arm with the **dev cell held FULL at the view's single
+pinned device value** (`BioInv.v:434-439`), which works because there is one
+device. xv6 is single-device too, so the trick carries -- but it breaks the
+moment entries are keyed by `(dev, inum)` across devices. Recorded because
+it is invisible until it fails.
+
+### 10.3 The two refutations are DIFFERENT, and only one is ours
+
+Do not conflate them; §5(iii) above does, slightly.
+
+* The **sleeplock winner** (`ilock`) refutes the checked-out arm with
+  `bown_exclusive` -- its own token against the arm's -- and the mid arm
+  with any fraction of an identity cell against the mid arm's full one.
+* The **authority-side opener** (`iget`, `iput`) holds no checkout token.
+  It refutes the checked-out arm with the count fragment: at
+  `M !! k = None` the arm's own `iref_tok` cannot exist. bio calls this
+  `bref_tok_free_absurd` (`BioInv.v:482`); ours is `iref_lookup`.
+
+It is the SECOND that `iget`'s `valid = 0` store needs, and it is the whole
+reason the checked-out arm must carry the count fragment rather than just a
+marker. The same fact does double duty in bio: `buf_pay_evict`
+(`BioInv.v:619`) kills eviction of a DIRTY buffer because a dirty payload
+parks a real reference. The inode analogue -- an inode with unflushed
+changes is pinned -- carries over cleanly and is the most reusable idea in
+the file.
+
+### 10.4 What the sleeplock holds afterwards
+
+Exactly one exclusive ghost token, and nothing else:
+
+```coq
+  is_sleeplock ... "buffer"%string (bown bn k)      (* BioInv.v:1030 *)
+  Definition bown bn k := lock_tok_excl (bn_own bn k).
+```
+
+`InodeLock.inode_parked` stops being the sleeplock's payload and becomes the
+escrow's parked arm. `inode_locked` -- which already carries
+`i_valid ip ↦₄ 1` and both key halves -- is already, structurally, the
+checked-out arm's complement; that is the one part of the restructuring the
+current file gets right for free.
+
+### 10.5 THE ONE THING STILL OPEN: who owns the dinode blocks
+
+The pool settles `ind_res` and `inode_blocks`. It does NOT settle the tie
+that makes `SpecIlock`'s
+
+      vv = false -> ds !!! islot inum = dn
+
+an OUTPUT rather than an assumed premise. Post-C1 the shadow is `Unloaded`
+and carries no `dn`, so `ilock` reads `ds !!! islot inum` off the block and
+must conclude that the pool entry it is about to take describes THAT dinode
+-- in particular that the pool's `bm` is the one `di_addrs dn` names.
+
+Nothing available says so. The pool entry would have to be tied to the
+dinode block's content, and the dinode block is not the pool's to own: it
+holds SIXTEEN inodes, and today the caller of `ilock` passes it in as
+`fsblock gfs (IBLOCK inum inodestart) (diblk_bytes ds)` with `SpecIlock.v:175`
+recording "who owns it is deferred exactly as it is for iupdate".
+
+The icache is where that deferral comes due. The invariant IS maintainable
+-- only `iupdate` writes a dinode, only on a LOCKED inode, and a locked
+inode is not in the pool -- but stating it needs the inode region's blocks
+to have an owner, which is a bigger object than the pool: something like an
+`inode_region` owning every dinode block plus, per allocated inum, the
+bundle the pool holds. `ialloc` and `ireclaim` will want the same object.
+
+DO NOT start the escrow implementation expecting this to fall out. It is a
+separate design step, it is the real remainder of §7, and the honest state
+is that the escrow is now fully determined and the dinode-block ownership is
+not.
+
+### 10.6 Two corrections to the files this was read from
+
+* `ProofBrelse.v:617-624` claims the escrow body is not timeless and strips
+  the later by hand. `BioInv.v:456-478` DOES provide the instance (the view
+  record carries `bv_clean_tl`/`bv_dirty_tl` precisely so every opener can
+  strip it), and `ProofBread.v` uses `>Hbody` throughout. The comment is
+  stale; model on the `>Hbody` form.
+* §5(iii) of this note describes the checked-out arm as holding "a slice of
+  the entry's reference share" and attributes the parked-arm argument to it
+  generally. Accurate for the authority-side opener, wrong for the sleeplock
+  winner -- see 10.3.
