@@ -85,7 +85,7 @@
        slot, and a parking hop and a same-hart hop are the same
        [callee_saved] transport.
      * the trap CSRs ride the loop: acquire(&tickslock) mints
-       [trap_csrs_pay 0 eb], sleep carries it across the park and hands it
+       [arm_pay 0 eb _], sleep carries it across the park and hands it
        back, and whichever release fires spends it.  sys_pause is therefore
        trap-CSR-balanced and its own contract does not mention them.
      * the parked-scheduler record is NOT threaded here.  It lives in the
@@ -316,7 +316,7 @@ Section SpProps.
         sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
-        cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
+        cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
         running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x70)) -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
@@ -339,7 +339,7 @@ Section SpProps.
         (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
-        cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
+        cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
         running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x8c)) -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
@@ -361,7 +361,7 @@ Section SpProps.
         pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
         locked γt cpu_id -∗ ticks_res -∗
         sie_cap_gpr M (av - 8) false pj -∗
-        cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
+        cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
         running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
         sp_exit0 CID0 Φ γt j m av eb C sp0 pj -∗
@@ -588,7 +588,7 @@ Section SpBodies.
     sp_free sp0 -∗ (∃ w : bv 64, pa_stk sp0 7 ↦₈ w) -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (av - 8) false pj -∗
-    cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
+    cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x70)) -∗
     sp_tail CID0 Φ j m av eb C sp0 pj -∗
@@ -703,7 +703,7 @@ Section SpBodies.
     (∃ w : bv 64, pa_stk sp0 8 ↦₈ w) -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr N (av - 8) false pj -∗
-    cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
+    cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x8c)) -∗
     sp_tail CID0 Φ j m av eb C sp0 pj -∗
@@ -911,7 +911,7 @@ Section SpBodies.
     pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (av - 8)%nat false pj -∗
-    cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
+    cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x5c)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -1126,7 +1126,7 @@ Section SpBodies.
     pa_add (pa_stk sp0 7) 4 ↦₄ nv -∗ sp_join7 sp0 -∗
     locked γt cpu_id -∗ ticks_res -∗
     sie_cap_gpr M (av - 8)%nat false pj -∗
-    cpu_own 1 eb pj C false -∗ trap_csrs_pay 0 eb -∗
+    cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.

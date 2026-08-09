@@ -37,7 +37,7 @@
    ARBITRARY value, and ticks++ re-establishes exactly that.
 
    Interrupt/noff bookkeeping is acquire/release's and is order-balanced here,
-   so the spec never mentions [trap_csrs_pay]; the level returns to [n].
+   so the spec never mentions [arm_pay]; the level returns to [n].
    Calls no per-process state, but acquire/wakeup pin tp = [cid_word]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.

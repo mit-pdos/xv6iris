@@ -256,7 +256,7 @@ Section ProofBrelse.
     locked (bn_lk bn) cpu_id -∗
     bcache_res bn V -∗
     cpu_own 1%nat eb p C false -∗
-    trap_csrs_pay 0%nat eb -∗
+    arm_pay 0%nat eb p -∗
     pa_stk (m !!! Regidx csp_rs1) 1 ↦₈ (m !!! Regidx Rra) -∗
     pa_stk (m !!! Regidx csp_rs1) 2 ↦₈ (m !!! Regidx Rs0) -∗
     pa_stk (m !!! Regidx csp_rs1) 3 ↦₈ (m !!! Regidx Rs1) -∗

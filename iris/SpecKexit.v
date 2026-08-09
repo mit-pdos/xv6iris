@@ -77,7 +77,7 @@
    out the trap CSRs the chain payload demands.  kexit's own
    acquire(&wait_lock) produces that pay and the release(&wait_lock) before
    sched() spends the SECOND acquire's, so kexit is balanced and asks the
-   caller for no [trap_csrs_pay] -- the sys_pause rule.
+   caller for no [arm_pay] -- the sys_pause rule.
 
    [is_lock γw wait_lock_addr ... wait_res] -- kexit is the second consumer
    of the parent table after kwait, and takes it exactly as kwait does.

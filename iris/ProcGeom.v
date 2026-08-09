@@ -1033,23 +1033,32 @@ Section ParkGhost.
   (* ==================================================================== *)
   (* THE RUNNING CLAIM: what a thread carries to say "I am proc j, running". *)
   (*                                                                       *)
-  (* Two things with identical lifetimes and identical travel: the park     *)
-  (* receipt (the scheduler's record for the hart running j is in its box)  *)
-  (* and half #2 of j's state mirror (the right to change j's state).  Both *)
-  (* are issued at dispatch, both are spent at a park, and both must reach  *)
-  (* yield / sleep / exit -- and so, eventually, a PREEMPTING kerneltrap.   *)
-  (*                                                                       *)
-  (* Named as ONE bundle so that every function between here and sleep      *)
-  (* mentions the concept rather than its parts: re-homing the pieces (the  *)
-  (* record into [sie_arm], the park receipt away entirely) then changes    *)
-  (* this definition and the handful of places that OPEN it, not the ~60    *)
-  (* files that merely pass it through.                                     *)
+  (* The park receipt: the scheduler's record for the hart running j is in   *)
+  (* its box.  Issued at dispatch, spent at a park, and it must reach        *)
+  (* yield / sleep / exit -- and so, eventually, a PREEMPTING kerneltrap.    *)
+  (*                                                                        *)
+  (* HALF #2 OF j'S STATE MIRROR USED TO RIDE HERE TOO, and no longer does.  *)
+  (* Its home is [IntrDefs.cpu_claim], a conjunct of [sie_arm true p]        *)
+  (* (design/proc-struct.md): while interrupts are ON the arm owns it, and   *)
+  (* the seam forms [cpu_claim_pay] / [cpu_claim_ext] move it in and out.    *)
+  (* Keeping it here was not merely redundant but UNSATISFIABLE at the       *)
+  (* release that ends a resumed thread's critical section: the holder has   *)
+  (* [pstate_whole], the release returns [pstate_lock] to the invariant, and *)
+  (* at [RUNNING] ([unclaimed = false]) that consumes ONE half -- so exactly *)
+  (* one half #2 is left over, and it is owed to the arm.  A [running_claim] *)
+  (* that also demanded it would have needed a second copy that cannot exist.*)
+  (*                                                                        *)
+  (* Left as a NAMED wrapper rather than inlined to [park_hlf j true] so     *)
+  (* that the ~200 sites which merely pass it through keep naming the        *)
+  (* concept: deleting the receipt outright (once the scheduler's saved      *)
+  (* record moves into the arm as well) then changes this definition and the *)
+  (* handful of places that OPEN it, not the ~60 files that thread it.       *)
   (* ==================================================================== *)
   Definition running_claim (j : nat) : iProp Σ :=
-    (park_hlf j true ∗ pstate_hlf j RUNNING)%I.
+    park_hlf j true.
 
-  Lemma running_claim_split (j : nat) :
-    running_claim j ⊣⊢ park_hlf j true ∗ pstate_hlf j RUNNING.
+  Lemma running_claim_park (j : nat) :
+    running_claim j ⊣⊢ park_hlf j true.
   Proof. done. Qed.
 
   (* WHAT A LOCK HOLDER HAS: the WHOLE variable, at every state.  On an

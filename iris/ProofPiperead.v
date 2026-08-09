@@ -1128,7 +1128,7 @@ Section ProofPiperead.
         sie_cap_gpr M (av - 12)%nat false pj -∗
         pc_is (mword_of_int (KernelSyms.piperead + 0x76) : mword 64) -∗
         cpu_own 1%nat true pj C false -∗
-        trap_csrs_pay 0 true -∗
+        arm_pay 0 true pj -∗
         locked γl cpu_id -∗
         pipe_res γp pi -∗
         pipe_ref γp w q -∗
@@ -1284,7 +1284,7 @@ Section ProofPiperead.
           sie_cap_gpr M2 (av - 12)%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0xc2) : mword 64) -∗
           cpu_own 1%nat true pj C false -∗
-          trap_csrs_pay 0 true -∗
+          arm_pay 0 true pj -∗
           locked γl cpu_id -∗
           pipe_res γp pi -∗
           pipe_ref γp w q -∗
@@ -1538,7 +1538,7 @@ Section ProofPiperead.
           sie_cap_gpr M3 (av - 12)%nat false pj -∗
           pc_is (mword_of_int (KernelSyms.piperead + 0x84) : mword 64) -∗
           cpu_own 1%nat true pj C false -∗
-          trap_csrs_pay 0 true -∗
+          arm_pay 0 true pj -∗
           locked γl cpu_id -∗
           pipe_res γp pi -∗
           pipe_ref γp w q -∗
@@ -2134,7 +2134,7 @@ Section ProofPiperead.
         sie_cap_gpr M (av - 12)%nat false pj -∗
         pc_is (mword_of_int (KernelSyms.piperead + 0x34) : mword 64) -∗
         cpu_own 1%nat true pj C false -∗
-        trap_csrs_pay 0 true -∗
+        arm_pay 0 true pj -∗
         locked γl cpu_id -∗
         pipe_res γp pi -∗
         pipe_ref γp w q -∗

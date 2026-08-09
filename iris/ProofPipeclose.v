@@ -440,7 +440,7 @@ Section ProofPipeclose.
                sie_cap_gpr M (av - 4)%nat false pme -∗
                pc_is (mword_of_int (KernelSyms.pipeclose + 0x24) : mword 64) -∗
                cpu_own (S n) eb pme C false -∗
-               trap_csrs_pay n eb -∗
+               arm_pay n eb pme -∗
                locked γl cpu_id -∗
                pipe_res γp pi -∗
                WP (Loop : expr riscv_lang) {{ Φ }})%I
@@ -460,7 +460,7 @@ Section ProofPipeclose.
                  sie_cap_gpr M' (av - 4)%nat false pme -∗
                  pc_is (mword_of_int (KernelSyms.pipeclose + 0x30) : mword 64) -∗
                  cpu_own (S n) eb pme C false -∗
-                 trap_csrs_pay n eb -∗
+                 arm_pay n eb pme -∗
                  locked γl cpu_id -∗
                  pipe_res γp pi -∗
                  WP (Loop : expr riscv_lang) {{ Φ }})

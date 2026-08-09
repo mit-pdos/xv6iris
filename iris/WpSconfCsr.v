@@ -713,6 +713,7 @@ Section WpSconfCsr.
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sstatus_read ms)]> m) n false p -∗
       intr_count (S k) eb -∗
       trap_csrs_pay k eb -∗
+      cpu_claim_pay k eb p -∗
       cpu_cells_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -756,7 +757,7 @@ Section WpSconfCsr.
            the arm itself is dismantled for the rest. ---- *)
       iDestruct (intr_count_pre_on with "Hcnt") as %Hke.
       destruct Hke as [-> ->].
-      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & (Hcells & Hc1))".
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclmx & (Hcells & Hc1))".
       iDestruct (ghost_var_agree with "Hhalf Hq1") as %Hb1.
       iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hc1)".
       destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
@@ -822,7 +823,7 @@ Section WpSconfCsr.
       iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
       iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
       iApply ("Hcont" $! ms0 with "[%] [%] Hcg
-                            [Htok] [Hsepcx Hscausex Hstvalx Hsppc] [Hcells] [$Hpc' $Hnpc]").
+                            [Htok] [Hsepcx Hscausex Hstvalx Hsppc] [Hclmx] [Hcells] [$Hpc' $Hnpc]").
       { exact Hmsf. }
       { intros _. cbn [sie_bit]. exact Hb1. }
       { iApply (intr_count_pack_S_on with "Htok").
@@ -830,6 +831,7 @@ Section WpSconfCsr.
         iSplit; [iPureIntro; exact Htvd |].
         iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
       { iFrame "Hsepcx Hscausex Hstvalx Hsppc". }
+      { rewrite /cpu_claim_pay. iExact "Hclmx". }
       { rewrite /cpu_cells_pay. iExact "Hcells". }
     - (* ---- b = false: the idempotent write; ghosts untouched ---- *)
       iDestruct (intr_count_pre_off with "Hcnt") as "Hcnt".
@@ -873,10 +875,11 @@ Section WpSconfCsr.
         iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
       iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
-      iApply ("Hcont" $! ms0 with "[%] [%] Hcg Hcnt [] [] [$Hpc' $Hnpc]").
+      iApply ("Hcont" $! ms0 with "[%] [%] Hcg Hcnt [] [] [] [$Hpc' $Hnpc]").
       { exact Hmsf. }
       { intros Hk. rewrite (Heb0 Hk). cbn [sie_bit]. exact Hb0. }
       { destruct k; [rewrite (Heb0 eq_refl) |]; done. }
+      { rewrite /cpu_claim_pay. destruct k; [rewrite (Heb0 eq_refl) |]; done. }
       { rewrite /cpu_cells_pay. done. }
   Qed.
 
@@ -965,6 +968,7 @@ Section WpSconfCsr.
     intr_count 1 true -∗
     trap_csrs -∗
     cpu_cells 0 true p -∗
+    cpu_claim p -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -975,7 +979,7 @@ Section WpSconfCsr.
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
-    iIntros "Hcg Hcnt Hcsrs Hcells Hpc Hinstr Hcont".
+    iIntros "Hcg Hcnt Hcsrs Hcells Hclm Hpc Hinstr Hcont".
     iDestruct "Hcnt" as "[Htok Hhx]".
     iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx & Hsppc)".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1005,7 +1009,7 @@ Section WpSconfCsr.
     destruct b.
     - (* ---- b = true: already enabled -- impossible.  The payload's sepc
            cell and the '1' arm's sepc cell cannot coexist. ---- *)
-      iDestruct "Harm" as "(Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx' & Hcells')".
+      iDestruct "Harm" as "(Hq1 & Hhx' & Hsepcx' & Hscausex' & Hstvalx' & Hsppc' & Hclmx' & Hcells')".
       iDestruct "Hsepcx" as (v1) "Hsepc1".
       iDestruct "Hsepcx'" as (v2) "Hsepc2".
       iDestruct (reg_pointsto_excl sepc v1 v2 with "Hsepc1 Hsepc2") as %[].
@@ -1045,10 +1049,10 @@ Section WpSconfCsr.
          re-expressing at the new mstatus -- no ghost movement. *)
       iDestruct (sret_tie_congr ms0 ms1 Hspp' Hspie' with "Hspp") as "Hspp".
       iAssert (sie_cap m n true p)
-        with "[Hqcap Hqcnt Hsepcx Hscausex Hstvalx Hsppc Hstk Htr Hcells]" as "Hcap".
+        with "[Hqcap Hqcnt Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
       { iSplitL "Hstk". { iExact "Hstk". }
         iFrame "Htr".
-        iFrame "Hqcap Hsepcx Hscausex Hstvalx Hsppc".
+        iFrame "Hqcap Hsepcx Hscausex Hstvalx Hsppc Hclm".
         iSplitR "Hcells Hqcnt".
         { iExists handler. iSplit; [iPureIntro; exact Htvd |].
           iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
@@ -1151,6 +1155,7 @@ Section WpSconfCsr.
     (if eb then emp else intr_count 0 false) -∗
     (if eb then emp else trap_csrs) -∗
     (if eb then emp else cpu_cells 0 true p) -∗
+    cpu_claim_ext eb p -∗
     intr_handler_avail -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
@@ -1164,12 +1169,12 @@ Section WpSconfCsr.
   Proof.
     destruct eb.
     2:{ (* ---- base state DISABLED: the real flip, via the restore leaf ---- *)
-        iIntros "Hcg Hcnt Hcsrs Hcells #Havail Hpc Hinstr Hcont".
+        iIntros "Hcg Hcnt Hcsrs Hcells Hclm #Havail Hpc Hinstr Hcont".
         iApply (wp_csrsi_sstatus_x0_s_sconf Φ pc m n false
-                  with "Hcg [Hcnt] Hcsrs Hcells Hpc Hinstr Hcont").
+                  with "Hcg [Hcnt] Hcsrs Hcells Hclm Hpc Hinstr Hcont").
         iApply (intr_count_pack_S_on 0 with "Hcnt Havail"). }
     (* ---- base state ENABLED: idempotent on SIE, ghosts stand still ---- *)
-    iIntros "Hcg _ _ _ #Havail Hpc Hinstr Hcont".
+    iIntros "Hcg _ _ _ _ #Havail Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n true Φ pc false
               (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS))
               with "Hcg Hpc Hinstr").
@@ -1305,7 +1310,7 @@ Section WpSconfCsr.
            inside [cpu_hart 0 true p].  Take the second out of THERE (the
            caller supplied only the pure fact) and do the real flip; the
            cells that are left are what the leaf hands back. ---- *)
-      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & (Hcells & Hc1))".
+      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & Hclmx & (Hcells & Hc1))".
       iClear "Hcnt".
       iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt)".
       destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').

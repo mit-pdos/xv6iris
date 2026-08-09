@@ -35,7 +35,7 @@
 
    It DOES sleep (both arms of the retry loop), so it threads the full
    running-process bundle exactly as SpecBread.v does and enters/returns at
-   noff 0: its own acquire mints the [trap_csrs_pay 0 eb] the interior sleep
+   noff 0: its own acquire mints the [arm_pay 0 eb _] the interior sleep
    needs and its release spends it, so no caller-held pay crosses the
    interface (see SpecBread.v's note on why a second one is
    unimplementable).

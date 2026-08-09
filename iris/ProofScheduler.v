@@ -861,12 +861,14 @@ Section ProofScheduler.
       { rewrite /T1 upd_ne; [| vm_compute; discriminate]. rewrite /T0 upd_eq Hp1. reflexivity. }
       assert (Hlka : add_vec (T1 !!! Regidx Ra0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr jj).
       { rewrite HT1a0 add_vec_zero_l. apply addv_sext0. }
-      (* trap_csrs -> release's [trap_csrs_pay 0 ebx] + the loop's complement *)
-      iAssert (trap_csrs_pay 0 ebx ∗ (if ebx then emp else trap_csrs))%I
+      (* trap_csrs -> release's [arm_pay 0 ebx zero_reg] + the loop's
+         complement.  The claim half is the IDLE one: the scheduler runs with
+         [c->proc == 0], so it mints what the arm is owed for free. *)
+      iAssert (arm_pay 0 ebx zero_reg ∗ (if ebx then emp else trap_csrs))%I
         with "[Hcsrs]" as "[Hpay Hcsrs]".
-      { destruct ebx;
-          [ iSplitL "Hcsrs"; [iExact "Hcsrs" | done]
-          | iSplitR "Hcsrs"; [done | iExact "Hcsrs"] ]. }
+      { rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay. destruct ebx.
+        - iSplitL "Hcsrs"; [ iFrame "Hcsrs"; iApply cpu_claim_idle | done ].
+        - iSplitR "Hcsrs"; [ iSplit; done | iExact "Hcsrs" ]. }
       iApply (Release.wp_release_sconf Φ γl (proc_addr jj) "proc"%string
                 (proc_lock_res Φ γs γl (proc_addr jj)) T1 0 ebx zero_reg emp (av - 10)%nat
                 Hlka ltac:(lia)
@@ -1060,8 +1062,11 @@ Section ProofScheduler.
         by (rewrite HM1ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hr5e) in "Hpc".
       (* after any acquire the scheduler holds [trap_csrs] UNCONDITIONALLY *)
+      (* the claim half of [arm_pay] is dropped: the scheduler runs at
+         [c->proc == 0], so what it owes back at the next intr_on is the IDLE
+         claim, which [cpu_claim_idle] re-mints for free. *)
       iAssert trap_csrs with "[Hcsrs Hpay]" as "Hcsrs".
-      { destruct ebc; [ iExact "Hpay" | iExact "Hcsrs" ]. }
+      { destruct ebc; [ iDestruct "Hpay" as "[$ _]" | iExact "Hcsrs" ]. }
       (* the callee-saved pins survive acquire *)
       assert (Hmq : forall c : mword 5, is_cs_idx c = true -> macq !!! Regidx c = M !!! Regidx c).
       { intros c Hc. rewrite (callee_saved_lookup Hcsaq c Hc).
@@ -1501,7 +1506,10 @@ Section ProofScheduler.
       iDestruct (sc_flip_pre with "Hcpu") as "[Hcnt Hcells]".
       (* +0x86 csrsi sstatus,2 : intr_on *)
       iApply (wp_csrsi_sstatus_x0_enable_s_sconf Φ (mword_of_int (KernelSyms.scheduler + 0x86)) eb M (av - 10)%nat
-                with "Hcg Hcnt Hcsrs Hcells Havail Hpc Hi86 [-]").
+                with "Hcg Hcnt Hcsrs Hcells [] Havail Hpc Hi86 [-]").
+      (* the scheduler runs with [c->proc == 0], so the claim it owes the arm
+         is the idle one -- [cpu_claim_idle], for free. *)
+      { rewrite /cpu_claim_ext. destruct eb; [done | iApply cpu_claim_idle]. }
       first [ rewrite wp_next_off | rewrite (wp_next_idle _ _ _ eq_refl) ].
       (* the enable leaf returns ONLY the bundle: the count eighth it consumed
          is now inside [sie_arm true], not handed back. *)

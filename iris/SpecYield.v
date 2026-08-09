@@ -97,6 +97,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   panic_wp_any -∗
   running_claim j -∗
   trap_csrs_ext eb -∗
+  cpu_claim_ext eb pj -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile),
       ⌜callee_saved m mf⌝ -∗
@@ -105,6 +106,7 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       pc_is ret_tgt -∗
       running_claim j -∗
       trap_csrs_ext eb -∗
+      cpu_claim_ext eb pj -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

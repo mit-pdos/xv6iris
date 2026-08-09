@@ -30,7 +30,7 @@
    is literally [false] -- acquire is unbalanced and returns with interrupts
    off -- so that whole stretch (the LSR read, the THRE test, the tx_busy
    clear, the wakeup) collapses by [wp_next_off] and the hart is pinned;
-   that is what lets [locked γl cpu_id] and [trap_csrs_pay] be carried across
+   that is what lets [locked γl cpu_id] and [arm_pay] be carried across
    it without transport.  release exits at
    [outb = match lvl with O => eb | S _ => false end], which [cpu_own_eb_agree]
    derives to be [b] from the entry resources (porting guide, "Derive the SIE
@@ -500,7 +500,7 @@ Section ProofUartintr.
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
     procs_inv Φ γs -∗ panic_wp_any -∗
     sie_cap_gpr M (av - 4) false pme -∗
-    cpu_own (S lvl) eb pme C false -∗ trap_csrs_pay lvl eb -∗
+    cpu_own (S lvl) eb pme C false -∗ arm_pay lvl eb pme -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x2e)) -∗
     locked γl cpu_id -∗ tx_res γu -∗
     ui_frame sp0 m0 -∗

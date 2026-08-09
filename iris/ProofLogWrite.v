@@ -482,7 +482,7 @@ Section LogWriteBlocks.
     pc_is (mword_of_int (KernelSyms.log_write + 0xae) : mword 64) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     lw_frame m -∗
@@ -747,7 +747,7 @@ Section LogWriteBlocks.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
     bslot bn -∗
@@ -977,7 +977,7 @@ Section LogWriteBlocks.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
     bslot bn -∗
@@ -1247,7 +1247,7 @@ Section LogWriteBlocks.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
     bslot bn -∗
@@ -1469,7 +1469,7 @@ Section LogWriteBlocks.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     locked (ln_lk γ) cpu_id -∗
     lw_frame m -∗
     bslot bn -∗

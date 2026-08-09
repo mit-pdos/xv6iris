@@ -44,7 +44,7 @@
      - the running-thread bundle sleep needs: [procs_inv], [own_ctx],
        the ▷-guarded parked scheduler, and [panic_wp].
 
-   NOT here: [trap_csrs_pay].  sleep is not push/pop-balanced and does want
+   NOT here: [arm_pay].  sleep is not push/pop-balanced and does want
    the level-0 pay, but sys_pause's OWN acquire(&tickslock) is what produces
    it (acquire's post) and its release is what consumes it -- sys_pause as a
    whole IS balanced, so it must not also ask the caller for one.  Asking

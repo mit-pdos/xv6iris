@@ -229,7 +229,7 @@ Section SleepPostSched.
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf av false pj -∗
         cpu_own 1 true pj C false -∗
-        trap_csrs_pay 0 true -∗
+        arm_pay 0 true pj -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         Tk -∗
         locked γk cpu_id -∗
@@ -342,7 +342,9 @@ Section SleepPostSched.
               (proc_lock_res Φ γs γl (proc_addr j)) E1 0 true (proc_addr j) C (av - 6)%nat
               Hlka_r2
               ltac:(lia)
-              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Htc [-]").
+              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [Htc Hclm] [-]").
+    { rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay. iFrame "Htc".
+      iApply (cpu_claim_proc j Hjn with "Hclm"). }
     iIntros (CID1 Hs1 mrel2) "Hcg Hpc %Hcs_rel2 Hcpu".
     assert (Hpc38 : ret_pc (E1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x38)) by (rewrite HE1ra; apply bv_eq; vm_compute; reflexivity).
@@ -595,8 +597,8 @@ Section SleepPostSched.
     assert (Cs11 : Gf !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
       by (rewrite (Hthr (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)); exact Hmsch27).
     iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc HTk Hklocked HRk [Hpark Hclm]");
-      [| rewrite /running_claim; iFrame "Hpark Hclm"].
+    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc HTk Hklocked HRk [Hpark]");
+      [| rewrite /running_claim; iExact "Hpark"].
     { unfold callee_saved. repeat split; assumption. }
   Qed.
 
@@ -627,7 +629,7 @@ Section ProofSleep.
        rides the sleeping process's frame through sched() and is presented
        again at the re-acquire of lk.  So is "Hpark", the hart-free park
        receipt, which [scheds_take] spends just before the jal. *)
-    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hscheds #Hkopen HTk Hklocked HRk #Hpanicany [Hpark Hclm] Hcont".
+    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hscheds #Hkopen HTk Hklocked HRk #Hpanicany Hpark Hcont".
     (* ------------------------------------------------------------------ *)
     (* Prologue: 48-byte frame (push 6), save ra/s0/s1/s2/s3.             *)
     (* sleep runs at noff = 1, so the resource index is the literal        *)
@@ -840,6 +842,10 @@ Section ProofSleep.
        That is why sleep needs no [own_ctx] premise. *)
     iDestruct (proc_lock_res_elim Φ γs γl (proc_addr j) with "HR") as (st0 ch0) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
     iDestruct (proc_slots_running Φ γs j st0 Hj with "Hpark Hslot") as "(Hpark & -> & Hown)".
+    (* this lemma runs at the literal [eb = true], so the arm owned the claim
+       and [arm_pay] carries it whole -- the caller's complement is [emp]. *)
+    iDestruct "Hpay0" as "[Hpay0 Hclm]".
+    iDestruct (cpu_claim_elim j Hj with "Hclm") as "Hclm".
     iDestruct (pstate_at_intro j (1/2) RUNNING Hj with "Hclm") as "Hclm".
     iDestruct (pstate_whole_split (proc_addr j) RUNNING) as "[_ Hwe]".
     iDestruct ("Hwe" with "[Hpg Hclm]") as "Hpg".

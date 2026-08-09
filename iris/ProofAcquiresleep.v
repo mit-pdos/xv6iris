@@ -53,7 +53,7 @@
        family) is gone.  A same-hart hop and a parking hop are the same
        [callee_saved] transport, [asl_regs_cs].
      * the trap CSRs ride the loop: acquire(&slk->lk) mints
-       [trap_csrs_pay 0 eb], sleep carries it across the park and hands it
+       [arm_pay 0 eb _], sleep carries it across the park and hands it
        back, and the final release(&slk->lk) spends it.  acquiresleep is
        therefore trap-CSR-balanced and its own contract does not mention them.
      * the parked-scheduler record is NOT threaded here any more.  It lives in
@@ -175,7 +175,7 @@ Section AslProps.
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
       running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
-      trap_csrs_pay 0 eb -∗
+      arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x28)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
@@ -197,7 +197,7 @@ Section AslProps.
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
       running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
-      trap_csrs_pay 0 eb -∗
+      arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
       asl_exit CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
@@ -249,7 +249,7 @@ Section AslBodies.
     p_pid pj ↦₄{dq} pidv -∗
     running_claim j -∗
     cpu_own 1 eb pj C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x28)) -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
@@ -583,7 +583,7 @@ Section AslBodies.
     p_pid pj ↦₄{dq} pidv -∗
     running_claim j -∗
     cpu_own 1 eb pj C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x24)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -683,7 +683,7 @@ Section AslBodies.
     p_pid pj ↦₄{dq} pidv -∗
     running_claim j -∗
     cpu_own 1 eb pj C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
     asl_exit CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗

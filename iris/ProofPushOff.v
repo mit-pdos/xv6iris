@@ -693,7 +693,7 @@ Section ProofPushOff.
               N1 (av - 4)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hcnt Hpc Hi0a [-]").
-    iIntros (CID6 Hh6 mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hpay Hpc".
+    iIntros (CID6 Hh6 mstatus0) "%Hmsf %Hsie Hcg Hcnt Htcp Hclm Hpay Hpc".
     iDestruct (po_cells_transport CID5 CID6 n eb p b ltac:(wp_next_chain) with "Hcells0") as "Hcells0".
     iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
     (* THE HART IS PINNED AT CID6 FROM HERE ON (push_off never re-enables),
@@ -897,7 +897,7 @@ Section ProofPushOff.
       destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
       assert (Hav4 : (av - 4 + 4)%nat = av) by lia.
       iEval (rewrite Hav4) in "Hcg".
-      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hcnt Hproc HC] Htcp Hpc [%]").
+      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hcnt Hproc HC] [$Htcp $Hclm] Hpc [%]").
       { exact Hmsf. }
       { (* cpu_own (S 0) eb p C false *)
         rewrite /cpu_own /cpu_hart /cpu_cells.
@@ -1073,7 +1073,7 @@ Section ProofPushOff.
       destruct Hp as (Hra & Hs0 & Hs1 & Hsp & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
       assert (Hav4 : (av - 4 + 4)%nat = av) by lia.
       iEval (rewrite Hav4) in "Hcg".
-      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hcnt Hproc HC] Htcp Hpc [%]").
+      iApply ("Hcont" $! mstatus0 mfin with "[%] Hcg [Hnoff Hintena Hcnt Hproc HC] [$Htcp $Hclm] Hpc [%]").
       { exact Hmsf. }
       { (* cpu_own (S (S n')) eb p C false *)
         rewrite /cpu_own /cpu_hart /cpu_cells.
@@ -1222,7 +1222,8 @@ Section ProofPushOff.
     set (P0 := <[Regidx csp_rs1 := regval_into_reg spd]> m).
     set (P1 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg
         (add_vec (P0 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm (mword_of_int 4 : mword 8))))]> P0).
-    iIntros "Hcg Hcpu Htcp #Htext Hpc Hcont".
+    iIntros "Hcg Hcpu Hap #Htext Hpc Hcont".
+    iDestruct (arm_pay_parts with "Hap") as "[Htcp Hclm]".
     iEval (rewrite cpu_own_off /cpu_hart /cpu_cells) in "Hcpu".
     iDestruct "Hcpu" as "(((%Hbound & Hnoff & Hint & Hproc) & Hcnt) & HC)".
     assert (Hcoup : neq_vec nv1 zero_reg = false <-> n = 0%nat)
@@ -1793,6 +1794,8 @@ Section ProofPushOff.
         subst eb.
         assert (Htcseq : trap_csrs_pay 0 true = trap_csrs) by reflexivity.
         iEval (rewrite Htcseq) in "Htcp".
+        assert (Hclmeq : cpu_claim_pay 0 true p = cpu_claim p) by reflexivity.
+        iEval (rewrite Hclmeq) in "Hclm".
         (* ---- 0x24: csrsi sstatus,2 (rd = x0) -- THE RESTORE, and the
            other half of the arm seam.  The pieces go IN: the counting
            token (level 0 + the persistent handler-avail = [intr_count 1
@@ -1806,7 +1809,7 @@ Section ProofPushOff.
         { symmetry. rewrite /storeval /nv1. change noffv with (noff_val 1).
           apply pop_storeval_pred. exact Hbound. }
         iApply (wp_csrsi_sstatus_x0_s_sconf Φ (mword_of_int (KernelSyms.pop_off + 0x24)) P7 (av - 2)%nat false
-                  with "Hcg [Htok] Htcp [Hnoff Hint Hproc] Hpc Hi24 [-]").
+                  with "Hcg [Htok] Htcp [Hnoff Hint Hproc] Hclm Hpc Hi24 [-]").
         { iApply (intr_count_pack_S_on 0 with "Htok Havail"). }
         { rewrite /cpu_cells.
           iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }

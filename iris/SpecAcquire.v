@@ -81,7 +81,7 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 
@@ -112,7 +112,7 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

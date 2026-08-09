@@ -1010,8 +1010,12 @@ Section KexitPark.
        and the RUNNING arm is the raw context cells sched wants.  That is
        why exit needs no [own_ctx] premise. *)
     iDestruct (proc_lock_res_elim Φ γs γl pj with "HR") as (st0 ch0) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
-    iDestruct "Hpark" as "[Hpark Hclm]".
     iDestruct (proc_slots_running Φ γs j st0 Hj with "Hpark Hslot") as "(Hpark & -> & Hoc)".
+    (* kexit runs at [eb = true], so the claim rode in on the p->lock
+       acquire's [arm_pay] -- and it is SPENT here: the ZOMBIE store below
+       moves the whole mirror, and ZOMBIE is unclaimed. *)
+    iDestruct "Hpay" as "[Hpay Hclm]".
+    iDestruct (cpu_claim_elim j Hj with "Hclm") as "Hclm".
     (* the claim joins the lock's tie: kexit's store of ZOMBIE below moves
        the whole mirror, and ZOMBIE is unclaimed, so the claim is spent. *)
     iDestruct (pstate_at_intro j (1/2) RUNNING Hj with "Hclm") as "Hclm".

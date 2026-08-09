@@ -372,7 +372,7 @@ Section VtPrologue.
         sie_cap_gpr MA (av - 4)%nat false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x1e) : mword 64) -∗
         locked γk cpu_id -∗ disk_res γd pd pav pu -∗
-        cpu_own (S n) eb pme C false -∗ trap_csrs_pay n eb -∗
+        cpu_own (S n) eb pme C false -∗ arm_pay n eb pme -∗
         (* the frame: ra/s0/s1's entry values and the unused fourth slot *)
         pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
         pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
@@ -635,7 +635,7 @@ Section VtEpilogue.
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
-    cpu_own (S n) eb pme C false -∗ trap_csrs_pay n eb -∗
+    cpu_own (S n) eb pme C false -∗ arm_pay n eb pme -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx ra_idx) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx s0_idx) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx s1_idx) -∗

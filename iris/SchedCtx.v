@@ -29,7 +29,7 @@
      the honest postcondition of every parking function.
    - The payload also carries the PER-HART trap CSRs [trap_csrs (CID := h)]
      -- yield/sleep hold them across the park (they take acquire's
-     [trap_csrs_pay] and spend it at their own release), and the scheduler
+     [arm_pay] and spend it at their own release), and the scheduler
      holds exactly one set at every dispatch -- and, on the DISPATCH
      direction, the resuming hart's [intr_handler_avail g]: the resumed
      thread's intena retune needs it under the FRESH ghost [g], and its own
@@ -199,7 +199,7 @@ Section SchedCtx.
      learning [h].
      [trap_csrs (CID := h)] rides on BOTH directions (factored out here):
      the parking side is yield/sleep, which took the CSRs from acquire's
-     [trap_csrs_pay] and owes them to their own release, entirely inside the
+     [arm_pay] and owes them to their own release, entirely inside the
      function -- so the crossing must carry them; the dispatch side is the
      scheduler, which provably holds exactly one set at every dispatch in
      both [eb] arms.

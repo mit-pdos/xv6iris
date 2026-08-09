@@ -550,7 +550,7 @@ Section PwConts.
        stack_own (pa_stk sp0 7%nat) 7%nat -∗
        sie_cap_gpr M (av - 14)%nat false (proc_addr j) -∗
        cpu_own 1%nat eb (proc_addr j) C false -∗
-       trap_csrs_pay 0%nat eb -∗
+       arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
        pc_is (mword_of_int (KernelSyms.pipewrite + 0xd8) : mword 64) -∗
@@ -574,7 +574,7 @@ Section PwConts.
        pw_chslot sp0 -∗
        sie_cap_gpr M (av - 14)%nat false (proc_addr j) -∗
        cpu_own 1%nat eb (proc_addr j) C false -∗
-       trap_csrs_pay 0%nat eb -∗
+       arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x46) : mword 64) -∗
@@ -607,7 +607,7 @@ Section PwConts.
        pw_chslot sp0 -∗
        sie_cap_gpr M (av - 14)%nat false (proc_addr j) -∗
        cpu_own 1%nat eb (proc_addr j) C false -∗
-       trap_csrs_pay 0%nat eb -∗
+       arm_pay 0%nat eb (proc_addr j) -∗
        locked γl cpu_id -∗
        pipe_res γp pi -∗
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x7e) : mword 64) -∗
@@ -781,7 +781,7 @@ Section PwGuard.
     pw_frame7 m sp0 -∗ pw_frame5 m sp0 -∗ pw_chslot sp0 -∗
     sie_cap_gpr M (av - 14)%nat false (proc_addr j) -∗
     cpu_own 1%nat eb (proc_addr j) C false -∗
-    trap_csrs_pay 0%nat eb -∗
+    arm_pay 0%nat eb (proc_addr j) -∗
     locked γl cpu_id -∗
     pipe_res γp pi -∗
     pc_is (mword_of_int (KernelSyms.pipewrite + 0x7a) : mword 64) -∗

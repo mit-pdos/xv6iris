@@ -290,6 +290,13 @@ Definition wp_kerneltrap_sconf_body
   devintr_caps γu γv γtx γdk γtl Φ γs pd pav pu -∗
   scheds_inv Φ γs -∗
   kt_proc_res p -∗
+  (* THE RUNNING CLAIM, handed over by the TRAP: taking the trap cleared SIE
+     and so dismantled [sie_arm true p], and the claim was one of its
+     conjuncts.  This is what a preempting kerneltrap spends on [yield] --
+     the whole reason the claim lives in the arm rather than in a caller's
+     frame, since a preempting trap holds no frame of the thread it
+     interrupted. *)
+  cpu_claim p -∗
   wp_next true p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (ms_f sc' tv' : mword 64),
       ⌜ callee_saved m mf ⌝ -∗
@@ -306,6 +313,7 @@ Definition wp_kerneltrap_sconf_body
       sepc ↦ᵣ ep -∗ scause ↦ᵣ sc' -∗ stval ↦ᵣ tv' -∗
       pc_is ret_tgt -∗
       kt_proc_res p -∗
+      cpu_claim p -∗
       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
   WP (Loop : expr riscv_lang) {{ Φ }}.
 

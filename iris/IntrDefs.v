@@ -687,8 +687,8 @@ Section IntrDefs.
   (*                                                                      *)
   (* [proc] is held at HALF ([ProcGeom.cpu_proc_half]): the other half is *)
   (* permanently owned by [SchedCtx.scheds_inv]'s slot for this hart, so  *)
-  (* that the global parked-scheduler protocol can read "the proc running *)
-  (* on hart h is p".  Keeping the FULL cell here would make that         *)
+  (* that the global parked-scheduler protocol can read: the proc running *)
+  (* on hart h is p.  Keeping the FULL cell here would make that          *)
   (* protocol's take-out move vacuous -- see                              *)
   (* [SchedCtx.cpu_own_full_is_vacuous].  The two [c->proc] STORES the    *)
   (* scheduler makes therefore have to reassemble the cell out of the     *)
@@ -742,6 +742,112 @@ Section IntrDefs.
      caller frame that crosses for free.  This matches the C: a thread
      touches c->noff / c->intena / c->proc only with interrupts disabled,
      which is precisely what push_off exists for. *)
+  (* ==================================================================== *)
+  (* THE RUNNING CLAIM: half #2 of the state mirror of whichever proc this   *)
+  (* hart is running -- the right to change that proc's state               *)
+  (* (design/proc-struct.md).  [zero_reg] means the SCHEDULER is running and *)
+  (* there is no proc to claim.                                              *)
+  (*                                                                        *)
+  (* A CONJUNCT OF THE ENABLED ARM, not of [cpu_cells].  [cpu_cells] is      *)
+  (* inside this arm (as [cpu_hart 0 true p]), so putting it there looks     *)
+  (* equivalent and far cheaper -- but [cpu_hart] is ALSO what the thread    *)
+  (* carries once interrupts are OFF, and the claim cannot hold across that  *)
+  (* window: after yield's [p->state = RUNNABLE] the state is [unclaimed],   *)
+  (* so [pstate_lock] owns both halves and no spare half exists, while       *)
+  (* [c->proc] still names p.  Here the obligation exists only while         *)
+  (* interrupts are on: push_off hands it to the code, the thread moves it   *)
+  (* freely while off, pop_off takes it back -- by then the thread has been  *)
+  (* dispatched again and is RUNNING, so it has one.                        *)
+  (* ==================================================================== *)
+  (* THE STATE IS PINNED AT [RUNNING], NOT EXISTENTIAL.  The claim is about  *)
+  (* [c->proc]: if that field names a real proc while interrupts are ON,     *)
+  (* then that proc IS the one executing on this hart, so its state is       *)
+  (* RUNNING.  No reachable configuration has an arm naming a non-RUNNING    *)
+  (* proc --                                                                 *)
+  (*   - at a park, interrupts are OFF (the thread holds p->lock), so no arm *)
+  (*     exists and the claim is in the thread's hands, spent into           *)
+  (*     [pstate_lock] alongside the [p->state] store;                       *)
+  (*   - the scheduler rebuilds the arm at [zero_reg], never with the proc   *)
+  (*     it just parked;                                                     *)
+  (*   - kfork's USED window is the CHILD's state, never [c->proc]'s.        *)
+  (*                                                                        *)
+  (* An existential [st] would be sound but useless: [pstate_lock_claimed]   *)
+  (* only yields [unclaimed st = false], i.e. [st ∈ {RUNNING, USED}], and    *)
+  (* those two arms of [proc_slots] hand out DIFFERENT resources             *)
+  (* ([own_ctx] vs [▷ proc_ctx]).  Pinning RUNNING here is what lets yield   *)
+  (* take the raw context cells from the lock without a park receipt to      *)
+  (* refute USED for it.                                                     *)
+  Definition cpu_claim (p : mword 64) : iProp Σ :=
+    (⌜ p = zero_reg ⌝ ∨
+     ∃ j : nat,
+       ⌜ proc_addr j = p /\ (j < NPROC)%nat ⌝ ∗ pstate_hlf j RUNNING)%I.
+
+  Lemma cpu_claim_idle : ⊢ cpu_claim zero_reg.
+  Proof. iLeft. done. Qed.
+
+  Lemma cpu_claim_proc (j : nat) :
+    (j < NPROC)%nat -> pstate_hlf j RUNNING -∗ cpu_claim (proc_addr j).
+  Proof. iIntros (Hj) "H". iRight. iExists j. by iFrame. Qed.
+
+  Lemma cpu_claim_elim (j : nat) :
+    (j < NPROC)%nat -> cpu_claim (proc_addr j) -∗ pstate_hlf j RUNNING.
+  Proof.
+    iIntros (Hj) "[%Hz | (%j' & [%Hpa %Hj'] & Hh)]".
+    - exfalso. exact (proc_addr_nonzero j Hj Hz).
+    - assert (Hjj : j' = j) by exact (proc_addr_inj j' j Hj' Hj Hpa).
+      subst j'. iExact "Hh".
+  Qed.
+
+  (* The claim rides the arm seam exactly as the trap CSRs do, and with the
+     same two-sided split.  [cpu_claim_pay n eb p] is what push_off HANDS OUT
+     when it dismantles the arm and what pop_off TAKES BACK when it rebuilds
+     it -- non-[emp] only at the one index where an arm existed (level 0 with
+     an enabled base).  [cpu_claim_ext eb p] is the complement: what a caller
+     must BRING because no arm owned it.  At [eb = false] -- kerneltrap's
+     case, where the trap itself cleared SIE -- the handler holds the claim
+     because the trap gave it to it. *)
+  Definition cpu_claim_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (match n with
+     | O => if eb then cpu_claim p else emp
+     | S _ => emp
+     end)%I.
+
+  Definition cpu_claim_ext (eb : bool) (p : mword 64) : iProp Σ :=
+    (if eb then emp else cpu_claim p)%I.
+
+  Lemma cpu_claim_ext_split (eb : bool) (p : mword 64) :
+    cpu_claim_pay 0 eb p ∗ cpu_claim_ext eb p ⊣⊢ cpu_claim p.
+  Proof.
+    destruct eb; rewrite /cpu_claim_pay /cpu_claim_ext.
+    - by rewrite bi.sep_emp.
+    - by rewrite bi.emp_sep.
+  Qed.
+
+  (* ==================================================================== *)
+  (* WHAT THE ARM HANDS OUT AT THIS INDEX.  The trap CSRs and the running   *)
+  (* claim are DIFFERENT resources -- yield spends the claim (surrendering  *)
+  (* both state halves to [pstate_lock]) while keeping the trap CSRs, and   *)
+  (* it is the SCHEDULER that later rebuilds the arm, at [zero_reg] -- but  *)
+  (* they enter and leave the arm at the same index, so they travel as one  *)
+  (* carrier.  Bundling is transport only: [arm_pay_parts] takes them apart *)
+  (* again by definition, and anyone who needs just one half says so.       *)
+  (*                                                                        *)
+  (* The SIE-flip leaves below deal in the components (they build and tear  *)
+  (* down the arm piecewise); the function-level specs deal in the bundle,  *)
+  (* which is what keeps a single hypothesis threading through the whole    *)
+  (* push_off / acquire / release / pop_off cone.                           *)
+  (* ==================================================================== *)
+  Definition arm_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (trap_csrs_pay n eb ∗ cpu_claim_pay n eb p)%I.
+
+  Lemma arm_pay_parts (n : nat) (eb : bool) (p : mword 64) :
+    arm_pay n eb p ⊣⊢ trap_csrs_pay n eb ∗ cpu_claim_pay n eb p.
+  Proof. reflexivity. Qed.
+
+  Lemma arm_pay_on (p : mword 64) :
+    arm_pay 0 true p ⊣⊢ trap_csrs ∗ cpu_claim p.
+  Proof. reflexivity. Qed.
+
   Definition sie_arm (b : bool) (p : mword 64) : iProp Σ :=
     (if b
      then (ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
@@ -750,6 +856,7 @@ Section IntrDefs.
            (∃ v : mword 64, scause ↦ᵣ v) ∗
            (∃ v : mword 64, stval ↦ᵣ v) ∗
            (∃ a b : mword 1, sret_bits a b) ∗
+           cpu_claim p ∗
            cpu_hart 0 true p)
      else ghost_var sie_gname (1/4/2)%Qp ('b"0" : mword 1))%I.
 
@@ -764,7 +871,7 @@ Section IntrDefs.
     ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝.
   Proof.
     iIntros "Hhalf Harm". rewrite /sie_arm. destruct b.
-    - iDestruct "Harm" as "(Hq & _ & _ & _ & _ & _)".
+    - iDestruct "Harm" as "(Hq & _ & _ & _ & _ & _ & _)".
       iDestruct (ghost_var_agree with "Hhalf Hq") as %H. iPureIntro. exact H.
     - iDestruct (ghost_var_agree with "Hhalf Harm") as %H. iPureIntro. exact H.
   Qed.
@@ -778,6 +885,7 @@ Section IntrDefs.
       (∃ v : mword 64, scause ↦ᵣ v) ∗
       (∃ v : mword 64, stval ↦ᵣ v) ∗
       (∃ a b : mword 1, sret_bits a b) ∗
+      cpu_claim p ∗
       cpu_hart 0 true p)).
   Proof.
     iSplit.
@@ -795,16 +903,18 @@ Section IntrDefs.
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) ∗
     (∃ handler : mword 64, intr_inv handler) ∗
     trap_csrs ∗
+    cpu_claim p ∗
     cpu_hart 0 true p.
-  Proof. iIntros "(Hbit & Hinv & Hsep & Hsca & Hstv & Hspp & Hcpu)". iFrame. Qed.
+  Proof. iIntros "(Hbit & Hinv & Hsep & Hsca & Hstv & Hspp & Hclm & Hcpu)". iFrame. Qed.
 
   Lemma sie_arm_on_in (p : mword 64) :
     ghost_var sie_gname (1/4/2)%Qp ('b"1" : mword 1) -∗
     (∃ handler : mword 64, intr_inv handler) -∗
     trap_csrs -∗
+    cpu_claim p -∗
     cpu_hart 0 true p -∗
     sie_arm true p.
-  Proof. iIntros "Hbit Hinv (Hsep & Hsca & Hstv & Hspp) Hcpu". iFrame. Qed.
+  Proof. iIntros "Hbit Hinv (Hsep & Hsca & Hstv & Hspp) Hclm Hcpu". iFrame. Qed.
 
   (* [strans_inv] -- THE TRANSLATION SLOT of the capability: the ambient
      S-mode translation invariant, regime and root hidden.  Clients thread

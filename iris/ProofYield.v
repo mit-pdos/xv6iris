@@ -175,6 +175,7 @@ Section YieldPostSched.
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         running_claim j -∗
         trap_csrs_ext eb -∗
+        cpu_claim_ext eb pj -∗
         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
   Proof.
@@ -267,17 +268,24 @@ Section YieldPostSched.
     iAssert (proc_lock_res Φ γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hpub Hown']" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, ch'. iFrame "Hstate Hpg Hchan Hpub".
       iApply (proc_slots_running_intro with "Hown'"). }
-    (* THE TRAP-CSR SPLIT.  release consumes [trap_csrs_pay 0 eb] -- the set
+    (* THE TRAP-CSR SPLIT.  release consumes [arm_pay 0 eb _] -- the set
        at [eb = true], nothing at [eb = false].  The complement is what this
        call was handed from outside and owes back to yield's caller; exactly
        one of the two is [emp]. *)
     iEval (rewrite -(trap_csrs_ext_split eb)) in "Htc".
     iDestruct "Htc" as "[Hpay Hext]".
+    (* THE FREED STATE HALF takes the same two-sided cut.  At [eb = true] the
+       release's last instruction re-enables interrupts, so half #2 goes back
+       INTO [sie_arm true pj] as the arm's claim; at [eb = false] no arm is
+       rebuilt and the thread keeps it, to hand to yield's caller. *)
+    iDestruct (cpu_claim_proc j Hj with "Hclm") as "Hclm".
+    iEval (rewrite -(cpu_claim_ext_split eb pj)) in "Hclm".
+    iDestruct "Hclm" as "[Hclmp Hclmx]".
     iApply (Release.wp_release_sconf Φ γl (proc_addr j) "proc"%string
               (proc_lock_res Φ γs γl (proc_addr j)) D1 0 eb pj C (av - 4)%nat
               Hlka
               ltac:(lia)
-              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay [-]").
+              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [$Hpay $Hclmp] [-]").
     (* release's exit index is [outb = eb]: at [eb = true] it re-enables at
        its LAST instruction, so the hart can move there and the epilogue
        below is hart-GENERIC; at [eb = false] it does not, and the chain
@@ -443,8 +451,8 @@ Section YieldPostSched.
     iDestruct (trap_csrs_ext_transport CID0 CIDe5 eb pj ltac:(wp_next_chain)
                  with "Hext") as "Hext".
     iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc [Hpark Hclm] Hext");
-      [| rewrite /running_claim; iFrame "Hpark Hclm"].
+    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc [Hpark] Hext Hclmx");
+      [| rewrite /running_claim; iExact "Hpark"].
     unfold callee_saved. repeat split; assumption.
   Qed.
 
@@ -462,7 +470,7 @@ Section ProofYield.
     cbv beta delta [wp_yield_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hscheds #Hpanic [Hpark Hclm] Hext Hcont".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hscheds #Hpanic Hpark Hext Hclmx Hcont".
     (* ONE INDEX.  [eb] is both the saved base enable and the resource index:
        at level 0 they are forced equal ([CpuOwn.cpu_own_eb_agree]), so there
        is nothing to derive and nothing to case-split on.  yield's own
@@ -616,7 +624,7 @@ Section ProofYield.
     { iEval (rewrite Ha0_B1). iExact "Hislock". }
     (* FROM HERE TO THE RELEASE THE LOCK IS HELD, so the index is the literal
        [false] and every leaf collapses with [wp_next_off]. *)
-    iIntros (CIDa Hsa ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu Hpay".
+    iIntros (CIDa Hsa ms2 macq) "%Hmsf2 Hcg Hpc %Hcs_acq Hlocked HR Hcpu [Hpay Hclmp]".
     assert (Hpc14 : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.yield + 0x14)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc14) in "Hpc".
@@ -629,6 +637,13 @@ Section ProofYield.
     iDestruct (proc_slots_running Φ γs j st0 Hj with "Hpark Hslot") as "(Hpark & -> & Hown)".
     (* the claim's half #2 joins the lock's tie into the WHOLE mirror, which
        is what the store to p->state below is allowed to move. *)
+    (* rejoin the claim: acquire's [push_off] handed out the arm's share and
+       the caller brought the complement, and exactly one of the two is
+       [emp].  Its state is existential, so pin it against the lock's tie --
+       [proc_slots_running] has just said that tie is at RUNNING. *)
+    iDestruct (cpu_claim_ext_split eb (proc_addr j)) as "[Hcj _]".
+    iDestruct ("Hcj" with "[$Hclmp $Hclmx]") as "Hclm".
+    iDestruct (cpu_claim_elim j Hj with "Hclm") as "Hclm".
     iDestruct (pstate_at_intro j (1/2) RUNNING Hj with "Hclm") as "Hclm".
     iDestruct (pstate_whole_split (proc_addr j) RUNNING) as "[_ Hwe]".
     iDestruct ("Hwe" with "[Hpg Hclm]") as "Hpg".
@@ -695,7 +710,7 @@ Section ProofYield.
     iDestruct (cpu_own_ctx_take with "Hcpu") as "[HC Hcpuemp]".
     (* sched's crossing wants the WHOLE trap-CSR set, unconditionally: those
        are per-hart registers and the park can move harts.  Half of it comes
-       from acquire's own [trap_csrs_pay 0 eb] (the set at [eb = true],
+       from acquire's own [arm_pay 0 eb _] (the set at [eb = true],
        nothing at [eb = false]) and the other half is [trap_csrs_ext eb],
        which yield's caller brought for exactly this reason. *)
     (* the lent half is at the ENTRY hart; transport it forward first

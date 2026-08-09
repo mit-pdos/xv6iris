@@ -243,7 +243,7 @@ Section ProofVirtioDiskRwB.
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (K - 12)%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
-       trap_csrs_pay 0 eb -∗
+       arm_pay 0 eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0b0) : mword 64) -∗
        running_claim j -∗
        locked γk cpu_id -∗
@@ -268,7 +268,7 @@ Section ProofVirtioDiskRwB.
         /\ vdrw_hi M m0⌝ -∗
        sie_cap_gpr M (K - 12)%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
-       trap_csrs_pay 0 eb -∗
+       arm_pay 0 eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x0a8) : mword 64) -∗
        running_claim j -∗
        locked γk cpu_id -∗
@@ -287,7 +287,7 @@ Section ProofVirtioDiskRwB.
     vdrw_regs M0 sp0 b wr sector -> vdrw_hi M0 m0 ->
     sie_cap_gpr M0 (K - 12)%nat false (proc_addr j) -∗
     cpu_own 1 eb (proc_addr j) C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb (proc_addr j) -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
     panic_wp_any -∗ procs_inv Φ γs -∗ scheds_inv Φ γs -∗
     running_claim j -∗
@@ -502,7 +502,7 @@ Section ProofVirtioDiskRwB.
                      Mz !!! Regidx r = M1 !!! Regidx r⌝ -∗
                   sie_cap_gpr Mz (K - 12)%nat false (proc_addr j) -∗
                   cpu_own 1 eb (proc_addr j) C false -∗
-                  trap_csrs_pay 0 eb -∗
+                  arm_pay 0 eb (proc_addr j) -∗
                   pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x094) : mword 64) -∗
                   running_claim j -∗
                   locked γk cpu_id -∗

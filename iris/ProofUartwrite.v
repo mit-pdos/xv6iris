@@ -355,7 +355,7 @@ Section UwProps.
        ⌜ (S i < n)%nat ⌝ -∗
        ⌜ uw_loop_regs m0 M' (pa_stk sp0 10) buf n (S i) ⌝ -∗
        sie_cap_gpr M' (av - 10) false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false -∗ trap_csrs_pay 0%nat eb -∗
+       cpu_own 1%nat eb (proc_addr j) C false -∗ arm_pay 0%nat eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x6c)) -∗
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f (S i)) -∗
@@ -370,7 +370,7 @@ Section UwProps.
        ∀ M' : regfile,
        ⌜ uw_loop_regs m0 M' (pa_stk sp0 10) buf n n ⌝ -∗
        sie_cap_gpr M' (av - 10) false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false -∗ trap_csrs_pay 0%nat eb -∗
+       cpu_own 1%nat eb (proc_addr j) C false -∗ arm_pay 0%nat eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x72)) -∗
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f n) -∗
@@ -386,7 +386,7 @@ Section UwProps.
        ∀ M : regfile,
        ⌜ uw_loop_regs m0 M (pa_stk sp0 10) buf n i ⌝ -∗
        sie_cap_gpr M (av - 10) false (proc_addr j) -∗
-       cpu_own 1%nat eb (proc_addr j) C false -∗ trap_csrs_pay 0%nat eb -∗
+       cpu_own 1%nat eb (proc_addr j) C false -∗ arm_pay 0%nat eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.uartwrite + 0x6c)) -∗
        locked γl cpu_id -∗ tx_res γu -∗
        uart_sent_sub γu (uw_bytes f i) -∗
@@ -444,7 +444,7 @@ Section UwBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     kernel_text -∗ is_txlock γl γu -∗
     sie_cap_gpr M (av - 10) false pj -∗
-    cpu_own 1%nat eb pj C false -∗ trap_csrs_pay 0%nat eb -∗
+    cpu_own 1%nat eb pj C false -∗ arm_pay 0%nat eb pj -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x7c)) -∗
     locked γl cpu_id -∗ tx_res γu -∗
     uart_sent_sub γu bs -∗
@@ -702,7 +702,7 @@ Section UwBodies.
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
     procs_inv Φ γs -∗ scheds_inv Φ γs -∗ panic_wp_any -∗
     sie_cap_gpr M (av - 10) false pj -∗
-    cpu_own 1%nat eb pj C false -∗ trap_csrs_pay 0%nat eb -∗
+    cpu_own 1%nat eb pj C false -∗ arm_pay 0%nat eb pj -∗
     pc_is (mword_of_int (KernelSyms.uartwrite + 0x6c)) -∗
     locked γl cpu_id -∗ tx_res γu -∗
     uart_sent_sub γu (uw_bytes f i) -∗
@@ -766,7 +766,7 @@ Section UwBodies.
       ∀ (M2 : regfile) (l2 : list (bv 8)) (b2 : mword 32),
       ⌜ uw_loop_regs m0 M2 (pa_stk sp0 10) buf n i ⌝ -∗
       sie_cap_gpr M2 (av - 10) false pj -∗
-      cpu_own 1%nat eb pj C false -∗ trap_csrs_pay 0%nat eb -∗
+      cpu_own 1%nat eb pj C false -∗ arm_pay 0%nat eb pj -∗
       pc_is (mword_of_int (KernelSyms.uartwrite + 0x5a)) -∗
       locked γl cpu_id -∗ a_tx_busy ↦₄ b2 -∗
       uart_tx_own γu l2 -∗ uart_out_lb γu l2 -∗
@@ -883,7 +883,7 @@ Section UwBodies.
       ∀ M1 : regfile,
       ⌜ uw_loop_regs m0 M1 (pa_stk sp0 10) buf n i ⌝ -∗
       sie_cap_gpr M1 (av - 10) false pj -∗
-      cpu_own 1%nat eb pj C false -∗ trap_csrs_pay 0%nat eb -∗
+      cpu_own 1%nat eb pj C false -∗ arm_pay 0%nat eb pj -∗
       pc_is (mword_of_int (KernelSyms.uartwrite + 0x4e)) -∗
       locked γl cpu_id -∗ tx_res γu -∗
       uw_full sp0 m0 -∗ uw_buf buf dq f n -∗

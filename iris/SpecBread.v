@@ -101,7 +101,7 @@ Definition wp_bread_sconf_body
   cpu_own 0 eb pj C b -∗
   (* TRAP CSRs: NOT threaded.  This function acquires at level 0 and releases
      before returning, so it is push/pop- AND trap-CSR-BALANCED: its own
-     [acquire] mints the [trap_csrs_pay 0 eb] its interior sleep needs and its
+     [acquire] mints the [arm_pay 0 eb _] its interior sleep needs and its
      [release] spends it.  A CALLER-held level-0 pay would be a second one, and
      a second one is UNIMPLEMENTABLE above a park -- sleep carries exactly the
      one the pushing acquire minted, so the extra copy would be [trap_csrs] at

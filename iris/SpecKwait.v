@@ -81,7 +81,7 @@
      found arm returns [pp->pid] through an [lw] (hence sign-extended) and
      the three failure arms return [li -1].
 
-   NOT here: [trap_csrs_pay].  kwait's own acquire(&wait_lock) produces the
+   NOT here: [arm_pay].  kwait's own acquire(&wait_lock) produces the
    level-0 pay that sleep wants, and every exit's release consumes it, so
    kwait as a whole is balanced and must not ask the caller for one -- the
    sys_pause rule (a second [trap_csrs] makes the eb = true precondition

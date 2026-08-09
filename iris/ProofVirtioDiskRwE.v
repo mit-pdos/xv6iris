@@ -237,7 +237,7 @@ Section ProofVirtioDiskRwE.
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
        sie_cap_gpr M (K - 12)%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
-       trap_csrs_pay 0 eb -∗
+       arm_pay 0 eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1b0) : mword 64) -∗
        running_claim j -∗
        locked γk cpu_id -∗
@@ -267,7 +267,7 @@ Section ProofVirtioDiskRwE.
         /\ vdrw_hi M m0⌝ -∗
        sie_cap_gpr M (K - 12)%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
-       trap_csrs_pay 0 eb -∗
+       arm_pay 0 eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a0) : mword 64) -∗
        running_claim j -∗
        locked γk cpu_id -∗

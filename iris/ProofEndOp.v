@@ -3319,7 +3319,7 @@ Section EndOpBlocks.
     eo_regsE m M ->
     sie_cap_gpr M (K - 8)%nat false (proc_addr j) -∗
     cpu_own 1 eb (proc_addr j) C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb (proc_addr j) -∗
     locked (ln_lk γ) cpu_id -∗
     log_res γ bn γfs cov logstart -∗
     kernel_text -∗

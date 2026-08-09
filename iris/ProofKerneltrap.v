@@ -88,7 +88,7 @@ Section ProofKerneltrap.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].
     intros pcE ret_tgt Hlen Hav Hsc Hepal.
-    iIntros "Hcg Hmir Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps #Hscheds Hproc Hcont".
+    iIntros "Hcg Hmir Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps #Hscheds Hproc Hclm Hcont".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
     iApply (kt_pro Φ m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
               with "Hcg Hmir Htext Hpc Hsepc Hscause [-]").
@@ -281,7 +281,7 @@ Section ProofKerneltrap.
         (* the hart cannot have moved: no yield on this path. *)
         iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
         iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Hcpu
-                              Hsepc Hscause Hstval Hpc Hproc").
+                              Hsepc Hscause Hstval Hpc Hproc Hclm").
         { exact Hcsf. }
         { exact Hsppf. } { exact Hspief. } { exact Hsief. }
       + (* ----- there IS a current proc: yield, then the epilogue ----- *)
@@ -343,13 +343,17 @@ Section ProofKerneltrap.
         iApply (Yield.wp_yield_sconf Φ γs j γl Y0 (av - 6)%nat false C
                   Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
                   with "Hcg Hcpu Htext Hpc Hprocs Hscheds Hpanic Hpark
-                        [Hsepc Hscause Hstval Hmir] [-]").
+                        [Hsepc Hscause Hstval Hmir] [Hclm] [-]").
         { rewrite /trap_csrs_ext /trap_csrs.
           iSplitL "Hsepc". { iExists ep. iExact "Hsepc". }
           iSplitL "Hscause". { iExists sc. iExact "Hscause". }
           iSplitL "Hstval". { iExists tv. iExact "Hstval". }
           iExists ('b"1"), ('b"1"). iExact "Hmir". }
-        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hpark Hext".
+        (* THE CLAIM THE TRAP HANDED US, spent on yield.  At [eb = false]
+           there is no arm to take it from, which is exactly why a preempting
+           trap must arrive holding it. *)
+        { rewrite /cpu_claim_ext -Hpj. iExact "Hclm". }
+        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hpark Hext Hclm".
         iEval (rewrite Hpj) in "Hcg". iEval (rewrite Hpj) in "Hcpu".
         (* back, possibly on ANOTHER hart: the trap CSRs are that hart's *)
         rewrite /trap_csrs_ext /trap_csrs.
@@ -399,11 +403,14 @@ Section ProofKerneltrap.
         iSpecialize ("Hcont" $! CIDy with "[%]").
         { intros [Hf | Hz]; [ discriminate | exfalso; exact (Hpne Hz) ]. }
         iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Hcpu
-                              Hsepc Hscause Hstval Hpc [Hpark]").
+                              Hsepc Hscause Hstval Hpc [Hpark] [Hclm]").
         { exact Hcsf. }
         { exact Hsppf. } { exact Hspief. } { exact Hsief. }
         { iRight. iExists j. iSplitR; [iPureIntro; exact Hj|].
           iSplitR; [iPureIntro; exact Hpj|]. iExact "Hpark". }
+        (* the claim comes back out of yield at [cpu_claim_ext false], i.e.
+           whole: the resumed thread is RUNNING again and holds half #2. *)
+        { rewrite /cpu_claim_ext -Hpj. iExact "Hclm". }
     - (* ===== the NON-timer path: straight to the epilogue ===== *)
       iApply (wp_beq_fall_s_sconf Φ (mword_of_int (KernelSyms.kerneltrap + 0x32))
                 (mword_of_int 84 : mword 13) a5_idx a0_idx D1 (av - 6)%nat false
@@ -428,7 +435,7 @@ Section ProofKerneltrap.
         iEval (rewrite Hav6) in "Hcgat".
       iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
       iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Hcpu
-                            Hsepc Hscause Hstval Hpc Hproc").
+                            Hsepc Hscause Hstval Hpc Hproc Hclm").
       { exact Hcsf. }
       { exact Hsppf. } { exact Hspief. } { exact Hsief. }
   Qed.

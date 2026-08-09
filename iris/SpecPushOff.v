@@ -58,7 +58,7 @@ Definition wp_push_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
     ⌜ sconf_ms_facts ms ⌝ -∗
     sie_cap_gpr mfin av false p -∗
     cpu_own (S n) eb p C false -∗
-    trap_csrs_pay n eb -∗
+    arm_pay n eb p -∗
     pc_is caller_ret -∗
     ⌜ callee_saved m mfin ⌝ -∗
     WP (Loop : expr riscv_lang) {{ Φ }}) -∗
@@ -95,7 +95,7 @@ Definition wp_pop_off_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
   (4 <= av)%nat ->
   sie_cap_gpr m av false p -∗
   cpu_own (S n) eb p C false -∗
-  trap_csrs_pay n eb -∗
+  arm_pay n eb p -∗
   kernel_text -∗ pc_is pcE -∗
   wp_next bexit p (fun (CID : CpuId) =>
     ∀ mf,

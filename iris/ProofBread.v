@@ -77,7 +77,7 @@
      with interrupts OFF, so the ENTIRE bget interior -- both scans, the miss
      preamble, the recycle field rewrites -- runs at the literal [false] index,
      where [wp_next_off] collapses the hart back at every single leaf.  That is
-     what keeps [locked _ cpu_id] and [trap_csrs_pay] (both pinned at the hart
+     what keeps [locked _ cpu_id] and [arm_pay] (both pinned at the hart
      that took the lock) usable across a hundred instructions, and it is why
      the two scan loops need no hart re-anchoring at all.  Only three stretches
      are hart-GENERIC: the prologue up to [acquire], the release/acquiresleep
@@ -924,7 +924,7 @@ Section BreadBlocks.
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
@@ -1199,7 +1199,7 @@ Section BreadBlocks.
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
@@ -1548,7 +1548,7 @@ Section BreadBlocks.
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
@@ -1826,7 +1826,7 @@ Section BreadBlocks.
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
@@ -2042,7 +2042,7 @@ Section BreadBlocks.
     bio_ctx bn V -∗
     bd_frame m -∗
     cpu_own 1 eb (proc_addr j) C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb (proc_addr j) -∗
     locked (bn_lk bn) cpu_id -∗
     bcache_scan bn V Mg ord devs bnos -∗
     bslot bn -∗
@@ -2081,7 +2081,7 @@ Section BreadBlocks.
                pc_is (mword_of_int (KernelSyms.bread + 0x36) : mword 64) -∗
                bd_frame m -∗
                cpu_own 1 eb (proc_addr j) C false -∗
-               trap_csrs_pay 0 eb -∗
+               arm_pay 0 eb (proc_addr j) -∗
                locked (bn_lk bn) cpu_id -∗
                bcache_scan bn V Mg ord devs bnos -∗
                bslot bn -∗

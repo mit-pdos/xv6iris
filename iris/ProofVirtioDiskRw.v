@@ -132,7 +132,7 @@ Section ProofVirtioDiskRw.
         ⌜vdrw_regs M sp0 bp wr (vdrw_sector_raw bno) /\ vdrw_hi M m⌝ -∗
         sie_cap_gpr M (K - 12)%nat false pj -∗
         cpu_own 1 eb pj C false -∗
-        trap_csrs_pay 0 eb -∗
+        arm_pay 0 eb pj -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x036) : mword 64) -∗
         locked γk cpu_id -∗
         disk_res γd pd pav pu -∗

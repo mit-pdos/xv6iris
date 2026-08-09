@@ -33,7 +33,7 @@
      - [eb = true] is now a premise.  At level 0 with an enabled base the
        trap CSRs sit in the SIE arm and the pushing acquire hands them out,
        so the parking thread genuinely holds the set the chain payload
-       demands.  [trap_csrs_pay 0 eb] therefore still rides both sides --
+       demands.  [arm_pay 0 eb _] therefore still rides both sides --
        sleep's interior pop reaches level 0 -- but is now [trap_csrs]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
@@ -92,7 +92,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      BEFORE re-acquiring the condition lock, so at eb = true the interior
      pop deposits the trap CSRs into the re-enabled arm and the
      re-acquire extracts them back -- the pay must ride the spec. *)
-  trap_csrs_pay 0 eb -∗
+  arm_pay 0 eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
@@ -108,7 +108,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av false pj -∗
       cpu_own 1 eb pj C false -∗
-      trap_csrs_pay 0 eb -∗
+      arm_pay 0 eb pj -∗
       pc_is ret_tgt -∗
       (* lk reacquired on the resuming hart, with its resource *)
       locked γk cpu_id -∗
@@ -174,7 +174,7 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   sie_cap_gpr m av false pj -∗
   cpu_own 1 eb pj C false -∗
   (* same pay note as [wp_sleep_sconf_body]: the interior pop reaches 0 *)
-  trap_csrs_pay 0 eb -∗
+  arm_pay 0 eb pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv Φ γs -∗
   scheds_inv Φ γs -∗
@@ -191,7 +191,7 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av false pj -∗
       cpu_own 1 eb pj C false -∗
-      trap_csrs_pay 0 eb -∗
+      arm_pay 0 eb pj -∗
       pc_is ret_tgt -∗
       (* lk reacquired on the resuming hart, with its resource and the
          credential *)

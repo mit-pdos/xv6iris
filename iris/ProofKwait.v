@@ -563,7 +563,7 @@ Section ProofKwait.
         ⌜ kw_round_regs M mm pme addr ⌝ -∗
         sie_cap_gpr M (K - 10)%nat false pme -∗
         cpu_own 1 eb pme C false -∗
-        trap_csrs_pay 0 eb -∗
+        arm_pay 0 eb pme -∗
         pc_is (mword_of_int (KW + 0xdc)) -∗
         locked γw CID -∗ wait_res -∗
         proc_priv γf pme pid V -∗
@@ -855,7 +855,7 @@ Section ProofKwait.
     kw_cs_rest Mt mm ->
     sie_cap_gpr Mt (K - 10)%nat false pme -∗
     cpu_own 1 eb pme C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KW + 0xe8)) -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
@@ -1006,8 +1006,8 @@ Section ProofKwait.
     kw_cs_rest Mt mm ->
     sie_cap_gpr Mt (K - 10)%nat false pme -∗
     cpu_own 2 eb pme C false -∗
-    trap_csrs_pay 1 eb -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 1 eb pme -∗
+    arm_pay 0 eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x90)) -∗
     is_lock γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) -∗
@@ -1223,8 +1223,8 @@ Section ProofKwait.
     kw_cs_rest Mr mm ->
     sie_cap_gpr Mr (K - 10)%nat false pme -∗
     cpu_own 2 eb pme C false -∗
-    trap_csrs_pay 1 eb -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 1 eb pme -∗
+    arm_pay 0 eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x5c)) -∗
     kalloc_env γa None -∗
@@ -1535,8 +1535,8 @@ Section ProofKwait.
     kw_cs_rest Mf mm ->
     sie_cap_gpr Mf (K - 10)%nat false pme -∗
     cpu_own 2 eb pme C false -∗
-    trap_csrs_pay 1 eb -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 1 eb pme -∗
+    arm_pay 0 eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x40)) -∗
     kalloc_env γa None -∗
@@ -1900,7 +1900,7 @@ Section ProofKwait.
           ⌜ Mx !!! Regidx Ra4 = hx ⌝ -∗
           sie_cap_gpr Mx (K - 10)%nat false pme -∗
           cpu_own 1 eb pme C false -∗
-          trap_csrs_pay 0 eb -∗
+          arm_pay 0 eb pme -∗
           pc_is (mword_of_int (KW + 0xca)) -∗
           locked γw CID0 -∗ parents_own px -∗
           proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
@@ -1908,7 +1908,7 @@ Section ProofKwait.
           WP (Loop : expr riscv_lang) {{ Φ }}) -∗
       sie_cap_gpr M (K - 10)%nat false pme -∗
       cpu_own 1 eb pme C false -∗
-      trap_csrs_pay 0 eb -∗
+      arm_pay 0 eb pme -∗
       pc_is (mword_of_int (KW + 0xae)) -∗
       locked γw CID0 -∗ parents_own ps -∗
       proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
@@ -1925,7 +1925,7 @@ Section ProofKwait.
                    ⌜ Mx !!! Regidx Ra4 = hx ⌝ -∗
                    sie_cap_gpr Mx (K - 10)%nat false pme -∗
                    cpu_own 1 eb pme C false -∗
-                   trap_csrs_pay 0 eb -∗
+                   arm_pay 0 eb pme -∗
                    pc_is (mword_of_int (KW + 0xca)) -∗
                    locked γw CID0 -∗ parents_own px -∗
                    proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
@@ -1933,7 +1933,7 @@ Section ProofKwait.
                    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
                sie_cap_gpr M (K - 10)%nat false pme -∗
                cpu_own 1 eb pme C false -∗
-               trap_csrs_pay 0 eb -∗
+               arm_pay 0 eb pme -∗
                pc_is (mword_of_int (KW + 0xae)) -∗
                locked γw CID0 -∗ parents_own ps -∗
                proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
@@ -1970,7 +1970,7 @@ Section ProofKwait.
                  kw_exit_fn CID0 Φ γf mm pme K eb C pid V R -∗
                  sie_cap_gpr M' (K - 10)%nat false pme -∗
                  cpu_own 1 eb pme C false -∗
-                 trap_csrs_pay 0 eb -∗
+                 arm_pay 0 eb pme -∗
                  pc_is (mword_of_int (KW + 0xa6)) -∗
                  locked γw CID0 -∗ parents_own ps' -∗
                  proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
@@ -2361,7 +2361,7 @@ Section ProofKwait.
     kw_exit_fn CIDt Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
     sie_cap_gpr Mt (K - 10)%nat false pme -∗
     cpu_own 1 eb pme C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pme -∗
     pc_is (mword_of_int (KW + 0xe8)) -∗
     locked γw CIDt -∗ parents_own px -∗
     proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗
@@ -2412,7 +2412,7 @@ Section ProofKwait.
     kw_exit_fn CIDt Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
     sie_cap_gpr Mx (K - 10)%nat false pme -∗
     cpu_own 1 eb pme C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pme -∗
     pc_is (mword_of_int (KW + 0xca)) -∗
     locked γw CIDt -∗ parents_own px -∗
     proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗
@@ -2642,7 +2642,7 @@ Section ProofKwait.
     kw_exit_fn CIDy Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
     sie_cap_gpr M (K - 10)%nat false pme -∗
     cpu_own 1 eb pme C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pme -∗
     pc_is (mword_of_int (KW + 0xdc)) -∗
     locked γw CIDy -∗ wait_res -∗
     proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗
@@ -2734,7 +2734,7 @@ Section ProofKwait.
                ⌜ Mx !!! Regidx Ra4 = hx ⌝ -∗
                sie_cap_gpr Mx (K - 10)%nat false pme -∗
                cpu_own 1 eb pme C false -∗
-               trap_csrs_pay 0 eb -∗
+               arm_pay 0 eb pme -∗
                pc_is (mword_of_int (KW + 0xca)) -∗
                locked γw CIDy -∗ parents_own px -∗
                proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗

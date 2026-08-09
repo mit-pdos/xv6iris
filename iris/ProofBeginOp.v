@@ -392,7 +392,7 @@ Section BoProps.
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
       running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
-      trap_csrs_pay 0 eb -∗
+      arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x58)) -∗
       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
@@ -415,7 +415,7 @@ Section BoProps.
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
       running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
-      trap_csrs_pay 0 eb -∗
+      arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x2c)) -∗
       bo_exit CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
@@ -461,7 +461,7 @@ Section BoBodies.
     p_pid pj ↦₄{dq} pidv -∗
     running_claim j -∗
     cpu_own 1 eb pj C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x58)) -∗
     wp_next (CID0 := CID0) true pj (fun (CID : CpuId) =>
@@ -729,7 +729,7 @@ Section BoBodies.
     p_pid pj ↦₄{dq} pidv -∗
     running_claim j -∗
     cpu_own 1 eb pj C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x24)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -841,7 +841,7 @@ Section BoBodies.
     p_pid pj ↦₄{dq} pidv -∗
     running_claim j -∗
     cpu_own 1 eb pj C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x46)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.
@@ -968,7 +968,7 @@ Section BoBodies.
     p_pid pj ↦₄{dq} pidv -∗
     running_claim j -∗
     cpu_own 1 eb pj C false -∗
-    trap_csrs_pay 0 eb -∗
+    arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x2c)) -∗
     WP (Loop : expr riscv_lang) {{ Φ }}.

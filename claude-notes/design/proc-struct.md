@@ -605,13 +605,18 @@ move on half alone, and the tie means the cell cannot move without the ghost.
 across the released-lock window, which is what tells it on re-acquire that the
 slot did not drift.
 
-Half #2 travels bundled with the park receipt, since the two have identical
-lifetimes — both issued at dispatch, both spent at a park:
+Half #2 does **not** travel with the park receipt. `running_claim j` is now
+just the receipt:
 
 ```coq
-Definition running_claim (j : nat) : iProp Σ :=
-  (park_hlf j true ∗ pstate_hlf j RUNNING)%I.
+Definition running_claim (j : nat) : iProp Σ := park_hlf j true.
 ```
+
+Bundling them was not merely redundant but unsatisfiable at the release that
+ends a resumed thread's critical section: the holder has `pstate_whole`, the
+release returns `pstate_lock` to the invariant, and at `RUNNING`
+(`unclaimed = false`) that consumes **one** half — so exactly one half #2 is
+left over, and it is owed to the arm. Half #2's home is `cpu_claim` below.
 
 Every function between here and `sleep` names the bundle rather than its
 parts, so re-homing the pieces changes this definition and the handful of
@@ -680,32 +685,86 @@ interrupts are on. `push_off` hands it to the code, the thread spends and
 moves it freely while off, and `pop_off` demands it back — by which point
 the thread has been dispatched again and is `RUNNING`, so it has it.
 
-At the disabled index it is a premise, on the `trap_csrs_ext eb` /
-`trap_csrs_pay 0 eb` pattern already threaded through the functions that
-can reach a `sleep`.
-
-
-
-`sie_arm true p`, beside the scheduler's saved `valid_context` for
-`cpu->context` — with the usual `_ext eb`-shaped complement at the disabled
-index, where the running thread holds it directly. This is what makes it
-reachable from `kerneltrap`, which receives the arm's contents from the trap
-engine when the trap clears SIE.
+The conjunct itself, and its two seam forms:
 
 ```coq
-sie_arm true p  ⊇
-  (⌜p = zero_reg⌝
-   ∨ ∃ j : nat, ⌜proc_addr j = p /\ (j < NPROC)%nat⌝ ∗
-                pstate_hlf j RUNNING ∗
-                sched_vc_at cpu_id (a_cpu_ctx cid_word) p)
+Definition cpu_claim (p : mword 64) : iProp Σ :=
+  (⌜ p = zero_reg ⌝ ∨
+   ∃ (j : nat) (st : mword 32),
+     ⌜ proc_addr j = p /\ (j < NPROC)%nat ⌝ ∗ pstate_hlf j st)%I.
 ```
 
-The disjunct must be **separable**, because its two payloads transport
-oppositely across a park: `pstate_hlf` is per-proc, hart-free, and crosses the
-migration as a frame, while `sched_vc_at` is per-hart — spent on the `swtch`
-into this hart's scheduler and freshly re-created by the resuming hart's
-`swtch`. A monolithic payload would either drag a hart-keyed record across a
-migration or block the state half from crossing.
+The state is **pinned at `RUNNING`**, not existential. The claim is about
+`c->proc`: if that field names a real proc while interrupts are on, that proc
+*is* the one executing on this hart. No reachable configuration has an arm
+naming a non-`RUNNING` proc — at a park interrupts are off (the thread holds
+`p->lock`), so no arm exists and the claim is in the thread's hands; the
+scheduler rebuilds the arm at `zero_reg`; and kfork's `USED` window is the
+*child*'s state, never `c->proc`'s.
+
+An existential `st` would be sound but useless. `pstate_lock_claimed` only
+yields `unclaimed st = false`, i.e. `st ∈ {RUNNING, USED}`, and those two arms
+of `proc_slots` hand out **different** resources (`own_ctx` vs `▷ proc_ctx`).
+Pinning is what lets yield take the raw context cells from the lock without a
+park receipt to refute `USED` for it — and so retires that job of `park_hlf`.
+
+The `zero_reg` disjunct is the scheduler — no proc to claim — and
+`proc_addr_nonzero` refutes it when `p` names a real slot.
+
+At the seam the claim rides exactly the `trap_csrs_pay` / `trap_csrs_ext`
+pattern, indexed by the level at which an arm exists:
+
+```coq
+Definition cpu_claim_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+  (match n with O => if eb then cpu_claim p else emp | S _ => emp end)%I.
+Definition cpu_claim_ext (eb : bool) (p : mword 64) : iProp Σ :=
+  (if eb then emp else cpu_claim p)%I.
+```
+
+`_pay` is what `push_off` hands out when it dismantles the arm and what
+`pop_off` takes back when it rebuilds it; `_ext` is the complement a caller
+must bring because no arm owned it. At `eb = false` — kerneltrap's case, where
+the trap itself cleared SIE — the handler holds the claim because the trap gave
+it to it. That is what makes the claim reachable from `kerneltrap`.
+
+### The transport carrier
+
+The trap CSRs and the claim enter and leave the arm at the same index, so they
+travel as one carrier:
+
+```coq
+Definition arm_pay (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+  (trap_csrs_pay n eb ∗ cpu_claim_pay n eb p)%I.
+Lemma arm_pay_parts n eb p :
+  arm_pay n eb p ⊣⊢ trap_csrs_pay n eb ∗ cpu_claim_pay n eb p.
+```
+
+Bundling is **transport only**. They are different resources with different
+lifetimes — `yield` spends the claim (surrendering both state halves to
+`pstate_lock`) while keeping the trap CSRs, and it is the *scheduler*, at
+`zero_reg`, that later rebuilds the arm. `arm_pay_parts` takes them apart by
+definition, and anyone needing one half says so.
+
+The reason to bundle is the cone: `trap_csrs_pay` already threads through
+push_off / acquire / release / pop_off and their ~40 dependents. A single
+carrier keeps that a **rename** — one hypothesis threads as before, and no
+proof body changes. Two separate premises would have meant a new name in
+~114 `iIntros`/`iApply` patterns.
+
+The SIE-flip leaves (`wp_csrci_…`, `wp_csrsi_…`) deal in the *components*,
+since they build and tear the arm down piecewise; the function-level specs deal
+in the bundle. `push_off` joins at its exit, `pop_off` splits at its entry.
+
+### The scheduler's saved context
+
+The other planned conjunct of the same disjunct is `sched_vc_at cpu_id
+(a_cpu_ctx cid_word) p`, the scheduler's saved `valid_context` for
+`cpu->context`. It must be **separable** from the claim, because the two
+transport oppositely across a park: `pstate_hlf` is per-proc, hart-free, and
+crosses the migration as a frame, while `sched_vc_at` is per-hart — spent on
+the `swtch` into this hart's scheduler and freshly re-created by the resuming
+hart's `swtch`. A monolithic payload would either drag a hart-keyed record
+across a migration or block the state half from crossing.
 
 This replaces `scheds_inv` / `sched_slot` / `scheds_take` / `scheds_put` and
 the park-receipt ghost entirely: the record moves to the arm, and the receipt's

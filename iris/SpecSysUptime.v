@@ -16,7 +16,7 @@
    universally quantified in the continuation -- with an invariant that says
    nothing about ticks, nothing more can be said, and a caller must accept any
    reading.  Interrupt/noff bookkeeping is acquire's: the count returns to [n]
-   and no [trap_csrs_pay] escapes.  Calls no per-process state, but acquire
+   and no [arm_pay] escapes.  Calls no per-process state, but acquire
    pins tp = [cid_word]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.

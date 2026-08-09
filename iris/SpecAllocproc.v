@@ -39,7 +39,7 @@
    [SchedCtx.proc_held j gl USED ch] -- the lock token and every cell the
    invariant holds unconditionally -- together with the detached private
    block, and [cpu_own] comes out at [S lvl] with the matching
-   [trap_csrs_pay].  On the empty-table path (a0 = 0) every lock the scan
+   [arm_pay].  On the empty-table path (a0 = 0) every lock the scan
    touched has been released and [cpu_own] is back at [lvl].
 
    TWO CONTRACTS, ONE PROOF.  [ALLOCPROC_GEN] below states what allocproc
@@ -167,7 +167,7 @@ Definition allocproc_post
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
        sie_cap_gpr mr K false pme ∗
        cpu_own (S lvl) eb pme C false ∗
-       trap_csrs_pay lvl eb ∗
+       arm_pay lvl eb pme ∗
        kalloc_env γa (avail_sub on nc))
   ∨ (* --- a FAILURE TAIL ran: the slot was taken and then given back.  a0
         is 0 and every lock is released, exactly as in the first arm, but

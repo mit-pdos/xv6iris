@@ -77,7 +77,7 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
   R -∗
   lock_finisher γl lka R Dc Out (⊤ ∖ ↑minstretN) -∗
   cpu_own (S n) eb p C false -∗
-  trap_csrs_pay n eb -∗
+  arm_pay n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     Out -∗
@@ -103,7 +103,7 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
   locked γl cpu_id -∗
   R -∗
   cpu_own (S n) eb p C false -∗
-  trap_csrs_pay n eb -∗
+  arm_pay n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr av outb p -∗
@@ -144,7 +144,7 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GE
   (* the licence to destroy, cashed inside the store *)
   (lock_frag γl None -∗ R ==∗ D ∗ Out) -∗
   cpu_own (S n) eb p C false -∗
-  trap_csrs_pay n eb -∗
+  arm_pay n eb p -∗
   wp_next outb p (fun (CID : CpuId) =>
     ∀ mr,
     lka ↦₄ (mword_of_int 0 : mword 32) -∗
