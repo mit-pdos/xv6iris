@@ -53,6 +53,8 @@ Require Import BitmapEnc BitmapInv.
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import InodeRegion.
+Require Import IcacheInv.
 Require Import SpecBread SpecBrelse SpecBfree SpecIupdate.
 Require Import SpecItrunc.
 Require Import ProofBmapParts.
@@ -84,14 +86,14 @@ Notation IT := KernelSyms.itrunc.
 (* ===================================================================== *)
 Section ItruncCont.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
-      (γ : log_names) (γfs : fs_names) (bn : bio_names)
+      (γ : log_names) (γfs : fs_names) (γi : gname) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart inodestart size : Z)
       (used : gset Z) (dev : mword 32)
       (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
-      (ds : list dinode) (u : nat)
+      (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
@@ -109,8 +111,7 @@ Section ItruncCont.
         inode_map γfs ip bm_empty -∗
         inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
         bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
-        fsblock γfs (IBLOCK inum inodestart)
-                (diblk_bytes (<[islot inum := di_trunc dn]> ds)) -∗
+        dinode_at γi inum (di_trunc dn) -∗
         bslots bn 3 -∗
         (* EXACTLY u: iupdate always runs, so the tail always spends one.
            The contract's RANGE is about the bitmap unit, which the tail
@@ -171,16 +172,17 @@ Proof. vm_compute; reflexivity. Qed.
 (* ===================================================================== *)
 Section ItruncTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart bmapstart inodestart size : Z) (dev : mword 32)
+      (bn : bio_names) (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart bmapstart inodestart size : Z) (nib : nat)
+      (dev : mword 32)
       (used : gset Z) (ip : mword 64) (inum : mword 32)
-      (dn : dinode) (bm : blkmap) (ds : list dinode)
+      (dn dn0 : dinode) (bm : blkmap)
       (u : nat) (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m M : regfile) (K : nat) (C : iProp Σ) (b : bool) :
     (K_itrunc <= K)%nat ->
@@ -188,7 +190,7 @@ Section ItruncTail.
     0 <= inodestart ->
     IBLOCK inum inodestart ∈ cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
-    diblk_wf ds ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     it_sp m M ->
@@ -212,20 +214,21 @@ Section ItruncTail.
     inode_map γfs ip bm_empty -∗
     inode_blocks γfs bm_empty (fun _ => replicate BSIZE (bv_0 8)) -∗
     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
-    fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn0 -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots bn 3 -∗
     log_op γ (S u) -∗
-    it_cont (CID0 := CID0) γ γfs bn cov logstart bmapstart inodestart size
-            used dev ip inum dn bm ds u pidv dq dqd dqn dqb dqs j m K C b -∗
+    it_cont (CID0 := CID0) γ γfs γi bn cov logstart bmapstart inodestart size
+            used dev ip inum dn bm u pidv dq dqd dqn dqb dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl Hsp Hthr Hs3.
+    intros HK Hgeom Hist Hicov Hilog Hnib Hj Hgl Hsp Hthr Hs3.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
-              Hfsb #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+              #Hireg Hdn #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iPoseProof (iti_38 with "Htext") as "Hi38".
     iPoseProof (iti_3c with "Htext") as "Hi3c".
     iPoseProof (iti_3e with "Htext") as "Hi3e".
@@ -313,16 +316,17 @@ Section ItruncTail.
     iDestruct "Hsl" as "[Hsl Hslp]".
     assert (Hdirlen : length (bm_dir bm_empty) = NDIRECT)
       by (rewrite /bm_empty; cbn [bm_dir]; apply length_replicate).
-    iApply (IU.wp_iupdate_sconf γs j γl γu γd γk pd pav pu bn γ γfs
-              cov logstart inodestart dev ip inum (di_trunc dn) bm_empty ds u
+    iApply (IU.wp_iupdate_sconf γs j γl γu γd γk pd pav pu bn γ γfs γi
+              cov logstart inodestart nib dev ip inum (di_trunc dn) dn0
+              bm_empty u
               pidv dq dqd dqn dqs T1 (K - 6)%nat true C b
-              HKiu Hgeom Hist Hicov Hilog Hdswf (di_trunc_addrs dn) Hdirlen
+              HKiu Hgeom Hist Hicov Hilog Hnib (di_trunc_addrs dn) Hdirlen
               Hj Hgl HT1a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
-                    Hsbi Hfsb Hppid Hprocs Hdevi Hdgeom
+                    Hsbi Hireg Hdn Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hop").
     iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hpc Hppid Hidev Hinum
-                           Hmeta Hmap Hsbi Hfsb Hsl Hop".
+                           Hmeta Hmap Hsbi Hdn Hsl Hop".
     assert (Hpc42 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x42)) by (rewrite HT1ra; pcw).
     iEval (rewrite Hpc42) in "Hpc".
@@ -581,7 +585,7 @@ Section ItruncTail.
                    = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; itidx).
     iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hppid Hidev Hinum
-                                 Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb [Hsl Hslp]
+                                 Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn [Hsl Hslp]
                                  [Hop]").
     { unfold callee_saved. split_and!; assumption. }
     { iEval (rewrite Hthree bslots_op). iSplitL "Hsl"; [iExact "Hsl"|].
@@ -603,7 +607,7 @@ End ItruncTail.
 (* ===================================================================== *)
 Section ItruncDLoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
   Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
@@ -1147,7 +1151,7 @@ End ItruncDLoop.
 (* ===================================================================== *)
 Section ItruncELoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names) (γd : disk_names)
@@ -1649,7 +1653,7 @@ End ItruncELoop.
 (* ===================================================================== *)
 Section ItruncIArm.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   (* what the arm hands to the tail: the inode names nothing at all *)
   Definition it_armexit `{GEN : GenId} `{CID0 : CpuId}
@@ -2341,31 +2345,42 @@ End ItruncIArm.
 (* ===================================================================== *)
 Section ItruncMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
-      (bn : bio_names) (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart bmapstart inodestart size : Z)
+      (bn : bio_names) (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart bmapstart inodestart : Z) (nib : nat)
+      (size : Z)
       (dev : mword 32) (used : gset Z)
       (ip : mword 64) (inum : mword 32)
-      (dn : dinode) (bm : blkmap) (ds : list dinode)
+      (dn dn0 : dinode) (bm : blkmap)
       (data : nat -> list (bv 8)) (u : nat)
       (pidv : mword 32) (dq dqd dqn dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                           cov logstart bmapstart inodestart size dev used
-                           ip inum dn bm ds data u
+    : wp_itrunc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                           cov logstart bmapstart inodestart nib size dev used
+                           ip inum dn dn0 bm data u
                            pidv dq dqd dqn dqb dqs m K eb C b.
   Proof.
     cbv beta delta [wp_itrunc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
-           Hdswf Hwf Hrange Hblen Hadr Hj Hgl Ha0 Heb.
+           Hnib Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Heb.
     subst eb.
     pose proof HK as HK'. unfold K_itrunc in HK'.
+    (* THE PER-SLOT RANGE FACT, no longer a premise: [blkmap_wf] already
+       says every block the map names is covered, and [cov_below] bounds a
+       covered block by the FS size (design §6(i)).  Everything below is
+       unchanged -- the loops still take [Hrange] in its old shape. *)
+    assert (Hrange : forall i : nat, (i <= MAXFILE)%nat ->
+              bv_unsigned (bm_slot bm i) <> 0 ->
+              bv_unsigned (bm_slot bm i) < size).
+    { intros i Hi Hnz.
+      exact (proj2 (blkmap_slot_inrange cov logstart size bm
+                      (proj1 Hgeom) Hbelow Hwf i Hi Hnz)). }
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinum Hmeta Hmap
-              Hblks Hsbb Hsbi Hbmr Hfsb Hppid #Hprocs #Hdevi
+              Hblks Hsbb Hsbi Hbmr #Hireg Hdn Hppid #Hprocs #Hdevi
               #Hdgeom #Hdlock Hsl Hop Hcont".
     iPoseProof (iti_00 with "Htext") as "Hi00".
     iPoseProof (iti_02 with "Htext") as "Hi02".
@@ -2713,13 +2728,14 @@ Section ItruncMain.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID14x)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (it_tail (CID0 := CID14x) γs j γl γu γd γk pd pav pu bn γ γfs
-                cov logstart bmapstart inodestart size dev used ip inum dn bm ds
+      iApply (it_tail (CID0 := CID14x) γs j γl γu γd γk pd pav pu bn γ γfs γi
+                cov logstart bmapstart inodestart size nib dev used ip inum
+                dn dn0 bm
                 n1 pidv dq dqd dqn dqb dqs m R0 K C b
-                HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl HR0sp HR0thr HR0s3
+                HK Hgeom Hist Hicov Hilog Hnib Hj Hgl HR0sp HR0thr HR0s3
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
                       Hframe Hppid Hidev Hinum Hsbb Hsbi
-                      Hmeta Hmap Hblks Hbmr Hfsb Hdevi Hdgeom Hdlock
+                      Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
                       [Hsl Hslp] Hop [Hcont]").
       { assert (H3b : (3 = 2 + 1)%nat) by lia.
         rewrite H3b bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hslp"]. }
@@ -2729,9 +2745,9 @@ Section ItruncMain.
       iIntros (CIDz) "%Hch". iSpecialize ("Hcont" $! CIDz with "[%]");
         [exact Hch|].
       iIntros (mf) "%Hcs Hsie Hcnt Hpc Hppid Hidev Hinum Hsbb Hsbi
-                    Hmeta Hmap Hblks Hbmr Hfsb Hsl Hop".
+                    Hmeta Hmap Hblks Hbmr Hdn Hsl Hop".
       iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hppid Hidev Hinum
-                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hsl
+                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn Hsl
                                   [Hop]");
         [exact Hcs | iExists n1; iSplitR; [iPureIntro; lia|]; iExact "Hop"].
     - (* ---------- there is one: take the arm ---------- *)
@@ -2773,22 +2789,23 @@ Section ItruncMain.
       destruct n2 as [|n3]; [exfalso; lia|].
       iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID15y)
                    ltac:(wp_next_chain) with "Hcont") as "Hcont".
-      iApply (it_tail (CID0 := CID15y) γs j γl γu γd γk pd pav pu bn γ γfs
-                cov logstart bmapstart inodestart size dev used ip inum dn bm ds
+      iApply (it_tail (CID0 := CID15y) γs j γl γu γd γk pd pav pu bn γ γfs γi
+                cov logstart bmapstart inodestart size nib dev used ip inum
+                dn dn0 bm
                 n3 pidv dq dqd dqn dqb dqs m Mz K C b
-                HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl HMzsp HMzthr HMzs3
+                HK Hgeom Hist Hicov Hilog Hnib Hj Hgl HMzsp HMzthr HMzs3
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
                       [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hppid Hidev Hinum Hsbb
-                      Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hdevi Hdgeom Hdlock
+                      Hsbi Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
                       Hsl Hop [Hcont]").
       { rewrite /it_frame. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5". iExact "Hslot6". }
       rewrite /it_cont.
       iIntros (CIDw) "%Hchw". iSpecialize ("Hcont" $! CIDw with "[%]");
         [exact Hchw|].
       iIntros (mf) "%Hcsw Hsie Hcnt Hpc Hppid Hidev Hinum Hsbb Hsbi
-                    Hmeta Hmap Hblks Hbmr Hfsb Hsl Hop".
+                    Hmeta Hmap Hblks Hbmr Hdn Hsl Hop".
       iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hppid Hidev Hinum
-                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hsl
+                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hdn Hsl
                                   [Hop]");
         [exact Hcsw | iExists n3; iSplitR; [iPureIntro; lia|]; iExact "Hop"].
   Qed.

@@ -21,11 +21,15 @@
      [wp_iupdate_sconf]  +0x00 .. +0x62   prologue, bread, the five field
                                           stores, the memmove.
 
-   THE COUPLING THAT MAKES IT WORK is [iu_held_content]: the caller's own
-   [fsblock] half for the inode block against the bio handle's machinery
-   half pins the buffer's bytes to [diblk_bytes ds] -- so the sixteen
-   dinodes the pure model names ARE the bytes the stores land in.  From
-   there [diblk_slot_acc] hands out slot [inum mod IPB] as six typed pieces
+   THE COUPLING THAT MAKES IT WORK is [InodeRegion.ireg_read]: the block's
+   client half lives in the inode REGION, never in the caller's hands
+   (design §11.3/§12), so the sixteen-dinode list [ds] is learned HERE --
+   one mask-preserving opening of [ireg_inv] against the machinery half
+   riding in the handle's own payload, which pins the buffer's bytes to
+   [diblk_bytes ds] for some well-formed [ds].  So the sixteen dinodes the
+   pure model names ARE the bytes the stores land in, and [ds] never
+   appears in the contract.  From there [diblk_slot_acc] hands out slot
+   [inum mod IPB] as six typed pieces
    (four halfword cells, one word cell, a 52-byte window) and takes them
    back at the NEW dinode, which is the entire content of what iupdate does
    to the buffer.
@@ -75,6 +79,7 @@ Require Import FsBlocks LogInv.
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import InodeRegion.
 Require Import CodeIupdate.
 Require Import SpecPanic.
 Require Import SpecBread SpecBrelse SpecLogWrite SpecMemmove.
@@ -117,7 +122,7 @@ Local Ltac iuidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (* ===================================================================== *)
 Section IupdateDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   (* iupdate's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
   Definition iu_frame (m : regfile) : iProp Σ :=
@@ -129,9 +134,9 @@ Section IupdateDefs.
   (* THE CONTINUATION, named so it is not re-traversed by every proofmode
      split (claude-notes/optimization.md). *)
   Definition iu_cont `{GEN : GenId} `{CID0 : CpuId}
-      (γfs : fs_names) (bn : bio_names) (γ : log_names)
+      (γfs : fs_names) (γi : gname) (bn : bio_names) (γ : log_names)
       (inodestart : Z) (ip : mword 64) (inum : mword 32)
-      (dn : dinode) (bm : blkmap) (ds : list dinode) (u : nat)
+      (dn : dinode) (bm : blkmap) (u : nat)
       (dev : mword 32) (pidv : mword 32) (dq dqd dqn dqs : dfrac) (j : nat)
       (m : regfile) (K : nat) (C : iProp Σ) (b : bool) : iProp Σ :=
     wp_next b (proc_addr j) (fun (CID : CpuId) =>
@@ -146,11 +151,37 @@ Section IupdateDefs.
         inode_meta ip dn -∗
         inode_map γfs ip bm -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        fsblock γfs (IBLOCK inum inodestart)
-                (diblk_bytes (<[islot inum := dn]> ds)) -∗
+        dinode_at γi inum dn -∗
         bslots bn 2 -∗
         log_op γ u -∗
         WP (Loop : expr riscv_lang))%I.
+
+  (* THE MACHINERY HALF, out of the handle and back.  [ireg_read] needs the
+     block's OTHER [fs_L] half to pin the region's parked bytes to the ones
+     bread returned, and the handle's payload carries exactly that -- on
+     BOTH polarities ([fs_mclean] / [fs_mdirty] each open with it).  This
+     is [ProofLogWrite.lw_pay_split]'s job, restated as an extract/restore
+     pair because that one is sealed inside its own module. *)
+  Lemma iu_held_L (bn : bio_names) (γfs : fs_names) (γd : disk_names)
+      (dev : mword 32) (cov : gset Z) (k : nat) (pidv dv bno : mword 32)
+      (bs bsl bsd : list (bv 8)) (d : bool) :
+    bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d -∗
+      (uint bno ↪[fs_L γfs]{#(1/2)} bsl) ∗
+      ((uint bno ↪[fs_L γfs]{#(1/2)} bsl) -∗
+       bio_held bn (fs_view γfs γd dev cov) k pidv dv bno bs bsl bsd d).
+  Proof.
+    rewrite /bio_held /bio_pay /fs_view /=.
+    iIntros "(%A & %B & %C & H1 & H2 & H3 & H4 & H5 & H6 & Hpay)".
+    destruct d.
+    - rewrite /fs_mdirty. iDestruct "Hpay" as "[[HL HD] Hq]".
+      iFrame "HL". iIntros "HL".
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD Hq".
+    - rewrite /fs_mclean. iDestruct "Hpay" as "[[HL HD] %He]".
+      iFrame "HL". iIntros "HL".
+      iSplitR; [done |]. iSplitR; [done |]. iSplitR; [done |].
+      iFrame "H1 H2 H3 H4 H5 H6". iFrame "HL HD". done.
+  Qed.
 
 End IupdateDefs.
 
@@ -170,13 +201,15 @@ Definition iu_sp (m M : regfile) : Prop :=
 (* ===================================================================== *)
 Section IupdateTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
-  Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId} 
+  Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId}
       (γs : list gname) (j : nat)
-      (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
-      (ip : mword 64) (inum : mword 32) (dn : dinode) (bm : blkmap)
+      (γfs : fs_names) (γi : gname) (γd : disk_names) (bn : bio_names)
+      (γ : log_names)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (dev : mword 32)
+      (ip : mword 64) (inum : mword 32) (dn dn0 : dinode) (bm : blkmap)
       (ds : list dinode) (u : nat)
       (kk : nat) (bno : mword 32) (bsd : list (bv 8)) (d0 : bool)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
@@ -189,6 +222,12 @@ Section IupdateTail.
     uint bno = IBLOCK inum inodestart ->
     IBLOCK inum inodestart ∈ cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
+    (* the region's side: the inum is covered, the parked list the caller
+       learned at its bread is well formed, and the record being flushed is
+       a legal dinode.  All three are the [ireg_write_au] premises. *)
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    diblk_wf ds ->
+    dinode_wf dn ->
     sie_cap_gpr M (K - 4)%nat b (proc_addr j) -∗
     cpu_own 0 true (proc_addr j) C b -∗
     kernel_text -∗
@@ -206,16 +245,17 @@ Section IupdateTail.
     sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
     bslots bn 1 -∗
     log_op γ (S u) -∗
-    fsblock γfs (IBLOCK inum inodestart) (diblk_bytes ds) -∗
+    ireg_inv γi γfs inodestart nib -∗
+    dinode_at γi inum dn0 -∗
     bio_held bn (fs_view γfs γd dev cov) kk pidv dev bno
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
-    iu_cont (CID0 := CID0) γfs bn γ inodestart ip inum dn bm ds u
+    iu_cont (CID0 := CID0) γfs γi bn γ inodestart ip inum dn bm u
             dev pidv dq dqd dqn dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog.
+    intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf.
     pose proof HK as HK'. unfold K_iupdate in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl Hop Hfsb Hheld Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hmeta Hmap Hsb Hsl Hop #Hireg Hdn Hheld Hcont".
     iPoseProof (iui_66 with "Htext") as "Hi66".
     iPoseProof (iui_68 with "Htext") as "Hi68".
     iPoseProof (iui_6c with "Htext") as "Hi6c".
@@ -273,19 +313,30 @@ Section IupdateTail.
     iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKlw : (K_log_write <= K - 4)%nat) by (unfold K_log_write; lia).
-    iEval (rewrite -Hbno) in "Hfsb".
-    iApply (LW.wp_log_write_sconf bn γ γfs γd cov logstart dev kk pidv bno
+    (* THE ATOMIC-UPDATE FORM (design §12.2).  The block's half is not in
+       our hands and never was: [ireg_write_au] IS the premise, opening the
+       region at log_write's own ghost step and paying out the retagged
+       fragment.  [cr := false] (this is an ordinary uncredited spend, the
+       unit is gone) and [Sb] is whatever set the caller's [log_op]
+       existential names -- iupdate does not care which blocks this op has
+       already logged, so it forgets the set again on the way out. *)
+    rewrite /log_op. iDestruct "Hop" as (Sb) "HopS".
+    iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
+              false Sb (⊤ ∖ ↑iregN) (dinode_at γi inum dn)
               T1 0%nat true (proc_addr j) C (K - 4)%nat b
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)
-              ltac:(rewrite Hbno; exact Hlog)
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl Hop Hfsb Hheld").
-    iIntros (CID3 Hq3 mL) "Hcg Hcnt Hpc %Hcs1 Hop Hfsb Hlk Hsl".
+              ltac:(rewrite Hbno; exact Hlog) ltac:(discriminate)
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl HopS [Hdn] Hheld").
+    { iEval (rewrite Hbno).
+      iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn ds
+                ltac:(solve_ndisj) Hnib Hdswf Hdnwf with "Hireg Hdn"). }
+    iIntros (CID3 Hq3 mL) "Hcg Hcnt Hpc %Hcs1 HopS Hdn Hlk Hsl".
+    iDestruct (log_opS_op with "HopS") as "Hop".
     assert (Hpc6c : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iupdate + 0x6c)) by (rewrite HT1ra; pcw).
     iEval (rewrite Hpc6c) in "Hpc".
-    iEval (rewrite Hbno) in "Hfsb".
     pose proof Hcs1 as Hcs1_cs.
     assert (HmLs2 : mL !!! Regidx Rs2 = bnode kk)
       by (rewrite (callee_saved_lookup Hcs1_cs Rs2 ltac:(vm_compute; reflexivity));
@@ -560,7 +611,7 @@ Section IupdateTail.
     rewrite /iu_cont.
     iSpecialize ("Hcont" $! CID12 with "[%]"); [wp_next_chain |].
     iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Hidev Hinum
-                     Hmeta Hmap Hsb Hfsb Hsl Hop").
+                     Hmeta Hmap Hsb Hdn Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
 
@@ -572,7 +623,7 @@ End IupdateTail.
 (* ===================================================================== *)
 Section ProofIupdateMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_iupdate_sconf 
@@ -580,20 +631,21 @@ Section ProofIupdateMain.
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
-      (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
+      (γ : log_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (inodestart : Z) (nib : nat)
+      (dev : mword 32)
       (ip : mword 64) (inum : mword 32)
-      (dn : dinode) (bm : blkmap) (ds : list dinode)
+      (dn dn0 : dinode) (bm : blkmap)
       (u : nat)
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                            cov logstart inodestart dev ip inum dn bm ds u
+    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs γi
+                            cov logstart inodestart nib dev ip inum dn dn0 bm u
                             pidv dq dqd dqn dqs m K eb C b.
   Proof.
     cbv beta delta [wp_iupdate_sconf_body].
-    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hdswf Hda Hdirlen Hj Hgl Ha0 Heb.
+    intros pcE pj ret_tgt HK Hgeom Hst Hcov Hlog Hnib Hda Hdirlen Hj Hgl Ha0 Heb.
     subst eb.
     pose proof HK as HK'. unfold K_iupdate in HK'.
     destruct Hgeom as [Hcovok Hlogsub].
@@ -618,16 +670,14 @@ Section ProofIupdateMain.
       pose proof (Z.mod_pos_bound (bv_unsigned inum) 16 ltac:(lia)) as [Hz _].
       exact Hz. }
     pose proof (islot_lt inum) as Hslotlt.
-    destruct Hdswf as [Hdslen Hdsall].
-    assert (Hdswf : diblk_wf ds) by (split; assumption).
     assert (Hdnwf : dinode_wf dn).
     { rewrite /dinode_wf Hda /bm_cells length_app Hdirlen. reflexivity. }
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
       by (rewrite /bm_cells length_app Hdirlen; reflexivity).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinumc Hmeta Hmap
-              Hsb Hfsb Hppid #Hprocs #Hdevi #Hdgeom
+              Hsb #Hireg Hdn Hppid #Hprocs #Hdevi #Hdgeom
               #Hdlock Hsl Hop Hcont".
-    iAssert (iu_cont (CID0 := CID) γfs bn γ inodestart ip inum dn bm ds u
+    iAssert (iu_cont (CID0 := CID) γfs γi bn γ inodestart ip inum dn bm u
                dev pidv dq dqd dqn dqs j m K C b)%I with "[Hcont]" as "Hcont";
       [rewrite /iu_cont; iExact "Hcont" |].
     iDestruct "Hmeta" as "(Hmty & Hmmaj & Hmmin & Hmnl & Hmsz)".
@@ -976,11 +1026,24 @@ Section ProofIupdateMain.
     { intros c Hcs N2 N8 N9 N18.
       rewrite (callee_saved_lookup Hcs1_cs c Hcs).
       exact (HRAthr c Hcs N2 N8 N9 N18). }
-    (* THE COUPLING: the buffer's bytes ARE the sixteen dinodes *)
+    (* THE COUPLING: the buffer's bytes ARE the sixteen dinodes.  The
+       block's client half lives in the REGION, so this is one
+       mask-preserving opening of [ireg_inv] (design §12.2): the machinery
+       half riding in the handle's payload pins the region's parked bytes
+       to the ones bread returned, and out comes the [ds] that the contract
+       no longer takes.  A [={⊤}=∗] cannot be [iMod]-ed straight onto a
+       [WP (Loop)] goal -- [iApply fupd_wp] first, the tree's idiom
+       (ProofInitlog.v:664). *)
     iEval (rewrite /bio_locked) in "Hheld".
     iDestruct (iu_held_k with "Hheld") as %Hkk.
-    iEval (rewrite -Hbno) in "Hfsb".
-    iDestruct (iu_held_content with "Hfsb Hheld") as %Hbs0.
+    iDestruct (iu_held_L with "Hheld") as "[HpL Hheldback0]".
+    iApply fupd_wp.
+    iMod (ireg_read ⊤ γi γfs inodestart nib inum dn0 (uint bno) bs0
+            ltac:(solve_ndisj) Hnib Hbno
+            with "Hireg Hdn HpL") as "(%Hex & Hdn & HpL)".
+    iModIntro.
+    iDestruct ("Hheldback0" with "HpL") as "Hheld".
+    destruct Hex as (ds & Hdswf & Hbs0 & _).
     subst bs0.
     iDestruct (iu_held_swap with "Hheld") as "[Hbuf Hheldback]".
     iDestruct (iu_buf_bytes (bpa kk) bno (mword_of_int 0 : mword 32) ds Hdswf
@@ -1526,16 +1589,16 @@ Section ProofIupdateMain.
     iDestruct ("Hbyback" $! (<[islot inum := dn]> ds) with "[%] Hby") as "Hbuf".
     { exact (diblk_wf_insert ds (islot inum) dn Hdswf Hdnwf). }
     iDestruct ("Hheldback" with "Hbuf") as "Hheld".
-    iEval (rewrite Hbno) in "Hfsb".
     (* ---- into the tail ---- *)
     iDestruct (cpu_own_transport CID15 CID36 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (iu_tail (CID0 := CID36)  γs j γfs γd bn γ cov logstart inodestart dev
-              ip inum dn bm ds u kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K C b
-              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog
+    iApply (iu_tail (CID0 := CID36) γs j γfs γi γd bn γ cov logstart inodestart
+              nib dev
+              ip inum dn dn0 bm ds u kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K C b
+              HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog Hnib Hdswf Hdnwf
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe
                     Hppid Hidev Hinumc [Hmty Hmmaj Hmmin Hmnl Hmsz] Hmap Hsb
-                    Hsl Hop Hfsb Hheld [Hcont]").
+                    Hsl Hop Hireg Hdn Hheld [Hcont]").
     { rewrite /inode_meta.
       iSplitL "Hmty"; [iExact "Hmty" |]. iSplitL "Hmmaj"; [iExact "Hmmaj" |].
       iSplitL "Hmmin"; [iExact "Hmmin" |]. iSplitL "Hmnl"; [iExact "Hmnl" |].

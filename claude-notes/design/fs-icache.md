@@ -482,8 +482,10 @@ closes it (proven in `IcacheInv.v`; the hypothesis is `fs_cov_in` spelled
 out rather than imported, so the file stays under the boot layer).
 
 **Where it goes in the contract**: `cov_below cov size` alongside
-`log_geom_ok cov logstart` in `SpecItrunc.v`, and thereafter in `SpecIput`
-and every FS contract that reaches `bfree`. The cleanest home is a single
+`log_geom_ok cov logstart` in `SpecItrunc.v` (LANDED, cycle C2), and
+thereafter in `SpecIput` and every FS contract that reaches `bfree`.
+(The §(ii) narrowing to `i < MAXFILE` was already in the landed
+`SpecItrunc.v` — the paragraph below predates it.) The cleanest home is a single
 `fs_geom_ok cov logstart size := log_geom_ok cov logstart ∧ cov_below cov
 size` bundle, but that renames a premise in ~10 landed contracts, so it is
 recorded and not done.
