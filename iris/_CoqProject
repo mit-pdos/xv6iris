@@ -903,6 +903,8 @@ ProofBallocParts.v
 ProofBfree.v
 ProofFileread.v
 ProofFilereadParts.v
+ProofKfork.v
+ProofKforkParts.v
 ProofSafestrcpy.v
 ProofStrncpy.v
 SpecBfree.v

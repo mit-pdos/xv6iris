@@ -98,7 +98,37 @@
    than through a separate premise on [myproc()]'s result (myproc's own
    contract, [SpecMyproc.v], returns exactly THAT [p]), and kfork is no
    different: [pme] is both [cpu_own]'s process index and the parent [p] the
-   C source calls [myproc()] to get. *)
+   C source calls [myproc()] to get.
+
+   THE FIVE ICACHE PREMISES ARE THE PRICE OF [ProcInv.cwd_ref] STILL BEING A
+   HOLE, AND THEY ARE TEMPORARY.  kfork runs [np->cwd = idup(p->cwd)], and
+   [SpecIdup.v] is no longer an assumed contract over the placeholder: it is
+   proven against the real inode cache, so it wants [is_itable γil γi],
+   [itable_inv γi], one [IrefSlots.iref_slot] and an actual
+   [IcacheInv.inode_ref γi ck cq cdev cinum] on the entry [p->cwd] names.
+   [ProcInv.cwd_ref] is [FileInv.inode_ref], which is literally [emp]
+   (design/proc-struct.md's "holes to be honest about", tracked as S5 in
+   claude-notes/projects/proc-struct-resources.md), so the parent's own
+   [proc_priv] CANNOT produce that reference and kfork has to be handed it.
+   Hence the premise [pv_cwd Vp = ientry ck] and the reference itself.
+
+   The reference comes BACK -- at an unnamed fraction, because idup halves
+   it and the two failure arms never call idup at all, so [∃ q'] is the only
+   statement true on every path.  That is the same shape [ofile_slot] uses
+   for a descriptor's [file_ref], and for the same reason.  The child's half
+   is DROPPED: it should go into the child's [cwd_ref], which is [emp], so
+   there is nowhere to put it.  The [iref_slot] is likewise consumed and not
+   returned (it is spent on exactly the path that calls idup, and claiming
+   it back on the others would be a stronger post than the code delivers for
+   no consumer).
+
+   When S5 lands -- [cwd_ref] becomes "v names a live itable entry and this
+   is one of its references" -- ALL of this collapses: the parent's
+   reference and the child's both come out of / go into their own
+   [proc_priv] blocks, the [ientry] premise becomes a consequence of the
+   parent's block, and the [iref_slot] rides beside a dormant process the
+   way [fd_slots FDSPARE] already does.  Only this file and [ProofKfork.v]'s
+   idup call site change; nothing else in kfork's proof touches them. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -120,6 +150,9 @@ Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
+Require Import InodeInv.
+Require Import IrefSlots.
+Require Import IcacheInv.
 Require Import SpecAllocpid.
 Require Import SpecAllocproc.
 Require Import WaitInv.
@@ -137,14 +170,19 @@ Local Open Scope Z_scope.
 Definition K_kfork : nat := 56%nat.
 
 Definition kfork_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+      !icacheG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa γf : gname) (lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+    (γa γf γi : gname) (lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
     (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
+    (ck : nat) (cdev cinum : mword 32)
     (K : nat) (mr : regfile) (rv : mword 64) : iProp Σ :=
   ( sie_cap_gpr mr K b pme ∗
     cpu_own lvl eb pme C b ∗
     proc_priv γf pme pid_p Vp ∗
+    (* the parent's cwd reference, at whatever is left of it: idup halves it
+       on the success path and never runs on the two failure paths. *)
+    (∃ q' : Qp, inode_ref γi ck q' cdev cinum) ∗
     ( (* --- allocproc itself found no slot: the same "not found" shape as
            [SpecAllocproc.allocproc_post]'s own first/third disjuncts,
            because kfork does nothing to the allocator's count between
@@ -165,11 +203,13 @@ Definition kfork_post
          ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝ ∗ kalloc_env γa None) ) )%I.
 
 Definition wp_kfork_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+      !icacheG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa γp γw γl γf : gname)  (γs : list gname)
+    (γa γp γw γl γf γil γi : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-    (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate) :=
+    (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
+    (ck : nat) (cq : Qp) (cdev cinum : mword 32) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_kfork <= K)%nat ->
@@ -177,6 +217,9 @@ Definition wp_kfork_sconf_body
      (lvl+2), and -- once the lock is held -- uvmcopy/freeproc/filedup/idup
      at (S lvl)+1 = lvl+2 again. *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+  (* p->cwd names itable entry [ck].  A consequence of the parent's own
+     block once [ProcInv.cwd_ref] stops being [emp]; a premise until then. *)
+  pv_cwd Vp = ientry ck ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
@@ -185,23 +228,30 @@ Definition wp_kfork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
+  is_itable γil γi -∗
+  itable_inv γi -∗
+  iref_slot -∗
+  inode_ref γi ck cq cdev cinum -∗
   kalloc_env γa on -∗
   proc_priv γf pme pid_p Vp -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γa γf lvl eb pme C on b pid_p Vp K mr
+      kfork_post γa γf γi lvl eb pme C on b pid_p Vp ck cdev cinum K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+             !icacheG Σ, !irefslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa γp γw γl γf : gname) (γs : list gname)
+      (γa γp γw γl γf γil γi : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate),
-      wp_kfork_sconf_body γa γp γw γl γf γs m lvl K eb pme C on b pid_p Vp.
+      (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
+      (ck : nat) (cq : Qp) (cdev cinum : mword 32),
+      wp_kfork_sconf_body γa γp γw γl γf γil γi γs m lvl K eb pme C on b
+        pid_p Vp ck cq cdev cinum.
 End KFORK.
