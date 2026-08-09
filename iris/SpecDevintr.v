@@ -182,8 +182,8 @@ Definition wp_devintr_sconf_body
       cpu_own lvl eb p C false -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is ret_tgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type DEVINTR.
   Parameter wp_devintr_sconf :

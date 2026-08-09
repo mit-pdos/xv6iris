@@ -370,7 +370,7 @@ Section UserStepIris.
   (* axiom -- both branches step, so the arm is total.  The continuation   *)
   (* is an ADDITIVE conjunction: stay / wake.                              *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_user_step_waiting Φ (wr : WaitReason) (ib : mword 32)
+  Lemma wp_user_step_waiting (Φ : mval -> iProp Σ) (wr : WaitReason) (ib : mword 32)
       (mip_v mie_v : mword 64) (va va' : mword 64) {dqp dqi : dfrac} :
     wr = WAIT_WRS_STO \/ wr = WAIT_WRS_NTO ->
     minstret_inv -∗
@@ -381,11 +381,11 @@ Section UserStepIris.
     mie ↦ᵣ{ dqi } mie_v -∗
     ▷ ((hart_state ↦ᵣ HART_WAITING (wr, ib) -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va' -∗
         mip ↦ᵣ{ dqp } mip_v -∗ mie ↦ᵣ{ dqi } mie_v -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})
+        WP (Loop : expr riscv_lang))
      ∧ (hart_state ↦ᵣ HART_ACTIVE tt -∗ PC ↦ᵣ va' -∗ nextPC ↦ᵣ va' -∗
         mip ↦ᵣ{ dqp } mip_v -∗ mie ↦ᵣ{ dqi } mie_v -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hwr) "#Hinv Hhs Hpc Hnpc Hmip Hmie Hcont".
     iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
@@ -572,7 +572,7 @@ Section UserStepObligation.
     user_step_obligation_active C pt Φ -∗
     user_inv C pt -∗
     stvec_handler_wp C pt Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hminstret #Hactive Hinv Htrap".
     iApply (wp_user_exec with "[] Hinv Htrap").

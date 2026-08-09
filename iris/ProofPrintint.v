@@ -118,8 +118,8 @@ Section ProofPrintint.
       sie_cap_gpr mf K b pcur -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spd HK Hsp Hagree.
     iIntros "Hcg #Htext Hpc Hc1 Hc2 Hc3 Hc4 Hc5 Hc6 Hc7 Hc8 Hcont".
@@ -274,8 +274,8 @@ Section ProofPrintint.
       sie_cap_gpr mb (K - 8)%nat b pcur -∗
       pc_is (mword_of_int (KernelSyms.printint + 0x40) : mword 64) -∗
       bytes_own (DfracOwn 1) buf 24 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hi24 Hi31 Hbase Ha0 Ha3 Ha4 Ha6.
     iIntros "Hcg #Htext #Hdig Hpc Hbuf Hcont".
@@ -513,8 +513,8 @@ Section ProofPrintint.
       sie_cap_gpr mf (K - 8)%nat b pcur -∗
       pc_is (mword_of_int (KernelSyms.printint + 0x44) : mword 64) -∗
       bytes_own (DfracOwn 1) buf 24 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     induction f as [|f' IH]; intros i CID0 x md Hif Hxf Hbase Ha0 Ha3 Ha4 Ha6;
       iIntros "Hcg #Htext #Hdig Hpc Hbuf Hcont";
@@ -639,8 +639,8 @@ Section ProofPrintint.
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
       uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hpv Hpkv.
     assert (HK6 : (6 <= K - 8)%nat) by lia.
@@ -806,8 +806,8 @@ Section ProofPrintint.
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
       uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spd buf HK Hpv Hpkv Hn1 Hn22 Ha4 Hsp Hs2 Hkept Hal7 Hal6 Hal5.
     iIntros "Hcg #Htext Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hpanicking Hpanicked #Hdev Htx #Hdlab Hcont".
@@ -1040,8 +1040,8 @@ Section ProofPrintint.
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
       uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spd buf HK Hpv Hpkv Hbase Ha0 Hsp Hs0 Hkept Hal7 Hal6 Hal5.
     iIntros "Hcg #Htext #Hdig Hpc Hbuf Hc1 Hc2 Hc3 Hc4 Hc8 Hpanicking Hpanicked #Hdev Htx #Hdlab Hcont".

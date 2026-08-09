@@ -292,8 +292,8 @@ Definition wp_bmap_sconf_body
       (* at most five units gone, and none gained *)
       ⌜((n - 5)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op γ n' -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BMAP.
   Parameter wp_bmap_sconf :
@@ -421,8 +421,8 @@ Definition wp_bmap_noalloc_sconf_body
       inode_map γfs ip bm -∗
       inode_blocks γfs bm data -∗
       bslot bn -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BMAP_NOALLOC.
   Parameter wp_bmap_noalloc_sconf :

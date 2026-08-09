@@ -72,8 +72,8 @@ Definition wp_memmove_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
     ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
     ⌜ mfin !!! Regidx a0_idx = p_dst ⌝ -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type MEMMOVE.
   Parameter wp_memmove_sconf :

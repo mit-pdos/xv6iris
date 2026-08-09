@@ -115,7 +115,7 @@ Section WpIntrInv.
   (* directly over [wp_exec_step_minstret]: retire bumps minstret, an      *)
   (* interrupt does not; both continuations come back under the step's ▷.  *)
   (* =================================================================== *)
-  Lemma wp_exec_step_retire_or_intr Φ {dq : dfrac} :
+  Lemma wp_exec_step_retire_or_intr (Φ : mval -> iProp Σ) {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ,
@@ -128,7 +128,7 @@ Section WpIntrInv.
            mstate_interp s_exec ∗
            (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
             PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-            ▷ WP (Loop : expr riscv_lang) {{ Φ }}) )
+            ▷ WP (Loop : expr riscv_lang)) )
        ∨
        ( (* a pending interrupt is taken (no fetch, no retire, no bump) *)
          ∃ (i : InterruptType) (p : Privilege) (s_trap : mstate),
@@ -138,8 +138,8 @@ Section WpIntrInv.
            mstate_interp s_trap ∗
            ▷ (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
               PC ↦ᵣ (register_lookup nextPC s_trap.(sregs)) -∗
-              WP (Loop : expr riscv_lang) {{ Φ }}) )) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+              WP (Loop : expr riscv_lang)) )) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hinv Hhs H".
     iApply (wp_exec_step_minstret (⊤ ∖ ↑minstretN) Φ with "Hinv").
@@ -248,8 +248,8 @@ Section WpIntrInv.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hpc0.
     iIntros "#Hintr Hhs Hcfg Hpc Hfile HF Hbody".

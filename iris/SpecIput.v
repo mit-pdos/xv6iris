@@ -168,8 +168,8 @@ Definition wp_iput_sconf_body
       (* at most [iput_units] gone, and none gained *)
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op γ n' -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type IPUT.
   Parameter wp_iput_sconf :

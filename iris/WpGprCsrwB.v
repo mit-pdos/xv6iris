@@ -763,8 +763,8 @@ Section WpCsrwGprNewB.
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
       mideleg ↦ᵣ mideleg_legalized mideleg0 (m !!! Regidx rs1) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrs1) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -843,8 +843,8 @@ Section WpCsrwGprNewB.
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (m !!! Regidx rs1) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrs1) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -937,8 +937,8 @@ Section WpCsrwGprNewB.
       gpr_file m -∗
       mie ↦ᵣ sie_new_mie mie0 mideleg0 (m !!! Regidx rs1) -∗
       mideleg ↦ᵣ mideleg0 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrs1) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hmie Hmdl Hinstr Hcont".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -1021,8 +1021,8 @@ Section WpCsrwGprNewB.
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
       satp ↦ᵣ satp_legalized satp0 (m !!! Regidx rs1) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrs1) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -1107,8 +1107,8 @@ Section WpCsrwGprNewB.
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
       pmpaddr_n ↦ᵣ pmp0_newaddr pmpcfg0 pmpaddr0 (m !!! Regidx rs1) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrs1) "Hmm [Hpmpc_wp Hpmpc_k] [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
     iDestruct (mmode_config_split with "Hmm") as "[Hmm_wp Hmm_k]".

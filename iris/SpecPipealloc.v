@@ -181,8 +181,8 @@ Definition wp_pipealloc_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     pipealloc_post γf γk on pf0 pf1 (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 (* The FS ghost CLASSES appear in the interface below although nothing in
    pipealloc's contract mentions the file system.  They are there because

@@ -155,7 +155,7 @@ Section SpecMainSecondary.
     started_inv (main_deposit γd γv Φ) -∗
     (* this hart's own translation and trap resources *)
     main_hart_raw tlbvec0 -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
 End SpecMainSecondary.
 

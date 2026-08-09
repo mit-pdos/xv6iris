@@ -93,8 +93,8 @@ Definition wp_vmfault_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
            ⌜(uint va < uint szv)%Z⌝ ∗
            ⌜P.(ud_um) !! svpn_of va0 = None⌝ ∗
            proc_pt (uptd_insert P (svpn_of va0) r)) ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type VMFAULT.
   Parameter wp_vmfault_sconf :

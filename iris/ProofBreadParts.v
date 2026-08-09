@@ -92,8 +92,8 @@ Section BreadEscrowLeaves.
         sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
         pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
         Ψ v -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hrd Hrdok HkptEm.
     iIntros "Hcg Hpc Hinstr HAU Hcont".
@@ -122,8 +122,8 @@ Section BreadEscrowLeaves.
       sie_cap_gpr m av b p -∗
       pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
       Ψ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intro HkptEm.
     iIntros "Hcg Hpc Hinstr HAU Hcont".

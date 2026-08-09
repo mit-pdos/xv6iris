@@ -146,6 +146,19 @@ Global Program Instance proto_irisGS `{!crashProtoGS Σ} : irisGS proto_lang Σ 
 }.
 Next Obligation. intros. iIntros "H". by iModIntro. Qed.
 
+(* Same deal as riscv_lang's [wp_triv] (RiscvPtsto.v): [pval := Empty_set]
+   and [p_to_val] is unconditionally [None], so a WP over [proto_lang] never
+   inspects its postcondition either. *)
+Lemma wp_proto_post_irrel `{!irisGS proto_lang Σ} s E (e : expr proto_lang) (Φ1 Φ2 : pval -> iProp Σ) :
+  WP e @ s; E {{ Φ1 }} ⊢ WP e @ s; E {{ Φ2 }}.
+Proof. iApply wp_mono. iIntros ([]). Qed.
+
+Definition wp_proto_triv `{!irisGS proto_lang Σ} (E : coPset) (e : expr proto_lang) : iProp Σ :=
+  WP e @ E {{ _, True%I }}.
+
+Notation "'WP' e @ E" := (wp_proto_triv E e%E) (at level 20, e at level 20) : bi_scope.
+Notation "'WP' e" := (wp_proto_triv ⊤ e%E) (at level 20, e at level 20) : bi_scope.
+
 (* the crash-spanning disk invariant: the toy "valid file system" P_fs is
    "disk cell 0 is even".  Its content is an iProp over FIXED-layer ghosts,
    so it survives every power cycle; neither power arm ever opens it. *)
@@ -177,7 +190,7 @@ Section wps.
 Context `{!crashProtoGS Σ}.
 
 Lemma wp_dead (gen : nat) (Φ : pval -> iProp Σ) :
-  dead gen ⊢ WP (WorkE gen : expr proto_lang) {{ Φ }}.
+  dead gen ⊢ WP (WorkE gen : expr proto_lang).
 Proof.
   iIntros "#Hdead". iLöb as "IH".
   iApply wp_lift_step; first done.
@@ -212,7 +225,7 @@ Qed.
 
 Lemma wp_work (gen : nat) (γm : gname) (n : nat) (Φ : pval -> iProp Σ) :
   crash_inv -∗ born gen -∗ gen ↪[cp_regname]□ γm -∗ 0 ↪[γm] n -∗
-  WP (WorkE gen : expr proto_lang) {{ Φ }}.
+  WP (WorkE gen : expr proto_lang).
 Proof.
   iIntros "#Hcinv #Hborn #Hrege Hcell".
   iRevert (n) "Hcell". iLöb as "IH". iIntros (n) "Hcell".
@@ -248,7 +261,7 @@ Proof.
     iSplitL "HregA".
     { iExists R. iFrame "HregA". iPureIntro. exact Hdom. }
     iSplitL; [|done].
-    iApply wp_dead. iExact "Hdead". }
+    iApply (wp_dead gen (fun _ => True%I)). iExact "Hdead". }
   destruct pw; last first.
   { (* CURRENT BUT POWERED OFF: impossible -- the registry has no entry for
        a generation whose PowerOn has not happened, yet we hold one. *)
@@ -325,8 +338,8 @@ Qed.
 Lemma wp_power (Φ : pval -> iProp Σ)
     (Hboot : forall (gen : nat) (γm : gname) (n : nat),
        ⊢ crash_inv -∗ born gen -∗ gen ↪[cp_regname]□ γm -∗ 0 ↪[γm] n -∗
-         WP (WorkE gen : expr proto_lang) {{ _, True }}) :
-  crash_inv ⊢ WP (PowerE : expr proto_lang) {{ Φ }}.
+         WP (WorkE gen : expr proto_lang)) :
+  crash_inv ⊢ WP (PowerE : expr proto_lang).
 Proof.
   iIntros "#Hcinv". iLöb as "IH".
   iApply wp_lift_step; first done.

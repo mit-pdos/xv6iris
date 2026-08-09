@@ -136,8 +136,8 @@ Definition wp_sys_dup_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
       sys_dup_post γf p pid V v (mf !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSDUP.
   Parameter wp_sys_dup_sconf :

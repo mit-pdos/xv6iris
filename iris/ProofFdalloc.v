@@ -268,8 +268,8 @@ Section ProofFdalloc.
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf av b p -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hsp0 Hra0 Hs00 Hs10 Hmtsp Hmta0 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hcont".
@@ -711,8 +711,8 @@ Section ProofFdalloc.
           pc_is ret_tgt -∗
           proc_priv_core p pid V -∗
           fdalloc_post γf p V D k (mf !!! Regidx Ra0) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I
+          WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (fd CID0 M) "%Hfuel %Hfd %Hpre %Hinv Hcg Hcpu Hpc Hcore Hpv Hc1 Hc2 Hc3 Hc4 Hcont".

@@ -167,8 +167,8 @@ Section ProofBrelse.
       sie_cap_gpr m0 av b pme -∗
       pc_is (add_vec_int pc 2) -∗
       Ψ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intro HkptEm.
     assert (Hsp : rget (CID := CID0) m0 csp_rs1 = m0 !!! Regidx csp_rs1).
@@ -267,8 +267,8 @@ Section ProofBrelse.
         sie_cap_gpr mf K eb p -∗
         cpu_own 0%nat eb p C eb -∗
         pc_is (ret_pc (m !!! Regidx Rra)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK HMsp HMthr.
     assert (HK26 : (26 <= K)%nat) by (unfold K_brelse in HK; exact HK).

@@ -152,7 +152,7 @@ Definition wp_sys_exit_sconf_body
   fd_slots FDSPARE -∗
   proc_priv γf pj pid V -∗
   (* NO continuation: sys_exit does not return.  See the header. *)
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSEXIT.
   Parameter wp_sys_exit_sconf :

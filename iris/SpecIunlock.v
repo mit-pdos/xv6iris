@@ -110,8 +110,8 @@ Definition wp_iunlock_sconf_body
       i_ref ip ↦₄{dqr} refv -∗
       (* the icache's record that this inode is loaded, and what it is *)
       inode_key gi true dn bm -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type IUNLOCK.
   Parameter wp_iunlock_sconf :

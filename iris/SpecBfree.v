@@ -198,8 +198,8 @@ Definition wp_bfree_gen_body
       bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bv_unsigned bno ]}) -∗
       bslots bn 2 -∗
       log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Definition wp_bfree_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
@@ -294,8 +294,8 @@ Definition wp_bfree_sconf_body
       bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bv_unsigned bno ]}) -∗
       bslots bn 2 -∗
       log_op γ u -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BFREE.
   (* THE CREDITED / GENERAL FORM; [wp_bfree_sconf] below is its

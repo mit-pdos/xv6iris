@@ -119,8 +119,8 @@ Section WpSmodeHalf.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -142,8 +142,8 @@ Section WpSmodeHalf.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -167,8 +167,8 @@ Section WpSmodeHalf.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₂ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".

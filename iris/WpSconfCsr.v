@@ -530,8 +530,8 @@ Section WpSconfCsr.
                      !!! Regidx csp_rs1) (kv_frame_slots + n) ∗
         ⌜ _get_Mstatus_SIE ms = sie_bit b ⌝ ∗
         sie_arm b p ) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
@@ -716,8 +716,8 @@ Section WpSconfCsr.
       cpu_claim_pay k eb p -∗
       cpu_cells_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok) "Hcg Hcnt Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
@@ -976,8 +976,8 @@ Section WpSconfCsr.
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m n true p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hcnt Hcsrs Hcells Hclm Hpc Hinstr Hcont".
     iDestruct "Hcnt" as "[Htok Hhx]".
@@ -1164,8 +1164,8 @@ Section WpSconfCsr.
       ⌜ sconf_ms_facts ms ⌝ -∗
       sie_cap_gpr m n true p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     destruct eb.
     2:{ (* ---- base state DISABLED: the real flip, via the restore leaf ---- *)
@@ -1277,8 +1277,8 @@ Section WpSconfCsr.
       trap_csrs -∗
       cpu_cells_pay b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hcnt Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1394,8 +1394,8 @@ Section WpSconfCsr.
       sie_cap_gpr m n b p -∗
       stvec ↦ᵣ wval -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval Hmode) "Hcg Hstv Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1492,8 +1492,8 @@ Section WpSconfCsr.
       sie_cap_gpr_at msf m n b p -∗
       sret_bits (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval Hms0f Hsie0) "Hcg Hsppc Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1617,8 +1617,8 @@ Section WpSconfCsr.
       sie_cap_gpr m n b p -∗
       sepc ↦ᵣ mepc_val wval -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval) "Hcg Hsepc Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1721,8 +1721,8 @@ Section WpSconfCsr.
       sie_cap_gpr (<[Regidx rd := regval_into_reg (f v)]> m) n b p -∗
       R_bitvector_64 rg ↦ᵣ{dq} v -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hne Hexec) "Hcg Hcell Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
@@ -1794,8 +1794,8 @@ Section WpSconfCsr.
       sie_cap_gpr (<[Regidx rd := regval_into_reg sc]> m) n b p -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
     iApply (wp_csrr_ro_s_sconf Φ pc csr_scause scause (fun x => x) rd m n b dq sc
@@ -1817,8 +1817,8 @@ Section WpSconfCsr.
       sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b p -∗
       stval ↦ᵣ{dq} tv -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
     iApply (wp_csrr_ro_s_sconf Φ pc csr_stval stval (fun x => x) rd m n b dq tv
@@ -1844,8 +1844,8 @@ Section WpSconfCsr.
       sie_cap_gpr (<[Regidx rd := regval_into_reg (mepc_val ep)]> m) n b p -∗
       sepc ↦ᵣ{dq} ep -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
     iApply (wp_csrr_ro_s_sconf Φ pc csr_sepc sepc mepc_val rd m n b dq ep

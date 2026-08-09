@@ -249,7 +249,7 @@ Section UvmallocDefs.
       (∃ w1 w3 w6 : mword 64,
          pa_stk sp0 3 ↦₈ w1 ∗ pa_stk sp0 5 ↦₈ w3 ∗ pa_stk sp0 8 ↦₈ w6) -∗
       ua_pay P vpn0 n oldsz newsz res -∗
-      WP (Loop : expr riscv_lang) {{ Φ }} )%I.
+      WP (Loop : expr riscv_lang) )%I.
 
 End UvmallocDefs.
 
@@ -384,7 +384,7 @@ Section ProofUvmalloc.
     pa_stk sp0 5 ↦₈ (mm !!! Regidx Rs3) -∗
     pa_stk sp0 8 ↦₈ (mm !!! Regidx Rs6) -∗
     ua_exit (CID0 := CID0) Φ mm P (svpn_of (pgroundup oldsz)) n K eb p C b sp0 spr oldsz newsz -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hxrng Hperm Hb3 Hb5 Hb8 Hpu Hnz Hpumod Hpu0 Hnb Hoin Hnchar Hfresh.
     assert (HKka : (14 <= K - 10)%nat) by (clear -HK; lia).

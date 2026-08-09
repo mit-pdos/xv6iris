@@ -220,8 +220,8 @@ Section WpEntryNew.
       gpr_file (m_jal m v_stack0 mhartid_in) -∗
       mhartid ↦ᵣ mhartid_in -∗
       entry_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp)
       "Hmm Hpmpc Hpc Hfile Hmh Hbytes #Htext Hcont".

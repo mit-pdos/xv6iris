@@ -96,8 +96,8 @@ Definition wp_uvmclear_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_set P vpn (pte_clear_u w)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMCLEAR.
   Parameter wp_uvmclear_sconf :

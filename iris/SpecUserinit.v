@@ -106,8 +106,8 @@ Definition wp_userinit_sconf_body
     cpu_own 0%nat eb pj C b -∗
     kalloc_env γa (avail_sub on userinit_pages) -∗
     (∃ v : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type USERINIT.
   Parameter wp_userinit_sconf :

@@ -130,8 +130,8 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       cpu_own 1 eb pj emp false -∗
       own_ctx (p_context pj) -∗
       ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SCHED.
   Parameter wp_sched_sconf :

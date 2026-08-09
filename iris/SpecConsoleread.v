@@ -125,8 +125,8 @@ Definition wp_consoleread_sconf_body
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       running_claim j -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type CONSOLEREAD.
   Parameter wp_consoleread_sconf :

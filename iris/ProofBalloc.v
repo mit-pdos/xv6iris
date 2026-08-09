@@ -234,7 +234,7 @@ Section BallocDefs.
             bitmap_res γfs bmapstart cov logstart size
                        (used ∪ {[ bv_unsigned blk ]}) ∗
             log_op γ u)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   (* ONE BYTE of a buffer's data area, borrowed and given back at a new byte
      list -- [ByteBuf.bb_byte_acc] over [buf_own]'s list form. *)
@@ -342,7 +342,7 @@ Section BallocEpilogue.
     ba_arms γfs γ cov logstart bmapstart size used u rv -∗
     ba_cont (CID0 := CID0) Φ γfs bn γ cov logstart bmapstart size used u
             pidv dq dqb dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1.
     pose proof HK as HK'. unfold K_balloc in HK'.
@@ -608,7 +608,7 @@ Section BallocOut.
     log_op γ (2 + u) -∗
     ba_cont (CID0 := CID0) Φ γfs bn γ cov logstart bmapstart size used u
             pidv dq dqb dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hpk Hsp Hthr.
     pose proof HK as HK'. unfold K_balloc in HK'.
@@ -988,7 +988,7 @@ Section BallocExhaust.
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev bnoB bsX bsdX dX -∗
     ba_cont (CID0 := CID0) Φ γfs bn γ cov logstart bmapstart size used u
             pidv dq dqb dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk.
     pose proof HK as HK'. unfold K_balloc in HK'.
@@ -1199,7 +1199,7 @@ Section BallocRestore.
     log_op γ u -∗
     ba_cont (CID0 := CID0) Φ γfs bn γ cov logstart bmapstart size used u
             pidv dq dqb dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1 Hnz Hcv Hlg.
     pose proof HK as HK'. unfold K_balloc in HK'.
@@ -1476,7 +1476,7 @@ Section BallocBzero.
     blk_own γfs bi -∗
     ba_cont (CID0 := CID0) Φ γfs bn γ cov logstart bmapstart size used u
             pidv dq dqb dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsize Hbirange Hbicov Hbilog Hbinz HbsDlen Hj Hgl Hsp Hthr Hs1 Hs7.
     pose proof HK as HK'. unfold K_balloc in HK'.
@@ -2026,7 +2026,7 @@ Section BallocAlloc.
        (bitmap_bytes used) bsdX dX -∗
     ba_cont (CID0 := CID0) Φ γfs bn γ cov logstart bmapstart size used u
             pidv dq dqb dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbirange Hbinu Hok HbnoB Hbmcov Hbmlog Hkk Hj Hgl
            Hsp Hthr Ha5 Ha2 Ha3 Hs1 Hs2 Hs7.
@@ -2457,7 +2457,7 @@ Section BallocScan.
        (bitmap_bytes used) bsdX dX -∗
     ba_cont (CID0 := CIDx) Φ γfs bn γ cov logstart bmapstart size used u
             pidv dq dqb dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hpk Hgeom Hsize HbnoB Hbmcov Hbmlog Hok Hkk Hj Hgl.
     pose proof HK as HK'. unfold K_balloc in HK'.

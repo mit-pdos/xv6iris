@@ -344,8 +344,8 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
     lk_fresh pid_lock_addr "nextpid"%string -∗
     lk_fresh wait_lock_addr "wait_lock"%string -∗
     ([∗ list] i ∈ seq 0 NPROC, proc_ready i) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PROCINIT.
   Parameter wp_procinit_sconf :

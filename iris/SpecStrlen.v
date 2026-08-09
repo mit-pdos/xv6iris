@@ -69,8 +69,8 @@ Definition wp_strlen_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
     ⌜callee_saved mm mr⌝ -∗
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5)
        = (mword_of_int (Z.of_nat k) : mword 64)⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type STRLEN.
   Parameter wp_strlen_sconf :

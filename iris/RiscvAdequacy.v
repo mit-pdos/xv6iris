@@ -437,10 +437,10 @@ Theorem riscv_system_adequacy Σ `{!riscvGpreS Σ, !sieG Σ} `{GEN : GenId}
           allocate [minstret_inv] *)
        gen_cert
        ={⊤}=∗
-       ([∗ list] c ∈ cs, WP (LoopE gen_id c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
-       WP (UartLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
-       WP (DiskLoop : expr riscv_lang) @ ⊤ {{ _, True }} ∗
-       WP (PlicLoop : expr riscv_lang) @ ⊤ {{ _, True }}) ->
+       ([∗ list] c ∈ cs, WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
+       WP (UartLoop : expr riscv_lang) @ ⊤ ∗
+       WP (DiskLoop : expr riscv_lang) @ ⊤ ∗
+       WP (PlicLoop : expr riscv_lang) @ ⊤) ->
   forall t2 g2 e2,
     rtc erased_step (cpu_pool cs, g) (t2, g2) ->
     e2 ∈ t2 ->
@@ -725,7 +725,7 @@ Proof.
   iSplitL.
   { iApply (wp_uart_loop γ with "Hcert Huinv Hpinv"). }
   iSplitL.
-  { iApply (wp_disk_loop γv _ Himg with "Hcert Hcinv Hqinv Hvinv Hpinv"). }
+  { iApply (wp_disk_loop γv Himg with "Hcert Hcinv Hqinv Hvinv Hpinv"). }
   iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
 Qed.
 
@@ -836,11 +836,11 @@ Section power.
          boot_facts g' ->
          ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
             ([∗ list] c ∈ enum CPU,
-               WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
-            WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
-            WP (DiskLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
-            WP (PlicLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }}) :
-    crash_inv -∗ WP (PowerLoopE : expr riscv_lang) {{ Φ }}.
+               WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
+            WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+            WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
+            WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
+    crash_inv -∗ WP (PowerLoopE : expr riscv_lang).
   Proof.
     iIntros "#Hcinv".
     iLöb as "IH".
@@ -1042,10 +1042,10 @@ Theorem riscv_power_adequacy Σ `{!riscvGpreS Σ, !sieG Σ}
        boot_facts g' ->
        ⊢ power_boot_res HE gen D nproc ndisk g' ={⊤}=∗
           ([∗ list] c ∈ enum CPU,
-             WP (LoopE gen c : expr riscv_lang) @ ⊤ {{ _, True%I }}) ∗
-          WP (UartLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
-          WP (DiskLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }} ∗
-          WP (PlicLoopE gen : expr riscv_lang) @ ⊤ {{ _, True%I }}) :
+             WP (LoopE gen c : expr riscv_lang) @ ⊤) ∗
+          WP (UartLoopE gen : expr riscv_lang) @ ⊤ ∗
+          WP (DiskLoopE gen : expr riscv_lang) @ ⊤ ∗
+          WP (PlicLoopE gen : expr riscv_lang) @ ⊤) :
   forall t2 g2 e2,
     rtc erased_step ([PowerLoopE : expr riscv_lang], g) (t2, g2) ->
     e2 ∈ t2 ->

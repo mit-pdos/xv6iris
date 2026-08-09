@@ -178,8 +178,8 @@ Definition wp_userret_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
     tf_pa tfp 280 ↦ₚ₈{ dqm } vt6 -∗
     tf_pa tfp 112 ↦ₚ₈{ dqm } va0f -∗
     kpt_frame kroot -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type USERRET.
   Parameter wp_userret_pt :

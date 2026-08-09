@@ -146,8 +146,8 @@ Section WpSmodePtBtype.
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       sr_inv R -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -191,8 +191,8 @@ Section WpSmodePtBtype.
     pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)) -∗
     ( smode_config γ dq -∗ sr_inv R -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hsm Htlbinv Hpc Hgpr Hinstr Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
@@ -238,8 +238,8 @@ Section WpSmodePtBtype.
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       sr_inv R -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp Hal0)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -302,8 +302,8 @@ Section WpSmodePtBtype.
     pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ)) -∗
     ( smode_config γ dq -∗ sr_inv R -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal) "Hsm Htlbinv Hpc Hgpr Hinstr Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
@@ -350,8 +350,8 @@ Section WpSmodePtBtype.
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       sr_inv R -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp)
       "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -395,8 +395,8 @@ Section WpSmodePtBtype.
     pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
     ( smode_config γ dq -∗ sr_inv R -∗
       pc_is (add_vec_int pc 4) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hsm Htlbinv Hpc Hgpr Hinstr Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as
@@ -442,8 +442,8 @@ Section WpSmodePtBtype.
       mie ↦ᵣ{ dq } mie_v -∗ mideleg ↦ᵣ{ dq } mdv0 -∗ menvcfg ↦ᵣ{ dq } menvcfg0 -∗
       sr_inv R -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 Hrs1 Hrs2 Hcmp Hal0)
       "#Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Htlbinv
@@ -506,8 +506,8 @@ Section WpSmodePtBtype.
     pc_is pc -∗ gpr_file m -∗ instr pc false (BTYPE (imm, Regidx rs2, Regidx rs1, BNE)) -∗
     ( smode_config γ dq -∗ sr_inv R -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗ gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal) "Hsm Htlbinv Hpc Hgpr Hinstr Hcont".
     iDestruct (smode_config_unbundle with "Hsm") as

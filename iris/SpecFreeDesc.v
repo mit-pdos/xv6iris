@@ -79,8 +79,8 @@ Definition wp_free_desc_sconf_body
       pa_add pd (16 * i + 8)  ↦₄ (mword_of_int 0 : mword 32) -∗
       pa_add pd (16 * i + 12) ↦₂ (mword_of_int 0 : mword 16) -∗
       pa_add pd (16 * i + 14) ↦₂ (mword_of_int 0 : mword 16) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FREEDESC.
   Parameter wp_free_desc_sconf :

@@ -92,8 +92,8 @@ Definition wp_plic_claim_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 /\
       plic_claim_a0_ok (m' !!! Regidx a0_idx) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PLIC_CLAIM.
   Parameter wp_plic_claim_sconf :

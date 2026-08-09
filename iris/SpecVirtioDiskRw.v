@@ -162,8 +162,8 @@ Definition wp_virtio_disk_rw_sconf_body
          client view shifts) plus the saved-proposition agreement's, and the
          epilogue's instruction stream pays one of the two off. *)
       ▷ Q -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type VIRTIODISKRW.
   Parameter wp_virtio_disk_rw_sconf :

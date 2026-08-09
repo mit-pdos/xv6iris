@@ -437,8 +437,8 @@ Definition wp_writei_sconf_body
        else [∗ list] i ∈ seq 0 n, pa_add src i ↦ₘ src_bytes i) -∗
       bslots bn 3 -∗
       log_op γ n' -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WRITEI.
   Parameter wp_writei_sconf :

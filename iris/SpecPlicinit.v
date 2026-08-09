@@ -71,8 +71,8 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
     sie_cap_gpr m' n b p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :

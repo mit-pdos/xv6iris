@@ -152,8 +152,8 @@ Section WpMulGpr.
              (mulop_mul.(mul_op_signed_rs2))
              (m !!! Regidx rs1) (m !!! Regidx rs2)
              (mulop_mul.(mul_op_result_part)))]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hcont".
     iApply (wp_instr Φ pc false (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) pmpcfg0

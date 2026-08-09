@@ -248,7 +248,7 @@ Section ProofVirtioDiskRwE.
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
        vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* what the completion-wait loop head at +0x1a0 consumes.  The lock's
      resource is CLOSED here (sleep takes it as [Rk]); the only thing that
@@ -288,7 +288,7 @@ Section ProofVirtioDiskRwE.
         /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
        vdrw_p5_exit CID0 γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0 kq -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* ------------------------------------------------------------------- *)
   (* Borrowing [b->disk] out of the lock's resource.                       *)

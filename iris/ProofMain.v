@@ -208,8 +208,8 @@ Section ProofMain.
     ( ∀ m1 : regfile,
         sie_cap_gpr m1 (K - 2)%nat false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x42) : mword 64) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hcid HK.
     pose proof (mn_bounds K HK) as (Hc2 & Hn50).
@@ -388,8 +388,8 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0x6e) : mword 64) -∗
         cpu_own 0 false p0 cpu_ctx_free false -∗
         printk_env γpr γd γv -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn.
     iIntros "Hcg #Htext #Hkdata #Hpanic #Hdev Hpc Hcpu Hlcons Hltx Hlpr".
@@ -712,8 +712,8 @@ Section ProofMain.
           (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
         kmap_at tramp_vpn tramp_ppn KP_rx -∗
         ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
@@ -880,8 +880,8 @@ Section ProofMain.
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
         intr_handler_avail -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hcid.
     (* [cid_word] is a [Definition] over [cpu_id]; naming the delta-expanded
@@ -1044,8 +1044,8 @@ Section ProofMain.
         cpu_own 0 false p0 cpu_ctx_free false -∗
         is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
         disk_geom γv pd pav pu -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hlen Hlive.
     iIntros "Hcg #Htext #Hkdata #Hpanic #Hdev Hpc Hcpu #Hpinv Hkenv".
@@ -1276,7 +1276,7 @@ Section ProofMain.
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
     kmap_at tramp_vpn tramp_ppn KP_rx -∗
     ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hp0.
     iIntros "Hcg #Htext #Hpanic Hpc Hcpu Htcsr #Hintr #Hsinv #Hwand".

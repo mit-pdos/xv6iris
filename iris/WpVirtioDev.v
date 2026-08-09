@@ -197,8 +197,8 @@ Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names)
     sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S w -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdok.
   pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
@@ -385,8 +385,8 @@ Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names)
     sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn.
   iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
@@ -565,8 +565,8 @@ Lemma wp_lw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
     ⌜ P w ⌝ -∗
     sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrdnz Hrdok Hread.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
@@ -618,8 +618,8 @@ Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names)
   wp_next b p (fun (CID : CpuId) =>
     sie_cap_gpr m n b p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".

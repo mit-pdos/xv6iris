@@ -608,7 +608,7 @@ Section EndOpDefs.
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   Lemma eo_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
       (Φ : mval -> iProp Σ) (j : nat) (pidv : mword 32) (dq : dfrac)
@@ -899,7 +899,7 @@ Section EndOpBlocks.
     eo_frame4 m -∗
     eo_frameJ m -∗
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hregs.
     pose proof Hregs as (Hsp & Hthr).
@@ -1144,7 +1144,7 @@ Section EndOpBlocks.
     eo_frameJ m -∗
     log_batch bn γfs cov logstart 0 ∅ -∗
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Heb Hregs.
     pose proof Hregs as (Hsp & Hthr).
@@ -1642,7 +1642,7 @@ Section EndOpBlocks.
     log_mirror_clean -∗
     eo_open bn γfs cov logstart n W L D Lw n -∗
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hj Hgl Heb Hshape Hnd Hwok HLw Hregs.
     destruct Hshape as [HnW Hn30].
@@ -2156,7 +2156,7 @@ Section EndOpBlocks.
     log_mirror_clean -∗
     eo_open bn γfs cov logstart n W L D Lw t -∗
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hj Hgl Heb Hshape Hnd Hwok.
     destruct Hshape as [HnW Hn30].
@@ -3332,7 +3332,7 @@ Section EndOpBlocks.
     eo_frame4 m -∗
     eo_frameJ m -∗
     eo_cont (CID0 := CID0) Φ j pidv dq m K eb C eb -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Heb Hregs.
     pose proof Hregs as (Hsp & Hthr).

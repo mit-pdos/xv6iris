@@ -369,7 +369,7 @@ Section ProofFreeproc.
         (* p->sz is a PARAMETER, not captured: the pagetable arm LOADS it
            for proc_freepagetable before this block stores 0 into it. *)
         p_sz pa ↦₈ pv_sz V -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I
+        WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hr24 Hr16 Hr8 Hr0 Hlk Hstate Hpsg Hchan Hkilled Hxstate Hpid Hpid2
              Hcwd Hnm Hof Hunits Hspare Hctx Hpark]" as "ZERO".
     { iIntros (CIDz Hsz0 me pgv).
@@ -627,7 +627,7 @@ Section ProofFreeproc.
         pc_is (mword_of_int (FR + 0x14) : mword 64) -∗
         p_trapframe pa ↦₈ tfv -∗
         p_sz pa ↦₈ pv_sz V -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I
+        WP (Loop : expr riscv_lang)))%I
       with "[ZERO Hpg]" as "PGT".
     { iIntros (CIDp Hsp0 me tfv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcpu Hpc Htf Hsz".

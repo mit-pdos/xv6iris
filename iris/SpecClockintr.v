@@ -126,8 +126,8 @@ Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       cpu_own n eb p C false -∗
       pc_is ret_tgt -∗
       tick_keeper Φ γl γs -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type CLOCKINTR.
   Parameter wp_clockintr_sconf :

@@ -253,8 +253,8 @@ Section SpecFreeproc.
       ⌜callee_saved mm mr⌝ -∗
       proc_held cpu_id j γl UNUSED (zero_reg : mword 64) -∗
       proc_dormant pa UNUSED -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
 
 End SpecFreeproc.
 

@@ -92,8 +92,8 @@ Definition wp_idup_sconf_body
     ⌜ callee_saved m mr /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ip ⌝ -∗
     cwd_ref ip -∗
     cwd_ref ip -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type IDUP.
   Parameter wp_idup_sconf :

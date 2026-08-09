@@ -99,8 +99,8 @@ Definition wp_iinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
     lock_name lk "itable"%string -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
     ([∗ list] i ∈ seq 0 NINODE, sl_fresh (inode_lock i) "inode"%string) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type IINIT.
   Parameter wp_iinit_sconf :

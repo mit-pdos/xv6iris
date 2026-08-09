@@ -65,8 +65,8 @@ Definition wp_wakeup_prologue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{G
       wk_fcell spF 2 ↦₈ (m !!! Regidx (mword_of_int 20)) -∗
       wk_fcell spF 1 ↦₈ (m !!! Regidx (mword_of_int 21)) -∗
       wk_fcell spF 0 ↦₈ vpad -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (M : regfile) (K : nat) (vra vs0 vs1 vs2 vs3 vs4 vs5 vpad : mword 64) (b : bool) (p : mword 64) :=
@@ -99,8 +99,8 @@ Definition wp_wakeup_epilogue_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ} `{G
       /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
       sie_cap_gpr Mf K b p -∗
       pc_is rettgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WAKEUPPARTS.
   Parameter wp_wakeup_prologue_sconf :

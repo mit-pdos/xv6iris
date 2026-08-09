@@ -108,8 +108,8 @@ Definition wp_piperead_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
       pipe_ref γp w q -∗
       proc_priv γf pj pid (upd_upt V P') -∗
       running_claim j -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PIPEREAD.
   Parameter wp_piperead_sconf :

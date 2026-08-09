@@ -248,7 +248,7 @@ Section IlockDefs.
         sleeplocked gisl -∗
         sl_pid (i_lock ip) ↦₄ pidv -∗
         inode_locked gfs gi cov logstart ip dn bm -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
 End IlockDefs.
 
@@ -287,7 +287,7 @@ Section IlockEpilogue.
     inode_locked gfs gi cov logstart ip dn bm -∗
     il_cont (CID0 := CID0) Φ gfs gi gisl bn cov logstart inodestart ip inum refv
             dn bm ds dev pidv dq dqd dqn dqr dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr.
     pose proof HK as HK'. unfold K_ilock in HK'.
@@ -544,7 +544,7 @@ Section IlockLoad.
     inode_raw ip -∗
     il_cont (CID0 := CID0) Φ gfs gi gisl bn cov logstart inodestart ip inum refv
             dn bm ds dev pidv dq dqd dqn dqr dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr HMs1 Hgeom Hst Hcov Hdswf0 Hagr Hok Hj Hgl.
     pose proof HK as HK'. unfold K_ilock in HK'.

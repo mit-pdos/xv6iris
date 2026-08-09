@@ -156,8 +156,8 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
     stimecmp ↦ᵣ stimecmpf -∗
     mb_ld_ea ↦ₚ₈{ dq } v_stack0 -∗
     stack_own_phys sp0 n -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ENTRY.
   Parameter wp_entry_boot :

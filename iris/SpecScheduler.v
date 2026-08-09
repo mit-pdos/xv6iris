@@ -74,7 +74,7 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   panic_wp_any -∗
   trap_csrs -∗
   intr_handler_avail -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang).
 
 Module Type SCHEDULER.
   Parameter wp_scheduler_sconf :

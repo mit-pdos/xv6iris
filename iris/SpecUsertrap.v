@@ -251,8 +251,8 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
     tf_pa tfp 280 ↦ₚ₈ v280 -∗
     tf_pa tfp 112 ↦ₚ₈ v112 -∗
     R pt' (autocast (T := mword) (ksp' : mword 64)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type USERTRAP.
   (* the kernel-internal resources usertrap consumes, for the process

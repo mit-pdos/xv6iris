@@ -156,7 +156,7 @@ Section UiCont.
          sie_cap_gpr mf av b pme -∗
          cpu_own lvl eb pme C b -∗
          pc_is (ret_pc (m0 !!! Regidx Rra)) -∗
-         WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+         WP (Loop : expr riscv_lang)))%I.
 
   (* re-anchor it at a hart reached mid-block.  Through the named definition
      [wp_next_shift]'s direct idiom cannot infer [K], so unfold first. *)
@@ -203,7 +203,7 @@ Section ProofUartintr.
     pc_is (mword_of_int (KernelSyms.uartintr + 0x6c)) -∗
     ui_frame sp0 m0 -∗
     ui_ret_cont Φ m0 av lvl eb pme C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hav.
     destruct Hregs as (Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -368,7 +368,7 @@ Section ProofUartintr.
       pc_is (mword_of_int (KernelSyms.uartintr + 0x44)) -∗
       ui_frame sp0 m0 -∗
       ui_ret_cont (CID0 := CIDe) Φ m0 av lvl eb pme C b -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp0 Hlen Hlvl Hav.
     iIntros (CIDe M) "%Hregs %Hs1 %Hs2 #Ht #Hdinv #Hpinv #Hpanic".
@@ -395,7 +395,7 @@ Section ProofUartintr.
       pc_is (mword_of_int (KernelSyms.uartintr + 0x44)) -∗
       ui_frame sp0 m0 -∗
       ui_ret_cont (CID0 := CIDk) Φ m0 av lvl eb pme C b -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "Loop".
+      WP (Loop : expr riscv_lang))%I with "[]" as "Loop".
     { iLöb as "IH".
       iIntros (CIDk M1) "%Hregs1 %Hls1 %Hls2 Hcg Hcnt Hpc Hfr Hcont".
       assert (Hlsr : forall (CID' : CpuId), rget (CID := CID') M1 Rs1 = uart_pa 5)
@@ -505,7 +505,7 @@ Section ProofUartintr.
     locked γl cpu_id -∗ tx_res γu -∗
     ui_frame sp0 m0 -∗
     ui_ret_cont Φ m0 av lvl eb pme C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hlen Hlvl Hav Hbeq.
     iIntros "#Ht #Hdinv #Htxl #Hpinv #Hpanic Hcg Hcnt Hpay Hpc Htok HR Hfr Hcont".

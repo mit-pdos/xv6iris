@@ -518,8 +518,8 @@ Section VdrwfP6.
         cpu_own 1 eb pme C false -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ea) : mword 64) -∗
         free_bundles pd (fr_upd fr i true) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hi8 Hfri Hlen Hs2 Hs3.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hdp Hd0 Hd8 Hd12 Hd14 Hbun Hrest Hcont".
@@ -749,7 +749,7 @@ Section VdrwfP6.
         (* THE RECEIPT: what the client's own view shift produced when this
            request's write landed, at the DMA completion. *)
         ▷ Q -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+        WP (Loop : expr riscv_lang)) -∗
     P5.vdrw_p5_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
                     bs_disk m kq.
   Proof.

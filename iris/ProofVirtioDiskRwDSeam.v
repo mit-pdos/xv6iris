@@ -126,7 +126,7 @@ Section ProofVirtioDiskRwDSeam.
        vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
        vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* [P3.vdrw_p3_exit] plus the triple-disjointness conjunct (see above). *)
   Definition vdrw_p3_exit_x (CID0 : CPU) (γk : gname) (Φ : mval -> iProp Σ)
@@ -156,7 +156,7 @@ Section ProofVirtioDiskRwDSeam.
        vdrw_chain pd b h m2 t wr sector -∗
        vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* P4, packaged as the wand P3 consumes. *)
   Lemma wp_vdrw_p4_seam (γk : gname) (Φ : mval -> iProp Σ)

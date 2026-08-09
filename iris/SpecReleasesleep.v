@@ -68,8 +68,8 @@ Definition wp_releasesleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
       sie_cap_gpr mf av b pme -∗
       cpu_own 0 eb pme C b -∗
       pc_is ret_tgt -∗
-          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+          WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type RELEASESLEEP.
   Parameter wp_releasesleep_sconf :

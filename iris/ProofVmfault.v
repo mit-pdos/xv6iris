@@ -458,7 +458,7 @@ Section ProofVmfault.
         (∃ w3 w6 : mword 64, pa_stk sp0 3 ↦₈ w3 ∗ pa_stk sp0 6 ↦₈ w6) -∗
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
         PAY res -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I).
+        WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hszc Hk1 Hk2 Hk4 Hk5]" as "Hepi".
     { rewrite /EPI.
       iIntros (CIDe Hbe mj res) "(%Hjsp & %Hjs3 & %Hjthr) Hcg Hcnt Hpc Hjunk Hptc Hpost".

@@ -165,8 +165,8 @@ Section ProofStrlen.
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf K b p -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp0 Hra0 Hs00 Hmtsp Hmta0 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hcont".
@@ -310,8 +310,8 @@ Section ProofStrlen.
         sie_cap_gpr Mp Kv b p -∗
         pc_is (mword_of_int (KernelSyms.strlen + 0x1a) : mword 64) -∗
         (pa_add s (S t)) ↦ₘ{dq} bt -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Ha5.
     iIntros "Hcg #Htext Hpc Hbyte Hcont".
@@ -419,8 +419,8 @@ Section ProofStrlen.
         sie_cap_gpr Mt (K - 2)%nat b p -∗
         pc_is (mword_of_int (KernelSyms.strlen + 0x20) : mword 64) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ{dq} f j) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hkn Hcstr Hk31 rem.
     induction rem as [| rem IH]; intros t M CID0 Hchain Hsum Hnn Hsp Ha0 Ha5 Hthr;

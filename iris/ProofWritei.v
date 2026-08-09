@@ -303,7 +303,7 @@ Section WriteiDefs.
                 pa_add (m !!! Regidx Ra2 : mword 64) i ↦ₘ (src_bytes i)) -∗
         bslots bn 3 -∗
         log_op γ n' -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
 End WriteiDefs.
 
@@ -393,7 +393,7 @@ Section WriteiRet.
     wi_cont (CID0 := CID0) Φ γfs bn γ γf cov logstart inodestart dev ip inum
             bm data dn ds user off n src_bytes V ncount pidv dq dqd dqn dqs A j
             m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
            Hwf' Hhz' Hdswf' Hadr' Hsz' Hcov' Hdb Hd0 Hrange Hker Harm Hlo Hhi Hext.
@@ -760,7 +760,7 @@ Section WriteiJoin.
     wi_cont (CID0 := CID0) Φ γfs bn γ γf cov logstart inodestart dev ip inum
             bm data dn ds user off n src_bytes V ncount pidv dq dqd dqn dqs A j
             m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hdswf Hadr Hwf' Hhz' Hsz' Hcov'
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hrange Hker Htotn Hdneq
@@ -1051,7 +1051,7 @@ Section WriteiSize.
     wi_cont (CID0 := CID0) Φ γfs bn γ γf cov logstart inodestart dev ip inum
             bm data dn ds user off n src_bytes V ncount pidv dq dqd dqn dqs A j
             m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hdswf Hwf' Hhz' HcovS HcovT Hszlt Hofflt
            Hj Hgl Hsp Hs5 Hs2 Hs3 Hdb Hd0 Hrange Hker Htotn Hlo Hhi Hext.
@@ -1648,7 +1648,7 @@ Section WriteiLoop.
     wi_cont (CID0 := CID0) Φ γfs bn γ γf cov logstart inodestart dev ip inum
             bm data dn ds user off n src_bytes V ncount pidv dq dqd dqn dqs A j
             m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hdswf Hszdn Hofflt Hnlt Hrng Husv Hj Hgl.
     pose proof HK as HK'. unfold K_writei in HK'.
@@ -2126,7 +2126,7 @@ Section WriteiLoop.
           ⌜Mb !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)⌝ -∗
           sie_cap_gpr Mb (K - 14)%nat b (proc_addr j) -∗
           pc_is (mword_of_int (WI + 0x4c) : mword 64) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})%I
+          WP (Loop : expr riscv_lang))%I
         with "[Hcnt Hcont Hframe Hpark Hppid Hidev Hinum Hmeta Hmap Hsb
                Hba Hfsb Hsrc Hsl2 Hop Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
       { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs1 %Hbs4 %Hbs7

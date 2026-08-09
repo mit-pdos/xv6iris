@@ -225,7 +225,7 @@ Section SwtchCtx.
          (∃ (A' : ctx_adm) (cret : mword 64),
             ▷ rec A' cret p ∗
             P h A' c cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
-         WP (LoopE gen_id h : expr riscv_lang) {{ Phi }}))%I.
+         WP (LoopE gen_id h : expr riscv_lang)))%I.
 
   Global Instance valid_context_pre_contractive Phi
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>

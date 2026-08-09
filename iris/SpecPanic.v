@@ -29,11 +29,10 @@ Section Panic.
 
   (* a0 = msg.  Everything else the caller still holds is simply dropped. *)
   Definition panic_wp : iProp Σ :=
-    (□ ∀ (Φ : mval -> iProp Σ) (m : regfile) (avail : nat) (b : bool)
-         (p : mword 64),
+    (□ ∀ (m : regfile) (avail : nat) (b : bool) (p : mword 64),
        kernel_text -∗ pc_is (mword_of_int KernelSyms.panic) -∗
        sie_cap_gpr m avail b p -∗
-       WP (Loop : expr riscv_lang) {{ Φ }})%I.
+       WP (Loop : expr riscv_lang))%I.
 
   Global Instance panic_wp_persistent : Persistent panic_wp.
   Proof. apply _. Qed.

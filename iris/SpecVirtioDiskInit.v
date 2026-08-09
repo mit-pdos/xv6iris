@@ -172,7 +172,7 @@ Definition vdi_post
        the persistent [lock_name], ready to be sealed into [is_lock]. *)
     lock_name disk_lock "virtio_disk"%string -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }})%I.
+    WP (Loop : expr riscv_lang))%I.
 Global Typeclasses Opaque vdi_post.
 
 (* BOOT-ONLY: virtio_disk_init runs strictly before interrupts are ever
@@ -225,7 +225,7 @@ Definition wp_virtio_disk_init_sconf_body
   disk_used ↦₈ pu0 -∗
   ([∗ list] j ∈ seq 0 8, (pa_add disk_free j) ↦ₘ free0 j) -∗
   vdi_post γv γa Φ m K eb pp C on ret_tgt c_cpu -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang).
 
 Module Type VIRTIODISKINIT.
   Parameter wp_virtio_disk_init_sconf :

@@ -307,7 +307,7 @@ Section ProofKvmmap.
       assert (Hpcpn : add_vec (mword_of_int (KernelSyms.kvmmap + 0x24) : mword 64) (sign_extend' 64 (mword_of_int 2094874 : mword 21)) = mword_of_int KernelSyms.panic) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpcpn) in "Hpc".
       iDestruct (panic_wp_any_at CIDd with "Hbudget") as "#Hpan".
-      iApply ("Hpan" $! Φ _ _ _ _ with "Htext Hpc Hcg").
+      iApply ("Hpan" $! _ _ _ _ with "Htext Hpc Hcg").
     }
     (* ---- mappages SUCCEEDED (k = npages, a0 = 0): bnez FALLS, epilogue ---- *)
     subst k.

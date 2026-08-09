@@ -91,8 +91,8 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG �
       kernel_text -∗ pc_is rettgt -∗
       (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
       parents_own (rp_map pv ip ps) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type REPARENT.
   Parameter wp_reparent_sconf :

@@ -62,8 +62,8 @@ Definition wp_myproc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
       pc_is ret_tgt -∗
       ⌜ callee_saved m mf /\
         mf !!! Regidx (mword_of_int 10 : mword 5) = p ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type MYPROC.
   Parameter wp_myproc_sconf :

@@ -424,8 +424,8 @@ Section KernelvecCore.
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈ (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈ (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈ (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros.
     iIntros "Hsm Htlbinv
@@ -589,8 +589,8 @@ Section KernelvecCore.
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 224)) ↦₈ w15 -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 232)) ↦₈ w16 -∗
       (add_vec (m !!! Regidx csp_rs1) (mword_of_int 240)) ↦₈ w17 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros.
     iIntros "Hsm Htlbinv
@@ -836,8 +836,8 @@ Section KernelvecCore.
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros.
     iIntros "Hsm Htlbinv Hpc Hfile
@@ -1058,8 +1058,8 @@ Section KernelvecCore.
       (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ v15 -∗
       (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ v16 -∗
       (((add_vec spv (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ v17 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
       Hsp0 HTSR Hsup Hlpe0.
@@ -1259,8 +1259,8 @@ Section KernelvecCore.
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 28 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 29 : mword 5)) -∗
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 29 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 30 : mword 5)) -∗
       (((add_vec (kv_sp1 m) (zero_extend' 64 (concat_vec (mword_of_int 30 : mword 6) ('b"000")))))) ↦₈ (m !!! Regidx (mword_of_int 31 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0 HMXR Hpmm
       HTSR Hsup Hlpe0 Hfiom Hleg.

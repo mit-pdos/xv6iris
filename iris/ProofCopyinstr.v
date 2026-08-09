@@ -279,8 +279,8 @@ Section ProofCopyinstr.
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = res⌝ -∗
         sie_cap_gpr mf av b pcur -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hsp0 Hra0 Hs00 Hs10 Hs20 Hs30 Hs40 Hs50 Hs60 Hs70
            Hmtsp Hmta0 Hmt8 Hmt9 Hmt10 Hmt11.
@@ -524,8 +524,8 @@ Section ProofCopyinstr.
         ⌜forall r : mword 5, r <> Ra0 -> r <> Ra5 -> Mo !!! Regidx r = M !!! Regidx r⌝ -∗
         sie_cap_gpr Mo Kv b pcur -∗
         pc_is (mword_of_int (KernelSyms.copyinstr + 0x34) : mword 64) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Ha5 Hcase.
     iIntros "Hcg #Htext Hpc Hcont".
@@ -621,7 +621,7 @@ Section ProofCopyinstr.
           pc_is (mword_of_int (KernelSyms.copyinstr + 0x26) : mword 64) -∗
           ([∗ list] j ∈ seq 0 n, (pa_add srcp j) ↦ₘ fsrc j) -∗
           ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})
+          WP (Loop : expr riscv_lang))
         ∧
         ( ∀ (Mc : regfile) (g : nat -> bv 8),
           ⌜bb_nonul g (done + n)⌝ -∗
@@ -633,8 +633,8 @@ Section ProofCopyinstr.
           pc_is (mword_of_int (KernelSyms.copyinstr + 0x4a) : mword 64) -∗
           ([∗ list] j ∈ seq 0 n, (pa_add srcp j) ↦ₘ fsrc j) -∗
           ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }}) )) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          WP (Loop : expr riscv_lang)) )) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hdn Hmax64.
     assert (Hn64 : (Z.of_nat n < 18446744073709551616)%Z).
@@ -869,8 +869,8 @@ Section ProofCopyinstr.
       pc_is (mword_of_int (KernelSyms.copyinstr + 0x34) : mword 64) -∗
       proc_pt P -∗
       ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hmax64.
     intro fuel.
@@ -1085,8 +1085,8 @@ Section ProofCopyinstr.
             pc_is (mword_of_int (KernelSyms.copyinstr + 0x34) : mword 64) -∗
             proc_pt P -∗
             ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ g j) -∗
-            WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})%I
+            WP (Loop : expr riscv_lang)) -∗
+          WP (Loop : expr riscv_lang))%I
         with "[Hdst Hpg Hback]" as "BODY".
       { iIntros (CIDb mb n) "%Hn1 %Hnrem %Hnoff %Hba3 %Hba0 %Hbsp %Hbs1 %Hbs2 %Hbs3
                         %Hbs4 %Hbs5 %Hbs6 %Hbs7 %Hbs8 %Hbs9 %Hbs10 %Hbs11 Hcg Hpc Hcont".

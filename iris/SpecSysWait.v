@@ -119,8 +119,8 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
       pc_is ret_tgt -∗
       running_claim j -∗
       proc_priv γf pj pid (upd_upt V P') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSWAIT.
   Parameter wp_sys_wait_sconf :

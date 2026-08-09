@@ -671,8 +671,8 @@ Section WpCsrwGprNewC.
       pmpcfg_n ↦ᵣ pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_config Φ pc false (CSRReg (csr_mstatus, Regidx rs1, zreg, CSRRW))
@@ -752,8 +752,8 @@ Section WpCsrwGprNewC.
       pmpcfg_n ↦ᵣ pmpcfg_written (m !!! Regidx rs1) pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat HmIE) "#Hhw #Hinv Hhs Hpriv0 Hms0 Hpmpc [Hpc Hnpc] [%Hdom Hfmap] Hinstr Hcont".
     iApply (wp_instr_config Φ pc false (CSRReg (csr_pmpcfg0, Regidx rs1, zreg, CSRRW))

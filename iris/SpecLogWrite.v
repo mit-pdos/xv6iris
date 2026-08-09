@@ -159,8 +159,8 @@ Definition wp_log_write_gen_body
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY -- see the header note *)
     bslot bn -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Definition wp_log_write_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !bioG Σ, !diskGhostG Σ, !fsLogG Σ, !logG Σ}
@@ -221,8 +221,8 @@ Definition wp_log_write_sconf_body
     bio_locked bn (fs_view γfs γd dev cov) k pidv dev bno bs bsd true -∗
     (* the slot unit comes back UNCONDITIONALLY -- see the header note *)
     bslot bn -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type LOG_WRITE.
   (* THE CREDITED / GENERAL FORM.  [wp_log_write_sconf] below is the

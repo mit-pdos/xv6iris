@@ -54,8 +54,8 @@ Definition wp_printkinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name lk "pr"%string -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PRINTKINIT.
   Parameter wp_printkinit_sconf :

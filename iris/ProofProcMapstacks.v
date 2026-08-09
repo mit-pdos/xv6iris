@@ -163,8 +163,8 @@ Section ProofPMS.
       ⌜(g' <= kstacks_missing t)%nat⌝ -∗
       ([∗ list] i ∈ seq 0 64,
          page_own (zero_extend' 64 (concat_vec (pas' i) (zeros' 12 : mword 12)))) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr ret_tgt Hlvl HK Hsp Hx25 Hx26 Hx27 Hbase Hrep Hnodes Hpasok Hmiss.
     iIntros "Hcg Hcnt #Htext Hpc
@@ -486,8 +486,8 @@ Section ProofPMS.
       ⌜(g' <= kstacks_missing t)%nat⌝ -∗
       ([∗ list] i0 ∈ seq 0 64,
          page_own (zero_extend' 64 (concat_vec (pas' i0) (zeros' 12 : mword 12)))) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     revert CID.
     induction rem as [| rem' IH]; intros CID i Mk tk gk pas sp0 spr ret_tgt

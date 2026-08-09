@@ -176,8 +176,8 @@ Section YieldPostSched.
         running_claim j -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Hj Hspd Hsp0 Hsp_msch Hs1_msch
            Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27.

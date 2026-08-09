@@ -809,7 +809,7 @@ Section ProofScheduler.
               cpu_own 0 ebx zero_reg emp ebx -∗
               (if ebx then emp else trap_csrs) -∗
               own_ctx (a_cpu_ctx cid_word) -∗
-              WP (Loop : expr riscv_lang) {{ Φ }} )
+              WP (Loop : expr riscv_lang) )
           ∧ ( ∀ (Me : regfile),
               ⌜ add_vec (Me !!! Regidx Rs4) (sign_extend' 64 (mword_of_int 48 : mword 12)) = a_cpu_proc cid_word
                 /\ Me !!! Regidx Rs6 = a_cpu_ctx cid_word
@@ -821,8 +821,8 @@ Section ProofScheduler.
               cpu_own 0 ebx zero_reg emp ebx -∗
               (if ebx then emp else trap_csrs) -∗
               own_ctx (a_cpu_ctx cid_word) -∗
-              WP (Loop : expr riscv_lang) {{ Φ }} ) ) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }} ))%I
+              WP (Loop : expr riscv_lang) ) ) -∗
+        WP (Loop : expr riscv_lang) ))%I
       with "[]" as "#Tail".
     { iModIntro.
       iIntros (jj γl Mt ebx) "%Hjj %Hgl %Hpins %Htie Hcg Hpc Hlocked HR Hcpu Hcsrs Hown Hcont".
@@ -993,8 +993,8 @@ Section ProofScheduler.
             cpu_own 0 eb2 zero_reg emp eb2 -∗
             (if eb2 then emp else trap_csrs) -∗
             own_ctx (a_cpu_ctx cid_word) -∗
-            WP (Loop : expr riscv_lang) {{ Φ }} ) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }} ))%I
+            WP (Loop : expr riscv_lang) ) -∗
+        WP (Loop : expr riscv_lang) ))%I
       with "[]" as "#Scan".
     { iModIntro. iIntros (fuel). iInduction fuel as [|fuel IH] "IH";
         iIntros (jj M ebc) "%Hfuel %Hjj %Hpins %Htie Hcg Hpc Hcpu Hcsrs Hown Hexit".
@@ -1483,7 +1483,7 @@ Section ProofScheduler.
         cpu_own 0 eb zero_reg emp eb -∗
         (if eb then emp else trap_csrs) -∗
         own_ctx (a_cpu_ctx cid_word) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }} ))%I
+        WP (Loop : expr riscv_lang) ))%I
       with "[]" as "#Outer".
     { iModIntro. iLöb as "IHo".
       iIntros (M eb) "%Hpo Hcg Hpc Hcpu Hcsrs Hown".

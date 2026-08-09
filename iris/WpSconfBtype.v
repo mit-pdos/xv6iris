@@ -291,8 +291,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -331,8 +331,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -371,8 +371,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -414,8 +414,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -457,8 +457,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -518,8 +518,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -561,8 +561,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -623,8 +623,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -688,8 +688,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -729,8 +729,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -789,8 +789,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -833,8 +833,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -877,8 +877,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -943,8 +943,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs2 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -985,8 +985,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1054,8 +1054,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1095,8 +1095,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1158,8 +1158,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1220,8 +1220,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs Hrd1 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc true
@@ -1264,8 +1264,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs Hrd1 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc true
@@ -1313,8 +1313,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1374,8 +1374,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hrs2 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1437,8 +1437,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm.
     iIntros (Hrs Hrd1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
@@ -1502,8 +1502,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm.
     iIntros (Hrs Hrd1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
@@ -1570,8 +1570,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1632,8 +1632,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1682,8 +1682,8 @@ Section WpSconfBtype.
     ▷ wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec pc (sign_extend' 64 imm)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp Hal0) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false
@@ -1743,8 +1743,8 @@ Section WpSconfBtype.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is(add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hcmp) "Hcg Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n b Φ pc false

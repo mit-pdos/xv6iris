@@ -203,8 +203,8 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
     tf_pa tfp 272 ↦ₚ₈ (g !!! Regidx (mword_of_int 30) : mword 64) -∗
     tf_pa tfp 280 ↦ₚ₈ (g !!! Regidx (mword_of_int 31) : mword 64) -∗
     tf_pa tfp 112 ↦ₚ₈ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type USERVEC.
   Parameter wp_uservec_pt :

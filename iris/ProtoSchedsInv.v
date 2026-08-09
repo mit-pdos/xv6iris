@@ -102,6 +102,6 @@ Section Payoff.
         cpu_own 0 eb pj C b -∗
         pc_is ret_tgt -∗
         running_claim j -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
 End Payoff.

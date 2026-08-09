@@ -146,8 +146,8 @@ Section ProofMappages.
         \/ ((k' < npages)%nat /\
             mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
             avail_zero (avail_sub on g)) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va vpn0 ppn0 sp0 spr ret_tgt HK Hsp Hx24 Hx25 Hx26 Hx27 Hbase Hrep Hpres Hnodes Hmiss Hpay.
     iIntros "Hcg Hcnt #Htext Hpc
@@ -488,8 +488,8 @@ Section ProofMappages.
         \/ ((k' < npages)%nat /\
             mr !!! Regidx (mword_of_int 10) = mword_of_int (-1) /\
             avail_zero (avail_sub on g)) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     revert CID0.
     induction rem as [| rem' IH]; intros CID0 k Mk tk consumed va pa vpn0 ppn0 sp0 spr ret_tgt

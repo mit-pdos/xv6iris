@@ -222,8 +222,8 @@ Section WpSconfTimer.
       wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok) "#Htcap Hcg Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
@@ -292,8 +292,8 @@ Section WpSconfTimer.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1) "#Htcap Hcg Hpc Hinstr Hcont".
     iDestruct "Htcap" as "[Hen #Hsinv]".

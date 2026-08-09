@@ -87,8 +87,8 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
     (* the page came back iff this was the LAST reference; the caller cannot
        tell, and does not need to *)
     (kalloc_avail γk on ∨ kalloc_avail γk (avail_inc on)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PIPECLOSE.
   Parameter wp_pipeclose_sconf :

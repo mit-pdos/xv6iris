@@ -371,8 +371,8 @@ Definition bm_gen_stmt
       bslots bn 1 -∗
       ⌜((n - 5)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       bm_kit ak bn γfs cov logstart dev n' -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module BmapCore (BR : BREAD) (BL : BRELSE).
 
@@ -473,7 +473,7 @@ Section BmapDefs.
         bslots bn 1 -∗
         ⌜((n - 5)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
         bm_kit ak bn γfs cov logstart dev n' -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
 End BmapDefs.
 
@@ -539,7 +539,7 @@ Section BmapEpilogue.
     bm_kit ak bn γfs cov logstart dev n' -∗
     bm_cont (CID0 := CID0) Φ γfs bn ak cov logstart dev ip bm data fbn n
             pidv dq dqd j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1 Hwf' Hag Hkeep Hnoal Hrv Hdat Hlo Hhi.
     unfold K_bmap in HK.
@@ -875,7 +875,7 @@ Section BmapRelease.
     bio_locked bn (fs_view γfs γd dev cov) kk pidv dev ibn bsX bsdX dX -∗
     bm_cont (CID0 := CID0) Φ γfs bn ak cov logstart dev ip bm data fbn n
             pidv dq dqd j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs1 Hs4 Hkk Hwf' Hag Hkeep Hnoal Hrv Hdat Hlo Hhi.
     pose proof HK as HK'. unfold K_bmap in HK'.
@@ -1063,7 +1063,7 @@ Section BmapTail.
     bm_kit ak bn γfs cov logstart dev nI -∗
     bm_cont (CID0 := CID0) Φ γfs bn ak cov logstart dev ip bm data fbn n
             pidv dq dqd j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom HwfI Hfbn Hq Hagr Hindnz HakI Haknz Hn3i Hnlo Hnhi Hba Hlw
            Hj Hgl Hsp Hthr Hs1 Hs2 Hs3.

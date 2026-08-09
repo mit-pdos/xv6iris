@@ -542,8 +542,8 @@ Definition wp_fileclose_sconf_body
     ⌜ callee_saved m mr ⌝ -∗
     fd_slot -∗
     fileclose_env_out fn on Cf -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :

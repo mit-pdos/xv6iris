@@ -101,8 +101,8 @@ Section WpSconfLock.
         Tc -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
         pc_is (add_vec_int pc 2) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpalk Hrd Hrdok Href.
     iIntros "Hcg Hpc Hinstr #Hlock HTc Hcont".
@@ -154,8 +154,8 @@ Section WpSconfLock.
         locked γl h0 -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
         pc_is (add_vec_int pc 2) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 Hpalk Hrd Hrdok Href.
     iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
@@ -217,8 +217,8 @@ Section WpSconfLock.
       Out -∗
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpalk Href.
     iIntros "Hcg Hpc Hinstr #Hlock Htok HRes Hfin Hcont".
@@ -281,8 +281,8 @@ Section WpSconfLock.
         T -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg c]> m) n b p -∗
         pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpacpu Hrd Hrdok Hview Href.
     iIntros "Hcg Hpc Hinstr #Hlock HT Hcont".
@@ -331,8 +331,8 @@ Section WpSconfLock.
         Tc -∗
         sie_cap_gpr (<[Regidx rd := regval_into_reg c]> m) n b p -∗
         pc_is (add_vec_int pc 2) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpacpu Hrd Hrdok Href.
     iIntros "Hcg Hpc Hinstr #Hlock HTc Hcont".
@@ -373,8 +373,8 @@ Section WpSconfLock.
       locked γl h0 -∗
       sie_cap_gpr (<[Regidx rd := regval_into_reg cpuv]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 cpuv Hpacpu Hrd Hrdok Href.
     iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
@@ -413,8 +413,8 @@ Section WpSconfLock.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
       T' -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpacpu Hsv Hupd Href.
     iIntros "Hcg Hpc Hinstr #Hlock HT Hcont".
@@ -461,8 +461,8 @@ Section WpSconfLock.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗
       locked γl h0 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 Hpacpu Hmycpu Href.
     assert (Hsv : lk_cpu_val (Some (h0, true)) = rget m rs2).
@@ -497,8 +497,8 @@ Section WpSconfLock.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       locked_pre γl h0 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 Hpacpu Href.
     iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
@@ -552,8 +552,8 @@ Section WpSconfLock.
         pc_is (add_vec_int pc 4) -∗
         (⌜w = (mword_of_int 0 : mword 32)⌝ ∗ locked_pre γl h0 ∗ R
          ∨ ⌜neq_vec (sign_extend' 64 w) zero_reg = true⌝) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 Hpalk Hstz Hrd Hrdok Href.
     rdok_split Hrdok.

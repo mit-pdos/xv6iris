@@ -201,8 +201,8 @@ Section ProofCopyout.
         pc_is (if wr then (mword_of_int (KernelSyms.copyout + 0x82) : mword 64)
                     else (mword_of_int (KernelSyms.copyout + 0xba) : mword 64)) -∗
         ptree_own 2 (DfracOwn 1) t -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hs1 Hs7 Hva0b Hrep Hsome.
     iIntros "Hcg #Htext Hpc Hptree Hcont".
@@ -441,8 +441,8 @@ Section ProofCopyout.
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
         proc_pt P' -∗
         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlen64 Hszb Hlvl fuel.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
@@ -594,8 +594,8 @@ Section ProofCopyout.
             p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
             proc_pt P' -∗
             ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-            WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I
+            WP (Loop : expr riscv_lang)) -∗
+        WP (Loop : expr riscv_lang))%I
       as "Htail".
     { iIntros (CIDh Pd Md pa0)
         "(%HText & %HTsp & %HTs11 & %HTs1 & %HTs3 & %HTs4 & %HTs5 &
@@ -677,8 +677,8 @@ Section ProofCopyout.
               p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
               proc_pt P' -∗
               ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-              WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})%I
+              WP (Loop : expr riscv_lang)) -∗
+          WP (Loop : expr riscv_lang))%I
         as "Hcopy".
       { iIntros (CIDc Mn nn)
           "(%Hnn1 & %Hnnr & %Hnna & %HNsp & %HNs11 & %HNs1 & %HNs2 & %HNs3 &
@@ -2088,7 +2088,7 @@ Section ProofCopyout.
         p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
         proc_pt P' -∗
         ([∗ list] j ∈ seq 0 len, (pa_add src j) ↦ₘ src_bytes j) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I
+        WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12]" as "Hepi".
     { iIntros (CIDe0 Hse0 mj res P')
         "(%Hjsp & %Hja0 & %Hjres & %Hjs11 & %Hjext) Hcg Hcnt Hpc Hszc Hptc Hpt Hsrc".

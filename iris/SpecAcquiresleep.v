@@ -83,8 +83,8 @@ Definition wp_acquiresleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslo
       R -∗
       p_pid pj ↦₄{dq} pidv -∗
       running_claim j -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ACQUIRESLEEP.
   Parameter wp_acquiresleep_sconf :

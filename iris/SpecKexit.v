@@ -199,7 +199,7 @@ Definition wp_kexit_sconf_body
   fd_slots FDSPARE -∗
   proc_priv γf pj pid V -∗
   (* NO continuation: kexit does not return.  See the header. *)
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang).
 
 (* ---------------------------------------------------------------------- *)
 (* WHAT THE CONSUMPTION LIST IS FOR, checked here.                          *)

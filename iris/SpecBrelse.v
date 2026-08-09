@@ -91,8 +91,8 @@ Definition wp_brelse_sconf_body
       p_pid p ↦₄{dq} pidv -∗
       (* the reference's slot unit comes back *)
       bslot bn -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BRELSE.
   Parameter wp_brelse_sconf :

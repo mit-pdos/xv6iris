@@ -96,8 +96,8 @@ Definition wp_kvminithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
     ⌜callee_saved mm mr⌝ -∗
     strans_bit strans_bit_kpt -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type KVMINITHART.
   Parameter wp_kvminithart_sconf :

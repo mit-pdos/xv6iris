@@ -145,8 +145,8 @@ Section ProofMainSecondary.
         pc_is (mword_of_int (KernelSyms.main + 0x16) : mword 64) -∗
         ⌜ add_vec (rget m1 (mword_of_int 14 : mword 5))
             (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr ⌝ -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hcid HK.
     pose proof (ms_bounds K HK) as (Hc2 & Hn38 & Hn20).
@@ -314,8 +314,8 @@ Section ProofMainSecondary.
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
         main_deposit γd γv Φ -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Ha4.
     iIntros "Hcg #Htext Hpc #Hsinv Hcont".
@@ -438,8 +438,8 @@ Section ProofMainSecondary.
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x32) : mword 64) -∗
         cpu_own 0 false p0 cpu_ctx_free false -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn.
     iIntros "Hcg #Htext #Hkdata #Hpanic Hpc Hcpu #Hpenv Hcont".
@@ -571,7 +571,7 @@ Section ProofMainSecondary.
     dev_inv γd γv -∗
     procs_inv Φ γs -∗
     scheds_inv Φ γs -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hp0.
     iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hsched".

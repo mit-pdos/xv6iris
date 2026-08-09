@@ -393,7 +393,7 @@ Section ProofWalkaddr.
                ⌜ M !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0
                  \/ (exists w, m !! vpn = Some w /\ pte_vu w /\
                        M !!! Regidx (mword_of_int 10 : mword 5) = page_base (pte_ppn w)) ⌝ -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I
+               WP (Loop : expr riscv_lang))%I
       with "[Hcont Hc1 Hc2]" as "EPI".
     { iIntros (CIDe M) "%Hchain %HcsM Hcg Hpc Hptree %Hpay'".
       assert (HspM : M !!! Regidx csp_rs1 = spr).

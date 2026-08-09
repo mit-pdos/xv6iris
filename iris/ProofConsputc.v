@@ -99,8 +99,8 @@ Section ProofConsputc.
       sie_cap_gpr mf K b p -∗
       pc_is (ret_pc (m !!! Regidx ra_idx)) -∗
       ⌜ callee_saved m mf /\ mf !!! Regidx ra_idx = m !!! Regidx ra_idx ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hagree.
     iIntros "Hcg #Htext Hpc Hc1 Hc2 Hcont".

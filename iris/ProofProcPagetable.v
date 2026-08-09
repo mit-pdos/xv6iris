@@ -358,7 +358,7 @@ Section ProofProcPagetable.
         pc_is (mword_of_int (KernelSyms.proc_pagetable + 0x4c) : mword 64) -∗
         p_trapframe pp ↦₈{dqtf} tf -∗
         ppt_post γa on tfp rv -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I
+        WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hc1 Hc2 Hc3 Hc4]" as "EPI".
     { iIntros (CIDe Hse me rv).
       iIntros "(%Hmesp & %Hmes1 & %Hmethr) Hcg Hcnt Hpc Htfcell Hpost".

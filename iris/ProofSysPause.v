@@ -302,7 +302,7 @@ Section SpProps.
         cpu_own 0 eb pj C true -∗
         running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x7e)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        WP (Loop : expr riscv_lang)))%I.
 
   (* +0x70 -- release(&tickslock); return 0. *)
   Definition sp_exit0 `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
@@ -320,7 +320,7 @@ Section SpProps.
         running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x70)) -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        WP (Loop : expr riscv_lang)))%I.
 
   (* +0x8c -- release(&tickslock); return -1.  Only the loop gets here, so the
      register shape is the loop's and slots 3/4/5 hold the spilled s1/s2/s3. *)
@@ -343,7 +343,7 @@ Section SpProps.
         running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x8c)) -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        WP (Loop : expr riscv_lang)))%I.
 
   (* +0x4a -- the wait loop's head. *)
   Definition sp_loop `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ) (γt : gname) (j : nat)
@@ -367,7 +367,7 @@ Section SpProps.
         sp_exit0 CID0 Φ γt j m av eb C sp0 pj -∗
         sp_exitk CID0 Φ γt j m av eb C sp0 pj tk -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        WP (Loop : expr riscv_lang)))%I.
 
   (* +0x1a -- a0 := &tickslock, acquire, the [n == 0] dispatch, the loop set-up.
      Quantified over the [n] cell's value: BOTH the [blt]'s fall-through and
@@ -387,7 +387,7 @@ Section SpProps.
         running_claim j -∗
         pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
         sp_tail CID0 Φ j m av eb C sp0 pj -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        WP (Loop : expr riscv_lang)))%I.
 
 End SpProps.
 
@@ -445,8 +445,8 @@ Section SpBodies.
         p_trapframe pj ↦₈{dqt} page_base tfp -∗
         tf_page tfp ws -∗
         running_claim j -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros ret_tgt Hav Hanch Hbase Hsav Hra0 Hrv Hsp0.
     destruct Hbase as (Hsp & Hs0M & Hhi).
@@ -592,7 +592,7 @@ Section SpBodies.
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x70)) -∗
     sp_tail CID0 Φ j m av eb C sp0 pj -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Heb Hanch Hbn Hsn. subst eb.
     iIntros "#Htext #Hlkt Hx1 Hx2 Hfree Hx7 Htok HR Hcg Hown Hpay Hpark Hpc Htail".
@@ -707,7 +707,7 @@ Section SpBodies.
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x8c)) -∗
     sp_tail CID0 Φ j m av eb C sp0 pj -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Heb Hanch Hbn Hln. subst eb.
     iIntros "#Htext #Hlkt Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy7 Hy8 Htok HR Hcg Hown Hpay Hpark Hpc Htail".
@@ -914,7 +914,7 @@ Section SpBodies.
     cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x5c)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     (* NB: [eb] is deliberately NOT substituted here.  This body runs [iNext]
        over [cpu_own]; with [eb] literal [intr_count]'s [if eb] reduces,
@@ -1129,7 +1129,7 @@ Section SpBodies.
     cpu_own 1 eb pj C false -∗ arm_pay 0 eb pj -∗
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x4a)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     (* [sleep]'s contract names the parking proc as [proc_addr j] literally, so
        the caller's [pj] has to be spelled that way before the crossing. *)
@@ -1329,7 +1329,7 @@ Section SpBodies.
     running_claim j -∗
     pc_is (mword_of_int (KernelSyms.sys_pause + 0x1a)) -∗
     sp_tail CID0 Φ j m av eb C sp0 pj -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Heb Hj Hjl Hpjv Hanch Hb Hsv.
     iIntros "#Htext #Hlkt #Hpinv #Hscheds #Hpanic Hs1 Hs2 Hfree Hnc Hjoin7

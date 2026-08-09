@@ -101,8 +101,8 @@ Definition wp_copyinstr_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID
     ([∗ list] j ∈ seq 0 maxn, (pa_add dst j) ↦ₘ dst_new j) -∗
     ⌜callee_saved mm mr⌝ -∗
     ⌜copyinstr_ret maxn dst_new (mr !!! Regidx (mword_of_int 10 : mword 5))⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type COPYINSTR.
   Parameter wp_copyinstr_sconf :

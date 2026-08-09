@@ -157,8 +157,8 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     cpu_own 0%nat eb pj C b -∗
     fmt ↦ₛ{ dqf } f -∗
     ([∗ list] j ↦ d ∈ descs, pk_desc_res (pk_vararg m0 j) d) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 (* printk's contract as a PROP, so a caller can carry it as a HYPOTHESIS
    rather than instantiate a functor.  [wp_printk_gen_sconf_body] has Coq-arrow

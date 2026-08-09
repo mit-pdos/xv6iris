@@ -88,7 +88,7 @@ Section UmodeSyscall.
     | UsysPureRet =>
         (∀ (CID : CpuId) (ret : mword 64),
            uv_run C pt M (<[Regidx a0_idx := ret]> g) (add_vec_int va 4) -∗
-           WP (Loop : expr riscv_lang) {{ Φ }})%I
+           WP (Loop : expr riscv_lang))%I
     | UsysNoRet => emp%I
     | UsysUnused => False%I
     end.

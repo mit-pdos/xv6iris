@@ -360,8 +360,8 @@ Definition ap_tail `{!riscvGS Σ, !sieG Σ} `{GEN : GenId}
          ⌜ callee_saved m Mf /\ Mf !!! Regidx ap_a0 = rv ⌝ -∗
          sie_cap_gpr Mf K xb pme -∗
          pc_is ret_tgt -∗
-         WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-     WP (LoopE gen_id CIDt : expr riscv_lang) {{ Φ }})%I.
+         WP (Loop : expr riscv_lang)) -∗
+     WP (LoopE gen_id CIDt : expr riscv_lang))%I.
 
 (* THE GENERAL PROOF.  Everything allocproc does, at an ARBITRARY page
    budget -- so both failure tails are live code and both are proved.  The
@@ -727,12 +727,12 @@ Section ProofAllocproc.
                        pc_is ret_tgt -∗
                        allocproc_post γa γf γs lvl eb pme C on b mr K
                          (mr !!! Regidx ap_a0) -∗
-                       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+                       WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr Mk (K - 4)%nat b pme -∗
                    cpu_own lvl eb pme C b -∗
                    kalloc_env γa on -∗
                    pc_is (mword_of_int (KernelSyms.allocproc + 0x1c)) -∗
-                   WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[]" as "Hloop".
+                   WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (CIDk Hsk k Mk) "%Hfuel %Hk _ _ _ _ _ _ _". exfalso. exact (ap_fuel0 k Hfuel Hk). }
       iIntros (CIDk Hsk k Mk) "%Hfuel %Hk %Hregs Htl Hcont Hcg Hcpu Henv Hpc".

@@ -94,8 +94,8 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
       sie_cap_gpr mf av b pme -∗
       cpu_own lvl eb pme C b -∗
       pc_is ret_tgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UARTINTR.
   Parameter wp_uartintr_sconf :

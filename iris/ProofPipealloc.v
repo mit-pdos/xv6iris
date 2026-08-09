@@ -308,7 +308,7 @@ Section ProofPipealloc.
         cpu_own n eb p C b -∗
         (∃ w4 w5 : mword 64, pa_stk sp0 4 ↦₈ w4 ∗ pa_stk sp0 5 ↦₈ w5) -∗
         pipealloc_post γf γk on pf0 pf1 res -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I).
+        WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hr40 Hr32 Hr24 Hr0]" as "Hepi".
     { rewrite /EPI.
       iIntros (CIDe Hbe mj res) "(%Hjsp & %Hja0 & %Hjthr) Hcg Hpc Hcnt Hslots Hpost".
@@ -497,7 +497,7 @@ Section ProofPipealloc.
         fd_slot -∗
         PF1 -∗
         kalloc_avail γk on -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I).
+        WP (Loop : expr riscv_lang)))%I).
     set (T4C := (wp_next (CID0 := CID) b p (fun (CIDu : CpuId) =>
         ∀ (Mt : regfile) (k0 : nat) (Cf0 : fcontent),
         (* the TYPE conjunct is the fileclose at +0xa4's: an untyped file
@@ -517,7 +517,7 @@ Section ProofPipealloc.
         (∃ w : mword 64, pf0 ↦₈ w) -∗
         PF1 -∗
         kalloc_avail γk on -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I).
+        WP (Loop : expr riscv_lang)))%I).
     iPoseProof (pai_a4 with "Htext") as "Hia4".
     iPoseProof (pai_a8 with "Htext") as "Hia8".
     iPoseProof (pai_ac with "Htext") as "Hiac".

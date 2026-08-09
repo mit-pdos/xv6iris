@@ -302,7 +302,7 @@ Section UserActiveClass.
     (forall E s v h, ⊢ rvc_exec_total_u C pt E s v h) ->
     hw_config -∗ minstret_inv -∗ wire_inv -∗
     user_inv C pt -∗ stvec_handler_wp C pt Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hbase Hrvc. iIntros "#Hhw #Hmin #Hwinv Hinv Htrap".
     iApply (wp_user_exec_active C pt Φ with "Hmin [] Hinv Htrap").

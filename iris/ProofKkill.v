@@ -200,13 +200,13 @@ Section ProofKkill.
         sie_cap_gpr Mx av b pme -∗
         cpu_own lvl eb pme C b -∗
         pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+        WP (Loop : expr riscv_lang)) -∗
     ∀ (k : nat) (M : regfile),
       ⌜(k < NPROC)%nat⌝ -∗ ⌜kkl_regs M mb spd pidv k⌝ -∗
       sie_cap_gpr M av b pme -∗
       cpu_own lvl eb pme C b -∗
       kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x20)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang).
   Proof.
     intros Hlen Hlvl Hav.
     iIntros "#Hpinv #Hpanic Hqexit".
@@ -225,11 +225,11 @@ Section ProofKkill.
                        sie_cap_gpr Mx av b pme -∗
                        cpu_own lvl eb pme C b -∗
                        pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
-                       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+                       WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr M av b pme -∗
                    cpu_own lvl eb pme C b -∗
                    kernel_text -∗ pc_is (mword_of_int (KernelSyms.kkill + 0x20)) -∗
-                   WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[]" as "Hloop".
+                   WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (CIDk Hsk k M) "%Hfuel %Hk %Hregs Hqx Hcg Hown Htext Hpc".
         exfalso. lia. }
@@ -357,7 +357,7 @@ Section ProofKkill.
                    sie_cap_gpr (CID := CIDf) Mr av false pme -∗
                    pc_is (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x4a)) -∗
                    locked γk CIDf -∗ proc_lock_res Φ γs γk (proc_addr k) -∗
-                   WP (LoopE gen_id CIDf : expr riscv_lang) {{ Φ }})%I
+                   WP (LoopE gen_id CIDf : expr riscv_lang))%I
           with "[Hown Hpay Hqx]" as "Hret0".
         { iIntros (Mr) "%Hmr Hcg Hpc Htok HR".
           destruct Hmr as (Hr9 & Hrsp & Hrcs).
@@ -1060,7 +1060,7 @@ Section ProofKkillMain.
                  sie_cap_gpr Mx (av - 6)%nat b p -∗
                  cpu_own n eb p C b -∗
                  pc_is (mword_of_int (KernelSyms.kkill + 0x52)) -∗
-                 WP (Loop : expr riscv_lang) {{ Φ }}))%I
+                 WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hb1 Hb2 Hb3 Hb4 Hb5 Hb6]" as "Hqexit".
     { iIntros (CIDx Hsx Mx rv) "%Hx Hcg Hown Hpc".
       destruct Hx as (Hxsp & Hxa0 & Hxrv & Hxcs).

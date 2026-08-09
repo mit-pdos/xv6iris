@@ -78,8 +78,8 @@ Definition wp_binit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId
     c_cpu ↦₈ (zero_reg : mword 64) -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_fresh (buf_lock (bnode k)) "buffer"%string) -∗
     bcache_lru bhead (blist 0 NBUF) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BINIT.
   Parameter wp_binit_sconf :

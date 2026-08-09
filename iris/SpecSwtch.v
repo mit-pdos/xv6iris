@@ -96,8 +96,8 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
       (∃ (A' : ctx_adm) (cret : mword 64),
          ▷ valid_context Φ P A' cret p ∗
          P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
-      WP (LoopE gen_id h : expr riscv_lang) {{ Φ }} ) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (LoopE gen_id h : expr riscv_lang) ) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SWTCH.
   Parameter wp_swtch_sconf :

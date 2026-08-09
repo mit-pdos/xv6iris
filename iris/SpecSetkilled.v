@@ -77,8 +77,8 @@ Definition wp_setkilled_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       sie_cap_gpr mf av b p -∗
       cpu_own n eb p C b -∗
       pc_is ret_tgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SETKILLED.
   Parameter wp_setkilled_sconf :

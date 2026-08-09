@@ -151,7 +151,7 @@ Section IupdateDefs.
                 (diblk_bytes (<[islot inum := dn]> ds)) -∗
         bslots bn 2 -∗
         log_op γ u -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
 End IupdateDefs.
 
@@ -213,7 +213,7 @@ Section IupdateTail.
        (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 -∗
     iu_cont (CID0 := CID0) Φ γfs bn γ inodestart ip inum dn bm ds u
             dev pidv dq dqd dqn dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Hs2 Hkk Hbno Hcov Hlog.
     pose proof HK as HK'. unfold K_iupdate in HK'.

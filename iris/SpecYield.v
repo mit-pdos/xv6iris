@@ -107,8 +107,8 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       running_claim j -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type YIELD.
   Parameter wp_yield_sconf :

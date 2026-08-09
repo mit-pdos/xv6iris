@@ -168,8 +168,8 @@ Definition wp_write_head_sconf_body
       bslot bn -∗
       (* the permit's RECEIPT, back from the DMA completion *)
       ▷ Q -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WRITE_HEAD.
   Parameter wp_write_head_sconf :

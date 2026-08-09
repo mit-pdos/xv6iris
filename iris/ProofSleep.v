@@ -235,8 +235,8 @@ Section SleepPostSched.
         locked γk cpu_id -∗
         Rk -∗
         running_claim j -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Hjn Hspd Hsp0 Hlka0 HrefT HrefLkp Hsp_msch Hs1_msch Hs2_msch
            Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27.

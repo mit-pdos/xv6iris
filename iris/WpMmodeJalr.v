@@ -47,8 +47,8 @@ Section RvcRet.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (ret_pc (m !!! Regidx ra)) -∗
       gpr_file m -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hra) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hinstr Hcont".
     pose proof (ret_pc_aligned (m !!! Regidx ra)) as Hal0.

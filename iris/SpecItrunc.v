@@ -313,8 +313,8 @@ Definition wp_itrunc_sconf_body
       (* SPEND AT MOST TWO, AT LEAST ONE: iupdate always runs; the bitmap
          unit is spent only if the inode named a block at all *)
       (∃ u' : nat, ⌜(u <= u' <= S u)%nat⌝ ∗ log_op γ u') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ITRUNC.
   Parameter wp_itrunc_sconf :

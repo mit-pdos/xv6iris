@@ -165,9 +165,9 @@ Section WPDead.
      resources, any postcondition.  This is what the base rules tail into
      when they discover their generation has passed, and it is the whole
      reason abandoning a generation's resources is sound. *)
-  Lemma wp_dead (e : mexpr) (gen : nat) (Φ : mval -> iProp Σ) :
+  Lemma wp_dead (e : mexpr) (gen : nat) :
     thread_gen e = Some gen ->
-    gen_dead gen ⊢ WP (e : expr riscv_lang) {{ Φ }}.
+    gen_dead gen ⊢ WP (e : expr riscv_lang).
   Proof.
     intros Hg.
     iIntros "#Hdead". iLöb as "IH".
@@ -218,14 +218,14 @@ Section WPExec.
      Current-but-off: refuted by the STARTED certificate (the started
      count would have to be both [gen_id] and [> gen_id]).  Unborn:
      refuted by the birth certificate. *)
-  Lemma wp_exec_step Φ :
+  Lemma wp_exec_step :
     gen_cert -∗
     (∀ σ, mstate_interp σ ={⊤,∅}=∗
        ∃ σ' σ'', ⌜exec (riscv_step false) σ = Some (tt, σ')⌝ ∗
                  ⌜exec (riscv_step true)  σ = Some (tt, σ'')⌝ ∗
           ▷ (∀ tick : bool, |={∅,⊤}=> mstate_interp (if tick then σ'' else σ') ∗
-                            WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+                            WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
@@ -339,13 +339,13 @@ Section WPDev.
     exfalso. rewrite /start_count Hpw Heq Nat.add_0_r in Hsge. lia.
   Qed.
 
-  Lemma wp_uart_step Φ :
+  Lemma wp_uart_step :
     gen_cert -∗
     (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
        ▷ (∀ d', ⌜uart_step d d'⌝ ={∅,⊤}=∗
             gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d' ∗
-            WP (UartLoop : expr riscv_lang) {{ Φ }})) -∗
-    WP (UartLoop : expr riscv_lang) {{ Φ }}.
+            WP (UartLoop : expr riscv_lang))) -∗
+    WP (UartLoop : expr riscv_lang).
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
@@ -431,7 +431,7 @@ Section WPDev.
      [gstate] -- the two are the same resource
      ([disk_dur_interp riscv_eraGS g = disk_img_auth disk_img_name
      (v_disk (dvirtio (gdev g)))]). *)
-  Lemma wp_disk_step Φ :
+  Lemma wp_disk_step :
     gen_cert -∗
     (* THE STARTED-GENERATIONS AUTH IS THREADED THROUGH TOO (phase C2b/D1),
        in the same accessor style as the image auth: a DMA completion is the
@@ -447,8 +447,8 @@ Section WPDev.
             gregs_interp gr ∗ gen_heap_interp m' ∗ dev_interp d' ∗
             disk_img_auth disk_img_name (v_disk (dvirtio d')) ∗
             disk_tie (v_disk (dvirtio d')) ∗ start_auth n ∗
-            WP (DiskLoop : expr riscv_lang) {{ Φ }})) -∗
-    WP (DiskLoop : expr riscv_lang) {{ Φ }}.
+            WP (DiskLoop : expr riscv_lang))) -∗
+    WP (DiskLoop : expr riscv_lang).
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.
@@ -525,13 +525,13 @@ Section WPDev.
     iExists dmap'. iFrame "Hdauth'". iPureIntro. exact Hdview'.
   Qed.
 
-  Lemma wp_plic_step Φ :
+  Lemma wp_plic_step :
     gen_cert -∗
     (∀ gr m d, gregs_interp gr ∗ gen_heap_interp m ∗ dev_interp d ={⊤,∅}=∗
        ▷ (∀ gr', ⌜plic_step d gr gr'⌝ ={∅,⊤}=∗
             gregs_interp gr' ∗ gen_heap_interp m ∗ dev_interp d ∗
-            WP (PlicLoop : expr riscv_lang) {{ Φ }})) -∗
-    WP (PlicLoop : expr riscv_lang) {{ Φ }}.
+            WP (PlicLoop : expr riscv_lang))) -∗
+    WP (PlicLoop : expr riscv_lang).
   Proof.
     iIntros "#(Hborn & Hstarted & Hrege) H".
     iApply wp_lift_step; first done.

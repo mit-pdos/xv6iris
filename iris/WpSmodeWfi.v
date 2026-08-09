@@ -437,8 +437,8 @@ Section WpSmodeWfi.
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       pc_is (add_vec_int pc 4) -∗
       R -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hminv Hhs Hpcr Hnpc HR Hcont".
     iRevert "Hhs Hpcr Hnpc HR Hcont".
@@ -521,8 +521,8 @@ Section WpSmodeWfi.
     ( ▷ ( sie_cap_gpr m n b p -∗
           intr_count 0 false -∗
           pc_is (add_vec_int pc 4) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hcnt Hpc Hinstr Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".

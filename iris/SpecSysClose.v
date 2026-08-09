@@ -135,8 +135,8 @@ Definition wp_sys_close_sconf_body
          bundle returns under an existential *)
       (∃ on', fileclose_pipe_env Φ fn on' n) -∗
       fileclose_fs_env Φ fn n eb p -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :

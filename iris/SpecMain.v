@@ -375,7 +375,7 @@ Section SpecMain.
        cannot build: the proc-lock names are chosen when main allocates the
        64 locks out of procinit's output, so [γs] is quantified in the
        statement inside the proof and [procs_inv] is NOT a precondition. *)
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
 End SpecMain.
 

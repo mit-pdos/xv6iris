@@ -125,8 +125,8 @@ Section ProofVirtioDiskRwC.
         d_ops h ↦₄ vdrw_ty wr -∗
         pa_add disk_base (168 + 16 * h + 4) ↦₄ (mword_of_int 0 : SailStdpp.Values.mword 32) -∗
         pa_add disk_base (168 + 16 * h + 8) ↦₈ sector -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hh8 Hs0 Hs6 Hs7.
     iIntros "Hcg #Htext Hpc Hidx Hty Hres Hsec Hcont".
@@ -386,8 +386,8 @@ Section ProofVirtioDiskRwC.
         d_desc pd h ↦₈ (d_ops h : SailStdpp.Values.mword 64) -∗
         pa_add pd (16 * h + 8) ↦₄ Z_to_bv 32 16 -∗
         pa_add pd (16 * h + 12) ↦₂ Z_to_bv 16 1 -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Ha3 Ha5.
     iIntros "Hcg #Htext Hpc #Hdp Hda Hdl Hdf Hcont".
@@ -648,8 +648,8 @@ Section ProofVirtioDiskRwC.
         d_desc pd m2 ↦₈ (b_data b : SailStdpp.Values.mword 64) -∗
         pa_add pd (16 * m2 + 8) ↦₄ Z_to_bv 32 1024 -∗
         pa_add pd (16 * m2 + 12) ↦₂ vdrw_flags wr -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hm8 Hs0 Hs3 Hs6 Ha1 Ha2 Ha5 Ha6.
     iIntros "Hcg #Htext Hpc #Hdp Hidx Hdn Hda Hdl Hdf Hcont".
@@ -974,8 +974,8 @@ Section ProofVirtioDiskRwC.
         pa_add pd (16 * m2 + 14) ↦₂ Z_to_bv 16 (Z.of_nat t) -∗
         d_info_status h ↦ₘ Z_to_bv 8 255 -∗
         d_desc pd t ↦₈ (d_info_status h : SailStdpp.Values.mword 64) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hh8 Ht8 Hs0 Ha0 Ha3 Ha4 Ha5 Ha7.
     iIntros "Hcg #Htext Hpc Hidx Hdn Hst Hda Hcont".
@@ -1264,8 +1264,8 @@ Section ProofVirtioDiskRwC.
         pa_add pd (16 * t + 14) ↦₂ Z_to_bv 16 0 -∗
         b_disk b ↦₄ (SailStdpp.Values.mword_of_int (len := 32) 1) -∗
         d_info_b h ↦₈ (b : SailStdpp.Values.mword 64) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hs3 Ha1 Ha2 Ha5 Ha6.
     iIntros "Hcg #Htext Hpc #Hdp Hdl Hdf Hdn Hbd Hib Hcont".
@@ -1451,8 +1451,8 @@ Section ProofVirtioDiskRwC.
         vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                      (mword_of_int (Z.of_nat t)) -∗
         vdrw_chain pd b h m2 t wr sector -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hh8 Hm8 Ht8 Hregs.
     destruct Hregs as (Hsp & Hs0 & Hs3 & Hs6 & Hs7).

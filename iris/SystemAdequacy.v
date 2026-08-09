@@ -112,10 +112,10 @@ Section SystemBoot.
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES g
     ={⊤}=∗
       ([∗ list] c ∈ enum CPU,
-         WP (LoopE gen_id c : expr riscv_lang) @ ⊤ {{ _, True }}) ∗
-      WP (UartLoopE gen_id : expr riscv_lang) @ ⊤ {{ _, True }} ∗
-      WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ {{ _, True }} ∗
-      WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤ {{ _, True }}.
+         WP (LoopE gen_id c : expr riscv_lang) @ ⊤) ∗
+      WP (UartLoopE gen_id : expr riscv_lang) @ ⊤ ∗
+      WP (DiskLoopE gen_id : expr riscv_lang) @ ⊤ ∗
+      WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
     intro Hbf. iIntros "Hres".
     iMod (boot_shared_alloc g XV6_DISK_BYTES (fun _ => True%I) Hbf with "Hres")
@@ -138,7 +138,7 @@ Section SystemBoot.
              Hpages".
     { iApply (big_sepL_cpu_glue
                 (fun c => WP (LoopE gen_id c : expr riscv_lang) @ ⊤
-                            {{ _, True }})%I).
+)%I).
       iSplitL "Hh0 Hlk Hgl Hhalves Hpark Hpst Htx Hdlab Hcfg Hclaim Hkpt Hkmap
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
@@ -159,7 +159,7 @@ Section SystemBoot.
                 with "Htext Hdata Hh Hpanic Hstarted"). }
     iSplitR; [iApply (wp_uart_loop γd with "Hcert Huinv Hpinv") |].
     iSplitR;
-      [iApply (wp_disk_loop γv _ Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
+      [iApply (wp_disk_loop γv Hdimg with "Hcert Hcinv Hqinv Hvinv Hpinv") |].
     iApply (wp_plic_loop with "Hcert Hpinv Hwinv").
   Qed.
 

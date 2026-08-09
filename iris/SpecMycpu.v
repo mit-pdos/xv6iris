@@ -42,8 +42,8 @@ Definition wp_mycpu_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\
       m' !!! Regidx a0_idx = mycpu_ret (rget m0 tp_idx) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
   (* INTERRUPTS MUST BE DISABLED -- xv6 says so in as many words above
      mycpu() ("Interrupts must be disabled"), and the explicit-cpuid refactor
@@ -73,8 +73,8 @@ Definition wp_call_mycpu_sconf_cs_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `
     ⌜ callee_saved m mo /\
       mo !!! Regidx (mword_of_int 10 : mword 5)
         = mycpu_ret (rget m (mword_of_int 4 : mword 5)) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type MYCPU.
   Parameter wp_mycpu_sconf :

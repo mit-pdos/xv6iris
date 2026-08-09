@@ -68,11 +68,11 @@ Section UserStepFull.
     cur_privilege ↦ᵣ User -∗ mstatus ↦ᵣ ms_v -∗ scause ↦ᵣ sc_v -∗
     stval ↦ᵣ stval_v -∗ sepc ↦ᵣ sepc_v -∗ PC ↦ᵣ va -∗ nextPC ↦ᵣ va -∗
     gpr_file g -∗ user_pt_inv pt -∗ user_cfg C -∗
-    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+    ▷ (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang)) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang) {{ Φ }}).
+         WP (Loop : expr riscv_lang)).
   Proof.
     iIntros (Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
              Lmip Lmeip Lseip Lmie Lmdl Hd)
@@ -185,12 +185,12 @@ Section UserStepFull.
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
         user_pt_inv pt -∗ user_cfg C -∗
         mstate_interp σ -∗ minstret_inv_body -∗
-        ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
-           (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
+        ▷ ((user_inv C pt -∗ WP (Loop : expr riscv_lang)) ∧
+           (user_trap_frame C pt -∗ WP (Loop : expr riscv_lang))) -∗
         |={Ei}=> ∃ s' : mstate,
           ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
           ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-             WP (Loop : expr riscv_lang) {{ Φ }})))%I.
+             WP (Loop : expr riscv_lang))))%I.
 
   (* ------------------------------------------------------------------- *)
   (* THE UNIFIED STEP WRAPPER: borrow the wires once, decide dispatch,     *)

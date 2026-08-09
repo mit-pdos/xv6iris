@@ -118,11 +118,11 @@ Section UvInterruptBranch.
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗
     umem pt M -∗ user_cfg C -∗
     ▷ (uv_trap_frame C pt (utrap_scause (Interrupt i) sc_v) (tval None) va g M -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+       WP (Loop : expr riscv_lang)) -∗
     |={Ei}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang) {{ Φ }}).
+         WP (Loop : expr riscv_lang)).
   Proof.
     iIntros (Hmsok HmisaS Help_ne Lpriv Lms Lsc Lstvec Lelp Lmisa Lpc
              Lmip Lmeip Lseip Lmie Lmdl Hd)
@@ -230,7 +230,7 @@ Section UvStepEngine.
        |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
           ⌜exec (riscv_step false) σ = Some (tt, s')⌝ ∗
           ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-             WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+             WP (Loop : expr riscv_lang)))%I.
 
   (* THE ENGINE, in the hart-quantified form the Löb induction needs: only
      [CID] is bound inside the entailment, everything else is a lemma
@@ -242,7 +242,7 @@ Section UvStepEngine.
         uv_cap_gpr (CID := CID) C pt Ψ M m -∗
         pc_is pc -∗
         uv_step_obl Ψ M m pc Φ -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang).
   Proof.
     iLöb as "IH".
     iIntros (CID) "(#Hcap & Hlin & Hgpr) [Hpc Hnpc] Hobl".
@@ -579,7 +579,7 @@ Section UvStepAt.
   Lemma wp_uv_step (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
       (pc : mword 64) (Φ : mval -> iProp Σ) :
     uv_cap_gpr C pt Ψ M m -∗ pc_is pc -∗ uv_step_obl C pt Ψ M m pc Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hobl".
     iPoseProof (wp_uv_step_gen C pt Ψ M m pc Φ) as "H".
@@ -679,11 +679,11 @@ Section UvRetirePost.
        PC ↦ᵣ uv_next jt (add_vec_int pc k) -∗
        nextPC ↦ᵣ uv_next jt (add_vec_int pc k) -∗
        gpr_file (uv_upd m wr) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+       WP (Loop : expr riscv_lang)) -∗
     |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang) {{ Φ }}).
+         WP (Loop : expr riscv_lang)).
   Proof.
     intros Hsi Hhart_a Lpcf Lprivf Hagreef Hwrok Hprog Hexec.
     iIntros "Hint HP Hhs Hpc Hnpc Hgpr Hmst Hmi Hcont".
@@ -798,8 +798,8 @@ Section UvRetireFunnel.
     (∀ CID0 : CpuId,
        uv_cap_gpr (CID := CID0) C pt Ψ M (uv_upd m wr) -∗
        pc_is (CID := CID0) (uv_next jt (add_vec_int pc (if is_rvc then 2 else 4))) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hred Hlpad Hwrok Hexec.
     destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode].
@@ -892,7 +892,7 @@ Section UvRetireFunnel.
                 PC ↦ᵣ uv_next jt (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                 nextPC ↦ᵣ uv_next jt (add_vec_int pc (if is_rvc then 2 else 4)) -∗
                 gpr_file (uv_upd m wr) -∗
-                WP (Loop : expr riscv_lang) {{ Φ }}))%I
+                WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hpriv Hms Hsc Hstval Hsepc]" as "Hk".
     { iNext. iIntros "(Hutlb & Humem & Hcfg) Hhs Hpc Hnpc Hgpr".
       iApply ("Hcont" $! CID0 with "[-Hpc Hnpc] [$Hpc $Hnpc]").
@@ -1083,7 +1083,7 @@ Section UvEcallPost.
     |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang) {{ Φ }}).
+         WP (Loop : expr riscv_lang)).
   Proof.
     intros Hmsok HmisaS Help_ne Hsi Hhart_a Lprivf Lmsf Lscf Lstvecf Lelpf
            Lmisaf Lmedlf Hha.
@@ -1185,7 +1185,7 @@ Section UvEcall.
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
     Ψ (uint (m !!! Regidx a7_idx)) m pc M Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hui.
     destruct Hui as [Hal2 Hcanon Hleaf Hinpage Hcode].

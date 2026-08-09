@@ -55,8 +55,8 @@ Definition wp_fileinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CI
     lk ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name lk "ftable"%string -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FILEINIT.
   Parameter wp_fileinit_sconf :

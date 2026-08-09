@@ -144,7 +144,7 @@ Section UserretUser.
     udata_own (ud_data pt) -∗
     (* ---- the (still assumed) kernel re-entry contract ---- *)
     stvec_handler_wp C pt Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
       HFS HVS Hdqc Hcov Hacc.

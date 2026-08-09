@@ -259,7 +259,7 @@ Section BreadDefs.
         running_claim j -∗
         p_pid pj ↦₄{dq} pidv -∗
         bio_locked bn V k pidv dev bno bs bsd d -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   (* Re-anchor [bd_cont] from the hart a block lemma entered at to the hart it
      hands the continuation on at.  [WpSconfVc.wp_next_shift] proves exactly
@@ -332,7 +332,7 @@ Section BreadBlocks.
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     bio_locked bn V k pidv dev bno bs_out bsd d -∗
     bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK (HMsp & HMs2 & HMs3 & HMthr) HMs1.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
@@ -596,7 +596,7 @@ Section BreadBlocks.
     bown bn k -∗
     bref bn k q dev bno -∗
     bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Hk Hgd Hcov Hdv Hj Hgl Hregs HMs1 Heb.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
@@ -936,7 +936,7 @@ Section BreadBlocks.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Hk Hdevs Hbnos Hgd Hcov Hdv Hj Hgl Hregs HMs1 Heb.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
@@ -1211,7 +1211,7 @@ Section BreadBlocks.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Hk HMk Hgd Hcov Hdv Htie Ha0 Ha1 Hj Hgl Hregs HMs1 Heb.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
@@ -1560,7 +1560,7 @@ Section BreadBlocks.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie.
     induction n as [|n IH];
@@ -1838,7 +1838,7 @@ Section BreadBlocks.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Htie Hordp Hregs Heb.
     pose proof Hregs as (HMsp & HMs2 & HMs3 & HMthr).
@@ -2054,7 +2054,7 @@ Section BreadBlocks.
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbno Ha0 Ha1 Hj Hgl Hgd Hcov Hdv Hordp.
     induction n as [|n IH];
@@ -2088,7 +2088,7 @@ Section BreadBlocks.
                running_claim j -∗
                p_pid (proc_addr j) ↦₄{dq} pidv -∗
                bd_cont (CID0 := CID0) Φ j bn V pidv dev bno dq m K eb (proc_addr j) C -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I as "HADV".
+               WP (Loop : expr riscv_lang))%I as "HADV".
     { iIntros (Mx (Hxregs & Hxs1 & Hxa4 & Hxne)).
       iIntros "Hcg Hpc Hframe Hcnt Hpay Htok Hscan Hbslot Hpark Hppid Hcont".
       pose proof Hxregs as (Hxsp & Hxs2 & Hxs3 & Hxthr).

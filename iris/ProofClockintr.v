@@ -130,8 +130,8 @@ Section ProofClockintr.
              r <> csp_rs1 -> r <> s0_idx -> Mf !!! Regidx r = M !!! Regidx r) ⌝ -∗
         sie_cap_gpr Mf (k + 2) false p -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intro HMsp.
     iIntros "#Htcap Hcg #Htext Hpc Hbra Hbs0 Hcont".

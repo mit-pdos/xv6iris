@@ -419,8 +419,8 @@ Section ProofFreewalk.
       cpu_own ilvl eb p C b -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros spr HK Hilvl Hmmsp Hjsp Hjs3 Hjthr.
     iIntros "Hcg Hcnt #Htext Hpc Hpre #Henv Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hcont".
@@ -669,8 +669,8 @@ Section ProofFreewalk.
       cpu_own ilvl eb p C b -∗
       pc_is (mword_of_int (KernelSyms.freewalk + 0x48) : mword 64) -∗
       fw_done (pt_base t) 512 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hilvl Hok.
     intro rem.
@@ -706,7 +706,7 @@ Section ProofFreewalk.
         pc_is (CID:=CIDx) (mword_of_int (KernelSyms.freewalk + 0x24) : mword 64) -∗
         fw_done (pt_base t) (d + 1) -∗
         fw_todo lvl t (d + 1) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I with "[Hcont]" as "TAIL".
+        WP (Loop : expr riscv_lang))%I with "[Hcont]" as "TAIL".
     { iIntros (CIDx mt).
       iIntros "(%Htsp & %Hts1 & %Hts2 & %Hts3 & %Htthr & %Hshiftx) Hcg Hcnt Hpc Hdone Htodo".
       iPoseProof (fwi_24 with "Htext") as "Hi24".

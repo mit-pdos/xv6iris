@@ -235,8 +235,8 @@ Section ProofKerneltrapParts.
         pa_stk (m !!! Regidx csp_rs1) 4 ↦₈ (m !!! Regidx s2_idx) -∗
         pa_stk (m !!! Regidx csp_rs1) 5 ↦₈ (m !!! Regidx s3_idx) -∗
         (∃ v : mword 64, pa_stk (m !!! Regidx csp_rs1) 6 ↦₈ v) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }} ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang) ) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hepal.
     iIntros "Hcg Hmir #Htext Hpc Hsepc Hscause Hcont".
@@ -601,8 +601,8 @@ Section ProofKerneltrapParts.
         cpu_own lvl false p C false -∗
         sepc ↦ᵣ ep -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }} ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang) ) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hm0sp Hm0ra Hm0s0 Hm0s1 Hm0s2 Hm0s3 HMsp HMs2 HMs1
            Hepal Hms0f Hsie0 Hspp0 Hspie0 Hthr.

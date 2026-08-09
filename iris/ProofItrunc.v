@@ -113,7 +113,7 @@ Section ItruncCont.
                 (diblk_bytes (<[islot inum := di_trunc dn]> ds)) -∗
         bslots bn 2 -∗
         (∃ u' : nat, ⌜(u <= u' <= S u)%nat⌝ ∗ log_op γ u') -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
 End ItruncCont.
 
@@ -206,7 +206,7 @@ Section ItruncTail.
     log_op γ (S u) -∗
     it_cont (CID0 := CID0) Φ γ γfs bn cov logstart bmapstart inodestart size
             used dev ip inum dn bm ds u pidv dq dqd dqn dqb dqs j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl Hsp Hthr Hs3.
     pose proof HK as HK'. unfold K_itrunc in HK'.
@@ -606,7 +606,7 @@ Section ItruncDLoop.
         bslots bn 2 -∗
         it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn
                      NDIRECT -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   Local Lemma it_dloop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (γs : list gname) (jx : nat) (γl : gname)
@@ -658,7 +658,7 @@ Section ItruncDLoop.
     it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn k -∗
     it_dexit (CID0 := CID0) Φ γ γfs bn cov logstart bmapstart size used dev
              ip bm data pidv dq dqd dqb jx m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl.
     (* REVERT CID0 BEFORE THE INDUCTION (the ProofWritei.wi_loop idiom).
@@ -1155,7 +1155,7 @@ Section ItruncELoop.
         buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
         it_ent_state γ γfs bm data cov logstart bmapstart size used
                      NINDIRECT -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   Local Lemma it_eloop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (γs : list gname) (jx : nat) (γl : gname)
@@ -1210,7 +1210,7 @@ Section ItruncELoop.
     it_ent_state γ γfs bm data cov logstart bmapstart size used q -∗
     it_eexit (CID0 := CID0) Φ γ γfs bn γd cov logstart bmapstart size used dev
              ip bm data kk dsk pidv dq dqd dqb jx m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hkk Hj Hgl.
     revert CID0.
@@ -1661,7 +1661,7 @@ Section ItruncIArm.
         bitmap_res γfs bmapstart cov logstart size (used ∖ bm_blocks bm) -∗
         bslots bn 2 -∗
         bm_paid γ bmapstart 1 -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
 End ItruncIArm.
 

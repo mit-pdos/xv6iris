@@ -395,7 +395,7 @@ Section BoProps.
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x58)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+      WP (Loop : expr riscv_lang)))%I.
 
   Definition bo_loop `{GEN : GenId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (j : nat)
@@ -419,7 +419,7 @@ Section BoProps.
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x2c)) -∗
       bo_exit CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+      WP (Loop : expr riscv_lang)))%I.
 
 End BoProps.
 
@@ -473,8 +473,8 @@ Section BoBodies.
         running_claim j -∗
         p_pid pj ↦₄{dq} pidv -∗
         log_op γ MAXOPBLOCKS -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj HK Heb Hanch Hspd Hsp0 Hbo. subst eb.
     destruct Hbo as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -732,7 +732,7 @@ Section BoBodies.
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x24)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj HK Heb Hj Hjl Hanch Hbo.
     iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc".
@@ -844,7 +844,7 @@ Section BoBodies.
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x46)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj HK Heb Hj Hjl Hanch Hbo.
     iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc".
@@ -971,7 +971,7 @@ Section BoBodies.
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.begin_op + 0x2c)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj HK Heb Hj Hjl Hanch Hbo.
     iIntros "#Htext #Hlog #Hpanic #Hpinv #Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc".

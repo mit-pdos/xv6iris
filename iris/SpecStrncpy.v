@@ -55,8 +55,8 @@ Definition wp_strncpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID :
     ⌜callee_saved mm mr⌝ -∗
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5) = s⌝ -∗
     ⌜(n = 0%nat /\ h = g) \/ (0 < n)%nat /\ snc_post f h n⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type STRNCPY.
   Parameter wp_strncpy_sconf :

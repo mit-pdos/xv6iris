@@ -538,7 +538,7 @@ Section ProofKwait.
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
         proc_priv γf pme pid (upd_upt V P') -∗
         R -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        WP (Loop : expr riscv_lang)))%I.
 
   (* The running-thread bundle kwait carries from the prologue to the exit
      and touches nowhere in between: it is [R] for every block below, and
@@ -570,7 +570,7 @@ Section ProofKwait.
         kw_frame (mm !!! Regidx csp_rs1) mm -∗
         kw_rt pme jj -∗
         kw_exit_fn CID Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        WP (Loop : expr riscv_lang)))%I.
 
   (* [SchedCtx.proc_slots_unused]'s ZOMBIE twin: a ZOMBIE is not RUNNING and
      needs no context, so its slot holds exactly the dormant block and the
@@ -612,8 +612,8 @@ Section ProofKwait.
         sie_cap_gpr mf K bx pme -∗
         cpu_own lvl eb pme C bx -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hsp Hs3 Hcs.
     iIntros "Hcg Hown #Htext Hpc Hframe0 Hcont".
@@ -869,8 +869,8 @@ Section ProofKwait.
         sie_cap_gpr mf K eb pme -∗
         cpu_own 0 eb pme C eb -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hsp Hcs.
     iIntros "Hcg Hown Hpay #Htext Hpc #Hlk Htok Hres Hframe Hcont".
@@ -1024,8 +1024,8 @@ Section ProofKwait.
         sie_cap_gpr mf K eb pme -∗
         cpu_own 0 eb pme C eb -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hsp Hs1 Hcs.
     iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Hlkk Htokk HRk #Hlk Htok Hres Hframe Hcont".
@@ -1251,8 +1251,8 @@ Section ProofKwait.
         sie_cap_gpr mf K eb pme -∗
         cpu_own 0 eb pme C eb -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hk Hsp Hs1 Hs3 Hcs.
     iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hpsg Hchan Hpub
@@ -1564,8 +1564,8 @@ Section ProofKwait.
         cpu_own 0 eb pme C eb -∗
         pc_is (ret_pc (mm !!! Regidx Rra)) -∗
         proc_priv γf pme pid (upd_upt V P') -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hk Hsp Hs1 Hs2 Hcs.
     iIntros "Hcg Hown Hpay1 Hpay0 #Htext Hpc #Henv #Hlkk Htokk Hstate Hpsg Hchan Hpub
@@ -1905,14 +1905,14 @@ Section ProofKwait.
           locked γw CID0 -∗ parents_own px -∗
           proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
           kw_exit_fn CID0 Φ γf mm pme K eb C pid V R -∗
-          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+          WP (Loop : expr riscv_lang)) -∗
       sie_cap_gpr M (K - 10)%nat false pme -∗
       cpu_own 1 eb pme C false -∗
       arm_pay 0 eb pme -∗
       pc_is (mword_of_int (KW + 0xae)) -∗
       locked γw CID0 -∗ parents_own ps -∗
       proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 HK Hlen.
     iIntros "#Hpinv #Hpanic #Htext #Henv #Hlk".
@@ -1930,14 +1930,14 @@ Section ProofKwait.
                    locked γw CID0 -∗ parents_own px -∗
                    proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
                    kw_exit_fn CID0 Φ γf mm pme K eb C pid V R -∗
-                   WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+                   WP (Loop : expr riscv_lang)) -∗
                sie_cap_gpr M (K - 10)%nat false pme -∗
                cpu_own 1 eb pme C false -∗
                arm_pay 0 eb pme -∗
                pc_is (mword_of_int (KW + 0xae)) -∗
                locked γw CID0 -∗ parents_own ps -∗
                proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "Hloop".
+               WP (Loop : expr riscv_lang))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (kk M hv ps) "%Hf %Hk %Hregs %Ha4 Hqfn Hqca Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe HR".
         exfalso. exact (kw_fuel0 kk Hf Hk). }
@@ -1974,7 +1974,7 @@ Section ProofKwait.
                  pc_is (mword_of_int (KW + 0xa6)) -∗
                  locked γw CID0 -∗ parents_own ps' -∗
                  proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
-                 WP (Loop : expr riscv_lang) {{ Φ }})%I
+                 WP (Loop : expr riscv_lang))%I
         with "[IHf Hqca]" as "Hnext".
       { iIntros (M' hv' ps') "%Hregs' %Ha4' Hqfn' Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe HR".
         pose proof Hregs' as Hregs''.
@@ -2219,7 +2219,7 @@ Section ProofKwait.
                        cpu_own 0 eb pme C eb -∗
                        pc_is (ret_pc (mm !!! Regidx Rra)) -∗
                        proc_priv γf pme pid (upd_upt V P') -∗
-                       WP (Loop : expr riscv_lang) {{ Φ }}))%I
+                       WP (Loop : expr riscv_lang)))%I
             with "[Hqfn HR]" as "Hqfn2".
           { rewrite /kw_exit_fn.
             iIntros (CIDq Hsq mf P' rv) "%Hcsq %Ha0q %Hextq Hcgq Hownq Hpcq Hprivq".
@@ -2365,7 +2365,7 @@ Section ProofKwait.
     pc_is (mword_of_int (KW + 0xe8)) -∗
     locked γw CIDt -∗ parents_own px -∗
     proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hsp Hcs.
     iIntros "#Htext #Hlk Hqfn Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe Hrt".
@@ -2416,7 +2416,7 @@ Section ProofKwait.
     pc_is (mword_of_int (KW + 0xca)) -∗
     locked γw CIDt -∗ parents_own px -∗
     proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 HK Heb Hjj Hgl Hpme Hanch Hregs Ha4.
     subst pme.
@@ -2646,7 +2646,7 @@ Section ProofKwait.
     pc_is (mword_of_int (KW + 0xdc)) -∗
     locked γw CIDy -∗ wait_res -∗
     proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 HK Heb Hjj Hgl Hlen Hpme Hanch Hregs.
     iIntros "#Htext #Hpinv #Hscheds #Hpanic #Henv #Hlk IH Hqfn Hcg Hown Hpay Hpc
@@ -2739,7 +2739,7 @@ Section ProofKwait.
                locked γw CIDy -∗ parents_own px -∗
                proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗
                kw_exit_fn CIDy Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I
+               WP (Loop : expr riscv_lang))%I
       with "[IH]" as "Hqca".
     { iIntros (Mx hx px) "%Hrx %Hax Hcgx Hownx Hpayx Hpcx Htokx Hpsx Hprivx Hframex Hrtx Hqfnx".
       iApply (kw_round_tail (CIDt := CIDy) CID0 Φ γs γf γw γl jj mm Mx pme addr K eb C

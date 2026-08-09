@@ -112,8 +112,8 @@ Section IsmappedEpi.
         ⌜ (mr !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0 /\ m !! vpn = None)
           \/ (exists w, m !! vpn = Some w /\
                mr !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 1) ⌝ -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang).
   Proof.
     iIntros "%HcsM #Htext Hcg Hpc Hptree Hc1 Hc2 %Hpay' Hcont".
     assert (HspM : M !!! Regidx csp_rs1 = spr).

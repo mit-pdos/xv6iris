@@ -439,8 +439,8 @@ Section ProofSysPipe.
         sie_cap_gpr Mr nav b p -∗
         pc_is (mword_of_int ze : mword 64) -∗
         p_ofile p fd ↦₈ (zero_reg : mword 64) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hfd Ha5 Hs1 Hs2 Hs6 Hs8 Hs12.
     destruct (sp_ofile_arith (Z.of_nat fd) Hfd) as (Ha1 & Ha2 & Ha3 & Ha4).
@@ -566,8 +566,8 @@ Section ProofSysPipe.
         fd_slot -∗ fd_slot -∗
         (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
         fileclose_fs_env Φ fn 0%nat eb p -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hnav Hs0 Hr1 Hr2 Hs04 Hs812 Hs1618 Ht1 Ht2.
     iIntros "Hcg Hcpu #Htext Hpc #Hftab #Hpanic Hi0 Hi4 Hi8 Hic Hi10 Hc6 Hc7 Href0 Href1 Hpenv Hfenv Hcont".
@@ -706,8 +706,8 @@ Section ProofSysPipe.
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf av b p -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hsp0 Hra0 Hs00 Hs10 Hmtsp Hmt15 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8 Hcont".
@@ -1015,7 +1015,7 @@ Section ProofSysPipe.
            word4_pointsto (pa_stk sp0 8) (DfracOwn 1) lo ∗
            word4_pointsto (pa_add (pa_stk sp0 8) 4) (DfracOwn 1) hi) -∗
         sys_pipe_post γf p pid (upd_upt V P') res -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I).
+        WP (Loop : expr riscv_lang)))%I).
     iAssert EPI with "[Hcont Hb1 Hb2 Hb3 Hb4]" as "Hepi".
     { rewrite /EPI.
       iIntros (CIDE HsE mj P' res) "(%Hjsp & %Hja5 & %Hjthr) %Hext Hcg Hcpu Hpc Hpenv Hfenv Hrest Hslot8 Hpost".
@@ -2080,7 +2080,7 @@ Section ProofSysPipe.
           (trunc32 (mword_of_int (Z.of_nat fd1) : mword 64)) -∗
         word4_pointsto (pa_add (pa_stk sp0 8) 4) (DfracOwn 1)
           (trunc32 (mword_of_int (Z.of_nat fd0) : mword 64)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I).
+        WP (Loop : expr riscv_lang)))%I).
     (* EPI and T7C are offered as a CONJUNCTION, the pipealloc idiom: exactly
        one is taken on each path, and T7C's own exit is EPI, so they must
        SHARE the epilogue rather than split it. *)

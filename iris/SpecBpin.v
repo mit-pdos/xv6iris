@@ -71,8 +71,8 @@ Definition wp_bpin_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     (∃ (q : Qp) (dev bno : mword 32), bref bn k q dev bno) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BPIN.
   Parameter wp_bpin_sconf :

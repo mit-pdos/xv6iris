@@ -64,8 +64,8 @@ Section USpecSync.
        UVG (<[Regidx a0_idx := ret]>
               (<[Regidx a7_idx := (mword_of_int 22 : mword 64)]> m)) M -∗
        pc_is (m !!! Regidx ra_idx) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
 
   (* exit @0x2c8: li a7,2; ecall.  DIVERGES (the trailing ret is dead). *)
   Definition wp_exit_stub_body (M : gmap Z (bv 8)) (m : regfile)
@@ -74,7 +74,7 @@ Section USpecSync.
       (Htext : uimg_sub SyncInstrs.sync_bytes M),
     UVG m M -∗
     pc_is (mword_of_int SyncSyms.exit) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
   (* ------------------------------------------------------------------- *)
   (* §2 main and start.  Both DIVERGE (their final call is exit, and       *)
@@ -92,7 +92,7 @@ Section USpecSync.
       (Hfr : uv_frame16 pt M sp0),
     UVG m M -∗
     pc_is (mword_of_int SyncSyms.main) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
   (* start @0x12 -- the ELF entry [exec()] jumps to: prologue, jal main,
      jal exit.  The top-level verified-execution statement for the whole
@@ -107,6 +107,6 @@ Section USpecSync.
       (Hfr' : uv_frame16 pt M (add_vec_int sp0 (-16))),    (* main's frame *)
     UVG m M -∗
     pc_is (mword_of_int SyncSyms.start) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
 
 End USpecSync.

@@ -70,8 +70,8 @@ Definition wp_initsleeplock_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN
     sl_lkcpu slk ↦₈ (zero_reg : mword 64) -∗
     sl_name slk s -∗
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type INITSLEEPLOCK.
   Parameter wp_initsleeplock_sconf :

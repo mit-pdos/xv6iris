@@ -68,8 +68,8 @@ Definition wp_holdingsleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN 
       sleeplocked γsl -∗
       sl_pid slk ↦₄ pidv -∗
       p_pid p ↦₄{dq} pidv -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type HOLDINGSLEEP.
   Parameter wp_holdingsleep_sconf :

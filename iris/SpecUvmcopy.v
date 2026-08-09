@@ -153,8 +153,8 @@ Definition wp_uvmcopy_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
                 w' = pte_set_ad (uvm_pte (pte_flags10 w) r) a d
             end⌝ ∗
          proc_pt P') ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMCOPY.
   Parameter wp_uvmcopy_sconf :

@@ -340,7 +340,7 @@ Section UvmcopyDefs.
       pc_is (mword_of_int (KernelSyms.uvmcopy + 0x80) : mword 64) -∗
       proc_pt Pold -∗
       uc_pay Pold Pnew vpn0 n res -∗
-      WP (Loop : expr riscv_lang) {{ Φ }} )%I).
+      WP (Loop : expr riscv_lang) )%I).
 
 End UvmcopyDefs.
 
@@ -469,7 +469,7 @@ Section ProofUvmcopy.
     proc_pt Pj -∗
     kalloc_env γa None -∗
     uc_exit Φ mm Pold Pnew vpn0 n K eb p C spr ilvl b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hilvl Hvpn0 Hiv Hjb Hext Hout Hfr Hsp Hs1 Hs7 Hthr.
     assert (HKuu : (22 <= K - 10)%nat) by (clear -HK; lia).
@@ -670,7 +670,7 @@ Section ProofUvmcopy.
     proc_pt Pj -∗
     kalloc_env γa None -∗
     uc_exit Φ mm Pold Pnew vpn0 n K eb p C spr ilvl b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hilvl Hvpn0 Hsz Hszb Hnchar Hnb Hfresh.
     assert (HKka : (14 <= K - 10)%nat) by (clear -HK; lia).
@@ -766,7 +766,7 @@ Section ProofUvmcopy.
         proc_pt Pold -∗
         proc_pt Pk -∗
         uc_exit Φ mm Pold Pnew vpn0 n K eb p C spr ilvl b -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "TAIL".
+        WP (Loop : expr riscv_lang))%I with "[]" as "TAIL".
     { iIntros (CIDt mt Pk).
       iIntros "(%Htsp & %Hts1 & %Hts4 & %Hts5 & %Hts6 & %Hts7 & %Htthr
                 & %Htext2 & %Htout & %Htfacts) Hcg Hcnt Hpc Hpo Hpt Hexit".

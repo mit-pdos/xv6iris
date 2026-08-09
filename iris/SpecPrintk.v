@@ -141,8 +141,8 @@ Definition wp_printk_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !disk
     (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
     (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
     uart_tx_own γd (l ++ bs) -∗ uart_sent γd (l ++ bs) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PRINTK.
   Parameter wp_printk_sconf :

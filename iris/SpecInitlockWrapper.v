@@ -100,8 +100,8 @@ Definition wp_initlock_wrapper_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : Gen
        the persistent [lock_name], ready to be sealed into [is_lock]. *)
     lock_name lk s -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type INITLOCK_WRAPPER.
   Parameter wp_initlock_wrapper_sconf :

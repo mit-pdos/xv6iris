@@ -135,8 +135,8 @@ Definition wp_bread_sconf_body
       (* the locked buffer, keyed to the request: its bytes ARE the
          block's logical content (the payload inside indexes them) *)
       bio_locked bn V k pidv dev bno bs bsd d -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BREAD.
   Parameter wp_bread_sconf :

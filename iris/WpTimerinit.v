@@ -234,8 +234,8 @@ Section WpTimerinitThm.
       mcounteren ↦ᵣ legalize_mcounteren mcen0 (ti_mcen1 mcen0) -∗
       stimecmp ↦ᵣ stimecmp_legalized stimecmp0 (ti_deadline tv) -∗
       stack_own_phys sp0 n -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn2 Hpmp Htor_ra Htor_s0 Hsp Hra Hs0.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hmenv Hmcen Hstc Hstk #Htext Hcont".

@@ -72,8 +72,8 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sie
       sie_cap_gpr Mf K b pme -∗
       cpu_own lvl eb pme C b -∗
       kernel_text -∗ pc_is rettgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :

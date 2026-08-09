@@ -234,8 +234,8 @@ Definition wp_initlog_sconf_body
       (* THE LOG LAYER, BUILT.  Everything else initlog was handed is now
          sealed inside the "log" spinlock's resource. *)
       (∃ γ : log_names, log_ctx γ bn γfs cov logstart dev) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type INITLOG.
   Parameter wp_initlog_sconf :

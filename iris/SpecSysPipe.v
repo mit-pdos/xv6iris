@@ -213,8 +213,8 @@ Definition wp_sys_pipe_sconf_body
          the pipe's last end *)
       (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
       fileclose_fs_env Φ fn 0%nat eb p -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :

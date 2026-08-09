@@ -111,8 +111,8 @@ Definition wp_safestrcpy_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CI
     ⌜mr !!! Regidx (mword_of_int 10 : mword 5) = s⌝ -∗
     ⌜(n = 0%nat /\ h = g) \/
      (0 < n)%nat /\ exists k, ssc_stop f n k /\ ssc_post f g h n k⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SAFESTRCPY.
   Parameter wp_safestrcpy_sconf :

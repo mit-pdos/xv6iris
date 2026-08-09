@@ -50,8 +50,8 @@ Section WpStoreGpr.
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
       ea ↦ₚ₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros offset ea Hpmp Hstat.
     iIntros "Hmm Hpmpc [Hpc Hnpc] Hfile Hinstr Hbw Hcont".
@@ -195,8 +195,8 @@ Section MmodeStoreTor.
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file m -∗
       ea ↦ₚ₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros offset ea Hpmp Hstat Htor.
     iIntros "Hmm Hpmpc Hpaddr [Hpc Hnpc] Hfile Hinstr Hbytes Hcont".
@@ -335,8 +335,8 @@ Section MmodeStoreTor.
       pc_is (add_vec_int pc 2) -∗
       gpr_file m -∗
       ea ↦ₚ₈ (m !!! Regidx rs2) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm ea Hpmp Hstat Htor.
     iIntros "Hmm Hpmpc Hpaddr Hpc Hfile Hinstr Hbytes Hcont".

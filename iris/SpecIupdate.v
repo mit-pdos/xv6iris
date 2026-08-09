@@ -207,8 +207,8 @@ Definition wp_iupdate_sconf_body
               (diblk_bytes (<[islot inum := dn]> ds)) -∗
       bslots bn 2 -∗
       log_op γ u -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :

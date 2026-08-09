@@ -47,8 +47,8 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}
       sie_cap_gpr Mf K b pme -∗
       cpu_own lvl eb pme C b -∗
       kernel_text -∗ pc_is rettgt -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :

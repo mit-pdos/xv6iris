@@ -53,8 +53,8 @@ Definition wp_initlock_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CI
        one that will free the object keeps it. *)
     c_name ↦₈ name -∗
     c_cpu ↦₈ (zero_reg : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type INITLOCK.
   Parameter wp_initlock_sconf :

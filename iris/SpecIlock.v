@@ -206,8 +206,8 @@ Definition wp_ilock_sconf_body
       (* ... and the inode is LOADED, at the map and record the caller's
          shadow named.  Same conclusion on both arms. *)
       inode_locked gfs gi cov logstart ip dn bm -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ILOCK.
   Parameter wp_ilock_sconf :

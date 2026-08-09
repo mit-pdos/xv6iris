@@ -146,8 +146,8 @@ Definition wp_bwrite_sconf_body
          permit invariant is not timeless, and the saved-proposition
          agreement costs the other later, which rw's epilogue pays off). *)
       ▷ Q -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BWRITE.
   Parameter wp_bwrite_sconf :

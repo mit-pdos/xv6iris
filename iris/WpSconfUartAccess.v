@@ -91,8 +91,8 @@ Section WpSconfUartAccess.
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hown Hcont".
     iApply (Uart.wp_lb_uart_s_sconf (CID:=CID) γd γv 5 Φ pc false true rd rs1 imm
@@ -133,8 +133,8 @@ Section WpSconfUartAccess.
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd l -∗
       (⌜ lsr_thre_clear bt = false ⌝ -∗ uart_out_lb γd l) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hrd Hrdok Haddr.
     exact (wp_uart_lsr_read_ea_s_sconf γd γv Φ pc rd rs1 (mword_of_int 0 : mword 12)
@@ -192,8 +192,8 @@ Section WpSconfUartAccess.
       ∀ bt : bv 8,
       sie_cap_gpr (<[Regidx rd := regval_into_reg (lsr_ldval_of bt)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hoff Hrd Hrdok Haddr) "Hcg Hpc Hinstr #Hdinv Hcont".
     destruct (uart_geom_ok off Hoff) as (Hg1 & Hg2 & Hg3).
@@ -235,8 +235,8 @@ Section WpSconfUartAccess.
       pc_is (add_vec_int pc 4) -∗
       uart_tx_own γd (l ++ [sb]) -∗
       uart_sent γd (l ++ [sb]) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sb.
     iIntros (Haddr) "Hcg Hpc Hinstr #Hdinv Hown #Hlb #Hoff Hcont".

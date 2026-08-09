@@ -330,7 +330,7 @@ Section UserExec.
   (* the assumed kernel re-entry contract: the handler at stvec (uservec)
      handles ANY trapped-out-of-user machine *)
   Definition stvec_handler_wp (Φ : mval -> iProp Σ) : iProp Σ :=
-    (user_trap_frame -∗ WP (Loop : expr riscv_lang) {{ Φ }})%I.
+    (user_trap_frame -∗ WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
   (* The step obligation: ONE machine step from the invariant, with both   *)
@@ -340,9 +340,9 @@ Section UserExec.
   (* ------------------------------------------------------------------- *)
   Definition user_step_obligation (Φ : mval -> iProp Σ) : iProp Σ :=
     (□ (user_inv -∗
-        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
-           (user_trap_frame -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang)) ∧
+           (user_trap_frame -∗ WP (Loop : expr riscv_lang))) -∗
+        WP (Loop : expr riscv_lang)))%I.
 
   (* the ACTIVE-hart residue of the step obligation: same contract, but the
      machine is handed over UNPACKED, with the hart pinned ACTIVE and the
@@ -356,9 +356,9 @@ Section UserExec.
         user_regs (HART_ACTIVE tt) ms_v sc_v stval_v sepc_v va va g -∗
         user_pt_inv pt -∗
         user_cfg -∗
-        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang) {{ Φ }}) ∧
-           (user_trap_frame -∗ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+        ▷ ((user_inv -∗ WP (Loop : expr riscv_lang)) ∧
+           (user_trap_frame -∗ WP (Loop : expr riscv_lang))) -∗
+        WP (Loop : expr riscv_lang)))%I.
 
   (* ------------------------------------------------------------------- *)
   (* The capstone: safety of arbitrary user-mode execution, by Löb.        *)
@@ -367,7 +367,7 @@ Section UserExec.
     user_step_obligation Φ -∗
     user_inv -∗
     stvec_handler_wp Φ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hstep".
     iLöb as "IH".

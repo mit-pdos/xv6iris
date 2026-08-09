@@ -108,15 +108,15 @@ Section WpUartgetc.
             ⌜ rx_empty bt = true ⌝ -∗
             sie_cap_gpr (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m) n b p -∗
             pc_is pcNo -∗
-            WP (Loop : expr riscv_lang) {{ Φ }})
+            WP (Loop : expr riscv_lang))
         ∧ (* "return the byte": it is in a0, zero-extended *)
         ( ∀ bt c : bv 8,
             ⌜ rx_empty bt = false ⌝ -∗
             sie_cap_gpr (<[Regidx Ra0 := regval_into_reg (lsr_ldval_of c)]>
                            (<[Regidx Ra5 := regval_into_reg (rx_masked bt)]> m)) n b p -∗
             pc_is pcK -∗
-            WP (Loop : expr riscv_lang) {{ Φ }}) )) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+            WP (Loop : expr riscv_lang)) )) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hlsr Hrhr Hne Hrtp HA HB HR HK HNo Hal) "Hcg Hpc HiL HiA HiB HiR #Hdinv Hk".
     (* Ra5 (x15) is never tp (x4): the one register-index fact the a5-side

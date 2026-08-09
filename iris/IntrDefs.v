@@ -415,8 +415,8 @@ Section IntrDefs.
           pc_is pc0 -∗
           gpr_file m -∗
           intr_frame root_ppn m -∗
-          WP (Loop : expr riscv_lang) {{ Φ }} ) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+          WP (Loop : expr riscv_lang) ) -∗
+        WP (Loop : expr riscv_lang))%I.
 
   Global Instance intr_handler_spec_persistent handler :
     Persistent (intr_handler_spec handler).

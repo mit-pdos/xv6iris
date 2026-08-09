@@ -56,8 +56,8 @@ Definition wp_ismapped_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
     ⌜ (mr !!! Regidx (mword_of_int 10) = mword_of_int 0 /\ m !! vpn = None)
       \/ (exists w, m !! vpn = Some w /\
            mr !!! Regidx (mword_of_int 10) = mword_of_int 1) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type ISMAPPED.
   Parameter wp_ismapped_sconf :

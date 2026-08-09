@@ -799,9 +799,9 @@ Section DevLoops.
   (*  the latch arm -- never both, because no single UART transition      *)
   (*  touches both halves.                                               *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_uart_loop γ Φ :
+  Lemma wp_uart_loop γ :
     gen_cert -∗ uart_inv γ -∗ plic_inv -∗
-    WP (UartLoop : expr riscv_lang) {{ Φ }}.
+    WP (UartLoop : expr riscv_lang).
   Proof.
     iIntros "#Hcert #Huinv #Hpinv".
     iLöb as "IH".
@@ -870,7 +870,7 @@ Section DevLoops.
   (*  THE DISK THREAD.  Opens [diskN] for the DMA/wild arms and [plicN]   *)
   (*  for the latch arm.                                                 *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_disk_loop γd Φ :
+  Lemma wp_disk_loop γd :
     (* the disk names are the CANONICAL ones: the image gname is the AMBIENT
        ERA's, which is what identifies the auth [wp_disk_step] hands over with
        the fragments [virtio_proto] holds.  [disk_ghosts_alloc] exports this
@@ -883,7 +883,7 @@ Section DevLoops.
        [plicN], so the two openings compose. *)
     gen_cert -∗ crash_inv -∗ perm_inv gen_id (dn_perm γd) -∗ disk_inv γd -∗
     plic_inv -∗
-    WP (DiskLoop : expr riscv_lang) {{ Φ }}.
+    WP (DiskLoop : expr riscv_lang).
   Proof.
     intros Himg.
     iIntros "#Hcert #Hcinv #Hqinv #Hvinv #Hpinv".
@@ -1031,9 +1031,9 @@ Section DevLoops.
   (*  three loops' interfaces uniform and to record that the wire's value   *)
   (*  is the PLIC's.                                                       *)
   (* ------------------------------------------------------------------ *)
-  Lemma wp_plic_loop Φ :
+  Lemma wp_plic_loop :
     gen_cert -∗ plic_inv -∗ wire_inv -∗
-    WP (PlicLoop : expr riscv_lang) {{ Φ }}.
+    WP (PlicLoop : expr riscv_lang).
   Proof.
     iIntros "#Hcert #Hpinv #Hwinv".
     iLöb as "IH".

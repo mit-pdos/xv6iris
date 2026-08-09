@@ -219,8 +219,8 @@ Section ProofWalkNoalloc.
               mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn /\
               (m !! vpn = Some w0
                \/ (w0 = mword_of_int 0 /\ m !! vpn = None))) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va vpn sp0 spr ret_tgt HK Hsp Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hpay.
     iIntros "Hcg #Htext Hpc
@@ -480,8 +480,8 @@ Section ProofWalkNoalloc.
               mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn /\
               (m !! vpn = Some w0
                \/ (w0 = mword_of_int 0 /\ m !! vpn = None))) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va vpn sp0 spr ret_tgt HK Hsp Hs6 Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hmv.
     iIntros "Hcg #Htext Hpc
@@ -598,8 +598,8 @@ Section ProofWalkNoalloc.
               mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn /\
               (m !! vpn = Some w0
                \/ (w0 = mword_of_int 0 /\ m !! vpn = None))) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va vpn sp0 spr ret_tgt HK Hva' Hsp Hs3 Hs1 Htp Hx23 Hx24 Hx25 Hx26 Hx27 Hlvl.
     iIntros "Hcg #Htext Hpc
@@ -730,8 +730,8 @@ Section ProofWalkNoalloc.
                  (<[Regidx (mword_of_int 18 : mword 5) := regval_into_reg slotaddr]> M))) n b p -∗
       pc_is (mword_of_int (KernelSyms.walk + 0x3a)) -∗
       slotaddr ↦₈{dqm} pte -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hs3 Hs4 Hslot.
     iIntros "Hcg #Htext Hpc Hown Hcont".

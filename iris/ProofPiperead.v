@@ -601,7 +601,7 @@ Section ProofPiperead.
                (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I)) : iProp Σ)).
+               WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
     iAssert EPIP with "[Hcont]" as "EPI".
     { rewrite /EPIP.
       iIntros (CIDe Hse M P' rv) "%Hrg %Hext %Hret Hcg Hpc Hown Href Hpriv Hpark Hg1 Hg2 Hg3 Hg4 Hg5 Hg6 Hg7 Hg8 Hg9 Hg10 Hg11 Hg12".
@@ -1139,7 +1139,7 @@ Section ProofPiperead.
         pa_stk sp0 10 ↦₈ vs8 -∗
         (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I)) : iProp Σ)).
+        WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
     pose (EPIC := (wp_next (CID0 := CID) true pj (fun (CIDx : CpuId) =>
                ((∀ (M : regfile) (P' : uptd) (rv : mword 64),
                ⌜ M !!! Regidx csp_rs1 = spr
@@ -1163,7 +1163,7 @@ Section ProofPiperead.
                (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
                (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I)) : iProp Σ)).
+               WP (Loop : expr riscv_lang))%I)) : iProp Σ)).
     iAssert ((EPIC ∧ CPP)%I) with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7]" as "EXITS".
     { iSplit.
       { rewrite /EPIC. iEval (rewrite /EPIP) in "EPI".
@@ -1291,7 +1291,7 @@ Section ProofPiperead.
           proc_priv γf pj pid (upd_upt V P') -∗
           running_claim j -∗
           (∃ b : bv 8, chaddr ↦ₘ b) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})%I : iProp Σ)).
+          WP (Loop : expr riscv_lang))%I : iProp Σ)).
       iAssert WXP with "[EPI Hf1 Hf2 Hf3 Hf4 Hf5 Hf6 Hf7 Hc8 Hc9 Hc10 Hq12 Hchback]" as "HWX".
       { rewrite /WXP. iEval (rewrite /EPIP) in "EPI".
         iIntros (M2 P' rv) "%Hxg %Hxext %Hxret Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hchx".
@@ -1550,7 +1550,7 @@ Section ProofPiperead.
              proc_priv γf pj pid (upd_upt V P'')) -∗
           chaddr ↦ₘ chb -∗
           running_claim j -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "CLOOP".
+          WP (Loop : expr riscv_lang))%I with "[]" as "CLOOP".
       { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
         { iIntros (i cur M3 P' chb) "%Hfu %Hi %Hrg3 %Hex3 HWX Hcg Hpc Hown Hpay Hlocked Hres Href Hszc Hptc Hpt Hpback Hch Hpark".
           exfalso. lia. }
@@ -2145,7 +2145,7 @@ Section ProofPiperead.
         (∃ z : mword 64, pa_stk sp0 10 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 11 ↦₈ z) -∗
         (∃ z : mword 64, pa_stk sp0 12 ↦₈ z) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})))%I with "[]" as "WLOOP".
+        WP (Loop : expr riscv_lang))))%I with "[]" as "WLOOP".
     { iLöb as "IH".
       iIntros (CIDl Hsl M) "%HcsM HEX Hcg Hpc Hown Hpay Hlocked Hres Href Hpriv Hpark Hq8 Hq9 Hq10 Hq11 Hq12".
       assert (HMcsp : M !!! Regidx csp_rs1 = spr)

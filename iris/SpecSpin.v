@@ -34,7 +34,7 @@ Definition wp_spin_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
   pc_is pc_spin -∗
   gpr_file m -∗
   kernel_text -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang).
 
 Module Type SPIN.
   Parameter wp_spin :

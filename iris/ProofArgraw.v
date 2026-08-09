@@ -285,8 +285,8 @@ Section ProofArgraw.
              Mf !!! Regidx r = M !!! Regidx r) ⌝ -∗
         sie_cap_gpr Mf (k + 4)%nat b p -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intro HMsp.
     iIntros "Hcg #Htext Hpc Hr24 Hr16 Hr8 Hgap Hcont".
@@ -458,8 +458,8 @@ Section ProofArgraw.
     pc_is (mword_of_int (KernelSyms.argraw + ar_ld_off k + 2) : mword 64) -∗
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr M av' b p -∗ pc_is (mword_of_int (KernelSyms.argraw + 0x2c) : mword 64) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intro Hk. iIntros "#Htext Hcg Hpc Hcont".
     destruct (decide (k = 0%nat)) as [->|Hne].
@@ -529,8 +529,8 @@ Section ProofArgraw.
         pc_is (ret_pc ra0) -∗
         p_trapframe p ↦₈{dqt} page_base tfp -∗
         tf_page tfp ws -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
 
   Local Lemma ar_arm0 `{CID0 : CpuId} (Φ : mval -> iProp Σ)
       (M : regfile) (av' : nat) (sp0 ra0 s00 s10 vgap p : mword 64) (tfp : mword 44)

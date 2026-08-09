@@ -57,8 +57,8 @@ Definition wp_memset_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : 
     pc_is ret_tgt -∗
     ([∗ list] j ∈ seq 0 len, (pa_add p j) ↦ₘ cbyte) -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type MEMSET.
   Parameter wp_memset_sconf :

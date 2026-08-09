@@ -130,8 +130,8 @@ Definition wp_consoleinit_sconf_body `{!riscvGS Σ} `{!sieG Σ} `{!uartGhostG Σ
     c_tcpu ↦₈ (zero_reg : mword 64) -∗
     devsw_console_read ↦₈ (mword_of_int KernelSyms.consoleread : mword 64) -∗
     devsw_console_write ↦₈ (mword_of_int KernelSyms.consolewrite : mword 64) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type CONSOLEINIT.
   Parameter wp_consoleinit_sconf :

@@ -490,7 +490,7 @@ Section WriteHeadDefs.
         ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
         bslot bn -∗
         ▷ Q -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   (* the four frame slots: ra@24, s0@16, s1@8, s2@0 *)
   Definition wh_frame (m : regfile) : iProp Σ :=
@@ -577,7 +577,7 @@ Section WriteHeadBlocks.
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
     wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1.
     pose proof Hregs as (Hsp & Hthr).
@@ -1054,7 +1054,7 @@ Section WriteHeadBlocks.
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
     wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk.
     (* CID0 is GENERALIZED: the loop body crosses [wp_next]s, so the hart the

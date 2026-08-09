@@ -108,8 +108,8 @@ Section ProofAcquire.
       sie_cap_gpr (<[Regidx (mword_of_int 15 : mword 5) := regval_into_reg (sign_extend' 64 (mword_of_int 0 : mword 32))]> M0) n false p -∗
       pc_is (mword_of_int (KernelSyms.acquire + 0x24)) -∗
       locked_pre γl cpu_id -∗ R -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros a4one HM0a4 HM0s1 Href.
     assert (Ha4any : forall w : mword 64,
@@ -476,7 +476,7 @@ Section ProofAcquire.
                       = mword_of_int KernelSyms.panic) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpcpn) in "Hpc".
       iDestruct (panic_wp_any_at cpu_id with "Hpanic") as "#Hpan".
-      iApply ("Hpan" $! Φ _ _ false with "Htext Hpc Hcg"). }
+      iApply ("Hpan" $! _ _ false with "Htext Hpc Hcg"). }
     (* ===== holding() said 0: the c.bnez falls through to the loop ===== *)
     assert (Ha0B3 : neq_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) zero_reg = false).
     { rewrite HB3a0v Ha0h. vm_compute. reflexivity. }

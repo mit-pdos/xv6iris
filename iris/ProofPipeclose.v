@@ -281,7 +281,7 @@ Section ProofPipeclose.
                pc_is (CID := CID0) (mword_of_int (KernelSyms.pipeclose + 0x36) : mword 64) -∗
                cpu_own (CID := CID0) n eb pme C b -∗
                (kalloc_avail γk on ∨ kalloc_avail γk (avail_inc on)) -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I
+               WP (Loop : expr riscv_lang))%I
       with "[Hcont Hr24 Hr16 Hr8 Hr0]" as "EPI".
     { iIntros (CID0 M) "%Hch %Hcs Hcg Hpc Hown Hav".
       assert (HcspM : M !!! Regidx csp_rs1 = spr).
@@ -443,7 +443,7 @@ Section ProofPipeclose.
                arm_pay n eb pme -∗
                locked γl cpu_id -∗
                pipe_res γp pi -∗
-               WP (Loop : expr riscv_lang) {{ Φ }})%I
+               WP (Loop : expr riscv_lang))%I
       with "[EPI Havail]" as "JOIN".
     { iIntros (M) "%Hcs Hcg Hpc Hown Hpay Hlocked Hres".
       assert (Hs1M : M !!! Regidx (mword_of_int 9 : mword 5) = pi).
@@ -463,7 +463,7 @@ Section ProofPipeclose.
                  arm_pay n eb pme -∗
                  locked γl cpu_id -∗
                  pipe_res γp pi -∗
-                 WP (Loop : expr riscv_lang) {{ Φ }})
+                 WP (Loop : expr riscv_lang))
                ∧ (kalloc_avail γk on ∗
                   (∀ (CIDx : CpuId) (M' : regfile),
                      ⌜ b = false \/ pme = zero_reg -> (CIDx : CPU) = (CID : CPU) ⌝ -∗
@@ -472,7 +472,7 @@ Section ProofPipeclose.
                      pc_is (CID := CIDx) (mword_of_int (KernelSyms.pipeclose + 0x36) : mword 64) -∗
                      cpu_own (CID := CIDx) n eb pme C b -∗
                      kalloc_avail γk (avail_inc on) -∗
-                     WP (LoopE gen_id CIDx : expr riscv_lang) {{ Φ }})))%I
+                     WP (LoopE gen_id CIDx : expr riscv_lang))))%I
         with "[EPI Havail]" as "TAILS".
       { iSplit.
         2:{ iFrame "Havail". iIntros (CIDf M') "%Hch' %Hcs' Hcg Hpc Hown Hav".

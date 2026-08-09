@@ -45,8 +45,8 @@ wp_next b p (fun (CID : CpuId) =>
   sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval bt)]> m) n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
   S bt -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang)) -∗
+WP (Loop : expr riscv_lang).
 
 Definition wp_sb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γd : uart_names) (γv : disk_names) (off : Z) (Φ : mval -> iProp Σ) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
@@ -70,8 +70,8 @@ wp_next b p (fun (CID : CpuId) =>
   sie_cap_gpr m n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
   S -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang)) -∗
+WP (Loop : expr riscv_lang).
 
 (* The SAME accessor-form store leaf, taking the BARE [uart_inv] rather than
    the [dev_inv] bundle.  This is the general form -- the store touches no PLIC
@@ -102,8 +102,8 @@ wp_next b p (fun (CID : CpuId) =>
   sie_cap_gpr m n b p -∗
   pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
   S -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-WP (Loop : expr riscv_lang) {{ Φ }}.
+  WP (Loop : expr riscv_lang)) -∗
+WP (Loop : expr riscv_lang).
 
 Module Type UART.
   Parameter wp_lb_uart_s_sconf :

@@ -178,7 +178,7 @@ Section AslProps.
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x28)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+      WP (Loop : expr riscv_lang)))%I.
 
   Definition asl_loop `{GEN : GenId} (CID0 : CPU)
       (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
@@ -201,7 +201,7 @@ Section AslProps.
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
       asl_exit CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+      WP (Loop : expr riscv_lang)))%I.
 
 End AslProps.
 
@@ -263,8 +263,8 @@ Section AslBodies.
         R -∗
         p_pid pj ↦₄{dq} pidv -∗
         running_claim j -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Heb Hanch Hspd Hsp0 Hasl. subst eb.
     destruct Hasl as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -586,7 +586,7 @@ Section AslBodies.
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x24)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     (* NB: [eb] is deliberately NOT substituted here.  This body runs [iNext]
        over [cpu_own], and with [eb] literal [intr_count]'s [if eb] reduces,
@@ -687,7 +687,7 @@ Section AslBodies.
     sie_cap_gpr M (av - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
     asl_exit CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Heb Hj Hjpl Hanch Hasl.
     iIntros "#Htext #Hslk #Hpanic #Hpinv #Hscheds IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hpark Hown Hpay Hcg Hpc Hexit".

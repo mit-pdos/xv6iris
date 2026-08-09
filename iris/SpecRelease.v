@@ -85,8 +85,8 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     cpu_own n eb p C outb -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : GenId} `{CID : CpuId}
     (Φ : mval -> iProp Σ) (γl : gname) (lka : mword 64) (s : string) (R : iProp Σ) (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
@@ -110,8 +110,8 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     cpu_own n eb p C outb -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 (* The cancelling instance: release DESTROYS the lock at its word clear and
    walks off with the storage.  The caller brings the dead state [D] it wants
@@ -154,8 +154,8 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GE
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     cpu_own n eb p C outb -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type RELEASE_GEN.
   Parameter wp_release_gen_sconf :

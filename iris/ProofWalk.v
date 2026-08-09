@@ -129,8 +129,8 @@ Section ProofWalk.
         \/ (exists p2 p1 w0,
              ptree_level0 t' vpn p2 p1 w0 /\
              mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va vpn sp0 spr ret_tgt HK Hsp Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hoff Hpres Hnodes Hmiss Hpay.
     iIntros "Hcg Hcnt #Htext Hpc
@@ -420,8 +420,8 @@ Section ProofWalk.
         \/ (exists p2 p1 w0,
              ptree_level0 t' vpn p2 p1 w0 /\
              mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va vpn sp0 spr ret_tgt HK Hva' Hsp Hs3 Hs1 Hx23 Hx24 Hx25 Hx26 Hx27 Hsame Hoff Hpres Hnodes Hmiss Hlvl.
     iIntros "Hcg Hcnt #Htext Hpc
@@ -551,8 +551,8 @@ Section ProofWalk.
                  (<[Regidx (mword_of_int 18 : mword 5) := regval_into_reg slotaddr]> M))) n b p -∗
       pc_is (mword_of_int (KernelSyms.walk + 0x3a)) -∗
       slotaddr ↦₈{dqm} pte -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hs3 Hs4 Hslot.
     iIntros "Hcg #Htext Hpc Hown Hcont".
@@ -675,8 +675,8 @@ Section ProofWalk.
       pc_is ret_tgt -∗
       ([∗ list] j ∈ seq 0 4096, (pa_add p j) ↦ₘ cbyte) -∗
       ⌜ callee_saved m0 mfin ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros a0_idx a1_idx a2_idx pcE sp0 ra0 p ret_tgt cbyte Hcval Ha2 Hret0 Hn.
     iIntros "Hcg #Htext Hpc Hpage Hcont".
@@ -762,7 +762,7 @@ Section ProofWalk.
       ptree_own N (DfracOwn 1) (tG bn) -∗
       kalloc_env γa (avail_sub on (S g)) -∗
       F -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+      WP (Loop : expr riscv_lang)) -∗
     (* FAILURE: kalloc returned 0; the tree is untouched, exit at +0x52 *)
     wp_next b p (fun (CID : CpuId) =>
     ∀ (Mo : regfile),
@@ -783,8 +783,8 @@ Section ProofWalk.
       ptree_own N (DfracOwn 1) tf -∗
       kalloc_env γa (avail_sub on g) -∗
       F -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va vpn sp0 spr ret_tgt Hlvl HK Hsp Hs2c Hs6 Hx23 Hx24 Hx25 Hx26 Hx27 Hacc.
     iIntros "Hcg Hcnt #Htext Hpc
@@ -1264,8 +1264,8 @@ Section ProofWalk.
         \/ (exists p2 p1 w0,
              ptree_level0 t' vpn p2 p1 w0 /\
              mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros va vpn sp0 spr ret_tgt Hlvl HK Hva.
     revert CID g Mf cur w.

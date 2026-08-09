@@ -164,8 +164,8 @@ Section ProofSysClose.
         ⌜callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = rv⌝ -∗
         sie_cap_gpr mf av b pp -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hsp0 Hra0 Hs00 Hmtsp Hmt15 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hcont".

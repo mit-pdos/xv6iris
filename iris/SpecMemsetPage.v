@@ -42,8 +42,8 @@ Definition wp_memset_page_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{C
     pc_is ret_tgt -∗
     page_own p -∗
     ⌜ callee_saved m0 mfin ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type MEMSETPAGE.
   Parameter wp_memset_page_sconf :

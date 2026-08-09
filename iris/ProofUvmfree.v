@@ -429,7 +429,7 @@ Section ProofUvmfree.
         cpu_own (CID := CIDj) ilvl eb p C b -∗
         pc_is (mword_of_int (KernelSyms.uvmfree + 0x0e) : mword 64) -∗
         bare_pt uroot ∅ -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I
+        WP (Loop : expr riscv_lang))%I
       with "[Hcont Hr24 Hr16 Hr8 Hgap]" as "Hjoin".
     { iIntros (CIDj Hcrossj mj) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hcpu Hpc Hpt".
       (* +0x0e c.mv a0,s1 *)

@@ -69,8 +69,8 @@ Section Proto.
       wp_next b p (fun (CID : CpuId) =>
         sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
         pc_is (add_vec_int pc 4) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang).
 
   (* ================================================================== *)
   (* (D2) INTERRUPTS OFF: read [tp], and the answer stays this cpu's.    *)
@@ -95,8 +95,8 @@ Section Proto.
     ( sie_cap_gpr (<[Regidx Ra5 := regval_into_reg
                          (add_vec (rget m1 Ra5) (rget m1 Ra5))]> m1) n false p -∗
       pc_is (add_vec_int (add_vec_int pc 4) 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hnz Hok m1. iIntros "Hcg Hpc Hi0 Hi4 Hcont".
     (* ---- add a5, zero, tp : the value premise is where the tp read lives.
@@ -146,8 +146,8 @@ Section Proto.
       sie_cap_gpr (<[Regidx Ra5 := regval_into_reg
                          (add_vec (rget m1 Ra5) (rget m1 Ra5))]> m1) n b p -∗
       pc_is (add_vec_int (add_vec_int pc 4) 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hnz Hok m1. iIntros "Hcg Hpc Hi0 Hi4 Hcont".
     iApply (wp_add_s_sconf Φ pc Ra5 Rzero Rzero

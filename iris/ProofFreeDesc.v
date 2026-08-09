@@ -236,8 +236,8 @@ Section ProofFreeDesc.
         pa_add pd (16 * i + 8)%nat  ↦₄ (mword_of_int 0 : mword 32) -∗
         pa_add pd (16 * i + 12)%nat ↦₂ (mword_of_int 0 : mword 16) -∗
         pa_add pd (16 * i + 14)%nat ↦₂ (mword_of_int 0 : mword 16) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hi8 HMa0.
     iIntros "Hcg #Htext Hpc #Hdp Hfree Hva Hvl Hvf Hvn Hcont".

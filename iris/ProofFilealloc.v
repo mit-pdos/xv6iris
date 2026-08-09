@@ -384,8 +384,8 @@ Section ProofFilealloc.
           pc_is ret_tgt -∗
           ⌜ callee_saved m mfin ⌝ -∗
           filealloc_post γf (mfin !!! Regidx Ra0) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I
+          WP (Loop : expr riscv_lang)) -∗
+        WP (Loop : expr riscv_lang))%I
       with "[Hr24 Hr16 Hr8 Hg4]" as "Hepi".
     { iIntros (CID0 mj res) "(%Hjsp & %Hjs1 & %Hjthr) Hcg Hpc Hcnt Hpost Kont".
       (* +0x52 c.mv a0,s1 *)
@@ -544,14 +544,14 @@ Section ProofFilealloc.
         sie_cap_gpr Mi (K - 4)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x42)) -∗
         ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I).
+        WP (Loop : expr riscv_lang))%I).
     set (Cfull := (∀ (Mf : regfile),
         ⌜ (forall c : mword 5, is_cs_idx c = true -> c <> mword_of_int 9 ->
              Mf !!! Regidx c = macq !!! Regidx c) ⌝ -∗
         sie_cap_gpr Mf (K - 4)%nat false p -∗
         pc_is (mword_of_int (KernelSyms.filealloc + 0x32)) -∗
         ([∗ list] k ∈ seq 0 NFILE, fslot γf Mg k) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I).
+        WP (Loop : expr riscv_lang))%I).
     iAssert (∀ (fuel j : nat) (M : regfile),
         ⌜ (NFILE - j <= fuel)%nat ⌝ -∗
         ⌜ (j < NFILE)%nat ⌝ -∗
@@ -566,7 +566,7 @@ Section ProofFilealloc.
            so they must SHARE the ambient resources (lock token, cpu_own,
            the authority, the epilogue) rather than split them. *)
         (Cfound ∧ Cfull) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I
+        WP (Loop : expr riscv_lang))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IH] "IH";
         iIntros (j M) "%Hfuel %Hj (%Hcurs1 & %Ha4 & %Hthr) Hcg Hpc Hslots Hexit".

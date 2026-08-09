@@ -251,8 +251,8 @@ Definition wp_balloc_sconf_body
           bitmap_res γfs bmapstart cov logstart size
                      (used ∪ {[ bv_unsigned blk ]}) ∗
           log_op γ u)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type BALLOC.
   Parameter wp_balloc_sconf :

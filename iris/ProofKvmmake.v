@@ -694,8 +694,8 @@ Section KvmmakeHouse.
       ⌜kvm_pas_ok pas'⌝ -∗
       ([∗ list] i ∈ seq 0 64,
          page_own (zero_extend' 64 (concat_vec (pas' i) (zeros' 12 : mword 12)))) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr ret_tgt Hlvl HK Hcross Hsp Hs1 Hx18 Hx19 Hx20 Hx21 Hx22 Hx23 Hx24 Hx25 Hx26 Hx27
       Hrep Hnodes Hpasok.
@@ -975,8 +975,8 @@ Section KvmmakeBody.
       ⌜M !!! Regidx (mword_of_int 25) = mm !!! Regidx (mword_of_int 25)⌝ -∗
       ⌜M !!! Regidx (mword_of_int 26) = mm !!! Regidx (mword_of_int 26)⌝ -∗
       ⌜M !!! Regidx (mword_of_int 27) = mm !!! Regidx (mword_of_int 27)⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hnb.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
@@ -1221,8 +1221,8 @@ Section KvmmakeBody.
       ⌜pt_rep0 t' kvm_m1⌝ -∗
       ⌜pt_nodes t' = (1 + g)%nat⌝ -∗
       ⌜(g <= 2)%nat⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hnb Hgs Hsp HM9.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
@@ -1366,8 +1366,8 @@ Section KvmmakeBody.
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜pt_base t' = bppn⌝ -∗ ⌜pt_rep0 t' kvm_m2⌝ -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗ ⌜(g <= 0)%nat⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
@@ -1499,8 +1499,8 @@ Section KvmmakeBody.
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜pt_base t' = bppn⌝ -∗ ⌜pt_rep0 t' kvm_m3⌝ -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗ ⌜(g <= 32)%nat⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
@@ -1632,8 +1632,8 @@ Section KvmmakeBody.
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜pt_base t' = bppn⌝ -∗ ⌜pt_rep0 t' kvm_m4⌝ -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗ ⌜(g <= 2)%nat⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
@@ -1781,8 +1781,8 @@ Section KvmmakeBody.
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜pt_base t' = bppn⌝ -∗ ⌜pt_rep0 t' kvm_m5⌝ -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗ ⌜(g <= 63)%nat⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).
@@ -1956,8 +1956,8 @@ Section KvmmakeBody.
       ⌜mr !!! Regidx csp_rs1 = spr⌝ -∗
       ⌜pt_base t' = bppn⌝ -∗ ⌜pt_rep0 t' kvm_map⌝ -∗
       ⌜pt_nodes t' = (pt_nodes t + g)%nat⌝ -∗ ⌜(g <= 2)%nat⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spr HK Hnb Hgs Hsp HM9 Hbase Hrep.
     pose proof (cap_bounds K HK) as (Hc4 & Hc2 & Hc14 & Hc34 & Hc44).

@@ -114,7 +114,7 @@ Section ProofIunlockMain.
         p_pid p ↦₄{dq} pidv -∗
         i_ref ip ↦₄{dqr} refv -∗
         inode_key gi true dn bm -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_iunlock_sconf (Φ : mval -> iProp Σ)
       (gs : list gname)

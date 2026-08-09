@@ -624,8 +624,8 @@ Section VdrwdLeaves.
       sie_cap_gpr (<[Regidx rd := regval_into_reg
           (zero_extend' 64 (wrap16 np : SailStdpp.Values.mword 16))]> m) n false pme -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hrd Hrdsp.
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub #Hlb0 Hcont".
@@ -702,8 +702,8 @@ Section VdrwdLeaves.
     ( sie_cap_gpr m n false pme -∗
       pc_is (add_vec_int pc 4) -∗
       disk_pub γd (S np) -∗ disk_receipt γd np sl pin -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hsv Hpinok Hwrbdom Hwrpin.
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hpin Hwrb Hpend Hcont".
@@ -1473,8 +1473,8 @@ Section VdrwdP4.
                                       (vdrwd_sldata wr bs_buf bs_disk))
                                  (h, m2, t) pin) -∗
         vdrw_slot_rest m2 -∗ vdrw_slot_rest t -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Htok Hdisj0 Hfrh Hfrm Hfrt Hlenbuf Hlendisk Hbufkd Hoff Ha0 Ha5.
     destruct Htok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8). cbn in Hh8, Hm8, Ht8.

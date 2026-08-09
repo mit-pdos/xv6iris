@@ -221,8 +221,8 @@ Section KexitPro.
         sie_cap_gpr M (K - 6) b pme -∗
         pc_is (mword_of_int (KX + 0x12)) -∗
         kx_frame spF -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 spF HK6 Hdom.
     iIntros "Hcg #Htext Hpc Hcont".
@@ -381,7 +381,7 @@ Section KexitLoop.
         proc_priv γf pj pid Vx -∗
         (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
         fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+        WP (Loop : expr riscv_lang)) -∗
     ∀ (fd : nat) (M : regfile) (V : pprivate),
       ⌜(fd < NOFILE)%nat⌝ -∗ ⌜kxl_regs M pj sv fd⌝ -∗ ⌜kx_nulled fd V⌝ -∗
       sie_cap_gpr M av b pj -∗
@@ -390,7 +390,7 @@ Section KexitLoop.
       proc_priv γf pj pid V -∗
       (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
       fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hfnj Hfndq Hfnpid Hav.
     iIntros "#Htext #Hft #Hpanic Hqexit".
@@ -409,14 +409,14 @@ Section KexitLoop.
                        proc_priv γf pj pid Vx -∗
                        (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
                        fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
-                       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
+                       WP (Loop : expr riscv_lang)) -∗
                    sie_cap_gpr M av b pj -∗
                    cpu_own 0 eb pj C b -∗
                    pc_is (mword_of_int (KX + 0x3e)) -∗
                    proc_priv γf pj pid V -∗
                    (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
                    fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
-                   WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[]" as "Hloop".
+                   WP (Loop : expr riscv_lang)))%I with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
       { iIntros (CIDk Hsk fd M V) "%Hfuel %Hfd %Hregs %Hnul Hqx Hcg Hown Hpc Hpriv Hpenv Hfenv".
         exfalso. lia. }
@@ -433,7 +433,7 @@ Section KexitLoop.
                    proc_priv γf pj pid Vt -∗
                    (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
                    fileclose_fs_env_nopid Φ fn 0%nat eb pj -∗
-                   WP (Loop : expr riscv_lang) {{ Φ }}))%I
+                   WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
       { iIntros (CIDt Hst Mt Vt) "%Hmt %Hnt Hcg Hown Hpc Hpriv Hpenv Hfenv".
         destruct Hmt as (Ht9 & Ht18 & Ht19 & Ht20 & Htdom).
@@ -742,7 +742,7 @@ Section KexitPark.
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     proc_priv γf pj pid V -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hgl Heb Hav Hregs Hof Hcwd. subst eb.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
@@ -1261,7 +1261,7 @@ Section KexitRest.
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
     proc_priv γf pj pid V -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hgl Heb Hav Hgeom Hregs Hof. subst eb.
     destruct Hregs as (Hs3 & Hs4 & Hdom).

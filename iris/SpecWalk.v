@@ -68,8 +68,8 @@ Definition wp_walk_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ} `
       \/ (exists p2 p1 w0,
            ptree_level0 t' vpn p2 p1 w0 /\
            mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WALK.
   Parameter wp_walk_sconf :
@@ -118,8 +118,8 @@ Definition wp_walk_noalloc_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{
            mr !!! Regidx (mword_of_int 10) = pt_addr0 p1 vpn /\
            (m !! vpn = Some w0
             \/ (w0 = mword_of_int 0 /\ m !! vpn = None))) ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type WALK_NOALLOC.
   Parameter wp_walk_noalloc_sconf :

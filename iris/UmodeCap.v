@@ -156,8 +156,8 @@ Section UmodeCap.
          (i : InterruptType) (sc0 stval_v : mword 64),
        uv_trap_frame C pt (utrap_scause (Interrupt i) sc0) stval_v va g M -∗
        (∀ CID : CpuId, uv_run C pt M g va -∗
-          WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }})%I.
+          WP (Loop : expr riscv_lang)) -∗
+       WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
   (* The kernel's SYSCALL service: an [ecall] from User (cause             *)
@@ -171,7 +171,7 @@ Section UmodeCap.
        uv_trap_frame C pt (utrap_scause (rv64d_types.Exception (E_U_EnvCall tt)) sc0)
          stval_v va g M -∗
        Ψ (uint (g !!! Regidx a7_idx)) g va M Φ -∗
-       WP (Loop : expr riscv_lang) {{ Φ }})%I.
+       WP (Loop : expr riscv_lang))%I.
 
   (* THE CAPABILITY: both services, persistent, hart-free. *)
   Definition uv_cap (Ψ : usys_protocol Σ) : iProp Σ :=

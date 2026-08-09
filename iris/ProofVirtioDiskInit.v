@@ -380,8 +380,8 @@ Section VdiLeaves.
     ( sie_cap_gpr m n false p -∗
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
       disk_cfg_is γv (DfracOwn (1/2)) c' -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hrs1tp Hrs2tp Hea Hg Hoff Hsw Hl0 Hl1 Hcw. destruct Hg as (Hr & Hal & Hcan & Hdv).
     assert (Hsw' : (autocast (T := mword)
@@ -436,8 +436,8 @@ Section VdiLeaves.
     ( sie_cap_gpr m n false p -∗
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
       disk_cfg_is γv (DfracOwn (1/2)) virtio_cfg0 -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hrs1tp Hrs2tp Hea Hg Hoff Hsw Hl0. destruct Hg as (Hr & Hal & Hcan & Hdv).
     assert (Hsw' : (autocast (T := mword)
@@ -499,8 +499,8 @@ Section VdiLeaves.
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
       disk_pub γv 0%nat -∗
       disk_cfg γv (virtio_init_cfg pd pav pu) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hrs1tp Hrs2tp Hea Hg Hoff Hsw Hl0 Hcw Hpal Hdisj.
     destruct Hg as (Hr & Hal & Hcan & Hdv).
@@ -561,8 +561,8 @@ Section VdiLeaves.
     ( sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 w)]> m) n false p -∗
       pc_is (add_vec_int pc (if rvc then 2 else 4)) -∗
       disk_cfg_is γv (DfracOwn (1/2)) c -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hrs1tp Hea Hg Hoff Hrd Hrdok Hcr. destruct Hg as (Hr & Hal & Hcan & Hdv).
     assert (Ha8 : sign_extend' 64 (subrange_vec_dec

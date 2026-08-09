@@ -110,8 +110,8 @@ Definition wp_uvmunmap_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG �
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     proc_pt (uptd_del_run P vpn0 npages) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMUNMAP.
   Parameter wp_uvmunmap_sconf :
@@ -167,8 +167,8 @@ Definition wp_uvmunmap_bare_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kall
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     bare_pt uroot (um_del_run um vpn0 npages) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMUNMAP_BARE.
   Parameter wp_uvmunmap_bare_sconf :
@@ -251,8 +251,8 @@ Definition wp_uvmunmap_fixed_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kal
     pc_is ret_tgt -∗
     ⌜callee_saved mm mr⌝ -∗
     uptg (delete v fx) uroot um -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMUNMAP_FIXED.
   Parameter wp_uvmunmap_fixed_sconf :

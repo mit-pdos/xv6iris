@@ -361,7 +361,7 @@ Section UwProps.
        uart_sent_sub γu (uw_bytes f (S i)) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        running_claim j -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   Definition uw_exit_cont `{GEN : GenId} (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
       (j : nat) (m0 : regfile) (av : nat) (eb : bool) (C : iProp Σ)
@@ -376,7 +376,7 @@ Section UwProps.
        uart_sent_sub γu (uw_bytes f n) -∗
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        running_claim j -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* the loop head at +0x6c, ENTERED at whatever hart the last park landed on *)
   Definition uw_head `{GEN : GenId} (CID0 : CPU) (γl : gname) (γu : uart_names) (Φ : mval -> iProp Σ)
@@ -393,7 +393,7 @@ Section UwProps.
        uw_full sp0 m0 -∗ uw_buf buf dq f n -∗
        running_claim j -∗
        uw_exit_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* the tail's own continuation: uartwrite's postcondition, at ANY hart *)
   Definition uw_ret `{GEN : GenId} (CID0 : CPU) (γu : uart_names) (Φ : mval -> iProp Σ)
@@ -408,7 +408,7 @@ Section UwProps.
          Rbuf -∗
          uart_sent_sub γu bs -∗
          running_claim j -∗
-         WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+         WP (Loop : expr riscv_lang)))%I.
 
 End UwProps.
 
@@ -452,7 +452,7 @@ Section UwBodies.
     Rbuf -∗
     running_claim j -∗
     uw_ret CID0 γu Φ j m0 av eb C bs Rbuf -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hregs Hsp0 Hav Heb Hanch. subst eb.
     destruct Hregs as (Hsp & H18 & H19 & H20 & H22 & H23 & H24 & H25 & H26 & H27).
@@ -710,7 +710,7 @@ Section UwBodies.
     running_claim j -∗
     ( uw_next_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq i
       ∧ uw_exit_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hin Hn31 Hj Hjlp Hav Heb Hanch Hregs.
     assert (H231 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
@@ -774,7 +774,7 @@ Section UwBodies.
       running_claim j -∗
       ( uw_next_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq i
         ∧ uw_exit_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq ) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[]" as "#Body".
+      WP (Loop : expr riscv_lang)))%I with "[]" as "#Body".
     { iIntros (CIDb Hsbd M2 l2 b2) "%Hregs2 Hcg Hcnt Hpay Hpc Htok Hcell Hown #Hlb Hfull Hbuf Hpark Hcont".
       destruct Hregs2 as (Hsp & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & H24 & H25 & H26 & H27).
       (* --- +0x5a  lbu a5,0(s4) --- *)
@@ -890,7 +890,7 @@ Section UwBodies.
       running_claim j -∗
       ( uw_next_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq i
         ∧ uw_exit_cont CID0 γl γu Φ j m0 av eb C sp0 buf n f dq ) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[]" as "Sleep".
+      WP (Loop : expr riscv_lang)))%I with "[]" as "Sleep".
     { iLöb as "IH".
       iIntros (CIDs0 Hss0 M1) "%Hregs1 Hcg Hcnt Hpay Hpc Htok Hres Hfull Hbuf Hpark Hcont".
       pose proof Hregs1 as Hregs1'.

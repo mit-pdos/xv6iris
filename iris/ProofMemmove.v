@@ -202,8 +202,8 @@ Section ProofMemmove.
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5)
         = M !!! Regidx (mword_of_int 10 : mword 5) ⌝ -∗
       ⌜ callee_saved m0 mf ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 Hn Hsp HMcs.
     set (ra_idx := (mword_of_int 1 : mword 5)).
@@ -345,8 +345,8 @@ Section ProofMemmove.
       ⌜ mf !!! Regidx (mword_of_int 10 : mword 5)
         = m !!! Regidx (mword_of_int 10 : mword 5) ⌝ -∗
       ⌜ callee_saved m mf ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hlen64.
     set (a1_idx := (mword_of_int 11 : mword 5)).
@@ -557,8 +557,8 @@ Section ProofMemmove.
       ([∗ list] j ∈ seq 0 len, (pa_add p_dst j) ↦ₘ src_bytes j) -∗
       ⌜ mfin !!! Regidx (mword_of_int 10 : mword 5) = p_dst ⌝ -∗
       ⌜ callee_saved m0 mfin ⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 p_dst p_src Hn Hlen0 Hlen32 HMa0 HMa1 HMa2 HMsp HMcs.
     set (a0_idx := (mword_of_int 10 : mword 5)).

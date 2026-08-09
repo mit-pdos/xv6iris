@@ -279,7 +279,7 @@ Section ReadiDefs.
                (m !!! Regidx Ra2 : mword 64) n
                (rd_delivered data dst_olds off tot) -∗
         bslot bn -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
 End ReadiDefs.
 
@@ -333,7 +333,7 @@ Section ReadiRet.
     bslot bn -∗
     rd_cont (CID0 := CID0) Φ γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs2 Hs3 Hs8 Hs9 Hs10 Hs11 Hext Htotle Harm.
     pose proof HK as HK'. unfold K_readi in HK'.
@@ -642,7 +642,7 @@ Section ReadiJoin.
     bslot bn -∗
     rd_cont (CID0 := CID0) Φ γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs3v Hs2 Hs8 Hs9 Hs10 Hs11 Hext Htotle Harm.
     pose proof HK as HK'. unfold K_readi in HK'.
@@ -798,7 +798,7 @@ Section ReadiExit.
     bslot bn -∗
     rd_cont (CID0 := CID0) Φ γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs3v Hext Htotle Harm Hab Hbc Hcd Hde Hef Htgt Hal.
     pose proof HK as HK'. unfold K_readi in HK'.
@@ -1044,7 +1044,7 @@ Section ReadiLoop.
     bslot bn -∗
     rd_cont (CID0 := CID0) Φ γfs bn γf dev ip bm data dn user off n dst_olds V
             pidv dq dqd j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hwf Hcov Hszmax Hsum Hncn Hoffnc Hncdef Husv Hj Hgl.
     pose proof HK as HK'. unfold K_readi in HK'.
@@ -1473,7 +1473,7 @@ Section ReadiLoop.
         ⌜Mb !!! Regidx Rs8 = (mword_of_int (-1) : mword 64)⌝ -∗
         sie_cap_gpr Mb (K - 14)%nat b (proc_addr j) -∗
         pc_is (mword_of_int (RI + 0x4c) : mword 64) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I
+        WP (Loop : expr riscv_lang))%I
       with "[Hcnt Hcont Hframe Hpark Hidev Hmeta Hmap Hdst
              Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
     { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs2 %Hbs4 %Hbs7
@@ -2845,7 +2845,7 @@ Section ReadiMain.
         ⌜Mt !!! Regidx Rs11 = (m !!! Regidx Rs11 : mword 64)⌝ -∗
         sie_cap_gpr Mt (K - 14)%nat b (proc_addr j) -∗
         pc_is (mword_of_int (RI + 0x34) : mword 64) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I
+        WP (Loop : expr riscv_lang))%I
       with "[Hcnt Hcont Hframe Hpark Hidev Hmeta Hmap Hblocks
              Hdst Hsl]" as "TAIL".
     { iIntros (CIDt Mt nc) "%Hanch %Hncdef %Hncn %Hoffnc %Htsp %Hts5 %Hts6 %Hts7

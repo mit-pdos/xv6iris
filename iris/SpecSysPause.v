@@ -132,8 +132,8 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       p_trapframe pj ↦₈{dqt} page_base tfp -∗
       tf_page tfp ws -∗
       running_claim j -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type SYSPAUSE.
   Parameter wp_sys_pause_sconf :

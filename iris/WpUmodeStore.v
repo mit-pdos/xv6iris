@@ -455,11 +455,11 @@ Section UvRetirePostState.
     minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ b -∗
     ▷ (P -∗
        hart_state ↦ᵣ HART_ACTIVE tt -∗ PC ↦ᵣ npc -∗ nextPC ↦ᵣ npc -∗
-       WP (Loop : expr riscv_lang) {{ Phi }}) -∗
+       WP (Loop : expr riscv_lang)) -∗
     |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang) {{ Phi }}).
+         WP (Loop : expr riscv_lang)).
   Proof.
     intros Hsi Hhart_a Lnpcx Hha.
     iIntros "Hint HP Hhs Hpc Hnpc Hmst Hmi Hcont".
@@ -549,11 +549,11 @@ Section WpUmodeStore.
        hart_state ↦ᵣ HART_ACTIVE tt -∗
        PC ↦ᵣ add_vec_int pc k -∗ nextPC ↦ᵣ add_vec_int pc k -∗
        gpr_file m -∗
-       WP (Loop : expr riscv_lang) {{ Phi }}) -∗
+       WP (Loop : expr riscv_lang)) -∗
     |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
-         WP (Loop : expr riscv_lang) {{ Phi }}).
+         WP (Loop : expr riscv_lang)).
   Proof.
     intros Hsi Hhart_a Lpcf Hagreef Hhtiff HSXLf Hmprvf Hmxrf Hpmaf
            Hexp Htgt Hwval Hl Hchk Hcanon Hpg Hal HMb Hprog.
@@ -684,8 +684,8 @@ Section WpUmodeStore.
     (∀ CID0 : CpuId,
        uv_cap_gpr (CID := CID0) C pt Psi (uM_store8 M (uint tgt) wval) m -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
-       WP (Loop : expr riscv_lang) {{ Phi }}) -∗
-    WP (Loop : expr riscv_lang) {{ Phi }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Htgt Hwval Hl Hchk Hcanon Hpg Hal HMb.
     destruct Hui as [Hal2 Hcanonpc Hleaf Hinpage Hcode].
@@ -787,7 +787,7 @@ Section WpUmodeStore.
                 hart_state ↦ᵣ HART_ACTIVE tt -∗
                 PC ↦ᵣ add_vec_int pc 2 -∗ nextPC ↦ᵣ add_vec_int pc 2 -∗
                 gpr_file m -∗
-                WP (Loop : expr riscv_lang) {{ Phi }}))%I
+                WP (Loop : expr riscv_lang)))%I
       with "[Hcont Hpriv Hms Hsc Hstval Hsepc Hcfg]" as "Hk".
     { iNext. iIntros "_ Hutlb Humem Hhs Hpc Hnpc Hgpr".
       iApply ("Hcont" $! CID0 with "[-Hpc Hnpc] [$Hpc $Hnpc]").

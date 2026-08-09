@@ -164,8 +164,8 @@ Section ProofUartPutc.
       sie_cap_gpr (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> mentry) n b p -∗
       pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x30)) -∗
       uart_tx_own γd l -∗ uart_out_lb γd l -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Ha4e.
     iIntros "Hcg #Ht Hpc #Hdinv Hown Hcont".
@@ -186,8 +186,8 @@ Section ProofUartPutc.
       wp_next (CID0:=CID1) b p (fun (CID : CpuId) =>
         ∀ bt : bv 8, sie_cap_gpr (<[Regidx (mword_of_int 15) := regval_into_reg (lsr_masked bt)]> mentry) n b p -∗
             pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x30)) -∗
-            uart_tx_own γd l -∗ uart_out_lb γd l -∗ WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "Loop".
+            uart_tx_own γd l -∗ uart_out_lb γd l -∗ WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang))%I with "[]" as "Loop".
     { iLöb as "IH". iIntros (CID1 m Ha4m Hagm) "Hcg Hpc Hown Hk".
       (* 0x26  lbu a5,0(a4) *)
       iApply (UAcc.wp_uart_lsr_read_s_sconf (CID:=CID1) γd γv Φ (mword_of_int (KernelSyms.uartputc_sync + 0x26)) (mword_of_int 15) (mword_of_int 14)
@@ -257,8 +257,8 @@ Section ProofUartPutc.
       ∀ bt : bv 8,
       sie_cap_gpr (ppc_f6' m bt) n b p -∗ pc_is (mword_of_int (KernelSyms.uartputc_sync + 0x3c)) -∗
       uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sb.
     iIntros "Hcg #Ht Hpc #Hdinv Hown #Hoff Hcont".
@@ -355,8 +355,8 @@ Section ProofUartPutc.
       (mword_of_int KernelSyms.panicking : mword 64) ↦₄{ dqm } pv -∗
       (mword_of_int KernelSyms.panicked : mword 64) ↦₄{ dqm2 } pkv -∗
       uart_tx_own γd (l ++ [sb]) -∗ uart_sent γd (l ++ [sb]) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sb.
     iIntros (Hpv Hpkv) "Hcg #Ht Hpc Hpk Hpkd #Hdinv Hown #Hoff Hcont".

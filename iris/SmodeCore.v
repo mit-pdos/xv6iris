@@ -1233,7 +1233,7 @@ Section SmodeCoreIris.
   (* wp_exec_step_decode_execute_inv is (semantically) the p := Machine,  *)
   (* σf := σ instance.                                                    *)
   (* =================================================================== *)
-  Lemma wp_exec_step_decode_execute_inv_priv (p : Privilege) Φ {dq : dfrac} :
+  Lemma wp_exec_step_decode_execute_inv_priv (p : Privilege) (Φ : mval -> iProp Σ) {dq : dfrac} :
     minstret_inv -∗
     hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
     (∀ σ, mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
@@ -1266,8 +1266,8 @@ Section SmodeCoreIris.
          mstate_interp s_exec ∗
          (hart_state ↦ᵣ{ dq } HART_ACTIVE tt -∗
           PC ↦ᵣ (register_lookup nextPC s_exec.(sregs)) -∗
-          ▷ WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+          ▷ WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hinv Hhs H".
     iApply (wp_exec_step_hart_active_inv Φ with "Hinv Hhs").

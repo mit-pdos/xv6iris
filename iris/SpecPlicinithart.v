@@ -99,8 +99,8 @@ Definition wp_plicinithart_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ,
     sie_cap_gpr m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type PLICINITHART.
   Parameter wp_plicinithart_sconf :

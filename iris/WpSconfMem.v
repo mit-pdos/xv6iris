@@ -209,8 +209,8 @@ Section WpSconfMem.
         sie_cap_gpr (<[Regidx rd := regval_into_reg (ext v)]> m) n b p -∗
         pc_is (add_vec_int pc (if c then 2 else 4)) -∗
         Ψ v -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hext pa Hrd Hrdok HkptEm.
     rdok_split Hrdok.
@@ -440,8 +440,8 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hread_plain Hlv pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -485,8 +485,8 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     exact (wp_load_s_sconf_gen_u width c false Φ pc rd rs1 imm m n v lv b (dqm := dqm)).
   Qed.
@@ -522,8 +522,8 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg lv]> m) n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa dqm v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     exact (wp_load_s_sconf_gen_u width c true Φ pc rd rs1 imm m n v lv b (dqm := dqm)).
   Qed.
@@ -583,8 +583,8 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦ₘ{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbyte Hcont".
@@ -633,8 +633,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (zero_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -654,8 +654,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -675,8 +675,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -696,8 +696,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₄{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -717,8 +717,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hrd Hrdok.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -764,8 +764,8 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       Ψ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv HkptEm pa.
     set (wlast := (Z.to_nat width - 1)%nat).
@@ -973,8 +973,8 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc (if c then 2 else 4)) -∗
       wordw_pointsto width pa (DfracOwn 1) sv -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hw0 Hw8 Hvw Hwdvd Huintw Hwrite_plain Hsv pa.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -1019,8 +1019,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -1041,8 +1041,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -1062,8 +1062,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗ pa ↦₄ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -1083,8 +1083,8 @@ Section WpSconfMem.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗ pa ↦₄ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -1169,8 +1169,8 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦ₘ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbyte Hcont".
@@ -1345,8 +1345,8 @@ Section WpSconfMem.
       sie_cap_gpr (<[Regidx rd := regval_into_reg v]> m) n b p -∗
       pc_is (add_vec_int pc 2) -∗
       pa ↦₈{ dqm } v -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm pa Hrd Hrdok.
     unfold pa.
@@ -1369,8 +1369,8 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 2) -∗
       pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros imm pa storeval.
     unfold pa.
@@ -1396,8 +1396,8 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦₈ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".
@@ -1583,8 +1583,8 @@ Section WpSconfMem.
       sie_cap_gpr m n b p -∗
       pc_is (add_vec_int pc 4) -∗
       pa ↦₄ storeval -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pa storeval.
     iIntros "Hcg Hpc Hinstr Hbytes Hcont".

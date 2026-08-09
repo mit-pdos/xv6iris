@@ -63,8 +63,8 @@ Definition wp_kvmmake_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ
     ⌜kvm_pas_ok pas⌝ -∗
     ([∗ list] i ∈ seq 0 64,
        page_own (zero_extend' 64 (concat_vec (pas i) (zeros' 12 : mword 12)))) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type KVMMAKE.
   Parameter wp_kvmmake_sconf :

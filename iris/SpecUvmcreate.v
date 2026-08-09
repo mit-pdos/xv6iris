@@ -77,8 +77,8 @@ Definition wp_uvmcreate_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG 
     ⌜callee_saved mm mr⌝ -∗
     uvmcreate_post γa on (mm !!! Regidx (mword_of_int 4))
       (mr !!! Regidx (mword_of_int 10)) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type UVMCREATE.
   Parameter wp_uvmcreate_sconf :

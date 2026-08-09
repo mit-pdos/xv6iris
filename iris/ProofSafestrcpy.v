@@ -440,8 +440,8 @@ Section ProofSafestrcpy.
         ⌜callee_saved mm mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf K b p -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp0 Hra0 Hs00 Hmtsp Hmta0 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hcont".
@@ -596,8 +596,8 @@ Section ProofSafestrcpy.
         pc_is (mword_of_int (KernelSyms.safestrcpy + 0x2e) : mword 64) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add t j) ↦ₘ{dq} f j) -∗
         ([∗ list] j ∈ seq 0 n, (pa_add s j) ↦ₘ hf j) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn0 Hn31 rem.
     induction rem as [| rem IH]; intros d h M CID0 Hchain Hsum Hcp Hun Hnn Hsp Ha0 Ha1 Ha3 Ha5 Hthr;

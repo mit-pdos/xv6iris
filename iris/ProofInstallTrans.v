@@ -594,7 +594,7 @@ Section InstallTransDefs.
            (uint w) ↪[fs_dirty γfs]{#(1/2)} false) -∗
         bslots bn (2 + length W) -∗
         ▷ R -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
   Lemma it_cont_shift `{GEN : GenId} `{CIDa : CpuId} `{CIDb : CpuId}
       (Φ : mval -> iProp Σ)
@@ -792,7 +792,7 @@ Section InstallTransBlocks.
     it_out bn γfs logstart n W Lw L D -∗
     ▷ R -∗
     it_cont (CID0 := CID0) Φ j bn γfs logstart n W Lw L D pidv dq m K eb C eb R -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hs9 Hs10 Hs11.
     iIntros "Hcg #Htext Hpc Hframe Hcnt Hpark Hppid Hout HR Hcont".
@@ -1246,7 +1246,7 @@ Section InstallTransBlocks.
          disk_write_permit gen_id (Some ((1024 * uint w)%Z, bs')) R) -∗
     ▷ R -∗
     it_cont (CID0 := CID0) Φ j bn γfs logstart n W Lw L D pidv dq m K eb C eb R -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hgeom Hj Hgl Heb Hshape Hnd Hwok HLw.
     destruct Hshape as [HnW Hn30].

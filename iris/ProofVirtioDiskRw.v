@@ -139,8 +139,8 @@ Section ProofVirtioDiskRw.
         vdrw_saved sp0 m -∗
         vdrw_scratch sp0 -∗
         b_blockno bp ↦₄{DfracOwn (1/2)} bno -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 bp wr HK.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hlk Hbno Hcont".
@@ -653,8 +653,8 @@ Section ProofVirtioDiskRw.
         ([∗ list] i ∈ seq k (S n), free_cell_res pd fr i) -∗
         sie_cap_gpr M' av false pme -∗
         vdrw_scan_out fr k M' -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     induction n as [|n IH]; intros k M Hkn Ha5 Ha4 Hs1;
       iIntros "Hcg #Htext Hpc Hcells Hcont".
@@ -903,8 +903,8 @@ Section ProofVirtioDiskRw.
         ⌜vdrw_iter_ag M M'⌝ -∗
         sie_cap_gpr M' av false pme -∗
         vdrw_iter_out pd fr idxa i M M' -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hi8 Ha2 Hs5 Hs1 Hs2.
     iIntros "Hcg #Htext Hpc Hcells Hidx Hcont".
@@ -1279,8 +1279,8 @@ Section ProofVirtioDiskRw.
          /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
         sie_cap_gpr M' av false pme -∗
         vdrw_alloc_out pd sp0 fr M' -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hs0 Hs5 Hs1 Hs4.
     iIntros "Hcg #Htext Hpc Hcells Hscr Hcont".

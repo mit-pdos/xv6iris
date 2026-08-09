@@ -227,8 +227,8 @@ Section ProofUvmunmap.
       sie_cap_gpr mf K b p -∗
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros spr HK Hmmsp Hjsp Hjthr.
     iIntros "Hcg #Htext Hpc Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hcont".
@@ -469,8 +469,8 @@ Section ProofUvmunmap.
       pc_is (mword_of_int (KernelSyms.uvmunmap + 0x76) : mword 64) -∗
       uptg (uu_fx df fx (svpn_of va) npages)
            uroot (uu_um df um (svpn_of va) npages) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hilvl Hrange Hwf Hfx Hside.
     intro rem.
@@ -549,7 +549,7 @@ Section ProofUvmunmap.
         pc_is (mword_of_int (KernelSyms.uvmunmap + 0x4a) : mword 64) -∗
         ptree_own 2 (DfracOwn 1) t' -∗
         upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[Hcont]" as "TAIL".
+        WP (Loop : expr riscv_lang)))%I with "[Hcont]" as "TAIL".
     { iIntros (CIDt Hst mt t' m').
       iIntros "(%Htsp & %Hts2 & %Hts3 & %Hts4 & %Hts5 & %Hts6 & %Htthr
                 & %Htrep & %Htview & %Htbase) Hcg Hcnt Hpc Hptree Hown".
@@ -932,7 +932,7 @@ Section ProofUvmunmap.
         pc_is (mword_of_int (KernelSyms.uvmunmap + 0x46) : mword 64) -∗
         ptree_own 2 (DfracOwn 1) t -∗
         upt_pages_own (uu_um df um (svpn_of va) (S done)) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}))%I with "[TAIL]" as "STORE".
+        WP (Loop : expr riscv_lang)))%I with "[TAIL]" as "STORE".
     { iIntros (CIDs Hss ms).
       iIntros "(%Hmksp & %Hss1 & %Hmks2 & %Hmks3 & %Hmks4 & %Hmks5 & %Hmks6 & %Hmkthr)
                Hcg Hcnt Hpc Hptree Hown".
@@ -1206,8 +1206,8 @@ Section ProofUvmunmap.
       pc_is ret_tgt -∗
       ⌜callee_saved mm mr⌝ -∗
       uptg (uu_fx df fx vpn0 npages) uroot (uu_um df um vpn0 npages) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros pcE va vpn0 ret_tgt HK Hilvl Hroot Hval Hnpr Hdf Hrange Hside.
     pose (sp0 := (mm !!! Regidx csp_rs1 : mword 64)).

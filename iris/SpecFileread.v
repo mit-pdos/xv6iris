@@ -460,8 +460,8 @@ Definition wp_fileread_sconf_body
       proc_priv γf pj pidv (upd_upt V P') -∗
       running_claim j -∗
       fileread_env_out fn Cf -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type FILEREAD.
   Parameter wp_fileread_sconf :

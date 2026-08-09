@@ -532,7 +532,7 @@ Section PwConts.
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
        running_claim j -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* +0xd8: wakeup(&pi->nread); release(&pi->lock); jump to the epilogue.  Three
      paths land here: the n <= 0 arm, the loop exit and the copyin failure. *)
@@ -557,7 +557,7 @@ Section PwConts.
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
        running_claim j -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* +0x46: release(&pi->lock); i := -1; reload s6..s10; fall into the
      epilogue.  Reached when readopen == 0 or the process was killed. *)
@@ -581,7 +581,7 @@ Section PwConts.
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
        running_claim j -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* exactly ONE of the two is taken, so they are offered as a conjunction and
      SHARE the epilogue closure. *)
@@ -616,7 +616,7 @@ Section PwConts.
        kalloc_env γa None -∗
        running_claim j -∗
        pw_exits CID0 γf Φ γs j γl γp w q m av eb C pid V n sp0 pi -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
 End PwConts.
 
@@ -657,8 +657,8 @@ Section PwRestore.
     wp_next b pme (fun (CID : CpuId) =>
       ∀ M' : regfile, ⌜ pw_restored m M M' ⌝ -∗
         sie_cap_gpr M' K b pme -∗ pc_is p5 -∗ pw_frame5 m sp0 -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp E1 E2 E3 E4 E5.
     iIntros "Hcg Hpc Hi0 Hi1 Hi2 Hi3 Hi4 (F8 & F9 & F10 & F11 & F12) Hcont".
@@ -791,7 +791,7 @@ Section PwGuard.
     running_claim j -∗
     pw_exits CID0 γf Φ γs j γl γp w q m av eb C pid V n sp0 pi -∗
     pw_loop CID0 γa γf Φ γs j γl γp w q m av eb C pid V n sp0 pi addr -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hn0 Hn31 Hi Hanch Hext Hregs.
     assert (H63 : (2 ^ 63 = 9223372036854775808)%Z) by (vm_compute; reflexivity).

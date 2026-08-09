@@ -244,8 +244,8 @@ Definition wp_install_trans_sconf_body
       bslots bn (2 + length W) -∗
       (* the threaded resource, back from the last entry's DMA completion *)
       ▷ R -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type INSTALL_TRANS.
   Parameter wp_install_trans_sconf :

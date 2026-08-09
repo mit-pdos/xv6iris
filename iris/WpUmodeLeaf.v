@@ -108,8 +108,8 @@ Section WpUmodeLeaf.
        uv_cap_gpr (CID := CID0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
     iIntros "Hcg Hpc Hcont".
@@ -152,8 +152,8 @@ Section WpUmodeLeaf.
        uv_cap_gpr (CID := CID0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Hwval.
     iIntros "Hcg Hpc Hcont".
@@ -196,8 +196,8 @@ Section WpUmodeLeaf.
        uv_cap_gpr (CID := CID0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) (add_vec_int pc 2) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hcr Hrd Hwval.
     iIntros "Hcg Hpc Hcont".
@@ -242,8 +242,8 @@ Section WpUmodeLeaf.
        uv_cap_gpr (CID := CID0) C pt Ψ M
          (<[Regidx rd := regval_into_reg wval]> m) -∗
        pc_is (CID := CID0) tgt -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrd Htgt Hwval Hal0.
     iIntros "Hcg Hpc Hcont".
@@ -281,8 +281,8 @@ Section WpUmodeLeaf.
     (∀ CID0 : CpuId,
        uv_cap_gpr (CID := CID0) C pt Ψ M m -∗
        pc_is (CID := CID0) tgt -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hui Hrs1 Htgt.
     iIntros "Hcg Hpc Hcont".

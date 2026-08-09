@@ -341,8 +341,8 @@ Section WpCsrrGprB.
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd := regval_into_reg tv]> m) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -419,8 +419,8 @@ Section WpCsrrGprB.
       gpr_file (<[Regidx rd :=
         regval_into_reg (menvcfg_in)]> m) -∗
       menvcfg ↦ᵣ menvcfg_in -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hcsr Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".
@@ -507,8 +507,8 @@ Section WpCsrrGprB.
         regval_into_reg (lower_mie mie_in mideleg_in)]> m) -∗
       mie ↦ᵣ mie_in -∗
       mideleg ↦ᵣ mideleg_in -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hpmp Hstat Hrd) "Hmm Hpmpc [Hpc Hnpc] Hfmap Hmie Hmdl Hinstr Hcont".
     iDestruct (mmode_config_split_half_csrr with "Hmm") as "[Hmm_wp Hmm_k]".

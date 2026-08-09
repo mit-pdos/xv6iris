@@ -431,8 +431,8 @@ Section ProofFilereadParts.
         ⌜callee_saved m mf /\ mf !!! Regidx Ra0 = rv⌝ -∗
         sie_cap_gpr mf K b p -∗
         pc_is (ret_pc ra0) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp0 Hra0 Hs00 Hs20 Hmtsp Hmts2 Hthr.
     iIntros "Hcg #Htext Hpc Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hcont".
@@ -607,8 +607,8 @@ Section ProofFilereadParts.
         pc_is (mword_of_int zc : mword 64) -∗
         word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
         word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hmtsp Hab Hbc.
     iIntros "Hcg Hpc Hia Hib Hb3 Hb5 Hcont".
@@ -691,8 +691,8 @@ Section ProofFilereadParts.
         pc_is (mword_of_int (FR + 0x58) : mword 64) -∗
         word_pointsto (pa_stk sp0 3) (DfracOwn 1) v1 -∗
         word_pointsto (pa_stk sp0 5) (DfracOwn 1) v3 -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hmtsp Hab Hbc Hcd Hde Hjt.
     iIntros "Hcg Hpc Hia Hib Hic Hid Hie Hb3 Hb5 Hcont".

@@ -610,8 +610,8 @@ Section WpSconfVc.
       vheap_own ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗
       vframe_own ρ (vsf st') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     revert st m CID. induction prog as [|op rest IH]; intros st m CID Hblk Hux Hxn Hmatch Hao.
     - (* empty block *)
@@ -1227,8 +1227,8 @@ Section WpSconfVc.
       vheap_own ρ (vsb st').(vheap) -∗
       vheap4_own ρ (vsb st').(vheap4) -∗
       vframe_own ρ (vsf st') -∗
-      WP (Loop : expr riscv_lang) {{ Φ }})) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hblk Hux Hxn Hmatch.
     iIntros "Hcg Hpc Hbi Hheap Hheap4 Hfr Hcont".

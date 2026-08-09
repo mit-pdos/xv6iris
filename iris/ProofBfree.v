@@ -471,8 +471,8 @@ Section WpBfreeSllw.
     wp_next b p (fun (CID : CpuId) =>
       sie_cap_gpr (<[Regidx rd := regval_into_reg wval]> m) n b p -∗
       pc_is (add_vec_int pc 4) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base Φ pc rd rs1 rs2
@@ -577,7 +577,7 @@ Section BfreeDefs.
         bitmap_res γfs bmapstart cov logstart size (used ∖ {[ bi ]}) -∗
         bslots bn 2 -∗
         Bud -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I.
+        WP (Loop : expr riscv_lang))%I.
 
 End BfreeDefs.
 
@@ -639,7 +639,7 @@ Section BfreeTail.
     bf_cont (CID0 := CID0) Φ γfs bn γ cov logstart bmapstart size used bi
             (log_opS γ (if cr then S u else u) (Sb ∪ {[bmapstart]}))
             pidv dq dqb j m K C b -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hsp Hthr Ha0 Hs2 Hkk Hbno Hcov Hlog Hokdel Hcredit.
     pose proof HK as HK'. unfold K_bfree in HK'.

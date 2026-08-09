@@ -413,8 +413,8 @@ Section BootRun.
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
        main_hart_raw (register_lookup tlb rs) -∗
        pc_is (mword_of_int KernelSyms.main) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+       WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset.
     pose proof (reset_regs_mie _ _ Hreset) as Hmie0.
@@ -515,7 +515,7 @@ Section BootSecondary.
     boot_hart_res rs iv dq -∗
     panic_wp_any -∗
     started_inv (main_deposit γd γv Φ) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hnz.
     pose proof (fin_to_nat_lt cpu_id) as Hn.
@@ -590,7 +590,7 @@ Section BootPrimary.
     kpt_unset -∗
     kmap_auth kmap_M0 -∗
     ([∗ list] p ∈ ps, page_own p) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hz Hprun Hlen Hlive.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted Hlk Hgl Hprocs Hpark Hpst

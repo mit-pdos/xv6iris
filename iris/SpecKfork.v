@@ -193,8 +193,8 @@ Definition wp_kfork_sconf_body
       pc_is ret_tgt -∗
       kfork_post γa γf lvl eb pme C on b pid_p Vp K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-  WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+  WP (Loop : expr riscv_lang).
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :

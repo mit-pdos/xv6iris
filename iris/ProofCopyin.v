@@ -273,8 +273,8 @@ Section ProofCopyin.
       pc_is (ret_pc (mm !!! Regidx Rra)) -∗
       ⌜callee_saved mm mf⌝ -∗
       ⌜mf !!! Regidx Ra0 = res⌝ -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros spr HK Hmmsp Hjsp Hja0 Hjs10 Hjs11.
     iIntros "Hcg Hcnt #Htext Hpc Hk1 Hk2 Hk3 Hk4 Hk5 Hk6 Hk7 Hk8 Hk9 Hk10 Hk11 Hk12 Hcont".
@@ -546,8 +546,8 @@ Section ProofCopyin.
       p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
       proc_pt P' -∗
       ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ g j) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlen64 Hszb Hlvl.
     change (2 ^ 64)%Z with 18446744073709551616%Z in Hlen64.
@@ -579,7 +579,7 @@ Section ProofCopyin.
       p_pagetable p ↦₈{dqp} page_base P.(ud_root) -∗
       proc_pt P' -∗
       ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ g j) -∗
-      WP (Loop : expr riscv_lang) {{ Φ }}))%I).
+      WP (Loop : expr riscv_lang)))%I).
     (* the cursor, its page and its offset inside that page *)
     pose (cur := (m !!! Regidx Rs2 : mword 64)).
     pose (va0 := (and_vec cur (mword_of_int (-4096)) : mword 64)).
@@ -629,7 +629,7 @@ Section ProofCopyin.
         (page_own pa0 -∗ proc_pt Pd) -∗
         ([∗ list] j ∈ seq 0 len, (pa_add dst j) ↦ₘ fd j) -∗
         EXIT -∗
-        WP (Loop : expr riscv_lang) {{ Φ }})%I with "[]" as "CHUNK".
+        WP (Loop : expr riscv_lang))%I with "[]" as "CHUNK".
     { iIntros (CIDb mb pa0 Pd) "%Hanchorb %Hextd %Hba0 %Hbsp %Hbs2 %Hbs3 %Hbs4 %Hbs5 %Hbs6
                             %Hbs7 %Hbs8 %Hbs9 %Hbs10 %Hbs11
                             Hcg Hcnt Hpc Hszc Hptc Hpg Hback Hdst HEXIT".
@@ -684,7 +684,7 @@ Section ProofCopyin.
           ⌜mc !!! Regidx Rs11 = v11⌝ -∗
           sie_cap_gpr mc (K - 12) b p -∗
           pc_is (mword_of_int (KernelSyms.copyin + 0x38) : mword 64) -∗
-          WP (Loop : expr riscv_lang) {{ Φ }})%I
+          WP (Loop : expr riscv_lang))%I
         with "[Hdst Hcnt Hszc Hptc Hpg Hback HEXIT]" as "BODY".
       { iIntros (CIDc mc n) "%Hanchorc %Hn1 %Hnrem %Hnoff %Hcs1 %Hca0 %Hcsp %Hcs2 %Hcs3
                         %Hcs4 %Hcs5 %Hcs6 %Hcs7 %Hcs8 %Hcs9 %Hcs10 %Hcs11 Hcg Hpc".

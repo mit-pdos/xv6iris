@@ -125,8 +125,8 @@ Section VdrwbFreeAt.
         pc_is (mword_of_int (KernelSyms.virtio_disk_rw + off + 8) : mword 64) -∗
         idxa ↦₄ (mword_of_int (Z.of_nat i) : mword 32) -∗
         free_bundles pd (fr_upd fr i true) -∗
-        WP (Loop : expr riscv_lang) {{ Φ }}) -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+        WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
   Proof.
     intros Hav Hi8 Hfri Hlen Haddr Hp4 Hjt Hjal Hret.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hpinv #Hdp Hi0 Hi4 Hidx Hbun Hslot Hcont".
@@ -252,7 +252,7 @@ Section ProofVirtioDiskRwB.
        free_slot_res pd h -∗ free_slot_res pd m2 -∗ free_slot_res pd t -∗
        vdrw_idx sp0 (mword_of_int (Z.of_nat h)) (mword_of_int (Z.of_nat m2))
                     (mword_of_int (Z.of_nat t)) -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   (* the loop head at +0x0a8 *)
   Definition vdrw_p2_loop (CID0 : CPU) (γk : gname) (Φ : mval -> iProp Σ)
@@ -275,7 +275,7 @@ Section ProofVirtioDiskRwB.
        disk_res γd pd pav pu -∗
        vdrw_scratch sp0 -∗
        vdrw_p2_exit CID0 γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
-       WP (Loop : expr riscv_lang) {{ Φ }}))%I.
+       WP (Loop : expr riscv_lang)))%I.
 
   Lemma wp_vdrw_p2 (γk : gname) (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname) (γd : disk_names)
@@ -297,7 +297,7 @@ Section ProofVirtioDiskRwB.
     disk_res γd pd pav pu -∗
     vdrw_scratch sp0 -∗
     vdrw_p2_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
-    WP (Loop : expr riscv_lang) {{ Φ }}.
+    WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hj Hjl Hlen Heb Hregs Hhi0.
     iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv #Hscheds Hpark
@@ -509,7 +509,7 @@ Section ProofVirtioDiskRwB.
                   free_bundles pd fr -∗
                   vdrw_scratch sp0 -∗
                   vdrw_p2_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
-                  WP (Loop : expr riscv_lang) {{ Φ }})%I
+                  WP (Loop : expr riscv_lang))%I
         with "[Hpub Hlb Hcl Huidx Hflight Hparked Hring IH]" as "Hsleep".
       { iIntros (Mz) "%Hcsz Hcg Hown Hpay Hpc Hpark Htok Hbun Hscr Hexit".
         assert (Hhiz : vdrw_hi Mz m0)
