@@ -270,7 +270,6 @@ Section ReadiDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        running_claim j -∗
         i_dev ip ↦₄{dqd} dev -∗
         inode_meta ip dn -∗
         inode_map γfs ip bm -∗
@@ -322,7 +321,6 @@ Section ReadiRet.
     kernel_text -∗
     pc_is (mword_of_int (RI + 0xdc) : mword 64) -∗
     rd_fr7 m -∗
-    running_claim j -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -337,7 +335,7 @@ Section ReadiRet.
   Proof.
     intros HK Hsp Hs2 Hs3 Hs8 Hs9 Hs10 Hs11 Hext Htotle Harm.
     pose proof HK as HK'. unfold K_readi in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hpark Hidev
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
     iPoseProof (rdi_0dc with "Htext") as "Hidc".
     iPoseProof (rdi_0de with "Htext") as "Hide".
@@ -589,8 +587,7 @@ Section ReadiRet.
     rewrite /rd_cont.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot P'
-              with "[%] [%] [%] [%] Hcg Hcnt Hpc
-                    Hpark Hidev Hmeta Hmap Hblocks Hdst Hsl").
+              with "[%] [%] [%] [%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hdst Hsl").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hext. }
     { exact Htotle. }
@@ -631,7 +628,6 @@ Section ReadiJoin.
     kernel_text -∗
     pc_is (mword_of_int (RI + 0xd8) : mword 64) -∗
     rd_fr8 m -∗
-    running_claim j -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -646,7 +642,7 @@ Section ReadiJoin.
   Proof.
     intros HK Hsp Hs3v Hs2 Hs8 Hs9 Hs10 Hs11 Hext Htotle Harm.
     pose proof HK as HK'. unfold K_readi in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hpark Hidev
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
     iPoseProof (rdi_0d8 with "Htext") as "Hid8".
     iPoseProof (rdi_0da with "Htext") as "Hida".
@@ -722,7 +718,7 @@ Section ReadiJoin.
               user off n tot dst_olds V P' pidv dq dqd j m T1 K C b
               HK HT1sp HT1s2 HT1s3 HT1s8 HT1s9 HT1s10 HT1s11 Hext Htotle
               ltac:(rewrite HT1a0; exact Harm)
-              with "Hcg Hcnt Htext Hpc Hframe Hpark Hidev
+              with "Hcg Hcnt Htext Hpc Hframe Hidev
                     Hmeta Hmap Hblocks Hdst Hsl [Hcont]").
     iApply (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
               with "Hcont").
@@ -787,7 +783,6 @@ Section ReadiExit.
              sp, Regidx Rs11, false, 8)) -∗
     instr (mword_of_int zf : mword 64) true (JAL (jimm, zreg)) -∗
     rd_fr13 m -∗
-    running_claim j -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -802,7 +797,7 @@ Section ReadiExit.
   Proof.
     intros HK Hsp Hs3v Hext Htotle Harm Hab Hbc Hcd Hde Hef Htgt Hal.
     pose proof HK as HK'. unfold K_readi in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc Hia Hib Hic Hid Hie Hif Hframe Hpark
+    iIntros "Hcg Hcnt #Htext Hpc Hia Hib Hic Hid Hie Hif Hframe
               Hidev Hmeta Hmap Hblocks Hdst Hsl Hcont".
     rewrite /rd_fr13.
     iDestruct "Hframe" as "(Hf1 & Hf2 & Hf3 & Hf4 & Hf5 & Hf6 & Hf7 & Hf8 & Hf9
@@ -940,7 +935,7 @@ Section ReadiExit.
     iApply (rd_join (CID0 := CID6)  γfs bn γf dev ip bm data dn
               user off n tot dst_olds V P' ans pidv dq dqd j m Q5 K C b
               HK HQ5sp HQ5s3 HQ5s2 HQ5s8 HQ5s9 HQ5s10 HQ5s11 Hext Htotle Harm
-              with "Hcg Hcnt Htext Hpc Hframe Hpark Hidev
+              with "Hcg Hcnt Htext Hpc Hframe Hidev
                     Hmeta Hmap Hblocks Hdst Hsl [Hcont]").
     iApply (wp_next_shift (CIDa := CID0) (CIDb := CID6) ltac:(wp_next_chain)
               with "Hcont").
@@ -1028,12 +1023,10 @@ Section ReadiLoop.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     kalloc_env γa None -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     rd_fr13 m -∗
-    running_claim j -∗
     i_dev ip ↦₄{dqd} dev -∗
     inode_meta ip dn -∗
     inode_map γfs ip bm -∗
@@ -1085,8 +1078,8 @@ Section ReadiLoop.
       by (rewrite Hubno; exact Hbcov).
     assert (Hblt' : (uint (blkmap_get bm fbn : mword 32) < 2147483648)%Z)
       by (rewrite Hubno; exact Hblt).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hkenv #Hprocs #Hscheds
-              #Hdevi #Hdgeom #Hdlock Hframe Hpark Hidev
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hkenv #Hprocs
+              #Hdevi #Hdgeom #Hdlock Hframe Hidev
               Hmeta Hmap Hblocks Hdst Hsl Hcont".
     (* BORROW the pid share for bmap and bread; it goes back into [Hdst]
        before either_copyout, which wants the block whole. *)
@@ -1169,9 +1162,9 @@ Section ReadiLoop.
               A3 (K - 14)%nat true C b
               HKbm Hgeom0 Hfbnlt Hwf Hbnzz Hj Hgl HA3a0 HA3a1 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hidev Hmap Hblocks Hppid
-                    Hprocs Hscheds Hpark Hdevi Hdgeom Hdlock Hsl").
+                    Hprocs Hdevi Hdgeom Hdlock Hsl").
     iIntros (CIDa4 Hqa4 mB)
-      "%Hcs1 %Ha0v Hcg Hcnt Hpc Hpark Hppid Hidev Hmap Hblocks Hsl".
+      "%Hcs1 %Ha0v Hcg Hcnt Hpc Hppid Hidev Hmap Hblocks Hsl".
     assert (Hpc86 : ret_pc (A3 !!! Regidx Rra : mword 64)
                     = mword_of_int (RI + 0x86)) by (rewrite HA3ra; pcw).
     iEval (rewrite Hpc86) in "Hpc".
@@ -1304,10 +1297,9 @@ Section ReadiLoop.
               B3 (K - 14)%nat true C b
               HKbr Hblt' eq_refl Hbcov'
               eq_refl Hj Hgl HB3a0 HB3a1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds 
-                    Hpark Hdevi Hdgeom Hdlock Hsl").
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl").
     iIntros (CIDa9 Hqa9 mBr kkb bsB bsdB dB)
-      "%Hfacts Hcg Hcnt Hpc Hpark Hppid Hheld".
+      "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
     (* the borrow closes: either_copyout wants the block whole *)
     iDestruct ("Hdstback" with "Hppid") as "Hdst".
     destruct Hfacts as [Hcs2 HmBra0].
@@ -1474,7 +1466,7 @@ Section ReadiLoop.
         sie_cap_gpr Mb (K - 14)%nat b (proc_addr j) -∗
         pc_is (mword_of_int (RI + 0x4c) : mword 64) -∗
         WP (Loop : expr riscv_lang))%I
-      with "[Hcnt Hcont Hframe Hpark Hidev Hmeta Hmap Hdst
+      with "[Hcnt Hcont Hframe Hidev Hmeta Hmap Hdst
              Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
     { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs2 %Hbs4 %Hbs7
                             %Hbs6 %Hbs1 %Hbs5 %Hbs3 %Hbs9 %Hbs8 Hcg Hpc".
@@ -2009,7 +2001,7 @@ Section ReadiLoop.
                     ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw)
                     ltac:(pcw) ltac:(vm_compute; reflexivity)
                     with "Hcg Hcnt Htext Hpc Hjbe Hjc0 Hjc2 Hjc4 Hjc6 Hjc8
-                          Hframe Hpark Hidev Hmeta Hmap Hblocks
+                          Hframe Hidev Hmeta Hmap Hblocks
                           Hdst2 Hsl [Hcont]").
           iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDc11)
                     ltac:(wp_next_chain) with "Hcont").
@@ -2047,8 +2039,8 @@ Section ReadiLoop.
           iApply (IH CIDc11 (tot + mm)%nat P2 G3
                     ltac:(lia) Hext2 ltac:(lia)
                     HG3sp HG3s6 HG3s7 HG3s4 HG3s1 HG3s5 HG3s3 HG3s9 HG3s8
-                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hprocs Hscheds
-                          Hdevi Hdgeom Hdlock Hframe Hpark Hidev
+                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hprocs
+                          Hdevi Hdgeom Hdlock Hframe Hidev
                           Hmeta Hmap Hblocks Hdst2 Hsl Hcont").
       - (* ====== THE COPY OUT FAULTED -- only reachable on the USER arm,
              where either_copyout may answer -1.  readi releases a buffer
@@ -2161,7 +2153,7 @@ Section ReadiLoop.
                   ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw) ltac:(pcw)
                   ltac:(pcw) ltac:(vm_compute; reflexivity)
                   with "Hcg Hcnt Htext Hpc Hjb2 Hjb4 Hjb6 Hjb8 Hjba Hjbc
-                        Hframe Hpark Hidev Hmeta Hmap Hblocks
+                        Hframe Hidev Hmeta Hmap Hblocks
                         Hdst3 Hsl [Hcont]").
         iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDd8)
                   ltac:(wp_next_chain) with "Hcont"). }
@@ -2332,8 +2324,7 @@ Section ReadiMain.
     assert (Hsumu : bv_unsigned (mword_of_int (Z.of_nat (off + n)) : mword 64)
                     = Z.of_nat (off + n)) by (apply rd_nat_u; lia).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hkenv Hidev
-              Hmeta Hmap Hblocks Hdst #Hprocs #Hscheds 
-              Hpark #Hdevi #Hdgeom #Hdlock Hsl Hcont".
+              Hmeta Hmap Hblocks Hdst #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hcont".
     iAssert (rd_cont (CID0 := CID) γfs bn γf dev ip bm data dn user off n
                dst_olds V pidv dq dqd j m K C b)%I with "[Hcont]" as "Hcont";
       [rewrite /rd_cont /rd_dst; iExact "Hcont"|].
@@ -2455,8 +2446,7 @@ Section ReadiMain.
       rewrite /rd_cont.
       iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! X1 0%nat (pv_upt V)
-                with "[%] [%] [%] [%] Hcg Hcnt Hpc
-                      Hpark Hidev Hmeta Hmap Hblocks Hdst Hsl").
+                with "[%] [%] [%] [%] Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks Hdst Hsl").
       { unfold callee_saved. split_and!; lkp. }
       { apply uptd_ext_refl. }
       { lia. }
@@ -2846,7 +2836,7 @@ Section ReadiMain.
         sie_cap_gpr Mt (K - 14)%nat b (proc_addr j) -∗
         pc_is (mword_of_int (RI + 0x34) : mword 64) -∗
         WP (Loop : expr riscv_lang))%I
-      with "[Hcnt Hcont Hframe Hpark Hidev Hmeta Hmap Hblocks
+      with "[Hcnt Hcont Hframe Hidev Hmeta Hmap Hblocks
              Hdst Hsl]" as "TAIL".
     { iIntros (CIDt Mt nc) "%Hanch %Hncdef %Hncn %Hoffnc %Htsp %Hts5 %Hts6 %Hts7
                             %Hts4 %Hts1 %Hts2 %Hts8 %Hts9 %Hts10 %Hts11 Hcg Hpc".
@@ -2909,7 +2899,7 @@ Section ReadiMain.
                   HK HZ1sp HZ1s3 HZ1s2 HZ1s8 HZ1s9 HZ1s10 HZ1s11
                   ltac:(apply uptd_ext_refl) ltac:(lia)
                   ltac:(right; split; [reflexivity | exact Hncdef])
-                  with "Hcg Hcnt Htext Hpc Hframe Hpark Hidev
+                  with "Hcg Hcnt Htext Hpc Hframe Hidev
                         Hmeta Hmap Hblocks Hdst Hsl [Hcont]").
         iApply (wp_next_shift (CIDa := CID) (CIDb := CIDz3) ltac:(wp_next_chain)
                   with "Hcont"). }
@@ -3089,8 +3079,8 @@ Section ReadiMain.
                 ltac:(replace (off + 0)%nat with off by lia;
                       replace (nc - 0)%nat with nc by lia; lia)
                 HU3sp HU3s6 HU3s7 HU3s4 HU3s1 HU3s5 HU3s3 HU3s9 HU3s8
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hprocs Hscheds
-                      Hdevi Hdgeom Hdlock Hframe Hpark Hidev
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hprocs
+                      Hdevi Hdgeom Hdlock Hframe Hidev
                       Hmeta Hmap Hblocks Hdst Hsl Hcont"). }
     (* ===== +0x2c bgeu a5,a4 : does the read fit inside the file? ===== *)
     destruct (Nat.leb_spec (off + n) szn) as [Hge | Hlt].

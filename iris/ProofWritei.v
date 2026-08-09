@@ -287,7 +287,6 @@ Section WriteiDefs.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         i_inum ip ↦₄{dqn} inum -∗
@@ -374,7 +373,6 @@ Section WriteiRet.
     kernel_text -∗
     pc_is (mword_of_int (WI + 0xdc) : mword 64) -∗
     wi_fr7 m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -398,7 +396,7 @@ Section WriteiRet.
     intros HK Hsp Hs1 Hs3 Hs8 Hs9 Hs10 Hs11
            Hwf' Hhz' Hdswf' Hadr' Hsz' Hcov' Hdb Hd0 Hrange Hker Harm Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc Hframe Hpark Hppid Hidev Hinum
+    iIntros "Hcg Hcnt #Htext Hpc Hframe Hppid Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont".
     iPoseProof (wri_dc with "Htext") as "Hid6".
     iPoseProof (wri_de with "Htext") as "Hid8".
@@ -651,8 +649,7 @@ Section WriteiRet.
     rewrite /wi_cont.
     iSpecialize ("Hcont" $! CID9 with "[%]"); [wp_next_chain|].
     iApply ("Hcont" $! P8 tot bm' data' dn' ds' n' wrote dist dstb P'
-              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc
-                    Hpark Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hfsb
+              with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hfsb
                     Hsrc Hsl Hop").
     { unfold callee_saved. split_and!; assumption. }
     { exact Hwf'. }
@@ -736,12 +733,10 @@ Section WriteiJoin.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wi_fr8 m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -766,8 +761,8 @@ Section WriteiJoin.
            Hj Hgl Hsp Hs5 Hs3 Hs1 Hs8 Hs9 Hs10 Hs11 Hdb Hd0 Hrange Hker Htotn Hdneq
            Hlo Hhi Hext.
     pose proof HK as HK'. unfold K_writei in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs #Hscheds
-              #Hdevi #Hdgeom #Hdlock Hframe Hpark Hppid Hidev Hinum
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
+              #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont".
     iPoseProof (wri_d2 with "Htext") as "Hicc".
     iPoseProof (wri_d4 with "Htext") as "Hice".
@@ -840,9 +835,9 @@ Section WriteiJoin.
               pidv dq dqd dqn dqs T1 (K - 14)%nat true C b
               HKiu Hgeom Hist Hicov Hilog Hdswf Hadr Hdirlen Hj Hgl HT1a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
-                    Hsb Hfsb Hppid Hprocs Hscheds Hpark Hdevi Hdgeom
+                    Hsb Hfsb Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl2 Hop").
-    iIntros (CID3 Hq3 mI) "%Hcs1 Hcg Hcnt Hpc Hpark Hppid Hidev Hinum
+    iIntros (CID3 Hq3 mI) "%Hcs1 Hcg Hcnt Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsb Hfsb Hsl2 Hop".
     assert (Hpcd2 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (WI + 0xd8)) by (rewrite HT1ra; pcw).
@@ -953,7 +948,7 @@ Section WriteiJoin.
               ltac:(right; split_and!;
                     [exact HT3a0 | exact Htotn | exact Hdneq | reflexivity])
               Hlo Hhi Hext
-              with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hidev Hinum
+              with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
     iApply (wp_next_shift (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
               with "Hcont").
@@ -1027,12 +1022,10 @@ Section WriteiSize.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wi_fr13 m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -1062,8 +1055,8 @@ Section WriteiSize.
     assert (Hcovf : bm_covers bm' (bv_unsigned (di_size (wi_dinode dn bm' off tot))))
       by exact (ProofWriteiParts.wi_covers_final bm' dn off tot
                   ltac:(clear -Hofflt; lia) HcovS HcovT).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs #Hscheds
-              #Hdevi #Hdgeom #Hdlock Hframe Hpark Hppid Hidev Hinum
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs
+              #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont".
     iPoseProof (wri_bc with "Htext") as "Hib6".
     iPoseProof (wri_c0 with "Htext") as "Hiba".
@@ -1308,8 +1301,8 @@ Section WriteiSize.
                 Hj Hgl HQB5sp HQB5s5 HQB5s3
                 HQB5Rs1 HQB5Rs8 HQB5Rs9 HQB5Rs10 HQB5Rs11
                 Hdb Hd0 Hrange Hker Htotn eq_refl Hlo Hhi Hext
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hdevi
-                      Hdgeom Hdlock Hframe Hpark Hppid Hidev Hinum Hmeta
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                      Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID0) (CIDb := CIDz3) ltac:(wp_next_chain)
                 with "Hcont").
@@ -1510,8 +1503,8 @@ Section WriteiSize.
                 Hj Hgl HQA5sp HQA5s5 HQA5s3
                 HQA5Rs1 HQA5Rs8 HQA5Rs9 HQA5Rs10 HQA5Rs11
                 Hdb Hd0 Hrange Hker Htotn eq_refl Hlo Hhi Hext
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hdevi
-                      Hdgeom Hdlock Hframe Hpark Hppid Hidev Hinum Hmeta
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                      Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID0) (CIDb := CIDQA5) ltac:(wp_next_chain)
                 with "Hcont").
@@ -1624,12 +1617,10 @@ Section WriteiLoop.
     log_ctx γ bn γfs cov logstart dev -∗
     kalloc_env γa None -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     wi_fr13 m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -1671,8 +1662,8 @@ Section WriteiLoop.
     pose proof Hfbnlt as Hfbn268. rewrite wi_maxfile_val in Hfbn268.
     assert (Hbsz : BSIZE = 1024%nat) by exact wi_bsize_val.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
-              #Hprocs #Hscheds
-              #Hdevi #Hdgeom #Hdlock Hframe Hpark Hppid Hidev Hinum
+              #Hprocs
+              #Hdevi #Hdgeom #Hdlock Hframe Hppid Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont".
     iPoseProof (wri_82 with "Htext") as "Hi82".
     iPoseProof (wri_86 with "Htext") as "Hi86".
@@ -1757,9 +1748,9 @@ Section WriteiLoop.
               with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hidev Hmap
                     Hblocks Hppid
                     Hszc Hbmsc Hbmres
-                    Hprocs Hscheds Hpark Hdevi Hdgeom Hdlock Hsl Hop").
+                    Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
     iIntros (CIDa4 Hqa4 mB bm2 nB data2 uMid)
-      "%Hcs1 %HuMid %Hwf2 %Hagr2 %Hnoun2 %Harm2 Hcg Hcnt Hpc Hpark Hppid
+      "%Hcs1 %HuMid %Hwf2 %Hagr2 %Hnoun2 %Harm2 Hcg Hcnt Hpc Hppid
        Hszc Hbmsc Hbmres Hidev Hmap %Hdep2 Hblocks Hsl %Hbud2 Hop".
     (* re-close the bundle at the SAME index -- [ba_used A ⊆ uIn ⊆ uMid] *)
     iAssert (bm_alloc_res γfs cov logstart A) with "[Hszc Hbmsc Hbmres]" as "Hba".
@@ -1865,8 +1856,8 @@ Section WriteiLoop.
                 Hj Hgl HB1sp HB1s5 HB1s2 HB1s3 ltac:(lia) ltac:(intros; reflexivity)
                 (wi_range_dist0 data data2 off tot wroteI wroteI Hrange2)
                 HkerI ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) HextI
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hdevi
-                      Hdgeom Hdlock Hframe Hpark Hppid Hidev Hinum Hmeta
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                      Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CIDa3) (CIDb := CIDa6) ltac:(wp_next_chain)
                 with "Hcont").
@@ -1963,10 +1954,9 @@ Section WriteiLoop.
                 B3 (K - 14)%nat true C b
                 HKbr Hblt' eq_refl Hbcov'
                 eq_refl Hj Hgl HB3a0 HB3a1 eq_refl
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds 
-                      Hpark Hdevi Hdgeom Hdlock Hsl1").
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
       iIntros (CIDa9 Hqa9 mBr kkb bsB bsdB dB)
-        "%Hfacts Hcg Hcnt Hpc Hpark Hppid Hheld".
+        "%Hfacts Hcg Hcnt Hpc Hppid Hheld".
       destruct Hfacts as [Hcs2 HmBra0].
       assert (Hpc98 : ret_pc (B3 !!! Regidx Rra : mword 64)
                       = mword_of_int (WI + 0x98)) by (rewrite HB3ra; pcw).
@@ -2127,7 +2117,7 @@ Section WriteiLoop.
           sie_cap_gpr Mb (K - 14)%nat b (proc_addr j) -∗
           pc_is (mword_of_int (WI + 0x4c) : mword 64) -∗
           WP (Loop : expr riscv_lang))%I
-        with "[Hcnt Hcont Hframe Hpark Hppid Hidev Hinum Hmeta Hmap Hsb
+        with "[Hcnt Hcont Hframe Hppid Hidev Hinum Hmeta Hmap Hsb
                Hba Hfsb Hsrc Hsl2 Hop Hbuf Hheldback Hfsb1 Htok1 Hblback]" as "BODY".
       { iIntros (CIDb Mb mm) "%Hanch %Hmmd %Hbsp %Hbs10 %Hba5 %Hbs1 %Hbs4 %Hbs7
                               %Hbs5 %Hbs2 %Hbs6 %Hbs3 %Hbs9 %Hbs8 Hcg Hpc".
@@ -2747,8 +2737,8 @@ Section WriteiLoop.
                       ltac:(lia) ltac:(intros; reflexivity)
                       (wi_range_dist0 data _ off (tot + mm)%nat wrote2 wrote2 Hrange3)
                       Hker3 ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) Hext2
-                      with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hdevi
-                            Hdgeom Hdlock Hframe Hpark Hppid Hidev Hinum Hmeta
+                      with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                            Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                             Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
             iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDc11)
                       ltac:(wp_next_chain) with "Hcont").
@@ -2788,8 +2778,8 @@ Section WriteiLoop.
                       ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia) ltac:(lia)
                       HG3sp HG3s5 HG3s7 HG3s4 HG3s2 HG3s6 HG3s3 HG3s9 HG3s8 Hprkc
                       with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx
-                            Hkenv Hprocs Hscheds
-                            Hdevi Hdgeom Hdlock Hframe Hpark Hppid Hidev Hinum
+                            Hkenv Hprocs
+                            Hdevi Hdgeom Hdlock Hframe Hppid Hidev Hinum
                             Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont").
 
         + (* ====== THE COPY FAILED PART-WAY (kernel defect D1's fix) ======
@@ -2959,8 +2949,8 @@ Section WriteiLoop.
                     (wi_range_fail data data2 off tot mm fbn o wroteI g
                        Hmmo Hdm Hrange2)
                     HkerI ltac:(lia) ltac:(unfold wi_cost; lia) ltac:(lia) Hext2
-                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hdevi
-                          Hdgeom Hdlock Hframe Hpark Hppid Hidev Hinum Hmeta
+                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                          Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                           Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
           iApply (wp_next_shift (CIDa := CIDa14) (CIDb := CIDd7)
                     ltac:(wp_next_chain) with "Hcont").
@@ -3121,8 +3111,7 @@ Section WriteiMain.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hkdata #Hprkenv #Hbio #Hlctx #Hkenv
               Hidev Hinum
               Hmeta Hmap Hblocks Hsb Hszc Hbmsc Hbmres Hfsb Hsrc Hppid
-              #Hprocs #Hscheds 
-              Hpark #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
+              #Hprocs #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iAssert (bm_alloc_res γfs cov logstart A) with "[Hszc Hbmsc Hbmres]" as "Hba".
     { rewrite /bm_alloc_res /A. iSplitR; [iPureIntro; exact Hgok|].
       iFrame "Hszc Hbmsc".
@@ -3139,14 +3128,14 @@ Section WriteiMain.
       iIntros (CIDf) "%Hchain".
       iIntros (mf tot bm2 data2 dn2 ds2 n2 wrote dist dstb P2)
         "%C1 %C2 %C3 %C4 %C5 %C6 %C7 %C8 %C9 %C10 %C11 %C12 %C13 %C14
-         Hcg Hcnt Hpc Hpark Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb
+         Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb
          Hba Hfsb Hsrc Hsl Hop".
       iDestruct "Hba" as "(%Hgok2 & Hszc & Hbmsc & Hbmg)".
       iDestruct "Hbmg" as (uOut) "[%HuOut Hbmres]".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [exact Hchain|].
       iApply ("Hcont" $! mf tot bm2 data2 dn2 ds2 n2 wrote dist dstb P2 uOut
                 with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%]
-                      Hcg Hcnt Hpc Hpark Hppid Hidev Hinum Hmeta Hmap
+                      Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap
                       Hblocks Hsb Hszc Hbmsc Hbmres Hfsb Hsrc Hsl Hop").
       { exact C1. } { exact HuOut. } { exact C2. } { exact C3. } { exact C4. }
       { exact C5. } { exact C6. } { exact C7. } { exact C8. } { exact C9. }
@@ -3260,8 +3249,7 @@ Section WriteiMain.
       iSpecialize ("Hcont" $! CIDx3 with "[%]"); [wp_next_chain|].
       iApply ("Hcont" $! X1 0%nat bm data dn ds ncount
                 (fun _ => bv_0 8) 0%nat (fun _ => bv_0 8) (pv_upt V)
-                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc
-                      Hpark Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hfsb
+                with "[%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hinum Hmeta Hmap Hblocks Hsb Hba Hfsb
                       [Hsrc] Hsl Hop").
       { unfold callee_saved. split_and!; lkp. }
       { exact Hwf. }
@@ -3666,7 +3654,7 @@ Section WriteiMain.
                       | reflexivity | reflexivity | reflexivity | reflexivity
                       | reflexivity | reflexivity | reflexivity ])
                 ltac:(lia) ltac:(lia) ltac:(apply uptd_ext_refl)
-                with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hidev Hinum
+                with "Hcg Hcnt Htext Hpc Hframe Hppid Hidev Hinum
                       Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID) (CIDb := CIDy3) ltac:(wp_next_chain)
                 with "Hcont").
@@ -3803,8 +3791,8 @@ Section WriteiMain.
                 ltac:(intros _ i Hi; exfalso; lia) ltac:(lia)
                 ltac:(symmetry; exact Hdn0)
                 ltac:(unfold wi_cost; lia) ltac:(lia) ltac:(apply uptd_ext_refl)
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hdevi
-                      Hdgeom Hdlock Hframe Hpark Hppid Hidev Hinum Hmeta
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hdevi
+                      Hdgeom Hdlock Hframe Hppid Hidev Hinum Hmeta
                       Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop [Hcont]").
       iApply (wp_next_shift (CIDa := CID) (CIDb := CIDz3) ltac:(wp_next_chain)
                 with "Hcont").
@@ -4005,8 +3993,8 @@ Section WriteiMain.
               ltac:(unfold wi_cost in Hcost; lia) ltac:(lia) ltac:(lia) ltac:(lia)
               HU3sp HU3s5 HU3s7 HU3s4 HU3s2 HU3s6 HU3s3 HU3s9 HU3s8 Hprkc
               with "Hcg Hcnt Htext Hpc Hpanic Hkdata Hprkenv Hbio Hlctx Hkenv
-                    Hprocs Hscheds
-                    Hdevi Hdgeom Hdlock Hframe Hpark Hppid Hidev Hinum
+                    Hprocs
+                    Hdevi Hdgeom Hdlock Hframe Hppid Hidev Hinum
                     Hmeta Hmap Hblocks Hsb Hba Hfsb Hsrc Hsl Hop Hcont").
   Qed.
 

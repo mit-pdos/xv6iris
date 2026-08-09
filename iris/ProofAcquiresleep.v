@@ -56,11 +56,10 @@
        [arm_pay 0 eb _], sleep carries it across the park and hands it
        back, and the final release(&slk->lk) spends it.  acquiresleep is
        therefore trap-CSR-balanced and its own contract does not mention them.
-     * the parked-scheduler record is NOT threaded here any more.  It lives in
-       the global [SchedCtx.scheds_inv]; what a sleeping thread carries is the
-       persistent [scheds_inv] plus the per-PROC receipt [running_claim j],
-       both HART-FREE.  acquiresleep never parks itself, so it does nothing
-       with them but frame them through into sleep and back out.
+     * the parked-scheduler record is NOT threaded here at all.  It lives in
+       the running proc's own [p->lock] ([SchedCtx.run_slot]), which sleep
+       reaches by holding that lock; acquiresleep never parks itself and so
+       never names it.
      * [panic_wp_any] is what acquire and sleep take; acquiresleep has no
        panic arm of its own after the park.
 
@@ -173,7 +172,6 @@ Section AslProps.
       sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
       slk ↦₄ (mword_of_int 0 : mword 32) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
@@ -195,7 +193,6 @@ Section AslProps.
       locked γl cpu_id -∗
       (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
       p_pid (proc_addr j) ↦₄{dq} pidv -∗
-      running_claim j -∗
       cpu_own 1 eb (proc_addr j) C false -∗
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
@@ -246,7 +243,6 @@ Section AslBodies.
     sl_pid slk ↦₄ (mword_of_int 0 : mword 32) -∗ R -∗
     slk ↦₄ (mword_of_int 0 : mword 32) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
@@ -261,13 +257,12 @@ Section AslBodies.
         sl_pid slk ↦₄ pidv -∗
         R -∗
         p_pid pj ↦₄{dq} pidv -∗
-        running_claim j -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Heb Hanch Hspd Hsp0 Hasl. subst eb.
     destruct Hasl as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
-    iIntros "#Htext #Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HR Hw Hpid Hpark Hown Hpay Hcg Hpc Hcont".
+    iIntros "#Htext #Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HR Hw Hpid Hown Hpay Hcg Hpc Hcont".
     (* the four saved-slot addresses, in the [c.ldsp] leaf's spelling *)
     assert (Hb1 : add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 1).
     { rewrite -Hspd. unfold pa_stk, add_vec_int. rewrite add_vec_off2.
@@ -538,7 +533,7 @@ Section AslBodies.
     iDestruct (cpu_own_transport CIDr CIDe6 0 true pj C true ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iSpecialize ("Hcont" $! CIDe6 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Q42 with "[%] Hcg Hown Hpc Hstok Hspid HR Hpid Hpark").
+    iApply ("Hcont" $! Q42 with "[%] Hcg Hown Hpc Hstok Hspid HR Hpid").
     { unfold callee_saved.
       split. { (* sp *) rewrite /Q42 upd_eq. rewrite Hwv. exact Hsp0. }
       split. { (* s0 *) rewrite /Q42 upd_ne; [| reg_neq]. rewrite /Q40 upd_ne; [| reg_neq]. rewrite /Q3e upd_ne; [| reg_neq]. rewrite /Q3c upd_eq. reflexivity. }
@@ -580,7 +575,6 @@ Section AslBodies.
     locked γl cpu_id -∗
     sl_res γsl slk R -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
@@ -592,7 +586,7 @@ Section AslBodies.
        [iNext] descends into [intr_handler_avail] and strips ITS later, after
        which the resource can no longer be folded back to [cpu_own]. *)
     intros pj Hav Heb Hanch Hasl.
-    iIntros "#Htext IH Hexit Hr24 Hr16 Hr8 Hr0 Htok HRc Hpid Hpark Hown Hpay Hcg Hpc".
+    iIntros "#Htext IH Hexit Hr24 Hr16 Hr8 Hr0 Htok HRc Hpid Hown Hpay Hcg Hpc".
     assert (HaslM : asl_regs m M slk spd) by exact Hasl.
     destruct Hasl as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iPoseProof (asl_24 with "Htext") as "Hi24".
@@ -631,7 +625,7 @@ Section AslBodies.
       iEval (rewrite Hvp0) in "Hwp".
       rewrite /asl_exit.
       iSpecialize ("Hexit" $! CID with "[%]"); [wp_next_chain|].
-      iApply ("Hexit" $! La5 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRu Hwp Hpid Hpark Hown Hpay Hcg Hpc").
+      iApply ("Hexit" $! La5 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRu Hwp Hpid Hown Hpay Hcg Hpc").
       exact HaslLa5.
     - (* HELD: vp <> 0 -> bnez TAKEN, back edge to +0x1c (the Löb IH).  Hand the
          loop resources -- INCLUDING the IH, which arrives under a [▷] -- to the
@@ -643,14 +637,14 @@ Section AslBodies.
                 La5 (av - 4)%nat false ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; rewrite HLa5_15; exact Hvph)
                 ltac:(vm_compute; reflexivity)
-                with "Hcg Hpc Hi26 [Hr24 Hr16 Hr8 Hr0 Htok Hpid Hpark Hown Hpay IH Hexit Hheldw]").
+                with "Hcg Hpc Hi26 [Hr24 Hr16 Hr8 Hr0 Htok Hpid Hown Hpay IH Hexit Hheldw]").
       iNext. iApply wp_next_off_intro. iIntros "Hcg Hpc".
       assert (Hbk : add_vec (mword_of_int (KernelSyms.acquiresleep + 0x26) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 251 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.acquiresleep + 0x1c))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hbk) in "Hpc".
       rewrite /asl_loop.
       iSpecialize ("IH" $! CID with "[%]"); [wp_next_chain|].
-      iApply ("IH" $! La5 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hheldw Hpid Hpark Hown Hpay Hcg Hpc Hexit").
+      iApply ("IH" $! La5 with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hheldw Hpid Hown Hpay Hcg Hpc Hexit").
       exact HaslLa5.
   Qed.
 
@@ -671,7 +665,6 @@ Section AslBodies.
     is_sleeplock γl γsl slk s R -∗
     panic_wp_any -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     ▷ asl_loop CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
@@ -680,7 +673,6 @@ Section AslBodies.
     locked γl cpu_id -∗
     (∃ v : mword 32, slk ↦₄ v ∗ ⌜neq_vec (sign_extend' 64 v) zero_reg = true⌝) -∗
     p_pid pj ↦₄{dq} pidv -∗
-    running_claim j -∗
     cpu_own 1 eb pj C false -∗
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
@@ -689,7 +681,7 @@ Section AslBodies.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Heb Hj Hjpl Hanch Hasl.
-    iIntros "#Htext #Hslk #Hpanic #Hpinv #Hscheds IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hpark Hown Hpay Hcg Hpc Hexit".
+    iIntros "#Htext #Hslk #Hpanic #Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Hpay Hcg Hpc Hexit".
     assert (HaslM : asl_regs m M slk spd) by exact Hasl.
     destruct Hasl as (Hs1 & Hs2 & Hsp & H19 & H20 & H21 & H22 & H23 & H24 & H25 & H26 & H27).
     iDestruct "Hheld" as (vh) "[Hw %Hvh]".
@@ -748,11 +740,11 @@ Section AslBodies.
     iApply (Sleep.wp_sleep_sconf γs j γpl γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) L2 (av - 4)%nat eb C
               Hj Hjpl Hsl_lka Heb
               ltac:(lia)
-              with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds [] Htok HRc Hpanic Hpark [-]").
+              with "Hcg Hown Hpay Htext Hpc Hpinv [] Htok HRc Hpanic [-]").
     { iApply (is_sleeplock_lock with "Hslk"). }
     (* SLEEP RETURNS ON HART [CIDs].  Everything after the park runs there,
        inside [asl_post_sleep_body] at [(CID := CIDs)]. *)
-    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok HRc Hpark".
+    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok HRc".
     assert (Hpc24 : ret_pc (L2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.acquiresleep + 0x24)) by (rewrite HL2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc24) in "Hpc".
@@ -760,7 +752,7 @@ Section AslBodies.
       by (apply (asl_regs_cs m L2 mfs slk spd Hs_cs HaslL2)).
     iApply (asl_post_sleep_body (CID := CIDs) CID0 γs j γl γsl R m mfs pidv av dq slk spd sp0 eb C
               Hav Heb ltac:(wp_next_chain) HaslMfs
-              with "Htext IH Hexit Hr24 Hr16 Hr8 Hr0 Htok HRc Hpid Hpark Hown Hpay Hcg Hpc").
+              with "Htext IH Hexit Hr24 Hr16 Hr8 Hr0 Htok HRc Hpid Hown Hpay Hcg Hpc").
   Qed.
 
 End AslBodies.
@@ -782,7 +774,7 @@ Section ProofAcquiresleep.
     intros pcE slk pj ret_tgt Hj Hav Heb.
     set (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
-    iIntros "Hcg Hown #Htext Hpc #Hslk #Hpanic Hpid #Hpinv #Hscheds Hpark Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hslk #Hpanic Hpid #Hpinv Hcont".
     (* LEVEL 0 WITH AN ENABLED BASE FORCES THE ENABLED INDEX: the [b = false]
        instance of this contract is vacuous, and pinning [b] here is what makes
        every crossing in the function speak the same index (sleep's and
@@ -984,18 +976,18 @@ Section ProofAcquiresleep.
     (* ============ the anchored EXIT continuation (+0x28 -> ret) ============ *)
     iAssert (asl_exit CID γs j γl γsl R m pidv av dq slk spd sp0 eb C) with "[Hcont]" as "Hexit".
     { rewrite /asl_exit.
-      iIntros (CIDx Hsx M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hpark Hown Hpay Hcg Hpc".
+      iIntros (CIDx Hsx M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hown Hpay Hcg Hpc".
       iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R m M pidv av dq slk spd sp0 eb C
                 Hav Heb Hsx Hspd Hsp0 HaslE
-                with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hpark Hown Hpay Hcg Hpc Hcont"). }
+                with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hown Hpay Hcg Hpc Hcont"). }
 
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ============ *)
     iAssert (asl_loop CID γs j γl γsl R m pidv av dq slk spd sp0 eb C) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /asl_loop.
-      iIntros (CIDy Hsy M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hpark Hown Hpay Hcg Hpc Hexit".
+      iIntros (CIDy Hsy M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Hpay Hcg Hpc Hexit".
       iApply (asl_loop_body (CID := CIDy) CID γs j γpl γl γsl s R m M pidv av dq slk spd sp0 eb C
                 Hav Heb Hj Hjpl Hsy HaslL
-                with "Htext Hslk Hpanic Hpinv Hscheds IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hpark Hown Hpay Hcg Hpc Hexit"). }
+                with "Htext Hslk Hpanic Hpinv IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hown Hpay Hcg Hpc Hexit"). }
 
     (* ============ entry dispatch at +0x18 (lw then c.beqz) ============ *)
     pose proof Hasl_acq as HaslAcqW.
@@ -1036,7 +1028,7 @@ Section ProofAcquiresleep.
       iEval (rewrite Hv00) in "Hw0".
       rewrite /asl_exit.
       iSpecialize ("Hexit" $! CID11 with "[%]"); [wp_next_chain|].
-      iApply ("Hexit" $! Me with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRu Hw0 Hpid Hpark Hown Hpay Hcg Hpc").
+      iApply ("Hexit" $! Me with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRu Hw0 Hpid Hown Hpay Hcg Hpc").
       exact HaslMe.
     - (* HELD at entry: v0 <> 0 -> c.beqz falls through -> +0x1c (the loop) *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.acquiresleep + 0x1a)) (mword_of_int 7 : mword 8) (Cregidx (mword_of_int 7)) (mword_of_int 15 : mword 5)
@@ -1051,7 +1043,7 @@ Section ProofAcquiresleep.
       { iExists v0. iFrame "Hw0". iPureIntro. exact Hv0h. }
       rewrite /asl_loop.
       iSpecialize ("Hloop" $! CID11 with "[%]"); [wp_next_chain|].
-      iApply ("Hloop" $! Me with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hheldw Hpid Hpark Hown Hpay Hcg Hpc Hexit").
+      iApply ("Hloop" $! Me with "[%] Hr24 Hr16 Hr8 Hr0 Htok Hheldw Hpid Hown Hpay Hcg Hpc Hexit").
       exact HaslMe.
   Qed.
 

@@ -118,6 +118,13 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      stash is about the wrong hart's ghost). *)
   cpu_own 1 eb pj emp false -∗
   own_ctx (p_context pj) -∗
+  (* THE HART TAG, WHOLE.  The parking thread merged the slot's half with its
+     own claim's half at [SchedCtx.proc_slots_running], and the reclaiming
+     scheduler needs the whole tag to close the parked slot's [not_running]
+     guard.  It comes back whole on the dispatch side, at the RESUMING hart,
+     which is what lets the resumed thread rebuild [run_slot] and its own
+     [cpu_claim] out of one resource. *)
+  hart_full j cpu_id -∗
   ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (ch' : mword 64),
@@ -129,6 +136,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       intr_handler_avail -∗
       cpu_own 1 eb pj emp false -∗
       own_ctx (p_context pj) -∗
+      hart_full j cpu_id -∗
       ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).

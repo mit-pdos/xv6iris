@@ -570,11 +570,10 @@ Section ProofMainSecondary.
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
     dev_inv γd γv -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hsched".
+    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv".
     iPoseProof (mni_32 with "Htext") as "Hi32".
     iPoseProof (mni_36 with "Htext") as "Hi36".
     iPoseProof (mni_3a with "Htext") as "Hi3a".
@@ -678,7 +677,7 @@ Section ProofMainSecondary.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
     iApply (Scheduler.wp_scheduler_sconf γs Q4 n p0 Hp0 ltac:(lia)
-              with "Hcg Hcpu Htext Hpc Hpinv Hsched Hpanic Htcsr Hintr").
+              with "Hcg Hcpu Htext Hpc Hpinv Hpanic Htcsr Hintr").
   Qed.
 
   (* =================================================================== *)
@@ -705,7 +704,7 @@ Section ProofMainSecondary.
     iApply (ms_spin γd γv m1 (K - 2)%nat p0 Ha4 with "Hcg Htext Hpc Hsinv").
     iIntros (m2) "Hcg Hpc #Hdep".
     iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
-      "(#Hpenv & #Hpinv & #Hsched & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
+      "(#Hpenv & #Hpinv & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
     iPoseProof "Hpenv" as "Hpenv2".
     iDestruct "Hpenv2" as "(_ & _ & #Hdev & _)".
     iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
@@ -713,7 +712,7 @@ Section ProofMainSecondary.
     iIntros (m3) "Hcg Hpc Hcpu".
     iApply (ms_inithart_sched γd γv γs m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hp0
-              with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv Hsched").
+              with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv").
   Qed.
 
 End ProofMainSecondary.

@@ -212,13 +212,12 @@ Record riscvEraGS := RiscvEraGS {
      a pair only because [sieG]'s [ghost_varG (mword 1)] then serves both
      with no new class. *)
   era_spie_name : CPU -> gname;
-  (* THE PARK RECEIPT, CANONICALLY per proc slot.  One [ghost_var bool] per
-     entry of the proc[] array, recording whether hart-h's parked scheduler
-     record is RESIDENT in the global [SchedCtx.scheds_inv] slot of the hart
-     that is running that proc ([true]) or CHECKED OUT by the running thread
-     ([false]).  Two halves: one in the invariant, one with the thread --
-     and while the proc is not RUNNING both sit in its [p->lock]
-     ([SchedCtx.proc_slots]).
+  (* THE HART TAG, CANONICALLY per proc slot.  One [ghost_var CPU] per entry
+     of the proc[] array, naming the hart that a RUNNING proc is running on.
+     Two halves: while the proc is RUNNING one sits in its [p->lock]'s
+     running arm ([SchedCtx.run_slot]) and the other rides the running
+     thread's [IntrDefs.cpu_claim]; otherwise both sit whole in the lock
+     ([SchedCtx.proc_slots]) and the value is meaningless.
 
      KEYED BY THE PROC, NOT BY THE HART: that is what makes the entitlement
      HART-FREE, so a thread carries it across a migration as a plain frame
@@ -297,7 +296,7 @@ Class riscvFixedGS (Σ : gFunctors) := RiscvFixedGS {
   riscvF_kmapGS :: @ghost_mapG Σ (SailStdpp.Values.mword 27) (SailStdpp.Values.mword 44 * kperm)
                     (@SailStdpp.Instances.Decidable_eq_mword 27) (@SailStdpp.Instances.Countable_mword 27);
   riscvF_kptGS :: inG Σ kptR;
-  riscvF_parkGS :: ghost_varG Σ bool;
+  riscvF_parkGS :: ghost_varG Σ CPU;
   (* the per-proc state mirror's typing (the NAME is per-era, above).  A
      [mword 32] instance of its own -- no other ghost_var in the record
      carries one, so nothing else can be confused with it. *)
@@ -402,7 +401,7 @@ Definition riscv_kmapGS `{!riscvGS Σ} :
     (@SailStdpp.Instances.Decidable_eq_mword 27)
     (@SailStdpp.Instances.Countable_mword 27) := riscvF_kmapGS.
 Definition riscv_kptGS `{!riscvGS Σ} : inG Σ kptR := riscvF_kptGS.
-Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ bool := riscvF_parkGS.
+Definition riscv_parkGS `{!riscvGS Σ} : ghost_varG Σ CPU := riscvF_parkGS.
 Definition riscv_pstateGS `{!riscvGS Σ} : ghost_varG Σ (SailStdpp.Values.mword 32) :=
   riscvF_pstateGS.
 Definition era_memGS_of `{!riscvFixedGS Σ} (E : riscvEraGS) : gen_heapGS Arch.pa (bv 8) Σ :=

@@ -101,11 +101,6 @@ Section SpecMainSecondary.
        (root : mword 44) (pas : nat -> mword 44),
        printk_env γpr γd γv ∗
        procs_inv γs ∗
-       (* the global parked-scheduler invariant: persistent and hart-free,
-          so it rides the one-shot [started] escrow exactly as [procs_inv]
-          does -- and a secondary hart's scheduler() needs it for its two
-          [c->proc] stores. *)
-       scheds_inv γs ∗
        is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
        disk_geom γv pd pav pu ∗
        kpt_inv root ∗

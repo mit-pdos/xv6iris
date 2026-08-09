@@ -325,8 +325,7 @@ Section ProofFileread.
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb.
     unfold fileread_stack in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs #Hscheds
-             Hpark Henv Hcont".
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic Href Hpriv Hkenv #Hprocs Henv Hcont".
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.
     (* the reference, taken apart: the four content cells the dispatch reads
        are fractions of it, and it is rebuilt unchanged at every exit. *)
@@ -549,7 +548,7 @@ Section ProofFileread.
       assert (HVid : upd_upt V (pv_upt V) = V) by apply fr_upd_upt_id.
       iApply ("Hcont" $! mf (mword_of_int (-1)) (pv_upt V)
                 with "[%] [%] [%] [%] Hcg Hcnt [Hpc] [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                      [Hpriv] Hpark [Henv]").
+                      [Hpriv] [Henv]").
       { exact Hcsf. }
       { apply uptd_ext_refl. }
       { apply fileread_ret_m1. }
@@ -811,10 +810,9 @@ Section ProofFileread.
         iApply (Piperead.wp_piperead_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q Q2 (K - 6)%nat eb C pidv V n b
                   Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
-                  with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hscheds Hpanic
-                        Hpark [-]").
+                  with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hpanic [-]").
         { iEval (rewrite HQ2a0). iExact "Hpipe". }
-        iIntros (CIDpr Hspr mf P') "%Hcspr %Hupt %Hretpr Hcg Hcnt Hpc Hpref Hpriv Hpark".
+        iIntros (CIDpr Hspr mf P') "%Hcspr %Hupt %Hretpr Hcg Hcnt Hpc Hpref Hpriv".
         assert (Hpc6a : ret_pc (Q2 !!! Regidx Rra) = mword_of_int (FR + 0x6a)).
         { rewrite HQ2ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc6a) in "Hpc".
@@ -892,7 +890,7 @@ Section ProofFileread.
         iApply ("Hcont" $! mfin (mf !!! Regidx Ra0) P'
                   with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                         [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hpn Hpref Hrlv]
-                        Hpriv Hpark [Henv]").
+                        Hpriv [Henv]").
         { exact Hcsf. }
         { exact Hupt. }
         { exact Hretpr. }
@@ -1283,7 +1281,7 @@ Section ProofFileread.
                 iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V)
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                [Hpriv] Hpark [Hslot]").
+                                [Hpriv] [Hslot]").
                 { exact Hcsf. }
                 { apply uptd_ext_refl. }
                 { apply fileread_ret_m1. }
@@ -1366,10 +1364,9 @@ Section ProofFileread.
                           E2 (K - 6)%nat eb C pidv V n b
                           Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
                           (fr_av_cons K HK) Heb
-                          with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hprocs Hscheds Hpanic
-                                Hpark [-]").
+                          with "Hcg Hcnt Htext Hpc Hpriv Hkenv Hprocs Hpanic [-]").
                 iIntros (CIDcr Hscr mf r P') "%Hcscr %Hupt %Hrr %Hra0 Hcg Hcnt Hpc
-                                              Hpriv Hpark".
+                                              Hpriv".
                 assert (Hpc96 : ret_pc (E2 !!! Regidx Rra) = mword_of_int (FR + 0x96)).
                 { rewrite HE2ra. apply bv_eq; vm_compute; reflexivity. }
                 iEval (rewrite Hpc96) in "Hpc".
@@ -1447,7 +1444,7 @@ Section ProofFileread.
                 iApply ("Hcont" $! mfin (mword_of_int r) P'
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                Hpriv Hpark [Hslot]").
+                                Hpriv [Hslot]").
                 { exact Hcsf. }
                 { exact Hupt. }
                 { exact (fr_ret_of_cons n r Hn0 Hrr). }
@@ -1518,7 +1515,7 @@ Section ProofFileread.
              iApply ("Hcont" $! mfin (mword_of_int (-1)) (pv_upt V)
                        with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                              [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                             [Hpriv] Hpark [Henv]").
+                             [Hpriv] [Henv]").
              { exact Hcsf. }
              { apply uptd_ext_refl. }
              { apply fileread_ret_m1. }
@@ -1693,9 +1690,9 @@ Section ProofFileread.
                        (fr_av_ilock K HK) Hlg Hist Hibcov Hdibwf Hvvag Hj Hgs
                        HI2a0 Hipnz Hrefp Heb
                        with "Hcg Hcnt Htext Hpc Hpanic Hbio Hslk Hkey Hidev Hinum
-                             Hrefc Hsb Hfsb Hppid Hprocs Hscheds Hpark
+                             Hrefc Hsb Hfsb Hppid Hprocs
                              Hdevi Hdgeom Hdlock Hbslot [-]").
-             iIntros (CIDil Hsil mil) "%Hcsil Hcg Hcnt Hpc Hpark Hppid Hidev
+             iIntros (CIDil Hsil mil) "%Hcsil Hcg Hcnt Hpc Hppid Hidev
                                        Hinum Hrefc Hsb Hfsb Hbslot Hheld Hslpid Hlocked".
              iDestruct ("Hpivbk" with "Hppid") as "Hpriv".
              assert (Hpc34 : ret_pc (I2 !!! Regidx Rra) = mword_of_int (FR + 0x34)).
@@ -1881,10 +1878,9 @@ Section ProofFileread.
                        (fr_av_readi K HK) Hlg Hbmwf Hbmcov Hszb Hjoint Hj Hgs
                        HJ6a0 ltac:(rewrite HJ6a1; by vm_compute) HJ6a3 HJ6a4 Heb
                        with "Hcg Hcnt Htext Hpc Hpanic Hbio Hkenv Hidev Hmeta Hmap
-                             Hblocks Hpriv Hprocs Hscheds Hpark Hdevi Hdgeom
+                             Hblocks Hpriv Hprocs Hdevi Hdgeom
                              Hdlock Hbslot [-]").
-             iIntros (CIDrd Hsrd mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt Hpc
-                                              Hpark Hidev Hmeta Hmap Hblocks
+             iIntros (CIDrd Hsrd mrd tot P') "%Hcsrd %Hupt %Htotcl %Hrdret Hcg Hcnt Hpc Hidev Hmeta Hmap Hblocks
                                               Hpriv Hbslot".
              iPoseProof (fri_42 with "Htext") as "Hi42".
              iPoseProof (fri_44 with "Htext") as "Hi44".
@@ -2089,7 +2085,7 @@ Section ProofFileread.
                 iApply ("Hcont" $! mfin (mrd !!! Regidx Ra0) P'
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                Hpriv Hpark
+                                Hpriv
                                 [Hkeyout Hidev Hinum Hrefc Hsb Hfsb Hbslot]").
                 { exact Hcsf. }
                 { exact Hupt. }
@@ -2339,7 +2335,7 @@ Section ProofFileread.
                 iApply ("Hcont" $! mfin (mword_of_int (Z.of_nat tot)) P'
                           with "[%] [%] [%] [%] Hcg Hcnt [Hpc]
                                 [Hrtok Hcty Hcrd Hcwr Hcpp Hcip Hcmaj Hrpay Hrlv]
-                                Hpriv Hpark
+                                Hpriv
                                 [Hkeyout Hidev Hinum Hrefc Hsb Hfsb Hbslot]").
                 { exact Hcsf. }
                 { exact Hupt. }

@@ -178,8 +178,6 @@ Definition wp_ilock_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
   procs_inv gs -∗
-  scheds_inv gs -∗
-  running_claim j -∗
   (* the disk fabric *)
   dev_inv gu gd -∗
   disk_geom gd pd pav pu -∗
@@ -192,7 +190,6 @@ Definition wp_ilock_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗

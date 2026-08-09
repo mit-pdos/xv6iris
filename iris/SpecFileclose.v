@@ -211,7 +211,7 @@ Section SpecFileclose.
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
      ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
-     procs_inv (fcn_procs fn) ∗ scheds_inv (fcn_procs fn) ∗
+     procs_inv (fcn_procs fn) ∗
      bio_ctx (fcn_bio fn)
        (fs_view (fcn_fs fn) (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
      log_ctx (fcn_log fn) (fcn_bio fn) (fcn_fs fn) (fcn_cov fn)
@@ -222,7 +222,6 @@ Section SpecFileclose.
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      bslots (fcn_bio fn) 3 ∗
-     running_claim (fcn_j fn) ∗
      p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn)%I.
 
   (* the same bundle WITHOUT the caller's pid cell.  kexit closes every
@@ -236,7 +235,7 @@ Section SpecFileclose.
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
      ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
      ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
-     procs_inv (fcn_procs fn) ∗ scheds_inv (fcn_procs fn) ∗
+     procs_inv (fcn_procs fn) ∗
      bio_ctx (fcn_bio fn)
        (fs_view (fcn_fs fn) (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
      log_ctx (fcn_log fn) (fcn_bio fn) (fcn_fs fn) (fcn_cov fn)
@@ -246,8 +245,7 @@ Section SpecFileclose.
      disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
-     bslots (fcn_bio fn) 3 ∗
-     running_claim (fcn_j fn))%I.
+     bslots (fcn_bio fn) 3)%I.
 
   Lemma fileclose_fs_env_split_pid fn n eb p :
     fileclose_fs_env fn n eb p ⊣⊢
@@ -262,9 +260,9 @@ Section SpecFileclose.
          the whole structural [iSplitL] chain below it). Naming it and
          routing it with [iSplitL] is a positional split, not a search --
          O(1) instead of O(#conjuncts). *)
-      iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
-                Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark & Hpid)".
-      iSplitL "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark";
+      iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hbio & Hlog &
+                Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpid)".
+      iSplitL "Hpr Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs";
         [| iExact "Hpid"].
       do 6 (iSplitR; [iPureIntro; assumption|]).
       (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
@@ -272,7 +270,6 @@ Section SpecFileclose.
          ~7 s a side here); [iSplitL]/[iExact] name both sides, so nothing
          is searched. *)
       iSplitL "Hpr"; [iExact "Hpr"|].
-      iSplitL "Hsc"; [iExact "Hsc"|].
       iSplitL "Hbio"; [iExact "Hbio"|].
       iSplitL "Hlog"; [iExact "Hlog"|].
       iSplitL "Hseam"; [iExact "Hseam"|].
@@ -280,16 +277,14 @@ Section SpecFileclose.
       iSplitL "Hdev"; [iExact "Hdev"|].
       iSplitL "Hgeom"; [iExact "Hgeom"|].
       iSplitL "Hdlk"; [iExact "Hdlk"|].
-      iSplitL "Hbs"; [iExact "Hbs"|].
-      iExact "Hpark".
+      iExact "Hbs".
     - (* Same fix, mirrored: name [p_pid] instead of destructuring it with
          [$], and place it with the same structural chain -- the [$] here
          searched the 17-conjunct [fileclose_fs_env] goal instead, ~11 s. *)
-      iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
-                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark) Hpid]".
+      iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hbio & Hlog &
+                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs) Hpid]".
       do 6 (iSplitR; [iPureIntro; assumption|]).
       iSplitL "Hpr"; [iExact "Hpr"|].
-      iSplitL "Hsc"; [iExact "Hsc"|].
       iSplitL "Hbio"; [iExact "Hbio"|].
       iSplitL "Hlog"; [iExact "Hlog"|].
       iSplitL "Hseam"; [iExact "Hseam"|].
@@ -298,12 +293,11 @@ Section SpecFileclose.
       iSplitL "Hgeom"; [iExact "Hgeom"|].
       iSplitL "Hdlk"; [iExact "Hdlk"|].
       iSplitL "Hbs"; [iExact "Hbs"|].
-      iSplitL "Hpark"; [iExact "Hpark"|iExact "Hpid"].
+      iExact "Hpid".
   Qed.
 
   Definition fileclose_fs_out (fn : fclose_names) : iProp Σ :=
-    (running_claim (fcn_j fn) ∗
-     p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn ∗
+    (p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn ∗
      bslots (fcn_bio fn) 3)%I.
 
   (* ---- and the two, selected by the file's type ---- *)
@@ -353,9 +347,9 @@ Section SpecFileclose.
     fileclose_fs_env fn n eb p -∗ fileclose_fs_out fn.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              Hbs & Hpark & Hpid)".
-    iFrame "Hpark Hpid Hbs".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+              Hbs & Hpid)".
+    iFrame "Hpid Hbs".
   Qed.
 
   (* THE FAST PATH'S OBLIGATION, checked here rather than discovered in the
@@ -405,14 +399,13 @@ Section SpecFileclose.
     □ (fileclose_fs_out fn -∗ fileclose_fs_env fn n eb p).
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_out.
-    iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & #Hpr & #Hsc & #Hbio & #Hlog &
-              #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & Hpark & Hpid)".
-    iSplitL "Hbs Hpark Hpid".
+    iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & #Hpr & #Hbio & #Hlog &
+              #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & Hpid)".
+    iSplitL "Hbs Hpid".
     { do 6 (iSplitR; [iPureIntro; assumption|]).
       (* Same structural split as [fileclose_fs_env_split_pid]: a named
          [iFrame] over this 12-conjunct goal measured ~13.5 s a side. *)
       iSplitL "Hpr"; [iExact "Hpr"|].
-      iSplitL "Hsc"; [iExact "Hsc"|].
       iSplitL "Hbio"; [iExact "Hbio"|].
       iSplitL "Hlog"; [iExact "Hlog"|].
       iSplitL "Hseam"; [iExact "Hseam"|].
@@ -421,12 +414,10 @@ Section SpecFileclose.
       iSplitL "Hgeom"; [iExact "Hgeom"|].
       iSplitL "Hdlk"; [iExact "Hdlk"|].
       iSplitL "Hbs"; [iExact "Hbs"|].
-      iSplitL "Hpark"; [iExact "Hpark"|].
       iExact "Hpid". }
-    iModIntro. iIntros "(Hpark & Hpid & Hbs)".
+    iModIntro. iIntros "(Hpid & Hbs)".
     do 6 (iSplitR; [iPureIntro; assumption|]).
     iSplitL "Hpr"; [iExact "Hpr"|].
-    iSplitL "Hsc"; [iExact "Hsc"|].
     iSplitL "Hbio"; [iExact "Hbio"|].
     iSplitL "Hlog"; [iExact "Hlog"|].
     iSplitL "Hseam"; [iExact "Hseam"|].
@@ -435,7 +426,6 @@ Section SpecFileclose.
     iSplitL "Hgeom"; [iExact "Hgeom"|].
     iSplitL "Hdlk"; [iExact "Hdlk"|].
     iSplitL "Hbs"; [iExact "Hbs"|].
-    iSplitL "Hpark"; [iExact "Hpark"|].
     iExact "Hpid".
   Qed.
 

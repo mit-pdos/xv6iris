@@ -22,10 +22,11 @@
    USER memory by the running thread.  So this contract is stated in
    [SpecPiperead.v]'s shape, conjunct for conjunct, minus the pipe:
 
-   * it SLEEPS, so it threads the full running-thread bundle
-     ([procs_inv]/[scheds_inv]/[own_ctx]/[park_hlf]) and takes the
-     hart-generic parking premise [eb = true] at [noff = 0] -- cons.lock is
-     the only lock it holds and sleep demands that;
+   * it SLEEPS, so it threads the running-thread bundle ([procs_inv]) and
+     takes the hart-generic parking premise [eb = true] at [noff = 0] --
+     cons.lock is the only lock it holds and sleep demands that.  The parked
+     scheduler record is NOT threaded: it lives in the running proc's own
+     [p->lock] ([SchedCtx.run_slot]), which sleep reaches by holding it;
    * it copies out, so it takes [proc_priv] and [kalloc_env] (copyout reaches
      vmfault, hence kalloc) and gives the block back at an EXTENDED page
      table ([uptd_ext]), exactly as readi's user arm does;
@@ -109,9 +110,7 @@ Definition wp_consoleread_sconf_body
   proc_priv γf pj pid V -∗
   kalloc_env γa None -∗
   procs_inv γs -∗
-  scheds_inv γs -∗
   panic_wp_any -∗
-  running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : Z) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -124,7 +123,6 @@ Definition wp_consoleread_sconf_body
       cpu_own 0%nat eb pj C b -∗
       pc_is ret_tgt -∗
       proc_priv γf pj pid (upd_upt V P') -∗
-      running_claim j -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

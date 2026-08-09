@@ -359,8 +359,6 @@ Definition wp_writei_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
-  scheds_inv γs -∗
-  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -420,7 +418,6 @@ Definition wp_writei_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       i_dev ip ↦₄{dqd} dev -∗
       i_inum ip ↦₄{dqn} inum -∗

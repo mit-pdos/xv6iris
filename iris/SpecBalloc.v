@@ -92,11 +92,11 @@
    free block": the premise makes the arm unreachable, so it is refuted
    rather than proved.
 
-   balloc SLEEPS (it breads), so it threads the full running-process
-   bundle exactly as SpecBread.v does: procs_inv / scheds_inv / own_ctx /
-   park_hlf / p_pid, the disk fabric (dev_inv / disk_geom / the
-   virtio_disk lock), and the parking premise eb = true.  It enters and
-   returns at noff 0. *)
+   balloc SLEEPS (it breads), so it threads the running-process bundle
+   exactly as SpecBread.v does: procs_inv / p_pid, the disk fabric
+   (dev_inv / disk_geom / the virtio_disk lock), and the parking premise
+   eb = true.  It enters and returns at noff 0.  The parked scheduler record
+   is not threaded -- it lives in the running proc's own [p->lock]. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -201,8 +201,6 @@ Definition wp_balloc_sconf_body
   bitmap_res γfs bmapstart cov logstart size used -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
-  scheds_inv γs -∗
-  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -219,7 +217,6 @@ Definition wp_balloc_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       sb_size ↦₄{dqs} (mword_of_int size : mword 32) -∗
       sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗

@@ -100,7 +100,6 @@ Section ItruncCont.
         sie_cap_gpr mf K b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         i_inum ip ↦₄{dqn} inum -∗
@@ -203,9 +202,7 @@ Section ItruncTail.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
     it_frame m -∗
-    running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     i_inum ip ↦₄{dqn} inum -∗
@@ -227,8 +224,7 @@ Section ItruncTail.
   Proof.
     intros HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl Hsp Hthr Hs3.
     pose proof HK as HK'. unfold K_itrunc in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs #Hscheds Hframe
-              Hrun Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
               Hfsb #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
     iPoseProof (iti_38 with "Htext") as "Hi38".
     iPoseProof (iti_3c with "Htext") as "Hi3c".
@@ -323,9 +319,9 @@ Section ItruncTail.
               HKiu Hgeom Hist Hicov Hilog Hdswf (di_trunc_addrs dn) Hdirlen
               Hj Hgl HT1a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hidev Hinum Hmeta Hmap
-                    Hsbi Hfsb Hppid Hprocs Hscheds Hrun Hdevi Hdgeom
+                    Hsbi Hfsb Hppid Hprocs Hdevi Hdgeom
                     Hdlock Hsl Hop").
-    iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hpc Hrun Hppid Hidev Hinum
+    iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsbi Hfsb Hsl Hop".
     assert (Hpc42 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x42)) by (rewrite HT1ra; pcw).
@@ -584,7 +580,7 @@ Section ItruncTail.
     assert (Cs11 : P6 !!! Regidx (mword_of_int 27 : mword 5)
                    = (m !!! Regidx (mword_of_int 27 : mword 5) : mword 64))
       by (apply Hfin; itidx).
-    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hrun Hppid Hidev Hinum
+    iApply ("Hcont" $! P6 with "[%] Hcg Hcnt Hpc Hppid Hidev Hinum
                                  Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb [Hsl Hslp]
                                  [Hop]").
     { unfold callee_saved. split_and!; assumption. }
@@ -623,7 +619,6 @@ Section ItruncDLoop.
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (mword_of_int (IT + 0x32) : mword 64) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -670,8 +665,6 @@ Section ItruncDLoop.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim jx -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -695,7 +688,7 @@ Section ItruncDLoop.
     induction fuel as [|fuel IH];
       intros CID0 k M Hk Hfuel Hsp Hthr Hs1 Hs2 Hs3;
       [ exfalso; unfold NDIRECT in Hk, Hfuel; lia |].
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs #Hscheds Hrun Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hst Hexit".
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hst Hexit".
     pose proof HK as HK'. unfold K_itrunc in HK'.
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hzlen : length (bm_dir (bm_dir_zeroed bm k)) = NDIRECT)
@@ -827,7 +820,7 @@ Section ItruncDLoop.
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hexit" $! CID4 with "[%]"); [wp_next_chain|].
         rewrite Hlast.
-        iApply ("Hexit" $! L1 with "[%] [%] [%] Hcg Hcnt Hpc Hrun Hppid
+        iApply ("Hexit" $! L1 with "[%] [%] [%] Hcg Hcnt Hpc Hppid
                                     Hidev Hsbb Hsl Hst");
           [exact HL1sp | exact HL1thr | exact HL1s3].
       + (* more entries to go: round again *)
@@ -855,8 +848,7 @@ Section ItruncDLoop.
         iDestruct (cpu_own_transport CID0 CID4 0 true (proc_addr jx) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iApply (IH CID4 (S k) L1 Hk' Hf' HL1sp HL1thr HL1s1 HL1s2 HL1s3
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds
-                        Hrun Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hst Hexit").
     - (* ---------- FREE: the slot names a block ---------- *)
       iPoseProof (iti_24 with "Htext") as "Hi24".
@@ -988,9 +980,9 @@ Section ItruncDLoop.
                 (Hblen k ltac:(unfold MAXFILE, NDIRECT in *; lia))
                 Hcrin Hj Hgl HL3a0 HL3a1 eq_refl
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsbb [Hbmr] Hfsb Htok
-                      Hppid Hprocs Hscheds Hrun Hdevi Hdgeom Hdlock Hsl Hop").
+                      Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
       { iExact "Hbmr". }
-      iIntros (CID4 Hq4 mf) "%Hcs Hcg Hcnt Hpc Hrun Hppid Hsbb Hbmr
+      iIntros (CID4 Hq4 mf) "%Hcs Hcg Hcnt Hpc Hppid Hsbb Hbmr
                              Hsl Hop".
       assert (Hpc2c : ret_pc (L3 !!! Regidx Rra : mword 64)
                       = mword_of_int (IT + 0x2c)) by (rewrite HL3ra; pcw).
@@ -1113,7 +1105,7 @@ Section ItruncDLoop.
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CID8 with "[%]"); [wp_next_chain|].
         rewrite Hlast.
-        iApply ("Hexit" $! N1 with "[%] [%] [%] Hcg Hcnt Hpc Hrun Hppid
+        iApply ("Hexit" $! N1 with "[%] [%] [%] Hcg Hcnt Hpc Hppid
                                     Hidev Hsbb Hsl Hst");
           [exact HN1sp | exact HN1thr | exact HN1s3].
       + assert (Hne' : i_addr ip (S k) <> i_addr ip NDIRECT).
@@ -1137,8 +1129,7 @@ Section ItruncDLoop.
         iDestruct (wp_next_shift (CIDa := CID3) (CIDb := CID8)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CID8 (S k) N1 Hk'' Hf'' HN1sp HN1thr HN1s1 HN1s2 HN1s3
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds
-                        Hrun Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hst Hexit").
   Qed.
 
@@ -1172,7 +1163,6 @@ Section ItruncELoop.
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (mword_of_int (IT + 0x7a) : mword 64) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1222,8 +1212,6 @@ Section ItruncELoop.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim jx -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1242,7 +1230,7 @@ Section ItruncELoop.
     induction fuel as [|fuel IH];
       intros CID0 q M Hq Hfuel Hsp Hthr Hs1 Hs2 Hs3 Hs4;
       [ exfalso; unfold NINDIRECT in Hq, Hfuel; lia |].
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs #Hscheds Hrun Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hbuf Hst Hexit".
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hsl Hbuf Hst Hexit".
     pose proof HK as HK'. unfold K_itrunc in HK'.
     pose proof (blkmap_wf_ent_len _ _ _ Hwf) as Hentlen.
     iDestruct (it_ent_state_open with "Hst") as "(Hres & Hbmr & Hpaid)".
@@ -1378,7 +1366,7 @@ Section ItruncELoop.
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CIDb with "[%]"); [wp_next_chain|].
         rewrite Hlast.
-        iApply ("Hexit" $! E1 with "[%] [%] [%] [%] Hcg Hcnt Hpc Hrun
+        iApply ("Hexit" $! E1 with "[%] [%] [%] [%] Hcg Hcnt Hpc
                                     Hppid Hidev Hsbb Hsl Hbuf Hst");
           [exact HE1sp | exact HE1thr | exact HE1s3 | exact HE1s4].
       + assert (Hne : pa_add (b_data (bpa kk)) (4 * S q)%nat
@@ -1404,8 +1392,7 @@ Section ItruncELoop.
         iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDb)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CIDb (S q) E1 Hq'' Hf'' HE1sp HE1thr HE1s1 HE1s2 HE1s3 HE1s4
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds
-                        Hrun Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hbuf Hst Hexit").
 
     - (* ---------- FREE ---------- *)
@@ -1519,8 +1506,8 @@ Section ItruncELoop.
                                           lia))
                 Hcrin Hj Hgl HE3a0 HE3a1 eq_refl
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsbb Hbmr Hfsb Htok
-                      Hppid Hprocs Hscheds Hrun Hdevi Hdgeom Hdlock Hsl Hop").
-      iIntros (CIDf Hqf mfE) "%Hcs Hcg Hcnt Hpc Hrun Hppid Hsbb Hbmr
+                      Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
+      iIntros (CIDf Hqf mfE) "%Hcs Hcg Hcnt Hpc Hppid Hsbb Hbmr
                               Hsl Hop".
       assert (Hpc78 : ret_pc (E3 !!! Regidx Rra : mword 64)
                       = mword_of_int (IT + 0x78)) by (rewrite HE3ra; pcw).
@@ -1619,7 +1606,7 @@ Section ItruncELoop.
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iSpecialize ("Hexit" $! CIDr with "[%]"); [wp_next_chain|].
         rewrite Hlastf.
-        iApply ("Hexit" $! F1 with "[%] [%] [%] [%] Hcg Hcnt Hpc Hrun
+        iApply ("Hexit" $! F1 with "[%] [%] [%] [%] Hcg Hcnt Hpc
                                     Hppid Hidev Hsbb Hsl Hbuf Hst");
           [exact HF1sp | exact HF1thr | exact HF1s3 | exact HF1s4].
       + assert (Hnef : pa_add (b_data (bpa kk)) (4 * S q)%nat
@@ -1645,8 +1632,7 @@ Section ItruncELoop.
         iDestruct (wp_next_shift (CIDa := CIDz) (CIDb := CIDr)
                      ltac:(wp_next_chain) with "Hexit") as "Hexit".
         iApply (IH CIDr (S q) F1 Hqf'' Hff'' HF1sp HF1thr HF1s1 HF1s2 HF1s3 HF1s4
-                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds
-                        Hrun Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
+                  with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl
                         Hbuf Hst Hexit").
 
   Qed.
@@ -1678,7 +1664,6 @@ Section ItruncIArm.
         sie_cap_gpr Mx (K - 6)%nat b (proc_addr j) -∗
         cpu_own 0 true (proc_addr j) C b -∗
         pc_is (mword_of_int (IT + 0x38) : mword 64) -∗
-        running_claim j -∗
         p_pid (proc_addr j) ↦₄{dq} pidv -∗
         i_dev ip ↦₄{dqd} dev -∗
         sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1727,8 +1712,6 @@ Section ItruncIArm.
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
     procs_inv γs -∗
-    scheds_inv γs -∗
-    running_claim jx -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
     sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
@@ -1749,7 +1732,7 @@ Section ItruncIArm.
     intros HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hindnz Hj Hgl
            Hsp Hthr Hs3 Ha1.
     pose proof HK as HK'. unfold K_itrunc in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs #Hscheds Hrun Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hslot6 Hsl Hmap
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hppid Hidev Hsbb #Hdevi #Hdgeom #Hdlock Hslot6 Hsl Hmap
               Hres Hbmr Hpaid Hexit".
     iPoseProof (iti_50 with "Htext") as "Hi50".
     iPoseProof (iti_52 with "Htext") as "Hi52".
@@ -1884,8 +1867,8 @@ Section ItruncIArm.
                     change (2 ^ 31)%Z with 2147483648%Z in Hilt; exact Hilt)
               eq_refl Hicov32 eq_refl Hj Hgl
               HA1a0 HA1a1 eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hscheds Hrun Hdevi Hdgeom Hdlock Hsl1").
-    iIntros (CID4 Hq4 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc Hrun
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hdevi Hdgeom Hdlock Hsl1").
+    iIntros (CID4 Hq4 mB kk bs0 bsd0 d0) "%Hfacts Hcg Hcnt Hpc
                                           Hppid Hheld".
     destruct Hfacts as [Hcs1 HmBa0].
     assert (Hpc5a : ret_pc (A1 !!! Regidx Rra : mword 64)
@@ -2023,9 +2006,9 @@ Section ItruncIArm.
               Hkk Hj Hgl
               0%nat A4 ltac:(unfold NINDIRECT; lia) ltac:(lia)
               HA4sp HA4thr HA4s1 HA4s2 HA4s3 HA4s4
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hrun Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hbuf Hst [-]").
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hbuf Hst [-]").
     (* ===== the loop is done: +0x7a onwards ===== *)
-    iIntros (CID9 Hq9 Mx) "%HMxsp %HMxthr %HMxs3 %HMxs4 Hcg Hcnt Hpc Hrun
+    iIntros (CID9 Hq9 Mx) "%HMxsp %HMxthr %HMxs3 %HMxs4 Hcg Hcnt Hpc
                            Hppid Hidev Hsbb Hsl Hbuf Hst".
     iPoseProof (iti_7a with "Htext") as "Hi7a".
     iPoseProof (iti_7c with "Htext") as "Hi7c".
@@ -2229,8 +2212,8 @@ Section ItruncIArm.
               ltac:(rewrite ind_bytes_length Hentlen; reflexivity)
               Hcrin Hj Hgl HC2a0 HC2a1 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsbb Hbmr Hindblk
-                    Hindtok Hppid Hprocs Hscheds Hrun Hdevi Hdgeom Hdlock Hsl Hop").
-    iIntros (CID16 Hq16 mZ) "%Hcs3 Hcg Hcnt Hpc Hrun Hppid Hsbb Hbmr Hsl Hop".
+                    Hindtok Hppid Hprocs Hdevi Hdgeom Hdlock Hsl Hop").
+    iIntros (CID16 Hq16 mZ) "%Hcs3 Hcg Hcnt Hpc Hppid Hsbb Hbmr Hsl Hop".
     assert (Hpc8c : ret_pc (C2 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x8c)) by (rewrite HC2ra; pcw).
     iEval (rewrite Hpc8c) in "Hpc".
@@ -2343,7 +2326,7 @@ Section ItruncIArm.
     iAssert (bslots bn 3) with "[Hsl Hsl1]" as "Hsl3".
     { assert (H3 : (3 = 2 + 1)%nat) by lia.
       rewrite H3 bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hsl1"]. }
-    iApply ("Hexit" $! D0 with "[%] [%] [%] Hcg Hcnt Hpc Hrun Hppid Hidev Hsbb
+    iApply ("Hexit" $! D0 with "[%] [%] [%] Hcg Hcnt Hpc Hppid Hidev Hsbb
                                 [Hslot6] Hmap [] Hbmr Hsl3 Hpaid");
       [exact HD0sp | exact HD0thr | exact HD0s3
       | iExists _; iExact "Hslot6"
@@ -2382,7 +2365,7 @@ Section ItruncMain.
     subst eb.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx Hidev Hinum Hmeta Hmap
-              Hblks Hsbb Hsbi Hbmr Hfsb Hppid #Hprocs #Hscheds Hrun #Hdevi
+              Hblks Hsbb Hsbi Hbmr Hfsb Hppid #Hprocs #Hdevi
               #Hdgeom #Hdlock Hsl Hop Hcont".
     iPoseProof (iti_00 with "Htext") as "Hi00".
     iPoseProof (iti_02 with "Htext") as "Hi02".
@@ -2635,10 +2618,10 @@ Section ItruncMain.
               HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hj Hgl
               0%nat Q3 ltac:(unfold NDIRECT; lia) ltac:(lia)
               HQ3sp HQ3thr HQ3s1 HQ3s2 HQ3s3
-              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hrun
+              with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
                     Hppid Hidev Hsbb Hdevi Hdgeom Hdlock Hsl Hst [-]").
     (* ===== the direct loop is done: +0x32 onwards ===== *)
-    iIntros (CID12x Hq12x Mx) "%HMsp %HMthr %HMs3 Hcg Hcnt Hpc Hrun Hppid
+    iIntros (CID12x Hq12x Mx) "%HMsp %HMthr %HMs3 Hcg Hcnt Hpc Hppid
                                Hidev Hsbb Hsl Hst".
     iPoseProof (iti_32 with "Htext") as "Hi32".
     iPoseProof (iti_36 with "Htext") as "Hi36".
@@ -2734,8 +2717,8 @@ Section ItruncMain.
                 cov logstart bmapstart inodestart size dev used ip inum dn bm ds
                 n1 pidv dq dqd dqn dqb dqs m R0 K C b
                 HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl HR0sp HR0thr HR0s3
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds
-                      Hframe Hrun Hppid Hidev Hinum Hsbb Hsbi
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
+                      Hframe Hppid Hidev Hinum Hsbb Hsbi
                       Hmeta Hmap Hblks Hbmr Hfsb Hdevi Hdgeom Hdlock
                       [Hsl Hslp] Hop [Hcont]").
       { assert (H3b : (3 = 2 + 1)%nat) by lia.
@@ -2745,9 +2728,9 @@ Section ItruncMain.
       rewrite /it_cont.
       iIntros (CIDz) "%Hch". iSpecialize ("Hcont" $! CIDz with "[%]");
         [exact Hch|].
-      iIntros (mf) "%Hcs Hsie Hcnt Hpc Hrun Hppid Hidev Hinum Hsbb Hsbi
+      iIntros (mf) "%Hcs Hsie Hcnt Hpc Hppid Hidev Hinum Hsbb Hsbi
                     Hmeta Hmap Hblks Hbmr Hfsb Hsl Hop".
-      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hrun Hppid Hidev Hinum
+      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hppid Hidev Hinum
                                   Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hsl
                                   [Hop]");
         [exact Hcs | iExists n1; iSplitR; [iPureIntro; lia|]; iExact "Hop"].
@@ -2776,7 +2759,7 @@ Section ItruncMain.
                 pidv dq dqd dqb u m R0 K C b
                 HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hwf Hrange Hblen Hyesind
                 Hj Hgl HR0sp HR0thr HR0s3 HR0a1
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds Hrun
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
                       Hppid Hidev Hsbb Hdevi Hdgeom Hdlock [Hf6]
                       [Hsl Hslp] Hmap Hres0 Hbmr Hpaid [-]").
       { iExact "Hf6". }
@@ -2784,7 +2767,7 @@ Section ItruncMain.
         rewrite H3c bslots_op. iSplitL "Hsl"; [iExact "Hsl" | iExact "Hslp"]. }
       (* ===== the arm rejoins at +0x38: hand on to the tail ===== *)
       rewrite /it_armexit.
-      iIntros (CID15y Hq15y Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hpc Hrun Hppid
+      iIntros (CID15y Hq15y Mz) "%HMzsp %HMzthr %HMzs3 Hcg Hcnt Hpc Hppid
                                  Hidev Hsbb Hslot6 Hmap Hblks Hbmr Hsl Hpaid".
       iDestruct (bm_paid_elim with "Hpaid") as (n2) "(%Hn2 & Hop)".
       destruct n2 as [|n3]; [exfalso; lia|].
@@ -2794,17 +2777,17 @@ Section ItruncMain.
                 cov logstart bmapstart inodestart size dev used ip inum dn bm ds
                 n3 pidv dq dqd dqn dqb dqs m Mz K C b
                 HK Hgeom Hist Hicov Hilog Hdswf Hj Hgl HMzsp HMzthr HMzs3
-                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hscheds
-                      [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hrun Hppid Hidev Hinum Hsbb
+                with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
+                      [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hppid Hidev Hinum Hsbb
                       Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hdevi Hdgeom Hdlock
                       Hsl Hop [Hcont]").
       { rewrite /it_frame. iFrame "Hf1 Hf2 Hf3 Hf4 Hf5". iExact "Hslot6". }
       rewrite /it_cont.
       iIntros (CIDw) "%Hchw". iSpecialize ("Hcont" $! CIDw with "[%]");
         [exact Hchw|].
-      iIntros (mf) "%Hcsw Hsie Hcnt Hpc Hrun Hppid Hidev Hinum Hsbb Hsbi
+      iIntros (mf) "%Hcsw Hsie Hcnt Hpc Hppid Hidev Hinum Hsbb Hsbi
                     Hmeta Hmap Hblks Hbmr Hfsb Hsl Hop".
-      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hrun Hppid Hidev Hinum
+      iApply ("Hcont" $! mf with "[%] Hsie Hcnt Hpc Hppid Hidev Hinum
                                   Hsbb Hsbi Hmeta Hmap Hblks Hbmr Hfsb Hsl
                                   [Hop]");
         [exact Hcsw | iExists n3; iSplitR; [iPureIntro; lia|]; iExact "Hop"].

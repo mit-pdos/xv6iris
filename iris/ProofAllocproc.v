@@ -868,8 +868,6 @@ Section ProofAllocproc.
         iApply fupd_wp.
         iMod (pstate_whole_update (proc_addr k) UNUSED USED with "Hpg") as "Hpg".
         iModIntro.
-        iDestruct (park_at_full_elim k false Hk with "Hpark") as "Hpark".
-        rewrite park_split. iDestruct "Hpark" as "[Hparka Hparkb]".
         iDestruct (proc_dormant_unused γf (proc_addr k) with "Hdorm")
           as "(Hctx & Hpgcell & Htfcell & Hspare & Hrest)".
         iDestruct "Hrest" as (V pid0) "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles)".
@@ -1132,8 +1130,8 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa T2 k γl V pidn USED ch None None
                     (K - 4)%nat eb pme C (S lvl)
                     (ap_K44 K HK) (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hparka] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell] Henv [-]").
-          { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hparka".
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell] Henv [-]").
+          { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
@@ -1199,12 +1197,10 @@ Section ProofAllocproc.
             rewrite /T4 upd_ne; [| congruence].
             rewrite /T3 upd_ne; [| congruence].
             exact (Hfp_rest r Hr Ncsp N8 N9 N18). }
-          (* the emptied slot goes back into the lock at UNUSED.  The park
-             receipt rejoins here: allocproc's found arm kept both halves, and
-             a not-RUNNING proc's whole receipt lives in its lock. *)
-          iDestruct "Hheld" as "(Hlocked & Hstate & Hpg & Hchan & Hpub & Hparkc)".
-          iAssert (park_at_full (proc_addr k) false) with "[Hparkb Hparkc]" as "Hpark".
-          { iApply (park_at_full_intro k false Hk). rewrite park_split. iFrame "Hparkb Hparkc". }
+          (* the emptied slot goes back into the lock at UNUSED, hart tag and
+             all: the tag never entered [proc_held], since a not-RUNNING proc
+             keeps both halves in its lock. *)
+          iDestruct "Hheld" as "(Hlocked & Hstate & Hpg & Hchan & Hpub)".
           iApply fupd_wp.
           iMod (pstate_whole_update (proc_addr k) _ UNUSED with "Hpg") as "Hpg".
           iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwb _]".
@@ -1479,8 +1475,8 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa U2 k γl V pidn USED ch None (Some (tfp, tfws))
                     (K - 4)%nat eb pme C (S lvl)
                     (ap_K44 K HK) (ap_lvlS lvl Hlvl) HU2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hparka] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell Htfpage] Henv [-]").
-          { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hparka".
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell Htfpage] Henv [-]").
+          { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
@@ -1548,9 +1544,7 @@ Section ProofAllocproc.
             rewrite /U4 upd_ne; [| congruence].
             rewrite /U3 upd_ne; [| congruence].
             exact (Hfp_rest r Hr Ncsp N8 N9 N18). }
-          iDestruct "Hheld" as "(Hlocked & Hstate & Hpg & Hchan & Hpub & Hparkc)".
-          iAssert (park_at_full (proc_addr k) false) with "[Hparkb Hparkc]" as "Hpark".
-          { iApply (park_at_full_intro k false Hk). rewrite park_split. iFrame "Hparkb Hparkc". }
+          iDestruct "Hheld" as "(Hlocked & Hstate & Hpg & Hchan & Hpub)".
           iApply fupd_wp.
           iMod (pstate_whole_update (proc_addr k) _ UNUSED with "Hpg") as "Hpg".
           iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwb _]".
@@ -1921,10 +1915,10 @@ Section ProofAllocproc.
           cbn [upd_pt pv_ofile pv_cwd].
           split; [exact Hof|]. split; [exact Hcwd|].
           split; [exact Hrestlen|]. exact (ap_nodes_le (pt_nodes t) Hnodes). }
-        iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv Hparka".
-        { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hparka".
+        iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv".
+        { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
           iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
-        iFrame "Hparkb Hpriv Hspare Hks".
+        iFrame "Hpark Hpriv Hspare Hks".
         iSplitL "Hc0 Hc1 Hcrest".
         { rewrite ctx_cells_run !big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
           iFrame "Hc0 Hc1 Hcrest". }

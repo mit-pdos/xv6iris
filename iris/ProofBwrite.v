@@ -141,7 +141,7 @@ Section ProofBwrite.
     unfold K_bwrite in HK.
     subst eb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs #Hscheds Hpark
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanicany #Hbio Hppid Hprocs
               Hdev Hgeom Hdlock Hlocked Hperm Hcont".
     iEval (rewrite /bio_hold0) in "Hlocked".
     iDestruct "Hlocked" as
@@ -414,20 +414,18 @@ Section ProofBwrite.
     (* The one-time blocker here is GONE: bwrite no longer carries          *)
     (* [▷ sched_vc] -- hart h's parked scheduler record, fourteen exclusive *)
     (* words of ONE hart's [struct cpu], for which no [wp_next] transport   *)
-    (* exists or could exist.  The record now lives in the global           *)
-    (* [SchedCtx.scheds_inv], and what a thread carries instead is the      *)
-    (* persistent [scheds_inv] plus the per-PROC receipt [running_claim j]. *)
-    (* Both are HART-FREE, so they cross rw's [wp_next] as ordinary frames, *)
-    (* exactly the way [procs_inv] and [p_pid] already do.  bwrite itself   *)
-    (* never parks, so it does nothing with the receipt but pass it on.     *)
+    (* exists or could exist.  The record lives in the running proc's own   *)
+    (* [p->lock] ([SchedCtx.run_slot]), which the parking function reaches  *)
+    (* by holding that lock -- so nothing about it is threaded here at all, *)
+    (* and bwrite passes on only the HART-FREE [procs_inv] / [p_pid].       *)
     (* ================================================================== *)
     iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu D3
               (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bsd b
               Q
               HKrw Hbno Hkdata Hj Hgl eq_refl
-              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hscheds Hpark Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm [-]").
+              with "Hcg Hcnt Htext Hpc Hpanicany Hprocs Hdev Hgeom Hdlock [Hbuf] Hdisk Hperm [-]").
     { iEval (rewrite HD3a0). iExact "Hbuf". }
-    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hpark Hbuf Hdisk HQ".
+    iIntros (CID14 Hs14 mR) "%Hcs2 Hcg Hcnt Hpc Hbuf Hdisk HQ".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hbuf".
     iEval (rewrite (bw_wr_true _ bs bsd HD3a1)) in "Hdisk".
     iEval (rewrite HD3a0) in "Hbuf".
@@ -608,7 +606,7 @@ Section ProofBwrite.
     iDestruct (cpu_own_transport CID14 CID19 0 true pj C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CID19 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hpark Hppid Hlocked HQ").
+    iApply ("Hcont" $! P4 with "[%] Hcg Hcnt Hpc Hppid Hlocked HQ").
     unfold callee_saved. repeat split; assumption.
   Qed.
 

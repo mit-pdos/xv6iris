@@ -357,33 +357,33 @@ Section BootBssChain.
 
   (* ONE hart's memory share, exactly as [BootChain.boot_hart_res] spells it
      (its stack slice and its four [cpus[h]] cells; the image word it also
-     takes is PERSISTENT and shared, so it is not here). *)
+     takes is PERSISTENT and shared, so it is not here).
+
+     [cpus[h].proc] is carved WHOLE and stays whole: it is private to hart
+     [h] (no invariant and no lock reads it), so it lives in that hart's
+     [IntrDefs.cpu_cells] and the scheduler's two stores to it are plain
+     stores to memory it already owns. *)
   Definition boot_hart_bss (h : CPU) : iProp Σ :=
     (stack_own_phys (mword_of_int (sp_of (fin_to_nat h))) boot_stack_depth ∗
      a_cpu_noff (cid_word_of h) ↦₄ noff_val 0 ∗
      (∃ iv : mword 32, a_cpu_int (cid_word_of h) ↦₄ iv) ∗
-     cpu_proc_half h (zero_reg : mword 64) ∗
+     a_cpu_proc (cid_word_of h) ↦₈ (zero_reg : mword 64) ∗
      own_ctx (a_cpu_ctx (cid_word_of h)))%I.
 
   (* the two families' per-element outputs, restated in the consumer's
-     vocabulary -- and the [cpus[h].proc] SPLIT (M6c (2a)): one half rides
-     that hart's [BootBridge.boot_bridge], the other eight go to main. *)
+     vocabulary. *)
   Lemma boot_hart_bss_of_raw (h : CPU) :
     hart_stack_raw
       (pa_of_z (KernelSyms.stack0 + 4096 * Z.of_nat (fin_to_nat h))) -∗
     cpu_slot_raw (pa_of_z (cpu_slot (fin_to_nat h))) -∗
-    boot_hart_bss h ∗ cpu_proc_half h (zero_reg : mword 64).
+    boot_hart_bss h.
   Proof.
     iIntros "Hst (Hp & Hctx & Hnoff & Hint)".
     iEval (rewrite /hart_stack_raw off_of_z sp_of_slice) in "Hst".
-    iAssert (cpu_proc_half h (zero_reg : mword 64) ∗
-             cpu_proc_half h (zero_reg : mword 64))%I with "[Hp]" as "[Hp1 Hp2]".
-    { rewrite -(cpu_proc_halve h (zero_reg : mword 64)) a_cpu_proc_cid.
-      iExact "Hp". }
-    rewrite /boot_hart_bss a_cpu_ctx_cid a_cpu_noff_cid a_cpu_int_cid.
-    iSplitR "Hp2"; [| iExact "Hp2"].
+    rewrite /boot_hart_bss a_cpu_ctx_cid a_cpu_noff_cid a_cpu_int_cid
+            a_cpu_proc_cid.
     iSplitL "Hst"; [iExact "Hst" |].
-    iFrame "Hnoff Hint Hp1 Hctx".
+    iFrame "Hnoff Hint Hp Hctx".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -398,7 +398,6 @@ Section BootBssChain.
       main_locks_raw ∗
       main_globals_raw ∗
       ([∗ list] h ∈ enum CPU, boot_hart_bss h) ∗
-      ([∗ list] h ∈ enum CPU, cpu_proc_half h (zero_reg : mword 64)) ∗
       (∃ ps : list (mword 64),
          ⌜prun phystop_val s1entry_val ps⌝ ∗
          ⌜(K_kvmmake + 64 + 3 < length ps)%nat⌝ ∗
@@ -639,14 +638,11 @@ Section BootBssChain.
                              (pa_of_z (KernelSyms.stack0 + 4096 * Z.of_nat i)) ∗
                            cpu_slot_raw (pa_of_z (cpu_slot i)))%I
                  with "Hharts") as "Hharts".
-    iAssert ([∗ list] h ∈ enum CPU,
-               (boot_hart_bss h ∗ cpu_proc_half h (zero_reg : mword 64)))%I
+    iAssert ([∗ list] h ∈ enum CPU, boot_hart_bss h)%I
       with "[Hharts]" as "Hharts".
     { iApply (big_sepL_mono with "Hharts"). iIntros (k h _) "[Ha Hb]".
       iApply (boot_hart_bss_of_raw h with "Ha Hb"). }
-    rewrite big_sepL_sep. iDestruct "Hharts" as "[Hb1 Hb2]".
-    iSplitL "Hb1"; [iExact "Hb1" |].
-    iSplitL "Hb2"; [iExact "Hb2" |].
+    iSplitL "Hharts"; [iExact "Hharts" |].
     iExists (pg_run s1entry_val kinit_pages).
     iSplitR; [iPureIntro; exact Hprun |].
     iSplitR; [iPureIntro; rewrite Hplen; exact kinit_budget |].
@@ -720,7 +716,7 @@ Section BootAlloc.
      ghost_var (spie_name c) (1/2)%Qp sie_bit_off)%I.
 
   (* [power_boot_res] is stated in ERA-EXPLICIT ghost forms; every ambient
-     form ([reg_pointsto_at], [kmap_auth], [uart_frag], [park_full], ...) IS
+     form ([reg_pointsto_at], [kmap_auth], [uart_frag], [hart_full], ...) IS
      that form at [riscv_eraGS] BY DELTA (RiscvPtsto §"the era's names"), so
      the unpacking is pure conversion and there is nothing to prove. *)
   Lemma power_boot_res_unpack (g : gstate) (ndisk : nat) :
@@ -735,7 +731,7 @@ Section BootAlloc.
       ([∗ list] c ∈ enum CPU, hart_sie c) ∗
       ([∗ list] c ∈ enum CPU, hart_spp c) ∗
       ([∗ list] c ∈ enum CPU, hart_spie c) ∗
-      ([∗ list] j ∈ seq 0 NPROC, park_full j false) ∗
+      ([∗ list] j ∈ seq 0 NPROC, hart_full j (0%fin : CPU)) ∗
       ([∗ list] j ∈ seq 0 NPROC, pstate_full j UNUSED) ∗
       uart_frag (g.(gdev).(duart)) ∗ plic_frag (g.(gdev).(dplic)) ∗
       virtio_frag (g.(gdev).(dvirtio)) ∗
@@ -832,7 +828,8 @@ Section BootAlloc.
     iEval (rewrite /own_ctx) in "Hctx".
     iFrame "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie Hmenv
             Hmcen Hstc Htlb Hstvec Hsepc Hscause Hstval Hword Hstk
-            Hs1 Hs2 Hg2 Hg4a Hg4b Hspp1 Hspie1 Hspp2 Hspie2 Hnoff Hint Hproc Hctx".
+            Hs1 Hs2 Hg2 Hg4a Hg4b Hspp1 Hspie1 Hspp2 Hspie2 Hnoff Hint Hproc
+            Hctx".
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -853,8 +850,7 @@ Section BootAlloc.
            boot_hart_res (CID := c) (g.(gregs) c) iv DfracDiscarded) ∗
       (* --- the BOOT hart's supply --- *)
       main_locks_raw ∗ main_globals_raw ∗
-      ([∗ list] h ∈ enum CPU, cpu_proc_half h (zero_reg : mword 64)) ∗
-      ([∗ list] i ∈ seq 0 NPROC, park_full i false) ∗
+      ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) ∗
       ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) ∗
       (∃ l0 : list (bv 8),
          uart_tx_own γd l0 ∗ uart_sent γd l0 ∗ uart_out_lb γd l0) ∗
@@ -910,7 +906,7 @@ Section BootAlloc.
     iMod fd_slots_alloc as (Hfd) "[_ Hfdslots]".
     (* ---- the .bss, in address order ---- *)
     iDestruct (boot_bss_carve g Hbf with "Hcl Hfdslots Hbss") as
-      "(Hstartcell & Hlocks & Hglobals & Hharts & Hprochalves & Hpages)".
+      "(Hstartcell & Hlocks & Hglobals & Hharts & Hpages)".
     (* ---- the device fabric ---- *)
     iMod (uart_ghosts_alloc (g.(gdev).(duart))) as (γd)
       "(Hacc & Hout & Htxa & Hdla & Htx & Hsent & Hdlab)".
@@ -981,7 +977,6 @@ Section BootAlloc.
     iSplitL "Hres"; [iExact "Hres" |].
     iSplitL "Hlocks"; [iExact "Hlocks" |].
     iSplitL "Hglobals"; [iExact "Hglobals" |].
-    iSplitL "Hprochalves"; [iExact "Hprochalves" |].
     iSplitL "Hpark"; [iExact "Hpark" |].
     iSplitL "Hpst"; [iExact "Hpst" |].
     iSplitL "Htx Hsent".

@@ -50,10 +50,11 @@
    premise, and none of them cares what comes back.
 
    iput SLEEPS -- acquiresleep on the inode, and bread underneath itrunc /
-   iupdate -- so it threads the full running-process bundle exactly as
-   SpecBalloc.v / SpecIupdate.v do: procs_inv / scheds_inv / own_ctx /
-   park_hlf / p_pid, the disk fabric, three buffer slots, and the parking
-   premise [eb = true].  It enters and returns at noff 0.
+   iupdate -- so it threads the running-process bundle exactly as
+   SpecBalloc.v / SpecIupdate.v do: procs_inv / p_pid, the disk fabric,
+   three buffer slots, and the parking premise [eb = true].  It enters and
+   returns at noff 0.  The parked scheduler record is not among them: it
+   lives in the running proc's own [p->lock] ([SchedCtx.run_slot]).
 
    WHAT IS DELIBERATELY NOT HERE.  Nothing about ip's fields, nothing about
    which arm ran, and no [inode_map]/[inode_blocks] traffic: with no inode
@@ -142,8 +143,6 @@ Definition wp_iput_sconf_body
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
   procs_inv γs -∗
-  scheds_inv γs -∗
-  running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -161,7 +160,6 @@ Definition wp_iput_sconf_body
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
       pc_is ret_tgt -∗
-      running_claim j -∗
       p_pid pj ↦₄{dq} pidv -∗
       bslots bn 3 -∗
       (* at most [iput_units] gone, and none gained *)

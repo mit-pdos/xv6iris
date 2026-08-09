@@ -55,7 +55,7 @@
      [FDSPARE] allowance travels beside it (FdSlots.v) and is retired the
      same way.
 
-   * [own_ctx] and [park_hlf] go in and do not come back either, for the
+   * [own_ctx] and the hart tag go in and do not come back either, for the
      same reason they come BACK from yield and sleep: the difference between
      a park you return from and a park you do not is entirely in whether the
      resume ever happens, and kexit's does not.  Its saved context is
@@ -170,10 +170,8 @@ Definition wp_kexit_sconf_body
   kernel_text -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
   procs_inv γs -∗
-  scheds_inv γs -∗
   panic_wp_any -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
-  running_claim j -∗
   (* wait_lock, and what it protects *)
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   (* the open-file table: every non-null descriptor is fileclose'd *)

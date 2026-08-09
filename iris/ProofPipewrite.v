@@ -531,7 +531,6 @@ Section PwConts.
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x58) : mword 64) -∗
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
-       running_claim j -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* +0xd8: wakeup(&pi->nread); release(&pi->lock); jump to the epilogue.  Three
@@ -556,7 +555,6 @@ Section PwConts.
        pc_is (mword_of_int (KernelSyms.pipewrite + 0xd8) : mword 64) -∗
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
-       running_claim j -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* +0x46: release(&pi->lock); i := -1; reload s6..s10; fall into the
@@ -580,7 +578,6 @@ Section PwConts.
        pc_is (mword_of_int (KernelSyms.pipewrite + 0x46) : mword 64) -∗
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V P') -∗
-       running_claim j -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* exactly ONE of the two is taken, so they are offered as a conjunction and
@@ -614,7 +611,6 @@ Section PwConts.
        pipe_ref γp w q -∗
        proc_priv γf (proc_addr j) pid (upd_upt V Pc) -∗
        kalloc_env γa None -∗
-       running_claim j -∗
        pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
        WP (Loop : expr riscv_lang)))%I.
 
@@ -788,7 +784,6 @@ Section PwGuard.
     pipe_ref γp w q -∗
     proc_priv γf (proc_addr j) pid (upd_upt V Pc) -∗
     kalloc_env γa None -∗
-    running_claim j -∗
     pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
     pw_loop CID0 γa γf γs j γl γp w q m av eb C pid V n sp0 pi addr -∗
     WP (Loop : expr riscv_lang).
@@ -804,7 +799,7 @@ Section PwGuard.
                         Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
     assert (Hcmp : zopz0zKzJ_s (M !!! Regidx Rs2) (M !!! Regidx Rs4) = Z.geb i n)
       by (rewrite Hs2 Hs4; apply pw_geb_s; assumption).
-    iIntros "#Htext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv #Henv Hpark HEX HLP".
+    iIntros "#Htext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv #Henv HEX HLP".
     iPoseProof (pwi_7a with "Htext") as "Hi7a".
     destruct (Z.geb i n) eqn:Hgb.
     - (* ==== i >= n : the copy is done, restore s6..s10 and take the tail ==== *)
@@ -858,7 +853,7 @@ Section PwGuard.
                    ltac:(vm_compute; discriminate)). exact Hs11. }
       iDestruct "HEX" as "[TAIL _]". rewrite /pw_tail.
       iSpecialize ("TAIL" $! CID with "[%]"); [wp_next_chain|].
-      iApply ("TAIL" $! M' Pc with "[%] [%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Hpark").
+      iApply ("TAIL" $! M' Pc with "[%] [%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv").
       + unfold pw_base_regs. split_and!; assumption.
       + exact Hs1'.
       + rewrite Hs2'. right. exists i. split; [reflexivity | lia].
@@ -878,7 +873,7 @@ Section PwGuard.
       iEval (rewrite Hpp7e) in "Hpc".
       rewrite /pw_loop.
       iSpecialize ("HLP" $! CID with "[%]"); [wp_next_chain|].
-      iApply ("HLP" $! i M Pc with "[%] [%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv Hpark HEX").
+      iApply ("HLP" $! i M Pc with "[%] [%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv HEX").
       + lia.
       + exact Hext.
       + exact Hregs.
@@ -925,7 +920,7 @@ Section ProofPipewrite.
       by (apply mycpu_ret_nonzero; apply tp_ok_cid).
     assert (Hn31 : (n < 2 ^ 31)%Z) by (destruct Hnrange as [_ HB]; exact HB).
     assert (Hn31L : (n < 2147483648)%Z) by (rewrite H31 in Hn31; exact Hn31).
-    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hscheds #Hpanic Hpark Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpipe Href Hpriv #Henv #Hpinv #Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbm.
     assert (Hbt : b = true) by (symmetry; exact Hbm).
     clear Hbm. subst b.
@@ -936,7 +931,7 @@ Section ProofPipewrite.
     (* EPI -- the common epilogue at +0x58.                              *)
     (* ================================================================= *)
     iAssert (pw_epi CID γf γs j γp w q m av true C pid V n sp0) with "[Hcont]" as "EPI".
-    { rewrite /pw_epi. iIntros (CIDep Hsep M P') "%Hbr %Hrw %Hext (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7) Hhi Hcg Hown Hpc Href Hpriv Hpark".
+    { rewrite /pw_epi. iIntros (CIDep Hsep M P') "%Hbr %Hrw %Hext (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7) Hhi Hcg Hown Hpc Href Hpriv".
       destruct Hbr as (Hsp & B6 & B7 & B8 & B9 & B10 & B11).
       assert (Hb1 : add_vec (pa_stk sp0 14%nat) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))) = pa_stk sp0 1%nat)
         by (apply pw_slot_bridge; apply bv_eq; vm_compute; reflexivity).
@@ -1160,7 +1155,7 @@ Section ProofPipewrite.
           rewrite /E3 upd_ne; [| reg_neq]. rewrite /E2 upd_ne; [| reg_neq].
           rewrite /E1 upd_ne; [| reg_neq]. exact B11. }
       iSpecialize ("Hcont" $! CIDp15 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont" $! E9 P' with "[%] [%] [%] Hcg Hown Hpc Href Hpriv Hpark").
+      iApply ("Hcont" $! E9 P' with "[%] [%] [%] Hcg Hown Hpc Href Hpriv").
       - exact HcsE9.
       - exact Hext.
       - rewrite Ha0E9. exact Hrw. }
@@ -1172,7 +1167,7 @@ Section ProofPipewrite.
     { rewrite /pw_exits. iSplit.
       - (* ---------------- +0xd8: wakeup(&pi->nread); release ---------------- *)
         rewrite /pw_tail. iIntros (CIDtl Hstl).
-        iIntros (M P') "%Hbr %Hs1M %Hrw %Hext HF7 Hhi Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Hpark".
+        iIntros (M P') "%Hbr %Hs1M %Hrw %Hext HF7 Hhi Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv".
         iPoseProof (pwi_d8 with "Htext") as "Hid8".
         iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.pipewrite + 0xd8)) Ra0 Rs1
                   (mword_of_int 536 : mword 12) M (av - 14)%nat false ltac:(nz) ltac:(rdok)
@@ -1277,14 +1272,14 @@ Section ProofPipewrite.
         iEval (rewrite Hjep) in "Hpc".
         rewrite /pw_epi.
         iSpecialize ("EPI" $! CIDp16 with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! mr P' with "[%] [%] [%] HF7 Hhi Hcg Hown Hpc Href Hpriv Hpark").
+        iApply ("EPI" $! mr P' with "[%] [%] [%] HF7 Hhi Hcg Hown Hpc Href Hpriv").
         + apply (pw_base_regs_cs m M mr (pa_stk sp0 14%nat) HcsMmr).
           unfold pw_base_regs. split_and!; assumption.
         + rewrite (callee_saved_lookup HcsMmr (mword_of_int 18) ltac:(vm_compute; reflexivity)). exact Hrw.
         + exact Hext.
       - (* ---------------- +0x46: release; i := -1; reload s6..s10 ---------------- *)
         rewrite /pw_minus1. iIntros (CIDmn Hsmn).
-        iIntros (M P') "%Hmr %Hext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Hpark".
+        iIntros (M P') "%Hmr %Hext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv".
         destruct Hmr as (Hsp & Hs1M & Hs11M).
         iPoseProof (pwi_46 with "Htext") as "Hi46".
         iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x46)) Ra0 Rs1 M (av - 14)%nat false
@@ -1373,7 +1368,7 @@ Section ProofPipewrite.
         { rewrite (Rrest (mword_of_int 18) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz) ltac:(nz)). exact Hs2Q3. }
         rewrite /pw_epi.
         iSpecialize ("EPI" $! CIDrs with "[%]"); [wp_next_chain|].
-        iApply ("EPI" $! M' P' with "[%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpc Href Hpriv Hpark").
+        iApply ("EPI" $! M' P' with "[%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpc Href Hpriv").
         + unfold pw_base_regs. split_and!; assumption.
         + rewrite Hs2'. by left.
         + exact Hext.
@@ -1736,7 +1731,7 @@ Section ProofPipewrite.
       iDestruct "EXITS" as "[TAIL _]".
       rewrite /pw_tail.
       iSpecialize ("TAIL" $! CIDaq with "[%]"); [wp_next_chain|].
-      iApply ("TAIL" $! Z1 (pv_upt V) with "[%] [%] [%] [%] HF7 Hhi Hcg Hown Hpay Hlocked Hres Hpc Href [Hpriv] Hpark").
+      iApply ("TAIL" $! Z1 (pv_upt V) with "[%] [%] [%] [%] HF7 Hhi Hcg Hown Hpay Hlocked Hres Hpc Href [Hpriv]").
       + (* [callee_saved M1 Z1] is false (s2 is callee-saved), so peel directly *)
         unfold pw_base_regs. split_and!.
         { rewrite /Z1 upd_ne; [exact HspM1 | reg_neq]. }
@@ -1926,7 +1921,7 @@ Section ProofPipewrite.
       (* ================================================================= *)
       iAssert (pw_loop CID γa γf γs j γl γp w q m av true C pid V n sp0 pi addr) with "[]" as "LOOP".
       { iLöb as "IH". rewrite /pw_loop.
-        iIntros (CIDlp Hslp i M Pc) "%Hi %Hext %Hregs HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv _ Hpark HEX".
+        iIntros (CIDlp Hslp i M Pc) "%Hi %Hext %Hregs HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv _ HEX".
         pose proof Hregs as Hregs2.
         destruct Hregs2 as (Hsp & Hs0 & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 &
                             Hs6 & Hs7 & Hs8 & Hs9 & Hs10 & Hs11).
@@ -1967,7 +1962,7 @@ Section ProofPipewrite.
           iEval (rewrite Hj46) in "Hpc".
           iDestruct "HEX" as "[_ MIN]". rewrite /pw_minus1.
           iSpecialize ("MIN" $! CIDlp with "[%]"); [wp_next_chain|].
-          iApply ("MIN" $! L1 Pc with "[%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv Hpark").
+          iApply ("MIN" $! L1 Pc with "[%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv").
           + unfold pw_min_regs. split_and!.
             { rewrite (callee_saved_lookup HcsML1 csp_rs1 ltac:(vm_compute; reflexivity)). exact Hsp. }
             { rewrite (callee_saved_lookup HcsML1 (mword_of_int 9) ltac:(vm_compute; reflexivity)). exact Hs1. }
@@ -2050,7 +2045,7 @@ Section ProofPipewrite.
             iEval (rewrite Hj46) in "Hpc".
             iDestruct "HEX" as "[_ MIN]". rewrite /pw_minus1.
             iSpecialize ("MIN" $! CIDlp with "[%]"); [wp_next_chain|].
-            iApply ("MIN" $! K0 Pc with "[%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv Hpark").
+            iApply ("MIN" $! K0 Pc with "[%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv").
             * unfold pw_min_regs. split_and!; assumption.
             * exact Hext.
             * iApply (pw_res_intro γp pi nr nw ro wo vname bs Hcnt Hbslen
@@ -2228,8 +2223,8 @@ Section ProofPipewrite.
                         Hj Hjlp HlkaG3 eq_refl Hav22
                         ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_dead)
                         ltac:(intros ?i; iApply locked_pre_dead)
-                        with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hopen Href Hlocked Hres Hpanic Hpark [-]").
-              iIntros (CIDsl Hssl Ms) "%Hscs Hcg Hown Hpay Hpc Href Hlocked Hres Hpark". rgall.
+                        with "Hcg Hown Hpay Htext Hpc Hpinv Hopen Href Hlocked Hres Hpanic [-]").
+              iIntros (CIDsl Hssl Ms) "%Hscs Hcg Hown Hpay Hpc Href Hlocked Hres". rgall.
               assert (HraG3 : G3 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.pipewrite + 0x76) : mword 64) 4)
                 by (rewrite /G3; apply upd_eq).
               iEval (rewrite HraG3) in "Hpc".
@@ -2246,7 +2241,7 @@ Section ProofPipewrite.
                 apply (pw_loop_regs_cs m Mw G3 (pa_stk sp0 14%nat) sp0 pi (proc_addr j) addr n i HcsMwG3 HregsMw). }
               iApply (pw_guard_step (CID := CIDsl) CID γa γf γs j γl γp w q m av true C pid V n sp0 pi addr i Ms Pc
                         Hn0 Hn31 ltac:(lia) ltac:(wp_next_chain) Hext HregsMs
-                        with "Htext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv Hpark HEX IH").
+                        with "Htext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv HEX IH").
             * (* ======== NOT full: copy one byte in ======== *)
               assert (Hfeq : eq_vec (sign_extend' 64 nw : mword 64)
                                (sign_extend' 64 (add_vec nr (mword_of_int 512 : mword 32))) = false).
@@ -2443,7 +2438,7 @@ Section ProofPipewrite.
                  iEval (rewrite Hjd8) in "Hpc".
                  iDestruct "HEX" as "[TAIL _]". rewrite /pw_tail.
                  iSpecialize ("TAIL" $! CIDlp with "[%]"); [wp_next_chain|].
-                 iApply ("TAIL" $! M' P' with "[%] [%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv Hpark").
+                 iApply ("TAIL" $! M' P' with "[%] [%] [%] [%] HF7 [HF5 HCH] Hcg Hown Hpay Hlocked [Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack] Hpc Href Hpriv").
                  --- unfold pw_base_regs. split_and!; assumption.
                  --- exact Hs1'.
                  --- rewrite Hs2'. right. exists i. split; [reflexivity | lia].
@@ -2652,7 +2647,7 @@ Section ProofPipewrite.
                  iEval (rewrite Hj7a) in "Hpc".
                  iApply (pw_guard_step (CID := CIDlp) CID γa γf γs j γl γp w q m av true C pid V n sp0 pi addr
                            (i + 1)%Z P6 P' Hn0 Hn31 ltac:(lia) ltac:(wp_next_chain) Hext' HregsP6
-                           with "Htext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv Hpark HEX IH"). }
+                           with "Htext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv HEX IH"). }
       (* ---- +0x44 c.j -> the loop body, with i = 0 ---- *)
       iPoseProof (pwi_44 with "Htext") as "Hi44".
       iApply (wp_cj_s_sconf (mword_of_int (KernelSyms.pipewrite + 0x44))
@@ -2665,7 +2660,7 @@ Section ProofPipewrite.
       iEval (rewrite Hj7e) in "Hpc".
       rewrite /pw_loop.
       iSpecialize ("LOOP" $! CIDaq with "[%]"); [wp_next_chain|].
-      iApply ("LOOP" $! 0%Z C6 (pv_upt V) with "[%] [%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href [Hpriv] Henv Hpark EXITS").
+      iApply ("LOOP" $! 0%Z C6 (pv_upt V) with "[%] [%] [%] HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href [Hpriv] Henv EXITS").
       + lia.
       + apply uptd_ext_refl.
       + exact HregsC6.

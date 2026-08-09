@@ -44,17 +44,11 @@
        kvminithart, so they travel BESIDE the bridge, straight into main's
        precondition.  Everything this file DOES thread is per-hart, which is
        what makes the bridge runnable on every hart at once;
-     - the cpus[cid] struct cells ([a_cpu_noff] / [a_cpu_int] / HALF of
+     - the cpus[cid] struct cells ([a_cpu_noff] / [a_cpu_int] /
        [a_cpu_proc] / the 14 context words behind [cpu_ctx_free]): .bss, from
-       the memory image.  Only HALF of [c->proc], because the other half
-       belongs to the global parked-scheduler invariant
-       ([SchedCtx.scheds_inv]) that main allocates out of ALL EIGHT harts'
-       spare halves -- and the SPLIT CANNOT HAPPEN HERE: every hart's bridge
-       runs inside that hart's own weakest precondition, long after the boot
-       client's single [={⊤}=∗] has ended, so hart 0 could never collect the
-       other seven.  The client's carve splits each cell and routes one half
-       here, the other into main's boot supply.  ([stvec] is NOT .bss --
-       it is a Sail register, and comes from the per-hart register set.)
+       the memory image.  [c->proc] arrives WHOLE and goes into [cpu_own].
+       ([stvec] is NOT .bss -- it is a Sail register, and comes from the
+       per-hart register set.)
 
    [pc_is] is NOT threaded: SpecEntry's post hands back [pc_is pcMain]
    with [pcMain := mword_of_int KernelSyms.main], which is literally the
@@ -352,17 +346,10 @@ Section BootBridge.
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     a_cpu_noff cid_word ↦₄ nv -∗
     a_cpu_int cid_word ↦₄ iv -∗
-    (* HALF of [cpus[cid].proc], not the whole cell.  [IntrDefs.cpu_cells]
-       keeps only half; the other half belongs to the global parked-scheduler
-       invariant [SchedCtx.scheds_inv], which main allocates once γs exists
-       ([SchedCtx.scheds_alloc]) out of ALL EIGHT harts' spare halves.  A
-       bridge cannot be where that split happens: each hart's bridge runs
-       inside that hart's OWN weakest precondition, long after the boot
-       client's single [={⊤}=∗] has ended, so hart 0 could never collect the
-       other seven.  The client's carve therefore splits every
-       [cpus[h].proc] cell itself, hands one half to hart [h] here and puts
-       the other eight in main's boot supply. *)
-    cpu_proc_half cpu_id p0 -∗
+    (* the WHOLE [cpus[cid].proc] cell, which goes into [cpu_own]
+       ([IntrDefs.cpu_cells]).  The field is private to this hart, so
+       nothing else ever holds a fraction of it. *)
+    cur_proc p0 -∗
     cpu_ctx_free
     ==∗
     ∃ mf : regfile,

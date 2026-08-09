@@ -154,12 +154,11 @@ Definition allocproc_post
          pv_cwd V = (zero_reg : mword 64) /\
          length rest = 12%nat /\ (nc <= K_allocproc)%nat ⌝ ∗
        proc_held cpu_id j γl USED ch ∗
-       (* the OTHER half of proc j's park receipt.  [proc_held] carries one
-          half (the crossing's share); the slot allocproc emptied held BOTH,
-          since a not-RUNNING proc's receipt lives in its lock
-          ([SchedCtx.proc_slots]).  So the caller gets the second half here
-          and can rebuild [proc_lock_res] at USED / RUNNABLE. *)
-       park_hlf j false ∗
+       (* proc j's HART TAG, whole.  A not-RUNNING proc keeps both halves in
+          its lock ([SchedCtx.proc_slots]'s [not_running] arm), which is the
+          arm allocproc emptied; the caller gets them back here and can
+          rebuild [proc_lock_res] at USED / RUNNABLE. *)
+       hart_at_any (proc_addr j) ∗
        proc_priv γf (proc_addr j) pid V ∗
        fd_slots FDSPARE ∗
        is_kstack (proc_addr j) ks ∗
