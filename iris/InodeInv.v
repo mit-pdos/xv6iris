@@ -532,9 +532,14 @@ Qed.
 
 Lemma bm_blocks_empty : bm_blocks bm_empty = ∅.
 Proof.
-  apply set_eq. intros b. split; [|set_solver].
-  rewrite bm_blocks_spec. intros (Hnz & i & _ & Hb).
-  exfalso. apply Hnz. rewrite -Hb. apply bm_empty_slot0.
+  apply set_eq. intros b. split.
+  - rewrite bm_blocks_spec. intros (Hnz & i & _ & Hb).
+    exfalso. apply Hnz. rewrite -Hb. apply bm_empty_slot0.
+  - (* [set_solver] here forced [set_unfold] to normalise [bm_blocks
+       bm_empty] -- a [list_to_set] over [seq 0 (S MAXFILE)], 269 entries --
+       even though the premise [b ∈ ∅] alone refutes the goal: 14.6 s.
+       [not_elem_of_empty] is the one fact this direction needs. *)
+    intros Hb. exfalso. exact (not_elem_of_empty b Hb).
 Qed.
 
 (* ===================================================================== *)

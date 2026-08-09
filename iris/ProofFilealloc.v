@@ -673,8 +673,12 @@ Section ProofFilealloc.
                           = mword_of_int (KernelSyms.filealloc + 0x26))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgtb) in "Hpc".
+          (* [done] here searched the whole accumulated hypothesis context
+             for this three-way conjunction (~8.85 s, the file's hottest
+             line) instead of just using the three facts already proven by
+             name -- [HM2s1]/[HM2a4]/[HM2thr] are exactly [IH]'s premise. *)
           iApply ("IH" $! (S j) M2 with "[%] [%] [%] Hcg Hpc Hslots Hexit");
-            [lia | lia | done].
+            [lia | lia | exact (conj HM2s1 (conj HM2a4 HM2thr))].
       - (* ---- entry is FREE: ref reads zero, take the branch to +0x42 ---- *)
         iEval (rewrite /fslot HMj) in "Hslot".
         iDestruct "Hslot" as "[Hcell Hfree]".
