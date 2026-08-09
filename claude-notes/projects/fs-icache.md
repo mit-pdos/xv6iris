@@ -21,17 +21,19 @@ only when the whole tree builds. Definitions/specs are orchestrator
 (Fable) work; whole-function proof reworks go to Opus subagents with the
 recipes below.
 
-## C1 — the region + log_write's AU form (IN FLIGHT, 2026-08-09)
+## C1 — the region + log_write's AU form (DONE, committed bc377b06)
 
 - [x] `InodeRegion.v`: `dinode_at`, the one-armed region invariant
       (`ireg_inv`), `ireg_read`, `ireg_write_au`, `diblk_bytes_inj`.
-      Compiles on the EC2 tree.
 - [x] `SpecLogWrite.v`: `wp_log_write_au_body` + the `wp_log_write_au`
-      parameter in `Module Type LOG_WRITE`. Compiles.
-- [ ] `ProofLogWrite.v`: retarget the main lemma to the AU form; derive
-      `wp_log_write_gen` from it (trivial AU at a held fsblock);
-      `wp_log_write_sconf`'s derivation unchanged. (Opus, running.)
-- [ ] Full build green; commit C1 as one unit.
+      parameter in `Module Type LOG_WRITE`.
+- [x] `ProofLogWrite.v`: main lemma retargeted to the AU form (the
+      receipt abstracted as a new opaque `Fb` binder beside `Bud` on
+      `lw_cont`/`lw_res` and the block lemmas — their proofs untouched;
+      the ghost step at ~2082 opens with `iApply fupd_wp`, the tree's
+      idiom, cf. ProofInitlog.v:664); `wp_log_write_gen` derived from it
+      at `Efs := ⊤`; `wp_log_write_sconf` unchanged.
+- [x] Full build green (EC2 -j30, 0 Errors, lemma_diff clean).
 
 ## C2 — iupdate onto `dinode_at` (branch)
 
@@ -62,16 +64,21 @@ landed proof):
 3. The postcondition assembly hands back `dinode_at` where it handed
    `Hfsb`.
 
-**Same-stroke spec swaps** (they only thread the block down to iupdate):
-`SpecItrunc`, `SpecWritei`, `SpecFileread` — swap the fsblock premise/
-postcondition for `ireg_inv + dinode_at` exactly as above; narrow
-`SpecItrunc`'s unbounded length premise to `i < MAXFILE` and add
-`cov_below cov size` while in there (design §6, both recorded). ALL
-THREE have landed proofs (`ProofItrunc` 2798, `ProofWritei` 4004,
-`ProofFileread` + Parts) — each repairs at its `wp_iupdate_sconf` call
-site (ProofItrunc.v:316, ProofWritei.v:833, plus fileread's) by
-supplying `ireg_inv + dinode_at` instead of the block, and threads the
-new `γi/nib/dn0` parameters up into its own statement.
+**Same-stroke spec swaps** (they thread the block down to iupdate):
+`SpecItrunc` (fsblock premise at :275, post at :312 — becomes
+`dinode_at γi inum (di_trunc dn)`) and `SpecWritei` (premise :350, post
+:431 at its flushed record) — swap for `ireg_inv + dinode_at` exactly
+as above; narrow `SpecItrunc`'s unbounded length premise to
+`i < MAXFILE` and swap its owed per-slot range hypothesis for
+`cov_below cov size` while in there (design §6 — ProofItrunc then
+derives the per-slot facts via `IcacheInv.blkmap_slot_inrange`). Both
+have landed proofs (`ProofItrunc` 2798, `ProofWritei` 4004) — each
+repairs at its `wp_iupdate_sconf` call site (ProofItrunc.v:316,
+ProofWritei.v:833) and threads `γi/nib/dn0` up into its own statement.
+
+**NOT C2: `SpecFileread`.** Its fsblock (:326/:349, inside the
+`frn_*` FD_INODE environment) feeds its ILOCK call, not iupdate — it
+swaps with SpecIlock in C3, and `ProofFileread` repairs there.
 
 ## C3 — the per-entry escrow, the pool, and ilock/iunlock (branch)
 
