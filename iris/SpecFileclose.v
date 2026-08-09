@@ -258,11 +258,35 @@ Section SpecFileclose.
     - iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark & $)".
       do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark".
+      (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
+         still walks the whole 11-conjunct goal per hypothesis (measured
+         ~7 s a side here); [iSplitL]/[iExact] name both sides, so nothing
+         is searched. *)
+      iSplitL "Hpr"; [iExact "Hpr"|].
+      iSplitL "Hsc"; [iExact "Hsc"|].
+      iSplitL "Hbio"; [iExact "Hbio"|].
+      iSplitL "Hlog"; [iExact "Hlog"|].
+      iSplitL "Hseam"; [iExact "Hseam"|].
+      iSplitL "Hcert"; [iExact "Hcert"|].
+      iSplitL "Hdev"; [iExact "Hdev"|].
+      iSplitL "Hgeom"; [iExact "Hgeom"|].
+      iSplitL "Hdlk"; [iExact "Hdlk"|].
+      iSplitL "Hbs"; [iExact "Hbs"|].
+      iExact "Hpark".
     - iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
                  Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark) $]".
       do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark".
+      iSplitL "Hpr"; [iExact "Hpr"|].
+      iSplitL "Hsc"; [iExact "Hsc"|].
+      iSplitL "Hbio"; [iExact "Hbio"|].
+      iSplitL "Hlog"; [iExact "Hlog"|].
+      iSplitL "Hseam"; [iExact "Hseam"|].
+      iSplitL "Hcert"; [iExact "Hcert"|].
+      iSplitL "Hdev"; [iExact "Hdev"|].
+      iSplitL "Hgeom"; [iExact "Hgeom"|].
+      iSplitL "Hdlk"; [iExact "Hdlk"|].
+      iSplitL "Hbs"; [iExact "Hbs"|].
+      iExact "Hpark".
   Qed.
 
   Definition fileclose_fs_out (fn : fclose_names) : iProp Σ :=
@@ -373,10 +397,34 @@ Section SpecFileclose.
               #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & Hpark & Hpid)".
     iSplitL "Hbs Hpark Hpid".
     { do 6 (iSplitR; [iPureIntro; assumption|]).
-      iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark Hpid". }
+      (* Same structural split as [fileclose_fs_env_split_pid]: a named
+         [iFrame] over this 12-conjunct goal measured ~13.5 s a side. *)
+      iSplitL "Hpr"; [iExact "Hpr"|].
+      iSplitL "Hsc"; [iExact "Hsc"|].
+      iSplitL "Hbio"; [iExact "Hbio"|].
+      iSplitL "Hlog"; [iExact "Hlog"|].
+      iSplitL "Hseam"; [iExact "Hseam"|].
+      iSplitL "Hcert"; [iExact "Hcert"|].
+      iSplitL "Hdev"; [iExact "Hdev"|].
+      iSplitL "Hgeom"; [iExact "Hgeom"|].
+      iSplitL "Hdlk"; [iExact "Hdlk"|].
+      iSplitL "Hbs"; [iExact "Hbs"|].
+      iSplitL "Hpark"; [iExact "Hpark"|].
+      iExact "Hpid". }
     iModIntro. iIntros "(Hpark & Hpid & Hbs)".
     do 6 (iSplitR; [iPureIntro; assumption|]).
-    iFrame "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark Hpid".
+    iSplitL "Hpr"; [iExact "Hpr"|].
+    iSplitL "Hsc"; [iExact "Hsc"|].
+    iSplitL "Hbio"; [iExact "Hbio"|].
+    iSplitL "Hlog"; [iExact "Hlog"|].
+    iSplitL "Hseam"; [iExact "Hseam"|].
+    iSplitL "Hcert"; [iExact "Hcert"|].
+    iSplitL "Hdev"; [iExact "Hdev"|].
+    iSplitL "Hgeom"; [iExact "Hgeom"|].
+    iSplitL "Hdlk"; [iExact "Hdlk"|].
+    iSplitL "Hbs"; [iExact "Hbs"|].
+    iSplitL "Hpark"; [iExact "Hpark"|].
+    iExact "Hpid".
   Qed.
 
   (* ---- WHAT A CLOSER OF AN ARBITRARY DESCRIPTOR DOES ----
