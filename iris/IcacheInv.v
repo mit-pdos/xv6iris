@@ -28,12 +28,11 @@
    ---- WHAT IS DELIBERATELY NOT HERE -----------------------------------
 
    The per-entry CONTENT (ip->valid, the five metadata cells, the thirteen
-   addrs cells, the file's blocks) is [InodeLock.inode_parked], parked in
-   the entry's sleeplock.  It is not re-stated here, and this file does not
-   pretend to compose with it: the design note records the changes
-   [InodeLock.v] needs before it can (its unloaded arm must stop owning a
-   block map, and its [i_valid] cell must be reachable by iput's lock-free
-   test), and making them is not this effort's to make.                    *)
+   addrs cells, the file's blocks) lives in [IcacheEscrow.ic_escrow], the
+   three-armed per-entry escrow built ON TOP of this file: the sleeplock
+   keeps only that escrow's checkout token.  This file supplies the pieces
+   it is keyed by -- the identity cells, the reference algebra and the
+   [ref]-word invariant -- and nothing above them.                         *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers.
@@ -221,7 +220,7 @@ Qed.
    below are what its producers need to re-establish it.
 
    Note the BOUND.  [SpecItrunc.v] states the premise for every [i : nat];
-   no holder of [inode_locked] can supply that, because both
+   no holder of ilock's bundle can supply that, because both
    [inode_blocks] and [blk_holes_zero] stop at MAXFILE.  The premise has to
    be narrowed to [i < MAXFILE] -- which is all itrunc's loops touch.
 
@@ -921,45 +920,49 @@ Section IcacheTable.
     iIntros "[_ H1] [_ H2]". iApply (inode_ident_agree with "H1 H2").
   Qed.
 
-  (* ---- THE IDENTITY BUDGET (design §13.1b) ----
+  (* ---- THE IDENTITY BUDGET (design §13.1b, as corrected by §13.1e) ----
 
-     The two identity cells no longer carry the same mass, because the
-     escrow's PARKED arm owns HALF of [i_inum] permanently: that half is what
-     ties the arm's [dinode_at] to the entry the cells name, and the
-     ½-versus-FULL split of this one cell is what distinguishes the parked
-     arm from the recycle-window arm (§13.1c).  So
+     The escrow's PARKED arm owns HALF of BOTH identity cells permanently.
+     For [i_inum] that half is what ties the arm's [dinode_at] to the entry
+     the cells name, and the ½-versus-FULL split of THAT cell is what
+     distinguishes the parked arm from the recycle-window arm (§13.1c -- the
+     inum cell remains the sole parked/mid discriminator).  For [i_dev] the
+     half exists for a different reason, and §13.1b's "the dev cell needs no
+     arm tie" was wrong: a checked-out [ilock] has deposited its WHOLE
+     reference, so without a dev half handed back at checkout it could not
+     read [ip->dev] for its own [bread] (ilock+0x48), and [iunlock] could not
+     return the caller's reference AT THE CALLER'S DEVICE.  [BioInv]'s
+     [buf_parked] holds [b_dev ↦₄{½}] for exactly these two reasons.  So the
+     budget is SYMMETRIC:
 
-         i_dev  :  1  =  q (the references)  +  (1 - q)  (the table)
+         i_dev  :  1  =  ½ (the escrow, forever)
+                      +  q (the references)  +  (½ - q)  (the table)
          i_inum :  1  =  ½ (the escrow, forever)
                       +  q (the references)  +  (½ - q)  (the table)
 
-     and a reference's fraction therefore ranges in (0, ½].  A REFERENCE is
-     still [inode_ident] -- both cells at ONE fraction, which is all a
-     lock-free reader needs; it is only the table's RETAINED share that is
-     lopsided, so [islot_rest] can no longer be spelled with [inode_ident].
+     and a reference's fraction therefore ranges in (0, ½].  The table's
+     retained share is now an [inode_ident] like every other share.
 
      [islot_rest_at] pins the two values (the pool's slot->inum map wants
      them pinned, §13.2); [islot_rest] is the ∃-bound form the plain
      [itable_res] uses.  The [Qp.sub] shape is unchanged: [None] is the
      [q = ½] case, where the whole shared half is out and the table keeps
-     only the dev cell's other half. *)
+     nothing of either cell. *)
   Definition islot_rest_at (k : nat) (q : Qp) (dev inum : mword 32) : iProp Σ :=
     match (1/2 - q)%Qp with
-    | Some q' => (i_dev (ientry k) ↦₄{DfracOwn (1/2 + q')} dev ∗
-                  i_inum (ientry k) ↦₄{DfracOwn q'} inum)%I
-    | None => (i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev)%I
+    | Some q' => inode_ident k (DfracOwn q') dev inum
+    | None => emp%I
     end.
 
   Definition islot_rest (k : nat) (q : Qp) : iProp Σ :=
     (∃ dev inum : mword 32, islot_rest_at k q dev inum)%I.
 
-  (* ...and a FREE slot's share: the dev cell whole (iget's [sw] at +0x6e
-     writes it under the lock alone) and the inum cell's other half (the
-     escrow keeps one half; iget's [sw] at +0x72 joins them, which is why
-     that store cannot happen without opening the escrow -- §13.1c). *)
+  (* ...and a FREE slot's share: each identity cell's other half (the escrow
+     keeps one half of each; iget's [sw]s at +0x6e and +0x72 join them, which
+     is why NEITHER store can happen without opening the escrow -- §13.1c,
+     §13.1e). *)
   Definition islot_free_at (k : nat) (dev inum : mword 32) : iProp Σ :=
-    (i_dev (ientry k) ↦₄ dev ∗
-     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum)%I.
+    inode_ident k (DfracOwn (1/2)) dev inum.
 
   Definition islot_free (k : nat) : iProp Σ :=
     (∃ dev inum : mword 32, islot_free_at k dev inum)%I.
@@ -1020,11 +1023,12 @@ Section IcacheTable.
   (* THE LAST CLOSER'S JOIN, and the second half of REF-1 EXCLUSIVITY at
      the points-to level: [iref_lookup] forced [q = qt] on a slot whose
      count is one, so the closer's share plus whatever the table kept is
-     everything the TABLE can ever hold of this entry -- the dev cell whole,
-     and the inum cell's half.  That is exactly [islot_free_at], i.e. the
-     slot handed back to iget as free; the inum cell's OTHER half stays in
-     the escrow's parked arm forever (§13.1b) and is joined in only by the
-     recycler, inside the escrow opening that performs the [sw] at +0x72. *)
+     everything the TABLE can ever hold of this entry -- half of each
+     identity cell.  That is exactly [islot_free_at], i.e. the slot handed
+     back to iget as free; each cell's OTHER half stays in the escrow's
+     parked arm forever (§13.1b/§13.1e) and is joined in only by the
+     recycler, inside the escrow openings that perform the [sw]s at +0x6e
+     and +0x72. *)
   Lemma islot_rest_join k (qt : Qp) dev inum :
     (qt ≤ 1/2)%Qp ->
     inode_ident k (DfracOwn qt) dev inum -∗ islot_rest k qt -∗
@@ -1033,24 +1037,18 @@ Section IcacheTable.
     intros Hle. rewrite /islot_rest /islot_rest_at /islot_free_at /inode_ident.
     destruct (1/2 - qt)%Qp as [q'|] eqn:Et.
     - apply Qp.sub_Some in Et.        (* 1/2 = qt + q' *)
-      assert (Hq : (qt + (1/2 + q'))%Qp = 1%Qp).
-      { rewrite (Qp.add_comm (1/2)%Qp q') Qp.add_assoc -Et Qp.div_2.
-        reflexivity. }
       iIntros "[Hd Hn] (%d & %n & [Hd' Hn'])".
       iDestruct (word4_pointsto_agree with "Hd Hd'") as %->.
       iDestruct (word4_pointsto_agree with "Hn Hn'") as %->.
       iSplitL "Hd Hd'".
       + iDestruct (word4_frac_join with "Hd Hd'") as "H".
-        iEval (rewrite Hq) in "H". iExact "H".
+        iEval (rewrite -Et) in "H". iExact "H".
       + iDestruct (word4_frac_join with "Hn Hn'") as "H".
         iEval (rewrite -Et) in "H". iExact "H".
     - apply Qp.sub_None in Et.
       assert (qt = (1/2)%Qp) as -> by
         (apply (anti_symm (≤)%Qp); [exact Hle | exact Et]).
-      iIntros "[Hd Hn] (%d & %n & Hd')".
-      iDestruct (word4_pointsto_agree with "Hd Hd'") as %->.
-      iSplitR "Hn"; [| iExact "Hn"].
-      iApply (word4_pointsto_half_join with "Hd Hd'").
+      iIntros "[Hd Hn] _". iFrame.
   Qed.
 
 End IcacheTable.

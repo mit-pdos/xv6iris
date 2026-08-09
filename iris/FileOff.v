@@ -43,15 +43,16 @@
    The MARKER a borrower parks is [i_valid ip ↦₄ 1]:
 
    * it is EXCLUSIVE and keyed by the INODE'S ADDRESS -- unlike
-     [InodeLock.inode_locked] / [SleepLock.sleeplocked] / [inode_key], which
-     are keyed by GHOST NAMES that a second borrower has no way to match;
-   * it is FUNGIBLE -- [inode_locked] pins its value at 1, so what a
+     [SleepLock.sleeplocked] / [IcacheEscrow.ic_tok], which are keyed by
+     GHOST NAMES that a second borrower has no way to match;
+   * it is FUNGIBLE -- a checked-out entry's valid cell is pinned at 1
+     ([InodeLock.valid_word true]), so what a
      borrower takes back on return is provably what it parked.  A slice of
      the borrower's own points-to fraction is NOT fungible (the invariant
      hands it back existentially quantified) which is why the marker cannot
      be one;
    * and readi / writei / iupdate do not touch [ip->valid], so a borrower
-     can hold it out of [inode_locked] for the whole call.
+     can hold it out of ilock's bundle for the whole call.
 
    ---- WHAT MAKES (b) WORK ---------------------------------------------
 
@@ -152,8 +153,8 @@ Section FileOff.
   Definition off_resident (k : nat) : iProp Σ :=
     (∃ v : mword 32, a_foff k ↦₄ v ∗ ⌜off_wf v⌝)%I.
 
-  (* the borrower's marker: the inode's [valid] flag, which [inode_locked]
-     pins at 1 and which no fs.c callee below ilock touches. *)
+  (* the borrower's marker: the inode's [valid] flag, which ilock hands out
+     at 1 and which no fs.c callee below ilock touches. *)
   Definition off_mark (ip : mword 64) : iProp Σ :=
     (i_valid ip ↦₄ (mword_of_int 1 : mword 32))%I.
 

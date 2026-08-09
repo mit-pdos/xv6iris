@@ -9,15 +9,21 @@
    64 bytes, 25 instructions, straight-line once the three panic tests are
    refuted -- structurally brelse's first half, and proved the same way.
 
-   THE PARK is the whole content: [InodeLock.inode_locked] is taken apart
-   and put back together as [InodeLock.inode_parked] at v = true, which is
-   exactly releasesleep's [R].  One half of the shadow goes into the lock
-   with it, the other is returned to the caller as the icache's record that
-   this inode is loaded and what it holds.
+   THE PARK is [IcacheEscrow.ic_swap_park], fired in one mask-balanced
+   opening of [ic_escrow] just before the releasesleep call: the checked-out
+   bundle (the two identity halves, the FULL valid cell, the loaded content
+   with its region fragment at the parked record -- PARKED-MEANS-FLUSHED,
+   §13.1d) goes back in, and out come the CHECKOUT TOKEN -- which is now the
+   whole of what the sleeplock protects, so it is exactly releasesleep's [R]
+   -- and the caller's REFERENCE, at its own device and inum (§13.1e).
 
-   The three panic tests: [ip == 0] and [ip->ref < 1] from the contract's
-   two premises ([InodeLock.inode_ptr_nonzero] / [inode_ref_spos]), and
-   [!holdingsleep] from the holder's bundle -- the token, the lock's pid
+   The three panic tests: [ip == 0] because the entry is slot [k]
+   ([iul_entry_nonzero], i.e. [IcacheInv.ientry_unsigned]); [ip->ref < 1]
+   from [IcacheInv.iref_load_au] against [itable_inv], over a reference
+   BORROWED out of the escrow's checked-out arm for that one atomic update
+   ([ic_open_out]; the holder's FULL valid cell is what refutes the other two
+   arms) -- after ilock's deposit the holder owns no reference of its own;
+   and [!holdingsleep] from the holder's bundle -- the token, the lock's pid
    field and the caller's own pid cell agreeing -- which is what makes
    SpecHoldingsleep's HOLDER variant answer 1. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
@@ -49,6 +55,14 @@ Require Import FsBlocks.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
+Require Import InodeRegion.
+Require Import IrefSlots.
+Require Import IcacheInv.
+Require Import IcacheEscrow.
+Require Import KptGhost.
+Require Import MinstretInv.
+Require Import RiscvFetchExec.
+Require Import SpecPanic.
 Require Import CodeIunlock.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecIunlock.
@@ -56,6 +70,55 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
+
+(* the entry address is never zero -- [ProofIlock.il_entry_nonzero]'s twin
+   (a proof file may not import another proof file) *)
+Lemma iul_entry_nonzero (k : nat) : (k < NINODE)%nat -> uint (ientry k) <> 0.
+Proof.
+  intros Hk. rewrite uint_unsigned (ientry_unsigned k ltac:(lia)).
+  unfold ISLOTSZ, KernelSyms.itable. lia.
+Qed.
+
+(* the mask-carrying compressed width-4 load ([ProofIdup.wp_lw_au_idup]) *)
+Section IunlockAuLeaf.
+  Context `{!riscvGS Σ, !sieG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+  Context {p : mword 64}.
+
+  Lemma wp_lw_au_iunlock (cmp : bool)
+      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (m : regfile) (av : nat) (Psi : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
+      {dqm : dfrac} :
+    uint rd <> 0 ->
+    rd_ok rd ->
+    ↑kptN ⊆ Em ->
+    sie_cap_gpr m av b p -∗
+    pc_is pc -∗
+    instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
+    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
+       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
+       (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
+          ={Em, ⊤ ∖ ↑minstretN}=∗ Psi v)) -∗
+    ( ∀ v : mword 32,
+      wp_next b p (fun (CID : CpuId) =>
+        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
+        pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
+        Psi v -∗
+        WP (Loop : expr riscv_lang))) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    intros Hrd Hrdok HkptEm.
+    iIntros "Hcg Hpc Hinstr HAU Hcont".
+    iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
+              (fun w => sign_extend' 64 w) Psi Em b
+              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
+              ltac:(exists 1024; reflexivity)
+              ltac:(vm_compute; reflexivity)
+              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
+              with "Hcg Hpc Hinstr HAU Hcont").
+  Qed.
+
+End IunlockAuLeaf.
 
 Module IunlockProof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) : IUNLOCK.
 
@@ -89,7 +152,7 @@ Definition iul_sp (m M : regfile) : Prop :=
 
 Section ProofIunlockMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-            !fsLogG Σ, !inodeG Σ}.
+            !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* iunlock's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
@@ -100,40 +163,46 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
 
   Definition iul_cont `{CID0 : CpuId} 
-      (gi : gname) (ip : mword 64) (refv : mword 32)
-      (dn : dinode) (bm : blkmap)
-      (pidv : mword 32) (dq dqr : dfrac)
+      (cn : ic_names) (k : nat) (dev inum : mword 32)
+      (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool) : iProp Σ :=
     wp_next b p (fun (CID : CpuId) =>
-      ∀ mf : regfile,
+      ∀ (mf : regfile) (q : Qp),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf K b p -∗
         cpu_own 0 eb p C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid p ↦₄{dq} pidv -∗
-        i_ref ip ↦₄{dqr} refv -∗
-        inode_key gi true dn bm -∗
+        inode_ref (icn_ref cn) k q dev inum -∗
         WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_iunlock_sconf 
       (gs : list gname)
       (gfs : fs_names) (gi : gname)
+      (cn : ic_names)
       (gil gisl : gname)
       (cov : gset Z) (logstart : Z)
-      (ip : mword 64) (refv : mword 32)
-      (dn : dinode) (bm : blkmap)
-      (pidv : mword 32) (dq dqr : dfrac)
+      (k : nat) (dev inum : mword 32)
+      (dn' : dinode) (bm' : blkmap)
+      (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool)
-    : wp_iunlock_sconf_body gs gfs gi gil gisl cov logstart ip refv dn bm
-                            pidv dq dqr m K eb p C b.
+    : wp_iunlock_sconf_body gs gfs gi cn gil gisl cov logstart k dev inum
+                            dn' bm' pidv dq m K eb p C b.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
-    intros pcE ret_tgt HK Ha0 Hipnz Href.
+    intros pcE ip ret_tgt HK Hk Ha0.
     pose proof HK as HK'. unfold K_iunlock in HK'.
-    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hslk Hstok Hpid Hppid Href #Hprocs Hlk Hcont".
-    iAssert (iul_cont (CID0 := CID)  gi ip refv dn bm pidv dq dqr m K eb p C b)%I
+    assert (Hipe : ip = ientry k) by reflexivity.
+    assert (Hipnz : uint ip <> 0)
+      by (rewrite Hipe; exact (iul_entry_nonzero k Hk)).
+    iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hitbl #Hesc #Hslk Hstok Hpid Hppid
+              #Hprocs Hidev Hinumc Hvalid Hlk Hcont".
+    iEval (rewrite Hipe) in "Hidev".
+    iEval (rewrite Hipe) in "Hinumc".
+    iEval (rewrite Hipe) in "Hvalid".
+    iAssert (iul_cont (CID0 := CID)  cn k dev inum pidv dq m K eb p C b)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     iPoseProof (iui2_00 with "Htext") as "Hi00".
     iPoseProof (iui2_02 with "Htext") as "Hi02".
@@ -346,7 +415,7 @@ Section ProofIunlockMain.
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iApply (HS.wp_holdingsleep_sconf (dq := dq) gil gisl "inode"%string
-              (inode_parked gfs gi cov logstart ip) R6 p pidv (K - 4)%nat eb C b
+              (ic_tok cn k) R6 p pidv (K - 4)%nat eb C b
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hpanic Hppid").
     { iEval (rewrite HR6a0). iExact "Hslk". }
@@ -388,16 +457,36 @@ Section ProofIunlockMain.
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.iunlock + 0x1a) : mword 64) 2
                     = mword_of_int (KernelSyms.iunlock + 0x1c)) by pcw.
     iEval (rewrite Hpp1c) in "Hpc".
-    (* ===== +0x1c c.lw a5,8(s1) : a5 := ip->ref ===== *)
+    (* ===== +0x1c c.lw a5,8(s1) : a5 := ip->ref, HOLDING NOTHING.
+       The holder deposited its whole reference at ilock's checkout, so it
+       BORROWS one out of the escrow's checked-out arm for the duration of
+       this single atomic update -- [ic_open_out], refuting the other two
+       arms with the FULL valid cell it is carrying (§13.1d) -- and reads
+       the word through [iref_load_au] inside that opening. ===== *)
     assert (Hrefadr : add_vec (rget mH Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                       = i_ref ip).
     { rgne. rewrite HmHs1. reflexivity. }
-    iEval (rewrite -Hrefadr) in "Href".
-    iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
-              (mword_of_int 8 : mword 12) mH (K - 4)%nat refv b
-              ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi1c Href").
-    iIntros (CID14 Hq14) "Hcg Hpc Href".
-    iEval (rewrite Hrefadr) in "Href".
+    iApply (wp_lw_au_iunlock true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
+              (mword_of_int 8 : mword 12) mH (K - 4)%nat
+              (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
+                         i_valid (ientry k) ↦₄ valid_word true)%I)
+              (⊤ ∖ ↑minstretN ∖ ↑icEscN ∖ ↑icacheN) b
+              ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
+              with "Hcg Hpc Hi1c [Hvalid]").
+    { rewrite Hrefadr Hipe.
+      iInv "Hesc" as ">Hbody" "Hclose".
+      iDestruct (ic_open_out cn gfs gi cov logstart k true with "Hbody Hvalid")
+        as "[Hvalid Hbor]".
+      iDestruct "Hbor" as (qb devb inumb) "[Hrefb Hbback]".
+      iDestruct "Hrefb" as "[Hrt Hrid]".
+      iMod (iref_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) (icn_ref cn) k qb
+              ltac:(solve_ndisj) with "Hitbl Hrt") as (v) "[Hcell Hcl]".
+      iModIntro. iExists v. iFrame "Hcell". iIntros "Hcell".
+      iMod ("Hcl" with "Hcell") as "[%Hb Hrt]".
+      iMod ("Hclose" with "[Hbback Hrt Hrid]") as "_".
+      { iNext. iApply "Hbback". rewrite /inode_ref. iFrame. }
+      iModIntro. iFrame "Hvalid". iPureIntro. exact Hb. }
+    iIntros (refv CID14 Hq14) "Hcg Hpc [%Href Hvalid]".
     set (R7 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> mH).
     assert (HR7a5 : R7 !!! Regidx Ra5 = (sign_extend' 64 refv : mword 64))
       by (rewrite /R7; apply upd_eq).
@@ -462,23 +551,26 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID17) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    (* THE PARK: the locked inode, re-packaged as the lock's resource *)
-    iDestruct "Hlk" as (data) "(%Hok & [Hkey1 Hkey2] & Hvalid & Hmeta & Hmap & Hblocks)".
-    iDestruct "Hmap" as "[Haddrs Hindres]".
+    (* THE PARK: one mask-balanced opening of the escrow puts the whole
+       checked-out bundle back and takes the CHECKOUT TOKEN -- which is all
+       the sleeplock protects now -- and the caller's reference out. *)
+    iApply fupd_wp.
+    iAssert (∃ (dn0 : dinode) (bm0 : blkmap),
+               ic_loaded gfs gi cov logstart k inum dn0 bm0)%I
+      with "[Hlk]" as "Hpay"; [iExists dn', bm'; iExact "Hlk" |].
+    iInv "Hesc" as ">Hbody" "Hclose".
+    iDestruct (ic_swap_park cn gfs gi cov logstart k true dev inum
+                 with "Hbody Hidev Hinumc Hvalid Hpay")
+      as "(Hbody & Htok & Hrefout)".
+    iMod ("Hclose" with "[Hbody]") as "_"; [iNext; iExact "Hbody" |].
+    iModIntro.
+    iDestruct "Hrefout" as (qr) "Href".
     iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string
-              (inode_parked gfs gi cov logstart ip) R9 pidv p (K - 4)%nat eb C b
+              (ic_tok cn k) R9 pidv p (K - 4)%nat eb C b
               ltac:(lia)
-              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] [Hkey1 Hvalid Hindres Hblocks Hmeta Haddrs] Hpanic Hprocs").
+              with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Htok Hpanic Hprocs").
     { iEval (rewrite HR9a0). iExact "Hslk". }
     { iEval (rewrite HR9a0). iExact "Hpid". }
-    { rewrite /inode_parked.
-      iExists true, dn, bm, data.
-      iSplitR; [iPureIntro; exact Hok |].
-      iSplitL "Hkey1"; [iExact "Hkey1" |].
-      iSplitL "Hvalid"; [iExact "Hvalid" |].
-      iSplitL "Hindres"; [iExact "Hindres" |].
-      iSplitL "Hblocks"; [iExact "Hblocks" |].
-      iSplitL "Hmeta"; [iExact "Hmeta" | iExact "Haddrs"]. }
     iIntros (CID18 Hq18 mR) "%Hcs2 Hcg Hcnt Hpc".
     assert (Hpc28 : ret_pc (R9 !!! Regidx Rra : mword 64)
                     = mword_of_int (KernelSyms.iunlock + 0x28)) by (rewrite HR9ra; pcw).
@@ -693,7 +785,7 @@ Section ProofIunlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     rewrite /iul_cont.
     iSpecialize ("Hcont" $! CID24 with "[%]"); [wp_next_chain |].
-    iApply ("Hcont" $! P5 with "[%] Hcg Hcnt Hpc Hppid Href Hkey2").
+    iApply ("Hcont" $! P5 qr with "[%] Hcg Hcnt Hpc Hppid Href").
     { unfold callee_saved. split_and!; assumption. }
   Qed.
 

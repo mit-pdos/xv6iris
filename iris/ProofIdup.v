@@ -54,8 +54,14 @@ Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import InodeInv.
+Require Import DiskPtsto.
+Require Import FsBlocks LogInv FsCrash.
+Require Import DinodeEnc.
+Require Import InodeLock.
+Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
+Require Import IcacheEscrow.
 Require Import CodeIdup.
 Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
@@ -142,7 +148,8 @@ End IdupAuLeaves.
 Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) : IDUP.
 
 Section ProofIdup.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
@@ -176,10 +183,13 @@ Section ProofIdup.
   Qed.
 
   Lemma wp_idup_sconf
-      (γl γ : gname) (k : nat) (q : Qp) (dev inum : mword 32)
+      (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (nib : nat)
+      (k : nat) (q : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool)
-    : wp_idup_sconf_body γl γ k q dev inum m n eb p C K b.
+    : wp_idup_sconf_body γl cn γfs γi cov logstart nib k q dev inum
+                         m n eb p C K b.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0.
@@ -340,7 +350,7 @@ Section ProofIdup.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf γl "itable"%string (itable_res γ) mA
+    iApply (Acquire.wp_acquire_sconf γl "itable"%string (itable_res2 cn γfs γi cov logstart nib) mA
               n eb p C (K - 4)%nat b
               HnZ ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic [-]").
@@ -355,12 +365,20 @@ Section ProofIdup.
     assert (Hms1 : macq !!! Regidx Rs1 = ientry k)
       by (rewrite (callee_saved_lookup Hacqpins_cs (mword_of_int 9) ltac:(vm_compute; reflexivity)); exact HmAs1).
     (* ===== the critical section (literal [false], no hart threading) ===== *)
-    iDestruct "HRres" as (M) "(Hhalf & %Hwf & Hiauth & Hslots)".
+    iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hslots & Hpool)".
     iDestruct "Href" as "[Hrtok Hrident]".
     iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt & _ & _).
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
-    iDestruct (islots_acc_upd M k Hk with "Hslots") as "[Hslot Hback]".
-    iEval (rewrite /islot HMk) in "Hslot".
+    (* [ci] is live exactly where [M] is (§13.2's first wf clause), so the
+       slot's identity values are readable off [ci !! k] -- which is what
+       makes [islot2]'s two mismatched arms unreachable. *)
+    assert (Hcik : exists di : mword 32 * mword 32, ci !! k = Some di).
+    { destruct Hciwf as [Hdom _].
+      assert (Hin : k ∈ dom ci) by (rewrite Hdom; apply elem_of_dom; by eexists).
+      apply elem_of_dom in Hin. exact Hin. }
+    destruct Hcik as [[cdev cinum] Hcik].
+    iDestruct (islots2_acc_upd M ci k Hk with "Hslots") as "[Hslot Hback]".
+    iEval (rewrite /islot2 HMk Hcik) in "Hslot".
     iDestruct "Hslot" as "(Hrest & Hiu)".
     (* the iref-slot conservation law: the caller's unit plus the ones the
        table already holds for this entry are within the fixed supply, so the
@@ -386,12 +404,12 @@ Section ProofIdup.
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
     iApply (wp_lw_au_idup true (mword_of_int (KernelSyms.idup + 0x18)) Ra5 Rs1
               (mword_of_int 8 : mword 12) macq (K - 4)%nat
-              (fun v => (⌜v = iref_word M k⌝ ∗ itable_half γ M)%I)
+              (fun v => (⌜v = iref_word M k⌝ ∗ itable_half (icn_ref cn) M)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc Hi18 [Hhalf] [-]").
     { rewrite Hpa.
-      iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) γ M k ltac:(solve_ndisj) Hk
+      iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) (icn_ref cn) M k ltac:(solve_ndisj) Hk
               with "Hinv Hhalf") as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback" with "Hcell") as "Hhalf". iModIntro. by iFrame. }
@@ -436,13 +454,13 @@ Section ProofIdup.
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
     iApply (wp_sw_au_idup true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) D2 (K - 4)%nat
-              (itable_half γ (<[k := (qt, Pos.succ cnt)]> M) ∗
-               iref_tok γ k (q/2)%Qp ∗ iref_tok γ k (q/2)%Qp)%I
+              (itable_half (icn_ref cn) (<[k := (qt, Pos.succ cnt)]> M) ∗
+               iref_tok (icn_ref cn) k (q/2)%Qp ∗ iref_tok (icn_ref cn) k (q/2)%Qp)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(solve_ndisj)
               with "Hcg Hpc Hi1c [Hhalf Hrtok] [-]").
     { rewrite Hpa2 Hstv.
-      iMod (iref_dup_store_au (⊤ ∖ ↑minstretN) γ M k q qt cnt
+      iMod (iref_dup_store_au (⊤ ∖ ↑minstretN) (icn_ref cn) M k q qt cnt
               ltac:(solve_ndisj) HMk Hno with "Hinv Hhalf Hrtok") as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback" with "Hcell") as "(Hhalf & Ht1 & Ht2)". iModIntro. iFrame. }
@@ -451,12 +469,21 @@ Section ProofIdup.
     iDestruct (inode_ident_split k (q/2) (q/2) dev inum) as "[Hsplit _]".
     iEval (rewrite Qp.div_2) in "Hsplit".
     iDestruct ("Hsplit" with "Hrident") as "[Hid1 Hid2]".
-    iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> M) with "[%] [Hrest Hiu]") as "Hslots".
+    iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> M) ci
+                 with "[%] [%] [Hrest Hiu]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
-    { rewrite /islot lookup_insert. iFrame "Hrest Hiu". }
-    iAssert (itable_res γ) with "[Hhalf Hiauth Hslots]" as "HRres".
-    { iExists (<[k := (qt, Pos.succ cnt)]> M). iFrame "Hhalf Hiauth".
-      iSplitR; [| iExact "Hslots"].
+    { intros j Hj. reflexivity. }
+    { rewrite /islot2 lookup_insert Hcik. iFrame "Hrest Hiu". }
+    iAssert (itable_res2 cn γfs γi cov logstart nib) with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
+    { iExists (<[k := (qt, Pos.succ cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
+      iSplitR; [| iSplitR; [| iExact "Hslots"]].
+      2:{ (* [ci] did not move, and [M]'s domain did not either: the slot was
+             already live, so §13.2's three clauses are preserved. *)
+        iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange).
+        split_and!; [| exact Hinj | exact Hrange].
+        rewrite dom_insert_L Hdom.
+        assert (Hkin : k ∈ dom M) by (apply elem_of_dom; by eexists).
+        set_solver. }
       iPureIntro. destruct Hwf as [Hdom Hcnt'].  split.
       - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
         rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
@@ -521,7 +548,7 @@ Section ProofIdup.
       rewrite /D3 upd_ne; [| vm_compute; discriminate]. exact HD2s1. }
     assert (HD5ra : D5 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.idup + 0x26) : mword 64) 4)
       by (rewrite /D5; apply upd_eq).
-    iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res γ) D5
+    iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)
