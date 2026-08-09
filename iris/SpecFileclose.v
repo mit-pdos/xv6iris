@@ -255,8 +255,17 @@ Section SpecFileclose.
     p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn.
   Proof.
     rewrite /fileclose_fs_env /fileclose_fs_env_nopid. iSplit.
-    - iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
-                Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark & $)".
+    - (* The trailing [$] used to close [p_pid] here too, but a [$]/[iFrame]
+         does not just place a known hypothesis -- it SEARCHES the goal for a
+         match, and here the goal is the 11-conjunct [nopid] bundle sitting
+         next to [p_pid]: that search alone was measured at ~14 s (worse than
+         the whole structural [iSplitL] chain below it). Naming it and
+         routing it with [iSplitL] is a positional split, not a search --
+         O(1) instead of O(#conjuncts). *)
+      iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
+                Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark & Hpid)".
+      iSplitL "Hpr Hsc Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs Hpark";
+        [| iExact "Hpid"].
       do 6 (iSplitR; [iPureIntro; assumption|]).
       (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
          still walks the whole 11-conjunct goal per hypothesis (measured
@@ -273,8 +282,11 @@ Section SpecFileclose.
       iSplitL "Hdlk"; [iExact "Hdlk"|].
       iSplitL "Hbs"; [iExact "Hbs"|].
       iExact "Hpark".
-    - iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
-                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark) $]".
+    - (* Same fix, mirrored: name [p_pid] instead of destructuring it with
+         [$], and place it with the same structural chain -- the [$] here
+         searched the 17-conjunct [fileclose_fs_env] goal instead, ~11 s. *)
+      iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hsc & Hbio & Hlog &
+                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpark) Hpid]".
       do 6 (iSplitR; [iPureIntro; assumption|]).
       iSplitL "Hpr"; [iExact "Hpr"|].
       iSplitL "Hsc"; [iExact "Hsc"|].
@@ -286,7 +298,7 @@ Section SpecFileclose.
       iSplitL "Hgeom"; [iExact "Hgeom"|].
       iSplitL "Hdlk"; [iExact "Hdlk"|].
       iSplitL "Hbs"; [iExact "Hbs"|].
-      iExact "Hpark".
+      iSplitL "Hpark"; [iExact "Hpark"|iExact "Hpid"].
   Qed.
 
   Definition fileclose_fs_out (fn : fclose_names) : iProp Σ :=
