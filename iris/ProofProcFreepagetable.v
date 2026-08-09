@@ -198,9 +198,22 @@ Section ProofProcFreepagetable.
      does NOT work -- [c] is a variable there. *)
   (* [Hc] is the [is_cs_idx c = true] hypothesis; SUBST first, then compute --
      [vm_compute in Hc] on a variable [c] does nothing. *)
+  (* [congruence] MUST come before the [vm_compute] branch: at every layer
+     whose written register IS one of the four ([csp_rs1]/[Rs0]/[Rs1]/[Rs2]),
+     [Hc] stays TRUE post-subst, so leading with [vm_compute in Hc;
+     discriminate] pays for that branch's FAILURE -- and a failed [vm_compute]
+     grows with the surrounding proof term, ~1 s a layer near the prologue and
+     ~10 s a layer by the epilogue (measured on the analogous [ppt_thr] peel,
+     proc-pagetable-ownership.md). [congruence] closes those layers instantly
+     from [H2]/[H8]/[H9]/[H18] (post-subst one of them reads [k <> k]); it
+     only falls through to [vm_compute] for a genuinely non-callee-saved
+     write, where it fails fast on a syntactic mismatch. The two [pf_thr]
+     peel sites this hits hardest (:902, the deepest -- 27.68 s; :505, the
+     shallowest -- 10.05 s) both drop off this file's expensive-sentence
+     list entirely; file total 53.77 s -> 27.42 s (1.96x). *)
   Ltac thr_side Hc :=
     intros Hx; injection Hx as Hx2; subst;
-    first [ vm_compute in Hc; discriminate | congruence ].
+    first [ congruence | vm_compute in Hc; discriminate ].
 
   (* the callee-saved registers proc_freepagetable itself writes *)
   Definition pf_thr (mm m : regfile) : Prop :=
