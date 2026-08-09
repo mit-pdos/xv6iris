@@ -54,15 +54,7 @@ scheduler's two stores to it are plain `wp_sd_s_sconf` / `wp_sd_zero_s_sconf`.
 
 ## Remaining work
 
-### 1. Retire `ProofKwait.kw_rt` and `kw_exit_fn`'s `R` parameter
-
-`kw_rt pme jj` was `running_claim jj` and is now literally `emp`.  It was left
-as `emp` to unblock the build rather than threaded away, because `R` is a
-parameter of `kw_exit_fn` and of the scan induction — ~40 sites in one file.
-Nothing is carried, so both should go.  This is the one knowingly-vacuous
-thing the sweep left standing.
-
-### 2. Stale comments
+### 1. Stale comments
 
 `SchedCtx.v:69,73` (`schedsN` and the `fin_enum_lookup` / `cpu_enum_lookup`
 plumbing are now unused — delete if nothing else wants them),
@@ -70,7 +62,7 @@ plumbing are now unused — delete if nothing else wants them),
 `SpecBalloc.v:96-97`, `SpecKexit.v:58`, `ProofBwrite.v:418-419`,
 `ProofAcquiresleep.v` header, `ProofUartwrite.v:68-69`, `ProofSysPause.v:92-93`.
 
-### 3. `Print Assumptions` on the parking cone
+### 2. `Print Assumptions` on the parking cone
 
 The definitive check after an interface change of this size
 (`durable-notes.md`, "Write the checker for a refactor's SILENT failure
