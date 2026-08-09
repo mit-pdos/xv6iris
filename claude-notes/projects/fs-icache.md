@@ -155,22 +155,27 @@ out 2026-08-09):**
   (icn_ref cn)`, `ic_escrow cn γfs γi cov logstart k`, `ireg_inv γi
   γfs inodestart nib`, the caller's reference `inode_ref (icn_ref cn)
   k q dev inum` (subsumes the old dev/inum fractions), and the
-  sleeplock now over `ic_tok cn k`. POST (corrected per §13.1d — a
-  reference cannot fraction-split without the authority, so checkout
-  deposits it WHOLE): `sleeplocked` + `sl_pid` + NO reference back +
-  the loaded bundle at ∃-bound `(dn, bm)`: valid cell at 1,
-  `inode_meta`/`inode_addrs`/`ind_res`/`inode_blocks` + `dinode_at γi
-  inum dn` + the arm's inum-cell half (PARKED-MEANS-FLUSHED: at park
-  the region record must equal the parked record; inside the critical
-  section it may lag until iupdate retags — the bundle's dinode_at is
-  therefore at a separate existential while checked out). THE "no
-  type" PANIC IS LIVE on the free-inode arm (§13.1) — say so in the
-  header; the null/ref panic stays refuted.
-- **SpecIunlock v2**: consumes the bundle at whatever `(dn', bm')` the
-  holder ended with — WITH `dinode_at γi inum dn'` (the flushed-record
-  obligation, §13.1d) — parks it, returns the caller's reference WHOLE
-  (from the OUT arm) after its own lock-free ref read via
-  `ic_open_out`.
+  sleeplock now over `ic_tok cn k`. POST (corrected per §13.1d/e/§13.6):
+  `sleeplocked` + `sl_pid` + NO reference back + BOTH identity-cell
+  halves at the caller's values (`i_dev ↦₄{½} dev ∗ i_inum ↦₄{½} inum`
+  — §13.1e) + `i_valid ↦₄ 1` + `IcacheEscrow.ic_loaded γfs γi cov
+  logstart k inum dn bm` VERBATIM at ∃-bound `(dn, bm)` (its dinode_at
+  is at the SAME dn — §13.6). THE "no type" PANIC IS LIVE on the
+  free-inode arm (§13.1) — say so in the header; the null/ref panic
+  stays refuted.
+- **SpecIunlock v2**: consumes `ic_loaded` at whatever `(dn', bm')` the
+  holder ended with (its dinode_at at dn' IS the flushed-record
+  obligation, §13.6) + the two identity halves + the valid cell; parks
+  it; returns `∃ q, inode_ref (icn_ref cn) k q dev inum` — dev/inum
+  PINNED, only q existential (§13.1e) — after its lock-free ref read
+  via `ic_open_out`.
+- **Pre-stage for the flip (adopted from C3b attempt 1's analysis,
+  ~30 mechanical lines):** §13.1e's dev-cell tie in IcacheEscrow.v +
+  the symmetric islot_rest_at/islot_free_at re-budget in IcacheInv.v
+  (ProofIdup ride-through re-checked), and §13.5's `inode_ok` size-cap
+  conjunct in InodeLock.v (discharges: ProofItrunc at size 0, ProofWritei
+  from its cap premise; ProofIlock v1 need not discharge it — it is
+  deleted by the flip in the same batch).
 - **SpecIdup flip**: `is_itable γl γic` → `is_itable2 γl cn …` with
   `γic := icn_ref cn`; the ref++ interior is untouched (ProofIdup
   frames the pool/ci through its critical section).

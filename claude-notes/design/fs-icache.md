@@ -1277,6 +1277,63 @@ Two facts surfaced landing `IcacheEscrow.v`, both now normative:
   (bio's split): what an evicted payload becomes is iget's argument,
   made between the two, not the definitional layer's.
 
+### 13.1e §13.1b's dev-cell exemption was WRONG: the arm ties BOTH
+### identity cells, symmetrically (C3b attempt 1, 2026-08-09)
+
+"The dev cell needs no arm tie — `dinode_at` is inum-keyed" (§13.1b)
+dies on two consumers, found by the first C3b attempt (which correctly
+stopped without editing):
+
+* **ilock's `bread(ip->dev, …)`** (+0x48 `c.lw a0,0(s1)`): the checkout
+  deposits the caller's WHOLE reference (§13.1d) — the only `i_dev`
+  fraction ilock ever holds — so after checkout nothing can read the
+  dev cell or name its value for `SpecBread`'s `dev = bv_dev V`
+  premise. Borrowing via `ic_open_out` re-existentialises it.
+* **iunlock's returned reference** would sit at an ∃-bound device, so
+  no caller could ever ilock the same inode twice.
+
+The fix is bio verbatim (`buf_parked` holds `b_dev ↦₄{½}`;
+`escrow_swap_checkout` pins and hands the half out;
+`escrow_swap_park` returns the reference with dev/inum pinned, only
+`q` existential): `ic_parked` gains `i_dev (ientry k) ↦₄{½} dev`
+(∃-bound), the checkout returns it at the CALLER's dev by agreement,
+the park takes it back and returns `∃ q, inode_ref … k q dev inum`,
+`ic_mid_arm` carries the dev cell too (either polarity — inum stays
+the sole parked/mid discriminator), and the §13.1b budget becomes
+SYMMETRIC: both identity cells at `½ escrow + q refs + (½−q) table`,
+so `islot_rest_at k q dev inum = inode_ident k (DfracOwn (½−q)) dev
+inum` and `islot_free_at = inode_ident k (DfracOwn ½) dev inum` —
+simpler than the lopsided version. iget's `sw dev` at +0x6e then
+needs the escrow's half joined in, as its own open/close pair (NOT a
+widening of the MID window — dev is not payload-coupled).
+
+### 13.5 `inode_ok` gains the size cap
+
+`SpecReadi`'s `bv_unsigned (di_size dn) <= MAXFILE * BSIZE` premise
+(the fact that keeps bmap off its out-of-range panic) is suppliable
+today only because fileread knows `dn`; under SpecIlock v2 `dn` is an
+OUTPUT, so the fact must ride the bundle: one new `inode_ok` conjunct.
+Producers all discharge it — itrunc truncates to size 0, writei
+already caps `off+n`, ilock's uncached arm inherits it from the pool
+shape, and the C7 boot stocking owes it (add to C7's list). No other
+contract consumes `inode_ok` (checked). `IcacheEscrow` inherits it
+textually with no edit.
+
+### 13.6 The bundle's dinode_at ties to the SAME dn (correction to the
+### first C3b worklist block)
+
+A separate `dn0` existential in ilock's postcondition makes fileread
+UNPROVABLE: readi never flushes, so iunlock's PARKED-MEANS-FLUSHED
+obligation would be undischargeable. The strong form holds on both
+arms (cached: the parked arm IS at its own dn; uncached: the loads
+reconstruct exactly the `dn0` that `ireg_read` pinned, so `dn = dn0`).
+ilock's postcondition hands back `ic_loaded γfs γi cov logstart k inum
+dn bm` VERBATIM (∃-bound dn, bm), which is literally iunlock's
+precondition and exactly what `ic_swap_park` consumes. The lag-window
+freedom of §13.1d applies only to holders that EDIT (writei/itrunc
+between their edit and their iupdate), and those flush before
+unlocking.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
