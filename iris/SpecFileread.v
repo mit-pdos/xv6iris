@@ -133,6 +133,10 @@ Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
 Require Import InodeLock.
+Require Import InodeRegion.
+Require Import IrefSlots.
+Require Import IcacheInv.
+Require Import IcacheEscrow.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import KvmSpec.
@@ -221,7 +225,8 @@ Record fread_names := MkFReadNames {
   frn_pu         : mword 64;
   frn_bio        : bio_names;
   frn_fs         : fs_names;
-  frn_ikey       : gname;         (* the inode shadow (InodeLock.v)         *)
+  frn_ireg       : gname;         (* the inode region (InodeRegion.v)       *)
+  frn_ic         : ic_names;      (* the icache's names (IcacheEscrow.v)    *)
   frn_ilk        : gname;         (* ip->lock's inner spinlock              *)
   frn_islk       : gname;         (* ip->lock's holder token                *)
   frn_cov        : gset Z;
@@ -229,14 +234,9 @@ Record fread_names := MkFReadNames {
   frn_inodestart : Z;
   frn_dev        : mword 32;
   frn_inum       : mword 32;
-  frn_refv       : mword 32;
-  frn_vv         : bool;          (* has this inode ever been loaded?       *)
-  frn_dn         : dinode;
-  frn_bm         : blkmap;
-  frn_ds         : list dinode;   (* the inode block, as sixteen dinodes    *)
-  frn_dqd        : dfrac;         (* ip->dev                                *)
-  frn_dqn        : dfrac;         (* ip->inum                               *)
-  frn_dqr        : dfrac;         (* ip->ref                                *)
+  frn_nib        : nat;           (* the inode region's block count         *)
+  frn_ik         : nat;           (* the itable SLOT this inode is           *)
+  frn_q          : Qp;            (* the borrowed reference's fraction       *)
   frn_dqs        : dfrac;         (* sb.inodestart                          *)
   frn_rp         : mword 64;      (* devsw[major].read                      *)
   frn_dqv        : dfrac;         (* ...and that cell's fraction            *)
@@ -259,16 +259,15 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkFsNames 1%positive 1%positive 1%positive)
-    1%positive 1%positive 1%positive
-    ∅ 0 0 (mword_of_int 0) (mword_of_int 0) (mword_of_int 0) false
-    inhabitant (MkBlkmap [] (mword_of_int 0 : mword 32) [])
-    [] (DfracOwn 1) (DfracOwn 1) (DfracOwn 1) (DfracOwn 1)
+    1%positive (MkIcNames 1%positive (fun _ => 1%positive) (fun _ => 1%positive))
+    1%positive 1%positive
+    ∅ 0 0 (mword_of_int 0) (mword_of_int 0) 0%nat 0%nat 1%Qp (DfracOwn 1)
     (mword_of_int 0) (DfracOwn 1)).
 
 Section SpecFileread.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !inodeG Σ}.
+            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
@@ -295,36 +294,42 @@ Section SpecFileread.
     (⌜log_geom_ok (frn_cov fn) (frn_logstart fn)⌝ ∗
      ⌜0 <= frn_inodestart fn⌝ ∗
      ⌜IBLOCK (frn_inum fn) (frn_inodestart fn) ∈ frn_cov fn⌝ ∗
-     ⌜diblk_wf (frn_ds fn)⌝ ∗
-     (* the deferred inode table's obligation; see SpecIlock.v *)
-     ⌜frn_vv fn = false ->
-        (frn_ds fn) !!! islot (frn_inum fn) = frn_dn fn⌝ ∗
-     (* a real inode with a live reference: ilock's and iunlock's dead panics *)
-     ⌜uint (fc_ip Cf) <> 0⌝ ∗
-     ⌜0 < bv_unsigned (frn_refv fn) < 2 ^ 31⌝ ∗
-     (* the file-system invariant readi trusts instead of checking: a size
-        past MAXFILE*BSIZE would drive bmap into its out-of-range panic *)
-     ⌜bv_unsigned (di_size (frn_dn fn))
-        <= Z.of_nat MAXFILE * Z.of_nat BSIZE⌝ ∗
+     (* the inum is inside the inode region: [ireg_read]'s premise *)
+     ⌜bv_unsigned (frn_inum fn) < 16 * Z.of_nat (frn_nib fn)⌝ ∗
+     (* THE INODE IS ITABLE SLOT [frn_ik fn].  This replaces v1's
+        [uint (fc_ip Cf) <> 0]: [IcacheInv.ientry_unsigned] refutes ilock's
+        and iunlock's null test outright.  Their [ref < 1] test is refuted
+        from [itable_inv] by [iref_load_au], so v1's [0 < refv < 2^31]
+        premise about a caller-owned [i_ref] fraction is gone too.  And
+        readi's [size <= MAXFILE*BSIZE] premise is gone because ilock's
+        record is now an OUTPUT: the bound travels with it, as the fifth
+        conjunct of [InodeLock.inode_ok] (design §13.5). *)
+     ⌜fc_ip Cf = ientry (frn_ik fn)⌝ ∗
+     ⌜(frn_ik fn < NINODE)%nat⌝ ∗
      (* THE OFF-BORROW INVARIANT for this slot -- persistent, and the whole
         reason design/file-table.md's stage 2 exists *)
      off_inv γf k ∗
      bio_ctx (frn_bio fn)
        (fs_view (frn_fs fn) (frn_disk fn) (frn_dev fn) (frn_cov fn)) ∗
-     (* THE INODE'S SLEEPLOCK and the caller's half of the shadow *)
+     (* THE THREE PERSISTENT INVARIANTS SpecIlock v2 / SpecIunlock v2 take:
+        the [ref] words, the entry's content escrow, the inode region.  They
+        replace v1's [inode_parked] sleeplock, its [inode_key] shadow half,
+        its [i_ref] fraction and its whole-inode-block [fsblock]. *)
+     itable_inv (icn_ref (frn_ic fn)) ∗
+     ic_escrow (frn_ic fn) (frn_fs fn) (frn_ireg fn) (frn_cov fn)
+               (frn_logstart fn) (frn_ik fn) ∗
+     ireg_inv (frn_ireg fn) (frn_fs fn) (frn_inodestart fn) (frn_nib fn) ∗
+     (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
      is_sleeplock (frn_ilk fn) (frn_islk fn) (i_lock (fc_ip Cf)) "inode"%string
-       (inode_parked (frn_fs fn) (frn_ikey fn) (frn_cov fn) (frn_logstart fn)
-                     (fc_ip Cf)) ∗
-     inode_key (frn_ikey fn) (frn_vv fn) (frn_dn fn) (frn_bm fn) ∗
-     (* ip->dev, ip->inum, ip->ref: read, never written -- FRACTIONS *)
-     i_dev (fc_ip Cf) ↦₄{frn_dqd fn} frn_dev fn ∗
-     i_inum (fc_ip Cf) ↦₄{frn_dqn fn} frn_inum fn ∗
-     i_ref (fc_ip Cf) ↦₄{frn_dqr fn} frn_refv fn ∗
+       (ic_tok (frn_ic fn) (frn_ik fn)) ∗
+     (* THE BORROWED REFERENCE.  ilock deposits it into the escrow and
+        iunlock brings it back, so what fileread hands its own caller is a
+        reference at SOME fraction -- [ic_swap_park] pins the device and the
+        inum but not the share (§13.1e), exactly as brelse does in bio. *)
+     IcacheInv.inode_ref (icn_ref (frn_ic fn)) (frn_ik fn) (frn_q fn)
+               (frn_dev fn) (frn_inum fn) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
-     (* the inode block, as sixteen pure dinodes; read, not written *)
-     fsblock (frn_fs fn) (IBLOCK (frn_inum fn) (frn_inodestart fn))
-             (diblk_bytes (frn_ds fn)) ∗
      (* the disk fabric *)
      dev_inv (frn_uart fn) (frn_disk fn) ∗
      disk_geom (frn_disk fn) (frn_pd fn) (frn_pav fn) (frn_pu fn) ∗
@@ -334,20 +339,18 @@ Section SpecFileread.
         readi's does the same, one after the other *)
      bslot (frn_bio fn))%I.
 
-  (* What comes back.  The shadow's [v] is EXISTENTIAL rather than [true]:
-     the two early returns (not readable; a type that is not FD_INODE) never
-     reach ilock, so they hand the caller's own half back untouched, and only
-     the arm that ran can promise "loaded".  A caller re-entering fileread
-     simply passes the [vv'] it got. *)
+  (* What comes back.  The reference's FRACTION is existential rather than
+     [frn_q fn]: the two early returns (not readable; a type that is not
+     FD_INODE) never reach ilock and hand the caller's own reference back
+     untouched, while the arm that ran gets one out of [ic_swap_park], which
+     pins the device and the inum but not the share.  A caller re-entering
+     fileread simply passes the [q'] it got.  (v1 had the same shape one
+     field over: its [vv'] was existential for the identical reason.) *)
   Definition fileread_fs_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    ((∃ vv' : bool, inode_key (frn_ikey fn) vv' (frn_dn fn) (frn_bm fn)) ∗
-     i_dev (fc_ip Cf) ↦₄{frn_dqd fn} frn_dev fn ∗
-     i_inum (fc_ip Cf) ↦₄{frn_dqn fn} frn_inum fn ∗
-     i_ref (fc_ip Cf) ↦₄{frn_dqr fn} frn_refv fn ∗
+    ((∃ q' : Qp, IcacheInv.inode_ref (icn_ref (frn_ic fn)) (frn_ik fn) q'
+                           (frn_dev fn) (frn_inum fn)) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
-     fsblock (frn_fs fn) (IBLOCK (frn_inum fn) (frn_inodestart fn))
-             (diblk_bytes (frn_ds fn)) ∗
      bslot (frn_bio fn))%I.
 
   (* ---- and the three, selected by the file's type ---- *)
@@ -373,9 +376,9 @@ Section SpecFileread.
     fileread_fs_env γf k fn Cf -∗ fileread_fs_out fn Cf.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hkey & Hdev & Hinum &
-              Href & Hsb & Hblk & _ & _ & _ & Hbs)".
-    iFrame "Hdev Hinum Href Hsb Hblk Hbs". iExists (frn_vv fn). iFrame "Hkey".
+    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Href & Hsb &
+              _ & _ & _ & Hbs)".
+    iFrame "Hsb Hbs". iExists (frn_q fn). iFrame "Href".
   Qed.
 
   Lemma fileread_env_out_of_env γf k fn Cf :
@@ -404,7 +407,8 @@ End SpecFileread.
 
 Definition wp_fileread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !inodeG Σ}
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
+      !icacheG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -464,7 +468,7 @@ Module Type FILEREAD.
   Parameter wp_fileread_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !inodeG Σ}
+             !icacheG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
       (γa : gname) (γf : gname)

@@ -31,6 +31,12 @@
 
    ---- THE TWO PREMISES A READER SHOULD LOOK AT TWICE -------------------
 
+   [is_itable2] is the itable spinlock over the v2 resource (design §13.2/
+   §13.3: the pure slot->inum map [ci] and the uncached POOL ride inside it
+   alongside the authority half).  idup moves only the [ref] word and [M],
+   so both of those ride through its critical section untouched -- the flip
+   from [is_itable] is a re-framing, not a re-proof (§13.4).
+
    [itable_inv γ] is where the [ref] WORDS live -- not in [itable.lock]'s
    resource.  idup writes one while holding the lock, so it opens the
    invariant and joins the two halves of the authority; that the halves meet
@@ -69,9 +75,15 @@ Require Import WpLock.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SpecPanic.
+Require Import DiskPtsto.
+Require Import FsBlocks LogInv FsCrash.
+Require Import DinodeEnc.
 Require Import InodeInv.
+Require Import InodeLock.
+Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
+Require Import IcacheEscrow.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -80,9 +92,12 @@ Local Open Scope Z_scope.
 Definition K_idup : nat := 14%nat.
 
 Definition wp_idup_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+      !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γl γ : gname) (k : nat) (q : Qp) (dev inum : mword 32)
+    (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
+    (cov : gset Z) (logstart : Z) (nib : nat)
+    (k : nat) (q : Qp) (dev inum : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
@@ -94,12 +109,12 @@ Definition wp_idup_sconf_body
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
-  is_itable γl γ -∗
-  itable_inv γ -∗
+  is_itable2 γl cn γfs γi cov logstart nib -∗
+  itable_inv (icn_ref cn) -∗
   panic_wp_any -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
-  inode_ref γ k q dev inum -∗
+  inode_ref (icn_ref cn) k q dev inum -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
@@ -107,17 +122,21 @@ Definition wp_idup_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-    inode_ref γ k (q/2)%Qp dev inum -∗
-    inode_ref γ k (q/2)%Qp dev inum -∗
+    inode_ref (icn_ref cn) k (q/2)%Qp dev inum -∗
+    inode_ref (icn_ref cn) k (q/2)%Qp dev inum -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γl γ : gname) (k : nat) (q : Qp) (dev inum : mword 32)
+      (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (nib : nat)
+      (k : nat) (q : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
-      wp_idup_sconf_body γl γ k q dev inum m n eb p C K b.
+      wp_idup_sconf_body γl cn γfs γi cov logstart nib k q dev inum
+                         m n eb p C K b.
 End IDUP.

@@ -113,7 +113,34 @@ swaps with SpecIlock in C3, and `ProofFileread` repairs there.
 
 ## C3 — the per-entry escrow, the pool, and ilock/iunlock (branch)
 
-**The definitional design is now §13 (read it in full — it went through
+**DONE 2026-08-09 (three agent runs: C3a transcription, C3b attempt 1's
+stop-and-report that produced §13.1e/13.5/13.6, C3b+c flip). Full
+remote build 907 .vo / 0 errors; lemma_diff one intentional line
+(inodeG retired); proof_coverage: idup, ilock, iunlock, fileread all
+proven. ilock's "no type" panic is the tree's first genuinely-taken
+panic arm (closes by panic_wp_any_at).**
+
+Findings worth keeping from the flip:
+- `iFrame` on a goal `<escrow body> ∗ cell` frames INTO the disjuncts
+  and instantiates their existentials; `iSplitR "H"` first, then pick
+  the arm.
+- Two shadowing traps: `IcacheInv.islot` (slot-keyed) shadows
+  `DinodeEnc.islot` (slot-in-block) — import DinodeEnc AFTER the icache
+  files; and `FileInv.inode_ref` (the emp placeholder) shadows
+  `IcacheInv.inode_ref` — qualify.
+- `wp_lw_au_*` (the compressed width-4 AU load wrapper) now exists in
+  THREE proof files (ProofIdup, ProofIlock, ProofIunlock) — OWED: lift
+  to a shared home (WpSconfMem or a small WpAu4.v) next time that
+  layer is touched.
+- `inode_ok` has NO producer anywhere in C1–C6 — the size-cap conjunct
+  (§13.5) and the whole `inode_ok` bundle are owed by C7's pool
+  stocking ALONE. Add to C7: establish `inode_ok` (incl. size cap) for
+  every allocated inum in the mkfs image.
+- iget's `+0x6e` dev store uses `ic_open_parked_free_dev` (PARKED
+  open/close with the table's half joined; MID carries dev at ½ so the
+  inum cell stays the sole discriminator).
+
+**The definitional design is §13 (read it in full — it went through
 three corrections on 2026-08-09 and supersedes §10.2/§10.3/§12.5 in
 places):** THREE arms after all (the mid window is `[+0x72, +0x7c)`,
 inum-store to valid-store, and its discriminator is the inum cell held
