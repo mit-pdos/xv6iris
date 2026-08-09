@@ -163,10 +163,27 @@ Section KforkB4Res.
     iExact "Hc".
   Qed.
 
-  (* [cwd_ref] is [inode_ref v 1] (FileInv.v), and [inode_ref] there is
-     literally [emp] -- for ANY [v], not just [zero_reg] ([cwd_ref_null]'s
-     value).  This is the general form the brief's "supplying a [cwd_ref
-     (ientry ck)]" step needs. *)
+  (* ################################################################### *)
+  (*  THIS LEMMA IS THE HOLE, WRITTEN DOWN.  DELETE IT WHEN S5 LANDS.     *)
+  (*                                                                      *)
+  (*  [ProcInv.cwd_ref v] is [FileInv.inode_ref v 1], and THAT is         *)
+  (*  literally [emp] -- so it is derivable at ANY [v], not just at        *)
+  (*  [zero_reg] the way [ProcInv.cwd_ref_null] is.  Its one use below     *)
+  (*  (the [sd a0,336(s4)] at +0xac) conjures the CHILD's cwd reference    *)
+  (*  out of nothing while idup's second half is dropped on the floor.     *)
+  (*                                                                      *)
+  (*  That is sound today and it is not a shortcut anyone chose: the       *)
+  (*  placeholder [FileInv.inode_ref] and the real [IcacheInv.inode_ref]   *)
+  (*  idup returns are DIFFERENT PREDICATES with no bridge between them,   *)
+  (*  so there is no honest route from one to the other to take.           *)
+  (*                                                                      *)
+  (*  When claude-notes/projects/cwd-ref.md lands, this lemma must be      *)
+  (*  deleted and the use at +0xac must instead CONSUME the second         *)
+  (*  [inode_ref γi ck (cq/2) cdev cinum] that idup hands back -- which is *)
+  (*  the whole reason idup returns two halves.  That is the ONE           *)
+  (*  proof-side edit this file needs; everything else here is about the   *)
+  (*  name array and the pid read and is unaffected.                       *)
+  (* ################################################################### *)
   Lemma kfk_cwd_ref_any (v : mword 64) : ⊢ (cwd_ref v : iProp Σ).
   Proof. unfold cwd_ref, FileInv.inode_ref. done. Qed.
 
@@ -512,14 +529,20 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* Package the child's final block as the existential [Vc'].     *)
     (* ------------------------------------------------------------- *)
-    iSpecialize ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hparent3 [Hchild4] Href1").
-    { exact (conj HMfcs HMfs1). }
+    iAssert (∃ Vc' : pprivate,
+               ⌜pv_sz Vc' = pv_sz Vc /\ pv_upt Vc' = pv_upt Vc /\
+                pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
+                pv_cwd Vc' = ientry ck /\ length (pv_name Vc') = PNAMELEN⌝ ∗
+               proc_priv γf npa pid_c Vc')%I
+      with "[Hchild4]" as "HchildFinal".
     { iExists Vc3.
       iSplitR.
       - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwd. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd].
-        repeat split; try reflexivity. exact Hlen_hn.
+        repeat split; reflexivity.
       - iExact "Hchild4". }
-    iExact "Hcont".
+    iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].
+    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hparent3 HchildFinal Href1").
+    exact (conj HMfcs HMfs1).
   Qed.
 
 End KforkB4Proof.

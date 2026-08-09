@@ -284,8 +284,7 @@ Section ProofKforkB5.
     set (M4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget M3 Ra0) (sign_extend' 64 (mword_of_int 1570 : mword 12)))]> M3).
     assert (HM4a0 : M4 !!! Regidx Ra0 = SpecProcinit.wait_lock_addr).
-    { rewrite /M4 upd_eq. assert (Hr : rget M3 Ra0 = M3 !!! Regidx Ra0) by (rgne; reflexivity).
-      rewrite Hr HM3a0. exact kfkb5_wladdr1. }
+    { rewrite /M4 upd_eq. rgne. rewrite HM3a0. exact kfkb5_wladdr1. }
     assert (Hpp_d0 : add_vec_int (mword_of_int (KF + 0xcc) : mword 64) 4 = mword_of_int (KF + 0xd0))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_d0) in "Hpc".
@@ -316,7 +315,7 @@ Section ProofKforkB5.
     iApply (AQ.wp_acquire_sconf (CID := CID4) γw "wait_lock"%string WaitInv.wait_res
               M5 lvl eb pme C (K - 8)%nat b Hlvl (kfkb5_stack_ok K HK)
               with "Hcg Hown Htext Hpc [Hwl] Hpanic [-]").
-    { iEval (rewrite HM5a0). iApply (WpLock.is_lock_inv with "Hwl"). }
+    { iEval (rewrite HM5a0). iExact "Hwl". }
     iIntros (CID5 Hs5 ms mr5) "%Hms5 Hcg Hpc %Hcs_5_r5 Htokw Hwaitres Hown Hpay".
     assert (Hpc_d4 : ret_pc (M5 !!! Regidx Rra) = mword_of_int (KF + 0xd4)).
     { rewrite HM5ra. apply bv_eq; vm_compute; reflexivity. }
@@ -371,8 +370,7 @@ Section ProofKforkB5.
     set (M7 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget M6 Ra0) (sign_extend' 64 (mword_of_int 1554 : mword 12)))]> M6).
     assert (HM7a0 : M7 !!! Regidx Ra0 = SpecProcinit.wait_lock_addr).
-    { rewrite /M7 upd_eq. assert (Hr : rget M6 Ra0 = M6 !!! Regidx Ra0) by (rgne; reflexivity).
-      rewrite Hr HM6a0. exact kfkb5_wladdr2. }
+    { rewrite /M7 upd_eq. rgne. rewrite HM6a0. exact kfkb5_wladdr2. }
     assert (Hpp_e0 : add_vec_int (mword_of_int (KF + 0xdc) : mword 64) 4 = mword_of_int (KF + 0xe0))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_e0) in "Hpc".
@@ -423,8 +421,7 @@ Section ProofKforkB5.
     iIntros (CID7 Hs7) "Hcg Hpc".
     set (M9 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget mr6 Rs4))]> mr6).
     assert (HM9a0 : M9 !!! Regidx Ra0 = (proc_addr j)).
-    { rewrite /M9 upd_eq. assert (Hr : rget mr6 Rs4 = mr6 !!! Regidx Rs4) by (rgne; reflexivity).
-      rewrite Hr Hr6s4. apply add_vec_zero_l. }
+    { rewrite /M9 upd_eq. rgne. rewrite Hr6s4. apply add_vec_zero_l. }
     assert (Hpp_e6 : add_vec_int (mword_of_int (KF + 0xe4) : mword 64) 2 = mword_of_int (KF + 0xe6))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_e6) in "Hpc".

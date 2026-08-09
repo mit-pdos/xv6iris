@@ -1160,6 +1160,16 @@ the evidence for every offset. This file is only the worklist.
       so that landing them does not rebuild the whole tree; each is a
       candidate to be lifted the next time someone is in that file anyway.
 
+      **One accessor `ProcInv.v` is missing, found by writing B4:**
+      `proc_priv_name`, the exact sibling of `proc_priv_cwd` — borrow
+      `pname_cells` out of the block and put back a (possibly different)
+      array of the same length.  `ProofKforkB4.v` builds it privately as
+      `kfk_name_open`; safestrcpy is not the last writer of a proc's name
+      that will want it (exec is the other), so lift it the next time
+      anyone is in `ProcInv.v`.  Note the rebuild needs a literal `MkPPriv`
+      because there is no `upd_name` beside `upd_ofile`/`upd_sz`/`upd_cwd`;
+      adding one is the tidier half of the same change.
+
       **Two rules the block proofs paid for, both general:**
 
       * **A BLOCK'S "agrees with the entry map" PREMISE MUST EXCLUDE EVERY

@@ -250,8 +250,19 @@ is:
    `cdev`, `cinum`, the `iref_slot`, the `inode_ref`, the `is_itable` /
    `itable_inv` premises and the `pv_cwd Vp = ientry ck` side condition,
    and `kfork_post` should shed its `∃ q'` conjunct — because the parent's
-   reference is back inside its own `proc_priv` where it belongs. The only
-   proof-side change should be `ProofKforkB4.v`'s idup call site.
+   reference is back inside its own `proc_priv` where it belongs.
+
+**The proof-side edit is ONE line, and it is already marked in the tree.**
+`ProofKforkB4.kfk_cwd_ref_any : ⊢ cwd_ref v` is the hole written down — it
+holds at an arbitrary `v` precisely because the predicate is `emp` — and its
+single use, at the `sd a0,336(s4)` at +0xac, conjures the child's cwd
+reference out of nothing while **idup's second half is dropped on the
+floor**. There is no honest alternative today: the placeholder
+`FileInv.inode_ref` and the real `IcacheInv.inode_ref` idup returns are
+different predicates with no bridge. When this project lands, delete that
+lemma and make +0xac consume the second half instead — which is the whole
+reason idup returns two. The lemma carries a `#`-banner comment saying so,
+so a `grep` for `kfk_cwd_ref_any` finds the work.
 
 That ordering also means the sweep is validated by a real consumer instead of
 by itself.
