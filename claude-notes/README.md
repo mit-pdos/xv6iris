@@ -82,6 +82,21 @@ are working on that effort — the relevant `projects/` file.
   returned, `BlockWords.v`'s word-in-a-block vocabulary, and the
   SPEND-AT-MOST budget rule — why any function above the log that does not
   take `log.lock` can only promise to spend at most N units, never exactly N.
+- **[`fs-icache.md`](design/fs-icache.md)** — the inode CACHE (`itable`,
+  `iget`/`idup`/`iput`), the chokepoint under most of `sysfile.c`: the
+  itable's geometry read off iget's own scan (24-byte lock, 136-byte
+  stride, and a loop bound that IS the next symbol's address), the Arc
+  reference algebra reused from `file-table.md`, why the `ref` WORDS must
+  live in an Iris invariant rather than in `itable.lock` (and why
+  `SpecIlock`'s `i_ref` premise is therefore unsatisfiable as written),
+  the REF-1 exclusivity theorem behind xv6's "`ip->ref == 1` means no
+  other process can have `ip` locked" — what part of it is free from the
+  algebra, what part needs a bio-style escrow, and what part needs no
+  theorem at all — and **where `itrunc`'s two owed premises belong**: the
+  block-range one is a pure `cov`-vs-`size` geometry premise (NOT a
+  `blkmap_wf` or `ilock` invariant, correcting `fs-inode.md`'s guess),
+  the BSIZE one an `inode_ok` conjunct, better folded into `fsblock`.
+  Definitional layer landed in `iris/IcacheInv.v`.
 - **[`fs-bitmap.md`](design/fs-bitmap.md)** — the block bitmap: the
   bits-in-a-block vocabulary (`BitmapEnc.v`, the third after `BlockWords`'
   words and `DinodeEnc`'s records), the `bitmap_res` resource and the FREE

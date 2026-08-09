@@ -867,6 +867,7 @@ SpecWritei.v
 ProofWriteiParts.v
 ProofWritei.v
 SpecReadi.v
+IcacheInv.v
 InodeLock.v
 CodeIlock.v
 CodeItrunc.v

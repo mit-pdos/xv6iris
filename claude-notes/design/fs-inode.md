@@ -902,3 +902,19 @@ The second is the real home — it is a statement about what a *disk* inode
 may contain — but it needs the icache design first, so it is recorded here
 rather than guessed at. Until then `itrunc`'s premise is a hypothesis, and
 `iput` will inherit it.
+
+**ANSWERED, and the guess above is wrong in both branches** — see
+[`fs-icache.md`](fs-icache.md) §6. The range premise needs neither: it is a
+PURE geometry fact `cov_below cov size` ("every covered block is below the
+FS size"), of exactly the same character as `log_geom_ok` and supplied from
+the same place, after which the per-slot claim is a two-line corollary of
+the `blkmap_wf` that already exists (`IcacheInv.blkmap_slot_inrange`), with
+no invariant moving anywhere. The `length (data i) = BSIZE` premise IS an
+inode-layer invariant and does belong beside `blk_holes_zero` in
+`inode_ok` (`IcacheInv.inode_sized`, with its three laws) — better still,
+folded into `FsBlocks.fsblock`, which retires it everywhere at once.
+
+The length premise was originally stated for every `i : nat`, which no
+holder of `inode_locked` can supply — both `inode_blocks` and
+`blk_holes_zero` stop at `MAXFILE`. It was narrowed to `i < MAXFILE` when
+`itrunc` landed; that part is done.
