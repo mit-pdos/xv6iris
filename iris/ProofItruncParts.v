@@ -521,7 +521,7 @@ Section ItruncDefs.
     bitmap_res γfs bmapstart cov logstart size (used ∖ bm_dir_freed bm k) -∗
     bm_paid γ bmapstart 1 -∗
     it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn k.
-  Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame. Qed.
+  Proof. iIntros "A B C D". rewrite /it_dir_state. iFrame "A B C D". Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  THE INDIRECT LOOP'S STATE, at cursor q                             *)
@@ -689,7 +689,7 @@ Section ItruncDefs.
       (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q)) -∗
     bm_paid γ bmapstart 1 -∗
     it_ent_state γ γfs bm data cov logstart bmapstart size used q.
-  Proof. iIntros "A B C". rewrite /it_ent_state. iFrame. Qed.
+  Proof. iIntros "A B C". rewrite /it_ent_state. iFrame "A B C". Qed.
 
   (* THE HANDOFF from the direct loop to the indirect one.  After the direct
      loop every direct slot of the map is zero, so [inode_blocks] at that

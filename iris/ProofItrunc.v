@@ -1022,7 +1022,7 @@ Section ItruncDLoop.
       assert (Hfstep : used ∖ bm_dir_freed bm k
                        ∖ {[ bv_unsigned (bm_dir bm !!! k : mword 32) ]}
                        = used ∖ bm_dir_freed bm (S k)).
-      { rewrite bm_dir_freed_step. set_solver. }
+      { rewrite bm_dir_freed_step. clear -Hnzero. set_solver. }
       iEval (rewrite Hfstep) in "Hbmr".
       iDestruct ("Hback" with "[Hop]") as "Hpaid";
         [ rewrite Hbud; iExact "Hop" |].
@@ -1525,7 +1525,7 @@ Section ItruncELoop.
                        ∖ {[ bv_unsigned (bm_ent bm !!! q : mword 32) ]}
                        = used ∖ (bm_dir_freed bm NDIRECT
                                  ∪ bm_ent_freed bm (S q))).
-      { rewrite bm_ent_freed_step. set_solver. }
+      { rewrite bm_ent_freed_step. clear -Hnzero. set_solver. }
       iEval (rewrite Hfstep) in "Hbmr".
       iDestruct ("Hback" with "[Hop]") as "Hpaid";
         [ rewrite Hbud; iExact "Hop" |].

@@ -1338,7 +1338,7 @@ Section BoBodies.
             destruct (decide (k = i)) as [->|Hne].
             - rewrite lookup_insert in Hk.
               assert (e = (MAXOPBLOCKS, ∅)) as -> by congruence.
-              set_solver.
+              apply empty_subseteq.
             - rewrite lookup_insert_ne in Hk; [| exact (not_eq_sym Hne)]. exact (Hsub k e Hk). }
           iApply ("Hbclose" with "Hlhn"). }
         rewrite /bo_exit.
