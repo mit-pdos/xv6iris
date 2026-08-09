@@ -532,10 +532,10 @@ allocation/parking transitions:
 
 ```coq
 Definition proc_slots (pa : mword 64) (st : mword 32) : iProp Σ :=
-  ((if needs_ctx st   then ▷ proc_ctx pa            else emp) ∗
-   (if is_running st  then own_ctx (p_context pa)   else emp) ∗
-   (if inv_dormant st then proc_dormant pa st       else emp) ∗
-   (if not_running st then park_at_full pa false    else emp))%I
+  ((if needs_ctx st   then ▷ proc_ctx pa      else emp) ∗
+   (if is_running st  then run_slot pa        else emp) ∗
+   (if inv_dormant st then proc_dormant pa st else emp) ∗
+   (if not_running st then hart_at_any pa     else emp))%I
 
 Lemma proc_slots_recast pa st st' :
   needs_ctx st' = needs_ctx st -> not_running st' = not_running st ->

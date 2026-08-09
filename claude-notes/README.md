@@ -239,17 +239,6 @@ are working on that effort — the relevant `projects/` file.
   over user VAs), the interrupt-absorbing step engine with hart-switching
   continuations, the Umode leaf WPs, and the sync program's function proofs
   (start/main + the sync/exit ecall stubs).
-- **[`park-to-lock.md`](projects/park-to-lock.md)** — deleting the global
-  parked-scheduler invariant `scheds_inv`. The parked `scheduler()` record
-  moved into the running proc's own `p->lock` (`SchedCtx.run_slot`), paid for
-  by the HART TAG — the per-proc `ghost_var CPU` that names the hart a RUNNING
-  proc runs on, and the only thing that can collapse the slot's `∃ h` (the
-  `cpus[h].proc` cell cannot: it is keyed on a hart, the tag on a proc).
-  `cpus[h].proc` is consequently NOT split any more — the whole cell sits in
-  `IntrDefs.cpu_cells` and the scheduler's two stores to it are plain stores.
-  Keeps the record of what the ~260-site premise sweep cost: the two
-  syntactic wrecks it left that a grep for the deleted NAMES cannot find.
-  Design in [`design/proc-struct.md`](design/proc-struct.md).
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
   driver: uartwrite, uartintr and uartgetc, all proven (uart.c 4/4). The
   `tx_lock` invariant (`UartTxInv.v`) whose implication "`tx_busy == 0` ⟹
@@ -271,6 +260,19 @@ are working on that effort — the relevant `projects/` file.
   layer through M6. `SystemAdequacy.xv6_power_adequacy` proves reducibility
   across arbitrary power cycles, hart scheduling, and device steps; the FS
   durability instantiation and torn-write model are separate future work.
+- **[`park-to-lock.md`](completed/park-to-lock.md)** — the global
+  parked-scheduler invariant `scheds_inv`, deleted. The parked `scheduler()`
+  record moved into the running proc's own `p->lock` (`SchedCtx.run_slot`),
+  paid for by the HART TAG — the per-proc `ghost_var CPU` naming the hart a
+  RUNNING proc runs on, and the only thing that can collapse the slot's `∃ h`
+  (the `cpus[h].proc` cell cannot: it is keyed on a hart, the tag on a proc).
+  `cpus[h].proc` is consequently NOT split — the whole cell sits in
+  `IntrDefs.cpu_cells` and the scheduler's two stores to it are plain stores.
+  Keeps the finding that closed `kerneltrap.md`'s open fork (when a resource
+  seems to need threading somewhere unreachable, check whether the taker
+  already holds a lock on the thing it is about) and the two syntactic wrecks
+  a ~260-site premise sweep left that grepping for the deleted NAMES cannot
+  find. Design in [`design/proc-struct.md`](design/proc-struct.md).
 - **[`sail-model-bump.md`](completed/sail-model-bump.md)** — the sail-riscv
   model bump: the model now comes from the `zeldovich/sail-riscv` FORK (pinned
   by `SAIL_RISCV_REV`), whose delta is the ATOMIC PTE A/D-bit update, and whose
@@ -294,8 +296,10 @@ are working on that effort — the relevant `projects/` file.
   execution RESUMES on rather than the one it started on. `wp_next` and its two
   escape hatches (interrupts off; no current proc), the SIE-arm index `b`, tp
   pinned to the hart (`HartTp.v`), the canonical per-hart SIE ghost, `cpu_own`
-  riding the enabled arm, and `scheds_inv` — the parked-scheduler record made
-  GLOBAL, which is what let it stop being carried across migrations. Keeps the
+  riding the enabled arm, and the parked-scheduler record made hart-free so it
+  stopped being carried across migrations (that project put it in a global
+  invariant `scheds_inv`; `completed/park-to-lock.md` has since moved it into
+  the running proc's own `p->lock` and deleted the invariant). Keeps the
   scoreboard of SIX contracts that were stated falsely and compiled anyway (and
   what each got wrong), the 25 surprises, and the retrospective on why this
   should have been six expand/contract cycles rather than one big-bang branch.

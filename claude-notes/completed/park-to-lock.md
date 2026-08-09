@@ -1,9 +1,8 @@
-# park-to-lock: deleting the global parked-scheduler invariant
+# park-to-lock: the global parked-scheduler invariant, deleted
 
-Branch `park-to-lock`, off `main` at `cae9c3e3`.  `main` is untouched and
-green.  The DESIGN now lives in `claude-notes/design/proc-struct.md`
-§"The scheduler's saved context" (read that first); this file is the
-worklist and the record of what the sweep cost.
+DONE and merged to `main`.  The DESIGN lives in
+`claude-notes/design/proc-struct.md` §"The scheduler's saved context" — read
+that, not this.  What is here is the decision record and the sweep's lessons.
 
 ## What changed and why
 
@@ -52,22 +51,6 @@ scheduler's two stores to it are plain `wp_sd_s_sconf` / `wp_sd_zero_s_sconf`.
   grew the tag, so a caller-lent `cpu_claim_ext` can no longer be framed
   across a `wp_next`.  Exact twin of `trap_csrs_ext_transport`.
 
-## Remaining work
-
-### 1. Stale comments
-
-`SchedCtx.v:69,73` (`schedsN` and the `fin_enum_lookup` / `cpu_enum_lookup`
-plumbing are now unused — delete if nothing else wants them),
-`SpecScheduler.v:56`, `SpecConsoleread.v:26`, `SpecIput.v:54-55`,
-`SpecBalloc.v:96-97`, `SpecKexit.v:58`, `ProofBwrite.v:418-419`,
-`ProofAcquiresleep.v` header, `ProofUartwrite.v:68-69`, `ProofSysPause.v:92-93`.
-
-### 2. `Print Assumptions` on the parking cone
-
-The definitive check after an interface change of this size
-(`durable-notes.md`, "Write the checker for a refactor's SILENT failure
-mode").  Also run `tools/lemma_diff.py --ref main` and justify every `GONE`.
-
 ## What the sweep actually cost, and the lesson
 
 The `20632d55` sweep deleted the premises from **statements** and left every
@@ -97,15 +80,20 @@ So: after any premise-deleting sweep, grep for a `Definition`/`Lemma` whose
 `:=` is followed by a blank line, and for a `∗` immediately before a blank
 line.  Both are cheap and neither is findable by name.
 
-## State
+## What it closed elsewhere
 
-`main` is green.  On this branch the whole tree builds except where noted in
-"Remaining work" — see the last build log rather than trusting this line.
+`projects/kerneltrap.md` recorded an OPEN FORK: preemption needs the
+interrupted thread's `own_ctx` and park receipt, both ordinary frames the
+handler cannot reach, and the two candidate homes were `sie_arm true`
+(measured at 66 files) or a per-hart invariant.  Neither was needed — the
+premise was wrong.  `yield` acquires `p->lock` anyway, and takes the cells,
+the tag and the record out of it; all the handler must reach is `cpu_claim`,
+which the trap itself delivers.  **When a resource looks like it has to be
+threaded to a place that cannot be handed it, check whether the taker already
+holds a lock on the thing the resource is about.**
 
-## Build discipline
-
-`eval $(opam env --switch=/shared/xv6rocq)` before any `make`, including in
-background shells, or `CoqMakefile` is rewritten with the wrong Rocq version.
-Build with `make -f CoqMakefile -jN -k` from `iris/`; pick `N` by RAM, not
-cores.  Always grep the log for `Error`.  Never `git add -A` from a parent
-directory — use `git add -A .` from `iris/`, or explicit paths.
+`ProofKwait`'s abstract frame `R` (and `kw_rt`) went the same way: its only
+instantiation was the receipt, so the frame is empty and the parameter is
+retired.  The RULE it illustrated — what a returning inner loop still owes its
+caller rides through as an abstract frame rather than inside the closure — is
+still live in `design/kernel-proofs.md`; only the instance went.

@@ -522,8 +522,7 @@ Section ProofKwait.
      what the continuation still wanted back, threaded through the scan
      rather than packaged into the closure, because the +0xca exit needs
      those very resources for sleep and a closure cannot give them back.
-     The only thing ever passed for [R] was the running-thread receipt, and
-     that is gone with [scheds_inv], so the parameter is gone too. *)
+     Nothing is left to carry, so there is no parameter. *)
   Definition kw_exit_fn `{GEN : GenId} (CID0 : CPU) 
       (γf : gname) (mm : regfile) (pme : mword 64) (K : nat) (eb : bool)
       (C : iProp Σ) (pid : mword 32) (V : pprivate) : iProp Σ :=

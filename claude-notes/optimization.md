@@ -285,7 +285,7 @@ Tree-wide the one line is worth far more than the two files it was found in:
 carry a `Persistent`/`Timeless` instance with no `Typeclasses Opaque` (find them
 with: collect every `Typeclasses Opaque` name tree-wide, then grep
 `Instance … : (Persistent|Timeless) (X`).  The ones over a big resource are
-`bio_ctx`, `log_ctx`, `procs_inv`/`scheds_inv`, `dev_inv`/`disk_inv`/`uart_inv`,
+`bio_ctx`, `log_ctx`, `procs_inv`, `dev_inv`/`disk_inv`/`uart_inv`,
 `is_sleeplock`, `is_ftable`, `is_kmem`, `is_txlock`, `is_tickslock`,
 `kalloc_avail`, `kpt_inv`, `intr_inv`.  Sealing each costs a `rewrite /X` in its
 projection lemmas and risks breaking any consumer that `iDestruct`s it, so seal

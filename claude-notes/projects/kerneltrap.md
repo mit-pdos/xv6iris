@@ -266,15 +266,15 @@ kerneltrap axiom does nothing.  A real kerneltrap needs:
    (6) + max(devintr = 40, myproc, yield's cone).  Changing that constant
    re-tunes every `K ≤ n` premise in the tree — budget for it.
 4. **The persistent device/proc credentials** — `devintr_caps`, `procs_inv`,
-   `scheds_inv`, `panic_wp_any`, `kernel_text`.  All persistent, so they can be
+   `panic_wp_any`, `kernel_text`.  All persistent, so they can be
    closed over at `intr_inv` allocation exactly as `hw_config`/`minstret_inv`/
    `kernel_text` already are in `kernelvec_handler_spec`; they never need to
    appear in the handler contract's footprint.
-5. **`own_ctx (p_context pj)` + `park_hlf j true` when `p ≠ 0`** — exclusive,
-   per-thread, needed by `yield`.  They belong in `sie_arm true` under a
-   disjunction keyed on `p = zero_reg`, which is exactly the shape
-   `wp_next`'s second escape hatch ("no current proc ⇒ same hart") already
-   assumes.
+5. **`cpu_claim p`** — exclusive, per-thread, and the only thing the yield arm
+   needs (see "the open fork", now closed, below).  It already rides
+   `sie_arm true` under a disjunction keyed on `p = zero_reg`, which is
+   exactly the shape `wp_next`'s second escape hatch ("no current proc ⇒ same
+   hart") assumes.
 6. **Hart migration.**  `yield` parks and resumes elsewhere, so the handler's
    continuation is at a NEW hart and `wp_exec_step_intr`'s `iLöb` has to be
    hart-generic.  This is Stage 2 verbatim, including its cut: canonical
@@ -397,38 +397,33 @@ consumers and its `eb = true` instance made `b` true.
    When it lands, delete `KERNELTRAP_RETURNS`, `KerneltrapRet`, `kv_cell` and
    `kt_clobbered`; nothing else refers to them.
 
-## THE OPEN FORK: where preemption's resources live
+## THE FORK THAT WAS OPEN HERE IS CLOSED — by park-to-lock
 
-`kerneltrap` PREEMPTS.  On a timer interrupt with a current process it calls
-`yield`, which parks the interrupted thread — and parking needs that thread's
-`own_ctx (p_context p)` and `park_hlf j true`.
+`kerneltrap` PREEMPTS: on a timer interrupt with a current process it calls
+`yield`, which parks the interrupted thread.  This file used to record that as
+an open design fork, because parking was thought to need that thread's
+`own_ctx (p_context p)` and its park receipt, and both were ordinary FRAMES
+held by whichever function happened to be interrupted — hence unreachable
+from the handler, whose WP those frames live outside of.  The two candidate
+answers were (A) move them into `sie_arm true` (measured at 35 `Spec*.v` +
+31 `Proof*.v` files) and (B) put them in a per-hart invariant.
 
-**Today those are ordinary frames** held by whichever function happened to be
-interrupted, so they are *unreachable* from the handler: a frame lives outside
-the handler's WP.  For the trap to park the thread they have to be reachable,
-and there are only two places they can be.
+**Neither was needed, because the premise was wrong.**  `yield` does not need
+either resource handed to it.  It ACQUIRES `p->lock` — it is about to write
+`p->state` anyway — and `SchedCtx.proc_slots_running` hands back the raw
+context cells, the whole hart tag AND this hart's parked scheduler record out
+of the lock's `is_running` arm.  What the handler has to reach is only
+`IntrDefs.cpu_claim p`, which the TRAP itself delivers: taking the trap
+cleared SIE and so dismantled `sie_arm true p`, and the claim was one of its
+conjuncts.  `cpu_claim` is a single exclusive resource in the handler's own
+footprint, and kerneltrap reads the proc index out of its existential, hands
+it to `yield`, and gets it back.
 
-Measured footprint of each:
+So the answer was neither (A) nor (B) but a third one: **put the resource in
+the object it is about, and let the taker take it.**  The generalisable form
+of that is worth keeping — when a resource looks like it has to be threaded to
+a place that cannot be handed it, check whether the taker already holds a lock
+on the thing the resource is about.
 
-- **(A) Move them into `sie_arm true`**, beside `cpu_hart 0 true p`, with
-  surrender/reclaim plumbing at the SIE flips (`csrci` hands them to the code,
-  `csrsi` takes them back) — the same shape `cpu_cells_pay` already has.
-  Cost: **35 `Spec*.v` and 31 `Proof*.v` files** thread `own_ctx`/`park_hlf`
-  today (essentially the whole blocking half of the kernel: sleep, the log,
-  bio, the pipe and file layers, kexit/kwait).  Every one of them would gain
-  the pay/reclaim conjunct.  `own_ctx`/`ctx_cells` also have to move below
-  `IntrDefs` first — cheap, they depend only on `↦₈` — because `SwtchCtx`
-  currently imports `IntrDefs`, not the other way round.
-- **(B) Put the current thread's park resources in a per-hart INVARIANT**, so
-  the handler OPENS them rather than being handed them.  `SchedCtx.scheds_inv`
-  already does exactly this for one half of the park bit, per hart, which is
-  why this looks like the natural extension.  Cost is concentrated in
-  `SchedCtx.v` + the handler contract instead of spread over 66 files —
-  but it is a real design change to the parked-scheduler protocol, not a
-  mechanical sweep, and it has to keep `own_ctx`'s exclusivity honest.
-
-**Recommendation: investigate (B) before committing to (A).**  (A) is the
-brute-force answer and its cost is now measured rather than guessed; (B) is
-plausibly an order of magnitude smaller and follows a protocol the tree
-already has.  Either way this is the last thing between the proven
-`kerneltrap` and deleting `KERNELTRAP_RETURNS`.
+Design: `claude-notes/design/proc-struct.md`; record:
+`claude-notes/completed/park-to-lock.md`.

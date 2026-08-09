@@ -494,9 +494,12 @@ the evidence for every offset. This file is only the worklist.
         does not run would have to drop one.
       * **What the exit still wants back rides through as an ABSTRACT FRAME
         `R`, never packaged into the closure.** kwait's running-thread
-        bundle (`own_ctx` + `park_hlf`, `kw_rt`) is untouched from the
+        bundle was untouched from the
         prologue to the exit, but the loop's foot needs it for `sleep` — so
-        a closure that had swallowed it could not give it back.  `kw_scan`
+        a closure that had swallowed it could not give it back.  (That bundle
+        was the parked-scheduler receipt and is now EMPTY, so `kw_scan`'s `R`
+        parameter has since been retired — the rule is the durable part, not
+        the instance.)  `kw_scan`
         threads `R` from entry to both exits and knows nothing else about
         it; the found arm cashes it in with a five-line
         `iAssert`, which is also what keeps `kw_found`'s statement
@@ -992,12 +995,11 @@ the evidence for every offset. This file is only the worklist.
               `upd_eq` has already stripped nothing (`upd_eq` leaves
               `regval_into_reg`, which IS convertible -- the mismatch is
               entirely in the zero).
-            - the park receipt rejoins here.  The found arm keeps BOTH
-              halves (`Hparka` into `proc_held`, `Hparkb` for the caller);
-              a tail gives `Hparka` to freeproc, gets it back in the
-              returned `proc_held`, and `park_split` + `park_at_full_intro`
-              put the whole receipt back into the lock, which is what
-              `proc_slots_unused_intro` needs.
+            - the HART TAG rides through whole.  `proc_held` does not carry
+              it (it is the generic lock-holder payload, taken on procs the
+              holder is not running), so the found arm simply keeps it across
+              the freeproc call and hands it back to
+              `proc_slots_unused_intro`.
          4. [x] **Seal.**  `AllocprocCore : ALLOCPROC_GEN` (the whole
             instruction-level proof) plus `AllocprocSeal (Core :
             ALLOCPROC_GEN) : ALLOCPROC`, thirty lines whose only content is
