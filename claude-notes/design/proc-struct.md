@@ -605,22 +605,14 @@ move on half alone, and the tie means the cell cannot move without the ghost.
 across the released-lock window, which is what tells it on re-acquire that the
 slot did not drift.
 
-Half #2 does **not** travel with the park receipt. `running_claim j` is now
-just the receipt:
-
-```coq
-Definition running_claim (j : nat) : iProp Σ := park_hlf j true.
-```
+Half #2 does **not** travel with the hart tag; the two are separate conjuncts
+of `cpu_claim` (below).
 
 Bundling them was not merely redundant but unsatisfiable at the release that
 ends a resumed thread's critical section: the holder has `pstate_whole`, the
 release returns `pstate_lock` to the invariant, and at `RUNNING`
 (`unclaimed = false`) that consumes **one** half — so exactly one half #2 is
 left over, and it is owed to the arm. Half #2's home is `cpu_claim` below.
-
-Every function between here and `sleep` names the bundle rather than its
-parts, so re-homing the pieces changes this definition and the handful of
-places that OPEN it, not the ~60 files that pass it through.
 
 `park_ok` excludes `USED` explicitly (`(needs_ctx st || st = ZOMBIE) &&
 not_used st`): `needs_ctx` covers `USED`, but a thread cannot *park* at
@@ -640,13 +632,16 @@ non-claimant writes — the scheduler's `RUNNABLE → RUNNING`, `wakeup`'s and
 `kill`'s `SLEEPING → RUNNABLE` — each **read the cell first** and only write at
 a state in the lock-resident class, so the lock holder owns both halves there.
 
-Presenting half #2 at value `RUNNING` is what gets the cells out of the lock:
+What gets the cells out of the lock is presenting the HART TAG half, not
+half #2 — see "The scheduler's saved context" below:
 
 ```coq
-Lemma proc_slots_running (j : nat) (st : mword 32) :
+Lemma proc_slots_running (j : nat) (h : CPU) (st : mword 32) :
   (j < NPROC)%nat ->
-  pstate_hlf j RUNNING -∗ proc_slots (proc_addr j) st -∗
-  pstate_hlf j RUNNING ∗ ⌜ st = RUNNING ⌝ ∗ own_ctx (p_context (proc_addr j)).
+  hart_hlf j h -∗ proc_slots (proc_addr j) st -∗
+  ⌜ st = RUNNING ⌝ ∗ hart_full j h ∗
+  own_ctx (p_context (proc_addr j)) ∗
+  ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) (proc_addr j).
 ```
 
 ### Half #2's home while interrupts are on
@@ -690,9 +685,15 @@ The conjunct itself, and its two seam forms:
 ```coq
 Definition cpu_claim (p : mword 64) : iProp Σ :=
   (⌜ p = zero_reg ⌝ ∨
-   ∃ (j : nat) (st : mword 32),
-     ⌜ proc_addr j = p /\ (j < NPROC)%nat ⌝ ∗ pstate_hlf j st)%I.
+   ∃ j : nat,
+     ⌜ proc_addr j = p /\ (j < NPROC)%nat ⌝ ∗
+     pstate_hlf j RUNNING ∗ hart_hlf j cpu_id)%I.
 ```
+
+Two halves, not one: the state mirror's half #2, and the running thread's
+half of the HART TAG (below).  They enter and leave the arm together because
+they are issued and returned together — at the two `p->state` writes that
+change running-ness, both under `p->lock`.
 
 The state is **pinned at `RUNNING`**, not existential. The claim is about
 `c->proc`: if that field names a real proc while interrupts are on, that proc
@@ -706,10 +707,19 @@ An existential `st` would be sound but useless. `pstate_lock_claimed` only
 yields `unclaimed st = false`, i.e. `st ∈ {RUNNING, USED}`, and those two arms
 of `proc_slots` hand out **different** resources (`own_ctx` vs `▷ proc_ctx`).
 Pinning is what lets yield take the raw context cells from the lock without a
-park receipt to refute `USED` for it — and so retires that job of `park_hlf`.
+separate receipt to refute `USED` for it.
 
 The `zero_reg` disjunct is the scheduler — no proc to claim — and
 `proc_addr_nonzero` refutes it when `p` names a real slot.
+
+**The claim is HART-INDEXED, and that is new with the tag.** `hart_hlf j
+cpu_id` names the ambient hart, so `cpu_claim_ext` — the complement a caller
+lends across a call that might park — can no longer simply be framed across a
+`wp_next`. It transports instead, by `IntrDefs.cpu_claim_ext_transport`, the
+exact twin of `trap_csrs_ext_transport`: at `eb = true` it is `emp`, and at
+`eb = false` the hart provably did not move. Any new caller that holds a
+`cpu_claim_ext` across a `wp_next` needs that line; the failure is an
+`iFrame`/`iSpecialize` mismatch on two terms that print identically.
 
 At the seam the claim rides exactly the `trap_csrs_pay` / `trap_csrs_ext`
 pattern, indexed by the level at which an arm exists:
@@ -772,7 +782,6 @@ Definition run_slot (pa : mword 64) : iProp Σ :=
   (own_ctx (p_context pa) ∗
    ∃ h : CPU,
      hart_at pa (1/2) h ∗
-     cpu_proc_half h pa ∗
      ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) pa)%I.
 ```
 
@@ -790,23 +799,68 @@ Three consequences make this the cheap home:
   a home in `sie_arm` this costs nothing on `sie_cap_gpr` (292 files, 1580
   sites) and does not have to name anything defined above `IntrDefs`.
 
-The `∃ h` is the one subtlety. A thread must collapse it to its own hart or
-the `swtch` operand address does not match, and the `cpu_proc_half` beside it
-cannot do that: two harts each holding half of *their own* `c->proc` cell,
-both reading `&proc[j]`, is consistent as far as separation logic can see, and
-"at most one hart runs proc `j`" is a global fact. So the tag `hart_own j q h`
-(`ProcGeom.v`) states it locally — half here, half in `IntrDefs.cpu_claim`
-inside the SIE arm — and `hart_own_agree` is timeless, so the collapse happens
-inside the acquire's fancy update with no program step. It is whole in the lock
-at every non-running state, on the `not_running` guard, with its value then
-meaningless; the halves move at the two `p->state` writes that change
-running-ness, both under the lock.
+### The hart tag, and why the `c->proc` cell cannot do its job
 
-`proc_held` carries `cpu_proc_half i pa` on both crossing directions: the
-spare half is what lets the scheduler store `c->proc`, which it therefore does
-holding only the lock, not an invariant. `scheds_inv`, `sched_slot`, its five
-access lemmas, `cpu_own_full_is_vacuous`, `ProtoSchedsInv.v`, the
-`park_own`/`park_hlf`/`park_full`/`park_at` family and `running_claim` all go.
+The `∃ h` is the one subtlety, and the HART TAG (`ProcGeom.hart_own j q h`, a
+`ghost_var (park_name j) q h` with `h : CPU`) is what resolves it. It reads
+"proc `j` is running on hart `h`".
+
+A thread must collapse `∃ h` to its own hart or the `swtch` operand address
+does not match. **Nothing about `cpus[h].proc` can do that, whole or split.**
+The cell is keyed on a HART and the tag on a PROC, and that is the whole
+difference: if the slot said anything about `cpus[h].proc` and the thread
+holds something about `cpus[myhart].proc`, then whenever `h ≠ myhart` those
+are two *different addresses* — nothing is contradictory, so nothing
+collapses, and no fraction discipline changes that. "At most one hart runs
+proc `j`" is a fact about proc `j`, and only a resource keyed on `j` can state
+it. The tag is one ghost per proc, so any two fragments must agree, and
+`hart_own_agree` is timeless — the collapse happens inside the acquire's fancy
+update, with no program step.
+
+The tag does a second job at the same time: the `not_running` guard holds it
+WHOLE, so presenting a half would need `1 + 1/2` to validate. Every
+non-RUNNING arm is refuted and `proc_slots_running` returns `st = RUNNING` as
+a pure fact, without reading `p->state`. That is what lets yield take the raw
+context cells out of the lock with no receipt.
+
+**Split while the proc runs; whole otherwise.** Half in `run_slot`, half in
+`IntrDefs.cpu_claim` inside the SIE arm; whole under the `not_running` guard,
+value then meaningless. The halves move at the two `p->state` writes that
+change running-ness, both under the lock.
+
+**Whole across a `swtch`.** `p_sched` — the chain payload — carries
+`hart_full j h` on BOTH of its disjuncts, beside `proc_held`:
+
+- *parking* (a proc into the scheduler): the thread merged the slot's half
+  with its own claim half at `proc_slots_running`, so it is whole in its
+  hands, and the reclaiming scheduler needs it whole to close the parked
+  slot's `not_running` guard when it releases the lock.
+- *dispatch* (the scheduler into a proc): the scheduler took it whole out of
+  `not_running`, stamped its own hart on it (`hart_update` — the value there
+  was meaningless), and hands it whole to the woken thread, which splits it
+  again at its release: half back into `run_slot`, half into its `cpu_claim`.
+
+`SpecSched` therefore has `hart_full j cpu_id` as a premise and again in its
+continuation, where `cpu_id` is the RESUMING hart — which is exactly the
+statement "the tag now names the hart you woke up on".
+
+### `cpus[h].proc` is not part of this protocol at all
+
+The whole cell lives in `IntrDefs.cpu_cells`, i.e. in the running thread's
+`cpu_own`, spelled `ProcGeom.cur_proc`. It is genuinely private to hart `h`:
+no invariant and no lock reads it. `myproc()` is provable from the thread's
+own cell plus `cpu_own`'s index; the tie to "which proc is RUNNING" is the
+tag's job, not the cell's.
+
+Consequently **the scheduler's two `c->proc` stores are plain stores**
+(`wp_sd_s_sconf` / `wp_sd_zero_s_sconf`) to memory it already owns whole — no
+invariant open, no mask change, no reassembly. `proc_held` does not carry any
+fraction of the cell, and must not: it is the generic lock-holder payload,
+taken by `allocproc` and `kill` on procs the holder is *not* running.
+
+`scheds_inv`, `sched_slot`, its five access lemmas, `cpu_own_full_is_vacuous`,
+`ProtoSchedsInv.v`, the `park_own`/`park_hlf`/`park_full`/`park_at` family,
+`running_claim` and `cpu_proc_half` are all gone.
 
 ## What moves where, and when
 

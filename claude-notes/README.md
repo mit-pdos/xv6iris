@@ -224,6 +224,17 @@ are working on that effort — the relevant `projects/` file.
   over user VAs), the interrupt-absorbing step engine with hart-switching
   continuations, the Umode leaf WPs, and the sync program's function proofs
   (start/main + the sync/exit ecall stubs).
+- **[`park-to-lock.md`](projects/park-to-lock.md)** — deleting the global
+  parked-scheduler invariant `scheds_inv`. The parked `scheduler()` record
+  moved into the running proc's own `p->lock` (`SchedCtx.run_slot`), paid for
+  by the HART TAG — the per-proc `ghost_var CPU` that names the hart a RUNNING
+  proc runs on, and the only thing that can collapse the slot's `∃ h` (the
+  `cpus[h].proc` cell cannot: it is keyed on a hart, the tag on a proc).
+  `cpus[h].proc` is consequently NOT split any more — the whole cell sits in
+  `IntrDefs.cpu_cells` and the scheduler's two stores to it are plain stores.
+  Keeps the record of what the ~260-site premise sweep cost: the two
+  syntactic wrecks it left that a grep for the deleted NAMES cannot find.
+  Design in [`design/proc-struct.md`](design/proc-struct.md).
 - **[`uart-driver.md`](projects/uart-driver.md)** — the interrupt-driven UART
   driver: uartwrite, uartintr and uartgetc, all proven (uart.c 4/4). The
   `tx_lock` invariant (`UartTxInv.v`) whose implication "`tx_busy == 0` ⟹

@@ -244,6 +244,20 @@ and it is cheap enough to run on every touched file:
   sibling proof file needs must not be `Local`, and the proof that it is needed
   is that the sibling names it.
 
+- **A PREMISE-DELETING SWEEP LEAVES TWO KINDS OF WRECKAGE, AND NEITHER IS
+  FINDABLE BY GREPPING FOR THE DELETED NAME** — the name is gone; only the
+  hole it left is still there. (a) If the deleted conjunct was the LAST one,
+  the definition loses its closing `)%I.` and runs into the next sentence;
+  the error is a syntax error tens of lines later, in code that is fine.
+  (b) If the deleted conjunct was the WHOLE body, you get `Definition f … :=`
+  with nothing after `:=`, reported as *"Syntax error: [reduce] expected after
+  ':='"* at the FOLLOWING `Definition`. Both happened in one sweep
+  (`SpecFileclose.fileclose_fs_env`, `ProofKwait.kw_rt`). Grep afterwards for
+  a `:=` followed by a blank line and for a `∗` immediately before a blank
+  line. Related, on the proof side: a sweep that edits STATEMENTS leaves every
+  `iIntros`/`iApply` name in place, so strip the token from multi-line
+  proofmode strings AND from `&`-separated destructuring patterns — a
+  per-line, space-separated regex misses both and quietly leaves `(A & & B)`.
 - **`tools/lemma_diff.py [--ref REF]`** — reports top-level declarations that
   VANISHED relative to a git ref, plus `Admitted`/`admit`/`Abort` and any new
   `Axiom`/`Parameter`/`Hypothesis`. A sweep's characteristic failure is not a
