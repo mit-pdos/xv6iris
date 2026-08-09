@@ -46,6 +46,7 @@ Require Import WpLock.
 Require Import LogInv.
 Require Import FsCrash.
 Require Import InodeInv.
+Require Import IrefSlots.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 
@@ -592,6 +593,35 @@ Section IcacheRefInv.
               (seq 0 NINODE) k k (seq_ninode_lookup k Hk)).
   Qed.
 
+  (* The same accessor, but permitting the cell to come back at a DIFFERENT
+     value -- which is what a [ref++] needs.  [iref_cells_acc] cannot serve:
+     its wand rebuilds [iref_cells M] at the very [M] it opened.  Only slot
+     [k]'s word moves, so the remainder is literally the same separating
+     conjunction at [M] and at [<[k:=e]> M]; [big_sepL_delete] is what lets
+     that be said, and the element of [seq 0 NINODE] at index [j] being [j]
+     is what turns "index ≠ k" into "the entry we rewrite is not this one". *)
+  Lemma iref_cells_acc_upd (M : gmap nat (Qp * positive)) (k : nat) :
+    (k < NINODE)%nat ->
+    iref_cells M -∗
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (∀ e : Qp * positive,
+         i_ref (ientry k) ↦₄ iref_word (<[k := e]> M) k -∗
+         iref_cells (<[k := e]> M)).
+  Proof.
+    intros Hk. rewrite /iref_cells. iIntros "Hc".
+    iDestruct (big_sepL_delete _ (seq 0 NINODE) k k (seq_ninode_lookup k Hk)
+                with "Hc") as "[Hcell Hrest]".
+    iFrame "Hcell". iIntros (e) "Hcell".
+    iApply (big_sepL_delete _ (seq 0 NINODE) k k (seq_ninode_lookup k Hk)).
+    iFrame "Hcell".
+    iApply (big_sepL_impl with "Hrest").
+    iIntros "!>" (j x Hjx) "H".
+    destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
+    apply lookup_seq in Hjx as [Hx _].
+    assert (Hxk : k <> x) by lia.
+    rewrite /iref_word lookup_insert_ne; [iExact "H" | exact Hxk].
+  Qed.
+
   (* ------------------------------------------------------------------ *)
   (*  The lock-free guard read                                           *)
   (* ------------------------------------------------------------------ *)
@@ -629,6 +659,82 @@ Section IcacheRefInv.
     exact (iref_word_live M k qt n Hwf HMk).
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  The two halves of a [ref++], for a thread that HOLDS itable.lock    *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE READ.  Unlike [iref_load_au] this one is for a lock holder, and it
+     delivers the value as a function of the holder's OWN [M] rather than as
+     an opaque word with bounds: the lock's half pins the authority, so the
+     map inside the invariant IS [M] ([itable_half_agree]) and the word the
+     [lw] sees is [iref_word M k].  That is what makes the [addiw] between
+     the load and the store mean "the count, plus one". *)
+  Lemma iref_load_locked_au (Eo : coPset) (γ : gname)
+      (M : gmap nat (Qp * positive)) (k : nat) :
+    ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
+    itable_inv γ -∗ itable_half γ M -∗
+    |={Eo, Eo ∖ ↑icacheN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ iref_word M k ={Eo ∖ ↑icacheN, Eo}=∗ itable_half γ M).
+  Proof.
+    iIntros (HE Hk) "#Hinv Hhalf".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    iDestruct (iref_cells_acc M k Hk with "Hcells") as "[Hcell Hback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
+    { iNext. iExists M. iFrame "Ha". iSplitR; [iPureIntro; exact Hwf|].
+      iApply ("Hback" with "Hcell"). }
+    iModIntro. iFrame.
+  Qed.
+
+  (* THE WRITE.  The [sw] and the ghost step happen in the SAME invariant
+     opening, which is the whole reason the read-modify-write is atomic in
+     the proof: the lock's half stops any other thread moving [M], and the
+     two halves meet only here, which is exactly the moment the physical
+     word changes.  [Hno] -- that the incremented count is still an [int] --
+     is what re-establishes [icM_wf]; it is NOT provable here and comes from
+     the caller's [IrefSlots.iref_slots_no_overflow]. *)
+  Lemma iref_dup_store_au (Eo : coPset) (γ : gname)
+      (M : gmap nat (Qp * positive)) (k : nat) (q qt : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo ->
+    M !! k = Some (qt, n) ->
+    (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
+    itable_inv γ -∗ itable_half γ M -∗ iref_tok γ k q -∗
+    |={Eo, Eo ∖ ↑icacheN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
+         ={Eo ∖ ↑icacheN, Eo}=∗
+         itable_half γ (<[k := (qt, Pos.succ n)]> M) ∗
+         iref_tok γ k (q/2)%Qp ∗ iref_tok γ k (q/2)%Qp).
+  Proof.
+    iIntros (HE HMk Hno) "#Hinv Hhalf Htok".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_dup_step γ M k q qt n HMk with "Hauth Htok") as "(Hauth & Ht1 & Ht2)".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
+    { iNext. iExists (<[k := (qt, Pos.succ n)]> M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
+        - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
+          rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
+        - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
+          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+            injection Hj as _ Hn. subst nj. exact Hno.
+          + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
+            by apply (Hcnt j qj). }
+      iApply ("Hback" $! (qt, Pos.succ n)).
+      rewrite /iref_word lookup_insert. iExact "Hcell". }
+    iModIntro. iFrame.
+  Qed.
+
 End IcacheRefInv.
 
 (* ===================================================================== *)
@@ -636,7 +742,7 @@ End IcacheRefInv.
 (* ===================================================================== *)
 
 Section IcacheTable.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   (* An entry's IDENTITY -- the two cells iget writes into a recycled slot
@@ -688,15 +794,21 @@ Section IcacheTable.
     | None => emp%I
     end.
 
+  (* A LIVE slot also parks one iref-slot unit per outstanding reference.
+     That is what lets a thread about to run [ref++] weigh the count against
+     the supply without leaving the lock: [IrefSlots.iref_slots_no_overflow]
+     against the [iref_slots_auth] below.  Exactly [FileInv]'s arrangement
+     for [fd_slots] -- see [IrefSlots.v]'s header for why an unconditional
+     increment needs it and why no axiom may replace it. *)
   Definition islot (M : gmap nat (Qp * positive)) (k : nat) : iProp Σ :=
     match M !! k with
     | None => (∃ dev inum : mword 32, inode_ident k (DfracOwn 1) dev inum)%I
-    | Some (q, _) => islot_rest k q
+    | Some (q, n) => (islot_rest k q ∗ iref_slots (Pos.to_nat n))%I
     end.
 
   Definition itable_res (γ : gname) : iProp Σ :=
     (∃ M : gmap nat (Qp * positive),
-       itable_half γ M ∗ ⌜icM_wf M⌝ ∗
+       itable_half γ M ∗ ⌜icM_wf M⌝ ∗ iref_slots_auth ∗
        [∗ list] k ∈ seq 0 NINODE, islot M k)%I.
 
   Definition is_itable (γl γ : gname) : iProp Σ :=
@@ -704,6 +816,36 @@ Section IcacheTable.
 
   Global Instance is_itable_persistent γl γ : Persistent (is_itable γl γ).
   Proof. apply _. Qed.
+
+  (* The lock resource's slot accessor, in the form a WRITER needs: the map
+     may come back CHANGED, provided it changed only at [k].  Same shape and
+     same proof as [iref_cells_acc_upd] one section up -- [big_sepL_delete]
+     splits index [k] off, and the element of [seq 0 NINODE] at index [j]
+     being [j] is what turns "index ≠ k" into "this slot did not move". *)
+  Lemma islots_acc_upd (M : gmap nat (Qp * positive)) (k : nat) :
+    (k < NINODE)%nat ->
+    ([∗ list] j ∈ seq 0 NINODE, islot M j) -∗
+      islot M k ∗
+      (∀ M' : gmap nat (Qp * positive),
+         ⌜forall j, j <> k -> M' !! j = M !! j⌝ -∗
+         islot M' k -∗ [∗ list] j ∈ seq 0 NINODE, islot M' j).
+  Proof.
+    intros Hk. iIntros "Hs".
+    iDestruct (big_sepL_delete _ (seq 0 NINODE) k k
+                 ltac:(apply lookup_seq; split; [lia|exact Hk]) with "Hs")
+      as "[Hslot Hrest]".
+    iFrame "Hslot". iIntros (M') "%Hagree Hslot".
+    iApply (big_sepL_delete _ (seq 0 NINODE) k k
+              ltac:(apply lookup_seq; split; [lia|exact Hk])).
+    iFrame "Hslot".
+    iApply (big_sepL_impl with "Hrest").
+    iIntros "!>" (j x Hjx) "H".
+    destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
+    apply lookup_seq in Hjx as [Hx _].
+    assert (Hxk : x <> k) by lia.
+    iEval (rewrite /islot) in "H".
+    rewrite /islot (Hagree x Hxk). iExact "H".
+  Qed.
 
   (* THE LAST CLOSER'S JOIN, and the second half of REF-1 EXCLUSIVITY at
      the points-to level: [iref_lookup] forced [q = qt] on a slot whose

@@ -270,6 +270,12 @@
   2
  ],
  [
+  "CodeIdup.v",
+  "idup",
+  "idi_",
+  2
+ ],
+ [
   "CodeIinit.v",
   "iinit",
   "iii_",

@@ -867,8 +867,10 @@ SpecWritei.v
 ProofWriteiParts.v
 ProofWritei.v
 SpecReadi.v
+IrefSlots.v
 IcacheInv.v
 InodeLock.v
+CodeIdup.v
 CodeIlock.v
 CodeItrunc.v
 CodeIunlock.v
@@ -880,6 +882,7 @@ LinkConsoleread.v
 LinkFileread.v
 LinkForkretPark.v
 LinkIdup.v
+ProofIdup.v
 SpecIlock.v
 ProofIlock.v
 LinkIlock.v
