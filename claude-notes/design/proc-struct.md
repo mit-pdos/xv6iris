@@ -755,20 +755,96 @@ The SIE-flip leaves (`wp_csrci_…`, `wp_csrsi_…`) deal in the *components*,
 since they build and tear the arm down piecewise; the function-level specs deal
 in the bundle. `push_off` joins at its exit, `pop_off` splits at its entry.
 
-### The scheduler's saved context
+### The scheduler's saved context — PLANNED, and where it goes
 
-The other planned conjunct of the same disjunct is `sched_vc_at cpu_id
-(a_cpu_ctx cid_word) p`, the scheduler's saved `valid_context` for
-`cpu->context`. It must be **separable** from the claim, because the two
-transport oppositely across a park: `pstate_hlf` is per-proc, hart-free, and
-crosses the migration as a frame, while `sched_vc_at` is per-hart — spent on
-the `swtch` into this hart's scheduler and freshly re-created by the resuming
-hart's `swtch`. A monolithic payload would either drag a hart-keyed record
-across a migration or block the state half from crossing.
+The parked scheduler record `sched_vc_at h (a_cpu_ctx (cid_word_of h)) pa`
+currently lives in the global box `SchedCtx.scheds_inv`, one slot per hart,
+guarded by the two-valued per-proc receipt `park_hlf j r`. Both the box and
+the receipt are to be deleted. Getting the replacement right took three
+attempts; the two dead ends are recorded because each looks obviously correct
+until you check one specific thing.
 
-This replaces `scheds_inv` / `sched_slot` / `scheds_take` / `scheds_put` and
-the park-receipt ghost entirely: the record moves to the arm, and the receipt's
-exclusion role is subsumed by the state ghost.
+**Why the bit is not bookkeeping.** `park_hlf`'s `r` is the *timeless
+discriminator* that an `inv` forces. Both moves see the slot under `▷`, and
+`scheds_put` has to refute "a record is already resident" — two copies of a
+`valid_context` give only `▷ False`, which is useless inside a bare fancy
+update, with no program step and no later credit to strip it. Any global box
+with two states needs such a flip-flop. **So the box has to go, not just the
+bit.** Deleting `r` while keeping `scheds_inv` — replacing `if r then rec else
+emp` with `rec ∨ tok` for an exclusive one-shot `tok` — dies exactly here: the
+take-out direction discriminates fine (the thread's `tok` refutes the slot's by
+exclusivity, timelessly), but the deposit direction cannot.
+
+**Why not the SIE arm.** Putting the record in `sie_arm true p` — the arm owns
+it when `c->proc ≠ 0`, `emp` when it is `0` — is correct and needs no
+discriminator at all, since there is then no disjunction to case on. It costs
+`Φ` and `γs` on `sie_arm`, hence on `sie_cap`, hence on `sie_cap_gpr`: **1580
+sites across 294 files.** `Φ` is in scope at every one of them as the WP's
+postcondition and `γs` is not, so it is a mechanical but very large sweep.
+
+**Where it actually goes: `proc_slots`' `is_running` arm.** The lock of the
+proc that is running already owns that proc's raw context cells on exactly
+this guard. The record and the invariant's half of `c->proc` join them:
+
+```coq
+Definition run_slot (pa : mword 64) : iProp Σ :=
+  (own_ctx (p_context pa) ∗
+   ∃ h : CPU,
+     hart_hlf_at pa h ∗
+     cpu_proc_half h pa ∗
+     ▷ sched_vc_at h (a_cpu_ctx (cid_word_of h)) pa)%I.
+```
+
+`proc_slots` is already `Φ`/`γs`-parameterized, so nothing changes arity. The
+entitlement to the record becomes **holding `p->lock`**, which `yield`, `sleep`
+and `exit` all do already — they are about to write `p->state` — so nothing is
+threaded: `running_claim` disappears from the ~60 files that only pass it down.
+
+The migration argument that motivated the global box in the first place (the
+record owns fourteen exclusive words of *its* hart's context slot, so it cannot
+cross `wp_next`) is satisfied for free: the record is out of the lock only
+while the lock is held, hence only with interrupts off, hence with no `wp_next`
+in between.
+
+**The one new ghost, and why a resource tie will not do.** The lock is
+hart-free and the record is not, so the slot quantifies its hart
+existentially, and the thread must collapse that `∃ h` to its own hart —
+otherwise it holds a record for `a_cpu_ctx (cid_word_of h)` while the `swtch`
+operand is `a_cpu_ctx cid_word`, and the proof is stuck. Agreeing the slot's
+`cpu_proc_half h pa` against the thread's own half **does not do it**: two
+halves of two *different* harts' `c->proc` cells both holding `pa` is
+perfectly satisfiable separation-logic-wise. "At most one hart has `c->proc =
+pa`" is a global fact, and re-introducing an invariant to state it is
+re-introducing the box.
+
+So the tie is a per-proc ghost recording *which* hart a running proc is on:
+`hart_own j q h`, half in `run_slot` and half in `IntrDefs.cpu_claim` beside
+`pstate_hlf j RUNNING`. Agreement is a `ghost_var` agreement, timeless, so it
+lands inside the acquire's fancy update with no program step. It replaces
+`park_hlf` one-for-one in count but differs in every way that mattered: it
+tracks no transient window, needs no invariant, and is threaded through **zero**
+files, because it rides `cpu_claim` in the arm — which is hart-pinned and
+interrupts-conditional already, and is exactly the resource a preempting
+`kerneltrap` is handed.
+
+It can reuse the existing `era_park_name : nat -> gname` family. The carrier
+type must stay one `Σ` already has: `ghost_varG Σ (mword 32)` (the state
+mirror's) works, storing `cid_word_of h` truncated, provided
+`cid_word_of` is proven injective — there is no such lemma today.
+
+**Deletions this enables:** `scheds_inv`, `sched_slot`, `scheds_take`,
+`scheds_put`, `scheds_put_take`, `scheds_dispatch`, `scheds_reclaim`,
+`scheds_idle`, `scheds_alloc`, `cpu_own_full_is_vacuous`, `ProtoSchedsInv.v`,
+the whole `park_own`/`park_hlf`/`park_full`/`park_at`/`park_at_full` family,
+`running_claim`, `proc_slots`' `not_running` guard, and `proc_held`'s park
+conjunct (which becomes `cpu_proc_half i pa` — the spare half the scheduler
+needs to store `c->proc`, carried on both crossing directions exactly where
+the receipt used to be). The scheduler's two `c->proc` stores stop being
+mask-changing steps, since no invariant holds a fraction of the cell any more.
+
+**Scope:** ~80 files. Most edits are premise deletions (`running_claim j -∗`,
+`scheds_inv Φ γs -∗`), but `ProofScheduler.v` needs real surgery where the
+mask-changing stores collapse to ordinary ones.
 
 ## What moves where, and when
 
