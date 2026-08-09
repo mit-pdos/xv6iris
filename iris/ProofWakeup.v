@@ -109,7 +109,7 @@ Section ProofWakeup.
      ▷-guarded [proc_ctx] over the scheduler swtch chain) is threaded OPAQUELY
      here: the ▷-slot is carried between elim and intro/wakeup, never stripped. *)
   Lemma wp_wakeup_loop_sconf `{GEN : GenId} `{CID0 : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (spF pme chan : mword 64)
       (vra vs0 vs1 vs2 vs3 vs4 vs5 : mword 64)
       (vs6 vs7 vs8 vs9 vs10 vs11 : mword 64) (lvl : nat) (av : nat)
@@ -118,7 +118,7 @@ Section ProofWakeup.
     (* the acquire/release + myproc push_off keep the transient +1 in range *)
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (10 <= av)%nat ->
-    procs_inv Φ γs -∗
+    procs_inv γs -∗
     (* acquire's "already holding" arm sits above panic() *)
     panic_wp_any -∗
     (* the loop's exit continuation: control at the epilogue entry [wakeup+0x58],
@@ -396,7 +396,7 @@ Section ProofWakeup.
         iEval (rewrite Hpp40) in "Hpc".
         (* the per-proc lock for proc[k] and its protected resource. *)
         destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γk Hγk].
-        iDestruct (procs_inv_lookup Φ γs k γk Hγk with "Hpinv") as "#Hlockk".
+        iDestruct (procs_inv_lookup γs k γk Hγk with "Hpinv") as "#Hlockk".
         (* sp preserved through myproc. *)
         assert (Hmret2 : mret !!! Regidx (mword_of_int 2 : mword 5) = spF).
         { rewrite (callee_saved_lookup Hpres (mword_of_int 2 : mword 5) ltac:(vm_compute; reflexivity)). exact HMjcsp. }
@@ -440,7 +440,7 @@ Section ProofWakeup.
         (* acquire(&proc[k]->lock): cpu_own lvl -> S lvl; returns locked + proc_lock_res + pay. *)
         iDestruct (cpu_own_transport CIDb CIDe lvl eb pme C b ltac:(wp_next_chain)
                      with "Hown") as "Hown".
-        iApply (Acquire.wp_acquire_sconf (CID := CIDe) γk "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) M42
+        iApply (Acquire.wp_acquire_sconf (CID := CIDe) γk "proc"%string (proc_lock_res γs γk (proc_addr k)) M42
                   lvl eb pme C av b
                   ltac:(lia)
                   ltac:(lia)
@@ -454,7 +454,7 @@ Section ProofWakeup.
                         = mword_of_int (KernelSyms.wakeup + 0x46)).
         { rewrite HM42ra. apply bv_eq; vm_compute; reflexivity. }
         iEval (rewrite Hpc46) in "Hpc".
-        iDestruct (proc_lock_res_elim Φ γs γk (proc_addr k) with "HR") as (st ch) "(Hpst & Hpg & Hpch & Hpub & Hctx)".
+        iDestruct (proc_lock_res_elim γs γk (proc_addr k) with "HR") as (st ch) "(Hpst & Hpg & Hpch & Hpub & Hctx)".
         (* register-preservation through acquire (callee_saved M42 Macq). *)
         assert (HMacq9 : Macq !!! Regidx (mword_of_int 9 : mword 5) = proc_addr k).
         { rewrite (callee_saved_lookup Hpins (mword_of_int 9 : mword 5) ltac:(vm_compute; reflexivity)).
@@ -482,7 +482,7 @@ Section ProofWakeup.
                      (forall r : regidx, r ∈ dom (rf_to_gmap Mr)) ⌝ -∗
                    sie_cap_gpr (CID := CIDf) Mr av false pme -∗
                    pc_is (CID := CIDf) (mword_of_int (KernelSyms.wakeup + 0x2a)) -∗
-                   locked γk CIDf -∗ proc_lock_res Φ γs γk (proc_addr k) -∗
+                   locked γk CIDf -∗ proc_lock_res γs γk (proc_addr k) -∗
                    WP (LoopE gen_id CIDf : expr riscv_lang))%I
           with "[Hown Hpay Hframe Htail]"
           as "Hrel".
@@ -533,7 +533,7 @@ Section ProofWakeup.
           (* release(&proc[k]->lock): cpu_own S lvl -> lvl (pay consumed).  Its
              exit index is the very [match] [b] is equal to, so the back edge
              lands on the loop invariant unchanged. *)
-          iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) Mr2c
+          iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) Mr2c
                     lvl eb pme C av
                     Hlka2
                     ltac:(lia)
@@ -704,7 +704,7 @@ Section ProofWakeup.
                             (sign_extend' 64 (mword_of_int 8162 : mword 13))
                           = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite H48tgt) in "Hpc".
-          iDestruct (proc_lock_res_intro Φ γs γk (proc_addr k) st ch with "Hpst Hpg Hpch Hpub Hctx") as "HR".
+          iDestruct (proc_lock_res_intro γs γk (proc_addr k) st ch with "Hpst Hpg Hpch Hpub Hctx") as "HR".
           iApply ("Hrel" $! M48 with "[%] Hcg Hpc Htok HR").
           repeat split; [exact HM48_9 | exact HM48_2 | exact HM48_18
                         | exact HM48_19 | exact HM48_20 | exact HM48_21
@@ -797,7 +797,7 @@ Section ProofWakeup.
                               (sign_extend' 64 (mword_of_int 8156 : mword 13))
                             = mword_of_int (KernelSyms.wakeup + 0x2a)) by (apply bv_eq; vm_compute; reflexivity).
             iEval (rewrite H4etgt) in "Hpc".
-            iDestruct (proc_lock_res_intro Φ γs γk (proc_addr k) st ch with "Hpst Hpg Hpch Hpub Hctx") as "HR".
+            iDestruct (proc_lock_res_intro γs γk (proc_addr k) st ch with "Hpst Hpg Hpch Hpub Hctx") as "HR".
             iApply ("Hrel" $! M4e with "[%] Hcg Hpc Htok HR").
             repeat split; [exact HM4e_9 | exact HM4e_2 | exact HM4e_18
                           | exact HM4e_19 | exact HM4e_20 | exact HM4e_21
@@ -841,7 +841,7 @@ Section ProofWakeup.
                SLEEPING -> RUNNABLE stays in one guard class: the slots cross
                untouched, so no guard is opened (proc_slots_recast). *)
             iApply fupd_wp.
-            iMod (proc_lock_res_wakeup Φ γs γk (proc_addr k) st ch Hst_sl
+            iMod (proc_lock_res_wakeup γs γk (proc_addr k) st ch Hst_sl
                     with "Hpst Hpg Hpch Hpub Hctx") as "HR".
             iModIntro.
             (* ---- 0x56 c.j release ---- *)
@@ -878,10 +878,10 @@ Section ProofWakeup.
   (* untouched.                                                             *)
   (* ===================================================================== *)
   Lemma wp_wakeup_sconf `{GEN : GenId} `{CID0 : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (m : regfile) (γs : list gname) (a0f pme : mword 64)
       (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_wakeup_sconf_body Φ m γs a0f pme lvl K eb C b.
+    : wp_wakeup_sconf_body m γs a0f pme lvl K eb C b.
   Proof.
     cbv beta delta [wp_wakeup_sconf_body].
     intros sp0 spF rettgt HK Hdom Hlen Hmycpu Hmycpu_nz Hlvl.
@@ -894,7 +894,7 @@ Section ProofWakeup.
     iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     (* ---- the loop, with the epilogue as its exit continuation ---- *)
-    iPoseProof (wp_wakeup_loop_sconf (CID0 := CIDpro) Φ γs spF pme
+    iPoseProof (wp_wakeup_loop_sconf (CID0 := CIDpro)  γs spF pme
                   (m !!! Regidx (mword_of_int 10 : mword 5))
                   (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))
                   (m !!! Regidx (mword_of_int 9 : mword 5)) (m !!! Regidx (mword_of_int 18 : mword 5))

@@ -81,7 +81,7 @@ Definition consoleread_stack : nat := 62%nat.
 Definition wp_consoleread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γf : gname) 
     (γs : list gname) (j : nat) (γlp : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (pid : mword 32) (V : pprivate) (n : Z) (b : bool) :=
@@ -108,8 +108,8 @@ Definition wp_consoleread_sconf_body
   kernel_text -∗ pc_is pcE -∗
   proc_priv γf pj pid V -∗
   kalloc_env γa None -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   panic_wp_any -∗
   running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -132,9 +132,8 @@ Module Type CONSOLEREAD.
   Parameter wp_consoleread_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
-      (γs : list gname) (j : nat) (γlp : gname)
+      (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
-      wp_consoleread_sconf_body γa γf Φ γs j γlp m av eb C pid V n b.
+      wp_consoleread_sconf_body γa γf γs j γlp m av eb C pid V n b.
 End CONSOLEREAD.

@@ -121,12 +121,12 @@ Section ProofFileclose.
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
   Qed.
 
-  Lemma wp_fileclose_sconf (Φ : mval -> iProp Σ) (γfl γf : gname)
+  Lemma wp_fileclose_sconf  (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool)
-    : wp_fileclose_sconf_body Φ γfl γf k q Cf fn on m n eb p C K b.
+    : wp_fileclose_sconf_body γfl γf k q Cf fn on m n eb p C K b.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0.
@@ -1068,7 +1068,7 @@ Section ProofFileclose.
            plain instructions have moved us. *)
         iDestruct (cpu_own_transport CIDr2 CIDp4 n eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Pipeclose.wp_pipeclose_sconf (CID := CIDp4) Φ (fcn_procs fn) (fp_lock pn)
+        iApply (Pipeclose.wp_pipeclose_sconf (CID := CIDp4)  (fcn_procs fn) (fp_lock pn)
                   (fp_pipe pn) (fc_wbool Cf) (fcn_kmem fn) (fcn_kalloc fn)
                   (mword_of_int KernelSyms.kmem)
                   (mword_of_int (KernelSyms.kmem + 24)) on
@@ -1219,7 +1219,7 @@ Section ProofFileclose.
                          || bool_decide (fc_type Cf = FD_DEVICE)) = true).
           { apply orb_true_intro. destruct Hinode as [H|H]; [left|right];
               by apply bool_decide_eq_true_2. }
-          iAssert (fileclose_fs_env Φ fn n eb p) with "[Henv]" as "Henv".
+          iAssert (fileclose_fs_env fn n eb p) with "[Henv]" as "Henv".
           { rewrite /fileclose_env bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Henv". }
           iAssert (cwd_ref (fc_ip Cf)) with "[Hpl]" as "Hcwd".
@@ -1272,7 +1272,7 @@ Section ProofFileclose.
             by (intros c Hcs; rewrite /B1 upd_ne; [reflexivity | regne]).
           iDestruct (cpu_own_transport CIDr2 CIDf2 0 true (proc_addr (fcn_j fn)) C true
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (BeginOp.wp_begin_op_sconf (CID := CIDf2) Φ (fcn_procs fn)
+          iApply (BeginOp.wp_begin_op_sconf (CID := CIDf2)  (fcn_procs fn)
                     (fcn_j fn) (fcn_plock fn) (fcn_bio fn) (fcn_log fn) (fcn_fs fn)
                     (fcn_cov fn) (fcn_logstart fn) (fcn_dev fn)
                     (fcn_pid fn) (fcn_dq fn) B1 (K - 8)%nat true C true
@@ -1326,7 +1326,7 @@ Section ProofFileclose.
             rewrite /B2 upd_ne; [reflexivity | regne]. }
           iDestruct (cpu_own_transport CIDf3 CIDf5 0 true (proc_addr (fcn_j fn)) C true
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (Iput.wp_iput_sconf (CID := CIDf5) Φ (fcn_procs fn) (fcn_j fn)
+          iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
                     (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
                     (fcn_log fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
@@ -1362,7 +1362,7 @@ Section ProofFileclose.
             by (intros c Hcs; rewrite /B4 upd_ne; [reflexivity | regne]).
           iDestruct (cpu_own_transport CIDf6 CIDf7 0 true (proc_addr (fcn_j fn)) C true
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (EndOp.wp_end_op_sconf (CID := CIDf7) Φ (fcn_procs fn) (fcn_j fn)
+          iApply (EndOp.wp_end_op_sconf (CID := CIDf7)  (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
                     (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
                     (fcn_log fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)

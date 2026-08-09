@@ -4,7 +4,7 @@
    parallel.
 
    swtch(old,new) with the coroutine-chain protocol: consume the ▷-guarded
-   [valid_context Φ P An newc] (▷ because a scheduler can only ever RE-store a
+   [valid_context P An newc] (▷ because a scheduler can only ever RE-store a
    parked context under ▷ -- its own swtch delivered it that way) plus the
    chain payload [P cpu_id Ao newc oldc tp p]; the machine ends up
    running new's saved WP.  The target's admissibility index [An] must admit
@@ -18,11 +18,11 @@
    [IntrDefs.intr_count]), which forces any co-held [sie_cap]/[sie_arm]
    fragment to agree at [false] by ghost_var agreement (exactly [Swconf]'s own
    reasoning in SwtchCtx.v) -- and its continuation (the content of
-   [valid_context Φ P Ao oldc]) receives, on a later resumption at hart [h],
+   [valid_context P Ao oldc]) receives, on a later resumption at hart [h],
    [sie_cap_gpr@h m av false p] at a fresh file [m] with its
    own saved image and its own [av], plus [cpu_own@h 1 eb' p emp false] at its
    own [p] and the resumer's [eb'], and the chain hand-off
-   [▷ valid_context Φ P A' cret ∗ P h A' oldc cret tp' p]
+   [▷ valid_context P A' cret ∗ P h A' oldc cret tp' p]
    (tp' = the resumer's x4, how the resumed code re-ties its per-CPU cells
    to its own tp -- read via [rget], never the raw map, since tp is pinned to
    the hart and not carried by [m]/[m0]).
@@ -48,7 +48,6 @@ Import Defs.
 
 
 Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
          mword 64 -d> mword 64 -d> iPropO Σ)
     (An Ao : ctx_adm)
@@ -82,7 +81,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
   cpu_own 1 eb p emp false -∗
   pc_is (mword_of_int KernelSyms.swtch) -∗
   ctx_cells oldc old_vs -∗
-  ▷ valid_context Φ P An newc p -∗
+  ▷ valid_context P An newc p -∗
   (* the payload's [A'] slot is always the RESUMER's record index, and the
      resumer of this crossing is the caller itself -- so it is [Ao]. *)
   P cpu_id Ao newc oldc (rget m0 (mword_of_int 4 : mword 5)) p -∗
@@ -94,7 +93,7 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
       pc_is (CID := h) (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
       ctx_cells oldc (callee_img m0) -∗
       (∃ (A' : ctx_adm) (cret : mword 64),
-         ▷ valid_context Φ P A' cret p ∗
+         ▷ valid_context P A' cret p ∗
          P h A' oldc cret (rget (CID := h) m (mword_of_int 4 : mword 5)) p) -∗
       WP (LoopE gen_id h : expr riscv_lang) ) -∗
   WP (Loop : expr riscv_lang).
@@ -102,11 +101,10 @@ Definition wp_swtch_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : C
 Module Type SWTCH.
   Parameter wp_swtch_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64),
-      wp_swtch_sconf_body Φ P An Ao oldc newc m0 old_vs av eb p.
+      wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
 End SWTCH.

@@ -525,10 +525,10 @@ Section UserStepObligation.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (C : ucfg) (pt : uptd).
 
-  Theorem user_step_obligation_holds (Φ : mval -> iProp Σ) :
+  Theorem user_step_obligation_holds :
     minstret_inv -∗
-    user_step_obligation_active C pt Φ -∗
-    user_step_obligation C pt Φ.
+    user_step_obligation_active C pt -∗
+    user_step_obligation C pt.
   Proof.
     iIntros "#Hminstret #Hactive".
     iIntros "!> Hinv Hk".
@@ -567,16 +567,16 @@ Section UserStepObligation.
 
   (* the capstone, over the ACTIVE residue only: what remains of the whole
      user-execution theorem is [user_step_obligation_active] *)
-  Corollary wp_user_exec_active (Φ : mval -> iProp Σ) :
+  Corollary wp_user_exec_active :
     minstret_inv -∗
-    user_step_obligation_active C pt Φ -∗
+    user_step_obligation_active C pt -∗
     user_inv C pt -∗
-    stvec_handler_wp C pt Φ -∗
+    stvec_handler_wp C pt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hminstret #Hactive Hinv Htrap".
     iApply (wp_user_exec with "[] Hinv Htrap").
-    iApply (user_step_obligation_holds Φ with "Hminstret Hactive").
+    iApply (user_step_obligation_holds with "Hminstret Hactive").
   Qed.
 
 End UserStepObligation.

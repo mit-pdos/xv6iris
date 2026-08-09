@@ -311,11 +311,11 @@ Section ProofSysClose.
   (* =================================================================== *)
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
-  Lemma wp_sys_close_sconf (Φ : mval -> iProp Σ) (γl γf : gname)
+  Lemma wp_sys_close_sconf  (γl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_sys_close_sconf_body Φ γl γf fn on m av n eb p C v pid V b.
+    : wp_sys_close_sconf_body γl γf fn on m av n eb p C v pid V b.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav.
@@ -799,9 +799,9 @@ Section ProofSysClose.
       (* the descriptor's type is not visible here -- [ofile_slot] quantifies
          the content -- so hand fileclose whichever bundle it asks for and
          keep the other ([fileclose_env_split]). *)
-      iDestruct (fileclose_env_frame Φ fn on n eb p Cf with "Hpenv Hfenv")
+      iDestruct (fileclose_env_frame fn on n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf Φ γl γf k q Cf fn on D n eb p C (av - 4)%nat b
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on D n eb p C (av - 4)%nat b
                 ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
                 with "Hcg Hcpu Htext Hpc Hftab Hpanic Href Hfcenv [-]").
       iIntros (CID21 Hs21 R) "Hcg Hcpu Hpc %HcsR Hfdslot Hout".

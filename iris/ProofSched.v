@@ -155,7 +155,7 @@ Section SchedPostSwtch.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
 
   Lemma sched_post_swtch `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname)
+       (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (m m' : regfile) (av : nat) (eb eb' : bool)
       (sp0 spd vgap : mword 64) :
@@ -196,7 +196,7 @@ Section SchedPostSwtch.
     trap_csrs -∗
     intr_handler_avail -∗
     own_ctx (p_context pj) -∗
-    ▷ sched_vc_at Φ γs cpu_id (a_cpu_ctx cid_word) pj -∗
+    ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
     ( ∀ (mf : regfile) (ch0 : mword 64),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf av false pj -∗
@@ -206,7 +206,7 @@ Section SchedPostSwtch.
         intr_handler_avail -∗
         cpu_own 1 eb pj emp false -∗
         own_ctx (p_context pj) -∗
-        ▷ sched_vc_at Φ γs cpu_id (a_cpu_ctx cid_word) pj -∗
+        ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
         WP (Loop : expr riscv_lang) ) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -530,10 +530,10 @@ Section ProofSched.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_sched_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_sched_sconf 
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool)
-    : wp_sched_sconf_body Φ γs j γl st ch m av eb.
+    : wp_sched_sconf_body γs j γl st ch m av eb.
   Proof.
     cbv beta delta [wp_sched_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hneeds Hav.
@@ -711,7 +711,7 @@ Section ProofSched.
     assert (Ha0_B1 : B1 !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j).
     { rewrite /B1 upd_ne; [| vm_compute; discriminate].
       rewrite /B0 upd_ne; [| vm_compute; discriminate]. exact Ha0_mp. }
-    iPoseProof (procs_inv_lookup Φ γs j γl Hgl with "Hprocs") as "#Hislock".
+    iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     assert (Hlkb : add_vec (B1 !!! Regidx (mword_of_int 10 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr j).
     { rewrite Ha0_B1.
       assert (H0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
@@ -719,7 +719,7 @@ Section ProofSched.
     assert (HB1ra : B1 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sched + 0x14) : mword 64) 4)
       by (rewrite /B1 upd_eq; reflexivity).
     iApply (Holding.wp_holding_lockinv_locked_s_sconf γl (proc_addr j)
-              (proc_lock_res Φ γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
+              (proc_lock_res γs γl (proc_addr j)) False%I B1 (av - 6)%nat pj
               Hlkb ltac:(lia) (lock_refute_False _)
               with "Hcg Htext Hpc [] Hlocked [-]").
     { iApply (is_lock_openable with "Hislock"). }
@@ -1275,7 +1275,7 @@ Section ProofSched.
        record sched deposits for ITSELF is a PROC context, hence MIGRATABLE
        ([Ao = None]) -- which is what makes the whole post-resume half below
        ∀-hart, and what lets [procs_inv] be hart-free. *)
-    iApply (Swtch.wp_swtch_sconf Φ (p_sched γs) (Some cpu_id) None
+    iApply (Swtch.wp_swtch_sconf (p_sched γs) (Some cpu_id) None
               (p_context (proc_addr j)) (a_cpu_ctx cid_word)
               Mc ctxvs (av - 6)%nat eb pj
               Hctxlen Holdc Hnewc (adm_pin cpu_id)
@@ -1427,7 +1427,7 @@ Section ProofSched.
     { intros [Hf | Hz]; [ discriminate
                         | exfalso; exact (sched_pj_nonzero j Hj Hz) ]. }
     (* ONE application of the post-resume half, at the resuming hart. *)
-    iApply (sched_post_swtch (CID := h) Φ γs j γl ch' m m' av eb eb' sp0 spd vgap
+    iApply (sched_post_swtch (CID := h)  γs j γl ch' m m' av eb eb' sp0 spd vgap
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
               Hsp_m' Hs2addr Hs3v Hf20 Hf21 Hf22 Hf23 Hf24 Hf25 Hf26 Hf27
               with "Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc' Havail [Hctxback] Hvc' Hcont").

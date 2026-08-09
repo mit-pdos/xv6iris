@@ -185,12 +185,12 @@ Section ProofKkill.
   (* The scan, +0x20 .. +0x52.                                          *)
   (* ================================================================== *)
   Lemma wp_kkill_loop `{GEN : GenId} `{CID0 : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname) (mb : regfile)
+       (γs : list gname) (mb : regfile)
       (spd pidv pme : mword 64) (lvl av : nat) (eb : bool) (C : iProp Σ) (b : bool) :
     length γs = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (10 <= av)%nat ->
-    procs_inv Φ γs -∗
+    procs_inv γs -∗
     panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [kkill+0x52],
        at whatever hart the scan ended on, with a0 = 0 or -1. *)
@@ -237,7 +237,7 @@ Section ProofKkill.
       destruct Hregs as (Hm9 & Hmsp & Hm18 & Hm19 & Hmcs).
       iDestruct (cpu_own_eb_agree with "Hcg Hown") as %Hbmatch. symmetry in Hbmatch.
       destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γk Hγk].
-      iDestruct (procs_inv_lookup Φ γs k γk Hγk with "Hpinv") as "#Hlockk".
+      iDestruct (procs_inv_lookup γs k γk Hγk with "Hpinv") as "#Hlockk".
       iPoseProof (kki_20 with "Htext") as "Hi20".
       iPoseProof (kki_22 with "Htext") as "Hi22".
       iPoseProof (kki_26 with "Htext") as "Hi26".
@@ -280,7 +280,7 @@ Section ProofKkill.
       iDestruct (cpu_own_transport CIDk CIDb lvl eb pme C b ltac:(wp_next_chain)
                    with "Hown") as "Hown".
       iApply (Acquire.wp_acquire_sconf (CID := CIDb) γk "proc"%string
-                (proc_lock_res Φ γs γk (proc_addr k)) M22 lvl eb pme C av b
+                (proc_lock_res γs γk (proc_addr k)) M22 lvl eb pme C av b
                 ltac:(lia) ltac:(lia)
                 with "Hcg Hown Htext Hpc [Hlockk] Hpanic [-]").
       { iEval (rewrite HM22a0). iExact "Hlockk". }
@@ -288,7 +288,7 @@ Section ProofKkill.
       assert (Hpc26 : ret_pc (M22 !!! Regidx Rra) = mword_of_int (KernelSyms.kkill + 0x26))
         by (rewrite HM22ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpc26) in "Hpc".
-      iDestruct (proc_lock_res_elim Φ γs γk (proc_addr k) with "HR")
+      iDestruct (proc_lock_res_elim γs γk (proc_addr k) with "HR")
         as (st ch) "(Hpst & Hpg & Hpch & Hpub & Hslots)".
       iDestruct "Hpub" as (kl xs pidc) "(Hkilled & Hxstate & Hpidhalf)".
       (* register facts through acquire *)
@@ -356,7 +356,7 @@ Section ProofKkill.
                      kk_cs_rest Mr mb ⌝ -∗
                    sie_cap_gpr (CID := CIDf) Mr av false pme -∗
                    pc_is (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x4a)) -∗
-                   locked γk CIDf -∗ proc_lock_res Φ γs γk (proc_addr k) -∗
+                   locked γk CIDf -∗ proc_lock_res γs γk (proc_addr k) -∗
                    WP (LoopE gen_id CIDf : expr riscv_lang))%I
           with "[Hown Hpay Hqx]" as "Hret0".
         { iIntros (Mr) "%Hmr Hcg Hpc Htok HR".
@@ -405,7 +405,7 @@ Section ProofKkill.
                             (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k)
             by (rewrite HMr4c_a0; apply addv_sext0).
           iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
-                    (proc_lock_res Φ γs γk (proc_addr k)) Mr4c lvl eb pme C av
+                    (proc_lock_res γs γk (proc_addr k)) Mr4c lvl eb pme C av
                     Hlka2 ltac:(lia)
                     with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay [-]").
           rewrite -Hbmatch.
@@ -578,7 +578,7 @@ Section ProofKkill.
           iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
           { iExists _, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
           iApply fupd_wp.
-          iMod (proc_lock_res_wakeup Φ γs γk (proc_addr k) st ch Hst_sl
+          iMod (proc_lock_res_wakeup γs γk (proc_addr k) st ch Hst_sl
                   with "Hpst Hpg Hpch Hpub Hslots") as "HR".
           iModIntro.
           (* +0x64 c.j -> +0x4a *)
@@ -607,7 +607,7 @@ Section ProofKkill.
           iEval (rewrite Hpp4a) in "Hpc".
           iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
           { iExists _, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
-          iDestruct (proc_lock_res_intro Φ γs γk (proc_addr k) st ch
+          iDestruct (proc_lock_res_intro γs γk (proc_addr k) st ch
                        with "Hpst Hpg Hpch Hpub Hslots") as "HR".
           iApply ("Hret0" $! M44 with "[%] Hcg Hpc Htok HR").
           split; [exact HD9|]. split; [exact HDsp|]. exact HDcs.
@@ -625,7 +625,7 @@ Section ProofKkill.
         (* nothing moved: put the lock resource straight back *)
         iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
         { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
-        iDestruct (proc_lock_res_intro Φ γs γk (proc_addr k) st ch
+        iDestruct (proc_lock_res_intro γs γk (proc_addr k) st ch
                      with "Hpst Hpg Hpch Hpub Hslots") as "HR".
         iPoseProof (kki_2c with "Htext") as "Hi2c".
         iPoseProof (kki_2e with "Htext") as "Hi2e".
@@ -681,7 +681,7 @@ Section ProofKkill.
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k)
           by (rewrite HM2e_a0; apply addv_sext0).
         iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
-                  (proc_lock_res Φ γs γk (proc_addr k)) M2e lvl eb pme C av
+                  (proc_lock_res γs γk (proc_addr k)) M2e lvl eb pme C av
                   Hlka1 ltac:(lia)
                   with "Hcg Htext Hpc Hlockk Htok HR Hown Hpay [-]").
         rewrite -Hbmatch.
@@ -823,9 +823,9 @@ Section ProofKkillMain.
   Notation Rs2 := (mword_of_int 18 : mword 5).
   Notation Rs3 := (mword_of_int 19 : mword 5).
 
-  Lemma wp_kkill_sconf (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_kkill_sconf  (γs : list gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_kkill_sconf_body Φ γs m av n eb p C b.
+    : wp_kkill_sconf_body γs m av n eb p C b.
   Proof.
     cbv beta delta [wp_kkill_sconf_body].
     intros pcE ret_tgt Hlen Hn Hav.
@@ -1238,7 +1238,7 @@ Section ProofKkillMain.
     (* ===================== the scan ===================== *)
     iDestruct (cpu_own_transport CID CID12 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iPoseProof (wp_kkill_loop (CID0 := CID12) Φ γs m (pa_stk sp0 6)
+    iPoseProof (wp_kkill_loop (CID0 := CID12)  γs m (pa_stk sp0 6)
                   (add_vec zero_reg (M2 !!! Regidx Ra0)) p n (av - 6)%nat eb C b
                   Hlen Hn ltac:(lia) with "Hprocs Hpanic Hqexit") as "Hscan".
     iApply ("Hscan" $! 0%nat M7 with "[%] [%] Hcg Hcpu Htext Hpc").

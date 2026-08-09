@@ -290,7 +290,7 @@ Section SpecFileread.
     fileread_dev_env fn Cf.
 
   (* ---- the FD_INODE arm's environment: ilock's, readi's and iunlock's ---- *)
-  Definition fileread_fs_env (Φ : mval -> iProp Σ) (γf : gname) (k : nat)
+  Definition fileread_fs_env  (γf : gname) (k : nat)
       (fn : fread_names) (Cf : fcontent) : iProp Σ :=
     (⌜log_geom_ok (frn_cov fn) (frn_logstart fn)⌝ ∗
      ⌜0 <= frn_inodestart fn⌝ ∗
@@ -351,12 +351,12 @@ Section SpecFileread.
      bslot (frn_bio fn))%I.
 
   (* ---- and the three, selected by the file's type ---- *)
-  Definition fileread_env (Φ : mval -> iProp Σ) (γf : gname) (k : nat)
+  Definition fileread_env  (γf : gname) (k : nat)
       (fn : fread_names) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE) then emp
      else if bool_decide (fc_type Cf = FD_DEVICE) then fileread_dev_env fn Cf
      else if bool_decide (fc_type Cf = FD_INODE)
-     then fileread_fs_env Φ γf k fn Cf
+     then fileread_fs_env γf k fn Cf
      else emp)%I.
 
   Definition fileread_env_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
@@ -369,8 +369,8 @@ Section SpecFileread.
      the proof: [f->readable == 0] returns before the type is ever tested, so
      the environment must already contain everything the postcondition
      promises.  This is what forced the existential [vv'] above. *)
-  Lemma fileread_fs_env_out Φ γf k fn Cf :
-    fileread_fs_env Φ γf k fn Cf -∗ fileread_fs_out fn Cf.
+  Lemma fileread_fs_env_out γf k fn Cf :
+    fileread_fs_env γf k fn Cf -∗ fileread_fs_out fn Cf.
   Proof.
     rewrite /fileread_fs_env /fileread_fs_out.
     iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hkey & Hdev & Hinum &
@@ -378,8 +378,8 @@ Section SpecFileread.
     iFrame "Hdev Hinum Href Hsb Hblk Hbs". iExists (frn_vv fn). iFrame "Hkey".
   Qed.
 
-  Lemma fileread_env_out_of_env Φ γf k fn Cf :
-    fileread_env Φ γf k fn Cf -∗ fileread_env_out fn Cf.
+  Lemma fileread_env_out_of_env γf k fn Cf :
+    fileread_env γf k fn Cf -∗ fileread_env_out fn Cf.
   Proof.
     rewrite /fileread_env /fileread_env_out.
     case_bool_decide; [by iIntros "$"|].
@@ -390,8 +390,8 @@ Section SpecFileread.
 
   (* A file that is neither a pipe, nor a device, nor an inode costs its
      reader nothing -- the arm is [panic], and [panic_wp_any] closes it. *)
-  Lemma fileread_env_none Φ γf k fn Cf :
-    fc_type Cf = FD_NONE -> ⊢ fileread_env Φ γf k fn Cf.
+  Lemma fileread_env_none γf k fn Cf :
+    fc_type Cf = FD_NONE -> ⊢ fileread_env γf k fn Cf.
   Proof.
     intro Ht. rewrite /fileread_env Ht.
     rewrite bool_decide_eq_false_2; [|by vm_compute].
@@ -406,7 +406,7 @@ Definition wp_fileread_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !inodeG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
     (γs : list gname) (j : nat) (γlp : gname)    (* the running process     *)
     (k : nat) (q : Qp) (Cf : fcontent)           (* the borrowed reference  *)
@@ -442,11 +442,11 @@ Definition wp_fileread_sconf_body
   (* ambient, because three of the four arms copy into user memory *)
   proc_priv γf pj pidv V -∗
   kalloc_env γa None -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   running_claim j -∗
   (* ...and what the file's TYPE selects *)
-  fileread_env Φ γf k fn Cf -∗
+  fileread_env γf k fn Cf -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile) (r : mword 64) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -469,12 +469,12 @@ Module Type FILEREAD.
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              !inodeG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
       (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool),
-      wp_fileread_sconf_body Φ γa γf γs j γlp k q Cf fn pidv V m K eb C n b.
+      wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b.
 End FILEREAD.

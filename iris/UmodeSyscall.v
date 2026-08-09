@@ -95,7 +95,7 @@ Section UmodeSyscall.
 
   (* a protocol from a number -> shape table *)
   Definition usys_protocol_of (tbl : Z -> usys_sem) : usys_protocol Σ :=
-    fun n g va M Φ => usys_arm (tbl n) g va M.
+    fun n g va M => usys_arm (tbl n) g va M.
 
 End UmodeSyscall.
 

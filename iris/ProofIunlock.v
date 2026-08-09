@@ -99,7 +99,7 @@ Section ProofIunlockMain.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ (m !!! Regidx Rs2 : mword 64))%I.
 
-  Definition iul_cont `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Definition iul_cont `{CID0 : CpuId} 
       (gi : gname) (ip : mword 64) (refv : mword 32)
       (dn : dinode) (bm : blkmap)
       (pidv : mword 32) (dq dqr : dfrac)
@@ -116,7 +116,7 @@ Section ProofIunlockMain.
         inode_key gi true dn bm -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Lemma wp_iunlock_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_iunlock_sconf 
       (gs : list gname)
       (gfs : fs_names) (gi : gname)
       (gil gisl : gname)
@@ -126,14 +126,14 @@ Section ProofIunlockMain.
       (pidv : mword 32) (dq dqr : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool)
-    : wp_iunlock_sconf_body Φ gs gfs gi gil gisl cov logstart ip refv dn bm
+    : wp_iunlock_sconf_body gs gfs gi gil gisl cov logstart ip refv dn bm
                             pidv dq dqr m K eb p C b.
   Proof.
     cbv beta delta [wp_iunlock_sconf_body].
     intros pcE ret_tgt HK Ha0 Hipnz Href.
     pose proof HK as HK'. unfold K_iunlock in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hslk Hstok Hpid Hppid Href #Hprocs Hlk Hcont".
-    iAssert (iul_cont (CID0 := CID) Φ gi ip refv dn bm pidv dq dqr m K eb p C b)%I
+    iAssert (iul_cont (CID0 := CID)  gi ip refv dn bm pidv dq dqr m K eb p C b)%I
       with "[Hcont]" as "Hcont"; [rewrite /iul_cont; iExact "Hcont" |].
     iPoseProof (iui2_00 with "Htext") as "Hi00".
     iPoseProof (iui2_02 with "Htext") as "Hi02".
@@ -465,7 +465,7 @@ Section ProofIunlockMain.
     (* THE PARK: the locked inode, re-packaged as the lock's resource *)
     iDestruct "Hlk" as (data) "(%Hok & [Hkey1 Hkey2] & Hvalid & Hmeta & Hmap & Hblocks)".
     iDestruct "Hmap" as "[Haddrs Hindres]".
-    iApply (RS.wp_releasesleep_sconf Φ gs gil gisl "inode"%string
+    iApply (RS.wp_releasesleep_sconf gs gil gisl "inode"%string
               (inode_parked gfs gi cov logstart ip) R9 pidv p (K - 4)%nat eb C b
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] [Hkey1 Hvalid Hindres Hblocks Hmeta Haddrs] Hpanic Hprocs").

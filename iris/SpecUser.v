@@ -25,7 +25,7 @@
 (*                   with EXISTENTIAL contents) and the loop-constant boot *)
 (*                   config [C].  Produced at boot / after userret by      *)
 (*                   [UserKernelBridge.userret_to_user_inv].               *)
-(*   [stvec_handler_wp C pt Φ]                                             *)
+(*   [stvec_handler_wp C pt]                                             *)
 (*                   the kernel re-entry contract: from [user_trap_frame]  *)
 (*                   (Supervisor, pc at stvec's direct base, trap CSRs     *)
 (*                   written, the same page table and config) the kernel   *)
@@ -51,13 +51,13 @@ Local Open Scope Z_scope.
 Import Defs.
 
 Definition wp_user_exec_closed_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
-    (C : ucfg) (pt : uptd) (Φ : mval -> iProp Σ) :=
+    (C : ucfg) (pt : uptd) :=
   hw_config -∗ minstret_inv -∗ wire_inv -∗
-  user_inv C pt -∗ stvec_handler_wp C pt Φ -∗
+  user_inv C pt -∗ stvec_handler_wp C pt -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USER.
   Parameter wp_user_exec_closed :
-    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd) (Φ : mval -> iProp Σ),
-      wp_user_exec_closed_body C pt Φ.
+    forall `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId} (C : ucfg) (pt : uptd),
+      wp_user_exec_closed_body C pt.
 End USER.

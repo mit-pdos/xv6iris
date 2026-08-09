@@ -112,7 +112,7 @@ Definition wp_ilock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !inodeG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
     (gu : uart_names) (gd : disk_names) (gk : gname)   (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -177,8 +177,8 @@ Definition wp_ilock_sconf_body
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle *)
-  procs_inv Φ gs -∗
-  scheds_inv Φ gs -∗
+  procs_inv gs -∗
+  scheds_inv gs -∗
   running_claim j -∗
   (* the disk fabric *)
   dev_inv gu gd -∗
@@ -214,7 +214,7 @@ Module Type ILOCK.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !inodeG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -227,7 +227,7 @@ Module Type ILOCK.
       (pidv : mword 32) (dq dqd dqn dqr dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_ilock_sconf_body Φ gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
+      wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
                           cov logstart inodestart dev ip inum refv
                           vv dn bm ds pidv dq dqd dqn dqr dqs m K eb C b.
 End ILOCK.

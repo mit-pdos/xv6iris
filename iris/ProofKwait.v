@@ -525,7 +525,7 @@ Section ProofKwait.
      Packaging it in would be unsound in the other direction: the +0xca
      exit needs those very resources for sleep, and a closure cannot give
      them back. *)
-  Definition kw_exit_fn `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ)
+  Definition kw_exit_fn `{GEN : GenId} (CID0 : CPU) 
       (γf : gname) (mm : regfile) (pme : mword 64) (K : nat) (eb : bool)
       (C : iProp Σ) (pid : mword 32) (V : pprivate) (R : iProp Σ) : iProp Σ :=
     (wp_next (CID0 := CID0) eb pme (fun (CID : CpuId) =>
@@ -555,7 +555,7 @@ Section ProofKwait.
      is anchored at the TURN's own hart rather than at [CID0]: sleep hands
      the thread back on an arbitrary hart, and a [wp_next] can only ever be
      re-anchored FORWARD. *)
-  Definition kw_round `{GEN : GenId} (CID0 : CPU) (Φ : mval -> iProp Σ)
+  Definition kw_round `{GEN : GenId} (CID0 : CPU)
       (γf γw : gname) (jj : nat) (mm : regfile) (pme addr : mword 64)
       (K : nat) (eb : bool) (C : iProp Σ) (pid : mword 32) (V : pprivate) : iProp Σ :=
     (wp_next (CID0 := CID0) true pme (fun (CID : CpuId) =>
@@ -569,7 +569,7 @@ Section ProofKwait.
         proc_priv γf pme pid V -∗
         kw_frame (mm !!! Regidx csp_rs1) mm -∗
         kw_rt pme jj -∗
-        kw_exit_fn CID Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
+        kw_exit_fn CID γf mm pme K eb C pid V (kw_rt pme jj) -∗
         WP (Loop : expr riscv_lang)))%I.
 
   (* [SchedCtx.proc_slots_unused]'s ZOMBIE twin: a ZOMBIE is not RUNNING and
@@ -577,8 +577,8 @@ Section ProofKwait.
      whole park receipt.  Stated here rather than in SchedCtx.v because
      kwait is its first (and so far only) consumer; it belongs beside
      [proc_slots_unused] the moment kexit wants it too. *)
-  Lemma kw_slots_zombie `{GEN : GenId} `{CIDz : CpuId} (Ph : mval -> iProp Σ) (gs : list gname) (pa : mword 64) :
-    proc_slots Ph gs pa ZOMBIE -∗ proc_dormant pa ZOMBIE ∗ park_at_full pa false.
+  Lemma kw_slots_zombie `{GEN : GenId} `{CIDz : CpuId} (gs : list gname) (pa : mword 64) :
+    proc_slots gs pa ZOMBIE -∗ proc_dormant pa ZOMBIE ∗ park_at_full pa false.
   Proof.
     rewrite /proc_slots inv_dormant_ZOMBIE not_running_ZOMBIE is_running_ZOMBIE.
     rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
@@ -592,7 +592,7 @@ Section ProofKwait.
   (* factoring sys_close's [sc_tail] and allocproc's epilogue use.       *)
   (* ================================================================== *)
   Local Lemma kw_epilogue `{GEN : GenId} `{CIDe : CpuId}
-      (Φ : mval -> iProp Σ) (mm Mx : regfile) (pme rv : mword 64)
+       (mm Mx : regfile) (pme rv : mword 64)
       (K lvl : nat) (eb bx : bool) (C : iProp Σ) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
@@ -846,7 +846,7 @@ Section ProofKwait.
   (* wait_lock, puts -1 in s3 and jumps to the epilogue.                 *)
   (* ================================================================== *)
   Local Lemma kw_exit_wait `{GEN : GenId} `{CIDt : CpuId}
-      (Φ : mval -> iProp Σ) (γw : gname) (mm Mt : regfile)
+       (γw : gname) (mm Mt : regfile)
       (pme : mword 64) (K : nat) (eb : bool) (C : iProp Σ) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
@@ -985,7 +985,7 @@ Section ProofKwait.
     (* ---- the epilogue ---- *)
     iDestruct (cpu_own_transport CIDr CIDj 0%nat eb pme C eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (kw_epilogue Φ mm T3 pme (mword_of_int (-1) : mword 64) K 0%nat eb eb C
+    iApply (kw_epilogue mm T3 pme (mword_of_int (-1) : mword 64) K 0%nat eb eb C
               (kw_K10K K HK) HT3sp HT3s3 HT3cs with "Hcg Hown Htext Hpc Hframe [-]").
     iApply (kw_next_reanchor CIDt CIDj eb pme with "[Hcont]"); [wp_next_chain |].
     iExact "Hcont".
@@ -996,7 +996,7 @@ Section ProofKwait.
   (* wait_lock, return -1.  The only exit that unwinds two levels.       *)
   (* ================================================================== *)
   Local Lemma kw_exit_both `{GEN : GenId} `{CIDt : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname) (γw γk : gname)
+       (γs : list gname) (γw γk : gname)
       (mm Mt : regfile) (pme : mword 64) (k K : nat) (eb : bool) (C : iProp Σ) :
     let sp0 := mm !!! Regidx csp_rs1 in
     let spr := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 59 : mword 6))) in
@@ -1010,9 +1010,9 @@ Section ProofKwait.
     arm_pay 0 eb pme -∗
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x90)) -∗
-    is_lock γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) -∗
     locked γk CIDt -∗
-    proc_lock_res Φ γs γk (proc_addr k) -∗
+    proc_lock_res γs γk (proc_addr k) -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     locked γw CIDt -∗
     wait_res -∗
@@ -1082,7 +1082,7 @@ Section ProofKwait.
       by (rewrite HU1a0; apply addv_sext0).
     (* ---- release(&pp->lock): level 2 -> 1, exit index still [false] ---- *)
     iApply (Release.wp_release_sconf γk (proc_addr k) "proc"%string
-              (proc_lock_res Φ γs γk (proc_addr k)) U1 1%nat eb pme C (K - 10)%nat
+              (proc_lock_res γs γk (proc_addr k)) U1 1%nat eb pme C (K - 10)%nat
               Hlkk (kw_K10 K HK)
               with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1 [-]").
     (* the exit index of a release at level 1 is [false], so the hart is
@@ -1198,7 +1198,7 @@ Section ProofKwait.
     iEval (rewrite Htgt78) in "Hpc".
     iDestruct (cpu_own_transport CIDr2 CIDj 0%nat eb pme C eb ltac:(wp_next_chain)
                  with "Hown") as "Hown".
-    iApply (kw_epilogue Φ mm U5 pme (mword_of_int (-1) : mword 64) K 0%nat eb eb C
+    iApply (kw_epilogue mm U5 pme (mword_of_int (-1) : mword 64) K 0%nat eb eb C
               (kw_K10K K HK) HU5sp HU5s3 HU5cs with "Hcg Hown Htext Hpc Hframe [-]").
     iApply (kw_next_reanchor CIDt CIDj eb pme with "[Hcont]"); [wp_next_chain |].
     iExact "Hcont".
@@ -1210,7 +1210,7 @@ Section ProofKwait.
   (* wait_lock's table), frees it, and unwinds both locks.               *)
   (* ================================================================== *)
   Local Lemma kw_reap `{GEN : GenId} `{CIDp : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname) (γa γw γk : gname)
+       (γs : list gname) (γa γw γk : gname)
       (mm Mr : regfile) (pme : mword 64) (k K : nat) (eb : bool) (C : iProp Σ)
       (pidc : mword 32) (ch : mword 64) (ps : list (mword 64)) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1229,7 +1229,7 @@ Section ProofKwait.
     pc_is (mword_of_int (KW + 0x5c)) -∗
     kalloc_env γa None -∗
     (* the child's lock, contents out, at ZOMBIE *)
-    is_lock γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) -∗
     locked γk CIDp -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
     (* ZOMBIE is unclaimed, so the caller's lock share is the whole mirror --
@@ -1411,12 +1411,12 @@ Section ProofKwait.
        the lock's share again. *)
     iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwu _]".
     iDestruct ("Hwu" with "Hpsg") as "[Hpsg _]".
-    iAssert (proc_lock_res Φ γs γk (proc_addr k)) with "[Hstate Hpsg Hchan Hpub Hdorm Hpark]" as "HRk".
-    { iApply (proc_lock_res_intro Φ γs γk (proc_addr k) UNUSED (zero_reg : mword 64)
+    iAssert (proc_lock_res γs γk (proc_addr k)) with "[Hstate Hpsg Hchan Hpub Hdorm Hpark]" as "HRk".
+    { iApply (proc_lock_res_intro γs γk (proc_addr k) UNUSED (zero_reg : mword 64)
                 with "Hstate Hpsg Hchan Hpub [Hdorm Hpark]").
-      iApply (proc_slots_unused_intro Φ γs (proc_addr k) with "Hdorm Hpark"). }
+      iApply (proc_slots_unused_intro γs (proc_addr k) with "Hdorm Hpark"). }
     iApply (Release.wp_release_sconf γk (proc_addr k) "proc"%string
-              (proc_lock_res Φ γs γk (proc_addr k)) R3 1%nat eb pme C (K - 10)%nat
+              (proc_lock_res γs γk (proc_addr k)) R3 1%nat eb pme C (K - 10)%nat
               Hlkk2 (kw_K10 K HK)
               with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1 [-]").
     (* level 1 -> 1: pinned hart, so collapse rather than re-anchor *)
@@ -1507,7 +1507,7 @@ Section ProofKwait.
       by (rewrite (callee_saved_lookup Hcsr Rs3 ltac:(vm_compute; reflexivity)); exact HR6s3).
     assert (Hmrcs : kw_cs_rest mr mm) by (eapply kw_cs_rest_cs; [exact Hcsr | exact HR6cs]).
     (* ---- fall through into the epilogue ---- *)
-    iApply (kw_epilogue Φ mm mr pme (sign_extend' 64 pidc) K 0%nat eb eb C
+    iApply (kw_epilogue mm mr pme (sign_extend' 64 pidc) K 0%nat eb eb C
               (kw_K10K K HK) Hmrsp Hmrs3 Hmrcs with "Hcg Hown Htext Hpc Hframe [-]").
     iApply (kw_next_reanchor CIDp CIDr2 eb pme with "[Hcont]"); [wp_next_chain |].
     iExact "Hcont".
@@ -1522,7 +1522,7 @@ Section ProofKwait.
   (* the arms differ only in whether the user page table grew.           *)
   (* ================================================================== *)
   Local Lemma kw_found `{GEN : GenId} `{CIDf : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname) (γa γf γw γk : gname)
+       (γs : list gname) (γa γf γw γk : gname)
       (mm Mf : regfile) (pme : mword 64) (k K : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (ch : mword 64) (ps : list (mword 64)) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -1540,7 +1540,7 @@ Section ProofKwait.
     kernel_text -∗
     pc_is (mword_of_int (KW + 0x40)) -∗
     kalloc_env γa None -∗
-    is_lock γk (proc_addr k) "proc"%string (proc_lock_res Φ γs γk (proc_addr k)) -∗
+    is_lock γk (proc_addr k) "proc"%string (proc_lock_res γs γk (proc_addr k)) -∗
     locked γk CIDf -∗
     p_state (proc_addr k) ↦₄ ZOMBIE -∗
     (* the whole mirror: ZOMBIE is unclaimed, so the lock's share is both
@@ -1620,7 +1620,7 @@ Section ProofKwait.
       iEval (rewrite Htgt5c) in "Hpc".
       iAssert (proc_pub (proc_addr k)) with "[Hkilled Hxstate Hpidhalf]" as "Hpub".
       { iExists kl, xs, pidc. iFrame "Hkilled Hxstate Hpidhalf". }
-      iApply (kw_reap Φ γs γa γw γk mm F0 pme k K eb C pidc ch ps
+      iApply (kw_reap γs γa γw γk mm F0 pme k K eb C pidc ch ps
                 HK Hk HF0sp HF0s1 HF0s3 HF0cs
                 with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
                       Hpub Hdorm Hpark Hlk Htok Hps Hframe [Hcont Hpriv]").
@@ -1819,13 +1819,13 @@ Section ProofKwait.
         iEval (rewrite Htgt90) in "Hpc".
         iDestruct (pstate_whole_split (proc_addr k) ZOMBIE) as "[Hwz2 _]".
         iDestruct ("Hwz2" with "Hpsg") as "[Hpsg _]".
-        iAssert (proc_lock_res Φ γs γk (proc_addr k)) with "[Hstate Hpsg Hchan Hpub Hdorm Hpark]" as "HRk".
-        { iApply (proc_lock_res_intro Φ γs γk (proc_addr k) ZOMBIE ch
+        iAssert (proc_lock_res γs γk (proc_addr k)) with "[Hstate Hpsg Hchan Hpub Hdorm Hpark]" as "HRk".
+        { iApply (proc_lock_res_intro γs γk (proc_addr k) ZOMBIE ch
                     with "Hstate Hpsg Hchan Hpub [Hdorm Hpark]").
           rewrite /proc_slots inv_dormant_ZOMBIE not_running_ZOMBIE is_running_ZOMBIE.
           rewrite (_ : needs_ctx ZOMBIE = false); [| vm_compute; reflexivity].
           iSplitR; [done |]. iSplitR; [done |]. iFrame "Hdorm Hpark". }
-        iApply (kw_exit_both Φ γs γw γk mm mco pme k K eb C
+        iApply (kw_exit_both γs γw γk mm mco pme k K eb C
                   HK Hcosp Hcos1 Hcocs
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Hlkk Htokk HRk Hlk Htok
                         [Hps] Hframe [Hcont Hpriv]").
@@ -1847,7 +1847,7 @@ Section ProofKwait.
                        = mword_of_int (KW + 0x5c))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp5c) in "Hpc".
-        iApply (kw_reap Φ γs γa γw γk mm mco pme k K eb C pidc ch ps
+        iApply (kw_reap γs γa γw γk mm mco pme k K eb C pidc ch ps
                   HK Hk Hcosp Hcos1 Hcos3 Hcocs
                   with "Hcg Hown Hpay1 Hpay0 Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
                         Hpub Hdorm Hpark Hlk Htok Hps Hframe [Hcont Hpriv]").
@@ -1876,13 +1876,13 @@ Section ProofKwait.
   (* (fdalloc's rule).                                                    *)
   (* ================================================================== *)
   Local Lemma kw_scan `{GEN : GenId} `{CID0 : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname) (γa γf γw : gname)
+      (γs : list gname) (γa γf γw : gname)
       (mm : regfile) (pme addr : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (R : iProp Σ) :
     let sp0 := mm !!! Regidx csp_rs1 in
     (K_kwait <= K)%nat ->
     length γs = NPROC ->
-    procs_inv Φ γs -∗
+    procs_inv γs -∗
     panic_wp_any -∗
     kernel_text -∗
     kalloc_env γa None -∗
@@ -1891,7 +1891,7 @@ Section ProofKwait.
       ⌜(kk < NPROC)%nat⌝ -∗ ⌜kw_scan_regs M mm pme addr kk⌝ -∗
       ⌜M !!! Regidx Ra4 = hv⌝ -∗
       (* the FUNCTION exit, for the found path *)
-      kw_exit_fn CID0 Φ γf mm pme K eb C pid V R -∗
+      kw_exit_fn CID0 γf mm pme K eb C pid V R -∗
       (* the SCAN exit, at +0xca, at the same (pinned) hart.  It takes the
          FUNCTION exit back as its own argument: the two are ONE linear
          resource and only the branch that actually runs may have it. *)
@@ -1904,7 +1904,7 @@ Section ProofKwait.
           pc_is (mword_of_int (KW + 0xca)) -∗
           locked γw CID0 -∗ parents_own px -∗
           proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
-          kw_exit_fn CID0 Φ γf mm pme K eb C pid V R -∗
+          kw_exit_fn CID0 γf mm pme K eb C pid V R -∗
           WP (Loop : expr riscv_lang)) -∗
       sie_cap_gpr M (K - 10)%nat false pme -∗
       cpu_own 1 eb pme C false -∗
@@ -1919,7 +1919,7 @@ Section ProofKwait.
     iAssert (∀ (fuel kk : nat) (M : regfile) (hv : mword 64) (ps : list (mword 64)),
                ⌜(NPROC - kk <= fuel)%nat⌝ -∗ ⌜(kk < NPROC)%nat⌝ -∗
                ⌜kw_scan_regs M mm pme addr kk⌝ -∗ ⌜M !!! Regidx Ra4 = hv⌝ -∗
-               kw_exit_fn CID0 Φ γf mm pme K eb C pid V R -∗
+               kw_exit_fn CID0 γf mm pme K eb C pid V R -∗
                (∀ (Mx : regfile) (hx : mword 64) (px : list (mword 64)),
                    ⌜ kw_scan_regs Mx mm pme addr NPROC ⌝ -∗
                    ⌜ Mx !!! Regidx Ra4 = hx ⌝ -∗
@@ -1929,7 +1929,7 @@ Section ProofKwait.
                    pc_is (mword_of_int (KW + 0xca)) -∗
                    locked γw CID0 -∗ parents_own px -∗
                    proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ R -∗
-                   kw_exit_fn CID0 Φ γf mm pme K eb C pid V R -∗
+                   kw_exit_fn CID0 γf mm pme K eb C pid V R -∗
                    WP (Loop : expr riscv_lang)) -∗
                sie_cap_gpr M (K - 10)%nat false pme -∗
                cpu_own 1 eb pme C false -∗
@@ -1945,7 +1945,7 @@ Section ProofKwait.
       pose proof Hregs as Hregs'.
       destruct Hregs' as (Hsp & Hs1 & Hs2 & Hs3 & Hs4 & Hs5 & Hs6 & Hs7 & Hcs).
       destruct (lookup_lt_is_Some_2 γs kk ltac:(rewrite Hlen; exact Hk)) as [γk Hγk].
-      iDestruct (procs_inv_lookup Φ γs kk γk Hγk with "Hpinv") as "#Hlkk".
+      iDestruct (procs_inv_lookup γs kk γk Hγk with "Hpinv") as "#Hlkk".
       iPoseProof (kwi_ae with "Htext") as "Hiae".
       iPoseProof (kwi_b0 with "Htext") as "Hib0".
       iPoseProof (kwi_b4 with "Htext") as "Hib4".
@@ -1967,7 +1967,7 @@ Section ProofKwait.
       (* ---------------------------------------------------------------- *)
       iAssert (∀ (M' : regfile) (hv' : mword 64) (ps' : list (mword 64)),
                  ⌜kw_scan_regs M' mm pme addr kk⌝ -∗ ⌜M' !!! Regidx Ra4 = hv'⌝ -∗
-                 kw_exit_fn CID0 Φ γf mm pme K eb C pid V R -∗
+                 kw_exit_fn CID0 γf mm pme K eb C pid V R -∗
                  sie_cap_gpr M' (K - 10)%nat false pme -∗
                  cpu_own 1 eb pme C false -∗
                  arm_pay 0 eb pme -∗
@@ -2141,7 +2141,7 @@ Section ProofKwait.
           by (rewrite /S2; apply kw_scan_regs_ncs;
               [vm_compute; reflexivity | exact HS1]).
         iApply (Acquire.wp_acquire_sconf γk "proc"%string
-                  (proc_lock_res Φ γs γk (proc_addr kk)) S2 1%nat eb pme C (K - 10)%nat false
+                  (proc_lock_res γs γk (proc_addr kk)) S2 1%nat eb pme C (K - 10)%nat false
                   kw_ilvl1 (kw_K10 K HK)
                   with "Hcg Hown Htext Hpc [Hlkk] Hpanic [-]").
         { iEval (rewrite HS2a0). iExact "Hlkk". }
@@ -2152,7 +2152,7 @@ Section ProofKwait.
         iEval (rewrite Hpba) in "Hpc".
         assert (HAcq : kw_scan_regs Macq mm pme addr kk)
           by (eapply kw_scan_regs_cs; [exact Hpins | exact HS2]).
-        iDestruct (proc_lock_res_elim Φ γs γk (proc_addr kk) with "HRk")
+        iDestruct (proc_lock_res_elim γs γk (proc_addr kk) with "HRk")
           as (st ch) "(Hstate & Hpsg & Hchan & Hpub & Hslots)".
         (* +0xba lw a5,24(s1) : pp->state *)
         assert (Heaba : add_vec (rget (CID := CID0) Macq Rs1)
@@ -2201,7 +2201,7 @@ Section ProofKwait.
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Htgt40) in "Hpc".
           rewrite Hstz.
-          iDestruct (kw_slots_zombie Φ γs (proc_addr kk) with "Hslots") as "[Hdorm Hpark]".
+          iDestruct (kw_slots_zombie γs (proc_addr kk) with "Hslots") as "[Hdorm Hpark]".
           (* ZOMBIE is unclaimed, so the lock's share is the whole mirror --
              which is what [proc_held] wants for the freeproc call below. *)
           iDestruct (pstate_whole_split (proc_addr kk) ZOMBIE) as "[_ Hwz]".
@@ -2226,7 +2226,7 @@ Section ProofKwait.
             iApply ("Hqfn" $! CIDq Hsq mf P' rv with
                      "[%] [%] [%] Hcgq Hownq Hpcq Hprivq HR");
               [exact Hcsq | exact Ha0q | exact Hextq]. }
-          iApply (kw_found Φ γs γa γf γw γk mm S3 pme kk K eb C pid V ch ps
+          iApply (kw_found γs γa γf γw γk mm S3 pme kk K eb C pid V ch ps
                     HK Hk HS3sp HS3s1 HS3s2 HS3cs
                     with "Hcg Hown Hpay1 Hpay Htext Hpc Henv Hlkk Htokk Hstate Hpsg Hchan
                           Hpub Hdorm Hpark Hlk Htok Hps Hpriv Hframe Hqfn2").
@@ -2283,11 +2283,11 @@ Section ProofKwait.
           assert (Hlkc : add_vec (S5 !!! Regidx Ra0)
                            (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr kk)
             by (rewrite HS5a0; apply addv_sext0).
-          iAssert (proc_lock_res Φ γs γk (proc_addr kk)) with "[Hstate Hpsg Hchan Hpub Hslots]" as "HRk".
-          { iApply (proc_lock_res_intro Φ γs γk (proc_addr kk) st ch
+          iAssert (proc_lock_res γs γk (proc_addr kk)) with "[Hstate Hpsg Hchan Hpub Hslots]" as "HRk".
+          { iApply (proc_lock_res_intro γs γk (proc_addr kk) st ch
                       with "Hstate Hpsg Hchan Hpub Hslots"). }
           iApply (Release.wp_release_sconf γk (proc_addr kk) "proc"%string
-                    (proc_lock_res Φ γs γk (proc_addr kk)) S5 1%nat eb pme C (K - 10)%nat
+                    (proc_lock_res γs γk (proc_addr kk)) S5 1%nat eb pme C (K - 10)%nat
                     Hlkc (kw_K10 K HK)
                     with "Hcg Htext Hpc Hlkk Htokk HRk Hown Hpay1 [-]").
           iApply wp_next_off_intro. iIntros (mrel) "Hcg Hpc %Hcsrel Hown".
@@ -2348,7 +2348,7 @@ Section ProofKwait.
   (* frame).                                                            *)
   (* ================================================================== *)
   Local Lemma kw_exit_neg `{GEN : GenId} `{CIDt : CpuId}
-      (Φ : mval -> iProp Σ) (γf γw : gname) (jj : nat) (mm Mt : regfile)
+      (γf γw : gname) (jj : nat) (mm Mt : regfile)
       (pme : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (px : list (mword 64)) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -2358,7 +2358,7 @@ Section ProofKwait.
     kw_cs_rest Mt mm ->
     kernel_text -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
-    kw_exit_fn CIDt Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
+    kw_exit_fn CIDt γf mm pme K eb C pid V (kw_rt pme jj) -∗
     sie_cap_gpr Mt (K - 10)%nat false pme -∗
     cpu_own 1 eb pme C false -∗
     arm_pay 0 eb pme -∗
@@ -2369,7 +2369,7 @@ Section ProofKwait.
   Proof.
     intros sp0 spr HK Hsp Hcs.
     iIntros "#Htext #Hlk Hqfn Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe Hrt".
-    iApply (kw_exit_wait Φ γw mm Mt pme K eb C HK Hsp Hcs
+    iApply (kw_exit_wait γw mm Mt pme K eb C HK Hsp Hcs
               with "Hcg Hown Hpay Htext Hpc Hlk Htok [Hps] Hframe [Hqfn Hpriv Hrt]").
     { rewrite /wait_res. iExists px. iExact "Hps". }
     rewrite /kw_exit_fn.
@@ -2394,7 +2394,7 @@ Section ProofKwait.
   (* [c.j] at +0xe6 paid for it).                                        *)
   (* ================================================================== *)
   Local Lemma kw_round_tail `{GEN : GenId} `{CIDt : CpuId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (γf γw γl : gname) (jj : nat)
+      (γs : list gname) (γf γw γl : gname) (jj : nat)
       (mm Mx : regfile) (pme addr : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (hx : mword 64) (px : list (mword 64)) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -2406,10 +2406,10 @@ Section ProofKwait.
     (true = false \/ pme = zero_reg -> (CIDt : CPU) = CID0) ->
     kw_scan_regs Mx mm pme addr NPROC ->
     Mx !!! Regidx Ra4 = hx ->
-    kernel_text -∗ procs_inv Φ γs -∗ scheds_inv Φ γs -∗ panic_wp_any -∗
+    kernel_text -∗ procs_inv γs -∗ scheds_inv γs -∗ panic_wp_any -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
-    kw_round CID0 Φ γf γw jj mm pme addr K eb C pid V -∗
-    kw_exit_fn CIDt Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
+    kw_round CID0 γf γw jj mm pme addr K eb C pid V -∗
+    kw_exit_fn CIDt γf mm pme K eb C pid V (kw_rt pme jj) -∗
     sie_cap_gpr Mx (K - 10)%nat false pme -∗
     cpu_own 1 eb pme C false -∗
     arm_pay 0 eb pme -∗
@@ -2444,7 +2444,7 @@ Section ProofKwait.
                            (concat_vec (mword_of_int 15 : mword 8) ('b"0"))))
                       = mword_of_int (KW + 0xe8)) by pcstep.
       iEval (rewrite Htge8) in "Hpc".
-      iApply (kw_exit_neg Φ γf γw jj mm Mx (proc_addr jj) K eb C pid V px HK Hsp Hcs
+      iApply (kw_exit_neg γf γw jj mm Mx (proc_addr jj) K eb C pid V px HK Hsp Hcs
                 with "Htext Hlk Hqfn Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe Hrt").
     - (* ===== there are kids: ask whether we were killed ===== *)
       iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KW + 0xca)) (mword_of_int 15 : mword 8)
@@ -2494,7 +2494,7 @@ Section ProofKwait.
       assert (HT1 : kw_scan_regs T1 mm (proc_addr jj) addr NPROC)
         by (rewrite /T1; apply kw_scan_regs_ncs;
             [vm_compute; reflexivity | exact HT0]).
-      iApply (Killed.wp_killed_sconf Φ γs jj γl T1 (K - 10)%nat 1%nat eb
+      iApply (Killed.wp_killed_sconf γs jj γl T1 (K - 10)%nat 1%nat eb
                 (proc_addr jj) C false HT1a0 Hjj Hgl kw_ilvl1 (kw_K14 K HK)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic [-]").
       iApply wp_next_off_intro. iIntros (mfk kl) "%Hkf Hcg Hown Hpc".
@@ -2520,7 +2520,7 @@ Section ProofKwait.
                               (concat_vec (mword_of_int 11 : mword 8) ('b"0"))))
                          = mword_of_int (KW + 0xe8)) by pcstep.
         iEval (rewrite Htge8') in "Hpc".
-        iApply (kw_exit_neg Φ γf γw jj mm mfk (proc_addr jj) K eb C pid V px HK Hksp Hkcsr
+        iApply (kw_exit_neg γf γw jj mm mfk (proc_addr jj) K eb C pid V px HK Hksp Hkcsr
                   with "Htext Hlk Hqfn Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe Hrt").
       + (* ===== still alive: sleep on p, then scan again ===== *)
         iApply (wp_cbnez_fall_s_sconf (mword_of_int (KW + 0xd2)) (mword_of_int 11 : mword 8)
@@ -2593,7 +2593,7 @@ Section ProofKwait.
                          (sign_extend' 64 (mword_of_int 0 : mword 12)) = wait_lock_addr)
           by (rewrite HT4a1; apply addv_sext0).
         iEval (rewrite /kw_rt) in "Hrt". iRename "Hrt" into "Hpark".
-        iApply (Sleep.wp_sleep_sconf Φ γs jj γl γw wait_lock_addr "wait_lock"%string
+        iApply (Sleep.wp_sleep_sconf γs jj γl γw wait_lock_addr "wait_lock"%string
                   wait_res T4 (K - 10)%nat eb C Hjj Hgl Hlka Heb (kw_K22 K HK)
                   with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hlk Htok [Hps] Hpanic Hpark [-]").
         { rewrite /wait_res. iExists px. iExact "Hps". }
@@ -2623,7 +2623,7 @@ Section ProofKwait.
   (* pays for the IH's later.                                            *)
   (* ================================================================== *)
   Local Lemma kw_round_body `{GEN : GenId} `{CIDy : CpuId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (γa γf γw γl : gname) (jj : nat)
+      (γs : list gname) (γa γf γw γl : gname) (jj : nat)
       (mm M : regfile) (pme addr : mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) :
     let sp0 := mm !!! Regidx csp_rs1 in
@@ -2635,11 +2635,11 @@ Section ProofKwait.
     pme = proc_addr jj ->
     (true = false \/ pme = zero_reg -> (CIDy : CPU) = CID0) ->
     kw_round_regs M mm pme addr ->
-    kernel_text -∗ procs_inv Φ γs -∗ scheds_inv Φ γs -∗ panic_wp_any -∗
+    kernel_text -∗ procs_inv γs -∗ scheds_inv γs -∗ panic_wp_any -∗
     kalloc_env γa None -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
-    ▷ kw_round CID0 Φ γf γw jj mm pme addr K eb C pid V -∗
-    kw_exit_fn CIDy Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
+    ▷ kw_round CID0 γf γw jj mm pme addr K eb C pid V -∗
+    kw_exit_fn CIDy γf mm pme K eb C pid V (kw_rt pme jj) -∗
     sie_cap_gpr M (K - 10)%nat false pme -∗
     cpu_own 1 eb pme C false -∗
     arm_pay 0 eb pme -∗
@@ -2738,15 +2738,15 @@ Section ProofKwait.
                pc_is (mword_of_int (KW + 0xca)) -∗
                locked γw CIDy -∗ parents_own px -∗
                proc_priv γf pme pid V -∗ kw_frame sp0 mm -∗ kw_rt pme jj -∗
-               kw_exit_fn CIDy Φ γf mm pme K eb C pid V (kw_rt pme jj) -∗
+               kw_exit_fn CIDy γf mm pme K eb C pid V (kw_rt pme jj) -∗
                WP (Loop : expr riscv_lang))%I
       with "[IH]" as "Hqca".
     { iIntros (Mx hx px) "%Hrx %Hax Hcgx Hownx Hpayx Hpcx Htokx Hpsx Hprivx Hframex Hrtx Hqfnx".
-      iApply (kw_round_tail (CIDt := CIDy) CID0 Φ γs γf γw γl jj mm Mx pme addr K eb C
+      iApply (kw_round_tail (CIDt := CIDy) CID0 γs γf γw γl jj mm Mx pme addr K eb C
                 pid V hx px HK Heb Hjj Hgl Hpme Hanch Hrx Hax
                 with "Htext Hpinv Hscheds Hpanic Hlk IH Hqfnx Hcgx Hownx Hpayx Hpcx
                       Htokx Hpsx Hprivx Hframex Hrtx"). }
-    iDestruct (kw_scan (CID0 := CIDy) Φ γs γa γf γw mm pme addr K eb C pid V
+    iDestruct (kw_scan (CID0 := CIDy)  γs γa γf γw mm pme addr K eb C pid V
                  (kw_rt pme jj) HK Hlen with "Hpinv Hpanic Htext Henv Hlk") as "Hscan".
     iApply ("Hscan" $! 0%nat D2 (mword_of_int 0 : mword 64) ps
               with "[%] [%] [%] Hqfn Hqca Hcg Hown Hpay Hpc Htok Hps Hpriv Hframe Hrt").
@@ -2782,10 +2782,10 @@ Section ProofKwaitMain.
   Notation Rs7 := (mword_of_int 23 : mword 5).
 
   Lemma wp_kwait_sconf `{GEN : GenId} `{CID : CpuId}
-      (γa γf γw : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate) :
-    wp_kwait_sconf_body γa γf γw Φ γs j γl m av eb C b pid V.
+    wp_kwait_sconf_body γa γf γw γs j γl m av eb C b pid V.
   Proof.
     cbv beta delta [wp_kwait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hav Heb.
@@ -3263,7 +3263,7 @@ Section ProofKwaitMain.
                     = mword_of_int (KW + 0xdc)) by pcstep.
     iEval (rewrite Htgdc) in "Hpc".
     (* ---- the caller's continuation, as [kw_exit_fn] at the CURRENT hart ---- *)
-    iAssert (kw_exit_fn CID19 Φ γf m pj av eb C pid V (kw_rt pj j))
+    iAssert (kw_exit_fn CID19 γf m pj av eb C pid V (kw_rt pj j))
       with "[Hcont]" as "Hqfn".
     { rewrite /kw_exit_fn.
       iIntros (CIDx Hsx mf P' rv) "%Hcsx %Ha0x %Hextx Hcgx Hownx Hpcx Hprivx Hparkx".
@@ -3272,10 +3272,10 @@ Section ProofKwaitMain.
       { split; [exact Hcsx | exact Ha0x]. }
       { exact Hextx. } }
     (* ==================== THE OUTER LOOP (iLöb) ==================== *)
-    iAssert (kw_round CID Φ γf γw j m pj adr av eb C pid V) with "[]" as "Hround".
+    iAssert (kw_round CID γf γw j m pj adr av eb C pid V) with "[]" as "Hround".
     { iLöb as "IH". rewrite /kw_round.
       iIntros (CIDz Hsz N) "%Hrz Hcgz Hownz Hpayz Hpcz Htokz Hresz Hprivz Hframez Hrtz Hqfnz".
-      iApply (kw_round_body (CIDy := CIDz) CID Φ γs γa γf γw γl j m N pj adr av eb C pid V
+      iApply (kw_round_body (CIDy := CIDz) CID γs γa γf γw γl j m N pj adr av eb C pid V
                 Hav Heb Hj Hgl Hlen Hpjv Hsz Hrz
                 with "Htext Hpinv Hscheds Hpanic Henv Hlk IH Hqfnz Hcgz Hownz Hpayz Hpcz
                       Htokz Hresz Hprivz Hframez Hrtz"). }

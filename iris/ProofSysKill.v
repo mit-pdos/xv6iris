@@ -62,10 +62,10 @@ Section ProofSysKill.
   Notation Ra0 := (mword_of_int 10 : mword 5).
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
-  Lemma wp_sys_kill_sconf (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_sys_kill_sconf  (γs : list gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool)
-    : wp_sys_kill_sconf_body Φ γs m av n eb p C tfp ws v dqt b.
+    : wp_sys_kill_sconf_body γs m av n eb p C tfp ws v dqt b.
   Proof.
     cbv beta delta [wp_sys_kill_sconf_body].
     intros pcE ret_tgt Hlen Hws Hn Hav.
@@ -264,7 +264,7 @@ Section ProofSysKill.
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HAisp. }
     (* ===================== kkill(pid) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 n eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kkill.wp_kkill_sconf Φ γs B2 (av - 4)%nat n eb p C b
+    iApply (Kkill.wp_kkill_sconf γs B2 (av - 4)%nat n eb p C b
               Hlen Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hprocs Hpanic [-]").
     iIntros (CID11 Hk11 Mkk rv) "%Hkk Hcg Hcpu Hpc".

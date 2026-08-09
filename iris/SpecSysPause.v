@@ -87,7 +87,7 @@ Import Defs.
 
 
 Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+     (γs : list gname) (j : nat) (γl : gname)
     (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
     (dqt : dfrac) (b : bool) :=
@@ -117,8 +117,8 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      rework, so nothing about it rides here. *)
   is_tickslock γt -∗
   (* the running-thread bundle killed() and sleep() need *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   panic_wp_any -∗
   running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -138,9 +138,9 @@ Definition wp_sys_pause_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type SYSPAUSE.
   Parameter wp_sys_pause_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+       (γs : list gname) (j : nat) (γl : gname)
       (γt : gname) (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (dqt : dfrac) (b : bool),
-      wp_sys_pause_sconf_body Φ γs j γl γt m av eb C i tfp ws v dqt b.
+      wp_sys_pause_sconf_body γs j γl γt m av eb C i tfp ws v dqt b.
 End SYSPAUSE.

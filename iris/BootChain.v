@@ -505,7 +505,7 @@ Section BootSecondary.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma boot_hart_secondary (Φ : mval -> iProp Σ) (rs : regstate)
+  Lemma boot_hart_secondary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names) :
     reset_regs cpu_id rs ->
     (* a SECONDARY hart: this is what makes main's [beqz a0] fall through *)
@@ -514,7 +514,7 @@ Section BootSecondary.
     kernel_data -∗
     boot_hart_res rs iv dq -∗
     panic_wp_any -∗
-    started_inv (main_deposit γd γv Φ) -∗
+    started_inv (main_deposit γd γv) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hreset Hnz.
@@ -522,7 +522,7 @@ Section BootSecondary.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
-    iApply (MainSecondary.wp_main_secondary_sconf Φ mf K_main zero_reg γd γv
+    iApply (MainSecondary.wp_main_secondary_sconf mf K_main zero_reg γd γv
               (register_lookup tlb rs)
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
@@ -556,7 +556,7 @@ Section BootPrimary.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma boot_hart_primary (Φ : mval -> iProp Σ) (rs : regstate)
+  Lemma boot_hart_primary (rs : regstate)
       (iv : mword 32) (dq : dfrac) (γd : uart_names) (γv : disk_names)
       (ps : list (mword 64)) (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg) :
     reset_regs cpu_id rs ->
@@ -574,7 +574,7 @@ Section BootPrimary.
     kernel_data -∗
     boot_hart_res rs iv dq -∗
     panic_wp_any -∗
-    started_inv (main_deposit γd γv Φ) -∗
+    started_inv (main_deposit γd γv) -∗
     (* --- the boot supply --- *)
     main_locks_raw -∗
     main_globals_raw -∗
@@ -597,11 +597,11 @@ Section BootPrimary.
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
-    iApply (Main.wp_main_boot_sconf Φ mf K_main zero_reg ps
+    iApply (Main.wp_main_boot_sconf mf K_main zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
-              (register_lookup tlb rs) (main_deposit γd γv Φ)
+              (register_lookup tlb rs) (main_deposit γd γv)
               (cid_word_of_zero _ Hz) (le_n K_main) eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
               with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl

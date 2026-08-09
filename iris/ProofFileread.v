@@ -249,10 +249,10 @@ Section ProofFileread.
           | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
 
   (* ---- the type-indexed environment, opened at the type the code read ---- *)
-  Local Lemma fr_env_dev (Φ' : mval -> iProp Σ) (γf' : gname) (k' : nat)
+  Local Lemma fr_env_dev (γf' : gname) (k' : nat)
       (fn' : fread_names) (Cf' : fcontent) :
     fc_type Cf' = FD_DEVICE ->
-    fileread_env Φ' γf' k' fn' Cf' -∗ fileread_dev_env fn' Cf'.
+    fileread_env γf' k' fn' Cf' -∗ fileread_dev_env fn' Cf'.
   Proof.
     intro Ht. rewrite /fileread_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -291,10 +291,10 @@ Section ProofFileread.
     iIntros "%Hd Hc". iSplitR; [iPureIntro; exact Hd | iExact "Hc"].
   Qed.
 
-  Local Lemma fr_env_fs (Φ' : mval -> iProp Σ) (γf' : gname) (k' : nat)
+  Local Lemma fr_env_fs (γf' : gname) (k' : nat)
       (fn' : fread_names) (Cf' : fcontent) :
     fc_type Cf' = FD_INODE ->
-    fileread_env Φ' γf' k' fn' Cf' -∗ fileread_fs_env Φ' γf' k' fn' Cf'.
+    fileread_env γf' k' fn' Cf' -∗ fileread_fs_env γf' k' fn' Cf'.
   Proof.
     intro Ht. rewrite /fileread_env Ht.
     rewrite bool_decide_eq_false_2; [| by vm_compute].
@@ -314,12 +314,12 @@ Section ProofFileread.
     by iIntros "$".
   Qed.
 
-  Lemma wp_fileread_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_fileread_sconf 
       (γa γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (k : nat) (q : Qp) (Cf : fcontent) (fn : fread_names)
       (pidv : mword 32) (V : pprivate)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ) (n : Z) (b : bool)
-    : wp_fileread_sconf_body Φ γa γf γs j γlp k q Cf fn pidv V m K eb C n b.
+    : wp_fileread_sconf_body γa γf γs j γlp k q Cf fn pidv V m K eb C n b.
   Proof.
     cbv beta delta [wp_fileread_sconf_body].
     intros pcE pj ret_tgt HK Hk Hj Hgs Hlens Ha0 Ha2 Hn0 Hnb Heb.
@@ -808,7 +808,7 @@ Section ProofFileread.
           exact (HB5thr c Hcs N2 N8 N9 N18 N19). }
         iDestruct (cpu_own_transport CID CID17 0%nat eb pj C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Piperead.wp_piperead_sconf γa γf Φ γs j γlp (fp_lock pn) (fp_pipe pn)
+        iApply (Piperead.wp_piperead_sconf γa γf γs j γlp (fp_lock pn) (fp_pipe pn)
                   (fc_wbool Cf) q Q2 (K - 6)%nat eb C pidv V n b
                   Hj Hgs Hlens HQ2a2 (fr_n_range n Hn0 Hnb) (fr_av_pipe K HK) Heb
                   with "Hcg Hcnt Htext Hpc [] Hpref Hpriv Hkenv Hprocs Hscheds Hpanic
@@ -943,7 +943,7 @@ Section ProofFileread.
              which is exactly what the environment's guard is about. *)
           assert (Htyd : fc_type Cf = FD_DEVICE)
             by (apply eq_vec_true_iff; exact Hp3).
-          iDestruct (fr_env_dev Φ γf k fn Cf Htyd with "Henv") as "Henv".
+          iDestruct (fr_env_dev γf k fn Cf Htyd with "Henv") as "Henv".
           pose proof (fr_major_range (fc_major Cf : mword 16)) as Hmjr.
           iPoseProof (fri_72 with "Htext") as "Hi72".
           iPoseProof (fri_76 with "Htext") as "Hi76".
@@ -1362,7 +1362,7 @@ Section ProofFileread.
                   exact (HD9thr c Hcs N2 N8 N9 N18 N19). }
                 iDestruct (cpu_own_transport CID CID58 0%nat eb pj C b ltac:(wp_next_chain)
                              with "Hcnt") as "Hcnt".
-                iApply (Consoleread.wp_consoleread_sconf γa γf Φ γs j γlp
+                iApply (Consoleread.wp_consoleread_sconf γa γf γs j γlp
                           E2 (K - 6)%nat eb C pidv V n b
                           Hj Hgs Hlens HE2a0 HE2a2 (fr_n_range n Hn0 Hnb)
                           (fr_av_cons K HK) Heb
@@ -1566,7 +1566,7 @@ Section ProofFileread.
                 BORROW protocol; iunlock. *)
              assert (Htyi : fc_type Cf = FD_INODE)
                by (apply eq_vec_true_iff; exact Hp2).
-             iDestruct (fr_env_fs Φ γf k fn Cf Htyi with "Henv") as "Henv".
+             iDestruct (fr_env_fs γf k fn Cf Htyi with "Henv") as "Henv".
              rewrite /fileread_fs_env.
              iDestruct "Henv" as "(%Hlg & %Hist & %Hibcov & %Hdibwf & %Hvvag &
                                    %Hipnz & %Hrefp & %Hszb & #Hoffinv & #Hbio &
@@ -1682,7 +1682,7 @@ Section ProofFileread.
              iDestruct (proc_priv_pid γf pj pidv V with "Hpriv") as "[Hppid Hpivbk]".
              iDestruct (cpu_own_transport CID CID72 0%nat eb pj C b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
-             iApply (Ilock.wp_ilock_sconf Φ γs j γlp (frn_uart fn) (frn_disk fn)
+             iApply (Ilock.wp_ilock_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) (frn_ikey fn) (frn_ilk fn) (frn_islk fn)
                        (frn_cov fn) (frn_logstart fn) (frn_inodestart fn) (frn_dev fn)
@@ -1869,7 +1869,7 @@ Section ProofFileread.
              { rewrite Hoffz Hnz. exact (fr_off_n_lt31 _ _ Hwf Hnb). }
              iDestruct (cpu_own_transport CIDil CID78 0%nat eb pj C b ltac:(wp_next_chain)
                           with "Hcnt") as "Hcnt".
-             iApply (Readi.wp_readi_sconf Φ γs j γlp (frn_uart fn) (frn_disk fn)
+             iApply (Readi.wp_readi_sconf γs j γlp (frn_uart fn) (frn_disk fn)
                        (frn_dlock fn) (frn_pd fn) (frn_pav fn) (frn_pu fn)
                        (frn_bio fn) (frn_fs fn) γa γf
                        (frn_cov fn) (frn_logstart fn) (frn_dev fn) (fc_ip Cf)
@@ -2029,7 +2029,7 @@ Section ProofFileread.
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID82 0%nat eb pj C b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iApply (Iunlock.wp_iunlock_sconf Φ γs (frn_fs fn) (frn_ikey fn)
+                iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ikey fn)
                           (frn_ilk fn) (frn_islk fn) (frn_cov fn) (frn_logstart fn)
                           (fc_ip Cf) (frn_refv fn) (frn_dn fn) (frn_bm fn)
                           pidv (DfracOwn (1/4)) (frn_dqr fn) N2 (K - 6)%nat eb pj C b
@@ -2279,7 +2279,7 @@ Section ProofFileread.
                   as "[Hppid Hpivbk2]".
                 iDestruct (cpu_own_transport CIDrd CID92 0%nat eb pj C b
                              ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-                iApply (Iunlock.wp_iunlock_sconf Φ γs (frn_fs fn) (frn_ikey fn)
+                iApply (Iunlock.wp_iunlock_sconf γs (frn_fs fn) (frn_ikey fn)
                           (frn_ilk fn) (frn_islk fn) (frn_cov fn) (frn_logstart fn)
                           (fc_ip Cf) (frn_refv fn) (frn_dn fn) (frn_bm fn)
                           pidv (DfracOwn (1/4)) (frn_dqr fn) N2 (K - 6)%nat eb pj C b

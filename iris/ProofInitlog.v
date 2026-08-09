@@ -273,7 +273,7 @@ Section ProofInitlog.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_initlog_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_initlog_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -287,7 +287,7 @@ Section ProofInitlog.
       (pidv : mword 32) (dq dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_initlog_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
+    : wp_initlog_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                             cov logstart dev sb bs_hdr L D
                             vlock vname vcpu v_start v_dev v_nc v_n
                             pidv dq dqs m K eb C b.
@@ -810,7 +810,7 @@ Section ProofInitlog.
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
-    iApply (Bread.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (Bread.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               T3 (K - 6)%nat true C b
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HT3a0 HT3a1 eq_refl
@@ -964,7 +964,7 @@ Section ProofInitlog.
     iDestruct (wp_next_shift (CIDa := CID21) (CIDb := CID26) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
-    iApply (Brelse.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kk pidv dev
+    iApply (Brelse.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk pidv dev
               (mword_of_int logstart : mword 32) dq B2 (K - 6)%nat true pj C
               bs_hdr bsd0 d0 b HKbl HA HB2a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hheld [-]").
@@ -1070,7 +1070,7 @@ Section ProofInitlog.
                fsblock γfs (log_slot_bno logstart i) [] ∗
                (uint w) ↪[fs_dirty γfs]{#(1/2)} true)%I
       as "Hnil2"; [iApply il_bigL_nil|].
-    iApply (InstallTrans.wp_install_trans_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
+    iApply (InstallTrans.wp_install_trans_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev true 0%nat ([] : list (mword 32))
               (fun _ : nat => ([] : list (bv 8))) L D pidv dq
               C2 (K - 6)%nat true C b True%I
@@ -1181,7 +1181,7 @@ Section ProofInitlog.
     assert (HKwh : (K_write_head <= K - 6)%nat) by (unfold K_write_head; lia).
     iAssert ([∗ list] i ↦ w ∈ ([] : list (mword 32)), lh_block i ↦₄ w)%I
       as "Hnil3"; [iApply il_bigL_nil|].
-    iApply (WriteHead.wp_write_head_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
+    iApply (WriteHead.wp_write_head_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev 0%nat ([] : list (mword 32)) L pidv dq
               D2 (K - 6)%nat true C b
               (log_mirror_at (0%nat, []) ∗ swap_lb (S gen_id))%I

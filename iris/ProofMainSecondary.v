@@ -134,7 +134,7 @@ Section ProofMainSecondary.
   (* spin loop at 0x16.  It also names [a4 = &started], materialized once *)
   (* by the auipc/addi pair at 0x0c/0x10 and reused by the loop.          *)
   (* =================================================================== *)
-  Local Lemma ms_entry (Φ : mval -> iProp Σ)
+  Local Lemma ms_entry 
       (m : regfile) (K : nat) (p0 : mword 64) :
     cid_word <> (zero_reg : mword 64) ->
     (K_main_secondary <= K)%nat ->
@@ -302,18 +302,18 @@ Section ProofMainSecondary.
   (* =================================================================== *)
   (* 0x16 .. 0x1e -- [while (started == 0) ;] with the acquire fence.     *)
   (* =================================================================== *)
-  Local Lemma ms_spin (Φ : mval -> iProp Σ)
+  Local Lemma ms_spin
       (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
       (p0 : mword 64) :
     add_vec (rget m (mword_of_int 14 : mword 5))
         (sign_extend' 64 (mword_of_int 0 : mword 12)) = started_addr ->
     sie_cap_gpr m n false p0 -∗ kernel_text -∗
     pc_is (mword_of_int (KernelSyms.main + 0x16) : mword 64) -∗
-    started_inv (main_deposit γd γv Φ) -∗
+    started_inv (main_deposit γd γv) -∗
     ( ∀ m' : regfile,
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x20) : mword 64) -∗
-        main_deposit γd γv Φ -∗
+        main_deposit γd γv -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -329,14 +329,14 @@ Section ProofMainSecondary.
               (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
               (mword_of_int 0 : mword 12) m n
               (fun v => sign_extend' 64 v)
-              (fun v => (▷ (⌜v = started_clear⌝ ∨ main_deposit γd γv Φ))%I)
+              (fun v => (▷ (⌜v = started_clear⌝ ∨ main_deposit γd γv))%I)
               ((⊤ ∖ ↑minstretN) ∖ ↑startedN) false
               ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
               ltac:(vm_compute; reflexivity) exec_read_ram_plain_4 data2_ext_4
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(solve_ndisj) with "Hcg Hpc Hi16 []").
     { rewrite Ha4.
-      iApply (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit γd γv Φ)
+      iApply (started_inv_load_au (⊤ ∖ ↑minstretN) (main_deposit γd γv)
                 ltac:(solve_ndisj) with "Hsinv"). }
     iIntros (v).
     iApply wp_next_off_intro.
@@ -426,7 +426,7 @@ Section ProofMainSecondary.
   (* =================================================================== *)
   (* 0x20 .. 0x2e -- [printk("hart %d starting\n", cpuid())].             *)
   (* =================================================================== *)
-  Local Lemma ms_printk (γpr : gname) (Φ : mval -> iProp Σ)
+  Local Lemma ms_printk (γpr : gname) 
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) :
     (38 <= n)%nat ->
@@ -553,7 +553,7 @@ Section ProofMainSecondary.
   (* plicinithart(), the [intr_inv_alloc_off] assembly over kernelvec,    *)
   (* and [jal scheduler], which never returns.                            *)
   (* =================================================================== *)
-  Local Lemma ms_inithart_sched (Φ : mval -> iProp Σ)
+  Local Lemma ms_inithart_sched 
       (γd : uart_names) (γv : disk_names) (γs : list gname)
       (m : regfile) (n : nat) (p0 : mword 64)
       (root : mword 44) (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
@@ -569,8 +569,8 @@ Section ProofMainSecondary.
     (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
     dev_inv γd γv -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hdc Hp0.
@@ -677,18 +677,18 @@ Section ProofMainSecondary.
               = (mword_of_int KernelSyms.scheduler : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
-    iApply (Scheduler.wp_scheduler_sconf Φ γs Q4 n p0 Hp0 ltac:(lia)
+    iApply (Scheduler.wp_scheduler_sconf γs Q4 n p0 Hp0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpinv Hsched Hpanic Htcsr Hintr").
   Qed.
 
   (* =================================================================== *)
   (* THE CONTRACT.                                                        *)
   (* =================================================================== *)
-  Lemma wp_main_secondary_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_main_secondary_sconf 
       (m : regfile) (K : nat) (p0 : mword 64)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
-    : wp_main_secondary_sconf_body Φ m K p0 γd γv tlbvec0.
+    : wp_main_secondary_sconf_body m K p0 γd γv tlbvec0.
   (* [kallocG]/[fileG] are in [MAIN_SECONDARY]'s signature but this arm's proof
      never touches them, so the section would not generalize over them. *)
   Proof using All.
@@ -700,18 +700,18 @@ Section ProofMainSecondary.
        (its acquire does), so keep both. *)
     iPoseProof (panic_wp_any_at cpu_id with "Hpany") as "#Hpanic".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
-    iApply (ms_entry Φ m K p0 Hcid HK with "Hcg Htext Hpc").
+    iApply (ms_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc %Ha4".
-    iApply (ms_spin Φ γd γv m1 (K - 2)%nat p0 Ha4 with "Hcg Htext Hpc Hsinv").
+    iApply (ms_spin γd γv m1 (K - 2)%nat p0 Ha4 with "Hcg Htext Hpc Hsinv").
     iIntros (m2) "Hcg Hpc #Hdep".
     iDestruct "Hdep" as (γpr γk γs pd pav pu root pas)
       "(#Hpenv & #Hpinv & #Hsched & #Hdlock & #Hgeom & #Hkinv & #Hkptp & #Htramp & #Hkstx)".
     iPoseProof "Hpenv" as "Hpenv2".
     iDestruct "Hpenv2" as "(_ & _ & #Hdev & _)".
-    iApply (ms_printk γpr Φ γd γv m2 (K - 2)%nat p0 Hn38
+    iApply (ms_printk γpr γd γv m2 (K - 2)%nat p0 Hn38
               with "Hcg Htext Hkdata Hpanic Hpc Hcpu Hpenv").
     iIntros (m3) "Hcg Hpc Hcpu".
-    iApply (ms_inithart_sched Φ γd γv γs m3 (K - 2)%nat p0 root tlbvec0
+    iApply (ms_inithart_sched γd γv γs m3 (K - 2)%nat p0 root tlbvec0
               Hn20 Hdc Hp0
               with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv Hsched").
   Qed.

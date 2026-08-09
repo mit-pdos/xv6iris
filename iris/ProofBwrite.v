@@ -124,7 +124,7 @@ Section ProofBwrite.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_bwrite_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bwrite_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -133,7 +133,7 @@ Section ProofBwrite.
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bs bsd : list (bv 8)) (b : bool)
       (Q : iProp Σ)
-    : wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
+    : wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
                            pidv dev bno dq m K eb C bs bsd b Q.
   Proof.
     cbv beta delta [wp_bwrite_sconf_body].
@@ -421,7 +421,7 @@ Section ProofBwrite.
     (* exactly the way [procs_inv] and [p_pid] already do.  bwrite itself   *)
     (* never parks, so it does nothing with the receipt but pass it on.     *)
     (* ================================================================== *)
-    iApply (RW.wp_virtio_disk_rw_sconf Φ γs j γl γu γd γk pd pav pu D3
+    iApply (RW.wp_virtio_disk_rw_sconf γs j γl γu γd γk pd pav pu D3
               (K - 4)%nat true C bno (mword_of_int 0 : mword 32) bs bsd b
               Q
               HKrw Hbno Hkdata Hj Hgl eq_refl

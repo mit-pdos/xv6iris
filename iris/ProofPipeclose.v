@@ -104,12 +104,12 @@ Section ProofPipeclose.
       apply (f_equal (@bv_unsigned _)) in Heq. vm_compute in Heq. discriminate.
   Qed.
 
-  Lemma wp_pipeclose_sconf (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_pipeclose_sconf  (γs : list gname)
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
       (b : bool)
-    : wp_pipeclose_sconf_body Φ γs γl γp w γkl γk klk kfl on m n eb pme C av b.
+    : wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme C av b.
   Proof.
     cbv beta delta [wp_pipeclose_sconf_body].
     intros pcE pi ret_tgt Hw Hav Hpos Hklk Hkfl.
@@ -802,7 +802,7 @@ Section ProofPipeclose.
       assert (Hwnz : eq_vec (zero_reg : mword 64) (mycpu_ret (rget W2 Rtp)) = false)
         by (rewrite Hwa0f; exact (Hcpune _)).
       assert (Hwlvl : (Z.of_nat (S n) + 1 < 2 ^ 31)%Z) by lia.
-      iApply (Wakeup.wp_wakeup_sconf Φ W2 γs (mycpu_ret cid_word) pme (S n) (av - 4)%nat eb C false
+      iApply (Wakeup.wp_wakeup_sconf W2 γs (mycpu_ret cid_word) pme (S n) (av - 4)%nat eb C false
                 HwK HwdomW Hlen Hwa0f Hwnz Hwlvl
                 with "Hcg Hown Htext Hpc Hpanic Hpinv [-]").
       iApply wp_next_off_intro.
@@ -870,7 +870,7 @@ Section ProofPipeclose.
       assert (Hwnz : eq_vec (zero_reg : mword 64) (mycpu_ret (rget W2 Rtp)) = false)
         by (rewrite Hwa0f; exact (Hcpune _)).
       assert (Hwlvl : (Z.of_nat (S n) + 1 < 2 ^ 31)%Z) by lia.
-      iApply (Wakeup.wp_wakeup_sconf Φ W2 γs (mycpu_ret cid_word) pme (S n) (av - 4)%nat eb C false
+      iApply (Wakeup.wp_wakeup_sconf W2 γs (mycpu_ret cid_word) pme (S n) (av - 4)%nat eb C false
                 HwK HwdomW Hlen Hwa0f Hwnz Hwlvl
                 with "Hcg Hown Htext Hpc Hpanic Hpinv [-]").
       iApply wp_next_off_intro.

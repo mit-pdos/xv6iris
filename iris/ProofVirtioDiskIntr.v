@@ -2665,12 +2665,12 @@ Section VtLoopProof.
     lazymatch goal with |- ?a <> ?b =>
       tryif unify a b then fail else (vm_compute; discriminate) end.
 
-  Lemma wp_vt_loop (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_vt_loop  (γs : list gname)
       (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (sp0 : mword 64) :
     (22 <= av)%nat -> length γs = NPROC -> (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-    kernel_text -∗ panic_wp_any -∗ procs_inv Φ γs -∗
+    kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
     dev_inv γu γd -∗ disk_geom γd pd pav pu -∗
     vt_loop γd pd pav pu m av lvl eb pme C sp0.
   Proof.
@@ -2747,7 +2747,7 @@ Section VtLoopProof.
       by (rewrite rget_tp; exact (mycpu_ret_nonzero cid_word tp_ok_cid)).
     assert (HwK : (18 <= av - 4)%nat) by lia.
     assert (Hwlvl : (Z.of_nat (S lvl) + 1 < 2 ^ 31)%Z) by lia.
-    iApply (Wakeup.wp_wakeup_sconf Φ W γs (mycpu_ret cid_word) pme (S lvl)
+    iApply (Wakeup.wp_wakeup_sconf W γs (mycpu_ret cid_word) pme (S lvl)
               (av - 4)%nat eb C false HwK HWdom Hlen HWmc HWnz Hwlvl
               with "Hcg Hown Htext Hpc Hpanic Hpi [-]").
     iApply wp_next_off_intro.
@@ -2946,12 +2946,12 @@ Section ProofVirtioDiskIntr.
       tryif unify a b then fail else (vm_compute; discriminate) end.
 
 
-  Lemma wp_virtio_disk_intr_sconf (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_virtio_disk_intr_sconf  (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (b : bool)
-    : wp_virtio_disk_intr_sconf_body Φ γs γu γd γk pd pav pu m K lvl eb pme C b.
+    : wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme C b.
   Proof.
     cbv beta delta [wp_virtio_disk_intr_sconf_body].
     intros pcE ret_tgt HK Hdom Hlen Hlvl.
@@ -3009,7 +3009,7 @@ Section ProofVirtioDiskIntr.
         iPureIntro. split_and!; assumption. }
     - (* ---- the loop is entered ---- *)
       iIntros (ME nc) "%HMEthr %Hbnd #Hlbc Hcg Hpc Hpub Hidx".
-      iPoseProof (Lp.wp_vt_loop (CID:=CIDa) Φ γs γu γd pd pav pu m K lvl eb pme C sp0
+      iPoseProof (Lp.wp_vt_loop (CID:=CIDa)  γs γu γd pd pav pu m K lvl eb pme C sp0
                     HKav Hlen Hlvl
                     with "Htext Hpanic Hpi Hdinv Hgeom") as "Hloop".
       iApply ("Hloop" $! ME with "[%] Hcg Hpc Hown [Hpub Hauth Hidx Hfl Hpk Hfree Hring] Hexit").

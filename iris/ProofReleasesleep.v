@@ -69,11 +69,11 @@ Section ProofReleasesleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_releasesleep_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_releasesleep_sconf 
       (γs : list gname)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pd : mword 32) (pme : mword 64) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_releasesleep_sconf_body Φ γs γl γsl s R m pd pme av eb C b.
+    : wp_releasesleep_sconf_body γs γl γsl s R m pd pme av eb C b.
   Proof.
     cbv beta delta [wp_releasesleep_sconf_body].
     intros pcE slk ret_tgt Hav.
@@ -303,7 +303,7 @@ Section ProofReleasesleep.
     assert (HCwkra : Cwk !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.releasesleep + 0x22) : mword 64) 4)
       by (rewrite /Cwk; apply upd_eq).
     (* ===== wakeup(slk): intr_count 1 (unchanged net), noff/intena threaded ===== *)
-    iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq) Φ Cwk γs (mycpu_ret (cid_word_of CIDacq)) pme 1%nat (av - 4)%nat b C false
+    iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq)  Cwk γs (mycpu_ret (cid_word_of CIDacq)) pme 1%nat (av - 4)%nat b C false
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
               Hlen

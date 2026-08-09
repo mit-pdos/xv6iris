@@ -508,11 +508,11 @@ Section ProofFreeDesc.
   (* ================================================================== *)
   (* THE WHOLE FUNCTION.                                                 *)
   (* ================================================================== *)
-  Lemma wp_free_desc_sconf (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_free_desc_sconf  (γs : list gname)
       (pd : mword 64) (i : nat)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (va : mword 64) (vl : mword 32) (vf vn : mword 16) (b : bool)
-    : wp_free_desc_sconf_body Φ γs pd i m K lvl eb pme C va vl vf vn b.
+    : wp_free_desc_sconf_body γs pd i m K lvl eb pme C va vl vf vn b.
   Proof.
     cbv beta delta [wp_free_desc_sconf_body].
     intros pcE ret_tgt HK Hi8 Ha0 Hdom Hlen Hlvl.
@@ -814,7 +814,7 @@ Section ProofFreeDesc.
     (* ===================== wakeup(&disk.free[0]) ===================== *)
     iDestruct (cpu_own_transport CID CIDd15 lvl eb pme C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Wakeup.wp_wakeup_sconf (CID := CIDd15) Φ E2 γs
+    iApply (Wakeup.wp_wakeup_sconf (CID := CIDd15)  E2 γs
               (mycpu_ret (cid_word (CID := CIDd15))) pme lvl (K - 2)%nat eb C b
               HKw HE2dom Hlen HE2mc HE2nz Hlvl
               with "Hcg Hcnt Htext Hpc Hpanic Hpi [-]").

@@ -254,7 +254,7 @@ Section BmapKit.
      the current hart first. *)
   Definition balloc_contract : Prop :=
     forall (GENa : GenId) (CIDa : CpuId)
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -267,7 +267,7 @@ Section BmapKit.
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
       wp_balloc_sconf_body (GEN := GENa) (CID := CIDa)
-                           Φ γs j γl γu γd γk pd pav pu bn γ γfs
+                            γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev used γpr u
                            pidv dq dqb dqs m K eb C b.
 
@@ -291,7 +291,7 @@ Definition bm_gen_stmt
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
@@ -330,8 +330,8 @@ Definition bm_gen_stmt
   inode_map γfs ip bm -∗
   inode_blocks γfs bm data -∗
   p_pid pj ↦₄{dq} pidv -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   running_claim j -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
@@ -500,7 +500,7 @@ Section BmapEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bm_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (bm bm' : blkmap) (data data' : nat -> list (bv 8))
@@ -829,7 +829,7 @@ Section BmapRelease.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bm_release `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (ak : option bm_alloc)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
@@ -862,7 +862,7 @@ Section BmapRelease.
     pc_is (mword_of_int (KernelSyms.bmap + 0x82) : mword 64) -∗
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
-    procs_inv Φ γs -∗
+    procs_inv γs -∗
     bm_frame4 m -∗
     running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -929,7 +929,7 @@ Section BmapRelease.
     iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 6)%nat) by (unfold K_brelse; lia).
-    iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev ibn dq T1 (K - 6)%nat true (proc_addr j) C bsX bsdX dX b
               HKbl Hkk HT1a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
@@ -985,7 +985,7 @@ Section BmapRelease.
       iSplitL "Hf5"; [iExact "Hf5"|]. iExists _. iExact "Hf6". }
     iDestruct (cpu_own_transport CID3 CID4 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (bm_epilogue (CID0 := CID4) Φ j γfs bn ak cov logstart dev ip bm bm'
+    iApply (bm_epilogue (CID0 := CID4)  j γfs bn ak cov logstart dev ip bm bm'
               data data' fbn n n' rv pidv dq dqd m T2 K C b
               HK HT2sp HT2thr HT2s1 Hwf' Hag Hkeep Hnoal Hrv Hdat Hlo Hhi
               with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hidev Hmap
@@ -1005,7 +1005,7 @@ Section BmapTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma bm_indirect_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1044,8 +1044,8 @@ Section BmapTail.
     panic_wp_any -∗
     bm_prk ak γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -1174,7 +1174,7 @@ Section BmapTail.
     iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 6)%nat) by (unfold K_bread; lia).
-    iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (bm_ind bmI) dq
               I2 (K - 6)%nat true C b
               HKbr Hilt' eq_refl Hicov' eq_refl Hj Hgl HI2a0 HI2a1 eq_refl
@@ -1495,7 +1495,7 @@ Section BmapTail.
       remember (nI - 3)%nat as w eqn:Hweq.
       assert (Hnn : nI = (2 + S w)%nat) by lia.
       iEval (rewrite Hnn) in "Hop".
-      iApply (Hballoc _ _ Φ γs j γl γu γd γk pd pav pu bn γ γfs
+      iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bms sz dev uc γpr (S w) pidv dq dqb dqs A1
                 (K - 6)%nat true C b
                 HKba Hgeom0 Hprkc Hbgsz Hbg0 Hbgcov Hbglog Hj Hgl HA1a0 eq_refl
@@ -1581,7 +1581,7 @@ Section BmapTail.
         iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev nI
                      eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                      with "Hlctx Hsl Hop Hsbsz Hsbbm Hbmg") as "Hkit".
-        iApply (bm_release (CID0 := CID17) Φ γs j γfs γd bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev
+        iApply (bm_release (CID0 := CID17)  γs j γfs γd bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev
                   ip bm bmI data data fbn n nI (mword_of_int 0 : mword 32)
                   kk (bm_ind bmI) (ind_bytes (bm_ent bmI)) bsd0 d0
                   pidv dq dqd m F0 K C b
@@ -1807,7 +1807,7 @@ Section BmapTail.
         iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev w
                      eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                      with "Hlctx Hsl Hop Hsbsz Hsbbm Hbmg") as "Hkit".
-        iApply (bm_release (CID0 := CID22) Φ γs j γfs γd bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev
+        iApply (bm_release (CID0 := CID22)  γs j γfs γd bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev
                   ip bm bmJ data (<[fbn := replicate BSIZE (bv_0 8)]> data)
                   fbn n w blk kk (bm_ind bmI)
                   (ind_bytes (<[q := blk]> (bm_ent bmI))) bsd0 true
@@ -1852,7 +1852,7 @@ Section BmapTail.
         iEval (rewrite -Huind). iExact "Hindblk". }
       iDestruct (cpu_own_transport CID4 CID12 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (bm_release (CID0 := CID12) Φ γs j γfs γd bn ak cov logstart dev
+      iApply (bm_release (CID0 := CID12)  γs j γfs γd bn ak cov logstart dev
                 ip bm bmI data data fbn n nI (bm_ent bmI !!! q)
                 kk (bm_ind bmI) (ind_bytes (bm_ent bmI)) bsd0 d0
                 pidv dq dqd m B7 K C b
@@ -1879,7 +1879,7 @@ Section ProofBmapMain.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_bmap_gen (Φ : mval -> iProp Σ)
+  Lemma wp_bmap_gen 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1893,7 +1893,7 @@ Section ProofBmapMain.
       (b : bool)
       (Hba : ak <> None -> balloc_contract)
       (Hlw : ak <> None -> log_write_contract)
-    : bm_gen_stmt Φ γs j γl γu γd γk pd pav pu bn ak γfs
+    : bm_gen_stmt γs j γl γu γd γk pd pav pu bn ak γfs
                   cov logstart dev ip bm data fbn n pidv dq dqd m K eb C b.
   Proof.
     cbv beta delta [bm_gen_stmt].
@@ -2311,7 +2311,7 @@ Section ProofBmapMain.
         remember (n - 2)%nat as u2 eqn:Hu2eq.
         assert (Hnn : n = (2 + u2)%nat) by lia.
         iEval (rewrite Hnn) in "Hop".
-        iApply (Hballoc _ _ Φ γs j γl γu γd γk pd pav pu bn γ γfs
+        iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart bms sz dev uc γpr u2 pidv dq dqb dqs D5
                   (K - 6)%nat true C b
                   HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog Hj Hgl HD5a0 eq_refl
@@ -2388,7 +2388,7 @@ Section ProofBmapMain.
           iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev n
                        eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                        with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
-          iApply (bm_epilogue (CID0 := CID20) Φ j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bm
+          iApply (bm_epilogue (CID0 := CID20)  j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bm
                     data data fbn n n (mword_of_int 0 : mword 32) pidv dq dqd m E0 K C b
                     HK HE0sp HE0thr HE0s1 Hwf
                     ltac:(intros i _ _; reflexivity)
@@ -2513,7 +2513,7 @@ Section ProofBmapMain.
           iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev u2
                        eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                        with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
-          iApply (bm_epilogue (CID0 := CID22) Φ j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bmD
+          iApply (bm_epilogue (CID0 := CID22)  j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bmD
                     data (<[fbn := replicate BSIZE (bv_0 8)]> data) fbn n u2 blk
                     pidv dq dqd m N0 K C b
                     HK HN0sp HN0thr HN0s1 HwfD HgetD
@@ -2557,7 +2557,7 @@ Section ProofBmapMain.
           iSplitL "Hf5"; [iExact "Hf5"|]. iExists _. iExact "Hf6". }
         iDestruct (cpu_own_transport CID CID15 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (bm_epilogue (CID0 := CID15) Φ j γfs bn ak cov logstart dev ip bm bm
+        iApply (bm_epilogue (CID0 := CID15)  j γfs bn ak cov logstart dev ip bm bm
                   data data fbn n n (blkmap_get bm fbn) pidv dq dqd m D3 K C b
                   HK HD3sp HD3thr HD3s1 Hwf
                   ltac:(intros i _ _; reflexivity)
@@ -2835,7 +2835,7 @@ Section ProofBmapMain.
         remember (n - 2)%nat as u2 eqn:Hu2eq.
         assert (Hnn : n = (2 + u2)%nat) by lia.
         iEval (rewrite Hnn) in "Hop".
-        iApply (Hballoc _ _ Φ γs j γl γu γd γk pd pav pu bn γ γfs
+        iApply (Hballoc _ _ γs j γl γu γd γk pd pav pu bn γ γfs
                   cov logstart bms sz dev uc γpr u2 pidv dq dqb dqs P1
                   (K - 6)%nat true C b
                   HKba Hgeom Hprkc Hbgsz Hbg0 Hbgcov Hbglog Hj Hgl HP1a0 eq_refl
@@ -2922,7 +2922,7 @@ Section ProofBmapMain.
           iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev n
                        eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                        with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
-          iApply (bm_epilogue (CID0 := CID22) Φ j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bm
+          iApply (bm_epilogue (CID0 := CID22)  j γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bm
                     data data fbn n n (mword_of_int 0 : mword 32) pidv dq dqd m P2 K C b
                     HK HP2sp HP2thr HP2s1 Hwf
                     ltac:(intros i _ _; reflexivity)
@@ -3054,7 +3054,7 @@ Section ProofBmapMain.
           iDestruct (bm_kit_intro γ bms sz uu dqb dqs γpr _ bn γfs cov logstart dev u2
                        eq_refl (conj Hbgsz (conj Hbg0 (conj Hbgcov Hbglog)))
                        with "Hlctx Hsl2 Hop Hsbsz Hsbbm Hbmg") as "Hkit".
-          iApply (bm_indirect_tail (CID0 := CID25) Φ γs j γl γu γd γk pd pav pu
+          iApply (bm_indirect_tail (CID0 := CID25)  γs j γl γu γd γk pd pav pu
                     γfs bn (Some (MkBmAlloc γ bms sz uu dqb dqs γpr)) cov logstart dev ip bm bmI data fbn q n u2
                     pidv dq dqd m P2 K C b
                     HK Hgeom HwfI Hfbnq Hqlt HgetI
@@ -3115,7 +3115,7 @@ Section ProofBmapMain.
           iSplitL "Hf5"; [iExact "Hf5"|]. iExact "Hf6". }
         iDestruct (cpu_own_transport CID CID18 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (bm_indirect_tail (CID0 := CID18) Φ γs j γl γu γd γk pd pav pu
+        iApply (bm_indirect_tail (CID0 := CID18)  γs j γl γu γd γk pd pav pu
                   γfs bn ak cov logstart dev ip bm bm data fbn q n n
                   pidv dq dqd m J4 K C b
                   HK Hgeom Hwf Hfbnq Hqlt ltac:(intros i _; reflexivity) Hinz
@@ -3152,7 +3152,7 @@ Section BmapSeal.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_bmap_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bmap_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3165,7 +3165,7 @@ Section BmapSeal.
       (pidv : mword 32) (dq dqd dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_bmap_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
+    : wp_bmap_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                          cov logstart bmapstart size dev used γpr ip bm data fbn n
                          pidv dq dqd dqb dqs m K eb C b.
   Proof.
@@ -3184,7 +3184,7 @@ Section BmapSeal.
     iAssert (bm_prk (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γu γd)
       as "#Hprk".
     { rewrite /bm_prk. iSplitR; [iPureIntro; exact Hprkc|]. iFrame "Hkdata Hprkenv". }
-    iApply (Core.wp_bmap_gen Φ γs j γl γu γd γk pd pav pu bn
+    iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn
               (Some (MkBmAlloc γ bmapstart size used dqb dqs γpr)) γfs
               cov logstart dev ip bm data fbn n pidv dq dqd m K eb C b
               ltac:(intros _ GEN0 CID0;
@@ -3233,7 +3233,7 @@ Section BmapNoallocSeal.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_bmap_noalloc_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_bmap_noalloc_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3244,7 +3244,7 @@ Section BmapNoallocSeal.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_bmap_noalloc_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
+    : wp_bmap_noalloc_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                  cov logstart dev ip bm data fbn pidv dq dqd
                                  m K eb C b.
   Proof.
@@ -3252,7 +3252,7 @@ Section BmapNoallocSeal.
     intros pcE pj ret_tgt bnw HK Hgeom Hfbn Hwf Hnz Hj Hgl Ha0 Ha1 Heb.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio Hidev Hmap Hblocks Hppid
               #Hprocs #Hscheds Hpark #Hdevi #Hdgeom #Hdlock Hsl Hcont".
-    iApply (Core.wp_bmap_gen Φ γs j γl γu γd γk pd pav pu bn None γfs
+    iApply (Core.wp_bmap_gen γs j γl γu γd γk pd pav pu bn None γfs
               cov logstart dev ip bm data fbn 0%nat pidv dq dqd m K eb C b
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))
               ltac:(intros Hc; exfalso; exact (Hc eq_refl))

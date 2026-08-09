@@ -838,14 +838,14 @@ Section BootAlloc.
   (* ------------------------------------------------------------------ *)
   (* THE COMPANION LEMMA.                                               *)
   (* ------------------------------------------------------------------ *)
-  Lemma boot_shared_alloc (g : gstate) (ndisk : nat) (Φ : mval -> iProp Σ) :
+  Lemma boot_shared_alloc (g : gstate) (ndisk : nat) :
     boot_facts g ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g
     ={⊤}=∗ ∃ (_ : fdslotG Σ) (γd : uart_names) (γv : disk_names),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗ panic_wp_any ∗
-      started_inv (main_deposit γd γv Φ) ∗
+      started_inv (main_deposit γd γv) ∗
       dev_inv γd γv ∗ wire_inv ∗ crash_inv ∗ gen_cert ∗
       (* --- one bundle per hart --- *)
       ([∗ list] c ∈ enum CPU,
@@ -965,7 +965,7 @@ Section BootAlloc.
       as "#Hwinv".
     { iApply RiscvAdequacy.big_sepL_enum_to_set. iExact "Hpins". }
     (* ---- the handover channel, at the settled payload ---- *)
-    iMod (started_inv_alloc ⊤ (main_deposit γd γv Φ) with "Hstartcell")
+    iMod (started_inv_alloc ⊤ (main_deposit γd γv) with "Hstartcell")
       as "#Hstarted".
     (* ================================================================ *)
     iModIntro. iExists Hfd, γd, γv.

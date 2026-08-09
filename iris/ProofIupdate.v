@@ -173,7 +173,7 @@ Section IupdateTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart : Z) (inodestart : Z) (dev : mword 32)
@@ -197,7 +197,7 @@ Section IupdateTail.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv Φ γs -∗
+    procs_inv γs -∗
     iu_frame m -∗
     running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -344,7 +344,7 @@ Section IupdateTail.
     iDestruct (wp_next_shift (CIDa := CID2) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
-    iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bno dq T3 (K - 4)%nat true (proc_addr j) C
               (diblk_bytes (<[islot inum := dn]> ds)) bsd true b
               HKbl Hkk HT3a0
@@ -578,7 +578,7 @@ Section ProofIupdateMain.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_iupdate_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_iupdate_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -591,7 +591,7 @@ Section ProofIupdateMain.
       (pidv : mword 32) (dq dqd dqn dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_iupdate_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
+    : wp_iupdate_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                             cov logstart inodestart dev ip inum dn bm ds u
                             pidv dq dqd dqn dqs m K eb C b.
   Proof.
@@ -956,7 +956,7 @@ Section ProofIupdateMain.
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
-    iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bno dq
               RA (K - 4)%nat true C b
               HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HRAa0 HRAa1 eq_refl
@@ -1533,7 +1533,7 @@ Section ProofIupdateMain.
     (* ---- into the tail ---- *)
     iDestruct (cpu_own_transport CID15 CID36 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (iu_tail (CID0 := CID36) Φ γs j γfs γd bn γ cov logstart inodestart dev
+    iApply (iu_tail (CID0 := CID36)  γs j γfs γd bn γ cov logstart inodestart dev
               ip inum dn bm ds u kk bno bsd0 d0 pidv dq dqd dqn dqs m mM K C b
               HK HmMsp HmMthr HmMs2 Hkk Hbno Hcov Hlog
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs Hframe Hpark

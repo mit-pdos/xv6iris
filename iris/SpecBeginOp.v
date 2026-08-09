@@ -82,7 +82,6 @@ Definition wp_begin_op_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (bn : bio_names)
     (γ : log_names) (γfs : fs_names)
@@ -107,8 +106,8 @@ Definition wp_begin_op_sconf_body
   (* threaded, never read: see the header note *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle threaded through the two sleeps *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
   ∀ (mf : regfile),
@@ -128,7 +127,6 @@ Module Type BEGIN_OP.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
@@ -136,6 +134,6 @@ Module Type BEGIN_OP.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_begin_op_sconf_body Φ γs j γl bn γ γfs cov logstart dev
+      wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev
                              pidv dq m K eb C b.
 End BEGIN_OP.

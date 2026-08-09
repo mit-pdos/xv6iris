@@ -77,11 +77,11 @@ Section SpecClockintr.
      contract is stated at [b = false] and not generically; see the note on
      [wp_clockintr_sconf_body]. [panic_wp_any] rather than [panic_wp] because
      the acquire/wakeup arms it discharges are stated hart-generically. *)
-  Definition tick_keeper (Φ : mval -> iProp Σ)
+  Definition tick_keeper 
       (γl : gname) (γs : list gname) : iProp Σ :=
     ( ⌜ tick_hart = false ⌝
     ∨ ( is_tickslock γl ∗
-        procs_inv Φ γs ∗
+        procs_inv γs ∗
         panic_wp_any ) )%I.
 
 End SpecClockintr.
@@ -107,7 +107,7 @@ End SpecClockintr.
    trap handler, with SIE already off.  Stated at the literal [false] there is
    no [wp_next] wrapper at all ([wp_next_off] would collapse it). *)
 Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
+     (γl : gname) (γs : list gname)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.clockintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -119,20 +119,20 @@ Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   cpu_own n eb p C false -∗
   kernel_text -∗ pc_is pcE -∗
   timer_cap -∗
-  tick_keeper Φ γl γs -∗
+  tick_keeper γl γs -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf ⌝ -∗
       sie_cap_gpr mf av false p -∗
       cpu_own n eb p C false -∗
       pc_is ret_tgt -∗
-      tick_keeper Φ γl γs -∗
+      tick_keeper γl γs -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type CLOCKINTR.
   Parameter wp_clockintr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
+       (γl : gname) (γs : list gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
-      wp_clockintr_sconf_body Φ γl γs m n eb p C av.
+      wp_clockintr_sconf_body γl γs m n eb p C av.
 End CLOCKINTR.

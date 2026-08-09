@@ -26,7 +26,7 @@ Require Import SchedCtx.
 From Kernel Require KernelSyms.
 
 Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
+     (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let sp0 : mword 64 := m !!! Regidx csp_rs1 in
   let spF := add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 60 : mword 6))) in
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -40,7 +40,7 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is (mword_of_int KernelSyms.wakeup) -∗
-  panic_wp_any -∗ procs_inv Φ γs -∗
+  panic_wp_any -∗ procs_inv γs -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ Mf : regfile,
       ⌜ callee_saved m Mf /\ (forall r : regidx, r ∈ dom (rf_to_gmap Mf)) ⌝ -∗
@@ -53,6 +53,6 @@ Definition wp_wakeup_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}
 Module Type WAKEUP.
   Parameter wp_wakeup_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_wakeup_sconf_body Φ m γs a0f pme lvl K eb C b.
+       (m : regfile) (γs : list gname) (a0f pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
+      wp_wakeup_sconf_body m γs a0f pme lvl K eb C b.
 End WAKEUP.

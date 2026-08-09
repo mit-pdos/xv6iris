@@ -81,10 +81,10 @@ Section ProofKerneltrap.
 
   Lemma wp_kerneltrap_sconf
       (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
-      (Φ : mval -> iProp Σ) (γs : list gname) (pd pav pu : mword 64)
+      (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
       (ep sc tv : mword 64)
-    : wp_kerneltrap_sconf_body γu γv γtx γdk γtl Φ γs pd pav pu m av p C ep sc tv.
+    : wp_kerneltrap_sconf_body γu γv γtx γdk γtl γs pd pav pu m av p C ep sc tv.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].
     intros pcE ret_tgt Hlen Hav Hsc Hepal.
@@ -123,7 +123,7 @@ Section ProofKerneltrap.
     assert (HD0s2 : D0 !!! Regidx s2_idx = ep)
       by (rewrite /D0 upd_ne; [exact HMs2 | vm_compute; discriminate]).
     (* devintr's caps are the whole device complement, threaded persistently *)
-    iApply (Devintr.wp_devintr_sconf γu γv γtx γdk γtl Φ γs pd pav pu
+    iApply (Devintr.wp_devintr_sconf γu γv γtx γdk γtl γs pd pav pu
               D0 (av - 6)%nat 0 false p C (DfracOwn 1) sc
               Hlen ltac:(change (2^31)%Z with 2147483648%Z; lia)
               ltac:(unfold kerneltrap_stack in Hav; unfold devintr_stack; lia)
@@ -340,7 +340,7 @@ Section ProofKerneltrap.
         (* [j < NPROC] and [length γs = NPROC] give a slot ghost for proc j *)
         assert (Hjl : (j < length γs)%nat) by (rewrite Hlen; exact Hj).
         destruct (lookup_lt_is_Some_2 γs j Hjl) as [γl Hgl].
-        iApply (Yield.wp_yield_sconf Φ γs j γl Y0 (av - 6)%nat false C
+        iApply (Yield.wp_yield_sconf γs j γl Y0 (av - 6)%nat false C
                   Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
                   with "Hcg Hcpu Htext Hpc Hprocs Hscheds Hpanic Hpark
                         [Hsepc Hscause Hstval Hmir] [Hclm] [-]").

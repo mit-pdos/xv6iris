@@ -172,7 +172,7 @@ Section UserStepFull.
      minstret_increment, so the wrapper proves it uniformly.  This is the
      shape the payload arms ([retire_branch] / [execute_trap_branch] /
      the fetch-fault arms, UserArms.v) consume. *)
-  Definition active_class (Ei : coPset) (Φ : mval -> iProp Σ) : iProp Σ :=
+  Definition active_class (Ei : coPset)  : iProp Σ :=
     (□ (∀ (σ : mstate) (ms_v sc_v stval_v sepc_v va : mword 64)
           (g : regfile),
         ⌜user_mstatus_ok ms_v⌝ -∗
@@ -202,12 +202,12 @@ Section UserStepFull.
   (* [reg_pointsto_at cpu_id] definitionally); the step only READS them,    *)
   (* so the invariant re-closes with the same witnesses.                    *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_user_step_active Φ :
+  Lemma wp_user_step_active :
     hw_config -∗
     minstret_inv -∗
     wire_inv -∗
-    active_class (⊤ ∖ ↑minstretN ∖ ↑wireN) Φ -∗
-    user_step_obligation_active C pt Φ.
+    active_class (⊤ ∖ ↑minstretN ∖ ↑wireN) -∗
+    user_step_obligation_active C pt.
   Proof.
     iIntros "#Hhw #Hmin #Hwinv #Hclass".
     iIntros "!>" (ms_v sc_v stval_v sepc_v va g) "%Hmsok Hregs Hupt Hcfg Hk".

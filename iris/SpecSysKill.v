@@ -51,7 +51,7 @@ Import Defs.
 
 
 Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γs : list gname)
+     (γs : list gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_kill in
@@ -69,7 +69,7 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   p_trapframe p ↦₈{dqt} page_base tfp -∗
   tf_page tfp ws -∗
   (* kkill's *)
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (rv : mword 64),
@@ -87,8 +87,8 @@ Definition wp_sys_kill_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
 Module Type SYSKILL.
   Parameter wp_sys_kill_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname)
+       (γs : list gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (tfp : mword 44) (ws : list (mword 64)) (v : mword 64) (dqt : dfrac) (b : bool),
-      wp_sys_kill_sconf_body Φ γs m av n eb p C tfp ws v dqt b.
+      wp_sys_kill_sconf_body γs m av n eb p C tfp ws v dqt b.
 End SYSKILL.

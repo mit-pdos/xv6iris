@@ -54,7 +54,7 @@ Import Defs.
 
 
 Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+     (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.killed in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -68,7 +68,7 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
   sie_cap_gpr m av b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   panic_wp_any -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (kl : mword 32),
@@ -83,7 +83,7 @@ Definition wp_killed_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ,
 Module Type KILLED.
   Parameter wp_killed_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+       (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool),
-      wp_killed_sconf_body Φ γs j γl m av n eb p C b.
+      wp_killed_sconf_body γs j γl m av n eb p C b.
 End KILLED.

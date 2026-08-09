@@ -78,7 +78,7 @@ Definition uartwrite_stack : nat := 32%nat.
 
 Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+    (γu : uart_names) (γv : disk_names) 
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
     (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool) :=
@@ -108,8 +108,8 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* the buffer, read-only *)
   ([∗ list] k ∈ seq 0 n, (pa_add buf k) ↦ₘ{dq} f k) -∗
   (* the running-thread bundle (SpecSleep.v) *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   panic_wp_any -∗
   running_claim j -∗
   wp_next b pj (fun (CID : CpuId) =>
@@ -128,9 +128,8 @@ Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
-      (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
+      (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (n : nat) (f : nat -> bv 8) (dq : dfrac) (b : bool),
-      wp_uartwrite_sconf_body γu γv Φ γs j γlp γl m av eb C n f dq b.
+      wp_uartwrite_sconf_body γu γv γs j γlp γl m av eb C n f dq b.
 End UARTWRITE.

@@ -265,7 +265,7 @@ Definition wp_kerneltrap_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
-    (Φ : mval -> iProp Σ) (γs : list gname) (pd pav pu : mword 64)
+    (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
     (ep sc tv : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kerneltrap in
@@ -285,8 +285,8 @@ Definition wp_kerneltrap_sconf_body
   cpu_own 0 false p C false -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
-  devintr_caps γu γv γtx γdk γtl Φ γs pd pav pu -∗
-  scheds_inv Φ γs -∗
+  devintr_caps γu γv γtx γdk γtl γs pd pav pu -∗
+  scheds_inv γs -∗
   kt_proc_res p -∗
   (* THE RUNNING CLAIM, handed over by the TRAP: taking the trap cleared SIE
      and so dismantled [sie_arm true p], and the claim was one of its
@@ -320,9 +320,9 @@ Module Type KERNELTRAP.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
-      (Φ : mval -> iProp Σ) (γs : list gname) (pd pav pu : mword 64)
+      (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av : nat) (p : mword 64) (C : iProp Σ)
       (ep sc tv : mword 64),
-      wp_kerneltrap_sconf_body γu γv γtx γdk γtl Φ γs pd pav pu
+      wp_kerneltrap_sconf_body γu γv γtx γdk γtl γs pd pav pu
         m av p C ep sc tv.
 End KERNELTRAP.

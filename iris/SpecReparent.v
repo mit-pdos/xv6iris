@@ -67,7 +67,7 @@ From Kernel Require KernelSyms.
 Definition K_reparent : nat := 24%nat.
 
 Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (pme ip : mword 64)
+     (m : regfile) (γs : list gname) (pme ip : mword 64)
     (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.reparent in
   let pv : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
@@ -80,7 +80,7 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG �
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗ procs_inv Φ γs -∗
+  panic_wp_any -∗ procs_inv γs -∗
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   parents_own ps -∗
   wp_next b pme (fun (CID : CpuId) =>
@@ -97,7 +97,7 @@ Definition wp_reparent_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG �
 Module Type REPARENT.
   Parameter wp_reparent_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (pme ip : mword 64)
+       (m : regfile) (γs : list gname) (pme ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
-      wp_reparent_sconf_body Φ m γs pme ip ps dqi lvl K eb C b.
+      wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b.
 End REPARENT.

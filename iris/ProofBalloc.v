@@ -319,7 +319,7 @@ Section BallocEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma ba_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (u : nat)
       (rv : mword 32)
@@ -582,7 +582,7 @@ Section BallocOut.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma ba_out `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names) (γd : disk_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (u : nat)
@@ -873,7 +873,7 @@ Section BallocOut.
     iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID10) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     iPoseProof (panic_wp_any_at CID10 with "Hpanic") as "Hpanic10".
-    iApply (Hpk CID10 Φ QA (K - 10)%nat true (proc_addr j) C
+    iApply (Hpk CID10 QA (K - 10)%nat true (proc_addr j) C
               DfracDiscarded ba_msg [] b
               ltac:(lia) Hlmsg Hnmsg ltac:(rewrite Hkmsg; reflexivity)
               ltac:(cbn [length]; lia)
@@ -926,7 +926,7 @@ Section BallocOut.
     iEval (rewrite Hjt) in "Hpc".
     iDestruct (cpu_own_transport CID11 CID13 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (ba_epilogue (CID0 := CID13) Φ j γfs bn γ cov logstart bmapstart size
+    iApply (ba_epilogue (CID0 := CID13)  j γfs bn γ cov logstart bmapstart size
               used u (mword_of_int 0 : mword 32) pidv dq dqb dqs m QB K C b
               HK HQBsp HQBthr HQBs1
               with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hsbsz Hsbbm Hsl
@@ -950,7 +950,7 @@ Section BallocExhaust.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma ba_exhaust `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma ba_exhaust `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat)
       (γfs : fs_names) (γd : disk_names) (bn : bio_names) (γ : log_names)
       (γpr : gname) (γu : uart_names)
@@ -976,7 +976,7 @@ Section BallocExhaust.
     panic_wp_any -∗
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
-    procs_inv Φ γs -∗
+    procs_inv γs -∗
     ba_frame m -∗
     running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -1057,7 +1057,7 @@ Section BallocExhaust.
     iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID2) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
-    iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bnoB dq E1 (K - 10)%nat true (proc_addr j) C bsX bsdX dX b
               HKbl Hkk HE1a0
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hppid Hprocs Hlk").
@@ -1152,7 +1152,7 @@ Section BallocExhaust.
     iEval (rewrite Hjt) in "Hpc".
     iDestruct (cpu_own_transport CID3 CID6 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (ba_out (CID0 := CID6) Φ j γfs bn γ γpr γu γd cov logstart bmapstart
+    iApply (ba_out (CID0 := CID6)  j γfs bn γ γpr γu γd cov logstart bmapstart
               size used u pidv dq dqb dqs m E3 K C b HK Hpk HE3sp HE3thr
               with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hframe Hpark
                     Hppid Hsbsz Hsbbm Hsl Hbmr Hop [Hcont]").
@@ -1170,7 +1170,7 @@ Section BallocRestore.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma ba_restore `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (γfs : fs_names) (bn : bio_names) (γ : log_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z) (bi : Z)
       (u : nat) (rv : mword 32)
@@ -1404,7 +1404,7 @@ Section BallocRestore.
     iEval (rewrite Hpp7e) in "Hpc".
     iDestruct (cpu_own_transport CID0 CID7 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (ba_epilogue (CID0 := CID7) Φ j γfs bn γ cov logstart bmapstart size
+    iApply (ba_epilogue (CID0 := CID7)  j γfs bn γ cov logstart bmapstart size
               used u rv pidv dq dqb dqs m R7 K C b HK HR7sp HR7thr HR7s1
               with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hsbsz Hsbbm Hsl
                     [Hfsb Hown Hbmr Hop] [Hcont]").
@@ -1430,7 +1430,7 @@ Section BallocBzero.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma ba_bzero `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma ba_bzero `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1459,8 +1459,8 @@ Section BallocBzero.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     ba_frame m -∗
     running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -1596,7 +1596,7 @@ Section BallocBzero.
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 10)%nat) by (unfold K_bread; lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
-    iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoD dq
               Z2 (K - 10)%nat true C b
               HKbr HbnoDlt eq_refl HbnoDcov eq_refl Hj Hgl HZ2a0 HZ2a1 eq_refl
@@ -1921,7 +1921,7 @@ Section BallocBzero.
     iDestruct (wp_next_shift (CIDa := CID12) (CIDb := CID15) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl2 : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
-    iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kk2
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk2
               pidv dev bnoD dq ZB (K - 10)%nat true (proc_addr j) C
               (replicate BSIZE (bv_0 8)) bsd0 true b
               HKbl2 Hkk2 HZBa0
@@ -1943,7 +1943,7 @@ Section BallocBzero.
       rewrite (callee_saved_lookup Hcs4_cs c Hcs).
       exact (HZBthr c Hcs N2 N8 N9 N18 N19 N20 N21 N22 N23 N24). }
     iDestruct (iu_slots_join bn 1 1 with "Hsl Hsl1") as "Hsl".
-    iApply (ba_restore (CID0 := CID16) Φ j γfs bn γ cov logstart bmapstart size
+    iApply (ba_restore (CID0 := CID16)  j γfs bn γ cov logstart bmapstart size
               used bi u bnoD pidv dq dqb dqs m mR2 K C b
               HK HmR2sp HmR2thr ltac:(rewrite HmR2s1 HbnoDsext; reflexivity)
               HbnoDnz
@@ -1970,7 +1970,7 @@ Section BallocAlloc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma ba_alloc `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma ba_alloc `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2008,8 +2008,8 @@ Section BallocAlloc.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     ba_frame m -∗
     running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -2334,7 +2334,7 @@ Section BallocAlloc.
     iDestruct (wp_next_shift (CIDa := CID5) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 10)%nat) by (unfold K_brelse; lia).
-    iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kk
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kk
               pidv dev bnoB dq A5 (K - 10)%nat true (proc_addr j) C
               (bitmap_bytes (used ∪ {[ bi ]})) bsdX true b
               HKbl Hkk HA5a0
@@ -2364,7 +2364,7 @@ Section BallocAlloc.
       by (apply bitmap_ok_add; exact Hok).
     iDestruct (bitmap_res_close γfs bmapstart cov logstart size
                  (used ∪ {[ bi ]}) Hokadd with "Hfsbm Hpool") as "Hbmr".
-    iApply (ba_bzero (CID0 := CID9) Φ γs j γl γu γd γk pd pav pu γfs bn γ
+    iApply (ba_bzero (CID0 := CID9)  γs j γl γu γd γk pd pav pu γfs bn γ
               cov logstart bmapstart size dev used bi u bsD
               pidv dq dqb dqs m mR K C b
               HK Hsize Hbirange Hbicov Hbilog Hbinz HbsDlen Hj Hgl
@@ -2395,7 +2395,7 @@ Section BallocScan.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma ba_scan `{GEN : GenId} (Φ : mval -> iProp Σ)
+  Local Lemma ba_scan `{GEN : GenId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2439,8 +2439,8 @@ Section BallocScan.
     printk_env γpr γu γd -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     ba_frame m -∗
     running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -2492,7 +2492,7 @@ Section BallocScan.
                    with "Hfsbm Hpool") as "Hbmr".
       iDestruct (cpu_own_transport CIDx CID1 0 true (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-      iApply (ba_exhaust (CID0 := CID1) Φ γs j γfs γd bn γ γpr γu cov logstart
+      iApply (ba_exhaust (CID0 := CID1)  γs j γfs γd bn γ γpr γu cov logstart
                 bmapstart size dev used u kk bnoB (bitmap_bytes used) bsdX dX
                 pidv dq dqb dqs m M K C b HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk
                 with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe
@@ -2518,7 +2518,7 @@ Section BallocScan.
                      with "Hfsbm Hpool") as "Hbmr".
         iDestruct (cpu_own_transport CIDx CID1 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (ba_exhaust (CID0 := CID1) Φ γs j γfs γd bn γ γpr γu cov logstart
+        iApply (ba_exhaust (CID0 := CID1)  γs j γfs γd bn γ γpr γu cov logstart
                   bmapstart size dev used u kk bnoB (bitmap_bytes used) bsdX dX
                   pidv dq dqb dqs m M K C b HK Hpk Hsize Hsp Hthr Hs2 Hs5 Hs6 Hs8 Hkk
                   with "Hcg Hcnt Htext Hkdata Hpc Hpanic Hpenv Hbio Hprocs Hframe
@@ -3141,7 +3141,7 @@ Section BallocScan.
                           with "Hfsbm Hpool") as "Hbmr".
              iDestruct (cpu_own_transport CIDx CID15 0 true (proc_addr j) C b
                           ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-             iApply (ba_exhaust (CID0 := CID15) Φ γs j γfs γd bn γ γpr γu cov logstart
+             iApply (ba_exhaust (CID0 := CID15)  γs j γfs γd bn γ γpr γu cov logstart
                        bmapstart size dev used u kk bnoB (bitmap_bytes used) bsdX dX
                        pidv dq dqb dqs m SA K C b HK Hpk Hsize HSAsp HSAthr HSAs2
                        HSAs5 HSAs6 HSAs8 Hkk
@@ -3197,7 +3197,7 @@ Section BallocScan.
           iEval (rewrite Hjt4) in "Hpc".
           iDestruct (cpu_own_transport CIDx CID11 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (ba_alloc (CID0 := CID11) Φ γs j γl γu γd γk pd pav pu γfs bn γ
+          iApply (ba_alloc (CID0 := CID11)  γs j γl γu γd γk pd pav pu γfs bn γ
                     cov logstart bmapstart size dev used bi u kk bnoB bsdX dX
                     pidv dq dqb dqs m S8 K C b
                     HK Hgeom Hsize Hbirange Hnu Hok HbnoB Hbmcov Hbmlog Hkk Hj Hgl
@@ -3234,7 +3234,7 @@ Section BallocMain.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_balloc_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_balloc_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -3247,7 +3247,7 @@ Section BallocMain.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_balloc_sconf_body Φ γs j γl γu γd γk pd pav pu bn γ γfs
+    : wp_balloc_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
                            cov logstart bmapstart size dev used γpr u
                            pidv dq dqb dqs m K eb C b.
   Proof.
@@ -3944,7 +3944,7 @@ Section BallocMain.
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 10)%nat) by (unfold K_bread; lia).
     iDestruct (iu_slots_split bn 1 1 with "Hsl") as "[Hsl Hsl1]".
-    iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev bnoB dq
               RA (K - 10)%nat true C b
               HKbr HbnoBlt eq_refl HbnoBcov eq_refl Hj Hgl HRAa0 HRAa1 eq_refl
@@ -4141,7 +4141,7 @@ Section BallocMain.
     (* ===== +0xb6 : INTO THE SCAN, at bi = 0 with the full tank ===== *)
     iDestruct (cpu_own_transport CIDb29 CIDb33 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (ba_scan Φ γs j γl γu γd γk pd pav pu γfs bn γ γpr cov logstart
+    iApply (ba_scan γs j γl γu γd γk pd pav pu γfs bn γ γpr cov logstart
               bmapstart size dev used u kk bnoB bsd0 d0 pidv dq dqb dqs
               m K C b (Z.to_nat BPB)
               HK Hpk Hgeom Hsize HbnoB Hbmcov Hbmlog Hok Hkk Hj Hgl

@@ -100,11 +100,6 @@ Qed.
 Section SchedCtx.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  (* the ambient S-mode world: the whole-machine postcondition.  (The SIE
-     ghost is canonical per hart now -- [IntrDefs.sie_gname] -- so no [γ]
-     binder survives here; the kernel page table rides inside [swconf]'s
-     translation slot, no root parameter.) *)
-  Context (Φ : mval -> iProp Σ).
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).
 
@@ -246,7 +241,7 @@ Section SchedCtx.
      partner's own hart, so a parking function's continuation states the
      slot with [sched_vc_at h]. *)
   Definition sched_vc_at (h : CPU) (c p : mword 64) : iProp Σ :=
-    valid_context Φ p_sched (Some h) c p.
+    valid_context p_sched (Some h) c p.
 
   Definition sched_vc (c p : mword 64) : iProp Σ := sched_vc_at cpu_id c p.
 
@@ -352,7 +347,7 @@ Section SchedCtx.
   (* THE GLOBAL PARKED-SCHEDULER INVARIANT.                                *)
   (*                                                                      *)
   (* A hart's parked scheduler record used to be THREAD-OWNED: a running  *)
-  (* kernel thread carried [▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj], and *)
+  (* kernel thread carried [▷ sched_vc γs (a_cpu_ctx cid_word) pj], and *)
   (* that record owns fourteen EXCLUSIVE words of ITS hart's context slot *)
   (* plus a hart-pinned admission index -- so it could not cross a        *)
   (* migration, and every level-0/enabled-base contract that held one     *)
@@ -681,7 +676,7 @@ Section SchedCtx.
      [procs_inv] below mention neither -- which is what lets ONE [procs_inv]
      ride the [started] payload to every secondary hart. *)
   Definition proc_ctx (pa : mword 64) : iProp Σ :=
-    valid_context Φ p_sched None (p_context pa) pa.
+    valid_context p_sched None (p_context pa) pa.
 
   (* the resource protected by [p->lock].  The context slot is ▷-guarded:
      its producer (the scheduler, releasing a freshly parked proc) only ever

@@ -90,7 +90,7 @@ Section ProofVirtioDiskRwDSeam.
   (* (h,m2,t) and the [int idx[3]] local survive for P6's [free_chain];     *)
   (* the two untouched descriptor-slot remainders come back with them.      *)
   (* ------------------------------------------------------------------- *)
-  Definition vdrw_p4_exit (CID0 : CPU) (γk : gname) (Φ : mval -> iProp Σ)
+  Definition vdrw_p4_exit (CID0 : CPU) (γk : gname) 
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -129,7 +129,7 @@ Section ProofVirtioDiskRwDSeam.
        WP (Loop : expr riscv_lang)))%I.
 
   (* [P3.vdrw_p3_exit] plus the triple-disjointness conjunct (see above). *)
-  Definition vdrw_p3_exit_x (CID0 : CPU) (γk : gname) (Φ : mval -> iProp Σ)
+  Definition vdrw_p3_exit_x (CID0 : CPU) (γk : gname) 
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -159,7 +159,7 @@ Section ProofVirtioDiskRwDSeam.
        WP (Loop : expr riscv_lang)))%I.
 
   (* P4, packaged as the wand P3 consumes. *)
-  Lemma wp_vdrw_p4_seam (γk : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_vdrw_p4_seam (γk : gname)
       (γs : list gname) (jp : nat) (γu : uart_names) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr : SailStdpp.Values.mword 64)
@@ -177,9 +177,9 @@ Section ProofVirtioDiskRwDSeam.
        REQUEST'S WRITE IDENTITY (phase C2a): [1024 * bno] is the byte offset
        the sector arithmetic lands on. *)
     perm_pend (dn_perm γd) kq (vdrwd_wr wr (1024 * uint bno)%Z bs_buf) -∗
-    vdrw_p4_exit CID γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno)
+    vdrw_p4_exit CID γk γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno)
                  bs_buf bs_disk m0 kq -∗
-    vdrw_p3_exit_x CID γk Φ γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno) m0.
+    vdrw_p3_exit_x CID γk γs jp γd pd pav pu K eb C sp0 b wr (vdrw_sector_raw bno) m0.
   Proof.
     intros Hbno Hlenbuf Hbufkd.
     iIntros "#Htext #Hdinv #Hgeom Hbuf Hdisk Hpend Hexit".

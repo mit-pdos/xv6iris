@@ -213,7 +213,7 @@ Section ProofVirtioDiskRwE.
   (* Note that s1/s2 are NOT pinned: +0x1b0 reloads [idx[0]] into s2 and   *)
   (* P6 never reads s1 again.                                             *)
   (* ------------------------------------------------------------------- *)
-  Definition vdrw_p5_exit (CID0 : CPU) (γk : gname) (Φ : mval -> iProp Σ)
+  Definition vdrw_p5_exit (CID0 : CPU) (γk : gname) 
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -253,7 +253,7 @@ Section ProofVirtioDiskRwE.
   (* what the completion-wait loop head at +0x1a0 consumes.  The lock's
      resource is CLOSED here (sleep takes it as [Rk]); the only thing that
      survives an iteration besides the register discipline is the claim. *)
-  Definition vdrw_p5_loop (CID0 : CPU) (γk : gname) (Φ : mval -> iProp Σ)
+  Definition vdrw_p5_loop (CID0 : CPU) (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -287,7 +287,7 @@ Section ProofVirtioDiskRwE.
                             (vdrwd_bufwin b wr bs_buf))
         /\ pm_ok (vdrwd_pinr_regions pd b h m2 t wr sector
                     (vdrwd_bufwin b wr bs_buf))⌝ -∗
-       vdrw_p5_exit CID0 γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0 kq -∗
+       vdrw_p5_exit CID0 γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk m0 kq -∗
        WP (Loop : expr riscv_lang)))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -355,7 +355,7 @@ Section ProofVirtioDiskRwE.
   (* ------------------------------------------------------------------- *)
   (* P5, packaged as the wand P4 consumes.                                 *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrw_p5_seam (γk : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_vdrw_p5_seam (γk : gname)
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
@@ -366,13 +366,13 @@ Section ProofVirtioDiskRwE.
     eb = true ->
     kernel_text -∗
     panic_wp_any -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     dev_inv γu γd -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-    vdrw_p5_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk
+    vdrw_p5_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf bs_disk
                  m0 kq -∗
-    P4.vdrw_p4_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
+    P4.vdrw_p4_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
                     bs_disk m0 kq.
   Proof.
     intros HK Hj Hjl Heb.
@@ -393,7 +393,7 @@ Section ProofVirtioDiskRwE.
     iPoseProof (rwi_19a with "Htext") as "Hi19a".
     iPoseProof (rwi_19c with "Htext") as "Hi19c".
     (* ================= THE LOOP, first (it is used by both arms) ======= *)
-    iAssert (vdrw_p5_loop CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector
+    iAssert (vdrw_p5_loop CID γk γs j γd pd pav pu K eb C sp0 b wr sector
                bs_buf bs_disk h m2 t q pin m0 kq)%I with "[]" as "Hloop".
     { iLöb as "IH". rewrite {2}/vdrw_p5_loop.
       iIntros (CIDlp Hslp M') "%Hinv Hcg Hown Hpay Hpc Hpark Htok HR Hclaim Hrm Hrt Hidx
@@ -454,7 +454,7 @@ Section ProofVirtioDiskRwE.
       assert (HL3ra : L3 !!! Regidx Rra
                       = add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a4) : mword 64) 4)
         by (rewrite /L3; apply upd_eq).
-      iApply (Sleep.wp_sleep_sconf Φ γs j γl γk d_lock "virtio_disk"%string
+      iApply (Sleep.wp_sleep_sconf γs j γl γk d_lock "virtio_disk"%string
                 (disk_res γd pd pav pu) L3 (K - 12)%nat eb C
                 Hj Hjl HL3a1 Heb (vdrw_K22 K HK)
                 with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hlk Htok HR Hpanic Hpark [-]").

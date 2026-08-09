@@ -57,7 +57,7 @@ Definition K_virtio_disk_rw : nat := 34%nat.
 Definition wp_virtio_disk_rw_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* fabric + lock ghosts *)
     (pd pav pu : mword 64)
@@ -116,8 +116,8 @@ Definition wp_virtio_disk_rw_sconf_body
      See claude-notes/completed/sched-hart-generic.md. *)
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
@@ -169,13 +169,13 @@ Module Type VIRTIODISKRW.
   Parameter wp_virtio_disk_rw_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bno dsk0 : mword 32) (bs_buf bs_disk : list (bv 8)) (b : bool)
       (Q : iProp Σ),
-      wp_virtio_disk_rw_sconf_body Φ γs j γl γu γd γk pd pav pu
+      wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
                                    m K eb C bno dsk0 bs_buf bs_disk b Q.
 End VIRTIODISKRW.

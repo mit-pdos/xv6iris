@@ -158,7 +158,7 @@ Section AslProps.
      the only hart in scope inside the body and every resource resolves at
      it automatically. *)
   Definition asl_exit `{GEN : GenId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+       (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (m : regfile) (pidv : mword 32)
       (av : nat) (dq : dfrac) (slk spd sp0 : mword 64)
       (eb : bool) (C : iProp Σ) : iProp Σ :=
@@ -181,7 +181,7 @@ Section AslProps.
       WP (Loop : expr riscv_lang)))%I.
 
   Definition asl_loop `{GEN : GenId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+      (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ) (m : regfile) (pidv : mword 32)
       (av : nat) (dq : dfrac) (slk spd sp0 : mword 64)
       (eb : bool) (C : iProp Σ) : iProp Σ :=
@@ -200,7 +200,7 @@ Section AslProps.
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (av - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
-      asl_exit CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+      asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
       WP (Loop : expr riscv_lang)))%I.
 
 End AslProps.
@@ -561,7 +561,7 @@ Section AslBodies.
      inside this lemma.  Its two arms are the two anchored propositions: the
      exit path, or the loop's own Löb IH. ---- *)
   Lemma asl_post_sleep_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+      (γs : list gname) (j : nat)
       (γl γsl : gname) (R : iProp Σ)
       (m M : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
       (slk spd sp0 : mword 64) (eb : bool) (C : iProp Σ) :
@@ -571,8 +571,8 @@ Section AslBodies.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     asl_regs m M slk spd ->
     kernel_text -∗
-    ▷ asl_loop CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
-    asl_exit CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+    ▷ asl_loop CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+    asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -656,7 +656,7 @@ Section AslBodies.
 
   (* ---- one loop iteration: +0x1c .. the sleep() call, which parks ---- *)
   Lemma asl_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+      (γs : list gname) (j : nat)
       (γpl γl γsl : gname) (s : string) (R : iProp Σ)
       (m M : regfile) (pidv : mword 32) (av : nat) (dq : dfrac)
       (slk spd sp0 : mword 64) (eb : bool) (C : iProp Σ) :
@@ -670,9 +670,9 @@ Section AslBodies.
     kernel_text -∗
     is_sleeplock γl γsl slk s R -∗
     panic_wp_any -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
-    ▷ asl_loop CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
+    ▷ asl_loop CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -685,7 +685,7 @@ Section AslBodies.
     arm_pay 0 eb pj -∗
     sie_cap_gpr M (av - 4)%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.acquiresleep + 0x1c)) -∗
-    asl_exit CID0 Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
+    asl_exit CID0 γs j γl γsl R m pidv av dq slk spd sp0 eb C -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Heb Hj Hjpl Hanch Hasl.
@@ -745,7 +745,7 @@ Section AslBodies.
     iDestruct (sl_res_close_held γsl slk R vh Hvh with "Hw") as "HRc".
     assert (Hsl_lka : add_vec (L2 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = sl_lk slk).
     { rewrite HL2a1. replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
-    iApply (Sleep.wp_sleep_sconf Φ γs j γpl γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) L2 (av - 4)%nat eb C
+    iApply (Sleep.wp_sleep_sconf γs j γpl γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) L2 (av - 4)%nat eb C
               Hj Hjpl Hsl_lka Heb
               ltac:(lia)
               with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds [] Htok HRc Hpanic Hpark [-]").
@@ -758,7 +758,7 @@ Section AslBodies.
     iEval (rewrite Hpc24) in "Hpc".
     assert (HaslMfs : asl_regs m mfs slk spd)
       by (apply (asl_regs_cs m L2 mfs slk spd Hs_cs HaslL2)).
-    iApply (asl_post_sleep_body (CID := CIDs) CID0 Φ γs j γl γsl R m mfs pidv av dq slk spd sp0 eb C
+    iApply (asl_post_sleep_body (CID := CIDs) CID0 γs j γl γsl R m mfs pidv av dq slk spd sp0 eb C
               Hav Heb ltac:(wp_next_chain) HaslMfs
               with "Htext IH Hexit Hr24 Hr16 Hr8 Hr0 Htok HRc Hpid Hpark Hown Hpay Hcg Hpc").
   Qed.
@@ -771,12 +771,12 @@ Section ProofAcquiresleep.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_acquiresleep_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_acquiresleep_sconf 
       (γs : list gname) (j : nat)
       (γl γsl : gname) (s : string) (R : iProp Σ)
       (m : regfile) (pidv : mword 32) (av : nat) (eb : bool) (C : iProp Σ) {dq : dfrac}
       (b : bool)
-    : wp_acquiresleep_sconf_body Φ γs j γl γsl s R m pidv av eb C dq b.
+    : wp_acquiresleep_sconf_body γs j γl γsl s R m pidv av eb C dq b.
   Proof.
     cbv beta delta [wp_acquiresleep_sconf_body].
     intros pcE slk pj ret_tgt Hj Hav Heb.
@@ -982,7 +982,7 @@ Section ProofAcquiresleep.
       - rewrite (callee_saved_lookup Hpins (mword_of_int 27 : mword 5) ltac:(vm_compute; reflexivity)). apply Hpro_cs; reg_neq. }
 
     (* ============ the anchored EXIT continuation (+0x28 -> ret) ============ *)
-    iAssert (asl_exit CID Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C) with "[Hcont]" as "Hexit".
+    iAssert (asl_exit CID γs j γl γsl R m pidv av dq slk spd sp0 eb C) with "[Hcont]" as "Hexit".
     { rewrite /asl_exit.
       iIntros (CIDx Hsx M) "%HaslE Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hpark Hown Hpay Hcg Hpc".
       iApply (asl_exit_body (CID := CIDx) CID γs j γl γsl s R m M pidv av dq slk spd sp0 eb C
@@ -990,10 +990,10 @@ Section ProofAcquiresleep.
                 with "Htext Hslk Hr24 Hr16 Hr8 Hr0 Htok Hstok Hspid HRx Hw Hpid Hpark Hown Hpay Hcg Hpc Hcont"). }
 
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ============ *)
-    iAssert (asl_loop CID Φ γs j γl γsl R m pidv av dq slk spd sp0 eb C) with "[]" as "Hloop".
+    iAssert (asl_loop CID γs j γl γsl R m pidv av dq slk spd sp0 eb C) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /asl_loop.
       iIntros (CIDy Hsy M) "%HaslL Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hpark Hown Hpay Hcg Hpc Hexit".
-      iApply (asl_loop_body (CID := CIDy) CID Φ γs j γpl γl γsl s R m M pidv av dq slk spd sp0 eb C
+      iApply (asl_loop_body (CID := CIDy) CID γs j γpl γl γsl s R m M pidv av dq slk spd sp0 eb C
                 Hav Heb Hj Hjpl Hsy HaslL
                 with "Htext Hslk Hpanic Hpinv Hscheds IH Hr24 Hr16 Hr8 Hr0 Htok Hheld Hpid Hpark Hown Hpay Hcg Hpc Hexit"). }
 

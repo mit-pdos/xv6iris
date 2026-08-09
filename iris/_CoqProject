@@ -826,8 +826,6 @@ SpecMainSecondary.v
 ProofMainSecondary.v
 LinkMainSecondary.v
 BootBridge.v
-ProtoCpuid.v
-ProtoSchedsInv.v
 CrashProto.v
 BootChain.v
 BootShared.v

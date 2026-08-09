@@ -1045,7 +1045,7 @@ Section UvEcallPost.
 
   (* everything from the FETCHED state on, for the ecall trap *)
   Lemma uv_ecall_post_fetch (CIDp : CpuId) (C : ucfg) (pt : uptd)
-      (Ψ : usys_protocol Σ) (Φ : mval -> iProp Σ)
+      (Ψ : usys_protocol Σ)
       (sg sf : mstate) (b : bool) (mst pc : mword 64) (ib : mword 32)
       (ms_v sc_v stval_v sepc_v : mword 64)
       (m : regfile) (M : gmap Z (bv 8))
@@ -1078,7 +1078,7 @@ Section UvEcallPost.
     utlb_inv_pt (ud_root pt) (ud_tfp pt) (ud_um pt) -∗
     umem pt M -∗ user_cfg C -∗
     minstret ↦ᵣ mst -∗ (R_bool minstret_increment) ↦ᵣ b -∗
-    Ψ (uint (m !!! Regidx a7_idx)) m pc M Φ -∗
+    Ψ (uint (m !!! Regidx a7_idx)) m pc M -∗
     |={⊤ ∖ ↑minstretN ∖ ↑wireN}=> ∃ s' : mstate,
       ⌜exec (riscv_step false) sg = Some (tt, s')⌝ ∗
       ▷ (mstate_interp s' ∗ minstret_inv_body ∗
@@ -1160,7 +1160,7 @@ Section UvEcallPost.
     iSplitR. { iPureIntro. exact Hstep. }
     iNext. iFrame "Hint".
     iSplitL "Hmst Hmi". { iExists mst, b. iFrame. }
-    iApply ("Hsys" $! CIDp Φ m M pc sc_v
+    iApply ("Hsys" $! CIDp m M pc sc_v
               (tval (xtval_exception_value (E_U_EnvCall tt) (zeros' 64)))
               with "[-HPsi] HPsi").
     iExists (utrap_ms elp0 ms_v).
@@ -1179,11 +1179,11 @@ Section UvEcall.
      arm at the number in a7; the kernel's syscall service takes it from
      there, so this WP has no continuation of its own. *)
   Lemma wp_uv_ecall (Ψ : usys_protocol Σ) (M : gmap Z (bv 8)) (m : regfile)
-      (pc : mword 64) (Φ : mval -> iProp Σ) :
+      (pc : mword 64) :
     uinstr pt M pc false (ECALL tt) ->
     uv_cap_gpr C pt Ψ M m -∗
     pc_is pc -∗
-    Ψ (uint (m !!! Regidx a7_idx)) m pc M Φ -∗
+    Ψ (uint (m !!! Regidx a7_idx)) m pc M -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hui.
@@ -1298,7 +1298,7 @@ Section UvEcall.
       { rewrite ?mem_set_reg. iExact "Hmem". }
       destruct (Hsf sf Tr)
         as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lmsf & Lscf & Lstvecf & Lelpf & Lmedlf).
-      iApply (uv_ecall_post_fetch CID0 C pt Ψ Φ sg sf b mst pc (zero_extend' 32 w)
+      iApply (uv_ecall_post_fetch CID0 C pt Ψ sg sf b mst pc (zero_extend' 32 w)
                 ms_v sc_v stval_v sepc_v m M elp0 MISA_C
                 Hmsok HmisaS Help_ne Hsi Hhart_a Lprivf Lmsf Lscf Lstvecf Lelpf
                 Lmisaf Lmedlf
@@ -1319,7 +1319,7 @@ Section UvEcall.
       { rewrite ?mem_set_reg. iExact "Hmem". }
       destruct (Hsf sf Tr)
         as (Lpcf & Lprivf & Lmisaf & Helpf & Hagree & Lmsf & Lscf & Lstvecf & Lelpf & Lmedlf).
-      iApply (uv_ecall_post_fetch CID0 C pt Ψ Φ sg sf b mst pc (zero_extend' 32 w)
+      iApply (uv_ecall_post_fetch CID0 C pt Ψ sg sf b mst pc (zero_extend' 32 w)
                 ms_v sc_v stval_v sepc_v m M elp0 MISA_C
                 Hmsok HmisaS Help_ne Hsi Hhart_a Lprivf Lmsf Lscf Lstvecf Lelpf
                 Lmisaf Lmedlf

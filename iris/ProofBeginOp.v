@@ -374,7 +374,7 @@ Section BoProps.
      [CID0]: the park inside the loop means either can be entered at a hart
      nobody knew about when it was established. *)
   Definition bo_exit `{GEN : GenId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (j : nat)
+       (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m : regfile) (pidv : mword 32) (dq : dfrac)
@@ -398,7 +398,7 @@ Section BoProps.
       WP (Loop : expr riscv_lang)))%I.
 
   Definition bo_loop `{GEN : GenId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (j : nat)
+      (j : nat)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z)
       (m : regfile) (pidv : mword 32) (dq : dfrac)
@@ -418,7 +418,7 @@ Section BoProps.
       arm_pay 0 eb (proc_addr j) -∗
       sie_cap_gpr M (K - 4)%nat false (proc_addr j) -∗
       pc_is (mword_of_int (KernelSyms.begin_op + 0x2c)) -∗
-      bo_exit CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+      bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
       WP (Loop : expr riscv_lang)))%I.
 
 End BoProps.
@@ -700,7 +700,7 @@ Section BoBodies.
      [c.bnez] at +0x2e, whose later has already been stripped, so the Löb
      hypothesis arrives here WITHOUT its [▷]. ---- *)
   Lemma bo_armA_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
@@ -715,10 +715,10 @@ Section BoBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
-    bo_loop CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
-    bo_exit CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
+    bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -792,7 +792,7 @@ Section BoBodies.
     assert (HboA2 : bo_regs m A2 spd) by (apply (bo_regs_cs m M A2 spd HcsMA2 HboM)).
     assert (Hsl_lka : add_vec (A2 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HA2a1; apply addv_sext0).
-    iApply (Sleep.wp_sleep_sconf Φ γs j γl (ln_lk γ) log_addr "log"%string
+    iApply (Sleep.wp_sleep_sconf γs j γl (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) A2 (K - 4)%nat eb C
               Hj Hjl Hsl_lka Heb (bo_K22 K HK)
               with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hislock Htok Hres Hpanic Hpark [-]").
@@ -812,7 +812,7 @@ Section BoBodies.
      FALLING [bge] at +0x42, which carries no later, so the Löb hypothesis
      arrives WITH its [▷] and is stripped at that [c.j]. ---- *)
   Lemma bo_armB_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
@@ -827,10 +827,10 @@ Section BoBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
-    ▷ bo_loop CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
-    bo_exit CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
+    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -905,7 +905,7 @@ Section BoBodies.
     assert (HboB2 : bo_regs m B2 spd) by (apply (bo_regs_cs m M B2 spd HcsMB2 HboM)).
     assert (Hsl_lka : add_vec (B2 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = log_addr)
       by (rewrite HB2a1; apply addv_sext0).
-    iApply (Sleep.wp_sleep_sconf Φ γs j γl (ln_lk γ) log_addr "log"%string
+    iApply (Sleep.wp_sleep_sconf γs j γl (ln_lk γ) log_addr "log"%string
               (log_res γ bn γfs cov logstart) B2 (K - 4)%nat eb C
               Hj Hjl Hsl_lka Heb (bo_K22 K HK)
               with "Hcg Hown Hpay Htext Hpc Hpinv Hscheds Hislock Htok Hres Hpanic Hpark [-]").
@@ -939,7 +939,7 @@ Section BoBodies.
      +0x50..+0x54 that mints the reservation and hands control to
      [bo_exit]). ---- *)
   Lemma bo_loop_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γ : log_names) (bn : bio_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (m M : regfile) (pidv : mword 32) (dq : dfrac)
@@ -954,10 +954,10 @@ Section BoBodies.
     kernel_text -∗
     log_ctx γ bn γfs cov logstart dev -∗
     panic_wp_any -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
-    ▷ bo_loop CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
-    bo_exit CID0 Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
+    ▷ bo_loop CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
+    bo_exit CID0 j γ bn γfs cov logstart m pidv dq K eb C spd sp0 -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx (mword_of_int 1 : mword 5)) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
@@ -1059,7 +1059,7 @@ Section BoBodies.
                        = mword_of_int (KernelSyms.begin_op + 0x24))
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt24) in "Hpc".
-      iApply (bo_armA_body (CID := CID) CID0 Φ γs j γl γ bn γfs cov logstart dev m E1 pidv dq K eb C spd sp0
+      iApply (bo_armA_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E1 pidv dq K eb C spd sp0
                 HK Heb Hj Hjl Hanch HboE1
                 with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc").
     - (* ================= NOT COMMITTING: fall through to +0x30 ============ *)
@@ -1363,7 +1363,7 @@ Section BoBodies.
         assert (Hp46 : add_vec_int (mword_of_int (KernelSyms.begin_op + 0x42) : mword 64) 4 = mword_of_int (KernelSyms.begin_op + 0x46))
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp46) in "Hpc".
-        iApply (bo_armB_body (CID := CID) CID0 Φ γs j γl γ bn γfs cov logstart dev m E8 pidv dq K eb C spd sp0
+        iApply (bo_armB_body (CID := CID) CID0 γs j γl γ bn γfs cov logstart dev m E8 pidv dq K eb C spd sp0
                   HK Heb Hj Hjl Hanch HboE8
                   with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc").
   Qed.
@@ -1377,7 +1377,7 @@ Section ProofBeginOp.
             !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_begin_op_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_begin_op_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (bn : bio_names)
       (γ : log_names) (γfs : fs_names)
@@ -1385,7 +1385,7 @@ Section ProofBeginOp.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_begin_op_sconf_body Φ γs j γl bn γ γfs cov logstart dev pidv dq m K eb C b.
+    : wp_begin_op_sconf_body γs j γl bn γ γfs cov logstart dev pidv dq m K eb C b.
   Proof.
     cbv beta delta [wp_begin_op_sconf_body].
     intros pcE pj ret_tgt HK Hj Hjl Heb.
@@ -1575,17 +1575,17 @@ Section ProofBeginOp.
     { intros c Hcs N2 N8 N10 N1.
       rewrite (callee_saved_lookup Hcsacq c Hcs). exact (Hpro_cs c N2 N8 N10 N1). }
     (* ============ the anchored EXIT continuation (+0x58 -> ret) ============ *)
-    iAssert (bo_exit CID Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0) with "[Hcont]" as "Hexit".
+    iAssert (bo_exit CID j γ bn γfs cov logstart m pidv dq K eb C spd sp0) with "[Hcont]" as "Hexit".
     { rewrite /bo_exit.
       iIntros (CIDx Hsx Mx) "%HboE Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hpark Hown Hpay Hcg Hpc".
       iApply (bo_exit_body (CID := CIDx) CID j γ bn γfs cov logstart dev m Mx pidv dq K eb C spd sp0
                 HK Heb Hsx Hspd Hsp0 HboE
                 with "Htext Hlog Hr24 Hr16 Hr8 Hr0 Htok Hres Hop Hpid Hpark Hown Hpay Hcg Hpc Hcont"). }
     (* ============ the WAIT LOOP (iLöb over the anchored invariant) ======== *)
-    iAssert (bo_loop CID Φ j γ bn γfs cov logstart m pidv dq K eb C spd sp0) with "[]" as "Hloop".
+    iAssert (bo_loop CID j γ bn γfs cov logstart m pidv dq K eb C spd sp0) with "[]" as "Hloop".
     { iLöb as "IH". rewrite /bo_loop.
       iIntros (CIDy Hsy My) "%HboL Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc Hexit".
-      iApply (bo_loop_body (CID := CIDy) CID Φ γs j γl γ bn γfs cov logstart dev m My pidv dq K eb C spd sp0
+      iApply (bo_loop_body (CID := CIDy) CID γs j γl γ bn γfs cov logstart dev m My pidv dq K eb C spd sp0
                 HK Heb Hj Hjl Hsy HboL
                 with "Htext Hlog Hpanic Hpinv Hscheds IH Hexit Hr24 Hr16 Hr8 Hr0 Htok Hres Hpid Hpark Hown Hpay Hcg Hpc"). }
     (* ============ +0x18..+0x22: s1 := &log, s2 := 30, jump to the test ==== *)

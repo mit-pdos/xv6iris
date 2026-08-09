@@ -656,10 +656,10 @@ Section ProofPipealloc.
           by (rewrite /U4; apply upd_eq).
         iDestruct (cpu_own_transport CIDt CIDt5 n eb p C b ltac:(wp_next_chain)
                      with "Hcnt") as "Hcnt".
-        iApply (Fileclose.wp_fileclose_sconf (fun _ => True%I) γfl γf k1 1%Qp Cf1 inhabitant on U4 n eb p C (K - 6)%nat b
+        iApply (Fileclose.wp_fileclose_sconf γfl γf k1 1%Qp Cf1 inhabitant on U4 n eb p C (K - 6)%nat b
                   ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HU4a0
                   with "Hcg Hcnt Htext Hpc Hftab Hpanic Href1 [] [-]").
-        { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk1ty). }
+        { iApply (fileclose_env_none _ _ _ _ _ _ Hk1ty). }
         (* fileclose hands back the unit the reference was holding: it is
            the WRITE end's, and together with [Hunit0] it pays the two
            [pipealloc_post]'s failure arm promises. *)
@@ -723,13 +723,13 @@ Section ProofPipealloc.
         by (rewrite /V1; apply upd_eq).
       iDestruct (cpu_own_transport CIDu CIDu1 n eb p C b ltac:(wp_next_chain)
                    with "Hcnt") as "Hcnt".
-      iApply (Fileclose.wp_fileclose_sconf (fun _ => True%I) γfl γf k0 1%Qp Cf0 inhabitant on V1 n eb p C (K - 6)%nat b
+      iApply (Fileclose.wp_fileclose_sconf γfl γf k0 1%Qp Cf0 inhabitant on V1 n eb p C (K - 6)%nat b
                 ltac:(unfold fileclose_stack, K_iput; lia) Hnoffpos HV1a0
                 with "Hcg Hcnt Htext Hpc Hftab Hpanic Href0 [] [-]").
       (* an untyped file costs its closer nothing -- no pipe, no inode, so no
          file system.  [inhabitant] above is the ghost bundle the arms this
          file cannot take would have been indexed by. *)
-      { iApply (fileclose_env_none _ _ _ _ _ _ _ Hk0ty). }
+      { iApply (fileclose_env_none _ _ _ _ _ _ Hk0ty). }
       (* the READ end's unit, banked for T8 *)
       iIntros (CIDu2 Hsu2 mr) "Hcg Hcnt Hpc %Hfcpins Hunit0 _".
       assert (Hpca8 : ret_pc (V1 !!! Regidx Rra) = mword_of_int (KernelSyms.pipealloc + 0xa8))

@@ -346,7 +346,7 @@ Proof. rgne. reflexivity. Qed.
 (* per-arm.                                                               *)
 (* ===================================================================== *)
 Definition ap_tail `{!riscvGS Σ, !sieG Σ} `{GEN : GenId}
-    (Φ : mval -> iProp Σ) (m : regfile) (spd pme ret_tgt : mword 64) (K : nat) : iProp Σ :=
+     (m : regfile) (spd pme ret_tgt : mword 64) (K : nat) : iProp Σ :=
   (∀ (xb : bool) (CIDt : CpuId) (Mt : regfile) (rv : mword 64),
      ⌜ Mt !!! Regidx csp_rs1 = spd /\
        Mt !!! Regidx ap_s1 = rv /\
@@ -381,17 +381,17 @@ Section ProofAllocproc.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Lemma wp_allocproc_core
-      (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
-    : wp_allocproc_core_body γa γp γf Φ γs m lvl K eb pme C on b.
+    : wp_allocproc_core_body γa γp γf γs m lvl K eb pme C on b.
   Proof.
     cbv beta delta [wp_allocproc_core_body].
     intros pcE ret_tgt HK Hlvl.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hpidlk Henv Hcont".
-    iDestruct (procs_inv_len Φ γs with "Hprocs") as %Hlen.
-    iAssert (procs_inv Φ γs) as "#Hpinv". { iExact "Hprocs". }
+    iDestruct (procs_inv_len γs with "Hprocs") as %Hlen.
+    iAssert (procs_inv γs) as "#Hpinv". { iExact "Hprocs". }
     (* ================= PROLOGUE (32-byte frame, 4 slots) ================= *)
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
@@ -467,7 +467,7 @@ Section ProofAllocproc.
        The epilogue hands back only the final register file; assembling
        [SpecAllocproc.allocproc_post] out of it is the ARM's job, which is
        exactly what lets the post's SIE index be per-arm. *)
-    iAssert (ap_tail Φ m spd pme ret_tgt K) with "[Hb1 Hb2 Hb3 Hb4]" as "Htail".
+    iAssert (ap_tail m spd pme ret_tgt K) with "[Hb1 Hb2 Hb3 Hb4]" as "Htail".
     { rewrite /ap_tail.
       iIntros (xb CIDt Mt rv) "%Hmt Hcg Hpc Hk".
       destruct Hmt as (Htsp & Hts1 & Htrest).
@@ -720,7 +720,7 @@ Section ProofAllocproc.
                      (forall r : mword 5, is_cs_idx r = true ->
                         r <> csp_rs1 -> r <> ap_s0 -> r <> ap_s1 -> r <> ap_s2 ->
                         Mk !!! Regidx r = m !!! Regidx r) ⌝ -∗
-                   ap_tail Φ m spd pme ret_tgt K -∗
+                   ap_tail m spd pme ret_tgt K -∗
                    wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
                      ∀ (mr : regfile),
                        ⌜ callee_saved m mr ⌝ -∗
@@ -739,7 +739,7 @@ Section ProofAllocproc.
       destruct Hregs as (Hksp & Hks1 & Hks2 & Hkrest).
       iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbmatch. symmetry in Hbmatch.
       destruct (lookup_lt_is_Some_2 γs k ltac:(rewrite Hlen; exact Hk)) as [γl Hγl].
-      iDestruct (procs_inv_lookup Φ γs k γl Hγl with "Hpinv") as "#Hislock".
+      iDestruct (procs_inv_lookup γs k γl Hγl with "Hpinv") as "#Hislock".
       (* +0x1c c.mv a0,s1 *)
       iPoseProof (api_1c with "Htext") as "Hi1c".
       iApply (wp_cmv_s_sconf (CID := CIDk) (mword_of_int (KernelSyms.allocproc + 0x1c)) ap_a0 ap_s1 Mk (K - 4)%nat b
@@ -788,7 +788,7 @@ Section ProofAllocproc.
       iDestruct (cpu_own_transport CIDk CIDl2 lvl eb pme C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iApply (Acquire.wp_acquire_sconf (CID := CIDl2) γl "proc"%string
-                (proc_lock_res Φ γs γl (proc_addr k)) L2 lvl eb pme C (K - 4)%nat b
+                (proc_lock_res γs γl (proc_addr k)) L2 lvl eb pme C (K - 4)%nat b
                 (ap_lvl1 lvl Hlvl) (ap_K10 K HK)
                 with "Hcg Hcpu Htext Hpc [Hislock] Hpanic [-]").
       { iEval (rewrite HL2a0). iExact "Hislock". }
@@ -796,7 +796,7 @@ Section ProofAllocproc.
       assert (Hp22 : ret_pc (L2 !!! Regidx ap_ra) = mword_of_int (KernelSyms.allocproc + 0x22))
         by (rewrite HL2ra; apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hp22) in "Hpc".
-      iDestruct (proc_lock_res_elim Φ γs γl (proc_addr k) with "HR") as (st ch) "(Hstate & Hpg & Hchan & Hpub & Hslots)".
+      iDestruct (proc_lock_res_elim γs γl (proc_addr k) with "HR") as (st ch) "(Hstate & Hpg & Hchan & Hpub & Hslots)".
       assert (Hacq_s1 : macq !!! Regidx ap_s1 = proc_addr k).
       { rewrite (callee_saved_lookup Hcsacq ap_s1 ltac:(vm_compute; reflexivity)). exact HL2s1. }
       assert (Hacq_s2 : macq !!! Regidx ap_s2 = proc_addr NPROC).
@@ -859,7 +859,7 @@ Section ProofAllocproc.
           by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Htgt38) in "Hpc".
         (* the dormant block comes out of the invariant *)
-        iDestruct (proc_slots_unused Φ γs (proc_addr k) with "Hslots") as "[Hdorm Hpark]".
+        iDestruct (proc_slots_unused γs (proc_addr k) with "Hslots") as "[Hdorm Hpark]".
         (* UNUSED is unclaimed, so the lock's share IS the whole mirror; the
            store of USED below claims the slot, and the whole variable rides
            out on [proc_held]. *)
@@ -1210,17 +1210,17 @@ Section ProofAllocproc.
           iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwb _]".
           iDestruct ("Hwb" with "Hpg") as "[Hpg _]".
           iModIntro.
-          iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hdorm Hpark]" as "HR".
-          { iApply (proc_lock_res_intro Φ γs γl (proc_addr k) UNUSED (zero_reg : mword 64)
+          iAssert (proc_lock_res γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hdorm Hpark]" as "HR".
+          { iApply (proc_lock_res_intro γs γl (proc_addr k) UNUSED (zero_reg : mword 64)
                       with "Hstate Hpg Hchan Hpub [Hdorm Hpark]").
-            iApply (proc_slots_unused_intro Φ γs (proc_addr k) with "Hdorm Hpark"). }
+            iApply (proc_slots_unused_intro γs (proc_addr k) with "Hdorm Hpark"). }
           assert (Hlka1 : add_vec (T4 !!! Regidx ap_a0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k).
           { rewrite HT4a0.
             replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64)
               by (apply bv_eq; vm_compute; reflexivity).
             apply kv_addv_zero. }
           iApply (Release.wp_release_sconf (CID := CIDf) γl (proc_addr k) "proc"%string
-                    (proc_lock_res Φ γs γl (proc_addr k)) T4 lvl eb pme C (K - 4)%nat
+                    (proc_lock_res γs γl (proc_addr k)) T4 lvl eb pme C (K - 4)%nat
                     Hlka1 (ap_K10 K HK)
                     with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay [-]").
           rewrite -Hbmatch.
@@ -1556,17 +1556,17 @@ Section ProofAllocproc.
           iDestruct (pstate_whole_split (proc_addr k) UNUSED) as "[Hwb _]".
           iDestruct ("Hwb" with "Hpg") as "[Hpg _]".
           iModIntro.
-          iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hdorm Hpark]" as "HR".
-          { iApply (proc_lock_res_intro Φ γs γl (proc_addr k) UNUSED (zero_reg : mword 64)
+          iAssert (proc_lock_res γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hdorm Hpark]" as "HR".
+          { iApply (proc_lock_res_intro γs γl (proc_addr k) UNUSED (zero_reg : mword 64)
                       with "Hstate Hpg Hchan Hpub [Hdorm Hpark]").
-            iApply (proc_slots_unused_intro Φ γs (proc_addr k) with "Hdorm Hpark"). }
+            iApply (proc_slots_unused_intro γs (proc_addr k) with "Hdorm Hpark"). }
           assert (Hlka2 : add_vec (U4 !!! Regidx ap_a0) (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k).
           { rewrite HU4a0.
             replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64)
               by (apply bv_eq; vm_compute; reflexivity).
             apply kv_addv_zero. }
           iApply (Release.wp_release_sconf (CID := CIDf) γl (proc_addr k) "proc"%string
-                    (proc_lock_res Φ γs γl (proc_addr k)) U4 lvl eb pme C (K - 4)%nat
+                    (proc_lock_res γs γl (proc_addr k)) U4 lvl eb pme C (K - 4)%nat
                     Hlka2 (ap_K10 K HK)
                     with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay [-]").
           rewrite -Hbmatch.
@@ -1810,7 +1810,7 @@ Section ProofAllocproc.
         assert (Hp70 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x6e) : mword 64) 2 = mword_of_int (KernelSyms.allocproc + 0x70)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp70) in "Hpc".
         (* +0x70 c.ld a5,64(s1) : a5 := p->kstack *)
-        iDestruct (procs_inv_kstack Φ γs k γl Hγl with "Hpinv") as (ks) "#Hks".
+        iDestruct (procs_inv_kstack γs k γl Hγl with "Hpinv") as (ks) "#Hks".
         iPoseProof (api_70 with "Htext") as "Hi70".
         assert (Hksaddr : add_vec (H2 !!! Regidx ap_s1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                           = p_kstack (proc_addr k))
@@ -1943,8 +1943,8 @@ Section ProofAllocproc.
         assert (Hp26 : add_vec_int (mword_of_int (KernelSyms.allocproc + 0x24) : mword 64) 2 = mword_of_int (KernelSyms.allocproc + 0x26)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hp26) in "Hpc".
         (* rebuild the lock resource: nothing moved *)
-        iAssert (proc_lock_res Φ γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hslots]" as "HR".
-        { iApply (proc_lock_res_intro Φ γs γl (proc_addr k) st ch with "Hstate Hpg Hchan Hpub Hslots"). }
+        iAssert (proc_lock_res γs γl (proc_addr k)) with "[Hstate Hpg Hchan Hpub Hslots]" as "HR".
+        { iApply (proc_lock_res_intro γs γl (proc_addr k) st ch with "Hstate Hpg Hchan Hpub Hslots"). }
         (* +0x26 c.mv a0,s1 *)
         iPoseProof (api_26 with "Htext") as "Hi26".
         iApply (wp_cmv_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.allocproc + 0x26)) ap_a0 ap_s1 L3 (K - 4)%nat false
@@ -1995,7 +1995,7 @@ Section ProofAllocproc.
             by (apply bv_eq; vm_compute; reflexivity).
           apply kv_addv_zero. }
         iApply (Release.wp_release_sconf (CID := CIDf) γl (proc_addr k) "proc"%string
-                  (proc_lock_res Φ γs γl (proc_addr k)) R2 lvl eb pme C (K - 4)%nat
+                  (proc_lock_res γs γl (proc_addr k)) R2 lvl eb pme C (K - 4)%nat
                   Hlka (ap_K10 K HK)
                   with "Hcg Htext Hpc Hislock Hlocked HR Hcpu Hpay [-]").
         (* release's exit index is the very [match] [b] is equal to, so the
@@ -2153,16 +2153,16 @@ Section SealAllocproc.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Lemma wp_allocproc_sconf
-      (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γp : gname) (γf : gname)
       (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
-    : wp_allocproc_sconf_body γa γp γf Φ γs m lvl K eb pme C on b.
+    : wp_allocproc_sconf_body γa γp γf γs m lvl K eb pme C on b.
   Proof.
     cbv beta delta [wp_allocproc_sconf_body].
     intros pcE ret_tgt HK Hlvl Hex.
     destruct Hex as (nb & Hon & Hnb). subst on.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hpidlk Henv Hcont".
-    iApply (Core.wp_allocproc_core γa γp γf Φ γs m lvl K eb pme C (Some nb) b HK Hlvl
+    iApply (Core.wp_allocproc_core γa γp γf γs m lvl K eb pme C (Some nb) b HK Hlvl
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hpidlk Henv").
     iIntros (CIDx Hsx mr) "%Hcs Hpc Hpost".
     iSpecialize ("Hcont" $! CIDx with "[%]"); [exact Hsx|].

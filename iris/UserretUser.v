@@ -56,7 +56,6 @@ Section UserretUser.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_userret_user (C : ucfg) (pt : uptd) (kroot : mword 44)
-      (Φ : mval -> iProp Σ)
       (m : regfile) (usatp : mword 64)
       (mstatus0 sepc0 : mword 64)
       (sc_v stval_v : mword 64)
@@ -143,7 +142,7 @@ Section UserretUser.
     sstateen0 ↦ᵣ (mword_of_int 0 : mword 32) -∗
     udata_own (ud_data pt) -∗
     (* ---- the (still assumed) kernel re-entry contract ---- *)
-    stvec_handler_wp C pt Φ -∗
+    stvec_handler_wp C pt -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hwf HTSR Hsup Ha0 HuMode Huasid Huppn
@@ -190,7 +189,7 @@ Section UserretUser.
                  with "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc Hutlb Hpc
                        Hfile Hsc Hstval Hstvec Hmedl Hmip Hmse Hsse Hdata")
       as "Hinv".
-    iApply (U.wp_user_exec_closed C pt Φ with "Hhw Hmi Hwi Hinv Hhandler").
+    iApply (U.wp_user_exec_closed C pt with "Hhw Hmi Hwi Hinv Hhandler").
   Qed.
 
 End UserretUser.

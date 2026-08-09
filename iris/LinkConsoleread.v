@@ -33,9 +33,9 @@ Module Consoleread : CONSOLEREAD.
   Axiom wp_consoleread_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+      (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool),
-      wp_consoleread_sconf_body γa γf Φ γs j γlp m av eb C pid V n b.
+      wp_consoleread_sconf_body γa γf γs j γlp m av eb C pid V n b.
 End Consoleread.

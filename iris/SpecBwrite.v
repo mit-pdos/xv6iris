@@ -61,7 +61,7 @@ Definition K_bwrite : nat := 38%nat.
 Definition wp_bwrite_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
@@ -106,8 +106,8 @@ Definition wp_bwrite_sconf_body
   (* the caller's own pid cell, agreeing with the handle's (holdingsleep) *)
   p_pid pj ↦₄{dq} pidv -∗
   (* the running-thread bundle rw's sleeps thread through *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   running_claim j -∗
   (* the disk fabric *)
   dev_inv γu γd -∗
@@ -153,7 +153,7 @@ Module Type BWRITE.
   Parameter wp_bwrite_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -162,6 +162,6 @@ Module Type BWRITE.
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bs bsd : list (bv 8)) (b : bool)
       (Q : iProp Σ),
-      wp_bwrite_sconf_body Φ γs j γl γu γd γk pd pav pu bn V k
+      wp_bwrite_sconf_body γs j γl γu γd γk pd pav pu bn V k
                            pidv dev bno dq m K eb C bs bsd b Q.
 End BWRITE.

@@ -293,7 +293,7 @@ Section UProofSync.
     (* 0x2ca  ecall *)
     assert (Ha7 : uint (m1 !!! Regidx a7_idx) = 2)
       by (rewrite /m1; reg_lookup).
-    iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x2ca) (fun _ => True%I)
+    iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x2ca)
               (ui_sync_2ca pt M Hlay Htext) with "Hcg Hpc").
     rewrite /xv6_sys_protocol /usys_protocol_of.
     rewrite Ha7.
@@ -341,7 +341,7 @@ Section UProofSync.
     iEval (rewrite Epc1) in "Hpc".
     (* 0x36a  ecall -- SYS_sync, the returning arm *)
     assert (Ha7 : uint (m1 !!! Regidx a7_idx) = 22) by (rewrite /m1; reg_lookup).
-    iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x36a) (fun _ => True%I)
+    iApply (wp_uv_ecall C pt Ψxv6 M m1 (mword_of_int 0x36a)
               (ui_sync_36a pt M Hlay Htext) with "Hcg Hpc").
     rewrite /xv6_sys_protocol /usys_protocol_of.
     rewrite Ha7.

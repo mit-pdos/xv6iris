@@ -135,19 +135,19 @@ Section DevintrCaps.
      ALL PERSISTENT, so the bundle is threaded and never consumed, and the
      postcondition does not mention it. *)
   Definition devintr_caps (γu : uart_names) (γv : disk_names)
-      (γtx γdk γtl : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+      (γtx γdk γtl : gname)  (γs : list gname)
       (pd pav pu : mword 64) : iProp Σ :=
     ( dev_inv γu γv ∗
       is_txlock γtx γu ∗
       disk_geom γv pd pav pu ∗
       is_lock γdk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
       timer_cap ∗
-      tick_keeper Φ γtl γs ∗
-      procs_inv Φ γs ∗
+      tick_keeper γtl γs ∗
+      procs_inv γs ∗
       panic_wp_any )%I.
 
-  Global Instance devintr_caps_persistent γu γv γtx γdk γtl Φ γs pd pav pu :
-    Persistent (devintr_caps γu γv γtx γdk γtl Φ γs pd pav pu).
+  Global Instance devintr_caps_persistent γu γv γtx γdk γtl γs pd pav pu :
+    Persistent (devintr_caps γu γv γtx γdk γtl γs pd pav pu).
   Proof. rewrite /devintr_caps. apply _. Qed.
 
 End DevintrCaps.
@@ -161,7 +161,7 @@ Definition wp_devintr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
-    (Φ : mval -> iProp Σ) (γs : list gname) (pd pav pu : mword 64)
+    (γs : list gname) (pd pav pu : mword 64)
     (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (dq : dfrac) (sc : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.devintr in
@@ -175,7 +175,7 @@ Definition wp_devintr_sconf_body
   cpu_own lvl eb p C false -∗
   kernel_text -∗ pc_is pcE -∗
   scause ↦ᵣ{dq} sc -∗
-  devintr_caps γu γv γtx γdk γtl Φ γs pd pav pu -∗
+  devintr_caps γu γv γtx γdk γtl γs pd pav pu -∗
   ( ∀ mf : regfile,
       ⌜ callee_saved m mf /\ mf !!! Regidx (mword_of_int 10 : mword 5) = devintr_ret sc ⌝ -∗
       sie_cap_gpr mf av false p -∗
@@ -190,8 +190,8 @@ Module Type DEVINTR.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
-      (Φ : mval -> iProp Σ) (γs : list gname) (pd pav pu : mword 64)
+      (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (dq : dfrac) (sc : mword 64),
-      wp_devintr_sconf_body γu γv γtx γdk γtl Φ γs pd pav pu m av lvl eb p C dq sc.
+      wp_devintr_sconf_body γu γv γtx γdk γtl γs pd pav pu m av lvl eb p C dq sc.
 End DEVINTR.

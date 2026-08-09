@@ -598,7 +598,7 @@ Section ProofReparentLoop.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
 
   Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (spF pme pv ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac)
       (vra vs0 vs1 vs2 vs3 vs4 : mword 64)
@@ -608,7 +608,7 @@ Section ProofReparentLoop.
     length ps = NPROC ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (18 <= av)%nat ->
-    procs_inv Φ γs -∗
+    procs_inv γs -∗
     panic_wp_any -∗
     (* the exit continuation: control at the epilogue entry [reparent+0x46]. *)
     wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
@@ -904,7 +904,7 @@ Section ProofReparentLoop.
                      with "Hown") as "Hown".
         (* wakeup(initproc): everything it changes is invisible; [procs_inv] is
            persistent and the level round-trips. *)
-        iApply (Wakeup.wp_wakeup_sconf (CID := CIDp) Φ M40 γs
+        iApply (Wakeup.wp_wakeup_sconf (CID := CIDp)  M40 γs
                   (mycpu_ret (rget (CID := CIDp) M40 Rtp)) pme lvl av eb C b
                   ltac:(lia)
                   ltac:(intro r; apply rf_to_gmap_dom)
@@ -1035,9 +1035,9 @@ Section ProofReparent.
   Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
 
   Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
-      (Φ : mval -> iProp Σ) (m : regfile) (γs : list gname) (pme ip : mword 64)
+       (m : regfile) (γs : list gname) (pme ip : mword 64)
       (ps : list (mword 64)) (dqi : dfrac) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool)
-    : wp_reparent_sconf_body Φ m γs pme ip ps dqi lvl K eb C b.
+    : wp_reparent_sconf_body m γs pme ip ps dqi lvl K eb C b.
   Proof.
     cbv beta delta [wp_reparent_sconf_body].
     intros pcE pv rettgt HK Hdom Hlen Hlvl.
@@ -1051,7 +1051,7 @@ Section ProofReparent.
     iDestruct (cpu_own_transport CID0 CIDpro lvl eb pme C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     (* ---- the scan, with the epilogue as its exit continuation ---- *)
-    iPoseProof (rp_loop (CID0 := CIDpro) Φ γs
+    iPoseProof (rp_loop (CID0 := CIDpro)  γs
                   (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))))
                   pme pv ip ps dqi
                   (m !!! Regidx (mword_of_int 1 : mword 5)) (m !!! Regidx (mword_of_int 8 : mword 5))

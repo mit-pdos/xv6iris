@@ -190,7 +190,7 @@ Definition allocproc_post
 
 Definition wp_allocproc_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
@@ -206,7 +206,7 @@ Definition wp_allocproc_sconf_body
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on -∗
   wp_next b pme (fun (CID : CpuId) =>
@@ -225,7 +225,7 @@ Definition wp_allocproc_sconf_body
    LIVE code. *)
 Definition wp_allocproc_core_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
+    (γa : gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.allocproc in
@@ -236,7 +236,7 @@ Definition wp_allocproc_core_body
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   kalloc_env γa on -∗
   wp_next b pme (fun (CID : CpuId) =>
@@ -251,17 +251,15 @@ Definition wp_allocproc_core_body
 Module Type ALLOCPROC_GEN.
   Parameter wp_allocproc_core :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
-      (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+      (γa : gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_allocproc_core_body γa γp γf Φ γs m lvl K eb pme C on b.
+      wp_allocproc_core_body γa γp γf γs m lvl K eb pme C on b.
 End ALLOCPROC_GEN.
 
 Module Type ALLOCPROC.
   Parameter wp_allocproc_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γa : gname) (γp : gname) (γf : gname) (Φ : mval -> iProp Σ)
-      (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
+      (γa : gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
-      wp_allocproc_sconf_body γa γp γf Φ γs m lvl K eb pme C on b.
+      wp_allocproc_sconf_body γa γp γf γs m lvl K eb pme C on b.
 End ALLOCPROC.

@@ -70,7 +70,7 @@ Definition uartintr_stack : nat := 36%nat.
 Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γl : gname)
-    (Φ : mval -> iProp Σ) (γs : list gname)
+     (γs : list gname)
     (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.uartintr in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -86,7 +86,7 @@ Definition wp_uartintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG �
   dev_inv γu γv -∗
   is_txlock γl γu -∗
   (* the running-thread bundle (wakeup / consoleintr) *)
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   panic_wp_any -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ mf : regfile,
@@ -102,7 +102,7 @@ Module Type UARTINTR.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γl : gname)
-      (Φ : mval -> iProp Σ) (γs : list gname)
+      (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool),
-      wp_uartintr_sconf_body γu γv γl Φ γs m av lvl eb pme C b.
+      wp_uartintr_sconf_body γu γv γl γs m av lvl eb pme C b.
 End UARTINTR.

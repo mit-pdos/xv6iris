@@ -93,10 +93,10 @@ Section ProofSysWait.
   Notation Ra1 := (mword_of_int 11 : mword 5).
 
   Lemma wp_sys_wait_sconf
-      (γa γf γw : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64)
-    : wp_sys_wait_sconf_body γa γf γw Φ γs j γl m av eb C b pid V v0.
+    : wp_sys_wait_sconf_body γa γf γw γs j γl m av eb C b pid V v0.
   Proof.
     cbv beta delta [wp_sys_wait_sconf_body].
     intros pcE pj ret_tgt Hj Hgl Hv0 Hav Heb.
@@ -287,7 +287,7 @@ Section ProofSysWait.
       rewrite /B1 upd_ne; [| vm_compute; discriminate]. exact HAisp. }
     (* ===================== kwait(p) ===================== *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
-    iApply (Kwait.wp_kwait_sconf γa γf γw Φ γs j γl B2 (av - 4)%nat eb C b pid V
+    iApply (Kwait.wp_kwait_sconf γa γf γw γs j γl B2 (av - 4)%nat eb C b pid V
               Hj Hgl (sw_Kkw av Hav) Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hscheds Hpanic Hpark Hlk Henv Hpriv [-]").
     iIntros (CID11 Hk11 Mkw P' rv) "%Hkw %Hext Hcg Hcpu Hpc Hpark Hpriv".

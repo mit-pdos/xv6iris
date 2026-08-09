@@ -396,10 +396,10 @@ Section ProofDevintr.
   (* ================================================================== *)
   Lemma wp_devintr_sconf
       (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
-      (Φ : mval -> iProp Σ) (γs : list gname) (pd pav pu : mword 64)
+      (γs : list gname) (pd pav pu : mword 64)
       (m : regfile) (av lvl : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (dq : dfrac) (sc : mword 64)
-    : wp_devintr_sconf_body γu γv γtx γdk γtl Φ γs pd pav pu m av lvl eb p C dq sc.
+    : wp_devintr_sconf_body γu γv γtx γdk γtl γs pd pav pu m av lvl eb p C dq sc.
   Proof.
     cbv beta delta [wp_devintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav.
@@ -869,7 +869,7 @@ Section ProofDevintr.
         assert (HU0ra : U0 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x48) : mword 64) 4)
           by (rewrite /U0 upd_eq; reflexivity).
-        iApply (Uartintr.wp_uartintr_sconf γu γv γtx Φ γs U0 (av - 4)%nat lvl eb p C false
+        iApply (Uartintr.wp_uartintr_sconf γu γv γtx γs U0 (av - 4)%nat lvl eb p C false
                   Hlen ltac:(lia) ltac:(unfold devintr_stack, uartintr_stack in *; lia)
                   with "Hcg Hcnt Htext Hpc Hdev Htx Hpinv Hpanic [-]").
         iApply wp_next_off_intro. iIntros (MU) "%HcsU Hcg Hcnt Hpc".
@@ -976,7 +976,7 @@ Section ProofDevintr.
         assert (HV1ra : V1 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x4e) : mword 64) 4)
           by (rewrite /V1 upd_eq; reflexivity).
-        iApply (VirtioDiskIntr.wp_virtio_disk_intr_sconf Φ γs γu γv γdk pd pav pu
+        iApply (VirtioDiskIntr.wp_virtio_disk_intr_sconf γs γu γv γdk pd pav pu
                   V1 (av - 4)%nat lvl eb p C false
                   ltac:(unfold devintr_stack, K_virtio_disk_intr in *; lia)
                   ltac:(intro r; apply rf_to_gmap_dom) Hlen ltac:(lia)
@@ -1137,7 +1137,7 @@ Section ProofDevintr.
         assert (HK0ra : K0 !!! Regidx ra_idx
                         = add_vec_int (mword_of_int (KernelSyms.devintr + 0x6e) : mword 64) 4)
           by (rewrite /K0 upd_eq; reflexivity).
-        iApply (Clockintr.wp_clockintr_sconf Φ γtl γs K0 lvl eb p C (av - 4)%nat
+        iApply (Clockintr.wp_clockintr_sconf γtl γs K0 lvl eb p C (av - 4)%nat
                   ltac:(lia) ltac:(unfold devintr_stack in Hav; lia)
                   with "Hcg Hcnt Htext Hpc Htcap Htk [-]").
         iIntros (MC) "%HcsC Hcg Hcnt Hpc Htk2".

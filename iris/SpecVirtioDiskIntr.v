@@ -47,7 +47,7 @@ Definition K_virtio_disk_intr : nat := 22%nat.
 Definition wp_virtio_disk_intr_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γs : list gname)
+     (γs : list gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
     (pd pav pu : mword 64)
     (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :=
@@ -60,7 +60,7 @@ Definition wp_virtio_disk_intr_sconf_body
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗ procs_inv Φ γs -∗
+  panic_wp_any -∗ procs_inv γs -∗
   dev_inv γu γd -∗
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -77,9 +77,9 @@ Module Type VIRTIODISKINTR.
   Parameter wp_virtio_disk_intr_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname)
+       (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (m : regfile) (K lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool),
-      wp_virtio_disk_intr_sconf_body Φ γs γu γd γk pd pav pu m K lvl eb pme C b.
+      wp_virtio_disk_intr_sconf_body γs γu γd γk pd pav pu m K lvl eb pme C b.
 End VIRTIODISKINTR.

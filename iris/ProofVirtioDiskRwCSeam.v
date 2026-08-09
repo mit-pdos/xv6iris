@@ -96,7 +96,7 @@ Section ProofVirtioDiskRwCSeam.
   (* The ORIGINAL [fr] facts still travel: P4's window argument needs the  *)
   (* fourth disjoint triple to be free before the allocator cleared it.    *)
   (* ------------------------------------------------------------------- *)
-  Definition vdrw_p3_exit (CID0 : CPU) (γk : gname) (Φ : mval -> iProp Σ)
+  Definition vdrw_p3_exit (CID0 : CPU) (γk : gname) 
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -126,7 +126,7 @@ Section ProofVirtioDiskRwCSeam.
        WP (Loop : expr riscv_lang)))%I.
 
   (* P3, packaged as the wand P2.3 consumes. *)
-  Lemma wp_vdrw_p3_seam (γk : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_vdrw_p3_seam (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (wr sector : SailStdpp.Values.mword 64)
@@ -134,8 +134,8 @@ Section ProofVirtioDiskRwCSeam.
     kernel_text -∗
     disk_geom γd pd pav pu -∗
     b_disk b ↦₄ dsk0 -∗
-    vdrw_p3_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
-    P2.vdrw_p2_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector m0.
+    vdrw_p3_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector m0 -∗
+    P2.vdrw_p2_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector m0.
   Proof.
     iIntros "#Htext #Hgeom Hbd Hexit".
     rewrite /P2.vdrw_p2_exit.

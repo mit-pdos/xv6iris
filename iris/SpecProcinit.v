@@ -148,7 +148,7 @@ End SpecProcinit.
 Section ProcinitSeals.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (γ : gname) (Φ : mval -> iProp Σ) (γs : list gname).
+  Context (γ : gname)  (γs : list gname).
 
   (* ---- what the postcondition is FOR ----
      One [proc_ready i], plus the two public cells procinit does not touch,
@@ -166,7 +166,7 @@ Section ProcinitSeals.
     pstate_lock (proc_addr i) UNUSED -∗
     lk_fresh (proc_addr i) "proc"%string ∗
     p_kstack (proc_addr i) ↦₈ kstack_va i ∗
-    proc_lock_res Φ γs γl (proc_addr i).
+    proc_lock_res γs γl (proc_addr i).
   Proof.
     iIntros "(Hlk & Hst & Hks & Hdorm) Hch Hpub Hpark Hg".
     iFrame "Hlk Hks".
@@ -190,7 +190,7 @@ End ProcinitSeals.
 (*  [γs] is EXISTENTIAL in the conclusion, so this section must not     *)
 (*  have it as a section variable (which is why it is not in            *)
 (*  ProcinitSeals).  That existential is also the whole difficulty:     *)
-(*  every proc lock's resource [proc_lock_res Φ γs _ _] mentions the   *)
+(*  every proc lock's resource [proc_lock_res γs _ _] mentions the   *)
 (*  list of all 64 names (through [p_sched]), so the names have to be    *)
 (*  chosen BEFORE any invariant is allocated -- hence                    *)
 (*  [WpLock.newlock_delayed] and the two passes below.                  *)
@@ -198,7 +198,7 @@ End ProcinitSeals.
 Section ProcinitProcsInv.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context (γ : gname) (Φ : mval -> iProp Σ).
+  Context (γ : gname) .
 
   (* [lk_fresh] in the three pieces [newlock]/[newlock_delayed] take.  The
      only content is that [lk_cpu] and [WpLock.lock_cpu] are the same address
@@ -269,7 +269,7 @@ Section ProcinitProcsInv.
        ((proc_ready i ∗ (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
          proc_pub (proc_addr i)) ∗ park_full i false) ∗
        pstate_full i UNUSED)
-    ={E}=∗ ∃ γs : list gname, procs_inv Φ γs.
+    ={E}=∗ ∃ γs : list gname, procs_inv γs.
   Proof.
     iIntros "Hin".
     (* 1. peel [lk_fresh] out of each [proc_ready] *)
@@ -297,15 +297,15 @@ Section ProcinitProcsInv.
                  (fun i g => ((∀ R : iProp Σ, R ={E}=∗ is_lock g (proc_addr i) "proc"%string R)
                               ∗ proc_res i)%I)
                  (fun i g => (|={E}=> is_lock g (proc_addr i) "proc"%string
-                                        (proc_lock_res Φ γs g (proc_addr i)) ∗
+                                        (proc_lock_res γs g (proc_addr i)) ∗
                                       ∃ ks : mword 64, is_kstack (proc_addr i) ks)%I)
                  γs with "Hmk []") as "Hmk".
     { iIntros "!>" (i g _) "[Hmk (Hks & Hst & Hch & Hpub & Hdorm & Hpark & Hg)]".
       iMod (word_pointsto_persist with "Hks") as "#Hksp".
       iDestruct "Hch" as (ch) "Hch".
-      iMod ("Hmk" $! (proc_lock_res Φ γs g (proc_addr i))
+      iMod ("Hmk" $! (proc_lock_res γs g (proc_addr i))
               with "[Hst Hg Hch Hpub Hdorm Hpark]") as "#Hlk".
-      { iApply (proc_lock_res_intro Φ γs g (proc_addr i) UNUSED ch
+      { iApply (proc_lock_res_intro γs g (proc_addr i) UNUSED ch
                   with "Hst Hg Hch Hpub [Hdorm Hpark]").
         iApply (proc_slots_unused_intro with "Hdorm Hpark"). }
       iModIntro. iFrame "Hlk". iExists (kstack_va i). iExact "Hksp". }

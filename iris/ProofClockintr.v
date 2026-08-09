@@ -303,9 +303,9 @@ Section ProofClockintr.
   (* ================================================================== *)
   (* THE WHOLE FUNCTION.                                                 *)
   (* ================================================================== *)
-  Lemma wp_clockintr_sconf (Φ : mval -> iProp Σ) (γl : gname) (γs : list gname)
+  Lemma wp_clockintr_sconf  (γl : gname) (γs : list gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat)
-    : wp_clockintr_sconf_body Φ γl γs m n eb p C av.
+    : wp_clockintr_sconf_body γl γs m n eb p C av.
   Proof.
     cbv beta delta [wp_clockintr_sconf_body].
     intros pcE ret_tgt Hn Hav.
@@ -634,7 +634,7 @@ Section ProofClockintr.
         rewrite (callee_saved_lookup HcsA csp_rs1 ltac:(vm_compute; reflexivity)).
         exact HB2sp. }
       (* ===================== wakeup(&ticks) ===================== *)
-      iApply (Wakeup.wp_wakeup_sconf Φ D5 γs (mycpu_ret (rget D5 Rtp)) p
+      iApply (Wakeup.wp_wakeup_sconf D5 γs (mycpu_ret (rget D5 Rtp)) p
                 (S n) (av - 2)%nat eb C false
                 ltac:(lia)
                 ltac:(intro r; apply rf_to_gmap_dom)

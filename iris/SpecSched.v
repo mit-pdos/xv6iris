@@ -60,7 +60,7 @@ Import Defs.
 
 
 Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
     (m : regfile) (av : nat) (eb : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sched in
@@ -100,7 +100,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      [outb = eb = true]).  There is consequently no [b] binder left. *)
   sie_cap_gpr m av false pj -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   proc_held cpu_id j γl st ch -∗
   (* WHAT THE PARKED SLOT OWES BESIDES THE SAVED CONTEXT (SchedCtx.park_pay):
      [emp] at a resumable park -- the private block stays in the parking
@@ -118,7 +118,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      stash is about the wrong hart's ghost). *)
   cpu_own 1 eb pj emp false -∗
   own_ctx (p_context pj) -∗
-  ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+  ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
   wp_next true pj (fun (CID : CpuId) =>
     ∀ (mf : regfile) (ch' : mword 64),
       ⌜callee_saved m mf⌝ -∗
@@ -129,15 +129,15 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       intr_handler_avail -∗
       cpu_own 1 eb pj emp false -∗
       own_ctx (p_context pj) -∗
-      ▷ sched_vc Φ γs (a_cpu_ctx cid_word) pj -∗
+      ▷ sched_vc γs (a_cpu_ctx cid_word) pj -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SCHED.
   Parameter wp_sched_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool),
-      wp_sched_sconf_body Φ γs j γl st ch m av eb.
+      wp_sched_sconf_body γs j γl st ch m av eb.
 End SCHED.

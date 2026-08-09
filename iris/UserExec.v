@@ -329,7 +329,7 @@ Section UserExec.
 
   (* the assumed kernel re-entry contract: the handler at stvec (uservec)
      handles ANY trapped-out-of-user machine *)
-  Definition stvec_handler_wp (Φ : mval -> iProp Σ) : iProp Σ :=
+  Definition stvec_handler_wp  : iProp Σ :=
     (user_trap_frame -∗ WP (Loop : expr riscv_lang))%I.
 
   (* ------------------------------------------------------------------- *)
@@ -338,7 +338,7 @@ Section UserExec.
   (* after consuming one physical step).  The conjunction is ADDITIVE: the *)
   (* prover case-analyzes the machine first and selects exactly one arm.   *)
   (* ------------------------------------------------------------------- *)
-  Definition user_step_obligation (Φ : mval -> iProp Σ) : iProp Σ :=
+  Definition user_step_obligation  : iProp Σ :=
     (□ (user_inv -∗
         ▷ ((user_inv -∗ WP (Loop : expr riscv_lang)) ∧
            (user_trap_frame -∗ WP (Loop : expr riscv_lang))) -∗
@@ -349,7 +349,7 @@ Section UserExec.
      pc in lock-step ([user_step_obligation_holds], UserStep.v, discharges
      the WAITING case -- the WRS stay/wake steps -- so this is all that is
      left to prove) *)
-  Definition user_step_obligation_active (Φ : mval -> iProp Σ) : iProp Σ :=
+  Definition user_step_obligation_active  : iProp Σ :=
     (□ (∀ (ms_v sc_v stval_v sepc_v va : mword 64)
           (g : regfile),
         ⌜user_mstatus_ok ms_v⌝ -∗
@@ -363,10 +363,10 @@ Section UserExec.
   (* ------------------------------------------------------------------- *)
   (* The capstone: safety of arbitrary user-mode execution, by Löb.        *)
   (* ------------------------------------------------------------------- *)
-  Theorem wp_user_exec (Φ : mval -> iProp Σ) :
-    user_step_obligation Φ -∗
+  Theorem wp_user_exec  :
+    user_step_obligation -∗
     user_inv -∗
-    stvec_handler_wp Φ -∗
+    stvec_handler_wp -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "#Hstep".

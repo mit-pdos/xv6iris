@@ -176,7 +176,7 @@ Definition wp_printk_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ}
 Definition printk_gen_contract `{!riscvGS Σ, !sieG Σ, !lockG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId}
     (γpr : gname) (γd : uart_names) (γv : disk_names) : Prop :=
-  forall (CIDp : CpuId) (Φ : mval -> iProp Σ)
+  forall (CIDp : CpuId) 
     (m0 : regfile) (K : nat) (eb : bool) (pj : mword 64) (C : iProp Σ)
     (dqf : dfrac) (f : string) (descs : list pk_arg_desc) (b : bool),
     wp_printk_gen_sconf_body (CID := CIDp) γpr γd γv m0 K eb pj C dqf f descs b.

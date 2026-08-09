@@ -48,7 +48,7 @@ Import Defs.
 
 
 Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γs : list gname)
+    (γs : list gname)
     (γl : gname) (γp : pipe_names) (w : bool)
     (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
     (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
@@ -76,7 +76,7 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   is_lock γkl klk "kmem"%string (kmem_res γk kfl) -∗
   kalloc_avail γk on -∗
   (* wakeup's *)
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   panic_wp_any -∗
   wp_next b pme (fun (CID : CpuId) =>
   ∀ mr,
@@ -93,10 +93,10 @@ Definition wp_pipeclose_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type PIPECLOSE.
   Parameter wp_pipeclose_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !pipeG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname)
+      (γs : list gname)
       (γl : gname) (γp : pipe_names) (w : bool)
       (γkl : gname) (γk : gname * gname) (klk kfl : mword 64) (on : option nat)
       (m : regfile) (n : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (av : nat)
       (b : bool),
-      wp_pipeclose_sconf_body Φ γs γl γp w γkl γk klk kfl on m n eb pme C av b.
+      wp_pipeclose_sconf_body γs γl γp w γkl γk klk kfl on m n eb pme C av b.
 End PIPECLOSE.

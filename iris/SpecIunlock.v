@@ -67,7 +67,7 @@ Definition wp_iunlock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
       !fsLogG Σ, !inodeG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (gs : list gname)
     (gfs : fs_names) (gi : gname)
     (gil gisl : gname)
@@ -97,7 +97,7 @@ Definition wp_iunlock_sconf_body
   p_pid p ↦₄{dq} pidv -∗
   i_ref ip ↦₄{dqr} refv -∗
   (* wakeup's resources (releasesleep wakes the lock's sleepers) *)
-  procs_inv Φ gs -∗
+  procs_inv gs -∗
   (* THE LOCKED INODE, surrendered back into the lock *)
   inode_locked gfs gi cov logstart ip dn bm -∗
   wp_next b p (fun (CID : CpuId) =>
@@ -118,7 +118,7 @@ Module Type IUNLOCK.
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
              !fsLogG Σ, !inodeG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (gs : list gname)
       (gfs : fs_names) (gi : gname)
       (gil gisl : gname)
@@ -128,6 +128,6 @@ Module Type IUNLOCK.
       (pidv : mword 32) (dq dqr : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (b : bool),
-      wp_iunlock_sconf_body Φ gs gfs gi gil gisl cov logstart ip refv dn bm
+      wp_iunlock_sconf_body gs gfs gi gil gisl cov logstart ip refv dn bm
                             pidv dq dqr m K eb p C b.
 End IUNLOCK.

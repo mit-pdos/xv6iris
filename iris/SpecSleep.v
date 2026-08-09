@@ -61,7 +61,7 @@ Import Defs.
 
 
 Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
@@ -94,8 +94,8 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
      re-acquire extracts them back -- the pay must ride the spec. *)
   arm_pay 0 eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   (* the caller's condition lock, HELD (acquired on this cpu) *)
   is_lock γk lka sk Rk -∗
   locked γk cpu_id -∗
@@ -121,11 +121,11 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_sleep_sconf_body Φ γs j γl γk lka sk Rk m av eb C.
+      wp_sleep_sconf_body γs j γl γk lka sk Rk m av eb C.
 End SLEEP.
 
 (* ===================================================================== *)
@@ -148,7 +148,7 @@ End SLEEP.
    [wp_sleep_sconf_body] is the [Tk := emp], [Dk := False] instance
    (via WpLock.is_lock_openable); ProofSleep.SleepOfGen restates it. *)
 Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
@@ -176,8 +176,8 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* same pay note as [wp_sleep_sconf_body]: the interior pop reaches 0 *)
   arm_pay 0 eb pj -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   (* the caller's condition lock, HELD, with the credential *)
   lock_openable γk lka Rk Dk -∗
   Tk -∗
@@ -206,9 +206,9 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 Module Type SLEEP_GEN.
   Parameter wp_sleep_gen_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_sleep_gen_sconf_body Φ γs j γl γk lka Rk Tk Dk m av eb C.
+      wp_sleep_gen_sconf_body γs j γl γk lka Rk Tk Dk m av eb C.
 End SLEEP_GEN.

@@ -515,7 +515,7 @@ Section PwConts.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ}.
 
   (* +0x58: the common epilogue (mv a0,s2; reload ra/s0..s5; pop; ret). *)
-  Definition pw_epi `{GEN : GenId} (CID0 : CPU) (γf : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+  Definition pw_epi `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 : mword 64) : iProp Σ :=
@@ -536,7 +536,7 @@ Section PwConts.
 
   (* +0xd8: wakeup(&pi->nread); release(&pi->lock); jump to the epilogue.  Three
      paths land here: the n <= 0 arm, the loop exit and the copyin failure. *)
-  Definition pw_tail `{GEN : GenId} (CID0 : CPU) (γf : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+  Definition pw_tail `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
@@ -561,7 +561,7 @@ Section PwConts.
 
   (* +0x46: release(&pi->lock); i := -1; reload s6..s10; fall into the
      epilogue.  Reached when readopen == 0 or the process was killed. *)
-  Definition pw_minus1 `{GEN : GenId} (CID0 : CPU) (γf : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+  Definition pw_minus1 `{GEN : GenId} (CID0 : CPU) (γf : gname)  (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
@@ -585,15 +585,15 @@ Section PwConts.
 
   (* exactly ONE of the two is taken, so they are offered as a conjunction and
      SHARE the epilogue closure. *)
-  Definition pw_exits `{GEN : GenId} (CID0 : CPU) (γf : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+  Definition pw_exits `{GEN : GenId} (CID0 : CPU) (γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi : mword 64) : iProp Σ :=
-    (pw_tail CID0 γf Φ γs j γl γp w q m av eb C pid V n sp0 pi
-     ∧ pw_minus1 CID0 γf Φ γs j γl γp w q m av eb C pid V n sp0 pi)%I.
+    (pw_tail CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi
+     ∧ pw_minus1 CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi)%I.
 
   (* +0x7e: the loop BODY, entered with 0 <= i < n. *)
-  Definition pw_loop `{GEN : GenId} (CID0 : CPU) (γa γf : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+  Definition pw_loop `{GEN : GenId} (CID0 : CPU) (γa γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi addr : mword 64) : iProp Σ :=
@@ -615,7 +615,7 @@ Section PwConts.
        proc_priv γf (proc_addr j) pid (upd_upt V Pc) -∗
        kalloc_env γa None -∗
        running_claim j -∗
-       pw_exits CID0 γf Φ γs j γl γp w q m av eb C pid V n sp0 pi -∗
+       pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
        WP (Loop : expr riscv_lang)))%I.
 
 End PwConts.
@@ -768,7 +768,7 @@ Section PwGuard.
     iApply (pw_hi_intro sp0 with "F8 F9 F10 F11 F12 HCH").
   Qed.
 
-  Lemma pw_guard_step (CID0 : CPU) (γa γf : gname) (Φ : mval -> iProp Σ) (γs : list gname) (j : nat)
+  Lemma pw_guard_step (CID0 : CPU) (γa γf : gname) (γs : list gname) (j : nat)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (sp0 pi addr : mword 64)
@@ -789,8 +789,8 @@ Section PwGuard.
     proc_priv γf (proc_addr j) pid (upd_upt V Pc) -∗
     kalloc_env γa None -∗
     running_claim j -∗
-    pw_exits CID0 γf Φ γs j γl γp w q m av eb C pid V n sp0 pi -∗
-    pw_loop CID0 γa γf Φ γs j γl γp w q m av eb C pid V n sp0 pi addr -∗
+    pw_exits CID0 γf γs j γl γp w q m av eb C pid V n sp0 pi -∗
+    pw_loop CID0 γa γf γs j γl γp w q m av eb C pid V n sp0 pi addr -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn0 Hn31 Hi Hanch Hext Hregs.
@@ -907,12 +907,12 @@ Section ProofPipewrite.
      typeclass search once the base enable is the literal [true]. *)
   Local Typeclasses Opaque cpu_own.
 
-  Lemma wp_pipewrite_sconf (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_pipewrite_sconf (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool)
-    : wp_pipewrite_sconf_body γa γf Φ γs j γlp γl γp w q m av eb C pid V n b.
+    : wp_pipewrite_sconf_body γa γf γs j γlp γl γp w q m av eb C pid V n b.
   Proof.
     cbv beta delta [wp_pipewrite_sconf_body].
     intros pcE pj pi ret_tgt Hj Hjlp Hlen Ha2 Hnrange Hav Heb. subst eb.
@@ -935,7 +935,7 @@ Section ProofPipewrite.
     (* ================================================================= *)
     (* EPI -- the common epilogue at +0x58.                              *)
     (* ================================================================= *)
-    iAssert (pw_epi CID γf Φ γs j γp w q m av true C pid V n sp0) with "[Hcont]" as "EPI".
+    iAssert (pw_epi CID γf γs j γp w q m av true C pid V n sp0) with "[Hcont]" as "EPI".
     { rewrite /pw_epi. iIntros (CIDep Hsep M P') "%Hbr %Hrw %Hext (Hc1 & Hc2 & Hc3 & Hc4 & Hc5 & Hc6 & Hc7) Hhi Hcg Hown Hpc Href Hpriv Hpark".
       destruct Hbr as (Hsp & B6 & B7 & B8 & B9 & B10 & B11).
       assert (Hb1 : add_vec (pa_stk sp0 14%nat) (zero_extend' 64 (concat_vec (mword_of_int 13 : mword 6) ('b"000"))) = pa_stk sp0 1%nat)
@@ -1168,7 +1168,7 @@ Section ProofPipewrite.
     (* EXITS -- the +0xd8 tail and the +0x46 (-1) arm, CONJOINED: exactly *)
     (* one of them is taken, so they must SHARE the epilogue closure.     *)
     (* ================================================================= *)
-    iAssert (pw_exits CID γf Φ γs j γl γp w q m av true C pid V n sp0 pi) with "[EPI]" as "EXITS".
+    iAssert (pw_exits CID γf γs j γl γp w q m av true C pid V n sp0 pi) with "[EPI]" as "EXITS".
     { rewrite /pw_exits. iSplit.
       - (* ---------------- +0xd8: wakeup(&pi->nread); release ---------------- *)
         rewrite /pw_tail. iIntros (CIDtl Hstl).
@@ -1202,7 +1202,7 @@ Section ProofPipewrite.
         assert (Hwnz : eq_vec (zero_reg : mword 64) (mycpu_ret (rget T2 Rtp)) = false)
           by (rewrite rget_tp; apply mycpu_ret_nonzero; apply tp_ok_cid).
         assert (Hwlvl : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
-        iApply (Wakeup.wp_wakeup_sconf Φ T2 γs (mycpu_ret cid_word) (proc_addr j) 1%nat (av - 14)%nat true C false
+        iApply (Wakeup.wp_wakeup_sconf T2 γs (mycpu_ret cid_word) (proc_addr j) 1%nat (av - 14)%nat true C false
                   HwK HwdomW Hlen Hwa0f Hwnz Hwlvl
                   with "Hcg Hown Htext Hpc Hpanic Hpinv [-]").
         iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
@@ -1924,7 +1924,7 @@ Section ProofPipewrite.
       (* ================================================================= *)
       (* THE LOOP (iLöb at the body, +0x7e)                                 *)
       (* ================================================================= *)
-      iAssert (pw_loop CID γa γf Φ γs j γl γp w q m av true C pid V n sp0 pi addr) with "[]" as "LOOP".
+      iAssert (pw_loop CID γa γf γs j γl γp w q m av true C pid V n sp0 pi addr) with "[]" as "LOOP".
       { iLöb as "IH". rewrite /pw_loop.
         iIntros (CIDlp Hslp i M Pc) "%Hi %Hext %Hregs HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv _ Hpark HEX".
         pose proof Hregs as Hregs2.
@@ -2010,7 +2010,7 @@ Section ProofPipewrite.
             rewrite Hs3L1. apply add_vec_zero_l. }
           assert (Hlvl1 : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
           assert (Hav14 : (14 <= av - 14)%nat) by lia.
-          iApply (Killed.wp_killed_sconf Φ γs j γlp L3 (av - 14)%nat 1%nat true (proc_addr j) C false
+          iApply (Killed.wp_killed_sconf γs j γlp L3 (av - 14)%nat 1%nat true (proc_addr j) C false
                     Ha0L3 Hj Hjlp Hlvl1 Hav14
                     with "Hcg Hown Htext Hpc Hpinv Hpanic [-]").
           iApply wp_next_off_intro. iIntros (K0 kl) "%Hkfacts Hcg Hown Hpc". rgall.
@@ -2166,7 +2166,7 @@ Section ProofPipewrite.
               assert (Hwnz : eq_vec (zero_reg : mword 64) (mycpu_ret (rget F2 Rtp)) = false)
           by (rewrite rget_tp; apply mycpu_ret_nonzero; apply tp_ok_cid).
               assert (Hwlvl : (Z.of_nat 1%nat + 1 < 2 ^ 31)%Z) by (rewrite H31; lia).
-              iApply (Wakeup.wp_wakeup_sconf Φ F2 γs (mycpu_ret cid_word) (proc_addr j) 1%nat (av - 14)%nat true C false
+              iApply (Wakeup.wp_wakeup_sconf F2 γs (mycpu_ret cid_word) (proc_addr j) 1%nat (av - 14)%nat true C false
                         HwK HwdomF Hlen Hwa0f Hwnz Hwlvl
                         with "Hcg Hown Htext Hpc Hpanic Hpinv [-]").
               iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
@@ -2223,7 +2223,7 @@ Section ProofPipewrite.
                   by (apply bv_eq; vm_compute; reflexivity).
                 apply kv_addv_zero. }
               assert (Hav22 : (22 <= av - 14)%nat) by lia.
-              iApply (SleepGen.wp_sleep_gen_sconf Φ γs j γlp γl pi (pipe_res γp pi)
+              iApply (SleepGen.wp_sleep_gen_sconf γs j γlp γl pi (pipe_res γp pi)
                         (pipe_ref γp w q) (pipe_dead γl γp) G3 (av - 14)%nat true C
                         Hj Hjlp HlkaG3 eq_refl Hav22
                         ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_dead)
@@ -2244,7 +2244,7 @@ Section ProofPipewrite.
               assert (HregsMs : pw_loop_regs m Ms (pa_stk sp0 14%nat) sp0 pi (proc_addr j) addr n i).
               { apply (pw_loop_regs_cs m G3 Ms (pa_stk sp0 14%nat) sp0 pi (proc_addr j) addr n i Hscs).
                 apply (pw_loop_regs_cs m Mw G3 (pa_stk sp0 14%nat) sp0 pi (proc_addr j) addr n i HcsMwG3 HregsMw). }
-              iApply (pw_guard_step (CID := CIDsl) CID γa γf Φ γs j γl γp w q m av true C pid V n sp0 pi addr i Ms Pc
+              iApply (pw_guard_step (CID := CIDsl) CID γa γf γs j γl γp w q m av true C pid V n sp0 pi addr i Ms Pc
                         Hn0 Hn31 ltac:(lia) ltac:(wp_next_chain) Hext HregsMs
                         with "Htext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv Hpark HEX IH").
             * (* ======== NOT full: copy one byte in ======== *)
@@ -2650,7 +2650,7 @@ Section ProofPipewrite.
                                   (sign_extend' 64 (sign_extend' 21 (concat_vec (mword_of_int 2007 : mword 11) ('b"0"))))
                                 = mword_of_int (KernelSyms.pipewrite + 0x7a)) by (apply bv_eq; vm_compute; reflexivity).
                  iEval (rewrite Hj7a) in "Hpc".
-                 iApply (pw_guard_step (CID := CIDlp) CID γa γf Φ γs j γl γp w q m av true C pid V n sp0 pi addr
+                 iApply (pw_guard_step (CID := CIDlp) CID γa γf γs j γl γp w q m av true C pid V n sp0 pi addr
                            (i + 1)%Z P6 P' Hn0 Hn31 ltac:(lia) ltac:(wp_next_chain) Hext' HregsP6
                            with "Htext HF7 HF5 HCH Hcg Hown Hpay Hlocked Hres Hpc Href Hpriv Henv Hpark HEX IH"). }
       (* ---- +0x44 c.j -> the loop body, with i = 0 ---- *)

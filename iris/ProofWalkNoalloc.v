@@ -173,7 +173,7 @@ Section ProofWalkNoalloc.
   (* ================================================================= *)
   (* THE SHARED EPILOGUE (+0x52..+0x64).                                *)
   (* ================================================================= *)
-  Local Lemma wp_wkn_epilogue `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wp_wkn_epilogue `{CID0 : CpuId} 
       (mm Mf : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
       (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -438,7 +438,7 @@ Section ProofWalkNoalloc.
   (* ================================================================= *)
   (* THE alloc = 0 ARM (+0x72 -> +0x96 -> +0x98 -> the epilogue).        *)
   (* ================================================================= *)
-  Local Lemma wp_wkn_fail `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wp_wkn_fail `{CID0 : CpuId} 
       (mm Mf : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
       (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -536,7 +536,7 @@ Section ProofWalkNoalloc.
     { rewrite /F1. rewrite upd_ne; [| reg_neq]. exact Hx27. }
     assert (HF1a0 : F1 !!! Regidx (mword_of_int 10 : mword 5) = mword_of_int 0).
     { rewrite /F1 upd_eq. reflexivity. }
-    iApply (wp_wkn_epilogue Φ mm F1 t m K dq b p HK HspF1 HF1x4
+    iApply (wp_wkn_epilogue mm F1 t m K dq b p HK HspF1 HF1x4
               HF1x23 HF1x24 HF1x25 HF1x26 HF1x27
               ltac:(left; split; [exact HF1a0 | exact Hmv])
               with "Hcg Htext Hpc
@@ -550,7 +550,7 @@ Section ProofWalkNoalloc.
   (* ================================================================= *)
   (* THE SHARED TAIL (+0x46..+0x50) then the epilogue.                   *)
   (* ================================================================= *)
-  Local Lemma wp_wkn_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wp_wkn_tail `{CID0 : CpuId} 
       (mm Mf : regfile) (t : ptree) (m : gmap (mword 27) (mword 64))
       (b0 : mword 44) (K : nat) (dq : dfrac) (b : bool) (p : mword 64) :
     let va := mm !!! Regidx (mword_of_int 11) in
@@ -697,7 +697,7 @@ Section ProofWalkNoalloc.
       right. exists p2, p1, w0.
       split; [exact Hl0 |].
       split; [rewrite HT4a0 Heq; reflexivity | exact Hm0]. }
-    iApply (wp_wkn_epilogue Φ mm T4 t m K dq b p HK HspT4 HT4x4
+    iApply (wp_wkn_epilogue mm T4 t m K dq b p HK HspT4 HT4x4
               HT4x23 HT4x24 HT4x25 HT4x26 HT4x27 Hpay
               with "Hcg Htext Hpc
                     Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
@@ -710,7 +710,7 @@ Section ProofWalkNoalloc.
   (* ================================================================= *)
   (* THE LOOP BODY'S STRAIGHT-LINE CORE (+0x26..+0x36).                 *)
   (* ================================================================= *)
-  Local Lemma wp_wkn_probe `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wp_wkn_probe `{CID0 : CpuId} 
       (M : regfile) (n : nat) (va shift : mword 64) (slotaddr pte : mword 64) (b : bool) (p : mword 64) {dqm : dfrac} :
     M !!! Regidx (mword_of_int 19 : mword 5) = va ->
     M !!! Regidx (mword_of_int 20 : mword 5) = shift ->
@@ -1152,7 +1152,7 @@ Section ProofWalkNoalloc.
     iDestruct (ptree_own_cell_ro 1 dq t (vpn_idx 2 vpn) with "Hptree") as "[Hslot Hback2]".
     iDestruct (pt_slot_phys_to_mem (pt_base t) (vpn_idx 2 vpn) dq
                  (pt_ents t (vpn_idx 2 vpn)) with "Hcl2 Hslot") as "Hslot".
-    iApply (wp_wkn_probe (fun _ => True%I) W9 (K - 8)%nat va (mword_of_int 30 : mword 64)
+    iApply (wp_wkn_probe W9 (K - 8)%nat va (mword_of_int 30 : mword 64)
               (u_pte_addr (pt_base t) (vpn_idx 2 vpn)) (pt_ents t (vpn_idx 2 vpn)) b p
               (dqm:=dq) HW9s3 HW9s4
               ltac:(rewrite HW9s1; exact (walk_slot_addr2 (pt_base t) va Hva'))
@@ -1201,7 +1201,7 @@ Section ProofWalkNoalloc.
       iNext. iIntros (CID20 Hw20) "Hcg Hpc".
       assert (Htgt72 : add_vec (mword_of_int (KernelSyms.walk + 0x3a) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.walk + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt72) in "Hpc".
-      iApply (wp_wkn_fail (fun _ => True%I) mm M6 t m K dq b p HK HspM6 HM6s6 HM6x4
+      iApply (wp_wkn_fail mm M6 t m K dq b p HK HspM6 HM6s6 HM6x4
                 HM6x23 HM6x24 HM6x25 HM6x26 HM6x27 Hmv
                 with "Hcg Htext Hpc
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
@@ -1292,7 +1292,7 @@ Section ProofWalkNoalloc.
     iDestruct (ptree_own_cell_ro 0 dq c1 (vpn_idx 1 vpn) with "Hownc1") as "[Hslot Hback1]".
     iDestruct (pt_slot_phys_to_mem (pt_base c1) (vpn_idx 1 vpn) dq
                  (pt_ents c1 (vpn_idx 1 vpn)) with "Hcl1 Hslot") as "Hslot".
-    iApply (wp_wkn_probe (fun _ => True%I) M9 (K - 8)%nat va (mword_of_int 21 : mword 64)
+    iApply (wp_wkn_probe M9 (K - 8)%nat va (mword_of_int 21 : mword 64)
               (u_pte_addr (pt_base c1) (vpn_idx 1 vpn)) (pt_ents c1 (vpn_idx 1 vpn)) b p
               (dqm:=dq) HM9s3 HM9s4
               ltac:(rewrite HM9s1; exact (walk_slot_addr1 (pt_base c1) va Hva'))
@@ -1340,7 +1340,7 @@ Section ProofWalkNoalloc.
       iNext. iIntros (CID27 Hw27) "Hcg Hpc".
       assert (Htgt72 : add_vec (mword_of_int (KernelSyms.walk + 0x3a) : mword 64) (sign_extend' 64 (sign_extend' 13 (concat_vec (mword_of_int 28 : mword 8) ('b"0")))) = mword_of_int (KernelSyms.walk + 0x72)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Htgt72) in "Hpc".
-      iApply (wp_wkn_fail (fun _ => True%I) mm N6 t m K dq b p HK HspN6 HN6s6 HN6x4
+      iApply (wp_wkn_fail mm N6 t m K dq b p HK HspN6 HN6s6 HN6x4
                 HN6x23 HN6x24 HN6x25 HN6x26 HN6x27 Hmv
                 with "Hcg Htext Hpc
                       Hc56 Hc48 Hc40 Hc32 Hc24 Hc16 Hc08 Hc00
@@ -1428,7 +1428,7 @@ Section ProofWalkNoalloc.
       split; [reflexivity |]. split; [reflexivity |]. split; [reflexivity |].
       split; [rewrite /pte2; exact Hb12 |]. split; [rewrite /pte1; exact Hb01 |].
       split; [exact Hv2 |]. split; [exact Hp2 |]. split; [exact Hv1 | exact Hp1]. }
-    iApply (wp_wkn_tail (fun _ => True%I) mm N9 t m (pt_base c0) K dq b p HK Hva'
+    iApply (wp_wkn_tail mm N9 t m (pt_base c0) K dq b p HK Hva'
               HspN9 HN9s3 HN9s1 HN9x4 HN9x23 HN9x24 HN9x25 HN9x26 HN9x27
               ltac:(exists pte2, pte1, (pt_ents c0 (vpn_idx 0 vpn));
                     split; [exact Hl0 |];

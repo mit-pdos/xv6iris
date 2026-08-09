@@ -151,7 +151,7 @@ Section ProofBrelse.
   (*  base is [sp], a concrete non-tp index, so it stays a raw lookup     *)
   (*  (exactly as [wp_csdsp_s_sconf] spells it).                          *)
   (* ---------------------------------------------------------------- *)
-  Local Lemma wp_csdsp_au_s_sconf `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wp_csdsp_au_s_sconf `{CID0 : CpuId} 
       (pc : mword 64) (uimm : mword 6) (rs2 : mword 5)
       (m0 : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset)
       (b : bool) (pme : mword 64) :
@@ -239,7 +239,7 @@ Section ProofBrelse.
      [eb] -- release's own level-0 exit arm, which pop_off restores to the
      saved base enable.  The level is fixed at 1 (brelse's only call site),
      so no [nn] binder survives. *)
-  Local Lemma brelse_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ) (bn : bio_names)
+  Local Lemma brelse_tail `{CID0 : CpuId}  (bn : bio_names)
       (V : bio_view Σ)
       (m M : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ) :
     (K_brelse <= K)%nat ->
@@ -508,13 +508,13 @@ Section ProofBrelse.
   (*  THE WHOLE FUNCTION                                                 *)
   (* ================================================================== *)
 
-  Lemma wp_brelse_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_brelse_sconf 
       (γs : list gname)
       (bn : bio_names) (V : bio_view Σ) (k : nat)
       (pidv dev bno : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (bs bsd : list (bv 8)) (d : bool) (b : bool)
-    : wp_brelse_sconf_body Φ γs bn V k pidv dev bno dq m K eb p C bs bsd d b.
+    : wp_brelse_sconf_body γs bn V k pidv dev bno dq m K eb p C bs bsd d b.
   Proof.
     cbv beta delta [wp_brelse_sconf_body].
     intros pcE ret_tgt HK Hk Ha0.
@@ -603,7 +603,7 @@ Section ProofBrelse.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp02) in "Hpc".
     (* ===== +0x02 sd ra,24(sp) -- THE PARK ===== *)
-    iApply (wp_csdsp_au_s_sconf Φ (mword_of_int (KernelSyms.brelse + 0x02)) (mword_of_int 3 : mword 6) Rra
+    iApply (wp_csdsp_au_s_sconf (mword_of_int (KernelSyms.brelse + 0x02)) (mword_of_int 3 : mword 6) Rra
               R1 (K - 4)%nat
               ((add_vec (R1 !!! Regidx csp_rs1)
                   (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000")))
@@ -845,7 +845,7 @@ Section ProofBrelse.
       by (rewrite /H2; apply upd_eq).
     iDestruct (cpu_own_transport CID11 CID14 0%nat b p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Rsl.wp_releasesleep_sconf Φ γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
+    iApply (Rsl.wp_releasesleep_sconf γs (fst (bn_slk bn k)) (snd (bn_slk bn k))
               "buffer"%string (bown bn k) H2 pidv p (K - 4)%nat b C b
               ltac:(lia)
               with "Hcg Hcnt Htext Hpc [] Hstok [Hpid] Hbown Hpanic Hprocs [-]").
@@ -1356,7 +1356,7 @@ Section ProofBrelse.
         rewrite /E1 upd_ne; [| regne].
         rewrite /D2 upd_ne; [| regne].
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
-      iApply (brelse_tail (CID0 := CIDa) Φ bn V m E9 K b p C HK HE9sp HE9thr
+      iApply (brelse_tail (CID0 := CIDa)  bn V m E9 K b p C HK HE9sp HE9thr
                 with "Hcg Htext Hpc Hlock Htok HRres Hcnt Hpay Hr24 Hr16 Hr8 Hg4 [-]").
       iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].
@@ -1487,7 +1487,7 @@ Section ProofBrelse.
       { intros c Hcs N2 N8 N9 N18.
         rewrite /D2 upd_ne; [| regne].
         rewrite /D1 upd_ne; [| regne]. exact (HmQthr c Hcs N2 N8 N9 N18). }
-      iApply (brelse_tail (CID0 := CIDa) Φ bn V m D2 K b p C HK HD2sp HD2thr
+      iApply (brelse_tail (CID0 := CIDa)  bn V m D2 K b p C HK HD2sp HD2thr
                 with "Hcg Htext Hpc Hlock Htok HRres Hcnt Hpay Hr24 Hr16 Hr8 Hg4 [-]").
       iIntros (CIDf Hsf mf) "%Hcsf Hcg Hcnt Hpc".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain|].

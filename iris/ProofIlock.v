@@ -224,7 +224,7 @@ Section IlockDefs.
      pa_stk (m !!! Regidx csp_rs1 : mword 64) 3 ↦₈ (m !!! Regidx Rs1 : mword 64) ∗
      ∃ w : mword 64, pa_stk (m !!! Regidx csp_rs1 : mword 64) 4 ↦₈ w)%I.
 
-  Definition il_cont `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Definition il_cont `{GEN : GenId} `{CID0 : CpuId} 
       (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (ip : mword 64) (inum refv : mword 32)
@@ -259,7 +259,7 @@ Section IlockEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !inodeG Σ}.
 
-  Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
       (cov : gset Z) (logstart : Z) (inodestart : Z)
       (ip : mword 64) (inum refv : mword 32)
@@ -285,7 +285,7 @@ Section IlockEpilogue.
     sleeplocked gisl -∗
     sl_pid (i_lock ip) ↦₄ pidv -∗
     inode_locked gfs gi cov logstart ip dn bm -∗
-    il_cont (CID0 := CID0) Φ gfs gi gisl bn cov logstart inodestart ip inum refv
+    il_cont (CID0 := CID0)  gfs gi gisl bn cov logstart inodestart ip inum refv
             dn bm ds dev pidv dq dqd dqn dqr dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -492,7 +492,7 @@ Section IlockLoad.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !inodeG Σ}.
 
-  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId} 
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -521,8 +521,8 @@ Section IlockLoad.
     pc_is (mword_of_int (KernelSyms.ilock + 0x36) : mword 64) -∗
     panic_wp_any -∗
     bio_ctx bn (fs_view gfs gd dev cov) -∗
-    procs_inv Φ gs -∗
-    scheds_inv Φ gs -∗
+    procs_inv gs -∗
+    scheds_inv gs -∗
     dev_inv gu gd -∗
     disk_geom gd pd pav pu -∗
     is_lock gk d_lock "virtio_disk"%string (disk_res gd pd pav pu) -∗
@@ -542,7 +542,7 @@ Section IlockLoad.
     ind_res gfs bm -∗
     inode_blocks gfs bm data -∗
     inode_raw ip -∗
-    il_cont (CID0 := CID0) Φ gfs gi gisl bn cov logstart inodestart ip inum refv
+    il_cont (CID0 := CID0)  gfs gi gisl bn cov logstart inodestart ip inum refv
             dn bm ds dev pidv dq dqd dqn dqr dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -792,7 +792,7 @@ Section IlockLoad.
     iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID8) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
-    iApply (BR.wp_bread_sconf Φ gs j gl gu gd gk pd pav pu bn
+    iApply (BR.wp_bread_sconf gs j gl gu gd gk pd pav pu bn
               (fs_view gfs gd dev cov) pidv dev bno dq
               L7 (K - 4)%nat true C b
               HKbr Hbnolt eq_refl Hbnocov eq_refl Hj Hgl HL7a0 HL7a1 eq_refl
@@ -1417,7 +1417,7 @@ Section IlockLoad.
     iDestruct (wp_next_shift (CIDa := CID8) (CIDb := CID32) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat) by (unfold K_brelse; lia).
-    iApply (BL.wp_brelse_sconf Φ gs bn (fs_view gfs gd dev cov) kk
+    iApply (BL.wp_brelse_sconf gs bn (fs_view gfs gd dev cov) kk
               pidv dev bno dq H1 (K - 4)%nat true (proc_addr j) C
               (diblk_bytes ds) bsd0 d0b b
               HKbl Hkk HH1a0
@@ -1549,7 +1549,7 @@ Section IlockLoad.
       iSplitL "Hf3"; [iExact "Hf3" |]. iExists _. iExact "Hf4". }
     iDestruct (cpu_own_transport CID33 CID39 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (il_epilogue (CID0 := CID39) Φ j gfs gi gisl bn cov logstart inodestart
+    iApply (il_epilogue (CID0 := CID39)  j gfs gi gisl bn cov logstart inodestart
               ip inum refv dn bm ds dev pidv dq dqd dqn dqr dqs m Z0 K C b
               HK HZ0sp HZ0thr
               with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hidev Hinumc
@@ -1579,7 +1579,7 @@ Section ProofIlockMain.
             !uartGhostG Σ, !fsLogG Σ, !inodeG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_ilock_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_ilock_sconf 
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1592,7 +1592,7 @@ Section ProofIlockMain.
       (pidv : mword 32) (dq dqd dqn dqr dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_ilock_sconf_body Φ gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
+    : wp_ilock_sconf_body gs j gl gu gd gk pd pav pu bn gfs gi gil gisl
                           cov logstart inodestart dev ip inum refv
                           vv dn bm ds pidv dq dqd dqn dqr dqs m K eb C b.
   Proof.
@@ -1602,7 +1602,7 @@ Section ProofIlockMain.
     pose proof HK as HK'. unfold K_ilock in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hslk Hkey Hidev Hinumc Hrefc Hsb
               Hfsb Hppid #Hprocs #Hscheds Hpark #Hdevi #Hdgeom #Hdlock Hsl Hcont".
-    iAssert (il_cont (CID0 := CID) Φ gfs gi gisl bn cov logstart inodestart ip inum refv
+    iAssert (il_cont (CID0 := CID)  gfs gi gisl bn cov logstart inodestart ip inum refv
                dn bm ds dev pidv dq dqd dqn dqr dqs j m K C b)%I
       with "[Hcont]" as "Hcont"; [rewrite /il_cont; iExact "Hcont" |].
     iPoseProof (ili_00 with "Htext") as "Hi00".
@@ -1816,7 +1816,7 @@ Section ProofIlockMain.
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-    iApply (ASL.wp_acquiresleep_sconf (dq := dq) Φ gs j gil gisl "inode"%string
+    iApply (ASL.wp_acquiresleep_sconf (dq := dq)  gs j gil gisl "inode"%string
               (inode_parked gfs gi cov logstart ip) R6 pidv (K - 4)%nat true C b
               Hj ltac:(lia) eq_refl
               with "Hcg Hcnt Htext Hpc [] Hpanic Hppid Hprocs Hscheds Hpark").
@@ -1889,7 +1889,7 @@ Section ProofIlockMain.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
-      iApply (il_epilogue (CID0 := CID13) Φ j gfs gi gisl bn cov logstart inodestart
+      iApply (il_epilogue (CID0 := CID13)  j gfs gi gisl bn cov logstart inodestart
                 ip inum refv dn bm ds dev pidv dq dqd dqn dqr dqs m Q1 K C b
                 HK HQ1sp HQ1thr
                 with "Hcg Hcnt Htext Hpc Hframe Hpark Hppid Hidev Hinumc
@@ -1920,7 +1920,7 @@ Section ProofIlockMain.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID13) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
-      iApply (il_load (CID0 := CID13) Φ gs j gl gu gd gk pd pav pu bn gfs gi gisl
+      iApply (il_load (CID0 := CID13)  gs j gl gu gd gk pd pav pu bn gfs gi gisl
                 cov logstart inodestart dev ip inum refv dn bm ds datap
                 pidv dq dqd dqn dqr dqs m Q1 K C b
                 HK HQ1sp HQ1thr HQ1s1 Hgeom Hst Hcov Hdswf (Hagr eq_refl) Hok Hj Hgl

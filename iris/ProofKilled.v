@@ -90,16 +90,16 @@ Section ProofKilled.
 
 
 
-  Lemma wp_killed_sconf (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+  Lemma wp_killed_sconf  (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (b : bool)
-    : wp_killed_sconf_body Φ γs j γl m av n eb p C b.
+    : wp_killed_sconf_body γs j γl m av n eb p C b.
   Proof.
     cbv beta delta [wp_killed_sconf_body].
     intros pcE ret_tgt Ha0 Hj Hgl Hn Hav.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext Hpc #Hprocs Hpanic Hcont".
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
-    iDestruct (procs_inv_lookup Φ γs j γl Hgl with "Hprocs") as "#Hislock".
+    iDestruct (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     (* ===================== PROLOGUE (32-byte frame, 4 slots) ============ *)
     set (spd := add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 32 : mword 6)))).
     set (M1 := <[Regidx csp_rs1 := regval_into_reg
@@ -223,7 +223,7 @@ Section ProofKilled.
     iDestruct (cpu_own_transport CID CID8 n eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res Φ γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b
+              (proc_lock_res γs γl (proc_addr j)) B1 n eb p C (av - 4)%nat b
               Hn ltac:(lia)
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanic [-]").
     { iEval (rewrite HB1a0). iExact "Hislock". }
@@ -232,7 +232,7 @@ Section ProofKilled.
       by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hp12) in "Hpc".
     (* ---- open the lock: p->killed is in the ALWAYS-RESIDENT row ---- *)
-    iDestruct (proc_lock_res_elim Φ γs γl (proc_addr j) with "HR") as (st ch) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
+    iDestruct (proc_lock_res_elim γs γl (proc_addr j) with "HR") as (st ch) "(Hstate & Hpg & Hchan & Hpub & Hslot)".
     iDestruct "Hpub" as (kl xs pid) "(Hkilled & Hxstate & Hpidhalf)".
     (* +0x12: c.lw a5,40(s1) *)
     assert (Hmacq_s1 : macq !!! Regidx kl_s1 = proc_addr j).
@@ -308,12 +308,12 @@ Section ProofKilled.
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
     (* reassemble the lock resource: nothing moved, so the slots go back as-is *)
-    iAssert (proc_lock_res Φ γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hkilled Hxstate Hpidhalf Hslot]" as "HR2".
-    { iApply (proc_lock_res_intro Φ γs γl (proc_addr j) st ch with "Hstate Hpg Hchan [-Hslot] Hslot").
+    iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hkilled Hxstate Hpidhalf Hslot]" as "HR2".
+    { iApply (proc_lock_res_intro γs γl (proc_addr j) st ch with "Hstate Hpg Hchan [-Hslot] Hslot").
       iExists kl, xs, pid. iFrame "Hkilled Hxstate Hpidhalf". }
     (* ===================== release(&p->lock) ===================== *)
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res Φ γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat
+              (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat
               Hlka ltac:(lia)
               with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay [-]").
     iIntros (CIDrel Hsrel mrel) "Hcg Hpc %Hcs_rel Hcpu".

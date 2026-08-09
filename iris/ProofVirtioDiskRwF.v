@@ -491,7 +491,7 @@ Section VdrwfP6.
   (* s1 = desc[i].flags and s2 = desc[i].next (both callee-saved, so they   *)
   (* survive the call), and descriptor [i] back in the free pool.           *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId} (Φ : mval -> iProp Σ) (γs : list gname)
+  Lemma wp_vdrwf_iter `{GEN : GenId} `{CID : CpuId}  (γs : list gname)
       (pd : SailStdpp.Values.mword 64) (i : nat) (fr : nat -> bool)
       (va : SailStdpp.Values.mword 64) (vl : SailStdpp.Values.mword 32)
       (vf vn : SailStdpp.Values.mword 16)
@@ -504,7 +504,7 @@ Section VdrwfP6.
     sie_cap_gpr M av false pme -∗
     cpu_own 1 eb pme C false -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2) : mword 64) -∗
-    panic_wp_any -∗ procs_inv Φ γs -∗
+    panic_wp_any -∗ procs_inv γs -∗
     d_desc_ptr ↦₈□ pd -∗
     d_desc pd i ↦₈ va -∗ pa_add pd (16 * i + 8) ↦₄ vl -∗
     pa_add pd (16 * i + 12) ↦₂ vf -∗ pa_add pd (16 * i + 14) ↦₂ vn -∗
@@ -664,7 +664,7 @@ Section VdrwfP6.
     iEval (rewrite (free_bundles_split pd fr i Hi8)) in "Hbun".
     iDestruct "Hbun" as "[[Hcell _] Hbrest]".
     iEval (rewrite Hfri) in "Hcell".
-    iApply (FreeDesc.wp_free_desc_sconf Φ γs pd i N7 av 1%nat eb pme C va vl vf vn false
+    iApply (FreeDesc.wp_free_desc_sconf γs pd i N7 av 1%nat eb pme C va vl vf vn false
               Hav Hi8 HN7a0 ltac:(intro r; apply rf_to_gmap_dom) Hlen vdrwb_lvl1
               with "Hcg Hown Htext Hpc Hpanic Hpinv Hdp Hcell Hd0 Hd8 Hd12 Hd14 [-]").
     iApply wp_next_off_intro. iIntros (Mf) "%Hf Hcg Hown _ Hpc Hcell Hd0 Hd8 Hd12 Hd14".
@@ -710,7 +710,7 @@ Section VdrwfP6.
   (* interrupts (level 0, base [eb = true]) and the epilogue below it is    *)
   (* interruptible.                                                        *)
   (* ------------------------------------------------------------------- *)
-  Lemma wp_vdrw_p6_seam `{GEN : GenId} `{CID : CpuId} (γk : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_vdrw_p6_seam `{GEN : GenId} `{CID : CpuId} (γk : gname)
       (γs : list gname) (j : nat) (γd : disk_names)
       (pd pav pu : SailStdpp.Values.mword 64) (K : nat) (eb : bool) (C : iProp Σ)
       (sp0 b : Arch.pa) (m : regfile) (wr sector : SailStdpp.Values.mword 64)
@@ -722,7 +722,7 @@ Section VdrwfP6.
     (forall k, (k < 1024)%nat -> addr_is_kdata (pa_add (b_data b) k)) ->
     m !!! Regidx csp_rs1 = (sp0 : SailStdpp.Values.mword 64) ->
     eb = true ->
-    kernel_text -∗ panic_wp_any -∗ procs_inv Φ γs -∗
+    kernel_text -∗ panic_wp_any -∗ procs_inv γs -∗
     (* THE CRASH-PERMIT CHANNEL (PermInv.v): the invariant to collect the
        receipt from, and the persistent handle that says WHICH receipt is
        ours -- the claim pins [vs_perm] of our own slot, so the token the
@@ -750,7 +750,7 @@ Section VdrwfP6.
            request's write landed, at the DMA completion. *)
         ▷ Q -∗
         WP (Loop : expr riscv_lang)) -∗
-    P5.vdrw_p5_exit CID γk Φ γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
+    P5.vdrw_p5_exit CID γk γs j γd pd pav pu K eb C sp0 b wr sector bs_buf
                     bs_disk m kq.
   Proof.
     intros HK Hglen Hlenbuf Hlendisk Hsec Hbufkd Hsp0m Heb. subst eb.
@@ -1144,7 +1144,7 @@ Section VdrwfP6.
                    = mword_of_int (KernelSyms.virtio_disk_rw + 0x1d2)) by pcstep.
     assert (Hp1ec1 : add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x1ea) : mword 64) 2
                      = mword_of_int (KernelSyms.virtio_disk_rw + 0x1ec)) by pcstep.
-    iApply (wp_vdrwf_iter (CID := CIDx) Φ γs pd h fr (d_ops h : SailStdpp.Values.mword 64)
+    iApply (wp_vdrwf_iter (CID := CIDx)  γs pd h fr (d_ops h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 16) (Z_to_bv 16 1) (Z_to_bv 16 (Z.of_nat m2))
               E8 (K - 12)%nat true (proc_addr j) C
               (vdrwb_K20 K HK) Hh8 Hfrh Hglen HE8s2 HE8s3
@@ -1188,7 +1188,7 @@ Section VdrwfP6.
       exact HE8sp. }
     assert (Hfr1m : fr_upd fr h true m2 = false)
       by (rewrite (fr_upd_ne fr h m2 true (not_eq_sym Hhm)); exact Hfrm).
-    iApply (wp_vdrwf_iter (CID := CIDx) Φ γs pd m2 (fr_upd fr h true)
+    iApply (wp_vdrwf_iter (CID := CIDx)  γs pd m2 (fr_upd fr h true)
               (b_data b : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1024) (vdrw_flags wr) (Z_to_bv 16 (Z.of_nat t))
               G1 (K - 12)%nat true (proc_addr j) C
@@ -1234,7 +1234,7 @@ Section VdrwfP6.
     assert (Hfr2t : fr_upd (fr_upd fr h true) m2 true t = false).
     { rewrite (fr_upd_ne (fr_upd fr h true) m2 t true (not_eq_sym Hmt)).
       rewrite (fr_upd_ne fr h t true (not_eq_sym Hht)). exact Hfrt. }
-    iApply (wp_vdrwf_iter (CID := CIDx) Φ γs pd t (fr_upd (fr_upd fr h true) m2 true)
+    iApply (wp_vdrwf_iter (CID := CIDx)  γs pd t (fr_upd (fr_upd fr h true) m2 true)
               (d_info_status h : SailStdpp.Values.mword 64)
               (Z_to_bv 32 1) (Z_to_bv 16 2) (Z_to_bv 16 0)
               G2 (K - 12)%nat true (proc_addr j) C
@@ -1761,14 +1761,14 @@ Section ProofVirtioDiskRwF.
   (* the prologue, then the allocator, then peel the seams inwards.        *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_virtio_disk_rw_sconf
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : SailStdpp.Values.mword 64)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (bno dsk0 : SailStdpp.Values.mword 32) (bs_buf bs_disk : list (bv 8))
       (b : bool) (Q : iProp Σ)
-    : wp_virtio_disk_rw_sconf_body Φ γs j γl γu γd γk pd pav pu
+    : wp_virtio_disk_rw_sconf_body γs j γl γu γd γk pd pav pu
                                    m K eb C bno dsk0 bs_buf bs_disk b Q.
   Proof.
     cbv beta zeta delta [wp_virtio_disk_rw_sconf_body].
@@ -1826,27 +1826,27 @@ Section ProofVirtioDiskRwF.
     iIntros (CIDa Hsa M) "%Hrh Hcg Hown Hpay Hpc Htok HR Hsaved Hscr Hbno".
     destruct Hrh as (Hregs & Hhi).
     (* ---- P2: the descriptor allocator (with its sleep-retry loop) ---- *)
-    iApply (P2.wp_vdrw_p2 (CID := CIDa) γk Φ γs j γl γd pd pav pu M K eb C
+    iApply (P2.wp_vdrw_p2 (CID := CIDa) γk γs j γl γd pd pav pu M K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) m HK Hj Hjl Hglen Heb Hregs Hhi
               with "Hcg Hown Hpay Htext Hpc Hpanic Hpinv Hscheds Hpark Hgeom Hlk
                     Htok HR Hscr [-]").
     (* ---- P3: the chain formatting ---- *)
-    iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk Φ γs j γd pd pav pu K eb C
+    iApply (P3.wp_vdrw_p3_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) dsk0 m with "Htext Hgeom Hbdisk [-]").
     (* ---- P4: the ring write and THE PUBLISH ---- *)
-    iApply (P4.wp_vdrw_p4_seam (CID := CIDa) γk Φ γs j γu γd pd pav pu K eb C
+    iApply (P4.wp_vdrw_p4_seam (CID := CIDa) γk γs j γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               bno bs_buf bs_disk m kq Hbnolt Hlenbuf Hbufkd
               with "Htext Hdinv Hgeom Hbufm Hdisk Hpend [-]").
     (* ---- P5: the device kick and the completion wait ---- *)
-    iApply (P5.wp_vdrw_p5_seam (CID := CIDa) γk Φ γs j γl γu γd pd pav pu K eb C
+    iApply (P5.wp_vdrw_p5_seam (CID := CIDa) γk γs j γl γu γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) bs_buf bs_disk m kq HK Hj Hjl Heb
               with "Htext Hpanic Hpinv Hscheds Hdinv Hlk [-]").
     (* ---- P6: the payoff, free_chain, release, epilogue ---- *)
-    iApply (wp_vdrw_p6_seam (CID := CIDa) γk Φ γs j γd pd pav pu K eb C
+    iApply (wp_vdrw_p6_seam (CID := CIDa) γk γs j γd pd pav pu K eb C
               (m !!! Regidx csp_rs1) (m !!! Regidx Ra0) m (m !!! Regidx Ra1)
               (vdrw_sector_raw bno) bno bs_buf bs_disk Q kq
               HK Hglen Hlenbuf Hlendisk Hsecval Hbufkd eq_refl Heb

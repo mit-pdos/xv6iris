@@ -6,7 +6,7 @@
 
    THIS IS NOT A DESIGN SHORTCUT; IT IS A REAL, PRE-EXISTING GAP THAT KFORK
    IS THE FIRST FUNCTION TO NEED CLOSED.  [SchedCtx.proc_ctx pa] unfolds to
-   [SwtchCtx.valid_context Φ p_sched None (p_context pa) pa], a Löb/guarded
+   [SwtchCtx.valid_context p_sched None (p_context pa) pa], a Löb/guarded
    fixpoint whose obligation is literally "prove a WP for the code that runs
    when this context is resumed" -- i.e. proving that a scheduler which picks
    this process up, swtch's into it, and lands at [forkret] actually behaves
@@ -39,7 +39,7 @@
    a live process -- design/proc-struct.md's file-table.md cross-reference).
    Nothing about [p_sched]/[Φ]/[γs] is exposed beyond what [proc_ctx] itself
    already closes over (Section parameters of [SchedCtx.v]); the caller
-   supplies them the same way it supplies [procs_inv Φ γs] anywhere else. *)
+   supplies them the same way it supplies [procs_inv γs] anywhere else. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -67,7 +67,7 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 
 Definition forkret_park_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ) (γs : list gname)
+     (γs : list gname)
     (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) : Prop :=
   (length rest = 12%nat) ->
@@ -75,13 +75,13 @@ Definition forkret_park_body
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
     proc_priv γf pa pid V -∗
     fd_slots FDSPARE -∗
-    |==> ▷ proc_ctx Φ γs pa.
+    |==> ▷ proc_ctx γs pa.
 
 Module Type FORKRET_PARK.
   Parameter forkret_park :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ) (γs : list gname)
+       (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate),
-      forkret_park_body Φ γs γf pa ks rest pid V.
+      forkret_park_body γs γf pa ks rest pid V.
 End FORKRET_PARK.

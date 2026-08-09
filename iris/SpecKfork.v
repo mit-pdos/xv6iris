@@ -167,7 +167,7 @@ Definition kfork_post
 Definition wp_kfork_sconf_body
     `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa γp γw γl γf : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+    (γa γp γw γl γf : gname)  (γs : list gname)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
     (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
@@ -181,7 +181,7 @@ Definition wp_kfork_sconf_body
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
-  procs_inv Φ γs -∗
+  procs_inv γs -∗
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
@@ -200,8 +200,8 @@ Module Type KFORK.
   Parameter wp_kfork_sconf :
     forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa γp γw γl γf : gname) (Φ : mval -> iProp Σ) (γs : list gname)
+      (γa γp γw γl γf : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate),
-      wp_kfork_sconf_body γa γp γw γl γf Φ γs m lvl K eb pme C on b pid_p Vp.
+      wp_kfork_sconf_body γa γp γw γl γf γs m lvl K eb pme C on b pid_p Vp.
 End KFORK.

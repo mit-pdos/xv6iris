@@ -96,16 +96,16 @@ Section SpecMainSecondary.
   (* ride the one-shot [started] escrow to up to NCPU-1 readers.           *)
   (* ------------------------------------------------------------------- *)
   Definition main_deposit (γd : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) : iProp Σ :=
+       : iProp Σ :=
     (∃ (γpr γk : gname) (γs : list gname) (pd pav pu : mword 64)
        (root : mword 44) (pas : nat -> mword 44),
        printk_env γpr γd γv ∗
-       procs_inv Φ γs ∗
+       procs_inv γs ∗
        (* the global parked-scheduler invariant: persistent and hart-free,
           so it rides the one-shot [started] escrow exactly as [procs_inv]
           does -- and a secondary hart's scheduler() needs it for its two
           [c->proc] stores. *)
-       scheds_inv Φ γs ∗
+       scheds_inv γs ∗
        is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) ∗
        disk_geom γv pd pav pu ∗
        kpt_inv root ∗
@@ -114,15 +114,14 @@ Section SpecMainSecondary.
        kmap_at tramp_vpn tramp_ppn KP_rx ∗
        ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas i) KP_rw))%I.
 
-  Global Instance main_deposit_persistent γd γv Φ :
-    Persistent (main_deposit γd γv Φ).
+  Global Instance main_deposit_persistent γd γv :
+    Persistent (main_deposit γd γv).
   Proof. rewrite /main_deposit. apply _. Qed.
 
   (* ------------------------------------------------------------------- *)
   (* main(), entered on a SECONDARY hart.                                 *)
   (* ------------------------------------------------------------------- *)
   Definition wp_main_secondary_sconf_body
-      (Φ : mval -> iProp Σ)
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (γd : uart_names) (γv : disk_names)
@@ -152,7 +151,7 @@ Section SpecMainSecondary.
        acquire wants [panic_wp_any], and one hart's copy does not yield it. *)
     panic_wp_any -∗
     (* the handover channel, at the CONCRETE deposit *)
-    started_inv (main_deposit γd γv Φ) -∗
+    started_inv (main_deposit γd γv) -∗
     (* this hart's own translation and trap resources *)
     main_hart_raw tlbvec0 -∗
     WP (Loop : expr riscv_lang).
@@ -163,10 +162,10 @@ Module Type MAIN_SECONDARY.
   Parameter wp_main_secondary_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (m : regfile) (K : nat)
       (p0 : mword 64)
       (γd : uart_names) (γv : disk_names)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)),
-      wp_main_secondary_sconf_body Φ m K p0 γd γv tlbvec0.
+      wp_main_secondary_sconf_body m K p0 γd γv tlbvec0.
 End MAIN_SECONDARY.

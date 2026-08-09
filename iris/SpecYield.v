@@ -79,7 +79,7 @@ Import Defs.
 
 
 Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-    (Φ : mval -> iProp Σ)
+    
     (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) :=
   let pcE : mword 64 := mword_of_int KernelSyms.yield in
@@ -92,8 +92,8 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
   sie_cap_gpr m av eb pj -∗
   cpu_own 0 eb pj C eb -∗
   kernel_text -∗ pc_is pcE -∗
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   panic_wp_any -∗
   running_claim j -∗
   trap_csrs_ext eb -∗
@@ -113,8 +113,8 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
 Module Type YIELD.
   Parameter wp_yield_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      (Φ : mval -> iProp Σ)
+      
       (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
-      wp_yield_sconf_body Φ γs j γl m av eb C.
+      wp_yield_sconf_body γs j γl m av eb C.
 End YIELD.

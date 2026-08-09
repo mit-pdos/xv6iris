@@ -199,7 +199,7 @@ Section ProofMain.
   (* 0x00 .. 0x14 -- the frame push, [jal cpuid], and the [beqz a0] that  *)
   (* the boot premise [cid_word = 0] makes TAKEN into the boot arm.       *)
   (* =================================================================== *)
-  Local Lemma mn_boot_entry (Φ : mval -> iProp Σ)
+  Local Lemma mn_boot_entry 
       (m : regfile) (K : nat) (p0 : mword 64) :
     cid_word = (zero_reg : mword 64) ->
     (K_main <= K)%nat ->
@@ -366,7 +366,7 @@ Section ProofMain.
   (* three ghost steps in between: the [pr] lock over the transmitter      *)
   (* token, the panic-flag invariant, and [printk_env].                   *)
   (* =================================================================== *)
-  Local Lemma mn_grp_printk (Φ : mval -> iProp Σ)
+  Local Lemma mn_grp_printk 
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (l0 : list (bv 8)) (b0 : bool) :
     (50 <= n)%nat ->
@@ -667,7 +667,7 @@ Section ProofMain.
   (* (boot-hart-only, once) so that kvminithart's own contract is           *)
   (* hart-generic: it takes only the persistent [kpt_inv] + root cell.      *)
   (* =================================================================== *)
-  Local Lemma mn_grp_kvm (Φ : mval -> iProp Σ)
+  Local Lemma mn_grp_kvm 
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) :
@@ -702,8 +702,8 @@ Section ProofMain.
         pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
         cpu_own 0 false p0 cpu_ctx_free false -∗
         kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
-        procs_inv Φ γs -∗
-        scheds_inv Φ γs -∗
+        procs_inv γs -∗
+        scheds_inv γs -∗
         (∃ v : mword 64, stvec ↦ᵣ v) -∗
         (* what kvminithart published about the kernel page table: all four
            PERSISTENT, and exactly what the [started] deposit carries *)
@@ -851,11 +851,11 @@ Section ProofMain.
                                 proc_pub (proc_addr i))) ∗ park_full i false)%I)
                  (fun _ i => pstate_full i UNUSED)
                  (seq 0 NPROC) with "Hin Hpst") as "Hin".
-    iMod (procs_inv_alloc Φ ⊤ with "Hin") as (γs) "#Hpinv".
+    iMod (procs_inv_alloc ⊤ with "Hin") as (γs) "#Hpinv".
     (* ---- ASSEMBLY 2b: the eight c->proc halves -> scheds_inv ----
        Nothing below [SchedCtx] names [scheds_inv], which is exactly what
        makes this allocation legal HERE, one line after γs is chosen. *)
-    iMod (scheds_alloc Φ γs ⊤ with "Hhalves") as "#Hsched".
+    iMod (scheds_alloc γs ⊤ with "Hhalves") as "#Hsched".
     iModIntro.
     iApply ("Hcont" $! γl γs mpr (pt_base t) pas
               with "Hcg Hpc Hcpu Hkenv Hpinv Hsched Hstvec Hkinv Hkptp Htramp Hkstx").
@@ -865,7 +865,7 @@ Section ProofMain.
   (* 0x7e .. 0x8a -- trapinit(); trapinithart(); plicinit();              *)
   (* plicinithart(), plus [intr_inv_alloc_off] over kernelvec.            *)
   (* =================================================================== *)
-  Local Lemma mn_grp_trap (Φ : mval -> iProp Σ)
+  Local Lemma mn_grp_trap 
       (γd : uart_names) (γv : disk_names) (m : regfile) (n : nat)
       (p0 : mword 64) :
     (50 <= n)%nat ->
@@ -1008,7 +1008,7 @@ Section ProofMain.
   (* 0x8e .. 0x9e -- binit(); iinit(); fileinit(); virtio_disk_init();     *)
   (* userinit(), plus [DiskBoot.disk_res_boot] and the vdisk [newlock].    *)
   (* =================================================================== *)
-  Local Lemma mn_grp_fs (Φ : mval -> iProp Σ)
+  Local Lemma mn_grp_fs 
       (γa : gname) (γs : list gname) (γv : disk_names) (γd : uart_names)
       (m : regfile) (n : nat) (p0 : mword 64)
       (ps : list (mword 64)) (c0 : virtio_cfg) (free0 : nat -> bv 8) :
@@ -1019,7 +1019,7 @@ Section ProofMain.
     kernel_text -∗ kernel_data -∗ panic_wp_any -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
-    procs_inv Φ γs -∗
+    procs_inv γs -∗
     kalloc_env γa (avail_sub (Some (length ps)) K_kvmmake) -∗
     lk_raw bcache_addr -∗
     ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) -∗
@@ -1221,7 +1221,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.userinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtui) in "Hpc".
-    iApply (Userinit.wp_userinit_sconf γa Φ γs F5 n false p0 cpu_ctx_free
+    iApply (Userinit.wp_userinit_sconf γa γs F5 n false p0 cpu_ctx_free
               (avail_sub (avail_sub (Some (length ps)) K_kvmmake) 3) iv0 false
               ltac:(unfold K_userinit; lia) Hnb8
               with "Hcg Htext Hkdata Hpc Hpanic Hcpu Hpinv Hkenv Hinitproc").
@@ -1239,7 +1239,7 @@ Section ProofMain.
   (* 0xa2 .. 0xb0 then the join at 0x3e -- the release fence, the         *)
   (* [started = 1] deposit, and [jal scheduler] (which never returns).    *)
   (* =================================================================== *)
-  Local Lemma mn_grp_started (Φ : mval -> iProp Σ)
+  Local Lemma mn_grp_started 
       (γpr γk γa : gname) (γs : list gname)
       (γd : uart_names) (γv : disk_names)
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
@@ -1256,8 +1256,8 @@ Section ProofMain.
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
          printk_env γpr' γd γv -∗
-         procs_inv Φ γs' -∗
-         scheds_inv Φ γs' -∗
+         procs_inv γs' -∗
+         scheds_inv γs' -∗
          is_lock γk' d_lock "virtio_disk"%string (disk_res γv pd' pav' pu') -∗
          disk_geom γv pd' pav' pu' -∗
          kpt_inv root' -∗
@@ -1267,8 +1267,8 @@ Section ProofMain.
          ([∗ list] i ∈ seq 0 64, kmap_at (kstack_vpn i) (pas' i) KP_rw) -∗
          P) -∗
     printk_env γpr γd γv -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γv pd pav pu) -∗
     disk_geom γv pd pav pu -∗
     kpt_inv root -∗
@@ -1398,21 +1398,21 @@ Section ProofMain.
               = (mword_of_int KernelSyms.scheduler : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
-    iApply (Scheduler.wp_scheduler_sconf Φ γs SS n p0 Hp0 ltac:(lia)
+    iApply (Scheduler.wp_scheduler_sconf γs SS n p0 Hp0 ltac:(lia)
               with "Hcg Hcpu Htext Hpc Hpinv Hsched Hpanic Htcsr Hintr").
   Qed.
 
   (* =================================================================== *)
   (* THE CONTRACT.                                                        *)
   (* =================================================================== *)
-  Lemma wp_main_boot_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_main_boot_sconf 
       (m : regfile) (K : nat) (p0 : mword 64)
       (ps : list (mword 64)) (s1entry phystop : mword 64)
       (γd : uart_names) (γv : disk_names)
       (l0 : list (bv 8)) (b0 : bool) (c0 : virtio_cfg)
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6))
       (P : iProp Σ) `{!Persistent P}
-    : wp_main_boot_sconf_body Φ m K p0 ps s1entry phystop
+    : wp_main_boot_sconf_body m K p0 ps s1entry phystop
         γd γv l0 b0 c0 tlbvec0 P.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
@@ -1436,15 +1436,15 @@ Section ProofMain.
        [Hpany] directly. *)
     iPoseProof (panic_wp_any_at cpu_id with "Hpany") as "#Hpanic".
     (* --- 0x00 .. 0x14 : prologue, cpuid, the taken branch --- *)
-    iApply (mn_boot_entry Φ m K p0 Hcid HK with "Hcg Htext Hpc").
+    iApply (mn_boot_entry m K p0 Hcid HK with "Hcg Htext Hpc").
     iIntros (m1) "Hcg Hpc".
     (* --- 0x42 .. 0x6a : console / printk --- *)
-    iApply (mn_grp_printk Φ γd γv m1 (K - 2)%nat p0 l0 b0 Hn50
+    iApply (mn_grp_printk γd γv m1 (K - 2)%nat p0 l0 b0 Hn50
               with "Hcg Htext Hkdata Hpanic Hdev Hpc Hcpu Hlcons Hltx Hlpr
                     Hdevsw Hflags Htx Hsent Hlb Hdlab").
     iIntros (γpr m2) "Hcg Hpc Hcpu #Hpenv".
     (* --- 0x6e .. 0x7a : kinit / kvminit / kvminithart / procinit --- *)
-    iApply (mn_grp_kvm Φ m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
+    iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpany Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt
                     Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds
@@ -1452,19 +1452,19 @@ Section ProofMain.
     iIntros (γa γs m3 root pas)
       "Hcg Hpc Hcpu Hkenv #Hpinv #Hsched Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
-    iApply (mn_grp_trap Φ γd γv m3 (K - 2)%nat p0 Hn50 Hcid
+    iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hstvec Hq").
     iIntros (m4) "Hcg Hpc #Hintr".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
-    iApply (mn_grp_fs Φ γa γs γv γd m4 (K - 2)%nat p0 ps c0 free0
+    iApply (mn_grp_fs γa γs γv γd m4 (K - 2)%nat p0 ps c0 free0
               Hn50 Hlen Hlive
               with "Hcg Htext Hkdata Hpany Hdev Hpc Hcpu Hpinv Hkenv Hlbc Hbufl
                     Hbufn Hbhead Hlit Hinl Hlft Hldisk Hdiskptr Hdiskfree
                     Hdusedidx Hdslots Hclaim Hdone Hcfg Hinitproc").
     iIntros (γk pd pav pu m5) "Hcg Hpc Hcpu #Hdlock #Hgeom".
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
-    iApply (mn_grp_started Φ γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
+    iApply (mn_grp_started γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
               with "Hcg Htext Hpany Hpc Hcpu Htcsr Hintr Hsinv Hwand Hpenv
                     Hpinv Hsched Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").

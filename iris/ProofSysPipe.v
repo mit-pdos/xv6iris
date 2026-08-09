@@ -514,7 +514,7 @@ Section ProofSysPipe.
   (*  gcc emitted this twice (+0x9c and +0xc4), so again ONE lemma over   *)
   (*  the entry offset [a] and the two relocated jal immediates.          *)
   (* =================================================================== *)
-  Lemma sp_close2 `{CID0 : CpuId} (Φ : mval -> iProp Σ) (γfl γf : gname)
+  Lemma sp_close2 `{CID0 : CpuId}  (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (Mt : regfile) (nav : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (sp0 : mword 64) (k0 k1 : nat) (q0 q1 : Qp) (Cf0 Cf1 : fcontent)
@@ -552,8 +552,8 @@ Section ProofSysPipe.
     (* both closes run under ONE environment, threaded through: the first may
        have moved the page count, so what the second gets, and what comes
        out, is at an existential [on'] *)
-    fileclose_pipe_env Φ fn on 0%nat -∗
-    fileclose_fs_env Φ fn 0%nat eb p -∗
+    fileclose_pipe_env fn on 0%nat -∗
+    fileclose_fs_env fn 0%nat eb p -∗
     wp_next b p (fun (CID : CpuId) =>
       ∀ Mr : regfile,
         ⌜ (forall c : mword 5, is_cs_idx c = true -> Mr !!! Regidx c = Mt !!! Regidx c)
@@ -564,8 +564,8 @@ Section ProofSysPipe.
         word_pointsto (pa_stk sp0 6) (DfracOwn 1) (fnode k0) -∗
         word_pointsto (pa_stk sp0 7) (DfracOwn 1) (fnode k1) -∗
         fd_slot -∗ fd_slot -∗
-        (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
-        fileclose_fs_env Φ fn 0%nat eb p -∗
+        (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
+        fileclose_fs_env fn 0%nat eb p -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -596,9 +596,9 @@ Section ProofSysPipe.
       by (rewrite /D2; apply upd_eq).
     iDestruct (cpu_own_transport CID0 CID6 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iDestruct (fileclose_env_frame Φ fn on 0%nat eb p Cf0 with "Hpenv Hfenv")
+    iDestruct (fileclose_env_frame fn on 0%nat eb p Cf0 with "Hpenv Hfenv")
       as "[Hfcenv0 Hfcback0]".
-    iApply (Fileclose.wp_fileclose_sconf Φ γfl γf k0 q0 Cf0 fn on D2 0%nat eb p C nav b
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k0 q0 Cf0 fn on D2 0%nat eb p C nav b
               Hnav sp_noff0 HD2a0
               with "Hcg Hcpu Htext Hpc Hftab Hpanic Href0 Hfcenv0 [-]").
     iIntros (CID7 Hcr7 E1) "Hcg Hcpu Hpc %HcsE1 Hunit0 Hout0".
@@ -639,9 +639,9 @@ Section ProofSysPipe.
       by (rewrite /F2; apply upd_eq).
     iDestruct (cpu_own_transport CID7 CID9 0%nat eb p C b ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
-    iDestruct (fileclose_env_frame Φ fn on1 0%nat eb p Cf1 with "Hpenv Hfenv")
+    iDestruct (fileclose_env_frame fn on1 0%nat eb p Cf1 with "Hpenv Hfenv")
       as "[Hfcenv1 Hfcback1]".
-    iApply (Fileclose.wp_fileclose_sconf Φ γfl γf k1 q1 Cf1 fn on1 F2 0%nat eb p C nav b
+    iApply (Fileclose.wp_fileclose_sconf γfl γf k1 q1 Cf1 fn on1 F2 0%nat eb p C nav b
               Hnav sp_noff0 HF2a0
               with "Hcg Hcpu Htext Hpc Hftab Hpanic Href1 Hfcenv1 [-]").
     iIntros (CID10 Hcr10 G1) "Hcg Hcpu Hpc %HcsG1 Hunit1 Hout1".
@@ -865,11 +865,11 @@ Section ProofSysPipe.
   (* =================================================================== *)
   (*  THE FUNCTION.                                                       *)
   (* =================================================================== *)
-  Lemma wp_sys_pipe_sconf (γa : gname) (Φ : mval -> iProp Σ) (γfl γf : gname)
+  Lemma wp_sys_pipe_sconf (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_sys_pipe_sconf_body γa Φ γfl γf fn on m av eb p C v pid V b.
+    : wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p C v pid V b.
   Proof.
     cbv beta delta [wp_sys_pipe_sconf_body].
     intros pcE ret_tgt Harg Hav.
@@ -1005,8 +1005,8 @@ Section ProofSysPipe.
         cpu_own 0%nat eb p C b -∗
         pc_is (mword_of_int (KernelSyms.sys_pipe + 0xd6) : mword 64) -∗
         (* fileclose's environment, back from whichever exit this is *)
-        (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
-        fileclose_fs_env Φ fn 0%nat eb p -∗
+        (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
+        fileclose_fs_env fn 0%nat eb p -∗
         (∃ w5 w6 w7 : mword 64,
            word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
            word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
@@ -1525,7 +1525,7 @@ Section ProofSysPipe.
       iEval (rewrite Hbt1) in "Hpc".
       iDestruct (cpu_own_transport CID41 CID43 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (sp_close2 (CID0 := CID43) Φ γfl γf fn on Y0 (av - 8)%nat eb p C sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
+      iApply (sp_close2 (CID0 := CID43)  γfl γf fn on Y0 (av - 8)%nat eb p C sp0 k0 k1 1%Qp 1%Qp Cf0 Cf1
                 (KernelSyms.sys_pipe + 0xc4) (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd6)
                 (mword_of_int 2092124 : mword 21) (mword_of_int 2092116 : mword 21) b
                 Havfc HY0s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g
@@ -1743,7 +1743,7 @@ Section ProofSysPipe.
       (* +0xc4: fileclose(rf); fileclose(wf); a5 = -1 *)
       iDestruct (cpu_own_transport CID48 CID53 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
-      iApply (sp_close2 (CID0 := CID53) Φ γfl γf fn on F2 (av - 8)%nat eb p C sp0 k0' k1 q0' 1%Qp C0' Cf1
+      iApply (sp_close2 (CID0 := CID53)  γfl γf fn on F2 (av - 8)%nat eb p C sp0 k0' k1 q0' 1%Qp C0' Cf1
                 (KernelSyms.sys_pipe + 0xc4) (KernelSyms.sys_pipe + 0xc8) (KernelSyms.sys_pipe + 0xcc) (KernelSyms.sys_pipe + 0xd0) (KernelSyms.sys_pipe + 0xd4) (KernelSyms.sys_pipe + 0xd6)
                 (mword_of_int 2092124 : mword 21) (mword_of_int 2092116 : mword 21) b
                 Havfc HF2s0 Hcc4a Hcc4b Hcc4c Hcc4d Hcc4e Hcc4f Hcc4g
@@ -2068,8 +2068,8 @@ Section ProofSysPipe.
         sie_cap_gpr Mt (av - 8)%nat b p -∗
         cpu_own 0%nat eb p C b -∗
         pc_is (mword_of_int (KernelSyms.sys_pipe + 0x7c) : mword 64) -∗
-        (∃ on', fileclose_pipe_env Φ fn on' 0%nat) -∗
-        fileclose_fs_env Φ fn 0%nat eb p -∗
+        (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
+        fileclose_fs_env fn 0%nat eb p -∗
         proc_priv γf p pid
           (upd_upt (upd_ofile (upd_ofile V fd0 (fnode k0)) fd1 (fnode k1)) P') -∗
         fd_slot -∗ fd_slot -∗
@@ -2193,7 +2193,7 @@ Section ProofSysPipe.
       iDestruct (cpu_own_transport CIDT CID65 0%nat eb p C b ltac:(wp_next_chain)
                    with "Hcpu") as "Hcpu".
       iDestruct "Hpenv" as (on2) "Hpenv".
-      iApply (sp_close2 (CID0 := CID65) Φ γfl γf fn on2 E4 (av - 8)%nat eb p C sp0 k0' k1' q0' q1' C0' C1'
+      iApply (sp_close2 (CID0 := CID65)  γfl γf fn on2 E4 (av - 8)%nat eb p C sp0 k0' k1' q0' q1' C0' C1'
                 (KernelSyms.sys_pipe + 0x9c) (KernelSyms.sys_pipe + 0xa0) (KernelSyms.sys_pipe + 0xa4) (KernelSyms.sys_pipe + 0xa8) (KernelSyms.sys_pipe + 0xac) (KernelSyms.sys_pipe + 0xae)
                 (mword_of_int 2092164 : mword 21) (mword_of_int 2092156 : mword 21) b
                 Havfc HE4s0 Hc9ca Hc9cb Hc9cc Hc9cd Hc9ce Hc9cf Hc9cg

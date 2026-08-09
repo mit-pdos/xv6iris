@@ -148,7 +148,7 @@ Section UiCont.
      pa_stk sp0 4 ↦₈ (m0 !!! Regidx Rs2))%I.
 
   (* the caller's continuation, named once *)
-  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ) (m0 : regfile)
+  Definition ui_ret_cont `{GEN : GenId} `{CID0 : CpuId}  (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) : iProp Σ :=
     (wp_next (CID0 := CID0) b pme (fun (CID : CpuId) =>
        ∀ mf : regfile,
@@ -160,11 +160,11 @@ Section UiCont.
 
   (* re-anchor it at a hart reached mid-block.  Through the named definition
      [wp_next_shift]'s direct idiom cannot infer [K], so unfold first. *)
-  Lemma ui_ret_cont_shift `{GEN : GenId} (CIDa CIDb : CpuId) (Φ : mval -> iProp Σ) (m0 : regfile)
+  Lemma ui_ret_cont_shift `{GEN : GenId} (CIDa CIDb : CpuId)  (m0 : regfile)
       (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool) :
     (b = false \/ pme = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
-    ui_ret_cont (CID0 := CIDa) Φ m0 av lvl eb pme C b -∗
-    ui_ret_cont (CID0 := CIDb) Φ m0 av lvl eb pme C b.
+    ui_ret_cont (CID0 := CIDa)  m0 av lvl eb pme C b -∗
+    ui_ret_cont (CID0 := CIDb)  m0 av lvl eb pme C b.
   Proof. intros Hs. rewrite /ui_ret_cont. exact (wp_next_shift Hs). Qed.
 
 
@@ -191,7 +191,7 @@ Section ProofUartintr.
   (* ------------------------------------------------------------------ *)
   (*  THE EPILOGUE: +0x6c -> return.                                      *)
   (* ------------------------------------------------------------------ *)
-  Lemma ui_tail `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Lemma ui_tail `{CID0 : CpuId} 
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (sp0 : mword 64) (b : bool) :
     ui_regs m0 M (pa_stk sp0 4) ->
@@ -202,7 +202,7 @@ Section ProofUartintr.
     cpu_own lvl eb pme C b -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x6c)) -∗
     ui_frame sp0 m0 -∗
-    ui_ret_cont Φ m0 av lvl eb pme C b -∗
+    ui_ret_cont m0 av lvl eb pme C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hav.
@@ -351,7 +351,7 @@ Section ProofUartintr.
      iteration ends on a fresh hart, and both [sie_cap_gpr] / [cpu_own] and
      the caller's obligation have to be re-anchored there before the back
      edge.  Hence the leading [∀ CIDk : CpuId] in the invariant. *)
-  Lemma ui_rx (γu : uart_names) (γv : disk_names) (Φ : mval -> iProp Σ)
+  Lemma ui_rx (γu : uart_names) (γv : disk_names) 
       (γs : list gname) (m0 : regfile) (av lvl : nat) (eb : bool)
       (pme : mword 64) (C : iProp Σ) (sp0 : mword 64) (b : bool) :
     m0 !!! Regidx csp_rs1 = sp0 ->
@@ -362,12 +362,12 @@ Section ProofUartintr.
       ⌜ ui_regs m0 M (pa_stk sp0 4) ⌝ -∗
       ⌜ M !!! Regidx Rs1 = uart_pa 5 ⌝ -∗
       ⌜ M !!! Regidx Rs2 = uart_pa 0 ⌝ -∗
-      kernel_text -∗ dev_inv γu γv -∗ procs_inv Φ γs -∗ panic_wp_any -∗
+      kernel_text -∗ dev_inv γu γv -∗ procs_inv γs -∗ panic_wp_any -∗
       sie_cap_gpr (CID := CIDe) M (av - 4) b pme -∗
       cpu_own (CID := CIDe) lvl eb pme C b -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x44)) -∗
       ui_frame sp0 m0 -∗
-      ui_ret_cont (CID0 := CIDe) Φ m0 av lvl eb pme C b -∗
+      ui_ret_cont (CID0 := CIDe)  m0 av lvl eb pme C b -∗
       WP (Loop : expr riscv_lang).
   Proof.
     intros Hsp0 Hlen Hlvl Hav.
@@ -394,7 +394,7 @@ Section ProofUartintr.
       cpu_own (CID := CIDk) lvl eb pme C b -∗
       pc_is (mword_of_int (KernelSyms.uartintr + 0x44)) -∗
       ui_frame sp0 m0 -∗
-      ui_ret_cont (CID0 := CIDk) Φ m0 av lvl eb pme C b -∗
+      ui_ret_cont (CID0 := CIDk)  m0 av lvl eb pme C b -∗
       WP (Loop : expr riscv_lang))%I with "[]" as "Loop".
     { iLöb as "IH".
       iIntros (CIDk M1) "%Hregs1 %Hls1 %Hls2 Hcg Hcnt Hpc Hfr Hcont".
@@ -420,9 +420,9 @@ Section ProofUartintr.
         { destruct Hregs1 as (A2 & A19 & A20 & A21 & A22 & A23 & A24 & A25 & A26 & A27).
           unfold ui_regs. split_and!; (rewrite upd_ne; [| reg_neq]); assumption. }
         iDestruct (cpu_own_transport CIDk CIDg lvl eb pme C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (ui_ret_cont_shift CIDk CIDg Φ m0 av lvl eb pme C b
+        iDestruct (ui_ret_cont_shift CIDk CIDg m0 av lvl eb pme C b
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
-        iApply (ui_tail Φ m0 (<[Regidx Ra5 := regval_into_reg (UG.rx_masked bt)]> M1)
+        iApply (ui_tail m0 (<[Regidx Ra5 := regval_into_reg (UG.rx_masked bt)]> M1)
                   av lvl eb pme C sp0 b Hrx Hsp0 Hav
                   with "Ht Hcg Hcnt Hpc Hfr Hcont").
       - (* a byte: hand it to consoleintr and go round again *)
@@ -450,7 +450,7 @@ Section ProofUartintr.
           apply callee_saved_insert_r; [vm_compute; reflexivity|].
           apply callee_saved_refl. }
         iDestruct (cpu_own_transport CIDk CIDj lvl eb pme C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (Consoleintr.wp_consoleintr_sconf Φ G1 γs pme lvl (av - 4)%nat eb C b
+        iApply (Consoleintr.wp_consoleintr_sconf G1 γs pme lvl (av - 4)%nat eb C b
                   ltac:(unfold consoleintr_stack, uartintr_stack in *; lia)
                   ltac:(intro r; apply rf_to_gmap_dom)
                   Hlen
@@ -469,7 +469,7 @@ Section ProofUartintr.
                   Mf (av - 4)%nat b ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi54 [-]").
         iIntros (CIDz Hsz). iNext. iIntros "Hcg Hpc". iEval (rewrite Jback) in "Hpc".
         iDestruct (cpu_own_transport CIDc CIDz lvl eb pme C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iDestruct (ui_ret_cont_shift CIDk CIDz Φ m0 av lvl eb pme C b
+        iDestruct (ui_ret_cont_shift CIDk CIDz m0 av lvl eb pme C b
                      ltac:(wp_next_chain) with "Hcont") as "Hcont".
         iApply ("IH" $! CIDz Mf with "[%] [%] [%] Hcg Hcnt Hpc Hfr Hcont").
         + apply (ui_regs_cs m0 M1 Mf); [exact HcsMf | exact Hregs1].
@@ -488,7 +488,7 @@ Section ProofUartintr.
      OFF (acquire is unbalanced), so everything up to the release collapses
      by [wp_next_off]; from release's exit onwards the index is [b] again. *)
   Lemma ui_after_tx `{CID0 : CpuId} (γl : gname) (γu : uart_names) (γv : disk_names)
-      (Φ : mval -> iProp Σ) (γs : list gname)
+       (γs : list gname)
       (m0 M : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (sp0 : mword 64) (b : bool) :
     ui_regs m0 M (pa_stk sp0 4) ->
@@ -498,13 +498,13 @@ Section ProofUartintr.
     (uartintr_stack <= av)%nat ->
     (match lvl with O => eb | S _ => false end) = b ->
     kernel_text -∗ dev_inv γu γv -∗ is_txlock γl γu -∗
-    procs_inv Φ γs -∗ panic_wp_any -∗
+    procs_inv γs -∗ panic_wp_any -∗
     sie_cap_gpr M (av - 4) false pme -∗
     cpu_own (S lvl) eb pme C false -∗ arm_pay lvl eb pme -∗
     pc_is (mword_of_int (KernelSyms.uartintr + 0x2e)) -∗
     locked γl cpu_id -∗ tx_res γu -∗
     ui_frame sp0 m0 -∗
-    ui_ret_cont Φ m0 av lvl eb pme C b -∗
+    ui_ret_cont m0 av lvl eb pme C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hregs Hsp0 Hlen Hlvl Hav Hbeq.
@@ -620,9 +620,9 @@ Section ProofUartintr.
         (rewrite /S2 upd_ne; [| reg_neq]); (rewrite /S1 upd_ne; [| reg_neq]);
         (rewrite /S0 upd_ne; [| reg_neq]); assumption. }
     iDestruct (cpu_own_transport CIDR CIDT3 lvl eb pme C b ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iDestruct (ui_ret_cont_shift CID0 CIDT3 Φ m0 av lvl eb pme C b
+    iDestruct (ui_ret_cont_shift CID0 CIDT3 m0 av lvl eb pme C b
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
-    iPoseProof (ui_rx γu γv Φ γs m0 av lvl eb pme C sp0 b Hsp0 Hlen Hlvl Hav) as "Rx".
+    iPoseProof (ui_rx γu γv γs m0 av lvl eb pme C sp0 b Hsp0 Hlen Hlvl Hav) as "Rx".
     iApply ("Rx" $! CIDT3 S2 with "[%] [%] [%] Ht Hdinv Hpinv Hpanic Hcg Hcnt Hpc Hfr Hcont");
       [exact HS2regs | exact HS2s1 | exact HS2s2].
   Qed.
@@ -631,14 +631,14 @@ Section ProofUartintr.
   (*  THE WHOLE FUNCTION.                                                 *)
   (* ------------------------------------------------------------------ *)
   Lemma wp_uartintr_sconf (γu : uart_names) (γv : disk_names) (γl : gname)
-      (Φ : mval -> iProp Σ) (γs : list gname)
+      (γs : list gname)
       (m : regfile) (av lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ) (b : bool)
-    : wp_uartintr_sconf_body γu γv γl Φ γs m av lvl eb pme C b.
+    : wp_uartintr_sconf_body γu γv γl γs m av lvl eb pme C b.
   Proof.
     cbv beta delta [wp_uartintr_sconf_body].
     intros pcE ret_tgt Hlen Hlvl Hav.
     iIntros "Hcg Hcnt #Ht Hpc #Hdinv #Htxl #Hpinv #Hpanic Hcont".
-    iAssert (ui_ret_cont Φ m av lvl eb pme C b) with "[Hcont]" as "Hcont".
+    iAssert (ui_ret_cont m av lvl eb pme C b) with "[Hcont]" as "Hcont".
     { iExact "Hcont". }
     iDestruct (is_txlock_lock with "Htxl") as "#Hlk".
     iDestruct (cpu_own_eb_agree with "Hcg Hcnt") as %Hbeq.
@@ -811,7 +811,7 @@ Section ProofUartintr.
     destruct HregsA' as (Wsp & W19 & W20 & W21 & W22 & W23 & W24 & W25 & W26 & W27).
     (* the caller's obligation now travels with the [false] stretch: re-anchor
        it once, at the hart acquire resumed on. *)
-    iDestruct (ui_ret_cont_shift CID CIDA Φ m av lvl eb pme C b
+    iDestruct (ui_ret_cont_shift CID CIDA m av lvl eb pme C b
                  ltac:(wp_next_chain) with "Hcont") as "Hcont".
     (* ============ the LSR read, under the lock (interrupts OFF) ============ *)
     iDestruct "HR" as (bcell l) "(Hcell & Hown & Hwand)".
@@ -866,7 +866,7 @@ Section ProofUartintr.
                 with "Hcg Hpc Hi2c [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc". iEval (rewrite P2e) in "Hpc".
-      iApply (ui_after_tx γl γu γv Φ γs m B2 av lvl eb pme C sp0 b
+      iApply (ui_after_tx γl γu γv γs m B2 av lvl eb pme C sp0 b
                 HB2regs Hspm Hlen Hlvl Hav Hbeq
                 with "Ht Hdinv Htxl Hpinv Hpanic Hcg Hcnt Hpay Hpc Htok [Hcell Hown Hwand] Hfr Hcont").
       iExists bcell, l. iFrame "Hcell Hown Hwand".
@@ -954,7 +954,7 @@ Section ProofUartintr.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
-      iApply (Wakeup.wp_wakeup_sconf Φ T3 γs (mycpu_ret (rget (CID := CIDA) T3 Rtp')) pme
+      iApply (Wakeup.wp_wakeup_sconf T3 γs (mycpu_ret (rget (CID := CIDA) T3 Rtp')) pme
                 (S lvl) (av - 4)%nat eb C false
                 ltac:(unfold uartintr_stack in Hav; lia)
                 ltac:(intro r; apply rf_to_gmap_dom)
@@ -978,7 +978,7 @@ Section ProofUartintr.
                 Mw (av - 4)%nat false ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi6a [-]").
       iApply wp_next_off_intro.
       iNext. iIntros "Hcg Hpc". iEval (rewrite Jrel) in "Hpc".
-      iApply (ui_after_tx γl γu γv Φ γs m Mw av lvl eb pme C sp0 b
+      iApply (ui_after_tx γl γu γv γs m Mw av lvl eb pme C sp0 b
                 HregsW Hspm Hlen Hlvl Hav Hbeq
                 with "Ht Hdinv Htxl Hpinv Hpanic Hcg Hcnt Hpay Hpc Htok HR Hfr Hcont").
   Qed.

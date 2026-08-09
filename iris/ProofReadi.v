@@ -296,7 +296,7 @@ Section ReadiRet.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma rd_ret `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma rd_ret `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -606,7 +606,7 @@ Section ReadiJoin.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma rd_join `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma rd_join `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -718,7 +718,7 @@ Section ReadiJoin.
       iExact "HfE". }
     iDestruct (cpu_own_transport CID0 CID2 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (rd_ret (CID0 := CID2) Φ γfs bn γf dev ip bm data dn
+    iApply (rd_ret (CID0 := CID2)  γfs bn γf dev ip bm data dn
               user off n tot dst_olds V P' pidv dq dqd j m T1 K C b
               HK HT1sp HT1s2 HT1s3 HT1s8 HT1s9 HT1s10 HT1s11 Hext Htotle
               ltac:(rewrite HT1a0; exact Harm)
@@ -739,7 +739,7 @@ Section ReadiExit.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma rd_exit `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma rd_exit `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (γf : gname) (dev : mword 32)
       (ip : mword 64) (bm : blkmap) (data : nat -> list (bv 8)) (dn : dinode)
       (user : bool) (off n tot : nat) (dst_olds : nat -> bv 8)
@@ -937,7 +937,7 @@ Section ReadiExit.
       iSplitL "HfD"; [iExists _; iExact "HfD"|]. iExact "HfE". }
     iDestruct (cpu_own_transport CID0 CID6 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-    iApply (rd_join (CID0 := CID6) Φ γfs bn γf dev ip bm data dn
+    iApply (rd_join (CID0 := CID6)  γfs bn γf dev ip bm data dn
               user off n tot dst_olds V P' ans pidv dq dqd j m Q5 K C b
               HK HQ5sp HQ5s3 HQ5s2 HQ5s8 HQ5s9 HQ5s10 HQ5s11 Hext Htotle Harm
               with "Hcg Hcnt Htext Hpc Hframe Hpark Hidev
@@ -984,7 +984,7 @@ Section ReadiLoop.
     repeat rewrite add_vec_zero_l;
     first [ reflexivity | assumption ].
 
-  Local Lemma rd_loop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma rd_loop `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1027,8 +1027,8 @@ Section ReadiLoop.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     kalloc_env γa None -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
@@ -1164,7 +1164,7 @@ Section ReadiLoop.
     iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDa3) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbm : (K_bmap <= K - 14)%nat) by (unfold K_bmap; lia).
-    iApply (BM.wp_bmap_noalloc_sconf Φ γs j γl γu γd γk pd pav pu bn γfs
+    iApply (BM.wp_bmap_noalloc_sconf γs j γl γu γd γk pd pav pu bn γfs
               cov logstart dev ip bm data fbn pidv (rd_q user dq) dqd
               A3 (K - 14)%nat true C b
               HKbm Hgeom0 Hfbnlt Hwf Hbnzz Hj Hgl HA3a0 HA3a1 eq_refl
@@ -1298,7 +1298,7 @@ Section ReadiLoop.
     iDestruct (cpu_own_transport CIDa4 CIDa8 0 true (proc_addr j) C b
                  ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
     assert (HKbr : (K_bread <= K - 14)%nat) by (unfold K_bread; lia).
-    iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (blkmap_get bm fbn)
               (rd_q user dq)
               B3 (K - 14)%nat true C b
@@ -1834,7 +1834,7 @@ Section ReadiLoop.
                      (m !!! Regidx Ra2 : mword 64) n
                      (rd_delivered data dst_olds off (tot + mm)%nat)
                      with "Hdst2") as "[Hppid Hdstback]".
-        iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kkb
+        iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kkb
                   pidv dev (blkmap_get bm fbn) (rd_q user dq) F2 (K - 14)%nat true
                   (proc_addr j) C (data fbn) bsdB dB b
                   HKbl Hkklt HF2a0
@@ -1997,7 +1997,7 @@ Section ReadiLoop.
           iPoseProof (rdi_0c8 with "Htext") as "Hjc8".
           iDestruct (cpu_own_transport CIDc7 CIDc11 0 true (proc_addr j) C b
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-          iApply (rd_exit (CID0 := CIDc11) Φ γfs bn γf dev ip bm data dn
+          iApply (rd_exit (CID0 := CIDc11)  γfs bn γf dev ip bm data dn
                     user off n (tot + mm)%nat dst_olds V P2
                     (mword_of_int (Z.of_nat (tot + mm)) : mword 64)
                     pidv dq dqd j
@@ -2101,7 +2101,7 @@ Section ReadiLoop.
                      (m !!! Regidx Ra2 : mword 64) n
                      (rd_delivered data dst_olds off (tot + mm)%nat)
                      with "Hdst2") as "[Hppid Hdstback]".
-        iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) kkb
+        iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) kkb
                   pidv dev (blkmap_get bm fbn) (rd_q user dq) J2 (K - 14)%nat true
                   (proc_addr j) C (data fbn) bsdB dB b
                   HKbl Hkklt HJ2a0
@@ -2149,7 +2149,7 @@ Section ReadiLoop.
         iPoseProof (rdi_0bc with "Htext") as "Hjbc".
         iDestruct (cpu_own_transport CIDd7 CIDd8 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (rd_exit (CID0 := CIDd8) Φ γfs bn γf dev ip bm data dn
+        iApply (rd_exit (CID0 := CIDd8)  γfs bn γf dev ip bm data dn
                   user off n tot dst_olds V P2 (mword_of_int (-1) : mword 64)
                   pidv dq dqd j
                   (RI + 0xb2) (RI + 0xb4) (RI + 0xb6) (RI + 0xb8) (RI + 0xba)
@@ -2284,7 +2284,7 @@ Section ReadiMain.
     repeat rewrite add_vec_zero_l;
     first [ reflexivity | assumption ].
 
-  Lemma wp_readi_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_readi_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -2300,7 +2300,7 @@ Section ReadiMain.
       (pidv : mword 32) (dq dqd : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_readi_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs γa γf
+    : wp_readi_sconf_body γs j γl γu γd γk pd pav pu bn γfs γa γf
                           cov logstart dev ip bm data dn
                           user off n dst_olds V pidv dq dqd m K eb C b.
   Proof.
@@ -2902,7 +2902,7 @@ Section ReadiMain.
         iEval (rewrite Htgtd8) in "Hpc".
         iDestruct (cpu_own_transport CID CIDz3 0 true (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
-        iApply (rd_join (CID0 := CIDz3) Φ γfs bn γf dev ip bm data dn
+        iApply (rd_join (CID0 := CIDz3)  γfs bn γf dev ip bm data dn
                   user off n 0%nat dst_olds V (pv_upt V)
                   (mword_of_int (Z.of_nat 0%nat) : mword 64)
                   pidv dq dqd j m Z1 K C b
@@ -3078,7 +3078,7 @@ Section ReadiMain.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID) (CIDb := CIDu9) ltac:(wp_next_chain)
                    with "Hcont") as "Hcont".
-      iApply (rd_loop (CID0 := CIDu9) Φ γs j γl γu γd γk pd pav pu γfs bn γf γa
+      iApply (rd_loop (CID0 := CIDu9)  γs j γl γu γd γk pd pav pu γfs bn γf γa
                 cov logstart dev ip bm data dn user off n nc szn dst_olds V
                 (m !!! Regidx Ra1 : mword 64) pidv dq dqd m K C b
                 HK Hgeom0 Hwf Hcov Hsznmax

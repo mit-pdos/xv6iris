@@ -118,7 +118,7 @@ Section SystemBoot.
       WP (PlicLoopE gen_id : expr riscv_lang) @ ⊤.
   Proof.
     intro Hbf. iIntros "Hres".
-    iMod (boot_shared_alloc g XV6_DISK_BYTES (fun _ => True%I) Hbf with "Hres")
+    iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
       as (Hfd γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hhalves & Hpark & Hpst & Huart &
@@ -143,7 +143,7 @@ Section SystemBoot.
                Hpages".
       { (* THE BOOT HART: the arm that consumes the whole supply. *)
         iDestruct "Hh0" as (iv) "Hh0".
-        iApply (boot_hart_primary (CID := 0%fin) (fun _ => True%I)
+        iApply (boot_hart_primary (CID := 0%fin)
                   (g.(gregs) 0%fin) iv DfracDiscarded γd γv ps l0 b0 c0
                   (boot_regs_of_facts g Hbf 0%fin) fin_0_z Hprun Hplen Hlive
                   with "Htext Hdata Hh0 Hpanic Hstarted Hlk Hgl Hhalves Hpark Hpst
@@ -153,7 +153,7 @@ Section SystemBoot.
       iApply (big_sepL_impl with "Hhrest").
       iIntros "!>" (k c _) "Hh".
       iDestruct "Hh" as (iv) "Hh".
-      iApply (boot_hart_secondary (CID := FS c) (fun _ => True%I)
+      iApply (boot_hart_secondary (CID := FS c)
                 (g.(gregs) (FS c)) iv DfracDiscarded γd γv
                 (boot_regs_of_facts g Hbf (FS c)) (fin_FS_nz c)
                 with "Htext Hdata Hh Hpanic Hstarted"). }

@@ -157,7 +157,7 @@ Section ItruncTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -185,8 +185,8 @@ Section ItruncTail.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     it_frame m -∗
     running_claim j -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
@@ -296,7 +296,7 @@ Section ItruncTail.
     assert (HKiu : (K_iupdate <= K - 6)%nat) by (unfold K_iupdate; lia).
     assert (Hdirlen : length (bm_dir bm_empty) = NDIRECT)
       by (rewrite /bm_empty; cbn [bm_dir]; apply length_replicate).
-    iApply (IU.wp_iupdate_sconf Φ γs j γl γu γd γk pd pav pu bn γ γfs
+    iApply (IU.wp_iupdate_sconf γs j γl γu γd γk pd pav pu bn γ γfs
               cov logstart inodestart dev ip inum (di_trunc dn) bm_empty ds u
               pidv dq dqd dqn dqs T1 (K - 6)%nat true C b
               HKiu Hgeom Hist Hicov Hilog Hdswf (di_trunc_addrs dn) Hdirlen
@@ -586,7 +586,7 @@ Section ItruncDLoop.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
-  Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Definition it_dexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
@@ -608,7 +608,7 @@ Section ItruncDLoop.
                      NDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_dloop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma it_dloop `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (jx : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -645,8 +645,8 @@ Section ItruncDLoop.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     running_claim jx -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
@@ -656,7 +656,7 @@ Section ItruncDLoop.
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     bslots bn 2 -∗
     it_dir_state γ γfs ip bm data cov logstart bmapstart size used bn k -∗
-    it_dexit (CID0 := CID0) Φ γ γfs bn cov logstart bmapstart size used dev
+    it_dexit (CID0 := CID0)  γ γfs bn cov logstart bmapstart size used dev
              ip bm data pidv dq dqd dqb jx m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -953,7 +953,7 @@ Section ItruncDLoop.
       iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID3)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
-      iApply (BF.wp_bfree_gen Φ γs jx γl γu γd γk pd pav pu bn γ γfs
+      iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bmapstart size dev (used ∖ bm_dir_freed bm k)
                 (bm_dir bm !!! k : mword 32) (data k) u' cr Sb
                 pidv dq dqb L3 (K - 6)%nat true C b
@@ -1134,7 +1134,7 @@ Section ItruncELoop.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
-  Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
       (γ : log_names) (γfs : fs_names) (bn : bio_names) (γd : disk_names)
       (cov : gset Z) (logstart bmapstart size : Z) (used : gset Z)
       (dev : mword 32) (ip : mword 64) (bm : blkmap)
@@ -1157,7 +1157,7 @@ Section ItruncELoop.
                      NINDIRECT -∗
         WP (Loop : expr riscv_lang))%I.
 
-  Local Lemma it_eloop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma it_eloop `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (jx : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1196,8 +1196,8 @@ Section ItruncELoop.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     log_ctx γ bn γfs cov logstart dev -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     running_claim jx -∗
     p_pid (proc_addr jx) ↦₄{dq} pidv -∗
     i_dev ip ↦₄{dqd} dev -∗
@@ -1208,7 +1208,7 @@ Section ItruncELoop.
     bslots bn 2 -∗
     buf_own (bpa kk) (bm_ind bm) dsk (ind_bytes (bm_ent bm)) -∗
     it_ent_state γ γfs bm data cov logstart bmapstart size used q -∗
-    it_eexit (CID0 := CID0) Φ γ γfs bn γd cov logstart bmapstart size used dev
+    it_eexit (CID0 := CID0)  γ γfs bn γd cov logstart bmapstart size used dev
              ip bm data kk dsk pidv dq dqd dqb jx m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -1481,7 +1481,7 @@ Section ItruncELoop.
       iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CIDz)
                    ltac:(wp_next_chain) with "Hexit") as "Hexit".
       assert (HKbf : (K_bfree <= K - 6)%nat) by (unfold K_bfree; lia).
-      iApply (BF.wp_bfree_gen Φ γs jx γl γu γd γk pd pav pu bn γ γfs
+      iApply (BF.wp_bfree_gen γs jx γl γu γd γk pd pav pu bn γ γfs
                 cov logstart bmapstart size dev
                 (used ∖ (bm_dir_freed bm NDIRECT ∪ bm_ent_freed bm q))
                 (bm_ent bm !!! q : mword 32) (data (NDIRECT + q)%nat) u' cr Sb

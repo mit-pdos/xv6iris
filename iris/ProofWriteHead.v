@@ -468,7 +468,7 @@ Section WriteHeadDefs.
   (* ---------------------------------------------------------------- *)
   (*  the continuation, the frame and the register threading            *)
   (* ---------------------------------------------------------------- *)
-  Definition wh_cont `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Definition wh_cont `{GEN : GenId} `{CID0 : CpuId} 
       (γfs : fs_names) (bn : bio_names) (logstart : Z) (n : nat)
       (W : list (mword 32)) (L : gmap Z (list (bv 8)))
       (pidv : mword 32) (dq : dfrac) (j : nat)
@@ -523,7 +523,7 @@ Section WriteHeadBlocks.
   (*  +0x46 .. +0x5c : bwrite, the logged-view move, brelse, epilogue.   *)
   (*  Entered from the loop's exit AND from the [blez] shortcut (n = 0). *)
   (* ================================================================== *)
-  Local Lemma wh_tail `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wh_tail `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -558,8 +558,8 @@ Section WriteHeadBlocks.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     running_claim j -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -576,7 +576,7 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
-    wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
+    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K true C b Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4 Henc Hregs HMs1.
@@ -657,7 +657,7 @@ Section WriteHeadBlocks.
       change (2 ^ 32)%Z with 4294967296%Z. lia. }
     assert (Hdec_early : hdr_dec (f <$> seq 0 1024) = (n, map uint W))
       by exact (wh_hdr_dec f n W HnW HnB Hf4 Henc).
-    iApply (BW.wp_bwrite_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BW.wp_bwrite_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) k pidv dev bno dq T2 (K - 4)%nat true C
               (f <$> seq 0 1024) bsd0 b Q
               HKbw Hbnolt eq_refl Hj Hgl Hk HT2a0 eq_refl
@@ -756,7 +756,7 @@ Section WriteHeadBlocks.
                  with "Hcont") as "Hcont".
     assert (HKbl : (K_brelse <= K - 4)%nat)
       by (unfold K_brelse, K_write_head in *; lia).
-    iApply (BL.wp_brelse_sconf Φ γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
+    iApply (BL.wp_brelse_sconf γs bn (fs_view γfs γd dev cov) k pidv dev bno dq
               T4 (K - 4)%nat true (proc_addr j) C
               (f <$> seq 0 1024) (f <$> seq 0 1024) d0 b
               HKbl Hk HT4a0
@@ -996,7 +996,7 @@ Section WriteHeadBlocks.
   (*  A fuel induction on the entries still to copy; the exit test is a  *)
   (*  POINTER compare read back as an index compare.                    *)
   (* ================================================================== *)
-  Local Lemma wh_loop `{GEN : GenId} `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma wh_loop `{GEN : GenId} `{CID0 : CpuId} 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1035,8 +1035,8 @@ Section WriteHeadBlocks.
     panic_wp_any -∗
     bio_ctx bn (fs_view γfs γd dev cov) -∗
     p_pid (proc_addr j) ↦₄{dq} pidv -∗
-    procs_inv Φ γs -∗
-    scheds_inv Φ γs -∗
+    procs_inv γs -∗
+    scheds_inv γs -∗
     running_claim j -∗
     dev_inv γu γd -∗
     disk_geom γd pd pav pu -∗
@@ -1053,7 +1053,7 @@ Section WriteHeadBlocks.
     (∀ bs' : list (bv 8), ⌜length bs' = 1024%nat⌝ -∗ ⌜hdr_n bs' = Z.of_nat n⌝ -∗
        ⌜hdr_dec bs' = (n, map uint W)⌝ -∗
        disk_write_permit gen_id (Some ((1024 * log_hdr_bno logstart)%Z, bs')) Q) -∗
-    wh_cont (CID0 := CID0) Φ γfs bn logstart n W L pidv dq j m K true C b Q -∗
+    wh_cont (CID0 := CID0)  γfs bn logstart n W L pidv dq j m K true C b Q -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hbnolt Hbnou Hj Hgl HnW HnB Hk.
@@ -1234,7 +1234,7 @@ Section WriteHeadBlocks.
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID0) (CIDb := CID5) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-      iApply (wh_tail (CID0 := CID5) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
+      iApply (wh_tail (CID0 := CID5)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev n W L pidv dq kk bno bsh bs0 bsd0 d0 f' m S3 K C b Q
                 HK Hbnolt Hbnou Hj Hgl HnW HnB Hk Hf4'
                 ltac:(intros i' jj Hi' Hjj; exact (Henc' i' jj ltac:(lia) Hjj))
@@ -1282,7 +1282,7 @@ Section ProofWriteHead.
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
-  Lemma wp_write_head_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_write_head_sconf 
       (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
@@ -1293,7 +1293,7 @@ Section ProofWriteHead.
       (pidv : mword 32) (dq : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool) (Q : iProp Σ)
-    : wp_write_head_sconf_body Φ γs j γl γu γd γk pd pav pu bn γfs
+    : wp_write_head_sconf_body γs j γl γu γd γk pd pav pu bn γfs
                                cov logstart dev n W L pidv dq m K eb C b Q.
   Proof.
     cbv beta delta [wp_write_head_sconf_body].
@@ -1320,7 +1320,7 @@ Section ProofWriteHead.
     assert (Hcovin : uint (mword_of_int logstart : mword 32)
                      ∈ bv_cov (fs_view γfs γd dev cov))
       by (rewrite Huint; exact Hhdrcov).
-    iAssert (wh_cont (CID0 := CID) Φ γfs bn logstart n W L pidv dq j m K true C b Q)%I
+    iAssert (wh_cont (CID0 := CID)  γfs bn logstart n W L pidv dq j m K true C b Q)%I
       with "[Hcont]" as "Hcont"; [rewrite /wh_cont; iExact "Hcont"|].
     iPoseProof (whi_00 with "Htext") as "Hi00".
     iPoseProof (whi_02 with "Htext") as "Hi02".
@@ -1558,7 +1558,7 @@ Section ProofWriteHead.
     iDestruct (wp_next_shift (CIDa := CID) (CIDb := CID11) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
     assert (HKbr : (K_bread <= K - 4)%nat) by (unfold K_bread; lia).
-    iApply (BR.wp_bread_sconf Φ γs j γl γu γd γk pd pav pu bn
+    iApply (BR.wp_bread_sconf γs j γl γu γd γk pd pav pu bn
               (fs_view γfs γd dev cov) pidv dev (mword_of_int logstart : mword 32) dq
               mA (K - 4)%nat true C b
               HKbr Hbnolt eq_refl Hcovin eq_refl Hj Hgl HmAa0 HmAa1 eq_refl
@@ -1715,7 +1715,7 @@ Section ProofWriteHead.
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID16) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-      iApply (wh_tail (CID0 := CID16) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
+      iApply (wh_tail (CID0 := CID16)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev 0%nat W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 f1 m B2 K C b Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA Hf14
@@ -1876,7 +1876,7 @@ Section ProofWriteHead.
                    with "Hcnt") as "Hcnt".
       iDestruct (wp_next_shift (CIDa := CID11) (CIDb := CID21) ltac:(wp_next_chain)
                  with "Hcont") as "Hcont".
-      iApply (wh_loop (CID0 := CID21) Φ γs j γl γu γd γk pd pav pu bn γfs cov logstart
+      iApply (wh_loop (CID0 := CID21)  γs j γl γu γd γk pd pav pu bn γfs cov logstart
                 dev (S n') W L pidv dq kk (mword_of_int logstart : mword 32)
                 bsh bs0 bsd0 d0 m K C b (S n') Q
                 HK Hbnolt Huint Hj Hgl HnW HnB HA 0%nat B7 f1

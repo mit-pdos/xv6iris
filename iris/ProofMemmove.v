@@ -181,7 +181,7 @@ Section ProofMemmove.
   (*  post-loop arm use it.  Non-recursive: a single leading (shadowing)     *)
   (*  hart [CID0] suffices, resolved fresh by unification at each call.     *)
   (* =================================================================== *)
-  Local Lemma mm_epilogue `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma mm_epilogue `{CID0 : CpuId} 
       (m0 M : regfile) (n : nat) (b : bool) (pcur : mword 64) :
     let sp0 := (m0 !!! Regidx csp_rs1 : mword 64) in
     let ra0 := (m0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -320,7 +320,7 @@ Section ProofMemmove.
   (*  recursive step, with [Hchain] threading "still traces back to CIDh"     *)
   (*  through the recursion. *)
   (* =================================================================== *)
-  Local Lemma mm_loop (Φ : mval -> iProp Σ)
+  Local Lemma mm_loop 
       (p_src p_dst : mword 64) (len : nat) (src_bytes dst_olds : nat -> bv 8) (n : nat)
       (b : bool) (pcur : mword 64) (CIDh : CpuId) :
     (Z.of_nat len < 2 ^ 64)%Z ->
@@ -528,7 +528,7 @@ Section ProofMemmove.
   (*  this, so none of it is proved twice.  Non-recursive: a single          *)
   (*  leading (shadowing) hart [CID0] suffices, as for [mm_epilogue].        *)
   (* =================================================================== *)
-  Local Lemma mm_fwd `{CID0 : CpuId} (Φ : mval -> iProp Σ)
+  Local Lemma mm_fwd `{CID0 : CpuId} 
       (m0 M : regfile) (n len : nat) (src_bytes dst_olds : nat -> bv 8) (b : bool) (pcur : mword 64) :
     let sp0 := (m0 !!! Regidx csp_rs1 : mword 64) in
     let ra0 := (m0 !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -666,7 +666,7 @@ Section ProofMemmove.
     { unfold M4. rewrite upd_ne; [| vm_compute; discriminate].
       unfold M3. rewrite upd_eq. unfold regval_into_reg. apply add_vec64_comm. }
     (* ---- +0x18..+0x24: the copy loop ---- *)
-    iApply (mm_loop Φ p_src p_dst len src_bytes dst_olds (n - 2) b pcur CID4 Hlen64
+    iApply (mm_loop p_src p_dst len src_bytes dst_olds (n - 2) b pcur CID4 Hlen64
               len 0%nat M4 CID4 ltac:(intros _; reflexivity) ltac:(lia) ltac:(lia)
               HM4a1 HM4a4 HM4a5
               with "Hcg Htext Hpc Hsrc Hdst [-]").
@@ -686,7 +686,7 @@ Section ProofMemmove.
       rewrite (callee_saved_lookup Hcsf c Hc).
       unfold M4, M3, M2, M1. strip_caller Hc.
       exact (HMcs c Hc Hc8 Hcsp). }
-    iApply (mm_epilogue Φ m0 mf n b pcur Hn Hmfsp HmfCs
+    iApply (mm_epilogue m0 mf n b pcur Hn Hmfsp HmfCs
               with "Htext Hcg Hpc Hb1 Hb2 [-]").
     iIntros (CID5 Hs5 mfin) "Hcg Hpc %Ha0fin %Hcsfin".
     iSpecialize ("Hcont" $! CID5 with "[%]"); [wp_next_chain|].
@@ -832,7 +832,7 @@ Section ProofMemmove.
                         (sign_extend' 64 (sign_extend' 13 (concat_vec imm8_beqz ('b"0"))))
                       = mword_of_int (KernelSyms.memmove + 0x28)) by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpsuf) in "Hpc".
-      iApply (mm_epilogue (fun _ => True%I) m0 m2 n b pcur Hn Hm2sp Hm2cs
+      iApply (mm_epilogue m0 m2 n b pcur Hn Hm2sp Hm2cs
                 with "Htext Hcg Hpc Hb1 Hb2 [-]").
       iIntros (CID6 Hs6 mfin) "Hcg Hpc %Ha0fin %Hcsfin".
       iSpecialize ("Hcont" $! CID6 with "[%]"); [wp_next_chain|].
@@ -957,7 +957,7 @@ Section ProofMemmove.
                          = mword_of_int (KernelSyms.memmove + 0x0e))
             by (apply bv_eq; vm_compute; reflexivity).
           iEval (rewrite Hp0e) in "Hpc".
-          iApply (mm_fwd (fun _ => True%I) m0 m5 n (S len') src_bytes dst_olds b pcur Hn Hlen0 Hlen32
+          iApply (mm_fwd m0 m5 n (S len') src_bytes dst_olds b pcur Hn Hlen0 Hlen32
                     Hm5a0 ltac:(unfold m5, m4, m3;
                                 repeat (rewrite upd_ne; [| vm_compute; discriminate]);
                                 exact Hm2a1)
@@ -1007,7 +1007,7 @@ Section ProofMemmove.
                   with "Hcg Hpc Hi0a [-]").
         iIntros (CID6 Hs6) "Hcg Hpc".
         iEval (rewrite Hp0e) in "Hpc".
-        iApply (mm_fwd (fun _ => True%I) m0 m2 n (S len') src_bytes dst_olds b pcur Hn Hlen0 Hlen32
+        iApply (mm_fwd m0 m2 n (S len') src_bytes dst_olds b pcur Hn Hlen0 Hlen32
                   Hm2a0 Hm2a1 Hm2a2 Hm2sp Hm2cs
                   with "Htext Hcg Hpc Hb1 Hb2 Hsrc Hdst [-]").
         iIntros (CID7 Hs7 mfin) "Hcg Hpc Hsrc Hdst %Ha0fin %Hcsfin".

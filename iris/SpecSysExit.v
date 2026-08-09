@@ -91,7 +91,7 @@ Definition wp_sys_exit_sconf_body
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
-    (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+     (γs : list gname) (j : nat) (γl : gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
     (pd pav pu : mword 64)
     (bn : bio_names)
@@ -123,8 +123,8 @@ Definition wp_sys_exit_sconf_body
      lives there); kexit needs none of it *)
   kernel_text -∗ kernel_data -∗ pc_is pcE -∗
   (* the proc table, and the scheduler chain the park hands itself to *)
-  procs_inv Φ γs -∗
-  scheds_inv Φ γs -∗
+  procs_inv γs -∗
+  scheds_inv γs -∗
   panic_wp_any -∗
   (* the running-thread bundle -- consumed: this thread parks forever *)
   running_claim j -∗
@@ -160,7 +160,7 @@ Module Type SYSEXIT.
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
-      (Φ : mval -> iProp Σ) (γs : list gname) (j : nat) (γl : gname)
+      (γs : list gname) (j : nat) (γl : gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)
       (pd pav pu : mword 64)
       (bn : bio_names)
@@ -171,7 +171,7 @@ Module Type SYSEXIT.
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64),
-      wp_sys_exit_sconf_body γft γf γw Φ γs j γl γu γd γk pd pav pu bn γ γfs
+      wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
                              cov logstart dev ip dqi γkl γka on fn
                              m av eb C b pid V v0.
 End SYSEXIT.

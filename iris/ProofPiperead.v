@@ -383,12 +383,12 @@ Section ProofPiperead.
   Notation Ra4 := (mword_of_int 14 : mword 5).
   Notation Ra5 := (mword_of_int 15 : mword 5).
 
-  Lemma wp_piperead_sconf (γa : gname) (γf : gname) (Φ : mval -> iProp Σ)
+  Lemma wp_piperead_sconf (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)
       (γl : gname) (γp : pipe_names) (w : bool) (q : Qp)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (pid : mword 32) (V : pprivate) (n : Z) (b : bool)
-    : wp_piperead_sconf_body γa γf Φ γs j γlp γl γp w q m av eb C pid V n b.
+    : wp_piperead_sconf_body γa γf γs j γlp γl γp w q m av eb C pid V n b.
   Proof.
     cbv beta delta [wp_piperead_sconf_body].
     intros pcE pj pi ret_tgt Hj Hjl Hlen Ha2 Hnrng Hav Heb. subst eb.
@@ -1332,7 +1332,7 @@ Section ProofPiperead.
           by (rewrite rget_tp; reflexivity).
         assert (Hwnz : eq_vec (zero_reg : mword 64) (mycpu_ret (rget X2 Rtp)) = false)
           by (rewrite rget_tp; apply mycpu_ret_nonzero; apply tp_ok_cid).
-        iApply (Wakeup.wp_wakeup_sconf Φ X2 γs (mycpu_ret cid_word) pj 1%nat (av - 12)%nat true C false
+        iApply (Wakeup.wp_wakeup_sconf X2 γs (mycpu_ret cid_word) pj 1%nat (av - 12)%nat true C false
                   HwK HwdomX Hlen Hwa0f Hwnz pr_lvl1
                   with "Hcg Hown Htext Hpc Hpanic Hpinv").
         iApply wp_next_off_intro. iIntros (Mw) "[%Hwcs %Hwdom] Hcg Hown Htext2 Hpc". rgall.
@@ -2311,7 +2311,7 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
-      iApply (Killed.wp_killed_sconf Φ γs j γlp L3 (av - 12)%nat 1%nat true pj C false
+      iApply (Killed.wp_killed_sconf γs j γlp L3 (av - 12)%nat 1%nat true pj C false
                 HL3a0 Hj Hjl pr_lvl1 ltac:(lia)
                 with "Hcg Hown Htext Hpc Hpinv Hpanic").
       iApply wp_next_off_intro. iIntros (mk kl) "[%Hkcs %Hka0] Hcg Hown Hpc". rgall.
@@ -2504,7 +2504,7 @@ Section ProofPiperead.
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_insert_r; [vm_compute; reflexivity|].
         apply callee_saved_refl. }
-      iApply (SleepGen.wp_sleep_gen_sconf Φ γs j γlp γl pi (pipe_res γp pi)
+      iApply (SleepGen.wp_sleep_gen_sconf γs j γlp γl pi (pipe_res γp pi)
                 (pipe_ref γp w q) (pipe_dead γl γp) L6 (av - 12)%nat true C
                 Hj Hjl HL6lka eq_refl ltac:(lia)
                 ltac:(iApply pipe_ref_dead) ltac:(intros ?i; iApply locked_dead)

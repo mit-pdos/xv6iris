@@ -83,13 +83,13 @@ Section ProofSwtch.
     nth 1 (callee_img m) d = m !!! Regidx csp_rs1.
   Proof. unfold callee_img, ctx_regs, csp_rs1. cbn [map nth]. reflexivity. Qed.
 
-  Lemma wp_swtch_sconf (Φ : mval -> iProp Σ)
+  Lemma wp_swtch_sconf
       (P : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
            mword 64 -d> mword 64 -d> iPropO Σ)
       (An Ao : ctx_adm)
       (oldc newc : mword 64) (m0 : regfile) (old_vs : list (mword 64))
       (av : nat) (eb : bool) (p : mword 64) :
-    wp_swtch_sconf_body Φ P An Ao oldc newc m0 old_vs av eb p.
+    wp_swtch_sconf_body P An Ao oldc newc m0 old_vs av eb p.
   Proof.
     cbv beta delta [wp_swtch_sconf_body].
     iIntros (Hlen_old Holdc Hnewc Hadm)
@@ -131,7 +131,7 @@ Section ProofSwtch.
        and its resume wand demands cpu_own at that SAME index p -- so the
        cpu_own we already hold fits with no retune, no equation. ---- *)
     iApply fupd_wp.
-    iEval (rewrite (valid_context_unfold Φ P An newc p)
+    iEval (rewrite (valid_context_unfold P An newc p)
                    /valid_context_pre !bi.later_exist) in "Hvalidnew".
     iDestruct "Hvalidnew" as (new_vs av_t) "Hvalidnew".
     iDestruct "Hvalidnew" as "(>%Hlen_new & >%Hal_new & >Hnewcells & >Hstk_t & Hnewwand)".
@@ -202,9 +202,9 @@ Section ProofSwtch.
        wand.  Pack p := the spec's [p] param; the caller continuation [Hwold]
        is already [∀ m eb', … cpu_own γ 1 eb' p emp …], matching the record's
        [∀ m eb'] wand at that same p. ---- *)
-    iAssert (valid_context Φ P Ao oldc p)
+    iAssert (valid_context P Ao oldc p)
       with "[Holdpart Hstk Hwold]" as "Hvoldc".
-    { rewrite (valid_context_unfold Φ P Ao oldc p) /valid_context_pre.
+    { rewrite (valid_context_unfold P Ao oldc p) /valid_context_pre.
       iExists (callee_img m0), av.
       iSplit.
       { iPureIntro. unfold callee_img, ctx_regs; cbn. reflexivity. }
