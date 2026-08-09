@@ -531,6 +531,19 @@ Lemma proc_addr_unsigned (i : nat) :
   bv_unsigned (proc_addr i) = KernelSyms.proc + proc_size * Z.of_nat i.
 Proof. intro Hi. apply proc_addr_unsigned_le. lia. Qed.
 
+(* no proc's address is null -- the array sits far above 0, which is what
+   lets [IntrDefs.cpu_claim]'s [zero_reg] disjunct be refuted for a real
+   proc.  [zero_reg] there means the SCHEDULER is running. *)
+Lemma proc_addr_nonzero (i : nat) :
+  (i < NPROC)%nat -> proc_addr i <> (zero_reg : mword 64).
+Proof.
+  intros Hi Heq.
+  assert (Hz : bv_unsigned (proc_addr i) = 0)
+    by (rewrite Heq; vm_compute; reflexivity).
+  rewrite (proc_addr_unsigned i Hi) in Hz.
+  unfold KernelSyms.proc, proc_size in Hz. lia.
+Qed.
+
 Lemma p_context_unsigned (i : nat) :
   (i < NPROC)%nat ->
   bv_unsigned (p_context (proc_addr i))

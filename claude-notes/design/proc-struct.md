@@ -646,6 +646,46 @@ Lemma proc_slots_running (j : nat) (st : mword 32) :
 
 ### Half #2's home while interrupts are on
 
+It is a conjunct of `sie_arm true p` — **not** of `cpu_cells`.
+
+That distinction is the whole point and is easy to get wrong, because
+`cpu_cells` sits *inside* `sie_arm true p` (via `cpu_hart 0 true p`), so
+putting the claim there looks like the same thing for a fraction of the
+cost. It isn't:
+
+```coq
+Definition cpu_own (n : nat) (eb : bool) (p : mword 64)
+    (C : iProp Σ) (b : bool) : iProp Σ :=
+  ((if b then ⌜ n = 0%nat /\ eb = true ⌝ else cpu_hart n eb p) ∗ C)%I.
+```
+
+`cpu_hart` is *also* what the thread carries once interrupts are off, so a
+claim placed in `cpu_cells` must hold **continuously**, across the whole
+interrupts-off window. It cannot. In `yield`:
+
+```c
+acquire(&p->lock);     // push_off: arm dismantled, thread holds the payload
+p->state = RUNNABLE;   // c->proc still &p, but the state is now unclaimed
+sched();               // swtch away; the scheduler releases p->lock
+```
+
+After that store the state is `RUNNABLE`, which is `unclaimed`, so
+`pstate_lock` owns *both* halves and there is no spare half for the hart to
+be holding — while `c->proc` still names `p`. A `cpu_cells` conjunct is
+unsatisfiable there. `pstate_whole_split` at an unclaimed state returns
+`emp` for the second component, which is exactly this fact.
+
+In `sie_arm true p` the obligation is the right shape: it exists only while
+interrupts are on. `push_off` hands it to the code, the thread spends and
+moves it freely while off, and `pop_off` demands it back — by which point
+the thread has been dispatched again and is `RUNNING`, so it has it.
+
+At the disabled index it is a premise, on the `trap_csrs_ext eb` /
+`trap_csrs_pay 0 eb` pattern already threaded through the functions that
+can reach a `sleep`.
+
+
+
 `sie_arm true p`, beside the scheduler's saved `valid_context` for
 `cpu->context` — with the usual `_ext eb`-shaped complement at the disabled
 index, where the running thread holds it directly. This is what makes it
