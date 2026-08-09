@@ -1170,6 +1170,31 @@ the evidence for every offset. This file is only the worklist.
       because there is no `upd_name` beside `upd_ofile`/`upd_sz`/`upd_cwd`;
       adding one is the tidier half of the same change.
 
+      **THE PARK HAPPENS AT THE FIRST RELEASE, NOT AT THE RUNNABLE ONE**, and
+      the reason is one `vm_compute`: `ProcGeom.needs_ctx st` is
+      `st = RUNNABLE || st = SLEEPING || **st = USED**`, so the moment kfork
+      releases `np->lock` at +0xc4 — still at USED, before the wait_lock
+      crossing — the lock invariant already demands a live `▷ proc_ctx`.  So
+      `SpecForkretPark.forkret_park` runs ONCE, there, swallowing the child's
+      `proc_priv` and its `fd_slots FDSPARE`; and the later USED → RUNNABLE
+      crossing at +0xec then moves NO resource at all — `needs_ctx`,
+      `is_running`, `inv_dormant` and `not_running` all agree between the two
+      states, so it is a bare `SchedCtx.proc_slots_recast`.  Anyone reading
+      the C and expecting the park to pair with `np->state = RUNNABLE` will
+      get this backwards.
+
+      **`st = USED` AT THE RE-ACQUIRE COSTS NOTHING, AND THE DESIGN ALREADY
+      SAID SO.**  The obvious worry — kfork releases `np->lock`, and when it
+      re-acquires at +0xe6 the lock hands back a `proc_lock_res` at an
+      arbitrary `st` — is answered by never giving up the claimant's half of
+      the state mirror: split `proc_held`'s `pstate_whole _ USED` with
+      `pstate_whole_split`/`unclaimed_USED`, hand `pstate_lock _ USED` to the
+      released lock and KEEP `pstate_at_hlf _ USED` as an ordinary ghost
+      across the wait_lock crossing.  `ProcGeom.pstate_lock_claimed` then
+      reads `st = USED` straight off it, and its own comment names this
+      caller: *"this is what lets yield/sleep/exit learn `st = RUNNING`, and
+      kfork `st = USED`, without reading the cell."*
+
       **Two rules the block proofs paid for, both general:**
 
       * **A BLOCK'S "agrees with the entry map" PREMISE MUST EXCLUDE EVERY

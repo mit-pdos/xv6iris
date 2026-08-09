@@ -562,7 +562,8 @@ Section ProofKforkB5.
     assert (Hcs_0_r10 : callee_saved Mt mr10) by (eapply callee_saved_trans; [exact Hcs_0_13 | exact Hcs_13_r10]).
     iEval (rewrite -Hb) in "Hcg".
     iEval (rewrite -Hb) in "Hown".
-    iSpecialize ("Hcont" $! CID10 with "[]"); [iPureIntro; rewrite Hb; wp_next_chain|].
+    rewrite <- Hb in Hs1. rewrite <- Hb in Hs6. rewrite <- Hb in Hs10.
+    iSpecialize ("Hcont" $! CID10 with "[]"); [iPureIntro; wp_next_chain|].
     iApply ("Hcont" $! mr10 with "[%] Hcg Hown Hpc"). exact Hcs_0_r10.
   Qed.
 

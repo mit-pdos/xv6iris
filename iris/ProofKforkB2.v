@@ -180,7 +180,7 @@ Section KforkTfLoop.
      +0x66, a5 = a3 = the source's end pointer, a4 at the dest's end
      pointer, every callee-saved register untouched, and [tf_page tfdst
      ws] -- the child's trapframe is now a verbatim copy of the parent's. *)
-  Lemma kfk_tf_copy_loop (m M : regfile) (tfsrc tfdst : mword 44)
+  Lemma kfk_tf_copy_loop (M : regfile) (tfsrc tfdst : mword 44)
       (ws cur0 : list (mword 64)) (n : nat) (p : mword 64) :
     page_valid (page_base tfsrc) ->
     page_valid (page_base tfdst) ->
@@ -189,7 +189,13 @@ Section KforkTfLoop.
     M !!! Regidx Ra5 = a_tf_word tfsrc 0 ->
     M !!! Regidx Ra4 = a_tf_word tfdst 0 ->
     M !!! Regidx Ra3 = a_tf_word tfsrc 36 ->
-    (forall r : mword 5, is_cs_idx r = true -> M !!! Regidx r = m !!! Regidx r) ->
+    (* NO premise tying [M] to kfork's ENTRY map: at +0x4a the frame is
+       pushed, s0 is the frame pointer, s4 is the child and s5 is the parent,
+       so "every callee-saved register still agrees with the entry map" is
+       FALSE here.  The loop writes only a0..a5, so what it can honestly say
+       -- and what the capstone actually wants -- is preservation relative to
+       ITS OWN entry map [M].  (durable-notes / S11: getting this wrong
+       compiles, and only fails when the capstone tries to apply the block.) *)
     sie_cap_gpr M n false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
@@ -197,7 +203,7 @@ Section KforkTfLoop.
     tf_page tfdst cur0 -∗
     wp_next false p (fun (CID : CpuId) =>
       ∀ mf : regfile,
-        ⌜callee_saved m mf /\
+        ⌜callee_saved M mf /\
          mf !!! Regidx Ra5 = a_tf_word tfsrc 36 /\
          mf !!! Regidx Ra4 = a_tf_word tfdst 36⌝ -∗
         sie_cap_gpr mf n false p -∗
@@ -207,7 +213,7 @@ Section KforkTfLoop.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hpvsrc Hpvdst Hwslen Hcur0len HM5 HM4 HM3 HMcs.
+    intros Hpvsrc Hpvdst Hwslen Hcur0len HM5 HM4 HM3.
     iIntros "Hcg #Htext Hpc Hsrcp Hdstp Hcont".
     assert (Hwslen36 : length ws = 36%nat) by (unfold TFWORDS in Hwslen; exact Hwslen).
     iPoseProof (kfk_04a with "Htext") as "Hi04a".
@@ -235,14 +241,14 @@ Section KforkTfLoop.
       ⌜Mk !!! Regidx Ra5 = a_tf_word tfsrc (4*k) /\
        Mk !!! Regidx Ra4 = a_tf_word tfdst (4*k) /\
        Mk !!! Regidx Ra3 = a_tf_word tfsrc 36 /\
-       (forall r : mword 5, is_cs_idx r = true -> Mk !!! Regidx r = m !!! Regidx r)⌝ -∗
+       (forall r : mword 5, is_cs_idx r = true -> Mk !!! Regidx r = M !!! Regidx r)⌝ -∗
       sie_cap_gpr Mk n false p -∗
       pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
       tf_page tfsrc ws -∗
       tf_page tfdst cur -∗
       wp_next false p (fun (CID : CpuId) =>
         ∀ mf : regfile,
-          ⌜callee_saved m mf /\
+          ⌜callee_saved M mf /\
            mf !!! Regidx Ra5 = a_tf_word tfsrc 36 /\
            mf !!! Regidx Ra4 = a_tf_word tfdst 36⌝ -∗
           sie_cap_gpr mf n false p -∗
@@ -533,7 +539,7 @@ Section KforkTfLoop.
         by (rewrite /M6 upd_ne; [exact HM5a3 | vm_compute; discriminate]).
       assert (HM6a5 : M6 !!! Regidx Ra5 = a_tf_word tfsrc (4 * S k))
         by (rewrite /M6 upd_ne; [exact HM5a5 | vm_compute; discriminate]).
-      assert (HM6cs : forall r : mword 5, is_cs_idx r = true -> M6 !!! Regidx r = m !!! Regidx r).
+      assert (HM6cs : forall r : mword 5, is_cs_idx r = true -> M6 !!! Regidx r = M !!! Regidx r).
       { intros r Hr.
         rewrite /M6 upd_ne; [| regne].
         rewrite /M5 upd_ne; [| regne].
@@ -568,7 +574,8 @@ Section KforkTfLoop.
         { apply kfk_full_agree.
           - rewrite Hcur4len Hwslen36. reflexivity.
           - rewrite Hwslen36. rewrite (kfk_send9_mul k Hend) in Hagree4. exact Hagree4. }
-        iEval (rewrite Hcur4_ws) in "Hdstp".
+        iAssert (tf_page tfdst ws) with "[Hdstp]" as "Hdstp".
+        { rewrite -Hcur4_ws. iExact "Hdstp". }
         iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].
         iApply ("Hcont" $! M6 with "[%] Hcg Hpc Hsrcp Hdstp").
         + split; [| split].
@@ -629,7 +636,9 @@ Section KforkTfLoop.
     - exact kfk_k0_lt9.
     - exact Hcur0len.
     - intros i Hi. exfalso. exact (Nat.nlt_0_r i Hi).
-    - split; [exact HM5 |]. split; [exact HM4 |]. split; [exact HM3 |]. exact HMcs.
+    - split; [exact HM5 |]. split; [exact HM4 |]. split; [exact HM3 |].
+      (* the loop is entered at its own entry map, so the agreement is refl *)
+      intros r _. reflexivity.
   Qed.
 
 End KforkTfLoop.

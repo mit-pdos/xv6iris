@@ -599,6 +599,8 @@ Section KforkB3Proof.
         { intros r Hr Ncsp N0 N1 N2 N3 N4 N5.
           rewrite /L2 upd_ne; [| regne]. apply HL1thr; assumption. }
         assert (HL2a0k : L2 !!! Regidx Ra0 = fnode k) by (rewrite HL2a0; exact Hfn).
+        iDestruct (cpu_own_transport CIDk CIDn n eb pme C b ltac:(wp_next_chain) with "Hown")
+          as "Hown".
         iApply (FD.wp_filedup_sconf γl γf k q Cf L2 n eb pme C (K - 8)%nat b
                   HK14 Hn HL2a0k
                   with "Hcg Hown Htext Hpc Hft Hpanic Hfds Href [-]").
@@ -632,19 +634,19 @@ Section KforkB3Proof.
                   with "Hcg Hpc Hi09e [Hcell2] [-]").
         { iEval (rgne; rewrite Haddr2). iExact "Hcell2". }
         iIntros (CIDp Hstp) "Hcg Hpc Hcell2".
-        iEval (rgne; rewrite Haddr2 Hmra0) in "Hcell2".
+        iEval (rgne; rgne; rewrite Haddr2 Hmra0) in "Hcell2".
         assert (Hpp0a2 : add_vec_int (mword_of_int (KF + 0x9e) : mword 64) 4
                         = mword_of_int (KF + 0xa2)) by (apply bv_eq; vm_compute; reflexivity).
         iEval (rewrite Hpp0a2) in "Hpc".
         (* close the child's slot: it now names the SAME file the parent's does *)
-        iDestruct (ofile_slot_file γf npa i k q Cf Hk with "Hcell2 Hslotb") as "Hslot2".
+        iDestruct (ofile_slot_file γf npa i k (q/2)%Qp Cf Hk with "Hcell2 Hslotb") as "Hslot2".
         iDestruct ("Hback2" $! (fnode k) with "Hslot2") as "Hpv2".
-        assert (Hvfn : pv_ofile Vp !! i = Some (fnode k)) by (rewrite Hv; exact Hfn).
+        assert (Hvfn : pv_ofile Vp !! i = Some (fnode k)) by (rewrite Hv Hfn; reflexivity).
         iEval (rewrite (kfk_childV_step V0 (pv_ofile Vp) i (fnode k) HlenVp HlenV0 Hvfn Hi))
           in "Hpv2".
         (* close the parent's slot back: it names the SAME file it always did *)
         iEval (rewrite Hfn) in "Hcell".
-        iDestruct (ofile_slot_file γf pme i k q Cf Hk with "Hcell Hslota") as "Hslot".
+        iDestruct (ofile_slot_file γf pme i k (q/2)%Qp Cf Hk with "Hcell Hslota") as "Hslot".
         iDestruct ("Hback" $! (fnode k) with "Hslot") as "Hpv".
         iEval (rewrite (upd_ofile_id _ _ _ Hvfn)) in "Hpv".
         (* ---- +0xa2: c.j -> +0x8e ---- *)
