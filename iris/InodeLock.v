@@ -79,7 +79,17 @@ Definition inode_ok (cov : gset Z) (logstart : Z)
   /\ di_addrs dn = bm_cells bm
   /\ bv_unsigned (di_type dn) <> 0
   /\ bv_unsigned (di_size dn) <= Z.of_nat MAXFILE * Z.of_nat BSIZE
-  /\ blk_holes_zero bm data.
+  /\ blk_holes_zero bm data
+  (* EVERY BLOCK IS A BLOCK'S WORTH OF BYTES (design §6(ii), landed by
+     §13.12(b)).  itrunc's [bfree] needs it of every block it frees, and
+     under SpecIlock v2 [data] is an OUTPUT -- existentially bound inside
+     [IcacheEscrow.ic_loaded] -- so iput cannot supply it as a premise and
+     it has to travel WITH the record, exactly as §13.5's size cap does.
+     [blk_holes_zero] above pins the length only at HOLES; the blocks
+     itrunc frees are precisely the ALLOCATED indices, which is why the
+     hole clause could not serve.  Producers re-establish it with
+     [InodeInv.inode_sized_zero] / [_insert] / [_of_alloc]. *)
+  /\ inode_sized data.
 
 (* ip->valid, as the word the [sw]/[lw] at +0x96 / +0x1a see *)
 Definition valid_word (v : bool) : mword 32 :=

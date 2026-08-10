@@ -1737,7 +1737,8 @@ Section ProofFileread.
                     [ip] its own [f->ip] cell holds. ---- *)
              rewrite /ic_loaded.
              iDestruct "Hlk" as (data) "(%Hiok & Hdnat & Hmeta & Haddrs & Hindres & Hblocks)".
-             destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes).
+             destruct Hiok as (Hbmwf & Hbmcov & Hdaddr & Hdty & Hszb & Hholes
+                               & Hsized).
              iEval (rewrite -Hipk) in "Hmeta".
              iEval (rewrite -Hipk) in "Haddrs".
              iEval (rewrite -Hipk) in "Hidev".
@@ -1998,7 +1999,7 @@ Section ProofFileread.
                 { rewrite /ic_loaded /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
-                    | exact Hszb | exact Hholes]|].
+                    | exact Hszb | exact Hholes | exact Hsized]|].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
                 iAssert (i_valid (ientry (frn_ik fn)) ↦₄ valid_word true)%I
@@ -2257,7 +2258,7 @@ Section ProofFileread.
                 { rewrite /ic_loaded /inode_map -Hipk. iExists data.
                   iSplitR; [iPureIntro; split_and!;
                     [exact Hbmwf | exact Hbmcov | exact Hdaddr | exact Hdty
-                    | exact Hszb | exact Hholes]|].
+                    | exact Hszb | exact Hholes | exact Hsized]|].
                   iDestruct "Hmap" as "[Haddrs Hindres]".
                   iFrame "Hdnat Hmeta Haddrs Hindres Hblocks". }
                 iAssert (i_valid (ientry (frn_ik fn)) ↦₄ valid_word true)%I

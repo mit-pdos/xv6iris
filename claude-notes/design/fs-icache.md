@@ -1513,6 +1513,39 @@ and the recycle re-establishes the device clause by construction.
 `bio_ctx`, not the table). A future multi-device xv6 re-keys
 `dinode_at` by (dev, inum) — recorded, not owed.
 
+### 13.12 §5(a) is wrong at iput's call site: the nested acquiresleep's
+### block IS a safety obligation — and §6(ii)'s conjunct comes due
+
+**(a)** iput calls `acquiresleep(&ip->lock)` at +0x50 HOLDING
+itable.lock (the only nested acquiresleep in the kernel; fs.c:348).
+The sleep path runs sched's `noff != 1` check, i.e. blocking is
+reached only through `panic("sched locks")` — a SAFETY arm, not the
+liveness §5(a) waved away. xv6's "won't block (or deadlock)" comment
+is asserting exactly this. The adopted route (C6's, Route B): take
+the panic. Three lemmas in the sched/sleep stack, no definitional
+change anywhere: (1) sched entered at noff ≥ 2 diverges (ProofSched's
+walk already reads the check; this variant takes the branch it
+refutes); (2) sleep at noff ≥ 2 diverges; (3)
+`wp_acquiresleep_nested_sconf` at `cpu_own (S n)`: returns holding the
+lock on the free branch (no park, so no `cpu_own 0`), diverges on the
+locked branch. iput's REF-1 makes the divergence unreachable in
+practice; we do not prove that, we permit it — the ilock/iget live
+panics are the precedent. Route A (prove the lock free) was examined
+and rejected: `sl_res`'s locked arm is a bare pure with no resource to
+refute by, and giving it one reparameterizes `is_sleeplock` for every
+user including bio.
+
+**(b)** itrunc's `length (data i) = BSIZE` premise is unstateable by
+iput — `data` is ∃-bound in the checked-out payload. §6(ii)'s designed
+home lands: `inode_sized data` becomes an `inode_ok` conjunct
+(IcacheInv shipped `inode_sized_zero`/`_insert`/`_of_alloc` for
+exactly this in C1). iput then derives itrunc's premise from the
+bundle's own `inode_ok` — NO contract changes anywhere; discharges at
+the `inode_ok` producers (ProofIlock's uncached arm inherits from the
+pool shape, ProofItrunc by `inode_sized_zero`, ProofWritei by
+`inode_sized_insert`; C7's stocking owes it like the §13.5 cap). The
+`fsblock`-fold alternative stays deferred.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
