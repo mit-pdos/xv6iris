@@ -841,3 +841,14 @@ state register facts CID-generically up front —
 `assert (∀ CID', rget (CID := CID') M2 r = v)` — and rewrite with that
 (the prologue's ra/s0 facts already follow this pattern; follow it for
 every register that survives a hart-peeling branch).
+## The Iris-side fix, written up as a PR proposal
+
+`claude-notes/proposals/iris-primstring/` holds a PR-ready write-up of the
+`INamed : PrimString.string` change from §5c, with a self-contained benchmark
+suite (`bench/`) that needs only coq-iris + coq-stdpp: the representation cost
+(12 nodes/char vs 1), an end-to-end proofmode benchmark over three (N hyps, M
+steps) shapes showing **−47…−52 % proof-term size and −29…−42 % compile time**,
+and a kernel-checked feasibility probe showing the `string -> PrimString.string`
+bridge reduces to a 1-node literal under `vm_compute`.  The `anon` rows of the
+benchmark are the trick worth remembering: `iIntros "?"` gives `IAnon p`, so
+STOCK Iris can be used to price a compact `ident` without patching anything.
