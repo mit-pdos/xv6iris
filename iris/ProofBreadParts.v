@@ -8,23 +8,17 @@
        ProofBread.v's recycle block is three [wp_sw_au_s_sconf]s over three
        one-line lemma applications.
 
-   (1) The two MASK-CARRYING width-4 memory leaves.  bread opens the
-       per-buffer escrow around four single instructions -- the three field
-       stores of the recycle block ([sw s2,8(s1)] / [sw s3,12(s1)] /
-       [sw zero,0(s1)]) and the [lw a5,0(s1)] of the tail's checkout swap --
-       so each needs the cell produced and returned INSIDE the engine
-       callback's own mask.  These are ~15-line wrappers over
-       [WpSconfMem.wp_{load,store}_s_sconf_au], exactly as WpSconfLock.v's
-       lock leaves are and as ProofBrelse.wp_csdsp_au_s_sconf is at width 8.
-       Both are RVC-generic in [cmp] because bread uses the compressed form
-       at the tail ([c.lw a5,0(s1)]) and the base form in the recycle block.
-
-       This settles the "does the masked-leaf mechanism cover bread's cases"
-       question: it does -- [wp_load_s_sconf_au] / [wp_store_s_sconf_au] are
-       width-generic, and width 4 needs no new engine work, only the two
-       witnesses [exec_read_ram_plain_4] / [exec_write_ram_plain_4] and the
-       two extension equations [data2_ext_4] / [store_ext_4], all of which
-       already exist.                                                        *)
+   (1) The two MASK-CARRYING width-4 memory leaves no longer live here.
+       bread opens the per-buffer escrow around four single instructions --
+       the three field stores of the recycle block ([sw s2,8(s1)] /
+       [sw s3,12(s1)] / [sw zero,0(s1)]) and the [lw a5,0(s1)] of the tail's
+       checkout swap -- so each needs the cell produced and returned INSIDE
+       the engine callback's own mask.  Those two wrappers are
+       [WpAu4.wp_lw_au_s_sconf] / [wp_sw_au_s_sconf]: they were first proved
+       here, but a proof file may not import a proof file, so the five
+       icache proofs each restated them verbatim.  They now sit in their own
+       definitional file, [WpAu4.v], which this file imports.  Only the
+       ESCROW-shaped glue below is bread's own.                              *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -48,6 +42,7 @@ Require Import HartTp WpNext.
 Require Import IntrDefs.
 Require Import WpLock.
 Require Import WpSconfMem.
+Require Import WpAu4.
 Require Import BufOwn.
 Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
@@ -57,83 +52,18 @@ Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 (* ===================================================================== *)
-(*  (1) The mask-carrying width-4 load / store.                           *)
+(*  (1) The escrow, in the raw [inv] shape [iInv] recognizes.             *)
+(*      (The mask-carrying width-4 load/store are [WpAu4.v]'s now.)       *)
 (* ===================================================================== *)
 
 Section BreadEscrowLeaves.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !bioG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
 
   (* the escrow, in the raw [inv] shape [iInv] recognizes *)
   Lemma buf_escrow_inv (bn : bio_names) (V : bio_view Σ) (k : nat) :
     buf_escrow bn V k -∗ inv bioN (buf_escrow_body bn V k).
   Proof. iIntros "H". iExact "H". Qed.
-
-  (* [lw rd, imm(rs1)] with the cell produced and returned inside the
-     engine's callback -- the tail's [c.lw a5,0(s1)] opens [buf_escrow]
-     around exactly this step. *)
-  Lemma wp_lw_au_s_sconf (cmp : bool)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
-      {dqm : dfrac} :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
-          ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
-    ( ∀ v : mword 32,
-      wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
-        pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-        Ψ v -∗
-        WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Hrd Hrdok HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
-              (fun w => sign_extend' 64 w) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-  (* [sw rs2, imm(rs1)], same discipline -- the recycle block's three field
-     stores each open [buf_escrow] around one of these. *)
-  Lemma wp_sw_au_s_sconf (cmp : bool)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄ vold ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm)
-          ↦₄ (trunc32 (rget m rs2)) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m av b p -∗
-      pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-      Ψ -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intro HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_store_s_sconf_au 4 cmp pc rs2 rs1 imm m av
-              (trunc32 (rget m rs2)) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
 
 End BreadEscrowLeaves.
 

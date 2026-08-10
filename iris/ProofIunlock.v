@@ -49,6 +49,7 @@ Require Import CpuOwn.
 Require Import DiskPtsto.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpAu4.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Import FsBlocks.
@@ -79,46 +80,6 @@ Proof.
   unfold ISLOTSZ, KernelSyms.itable. lia.
 Qed.
 
-(* the mask-carrying compressed width-4 load ([ProofIdup.wp_lw_au_idup]) *)
-Section IunlockAuLeaf.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
-
-  Lemma wp_lw_au_iunlock (cmp : bool)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Psi : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
-      {dqm : dfrac} :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
-          ={Em, ⊤ ∖ ↑minstretN}=∗ Psi v)) -∗
-    ( ∀ v : mword 32,
-      wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
-        pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-        Psi v -∗
-        WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Hrd Hrdok HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
-              (fun w => sign_extend' 64 w) Psi Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
-              ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-End IunlockAuLeaf.
 
 Module IunlockProof (HS : HOLDINGSLEEP) (RS : RELEASESLEEP) : IUNLOCK.
 
@@ -466,7 +427,7 @@ Section ProofIunlockMain.
     assert (Hrefadr : add_vec (rget mH Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                       = i_ref ip).
     { rgne. rewrite HmHs1. reflexivity. }
-    iApply (wp_lw_au_iunlock true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
+    iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iunlock + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) mH (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
                          i_valid (ientry k) ↦₄ valid_word true)%I)

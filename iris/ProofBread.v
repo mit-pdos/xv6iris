@@ -121,6 +121,7 @@ Require Import ArrCursor.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn BcacheInv BioInv.
 Require Import BreadLru.
+Require Import WpAu4.
 Require Import ProofBreadParts.
 Require Import CodeBread.
 Require Import SpecAcquire SpecRelease SpecAcquiresleep.

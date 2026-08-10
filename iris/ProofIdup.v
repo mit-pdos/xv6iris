@@ -51,6 +51,7 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
+Require Import WpAu4.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import InodeInv.
@@ -69,81 +70,6 @@ Require Import SpecIdup.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
-(* ===================================================================== *)
-(*  The two mask-carrying width-4 leaves.                                 *)
-(*                                                                        *)
-(*  Identical to [ProofBreadParts]' [wp_lw_au_s_sconf] / [wp_sw_au_s_sconf]*)
-(*  -- restated rather than imported because those live in a section that  *)
-(*  fixes [bioG]/[diskGhostG], and idup has no business carrying the bio   *)
-(*  layer's ghost state to get at a two-line wrapper.                      *)
-(* ===================================================================== *)
-
-Section IdupAuLeaves.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
-
-  Lemma wp_lw_au_idup (cmp : bool)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
-      {dqm : dfrac} :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
-          ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
-    ( ∀ v : mword 32,
-      wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
-        pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-        Ψ v -∗
-        WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Hrd Hrdok HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
-              (fun w => sign_extend' 64 w) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-  Lemma wp_sw_au_idup (cmp : bool)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄ vold ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm)
-          ↦₄ (trunc32 (rget m rs2)) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m av b p -∗
-      pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-      Ψ -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intro HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_store_s_sconf_au 4 cmp pc rs2 rs1 imm m av
-              (trunc32 (rget m rs2)) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-End IdupAuLeaves.
 
 Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) : IDUP.
 
@@ -403,7 +329,7 @@ Section ProofIdup.
     assert (Hpa : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                   = i_ref (ientry k)).
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
-    iApply (wp_lw_au_idup true (mword_of_int (KernelSyms.idup + 0x18)) Ra5 Rs1
+    iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.idup + 0x18)) Ra5 Rs1
               (mword_of_int 8 : mword 12) macq (K - 4)%nat
               (fun v => (⌜v = iref_word M k⌝ ∗ itable_half M)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
@@ -453,7 +379,7 @@ Section ProofIdup.
     assert (Hpa2 : add_vec (rget D2 Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                    = i_ref (ientry k)).
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
-    iApply (wp_sw_au_idup true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
+    iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) D2 (K - 4)%nat
               (itable_half (<[k := (qt, Pos.succ cnt)]> M) ∗
                iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp)%I
