@@ -233,6 +233,61 @@ address.  Both still compile with no other edit:
   only bites when the unfolded abstraction appears in a hypothesis that a *long*
   proof carries, which in this tree meant `tf_pa` and nothing else.
 
+### 5c. WHAT THE ENVIRONMENT TERM IS MADE OF — and the one Iris-side fix worth proposing
+
+`|Δ|` is not only the hypotheses' PROPOSITIONS.  An `Esnoc Γ i P` also carries
+the identifier `i`, and Iris's `ident` (`iris/proofmode/base.v`) is
+`IAnon : positive | INamed :> string` — a **Stdlib `string`, i.e. a cons-list
+of `Ascii` applied to eight booleans, ~10 term nodes per character**.  Priced
+on the `ProofUservec` probe (44-`iPoseProof` block, base = 8.25-char names):
+
+| hypothesis names | tree |
+|---|---|
+| 2–3 chars (`q0`…`q39`) | 1,471,889 (**−10.0 %**) |
+| 8.25 chars (as written) | 1,636,181 |
+| 41 chars | 2,604,449 (**+59 %**) |
+
+The slope is 1,132,560 nodes / (40 names × 38.6 chars) = **~730 nodes per
+character of hypothesis name**, which is exactly 10 nodes/char × the ~73 times
+the environment is embedded across the block.  So in a whole-function proof
+**hypothesis names alone are ~10–20 % of the proof term**, and they scale
+linearly with how descriptive you make them.
+
+**The fix is Iris-side and cheap: `INamed` should carry a PRIMITIVE string.**
+Rocq 9.0 ships `Corelib.Strings.PrimString` (present in this switch), whose
+literals are ONE term node regardless of length and whose comparison is a
+kernel primitive.  Changing `ident` to `INamed : PrimString.string` (plus
+`ident_beq` and the `iIntros`/spec-pattern Ltac that builds idents from parsed
+names) would take that 10–20 % to ~0 with no change to any proof script and no
+loss of goal readability.  Until then the only lever is shorter names, which
+is a bad trade for readability — take it only in the two or three longest
+monoliths.
+
+**Second component: how many entries are LIVE.**  Same probe, posing each of
+the 40 persistent instruction facts and `iClear`ing it immediately (so the
+context never accumulates) is **1,536,848 vs 1,636,181 — −6 % while running 40
+EXTRA proofmode steps**, i.e. the accumulation itself is worth appreciably more
+than 6 %.  A persistent hypothesis is not free: it is re-embedded in the term
+of every step that follows it.  `ProofUservec` and `ProofUserret` open by
+posing 44 and 39 instruction facts up front and carrying them for ~600 steps;
+posing each immediately before its `iApply` is the outstanding fix there.
+(Contrast the ProofEndOp measurement above, −2.7 %: the driver is entry SIZE ×
+lifetime, not entry count, and EndOp's entries are small.)
+
+**Third: the asymptotics, and why they are hard to fix.**  `tree ≈ 2 × N × |Δ|`
+because each step's `tac_*` names the whole environment.  The only asymptotic
+fix is for the proof term to NAME the environment rather than spell it —
+`let Δ0 := … in`, with each step's term mentioning `Δ0` plus its own update.
+That would make step *k* cost O(k) tiny links instead of O(|Δ|) ≈ 20k nodes
+(for N=600: ~1.8 M instead of ~24 M).  What blocks it is `pm_reduce`, which is
+`cbv` over the `pm_*` constants and therefore zeta-reduces any let-bound
+environment straight back open — the proofmode is *designed* to keep the
+environment in normal form so `envs_lookup`/`envs_app` compute.  Making it work
+through an opaque environment handle is a real Iris redesign, not a tactic
+swap.  A cheaper approximation with the same shape: re-seal the environment
+every √|Δ| ≈ 150 steps.  Neither has been prototyped; the primitive-string
+change above is the one with a good effort/payoff ratio.
+
 ### 6. Which hypothesis is big: ablate with `iClear`, do not read the proof
 
 Insert `iClear "…"` **before** the block of steps you are measuring — clearing
