@@ -163,11 +163,22 @@ Files: `CodeKerneltrap.v` (40 decode facts, generated),
 `ProofKerneltrapParts.v` (835 lines), `ProofKerneltrap.v` (444 lines, the
 functor over DEVINTR/MYPROC/YIELD), `LinkKerneltrap.v`.
 
-**What is NOT done, and it is the only thing left:** `ProofKernelvec.v` still
-runs against `KERNELTRAP_RETURNS`, whose `Axiom` `LinkKerneltrap.v` still
-supplies as `KerneltrapRet`.  That assumption is no longer about whether
-kerneltrap works — it is about the SHAPE of the handler contract, i.e. step
-10 below.  Nothing else stands between the two.
+**What is NOT done:** `ProofKernelvec.v` still runs against
+`KERNELTRAP_RETURNS`, whose `Axiom` `LinkKerneltrap.v` still supplies as
+`KerneltrapRet`.  That assumption is no longer about whether kerneltrap works —
+it is about the SHAPE of the handler contract, i.e. step 10 below.
+
+**IT IS ONE DESIGN, NOT ONE LANDING, AND THE DIFFERENCE MATTERS FOR PLANNING.**
+Read "one thing left" as *one remaining design*, not as a task an agent can pick
+up and finish: the ledger at 2026-08-10 is six queued slices (3a, 3b, 4, 6, 7,
+8) plus an atomic core that must now be re-derived rather than rebased, and two
+of the six are wide sweeps (~1750 call sites; 56 files).  `Print Assumptions
+Kernelvec.kernelvec_handler_spec` is
+`5 rv64d platform axioms + functional_extensionality_dep +
+LinkKerneltrap.KerneltrapRet.kerneltrap_returns`, and none of the individual
+slices moves that set — only the core's last step does.  Anyone scoping this as
+a single task will produce a half-landed sweep, which is the one outcome worse
+than the axiom.
 
 ### The proof's shape
 
@@ -487,7 +498,28 @@ hart's copy exists — it comes out of the dispatch payload, and
 swallows it.  So:
 
 - `SpecYield`/`ProofYield`: expose `intr_handler_avail` in the `wp_next`
-  continuation (it is persistent, so unconditionally, at either `eb`).
+  continuation — **at `eb = false` ONLY.  "It is persistent, so
+  unconditionally, at either `eb`" IS WRONG, and the error is worth keeping
+  because it is the easy one to make: PERSISTENCE IS NOT HART-INDEPENDENCE.**
+  `intr_handler_avail` is `∃ h, intr_inv h ∗ ▷ intr_handler_spec h`, and
+  `intr_inv` owns THIS hart's `stvec` and THIS hart's SIE quarter, so a copy is
+  a copy *at one hart*.  Yield's crossing index is the literal `true` and
+  `pj ≠ zero_reg`, so its continuation's guard is vacuous and `K` has to hold at
+  the hart `yield_post_sched` actually lands on, call it `CIDz`; what yield
+  holds is sched's payload at the DISPATCHING hart `CIDs`.  The post-resume
+  half's chain gives `CIDz = CIDs` from `wp_next_chain` only under
+  `eb = false ∨ pj = zero_reg` — i.e. **at `eb = false` the transport is free
+  and at `eb = true` there is nothing to transport with.**  So the shape is the
+  `_ext` guard already used for the same reason one section down —
+  `intr_handler_avail_ext eb := if eb then emp else intr_handler_avail`, the
+  third member of the `trap_csrs_ext` / `cpu_claim_ext` family — and that costs
+  nothing, because **kerneltrap only ever needs it at `eb = false`** (the trap
+  cleared SIE; that is this contract's whole `eb = false` story).  At `eb = true`
+  it is also not lost: the returned bundle's `sie_arm true` carries
+  `∃ h, intr_inv h` and the arm's eighth pins the guard's `b = '1'`, so a caller
+  that wants it there can open `intrN` and read the □ spec out exactly as
+  `WpSconfCsr.v:772` does — under a fupd, which a bare wand postcondition
+  cannot do, which is the other half of why the guard is the right shape.
 - `SpecKerneltrap`/`ProofKerneltrap`: take it in the precondition, return it
   in the continuation — from the premise on the no-yield path (where
   `wp_next` is instantiated at `cpu_id`) and from yield's post on the yield
@@ -533,8 +565,16 @@ attempted behind them.  Everything in it is proven, but nothing in it was
 *landable*.
 
 It has since been cut into slices that each reach green on `main` on their own.
-**Do that.  The parked branch is a reference for the atomic core, not a thing to
-merge.**
+**Do that.**
+
+**THE PARKED BRANCH IS GONE — DO NOT PLAN AROUND IT** (verified 2026-08-10).
+`kerneltrap-stage2` is not a local branch, not on `origin`, and its two named
+commits are not objects in this repository at all
+(`git cat-file -t a6a67d6c` / `78bc0283` both fail; `git log --all` does not
+reach them).  Whatever was written there — the two-section `IntrDefs.v` split,
+the `ihs_*` layer, the contractive `fixpoint`, the hart-generic engine and
+funnel — **has to be re-derived from the sketches in this file.**  Budget the
+atomic core as new work, not as a rebase.
 
 ### Landed on `main`
 
@@ -551,30 +591,90 @@ merge.**
   33 leaves + 4 engines widened, 12 keep plain `rd_ok`, and **zero of 1192 call
   sites changed** — the slot's content widened while its position did not, and
   every site fills it with the positional opaque `ltac:(rdok)`.
+- **`WpNext.wp_next_retarget`** (slice 5, below), with its one existing
+  consumer converted: `ProofYield.v`'s tail hand-rolled the transport inline
+  (`iIntros (CIDx Hsx); iSpecialize ("Hcont" $! CIDx …); iExact`), and that is
+  now one `iApply (wp_next_retarget …)`.  It is the ONLY hand-rolled instance in
+  the tree — every other `iIntros (CIDk Hsk); iSpecialize … ; iExact "Hcont"` is
+  a same-anchor `wp_next_chain` discharge, not a retarget.
 
 ### In flight / queued, each independently landable
 
-3. **Expose `wp_next` in the engine and funnel** — `wp_exec_step_intr`,
-   `wp_instr_s_intr`, `wp_instr_s_sconf`, plus their ~60 consumers.  Branch
-   `wp-next-funnel`.  Requires slice 2 (`ops_ok`) and nothing else.
+**RE-SCOPED 2026-08-10.**  Two of these are much bigger than the line that
+described them, and the evidence is in the tree, not in a guess:
+
+3a. **THE `ops_ok` WIDENING OF THE REMAINING 72 LEAVES — a prerequisite of the
+   funnel move that was not on this list.**  `IntrDefs.v`'s own comment above
+   `rget_next_indep` records it: the 72 leaves whose pure premises mention
+   `rget m rs` for a CALLER-CHOSEN `rs` (24 in `WpSconfBtype.v`, 20 in
+   `WpSconfMem.v`, the rest across `WpSconfLock` / `WpSconfUartAccess` /
+   `WpPlic` / `WpVirtioDev` / `WpSmodeHalf` / `WpSconfCsr` / `WpSconfCtl` /
+   `ProofBreadParts`) have no `src_ok` to feed `rget_next_indep`, and giving
+   them one **changes call-site ARITY at ~1750 references** — unlike slice 2,
+   whose 33 leaves already had a positional `rd_ok` slot to widen in place, so
+   zero of 1192 call sites moved.  Without this, the funnel move is unprovable
+   at every one of those leaves: after the callback moves inside `wp_next`, the
+   leaf's σ-obligation arrives about `rget (CID := CIDn) m rs` while the caller
+   supplied a fact about `rget (CID := CID0) m rs`, and those differ at
+   `rs = tp`.
+3b. **The funnel move itself** — `wp_instr_s_sconf`'s σ-callback inside
+   `wp_next b p`, plus its consumers.  Measured: **13 files, 69 call sites**
+   (`WpSconfBtype` 29, `WpSconfCsr` 9, `WpSconfCtl` 8, `WpSconfMem` 6,
+   `ProofUart`/`ProofKvminithart` 3 each, `WpSconfAlu`/`WpSconfTimer`/`WpPlic`/
+   `WpVirtioDev` 2 each, `WpSconfLock`/`WpSmodeWfi`/`HartTp` 1 each), plus 61
+   `$! cpu_id` → `$! CID` sites.  The funnel's own proof is a two-line change
+   (`wp_next_here` to recover today's body).
+   **AND IT STOPS THERE.**  `wp_instr_s_intr` and `wp_exec_step_intr` CANNOT
+   have their callbacks wrapped in this slice, for the reason `wp_next_here`'s
+   comment already gives: the funnel's `b = true` arm frames PER-HART residue
+   across the engine (the travelling `sret_bits` half, the SIE eighth,
+   `cpu_hart`'s cells, `strans_bit`, `intr_inv` itself), and only the trap
+   handler can hand those back at the resuming hart.  Those two belong to the
+   atomic core, not to slice 3.
 4. **The `trap_res` arm-dependent carve** + the arm-blind `stack_own` sweep +
-   `SwtchCtx`'s parked record + `BootBridge`'s index.
-5. **`wp_next_retarget`** in `WpNext.v`.
-6. **`wp_sret_s_sconf`**, the SIE-enabling sret leaf.
-7. **`SpecYield`/`ProofYield` exposing `intr_handler_avail`.**
+   `SwtchCtx`'s parked record + `BootBridge`'s index.  Footprint re-measured
+   and it matches the enumeration below: `IntrDefs` (the definition + the five
+   carve lemmas), `WpSconfCsr:530/:591`, the three `sp_bounds` copies,
+   `BootBridge`, `SwtchCtx:216`, `ProofKernelvec:1614`.  What that enumeration
+   does NOT cover is the SIE-FLIP LEAVES, whose avail index moves with the arm:
+   `wp_csrci_sstatus_s_sconf` / `_x0_` exit at `trap_res b + n`, and the
+   re-enabling `wp_csrsi_sstatus_x0_enable_s_sconf` gains a
+   `kv_frame_slots <= n` premise (it has to carve the reserve back out).  Those
+   premises are discharged INSIDE push_off/pop_off/acquire/release at their own
+   seams and do not propagate — that is what "no balanced caller changes"
+   rests on, and it is the thing to verify first, against the 56 files / 210
+   sites that name those four.
+5. ~~**`wp_next_retarget`** in `WpNext.v`~~ **done** (above).
+6. **`wp_sret_s_sconf`**, the SIE-enabling sret leaf.  Blocked on 4 (its
+   `kv_frame_slots <= av` premise is only satisfiable under the arm-dependent
+   carve) and on the core (it re-seals `intr_inv` with the □ handler spec).
+7. **`SpecYield`/`ProofYield` exposing `intr_handler_avail`** — **and it is NOT
+   the unconditional exposure this file claimed.**  See the correction below.
 8. **Cleanups with no users**: delete `sie_cap_acc`; delete the five dead
    `Hdeepaddr` asserts; decide whether `sie_cap_grow`/`_shrink` should exist.
+
+### The order to take them in
+
+`4` and `3a` are INDEPENDENT of each other and of everything else, so they can
+run in parallel; `3b` needs `3a`; `6` needs `4` and the core's `intr_inv`
+re-seal; `7` needs nothing but is only worth landing once its shape is settled
+(the `_ext` guard, below).  `8` is free at any point.  The core comes last and
+absorbs whatever is left.  Both wide slices are mechanical-by-construction and
+are the natural place to fan out subagents: `3a` is one premise slot per leaf
+plus a positional `ltac:(rdok)` at each reference, `3b` is
+`iIntros (CIDn Hsn)` + `$! cpu_id` → `$! CIDn` + `iPureIntro; exact Hsn`.
 
 ### The atomic core, and why it cannot be cut further
 
 The fixpoint, the folded-bundle `intr_handler_spec`, the engine's trap arm
 actually re-entering at the resuming hart, `ProofKernelvec.v`, and deleting
-`KERNELTRAP_RETURNS`.  **All of it except `ProofKernelvec` is already WRITTEN AND
-GREEN on the parked branch** — `kerneltrap-stage2:a6a67d6c` is `IntrDefs.v` with
-the two-section split, the `ihs_*` layer and the contractive `fixpoint`;
-`:78bc0283` is the hart-generic engine and funnel.  Read those rather than
-re-deriving from the sketches below; what they need is rebasing onto the landed
-slices, not reinventing.  **Checked: a "folded bundle but same hart" contract does
+`KERNELTRAP_RETURNS`.  It was once written and green on the parked branch
+(`kerneltrap-stage2:a6a67d6c` = `IntrDefs.v` with the two-section split, the
+`ihs_*` layer and the contractive `fixpoint`; `:78bc0283` = the hart-generic
+engine and funnel) — **but those objects no longer exist in this repository, so
+the core is new work: derive it from the sketches below, and add the two
+engine-callback wraps slice 3b deliberately leaves out.**
+**Checked: a "folded bundle but same hart" contract does
 NOT avoid the fixpoint.**  The moment the handler owns the re-enable, its `sret`
 must flip the SIE ghost, which needs the invariant quarter, which needs
 `intr_inv` in its precondition — and `intr_inv`'s body holds the handler spec.
@@ -905,8 +1005,10 @@ consumers and its `eb = true` instance made `b` true.
    park-to-lock** (section below).
 
 10. **The `intr_handler_spec` upgrade + `ProofKernelvec.v` rewiring**
-   (explicit-cpuid Stage 2) — the only thing left, and IN PROGRESS as a series
-   of independently-landable slices rather than one branch.  What is landed,
+   (explicit-cpuid Stage 2) — the one remaining DESIGN, being landed as a
+   series of independently-landable slices rather than one branch.  Six slices
+   are queued ahead of the atomic core, two of them wide sweeps, and the parked
+   reference branch is gone; see the re-scoping note.  What is landed,
    what is queued and in what order:
    **[HOW THIS IS BEING LANDED](#how-this-is-being-landed--the-decomposition-and-why-it-exists)**.
    The design itself is in `STEP 10` and the sections after it: the fixpoint in
