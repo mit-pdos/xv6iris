@@ -911,6 +911,8 @@ SpecFileread.v
 SpecForkretPark.v
 SpecIdup.v
 SpecIget.v
+ProofIget.v
+LinkIget.v
 SpecKfork.v
 SpecSafestrcpy.v
 SpecStrncpy.v

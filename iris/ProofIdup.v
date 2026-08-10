@@ -350,7 +350,7 @@ Section ProofIdup.
       by (rewrite /mA; apply upd_eq).
     iDestruct (cpu_own_transport CID CID9 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
-    iApply (Acquire.wp_acquire_sconf γl "itable"%string (itable_res2 cn γfs γi cov logstart nib) mA
+    iApply (Acquire.wp_acquire_sconf γl "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) mA
               n eb p C (K - 4)%nat b
               HnZ ltac:(lia)
               with "Hcg Hcnt Htext Hpc [Hlock] Hpanic [-]").
@@ -475,13 +475,15 @@ Section ProofIdup.
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     { intros j Hj. reflexivity. }
     { rewrite /islot2 lookup_insert Hcik. iFrame "Hrest Hiu Hgid". }
-    iAssert (itable_res2 cn γfs γi cov logstart nib) with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
+    iAssert (itable_res2 cn γfs γi cov logstart nib dev) with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
     { iExists (<[k := (qt, Pos.succ cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
       iSplitR; [| iSplitR; [| iExact "Hslots"]].
       2:{ (* [ci] did not move, and [M]'s domain did not either: the slot was
-             already live, so §13.2/§13.9's three clauses are preserved. *)
-        iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange).
-        split_and!; [| exact Hinj | exact Hrange].
+             already live, so §13.2/§13.9/§13.11's four clauses are
+             preserved -- including the single-device one, which is about
+             [ci] alone and so is literally the hypothesis. *)
+        iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange & Hdev).
+        split_and!; [| exact Hinj | exact Hrange | exact Hdev].
         rewrite dom_insert_L Hdom.
         assert (Hkin : k ∈ dom M) by (apply elem_of_dom; by eexists).
         set_solver. }
@@ -549,7 +551,7 @@ Section ProofIdup.
       rewrite /D3 upd_ne; [| vm_compute; discriminate]. exact HD2s1. }
     assert (HD5ra : D5 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.idup + 0x26) : mword 64) 4)
       by (rewrite /D5; apply upd_eq).
-    iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib) D5
+    iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; reflexivity)
               ltac:(lia)

@@ -254,26 +254,34 @@ Section IcacheEscrow.
      [lock_tok_excl] (FsCrash.v's route out of the same problem): BOTH sides
      must be able to READ the state, and an exclusive token can be held by
      only one of them. *)
-  Definition ic_id (cn : ic_names) (k : nat) (q : Qp) (v : bool) : iProp Σ :=
-    ghost_var (icn_id cn k) q v.
+  Definition ic_id (cn : ic_names) (k : nat) (q : Qp)
+      (v : bool) (dev inum : mword 32) : iProp Σ :=
+    ghost_var (icn_id cn k) q (v, dev, inum).
 
-  Global Instance ic_id_timeless cn k q v : Timeless (ic_id cn k q v).
+  Global Instance ic_id_timeless cn k q v dev inum :
+    Timeless (ic_id cn k q v dev inum).
   Proof. rewrite /ic_id. apply _. Qed.
 
-  Lemma ic_id_agree cn k q1 q2 v1 v2 :
-    ic_id cn k q1 v1 -∗ ic_id cn k q2 v2 -∗ ⌜v1 = v2⌝.
+  Lemma ic_id_agree cn k q1 q2 v1 d1 n1 v2 d2 n2 :
+    ic_id cn k q1 v1 d1 n1 -∗ ic_id cn k q2 v2 d2 n2 -∗
+    ⌜v1 = v2 /\ d1 = d2 /\ n1 = n2⌝.
   Proof.
     rewrite /ic_id. iIntros "H1 H2".
-    by iDestruct (ghost_var_agree with "H1 H2") as %->.
+    iDestruct (ghost_var_agree with "H1 H2") as %Heq.
+    iPureIntro. by injection Heq.
   Qed.
 
-  (* the two halves in one hand -- iget's recycle and iput's last close *)
-  Lemma ic_id_flip cn k (v v' : bool) :
-    ic_id cn k (1/2) v -∗ ic_id cn k (1/2) v ==∗
-    ic_id cn k (1/2) v' ∗ ic_id cn k (1/2) v'.
+  (* the two halves in one hand -- iget's recycle (twice: the dev store's
+     re-tag at +0x6e and the identification flip at +0x72) and iput's last
+     close.  §13.10: this is a VALUE update, not just a state flip, and the
+     values are what a recycler cannot otherwise recover from a cell its arm
+     owns whole. *)
+  Lemma ic_id_flip cn k (v v' : bool) (d n d' n' : mword 32) :
+    ic_id cn k (1/2) v d n -∗ ic_id cn k (1/2) v d n ==∗
+    ic_id cn k (1/2) v' d' n' ∗ ic_id cn k (1/2) v' d' n'.
   Proof.
     rewrite /ic_id. iIntros "H1 H2".
-    iApply (ghost_var_update_halves v' with "H1 H2").
+    iApply (ghost_var_update_halves (v', d', n') with "H1 H2").
   Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -365,14 +373,14 @@ Section IcacheEscrow.
        i_valid (ientry k) ↦₄ valid_word v ∗
        ic_payload γfs γi cov logstart k inum v ∗
        ic_mid cn k ∗
-       ic_id cn k (1/2) true)%I.
+       ic_id cn k (1/2) true dev inum)%I.
 
   Definition ic_out (cn : ic_names) (k : nat) : iProp Σ :=
     (∃ (q : Qp) (dev inum : mword 32),
        ic_tok cn k ∗
        inode_ref (icn_ref cn) k q dev inum ∗
        ic_mid cn k ∗
-       ic_id cn k (1/2) true)%I.
+       ic_id cn k (1/2) true dev inum)%I.
 
   (* the recycle window.  The inum cell is FULL (the discriminator) and the
      valid word is an ARBITRARY stale value, decoupled from the payload's
@@ -385,7 +393,7 @@ Section IcacheEscrow.
        i_inum (ientry k) ↦₄ inum ∗
        i_valid (ientry k) ↦₄ w ∗
        ic_unloaded γfs γi cov logstart k inum ∗
-       ic_id cn k (1/2) true)%I.
+       ic_id cn k (1/2) true dev inum)%I.
 
   (* THE EMPTY ARM (§13.8, renamed by §13.9): the arm of every slot the
      table does not show LIVE -- the state of all fifty entries at boot, and
@@ -412,7 +420,7 @@ Section IcacheEscrow.
        i_valid (ientry k) ↦₄ w ∗
        inode_raw (ientry k) ∗
        ic_mid cn k ∗
-       ic_id cn k (1/2) false)%I.
+       ic_id cn k (1/2) false dev inum)%I.
 
   Definition ic_escrow_body (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) : iProp Σ :=
@@ -579,7 +587,7 @@ Section IcacheEscrow.
        i_valid (ientry k) ↦₄ valid_word v ∗
        ic_payload γfs γi cov logstart k inum v ∗
        ic_mid cn k ∗
-       ic_id cn k (1/2) true) ∗
+       ic_id cn k (1/2) true dev inum) ∗
     (ic_parked cn γfs γi cov logstart k -∗
      ic_escrow_body cn γfs γi cov logstart k).
   Proof.
@@ -615,34 +623,41 @@ Section IcacheEscrow.
      whole), so the ONLY thing that tells this arm from an ordinary parked
      one is the identification ghost.  This is also where the FLIP happens:
      past this opening the entry is live, and both halves are in the
-     recycler's hand exactly here. *)
-  Lemma ic_open_empty_free cn γfs γi cov logstart k (inumT : mword 32) :
+     recycler's hand exactly here.
+
+     §13.10: the arm's dev cell -- which the recycler wrote at +0x6e and
+     could not keep a fraction of -- comes out AT THE VALUE THE TABLE'S
+     GHOST HALF NAMES, and the flip retags both halves to the identity the
+     entry is being recycled TO.  Without that the recycled entry's dev
+     would be unrecoverable here and the postcondition unstatable. *)
+  Lemma ic_open_empty_free cn γfs γi cov logstart k
+      (devT inumT devN inumN : mword 32) :
     ic_escrow_body cn γfs γi cov logstart k -∗
-    ic_id cn k (1/2) false -∗
+    ic_id cn k (1/2) false devT inumT -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inumT -∗
     |==> i_inum (ientry k) ↦₄ inumT ∗
-      (∃ devA w : mword 32,
-         i_dev (ientry k) ↦₄ devA ∗
-         i_valid (ientry k) ↦₄ w ∗
-         inode_raw (ientry k)) ∗
+      i_dev (ientry k) ↦₄ devT ∗
+      (∃ w : mword 32, i_valid (ientry k) ↦₄ w) ∗
+      inode_raw (ientry k) ∗
       ic_mid cn k ∗
-      ic_id cn k (1/2) true ∗
-      ic_id cn k (1/2) true.
+      ic_id cn k (1/2) true devN inumN ∗
+      ic_id cn k (1/2) true devN inumN.
   Proof.
     iIntros "Hbody Hgf HinT".
     iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
     - iDestruct "Hpk" as (dev' inum' v) "(_ & _ & _ & _ & _ & Hgt)".
-      iDestruct (ic_id_agree with "Hgf Hgt") as %Hc. discriminate.
+      iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hout" as (q dev' inum') "(_ & _ & _ & Hgt)".
-      iDestruct (ic_id_agree with "Hgf Hgt") as %Hc. discriminate.
+      iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & _ & _ & Hgt)".
-      iDestruct (ic_id_agree with "Hgf Hgt") as %Hc. discriminate.
+      iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hvg" as (devA inum' w) "(Hidv & Hin & Hvld & Hraw & Hmidt & Hgf')".
-      iDestruct (word4_pointsto_agree with "HinT Hin") as %<-.
+      iDestruct (ic_id_agree with "Hgf Hgf'") as %(_ & <- & <-).
       iDestruct (word4_pointsto_half_join with "HinT Hin") as "Hin".
-      iMod (ic_id_flip cn k false true with "Hgf Hgf'") as "[Hg1 Hg2]".
-      iModIntro. iFrame "Hin Hmidt Hg1 Hg2".
-      iExists devA, w. iFrame.
+      iMod (ic_id_flip cn k false true devT inumT devN inumN with "Hgf Hgf'")
+        as "[Hg1 Hg2]".
+      iModIntro. iFrame "Hin Hidv Hraw Hmidt Hg1 Hg2".
+      iExists w. iFrame.
   Qed.
 
   (* (d0) THE RECYCLER'S DEV STORE (iget, the [sw] at +0x6e).  The empty arm
@@ -652,30 +667,38 @@ Section IcacheEscrow.
      empty arm couples dev to anything, which is why this is a plain
      open/close pair, and why the recycler keeps NO dev fraction across the
      gap to +0x72: the arm must still hold the cell whole, or
-     [ic_swap_checkout] would lose its refutation. *)
-  Lemma ic_open_empty_dev cn γfs γi cov logstart k :
+     [ic_swap_checkout] would lose its refutation.
+
+     §13.10: the arm's dev cell is FULL and the recycler may keep no
+     fraction of it, so the re-tag of the AGREEMENT GHOST is what carries
+     the stored value to +0x72 -- the two halves are in one hand here, and
+     nowhere else between the two stores.  [devN] is the value the caller is
+     about to store; the cell comes out at the OLD value [devT], which the
+     ghost names. *)
+  Lemma ic_open_empty_dev cn γfs γi cov logstart k (devT inumT devN : mword 32) :
     ic_escrow_body cn γfs γi cov logstart k -∗
-    ic_id cn k (1/2) false -∗
-    ic_id cn k (1/2) false ∗
-    (∃ devA : mword 32, i_dev (ientry k) ↦₄ devA) ∗
-    (∀ dev' : mword 32,
-       i_dev (ientry k) ↦₄ dev' -∗
+    ic_id cn k (1/2) false devT inumT -∗
+    |==> i_dev (ientry k) ↦₄ devT ∗
+      ic_id cn k (1/2) false devN inumT ∗
+      (i_dev (ientry k) ↦₄ devN -∗
        ic_escrow_body cn γfs γi cov logstart k).
   Proof.
     iIntros "Hbody Hgf".
     iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
     - iDestruct "Hpk" as (dev' inum' v) "(_ & _ & _ & _ & _ & Hgt)".
-      iDestruct (ic_id_agree with "Hgf Hgt") as %Hc. discriminate.
+      iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hout" as (q dev' inum') "(_ & _ & _ & Hgt)".
-      iDestruct (ic_id_agree with "Hgf Hgt") as %Hc. discriminate.
+      iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & _ & _ & Hgt)".
-      iDestruct (ic_id_agree with "Hgf Hgt") as %Hc. discriminate.
+      iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hvg" as (devA inum' w) "(Hidv & Hin & Hvld & Hraw & Hmidt & Hgf')".
-      iFrame "Hgf".
-      iSplitL "Hidv"; [iExists devA; iExact "Hidv" |].
-      iIntros (dev2) "Hd".
+      iDestruct (ic_id_agree with "Hgf Hgf'") as %(_ & <- & <-).
+      iMod (ic_id_flip cn k false false devT inumT devN inumT with "Hgf Hgf'")
+        as "[Hg1 Hg2]".
+      iModIntro. iFrame "Hidv Hg1".
+      iIntros "Hd".
       iRight; iRight; iRight. rewrite /ic_empty_arm.
-      iExists dev2, inum', w. iFrame.
+      iExists devN, inumT, w. iFrame.
   Qed.
 
   (* closing the window OPEN: any mid bundle is a legal body
@@ -717,8 +740,8 @@ Section IcacheEscrow.
      become the empty arm's [inode_raw]; their thirteen-element length comes
      from [blkmap_wf], which [inode_ok] carries. *)
   Lemma ic_close_to_empty cn γfs γi cov logstart k (v : bool) (dev inum : mword 32) :
-    ic_id cn k (1/2) true -∗
-    ic_id cn k (1/2) true -∗
+    ic_id cn k (1/2) true dev inum -∗
+    ic_id cn k (1/2) true dev inum -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
@@ -726,11 +749,12 @@ Section IcacheEscrow.
     ic_payload γfs γi cov logstart k inum v -∗
     ic_mid cn k -∗
     |==> ic_escrow_body cn γfs γi cov logstart k ∗
-         ic_id cn k (1/2) false ∗
+         ic_id cn k (1/2) false dev inum ∗
          ipool_shape γfs γi cov logstart inum.
   Proof.
     iIntros "Hg1 Hg2 Hd1 Hd2 Hin Hvld Hpay Hmt".
-    iMod (ic_id_flip cn k true false with "Hg1 Hg2") as "[Hgf1 Hgf2]".
+    iMod (ic_id_flip cn k true false dev inum dev inum with "Hg1 Hg2")
+      as "[Hgf1 Hgf2]".
     iDestruct (word4_pointsto_half_join with "Hd1 Hd2") as "Hd".
     (* the payload splits into the cells the empty arm keeps and the bundle
        the pool takes back *)
@@ -785,7 +809,7 @@ Section IcacheEscrow.
      iget's proof from having to know the budget. *)
   Lemma ic_close_mid_to_parked cn γfs γi cov logstart k (dev inum : mword 32) :
     ic_mid cn k -∗
-    ic_id cn k (1/2) true -∗
+    ic_id cn k (1/2) true dev inum -∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
     i_inum (ientry k) ↦₄ inum -∗
     i_valid (ientry k) ↦₄ valid_word false -∗
@@ -868,8 +892,9 @@ Section IcacheEscrow.
       split; [lia |]. apply elem_of_seq. lia.
   Qed.
 
-  (* THE THREE WF CLAUSES (§13.2, and §13.9 on why the first one is an
-     EQUALITY after all): [ci] records exactly the LIVE slots.
+  (* THE FOUR WF CLAUSES (§13.2, §13.9 on why the first one is an
+     EQUALITY after all, §13.11 for the fourth): [ci] records exactly the
+     LIVE slots, at ONE device.
 
      §13.7 weakened this to [dom M ⊆ dom ci] so that iput's last close could
      leave a ref-0 entry CACHED, and §13.9 undid that: xv6's scan hit-test
@@ -888,15 +913,33 @@ Section IcacheEscrow.
      after a full scan misses, and the scan's LIVE-slot loop invariant is
      exactly what proves it, now that live is all [ci] records); and every
      cached inum is inside the inode region, which is what makes
-     [mword_of_int] faithful on the pool's keys. *)
+     [mword_of_int] faithful on the pool's keys.
+
+     AND THE TABLE IS SINGLE-DEVICE (§13.11).  The region and the pool are
+     inum-keyed -- [InodeRegion]'s map is one file system's, [dinode_at γi
+     inum dn] names an inum and nothing else -- so "this inum is not
+     cached" has to be decidable from the inums alone.  But xv6's scan
+     hit-test is on the PAIR (`ip->dev == dev && ip->inum == inum`, and the
+     dev compare at iget+0x4c short-circuits BEFORE the inum is ever
+     loaded), so a scan that misses proves only that no live slot carries
+     (dev, inum) -- and a live slot at (dev', inum) would leave iget's
+     recycle with no bundle to withdraw, a second [dinode_at] for one inum
+     against [InodeRegion.dinode_at_excl], and [ci]-injectivity broken.
+     The two coincide exactly when every cached entry has the SAME device,
+     which is what this clause says and what [BioInv]'s [bv_dev V] already
+     says for the buffer cache.  [dv] is the table's device; iget and idup
+     instantiate it at their own [dev] argument, so the clause is
+     re-established by construction at the one place [ci] grows. *)
   Definition ic_ci_wf (M : gmap nat (Qp * positive))
-      (ci : gmap nat (mword 32 * mword 32)) (nib : nat) : Prop :=
+      (ci : gmap nat (mword 32 * mword 32)) (nib : nat) (dv : mword 32) : Prop :=
     dom ci = dom M
     /\ (forall (k1 k2 : nat) (p1 p2 : mword 32 * mword 32),
           ci !! k1 = Some p1 -> ci !! k2 = Some p2 ->
           bv_unsigned (snd p1) = bv_unsigned (snd p2) -> k1 = k2)
     /\ (forall (k : nat) (p : mword 32 * mword 32),
-          ci !! k = Some p -> bv_unsigned (snd p) < 16 * Z.of_nat nib).
+          ci !! k = Some p -> bv_unsigned (snd p) < 16 * Z.of_nat nib)
+    /\ (forall (k : nat) (p : mword 32 * mword 32),
+          ci !! k = Some p -> fst p = dv).
 
   (* the pool's keys are region inums, so [mword_of_int] round-trips *)
   Lemma region_inum_faithful (nib : nat) (z : Z) :
@@ -972,8 +1015,9 @@ Section IcacheEscrow.
      RECYCLER arriving here reads -- it has no dev fraction to reason with,
      by construction. *)
   Definition islot_empty (cn : ic_names) (k : nat) : iProp Σ :=
-    ((∃ inum : mword 32, i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum) ∗
-     ic_id cn k (1/2) false)%I.
+    (∃ dev inum : mword 32,
+       i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum ∗
+       ic_id cn k (1/2) false dev inum)%I.
 
   Definition islot2 (cn : ic_names) (M : gmap nat (Qp * positive))
       (ci : gmap nat (mword 32 * mword 32)) (k : nat) : iProp Σ :=
@@ -981,26 +1025,27 @@ Section IcacheEscrow.
     | None, None => islot_empty cn k
     | Some (q, n), Some (dev, inum) =>
         (islot_rest_at k q dev inum ∗ iref_slots (Pos.to_nat n) ∗
-         ic_id cn k (1/2) true)%I
+         ic_id cn k (1/2) true dev inum)%I
     | _, _ => False%I
     end.
 
   Definition itable_res2 (cn : ic_names) (γfs : fs_names) (γi : gname)
-      (cov : gset Z) (logstart : Z) (nib : nat) : iProp Σ :=
+      (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) : iProp Σ :=
     (∃ (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)),
        itable_half (icn_ref cn) M ∗
-       ⌜icM_wf M⌝ ∗ ⌜ic_ci_wf M ci nib⌝ ∗
+       ⌜icM_wf M⌝ ∗ ⌜ic_ci_wf M ci nib dv⌝ ∗
        iref_slots_auth ∗
        ([∗ list] k ∈ seq 0 NINODE, islot2 cn M ci k) ∗
        ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci))%I.
 
   Definition is_itable2 (γl : gname) (cn : ic_names) (γfs : fs_names)
-      (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat) : iProp Σ :=
+      (γi : gname) (cov : gset Z) (logstart : Z) (nib : nat)
+      (dv : mword 32) : iProp Σ :=
     is_lock γl itable_lock "itable"%string
-      (itable_res2 cn γfs γi cov logstart nib).
+      (itable_res2 cn γfs γi cov logstart nib dv).
 
-  Global Instance is_itable2_persistent γl cn γfs γi cov logstart nib :
-    Persistent (is_itable2 γl cn γfs γi cov logstart nib).
+  Global Instance is_itable2_persistent γl cn γfs γi cov logstart nib dv :
+    Persistent (is_itable2 γl cn γfs γi cov logstart nib dv).
   Proof. apply _. Qed.
 
   (* the slot accessor a WRITER needs: BOTH pure maps may come back changed,
@@ -1070,12 +1115,13 @@ Section IcacheEscrowAlloc.
   (* the IDENTIFICATION ghost's family (§13.8), allocated the same way and at
      [false]: at boot every entry is empty.  Each slot's variable comes out
      WHOLE, so the caller splits it into the escrow's half and the table's. *)
-  Lemma ic_id_fun_alloc (n j : nat) :
-    ⊢ |==> ∃ f : nat -> gname, [∗ list] k ∈ seq j n, ghost_var (f k) 1 false.
+  Lemma ic_id_fun_alloc (dvs : nat -> mword 32 * mword 32) (n j : nat) :
+    ⊢ |==> ∃ f : nat -> gname,
+      [∗ list] k ∈ seq j n, ghost_var (f k) 1 (false, (dvs k).1, (dvs k).2).
   Proof.
     iInduction n as [|n IH] forall (j).
     { iModIntro. iExists (fun _ => inhabitant). cbn [seq]. done. }
-    iMod (ghost_var_alloc false) as (γ) "Hg".
+    iMod (ghost_var_alloc (false, (dvs j).1, (dvs j).2)) as (γ) "Hg".
     iMod ("IH" $! (S j)) as (f) "Hf".
     iModIntro. iExists (fun k => if decide (k = j) then γ else f k).
     rewrite ic_seq_cons. iSplitL "Hg".
@@ -1088,16 +1134,16 @@ Section IcacheEscrowAlloc.
   (* the whole layer's names, at a given reference authority: NINODE
      checkout tokens, NINODE recycle tokens and NINODE identification
      variables (all [false] -- every entry starts empty), all fresh. *)
-  Lemma ic_names_alloc (γref : gname) :
+  Lemma ic_names_alloc (γref : gname) (dvs : nat -> mword 32 * mword 32) :
     ⊢ |==> ∃ cn : ic_names,
       ⌜icn_ref cn = γref⌝ ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok cn k) ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_mid cn k) ∗
-      ([∗ list] k ∈ seq 0 NINODE, ic_id cn k 1 false).
+      ([∗ list] k ∈ seq 0 NINODE, ic_id cn k 1 false (dvs k).1 (dvs k).2).
   Proof.
     iMod (ic_tok_fun_alloc NINODE 0) as (fesc) "Hesc".
     iMod (ic_tok_fun_alloc NINODE 0) as (fmid) "Hmid".
-    iMod (ic_id_fun_alloc NINODE 0) as (fid) "Hid".
+    iMod (ic_id_fun_alloc dvs NINODE 0) as (fid) "Hid".
     iModIntro. iExists (MkIcNames γref fesc fmid fid).
     iSplitR; [done |]. rewrite /ic_tok /ic_mid /ic_id.
     cbn [icn_esc icn_mid icn_id].
