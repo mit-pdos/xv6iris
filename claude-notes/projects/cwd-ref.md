@@ -1,5 +1,24 @@
 # Project: filling `cwd_ref` — the inode-reference hole
 
+> **MERGE NOTE 2 (2026-08-10, second reconciliation).** The "Step 1 is
+> DONE" update below (origin's 5fa5f8c3, the share-shaped payload arm)
+> and d69678b3 (idup over shares) were REVIEWED AND NOT TAKEN into the
+> merged tree: against the merged base they are a regression — every
+> rewired call site moves from paying a REAL reference into a proven
+> iput to paying a share into an axiomatized one, and the merged tree's
+> `inode_pay` (cancellable invariant) already discharges steps 1–4 of
+> the ORDER OF WORK below by a shorter route, with `ProofIput`/`ProofIget`
+> proven behind it. What IS adopted from these commits, when T5 lands:
+> the `fp_iq` per-slot CONSTANT (so `file_payload_split` is
+> distributivity — the "share beside the cinv" third shape), and
+> `iref_upgrade_step`/the simpler ProofIdup. The T5 gate is UNCHANGED
+> and now sharper: `∃ q, iref_at ip q` as SpecIput's premise is still
+> insufficient — with a second reference to the same inode outstanding
+> (p->cwd), the caller-side "gather first" story cannot tell iput that
+> `q` is the whole slice; the whole-outstanding-share WITNESS remains
+> the unsolved design on both lines. See
+> projects/reconcile-fork-icache.md, round 2.
+
 > **MERGE NOTE (2026-08-10, reconcile-fork-icache).** This file records the
 > kfork line's design and is kept verbatim as that line's record. Three of
 > its claims were superseded when the two lines were merged onto the local
@@ -505,17 +524,42 @@ everything ilock actually uses (`q > 0` gives `k ∈ dom M`, hence the slot is
 live, hence `ip->ref > 0`, hence `InodeLock.inode_ref_spos` and the dead
 panic).
 
-**ORDER OF WORK**, once someone picks this up:
+**ORDER OF WORK.** Step 1 is DONE; the rest is not.
 
-1. `FileInv.inode_ref` real; re-prove `inode_ref_split`. Nothing else moves
-   yet — `fileclose` still passes it to an `iput` whose premise is `emp`.
-2. `off_body` gains the parked arm + a `off_take_last` lemma shaped like
-   `off_acc_excl`.
+1. ~~`FileInv.inode_ref` real~~ — **DONE.** It is `FileInv.inode_share v q :=
+   InodeRef.iref_shr_at v q`, the payload arm is
+   `inode_share (fc_ip C) (q * fp_iq pn)`, `fpnames` gained the `fp_iq : Qp`
+   constant, and `file_payload_split` is distributivity. `SpecIput`'s
+   premise went from `emp` to `∃ q, iref_shr_at ip q` — still a share, still
+   too weak, but real; `ProofKexit` now hands over half its identity slice
+   instead of dropping everything, and `ProofFileclose` passes the payload's
+   own arm. `FileInv` requires `InodeRef` (no cycle: `IcacheInv`'s cone
+   mentions `FileInv` only in comments).
+2. `off_body` gains the parked arm + an `off_take_last` lemma shaped like
+   `off_acc_excl`. **THIS NEEDS A NEW ESCROW TOKEN AND HERE IS WHY** — three
+   candidates were tried and all fail:
+   - **`fslot`** cannot host it: at `q = 1` `file_rest` is `emp`, so the
+     table cannot name `f->ip`. (This is the original obstruction.)
+   - **`flive_tok`** cannot discriminate the arms: it is one-per-REFERENCE
+     (`file_ref` carries one) and `off_body`'s borrow arm already uses it
+     that way, so a token parked in a "taken" arm would be orphaned when
+     `flive_close_last` deletes the slot.
+   - **`fpay_tok`** cannot either: the "taken" arm would have to hold
+     fraction 1, and fraction 1 is exactly what the last closer needs in
+     hand to return `file_pay` to `fslot`'s free arm.
+
+   So: a **fourth `fileUR` component**, `gmapUR nat fracR`, mirroring
+   `flive`'s ~40 lines. A holder of file fraction `q` carries
+   `fpark_tok γ k q`; `off_body`'s new disjunct is
+   `(∃ q, iref_at ip q) ∨ fpark_tok γ k 1`. At `q = 1` the closer holds the
+   whole claim, so the right arm is refuted by validity, the reference is
+   withdrawn and the claim deposited in its place. A later `sys_open`
+   reclaims the token from that arm under the ftable lock.
 3. `SpecIput`: premise becomes `∃ q, InodeRef.iref_at ip q`. Its
    postcondition's `iref_slot` is already there.
 4. `ProofFileclose`'s FD_INODE arm withdraws and spends; the `###` banner
    there goes away, and so does `ProofKexit`'s.
-5. `SpecIlock` / `SpecFileread` take `inode_shr`; re-prove `ProofIlock`.
+5. `SpecIlock` / `SpecFileread` take `inode_share`; re-prove `ProofIlock`.
 6. Boot routes the supply's `NFILE` units to the ftable
    (`BootShared`'s `###` banner).
 

@@ -53,6 +53,42 @@ local→origin re-proves ~7000 lines behind an unsolved design question.
   OUT arm (which holds a tok the two_lookup refutations need — a
   share-holding ilock has nothing to deposit). Genuine open design.
 
+## Round 2 (2026-08-10): origin's six post-merge commits
+
+Origin gained six commits on ce985dbc while round 1 was in flight. The
+recon verdict, executed as one merge with ours-resolution on the
+collision set:
+
+- **TAKEN (auto-merged, disjoint):** the four Qed/perf commits
+  (ae9bc6dc, d5cee89a, 34027d19, ddf514a2 — uservec/userret sealing,
+  tf_pa folded, pose-late/iClear-early; measured 83→39 s and 60→35 s on
+  the two trampoline monoliths) + all notes (optimization.md's new
+  sections apply to our tree verbatim).
+- **NOT TAKEN (ours kept on 9 conflict files + 5 chimera-risk files):**
+  5fa5f8c3 (the share-shaped file payload — a REGRESSION against the
+  merged base: it pays shares into an axiomatized iput where ours pays
+  whole references into a proven one; its `fp_iq` constant idea is
+  salvaged for T5's third shape) and d69678b3 (idup over shares —
+  genuinely nicer, but requires natR; deferred with T5, together with
+  `iref_upgrade_step` and the shorter ProofKforkB4).
+- **Chimera warning that paid off:** `SpecIdup.v` AUTO-merges into a
+  non-compiling file (our dev/ICFG binders + their `inode_shr` body);
+  `ProofFilealloc/ProofFiledup/SpecFilealloc/SpecFiledup` auto-add
+  `!irefNameG Σ` binders for a class the merged tree folded away. All
+  five were reset to ours explicitly. THE LESSON (second time): in a
+  design-divergent merge, the conflict list understates — audit every
+  auto-merged file in the collision cone.
+- **The T5 gate, sharpened by their own notes + our recon:** their plan
+  targets `SpecIput` at `∃ q, iref_at ip q` — still insufficient. With
+  a second reference to the same inode outstanding (p->cwd), iput
+  cannot learn from a share-or-reference existential that its fraction
+  is the whole outstanding slice; `iref_lookup`'s surviving direction
+  (`q = qt -> n = 1`) needs `q = qt` SUPPLIED. T5 must open with the
+  witness design: either a caller-mintable `iref_whole` or an
+  authority-side accounting invariant that yields `q = qt` under the
+  lock (their `fp_iq` proportional constant is an ingredient, not the
+  invariant).
+
 ## What actually landed (2026-08-10, branch `reconcile-fork`)
 
 One merge commit, `git merge origin/main` with the conflicts resolved

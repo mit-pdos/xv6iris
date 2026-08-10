@@ -81,6 +81,72 @@ Definition uservec_gpr (g : regfile) (vksp vkhart vktr vksat : bv 64) : regfile 
   (<[Regidx (mword_of_int 5) := regval_into_reg (g !!! Regidx (mword_of_int 10) : mword 64)]>
   (<[Regidx (mword_of_int 10) := mword_of_int TRAPFRAME]> g)))))).
 
+(* THE CONTINUATION, NAMED.  A whole-function WP carries its continuation as
+   a spatial hypothesis across every instruction step, so its TYPE is not only
+   re-traversed by every proofmode operation but re-embedded in the proof TERM
+   at every step.  Spelled out, this one is ~50 wands over 32 trapframe cells;
+   named, it is one constant applied to eight arguments.  [Typeclasses Opaque]
+   stops instance search from descending into it.  The proof unfolds it exactly
+   once, at the return.  See claude-notes/optimization.md. *)
+Definition uservec_post `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    (C : ucfg) (pt : uptd) (kroot : mword 44)
+    (vksat vksp vktr vkhart : bv 64) (dqk : dfrac) : iProp Σ :=
+  let uroot := ud_root pt in
+  let tfp := ud_tfp pt in
+  let um := ud_um pt in
+  ( ∀ (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64),
+    ⌜trap_mstatus_ok ms_v⌝ -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    mstatus ↦ᵣ ms_v -∗
+    scause ↦ᵣ sc_v -∗
+    stval ↦ᵣ stval_v -∗
+    sepc ↦ᵣ sepc_v -∗
+    sscratch ↦ᵣ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
+    tlb_inv_pt kroot -∗
+    pt_frame (upt_tree_spec uroot tfp um) -∗
+    udata_own (ud_data pt) -∗
+    user_cfg C -∗
+    pc_is (ret_pc (vktr : mword 64)) -∗
+    gpr_file (uservec_gpr g vksp vkhart vktr vksat) -∗
+    tf_pa tfp 0 ↦ₚ₈{ dqk } vksat -∗
+    tf_pa tfp 8 ↦ₚ₈{ dqk } vksp -∗
+    tf_pa tfp 16 ↦ₚ₈{ dqk } vktr -∗
+    tf_pa tfp 32 ↦ₚ₈{ dqk } vkhart -∗
+    tf_pa tfp 40 ↦ₚ₈ (g !!! Regidx (mword_of_int 1) : mword 64) -∗
+    tf_pa tfp 48 ↦ₚ₈ (g !!! Regidx (mword_of_int 2) : mword 64) -∗
+    tf_pa tfp 56 ↦ₚ₈ (g !!! Regidx (mword_of_int 3) : mword 64) -∗
+    tf_pa tfp 64 ↦ₚ₈ (g !!! Regidx (mword_of_int 4) : mword 64) -∗
+    tf_pa tfp 72 ↦ₚ₈ (g !!! Regidx (mword_of_int 5) : mword 64) -∗
+    tf_pa tfp 80 ↦ₚ₈ (g !!! Regidx (mword_of_int 6) : mword 64) -∗
+    tf_pa tfp 88 ↦ₚ₈ (g !!! Regidx (mword_of_int 7) : mword 64) -∗
+    tf_pa tfp 96 ↦ₚ₈ (g !!! Regidx (mword_of_int 8) : mword 64) -∗
+    tf_pa tfp 104 ↦ₚ₈ (g !!! Regidx (mword_of_int 9) : mword 64) -∗
+    tf_pa tfp 120 ↦ₚ₈ (g !!! Regidx (mword_of_int 11) : mword 64) -∗
+    tf_pa tfp 128 ↦ₚ₈ (g !!! Regidx (mword_of_int 12) : mword 64) -∗
+    tf_pa tfp 136 ↦ₚ₈ (g !!! Regidx (mword_of_int 13) : mword 64) -∗
+    tf_pa tfp 144 ↦ₚ₈ (g !!! Regidx (mword_of_int 14) : mword 64) -∗
+    tf_pa tfp 152 ↦ₚ₈ (g !!! Regidx (mword_of_int 15) : mword 64) -∗
+    tf_pa tfp 160 ↦ₚ₈ (g !!! Regidx (mword_of_int 16) : mword 64) -∗
+    tf_pa tfp 168 ↦ₚ₈ (g !!! Regidx (mword_of_int 17) : mword 64) -∗
+    tf_pa tfp 176 ↦ₚ₈ (g !!! Regidx (mword_of_int 18) : mword 64) -∗
+    tf_pa tfp 184 ↦ₚ₈ (g !!! Regidx (mword_of_int 19) : mword 64) -∗
+    tf_pa tfp 192 ↦ₚ₈ (g !!! Regidx (mword_of_int 20) : mword 64) -∗
+    tf_pa tfp 200 ↦ₚ₈ (g !!! Regidx (mword_of_int 21) : mword 64) -∗
+    tf_pa tfp 208 ↦ₚ₈ (g !!! Regidx (mword_of_int 22) : mword 64) -∗
+    tf_pa tfp 216 ↦ₚ₈ (g !!! Regidx (mword_of_int 23) : mword 64) -∗
+    tf_pa tfp 224 ↦ₚ₈ (g !!! Regidx (mword_of_int 24) : mword 64) -∗
+    tf_pa tfp 232 ↦ₚ₈ (g !!! Regidx (mword_of_int 25) : mword 64) -∗
+    tf_pa tfp 240 ↦ₚ₈ (g !!! Regidx (mword_of_int 26) : mword 64) -∗
+    tf_pa tfp 248 ↦ₚ₈ (g !!! Regidx (mword_of_int 27) : mword 64) -∗
+    tf_pa tfp 256 ↦ₚ₈ (g !!! Regidx (mword_of_int 28) : mword 64) -∗
+    tf_pa tfp 264 ↦ₚ₈ (g !!! Regidx (mword_of_int 29) : mword 64) -∗
+    tf_pa tfp 272 ↦ₚ₈ (g !!! Regidx (mword_of_int 30) : mword 64) -∗
+    tf_pa tfp 280 ↦ₚ₈ (g !!! Regidx (mword_of_int 31) : mword 64) -∗
+    tf_pa tfp 112 ↦ₚ₈ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
+    WP (Loop : expr riscv_lang)).
+Global Typeclasses Opaque uservec_post.
+
 Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
     (C : ucfg) (pt : uptd) (kroot : mword 44)
     (sscr0 : mword 64)
@@ -153,57 +219,7 @@ Definition wp_uservec_pt_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : Cp
   (* the continuation: at usertrap, on the kernel table, the user machine
      fully banked into the trapframe.  Universally quantified over the trap
      frame's existentials -- [g] is the interrupted USER register file. *)
-  ( ∀ (g : regfile) (ms_v sc_v stval_v sepc_v : mword 64),
-    ⌜trap_mstatus_ok ms_v⌝ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗
-    mstatus ↦ᵣ ms_v -∗
-    scause ↦ᵣ sc_v -∗
-    stval ↦ᵣ stval_v -∗
-    sepc ↦ᵣ sepc_v -∗
-    sscratch ↦ᵣ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
-    tlb_inv_pt kroot -∗
-    pt_frame (upt_tree_spec uroot tfp um) -∗
-    udata_own (ud_data pt) -∗
-    user_cfg C -∗
-    pc_is (ret_pc (vktr : mword 64)) -∗
-    gpr_file (uservec_gpr g vksp vkhart vktr vksat) -∗
-    tf_pa tfp 0 ↦ₚ₈{ dqk } vksat -∗
-    tf_pa tfp 8 ↦ₚ₈{ dqk } vksp -∗
-    tf_pa tfp 16 ↦ₚ₈{ dqk } vktr -∗
-    tf_pa tfp 32 ↦ₚ₈{ dqk } vkhart -∗
-    tf_pa tfp 40 ↦ₚ₈ (g !!! Regidx (mword_of_int 1) : mword 64) -∗
-    tf_pa tfp 48 ↦ₚ₈ (g !!! Regidx (mword_of_int 2) : mword 64) -∗
-    tf_pa tfp 56 ↦ₚ₈ (g !!! Regidx (mword_of_int 3) : mword 64) -∗
-    tf_pa tfp 64 ↦ₚ₈ (g !!! Regidx (mword_of_int 4) : mword 64) -∗
-    tf_pa tfp 72 ↦ₚ₈ (g !!! Regidx (mword_of_int 5) : mword 64) -∗
-    tf_pa tfp 80 ↦ₚ₈ (g !!! Regidx (mword_of_int 6) : mword 64) -∗
-    tf_pa tfp 88 ↦ₚ₈ (g !!! Regidx (mword_of_int 7) : mword 64) -∗
-    tf_pa tfp 96 ↦ₚ₈ (g !!! Regidx (mword_of_int 8) : mword 64) -∗
-    tf_pa tfp 104 ↦ₚ₈ (g !!! Regidx (mword_of_int 9) : mword 64) -∗
-    tf_pa tfp 120 ↦ₚ₈ (g !!! Regidx (mword_of_int 11) : mword 64) -∗
-    tf_pa tfp 128 ↦ₚ₈ (g !!! Regidx (mword_of_int 12) : mword 64) -∗
-    tf_pa tfp 136 ↦ₚ₈ (g !!! Regidx (mword_of_int 13) : mword 64) -∗
-    tf_pa tfp 144 ↦ₚ₈ (g !!! Regidx (mword_of_int 14) : mword 64) -∗
-    tf_pa tfp 152 ↦ₚ₈ (g !!! Regidx (mword_of_int 15) : mword 64) -∗
-    tf_pa tfp 160 ↦ₚ₈ (g !!! Regidx (mword_of_int 16) : mword 64) -∗
-    tf_pa tfp 168 ↦ₚ₈ (g !!! Regidx (mword_of_int 17) : mword 64) -∗
-    tf_pa tfp 176 ↦ₚ₈ (g !!! Regidx (mword_of_int 18) : mword 64) -∗
-    tf_pa tfp 184 ↦ₚ₈ (g !!! Regidx (mword_of_int 19) : mword 64) -∗
-    tf_pa tfp 192 ↦ₚ₈ (g !!! Regidx (mword_of_int 20) : mword 64) -∗
-    tf_pa tfp 200 ↦ₚ₈ (g !!! Regidx (mword_of_int 21) : mword 64) -∗
-    tf_pa tfp 208 ↦ₚ₈ (g !!! Regidx (mword_of_int 22) : mword 64) -∗
-    tf_pa tfp 216 ↦ₚ₈ (g !!! Regidx (mword_of_int 23) : mword 64) -∗
-    tf_pa tfp 224 ↦ₚ₈ (g !!! Regidx (mword_of_int 24) : mword 64) -∗
-    tf_pa tfp 232 ↦ₚ₈ (g !!! Regidx (mword_of_int 25) : mword 64) -∗
-    tf_pa tfp 240 ↦ₚ₈ (g !!! Regidx (mword_of_int 26) : mword 64) -∗
-    tf_pa tfp 248 ↦ₚ₈ (g !!! Regidx (mword_of_int 27) : mword 64) -∗
-    tf_pa tfp 256 ↦ₚ₈ (g !!! Regidx (mword_of_int 28) : mword 64) -∗
-    tf_pa tfp 264 ↦ₚ₈ (g !!! Regidx (mword_of_int 29) : mword 64) -∗
-    tf_pa tfp 272 ↦ₚ₈ (g !!! Regidx (mword_of_int 30) : mword 64) -∗
-    tf_pa tfp 280 ↦ₚ₈ (g !!! Regidx (mword_of_int 31) : mword 64) -∗
-    tf_pa tfp 112 ↦ₚ₈ (g !!! Regidx (mword_of_int 10) : mword 64) -∗
-    WP (Loop : expr riscv_lang)) -∗
+  uservec_post C pt kroot vksat vksp vktr vkhart dqk -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERVEC.
