@@ -265,7 +265,29 @@ out 2026-08-09):**
     an incr-shaped store AU — add `iref_incr_store_au` beside it,
     same proof shape over `iref_incr_step`);
   * ProofIget → Opus.
-- C6: `SpecIput`/`ProofIput` — the choreography settled by §13.7–13.9:
+- C6: **DONE — iput PROVEN AND LINKED** (ProofIput.v 2216 lines;
+  coverage 147 proven / 78%, 16502 text bytes / 71%; `Print Assumptions
+  LinkIput.Iput.wp_iput2_sconf` = the five Sail platform axioms +
+  funext, nothing else). It cost ONE definitional gap, found by
+  proof-forward tracing and fixed in IcacheEscrow.v alone: **§13.13's
+  HELD arm** — iput's `ip->valid` reading at +0x3c cannot cross the
+  +0x50 `acquiresleep`, and the window that fixes it needs no new
+  token and splits the valid cell ½/½ (read §13.13, which records both
+  as the compile settled them). Proof surprises worth keeping:
+  `iNext` on a whole-function context UNFOLDS `cpu_own` and the next
+  `iApply`'s spec pattern then cannot instantiate it — use
+  `iApply bi.later_intro` for a taken branch's `▷`, never `iNext`;
+  `set_solver` at this altitude cost **284 s in one call** (hoist to a
+  named one-line lemma — the whole file went 454 s → 163 s of tactics);
+  `repeat split` + `-` bullets is fragile in a capstone, use
+  `repeat split; first [exact … | rewrite <thr-lemma>; [ … ]]`;
+  `sign_extend' 64 (di_nlink dn)` needs an explicit `: mword 16`
+  ascription (`mword ?n` will not unify with `bv 16`); `iref_lookup`
+  does NOT expose `q < qt` at count ≥ 2, so the non-last close restates
+  the `singleton_included_l` argument locally (`ip_ref_sub`); the
+  instantiation in a Link file must be UNASCRIBED and on one line or
+  `tools/proof_coverage.py` reads the function as `assumed`.
+  The original plan, all of which held:
   * the two reads of `valid`/`nlink` under only itable.lock: REF-1
     (`iref_lookup` at count 1) + `ic_open_auth_ref` (the opener's dev
     fraction refutes EMPTY now too — check the lemma gained that case

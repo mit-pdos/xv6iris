@@ -1563,20 +1563,42 @@ close at MID/OUT/EMPTY, retain `dinode_at` fractions, handle
 are untied to the record).
 
 The fix is the MID arm's own idea, replayed for iput: **`ic_held`, an
-authority-side window arm** — the cells stay in the arm (dev ½, inum
-FULL as the discriminator, valid at an arbitrary word), the PAYLOAD at
+authority-side window arm** — the cells stay in the arm, the PAYLOAD at
 its concrete polarity leaves with the holder (so nothing is re-bound
-and nothing needs stability), plus a new `ic_hld` token family for the
-arm bookkeeping. Entered at +0x3c under REF-1
-(`ic_open_parked_to_held`), exited at the post-acquiresleep checkout
-(`ic_open_held`/`ic_close_held_to_parked`-shaped, where the full inum
-cell re-splits into arm-½ + the deposited reference's q + the table's
-(½−q)). Refutations for the new disjunct are one existing line each
-(the report's table: checkout/park/auth_ref/out by `ic_word4_excl`
-against the full inum or valid cell; mid by `ic_mid` exclusivity;
-empty by `ic_id_agree`). No exported signature changes;
-ProofIget/ProofIlock/ProofIunlock rebuild untouched; C7's stocking
-gains the `ic_hld` allocation obligation.
+and nothing needs stability). LANDED, and two details the compile
+settled differently from this note's first draft:
+
+* **NO NEW TOKEN.** A fresh `ic_hld` family would have had to sit in
+  the four other arms, which means in `ic_mid_arm` — and that is
+  ProofIget's inline arm construction at +0x72 and its destructuring at
+  +0x7c, so it would have broken the "no proof file moves" rule for a
+  refutation already available. `ic_open_held`'s credential is **REF-1
+  plus the payload**: `iref_tok_two_lookup` kills OUT (and makes the
+  credential exclusive — no second thread holds a reference at all),
+  the carried payload's `dinode_at` kills PARKED and MID by
+  `dinode_at_excl` (the inum pinned first by `ic_id_agree`), and the
+  table's `ic_id` half at `true` kills EMPTY. REF-1 rather than
+  `ic_tok` is FORCED: iput must also UNDO the window at +0x44, where
+  `ip->nlink ≠ 0` and no `acquiresleep` has run.
+* **The valid cell is SPLIT ½/½,** not left whole in the arm. The undo
+  closes back at PARKED and needs the cell AT THE PAYLOAD'S POLARITY;
+  a cell the arm owned whole hands its value back existentially bound —
+  §13.13's own failure one level down. The holder's half pins it by
+  `word4_pointsto_agree`, and a half still dies to `ic_word4_excl`
+  against the FULL cell the parker and `ic_open_out` carry.
+
+So the arm is `dev ↦{½} ∗ inum ↦ (FULL, the discriminator) ∗
+valid ↦{½} ∗ ic_mid ∗ ic_id{½} true`, entered at +0x3c off
+`ic_open_auth_ref` and closed with `ic_close_held`, exited by
+`ic_open_held` (then `ic_close_out` at the checkout, or a rebuilt
+`ic_parked` at the nlink undo), where the full inum cell re-splits into
+arm-½ + the deposited reference's q + the table's (½−q). Refutations
+for the new disjunct are one existing line each: checkout/auth_ref by
+`ic_word4_excl` against the full inum cell, park/out by the same
+against the valid half, mid by `ic_mid` exclusivity, empty by
+`ic_id_agree`. No exported signature changes, no `ic_names` change, no
+C7 obligation; ProofIget/ProofIlock/ProofIunlock rebuilt untouched
+(verified: 0 errors, 913 .vo, none of the three recompiled by hand).
 
 Also settled by the same trace: the `iref_slot` give-back needs no new
 IrefSlots lemma (Pos2Nat.inj_succ + iref_slots_split on the non-last

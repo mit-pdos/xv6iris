@@ -19,9 +19,27 @@
 
        Require Import LinkAcquire LinkRelease LinkAcquiresleep
                       LinkReleasesleep LinkItrunc LinkIupdate ProofIput.
-       Module Iput : IPUT2 :=
-         IputProof Acquire Release Acquiresleep Releasesleep Itrunc Iupdate.
+       Module Iput := IputProof Acquire Release Acquiresleep Releasesleep
+                                Itrunc Iupdate.
+
+   (The instantiation is UNASCRIBED, as every other Link file's is: the
+   ascription lives on [ProofIput.IputProof]'s own header, and an ascribed
+   [Module X : T := F A B.] is invisible to tools/proof_coverage.py's
+   instance scanner -- which would leave iput reading as `assumed` with the
+   proof sitting right there.)
 
    with no [Axiom] at any point.  C6b then repoints the six cones back here
-   and deletes [LinkIputCompat.v] (its header carries the plan).           *)
+   and deletes [LinkIputCompat.v] (its header carries the plan).
+
+   ==== FILLED (C6b-proof): ProofIput.v LANDED, and there is no axiom ====
+
+   [ProofIput.v] proves [SpecIput.wp_iput2_sconf_body] outright, so the
+   functor line below is the whole file and the slot's own assumption count
+   is ZERO.  The bridging axiom in [LinkIputCompat.v] is untouched and is
+   still the only iput assumption in the tree; it belongs to the six OLD
+   cones and dies with C6b's caller-side work.                             *)
 Require Import SpecIput.
+Require Import LinkAcquire LinkRelease LinkAcquiresleep LinkReleasesleep
+               LinkItrunc LinkIupdate ProofIput.
+
+Module Iput := IputProof Acquire Release Acquiresleep Releasesleep Itrunc Iupdate.
