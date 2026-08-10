@@ -44,6 +44,7 @@ Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
 Require Import LogInv.
 Require Import FsCrash.
+Require Export IcacheRef.   (* the geometry, the algebra, [inode_ref] *)
 Require Import InodeInv.
 Require Import IrefSlots.
 From Kernel Require KernelSyms.
@@ -76,58 +77,9 @@ Local Open Scope Z_scope.
    pointers -- and 136 is [sizeof(struct inode)] = 132 rounded up to the 8
    the embedded sleeplock forces (InodeInv.v's header).                    *)
 
-Definition NINODE : nat := 50%nat.
-
-(* the spinlock is the first member, so its address IS the symbol *)
-Definition itable_lock : mword 64 := mword_of_int KernelSyms.itable.
-
-Definition ISLOTSZ : Z := 136.
-
-Definition ientry (k : nat) : mword 64 :=
-  mword_of_int (KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k).
-
-(* the whole geometry as ONE arithmetic fact: every entry address in range
-   is its literal offset, with no wrap.  Injectivity, the scan's step and
-   the scan's sentinel are corollaries, which is why this is the only
-   bitvector reasoning in the file. *)
-Lemma ientry_unsigned (k : nat) :
-  (k <= NINODE)%nat ->
-  bv_unsigned (ientry k) = KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k.
-Proof.
-  intros Hk. rewrite /ientry. apply moi64_small.
-  unfold NINODE in Hk. unfold ISLOTSZ, KernelSyms.itable. lia.
-Qed.
-
-Lemma ientry_inj (k1 k2 : nat) :
-  (k1 <= NINODE)%nat -> (k2 <= NINODE)%nat -> ientry k1 = ientry k2 -> k1 = k2.
-Proof.
-  intros H1 H2 Heq.
-  apply (f_equal bv_unsigned) in Heq.
-  rewrite (ientry_unsigned k1 H1) (ientry_unsigned k2 H2) in Heq.
-  unfold ISLOTSZ in Heq. lia.
-Qed.
-
-(* the scan's [addi s1,s1,136] *)
-Lemma ientry_step (k : nat) :
-  ientry (S k) = add_vec_int (ientry k) ISLOTSZ.
-Proof.
-  rewrite /ientry avi_mword.
-  assert (Harith : KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat (S k)
-                 = KernelSyms.itable + 24 + ISLOTSZ * Z.of_nat k + ISLOTSZ)
-    by (rewrite Nat2Z.inj_succ; unfold ISLOTSZ; lia).
-  rewrite Harith. reflexivity.
-Qed.
-
-(* the scan's sentinel: one past the last entry is the NEXT SYMBOL.  If a
-   future revision inserts a global between [itable] and [log] this lemma
-   is what fails, which is the point of stating it. *)
-Lemma ientry_sentinel : ientry NINODE = (mword_of_int KernelSyms.log : mword 64).
-Proof. rewrite /ientry. apply bv_eq. vm_compute. reflexivity. Qed.
-
-(* iinit's loop cursor walks the SLEEPLOCKS, not the entries *)
-Lemma ientry_lock_0 :
-  i_lock (ientry 0) = (mword_of_int (KernelSyms.itable + 40) : mword 64).
-Proof. rewrite /i_lock /ientry. apply bv_eq. vm_compute. reflexivity. Qed.
+(* [NINODE], [itable_lock], [ISLOTSZ], [ientry] and its four arithmetic
+   corollaries now live in [IcacheRef.v] (re-exported below) -- the file
+   table needs them and sits underneath this one.  See its header. *)
 
 (* ===================================================================== *)
 (*  2.  WHERE itrunc's FIRST OWED PREMISE LIVES: [cov] BOUNDS THE FS      *)
@@ -228,30 +180,8 @@ Qed.
    WHOLE outstanding share -- there is no other reference in the system.
    That is [iref_lookup], and it is the algebraic half of the theorem
    xv6's comment above iput asserts.                                      *)
-Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
-
-(* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
-   ([icn_id], design §13.8 as widened by §13.10): an agreement between the
-   escrow's arm and the table's [islot2] share carrying (is the entry LIVE,
-   and what do its two identity cells hold).  The two words are not
-   bookkeeping: a recycler's stores land in cells the arm then owns WHOLE
-   (EMPTY's dev, MID's inum -- each is a discriminator and so admits no
-   retained fraction), and this agreement is the only thing that carries
-   their values across the openings.  It lives HERE, as a field of [icacheG], rather
-   than as an extra [!ghost_varG Σ bool] on every section that mentions the
-   escrow -- nine spec and proof files already carry [icacheG], and this way
-   they need no edit at all.  ([FsCrash.v]'s header records the tree's other
-   route out of the same problem, reusing [WpLock.lock_tok_excl]; that one
-   cannot serve here, because BOTH sides must be able to READ the state and
-   an exclusive token can only be held by one of them.) *)
-Class icacheG (Σ : gFunctors) := IcacheG {
-  icache_inG :: inG Σ icacheUR;
-  icache_idG :: ghost_varG Σ (bool * mword 32 * mword 32);
-}.
-Definition icacheΣ : gFunctors :=
-  #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32)].
-Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
-Proof. solve_inG. Qed.
+(* [icacheUR], [icacheG] and [icacheΣ] moved to [IcacheRef.v]; the
+   comment that explained them travelled with them. *)
 
 (* the word in [ip->ref]: zero exactly on a free slot.  [FileInv]'s
    [fref_word_zero] / [fref_word_nonzero] / [fref_word_spos] read the two
@@ -354,21 +284,7 @@ Qed.
 Section IcacheGhost.
   Context `{!icacheG Σ}.
 
-  (* HALF the authority.  The other half is the other one: the itable
-     lock's resource and the [ref]-word invariant hold one each, so neither
-     can move [M] alone, and the lock holder's half PINS every count across
-     the [lw; addiw; sw] the code performs. *)
-  Definition itable_half (γ : gname) (M : gmap nat (Qp * positive)) : iProp Σ :=
-    own γ (●{#(1/2)} M).
-
-  (* ONE reference to slot [k], holding fraction [q] of its identity. *)
-  Definition iref_tok (γ : gname) (k : nat) (q : Qp) : iProp Σ :=
-    own γ (◯ {[ k := (q, 1%positive) ]}).
-
-  Global Instance itable_half_timeless γ M : Timeless (itable_half γ M).
-  Proof. apply _. Qed.
-  Global Instance iref_tok_timeless γ k q : Timeless (iref_tok γ k q).
-  Proof. apply _. Qed.
+  (* [itable_half] and [iref_tok] are [IcacheRef.v]'s. *)
 
   Lemma itable_half_agree γ M1 M2 :
     itable_half γ M1 -∗ itable_half γ M2 -∗ ⌜M1 = M2⌝.
@@ -1017,22 +933,8 @@ Section IcacheTable.
   Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
-  (* An entry's IDENTITY -- the two cells iget writes into a recycled slot
-     and nobody writes again while the slot is live.  Fractional, so a
-     reference holder reads [ip->dev] / [ip->inum] with no lock at all,
-     which is what ilock's contract already assumes of them. *)
-  Definition inode_ident (k : nat) (dq : dfrac) (dev inum : mword 32) : iProp Σ :=
-    (i_dev (ientry k) ↦₄{dq} dev ∗ i_inum (ientry k) ↦₄{dq} inum)%I.
-
-  Lemma inode_ident_agree k dq1 d1 n1 dq2 d2 n2 :
-    inode_ident k dq1 d1 n1 -∗ inode_ident k dq2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
-  Proof.
-    iIntros "[Hd1 Hn1] [Hd2 Hn2]".
-    iDestruct (word4_pointsto_agree with "Hd1 Hd2") as %->.
-    iDestruct (word4_pointsto_agree with "Hn1 Hn2") as %->.
-    done.
-  Qed.
-
+  (* [inode_ident] and [inode_ref] are [IcacheRef.v]'s; only the JOIN
+     helper below stayed, because [islot_rest_join] uses it. *)
   (* the fraction JOIN for one cell, as a wand.  A bare
      [rewrite word4_pointsto_frac_split] at a call site rewrites the whole
      [envs_entails] -- hypotheses included -- and silently re-splits the very
@@ -1042,30 +944,6 @@ Section IcacheTable.
   Local Lemma word4_frac_join (a : Arch.pa) (q1 q2 : Qp) (w : bv 32) :
     a ↦₄{DfracOwn q1} w -∗ a ↦₄{DfracOwn q2} w -∗ a ↦₄{DfracOwn (q1 + q2)} w.
   Proof. iIntros "H1 H2". rewrite word4_pointsto_frac_split. iFrame. Qed.
-
-  Lemma inode_ident_split k q1 q2 dev inum :
-    inode_ident k (DfracOwn (q1 + q2)) dev inum ⊣⊢
-    inode_ident k (DfracOwn q1) dev inum ∗ inode_ident k (DfracOwn q2) dev inum.
-  Proof.
-    rewrite /inode_ident !word4_pointsto_frac_split.
-    iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
-  Qed.
-
-  (* HOLDING ONE REFERENCE to itable slot [k].  This is the predicate
-     [FileInv.inode_ref] is today a [emp] placeholder for -- note it needs
-     no inode POINTER argument beyond the slot, because [ientry] determines
-     the address and [ientry_inj] determines the slot. *)
-  Definition inode_ref (γ : gname) (k : nat) (q : Qp)
-      (dev inum : mword 32) : iProp Σ :=
-    (iref_tok γ k q ∗ inode_ident k (DfracOwn q) dev inum)%I.
-
-  (* two references to one entry see the same inode -- for free, from the
-     fractional cells; no [agree] ghost is needed *)
-  Lemma inode_ref_agree γ k q1 d1 n1 q2 d2 n2 :
-    inode_ref γ k q1 d1 n1 -∗ inode_ref γ k q2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
-  Proof.
-    iIntros "[_ H1] [_ H2]". iApply (inode_ident_agree with "H1 H2").
-  Qed.
 
   (* ---- THE IDENTITY BUDGET (design §13.1b, as corrected by §13.1e) ----
 

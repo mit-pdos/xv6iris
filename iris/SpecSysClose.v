@@ -67,6 +67,7 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
+Require Import IcacheRef IcacheInv IcacheEscrow IrefSlots InodeRegion.
 Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -97,8 +98,9 @@ End SpecSysClose.
 
 Definition wp_sys_close_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
-     (γl γf : gname) (fn : fclose_names) (on : option nat)
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
+     (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_close in
@@ -122,7 +124,7 @@ Definition wp_sys_close_sconf_body
      close ANY [struct file] costs, and there is no honest way to make it
      smaller: closing an inode file writes the disk and sleeps. *)
   fileclose_pipe_env fn on n -∗
-  fileclose_fs_env fn n eb p -∗
+  fileclose_fs_env fn us n eb p -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mf : regfile,
       ⌜callee_saved m mf⌝ -∗
@@ -134,16 +136,17 @@ Definition wp_sys_close_sconf_body
          descriptor may have held a pipe's last end), which is why the pipe
          bundle returns under an existential *)
       (∃ on', fileclose_pipe_env fn on' n) -∗
-      fileclose_fs_env fn n eb p -∗
+      (∃ us', fileclose_fs_env fn us' n eb p) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
-       (γl γf : gname) (fn : fclose_names) (on : option nat)
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
+       (γl γf : gname) (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
-      wp_sys_close_sconf_body γl γf fn on m av n eb p C v pid V b.
+      wp_sys_close_sconf_body γl γf fn on us m av n eb p C v pid V b.
 End SYSCLOSE.

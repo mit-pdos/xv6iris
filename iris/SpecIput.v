@@ -1,43 +1,5 @@
 (* SpecIput.v -- the public interface of iput.
 
-   ==== TWO MODULE TYPES LIVE HERE, AND ONE OF THEM IS SCHEDULED TO DIE ====
-
-   [IPUT2] (bottom of the file) is THE contract: iput over the real inode
-   cache, proven by [ProofIput.v] and instantiated by [LinkIput.v].  New
-   callers take this one.
-
-   [IPUT] (immediately below) is the OLD, emp-shaped statement -- the one
-   written when there was no inode model and [ProcInv.cwd_ref] was literally
-   [emp].  It is FROZEN VERBATIM: not one character of it, of
-   [wp_iput_sconf_body], of [K_iput] or of [iput_units] may move, because six
-   already-proven cones (kexit, fileclose, pipealloc, sys_close, sys_exit,
-   sys_pipe) are functors over it and their proof files are not to be
-   touched.  [LinkIputCompat.v] supplies it with the single bridging [Axiom]
-   that keeps those cones building.
-
-   THE BRIDGE IS NOT A THEOREM AND IS NOT DERIVED FROM [IPUT2].  It cannot
-   be: the v1 statement consumes [ProcInv.cwd_ref ip] at a raw pointer [ip],
-   and [cwd_ref] is [emp] -- there is no slot, no fraction and no identity in
-   it, so nothing in it determines which itable entry the caller means, and
-   [IPUT2]'s [inode_ref (icn_ref cn) k q dev inum] cannot be manufactured
-   from it.  Retiring the axiom is therefore a CALLER-SIDE change, not a
-   derivation: C6b replaces the [emp] placeholders
-   ([FileInv.inode_ref] / [ProcInv.cwd_ref]) with real references carried
-   through an [icacheG]-supplied gname, re-proves the six cones against
-   [IPUT2], and then deletes [LinkIputCompat.v], this module type,
-   [wp_iput_sconf_body] and its two constants in one move, renaming
-   [IPUT2] -> [IPUT] mechanically.  See claude-notes/projects/fs-icache.md,
-   C6b.
-
-   Until then the kexit-cone [Print Assumptions] audit shows exactly one fs
-   axiom, [LinkIputCompat.IputCompat.wp_iput_sconf], in place of the old
-   [LinkIput.Iput.wp_iput_sconf] -- the same assumption, moved, NOT a new
-   one and NOT a stronger one.
-
-   ================= THE FROZEN v1 STATEMENT FOLLOWS ====================
-
-   The original header, kept as written:
-
      void iput(struct inode *ip) {
        acquire(&itable.lock);
        if(ip->ref == 1 && ip->valid && ip->nlink == 0){
@@ -55,46 +17,51 @@
        release(&itable.lock);
      }
 
-   ==== WHAT THE CONTRACT SAYS, AND WHY IT IS THIS WEAK ==================
+   ONE module type, [IPUT], proven by [ProofIput.v] and instantiated with no
+   axiom at all by [LinkIput.v].  (Until C6b there were two: an older
+   [emp]-shaped statement written when there was no inode model, bridged to
+   the callers by an [Axiom] in [LinkIputCompat.v].  Both are gone -- the
+   callers now carry real references, so the frozen statement had no
+   consumers left.  git history has it if it is ever wanted.)
 
-   iput DESTROYS one inode reference and MAY SPEND LOG BUDGET.  That is the
-   whole of it, and it is the whole of what its callers -- kexit here, and
-   sys_chdir / sys_unlink / fileclose later -- actually depend on.
+   ==== WHAT THE CONTRACT SAYS ==========================================
 
-   The reference is [ProcInv.cwd_ref ip].  There is no inode model in this
-   tree yet, so that predicate is literally [emp] (design/proc-struct.md,
-   "holes to be honest about"): it is a PLACEHOLDER with the shape of
-   [ofile_slot]'s file clause, deliberately introduced so that the contracts
-   which surrender an inode reference can be written NOW and gain content
-   later without being restated.  This spec is one of those contracts.  When
-   the inode layer lands, [cwd_ref] becomes "ip names a live itable entry
-   and this is one of its references" and iput's precondition here does not
-   change a character.
-
-   The budget is a SPEND-AT-MOST clause, the shape [SpecBmap.v] fixed and
-   for the same reason: [log_op] moves only through [LogInv.log_spend_step]
-   against the ledger authority inside log.lock, and iput never takes that
-   lock -- so it cannot hand a surplus back, and the honest postcondition is
-   an interval.  The fast path (a reference that is not the last) spends
-   NOTHING and the interval covers that too.  [iput_units] is the whole
-   reservation: xv6 sizes MAXOPBLOCKS so that one operation's worth of
-   metadata writes fits, and itrunc + iupdate is the operation this spends
-   for.  A caller inside begin_op/end_op therefore always satisfies the
-   premise, and none of them cares what comes back.
+   iput DESTROYS one inode reference: [IcacheRef.inode_ref (icn_ref cn) k q
+   dev inum] goes in and nothing comes back but one [iref_slot], the
+   ledger unit that makes iget/iput a matched pair against the fixed
+   IREFSLOTS supply.  On the last close of an unlinked inode it also
+   TRUNCATES -- which is why the whole log/bitmap/inode-region environment
+   is here, why the [bitmap_res] comes back at a SMALLER [used'] (the
+   truncate arm freed blocks; the two close arms did not), and why the
+   budget clause is a spend-at-most interval: [log_op] moves only through
+   [LogInv.log_spend_step] against the ledger authority inside log.lock,
+   and iput never takes that lock, so it cannot hand a surplus back.
 
    iput SLEEPS -- acquiresleep on the inode, and bread underneath itrunc /
    iupdate -- so it threads the running-process bundle exactly as
    SpecBalloc.v / SpecIupdate.v do: procs_inv / p_pid, the disk fabric,
-   three buffer slots, and the parking premise [eb = true].  It enters and
-   returns at noff 0.  The parked scheduler record is not among them: it
-   lives in the running proc's own [p->lock] ([SchedCtx.run_slot]).
+   three buffer slots, and the parking premise [eb = true].  The bundle is
+   UNCONDITIONAL: xv6's iput always MAY truncate and no caller can know in
+   advance which arm runs.  It enters and returns at noff 0.
 
-   WHAT IS DELIBERATELY NOT HERE.  Nothing about ip's fields, nothing about
-   which arm ran, and no [inode_map]/[inode_blocks] traffic: with no inode
-   model those would be invented vocabulary, and inventing it here -- in a
-   contract nobody can yet prove -- is exactly how an assumed spec becomes
-   wrong.  The one thing an assumed contract must not do is claim MORE than
-   the code delivers; this claims strictly less. *)
+   Two below-icache blockers were found by tracing the proof forward and
+   both are ruled on (design §13.12):
+
+     (B1) iput calls acquiresleep at noff = 1 (itable.lock held), and
+          SpecAcquiresleep demands [cpu_own 0 ...].  ROUTE B adopted: the
+          sleeping branch is panic("sched locks"), so it DIVERGES and
+          [panic_wp_any] -- which iput already carries -- closes it.
+          LANDED (ef035525): the truncate arm calls
+          [wp_acquiresleep_nested_sconf] at n := 0.  NOTHING in this
+          statement changes because of it.
+
+     (B2) SpecItrunc's [forall i < MAXFILE, length (data i) = BSIZE] is not
+          derivable: [data] is EXISTENTIAL inside [ic_loaded], and
+          [inode_ok] pinned lengths only at HOLES ([blk_holes_zero]).
+          FIXED AND LANDED (a791194a): [InodeInv.inode_sized] IS
+          [inode_ok]'s seventh conjunct, so iput derives the premise from
+          the checked-out bundle at the call site.  NO premise appears
+          below for it, and SpecItrunc is unchanged.                      *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -116,6 +83,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
+Require Import FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WpUart.
@@ -143,130 +111,11 @@ Local Open Scope Z_scope.
    deeper. *)
 Definition K_iput : nat := 60%nat.
 
-(* THE BUDGET IT MAY SPEND: the whole reservation.  itrunc's bfree writes
-   (bitmap blocks) plus iupdate's one are what xv6 sizes MAXOPBLOCKS for. *)
-Definition iput_units : nat := MAXOPBLOCKS.
-
-Definition wp_iput_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
-    `{GEN : GenId} `{CID : CpuId}
-    (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
-    (γu : uart_names) (γd : disk_names) (γk : gname)  (* disk fabric + lock  *)
-    (pd pav pu : mword 64)
-    (bn : bio_names)
-    (γ : log_names) (γfs : fs_names)
-    (cov : gset Z) (logstart : Z) (dev : mword 32)
-    (ip : mword 64) (n : nat)
-    (pidv : mword 32) (dq : dfrac)
-    (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-    (b : bool) :=
-  let pcE : mword 64 := mword_of_int KernelSyms.iput in
-  let pj := proc_addr j in
-  let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
-  (K_iput <= K)%nat ->
-  (* the covered range's block-number bounds, and the log's own storage *)
-  log_geom_ok cov logstart ->
-  (* enough budget for the truncate-and-free arm *)
-  (iput_units <= n)%nat ->
-  (j < NPROC)%nat ->
-  γs !! j = Some γl ->
-  (* a0 = ip *)
-  m !!! Regidx (mword_of_int 10 : mword 5) = ip ->
-  (* PARKING PREMISE (hart-generic scheduler protocol) -- everything below
-     sleeps.  See SpecSched.v / SpecSleep.v. *)
-  eb = true ->
-  sie_cap_gpr m K b pj -∗
-  cpu_own 0 eb pj C b -∗
-  kernel_text -∗ pc_is pcE -∗
-  panic_wp_any -∗
-  bio_ctx bn (fs_view γfs γd dev cov) -∗
-  log_ctx γ bn γfs cov logstart dev -∗
-  (* the caller's own pid cell (bread's acquiresleep records it) *)
-  p_pid pj ↦₄{dq} pidv -∗
-  (* the running-thread bundle *)
-  procs_inv γs -∗
-  (* the disk fabric *)
-  dev_inv γu γd -∗
-  disk_geom γd pd pav pu -∗
-  is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
-  (* three buffer slots: the inode block is held across the indirect
-     block's bread and across log_write, as in bmap *)
-  bslots bn 3 -∗
-  (* THE REFERENCE BEING DESTROYED -- today a placeholder, see the header *)
-  cwd_ref ip -∗
-  (* this operation's reservation *)
-  log_op γ n -∗
-  wp_next b pj (fun (CID : CpuId) =>
-  ∀ (mf : regfile) (n' : nat),
-      ⌜callee_saved m mf⌝ -∗
-      sie_cap_gpr mf K b pj -∗
-      cpu_own 0 eb pj C b -∗
-      pc_is ret_tgt -∗
-      p_pid pj ↦₄{dq} pidv -∗
-      bslots bn 3 -∗
-      (* at most [iput_units] gone, and none gained *)
-      ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
-      log_op γ n' -∗
-      WP (Loop : expr riscv_lang)) -∗
-  WP (Loop : expr riscv_lang).
-
-Module Type IPUT.
-  Parameter wp_iput_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ,
-             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
-      `{GEN : GenId} `{CID : CpuId}
-      (γs : list gname) (j : nat) (γl : gname)
-      (γu : uart_names) (γd : disk_names) (γk : gname)
-      (pd pav pu : mword 64)
-      (bn : bio_names)
-      (γ : log_names) (γfs : fs_names)
-      (cov : gset Z) (logstart : Z) (dev : mword 32)
-      (ip : mword 64) (n : nat)
-      (pidv : mword 32) (dq : dfrac)
-      (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
-      (b : bool),
-      wp_iput_sconf_body γs j γl γu γd γk pd pav pu bn γ γfs
-                         cov logstart dev ip n pidv dq m K eb C b.
-End IPUT.
-
-(* ===================================================================== *)
-(*  ===== SpecIput v2 -- THE REAL CONTRACT, over the real inode cache ==== *)
-(* ===================================================================== *)
-
-(* Two below-icache blockers were found by tracing the proof forward and
-   both are now ruled on (design §13.12):
-
-     (B1) iput calls acquiresleep at noff = 1 (itable.lock held), and
-          SpecAcquiresleep demands [cpu_own 0 ...].  ROUTE B adopted: the
-          sleeping branch is panic("sched locks"), so it DIVERGES and
-          [panic_wp_any] -- which iput already carries -- closes it.
-          LANDED (ef035525): [SpecSched.wp_sched_locks_body],
-          [SpecSleep.wp_sleep_locks_body] and
-          [SpecAcquiresleep.wp_acquiresleep_nested_body] are proven and
-          instantiated.  The truncate arm calls
-          [wp_acquiresleep_nested_sconf] at n := 0.  NOTHING in this
-          statement changes because of it.
-
-     (B2) SpecItrunc's [forall i < MAXFILE, length (data i) = BSIZE] is not
-          derivable: [data] is EXISTENTIAL inside [ic_loaded], and
-          [inode_ok] pinned lengths only at HOLES ([blk_holes_zero]).
-          FIXED AND LANDED (a791194a): [InodeInv.inode_sized] IS
-          [inode_ok]'s seventh conjunct, so iput derives the premise from
-          the checked-out bundle at the call site.  NO premise appears
-          below for it, and SpecItrunc is unchanged.
-
-   NOTE ON THE TWO CONSTANTS.  [K_iput] is shared with the frozen v1
-   statement (same value, same reason: iput's own 48-byte frame plus
-   bread's, one frame deeper than balloc's).  The BUDGET is not shared:
-   v1 reserved the whole [MAXOPBLOCKS], v2 knows the real number, and the
-   v1 constant may not move, so v2 gets its own.                         *)
-
 (* itrunc's two (bitmap block + its closing iupdate) plus iput's own
    iupdate at +0x6c.  SPEND-AT-MOST: the fast path spends nothing. *)
-Definition iput2_units : nat := 3%nat.
+Definition iput_units : nat := 3%nat.
 
-Definition wp_iput2_sconf_body
+Definition wp_iput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
@@ -310,7 +159,7 @@ Definition wp_iput2_sconf_body
   (* bfree's per-slot range fact, via IcacheInv.blkmap_slot_inrange *)
   cov_below cov size ->
   (* enough budget for the truncate-and-free arm *)
-  (iput2_units <= n)%nat ->
+  (iput_units <= n)%nat ->
   (j < NPROC)%nat ->
   gs !! j = Some gl ->
   (* a0 = ip *)
@@ -373,8 +222,8 @@ Definition wp_iput2_sconf_body
       ⌜used' ⊆ used⌝ -∗
       bitmap_res gfs bmapstart cov logstart size used' -∗
       bslots bn 3 -∗
-      (* at most [iput2_units] gone, and none gained *)
-      ⌜((n - iput2_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
+      (* at most [iput_units] gone, and none gained *)
+      ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op g n' -∗
       (* THE LEDGER: one unit back, on EVERY arm.  islot2's live arm holds
          [iref_slots (Pos.to_nat n)]; a non-last close takes n -> n-1 and
@@ -387,8 +236,8 @@ Definition wp_iput2_sconf_body
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
-Module Type IPUT2.
-  Parameter wp_iput2_sconf :
+Module Type IPUT.
+  Parameter wp_iput_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
@@ -406,7 +255,7 @@ Module Type IPUT2.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool),
-      wp_iput2_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+      wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
                           k q inum n pidv dq dqb dqs m K eb C b.
-End IPUT2.
+End IPUT.

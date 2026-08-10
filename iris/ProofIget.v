@@ -200,7 +200,7 @@ Proof.
 Qed.
 
 (* the [beq s1,a3] at +0x40: [a3] is [&itable.inode[NINODE]], which IS the
-   next symbol ([IcacheInv.ientry_sentinel]), so the exit test is the index
+   next symbol ([IcacheRef.ientry_sentinel]), so the exit test is the index
    test the induction runs on. *)
 Lemma ig_sentinel_eq (j : nat) :
   (j <= NINODE)%nat ->
@@ -755,7 +755,7 @@ Section ProofIget.
         sie_cap_gpr (CID := CIDt) mt (K - 6)%nat b p -∗
         cpu_own (CID := CIDt) n eb p C b -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
-        IcacheInv.inode_ref (icn_ref cn) kk q dev inum -∗
+        IcacheRef.inode_ref (icn_ref cn) kk q dev inum -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert TAILC
       with "[Hcont Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
@@ -1012,7 +1012,7 @@ Section ProofIget.
         WP (Loop : expr riscv_lang))%I with "[]" as "Hstep".
       { iIntros (Ms) "%Hsreg %Hscan' %Hemp' Hcg Hpc Hcnt Hpay Htok Hhalf Hiauth Hslots Hpool Hislot Hcont2".
         destruct Hsreg as (HSs1 & HSa3 & HSs2 & HSs4 & HSsp & HSra & HScs).
-        (* +0x3c addi s1,s1,136 -- [IcacheInv.ientry_step] *)
+        (* +0x3c addi s1,s1,136 -- [IcacheRef.ientry_step] *)
         iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.iget + 0x3c)) Rs1 Rs1
                   (mword_of_int 136 : mword 12) Ms (K - 6)%nat false
                   ltac:(nz) ltac:(rdok) with "Hcg Hpc Hi3c [-]").
@@ -1467,7 +1467,7 @@ Section ProofIget.
             iApply ("Hcont2" $! mr e (1/2/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2]").
             * split; [exact He|]. split; [exact Hmrs3|].
               split; [exact Hmrsp | exact Hmrcs].
-            * rewrite /IcacheInv.inode_ref. iFrame "Htok2 Hid2".
+            * rewrite /IcacheRef.inode_ref. iFrame "Htok2 Hid2".
         - (* ===== the back edge to +0x44, at cursor [S j] ===== *)
           assert (Hfall : eq_vec (N1 !!! Regidx Rs1) (N1 !!! Regidx Ra3) = false).
           { rewrite Hcmp. by apply Nat.eqb_neq. }
@@ -1897,7 +1897,7 @@ Section ProofIget.
         iSpecialize ("Hcont2" $! CIDh2 with "[]"); [ iPureIntro; wp_next_chain | ].
         iApply ("Hcont2" $! Z1 j (qj'/2)%Qp with "[%] Hcg Hcnt Hpc [Htok2 Hid2]").
         + split; [exact Hk|]. split; [exact HZ1s3|]. split; [exact HZ1sp | exact HZ1cs].
-        + rewrite /IcacheInv.inode_ref. iFrame "Htok2 Hid2".
+        + rewrite /IcacheRef.inode_ref. iFrame "Htok2 Hid2".
       - (* ===== A FREE SLOT: [bge x0,a5] is TAKEN, to +0x34 ===== *)
         assert (Hiw : iref_word M j = (mword_of_int 0 : mword 32))
           by (rewrite /iref_word HMj; reflexivity).

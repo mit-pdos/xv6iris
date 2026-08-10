@@ -77,6 +77,7 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
+Require Import IrefSlots InodeRegion.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
@@ -193,7 +194,7 @@ Definition wp_pipealloc_sconf_body
    derived lemma's statement. *)
 Module Type PIPEALLOC.
   Parameter wp_pipealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId} (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)
       (m : regfile) (v0 v1 : mword 64) (on : option nat)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
       wp_pipealloc_sconf_body γfl γf γkl γk fl m v0 v1 on n eb p C K b.

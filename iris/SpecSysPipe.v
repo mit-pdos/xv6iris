@@ -115,6 +115,7 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
+Require Import IcacheRef IcacheInv IcacheEscrow IrefSlots InodeRegion.
 Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
@@ -158,9 +159,10 @@ End SpecSysPipe.
 
 Definition wp_sys_pipe_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname)  (γfl γf : gname)
-    (fn : fclose_names) (on : option nat)
+    (fn : fclose_names) (on : option nat) (us : gset Z)
     (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool) :=
   (* [pipeG] is not a separate binder: [fileG] subsumes it (FileInv.v), and
@@ -199,7 +201,7 @@ Definition wp_sys_pipe_sconf_body
      descriptor names is going to be per-[ofile] ghost state, not something
      recoverable from the file table. *)
   fileclose_pipe_env fn on 0%nat -∗
-  fileclose_fs_env fn 0%nat eb p -∗
+  fileclose_fs_env fn us 0%nat eb p -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ (mf : regfile) (P' : uptd),
       ⌜callee_saved m mf⌝ -∗
@@ -212,17 +214,18 @@ Definition wp_sys_pipe_sconf_body
       (* the environment back; the page count has moved if either close was
          the pipe's last end *)
       (∃ on', fileclose_pipe_env fn on' 0%nat) -∗
-      fileclose_fs_env fn 0%nat eb p -∗
+      (∃ us', fileclose_fs_env fn us' 0%nat eb p) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ,
-             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
+             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !irefslotG Σ, !iregG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γfl γf : gname)
-      (fn : fclose_names) (on : option nat)
+      (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool),
-      wp_sys_pipe_sconf_body γa γfl γf fn on m av eb p C v pid V b.
+      wp_sys_pipe_sconf_body γa γfl γf fn on us m av eb p C v pid V b.
 End SYSPIPE.

@@ -129,17 +129,27 @@ have to prove `p ≠ initproc`, and the `panic("zombie exit")` after sched is
 what a resumed zombie would run. Both close through `panic_wp_any`
 (SpecPanic.v's convention).
 
-## iput, assumed
+## iput — assumed when this was written, PROVEN since
 
-`SpecIput.v` says exactly two things: it DESTROYS one inode reference
-(`ProcInv.cwd_ref ip`, today a placeholder for `emp` — the hole
-`design/proc-struct.md` records) and it may SPEND log budget, as a
+As written (June 2026), `SpecIput.v` said exactly two things: it DESTROYS
+one inode reference (`ProcInv.cwd_ref ip`, then a placeholder for `emp` —
+the hole `design/proc-struct.md` records) and it may SPEND log budget, as a
 spend-at-most interval in `SpecBmap.v`'s shape (`log_op` moves only through
 the ledger authority inside log.lock, and iput never takes that lock, so it
 cannot hand a surplus back). Nothing about ip's fields, nothing about which
-arm ran. With no inode model in the tree, anything more would be invented
-vocabulary in a contract nobody can yet check — and the one thing an assumed
-contract must not do is claim more than the code delivers.
+arm ran. With no inode model in the tree, anything more would have been
+invented vocabulary in a contract nobody could check.
+
+**That is no longer the shape.** C6 proved iput over the real inode cache
+and C6b retired the placeholder: `cwd_ref` is now `IcacheRef.inode_held`
+under a null test, kexit hands the REAL reference to the REAL contract, and
+`Print Assumptions Kexit.wp_kexit_sconf` is the five Sail platform axioms
+plus funext — no file-system assumption on the exit path at all. The price,
+all of it caller-side: kexit's contract gained the inode cache's persistent
+set and the bitmap (`SpecFileclose.fileclose_ic_env` / `fileclose_bm`,
+shared verbatim with the descriptor loop), nine ghost/geometry fields on
+`fclose_names`, and one honest pure premise — `pv_cwd V <> 0`, because
+xv6's `iput(p->cwd)` has no null test. See projects/fs-icache.md, C6b.
 
 ## The proof, as it landed
 

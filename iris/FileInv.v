@@ -50,7 +50,7 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants own.
+From iris.base_logic.lib Require Import gen_heap invariants own cancelable_invariants.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
@@ -58,6 +58,7 @@ Require Import ArrCursor.
 Require Import FdSlots.
 Require Import WpLock.
 Require Import PipeInv.
+Require Import IcacheRef.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -177,12 +178,18 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    name, so that nothing above the file layer -- and no boot wiring -- learns
    that the payload has an identity at all.  The supply is minted with the
    authority ([ftable_ghosts_alloc]), every slot present; a free slot's entry
-   is held by the invariant, exactly like its content cells. *)
-Record fpnames := MkFPNames { fp_lock : gname; fp_pipe : pipe_names }.
+   is held by the invariant, exactly like its content cells.
+
+   [fp_icv] is the FD_INODE arm's, and is a CANCELLABLE INVARIANT'S name
+   rather than the inode's: see [inode_pay] for why a share of an inode
+   reference cannot be the reference itself. *)
+Record fpnames := MkFPNames
+  { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname }.
 
 Global Instance fpnames_inhabited : Inhabited fpnames :=
   populate (MkFPNames 1%positive
-              (MkPipeNames 1%positive 1%positive 1%positive 1%positive)).
+              (MkPipeNames 1%positive 1%positive 1%positive 1%positive)
+              1%positive).
 
 Definition fpayUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO fpnames))).
@@ -233,13 +240,24 @@ Proof. rewrite /Mcount fmap_delete. reflexivity. Qed.
    the ~100 files that merely mention [proc_priv] do not have to name the
    pipe layer's ghosts.  A file that needs both must take [fileG] alone and
    project: two instance paths to [inG Σ fracR] print identically and do not
-   unify. *)
+   unify.
+
+   [icacheG] and [icfg] are superclasses for the SAME reason, and the rule
+   is the same: a file that needs both the file table and the inode cache
+   takes [fileG] alone (SpecFileread.v is the one such file today).  They
+   are here because an FD_INODE file's payload IS an inode reference --
+   [IcacheRef.inode_held] -- so the predicate cannot be stated without the
+   cache's algebra and its three constants.  [cinvG] is the cancellable
+   invariant the payload's fraction law needs; see [inode_pay]. *)
 Class fileG (Σ : gFunctors) := FileG {
   file_inG :: inG Σ fileUR;
   file_pipeG :: pipeG Σ;
+  file_icacheG :: icacheG Σ;
+  file_cinvG :: cinvG Σ;
+  file_icfg :: icfg;
 }.
-Definition fileΣ : gFunctors := #[GFunctor fileUR; pipeΣ].
-Global Instance subG_fileΣ {Σ} : subG fileΣ Σ -> fileG Σ.
+Definition fileΣ : gFunctors := #[GFunctor fileUR; pipeΣ; icacheΣ; cinvΣ].
+Global Instance subG_fileΣ {Σ} `{ICFG : icfg} : subG fileΣ Σ -> fileG Σ.
 Proof. solve_inG. Qed.
 
 (* The immutable-while-referenced content of a [struct file]: every field but
@@ -480,17 +498,63 @@ Section FileInv.
   (*  The payload: the thing a [struct file] is a reference TO            *)
   (* ------------------------------------------------------------------ *)
 
-  (* An inode reference, as [ProcInv.cwd_ref] is today: a PLACEHOLDER with
-     the right shape, so the contracts that surrender one can be written now
-     and gain content when the inode layer lands (design/fs-inode.md).  It is
-     stated fractionally from the start -- [cwd_ref v] is [inode_ref v 1] --
-     because a file's payload is split by every filedup, and retrofitting the
-     fraction later would restate every contract that mentions it. *)
-  Definition inode_ref (v : mword 64) (q : Qp) : iProp Σ := emp%I.
+  (* ---- AN FD_INODE FILE'S PAYLOAD: A SHARE OF ONE INODE REFERENCE ----
 
-  Lemma inode_ref_split v q1 q2 :
-    inode_ref v (q1 + q2) ⊣⊢ inode_ref v q1 ∗ inode_ref v q2.
-  Proof. rewrite /inode_ref. by rewrite left_id. Qed.
+     The predicate this file carried as [emp] until C6b.  What replaced it
+     is NOT [IcacheRef.inode_held] at fraction [q], and the reason is the
+     whole content of the definition:
+
+     an icache reference is [iref_tok γ k q ∗ inode_ident k q dev inum],
+     and its ghost fragment [◯ {[k := (q, 1%positive)]}] carries a COUNT of
+     one.  Two of them compose to a count of TWO -- a second reference,
+     which the itable would have to have handed out.  So [inode_held] does
+     not split fractionally, at any fraction, and [file_payload_split] --
+     which is a genuine ⊣⊢, used leftwards by filedup and rightwards by
+     fileclose -- cannot be satisfied by any function of [q] that mentions
+     the token directly.  Recombining a resource that is not itself
+     fractional out of fractional shares is exactly what a CANCELLABLE
+     INVARIANT is for, and it is what [PipeInv] already does one layer down
+     ([pipe_ref] carries [cinv_own (pn_cancel γp) (q/2)] beside its own
+     fraction).  So: the reference goes into a [cinv], the persistent half
+     rides every share, and the FRACTION is the cancel token.  The last
+     closer -- and only it -- holds [cinv_own γx 1], cancels, and walks
+     away with a WHOLE [inode_held] to give to iput.
+
+     [v] is the pointer, not the slot: [ientry_inj] makes them the same
+     thing, and the file table has no vocabulary for a slot. *)
+  Definition fileipN : namespace := nroot .@ "fileip".
+
+  Definition inode_pay (γx : gname) (v : mword 64) (q : Qp) : iProp Σ :=
+    (cinv fileipN γx (inode_held v) ∗ cinv_own γx q)%I.
+
+  Lemma inode_pay_split γx v q1 q2 :
+    inode_pay γx v (q1 + q2) ⊣⊢ inode_pay γx v q1 ∗ inode_pay γx v q2.
+  Proof.
+    rewrite /inode_pay cinv_own_fractional. iSplit.
+    - iIntros "[#Hi [H1 H2]]". iFrame "Hi H1 H2".
+    - iIntros "[[#Hi H1] [_ H2]]". iFrame "Hi H1 H2".
+  Qed.
+
+  (* THE LAST CLOSER'S MOVE, packaged: fraction one is the whole reference.
+     A fupd, and the only one the file layer performs. *)
+  Lemma inode_pay_cancel (E : coPset) (γx : gname) (v : mword 64) :
+    ↑fileipN ⊆ E -> inode_pay γx v 1 ={E}=∗ inode_held v.
+  Proof.
+    iIntros (HE) "[#Hi Hown]".
+    iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
+    by iMod "H".
+  Qed.
+
+  (* ...and its inverse, for whoever PUBLISHES an FD_INODE file (sys_open):
+     an inode reference becomes a payload at fraction one. *)
+  Lemma inode_pay_alloc (E : coPset) (v : mword 64) :
+    inode_held v ={E}=∗ ∃ γx, inode_pay γx v 1.
+  Proof.
+    iIntros "H".
+    iMod (cinv_alloc E fileipN (inode_held v) with "[H]") as (γx) "[#Hi Hown]".
+    { by iNext. }
+    iModIntro. iExists γx. by iFrame "Hi Hown".
+  Qed.
 
   (* the per-slot payload-names ghost: fractional, agreeing, and updatable
      by whoever holds the whole of it.  See the header above [fpnames]. *)
@@ -552,7 +616,7 @@ Section FileInv.
      then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
           pipe_ref (fp_pipe pn) (fc_wbool C) q
      else if bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE)
-     then inode_ref (fc_ip C) q
+     then inode_pay (fp_icv pn) (fc_ip C) q
      else emp)%I.
 
   Lemma file_payload_split q1 q2 pn C :
@@ -563,7 +627,7 @@ Section FileInv.
     - rewrite pipe_ref_split. iSplit.
       + iIntros "(#Hi & H1 & H2)". iSplitL "H1"; (iSplitR; [iExact "Hi"|iFrame]).
       + iIntros "[[#Hi H1] [_ H2]]". iSplitR; [iExact "Hi"|]. iFrame.
-    - apply inode_ref_split.
+    - apply inode_pay_split.
     - by rewrite left_id.
   Qed.
 

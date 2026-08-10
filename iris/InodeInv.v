@@ -60,6 +60,7 @@ Require Import LogInv.
 Require Import FsCrash.   (* [BSIZE]: the block size [bm_covers] divides by *)
 Require Import BlockWords.
 Require Import DinodeEnc.
+Require Export IcacheRef.   (* the in-core scalar fields + the reference *)
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 
@@ -81,18 +82,12 @@ Proof. reflexivity. Qed.
 (* ===================================================================== *)
 
 (* The scalar fields, in the 12-bit displacement form the lw/sw/lh that
-   reach them encode -- the [BcacheInv.buf_lock] / [ProcGeom.p_pid] idiom. *)
-Definition i_dev   (ip : mword 64) : mword 64 :=
-  add_vec ip (sign_extend' 64 (mword_of_int 0 : mword 12)).
-Definition i_inum  (ip : mword 64) : mword 64 :=
-  add_vec ip (sign_extend' 64 (mword_of_int 4 : mword 12)).
-Definition i_ref   (ip : mword 64) : mword 64 :=
-  add_vec ip (sign_extend' 64 (mword_of_int 8 : mword 12)).
-(* the sleeplock -- 8-aligned, hence the four-byte hole after ref *)
-Definition i_lock  (ip : mword 64) : mword 64 :=
-  add_vec ip (sign_extend' 64 (mword_of_int 16 : mword 12)).
-Definition i_valid (ip : mword 64) : mword 64 :=
-  add_vec ip (sign_extend' 64 (mword_of_int 64 : mword 12)).
+   reach them encode -- the [BcacheInv.buf_lock] / [ProcGeom.p_pid] idiom.
+
+   The five IN-CORE ones ([i_dev], [i_inum], [i_ref], [i_lock], [i_valid])
+   are re-exported from [IcacheRef.v], which is underneath the file table
+   and hence underneath this file; see that file's header.  The ones below
+   are the DINODE MIRROR, and belong with the encoding they mirror. *)
 Definition i_type  (ip : mword 64) : mword 64 :=
   add_vec ip (sign_extend' 64 (mword_of_int 68 : mword 12)).
 Definition i_major (ip : mword 64) : mword 64 :=

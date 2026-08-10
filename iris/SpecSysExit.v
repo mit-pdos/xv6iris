@@ -67,6 +67,7 @@ Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
+Require Import IcacheRef IcacheInv IcacheEscrow IrefSlots InodeRegion.
 Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.
@@ -88,7 +89,8 @@ Definition K_sys_exit : nat := (4 + K_kexit)%nat.
 
 Definition wp_sys_exit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
@@ -99,13 +101,17 @@ Definition wp_sys_exit_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
+    (γi : gname) (cn : ic_names) (γtl : gname)        (* the inode cache     *)
+    (bmapstart inodestart : Z) (nib : nat) (size : Z)
+    (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
     (pid : mword 32) (V : pprivate) (v0 : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.sys_exit in
   let pj := proc_addr j in
   fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
-         cov logstart dev pid (DfracOwn (1/4)) ->
+         cov logstart dev pid (DfracOwn (1/4))
+         γi cn γtl bmapstart inodestart nib size dqb dqs ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (* the syscall argument, out of the trapframe page [proc_priv] carries *)
@@ -116,6 +122,8 @@ Definition wp_sys_exit_sconf_body
   (* the PARKING premise, inherited from kexit: everything that sleeps or
      parks needs it *)
   eb = true ->
+  (* kexit's, inherited verbatim: [iput(p->cwd)] has no null test *)
+  pv_cwd V <> (zero_reg : mword 64) ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0%nat eb pj C b -∗
@@ -143,6 +151,10 @@ Definition wp_sys_exit_sconf_body
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots bn 3 -∗
+  (* the inode cache and the two regions iput's truncate arm frees into,
+     kexit's verbatim *)
+  fileclose_ic_env fn -∗
+  fileclose_bm fn us -∗
   (* the initproc pointer, at any fraction *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   (* the process itself: its private block (trapframe included) and its
@@ -155,7 +167,8 @@ Definition wp_sys_exit_sconf_body
 Module Type SYSEXIT.
   Parameter wp_sys_exit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
@@ -166,10 +179,14 @@ Module Type SYSEXIT.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
+      (γi : gname) (cn : ic_names) (γtl : gname)
+      (bmapstart inodestart : Z) (nib : nat) (size : Z)
+      (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64),
       wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
-                             cov logstart dev ip dqi γkl γka on fn
-                             m av eb C b pid V v0.
+                             cov logstart dev ip dqi γkl γka
+                             γi cn γtl bmapstart inodestart nib size dqb dqs us
+                             on fn m av eb C b pid V v0.
 End SYSEXIT.

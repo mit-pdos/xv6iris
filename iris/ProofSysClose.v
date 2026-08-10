@@ -54,6 +54,7 @@ Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import SpecMyproc SpecArgfd SpecIput SpecFileclose.
+Require Import IrefSlots InodeRegion.
 Require Import SpecSysClose.
 Require Import CodeSysClose.
 From Kernel Require KernelInstrs.
@@ -111,7 +112,8 @@ Module SysCloseProof (Argfd : ARGFD) (Myproc : MYPROC) (Fileclose : FILECLOSE) :
 
 Section ProofSysClose.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
+            !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* the frame's sp is sound: read the bound out of the ambient capability's
@@ -312,10 +314,10 @@ Section ProofSysClose.
   (*  THE CAPSTONE.                                                       *)
   (* =================================================================== *)
   Lemma wp_sys_close_sconf  (γl γf : gname)
-      (fn : fclose_names) (on : option nat)
+      (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (v : mword 64) (pid : mword 32) (V : pprivate) (b : bool)
-    : wp_sys_close_sconf_body γl γf fn on m av n eb p C v pid V b.
+    : wp_sys_close_sconf_body γl γf fn on us m av n eb p C v pid V b.
   Proof.
     cbv beta delta [wp_sys_close_sconf_body].
     intros pcE ret_tgt Harg Hn Hav.
@@ -602,7 +604,7 @@ Section ProofSysClose.
         split; [exact Hmfa0 | exact Hnone]. }
       (* no fileclose ran on this path, so both bundles are as they came in *)
       { by iExists on. }
-      { iExact "Hfenv". }
+      { by iExists us. }
     - (* ================= SUCCESS: fd names a live file ================= *)
       iDestruct "Hsucc" as (fd fv) "([%Hr %Hsome] & Hfdcell & Hfcell)".
       iDestruct (ofd_out_elim _ _ Hnzfd with "Hfdcell") as "Hfdcell".
@@ -799,9 +801,9 @@ Section ProofSysClose.
       (* the descriptor's type is not visible here -- [ofile_slot] quantifies
          the content -- so hand fileclose whichever bundle it asks for and
          keep the other ([fileclose_env_split]). *)
-      iDestruct (fileclose_env_frame fn on n eb p Cf with "Hpenv Hfenv")
+      iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hpenv Hfenv")
         as "[Hfcenv Hfcback]".
-      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on D n eb p C (av - 4)%nat b
+      iApply (Fileclose.wp_fileclose_sconf γl γf k q Cf fn on us D n eb p C (av - 4)%nat b
                 ltac:(unfold fileclose_stack, K_iput; lia) Hn HDa0
                 with "Hcg Hcpu Htext Hpc Hftab Hpanic Href Hfcenv [-]").
       iIntros (CID21 Hs21 R) "Hcg Hcpu Hpc %HcsR Hfdslot Hout".

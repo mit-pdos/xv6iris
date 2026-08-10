@@ -87,7 +87,7 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 (* RE-IMPORT: [IcacheInv.islot] shadows [DinodeEnc.islot] and
-   [IcacheInv.inode_ref] shadows [FileInv]'s placeholder; neither icache
+   [IcacheRef.inode_ref] shadows [FileInv]'s placeholder; neither icache
    name is meant here except through the two contracts. *)
 Require Import DinodeEnc.
 Require Import WpLock.

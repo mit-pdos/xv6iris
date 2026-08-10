@@ -50,6 +50,7 @@ Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import FdSlots FileInv.
+Require Import IcacheRef.   (* [inode_held]: what [p->cwd] owns *)
 Require Import KallocInv PageFields ByteBuf.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
@@ -522,17 +523,49 @@ Section ProcInv.
   (* =================================================================== *)
   (* THE resource that rides alongside [cur_proc p].                      *)
   (* =================================================================== *)
-  (* [cwd]: there is no inode model in the tree yet, so the "cwd names a
-     live inode" clause is [emp] for now -- deliberately a hole with the
-     shape of [ofile_slot]'s, so it can be filled without restating any
-     caller.  See the "holes" section of design/proc-struct.md.
+  (* [cwd]: p->cwd holds ONE WHOLE inode reference -- [IcacheRef.inode_held],
+     the same predicate the last [fileclose] of an FD_INODE file recovers
+     from its payload and hands to iput.  (C6b: this was [emp] while there
+     was no inode model; design/proc-struct.md's "holes to be honest about"
+     records the hole and design/fs-icache.md §3 the route out of it.)
 
-     It is the WHOLE of [FileInv.inode_ref], the same placeholder a
-     FD_INODE / FD_DEVICE [file_ref] carries fractionally as its payload:
-     p->cwd holds a reference outright, and the last [fileclose] of an inode
-     file recovers fraction 1 of one and hands it to [iput] -- which is why
-     the two must be the same predicate rather than two holes. *)
-  Definition cwd_ref (v : mword 64) : iProp Σ := inode_ref v 1.
+     TWO ARMS, on the pointer itself.  A process between [p->cwd = 0] and
+     its next chdir -- which is every process kexit has walked past, and
+     every slot the boot carve hands out -- has no working directory and
+     owns no reference; a live one names an itable entry, and an entry
+     address is never null ([IcacheRef.ientry_ne_zero]), so the two arms
+     cannot be confused.  kexit's contract asks for the second by asking
+     [pv_cwd V <> 0]: xv6's kexit calls iput(p->cwd) unconditionally, so
+     that premise is the honest reading of the code and not a convenience. *)
+  Definition cwd_ref (v : mword 64) : iProp Σ :=
+    (if decide (v = (zero_reg : mword 64)) then emp else inode_held v)%I.
+
+  (* the live arm, in the form a consumer uses it *)
+  (* "no working directory" owes no reference.  A LEMMA rather than a
+     [rewrite /cwd_ref] at the call site, because it is exactly the fact the
+     real predicate keeps: a null [p->cwd] names no inode. *)
+  Lemma cwd_ref_null : ⊢ cwd_ref (zero_reg : mword 64).
+  Proof.
+    rewrite /cwd_ref.
+    destruct (decide ((zero_reg : mword 64) = (zero_reg : mword 64)))
+      as [_ | Hne]; [auto | by destruct (Hne eq_refl)].
+  Qed.
+
+  Lemma cwd_ref_held (v : mword 64) :
+    v <> (zero_reg : mword 64) -> cwd_ref v -∗ inode_held v.
+  Proof.
+    intros Hne. rewrite /cwd_ref.
+    destruct (decide (v = (zero_reg : mword 64))) as [Hz | _];
+      [by destruct (Hne Hz) | iIntros "$"].
+  Qed.
+
+  Lemma cwd_ref_of_held (v : mword 64) : inode_held v -∗ cwd_ref v.
+  Proof.
+    iIntros "H". rewrite /cwd_ref.
+    iDestruct (inode_held_ne_zero with "H") as %Hne.
+    destruct (decide (v = (zero_reg : mword 64))) as [Hz | _];
+      [by destruct (Hne Hz) | iExact "H"].
+  Qed.
 
   (* [p->sz] NEVER EXCEEDS MAXVA.  This is a real invariant of a live
      process -- exec and growproc are the only writers and both bound the
@@ -608,6 +641,13 @@ Section ProcInv.
       (V : pprivate) (P : uptd) (ws : list (mword 64)) :
     (uint (pv_sz V) <= uvm_maxsz)%Z ->
     um_below (pv_sz V) (ud_um P) ->
+    (* NO WORKING DIRECTORY YET.  allocproc's block comes out of
+       [proc_dormant UNUSED], which pins [pv_cwd V = 0] ([proc_dormant_unused]
+       hands the fact over), and xv6 agrees: allocproc does not touch
+       p->cwd -- userinit and fork are what install one.  Before C6b
+       [cwd_ref] was [emp] and this premise was not needed; it is not a
+       restriction, it is the fact that was being silently assumed. *)
+    pv_cwd V = (zero_reg : mword 64) ->
     p_pid pa ↦₄{DfracOwn (1/2)} pid -∗
     proc_fields pa (DfracOwn 1) V -∗
     proc_pt_at pa P -∗
@@ -615,12 +655,13 @@ Section ProcInv.
     proc_ofiles γf pa (pv_ofile V) -∗
     proc_priv γf pa pid (upd_pt V P ws).
   Proof.
-    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho".
-    rewrite /proc_priv /proc_priv_core /cwd_ref.
+    iIntros (Hsz Hbel Hcwd) "Hpid Hf Hpt Htf Ho".
+    rewrite /proc_priv /proc_priv_core.
     cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
     iSplitR "Ho"; [|iFrame "Ho"].
     iSplitR; [iPureIntro; exact Hsz|].
     iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpid Hf Hpt Htf".
+    rewrite Hcwd. iApply cwd_ref_null.
   Qed.
 
   (* ---- projections: what callers actually use ---- *)
@@ -689,8 +730,8 @@ Section ProcInv.
      the two writers, and both do the same thing: hand the reference the cell
      names to iput, then store a new pointer.  So the accessor gives out the
      cell AND the reference clause together and takes back a matching pair --
-     which is what will keep both callers standing when [cwd_ref] stops being
-     a placeholder (design/proc-struct.md, "holes to be honest about"). *)
+     which is what kept both callers standing when [cwd_ref] stopped being a
+     placeholder (C6b, design/fs-icache.md §3). *)
   Lemma proc_priv_cwd (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
     proc_priv γf pa pid V -∗
     p_cwd pa ↦₈ pv_cwd V ∗ cwd_ref (pv_cwd V) ∗
@@ -700,10 +741,9 @@ Section ProcInv.
     iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
     rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
     iSplitL "Hcwd"; [iExact "Hcwd"|].
-    (* [cwd_ref] is [emp] today, so the proofmode has already normalised the
-       hypothesis to [emp] and [iFrame] cannot MATCH it against the goal's
-       folded [cwd_ref _]; [iExact] closes it by conversion and keeps working
-       when the predicate gains content. *)
+    (* [iExact], not [iFrame]: the hypothesis and the goal are the same
+       FOLDED [cwd_ref _] and conversion closes it.  (This is what kept the
+       lemma standing across C6b, when the predicate gained content.) *)
     iSplitL "Hc"; [iExact "Hc"|].
     iIntros (v') "Hcwd Hc".
     rewrite /proc_priv /proc_priv_core /proc_fields.
@@ -741,9 +781,7 @@ Section ProcInv.
     rewrite Hq word4_pointsto_frac_split.
     iDestruct "Hpid" as "[Hq1 Hq2]".
     iSplitL "Hcwd"; [iExact "Hcwd"|].
-    (* [cwd_ref] is [emp] today, so [iFrame] cannot MATCH the normalised
-       hypothesis against the goal's folded [cwd_ref _] -- see
-       [proc_priv_cwd]. *)
+    (* [iExact], not [iFrame] -- see [proc_priv_cwd]. *)
     iSplitL "Hc"; [iExact "Hc"|].
     iSplitL "Hq1"; [iExact "Hq1"|].
     iIntros (v') "Hcwd Hc Hq1".
@@ -758,12 +796,6 @@ Section ProcInv.
     iSplitL "Htfp"; [iExact "Htfp"|].
     iExact "Hc".
   Qed.
-
-  (* "no working directory" owes no reference.  A LEMMA rather than a
-     [rewrite /cwd_ref] at the call site, because it is exactly the fact the
-     real predicate will have to keep: a null [p->cwd] names no inode. *)
-  Lemma cwd_ref_null : ⊢ cwd_ref (zero_reg : mword 64).
-  Proof. rewrite /cwd_ref. auto. Qed.
 
   (* The array's length, which a caller needs BEFORE it knows which
      descriptor it wants: an fd below NOFILE always has a slot to look up. *)

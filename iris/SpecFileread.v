@@ -298,7 +298,7 @@ Section SpecFileread.
      (* the inum is inside the inode region: [ireg_read]'s premise *)
      ⌜bv_unsigned (frn_inum fn) < 16 * Z.of_nat (frn_nib fn)⌝ ∗
      (* THE INODE IS ITABLE SLOT [frn_ik fn].  This replaces v1's
-        [uint (fc_ip Cf) <> 0]: [IcacheInv.ientry_unsigned] refutes ilock's
+        [uint (fc_ip Cf) <> 0]: [IcacheRef.ientry_unsigned] refutes ilock's
         and iunlock's null test outright.  Their [ref < 1] test is refuted
         from [itable_inv] by [iref_load_au], so v1's [0 < refv < 2^31]
         premise about a caller-owned [i_ref] fraction is gone too.  And
@@ -327,7 +327,7 @@ Section SpecFileread.
         iunlock brings it back, so what fileread hands its own caller is a
         reference at SOME fraction -- [ic_swap_park] pins the device and the
         inum but not the share (§13.1e), exactly as brelse does in bio. *)
-     IcacheInv.inode_ref (icn_ref (frn_ic fn)) (frn_ik fn) (frn_q fn)
+     IcacheRef.inode_ref (icn_ref (frn_ic fn)) (frn_ik fn) (frn_q fn)
                (frn_dev fn) (frn_inum fn) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
@@ -348,7 +348,7 @@ Section SpecFileread.
      fileread simply passes the [q'] it got.  (v1 had the same shape one
      field over: its [vv'] was existential for the identical reason.) *)
   Definition fileread_fs_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    ((∃ q' : Qp, IcacheInv.inode_ref (icn_ref (frn_ic fn)) (frn_ik fn) q'
+    ((∃ q' : Qp, IcacheRef.inode_ref (icn_ref (frn_ic fn)) (frn_ik fn) q'
                            (frn_dev fn) (frn_inum fn)) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗

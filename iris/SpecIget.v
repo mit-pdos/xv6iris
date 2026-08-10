@@ -25,7 +25,7 @@
    do-while scan of the fifty entries, and TWO exits that each release and
    return the entry -- the cache HIT (+0x56/+0x58, [ref++]) and the RECYCLE
    (+0x6e/+0x72/+0x78/+0x7c, the four identity/ref/valid stores).  The scan
-   is the loop [IcacheInv.ientry_step] and [ientry_sentinel] describe: the
+   is the loop [IcacheRef.ientry_step] and [ientry_sentinel] describe: the
    cursor steps by [ISLOTSZ] and stops at [KernelSyms.log], which IS
    [ientry NINODE].
 
@@ -99,7 +99,7 @@
 
    Note the WIDTHS.  The reference is at the 32-bit [dev] / [inum] the
    identity cells hold; the returned register carries the 64-bit entry
-   ADDRESS, and [IcacheInv.ientry_inj] is what makes the two views the same
+   ADDRESS, and [IcacheRef.ientry_inj] is what makes the two views the same
    thing.  The arguments arrive sign-extended, which is forced by the code:
    the scan's compares at +0x4c / +0x52 are 64-bit [bne]s against registers
    holding the [c.lw] of a cell.

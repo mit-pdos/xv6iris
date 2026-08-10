@@ -114,6 +114,7 @@ Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
+Require Import IcacheRef IcacheInv IcacheEscrow IrefSlots InodeRegion.
 Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.
@@ -135,7 +136,8 @@ Definition K_kexit : nat := 74%nat.
 
 Definition wp_kexit_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
+      !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
      (γs : list gname) (j : nat) (γl : gname)
@@ -146,6 +148,9 @@ Definition wp_kexit_sconf_body
     (cov : gset Z) (logstart : Z) (dev : mword 32)
     (ip : mword 64) (dqi : dfrac)                     (* the initproc cell   *)
     (γkl : gname) (γka : gname * gname)               (* kmem.lock, kalloc   *)
+    (γi : gname) (cn : ic_names) (γtl : gname)        (* the inode cache     *)
+    (bmapstart inodestart : Z) (nib : nat) (size : Z)
+    (dqb dqs : dfrac) (us : gset Z)
     (on : option nat) (fn : fclose_names)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
     (pid : mword 32) (V : pprivate) :=
@@ -156,7 +161,8 @@ Definition wp_kexit_sconf_body
      than fifteen coherence conjuncts, and it computes away in the proof.  The
      pid fraction is the quarter [ProcInv.proc_priv_pid_ofile] lends. *)
   fn = MkFCloseNames γs j γl γkl γka γu γd γk pd pav pu bn γ γfs
-         cov logstart dev pid (DfracOwn (1/4)) ->
+         cov logstart dev pid (DfracOwn (1/4))
+         γi cn γtl bmapstart inodestart nib size dqb dqs ->
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   (K_kexit <= av)%nat ->
@@ -164,6 +170,12 @@ Definition wp_kexit_sconf_body
   log_geom_ok cov logstart ->
   (* the PARKING premise: everything that sleeps or parks needs it *)
   eb = true ->
+  (* THE PROCESS HAS A WORKING DIRECTORY.  [begin_op(); iput(p->cwd);] is
+     unconditional in xv6 -- there is no null test -- so a caller that
+     cannot exhibit one is calling iput on a null pointer.  Before C6b
+     [cwd_ref] was [emp] and this premise was invisible; it is not new
+     strength, it is the assumption the [emp] was hiding. *)
+  pv_cwd V <> (zero_reg : mword 64) ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b -∗
@@ -191,6 +203,13 @@ Definition wp_kexit_sconf_body
   disk_geom γd pd pav pu -∗
   is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
   bslots bn 3 -∗
+  (* THE INODE CACHE, and the two regions iput's truncate arm frees into.
+     Both bundles are [SpecFileclose]'s, verbatim: kexit hands them to
+     fileclose once per descriptor and then spends them itself on
+     [iput(p->cwd)], so stating them twice would be stating them
+     differently. *)
+  fileclose_ic_env fn -∗
+  fileclose_bm fn us -∗
   (* the initproc pointer, at any fraction (write-once; see the header) *)
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   (* the process itself: its private block and its fd-slot allowance *)
@@ -232,7 +251,8 @@ End KexitSeals.
 Module Type KEXIT.
   Parameter wp_kexit_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
+             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+             !kallocG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)
       (γs : list gname) (j : nat) (γl : gname)
@@ -243,10 +263,14 @@ Module Type KEXIT.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
+      (γi : gname) (cn : ic_names) (γtl : gname)
+      (bmapstart inodestart : Z) (nib : nat) (size : Z)
+      (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate),
       wp_kexit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
-                          cov logstart dev ip dqi γkl γka on fn
-                          m av eb C b pid V.
+                          cov logstart dev ip dqi γkl γka
+                          γi cn γtl bmapstart inodestart nib size dqb dqs us
+                          on fn m av eb C b pid V.
 End KEXIT.

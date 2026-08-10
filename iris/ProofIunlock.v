@@ -18,7 +18,7 @@
    -- and the caller's REFERENCE, at its own device and inum (§13.1e).
 
    The three panic tests: [ip == 0] because the entry is slot [k]
-   ([iul_entry_nonzero], i.e. [IcacheInv.ientry_unsigned]); [ip->ref < 1]
+   ([iul_entry_nonzero], i.e. [IcacheRef.ientry_unsigned]); [ip->ref < 1]
    from [IcacheInv.iref_load_au] against [itable_inv], over a reference
    BORROWED out of the escrow's checked-out arm for that one atomic update
    ([ic_open_out]; the holder's FULL valid cell is what refutes the other two

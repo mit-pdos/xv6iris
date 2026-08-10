@@ -316,18 +316,90 @@ out 2026-08-09):**
     always MAY truncate, so the bundle is unconditional; premises:
     the `nib` bound, `cov_below cov size` (bfree's, via itrunc),
     itrunc/iupdate's geometry premises threaded.
-  C6a retires `LinkIput.v`'s axiom for every consumer EXCEPT
-  kexit/fileclose, which hold the `emp` placeholder
-  (`FileInv.inode_ref` — ProofFileclose:1225's fraction mismatch only
-  typechecks BECAUSE it is emp) and bridge through a clearly-marked
-  `LinkIputCompat.v` axiom until **C6b**: the placeholder retirement
-  (design §3's icacheG-carried-names route; FileInv.file_payload's
-  FD_INODE arm carries cn/k/dev/inum + the `fc_ip C = ientry k` tie;
-  ProcInv.cwd_ref; SpecFileclose/ProofFileclose/ProofKexit thread).
-  The kexit-cone Print Assumptions audit comes fully clean only after
-  C6b. Decode landed 2346c26a (ipi_, 138 B; the walk validated the
+  Decode landed 2346c26a (ipi_, 138 B; the walk validated the
   whole choreography, incl. the SHARED ref-- tail both arms fall into
   and the +0x18-read-then-REF-1 ordering).
+- C6b: **DONE — THE PLACEHOLDERS ARE RETIRED AND THE BRIDGE IS DELETED.**
+  `LinkIputCompat.v` is gone, `SpecIput`'s frozen v1 (`IPUT`,
+  `wp_iput_sconf_body`, `iput_units = MAXOPBLOCKS`) is gone, and `IPUT2`
+  was renamed onto the vacated names. All six cones (fileclose, kexit,
+  pipealloc, sys_close, sys_exit, sys_pipe) consume the REAL contract;
+  `Print Assumptions` on `Kexit.wp_kexit_sconf`, on
+  `Fileclose.wp_fileclose_sconf` and on `Iput.wp_iput_sconf` is now the
+  five Sail platform axioms + funext and nothing else. What it took, and
+  what is worth keeping:
+  * **A NEW BASE FILE, `IcacheRef.v`.** `FileInv.v` cannot import
+    `IcacheInv.v` — `IrefSlots.v` imports `FileInv.v` and `IcacheInv.v`
+    imports `IrefSlots.v`, so the reference predicate had to move BELOW
+    the file table. `IcacheRef.v` holds the entry geometry (`NINODE`,
+    `ientry` + its four corollaries, and the five IN-CORE scalar fields
+    `i_dev`/`i_inum`/`i_ref`/`i_lock`/`i_valid`, moved out of
+    `InodeInv.v`), the algebra (`icacheUR`, `icacheG`, `iref_tok`,
+    `itable_half`), `inode_ident`/`inode_ref`, and the new pointer-keyed
+    `inode_held`. `IcacheInv.v` and `InodeInv.v` `Require Export` it, so
+    every unqualified use in the fs stack is unchanged; the handful of
+    `IcacheInv.inode_ref`-style QUALIFIED uses became `IcacheRef.…`.
+  * **`icfg`** (design §3's "icacheG carries the gname", generalised):
+    a three-field class — the count-authority gname, THE device, the
+    inode region's block count — made a superclass field of `fileG`, so
+    `FileInv`/`ProcInv` name the cache with NO arity change and the ~64
+    files that merely mention `proc_priv` need no edit. A cone that also
+    names the cache explicitly (`fcn_ic`) ties the two with a PURE
+    premise, `icn_ref cn = icfg_iref` (+ dev, + nib). That tie is the
+    only honest bridge: a reference carries no evidence of which
+    authority minted it.
+  * **THE FRACTION LAW IS WHY THE PAYLOAD IS A `cinv`.** An icache
+    reference's ghost fragment is `◯ {[k := (q, 1%positive)]}` — the
+    count column is 1 — so two of them compose to a count of TWO and
+    `inode_held` does NOT split at any fraction. `file_payload_split` is
+    a genuine ⊣⊢ (filedup leftwards, fileclose rightwards), so no
+    function of `q` mentioning the token can satisfy it. The reference
+    therefore goes into a CANCELLABLE INVARIANT: `FileInv.inode_pay γx v
+    q := cinv fileipN γx (inode_held v) ∗ cinv_own γx q`, the persistent
+    half rides every share, the FRACTION is the cancel token, and the
+    last closer (fraction 1) cancels and walks away with the whole
+    reference. This is exactly `PipeInv.pipe_ref`'s shape one layer down
+    (`own (pn_end γp w) q ∗ cinv_own (pn_cancel γp) (q/2)`) and the one
+    fupd fileclose performs (`iApply fupd_wp` then
+    `inode_pay_cancel`). `fpnames` gained one field, `fp_icv`.
+  * **`ProcInv.cwd_ref` is TWO-ARMED on the pointer** — `emp` at null,
+    `inode_held v` otherwise — because a process between `p->cwd = 0`
+    and its next chdir owns no reference, and `ientry_ne_zero` keeps the
+    arms apart. Consequences: `proc_priv_intro` gained the pure premise
+    `pv_cwd V = 0` (allocproc's dormant block already carries it), and
+    **kexit/sys_exit gained `pv_cwd V <> 0`** — xv6's `iput(p->cwd)` has
+    no null test, so that premise is the assumption the `emp` was
+    hiding, not new strength.
+  * **kexit's loop had to learn that it does not move the cwd**:
+    `kx_nulled` gained the expected `p->cwd` value as a parameter (one
+    extra conjunct, `pv_cwd V = cwdv`), since the fd loop runs between
+    the caller's non-null promise and the `iput` that uses it.
+  * **The cone contracts' new shape.** `fclose_names` gained nine fields
+    (`fcn_ireg`, `fcn_ic`, `fcn_tlock`, bmapstart/inodestart/nib/size,
+    two superblock dfracs); `fileclose_ic_env` is the WHOLLY PERSISTENT
+    half (is_itable2 + itable_inv + `ic_escrows` + ireg_inv + the new
+    `ic_sleeplocks` family + ten pure geometry facts, incl. the
+    ∀-quantified inum-in-region fact — a closer cannot name the inum,
+    it is existential in the reference); `fileclose_bm` is the
+    consumable half (two sb cells + `bitmap_res`). The bitmap comes back
+    SMALLER on the truncate arm, so the whole fs environment is indexed
+    by `us` exactly as the pipe arm is by the page count `on`, and every
+    caller carries it existentially. `fileclose_fs_env` is now DEFINED
+    as `nopid ∗ p_pid`, which turned `fileclose_fs_env_split_pid` into
+    `reflexivity` and deleted ~80 lines of tuned proofmode text.
+  * **Slot-indexed resources travel as FAMILIES.** A closer of an
+    arbitrary descriptor cannot name the slot in its contract (the
+    payload tells it only that there is one), so the escrow comes from
+    `ic_escrows` and the sleeplock from the new
+    `SpecFileclose.ic_sleeplocks` (`∃ γil γisl, is_sleeplock … (ic_tok
+    cn k)`, per slot), each with a `…_acc` lemma. Both are persistent,
+    so the ∃ costs nothing.
+  * OWED, and deliberate: fileclose's postcondition DROPS the
+    `iref_slot` iput hands back, because it comes back only on the arm
+    that ran and the contract cannot see which. That leaks one unit of
+    the IREFSLOTS supply per inode file closed. Fixing it wants
+    per-`ofile` ghost state saying what a descriptor names — the same
+    thing `SpecFileclose`'s header already owes for the type.
 
 ## C7 — the boot wiring (`ireg_alloc` + pool stocking)
 
@@ -349,5 +421,6 @@ IN SCOPE (user-confirmed 2026-08-09), after C6. One seam, two halves:
 ## Deferred / owed
 - The `fsblock`-carries-its-length fold (design §6(ii), better home) —
   whoever next touches `FsBlocks.v`.
-- `FileInv.inode_ref`/`ProcInv.cwd_ref` placeholders → `IcacheInv.inode_ref`
-  via an `icacheG`-carried gname (design §3's recorded choice).
+- ~~`FileInv.inode_ref`/`ProcInv.cwd_ref` placeholders~~ — DONE in C6b.
+- fileclose drops iput's `iref_slot` give-back (C6b, above): one supply
+  unit leaked per inode file closed. Wants per-`ofile` ghost state.
