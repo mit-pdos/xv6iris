@@ -266,6 +266,46 @@ explicit `wp_*_s_sconf` argument and once inside a companion
 `add_vec … sign_extend'` assert or `set`. Update both, or the file fails
 again at the same offset.
 
+## A WEAKENING IS CHEAP TO PROVE AND EXPENSIVE TO USE — plan the sweep accordingly
+
+Strengthening a lemma's HYPOTHESIS weakens the lemma, so it stays provable from
+the existing proof by instantiating the stronger hypothesis at whatever the old
+one supplied.  That is genuinely free.  **What is not free is every CONSUMER**,
+which must now establish the stronger form — and that obligation propagates up
+the whole tier, not one level.  Both halves showed up in the same change:
+wrapping `WpIntrInv.wp_exec_step_intr`'s σ-callback in `WpNext.wp_next` costs the
+engine's own proof one `iApply … $! cpu_id` with the guard closed by
+`reflexivity`, and costs its consumers `wp_instr_s_intr` → `wp_instr_s_sconf` →
+~60 leaf proofs, because each in turn has to invoke ITS caller's callback at the
+rebound hart.  **There is no independent half of such a change**: if you are
+tempted to land "just the bottom lemma", check whether its immediate consumer can
+still call its own continuation.  (`completed/explicit-cpuid.md` made exactly this
+trade one tier lower, and its Stage-1/Stage-2 split is the same observation.)
+
+Two mitigations worth reaching for before budgeting the full sweep:
+
+- **A consumer that can DISCHARGE the stronger form pays nothing.**  For
+  `wp_next`, `wp_next_off_intro` (interrupts off) and `wp_next_idle` (no current
+  proc) collapse the obligation outright, so the interrupts-off-only leaves — the
+  ones threading per-hart registers, which would have been the hard cases — are
+  free.  Look for the collapse lemma first and count what it covers.
+- **Widen an EXISTING premise slot instead of adding one.**  A new premise changes
+  arity and therefore every call site; widening what an existing slot MEANS costs
+  nothing wherever the slot is discharged by an opaque `ltac:(…)`.  Measured on
+  this tree: `IntrDefs.rd_ok` → `ops_ok` over the read operands touched 33 leaves
+  and 4 engines and **zero of 1192 call sites**, because all 1192 fill that slot
+  with the positional `ltac:(rdok)`.  This is the second time the trick has paid
+  (`rd_ok` itself replaced an older `rd <> csp_rs1` the same way), so it is worth
+  designing FOR: keep such side conditions in one named, Ltac-discharged
+  predicate rather than as loose conjuncts.
+
+Corollary on picking the premise: **guard a side condition on the index that makes
+it necessary.**  `src_ok b rs := b = true -> Regidx rs <> Regidx Rtp` is provable
+at every site, whereas the unguarded `rs <> Rtp` is UNPROVABLE at the three places
+that legitimately read `tp` (all of which run interrupts-off, where the condition
+is not needed).  An unguarded side condition that is false somewhere real forces a
+duplicate leaf family; a guarded one is discharged by `discriminate`.
+
 ## Write the checker for a refactor's SILENT failure mode, before the sweep
 
 If a change has a way of going wrong that still compiles, that way WILL be
