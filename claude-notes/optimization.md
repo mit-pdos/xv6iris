@@ -233,7 +233,7 @@ address.  Both still compile with no other edit:
   only bites when the unfolded abstraction appears in a hypothesis that a *long*
   proof carries, which in this tree meant `tf_pa` and nothing else.
 
-### 5c. WHAT THE ENVIRONMENT TERM IS MADE OF — and the one Iris-side fix worth proposing
+### 5c. WHAT THE ENVIRONMENT TERM IS MADE OF: names are 10–20 % of it
 
 `|Δ|` is not only the hypotheses' PROPOSITIONS.  An `Esnoc Γ i P` also carries
 the identifier `i`, and Iris's `ident` (`iris/proofmode/base.v`) is
@@ -253,15 +253,20 @@ the environment is embedded across the block.  So in a whole-function proof
 **hypothesis names alone are ~10–20 % of the proof term**, and they scale
 linearly with how descriptive you make them.
 
-**The fix is Iris-side and cheap: `INamed` should carry a PRIMITIVE string.**
-Rocq 9.0 ships `Corelib.Strings.PrimString` (present in this switch), whose
-literals are ONE term node regardless of length and whose comparison is a
-kernel primitive.  Changing `ident` to `INamed : PrimString.string` (plus
-`ident_beq` and the `iIntros`/spec-pattern Ltac that builds idents from parsed
-names) would take that 10–20 % to ~0 with no change to any proof script and no
-loss of goal readability.  Until then the only lever is shorter names, which
-is a bad trade for readability — take it only in the two or three longest
-monoliths.
+**This cost is in Iris, not in our proofs, and the only lever we have here is
+shorter names** — a bad trade for readability, worth taking only in the two or
+three longest monoliths.  What would remove it is a compact `ident`
+representation (Rocq 9.0's `Corelib.Strings.PrimString` literals are ONE term
+node regardless of length, and its comparison is a kernel primitive), which is
+an upstream change, not something to do in this tree.
+
+**Measuring it without patching anything: `iIntros "?"` gives `IAnon p`**, a
+positive literal of a few nodes.  So the A/B "descriptive names vs anonymous"
+prices a compact ident representation on STOCK Iris, and does so
+conservatively.  On a synthetic proof holding 40 hypotheses across 200
+proofmode steps that difference is about half the proof term and ~35 % of
+compile time — which is the scale to keep in mind before blaming a slow `Qed`
+on the proof itself.
 
 **Second component: how many entries are LIVE.**  Same probe, posing each of
 the 40 persistent instruction facts and `iClear`ing it immediately (so the
@@ -841,14 +846,3 @@ state register facts CID-generically up front —
 `assert (∀ CID', rget (CID := CID') M2 r = v)` — and rewrite with that
 (the prologue's ra/s0 facts already follow this pattern; follow it for
 every register that survives a hart-peeling branch).
-## The Iris-side fix, written up as a PR proposal
-
-`claude-notes/proposals/iris-primstring/` holds a PR-ready write-up of the
-`INamed : PrimString.string` change from §5c, with a self-contained benchmark
-suite (`bench/`) that needs only coq-iris + coq-stdpp: the representation cost
-(12 nodes/char vs 1), an end-to-end proofmode benchmark over three (N hyps, M
-steps) shapes showing **−47…−52 % proof-term size and −29…−42 % compile time**,
-and a kernel-checked feasibility probe showing the `string -> PrimString.string`
-bridge reduces to a 1-node literal under `vm_compute`.  The `anon` rows of the
-benchmark are the trick worth remembering: `iIntros "?"` gives `IAnon p`, so
-STOCK Iris can be used to price a compact `ident` without patching anything.
