@@ -251,10 +251,38 @@ out 2026-08-09):**
     an incr-shaped store AU — add `iref_incr_store_au` beside it,
     same proof shape over `iref_incr_step`);
   * ProofIget → Opus.
-- C6: `SpecIput`/`ProofIput`: REF-1 (`iref_lookup`), both close steps,
-  the escrow opening for the two lock-free loads, the truncate arm.
+- C6: `SpecIput`/`ProofIput` — the choreography settled by §13.7–13.9:
+  * the two reads of `valid`/`nlink` under only itable.lock: REF-1
+    (`iref_lookup` at count 1) + `ic_open_auth_ref` (the opener's dev
+    fraction refutes EMPTY now too — check the lemma gained that case
+    in C5a);
+  * non-last close (count ≥ 2): `iref_close_step` inside one
+    `itable_inv` opening, one `iref_slot` returned, identity fraction
+    rejoins `islot_rest_at` — no escrow touch;
+  * LAST close, no-truncate: `iref_close_last_step` + THE EVICTION
+    (§13.9): `ic_close_to_empty` (landed, proven — both `ic_id` halves,
+    the completed dev cell, the payload → empty arm + the pool-shaped
+    bundle out), `ipool_insert` (fresh: inum ∈ ci pre-delete), ci and M
+    delete together, table side re-forms as `islot_empty`. The
+    loaded-shape→pool-shape step is where PARKED-MEANS-FLUSHED is
+    spent;
+  * the truncate arm (`ref==1 && valid && nlink==0`): acquiresleep
+    (checkout — iput's own reference deposits), release itable.lock,
+    itrunc + `di_type := 0` store + iupdate (the flush retags
+    `dinode_at` to the type-0 record = the FREE pool shape), valid=0
+    store, releasesleep (park at unloaded-free), re-acquire, then the
+    last-close eviction as above — the parked bundle is already
+    pool-shaped;
+  * SpecIput's contract: consumes `inode_ref … k q dev inum` +
+    `iref_slot`-give-back bookkeeping; returns NOTHING on the close
+    arms (pure postcondition); needs the running-process bundle only
+    on the truncate arm (acquiresleep + bread sleep) — xv6's iput
+    always MAY truncate, so the bundle is unconditional; premises:
+    the `nib` bound, `cov_below cov size` (bfree's, via itrunc),
+    itrunc/iupdate's geometry premises threaded.
   Retires `LinkIput.v`'s axiom and the last fs-side assumption in
-  kexit's cone.
+  kexit's cone; finish with Print Assumptions over kexit's linked
+  theorem.
 
 ## C7 — the boot wiring (`ireg_alloc` + pool stocking)
 
