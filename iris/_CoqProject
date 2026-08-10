@@ -240,6 +240,12 @@ CodeMemcpy.v
 CodeMemmove.v
 ProofMemmove.v
 LinkMemmove.v
+SpecMemcmp.v
+ProofMemcmp.v
+LinkMemcmp.v
+SpecMemcpy.v
+ProofMemcpy.v
+LinkMemcpy.v
 SpecKfree.v
 ProofKfree.v
 LinkKfree.v
@@ -537,6 +543,7 @@ ProofBrelse.v
 LinkBrelse.v
 CodeBread.v
 BreadLru.v
+WpAu4.v
 ProofBreadParts.v
 ProofBread.v
 LinkBread.v

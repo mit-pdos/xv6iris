@@ -100,6 +100,7 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpAu4.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
@@ -296,84 +297,9 @@ Lemma ig_pool_set (P : gset Z) (S : gset Z) (z : Z) :
   P ∖ ({[z]} ∪ S) = (P ∖ S) ∖ {[z]}.
 Proof. set_solver. Qed.
 
-(* ===================================================================== *)
-(*  2.  THE TWO MASK-CARRYING WIDTH-4 LEAVES                              *)
-(* ===================================================================== *)
-
-(* [ProofIdup.wp_lw_au_idup] / [wp_sw_au_idup], restated: a proof file may
-   not import a proof file, and those two live in a section that fixes
-   idup's ghost context.  iget uses BOTH namespaces -- [icacheN] for the
-   three [ref]-word accesses and [icEscN] for the three identity/valid
-   stores, whose cells live in an [inv], not in the lock. *)
-Section IgetAuLeaves.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
-
-  Lemma wp_lw_au_iget (cmp : bool)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
-      {dqm : dfrac} :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
-          ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
-    ( ∀ v : mword 32,
-      wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
-        pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-        Ψ v -∗
-        WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Hrd Hrdok HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
-              (fun w => sign_extend' 64 w) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-  Lemma wp_sw_au_iget (cmp : bool)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄ vold ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm)
-          ↦₄ (trunc32 (rget m rs2)) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m av b p -∗
-      pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-      Ψ -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intro HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_store_s_sconf_au 4 cmp pc rs2 rs1 imm m av
-              (trunc32 (rget m rs2)) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-End IgetAuLeaves.
 
 (* ===================================================================== *)
-(*  3.  THE FUNCTION                                                      *)
+(*  2.  THE FUNCTION                                                      *)
 (* ===================================================================== *)
 
 Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) : IGET.
@@ -1175,7 +1101,7 @@ Section ProofIget.
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
             assert (Hsv6e : trunc32 (rget N1 Rs2) = dev).
             { rewrite (rget_ne N1 Rs2 ltac:(nz)) HN1s2. apply trunc32_sext. }
-            iApply (wp_sw_au_iget false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
+            iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x6e)) Rs2 Rs3
                       (mword_of_int 0 : mword 12) N1 (K - 6)%nat
                       (ic_id cn e (1/2) false dev inumT)
                       (⊤ ∖ ↑minstretN ∖ ↑icEscN) false ltac:(solve_ndisj)
@@ -1207,7 +1133,7 @@ Section ProofIget.
             { rewrite (rget_ne N1 Rs3 ltac:(nz)) HN1s3e. reflexivity. }
             assert (Hsv72 : trunc32 (rget N1 Rs4) = inum).
             { rewrite (rget_ne N1 Rs4 ltac:(nz)) HN1s4. apply trunc32_sext. }
-            iApply (wp_sw_au_iget false (mword_of_int (KernelSyms.iget + 0x72)) Rs4 Rs3
+            iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x72)) Rs4 Rs3
                       (mword_of_int 4 : mword 12) N1 (K - 6)%nat
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
                        ic_id cn e (1/2) true dev inum ∗ ic_mid cn e)%I
@@ -1258,7 +1184,7 @@ Section ProofIget.
             { rewrite (rget_ne V1 Ra5 ltac:(nz)) /V1 upd_eq.
               unfold regval_into_reg. pcw. }
             assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
-            iApply (wp_sw_au_iget false (mword_of_int (KernelSyms.iget + 0x78)) Ra5 Rs3
+            iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x78)) Ra5 Rs3
                       (mword_of_int 8 : mword 12) V1 (K - 6)%nat
                       (itable_half (<[e := ((1/2/2)%Qp, 1%positive)]> M) ∗
                        iref_tok e (1/2/2)%Qp)%I
@@ -1302,7 +1228,7 @@ Section ProofIget.
                          ltac:(vm_compute; reflexivity) with "Hcg") as "[%Hx0 Hcg]".
             assert (Hsv7c : trunc32 (rget V1 Rz) = valid_word false).
             { rewrite (rget_ne V1 Rz ltac:(nz)) Hx0. exact ig_trunc32_zero. }
-            iApply (wp_sw_au_iget false (mword_of_int (KernelSyms.iget + 0x7c)) Rz Rs3
+            iApply (wp_sw_au_s_sconf false (mword_of_int (KernelSyms.iget + 0x7c)) Rz Rs3
                       (mword_of_int 64 : mword 12) V1 (K - 6)%nat
                       (i_dev (ientry e) ↦₄{DfracOwn (1/2)} dev ∗
                        i_inum (ientry e) ↦₄{DfracOwn (1/2)} inum ∗
@@ -1492,7 +1418,7 @@ Section ProofIget.
       assert (Hpa44 : add_vec (rget Mr Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                       = i_ref (ientry j)).
       { rewrite (rget_ne Mr Rs1 ltac:(nz)) HMs1. reflexivity. }
-      iApply (wp_lw_au_iget true (mword_of_int (KernelSyms.iget + 0x44)) Ra5 Rs1
+      iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x44)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) Mr (K - 6)%nat
                 (fun v => (⌜v = iref_word M j⌝ ∗ itable_half M)%I)
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
@@ -1740,7 +1666,7 @@ Section ProofIget.
                         = i_ref (ientry j)).
         { rewrite (rget_ne L4 Rs1 ltac:(nz)) HL4s1. reflexivity. }
         assert (Hqv : ✓ (qj + qj'/2)%Qp) by (apply ig_frac_valid; by apply Qp.sub_Some).
-        iApply (wp_sw_au_iget true (mword_of_int (KernelSyms.iget + 0x58)) Ra5 Rs1
+        iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iget + 0x58)) Ra5 Rs1
                   (mword_of_int 8 : mword 12) L4 (K - 6)%nat
                   (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
                    iref_tok j (qj'/2)%Qp)%I

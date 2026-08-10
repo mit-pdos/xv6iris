@@ -48,7 +48,7 @@
 
    The boot-time allocation (building the initial map from the mkfs
    image's dinode blocks and minting every [dinode_at]) is fsinit wiring
-   and lives with FsBoot, not here.  The icache pool that HOLDS the
+   and lives in [IcacheBoot.v], not here.  The icache pool that HOLDS the
    fragments of uncached inodes is IcacheInv's (design §10.4).            *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
