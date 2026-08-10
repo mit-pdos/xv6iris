@@ -27,7 +27,7 @@
 
    THE GUARD READ IS AN ATOMIC UPDATE.  [ip->ref] lives in [itable_inv],
    not in any caller's hands (design §4), so the [c.lw a5,8(a0)] at +0x0e
-   goes through [wp_lw_au_ilock] (the compressed width-4 wrapper below)
+   goes through [WpAu4.wp_lw_au_s_sconf] (the width-4 masked wrapper)
    fed by [IcacheInv.iref_load_au]; what comes back out is the bounds
    [0 < v < 2^31] that [inode_ref_spos] turns into "[bge x0,a5] falls
    through".  The null half of the same panic needs no resource at all now
@@ -105,6 +105,7 @@ Require Import DiskPtsto DiskInv.
 Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
+Require Import WpAu4.
 Require Import WpSmodeHalf WpSmodeIntr.
 Require Import WpSconfSrliw.
 Require Import ByteBuf.
@@ -255,49 +256,6 @@ Section IlockParts.
 
 End IlockParts.
 
-(* ===================================================================== *)
-(*  The mask-carrying compressed width-4 LOAD.                            *)
-(*  [ProofIdup.wp_lw_au_idup] restated (same reason as [il_held_L]).       *)
-(* ===================================================================== *)
-Section IlockAuLeaf.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
-
-  Lemma wp_lw_au_ilock (cmp : bool)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Psi : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
-      {dqm : dfrac} :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
-          ={Em, ⊤ ∖ ↑minstretN}=∗ Psi v)) -∗
-    ( ∀ v : mword 32,
-      wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
-        pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-        Psi v -∗
-        WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Hrd Hrdok HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
-              (fun w => sign_extend' 64 w) Psi Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia)
-              ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-End IlockAuLeaf.
 
 Module IlockProof (ASL : ACQUIRESLEEP) (BR : BREAD) (MM : MEMMOVE) (BL : BRELSE)
   : ILOCK.
@@ -1966,7 +1924,7 @@ Section ProofIlockMain.
                       = i_ref ip).
     { rgne. rewrite HR3a0. reflexivity. }
     iDestruct "Href" as "[Hrt Hrid]".
-    iApply (wp_lw_au_ilock true (mword_of_int (KernelSyms.ilock + 0x0e)) Ra5 Ra0
+    iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.ilock + 0x0e)) Ra5 Ra0
               (mword_of_int 8 : mword 12) R3 (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
                          iref_tok k q)%I)

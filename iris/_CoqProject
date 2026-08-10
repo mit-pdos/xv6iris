@@ -535,6 +535,7 @@ ProofBrelse.v
 LinkBrelse.v
 CodeBread.v
 BreadLru.v
+WpAu4.v
 ProofBreadParts.v
 ProofBread.v
 LinkBread.v

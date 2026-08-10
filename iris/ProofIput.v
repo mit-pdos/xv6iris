@@ -101,6 +101,7 @@ Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpAu4.
 Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
@@ -282,82 +283,9 @@ Proof.
   destruct (decide (x = z)) as [->|Hne]; naive_solver.
 Qed.
 
-(* ===================================================================== *)
-(*  2.  THE TWO MASK-CARRYING WIDTH-4 LEAVES                              *)
-(* ===================================================================== *)
-
-(* [ProofIdup.wp_lw_au_idup] / [wp_sw_au_idup] verbatim.  iput uses BOTH
-   namespaces: [icacheN] for the three [ref]-word accesses and [icEscN] for
-   the escrow-owned [ip->valid] read at +0x3c. *)
-Section IputAuLeaves.
-  Context `{!riscvGS Σ, !sieG Σ}.
-  Context `{GEN : GenId} `{CID : CpuId}.
-  Context {p : mword 64}.
-
-  Lemma wp_lw_au_iput (cmp : bool)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
-      {dqm : dfrac} :
-    uint rd <> 0 ->
-    rd_ok rd ->
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (LOAD (imm, Regidx rs1, Regidx rd, false, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ v : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄{dqm} v
-          ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ v)) -∗
-    ( ∀ v : mword 32,
-      wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg (sign_extend' 64 v)]> m) av b p -∗
-        pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-        Ψ v -∗
-        WP (Loop : expr riscv_lang))) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intros Hrd Hrdok HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
-              (fun w => sign_extend' 64 w) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_read_ram_plain_4 data2_ext_4 Hrd Hrdok HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-  Lemma wp_sw_au_iput (cmp : bool)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
-      (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
-    ↑kptN ⊆ Em ->
-    sie_cap_gpr m av b p -∗
-    pc_is pc -∗
-    instr pc cmp (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
-    (|={⊤ ∖ ↑minstretN, Em}=> ∃ vold : mword 32,
-       add_vec (rget m rs1) (sign_extend' 64 imm) ↦₄ vold ∗
-       (add_vec (rget m rs1) (sign_extend' 64 imm)
-          ↦₄ (trunc32 (rget m rs2)) ={Em, ⊤ ∖ ↑minstretN}=∗ Ψ)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m av b p -∗
-      pc_is (add_vec_int pc (if cmp then 2 else 4)) -∗
-      Ψ -∗
-      WP (Loop : expr riscv_lang)) -∗
-    WP (Loop : expr riscv_lang).
-  Proof.
-    intro HkptEm.
-    iIntros "Hcg Hpc Hinstr HAU Hcont".
-    iApply (wp_store_s_sconf_au 4 cmp pc rs2 rs1 imm m av
-              (trunc32 (rget m rs2)) Ψ Em b
-              ltac:(lia) ltac:(lia) ltac:(unfold vmem_width; lia) ltac:(exists 1024; reflexivity)
-              ltac:(vm_compute; reflexivity)
-              exec_write_ram_plain_4 (store_ext_4 (rget m rs2)) HkptEm
-              with "Hcg Hpc Hinstr HAU Hcont").
-  Qed.
-
-End IputAuLeaves.
 
 (* ===================================================================== *)
-(*  3.  THE TAIL'S REGISTER INVARIANT                                     *)
+(*  2.  THE TAIL'S REGISTER INVARIANT                                     *)
 (* ===================================================================== *)
 
 (* [ProofAcquiresleep.asl_regs]' shape.  s1 is the entry cursor, sp is the
@@ -485,7 +413,7 @@ Section IputCommon.
 End IputCommon.
 
 (* ===================================================================== *)
-(*  4.  THE SHARED [ref--] TAIL, +0x20 .. +0x3a                           *)
+(*  3.  THE SHARED [ref--] TAIL, +0x20 .. +0x3a                           *)
 (* ===================================================================== *)
 
 Section IputTail.
@@ -866,7 +794,7 @@ Section IputTail.
     assert (Hpa : add_vec (rget M Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                   = i_ref (ientry k)).
     { rewrite (rget_ne M Rs1 ltac:(nz)) HMs1. reflexivity. }
-    iApply (wp_lw_au_iput true (mword_of_int (KernelSyms.iput + 0x20)) Ra5 Rs1
+    iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x20)) Ra5 Rs1
               (mword_of_int 8 : mword 12) M (K - 4)%nat
               (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half Mt)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
@@ -944,7 +872,7 @@ Section IputTail.
         exact (Hrange k (dev, inum) Hcik). }
       assert (Hincid : bv_unsigned inum ∈ ci_inums ci).
       { apply ci_inums_spec. exists k, (dev, inum). split; [exact Hcik | reflexivity]. }
-      iApply (wp_sw_au_iput true (mword_of_int (KernelSyms.iput + 0x24)) Ra5 Rs1
+      iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x24)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) D2 (K - 4)%nat
                 (itable_half (delete k Mt))
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
@@ -1007,7 +935,7 @@ Section IputTail.
       assert (Hzs : (Z.pos cnt - 1)%Z = Z.pos npred).
       { rewrite /npred. rewrite <- Hsucc at 1. rewrite Pos2Z.inj_succ. lia. }
       pose proof Hqrest as Hqt'. apply Qp.sub_Some in Hqt'.  (* qt = q + qrest *)
-      iApply (wp_sw_au_iput true (mword_of_int (KernelSyms.iput + 0x24)) Ra5 Rs1
+      iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x24)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) D2 (K - 4)%nat
                 (itable_half (<[k := (qrest, npred)]> Mt))
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
@@ -1064,7 +992,7 @@ Section IputTail.
 End IputTail.
 
 (* ===================================================================== *)
-(*  5.  THE FUNCTION                                                      *)
+(*  4.  THE FUNCTION                                                      *)
 (* ===================================================================== *)
 
 Section ProofIput.
@@ -1317,7 +1245,7 @@ Section ProofIput.
     assert (Hpa18 : add_vec (rget macq Rs1) (sign_extend' 64 (mword_of_int 8 : mword 12))
                     = i_ref (ientry k)).
     { rewrite (rget_ne macq Rs1 ltac:(nz)) Hms1. reflexivity. }
-    iApply (wp_lw_au_iput true (mword_of_int (KernelSyms.iput + 0x18)) Ra4 Rs1
+    iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x18)) Ra4 Rs1
               (mword_of_int 8 : mword 12) macq (K - 4)%nat
               (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half Mt)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
@@ -1421,7 +1349,7 @@ Section ProofIput.
     assert (Hpa3c : add_vec (rget E2 Rs1) (sign_extend' 64 (mword_of_int 64 : mword 12))
                     = i_valid (ientry k)).
     { rewrite (rget_ne E2 Rs1 ltac:(nz)) HE2s1. reflexivity. }
-    iApply (wp_lw_au_iput true (mword_of_int (KernelSyms.iput + 0x3c)) Ra5 Rs1
+    iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.iput + 0x3c)) Ra5 Rs1
               (mword_of_int 64 : mword 12) E2 (K - 4)%nat
               (fun w => (∃ v : bool, ⌜w = valid_word v⌝ ∗
                   itable_half Mt ∗ iref_tok k q ∗
