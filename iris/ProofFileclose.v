@@ -68,6 +68,8 @@ Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
 Require Import WpLock.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.
+Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
+Require Import BitmapInv DinodeEnc InodeInv.
 Require Import SpecFileclose.
 Require Import CodeFileclose ProofFilecloseParts.
 From Kernel Require KernelSyms.
@@ -81,7 +83,7 @@ Module FilecloseProof (Acquire : ACQUIRE) (Release : RELEASE)
 Section ProofFileclose.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -123,10 +125,10 @@ Section ProofFileclose.
 
   Lemma wp_fileclose_sconf  (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
-      (fn : fclose_names) (on : option nat)
+      (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool)
-    : wp_fileclose_sconf_body γfl γf k q Cf fn on m n eb p C K b.
+    : wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p C K b.
   Proof.
     cbv beta delta [wp_fileclose_sconf_body].
     intros pcE ret_tgt HK HnZ Ha0.
@@ -1219,17 +1221,49 @@ Section ProofFileclose.
                          || bool_decide (fc_type Cf = FD_DEVICE)) = true).
           { apply orb_true_intro. destruct Hinode as [H|H]; [left|right];
               by apply bool_decide_eq_true_2. }
-          iAssert (fileclose_fs_env fn n eb p) with "[Henv]" as "Henv".
+          iAssert (fileclose_fs_env fn us n eb p) with "[Henv]" as "Henv".
           { rewrite /fileclose_env bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Henv". }
-          iAssert (cwd_ref (fc_ip Cf)) with "[Hpl]" as "Hcwd".
+          (* THE PAYLOAD IS THE REFERENCE, and this closer holds ALL of it:
+             [file_rest_join] gave fraction one, so the cancel token is
+             whole and [FileInv.inode_pay_cancel] turns it into the inode
+             reference iput consumes.  This is the one fupd fileclose
+             performs, and the whole point of the payload being a
+             cancellable invariant rather than a fraction of the reference
+             (which does not exist -- see [FileInv.inode_pay]). *)
+          iAssert (inode_pay (fp_icv pn) (fc_ip Cf) 1) with "[Hpl]" as "Hpl".
           { rewrite /file_payload bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib. rewrite /cwd_ref. iExact "Hpl". }
-          rewrite /fileclose_fs_env.
-          iDestruct "Henv" as "(%Hn0 & %Heb & %Hpj & %Hjlt & %Hgl & %Hgeom &
-                                #Hprocs & #Hbio & #Hlog & #Hseam &
-                                #Hgen & #Hdev & #Hgeo & #Hdlk & Hbsl & Hpid)".
+            rewrite Hib. iExact "Hpl". }
+          iApply fupd_wp.
+          iMod (inode_pay_cancel ⊤ (fp_icv pn) (fc_ip Cf) ltac:(solve_ndisj)
+                  with "Hpl") as "Hheld".
+          iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href)".
+          iModIntro.
+          rewrite /fileclose_fs_env /fileclose_fs_env_nopid.
+          iDestruct "Henv" as "[(%Hn0 & %Heb & %Hpj & %Hjlt & %Hgl & %Hgeom &
+                                 #Hprocs & #Hbio & #Hlog & #Hseam &
+                                 #Hgen & #Hdev & #Hgeo & #Hdlk & Hbsl &
+                                 #Hicenv & Hbm) Hpid]".
           subst n. subst eb. subst p.
+          rewrite /fileclose_ic_env.
+          iDestruct "Hicenv" as "(%Hciref & %Hcdev & %Hcnib & %Hsz & %Hbm0 &
+                                  %Hbmcov & %Hbmlog & %Hist0 & %Hinumgeo &
+                                  %Hcovb & #Hitab & #Hitinv & #Hescrows &
+                                  #Hireg & #Hslks)".
+          rewrite /fileclose_bm.
+          iDestruct "Hbm" as "(Hsbb & Hsbi & Hbmres)".
+          (* the entry's own escrow and sleeplock, out of the two families:
+             a closer cannot name the slot in its contract, so it takes
+             every slot's and picks the one the reference names *)
+          iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
+          iDestruct (ic_sleeplocks_acc _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
+          (* the reference is at the CACHE's authority and device; iput names
+             them through the [ic_names] its other premises are stated at.
+             The two pure ties in [fileclose_ic_env] are what bridge them. *)
+          iEval (rewrite -Hciref -Hcdev) in "Href".
+          assert (Hinb : bv_unsigned inum < 16 * Z.of_nat (fcn_nib fn))
+            by (rewrite Hcnib; exact Hinumb).
+          destruct (Hinumgeo inum Hinb) as [Hiblk Hiblog].
           (* with no lock held and the parking premise, the SIE arm is fixed:
              [Houtb] reads [b = eb] at [noff = 0]. *)
           subst b.
@@ -1328,13 +1362,22 @@ Section ProofFileclose.
           iApply (Iput.wp_iput_sconf (CID := CIDf5) (fcn_procs fn) (fcn_j fn)
                     (fcn_plock fn) (fcn_uart fn) (fcn_disk fn) (fcn_dlock fn)
                     (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) (fcn_bio fn)
-                    (fcn_log fn) (fcn_fs fn) (fcn_cov fn) (fcn_logstart fn)
-                    (fcn_dev fn) (fc_ip Cf) MAXOPBLOCKS (fcn_pid fn) (fcn_dq fn)
+                    (fcn_log fn) (fcn_fs fn) (fcn_ireg fn) (fcn_ic fn)
+                    (fcn_tlock fn) gil gisl
+                    (fcn_cov fn) (fcn_logstart fn) (fcn_bmapstart fn)
+                    (fcn_inodestart fn) (fcn_nib fn) (fcn_size fn)
+                    (fcn_dev fn) us kk qq inum MAXOPBLOCKS
+                    (fcn_pid fn) (fcn_dq fn) (fcn_dqb fn) (fcn_dqs fn)
                     B3 (K - 8)%nat true C true
-                    ltac:(unfold K_iput; lia) Hgeom
-                    ltac:(unfold iput_units; lia) Hjlt Hgl HB3a0 eq_refl
-                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hpid Hprocs Hdev Hgeo Hdlk Hbsl Hcwd Hop [-]").
-          iIntros (CIDf6 Hsf6 mi ni) "%Hics Hcg Hcnt Hpc Hpid Hbsl %Hni Hop".
+                    ltac:(unfold K_iput; lia) Hkk Hgeom Hsz Hbm0 Hbmcov Hbmlog
+                    Hist0 Hiblk Hiblog Hinb Hcovb
+                    ltac:(unfold iput_units, MAXOPBLOCKS; lia) Hjlt Hgl
+                    ltac:(rewrite HB3a0; exact Hipe) eq_refl
+                    with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hitab Hitinv
+                          Hescrow Hireg Hslk Href Hsbb Hsbi Hbmres Hpid Hprocs
+                          Hdev Hgeo Hdlk Hbsl Hop [-]").
+          iIntros (CIDf6 Hsf6 mi ni us') "%Hics Hcg Hcnt Hpc Hpid Hsbb Hsbi
+                                          %Hussub Hbmres Hbsl %Hni Hop Hislot".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
           { rewrite HB3ra. apply bv_eq; vm_compute; reflexivity. }
@@ -1439,11 +1482,19 @@ Section ProofFileclose.
           iDestruct (cpu_own_transport CIDf8 CIDf10 0 true (proc_addr (fcn_j fn)) C true
                        ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
           iSpecialize ("Hcont" $! CIDf10 with "[]"); [iPureIntro; wp_next_chain|].
-          iApply ("Hcont" $! mf with "Hcg Hcnt [Hpc] [%] Hfd [ Hpid Hbsl]").
+          iApply ("Hcont" $! mf with
+                    "Hcg Hcnt [Hpc] [%] Hfd [Hpid Hbsl Hsbb Hsbi Hbmres]").
           { iEval (rewrite /ret_tgt). iExact "Hpc". }
           { exact Hcsf. }
           { rewrite /fileclose_env_out bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib /fileclose_fs_out. iFrame " Hpid Hbsl". }
+            rewrite Hib /fileclose_fs_out.
+            iSplitL "Hpid"; [iExact "Hpid"|].
+            iSplitL "Hbsl"; [iExact "Hbsl"|].
+            (* the bitmap comes back smaller iff the truncate arm ran; iput
+               states exactly that and no more.  (iput's [iref_slot] is
+               dropped here -- see [fileclose_fs_out]'s note.) *)
+            iExists us'. iSplitR; [iPureIntro; exact Hussub|].
+            rewrite /fileclose_bm. iFrame "Hsbb Hsbi Hbmres". }
         * (* ======== FD_NONE (or anything else): nothing to do ========== *)
           iApply (wp_bgeu_fall_s_sconf (mword_of_int (FC + 0x60))
                     (mword_of_int 74 : mword 13) Ra5 Ra4 Q2 (K - 8)%nat b

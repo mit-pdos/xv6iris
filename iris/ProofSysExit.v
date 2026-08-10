@@ -40,6 +40,8 @@ Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import KallocInv.
 Require Import UserPtTree.
+Require Import IrefSlots InodeRegion.
+Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
 Require Import SpecFileclose.
 Require Import WpUart.
 Require Import DiskPtsto.
@@ -85,7 +87,8 @@ Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
 
 Section ProofSysExit.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
-            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}.
+            !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ,
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac pcstep := apply bv_eq; vm_compute; reflexivity.
@@ -105,19 +108,23 @@ Section ProofSysExit.
       (cov : gset Z) (logstart : Z) (dev : mword 32)
       (ip : mword 64) (dqi : dfrac)
       (γkl : gname) (γka : gname * gname)
+      (γi : gname) (cn : ic_names) (γtl : gname)
+      (bmapstart inodestart : Z) (nib : nat) (size : Z)
+      (dqb dqs : dfrac) (us : gset Z)
       (on : option nat) (fn : fclose_names)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64)
     : wp_sys_exit_sconf_body γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
-                             cov logstart dev ip dqi γkl γka on fn
-                             m av eb C b pid V v0.
+                             cov logstart dev ip dqi γkl γka
+                             γi cn γtl bmapstart inodestart nib size dqb dqs us
+                             on fn m av eb C b pid V v0.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
-    intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb.
+    intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb Hcwdnz.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpanic
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
-             #Hdlk Hbs Hip Hfds Hpriv".
+             #Hdlk Hbs #Hicenv Hbm Hip Hfds Hpriv".
     iPoseProof (se_00 with "Htext") as "Hi00".
     iPoseProof (se_02 with "Htext") as "Hi02".
     iPoseProof (se_04 with "Htext") as "Hi04".
@@ -298,11 +305,13 @@ Section ProofSysExit.
        them, because nothing after this call is reachable. *)
     iDestruct (cpu_own_transport CID8 CID10 0%nat eb pj C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
     iApply (Kexit.wp_kexit_sconf γft γf γw γs j γl γu γd γk pd pav pu bn γ γfs
-              cov logstart dev ip dqi γkl γka on fn B2 (av - 4)%nat eb C b pid V
-              Hfn Hj Hgl (sex_Kke av Hav) Hgeo Heb
+              cov logstart dev ip dqi γkl γka
+              γi cn γtl bmapstart inodestart nib size dqb dqs us
+              on fn B2 (av - 4)%nat eb C b pid V
+              Hfn Hj Hgl (sex_Kke av Hav) Hgeo Heb Hcwdnz
               with "Hcg Hcpu Htext Hpc Hprocs Hpanic Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
-                    Hip Hfds Hpriv").
+                    Hicenv Hbm Hip Hfds Hpriv").
   Qed.
 
 End ProofSysExit.

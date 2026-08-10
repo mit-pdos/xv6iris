@@ -4,10 +4,23 @@
 between the tree and four `Link` files: `pipealloc`, `sys_close`, `sys_pipe`
 and `kexit` were all proved and all unlinked because their one unproven
 callee was this one.  All five now read `proven` in
-`tools/proof_coverage.py`, on the single sanctioned `wp_iput_sconf` axiom
-(`LinkIput.v`) — file.c 4/7, pipe.c 4/4.
+`tools/proof_coverage.py` — file.c 4/7, pipe.c 4/4.
 
-Kept for its design record and its gotchas; nothing here is outstanding.
+Written when iput was the cone's one sanctioned axiom. **It is not any
+more**: C6 proved iput over the real inode cache and C6b (projects/
+fs-icache.md) repointed this cone at it, so `Print Assumptions
+Fileclose.wp_fileclose_sconf` is the five Sail platform axioms plus funext
+and nothing else. Two things below are superseded by that cycle, and both
+are worth reading together with it: the FD_INODE arm's environment grew the
+inode cache's persistent set plus the block bitmap (which comes back
+smaller if the truncate arm ran, so the whole bundle is now indexed by
+`us` the way the pipe arm is by `on`), and **the payload's inode half is no
+longer a fraction of the reference** — an icache reference does not split
+(its ghost fragment's count column is `1%positive`), so it lives in a
+cancellable invariant whose CANCEL TOKEN is what the fractions divide. The
+pipe half below is unchanged and is the shape the inode half now copies.
+
+Otherwise kept for its design record and its gotchas.
 
 ```c
 void fileclose(struct file *f) {

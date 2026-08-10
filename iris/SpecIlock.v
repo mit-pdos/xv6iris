@@ -26,7 +26,7 @@
 
    ---- THE ENTRY IS A SLOT, NOT A POINTER ------------------------------
 
-   [ip] is [IcacheInv.ientry k] for a slot [k < NINODE], not a free pointer:
+   [ip] is [IcacheRef.ientry k] for a slot [k < NINODE], not a free pointer:
    the whole icache is indexed by slot ([ientry_inj] makes the two views
    interchangeable) and the escrow, the reference algebra and the [ref]-word
    invariant are all keyed that way.  It is also what kills the first
@@ -35,7 +35,7 @@
 
    ---- WHAT IT CONSUMES, AND WHAT IT PRODUCES --------------------------
 
-   IN: ONE REFERENCE, [IcacheInv.inode_ref γic k q dev inum] -- and it is
+   IN: ONE REFERENCE, [IcacheRef.inode_ref γic k q dev inum] -- and it is
    consumed.  §13.1d: a reference cannot be split without the authority
    ([iref_tok]'s fraction and its count move together), so the checkout
    DEPOSITS the winner's whole reference into the escrow's checked-out arm,

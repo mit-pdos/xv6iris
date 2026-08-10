@@ -403,7 +403,7 @@ Qed.
 
 Module IputProof (Acquire : ACQUIRE) (Release : RELEASE)
                  (ASL : ACQUIRESLEEP) (RS : RELEASESLEEP)
-                 (IT : ITRUNC) (IU : IUPDATE) : IPUT2.
+                 (IT : ITRUNC) (IU : IUPDATE) : IPUT.
 
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz  := vm_compute; discriminate.
@@ -524,7 +524,7 @@ Section IputTail.
     (true = false \/ pj = zero_reg -> (CID : CPU) = CID0) ->
     sp0 = m !!! Regidx csp_rs1 ->
     iput_regs m D spd k ->
-    ((n - iput2_units)%nat <= n')%nat ->
+    ((n - iput_units)%nat <= n')%nat ->
     (n' <= n)%nat ->
     used' ⊆ used ->
     kernel_text -∗
@@ -559,7 +559,7 @@ Section IputTail.
         ⌜used'' ⊆ used⌝ -∗
         bitmap_res gfs bmapstart cov logstart size used'' -∗
         bslots bn 3 -∗
-        ⌜((n - iput2_units)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
+        ⌜((n - iput_units)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
         log_op g n'' -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -784,7 +784,7 @@ Section IputTail.
     iput_regs m M spd k ->
     icM_wf Mt ->
     ic_ci_wf Mt ci nib dev ->
-    ((n - iput2_units)%nat <= n')%nat ->
+    ((n - iput_units)%nat <= n')%nat ->
     (n' <= n)%nat ->
     used' ⊆ used ->
     kernel_text -∗
@@ -801,7 +801,7 @@ Section IputTail.
     iref_slots_auth -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
     ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) -∗
-    IcacheInv.inode_ref (icn_ref cn) k q dev inum -∗
+    IcacheRef.inode_ref (icn_ref cn) k q dev inum -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
@@ -824,7 +824,7 @@ Section IputTail.
         ⌜used'' ⊆ used⌝ -∗
         bitmap_res gfs bmapstart cov logstart size used'' -∗
         bslots bn 3 -∗
-        ⌜((n - iput2_units)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
+        ⌜((n - iput_units)%nat <= n'')%nat /\ (n'' <= n)%nat⌝ -∗
         log_op g n'' -∗
         iref_slot -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -1100,7 +1100,7 @@ Section ProofIput.
   Lemma di_free_addrs (d : dinode) : di_addrs (di_free d) = bm_cells bm_empty.
   Proof. reflexivity. Qed.
 
-  Lemma wp_iput2_sconf
+  Lemma wp_iput_sconf
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -1115,15 +1115,15 @@ Section ProofIput.
       (pidv : mword 32) (dq dqb dqs : dfrac)
       (m : regfile) (K : nat) (eb : bool) (C : iProp Σ)
       (b : bool)
-    : wp_iput2_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
+    : wp_iput_sconf_body gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl gil gisl
                           cov logstart bmapstart inodestart nib size dev used
                           k q inum n pidv dq dqb dqs m K eb C b.
   Proof.
-    cbv beta delta [wp_iput2_sconf_body].
+    cbv beta delta [wp_iput_sconf_body].
     intros pcE ip pj ret_tgt HK Hk Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
            Hnib Hcovb Hn Hj Hgsj Ha0 Heb.
     pose proof HK as HK'. unfold K_iput in HK'.
-    unfold iput2_units in Hn.
+    unfold iput_units in Hn.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlogc #Hitab #Hinv #Hesc #Hireg #Hslk
              Href Hbms Hins Hbm Hppid #Hprocs #Hdevi #Hdgeom #Hdlock Hbslots Hop Hcont".
@@ -1381,7 +1381,7 @@ Section ProofIput.
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
-      rewrite /IcacheInv.inode_ref. iFrame. }
+      rewrite /IcacheRef.inode_ref. iFrame. }
 
     (* ---- ref == 1: the branch to +0x3c, and the WINDOW (§13.13) ---- *)
     subst cnt. specialize (Hone eq_refl). subst qt.
@@ -1430,7 +1430,7 @@ Section ProofIput.
                         i_dev (ientry k) ↦₄{DfracOwn qr} dev ∗
                         i_valid (ientry k) ↦₄{DfracOwn (1/2)} (valid_word true) ∗
                         ic_payload gfs gi cov logstart k inum true
-                   else IcacheInv.inode_ident k (DfracOwn q) dev inum ∗
+                   else IcacheRef.inode_ident k (DfracOwn q) dev inum ∗
                         islot_rest_at k q dev inum))%I)
               (⊤ ∖ ↑minstretN ∖ ↑icEscN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
@@ -1503,7 +1503,7 @@ Section ProofIput.
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrident] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
-      rewrite /IcacheInv.inode_ref. iFrame. }
+      rewrite /IcacheRef.inode_ref. iFrame. }
     (* ===== valid == 1: fall through, WITH the payload in hand ===== *)
     iDestruct "Hrem" as "(Hrd & Htd & Hvb & Hpayl)".
     iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KernelSyms.iput + 0x3e))
@@ -1585,7 +1585,7 @@ Section ProofIput.
       iModIntro.
       iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].
-      { rewrite /islot2 HMk Hcik. rewrite /islot_rest_at Ert /IcacheInv.inode_ident.
+      { rewrite /islot2 HMk Hcik. rewrite /islot_rest_at Ert /IcacheRef.inode_ident.
         iFrame. }
       iApply (ip_tail (CID := CIDacq) CID j bn g gfs gi cn gtl cov logstart bmapstart
                 inodestart nib size dev used used k q inum Mt ci n n pidv dq dqb dqs
@@ -1595,7 +1595,7 @@ Section ProofIput.
                 with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Htok Hhalf Hiauth Hslots
                       Hpool [Hrtok Hrd Hrn] Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                       Hbslots Hop Hcont").
-      rewrite /IcacheInv.inode_ref /IcacheInv.inode_ident. iFrame. }
+      rewrite /IcacheRef.inode_ref /IcacheRef.inode_ident. iFrame. }
 
     (* ===== nlink == 0: TRUNCATE.  +0x44 falls through ===== *)
     iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.iput + 0x44))
@@ -1763,12 +1763,12 @@ Section ProofIput.
     iMod ("Hclose" with "[Hictok Hrtok Hrd Hrn Hmt Hgida]") as "_".
     { iNext. iApply (ic_close_out cn gfs gi cov logstart k q dev inum
                        with "Hictok [Hrtok Hrd Hrn] Hmt Hgida").
-      rewrite /IcacheInv.inode_ref /IcacheInv.inode_ident. iFrame. }
+      rewrite /IcacheRef.inode_ref /IcacheRef.inode_ident. iFrame. }
     iModIntro.
     (* the lock's resource re-forms, unchanged, and is released at +0x5c *)
     iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid]") as "Hslots";
       [ intros i0 Hi0; reflexivity | intros i0 Hi0; reflexivity | | ].
-    { rewrite /islot2 HMk Hcik. rewrite /islot_rest_at Ert /IcacheInv.inode_ident.
+    { rewrite /islot2 HMk Hcik. rewrite /islot_rest_at Ert /IcacheRef.inode_ident.
       iFrame. }
     iAssert (itable_res2 cn gfs gi cov logstart nib dev)
       with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
@@ -2214,7 +2214,7 @@ Section ProofIput.
               inodestart nib size dev used (used ∖ bm_blocks bm2) k q2 inum Mt2 ci2
               n (u' - 1)%nat pidv dq dqb dqs m J10 K C sp0 (m !!! Regidx Rs2)
               HK Hk ltac:(wp_next_chain) Hsp0eq HJ10regs Hwf2 Hciwf2
-              ltac:(unfold iput2_units; lia) ltac:(lia) ltac:(apply ip_diff_sub)
+              ltac:(unfold iput_units; lia) ltac:(lia) ltac:(apply ip_diff_sub)
               with "Htext Hitab Hinv Hesc Hpc Hcg Hcnt Hpay Htok Hhalf2 Hiauth2
                     Hslots2 Hpool2 Href Hr24 Hr16 Hr8 Hg4 Hppid Hbms Hins Hbm
                     [Hbs2 Hbs1] Hop Hcont").

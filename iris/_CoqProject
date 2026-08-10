@@ -328,6 +328,7 @@ CodeAcquire.v
 WpLock.v
 ArrCursor.v
 FdSlots.v
+IcacheRef.v
 FileInv.v
 FileOff.v
 KallocInv.v
@@ -790,7 +791,6 @@ CodeKwait.v
 ProofKwait.v
 LinkKwait.v
 SpecIput.v
-LinkIputCompat.v
 SpecKexit.v
 CodeKexit.v
 ProofKexit.v

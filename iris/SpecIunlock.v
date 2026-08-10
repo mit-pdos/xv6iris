@@ -33,7 +33,7 @@
    writes, like fileread, gets it straight out of ilock (§13.6).
 
    THE THREE PANIC TESTS ARE ALL DEAD.  [ip == 0] because the entry is slot
-   [k] and [IcacheInv.ientry_unsigned] says its address is
+   [k] and [IcacheRef.ientry_unsigned] says its address is
    [itable + 24 + 136k]; [ip->ref < 1] by [IcacheInv.iref_load_au] against
    [itable_inv], over a reference BORROWED from the escrow's checked-out arm
    for the duration of that one atomic update ([ic_open_out] -- the holder's

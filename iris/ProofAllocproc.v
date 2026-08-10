@@ -1876,7 +1876,7 @@ Section ProofAllocproc.
           iFrame "Hpt". iSplitL "Hpgcell"; [iExact "Hpgcell"|].
           iEval (rewrite -Hbasetf) in "Htfcell". iExact "Htfcell". }
         iDestruct (proc_priv_intro γf (proc_addr k) pidn V (upt_desc (pt_base t) tfp) tfws
-                     Hszb (um_below_empty (pv_sz V))
+                     Hszb (um_below_empty (pv_sz V)) Hcwd
                      with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".
         { cbn [ud_tfp]. iExact "Htfpage". }
         iEval (rewrite /ap_tail) in "Htl".

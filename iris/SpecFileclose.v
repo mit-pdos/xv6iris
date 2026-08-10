@@ -122,6 +122,16 @@ Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
+Require Import BitmapInv.
+Require Import DinodeEnc.
+Require Import InodeInv.
+Require Import InodeLock.
+Require Import InodeRegion.
+Require Import IrefSlots.
+Require Import IcacheRef.
+Require Import IcacheInv.
+Require Import IcacheEscrow.
+Require Import SleepLock.
 Require Import SpecIput.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -158,6 +168,21 @@ Record fclose_names := MkFCloseNames {
   fcn_dev      : mword 32;
   fcn_pid      : mword 32;        (* the caller's own pid cell              *)
   fcn_dq       : dfrac;
+  (* ---- C6b: iput's own indices.  Everything below is the INODE CACHE and
+     the two file-system regions its truncate arm reaches -- the inode
+     region it frees a dinode into, and the bitmap it frees blocks into.
+     They are fields rather than parameters for the same reason the rest
+     are: one equation at the caller ([SpecKexit]'s [fn = MkFCloseNames
+     ...]) instead of a dozen coherence conjuncts. *)
+  fcn_ireg     : gname;           (* the inode region's ghost (iput's [gi]) *)
+  fcn_ic       : ic_names;        (* the icache's names                     *)
+  fcn_tlock    : gname;           (* itable.lock                            *)
+  fcn_bmapstart : Z;
+  fcn_inodestart : Z;
+  fcn_nib      : nat;             (* inode blocks in the region             *)
+  fcn_size     : Z;               (* the bitmap's covered size              *)
+  fcn_dqb      : dfrac;           (* the two superblock cells' fractions    *)
+  fcn_dqs      : dfrac;
 }.
 
 (* Spelled out rather than derived: several of these records have no
@@ -177,12 +202,19 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
        (fun _ => 1%positive))
     (MkLogNames 1%positive 1%positive)
     (MkFsNames 1%positive 1%positive 1%positive)
-    ∅ 0 (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)).
+    ∅ 0 (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)
+    1%positive
+    (MkIcNames 1%positive (fun _ => 1%positive) (fun _ => 1%positive)
+               (fun _ => 1%positive))
+    1%positive 0 0 0%nat 0 (DfracOwn 1) (DfracOwn 1)).
 
 Section SpecFileclose.
+  (* NOTE [icacheG] is NOT here: [fileG] carries it (FileInv.v's header --
+     two instance paths print identically and do not unify), and iput's
+     contract is applied at the one that comes with the file table. *)
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !fsCrashG Σ}.
+            !fsCrashG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_PIPE arm's environment: pipeclose's ---- *)
@@ -205,7 +237,108 @@ Section SpecFileclose.
 
   (* ---- the FD_INODE / FD_DEVICE arm's environment: begin_op / iput /
          end_op's, which is the whole file system ---- *)
-  Definition fileclose_fs_env (fn : fclose_names)
+
+  (* EVERY ENTRY'S SLEEPLOCK, as one persistent family.  iput names the ONE
+     slot it was handed, but a closer of an ARBITRARY descriptor does not
+     know which entry the file points at -- the payload tells it only that
+     there is one -- so what its contract can carry is the family, exactly
+     as [IcacheEscrow.ic_escrows] is the family of escrows for the same
+     reason.  The two lock gnames are existential because nothing above the
+     cache names them and [is_sleeplock] is persistent, so the ∃ is free. *)
+  Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
+    ([∗ list] k ∈ seq 0 NINODE,
+       ∃ γil γisl : gname,
+         is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string
+                      (ic_tok cn k))%I.
+
+  Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
+  Proof. apply _. Qed.
+
+  Lemma ic_sleeplocks_acc (cn : ic_names) (k : nat) :
+    (k < NINODE)%nat ->
+    (ic_sleeplocks cn -∗
+     ∃ γil γisl : gname,
+       is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k)
+     : iProp Σ).
+  Proof.
+    iIntros (Hk) "H". rewrite /ic_sleeplocks.
+    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
+    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+  Qed.
+
+  Lemma ic_escrows_acc (cn : ic_names) (γfs : fs_names) (γi : gname)
+      (cov : gset Z) (logstart : Z) (k : nat) :
+    (k < NINODE)%nat ->
+    (ic_escrows cn γfs γi cov logstart -∗ ic_escrow cn γfs γi cov logstart k
+     : iProp Σ).
+  Proof.
+    iIntros (Hk) "H". rewrite /ic_escrows.
+    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
+    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+  Qed.
+
+  (* THE INODE CACHE, AS A CLOSER SEES IT.  Wholly persistent -- four
+     invariants, a spinlock and fifty sleeplocks -- plus the pure geometry
+     iput threads down to itrunc and iupdate.  Three of the pure conjuncts
+     are the C6b TIE: [FileInv]'s payload and [ProcInv.cwd_ref] name the
+     cache through the [icfg] class ("there is one inode cache"), while iput
+     names it through an [ic_names]; these say the two are the same cache,
+     the same device and the same inode region.  Nothing else can say it --
+     a reference carries no evidence of which authority minted it.
+
+     The inum conjunct is quantified rather than pointed because the inum
+     is EXISTENTIAL in the reference the payload hands over: a closer does
+     not know which inode its descriptor named, so what it can promise is
+     the region-wide fact -- every inum the region covers has its block
+     inside [cov] and outside the log -- which is what mkfs lays out and
+     what [C7]'s [ireg_alloc] will establish once and for all. *)
+  Definition fileclose_ic_env (fn : fclose_names) : iProp Σ :=
+    (⌜icn_ref (fcn_ic fn) = icfg_iref⌝ ∗
+     ⌜fcn_dev fn = icfg_dev⌝ ∗
+     ⌜fcn_nib fn = icfg_nib⌝ ∗
+     ⌜0 < fcn_size fn <= BPB⌝ ∗
+     ⌜0 <= fcn_bmapstart fn⌝ ∗
+     ⌜fcn_bmapstart fn ∈ fcn_cov fn⌝ ∗
+     ⌜~ (fcn_bmapstart fn ∈ log_region_set (fcn_logstart fn))⌝ ∗
+     ⌜0 <= fcn_inodestart fn⌝ ∗
+     ⌜forall inum : mword 32,
+        bv_unsigned inum < 16 * Z.of_nat (fcn_nib fn) ->
+        IBLOCK inum (fcn_inodestart fn) ∈ fcn_cov fn /\
+        ~ (IBLOCK inum (fcn_inodestart fn)
+             ∈ log_region_set (fcn_logstart fn))⌝ ∗
+     ⌜cov_below (fcn_cov fn) (fcn_size fn)⌝ ∗
+     is_itable2 (fcn_tlock fn) (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn)
+                (fcn_cov fn) (fcn_logstart fn) (fcn_nib fn) (fcn_dev fn) ∗
+     itable_inv (icn_ref (fcn_ic fn)) ∗
+     ic_escrows (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn) (fcn_cov fn)
+                (fcn_logstart fn) ∗
+     ireg_inv (fcn_ireg fn) (fcn_fs fn) (fcn_inodestart fn) (fcn_nib fn) ∗
+     ic_sleeplocks (fcn_ic fn))%I.
+
+  Global Instance fileclose_ic_env_persistent fn :
+    Persistent (fileclose_ic_env fn).
+  Proof. apply _. Qed.
+
+  (* ...and the CONSUMABLE half of the same arm: the two superblock cells
+     itrunc and iupdate read, and the block bitmap iput's truncate arm frees
+     into.  The bitmap comes back SMALLER (the C2 finding, and iput's
+     postcondition states it as [used' ⊆ used]), which is why the whole
+     environment is indexed by [us] exactly as the pipe arm's is by the
+     page count [on]: a caller closing descriptor after descriptor carries
+     it existentially. *)
+  Definition fileclose_bm (fn : fclose_names) (us : gset Z) : iProp Σ :=
+    (sb_bmapstart ↦₄{fcn_dqb fn} (mword_of_int (fcn_bmapstart fn) : mword 32) ∗
+     sb_inodestart ↦₄{fcn_dqs fn}
+       (mword_of_int (fcn_inodestart fn) : mword 32) ∗
+     bitmap_res (fcn_fs fn) (fcn_bmapstart fn) (fcn_cov fn) (fcn_logstart fn)
+                (fcn_size fn) us)%I.
+
+  (* the bundle WITHOUT the caller's pid cell.  kexit closes every
+     descriptor in a loop while holding [proc_priv], and the pid cell the FS
+     calls want is INSIDE that block -- so its loop carries this, and pairs it
+     with the quarter [ProcInv.proc_priv_pid_ofile] lends for the duration of
+     one call. *)
+  Definition fileclose_fs_env_nopid (fn : fclose_names) (us : gset Z)
       (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
     (⌜(n = 0)%nat⌝ ∗ ⌜eb = true⌝ ∗ ⌜p = proc_addr (fcn_j fn)⌝ ∗
      ⌜(fcn_j fn < NPROC)%nat⌝ ∗
@@ -222,109 +355,60 @@ Section SpecFileclose.
      is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
        (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
      bslots (fcn_bio fn) 3 ∗
+     fileclose_ic_env fn ∗
+     fileclose_bm fn us)%I.
+
+  (* the whole arm IS the nopid bundle plus the cell -- stated that way
+     rather than spelled twice, which is what makes [_split_pid] a
+     [reflexivity] and keeps the two from drifting apart. *)
+  Definition fileclose_fs_env (fn : fclose_names) (us : gset Z)
+      (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
+    (fileclose_fs_env_nopid fn us n eb p ∗
      p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn)%I.
 
-  (* the same bundle WITHOUT the caller's pid cell.  kexit closes every
-     descriptor in a loop while holding [proc_priv], and the pid cell the FS
-     calls want is INSIDE that block -- so its loop carries this, and pairs it
-     with the quarter [ProcInv.proc_priv_pid_ofile] lends for the duration of
-     one call. *)
-  Definition fileclose_fs_env_nopid (fn : fclose_names)
-      (n : nat) (eb : bool) (p : mword 64) : iProp Σ :=
-    (⌜(n = 0)%nat⌝ ∗ ⌜eb = true⌝ ∗ ⌜p = proc_addr (fcn_j fn)⌝ ∗
-     ⌜(fcn_j fn < NPROC)%nat⌝ ∗
-     ⌜fcn_procs fn !! fcn_j fn = Some (fcn_plock fn)⌝ ∗
-     ⌜log_geom_ok (fcn_cov fn) (fcn_logstart fn)⌝ ∗
-     procs_inv (fcn_procs fn) ∗
-     bio_ctx (fcn_bio fn)
-       (fs_view (fcn_fs fn) (fcn_disk fn) (fcn_dev fn) (fcn_cov fn)) ∗
-     log_ctx (fcn_log fn) (fcn_bio fn) (fcn_fs fn) (fcn_cov fn)
-       (fcn_logstart fn) (fcn_dev fn) ∗
-     fs_crash_seam (fcn_cov fn) (fcn_logstart fn) ∗ gen_cert ∗
-     dev_inv (fcn_uart fn) (fcn_disk fn) ∗
-     disk_geom (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn) ∗
-     is_lock (fcn_dlock fn) d_lock "virtio_disk"%string
-       (disk_res (fcn_disk fn) (fcn_pd fn) (fcn_pav fn) (fcn_pu fn)) ∗
-     bslots (fcn_bio fn) 3)%I.
-
-  Lemma fileclose_fs_env_split_pid fn n eb p :
-    fileclose_fs_env fn n eb p ⊣⊢
-    fileclose_fs_env_nopid fn n eb p ∗
+  Lemma fileclose_fs_env_split_pid fn us n eb p :
+    fileclose_fs_env fn us n eb p ⊣⊢
+    fileclose_fs_env_nopid fn us n eb p ∗
     p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn.
-  Proof.
-    rewrite /fileclose_fs_env /fileclose_fs_env_nopid. iSplit.
-    - (* The trailing [$] used to close [p_pid] here too, but a [$]/[iFrame]
-         does not just place a known hypothesis -- it SEARCHES the goal for a
-         match, and here the goal is the 11-conjunct [nopid] bundle sitting
-         next to [p_pid]: that search alone was measured at ~14 s (worse than
-         the whole structural [iSplitL] chain below it). Naming it and
-         routing it with [iSplitL] is a positional split, not a search --
-         O(1) instead of O(#conjuncts). *)
-      iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hbio & Hlog &
-                Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs & Hpid)".
-      iSplitL "Hpr Hbio Hlog Hseam Hcert Hdev Hgeom Hdlk Hbs";
-        [| iExact "Hpid"].
-      do 6 (iSplitR; [iPureIntro; assumption|]).
-      (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
-         still walks the whole 11-conjunct goal per hypothesis (measured
-         ~7 s a side here); [iSplitL]/[iExact] name both sides, so nothing
-         is searched. *)
-      iSplitL "Hpr"; [iExact "Hpr"|].
-      iSplitL "Hbio"; [iExact "Hbio"|].
-      iSplitL "Hlog"; [iExact "Hlog"|].
-      iSplitL "Hseam"; [iExact "Hseam"|].
-      iSplitL "Hcert"; [iExact "Hcert"|].
-      iSplitL "Hdev"; [iExact "Hdev"|].
-      iSplitL "Hgeom"; [iExact "Hgeom"|].
-      iSplitL "Hdlk"; [iExact "Hdlk"|].
-      iExact "Hbs".
-    - (* Same fix, mirrored: name [p_pid] instead of destructuring it with
-         [$], and place it with the same structural chain -- the [$] here
-         searched the 17-conjunct [fileclose_fs_env] goal instead, ~11 s. *)
-      iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & Hpr & Hbio & Hlog &
-                 Hseam & Hcert & Hdev & Hgeom & Hdlk & Hbs) Hpid]".
-      do 6 (iSplitR; [iPureIntro; assumption|]).
-      iSplitL "Hpr"; [iExact "Hpr"|].
-      iSplitL "Hbio"; [iExact "Hbio"|].
-      iSplitL "Hlog"; [iExact "Hlog"|].
-      iSplitL "Hseam"; [iExact "Hseam"|].
-      iSplitL "Hcert"; [iExact "Hcert"|].
-      iSplitL "Hdev"; [iExact "Hdev"|].
-      iSplitL "Hgeom"; [iExact "Hgeom"|].
-      iSplitL "Hdlk"; [iExact "Hdlk"|].
-      iSplitL "Hbs"; [iExact "Hbs"|].
-      iExact "Hpid".
-  Qed.
+  Proof. reflexivity. Qed.
 
-  Definition fileclose_fs_out (fn : fclose_names) : iProp Σ :=
+  Definition fileclose_fs_out (fn : fclose_names) (us : gset Z) : iProp Σ :=
     (p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn ∗
-     bslots (fcn_bio fn) 3)%I.
+     bslots (fcn_bio fn) 3 ∗
+     (* the bitmap, possibly smaller: an inode was freed iff this was the
+        last reference AND its link count had reached zero, and no caller
+        can know that.  ([iput]'s [iref_slot] give-back is NOT here for the
+        same reason one level up: it comes back only on the arm that ran,
+        and fileclose's postcondition cannot see which did.  Dropping it
+        leaks one unit of the [IrefSlots] supply per inode file closed --
+        recorded as owed in claude-notes/projects/fs-icache.md.) *)
+     ∃ us' : gset Z, ⌜us' ⊆ us⌝ ∗ fileclose_bm fn us')%I.
 
   (* ---- and the two, selected by the file's type ---- *)
   Definition fileclose_env (fn : fclose_names)
-      (on : option nat) (n : nat) (eb : bool) (p : mword 64) (Cf : fcontent)
-      : iProp Σ :=
+      (on : option nat) (us : gset Z) (n : nat) (eb : bool) (p : mword 64)
+      (Cf : fcontent) : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE)
      then fileclose_pipe_env fn on n
      else if bool_decide (fc_type Cf = FD_INODE)
                || bool_decide (fc_type Cf = FD_DEVICE)
-     then fileclose_fs_env fn n eb p
+     then fileclose_fs_env fn us n eb p
      else emp)%I.
 
   Definition fileclose_env_out (fn : fclose_names) (on : option nat)
-      (Cf : fcontent) : iProp Σ :=
+      (us : gset Z) (Cf : fcontent) : iProp Σ :=
     (if bool_decide (fc_type Cf = FD_PIPE)
      then fileclose_pipe_out fn on
      else if bool_decide (fc_type Cf = FD_INODE)
                || bool_decide (fc_type Cf = FD_DEVICE)
-     then fileclose_fs_out fn
+     then fileclose_fs_out fn us
      else emp)%I.
 
   (* A file that is neither a pipe nor an inode costs its closer nothing.
      This is the lemma pipealloc's two error-path calls are discharged by --
      [SpecFilealloc]'s post already pins the type. *)
-  Lemma fileclose_env_none fn on n eb p Cf :
-    fc_type Cf = FD_NONE -> ⊢ fileclose_env fn on n eb p Cf.
+  Lemma fileclose_env_none fn on us n eb p Cf :
+    fc_type Cf = FD_NONE -> ⊢ fileclose_env fn on us n eb p Cf.
   Proof.
     intro Ht. rewrite /fileclose_env Ht.
     rewrite bool_decide_eq_false_2; [|by vm_compute].
@@ -343,21 +427,23 @@ Section SpecFileclose.
     iIntros "(_ & _ & _ & Hav)". by iLeft.
   Qed.
 
-  Lemma fileclose_fs_env_out fn n eb p :
-    fileclose_fs_env fn n eb p -∗ fileclose_fs_out fn.
+  Lemma fileclose_fs_env_out fn us n eb p :
+    fileclose_fs_env fn us n eb p -∗ fileclose_fs_out fn us.
   Proof.
-    rewrite /fileclose_fs_env /fileclose_fs_out.
-    iIntros "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
-              Hbs & Hpid)".
-    iFrame "Hpid Hbs".
+    rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
+    iIntros "[(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
+               Hbs & _ & Hbm) Hpid]".
+    iSplitL "Hpid"; [iExact "Hpid"|].
+    iSplitL "Hbs"; [iExact "Hbs"|].
+    iExists us. iSplitR; [iPureIntro; reflexivity|]. iExact "Hbm".
   Qed.
 
   (* THE FAST PATH'S OBLIGATION, checked here rather than discovered in the
      proof: when [--f->ref > 0] fileclose returns without touching any of it,
      so the environment must already contain everything the postcondition
      promises. *)
-  Lemma fileclose_env_out_of_env fn on n eb p Cf :
-    fileclose_env fn on n eb p Cf -∗ fileclose_env_out fn on Cf.
+  Lemma fileclose_env_out_of_env fn on us n eb p Cf :
+    fileclose_env fn on us n eb p Cf -∗ fileclose_env_out fn on us Cf.
   Proof.
     rewrite /fileclose_env /fileclose_env_out.
     case_bool_decide; [|case_match].
@@ -393,18 +479,22 @@ Section SpecFileclose.
     - iExists (avail_inc on). iSplitR; [iPureIntro; exact Hb|]. iFrame "Hpi Hlk H".
   Qed.
 
-  Lemma fileclose_fs_env_reuse fn n eb p :
-    fileclose_fs_env fn n eb p -∗
-    fileclose_fs_env fn n eb p ∗
-    □ (fileclose_fs_out fn -∗ fileclose_fs_env fn n eb p).
+  Lemma fileclose_fs_env_reuse fn us n eb p :
+    fileclose_fs_env fn us n eb p -∗
+    fileclose_fs_env fn us n eb p ∗
+    □ (fileclose_fs_out fn us -∗ ∃ us', fileclose_fs_env fn us' n eb p).
   Proof.
-    rewrite /fileclose_fs_env /fileclose_fs_out.
-    iIntros "(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & #Hpr & #Hbio & #Hlog &
-              #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & Hpid)".
-    iSplitL "Hbs Hpid".
-    { do 6 (iSplitR; [iPureIntro; assumption|]).
-      (* Same structural split as [fileclose_fs_env_split_pid]: a named
-         [iFrame] over this 12-conjunct goal measured ~13.5 s a side. *)
+    rewrite /fileclose_fs_env /fileclose_fs_env_nopid /fileclose_fs_out.
+    iIntros "[(%H1 & %H2 & %H3 & %H4 & %H5 & %H6 & #Hpr & #Hbio & #Hlog &
+               #Hseam & #Hcert & #Hdev & #Hgeom & #Hdlk & Hbs & #Hic & Hbm)
+              Hpid]".
+    iSplitL "Hbs Hpid Hbm".
+    { iSplitR "Hpid"; [| iExact "Hpid"].
+      do 6 (iSplitR; [iPureIntro; assumption|]).
+      (* Split STRUCTURALLY before framing, front to back -- a named [iFrame]
+         still walks the whole goal per hypothesis (measured ~7 s a side
+         here); [iSplitL]/[iExact] name both sides, so nothing is
+         searched. *)
       iSplitL "Hpr"; [iExact "Hpr"|].
       iSplitL "Hbio"; [iExact "Hbio"|].
       iSplitL "Hlog"; [iExact "Hlog"|].
@@ -414,8 +504,9 @@ Section SpecFileclose.
       iSplitL "Hgeom"; [iExact "Hgeom"|].
       iSplitL "Hdlk"; [iExact "Hdlk"|].
       iSplitL "Hbs"; [iExact "Hbs"|].
-      iExact "Hpid". }
-    iModIntro. iIntros "(Hpid & Hbs)".
+      iSplitR; [iExact "Hic"|]. iExact "Hbm". }
+    iModIntro. iIntros "(Hpid & Hbs & %us' & _ & Hbm)".
+    iExists us'. iSplitR "Hpid"; [| iExact "Hpid"].
     do 6 (iSplitR; [iPureIntro; assumption|]).
     iSplitL "Hpr"; [iExact "Hpr"|].
     iSplitL "Hbio"; [iExact "Hbio"|].
@@ -426,7 +517,7 @@ Section SpecFileclose.
     iSplitL "Hgeom"; [iExact "Hgeom"|].
     iSplitL "Hdlk"; [iExact "Hdlk"|].
     iSplitL "Hbs"; [iExact "Hbs"|].
-    iExact "Hpid".
+    iSplitR; [iExact "Hic"|]. iExact "Hbm".
   Qed.
 
   (* ---- WHAT A CLOSER OF AN ARBITRARY DESCRIPTOR DOES ----
@@ -442,11 +533,11 @@ Section SpecFileclose.
 
      (Only pipealloc escapes it, because [filealloc] pins its files untyped;
      it uses [fileclose_env_none] instead.) *)
-  Lemma fileclose_env_split fn on n eb p Cf :
-    fileclose_pipe_env fn on n -∗ fileclose_fs_env fn n eb p -∗
-    fileclose_env fn on n eb p Cf ∗
-    (fileclose_env_out fn on Cf -∗
-       fileclose_pipe_out fn on ∗ fileclose_fs_out fn).
+  Lemma fileclose_env_split fn on us n eb p Cf :
+    fileclose_pipe_env fn on n -∗ fileclose_fs_env fn us n eb p -∗
+    fileclose_env fn on us n eb p Cf ∗
+    (fileclose_env_out fn on us Cf -∗
+       fileclose_pipe_out fn on ∗ fileclose_fs_out fn us).
   Proof.
     rewrite /fileclose_env /fileclose_env_out.
     case_bool_decide; [|case_match].
@@ -464,49 +555,53 @@ Section SpecFileclose.
      if the descriptor held a pipe's last end, so the pipe bundle returns
      under an existential -- which is exactly what lets a caller close a
      second descriptor, and hence what kexit's loop runs on. *)
-  Lemma fileclose_env_frame fn on n eb p Cf :
-    fileclose_pipe_env fn on n -∗ fileclose_fs_env fn n eb p -∗
-    fileclose_env fn on n eb p Cf ∗
-    (fileclose_env_out fn on Cf -∗
-       (∃ on', fileclose_pipe_env fn on' n) ∗ fileclose_fs_env fn n eb p).
+  Lemma fileclose_env_frame fn on us n eb p Cf :
+    fileclose_pipe_env fn on n -∗ fileclose_fs_env fn us n eb p -∗
+    fileclose_env fn on us n eb p Cf ∗
+    (fileclose_env_out fn on us Cf -∗
+       (∃ on', fileclose_pipe_env fn on' n) ∗
+       (∃ us', fileclose_fs_env fn us' n eb p)).
   Proof.
     iIntros "Hp Hf".
     iDestruct (fileclose_pipe_env_reuse with "Hp") as "[Hp #Hpre]".
     iDestruct (fileclose_fs_env_reuse with "Hf") as "[Hf #Hfre]".
-    iDestruct (fileclose_env_split fn on n eb p Cf with "Hp Hf") as "[$ Hback]".
+    iDestruct (fileclose_env_split fn on us n eb p Cf with "Hp Hf") as "[$ Hback]".
     iIntros "Hout". iDestruct ("Hback" with "Hout") as "[Hpo Hfo]".
     iSplitL "Hpo"; [by iApply "Hpre" | by iApply "Hfre"].
   Qed.
 
   (* WHAT A LOOP OVER DESCRIPTORS CARRIES.  The pid quarter is lent per
      iteration out of [proc_priv]; everything else goes round. *)
-  Lemma fileclose_loop_open fn on n eb p Cf :
+  Lemma fileclose_loop_open fn on us n eb p Cf :
     fileclose_pipe_env fn on n -∗
-    fileclose_fs_env_nopid fn n eb p -∗
+    fileclose_fs_env_nopid fn us n eb p -∗
     p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn -∗
-    fileclose_env fn on n eb p Cf ∗
-    (fileclose_env_out fn on Cf -∗
+    fileclose_env fn on us n eb p Cf ∗
+    (fileclose_env_out fn on us Cf -∗
        (∃ on', fileclose_pipe_env fn on' n) ∗
-       fileclose_fs_env_nopid fn n eb p ∗
+       (∃ us', fileclose_fs_env_nopid fn us' n eb p) ∗
        p_pid (proc_addr (fcn_j fn)) ↦₄{fcn_dq fn} fcn_pid fn).
   Proof.
     iIntros "Hp Hf Hpid".
     iDestruct (fileclose_fs_env_split_pid with "[Hf Hpid]") as "Hf";
       [iFrame "Hf Hpid"|].
-    iDestruct (fileclose_env_frame fn on n eb p Cf with "Hp Hf") as "[$ Hback]".
-    iIntros "Hout". iDestruct ("Hback" with "Hout") as "[$ Hf]".
-    by iApply fileclose_fs_env_split_pid.
+    iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hp Hf")
+      as "[$ Hback]".
+    iIntros "Hout". iDestruct ("Hback" with "Hout") as "[$ (%us' & Hf)]".
+    iDestruct (fileclose_fs_env_split_pid with "Hf") as "[Hf $]".
+    iExists us'. iExact "Hf".
   Qed.
 
 End SpecFileclose.
 
 Definition wp_fileclose_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
-      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
+      !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γfl γf : gname)            (* ftable.lock, ftable  *)
     (k : nat) (q : Qp) (Cf : fcontent)                (* the reference        *)
-    (fn : fclose_names) (on : option nat)             (* the arms' ghosts     *)
+    (fn : fclose_names) (on : option nat) (us : gset Z) (* the arms' ghosts   *)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.fileclose in
@@ -523,7 +618,7 @@ Definition wp_fileclose_sconf_body
   is_ftable γfl γf -∗
   panic_wp_any -∗
   file_ref γf k q Cf -∗
-  fileclose_env fn on n eb p Cf -∗
+  fileclose_env fn on us n eb p Cf -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
@@ -531,7 +626,7 @@ Definition wp_fileclose_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr ⌝ -∗
     fd_slot -∗
-    fileclose_env_out fn on Cf -∗
+    fileclose_env_out fn on us Cf -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -539,12 +634,12 @@ Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !fsCrashG Σ}
+             !fsCrashG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γfl γf : gname)
       (k : nat) (q : Qp) (Cf : fcontent)
-      (fn : fclose_names) (on : option nat)
+      (fn : fclose_names) (on : option nat) (us : gset Z)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
-      wp_fileclose_sconf_body γfl γf k q Cf fn on m n eb p C K b.
+      wp_fileclose_sconf_body γfl γf k q Cf fn on us m n eb p C K b.
 End FILECLOSE.

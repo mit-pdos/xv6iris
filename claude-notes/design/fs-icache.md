@@ -158,14 +158,36 @@ interchangeable. `inode_ref_agree` — two references to one entry see the
 same `dev`/`inum` — falls out of fractional points-to agreement with no
 `agree` ghost, exactly as in the ftable.
 
-**This is the predicate `FileInv.inode_ref v q` (today literally `emp`) and
-`ProcInv.cwd_ref v = inode_ref v 1` are placeholders for.** Its signature
-does not match theirs: it needs `γ` (and reads the slot off the address).
-Two ways to close that, both recorded, neither taken here:
+**This is the predicate `FileInv.inode_ref v q` (once literally `emp`) and
+`ProcInv.cwd_ref v` were placeholders for.** Its signature does not match
+theirs: it needs `γ` (and reads the slot off the address). Two ways to
+close that were recorded; **C6b took the second, and generalised it**:
 `inode_ref` gains a `γ` parameter (ripples into `FileInv`, `ProcInv`,
-`SpecIput`, `SpecFileclose`, `kexit`), or `icacheG` carries the gname as a
-class field so the predicate's arity is unchanged. The second is cheaper
-and is what the ftable would have done if it had needed it.
+`SpecIput`, `SpecFileclose`, `kexit`), or a class carries the gname as a
+field so the predicate's arity is unchanged.
+
+What landed (see projects/fs-icache.md's C6b entry for the whole story):
+
+* the reference layer moved BELOW the file table, into a new
+  `IcacheRef.v` — `IrefSlots.v` imports `FileInv.v`, so `FileInv.v`
+  cannot import `IcacheInv.v`. `IcacheInv.v`/`InodeInv.v` re-export it,
+  so no unqualified name moved;
+* the class is `IcacheRef.icfg` — THREE fields, not one: the
+  count-authority gname, THE device (§13.11's single-device pin makes
+  that honest) and the inode region's block count (which is what bounds
+  an inum). A reference is `inode_held v := ∃ k q inum, ⌜v = ientry k⌝ ∗
+  ⌜k < NINODE⌝ ∗ ⌜uint inum < 16·nib⌝ ∗ inode_ref icfg_iref k q icfg_dev
+  inum`, and `icfg` is a superclass field of `fileG`, so nothing that
+  merely mentions `proc_priv` learns of it. A cone that ALSO names the
+  cache as an `ic_names` ties the two with a pure premise,
+  `icn_ref cn = icfg_iref`;
+* `ProcInv.cwd_ref` is `inode_held` under a null test (`emp` at
+  `p->cwd = 0`); `FileInv`'s payload is `inode_pay γx v q := cinv fileipN
+  γx (inode_held v) ∗ cinv_own γx q`, because **`inode_held` does not
+  split fractionally** — the fragment's count column is `1%positive`, so
+  two shares are two references — and `file_payload_split` is a genuine
+  ⊣⊢. The cancellable invariant is what makes fraction one, and only
+  fraction one, produce the whole reference for `iput`.
 
 ### The lock's resource
 
