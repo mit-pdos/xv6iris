@@ -15,7 +15,7 @@
        those cells sit fully inside neither the sleeplock chain nor the
        table's resource.
 
-   ---- THE THREE ARMS (§13.1c) -----------------------------------------
+   ---- THE FIVE ARMS (§13.1c, §13.8/13.9, §13.13) -----------------------
 
      PARKED : the traveling content, waiting for whoever wins the sleeplock.
               [i_valid] FULL, keyed by a bool that selects the payload's
@@ -52,8 +52,24 @@
               ([ic_open_empty_dev]), not part of this window --
               nothing couples the arm's dev to its payload, so a parked arm
               whose dev already names the incoming inode is well formed.
+     HELD   : iput's AUTHORITY-SIDE window [+0x3c, the post-acquiresleep
+              checkout) -- design §13.13.  Same idea as MID, for the other
+              function and in the other direction: the CELLS stay in the arm
+              (dev ½ as always, inum FULL -- the same discriminator MID uses
+              -- and HALF the valid word, the holder keeping the other half
+              so the polarity stays pinned by agreement) while the PAYLOAD
+              LEAVES WITH THE HOLDER, at the concrete polarity the holder
+              observed.  That is the whole content of the arm: iput reads
+              [ip->valid] at +0x3c and cannot use the answer twenty bytes
+              later, because [ic_open_auth_ref] re-seals the parked arm with
+              its [v] existentially bound and NOTHING an itable-lock holder
+              owns can pin it ([valid]'s writer, ilock, holds no itable
+              credential, so a table-anchored ghost half would have no
+              partner).  Taking the payload out of the invariant removes the
+              question: a resource in the holder's own context is not
+              re-bound by anything.
 
-   Refutations, and which opener uses which (§10.3, §13.1c):
+   Refutations, and which opener uses which (§10.3, §13.1c, §13.13):
 
      * the sleeplock winner (post-[acquiresleep]) refutes OUT with its own
        [ic_tok], and MID with its reference's inum-cell FRACTION against
@@ -69,11 +85,39 @@
        would make the count at least two -- and MID by its own inum
        fraction;
      * the recycler re-opening its own window refutes PARKED and OUT with
-       [ic_mid], which both of them hold and it is carrying.
+       [ic_mid], which both of them hold and it is carrying;
+     * HELD is refuted by every one of the above with the line it already
+       uses: the sleeplock winner and the REF-1 opener by their inum
+       FRACTION against HELD's FULL cell (the MID line, verbatim), the
+       parker and [ic_open_out] by their FULL valid cell, the recycler by
+       [ic_mid] (HELD parks it, exactly as PARKED does), and iget's arrival
+       at a not-live slot by the identification ghost;
+     * ...and HELD's own re-opener -- iput -- needs NO NEW TOKEN, which is
+       why none was added (§13.13 wrote one down as an option; the compile
+       settles it, and it is not needed).  Its credential is REF-1 PLUS THE
+       PAYLOAD, and each part kills one arm: the authority half at count one
+       against its own [iref_tok] kills OUT ([iref_tok_two_lookup], the line
+       [ic_open_auth_ref] already uses) and is what makes the credential
+       exclusive -- no second thread holds a reference to this slot at all;
+       the PAYLOAD it is carrying kills PARKED and MID, because both hold a
+       [dinode_at] for the same inum and [InodeRegion.dinode_at_excl] is
+       exactly that (the inum is pinned to the opener's by [ic_id_agree]
+       first); and the table's [ic_id] half at [true] kills EMPTY.  REF-1
+       rather than [ic_tok] is FORCED, not chosen: iput must also be able to
+       UNDO the window at +0x44, when [ip->nlink] is nonzero and no
+       [acquiresleep] has run.  Putting a
+       fresh token in the four other arms instead would have forced
+       [ic_mid_arm] to carry it, which is [ProofIget]'s inline arm
+       construction at +0x72 and its destructuring at +0x7c -- i.e. it would
+       have broken the "no proof file moves" requirement for the sake of a
+       refutation that is already available.
 
    The ½-versus-FULL split of the inum cell IS the parked/mid
    discriminator, which is why §13.1b's identity re-budget in
-   [IcacheInv.islot_rest] is not bookkeeping.
+   [IcacheInv.islot_rest] is not bookkeeping.  HELD shares that signature
+   deliberately -- no opener has to tell HELD from MID except iput, which
+   does it with the payload, and MID/HELD are told apart by [ic_mid]
+   (HELD parks it, MID does not).
 
    ---- ONE DEVIATION FROM THE C3a BRIEF, RECORDED HERE ------------------
 
@@ -422,12 +466,44 @@ Section IcacheEscrow.
        ic_mid cn k ∗
        ic_id cn k (1/2) false dev inum)%I.
 
+  (* THE AUTHORITY-SIDE WINDOW (§13.13).  [ic_mid_arm] with the payload
+     removed and the recycle token parked -- and that pair of differences is
+     the whole design:
+
+       the payload is GONE from the arm because it is in the holder's hand,
+       at the polarity the holder observed, which is the only way iput's
+       [ip->valid] reading at +0x3c survives the [acquiresleep] at +0x50;
+
+       [ic_mid] is PARKED here (unlike MID) so that iget's recycler, which
+       carries it, refutes this arm with the line it already has.
+
+     The [i_inum] cell is FULL, as in MID and for the same reason: it is what
+     makes a concurrent [ic_swap_checkout] impossible.  Its extra half is the
+     one the entering holder joins in from its own reference plus the table's
+     retained share ([IcacheInv.islot_rest_join]'s arithmetic, ½ = q + (½−q)),
+     and the exit splits it back three ways.  The valid word is at an
+     ARBITRARY value [w] -- but only at HALF, the holder keeping the other.
+     That half is not decoration: closing the window back at PARKED (the
+     +0x44 nlink exit) needs the cell AT THE POLARITY OF THE PAYLOAD the
+     holder carries, and a cell the arm owned WHOLE would hand its value back
+     existentially bound -- §13.13's own failure, one level down.  A half
+     leaves every existing refutation intact: [ic_word4_excl] kills a
+     fraction with the FULL cell the parker and [ic_open_out] carry. *)
+  Definition ic_held (cn : ic_names) (k : nat) : iProp Σ :=
+    (∃ (dev inum w : mword 32),
+       i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
+       i_inum (ientry k) ↦₄ inum ∗
+       i_valid (ientry k) ↦₄{DfracOwn (1/2)} w ∗
+       ic_mid cn k ∗
+       ic_id cn k (1/2) true dev inum)%I.
+
   Definition ic_escrow_body (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (k : nat) : iProp Σ :=
     (ic_parked cn γfs γi cov logstart k
      ∨ ic_out cn k
      ∨ ic_mid_arm cn γfs γi cov logstart k
-     ∨ ic_empty_arm cn k)%I.
+     ∨ ic_empty_arm cn k
+     ∨ ic_held cn k)%I.
 
   (* distinct from [IcacheInv.icacheN] (the ref words) and
      [InodeRegion.iregN] (the dinode blocks): an opener of this escrow may
@@ -469,6 +545,9 @@ Section IcacheEscrow.
   Global Instance ic_empty_arm_timeless cn k : Timeless (ic_empty_arm cn k).
   Proof. rewrite /ic_empty_arm /inode_raw. apply _. Qed.
 
+  Global Instance ic_held_timeless cn k : Timeless (ic_held cn k).
+  Proof. rewrite /ic_held. apply _. Qed.
+
   Global Instance ic_escrow_body_timeless cn γfs γi cov logstart k :
     Timeless (ic_escrow_body cn γfs γi cov logstart k).
   Proof. rewrite /ic_escrow_body. apply _. Qed.
@@ -499,7 +578,7 @@ Section IcacheEscrow.
        ic_payload γfs γi cov logstart k inum v).
   Proof.
     iIntros "Hbody Htok Href".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v) "(Hid & Hin & Hvld & Hpay & Hmid & Hgid)".
       iDestruct "Href" as "[Hrt [Hrd Hrn]]".
       iDestruct (word4_pointsto_agree with "Hrd Hid") as %<-.
@@ -517,6 +596,10 @@ Section IcacheEscrow.
       iDestruct "Hvg" as (dev' inum' w) "(Hidv & _ & _ & _ & _ & _)".
       iDestruct "Href" as "[_ [Hqd _]]".
       iExFalso. iApply (ic_word4_excl with "Hidv Hqd").
+    - (* HELD (§13.13): the FULL inum cell, exactly as MID above *)
+      iDestruct "Hhd" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
+      iDestruct "Href" as "[_ [_ Hq]]".
+      iExFalso. iApply (ic_word4_excl with "Hin Hq").
   Qed.
 
   (* (b) PARK, [iunlock]'s release (BioInv.escrow_swap_park).
@@ -541,7 +624,7 @@ Section IcacheEscrow.
     (∃ q : Qp, inode_ref (icn_ref cn) k q dev inum).
   Proof.
     iIntros "Hbody Hid Hin Hvld Hpay".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v') "(_ & _ & Hvld' & _ & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
     - iDestruct "Hout" as (q dev' inum') "(Htok & [Hrt [Hrd Hrn]] & Hmid & Hgid)".
@@ -554,6 +637,9 @@ Section IcacheEscrow.
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
     - (* EMPTY: it holds the valid cell too, and the parker is carrying it *)
       iDestruct "Hvg" as (dev' inum' w) "(_ & _ & Hvld' & _ & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - (* HELD (§13.13): so does it *)
+      iDestruct "Hhd" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
   Qed.
 
@@ -592,7 +678,7 @@ Section IcacheEscrow.
      ic_escrow_body cn γfs γi cov logstart k).
   Proof.
     iIntros (HMk) "Hbody Hhalf Htok Hid".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v) "(Hidv & Hin & Hvld & Hpay & Hmidt & Hgid)".
       iDestruct "Hid" as "[Hidd Hidn]".
       iDestruct (word4_pointsto_agree with "Hidd Hidv") as %<-.
@@ -613,6 +699,12 @@ Section IcacheEscrow.
       iDestruct "Hvg" as (dev' inum' w) "(Hidv & _ & _ & _ & _ & _)".
       iDestruct "Hid" as "[Hqd _]".
       iExFalso. iApply (ic_word4_excl with "Hidv Hqd").
+    - (* HELD (§13.13): the opener's inum fraction against the FULL cell.
+         This is what keeps iput's own LAST CLOSE (which is this lemma) from
+         ever meeting its own window arm. *)
+      iDestruct "Hhd" as (dev' inum' w) "(_ & Hin & _ & _ & _)".
+      iDestruct "Hid" as "[_ Hqi]".
+      iExFalso. iApply (ic_word4_excl with "Hin Hqi").
   Qed.
 
   (* (d1) THE RECYCLER'S OPENING (iget, the [sw] at +0x72).  Under §13.9
@@ -644,7 +736,7 @@ Section IcacheEscrow.
       ic_id cn k (1/2) true devN inumN.
   Proof.
     iIntros "Hbody Hgf HinT".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v) "(_ & _ & _ & _ & _ & Hgt)".
       iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hout" as (q dev' inum') "(_ & _ & _ & Hgt)".
@@ -658,6 +750,10 @@ Section IcacheEscrow.
         as "[Hg1 Hg2]".
       iModIntro. iFrame "Hin Hidv Hraw Hmidt Hg1 Hg2".
       iExists w. iFrame.
+    - (* HELD (§13.13): the identification ghost, exactly as for the other
+         three live arms *)
+      iDestruct "Hhd" as (dev' inum' w) "(_ & _ & _ & _ & Hgt)".
+      iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
   Qed.
 
   (* (d0) THE RECYCLER'S DEV STORE (iget, the [sw] at +0x6e).  The empty arm
@@ -684,7 +780,7 @@ Section IcacheEscrow.
        ic_escrow_body cn γfs γi cov logstart k).
   Proof.
     iIntros "Hbody Hgf".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum' v) "(_ & _ & _ & _ & _ & Hgt)".
       iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
     - iDestruct "Hout" as (q dev' inum') "(_ & _ & _ & Hgt)".
@@ -697,8 +793,11 @@ Section IcacheEscrow.
         as "[Hg1 Hg2]".
       iModIntro. iFrame "Hidv Hg1".
       iIntros "Hd".
-      iRight; iRight; iRight. rewrite /ic_empty_arm.
+      iRight; iRight; iRight; iLeft. rewrite /ic_empty_arm.
       iExists devN, inumT, w. iFrame.
+    - (* HELD (§13.13): the identification ghost *)
+      iDestruct "Hhd" as (dev' inum' w) "(_ & _ & _ & _ & Hgt)".
+      iDestruct (ic_id_agree with "Hgf Hgt") as %(Hc & _ & _). discriminate.
   Qed.
 
   (* closing the window OPEN: any mid bundle is a legal body
@@ -713,7 +812,7 @@ Section IcacheEscrow.
   Lemma ic_close_empty cn γfs γi cov logstart k :
     ic_empty_arm cn k -∗
     ic_escrow_body cn γfs γi cov logstart k.
-  Proof. iIntros "H". iRight; iRight; iRight. iExact "H". Qed.
+  Proof. iIntros "H". iRight; iRight; iRight; iLeft. iExact "H". Qed.
 
   (* ...and closing at a normal parked arm *)
   Lemma ic_close_parked cn γfs γi cov logstart k :
@@ -792,13 +891,18 @@ Section IcacheEscrow.
     ic_mid cn k ∗ ic_mid_arm cn γfs γi cov logstart k.
   Proof.
     iIntros "Hmt Hbody".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev inum v) "(_ & _ & _ & _ & Hmt' & _)".
       iExFalso. iApply (ic_mid_exclusive with "Hmt Hmt'").
     - iDestruct "Hout" as (q dev inum) "(_ & _ & Hmt' & _)".
       iExFalso. iApply (ic_mid_exclusive with "Hmt Hmt'").
     - iFrame.
     - iDestruct "Hvg" as (dev inum w) "(_ & _ & _ & _ & Hmt' & _)".
+      iExFalso. iApply (ic_mid_exclusive with "Hmt Hmt'").
+    - (* HELD (§13.13): it parks the recycle token, which is exactly why it
+         does -- so that this line, which the recycler already had, covers
+         the new arm with no new token anywhere. *)
+      iDestruct "Hhd" as (dev inum w) "(_ & _ & _ & Hmt' & _)".
       iExFalso. iApply (ic_mid_exclusive with "Hmt Hmt'").
   Qed.
 
@@ -842,7 +946,7 @@ Section IcacheEscrow.
         ic_escrow_body cn γfs γi cov logstart k)).
   Proof.
     iIntros "Hbody Hvld".
-    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | Hvg]]]".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
     - iDestruct "Hpk" as (dev' inum v') "(_ & _ & Hvld' & _ & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
     - iDestruct "Hout" as (q dev inum) "(Htok & Href & Hmt & Hgid)".
@@ -853,6 +957,142 @@ Section IcacheEscrow.
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
     - iDestruct "Hvg" as (dev' inum w) "(_ & _ & Hvld' & _ & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+    - (* HELD (§13.13): the FULL valid cell again *)
+      iDestruct "Hhd" as (dev' inum w) "(_ & _ & Hvld' & _ & _)".
+      iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  4b. THE AUTHORITY-SIDE WINDOW (§13.13) -- iput's, and only iput's   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* CLOSING INTO THE WINDOW.  Trivial, like [ic_close_mid] / [ic_close_empty]:
+     the entering holder has already opened the parked arm with
+     [ic_open_auth_ref] (whose rebuild wand it simply does not use), joined
+     the inum cell to FULL out of its own reference share and the table's,
+     and kept the payload. *)
+  Lemma ic_close_held cn γfs γi cov logstart k :
+    ic_held cn k -∗ ic_escrow_body cn γfs γi cov logstart k.
+  Proof. iIntros "H". iRight; iRight; iRight; iRight. iExact "H". Qed.
+
+  (* ...and closing back at OUT, which is where the window EXITS: the
+     checkout state, reached by hand rather than through
+     [ic_swap_checkout] because the payload never went back into the
+     invariant in between.  Same arm, same contents -- this is only the
+     constructor, exported so ProofIput need not unfold [ic_escrow_body]. *)
+  Lemma ic_close_out cn γfs γi cov logstart k (q : Qp) (dev inum : mword 32) :
+    ic_tok cn k -∗
+    inode_ref (icn_ref cn) k q dev inum -∗
+    ic_mid cn k -∗
+    ic_id cn k (1/2) true dev inum -∗
+    ic_escrow_body cn γfs γi cov logstart k.
+  Proof.
+    iIntros "Htok Href Hmt Hgid".
+    iRight; iLeft. rewrite /ic_out. iExists q, dev, inum. iFrame.
+  Qed.
+
+  (* EVERY PAYLOAD NAMES ITS INUM'S REGION RECORD, on both polarities and on
+     both pool shapes.  This is the credential half of the window's re-open:
+     [dinode_at] is an exclusive per-inum fragment
+     ([InodeRegion.dinode_at_excl]), so a holder carrying a payload for inum
+     [inum] refutes any arm that also holds one -- which is PARKED (its
+     [ic_payload]) and MID (its [ic_unloaded]).  Stated as an accessor so the
+     refutation costs the payload nothing. *)
+  Lemma ic_payload_dinode γfs γi cov logstart k inum (v : bool) :
+    ic_payload γfs γi cov logstart k inum v -∗
+    ∃ dn : dinode,
+      dinode_at γi inum dn ∗
+      (dinode_at γi inum dn -∗ ic_payload γfs γi cov logstart k inum v).
+  Proof.
+    iIntros "Hpay". rewrite /ic_payload. destruct v.
+    - iDestruct "Hpay" as (dn bm) "Hlk".
+      iDestruct "Hlk" as (data) "(%Hok & Hdat & Hrest)".
+      iExists dn. iFrame "Hdat". iIntros "Hdat".
+      iExists dn, bm, data. iFrame "Hrest". iSplitR; [iPureIntro; exact Hok |].
+      iExact "Hdat".
+    - rewrite /ic_unloaded. iDestruct "Hpay" as "[Hraw Hpool]".
+      rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | Hfr]".
+      + iDestruct "Hal" as (dn0 bm0 data0) "(%Hok & Hdat & Hrest)".
+        iExists dn0. iFrame "Hdat". iIntros "Hdat". iFrame "Hraw".
+        iLeft. iExists dn0, bm0, data0. iFrame "Hrest".
+        iSplitR; [iPureIntro; exact Hok |]. iExact "Hdat".
+      + iDestruct "Hfr" as (dn0) "(%Hty & Hdat)".
+        iExists dn0. iFrame "Hdat". iIntros "Hdat". iFrame "Hraw".
+        iRight. iExists dn0. iSplitR; [iPureIntro; exact Hty |]. iExact "Hdat".
+  Qed.
+
+  (* RE-OPENING THE WINDOW.  iput does this TWICE, on two different paths,
+     and that is what fixes the credential: once at the post-[acquiresleep]
+     checkout (+0x54), and once at +0x44 when [ip->nlink] turns out to be
+     nonzero and the window must be UNDONE without truncating -- at which
+     point [acquiresleep] has not run and there is no [ic_tok] to be had.  So
+     the credential is REF-1, exactly [ic_open_auth_ref]'s, plus the payload:
+
+       [itable_half] at count 1 + the holder's own [iref_tok] kill OUT, by
+                    [IcacheInv.iref_tok_two_lookup] -- the arm's reference and
+                    the holder's would make the count at least two.  This is
+                    also what makes the credential EXCLUSIVE: no second
+                    thread can hold a reference to this slot at all;
+       the PAYLOAD -- carried across the window, and by [ic_payload_dinode]
+                    it names this inum's [dinode_at] -- kills PARKED and MID,
+                    whose payloads name it too
+                    ([InodeRegion.dinode_at_excl], after [ic_id_agree] has
+                    pinned the arm's inum to the holder's);
+       the table's [ic_id] half at [true] -- held continuously since the
+                    [acquire] at +0x14 -- kills EMPTY.
+
+     What comes back is the arm verbatim: the permanent dev half, the FULL
+     inum cell (which the caller re-splits into the arm's ½, its reference's
+     q and the table's (½−q)), the stale valid word, the recycle token and
+     the escrow's own identification half.  The escrow body is CONSUMED:
+     the caller closes with [ic_close_out] (the checkout path) or rebuilds a
+     [ic_parked] and closes with [ic_close_parked] (the nlink path). *)
+  Lemma ic_open_held cn γfs γi cov logstart k
+      (M : gmap nat (Qp * positive)) (q qt : Qp) (v : bool) (dev inum : mword 32) :
+    M !! k = Some (qt, 1%positive) ->
+    ic_escrow_body cn γfs γi cov logstart k -∗
+    itable_half (icn_ref cn) M -∗
+    iref_tok (icn_ref cn) k q -∗
+    ic_id cn k (1/2) true dev inum -∗
+    ic_payload γfs γi cov logstart k inum v -∗
+    itable_half (icn_ref cn) M ∗
+    iref_tok (icn_ref cn) k q ∗
+    ic_id cn k (1/2) true dev inum ∗
+    ic_payload γfs γi cov logstart k inum v ∗
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
+    i_inum (ientry k) ↦₄ inum ∗
+    (∃ w : mword 32, i_valid (ientry k) ↦₄{DfracOwn (1/2)} w) ∗
+    ic_mid cn k ∗
+    ic_id cn k (1/2) true dev inum.
+  Proof.
+    iIntros (HMk) "Hbody Hhalf Htok Hgid Hpay".
+    iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
+    - (* PARKED: its payload names the same inum (pinned by the ghost first),
+         and [dinode_at] is exclusive *)
+      iDestruct "Hpk" as (dev' inum' v') "(_ & _ & _ & Hpay' & _ & Hgt)".
+      iDestruct (ic_id_agree with "Hgid Hgt") as %(_ & <- & <-).
+      iDestruct (ic_payload_dinode with "Hpay") as (dn) "[Hd _]".
+      iDestruct (ic_payload_dinode with "Hpay'") as (dn') "[Hd' _]".
+      iExFalso. iApply (dinode_at_excl with "Hd Hd'").
+    - (* OUT: REF-1, exactly as in [ic_open_auth_ref] *)
+      iDestruct "Hout" as (q' dev' inum') "(_ & [Htok' _] & _ & _)".
+      iDestruct (iref_tok_two_lookup with "Hhalf Htok Htok'")
+        as %(qt' & n & HMk' & Hn).
+      rewrite HMk in HMk'. injection HMk' as _ Hn1. subst n.
+      iExFalso. iPureIntro. cbn in Hn. lia.
+    - (* MID: its unloaded bundle carries this inum's record too *)
+      iDestruct "Hmid" as (dev' inum' w) "(_ & _ & _ & Hpay' & Hgt)".
+      iDestruct (ic_id_agree with "Hgid Hgt") as %(_ & <- & <-).
+      iDestruct (ic_payload_dinode γfs γi cov logstart k inum false
+                   with "Hpay'") as (dn') "[Hd' _]".
+      iDestruct (ic_payload_dinode with "Hpay") as (dn) "[Hd _]".
+      iExFalso. iApply (dinode_at_excl with "Hd Hd'").
+    - (* EMPTY: the identification ghost *)
+      iDestruct "Hvg" as (dev' inum' w) "(_ & _ & _ & _ & _ & Hgt)".
+      iDestruct (ic_id_agree with "Hgid Hgt") as %(Hc & _ & _). discriminate.
+    - iDestruct "Hhd" as (dev' inum' w) "(Hidv & Hin & Hvld & Hmt & Hgt)".
+      iDestruct (ic_id_agree with "Hgid Hgt") as %(_ & <- & <-).
+      iFrame "Hhalf Htok Hgid Hpay Hidv Hin Hmt Hgt". iExists w. iFrame.
   Qed.
 
   (* ------------------------------------------------------------------ *)

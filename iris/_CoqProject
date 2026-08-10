@@ -790,7 +790,6 @@ CodeKwait.v
 ProofKwait.v
 LinkKwait.v
 SpecIput.v
-LinkIput.v
 LinkIputCompat.v
 SpecKexit.v
 CodeKexit.v
@@ -914,6 +913,8 @@ SpecForkretPark.v
 SpecIdup.v
 SpecIget.v
 ProofIget.v
+ProofIput.v
+LinkIput.v
 LinkIget.v
 SpecKfork.v
 SpecSafestrcpy.v
