@@ -19,8 +19,14 @@ boot mints the supply (`iref_slots_alloc`) and routes
 `iref_slot` premise is gone.**
 
 **WHAT IS LEFT: the file table's half** — `FileInv.file_payload`'s FD_INODE
-arm, which is what unblocks a real `SpecIput`. See "STILL TO DO — the
-consumers" and the marked holes under WHAT IS STILL DISHONEST.
+arm, which is what unblocks a real `SpecIput`. **The design is settled and
+written down** ("THE FILE TABLE'S HALF — DESIGNED, NOT BUILT" below); it is
+not implemented. The short version: parking the one reference is MANDATORY
+(a sum of count-0 shares is never a token), the ftable's own slot cannot
+name the inode at `q = 1`, and the place that CAN is `FileOff.off_body`,
+which already holds the permanent other half of `f->ip` for exactly this
+kind of reason — and whose `off_acc_excl` already contains the last-closer
+refutation the withdrawal needs.
 
 **WHAT IS STILL DISHONEST, and every site carries a `###` banner:**
 
@@ -365,18 +371,99 @@ anyway. The same swap fixes `iref_close_step`'s two frame-free cases.
 
 `IrefSlots.iref_slots_no_overflow` moved from `positive` to `nat` with it.
 
-### STILL TO DO — the consumers
+### THE FILE TABLE'S HALF — DESIGNED, NOT BUILT
 
-Nothing yet HOLDS an `iref_share`; this landed the algebra, and the tree is
-green with coverage unchanged (146 proven, 78%). What it unblocks:
+This is what is left of S5, and it was marked "an unsolved file-table design
+question" for three commits. It is solved now; what follows is the design,
+and it is not implemented.
 
-- `FileInv.file_payload`'s FD_INODE/FD_DEVICE arm becomes
-  `iref_shr_at (fc_ip C) q`, and `file_payload_split` goes through on
-  `iref_shr_at_split`. The last closer's rejoin to `q = 1` — which
-  `file_close_last_step` already computes — is what yields the `iref_at`
-  that `iput` needs.
-- `ProcInv.cwd_ref v := ∃ q, iref_at v q` (this needed no algebra change
-  and can land independently).
+**PARKING IS MANDATORY, and this is a proof rather than a preference.** The
+FD_INODE arm of `file_payload q pn C` cannot BE the reference:
+`file_payload_split` needs `file_payload (q1+q2) ⊣⊢ file_payload q1 ∗
+file_payload q2`, and at `q1 + q2 = 1` that would ask for
+
+    REFERENCE  ⊣⊢  SHARE ∗ SHARE
+
+whose `←` is false — every `iref_share` carries count 0, so no sum of them
+is ever an `iref_tok`. (`→` is fine: shed the tok. The asymmetry is the
+whole content of the count-0 fragment.) So the arm can only ever be a
+SHARE, and the one indivisible reference has to live somewhere the LAST
+CLOSER can reach.
+
+**THE FTABLE'S OWN SLOT IS NOT THAT PLACE**, which is the obstruction that
+stalled this. `FileInv.fslot γ M k`'s live arm holds `file_rest γ k q`, and
+`file_rest γ k 1` is `emp` — when every share is out, the table knows
+nothing about `C` and therefore cannot NAME `f->ip`. A conjunct it cannot
+state is not a place to park anything.
+
+**THE HOOK IS ALREADY IN THE TREE, one layer over: `FileOff.off_body`.**
+
+```coq
+off_body γ k := ∃ ip, a_fip k ↦₈{½} ip ∗ (off_resident k ∨ (off_mark ip ∗ flive_tok γ k))
+```
+
+`FileInv.file_fields` holds `a_fip` at `q/2` — the ONE asymmetry in that
+predicate — precisely so this per-slot invariant can hold the other half
+FOREVER. `FileInv.v`'s own comment says why: *"an invariant that cannot name
+the inode cannot appeal to its lock"*, and points-to agreement then hands a
+reference holder "the invariant's inode is MY inode" for nothing, with no
+ghost and no redundant copy of the pointer. That is exactly the naming
+power the parked reference needs, and it costs no CMRA change.
+
+**AND THE WITHDRAWAL ARGUMENT ALREADY EXISTS TOO.**
+`FileOff.off_acc_excl` refutes the checked-out arm from
+`ftable_auth γ M` at `M !! k = Some (qt, 1)` plus `flive_tok γ k` —
+i.e. from exactly what a LAST CLOSER holds. Adding a parked-reference
+disjunct to `off_body` reuses that argument verbatim; no new exclusivity
+principle is needed.
+
+So:
+
+```coq
+FileInv.inode_ref v q := (∃ q0, InodeRef.iref_shr_at v q0)%I
+```
+
+— the fraction EXISTENTIAL, which is what makes `P ⊣⊢ P ∗ P` hold in both
+directions (split at `q0/2`, join by `iref_shr_at_split`), so
+`file_payload_split` goes through unchanged and `inode_ref_split` becomes a
+two-line proof instead of `left_id`. `off_body` gains a
+parked/withdrawn disjunct carrying `∃ q, iref_at ip q`.
+
+**WHAT MAKES THIS CHEAPER THAN IT LOOKS: nothing produces an FD_INODE file
+yet.** `sys_open` / `create` / `namei` are unproven (sysfile.c is 5/16); the
+only producers of a live `file_ref` are `filealloc` (FD_NONE) and `sys_pipe`
+(FD_PIPE). So the obligation to ESTABLISH the parked reference falls on a
+function nobody has proven, and all the work here is on the CONSUMER side:
+
+- **`fileclose`** — the only hard one. Its last closer must open `off_inv`,
+  withdraw the reference, and hand it to `iput`. It already holds
+  `ftable_auth` at REF-1 and the `flive_tok`, so `off_acc_excl`'s refutation
+  applies as written. This is a re-proof of one arm of a PROVEN 194-byte
+  function.
+- **`fileread`** — needs only a SHARE, which the arm gives directly.
+- **`filedup`** — `file_payload_split`, unchanged.
+
+**AND THE MIS-SPECIFICATION BELOW IT MUST BE FIXED IN THE SAME PASS**, or
+`fileread` cannot pay `ilock`: `SpecIlock` / `SpecFileread` take
+`inode_ref` (a WHOLE reference) where they need `inode_shr`. `ProofIlock` is
+proven, so that is a second re-proof — but a small one, since a share proves
+everything ilock actually uses (`q > 0` gives `k ∈ dom M`, hence the slot is
+live, hence `ip->ref > 0`, hence `InodeLock.inode_ref_spos` and the dead
+panic).
+
+**ORDER OF WORK**, once someone picks this up:
+
+1. `FileInv.inode_ref` real; re-prove `inode_ref_split`. Nothing else moves
+   yet — `fileclose` still passes it to an `iput` whose premise is `emp`.
+2. `off_body` gains the parked arm + a `off_take_last` lemma shaped like
+   `off_acc_excl`.
+3. `SpecIput`: premise becomes `∃ q, InodeRef.iref_at ip q`. Its
+   postcondition's `iref_slot` is already there.
+4. `ProofFileclose`'s FD_INODE arm withdraws and spends; the `###` banner
+   there goes away, and so does `ProofKexit`'s.
+5. `SpecIlock` / `SpecFileread` take `inode_shr`; re-prove `ProofIlock`.
+6. Boot routes the supply's `NFILE` units to the ftable
+   (`BootShared`'s `###` banner).
 
 ### A LIVE MIS-SPECIFICATION THIS UNCOVERED
 
