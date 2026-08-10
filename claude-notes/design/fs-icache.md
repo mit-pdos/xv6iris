@@ -1546,6 +1546,46 @@ pool shape, ProofItrunc by `inode_sized_zero`, ProofWritei by
 `inode_sized_insert`; C7's stocking owes it like the §13.5 cap). The
 `fsblock`-fold alternative stays deferred.
 
+### 13.13 iput needs a FIFTH arm: the HELD window (the valid-polarity
+### observation cannot cross acquiresleep otherwise)
+
+iput reads `valid == 1` at +0x3c through the read-only authority-side
+open (`ic_open_auth_ref` re-seals with `v` ∃-bound), and its checkout
+happens 20 bytes and one `acquiresleep` later — with a FRESH `v` and
+nothing tying it to the one observed. The invariant genuinely permits
+the flip (the escrow is a persistent `inv`; a hypothetical opener could
+convert loaded→unloaded within one step), and no ghost can pin `v`
+from the itable side: `valid`'s writers (ilock) hold no itable
+credential, so a table-anchored half has no partner. Every alternative
+was enumerated and dies (C6a-final's route table — widen `ic_id`,
+close at MID/OUT/EMPTY, retain `dinode_at` fractions, handle
+`v = false` in the truncate arm which is UNSOUND since the raw cells
+are untied to the record).
+
+The fix is the MID arm's own idea, replayed for iput: **`ic_held`, an
+authority-side window arm** — the cells stay in the arm (dev ½, inum
+FULL as the discriminator, valid at an arbitrary word), the PAYLOAD at
+its concrete polarity leaves with the holder (so nothing is re-bound
+and nothing needs stability), plus a new `ic_hld` token family for the
+arm bookkeeping. Entered at +0x3c under REF-1
+(`ic_open_parked_to_held`), exited at the post-acquiresleep checkout
+(`ic_open_held`/`ic_close_held_to_parked`-shaped, where the full inum
+cell re-splits into arm-½ + the deposited reference's q + the table's
+(½−q)). Refutations for the new disjunct are one existing line each
+(the report's table: checkout/park/auth_ref/out by `ic_word4_excl`
+against the full inum or valid cell; mid by `ic_mid` exclusivity;
+empty by `ic_id_agree`). No exported signature changes;
+ProofIget/ProofIlock/ProofIunlock rebuild untouched; C7's stocking
+gains the `ic_hld` allocation obligation.
+
+Also settled by the same trace: the `iref_slot` give-back needs no new
+IrefSlots lemma (Pos2Nat.inj_succ + iref_slots_split on the non-last
+arm; `iref_slot` IS `iref_slots 1` definitionally on the last), and
+the truncate arm's park shape is exactly `ipool_shape`'s free disjunct
+after iupdate retags to the type-0 record — `ic_swap_park` at
+`v = false` consumes it with `inode_raw` rebuilt from the truncated
+cells.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
