@@ -312,7 +312,22 @@ Section KforkPrologue.
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
-        SwtchCtx.own_ctx (p_context npa) -∗
+        (* THE RAW CONTEXT, not [own_ctx].  The success path's park
+           ([SpecForkretPark.forkret_park], run inside ProofKforkB5 at
+           kfork's FIRST release) needs the kstack and the saved context at
+           their literal head values -- ra = forkret, sp = kstack + PGSIZE --
+           and a generic 14-word existential cannot be split back into those.
+           The uvmcopy-FAILURE continuation above keeps [own_ctx], because
+           freeproc's [fp_rest] wants exactly that and nothing sharper. *)
+        (∃ (ks : mword 64) (rest : list (mword 64)),
+           ⌜length rest = 12%nat⌝ ∗
+           ProcInv.is_kstack npa ks ∗
+           SwtchCtx.ctx_cells (p_context npa)
+             (* [SpecAllocproc.forkret_pc]; [SpecForkretPark.v] duplicates the
+                constant rather than importing it, so B5's premise names the
+                other copy.  The two are [mword_of_int KernelSyms.forkret]
+                either way, hence convertible, and [iApply] bridges them. *)
+             (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay lvl eb pme -∗
         cpu_own (S lvl) eb pme C false -∗
         (∃ q' : Qp, inode_ref γi ck q' cdev cinum) -∗
@@ -1160,7 +1175,7 @@ Section KforkPrologue.
                   (upd_pt (upd_sz Vc (pv_sz Vp)) P' (pv_tf Vc))
                   (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv HCpriv
-                        Hheld Hhart Hfdsp [Hctx] Harmpay Hcpu [Hiref2] [Henv'] Hwlock Hftbl Hitbl Hitinv Hiref").
+                        Hheld Hhart Hfdsp [Hks Hctx] Harmpay Hcpu [Hiref2] [Henv'] Hwlock Hftbl Hitbl Hitinv Hiref").
         * exact HN10sp.
         * exact HN10s4.
         * exact HN10s5.
@@ -1172,8 +1187,8 @@ Section KforkPrologue.
         * split_and!; [reflexivity | exact HjN | exact Hgamma
                       | cbn [upd_pt upd_sz pv_ofile]; exact HVcof
                       | cbn [upd_pt upd_sz pv_cwd]; exact HVccwd].
-        * iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
-          iSplitR; [iPureIntro; rewrite -Hrestlen; reflexivity | iExact "Hctx"].
+        * iExists ks, rest. iSplitR; [iPureIntro; exact Hrestlen|].
+          iFrame "Hks Hctx".
         * iExists cq. iExact "Hiref2".
         * iExact "Henv'".
     - (* ---- arm 3: a failure tail ran, budget resealed ---- *)
