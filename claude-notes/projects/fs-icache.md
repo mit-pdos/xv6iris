@@ -403,6 +403,111 @@ out 2026-08-09):**
 
 ## C7 — the boot wiring (`ireg_alloc` + pool stocking)
 
+**DONE 2026-08-10 — `iris/IcacheBoot.v` (695 lines), axiom-free.**
+`Print Assumptions` on every lemma in it (incl. `icache_boot`,
+`ireg_alloc`, `ipool_alloc`) is **"Closed under the global context"** —
+not even funext or the Sail platform axioms, because nothing in the file
+touches an instruction. Full build 915 .vo / 0 Errors; lemma_diff clean;
+coverage unchanged (147 proven / 78%, 16502 B / 71%).
+
+What landed, and the three things worth keeping:
+
+- **iinit WAS ALREADY PROVEN AND LINKED.** `CodeIinit`/`SpecIinit`/
+  `ProofIinit`/`LinkIinit` all exist and `ProofMain.v:1105` calls
+  `Iinit.wp_iinit_sconf` at main+0x92. So C7's "(b) function proofs" half
+  is empty: the boot wiring is a pure GHOST STEP between iinit's
+  postcondition (`lk ↦₄ 0` + `lock_name` + `c_cpu ↦₈ 0` + fifty
+  `sl_fresh`) and the icache's precondition. That step is `icache_boot`.
+- **THE IMAGE DECODE NEEDS NO IMAGE HYPOTHESIS AT ALL.** A dinode is a
+  fixed 64-byte record and `dinode_wf` is a LENGTH condition, so
+  `∃ ds, diblk_wf ds ∧ bs = diblk_bytes ds` holds for ANY 1024 bytes.
+  The surjectivity chain (`half_bytes_surj` / `word_bytes_surj` /
+  `ind_bytes_surj` / `dinode_bytes_surj` / `diblk_bytes_surj` /
+  `image_decode`) is the mirror of §12.3's `diblk_bytes_inj` family and
+  is proved off `RiscvModelBytes.nth_byte_assemble_len` — assemble the
+  window little-endian into a word of the right width and every byte
+  comes back. This is the one thing the C7 brief expected to be a grind
+  and it is ~100 lines.
+- **THE POOL'S ALLOCATED ARM IS THE ONLY REAL GAP, AND IT IS NOT THE
+  ICACHE'S.** `ipool_shape`'s allocated arm carries `inode_ok` (blkmap_wf
+  inside `cov`, the §13.5 size cap, `blk_holes_zero`, `inode_sized`) plus
+  the file's own `fsblock`s and its indirect block. No decoding produces
+  those: they are a claim about WHICH BLOCKS the image's inodes own and
+  that the runs are disjoint from each other, the log and the bitmap —
+  an image-wf layer that belongs with the bitmap/`ialloc` effort. So
+  `ipool_alloc` takes the allocated inums' bundles as a **threaded
+  premise** (the `FsBoot.fs_cov_in` shape, never an axiom), and
+  `ipool_alloc_all_free` discharges the whole thing outright for a
+  type-0-only image, which is what makes the premise satisfiable rather
+  than vacuous.
+
+The file's contents, by section:
+1. the decode surjectivity chain (above);
+2. `image_dinode` / `ireg_M0` (`FsBoot.fs_L0`'s `map_imap`-over-
+   `gset_to_gmap` shape) and **`ireg_alloc`** — in: the `nib` inode
+   blocks' `fsblock` halves; out: `ireg_inv` plus one `dinode_at` per
+   inum of `region_inums nib`, at the image's own record. Premises are
+   two arithmetic facts only (`16*nib ≤ 2^32`, each block is 1024 B);
+3. `ipool_shape_free` / `ipool_shape_alloc` / `ipool_split` /
+   `ipool_alloc` / `ipool_alloc_all_free`;
+4. `ientry_raw` (one entry's cells) and **`icache_boot`** — the ALL-EMPTY
+   boot state of §13.7–13.9 assembled in one fupd: `own_alloc (● ∅)` +
+   `itable_half_split`, `ic_names_alloc`, `inv_alloc icacheN` over
+   `iref_cells ∅`, fifty `inv_alloc icEscN` at `ic_empty_arm`, fifty
+   `islot_empty`, `itable_res2` at `M = ∅ / ci = ∅` with the whole
+   `iref_slots_auth` and the pool at `region_inums nib ∖ ci_inums ∅`,
+   `newlock`, and fifty `sl_fresh_new` over `ic_tok cn k` (which IS
+   `SpecFileclose.ic_sleeplocks`, spelled out because this file sits
+   below the fileclose spec);
+5. `inode_lock_is_ientry_lock` — `SpecIinit`'s cursor spelling
+   (`acur (itable+40) 136 k`) IS `i_lock (ientry k)`. Stated over the raw
+   literals so nothing here depends on `SpecIinit` (whose own `NINODE`
+   would shadow `IcacheRef`'s).
+
+Proof gotchas worth keeping:
+- `rewrite !big_sepL_sep` KEEPS GOING INTO `word4_pointsto` (itself a
+  `⌜aligned⌝ ∗ [∗ list] byte`) and leaves a byte-shredded hypothesis
+  nothing matches. Split a per-slot record field by field with a named
+  lemma (`ientry_raw_split`: one `rewrite big_sepL_sep` + `bi.sep_mono_r`
+  per field), never with the repeating form.
+- A `fun z dn => z ↪[γ] dn` passed as a `Φ` argument needs an explicit
+  `%I`: the ghost_map notation lives in `bi_scope`, and outside it the
+  error is *"Unknown interpretation for notation"* with a hole count that
+  matches no notation you wrote.
+- `mword_of_int z` in an argument position typed `bv 32` does NOT
+  unify (`mword n` is a match on `n`): ascribe `(mword_of_int z : mword 32)`.
+- `destruct l as [|a [|b l]]` does NOT discharge `length l = 2` — you
+  need ONE MORE level (`[|a [|b [|c l]]]`) before `try discriminate`
+  leaves a single closed case.
+- The reverse of `BioInv.tok_fun_alloc`: `fun_of_big` turns a big-op of
+  EXISTENTIALS over `seq j n` into one function of the index. Needed
+  because `ic_names_alloc`'s `dvs` must be chosen AT the values the
+  loader left in the cells, and those arrive existentially bound.
+
+**OWED after C7, precisely (all outside the icache):**
+- (i) `BootCarveMain.boot_inode_locks` keeps only bytes `[+16,+60)` of
+  each 136-byte entry and DROPS the rest, so `ientry_raw k` has no
+  producer yet. It is mechanical: the bytes are in the same
+  `boot_raw_ran`, and the concrete-zero `i_ref` conjunct is
+  `BootCarve.boot_ran_cell4_bss` (itable is past `img_end`, so the
+  loader's zero is a fact, not an assumption — the `d_used_idx` /
+  `kmem+24` conjuncts in `SpecMain.main_globals_raw` are the precedent).
+  A new conjunct in `main_globals_raw` and a `boot_inode_entries` lemma.
+- (ii) **`FsBoot.fs_boot_bundle` HAS ZERO CONSUMERS.** main never
+  receives the disk-image byte mint and never allocates `bio_ctx`/`γfs`,
+  so there is no `fsblock` anywhere at main's altitude and hence no
+  input for `ireg_alloc`. Wiring the fs BLOCK layer into main (binit's
+  seam, the `disk_bytes γv 0 (disk_read dk 0 ndisk)` precondition, and
+  the deposit into `started_inv`) is a separate cycle and blocks (iii).
+- (iii) publishing `is_itable2` / `itable_inv` / `ic_escrows` /
+  `ic_sleeplocks` / `ireg_inv` out of `SpecMain`'s postcondition (they
+  belong in the `started_inv P` deposit wand, beside `printk_env` and
+  `procs_inv`).
+- (iv) the image-wf layer that discharges `ipool_alloc`'s allocated half
+  for the real mkfs image (bitmap/`ialloc` effort).
+
+Original brief (kept for the record):
+
 IN SCOPE (user-confirmed 2026-08-09), after C6. One seam, two halves:
 
 - `ireg_alloc`: from the boot-time `fsblock` big-op over the inode
@@ -421,6 +526,11 @@ IN SCOPE (user-confirmed 2026-08-09), after C6. One seam, two halves:
 ## Deferred / owed
 - The `fsblock`-carries-its-length fold (design §6(ii), better home) —
   whoever next touches `FsBlocks.v`.
+- `InodeRegion.v`'s header still says the boot-time allocation "lives
+  with FsBoot, not here"; it lives in `IcacheBoot.v`. Comment-only, but
+  editing it rebuilds a 35-file cone (ProofWritei/ProofIget/ProofIput/
+  ProofSysPipe among them), so fix it in stride the next time
+  `InodeRegion.v` is touched for a real reason.
 - ~~`FileInv.inode_ref`/`ProcInv.cwd_ref` placeholders~~ — DONE in C6b.
 - fileclose drops iput's `iref_slot` give-back (C6b, above): one supply
   unit leaked per inode file closed. Wants per-`ofile` ghost state.
