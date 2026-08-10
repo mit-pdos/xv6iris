@@ -177,6 +177,11 @@ Lemma kd_cd11 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_BEQZ (mword_of_int 14, Cregidx (mword_of_int 2)), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_d3ed s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xd3ed : mword 16)) s
+  = Some (C_BEQZ (mword_of_int 241, Cregidx (mword_of_int 7)), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_d57d s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xd57d : mword 16)) s
   = Some (C_BEQZ (mword_of_int 247, Cregidx (mword_of_int 2)), s).

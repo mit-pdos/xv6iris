@@ -157,6 +157,11 @@ Lemma kd_b771 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") 
   = Some (C_J (mword_of_int 1990), s).
 Proof. intro H. rvc_oneshot s H. Qed.
 
+Lemma kd_bf61 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
+  exec (ext_decode_compressed (mword_of_int 0xbf61 : mword 16)) s
+  = Some (C_J (mword_of_int 1996), s).
+Proof. intro H. rvc_oneshot s H. Qed.
+
 Lemma kd_bff1 s : eq_vec (_get_Misa_C (register_lookup misa s.(sregs))) ('b"1") = true ->
   exec (ext_decode_compressed (mword_of_int 0xbff1 : mword 16)) s
   = Some (C_J (mword_of_int 2030), s).

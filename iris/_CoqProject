@@ -873,6 +873,7 @@ InodeLock.v
 InodeRegion.v
 IcacheEscrow.v
 CodeIget.v
+CodeIput.v
 CodeIdup.v
 CodeIlock.v
 CodeItrunc.v
