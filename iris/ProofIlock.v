@@ -1715,7 +1715,7 @@ Section IlockLoad.
     (* ===== ALLOCATED INODE: the type is nonzero and the branch falls
        through, exactly as v1's dead arm did ===== *)
     iDestruct "Hal" as (bm data) "(%Hok & Hindres & Hblocks)".
-    destruct Hok as (Hwf & Hcovers & Hda & Htynz & Hszcap & Hholes).
+    destruct Hok as (Hwf & Hcovers & Hda & Htynz & Hszcap & Hholes & Hsized).
     pose proof (blkmap_wf_dir_len _ _ _ Hwf) as Hdirlen.
     assert (Hcelllen : length (bm_cells bm) = 13%nat)
       by (rewrite /bm_cells length_app Hdirlen; reflexivity).

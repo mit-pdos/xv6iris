@@ -764,7 +764,7 @@ Section IcacheEscrow.
       iDestruct "Hpay" as (dn bm) "Hlk".
       iDestruct "Hlk" as (data) "(%Hok & Hdat & Hmeta & Haddrs & Hind & Hblks)".
       pose proof Hok as Hok'.
-      destruct Hok' as (Hwf & _ & Hda & _ & _ & _).
+      destruct Hok' as (Hwf & _ & Hda & _ & _ & _ & _).
       assert (Hcelllen : length (bm_cells bm) = 13%nat).
       { rewrite /bm_cells length_app (blkmap_wf_dir_len _ _ _ Hwf). reflexivity. }
       iSplitL "Hmeta Haddrs".

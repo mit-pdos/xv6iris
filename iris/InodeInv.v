@@ -454,6 +454,68 @@ Definition blk_holes_zero (bm : blkmap) (data : nat -> list (bv 8)) : Prop :=
     data i = replicate BSIZE (bv_0 8).
 
 (* ===================================================================== *)
+(*  A BLOCK IS BSIZE BYTES -- itrunc's second owed premise (design §6(ii),
+    landed by §13.12(b))                                                  *)
+(* ===================================================================== *)
+
+(* [bfree] hands the freed block back to [BitmapInv.free_blk], whose
+   [length bs = BSIZE] conjunct is the obligation; [inode_blocks] names a
+   block's contents but says nothing about their length, and
+   [FsBlocks.fsblock] is a bare ghost_map half with no length side
+   condition anywhere above it.  So the fact is not derivable and must be
+   CARRIED.
+
+   It cannot be carried as a caller's premise either: under SpecIlock v2
+   the record and its [data] are OUTPUTS, existentially bound inside
+   [IcacheEscrow.ic_loaded], so iput -- the first function to call itrunc
+   on a checked-out inode -- cannot name the [data] it would quantify
+   over.  The place it has to live is beside [InodeLock.inode_ok], the
+   pure record ilock mints and every parked entry holds, which is where
+   §13.12(b) put it.  It lives HERE rather than in IcacheInv.v (its first
+   home) because [InodeLock.v] and [IcacheInv.v] are siblings and only
+   [inode_ok]'s own file may name it.
+
+   Note the BOUND.  [SpecItrunc.v] states its premise for every [i : nat];
+   no holder of ilock's bundle can supply that, because both
+   [inode_blocks] and [blk_holes_zero] stop at MAXFILE.  [i < MAXFILE] is
+   all itrunc's loops touch.
+
+   The design note argues the BETTER home is [fsblock] itself (the length
+   is a block-layer truth, and [BitmapInv.free_blk] already pairs the two
+   by hand); that change is recorded there and left unmade.               *)
+Definition inode_sized (data : nat -> list (bv 8)) : Prop :=
+  forall i : nat, (i < MAXFILE)%nat -> length (data i) = BSIZE.
+
+(* itrunc's own output, and ialloc's fresh inode *)
+Lemma inode_sized_zero : inode_sized (fun _ => replicate BSIZE (bv_0 8)).
+Proof. intros i _. apply length_replicate. Qed.
+
+(* bmap's deposit and writei's block update are both this *)
+Lemma inode_sized_insert (data : nat -> list (bv 8)) (i : nat) (bs : list (bv 8)) :
+  inode_sized data -> length bs = BSIZE ->
+  inode_sized (<[i := bs]> data).
+Proof.
+  intros Hs Hbs j Hj.
+  destruct (decide (j = i)) as [->|Hne].
+  - rewrite fn_lookup_insert. exact Hbs.
+  - rewrite fn_lookup_insert_ne; [|exact (not_eq_sym Hne)]. exact (Hs j Hj).
+Qed.
+
+(* a HOLE is sized for free, so a producer only ever has to think about the
+   ALLOCATED indices ([blk_holes_zero] is already an [inode_ok] conjunct) *)
+Lemma inode_sized_of_alloc (bm : blkmap) (data : nat -> list (bv 8)) :
+  blk_holes_zero bm data ->
+  (forall i : nat, (i < MAXFILE)%nat -> bv_unsigned (blkmap_get bm i) <> 0 ->
+     length (data i) = BSIZE) ->
+  inode_sized data.
+Proof.
+  intros Hholes Halloc i Hi.
+  destruct (decide (bv_unsigned (blkmap_get bm i) = 0)) as [Hz|Hnz].
+  - rewrite (Hholes i Hi Hz). apply length_replicate.
+  - exact (Halloc i Hi Hnz).
+Qed.
+
+(* ===================================================================== *)
 (*  THE EMPTIED MAP: what itrunc leaves behind                            *)
 (* ===================================================================== *)
 
