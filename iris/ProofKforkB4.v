@@ -25,7 +25,7 @@
    THE RESOURCE STORY.  [p->cwd] names icache slot [ck] ([pv_cwd Vp = ientry
    ck], a premise of kfork's own contract because [ProcInv.cwd_ref] is [emp]
    and cannot produce idup's argument -- see SpecKfork.v's header).  idup
-   hands back TWO halves of [inode_ref γi ck (cq/2) cdev cinum]; this block
+   hands back TWO halves of [inode_ref (icn_ref cn) ck (cq/2) cdev cinum]; this block
    keeps one and drops the other (the child's [cwd_ref] is [emp], so there
    is nowhere to put it).  safestrcpy's precise characterisation of the
    child's new name bytes ([ssc_stop]/[ssc_post]) is dropped on the way out:
@@ -69,8 +69,12 @@ Require Import FdSlots FileInv.
 Require Import WpLock.
 Require Import ProcInv.
 Require Import InodeInv.
+Require Import DiskPtsto.
+Require Import FsBlocks.
+Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
+Require Import IcacheEscrow.
 Require Import SpecPanic.
 Require Import SpecIdup.
 Require Import SpecSafestrcpy.
@@ -179,7 +183,7 @@ Section KforkB4Res.
   (*                                                                      *)
   (*  When claude-notes/projects/cwd-ref.md lands, this lemma must be      *)
   (*  deleted and the use at +0xac must instead CONSUME the second         *)
-  (*  [inode_ref γi ck (cq/2) cdev cinum] that idup hands back -- which is *)
+  (*  [inode_ref (icn_ref cn) ck (cq/2) cdev cinum] that idup hands back -- which is *)
   (*  the whole reason idup returns two halves.  That is the ONE           *)
   (*  proof-side edit this file needs; everything else here is about the   *)
   (*  name array and the pid read and is unaffected.                       *)
@@ -195,7 +199,7 @@ End KforkB4Res.
 Module KforkB4 (ID : IDUP) (SS : SAFESTRCPY).
 
 Section KforkB4Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !icacheG Σ, !irefslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !icacheG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -213,7 +217,9 @@ Section KforkB4Proof.
           | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
 
   Lemma kfk_b4
-      (γf γil γi : gname) (ck : nat) (cq : Qp) (cdev cinum : mword 32)
+      (γf γil γic : gname) (cn : ic_names) (γfs : fs_names)
+      (cov : gset Z) (logstart : Z) (nib : nat)
+      (ck : nat) (cq : Qp) (cdev cinum : mword 32)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
       (m : regfile) (K lvl : nat) (eb : bool) (C : iProp Σ) :
@@ -227,10 +233,10 @@ Section KforkB4Proof.
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
     panic_wp_any -∗
-    is_itable γil γi -∗
-    itable_inv γi -∗
+    is_itable2 γil cn γfs γic cov logstart nib -∗
+    itable_inv (icn_ref cn) -∗
     iref_slot -∗
-    inode_ref γi ck cq cdev cinum -∗
+    inode_ref (icn_ref cn) ck cq cdev cinum -∗
     proc_priv γf pme pid_p Vp -∗
     proc_priv γf npa pid_c Vc -∗
     wp_next false pme (fun (CID : CpuId) =>
@@ -247,7 +253,7 @@ Section KforkB4Proof.
             pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
             pv_cwd Vc' = ientry ck /\ length (pv_name Vc') = PNAMELEN⌝ ∗
            proc_priv γf npa pid_c Vc') -∗
-        inode_ref γi ck (cq/2)%Qp cdev cinum -∗
+        inode_ref (icn_ref cn) ck (cq/2)%Qp cdev cinum -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -315,7 +321,8 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
-    iApply (ID.wp_idup_sconf γil γi ck cq cdev cinum M1 lvl eb pme C (K - 8)%nat false
+    iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart nib
+              ck cq cdev cinum M1 lvl eb pme C (K - 8)%nat false
               (kfk_b4_stack_idup K HK) Hlvl HM1a0
               with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hiref [-]").
     iApply wp_next_off_intro.

@@ -11,13 +11,23 @@ that surrender an inode reference could be written before an inode model
 existed. `IcacheInv.v` **is** that model now (it landed with idup), so the
 excuse is gone, and two things have made the hole cost real money:
 
-- **`idup` was proved against the real model** (upstream `8f5470a3`), so its
-  contract wants `is_itable`, `itable_inv`, an `IrefSlots.iref_slot` and an
-  actual `IcacheInv.inode_ref γ k q dev inum`. `cwd_ref` can supply none of
-  it, so `kfork` — whose `np->cwd = idup(p->cwd)` is the only caller — has to
-  carry all five as premises plus `pv_cwd Vp = ientry ck`. **No caller of
+- **`idup` was proved against the real model** (upstream `8f5470a3`), and
+  then moved to the v2 icache (`is_itable2`), so its contract now wants
+  `IcacheEscrow.is_itable2 γil cn γfs γic cov logstart nib`,
+  `itable_inv (icn_ref cn)`, an `IrefSlots.iref_slot` and an actual
+  `IcacheInv.inode_ref (icn_ref cn) k q dev inum`. `cwd_ref` can supply none
+  of it, so `kfork` — whose `np->cwd = idup(p->cwd)` is the only caller —
+  carries all of it as premises plus `pv_cwd Vp = ientry ck`. **No caller of
   kfork can discharge them**, so kfork's contract is honest but unusable
   until this lands.
+
+  **And the cost is still growing.** The v2 move dragged the DISK AND LOG
+  fabric — `γfs`, `cov`, `logstart`, `nib`, and the `diskGhostG`/`fsLogG`/
+  `iregG` classes — into `kfork`'s contract. kfork does no I/O and touches
+  no log; it inherits a filesystem to bump one reference count. Every
+  further change to the icache's lock resource will keep landing on kfork
+  until `cwd_ref` is real, because kfork is the only thing standing between
+  `idup` and a caller.
 - **The tree is now inconsistent about the hole**: `iput` is stated over the
   `emp` placeholder while `idup` is stated over the real model, so which
   vocabulary a function's contract inherits depends on which of the two it

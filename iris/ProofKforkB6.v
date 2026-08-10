@@ -65,8 +65,12 @@ Require Import KallocInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
 Require Import InodeInv.
+Require Import DiskPtsto.
+Require Import FsBlocks.
+Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
+Require Import IcacheEscrow.
 Require Import SpecAllocpid.
 Require Import WaitInv.
 Require Import SpecProcinit.
@@ -93,7 +97,7 @@ Module KforkPrologue (Myproc : MYPROC) (Allocproc : ALLOCPROC_GEN) (Uvmcopy : UV
 
 Section KforkPrologue.
   Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
-            !icacheG Σ, !irefslotG Σ}.
+            !icacheG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -186,7 +190,8 @@ Section KforkPrologue.
   (*  THE BLOCK.                                                          *)
   (* =================================================================== *)
   Lemma kfk_prologue
-      (γa γp γw γl γf γil γi : gname) (γs : list gname)
+      (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
       (ck : nat) (cq : Qp) (cdev cinum : mword 32) (R : iProp Σ) :
@@ -207,10 +212,10 @@ Section KforkPrologue.
     is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
-    is_itable γil γi -∗
-    itable_inv γi -∗
+    is_itable2 γil cn γfs γic cov logstart nib -∗
+    itable_inv (icn_ref cn) -∗
     iref_slot -∗
-    inode_ref γi ck cq cdev cinum -∗
+    inode_ref (icn_ref cn) ck cq cdev cinum -∗
     kalloc_env γa on -∗
     proc_priv γf pme pid_p Vp -∗
     (* THE CALLER'S EXIT, THREADED -- kwait's [kw_exit_fn] recipe.  The three
@@ -239,7 +244,7 @@ Section KforkPrologue.
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
         proc_priv γf pme pid_p Vp -∗
-        (∃ q' : Qp, inode_ref γi ck q' cdev cinum) -∗
+        (∃ q' : Qp, inode_ref (icn_ref cn) ck q' cdev cinum) -∗
         ( kalloc_env γa on
           ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
              kalloc_env γa None) ) -∗
@@ -295,7 +300,7 @@ Section KforkPrologue.
         SwtchCtx.own_ctx (p_context npa) -∗
         IntrDefs.arm_pay lvl eb pme -∗
         cpu_own (S lvl) eb pme C false -∗
-        (∃ q' : Qp, inode_ref γi ck q' cdev cinum) -∗
+        (∃ q' : Qp, inode_ref (icn_ref cn) ck q' cdev cinum) -∗
         kalloc_env γa None -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -359,12 +364,12 @@ Section KforkPrologue.
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay lvl eb pme -∗
         cpu_own (S lvl) eb pme C false -∗
-        (∃ q' : Qp, inode_ref γi ck q' cdev cinum) -∗
+        (∃ q' : Qp, inode_ref (icn_ref cn) ck q' cdev cinum) -∗
         kalloc_env γa None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
-        is_itable γil γi -∗
-        itable_inv γi -∗
+        is_itable2 γil cn γfs γic cov logstart nib -∗
+        itable_inv (icn_ref cn) -∗
         iref_slot -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
