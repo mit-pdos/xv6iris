@@ -424,7 +424,6 @@ Section KforkArms.
     (56 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
-    icn_ref cn = iref_name ->
     m !!! Regidx csp_rs1 = sp0 -> m !!! Regidx Rra = ra0 -> m !!! Regidx Rs0 = s00 ->
     m !!! Regidx Rs1 = s10 -> m !!! Regidx Rs5 = s50 ->
     Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ->
@@ -462,7 +461,7 @@ Section KforkArms.
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
     is_itable2 γil cn γfs γic cov logstart nib -∗
-    itable_inv (icn_ref cn) -∗
+    itable_inv -∗
     iref_slot -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
@@ -473,7 +472,7 @@ Section KforkArms.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hbeq Hcwd Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMts5
+    intros HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMts5
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
       Hofnull Hcwdnull.
     subst tfsrc tfdst.
@@ -563,7 +562,7 @@ Section KforkArms.
       iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart nib pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 K (S lvl) eb C
-                ltac:(lia) ltac:(lia) Hcwd Hd4 Hd3
+                ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx [-]").
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4".
@@ -663,7 +662,7 @@ Section KforkMain.
       m lvl K eb pme C b pid_p Vp.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
-    intros HK Hlvl Hnm.
+    intros HK Hlvl.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
              #Hitbl #Hitinv Hiref Henv Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
@@ -733,7 +732,7 @@ Section KforkMain.
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
                 (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
                 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst
-                (wpk_K_ge56 K HK) Hlvl Hbeq Hnm
+                (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
                 Hnpa HjN Hgamma Hofn Hcwdn

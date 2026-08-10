@@ -89,7 +89,7 @@ Local Open Scope Z_scope.
 Definition K_idup : nat := 14%nat.
 
 Definition wp_idup_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !irefNameG Σ, !irefslotG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
@@ -107,11 +107,11 @@ Definition wp_idup_sconf_body
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   is_itable2 γl cn γfs γi cov logstart nib -∗
-  itable_inv (icn_ref cn) -∗
+  itable_inv -∗
   panic_wp_any -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
-  inode_ref (icn_ref cn) k q dev inum -∗
+  inode_ref k q dev inum -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
@@ -119,14 +119,14 @@ Definition wp_idup_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-    inode_ref (icn_ref cn) k (q/2)%Qp dev inum -∗
-    inode_ref (icn_ref cn) k (q/2)%Qp dev inum -∗
+    inode_ref k (q/2)%Qp dev inum -∗
+    inode_ref k (q/2)%Qp dev inum -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IDUP.
   Parameter wp_idup_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !irefNameG Σ, !irefslotG Σ,
              !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)

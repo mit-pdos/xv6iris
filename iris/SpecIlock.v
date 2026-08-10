@@ -145,7 +145,7 @@ Definition K_ilock : nat := 44%nat.
 
 Definition wp_ilock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !irefNameG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)           (* the running process *)
@@ -192,13 +192,13 @@ Definition wp_ilock_sconf_body
   bio_ctx bn (fs_view gfs gd dev cov) -∗
   (* THE THREE PERSISTENT INVARIANTS: the [ref] words, the entry's content,
      the inode region *)
-  itable_inv (icn_ref cn) -∗
+  itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   ireg_inv gi gfs inodestart nib -∗
   (* THE ENTRY'S SLEEPLOCK -- over the CHECKOUT TOKEN alone *)
   is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
   (* THE CALLER'S REFERENCE -- consumed; deposited whole at the checkout *)
-  inode_ref (icn_ref cn) k q dev inum -∗
+  inode_ref k q dev inum -∗
   (* sb.inodestart, read once *)
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
   (* the caller's own pid cell (acquiresleep records it in the lock) *)
@@ -237,7 +237,7 @@ Definition wp_ilock_sconf_body
 Module Type ILOCK.
   Parameter wp_ilock_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !irefNameG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (gs : list gname) (j : nat) (gl : gname)

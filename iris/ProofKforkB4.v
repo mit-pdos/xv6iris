@@ -25,7 +25,7 @@
    THE RESOURCE STORY.  [p->cwd] names icache slot [ck] ([pv_cwd Vp = ientry
    ck], a premise of kfork's own contract because [ProcInv.cwd_ref] is [emp]
    and cannot produce idup's argument -- see SpecKfork.v's header).  idup
-   hands back TWO halves of [inode_ref (icn_ref cn) ck (cq/2) cdev cinum]; this block
+   hands back TWO halves of [inode_ref ck (cq/2) cdev cinum]; this block
    keeps one and drops the other (the child's [cwd_ref] is [emp], so there
    is nowhere to put it).  safestrcpy's precise characterisation of the
    child's new name bytes ([ssc_stop]/[ssc_post]) is dropped on the way out:
@@ -173,19 +173,16 @@ Section KforkB4Res.
      [ProcInv.cwd_ref] was [emp] the child's reference could be conjured at
      any [v] and idup's second half was dropped on the floor; now the two
      are the same predicate and the store at +0xac consumes the half, which
-     is the whole reason idup returns two.
-
-     [icn_ref cn = iref_name] is the one pure premise that ties the itable
-     the caller holds the LOCK for to the canonical authority [cwd_ref] is
-     stated over ([InodeRef.v]'s header: there is exactly one itable per
-     system, so threading its gname through [proc_priv] would put a
-     filesystem ghost name on thirty-three spec files). *)
-  Lemma kfk_child_cwd (cn : ic_names) (k : nat) (q : Qp) (dev inum : mword 32) :
-    icn_ref cn = iref_name ->
+     is the whole reason idup returns two.  No coherence premise is needed
+     to tie the itable the caller holds the LOCK for to the authority
+     [cwd_ref] is stated over: both are the same canonical
+     [IcacheInv.iref_name] by construction ([InodeRef.v]'s header explains
+     why). *)
+  Lemma kfk_child_cwd (k : nat) (q : Qp) (dev inum : mword 32) :
     (k < NINODE)%nat ->
-    inode_ref (icn_ref cn) k q dev inum -∗ cwd_ref (ientry k).
+    inode_ref k q dev inum -∗ cwd_ref (ientry k).
   Proof.
-    iIntros (Hnm Hk) "Href". rewrite Hnm.
+    iIntros (Hk) "Href". rewrite /cwd_ref /iref_at.
     iExists q, k, dev, inum. iFrame "Href". iPureIntro. done.
   Qed.
 
@@ -222,11 +219,12 @@ Section KforkB4Proof.
       (m : regfile) (K lvl : nat) (eb : bool) (C : iProp Σ) :
     (22 <= K)%nat ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-    (* the itable this block holds the lock for IS the one [cwd_ref] names.
-       This replaces the old [pv_cwd Vp = ientry ck] premise and the
-       [inode_ref] that came with it: the parent's reference is inside its
-       OWN block now, and the slot it names is read off it. *)
-    icn_ref cn = iref_name ->
+    (* the itable this block holds the lock for IS the one [cwd_ref] names,
+       by construction: both are stated over the canonical
+       [IcacheInv.iref_name].  This replaces the old [pv_cwd Vp = ientry ck]
+       premise and the [inode_ref] that came with it: the parent's
+       reference is inside its OWN block now, and the slot it names is read
+       off it. *)
     m !!! Regidx Rs5 = pme ->
     m !!! Regidx Rs4 = npa ->
     sie_cap_gpr m (K - 8)%nat false pme -∗
@@ -235,7 +233,7 @@ Section KforkB4Proof.
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
     panic_wp_any -∗
     is_itable2 γil cn γfs γic cov logstart nib -∗
-    itable_inv (icn_ref cn) -∗
+    itable_inv -∗
     iref_slot -∗
     proc_priv γf pme pid_p Vp -∗
     (* THE CHILD IS STILL IN THE CONSTRUCTION WINDOW: allocproc left
@@ -259,7 +257,7 @@ Section KforkB4Proof.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hnm Hms5 Hms4.
+    intros HK Hlvl Hms5 Hms4.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hitb #Hitinv Hirs Hparent Hchild Hcont".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
     iPoseProof (kfk_0a8 with "Htext") as "Hi0a8".
@@ -279,7 +277,6 @@ Section KforkB4Proof.
        than premised on the caller. *)
     iDestruct (proc_priv_cwd γf pme pid_p Vp with "Hparent") as "(Hpcwd & Hpcref & Hpback)".
     iDestruct "Hpcref" as (cq ck cdev cinum) "[[%Hcwd %Hcklt] Hiref]".
-    iEval (rewrite -Hnm) in "Hiref".
     assert (Hpa0a4 : add_vec (rget m Rs5) (sign_extend' 64 (mword_of_int 336 : mword 12))
                      = p_cwd pme).
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
@@ -336,7 +333,7 @@ Section KforkB4Proof.
               with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hiref [-]").
     iApply wp_next_off_intro.
     iIntros (mr) "Hcg Hown Hpc %Hidup_post Href1 Href2".
-    iDestruct (kfk_child_cwd cn ck (cq/2)%Qp cdev cinum Hnm Hcklt
+    iDestruct (kfk_child_cwd ck (cq/2)%Qp cdev cinum Hcklt
                  with "Href1") as "Hpcref1".
     iEval (rewrite -Hcwd) in "Hpcref1".
     iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
@@ -365,7 +362,7 @@ Section KforkB4Proof.
     assert (Hstoreval : rget mr Ra0 = ientry ck).
     { rewrite (rget_ne mr Ra0 ltac:(vm_compute; discriminate)). exact Hidup_a0. }
     iEval (rewrite Hstoreval) in "Hccwd".
-    iDestruct (kfk_child_cwd cn ck (cq/2)%Qp cdev cinum Hnm Hcklt
+    iDestruct (kfk_child_cwd ck (cq/2)%Qp cdev cinum Hcklt
                  with "Href2") as "Hccref2".
     iDestruct ("Hcback" $! (ientry ck) with "Hccwd") as "Hchild2".
     (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)

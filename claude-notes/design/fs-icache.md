@@ -149,7 +149,7 @@ reader to conclude its own slot's count is ≥ 1.
 
 ```coq
 Definition inode_ident k dq dev inum := i_dev (ientry k) ↦₄{dq} dev ∗ i_inum (ientry k) ↦₄{dq} inum.
-Definition inode_ref γ k q dev inum   := iref_tok γ k q ∗ inode_ident k (DfracOwn q) dev inum.
+Definition inode_ref k q dev inum    := iref_tok k q ∗ inode_ident k (DfracOwn q) dev inum.
 ```
 
 Note it takes no inode *pointer*: `ientry` determines the address from the
@@ -158,14 +158,18 @@ interchangeable. `inode_ref_agree` — two references to one entry see the
 same `dev`/`inum` — falls out of fractional points-to agreement with no
 `agree` ghost, exactly as in the ftable.
 
-**This is the predicate `FileInv.inode_ref v q` (today literally `emp`) and
-`ProcInv.cwd_ref v = inode_ref v 1` are placeholders for.** Its signature
-does not match theirs: it needs `γ` (and reads the slot off the address).
-Two ways to close that, both recorded, neither taken here:
-`inode_ref` gains a `γ` parameter (ripples into `FileInv`, `ProcInv`,
-`SpecIput`, `SpecFileclose`, `kexit`), or `icacheG` carries the gname as a
-class field so the predicate's arity is unchanged. The second is cheaper
-and is what the ftable would have done if it had needed it.
+**The reference authority's gname is canonical, not a parameter.**
+`inode_ref`/`inode_shr`/`itable_inv`/`itable_half`/`iref_tok` and the rest
+of this file's algebra take no explicit `γ`: `IcacheInv.irefNameG`'s
+`iref_name` field is it, inherited (not re-declared) by every class that
+needs it — `InodeRef.v`'s `iref_at`/`iref_shr_at` and, through those,
+`ProcInv.cwd_ref` (now real: `cwd_ref v := ∃ q, iref_at v q`). There is
+exactly one itable per system, so this is the same choice `IrefSlots`/
+`FdSlots` made for their own supplies, and it is why no site ever needs a
+`your-γ = my-γ` coherence premise to use two of these predicates together.
+`FileInv.inode_ref v q` — `iput`'s still-`emp` placeholder — is a separate,
+unrelated predicate at the file-table layer; closing it is `SpecIput`'s own
+open item, not this one's.
 
 ### The lock's resource
 

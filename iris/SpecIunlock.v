@@ -91,7 +91,7 @@ Definition K_iunlock : nat := 26%nat.
 
 Definition wp_iunlock_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-      !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !fsLogG Σ, !irefNameG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname)
@@ -116,7 +116,7 @@ Definition wp_iunlock_sconf_body
   kernel_text -∗ pc_is pcE -∗
   panic_wp_any -∗
   (* the [ref] words, and the entry's content escrow *)
-  itable_inv (icn_ref cn) -∗
+  itable_inv -∗
   ic_escrow cn gfs gi cov logstart k -∗
   is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
   (* THE HOLDER'S BUNDLE -- the third dead panic test is exactly this *)
@@ -140,14 +140,14 @@ Definition wp_iunlock_sconf_body
       pc_is ret_tgt -∗
       p_pid p ↦₄{dq} pidv -∗
       (* the caller's reference, back whole and at ITS OWN device *)
-      inode_ref (icn_ref cn) k q dev inum -∗
+      inode_ref k q dev inum -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IUNLOCK.
   Parameter wp_iunlock_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-             !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !fsLogG Σ, !irefNameG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 
       (gs : list gname)

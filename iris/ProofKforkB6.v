@@ -258,7 +258,7 @@ Section KforkPrologue.
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     is_ftable γl γf -∗
     is_itable2 γil cn γfs γic cov logstart nib -∗
-    itable_inv (icn_ref cn) -∗
+    itable_inv -∗
     iref_slot -∗
     kalloc_env γa on -∗
     proc_priv γf pme pid_p Vp -∗
@@ -410,7 +410,7 @@ Section KforkPrologue.
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
         is_itable2 γil cn γfs γic cov logstart nib -∗
-        itable_inv (icn_ref cn) -∗
+        itable_inv -∗
         iref_slot -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗

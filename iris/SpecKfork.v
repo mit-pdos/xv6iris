@@ -118,15 +118,12 @@
 
    What is left of the icache is only what the LOCK needs:
    [IcacheEscrow.is_itable2 γil cn γfs γic cov logstart nib] (which drags
-   the disk and log fabric -- [γfs], [cov], [logstart], [nib] -- along),
-   [itable_inv (icn_ref cn)], and one pure equation:
-
-       icn_ref cn = iref_name
-
-   -- the itable the caller holds the lock for IS the one [ProcInv.cwd_ref]
-   is stated over.  There is exactly one itable per system, so this is a
-   coherence side condition rather than a resource; [InodeRef.v]'s header
-   explains why the authority's gname is canonical instead of threaded.
+   the disk and log fabric -- [γfs], [cov], [logstart], [nib] -- along) and
+   [itable_inv].  No coherence side condition ties the caller's lock to
+   [ProcInv.cwd_ref]'s reference: both are stated over the same canonical
+   [IcacheInv.iref_name] by construction, so there is nothing left to
+   equate; [InodeRef.v]'s header explains why the authority's gname is
+   canonical instead of threaded.
 
    THE CHILD IS HANDED OVER AS A DEFICIT BLOCK AND COMES BACK WHOLE.
    allocproc returns [ProcInv.proc_priv_nocwd] -- a process whose [p->cwd]
@@ -228,8 +225,6 @@ Definition wp_kfork_sconf_body
      (lvl+2), and -- once the lock is held -- uvmcopy/freeproc/filedup/idup
      at (S lvl)+1 = lvl+2 again. *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-  (* the itable the caller holds the lock for IS the one [cwd_ref] names *)
-  icn_ref cn = iref_name ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
@@ -239,7 +234,7 @@ Definition wp_kfork_sconf_body
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
   is_itable2 γil cn γfs γic cov logstart nib -∗
-  itable_inv (icn_ref cn) -∗
+  itable_inv -∗
   iref_slot -∗
   kalloc_env γa None -∗
   proc_priv γf pme pid_p Vp -∗

@@ -151,7 +151,7 @@ Definition iul_sp (m M : regfile) : Prop :=
 
 Section ProofIunlockMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ,
-            !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !fsLogG Σ, !irefNameG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* iunlock's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
@@ -173,7 +173,7 @@ Section ProofIunlockMain.
         cpu_own 0 eb p C b -∗
         pc_is (ret_pc (m !!! Regidx Rra : mword 64)) -∗
         p_pid p ↦₄{dq} pidv -∗
-        inode_ref (icn_ref cn) k q dev inum -∗
+        inode_ref k q dev inum -∗
         WP (Loop : expr riscv_lang))%I.
 
   Lemma wp_iunlock_sconf 
@@ -478,7 +478,7 @@ Section ProofIunlockMain.
         as "[Hvalid Hbor]".
       iDestruct "Hbor" as (qb devb inumb) "[Hrefb Hbback]".
       iDestruct "Hrefb" as "[Hrt Hrid]".
-      iMod (iref_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) (icn_ref cn) k qb
+      iMod (iref_load_au (⊤ ∖ ↑minstretN ∖ ↑icEscN) k qb
               ltac:(solve_ndisj) with "Hitbl Hrt") as (v) "[Hcell Hcl]".
       iModIntro. iExists v. iFrame "Hcell". iIntros "Hcell".
       iMod ("Hcl" with "Hcell") as "[%Hb Hrt]".

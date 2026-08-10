@@ -108,11 +108,11 @@ change that produced it.
 - **A slow `Qed` is usually proof-term SIZE, not conversion — and `rocq compile -profile <f>.json` is what tells you which.** It breaks each `Qed` into `HConstr.of_constr` / `Typeops.execute` / `close_proof` / `sort_and_universes_of_constr`; measured across this tree only ~25 % is `Typeops` (real typechecking) and the rest is term-size-linear plumbing that re-walks every *occurrence* of a shared subterm. The one-command tell is **`Set Debug "hconstr".`**, which prints each `Qed`'s `tree size` and `bindings` (the DAG): a high **tree/bindings ratio** means a small proof with an exponentially unfolded term. To localise it inside a lemma, bisect with an `Axiom cheat_ : forall (A : Type), A.` stub (unlike `Admitted` this still runs `Qed`). See `optimization.md` for the whole method and for the `unfold set_reg` 3^N trap it found.
 - **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
 
-## Typeclass sweeps: the two traps that do not look like typeclass problems
+## Typeclass sweeps: the three traps that do not look like typeclass problems
 
 Adding a class constraint to a bottom-of-the-tree predicate (e.g. giving
-`ProcInv.proc_priv` an `!irefNameG Σ`) is a mechanical sweep with two failure
-modes that produce errors naming something else entirely.
+`ProcInv.proc_priv` an `!irefNameG Σ`) is a mechanical sweep with three
+failure modes that produce errors naming something else entirely.
 
 - **A class that is not IMPORTED becomes a fresh VARIABLE, silently.** Rocq's
   backtick binders do implicit generalization, so `` Context `{!irefNameG Σ} ``
@@ -136,13 +136,36 @@ modes that produce errors naming something else entirely.
   are character-for-character the same. Fix: drop the standalone `!icacheG Σ`
   and let the bundling class supply it. (Six files needed this: the kfork
   chain and fileread.)
+- **MOVING a class's `Class` declaration to a lower file breaks every
+  `Require Export` chain built on the OLD location, silently.** When
+  `irefNameG` moved from `InodeRef.v` into `IcacheInv.v` (so `itable_inv`/
+  `itable_half`/`iref_tok` could be stated over it directly, retiring their
+  explicit `γ` parameter), `InodeRef.v` still only `Require Import
+  IcacheInv`d it — so a file like `ProcInv.v` that does `Require Export
+  InodeRef` no longer re-exports `irefNameG` at all, and every one of ITS
+  `Require Export ProcInv` downstream files hits trap one (`irefNameG` /
+  `irefNameG0` both in context) despite `ProcInv.v` itself compiling fine in
+  isolation. **The fix is always to promote the broken link's `Require
+  Import` to `Require Export`**, not to patch every downstream site — the
+  chain is supposed to carry the class, and the mid-chain file is where it
+  broke. Check every `Require Import <file-you-moved-the-class-out-of>` in
+  files the class's own definitions/notations appear in.
 
-Both are invisible to a per-file `coqc` of the file you edited; they appear
-only where the predicate is USED. Do the sweep by fixing exactly the files
-the build names, in both the `_body` Definition and the `Module Type`
+All three are invisible to a per-file `coqc` of the file you edited; they
+appear only where the predicate is USED, and can appear only once every
+`.vo` in the tree is actually fresh (a stale sibling `.vo` — see the "Stale
+`.vo` trap" bullet above — reproduces trap one's exact symptom and wastes
+time chasing a phantom fix). Do the sweep by fixing exactly the files the
+build names, in both the `_body` Definition and the `Module Type`
 Parameter — a `Parameter` binder list that disagrees with the `Definition` it
 seals fails at `Module` instantiation with *"Signature components for field
-… do not match"*, which reads as a spec/proof mismatch and is not one.
+… do not match"*, which reads as a spec/proof mismatch and is not one. Once
+every file compiles standalone, validate with a full `make proofs` (or
+`make -f CoqMakefile -j16 -k` from `iris/`) rather than trusting a chain of
+individual `coqc` runs — those load whatever `.vo` already sits on disk for
+every dependency, so two files edited in the same sweep but checked out of
+dependency order can each "pass" against a stale sibling and still fail
+together under `make`.
 
 ## Changing the kernel SOURCE: what an image shift breaks, and how to find it
 

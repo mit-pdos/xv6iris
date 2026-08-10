@@ -41,15 +41,19 @@
    thirty-three spec files that mention it -- purely so that a process can
    name its cwd.  [FdSlots] and [IrefSlots] already carry their supply's
    name in the class for exactly this reason; [IrefSlots.v]'s own header
-   spells out the argument.  So does this.
+   spells out the argument.  So does this -- and [IcacheInv.irefNameG] (the
+   class [inode_ref]/[inode_shr]/[itable_inv]/[itable_half] are all stated
+   over) is where it actually lives; this file just inherits it.
 
    It cannot instead ride in [FileInv.fpnames]: [file_ref] is
    [∃ pn, fpay_tok γ k q pn ∗ file_payload q pn C], so the record is
    EXISTENTIALLY bound and a caller recovering a payload could never tie
    its gname to the itable it holds the lock for.
 
-   A function that holds BOTH a reference and the itable lock ties them
-   with one pure premise, [icn_ref cn = iref_name]. *)
+   Because the gname is canonical rather than a parameter, a function that
+   holds both a reference and the itable lock needs no bridging premise to
+   tie them together -- they are stated over the same [iref_name] by
+   construction. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -58,16 +62,9 @@ From iris.base_logic.lib Require Import own.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvExtras.
-Require Import IcacheInv.
+Require Export IcacheInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
-
-(* The itable's reference authority, canonically.  [icacheG] is inherited
-   rather than required separately so a client needs one constraint. *)
-Class irefNameG (Σ : gFunctors) := IrefNameG {
-  irefname_icacheG :: icacheG Σ;
-  iref_name : gname;
-}.
 
 (* [ientry k] is a kernel address, so it is never null -- the fourth
    corollary of [IcacheInv.ientry_unsigned], whose own comment already
@@ -93,7 +90,7 @@ Section InodeRef.
   Definition iref_at (v : mword 64) (q : Qp) : iProp Σ :=
     (∃ (k : nat) (dev inum : mword 32),
        ⌜ v = ientry k /\ (k < NINODE)%nat ⌝ ∗
-       inode_ref iref_name k q dev inum)%I.
+       inode_ref k q dev inum)%I.
 
   (* [q] OF SOMEBODY ELSE'S REFERENCE to the inode at [v] -- see
      [IcacheInv]'s algebra header.  This is what an fd holds of the inode
@@ -102,7 +99,7 @@ Section InodeRef.
   Definition iref_shr_at (v : mword 64) (q : Qp) : iProp Σ :=
     (∃ (k : nat) (dev inum : mword 32),
        ⌜ v = ientry k /\ (k < NINODE)%nat ⌝ ∗
-       inode_shr iref_name k q dev inum)%I.
+       inode_shr k q dev inum)%I.
 
   (* A HELD REFERENCE IMPLIES A NON-NULL POINTER, with no side condition --
      this is what lets a live process's [p->cwd <> 0] be read off its own

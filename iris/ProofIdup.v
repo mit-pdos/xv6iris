@@ -145,7 +145,7 @@ End IdupAuLeaves.
 Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) : IDUP.
 
 Section ProofIdup.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !irefNameG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -400,12 +400,12 @@ Section ProofIdup.
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
     iApply (wp_lw_au_idup true (mword_of_int (KernelSyms.idup + 0x18)) Ra5 Rs1
               (mword_of_int 8 : mword 12) macq (K - 4)%nat
-              (fun v => (⌜v = iref_word M k⌝ ∗ itable_half (icn_ref cn) M)%I)
+              (fun v => (⌜v = iref_word M k⌝ ∗ itable_half M)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc Hi18 [Hhalf] [-]").
     { rewrite Hpa.
-      iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) (icn_ref cn) M k ltac:(solve_ndisj) Hk
+      iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) M k ltac:(solve_ndisj) Hk
               with "Hinv Hhalf") as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback" with "Hcell") as "Hhalf". iModIntro. by iFrame. }
@@ -450,13 +450,13 @@ Section ProofIdup.
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
     iApply (wp_sw_au_idup true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) D2 (K - 4)%nat
-              (itable_half (icn_ref cn) (<[k := (qt, S cnt)]> M) ∗
-               iref_tok (icn_ref cn) k (q/2)%Qp ∗ iref_tok (icn_ref cn) k (q/2)%Qp)%I
+              (itable_half (<[k := (qt, S cnt)]> M) ∗
+               iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(solve_ndisj)
               with "Hcg Hpc Hi1c [Hhalf Hrtok] [-]").
     { rewrite Hpa2 Hstv.
-      iMod (iref_dup_store_au (⊤ ∖ ↑minstretN) (icn_ref cn) M k q qt cnt
+      iMod (iref_dup_store_au (⊤ ∖ ↑minstretN) M k q qt cnt
               ltac:(solve_ndisj) HMk Hno with "Hinv Hhalf Hrtok") as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback" with "Hcell") as "(Hhalf & Ht1 & Ht2)". iModIntro. iFrame. }
