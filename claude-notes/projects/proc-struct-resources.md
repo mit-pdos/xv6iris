@@ -1393,18 +1393,32 @@ the evidence for every offset. This file is only the worklist.
       duplicate — so the ledger closes per iteration and nothing has to be
       routed outside the loop after all.
 
-- [ ] **S5 — `cwd_ref`. UNBLOCKED (the inode model exists), URGENT (S11 has
-      to carry five premises no caller can discharge), and PLANNED IN ITS
-      OWN FILE: [`cwd-ref.md`](cwd-ref.md).** Read that before touching
-      `ProcInv.v`. The short version: `cwd_ref` becomes `ofile_slot`'s
-      disjunction with the fraction existential and an `iref_slot` unit
-      parked on the null arm; the `IrefSlots -> FileInv` dependency cycle is
-      one edge wide (it exists for `NFILE`) and is broken by factoring the
-      reference out of the invariant into a new low `InodeRef.v`; the itable
-      gname goes CANONICAL (the class carries it, as `FdSlots`/`IrefSlots`
-      already do) so `proc_priv` grows a class constraint and not a
-      parameter. **Do it AFTER kfork's proof lands**, with kfork's contract
-      simplification as the acceptance test.
+- [x] **S5 — `cwd_ref` IS REAL, and kfork's contract is clean.** Its own
+      file, [`cwd-ref.md`](cwd-ref.md), has the design and what is left.
+      `ProcInv.cwd_ref v := ∃ q, InodeRef.iref_at v q` — no null arm, so
+      "a live process has a non-null cwd" is a PROJECTION of the block and
+      no state transition re-establishes it. The price is the construction
+      window (allocproc returns a process whose cwd it has not set), paid by
+      `proc_priv_nocwd` + `proc_priv_split_cwd`; only the REFERENCE splits
+      off, not the `p_cwd` cell, so `proc_dormant` / `SpecFreeproc` /
+      `BootCarveMain` were untouched. The `IrefSlots -> FileInv` cycle was
+      broken by moving `NFILE` to `FdSlots.v`; the itable's gname went
+      canonical; and the iref-slot supply is routed
+      (`proc_dormant` parks `iref_slots (1 + IREFSPARE)`, procinit
+      distributes, allocproc hands out, kexit rejoins what iput returns).
+
+      **The acceptance test passed:** `SpecKfork` shed `ck`, `cq`, `cdev`,
+      `cinum`, the `inode_ref` premise, the `iref_slot`, the
+      `pv_cwd Vp = ientry ck` side condition and `kfork_post`'s `∃ q'`.
+      `ProofKforkB4.kfk_cwd_ref_any` — the hole that conjured the child's
+      reference while idup's second half went on the floor — is DELETED; the
+      store at +0xac consumes that half. What is left of the icache in
+      kfork's contract is the lock and the invariant.
+
+      **What S5 still owes is the FILE TABLE's half** —
+      `FileInv.file_payload`'s FD_INODE arm, which is what unblocks a real
+      `SpecIput`. Three drops are marked with `###` banners until it lands:
+      kexit's reference, fileclose's returned slot, boot's `NFILE` units.
 
 - [x] **S6 — `kexit` PROVEN AND LINKED**, and with it **`sys_exit`** — its own
       file, [`kexit.md`](../completed/kexit.md). What it forced into this
