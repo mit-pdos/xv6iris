@@ -460,7 +460,7 @@ Section WpBfreeSllw.
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     sign_extend' 64
       (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
          (subrange_vec_dec
@@ -474,10 +474,10 @@ Section WpBfreeSllw.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPEW_SLLW_gpr rs2 rs1 rd s_pc).

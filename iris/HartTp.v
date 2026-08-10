@@ -18,10 +18,16 @@
      rides in [rd_ok] (IntrDefs.v, where [csp_rs1] is in scope), which replaces
      the [rd <> csp_rs1] premise IN PLACE, so no call site changes arity.
    - a leaf that READS [rs] reads [rget m rs], which is correct for EVERY
-     register including [tp] -- so no [rs <> Rtp] premises anywhere, and the
-     inlined [mycpu] tp-reads in sched / scheduler / push_off need no special
-     leaf family.  For any literal [k <> 4], [rget m k] is [m !!! Regidx k]
-     by one [upd_ne] ([rget_ne] below).
+     register including [tp] AT A FIXED HART -- so no unconditional
+     [rs <> Rtp] premise anywhere, and the inlined [mycpu] tp-reads in sched /
+     scheduler / push_off need no special leaf family.  For any literal
+     [k <> 4], [rget m k] is [m !!! Regidx k] by one [upd_ne] ([rget_ne]
+     below).  What a read DOES need, once a leaf's continuation can be
+     instantiated at a DIFFERENT hart, is that its value not depend on WHICH
+     hart -- and by [rget_hart_indep] below that holds at every register
+     except [tp].  That residual side condition is [IntrDefs.src_ok], guarded
+     on the SIE index because at interrupts-off the hart cannot move at all
+     ([WpNext.wp_next_off]) and even a tp read is safe.
 
    Code that legitimately writes [tp] -- boot ([start]'s [w_tp]) and the
    trampoline ([uservec] restoring the kernel hartid, [userret] restoring the
@@ -75,6 +81,31 @@ Proof. by rewrite !rget_tp. Qed.
 
 Lemma rget_tp_all `{CID : CpuId} : forall m : regfile, rget m Rtp = cid_word_of cpu_id.
 Proof. exact rget_tp. Qed.
+
+(* AWAY FROM tp, A REGISTER READ DOES NOT DEPEND ON WHICH HART WE ARE ON --
+   and at tp it does, by construction ([rget_tp]: the value IS the hart id).
+   This is the whole content of the pin, stated as the fact CONSUMERS need
+   rather than as a rewrite: [rget] is a lookup in [tp_pin m], and the pin
+   touches exactly one slot, so the hart argument is dead everywhere else.
+
+   WHY IT IS HERE.  A leaf's σ-obligation is spelled at the hart whose
+   [CpuId] instance is ambient when the callback is instantiated.  Today that
+   is always the caller's hart, so this lemma has no user.  A later change
+   moves [WpSmodeIntr.wp_instr_s_sconf]'s callback INSIDE [WpNext.wp_next b p]
+   so that an instruction can execute on the hart a trap returned to; from
+   then on a leaf must reconcile [rget (CID := C1) m rs] against a caller's
+   fact about [rget (CID := C0) m rs], and THIS is the reconciliation.  The
+   side condition it needs is [IntrDefs.src_ok] / [ops_ok], which is landed
+   in the same commit -- see [IntrDefs.rget_src_indep], which is this lemma
+   under that guard, and which is what makes the new premise a proved
+   obligation rather than an asserted one. *)
+Lemma rget_hart_indep (m : regfile) (rs : mword 5) :
+  Regidx rs <> Regidx Rtp ->
+  forall c1 c2 : CpuId, rget (CID := c1) m rs = rget (CID := c2) m rs.
+Proof.
+  intros Hrs c1 c2.
+  by rewrite (rget_ne (CID := c1) m rs Hrs), (rget_ne (CID := c2) m rs Hrs).
+Qed.
 
 (* A map already carrying this hart's id at tp is its own pin: the bridge for
    the boot / trampoline code that owns [tp] explicitly. *)

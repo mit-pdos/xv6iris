@@ -119,7 +119,7 @@ Section BallocLeaves.
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs1 ->
     sign_extend' 64
       (shift_bits_right_arith (subrange_vec_dec (rget m rs1) 31 0 : mword 32) shamt)
       = wval ->
@@ -131,10 +131,10 @@ Section BallocLeaves.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRAIW)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIWOP_SRAIW_gpr rs1 rd shamt s_pc).
@@ -152,7 +152,7 @@ Section BallocLeaves.
       sign_extend' 64
         (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
            (subrange_vec_dec (subrange_vec_dec (rget m rs2) 31 0 : mword 32) 4 0)) in
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -162,10 +162,10 @@ Section BallocLeaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW))
-              wval m n b Hrd Hrdok _
+              wval m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPEW_SLLW_gpr rs2 rs1 rd s_pc).
