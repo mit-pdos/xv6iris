@@ -58,6 +58,12 @@ Require Import ArrCursor.
 Require Export FdSlots.
 Require Import WpLock.
 Require Import PipeInv.
+(* the inode layer's REFERENCE only -- [InodeRef.v]'s header explains why that
+   file exists and why nothing at the Spec/Code/Proof level is reachable from
+   it.  [IcacheInv]'s cone does not mention [FileInv] (the [NFILE] edge that
+   used to make it a cycle now runs through [FdSlots]), so this is an edge and
+   not a loop. *)
+Require Import InodeRef.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Local Open Scope Z_scope.
@@ -180,11 +186,32 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    that the payload has an identity at all.  The supply is minted with the
    authority ([ftable_ghosts_alloc]), every slot present; a free slot's entry
    is held by the invariant, exactly like its content cells. *)
-Record fpnames := MkFPNames { fp_lock : gname; fp_pipe : pipe_names }.
+(* [fp_iq] IS NOT A GHOST NAME, and it is the one field here that is a plain
+   number: it is THE FRACTION OF THE INODE'S IDENTITY CELLS that this slot's
+   FD_INODE / FD_DEVICE payload hands to its holders, fixed when the file is
+   opened and unchanged for the file's life.  A holder of file fraction [q]
+   carries [q * fp_iq] of them.
+
+   WHY IT HAS TO BE A CONSTANT RATHER THAN AN EXISTENTIAL.  An existential
+   "some share" splits and rejoins freely, which would make
+   [file_payload_split] fall out for nothing -- and would make the inode
+   UNFREEABLE.  [IcacheInv.iref_close_last_step] requires the final closer to
+   hold [iref_tok k qt], the ENTIRE outstanding slice, and
+   [IcacheInv.islot_rest_join] rejoins that with the table's leftover
+   [1/2 - qt] to hand back a free slot; so every sliver handed out has to
+   come back, and an existential fraction lets a holder split and drop half.
+   With a constant, [file_payload_split] is distributivity and the gather at
+   the last close adds up to exactly what was handed out.
+
+   It lives HERE, in the per-slot names, because that is what this record is
+   for: per-slot constants agreed across every holder by [fpay_tok]. *)
+Record fpnames := MkFPNames
+  { fp_lock : gname; fp_pipe : pipe_names; fp_iq : Qp }.
 
 Global Instance fpnames_inhabited : Inhabited fpnames :=
   populate (MkFPNames 1%positive
-              (MkPipeNames 1%positive 1%positive 1%positive 1%positive)).
+              (MkPipeNames 1%positive 1%positive 1%positive 1%positive)
+              1%Qp).
 
 Definition fpayUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO fpnames))).
@@ -334,7 +361,7 @@ Lemma pos_succ_1_add (b : positive) : Pos.succ (1 + b) = (2 + b)%positive.
 Proof. lia. Qed.
 
 Section FileInv.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
 
   (* ---- the content cells, at an arbitrary fraction ----
 
@@ -482,17 +509,29 @@ Section FileInv.
   (*  The payload: the thing a [struct file] is a reference TO            *)
   (* ------------------------------------------------------------------ *)
 
-  (* An inode reference, as [ProcInv.cwd_ref] is today: a PLACEHOLDER with
-     the right shape, so the contracts that surrender one can be written now
-     and gain content when the inode layer lands (design/fs-inode.md).  It is
-     stated fractionally from the start -- [cwd_ref v] is [inode_ref v 1] --
-     because a file's payload is split by every filedup, and retrofitting the
-     fraction later would restate every contract that mentions it. *)
-  Definition inode_ref (v : mword 64) (q : Qp) : iProp Σ := emp%I.
+  (* A SHARE OF THE FILE'S INODE REFERENCE -- real now, not a placeholder.
 
-  Lemma inode_ref_split v q1 q2 :
-    inode_ref v (q1 + q2) ⊣⊢ inode_ref v q1 ∗ inode_ref v q2.
-  Proof. rewrite /inode_ref. by rewrite left_id. Qed.
+     THE FILE HOLDS ONE INODE REFERENCE AND SHARES IT.  [create]/[namei] gave
+     it exactly one; [filedup] bumps [f->ref] and never [ip->ref]; the LAST
+     [fileclose] spends it on [iput].  So N holders of this [struct file]
+     share ONE reference, and what each of them carries is a
+     [InodeRef.iref_shr_at] -- a slice of the inode's identity cells with a
+     count of ZERO.  Enough to read [ip->dev] / [ip->inum] and to know the
+     itable slot is live; NOT enough to authorise an [iput], which is the
+     whole point.
+
+     The reference ITSELF -- the count -- is parked in this slot's
+     [FileOff.off_body] for the file's life, because that is the only
+     per-slot resource that can NAME the inode when every content share is
+     out: it holds the permanent other half of [a_fip].  The last closer
+     gathers the shares, withdraws the parked reference and joins the two.
+     claude-notes/projects/cwd-ref.md has the argument. *)
+  Definition inode_share (v : mword 64) (q : Qp) : iProp Σ :=
+    InodeRef.iref_shr_at v q.
+
+  Lemma inode_share_split v q1 q2 :
+    inode_share v (q1 + q2) ⊣⊢ inode_share v q1 ∗ inode_share v q2.
+  Proof. apply InodeRef.iref_shr_at_split. Qed.
 
   (* the per-slot payload-names ghost: fractional, agreeing, and updatable
      by whoever holds the whole of it.  See the header above [fpnames]. *)
@@ -554,7 +593,7 @@ Section FileInv.
      then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
           pipe_ref (fp_pipe pn) (fc_wbool C) q
      else if bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE)
-     then inode_ref (fc_ip C) q
+     then inode_share (fc_ip C) (q * fp_iq pn)
      else emp)%I.
 
   Lemma file_payload_split q1 q2 pn C :
@@ -565,7 +604,7 @@ Section FileInv.
     - rewrite pipe_ref_split. iSplit.
       + iIntros "(#Hi & H1 & H2)". iSplitL "H1"; (iSplitR; [iExact "Hi"|iFrame]).
       + iIntros "[[#Hi H1] [_ H2]]". iSplitR; [iExact "Hi"|]. iFrame.
-    - apply inode_ref_split.
+    - rewrite -inode_share_split. by rewrite Qp.mul_add_distr_r.
     - by rewrite left_id.
   Qed.
 
@@ -1176,7 +1215,7 @@ Proof.
 Qed.
 
 Section FileGhostAlloc.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
 
   Lemma fpay_map0_split (γ : gname) (n : nat) :
     own γ ((ε, (fpay_map0 n, ε)) : fileUR) ⊢

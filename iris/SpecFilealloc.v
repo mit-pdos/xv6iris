@@ -44,11 +44,12 @@ Require Import SpecPanic.
 Require Import IntrDefs.
 Require Import CpuOwn.
 From Kernel Require KernelSyms.
+Require Import InodeRef.
 Local Open Scope Z_scope.
 
 
 Section SpecFilealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
 
   (* filealloc's return value: either the table was full (a0 = 0), or a0 points
      at entry [k] and the caller owns it exclusively and uninitialized.
@@ -68,7 +69,7 @@ Section SpecFilealloc.
 
 End SpecFilealloc.
 
-Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname) (m : regfile)
+Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname) (m : regfile)
     (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.filealloc in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
@@ -96,7 +97,7 @@ Definition wp_filealloc_sconf_body `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ
 
 Module Type FILEALLOC.
   Parameter wp_filealloc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname) (m : regfile)
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ} `{GEN : GenId} `{CID : CpuId} (γl γf : gname) (m : regfile)
       (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (K : nat) (b : bool),
       wp_filealloc_sconf_body γl γf m n eb p C K b.
 End FILEALLOC.

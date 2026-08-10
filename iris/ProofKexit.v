@@ -1288,12 +1288,16 @@ Section KexitRest.
     iDestruct (proc_priv_split_cwd γf pj pid V with "Hpriv") as "[Hpriv Href]".
     iDestruct (proc_priv_nocwd_cwd_pid γf pj pid V with "Hpriv")
       as "(Hcwd & Hpidq & Hpback)".
-    iClear "Href".
-    (* iput's reference premise is [FileInv.inode_ref ip 1], i.e. [emp] --
-       the placeholder the banner above is about.  Named rather than passed
-       as a [[]] goal so the day the premise becomes real, this line is
-       where [Href] goes. *)
-    iAssert (FileInv.inode_ref (pv_cwd V) 1) as "Hiputref"; [done|].
+    (* iput's reference premise is a SHARE, not a reference -- the hole the
+       banner above is about.  kexit HAS a reference, so it splits its
+       identity slice in half, hands one half over as the share, and drops
+       the other half TOGETHER WITH THE COUNT.  When [SpecIput]'s premise
+       becomes [∃ q, iref_at ip q], this whole block collapses to passing
+       [Href] straight through. *)
+    iAssert (∃ q : Qp, InodeRef.iref_shr_at (pv_cwd V) q)%I
+      with "[Href]" as "Hiputref".
+    { iDestruct "Href" as (q) "Href".
+      iApply (InodeRef.iref_at_shr with "Href"). }
     iPoseProof (kxi_4c with "Htext") as "Hi4c".
     iPoseProof (kxi_50 with "Htext") as "Hi50".
     iPoseProof (kxi_54 with "Htext") as "Hi54".

@@ -28,28 +28,36 @@
    whole of it, and it is the whole of what its callers -- kexit here, and
    sys_chdir / sys_unlink / fileclose later -- actually depend on.
 
-   ==== THE REFERENCE PREMISE IS THE REMAINING HOLE ======================
+   ==== THE REFERENCE PREMISE IS A SHARE, AND THAT IS STILL TOO WEAK =====
 
-   It is [FileInv.inode_ref ip 1], which is literally [emp].  It used to be
-   spelled [ProcInv.cwd_ref ip] -- the SAME proposition, but named after the
-   process side and dragging a [ProcInv] import into a filesystem contract,
-   which is what forced [fileclose] to launder a file's payload into a "cwd"
-   reference at its [iput] call.  That laundering is gone; the name here is
-   now the one whose content it actually is.
+   It is [InodeRef.iref_shr_at ip q] at an unnamed [q]: a real slice of the
+   inode's identity cells, with a count of ZERO.  That is enough to know the
+   itable slot is LIVE and to name the inode, and it is exactly what both
+   callers can produce today -- but it is NOT a reference, and destroying a
+   reference is what iput does.  The premise should be
+   [∃ q, InodeRef.iref_at ip q].
 
-   [ProcInv.cwd_ref] IS REAL NOW ([InodeRef.iref_at]), and this premise is
-   deliberately NOT it.  The blocker is the other caller: the last
-   [fileclose] of an FD_INODE file must hand this function the reference its
-   [struct file] held, and [FileInv.file_payload]'s inode arm is still a
-   placeholder because parking ONE reference behind FRACTIONAL payload
-   holders is an unsolved file-table design question -- see
-   claude-notes/projects/cwd-ref.md, "STILL TO DO -- the consumers".
-   Strengthening this premise before that lands would break fileclose, which
-   is proven.
+   It used to be [emp] (spelled [ProcInv.cwd_ref ip], which dragged a
+   [ProcInv] import into a filesystem contract and forced [fileclose] to
+   launder a file's payload into a "cwd" reference).  That laundering is
+   gone and the premise now has content; what it does not yet have is the
+   COUNT.
 
-   WHAT THAT COSTS TODAY, precisely: kexit holds a real [cwd_ref] and must
-   DROP it here rather than spend it (ProofKexit.v, at the [ld a0,336(s3)]),
-   which is marked at its site and goes away with the file-table half.
+   THE BLOCKER IS THE OTHER CALLER.  [ProcInv.cwd_ref] is a real reference
+   ([InodeRef.iref_at]), so kexit could pay the stronger premise today.  The
+   last [fileclose] of an FD_INODE file cannot yet: its [struct file]'s ONE
+   inode reference has to be PARKED somewhere -- fractional payload holders
+   can only carry shares, because no sum of count-0 fragments is ever a
+   token -- and the parking place needs an escrow token that does not exist.
+   The design is settled and written down (claude-notes/projects/cwd-ref.md,
+   "THE FILE TABLE'S HALF"); until it is built, strengthening this premise
+   would break fileclose, which is proven.
+
+   WHAT THAT COSTS TODAY, precisely: kexit holds a real reference and can
+   only hand over HALF OF ITS IDENTITY SLICE as the share this premise asks
+   for; the count, and the other half, are dropped (ProofKexit.v, at the
+   [ld a0,336(s3)]).  That is marked at its site and goes away with the
+   file-table half.
 
    THE POSTCONDITION'S [iref_slot] IS NOT PART OF THAT HOLE, and it is
    true of the code: iput decrements [ip->ref], and [IcacheInv.islot] parks
@@ -106,6 +114,7 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
+Require Import InodeRef.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import WpUart.
@@ -173,8 +182,8 @@ Definition wp_iput_sconf_body
   (* three buffer slots: the inode block is held across the indirect
      block's bread and across log_write, as in bmap *)
   bslots bn 3 -∗
-  (* THE REFERENCE BEING DESTROYED -- still a placeholder, see the header *)
-  FileInv.inode_ref ip 1 -∗
+  (* THE REFERENCE BEING DESTROYED -- still only a SHARE, see the header *)
+  (∃ q : Qp, InodeRef.iref_shr_at ip q) -∗
   (* this operation's reservation *)
   log_op γ n -∗
   wp_next b pj (fun (CID : CpuId) =>

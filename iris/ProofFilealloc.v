@@ -72,12 +72,13 @@ Require Import CpuOwn.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecFilealloc.
 From Kernel Require KernelSyms.
+Require Import InodeRef.
 Local Open Scope Z_scope.
 
 Module FileallocProof (Acquire : ACQUIRE) (Release : RELEASE) : FILEALLOC.
 
 Section ProofFilealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

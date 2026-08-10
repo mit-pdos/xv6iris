@@ -1222,14 +1222,17 @@ Section ProofFileclose.
           iAssert (fileclose_fs_env fn n eb p) with "[Henv]" as "Henv".
           { rewrite /fileclose_env bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Henv". }
-          (* the payload's inode arm IS iput's reference premise -- both are
-             [FileInv.inode_ref], and there is no longer a "cwd" to launder
-             it into: [SpecIput] used to name [ProcInv.cwd_ref], which was
-             the same proposition under a process-side name (SpecIput.v's
-             header).  This is now a plain unfolding of [file_payload]. *)
-          iAssert (FileInv.inode_ref (fc_ip Cf) 1) with "[Hpl]" as "Hcwd".
+          (* THE PAYLOAD'S INODE ARM IS iput's PREMISE, and it is real now:
+             the last closer holds file fraction 1, so its slice of the
+             inode's identity cells is the file's whole slice [fp_iq pn].
+             That is a SHARE -- count zero -- which is exactly what
+             [SpecIput] asks for today and exactly what is too weak: the
+             COUNT is parked and this function cannot yet withdraw it.  See
+             SpecIput.v's header. *)
+          iAssert (∃ q : Qp, InodeRef.iref_shr_at (fc_ip Cf) q)%I
+            with "[Hpl]" as "Hcwd".
           { rewrite /file_payload bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib. iExact "Hpl". }
+            rewrite Hib. iExists (1 * fp_iq pn)%Qp. iExact "Hpl". }
           rewrite /fileclose_fs_env.
           iDestruct "Henv" as "(%Hn0 & %Heb & %Hpj & %Hjlt & %Hgl & %Hgeom &
                                 #Hprocs & #Hbio & #Hlog & #Hseam &

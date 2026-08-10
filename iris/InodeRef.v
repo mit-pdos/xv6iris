@@ -181,6 +181,19 @@ Section InodeRef.
       rewrite inode_shr_split. iFrame.
   Qed.
 
+  (* SHEDDING A SHARE from a reference, which is what a holder does when a
+     consumer needs only read access to the inode's identity.  The COUNT
+     stays with the caller: this is not a way to give a reference away. *)
+  Lemma iref_at_shr (v : mword 64) (q : Qp) :
+    iref_at v q -∗ ∃ q' : Qp, iref_shr_at v q'.
+  Proof.
+    iIntros "H".
+    iDestruct (bi.equiv_entails_1_1 _ _ (iref_at_split v (q/2) (q/2))
+                 with "[H]") as "[_ Hs]".
+    { rewrite Qp.div_2. iExact "H". }
+    iExists (q/2)%Qp. iExact "Hs".
+  Qed.
+
   (* a SHARE also proves the pointer non-null: same projection as
      [iref_at_nonzero], and it is what an fd holder reads [f->ip] with. *)
   Lemma iref_shr_at_nonzero (v : mword 64) (q : Qp) :

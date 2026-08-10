@@ -73,12 +73,13 @@ Require Import CpuOwn.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecFiledup.
 From Kernel Require KernelSyms.
+Require Import InodeRef.
 Local Open Scope Z_scope.
 
 Module FiledupProof (Acquire : ACQUIRE) (Release : RELEASE) : FILEDUP.
 
 Section ProofFiledup.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
