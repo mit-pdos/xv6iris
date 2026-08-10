@@ -886,6 +886,127 @@ Section IcacheRefInv.
     iModIntro. iFrame.
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (*  The two halves of iput's [ref--] (design §13.9)                     *)
+  (* ------------------------------------------------------------------ *)
+
+  (* THE DELETE-FLAVOURED CELL ACCESSOR.  [iref_cells_acc_upd]'s wand
+     rebuilds at [<[k := e]> M], which is every SURVIVING slot's shape;
+     iput's LAST close removes the key outright and [delete k M] is not of
+     that form.  Same [big_sepL_delete] argument, with [lookup_delete_ne]
+     where the other had [lookup_insert_ne]. *)
+  Lemma iref_cells_acc_del (M : gmap nat (Qp * positive)) (k : nat) :
+    (k < NINODE)%nat ->
+    iref_cells M -∗
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32) -∗
+       iref_cells (delete k M)).
+  Proof.
+    intros Hk. rewrite /iref_cells. iIntros "Hc".
+    iDestruct (big_sepL_delete _ (seq 0 NINODE) k k (seq_ninode_lookup k Hk)
+                with "Hc") as "[Hcell Hrest]".
+    iFrame "Hcell". iIntros "Hcell".
+    iApply (big_sepL_delete _ (seq 0 NINODE) k k (seq_ninode_lookup k Hk)).
+    iSplitL "Hcell".
+    { rewrite /iref_word lookup_delete. iExact "Hcell". }
+    iApply (big_sepL_impl with "Hrest").
+    iIntros "!>" (j x Hjx) "H".
+    destruct (decide (j = k)) as [->|Hne]; [iExact "H"|].
+    apply lookup_seq in Hjx as [Hx _].
+    assert (Hxk : k <> x) by lia.
+    rewrite /iref_word lookup_delete_ne; [iExact "H" | exact Hxk].
+  Qed.
+
+  (* iput's [ref--] WHEN IT IS NOT THE LAST: the count goes [Pos.succ n] to
+     [n] and the departing reference's fraction [q] rejoins the outstanding
+     total, leaving [qr] with [qt = q + qr].  The [sw] and the ghost step
+     are in ONE invariant opening, exactly as in [iref_dup_store_au] and
+     for the same reason -- the lock's half pins [M] across the
+     [lw; addiw; sw], and the two halves meet only here.
+
+     There is no [Hno] side condition and there cannot be one: the count
+     goes DOWN, so [icM_wf]'s bound is re-established from the bound the
+     invariant already carried ([icM_wf_count] at [Pos.succ n]).  That
+     asymmetry with the two increment wrappers is the whole difference. *)
+  Lemma iref_close_store_au (Eo : coPset) (γ : gname)
+      (M : gmap nat (Qp * positive)) (k : nat) (q qt qr : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo ->
+    M !! k = Some (qt, Pos.succ n) ->
+    (qt - q)%Qp = Some qr ->
+    itable_inv γ -∗ itable_half γ M -∗ iref_tok γ k q -∗
+    |={Eo, Eo ∖ ↑icacheN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos n) : mword 32)
+         ={Eo ∖ ↑icacheN, Eo}=∗
+         itable_half γ (<[k := (qr, n)]> M)).
+  Proof.
+    iIntros (HE HMk Hsub) "#Hinv Hhalf Htok".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_close_step γ M k q qt n qr HMk Hsub with "Hauth Htok") as "Hauth".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
+    { iNext. iExists (<[k := (qr, n)]> M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
+        - intros i Hi. destruct (decide (i = k)) as [->|Hne]; [exact Hk|].
+          rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym]. by apply Hdom.
+        - intros i qi ni Hi. destruct (decide (i = k)) as [->|Hne].
+          + rewrite lookup_insert in Hi. apply Some_inj in Hi.
+            injection Hi as _ Hn. subst ni.
+            pose proof (Hcnt k qt (Pos.succ n) HMk) as Hb. lia.
+          + rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym].
+            by apply (Hcnt i qi). }
+      iApply ("Hback" $! (qr, n)).
+      rewrite /iref_word lookup_insert. iExact "Hcell". }
+    iModIntro. iFrame.
+  Qed.
+
+  (* iput's [ref--] WHEN IT IS THE LAST: the slot leaves [M] entirely and
+     the word goes to zero, which is [iref_word]'s [None] branch -- i.e.
+     the free-slot shape iget's scan looks for.  The closer must present
+     the WHOLE outstanding share [qt]; REF-1 ([iref_lookup] at count one)
+     is what tells it that its own [q] is that share. *)
+  Lemma iref_close_last_store_au (Eo : coPset) (γ : gname)
+      (M : gmap nat (Qp * positive)) (k : nat) (qt : Qp) :
+    ↑icacheN ⊆ Eo ->
+    M !! k = Some (qt, 1%positive) ->
+    itable_inv γ -∗ itable_half γ M -∗ iref_tok γ k qt -∗
+    |={Eo, Eo ∖ ↑icacheN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)
+         ={Eo ∖ ↑icacheN, Eo}=∗
+         itable_half γ (delete k M)).
+  Proof.
+    iIntros (HE HMk) "#Hinv Hhalf Htok".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (iref_cells_acc_del M k Hk with "Hcells") as "[Hcell Hback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_close_last_step γ M k qt HMk with "Hauth Htok") as "Hauth".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
+    { iNext. iExists (delete k M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
+        - intros i Hi. apply Hdom.
+          destruct Hi as [e He]. exists e.
+          rewrite lookup_delete_Some in He. apply He.
+        - intros i qi ni Hi.
+          rewrite lookup_delete_Some in Hi. destruct Hi as [_ Hi].
+          by apply (Hcnt i qi). }
+      iApply ("Hback" with "Hcell"). }
+    iModIntro. iFrame.
+  Qed.
+
 End IcacheRefInv.
 
 (* ===================================================================== *)

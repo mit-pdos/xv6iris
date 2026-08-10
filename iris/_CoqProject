@@ -791,6 +791,7 @@ ProofKwait.v
 LinkKwait.v
 SpecIput.v
 LinkIput.v
+LinkIputCompat.v
 SpecKexit.v
 CodeKexit.v
 ProofKexit.v

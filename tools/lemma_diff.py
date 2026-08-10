@@ -75,7 +75,15 @@ def changed_files(ref, directory):
         ["git", "diff", "--name-only", ref, "--", directory],
         capture_output=True, text=True, check=True,
     ).stdout.split()
-    return [p for p in out if p.endswith(".v")]
+    # UNTRACKED files are invisible to `git diff --name-only <ref>` -- and a
+    # brand-new file is exactly where a new Axiom hides (found 2026-08-10:
+    # a bridging Axiom in a new Link file was not counted; the tool said
+    # "2 things to justify" when the honest count was 3).  Union them in.
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "--", directory],
+        capture_output=True, text=True, check=True,
+    ).stdout.split()
+    return sorted(set(p for p in out + untracked if p.endswith(".v")))
 
 
 def main():
