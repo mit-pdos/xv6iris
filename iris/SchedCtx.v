@@ -53,7 +53,7 @@ Require Import HartTp.
 Require Import WpLock.
 Require Import ProcGeom.
 Require Import FdSlots.
-Require Import ProcInv.
+Require Export ProcInv.
 Require Import SwtchCtx.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -81,7 +81,7 @@ Proof.
 Qed.
 
 Section SchedCtx.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).

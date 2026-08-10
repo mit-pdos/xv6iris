@@ -160,6 +160,9 @@ Definition wp_sys_exit_sconf_body
   (* the process itself: its private block (trapframe included) and its
      fd-slot allowance *)
   fd_slots FDSPARE -∗
+  (* ... and its iref allowance, which kexit rejoins with the cwd unit iput
+     hands back to build the ZOMBIE block *)
+  iref_slots IREFSPARE -∗
   proc_priv γf pj pid V -∗
   (* NO continuation: sys_exit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).

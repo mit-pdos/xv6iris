@@ -25,10 +25,11 @@
    field ... is what the ftable would have done if it had needed it").  It
    is a class field rather than a parameter because the alternative ripples
    through [proc_priv], and hence through sixty-four files that have no
-   business naming an inode cache.  A caller that also names the cache
-   explicitly (SpecIput's [cn], SpecFileclose's [fcn_ic]) ties the two with
-   a PURE premise, [icn_ref cn = icfg_iref] -- which is the honest reading
-   of "there is one inode cache". *)
+   business naming an inode cache.  And because it is CANONICAL rather than
+   threaded, [itable_half] / [iref_tok] / [inode_ref] take no gname argument
+   at all: a caller that holds both a reference and the itable lock needs no
+   bridging premise to tie them together -- they are stated over the same
+   [icfg_iref] by construction. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers.
@@ -165,23 +166,66 @@ Definition icacheΣ : gFunctors :=
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 
+(* ===================================================================== *)
+(*  3b. THE CACHE'S THREE GLOBAL CONSTANTS                                *)
+(* ===================================================================== *)
+
+(* THE inode cache: its count-authority gname, the one device its entries
+   name (design §13.11's single-device pin) and the number of inode blocks
+   the region covers (which is what bounds an inum).  See the header for
+   why these are a class and not parameters.
+
+   [icfg_iref] IS THE AUTHORITY'S GNAME, CANONICALLY -- it is not an
+   argument anybody threads.  There is exactly one itable per system, so
+   [itable_half] / [iref_tok] / [inode_ref] / [IcacheInv.itable_inv] read it
+   off the class, exactly as [FdSlots] and [IrefSlots] read their supply's
+   name off theirs.  Threading it instead would put a filesystem ghost name
+   on [ProcInv.proc_priv], hence on the thirty-odd spec files that mention
+   it, purely so a process can name its working directory -- and it would
+   force every function that holds both a reference and the itable lock to
+   carry a pure bridging premise tying the two gnames together. *)
+Class icfg := MkIcfg {
+  icfg_iref : gname;
+  icfg_dev  : mword 32;
+  icfg_nib  : nat;
+}.
+
+(* ALLOCATING ONE, for a boot that wants to CREATE the authority rather
+   than assume it: the class is inhabited at any device and region size,
+   with the count authority freshly minted at the empty table.  This is
+   what [IcacheBoot.icache_boot] takes as its authority premise, and it is
+   what makes that premise demonstrably satisfiable rather than vacuous.
+   (Nothing in the boot chain calls it yet: [FileInv.fileG] carries an
+   ambient [icfg], so the file table's payload is stated over THAT one, and
+   tying the two together is the remaining half of the boot wiring.) *)
+Lemma icfg_alloc `{!icacheG Σ} (dv : mword 32) (nib : nat) :
+  ⊢ |==> ∃ ICFG : icfg,
+      ⌜icfg_dev = dv⌝ ∗ ⌜icfg_nib = nib⌝ ∗
+      own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR).
+Proof.
+  iMod (own_alloc (● (∅ : gmap nat (Qp * positive)) : icacheUR)) as (γ) "Ha".
+  { by apply auth_auth_valid. }
+  iModIntro. iExists (MkIcfg γ dv nib). by iFrame "Ha".
+Qed.
+
 Section IcacheRefGhost.
   Context `{!icacheG Σ}.
+  Context `{ICFG : icfg}.
 
   (* HALF the authority.  The other half is the other one: the itable
      lock's resource and the [ref]-word invariant hold one each, so neither
      can move [M] alone, and the lock holder's half PINS every count across
      the [lw; addiw; sw] the code performs. *)
-  Definition itable_half (γ : gname) (M : gmap nat (Qp * positive)) : iProp Σ :=
-    own γ (●{#(1/2)} M).
+  Definition itable_half (M : gmap nat (Qp * positive)) : iProp Σ :=
+    own icfg_iref (●{#(1/2)} M).
 
   (* ONE reference to slot [k], holding fraction [q] of its identity. *)
-  Definition iref_tok (γ : gname) (k : nat) (q : Qp) : iProp Σ :=
-    own γ (◯ {[ k := (q, 1%positive) ]}).
+  Definition iref_tok (k : nat) (q : Qp) : iProp Σ :=
+    own icfg_iref (◯ {[ k := (q, 1%positive) ]}).
 
-  Global Instance itable_half_timeless γ M : Timeless (itable_half γ M).
+  Global Instance itable_half_timeless M : Timeless (itable_half M).
   Proof. apply _. Qed.
-  Global Instance iref_tok_timeless γ k q : Timeless (iref_tok γ k q).
+  Global Instance iref_tok_timeless k q : Timeless (iref_tok k q).
   Proof. apply _. Qed.
 
 End IcacheRefGhost.
@@ -193,6 +237,7 @@ End IcacheRefGhost.
 Section IcacheRef.
   Context `{!riscvGS Σ, !icacheG Σ}.
   Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
 
   (* An entry's IDENTITY -- the two cells iget writes into a recycled slot
      and nobody writes again while the slot is live.  Fractional, so a
@@ -231,14 +276,14 @@ Section IcacheRef.
   (* HOLDING ONE REFERENCE to itable slot [k].  Note it needs no inode
      POINTER argument beyond the slot, because [ientry] determines the
      address and [ientry_inj] determines the slot. *)
-  Definition inode_ref (γ : gname) (k : nat) (q : Qp)
+  Definition inode_ref (k : nat) (q : Qp)
       (dev inum : mword 32) : iProp Σ :=
-    (iref_tok γ k q ∗ inode_ident k (DfracOwn q) dev inum)%I.
+    (iref_tok k q ∗ inode_ident k (DfracOwn q) dev inum)%I.
 
   (* two references to one entry see the same inode -- for free, from the
      fractional cells; no [agree] ghost is needed *)
-  Lemma inode_ref_agree γ k q1 d1 n1 q2 d2 n2 :
-    inode_ref γ k q1 d1 n1 -∗ inode_ref γ k q2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
+  Lemma inode_ref_agree k q1 d1 n1 q2 d2 n2 :
+    inode_ref k q1 d1 n1 -∗ inode_ref k q2 d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
   Proof.
     iIntros "[_ H1] [_ H2]". iApply (inode_ident_agree with "H1 H2").
   Qed.
@@ -246,8 +291,8 @@ Section IcacheRef.
   Global Instance inode_ident_timeless k dq dev inum :
     Timeless (inode_ident k dq dev inum).
   Proof. apply _. Qed.
-  Global Instance inode_ref_timeless γ k q dev inum :
-    Timeless (inode_ref γ k q dev inum).
+  Global Instance inode_ref_timeless k q dev inum :
+    Timeless (inode_ref k q dev inum).
   Proof. apply _. Qed.
 
 End IcacheRef.
@@ -255,16 +300,6 @@ End IcacheRef.
 (* ===================================================================== *)
 (*  5.  THE CACHE'S THREE GLOBAL CONSTANTS, AND THE ADDRESS-KEYED FORM    *)
 (* ===================================================================== *)
-
-(* THE inode cache: its count-authority gname, the one device its entries
-   name (design §13.11's single-device pin) and the number of inode blocks
-   the region covers (which is what bounds an inum).  See the header for
-   why these are a class and not parameters. *)
-Class icfg := MkIcfg {
-  icfg_iref : gname;
-  icfg_dev  : mword 32;
-  icfg_nib  : nat;
-}.
 
 Section IcacheHeld.
   Context `{!riscvGS Σ, !icacheG Σ}.
@@ -285,7 +320,7 @@ Section IcacheHeld.
     (∃ (k : nat) (q : Qp) (inum : mword 32),
        ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
        ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
-       inode_ref icfg_iref k q icfg_dev inum)%I.
+       inode_ref k q icfg_dev inum)%I.
 
   Global Instance inode_held_timeless v : Timeless (inode_held v).
   Proof. apply _. Qed.

@@ -133,7 +133,7 @@ Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
    actually true, and it is what fork will need, since fork must [release] the
    proc it gets back and [release] demands [sie_cap_gpr … false …]. *)
 Definition allocproc_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf : gname) (γs : list gname) (lvl : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool)
     (mr : regfile) (K : nat)
@@ -159,8 +159,19 @@ Definition allocproc_post
           arm allocproc emptied; the caller gets them back here and can
           rebuild [proc_lock_res] at USED / RUNNABLE. *)
        hart_at_any (proc_addr j) ∗
-       proc_priv γf (proc_addr j) pid V ∗
+       (* THE DEFICIT BLOCK, not [proc_priv]: allocproc has not set
+          [p->cwd] -- the arm's own [pv_cwd V = 0] says so -- and
+          [ProcInv.cwd_ref] has no null arm, so there is no [proc_priv] at
+          this [V] to hand back.  The caller closes the construction window
+          when it installs a working directory ([proc_priv_split_cwd]);
+          kfork does it at its [sd a0,336(s4)]. *)
+       proc_priv_nocwd γf (proc_addr j) pid V ∗
        fd_slots FDSPARE ∗
+       (* THE CWD'S UNIT AND THE IREF ALLOWANCE, out of the dormant block
+          allocproc took the slot from.  The [1] is what kfork spends on
+          [idup] -- allocproc is the function that took the slot out of
+          [procs_inv], so it is where the unit has to come from. *)
+       iref_slots (1 + IREFSPARE) ∗
        is_kstack (proc_addr j) ks ∗
        ctx_cells (p_context (proc_addr j))
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
@@ -188,7 +199,7 @@ Definition allocproc_post
      kalloc_env γa None))%I.
 
 Definition wp_allocproc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
@@ -223,7 +234,7 @@ Definition wp_allocproc_sconf_body
    calls allocproc with no page budget, and there the two freeproc tails are
    LIVE code. *)
 Definition wp_allocproc_core_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γp : gname) (γf : gname) 
     (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool) :=
@@ -249,7 +260,7 @@ Definition wp_allocproc_core_body
 
 Module Type ALLOCPROC_GEN.
   Parameter wp_allocproc_core :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
       wp_allocproc_core_body γa γp γf γs m lvl K eb pme C on b.
@@ -257,7 +268,7 @@ End ALLOCPROC_GEN.
 
 Module Type ALLOCPROC.
   Parameter wp_allocproc_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γp : gname) (γf : gname) (γs : list gname) (m : regfile) (lvl K : nat) (eb : bool)
       (pme : mword 64) (C : iProp Σ) (on : option nat) (b : bool),
       wp_allocproc_sconf_body γa γp γf γs m lvl K eb pme C on b.

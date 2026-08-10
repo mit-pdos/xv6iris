@@ -145,7 +145,7 @@ Section TrapinithartBody.
     iEval (rewrite Hp10) in "Hpc".
     (* ============ +0x10 csrw stvec,a5 : THE INSTALL ============ *)
     iApply (wp_csrw_stvec_s_sconf (CID:=CID) (mword_of_int (KernelSyms.trapinithart + 0x10)) (mword_of_int 15 : mword 5)
-              A1 (K - 2)%nat false tv0 (mword_of_int KernelSyms.kernelvec : mword 64)
+              A1 (K - 2)%nat tv0 (mword_of_int KernelSyms.kernelvec : mword 64)
               ltac:(vm_compute; lia) ltac:(rgne; exact Ha5) ltac:(vm_compute; discriminate)
               with "Hcg Hstv Hpc Hi10 [-]").
     iApply wp_next_off_intro.

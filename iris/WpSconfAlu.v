@@ -21,7 +21,16 @@
        slots against [sie_cap]'s available count;
      - a register read at a VARIABLE index is [rget m rs] (HartTp.v),
        which is correct at tp too; a read of a CONCRETE register (sp, x0)
-       stays the plain map lookup -- [rget] reduces to it by conversion;
+       stays the plain map lookup -- [rget] reduces to it by conversion.
+       A leaf that reads a register the CALLER chooses states
+       `ops_ok b rd rs1 rs2` (IntrDefs.v) IN the `rd_ok` slot instead of
+       `rd_ok rd`: [rget] is a lookup in [tp_pin m] and so depends on the
+       ambient hart at exactly tp, which will matter once the funnel's
+       σ-callback moves inside [wp_next] (see IntrDefs.src_ok -- the premise
+       is deliberately landed ahead of its consumer, DO NOT DROP IT).  The
+       leaves whose engine operands are [rd] itself or a concrete register
+       read nothing a caller varies, so they keep plain `rd_ok rd` and build
+       the engine's premise with [ops_ok_self] / [ops_ok_conc];
      - every continuation is wrapped in [wp_next b]: with interrupts
        enabled the instruction can be trapped and the thread resumed on a
        DIFFERENT hart, and the rebound [CID] binder makes every resource
@@ -75,10 +84,14 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrdc Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    (* c.addi4spn reads sp, a CONCRETE register, so the engine's source guard
+       is derived here and this leaf keeps its plain [rd_ok rd] premise. *)
+    pose proof (ops_ok_conc b rd csp_rs1 csp_rs1 Hrdok
+                  ltac:(rdok_tpne) ltac:(rdok_tpne)) as Hops.
     unshelve iApply (wp_gpr_write_s_sconf pc rd csp_rs1 csp_rs1
               (ITYPE (caddi4spn_imm nzimm, sp, Regidx rd, ADDI))
               (add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm)))
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       change sp with (Regidx csp_rs1).
@@ -106,7 +119,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ADDI))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ITYPE_ADDI_gpr rd rd (sign_extend' 12 imm) s_pc).
@@ -133,7 +146,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (ITYPE (sign_extend' 12 imm, Regidx rd, Regidx rd, ANDI))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ITYPE_ANDI_gpr rd rd (sign_extend' 12 imm) s_pc).
@@ -147,7 +160,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs1 ->
     zero_extend' 64 (bool_to_bit (zopz0zI_u (rget m rs1) (sign_extend' 64 imm))) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU)) -∗
@@ -157,10 +170,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, SLTIU)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ITYPE_SLTIU_gpr rs1 rd imm s_pc).
@@ -175,7 +188,7 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     let wval := add_vec (rget m rd) (rget m rs2) in
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rd rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rd, Regidx rd, ADD)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -185,11 +198,11 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rs2
               (RTYPE (Regidx rs2, Regidx rd, Regidx rd, ADD))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       change (execute (RTYPE (Regidx rs2, Regidx rd, Regidx rd, ADD)))
@@ -204,7 +217,7 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     let wval := add_vec zero_reg (rget m rs2) in
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs2 rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, zreg, Regidx rd, ADD)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -214,11 +227,11 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf pc rd rs2 rs2
               (RTYPE (Regidx rs2, zreg, Regidx rd, ADD))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
@@ -235,7 +248,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     zero_extend' 64 (bool_to_bit (zopz0zI_u (rget m rs1) (rget m rs2))) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)) -∗
@@ -245,10 +258,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SLTU)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPE_SLTU_gpr rs2 rs1 rd s_pc Hrd).
@@ -259,7 +272,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     or_vec (rget m rs1) (rget m rs2) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
@@ -269,10 +282,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPE_OR_gpr rs2 rs1 rd s_pc Hrd).
@@ -287,7 +300,7 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     let wval := and_vec (rget m rd) (rget m rs2) in
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rd rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rd, Regidx rd, AND)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -297,11 +310,11 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rs2
               (RTYPE (Regidx rs2, Regidx rd, Regidx rd, AND))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPE_AND_gpr rs2 rd rd s_pc Hrd).
@@ -316,7 +329,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     and_vec (rget m rs1) (rget m rs2) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) -∗
@@ -326,10 +339,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, AND)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPE_AND_gpr rs2 rs1 rd s_pc Hrd).
@@ -346,7 +359,7 @@ Section WpSconfAlu.
     let wval :=
       sign_extend' 64 (subrange_vec_dec (add_vec (rget m rs1) (sign_extend' 64 imm)) 31 0) in
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs1 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (ADDIW (imm, Regidx rs1, Regidx rd)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -356,11 +369,11 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ADDIW (imm, Regidx rs1, Regidx rd))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ADDIW_gpr rs1 rd imm s_pc).
@@ -372,7 +385,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     sub_vec (rget m rs1) (rget m rs2) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) -∗
@@ -382,10 +395,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)))
@@ -406,7 +419,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     sub_vec (rget m rs1) (rget m rs2) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) -∗
@@ -416,10 +429,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SUB)))
@@ -436,7 +449,7 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     let wval := sub_vec (rget m rd) (rget m rs2) in
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rd rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (RTYPE (Regidx rs2, Regidx rd, Regidx rd, SUB)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -446,17 +459,17 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    intros Hrd Hrdok.
+    intros Hrd Hops.
     exact (wp_csub_wval_s_sconf pc rd rd rs2
              (sub_vec (rget m rd) (rget m rs2)) m n b
-             Hrd Hrdok eq_refl).
+             Hrd Hops eq_refl).
   Qed.
 
   Lemma wp_csubw_wval_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     sign_extend' 64
       (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
                (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) = wval ->
@@ -468,10 +481,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       change (execute (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)))
@@ -487,7 +500,7 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     let wval := sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -496,17 +509,17 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros wval Hrd Hrdok.
+    intros wval Hrd Hops.
     exact (wp_csubw_wval_s_sconf pc rd rs1 rs2
              (sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32))) m n b
-             Hrd Hrdok eq_refl).
+             Hrd Hops eq_refl).
   Qed.
 
   Lemma wp_add_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     add_vec (rget m rs1) (rget m rs2) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
@@ -516,10 +529,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       change (execute (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)))
@@ -536,7 +549,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 6) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs1 ->
     shift_bits_left (rget m rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
@@ -546,10 +559,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIOP_SLLI_gpr rs1 rd shamt s_pc).
@@ -574,7 +587,7 @@ Section WpSconfAlu.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (UTYPE (imm, Regidx rd, LUI)) wval m n b
-              Hrd Hrdok _
+              Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc _ _.
       rewrite (exec_execute_UTYPE_LUI_gpr rd imm s_pc).
@@ -600,7 +613,7 @@ Section WpSconfAlu.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rd rd
               (UTYPE (imm, Regidx rd, LUI)) wval m n b
-              Hrd Hrdok _
+              Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc _ _.
       rewrite (exec_execute_UTYPE_LUI_gpr rd imm s_pc).
@@ -613,7 +626,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs1 ->
     sign_extend' 64 (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32) shamt) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW)) -∗
@@ -623,10 +636,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SLLIW)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIWOP_SLLIW_gpr rs1 rd shamt s_pc).
@@ -654,7 +667,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (ADDIW (sign_extend' 12 imm, Regidx rd, Regidx rd))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ADDIW_gpr rd rd (sign_extend' 12 imm) s_pc).
@@ -683,7 +696,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (SHIFTIOP (shamt, Regidx rd, Regidx rd, SLLI))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIOP_SLLI_gpr rd rd shamt s_pc).
@@ -712,7 +725,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRLI))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIOP_SRLI_gpr rd rd shamt s_pc).
@@ -726,7 +739,7 @@ Section WpSconfAlu.
     let wval :=
       shift_bits_right (rget m rs1) (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0) in
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs1 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -736,11 +749,11 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SRLI))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIOP_SRLI_gpr rs1 rd shamt s_pc).
@@ -756,7 +769,7 @@ Section WpSconfAlu.
       (m : regfile) (n : nat) (b : bool) :
     let wval := add_vec (rget m rs1) (sign_extend' 64 imm) in
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs1 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -766,11 +779,11 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, ADDI))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ITYPE_ADDI_gpr rs1 rd imm s_pc).
@@ -799,9 +812,14 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    (* li reads x0 and nothing else -- the reason this cannot be an instance of
+       [wp_addi4_s_sconf] is the same reason it needs no source premise. *)
+    pose proof (ops_ok_conc b rd (zero_extend' 5 ('b"00"))
+                  (zero_extend' 5 ('b"00")) Hrdok
+                  ltac:(rdok_tpne) ltac:(rdok_tpne)) as Hops.
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd
               (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
-              (ITYPE (imm, zreg, Regidx rd, ADDI)) wval m n b Hrd Hrdok _
+              (ITYPE (imm, zreg, Regidx rd, ADDI)) wval m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).
@@ -823,7 +841,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rsa rsb : mword 5) (i : instruction) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rsa rsb ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
        register_lookup PC s_pc.(sregs) = pc ->
@@ -843,8 +861,8 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hbexec) "Hcg Hpc Hinstr Hcont".
-    rdok_split Hrdok.
+    iIntros (Hrd Hops Hbexec) "Hcg Hpc Hinstr Hcont".
+    ops_ok_split Hops.
     iApply (wp_instr_s_sconf m n b pc false i with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -882,7 +900,7 @@ Section WpSconfAlu.
                   = <[Regidx rd := regval_into_reg wval]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
     (* the leaf's own write commutes with the tp pin *)
-    tp_refold (rd_ok_tp _ Hrdok) "Hfile".
+    tp_refold (rd_ok_tp _ (ops_ok_rd _ _ _ _ Hops)) "Hfile".
     iDestruct (sie_cap_retarget m
                  (<[Regidx rd := regval_into_reg wval]> m) n b Hsp with "Hcap") as "Hcap".
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
@@ -909,7 +927,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf_base_pc pc rd rd rd
               (UTYPE (imm, Regidx rd, AUIPC))
               (add_vec pc (auipc_off imm)) m n b
-              Hrd Hrdok _
+              Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     intros s_pc Hnpc HPCpc _ _.
     rewrite (exec_execute_UTYPE_AUIPC_gpr rd imm s_pc).
@@ -926,15 +944,19 @@ Section WpSconfAlu.
   (* below instantiate it with [sie_cap_push]/[sie_cap_pop].              *)
   (* The tp half of [rd_ok] does NOT go away, though: the bundle owns     *)
   (* [gpr_file (tp_pin m)] (HartTp.v), so even an sp-mover may not write  *)
-  (* tp -- hence the standalone [Regidx rd <> Regidx Rtp] premise, which  *)
-  (* is what [tp_refold] needs to restate the engine's output write as a  *)
-  (* write under the pin.  (Both call sites below are at rd = sp.)        *)
+  (* tp -- and this engine READS [rget m rsa] / [rget m rsb] like the     *)
+  (* others, so it needs the same source guard.  Both facts ride in       *)
+  (* [ops_ok_sp b rd rsa rsb] (IntrDefs.v), which is [ops_ok] with the sp *)
+  (* conjunct dropped and the identical [src_ok] read side kept; its rd   *)
+  (* half is what [tp_refold] needs to restate the engine's output write  *)
+  (* as a write under the pin.  (Both call sites below are at rd = sp and *)
+  (* read sp, so [ltac:(rdok)] closes the whole thing.)                   *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_gpr_write_s_sconf_cap
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : regfile) (n n' : nat) (P : iProp Σ) (b : bool) :
     uint rd <> 0 ->
-    Regidx rd <> Regidx Rtp ->
+    ops_ok_sp b rd rsa rsb ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
        (if Z.eqb (uint rsa) 0 then zero_reg
@@ -956,7 +978,8 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdtp Hbexec) "Hcg Hpc Hinstr Hrecap Hcont".
+    iIntros (Hrd Hops Hbexec) "Hcg Hpc Hinstr Hrecap Hcont".
+    pose proof (ops_ok_sp_rd _ _ _ _ Hops) as Hrdtp.
     iApply (wp_instr_s_sconf m n b pc true base with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
@@ -1025,7 +1048,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf_cap pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (sign_extend' 12 imm, Regidx csp_rs1, Regidx csp_rs1, ADDI)) wval m n n' P b
               ltac:(vm_compute; discriminate)
-              ltac:(intro He; injection He as He2; vm_compute in He2; congruence) _
+              ltac:(rdok) _
               with "Hcg Hpc Hinstr Hrecap Hcont").
     intros s_pc Hnpc Hva _.
     rewrite (exec_execute_ITYPE_ADDI_gpr csp_rs1 csp_rs1 (sign_extend' 12 imm) s_pc).
@@ -1054,7 +1077,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf_cap pc csp_rs1 csp_rs1 csp_rs1
               (ITYPE (caddi16sp_imm imm6, sp, sp, ADDI)) wval m n n' P b
               ltac:(vm_compute; discriminate)
-              ltac:(intro He; injection He as He2; vm_compute in He2; congruence) _
+              ltac:(rdok) _
               with "Hcg Hpc Hinstr Hrecap Hcont").
     intros s_pc Hnpc Hva _.
     change sp with (Regidx csp_rs1).
@@ -1210,7 +1233,7 @@ Section WpSconfAlu.
   Lemma wp_srl_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     shift_bits_right (rget m rs1)
       (subrange_vec_dec (rget m rs2) (Z.sub log2_xlen 1) 0) = wval ->
     sie_cap_gpr m n b p -∗
@@ -1221,10 +1244,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, SRL)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPE_SRL_gpr rs2 rs1 rd s_pc Hrd).
@@ -1234,7 +1257,7 @@ Section WpSconfAlu.
   Lemma wp_ori_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs1 ->
     or_vec (rget m rs1) (sign_extend' 64 imm) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) -∗
@@ -1244,10 +1267,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ITYPE_ORI_gpr rs1 rd imm s_pc).
@@ -1260,7 +1283,7 @@ Section WpSconfAlu.
   Lemma wp_xori_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs1 ->
     xor_vec (rget m rs1) (sign_extend' 64 imm) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, XORI)) -∗
@@ -1270,10 +1293,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, XORI)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ITYPE_XORI_gpr rs1 rd imm s_pc).
@@ -1284,7 +1307,7 @@ Section WpSconfAlu.
   Lemma wp_andi_s_sconf
       (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs1 ->
     and_vec (rget m rs1) (sign_extend' 64 imm) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) -∗
@@ -1294,10 +1317,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (ITYPE (imm, Regidx rs1, Regidx rd, ANDI)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_ITYPE_ANDI_gpr rs1 rd imm s_pc).
@@ -1310,7 +1333,7 @@ Section WpSconfAlu.
   Lemma wp_or_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     or_vec (rget m rs1) (rget m rs2) = wval ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
@@ -1320,10 +1343,10 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     intros s_pc Hnpc Hva Hvb.
     rewrite (exec_execute_RTYPE_OR_gpr rs2 rs1 rd s_pc Hrd).
@@ -1355,7 +1378,7 @@ Section WpSconfAlu.
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rd
               (SHIFTIOP (shamt, Regidx rd, Regidx rd, SRAI))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd (ops_ok_self b rd Hrdok) _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIOP_SRAI_gpr rd rd shamt s_pc).
@@ -1365,7 +1388,7 @@ Section WpSconfAlu.
 
   Lemma wp_mul_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     mult_to_bits_half xlen (mulop_mul.(mul_op_signed_rs1)) (mulop_mul.(mul_op_signed_rs2))
       (rget m rs1) (rget m rs2) (mulop_mul.(mul_op_result_part)) = wval ->
     sie_cap_gpr m n b p -∗
@@ -1376,9 +1399,9 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
-              (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) wval m n b Hrd Hrdok _
+              (MUL (Regidx rs2, Regidx rs1, Regidx rd, mulop_mul)) wval m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_MUL_gpr rs2 rs1 rd s_pc Hrd).
@@ -1392,7 +1415,7 @@ Section WpSconfAlu.
      instead of carrying the architectural divide-by-zero case around. *)
   Lemma wp_divu_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     to_bits_truncate 64
       (if Z.eqb (uint (rget m rs2)) 0 then (-1)%Z
        else Z.quot (uint (rget m rs1)) (uint (rget m rs2))) = wval ->
@@ -1404,9 +1427,9 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
-              (DIV (Regidx rs2, Regidx rs1, Regidx rd, true)) wval m n b Hrd Hrdok _
+              (DIV (Regidx rs2, Regidx rs1, Regidx rd, true)) wval m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_DIVU_gpr rs2 rs1 rd s_pc Hrd).
@@ -1415,7 +1438,7 @@ Section WpSconfAlu.
 
   Lemma wp_remu_s_sconf
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64) (m : regfile) (n : nat) (b : bool) :
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     to_bits_truncate 64
       (if Z.eqb (uint (rget m rs2)) 0 then uint (rget m rs1)
        else Z.rem (uint (rget m rs1)) (uint (rget m rs2))) = wval ->
@@ -1427,9 +1450,9 @@ Section WpSconfAlu.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
-              (REM (Regidx rs2, Regidx rs1, Regidx rd, true)) wval m n b Hrd Hrdok _
+              (REM (Regidx rs2, Regidx rs1, Regidx rd, true)) wval m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_REMU_gpr rs2 rs1 rd s_pc Hrd).
@@ -1440,7 +1463,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs2 : mword 5) (m : regfile) (n : nat) (b : bool) :
     let wval :=
       sign_extend' 64 (add_vec (subrange_vec_dec (rget m rd) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rd rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc true (RTYPEW (Regidx rs2, Regidx rd, Regidx rd, ADDW)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -1450,11 +1473,11 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf pc rd rd rs2
               (RTYPEW (Regidx rs2, Regidx rd, Regidx rd, ADDW))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPEW_ADDW_gpr rs2 rd rd s_pc).
@@ -1469,7 +1492,7 @@ Section WpSconfAlu.
       (pc : mword 64) (rd rs1 rs2 : mword 5) (m : regfile) (n : nat) (b : bool) :
     let wval :=
       sign_extend' 64 (sub_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32) (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -1479,11 +1502,11 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SUBW))
               wval
-              m n b Hrd Hrdok _
+              m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPEW_SUBW_gpr rs2 rs1 rd s_pc).
@@ -1500,7 +1523,7 @@ Section WpSconfAlu.
     let wval :=
       sign_extend' 64 (add_vec (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
                                (subrange_vec_dec (rget m rs2) 31 0 : mword 32)) in
-    uint rd <> 0 -> rd_ok rd ->
+    uint rd <> 0 -> ops_ok b rd rs1 rs2 ->
     sie_cap_gpr m n b p -∗
     pc_is pc -∗ instr pc false (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW)) -∗
     wp_next b p (fun (CID : CpuId) =>
@@ -1510,10 +1533,10 @@ Section WpSconfAlu.
     WP (Loop : expr riscv_lang).
   Proof.
     intros wval.
-    iIntros (Hrd Hrdok) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, ADDW))
-              wval m n b Hrd Hrdok _
+              wval m n b Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPEW_ADDW_gpr rs2 rs1 rd s_pc).

@@ -42,9 +42,13 @@
                              [IntrDefs.sconf_ms_facts_of_kernel] and
                              [MstatusFacts.mstatus_kernel_SIE] are both one
                              step off it.
-     menvcfg = [MENVCFG_S],  the sconf tier's three CSR side conditions.
-     mie & ~mideleg = 0,
-     satp.Mode = Bare
+     menvcfg = [MENVCFG_S],  the sconf tier's four CSR side conditions.  [mie]
+     mie & ~mideleg = 0,     is handed over as an exact value and not only as a
+     mie = [MIE_S],          relation with mideleg because the set of interrupt
+     satp.Mode = Bare        causes that can ever be delivered is masked by it,
+                             so the S-mode side can only compute that set from
+                             a pinned [mie] -- see
+                             claude-notes/projects/kerneltrap.md.
      [mb_pmp_open]           PMP entry 0 as [SmodeCore.pmp_config_intro] wants
                              it, so the Bare translation arm can be built
                              without knowing which pmpcfg the machine powered
@@ -135,6 +139,7 @@ Definition wp_entry_boot_body `{!riscvGS Σ} `{GEN : GenId} `{CID : CpuId}
       /\ mstatus_kernel_facts msf
       /\ menvcfgf = MENVCFG_S
       /\ and_vec mief (not_vec midelegf) = zeros' 64
+      /\ mief = MIE_S
       /\ _get_Satp64_Mode (Mk_Satp64 satpf) = ('b"0000" : mword 4)
       /\ mb_pmp_open pmpcfgf pmpaddrf ⌝ -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗

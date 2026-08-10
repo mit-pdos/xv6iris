@@ -120,7 +120,7 @@ Module ReparentProof (Wakeup : WAKEUP) : REPARENT.
 (* so [CID] can be a section variable.                                    *)
 (* ===================================================================== *)
 Section ProofReparentEnds.
-  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* +0x00 .. +0x2a: carve the 6-slot frame, save ra/s0/s1..s4, set s0, park
@@ -595,7 +595,7 @@ End ProofReparentEnds.
 (* not express.                                                           *)
 (* ===================================================================== *)
 Section ProofReparentLoop.
-  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ}.
 
   Lemma rp_loop `{GEN : GenId} `{CID0 : CpuId}
       
@@ -1032,7 +1032,7 @@ End ProofReparentLoop.
 (* The whole function.                                                    *)
 (* ===================================================================== *)
 Section ProofReparent.
-  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ}.
 
   Lemma wp_reparent_sconf `{GEN : GenId} `{CID0 : CpuId}
        (m : regfile) (γs : list gname) (pme ip : mword 64)

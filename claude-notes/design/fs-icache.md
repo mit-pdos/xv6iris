@@ -149,7 +149,7 @@ reader to conclude its own slot's count is ≥ 1.
 
 ```coq
 Definition inode_ident k dq dev inum := i_dev (ientry k) ↦₄{dq} dev ∗ i_inum (ientry k) ↦₄{dq} inum.
-Definition inode_ref γ k q dev inum   := iref_tok γ k q ∗ inode_ident k (DfracOwn q) dev inum.
+Definition inode_ref k q dev inum    := iref_tok k q ∗ inode_ident k (DfracOwn q) dev inum.
 ```
 
 Note it takes no inode *pointer*: `ientry` determines the address from the
@@ -160,11 +160,11 @@ same `dev`/`inum` — falls out of fractional points-to agreement with no
 
 **This is the predicate `FileInv.inode_ref v q` (once literally `emp`) and
 `ProcInv.cwd_ref v` were placeholders for.** Its signature does not match
-theirs: it needs `γ` (and reads the slot off the address). Two ways to
-close that were recorded; **C6b took the second, and generalised it**:
-`inode_ref` gains a `γ` parameter (ripples into `FileInv`, `ProcInv`,
-`SpecIput`, `SpecFileclose`, `kexit`), or a class carries the gname as a
-field so the predicate's arity is unchanged.
+theirs: it needs a gname (and reads the slot off the address). Two ways to
+close that were recorded; **C6b took the second, and generalised it**: a
+class carries the gname as a field, so the predicate's arity is unchanged
+(the alternative — an explicit `γ` parameter — ripples into `FileInv`,
+`ProcInv`, `SpecIput`, `SpecFileclose`, `kexit`).
 
 What landed (see projects/fs-icache.md's C6b entry for the whole story):
 
@@ -176,11 +176,20 @@ What landed (see projects/fs-icache.md's C6b entry for the whole story):
   count-authority gname, THE device (§13.11's single-device pin makes
   that honest) and the inode region's block count (which is what bounds
   an inum). A reference is `inode_held v := ∃ k q inum, ⌜v = ientry k⌝ ∗
-  ⌜k < NINODE⌝ ∗ ⌜uint inum < 16·nib⌝ ∗ inode_ref icfg_iref k q icfg_dev
-  inum`, and `icfg` is a superclass field of `fileG`, so nothing that
-  merely mentions `proc_priv` learns of it. A cone that ALSO names the
-  cache as an `ic_names` ties the two with a pure premise,
-  `icn_ref cn = icfg_iref`;
+  ⌜k < NINODE⌝ ∗ ⌜uint inum < 16·nib⌝ ∗ inode_ref k q icfg_dev inum`, and `icfg` is a superclass field of `fileG`, so nothing that
+  merely mentions `proc_priv` learns of it. and because the gname is CANONICAL rather than
+  threaded, the algebra takes no explicit `γ` at all: `itable_half`,
+  `iref_tok`, `inode_ref`, `itable_inv` and `IcacheEscrow.ic_names` all
+  read it off `icfg`, and a cone that ALSO names the cache as an
+  `ic_names` needs no `your-γ = my-γ` coherence premise to use two of
+  these predicates together. (This is the same choice `IrefSlots` and
+  `FdSlots` made for their own supplies. It arrived with the kfork
+  merge, which had made it independently as `IcacheInv.irefNameG`;
+  folding that class into `icfg` is what the merge did with it.)
+  `IcacheRef.icfg_alloc` mints one, and `IcacheBoot.icache_boot` takes
+  the authority `own icfg_iref (● ∅)` as a premise rather than allocating
+  it — the ambient `icfg` the file table is stated over is the one the
+  boot has to be about;
 * `ProcInv.cwd_ref` is `inode_held` under a null test (`emp` at
   `p->cwd = 0`); `FileInv`'s payload is `inode_pay γx v q := cinv fileipN
   γx (inode_held v) ∗ cinv_own γx q`, because **`inode_held` does not
@@ -188,6 +197,14 @@ What landed (see projects/fs-icache.md's C6b entry for the whole story):
   two shares are two references — and `file_payload_split` is a genuine
   ⊣⊢. The cancellable invariant is what makes fraction one, and only
   fraction one, produce the whole reference for `iput`.
+
+**`FileInv.inode_ref v q`, the file layer's old `emp` placeholder, is
+gone**: an FD_INODE file's payload is `inode_pay`, above, and `SpecIput`
+takes the real reference. (The kfork line's `InodeRef.iref_at` /
+`iref_shr_at` were a second spelling of the same idea over a `natR`
+algebra with count-0 shares; `InodeRef.v` survives the merge as a thin
+re-export of `IcacheRef`/`IrefSlots`, and the share vocabulary is
+deferred to the T5 cycle — see projects/reconcile-fork-icache.md.)
 
 ### The lock's resource
 

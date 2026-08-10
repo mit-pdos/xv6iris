@@ -149,7 +149,7 @@ Local Ltac nz := vm_compute; discriminate.
 (*  Vocabulary: the frame in three strengths, and the continuation.       *)
 (* ===================================================================== *)
 Section ReadiDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* readi's 112-byte frame.  Slot k sits at [sp0 - 8k], i.e. at
@@ -292,7 +292,7 @@ Definition rd_sp (m M : regfile) : Prop :=
 (*  +0xdc .. +0xec : THE RETURN.                                          *)
 (* ===================================================================== *)
 Section ReadiRet.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   Local Lemma rd_ret `{GEN : GenId} `{CID0 : CpuId} 
@@ -600,7 +600,7 @@ End ReadiRet.
 (*  +0xd8 .. +0xda : a0 := s3, restore s3.  THREE PATHS JOIN HERE.        *)
 (* ===================================================================== *)
 Section ReadiJoin.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   Local Lemma rd_join `{GEN : GenId} `{CID0 : CpuId} 
@@ -732,7 +732,7 @@ End ReadiJoin.
 (*  plus arithmetic (claude-notes/durable-notes.md).                      *)
 (* ===================================================================== *)
 Section ReadiExit.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   Local Lemma rd_exit `{GEN : GenId} `{CID0 : CpuId} 
@@ -963,7 +963,7 @@ End ReadiExit.
 (*  [rd_blocks_step] is exactly the decrease that pays for it.            *)
 (* ===================================================================== *)
 Section ReadiLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   Local Ltac reg_neq := vm_compute; discriminate.
@@ -2262,7 +2262,7 @@ End ReadiLoop.
 (*  test, the clamp and the n = 0 arm.                                    *)
 (* ===================================================================== *)
 Section ReadiMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

@@ -25,10 +25,11 @@ Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
 Require Import FdSlots WpLock.
 Require Import SpecConsoleintr.
+Require Import InodeRef.
 
 Module Consoleintr : CONSOLEINTR.
   Axiom wp_consoleintr_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
        (m : regfile) (γs : list gname)
       (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
       wp_consoleintr_sconf_body m γs pme lvl K eb C b.

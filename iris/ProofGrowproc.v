@@ -126,7 +126,7 @@ Module GrowprocProof (Myproc : MYPROC) (Uvmalloc : UVMALLOC)
                      (Uvmdealloc : UVMDEALLOC) : GROWPROC.
 
 Section ProofGrowproc.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

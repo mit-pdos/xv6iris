@@ -52,3 +52,72 @@ local→origin re-proves ~7000 lines behind an unsolved design question.
   ip->ref == 3 today). Blocked on T5's vocabulary AND on the escrow's
   OUT arm (which holds a tok the two_lookup refutations need — a
   share-holding ilock has nothing to deposit). Genuine open design.
+
+## What actually landed (2026-08-10, branch `reconcile-fork`)
+
+One merge commit, `git merge origin/main` with the conflicts resolved
+inside it, so origin's 28-commit kfork line is a real ancestor of main.
+
+- **T1** — done as planned. The four interrupt/CSR/`wp_next_at`/`ops_ok`
+  commits, the dead-import sweep, the `_CoqProject`/manifest unions and
+  the `KernelDecode02`/`SpecSched`/`SpecSleep`/`SpecAcquiresleep`
+  both-hunks resolutions all fast-forwarded or merged clean. NOTES kept
+  ours as base with their sections interleaved; `design/fs-icache.md`'s
+  conflicting section keeps our §13.8–13.13 content and folds their
+  canonical-gname paragraph in (it is now true of the tree).
+- **T2** — done. `NFILE` lives in `FdSlots.v`; `IrefSlots` requires
+  `FdSlots`; `IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE`. `IcacheRef.v`
+  keeps our cut and is the ONLY home of `icacheG`/`icacheΣ`/`icfg`.
+  **`InodeRef.v` survives as a thin re-export** of `IrefSlots` +
+  `IcacheRef` (plus `ientry_nonzero`), which is the minimum-churn choice:
+  ~20 of their files `Require Import InodeRef` only to get the reference
+  vocabulary and the slot supply in scope at once. `iref_at` /
+  `iref_shr_at` are NOT re-provided — `iref_at` had exactly two consumers
+  (`ProcInv.cwd_ref`, `ProofKforkB4`) and both now use `inode_held`.
+- **T3** — done, and folded the way the ruling said: `IcacheRef.icfg`
+  carries the canonical authority gname (`icfg_iref` ≡ their
+  `iref_name`), and `itable_half` / `iref_tok` / `inode_ref` /
+  `itable_inv` / `itable_body` / `itable_res` / `is_itable` all lost
+  their `γ` argument, as did every lemma over them. `ic_names` lost
+  `icn_ref`, so `ic_names_alloc` no longer takes or returns a gname, and
+  the pure bridging premises (`icn_ref cn = icfg_iref` in `SpecFileclose`
+  and `ProofKexit`) are gone.
+  - **The one thing the ruling did not anticipate**: `icfg` is AMBIENT
+    (a superclass field of `FileInv.fileG`, fixed before the boot fupd),
+    whereas their `irefNameG` was minted inside `boot_shared_alloc` and
+    left existentially. Under the fold, a boot-time mint would produce a
+    SECOND `icfg`, unrelated to the one the file table's payload is
+    stated over. So `iref_name_alloc` and its `BootShared` call site are
+    gone; `IcacheRef.icfg_alloc` is the allocator (kept, so the premise
+    is demonstrably satisfiable), and `IcacheBoot.icache_boot` now TAKES
+    `own icfg_iref (● ∅)` instead of allocating it. Tying the ambient
+    `icfg` to a boot-minted authority is the remaining half of the boot
+    wiring, and it is the same not-done-ness their side had (their
+    `iref_name_alloc` discarded what it minted).
+  - Their `!irefNameG Σ` Context binders (~25 files) were DELETED rather
+    than translated: `fileG` already carries `icacheG` + `icfg`, and
+    binding both is the two-instance-paths trap. Where `fileG` is absent
+    (the i-cone spec/proof files) the binder is `ICFG : icfg` beside
+    `!icacheG Σ`.
+- **T4** — done. The kfork/sys_fork cone ported onto our `cwd_ref`:
+  `SpecKfork` and `SpecSysFork` gained `pv_cwd Vp <> 0` (threaded through
+  `ProofKforkMain.kfork_arm3` to `ProofKforkB4.kfk_b4`); B4's cwd destruct
+  goes through `cwd_ref_held` and `inode_held`, so the DEVICE is not
+  existential (it is `icfg_dev`) and the inum bound comes out with it;
+  `kfk_child_cwd` rebuilds the child's arm with `cwd_ref_of_held`. B4's
+  `is_itable2` call sites (and the cone's, seven files) gained our `dev`
+  argument as `icfg_dev` — no new spec parameter was needed, because
+  §13.11's single-device pin makes the itable's device and the
+  reference's the same thing. Kept their `proc_priv_nocwd` /
+  `proc_priv_split_cwd` / accessors, their `proc_dormant`
+  `iref_slots (1 + IREFSPARE)` routing and their `SpecAllocproc`; our
+  `proc_priv_intro`'s `pv_cwd V = 0` premise was dropped in favour of
+  their `cwd_ref (pv_cwd V)` argument (strictly more general under the
+  two-armed definition, and `ProofAllocproc` now uses
+  `proc_priv_nocwd_intro` anyway).
+- **T5** — still deferred. `positiveR` stayed. The one place their `natR`
+  retype leaked in through a theirs-only file was
+  `IrefSlots.iref_slots_no_overflow`, restated at `nat`; it is back at
+  `positive` with a pointer to T5 at the site. Verified by grep that no
+  file in the kfork/sys_fork cone consumes `iref_shr_at` / `inode_shr` /
+  count-0 shares.

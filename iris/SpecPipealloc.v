@@ -79,6 +79,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import IrefSlots InodeRegion.
 From Kernel Require KernelSyms.
+Require Import InodeRef.
 Local Open Scope Z_scope.
 
 
@@ -88,7 +89,7 @@ Local Open Scope Z_scope.
 Definition pipe_name_str : Z := 0x80007598%Z.
 
 Section SpecPipealloc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !kallocG Σ}.
 
   (* the four content fields pipealloc writes into each [struct file]: it makes
      the [w = false] file the READ end and the [w = true] file the WRITE end,
@@ -138,7 +139,7 @@ Section SpecPipealloc.
 End SpecPipealloc.
 
 Definition wp_pipealloc_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ, !kallocG Σ} `{GEN : GenId} `{CID : CpuId}
     (γfl γf : gname)                    (* ftable.lock, the file refcount ghost, the fd-slot ghost *)
     (γkl : gname) (γk : gname * gname) (fl : mword 64)   (* kmem.lock, kalloc's ghosts *)
     (m : regfile) (v0 v1 : mword 64) (on : option nat)

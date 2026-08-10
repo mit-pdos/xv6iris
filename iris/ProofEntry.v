@@ -93,13 +93,13 @@ Section ProofEntry.
        Hmenv Hmcen Hstc Hstko".
     (* ---- <main>, in S-mode: the composed continuation ----
        Here the M-mode symbolic execution is DISCHARGED into facts: the client
-       is handed the post-state as eleven opaque values plus the seven things
+       is handed the post-state as eleven opaque values plus the eight things
        it consumes about them, and never sees [st_mout]'s tower again. *)
     iEval (change st_main with pcMain) in "Hpc".
     iEval (change st_main with pcMain) in "Hmepc".
     iEval (rewrite entry_ld_ea_mb) in "Hstk".
     destruct (st_boot_csr_facts menvcfg0 mie0 mideleg0 satp0 Hmenv0 Hmie0 Hmdl0)
-      as (Hmenvf & Hmief & Hsatpf).
+      as (Hmenvf & Hmief & Hsatpf & Hmiepin).
     iApply ("Hcont" $! (st_mout (m_jal m v_stack0 mhartid_in) sp0 ms0 mie0 mideleg0
                           menvcfg0 mcounteren0 tv mhartid_in)
                        (cms5 (st_ms1 ms0))
@@ -120,6 +120,7 @@ Section ProofEntry.
     - exact (st_boot_ms_kernel_facts ms0 HoKF).
     - exact Hmenvf.
     - exact Hmief.
+    - exact Hmiepin.
     - exact Hsatpf.
     - exact (st_pmp_open pmpcfg0 pmpaddr00 Hpmp).
   Qed.

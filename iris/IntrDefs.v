@@ -12,9 +12,15 @@
      - the interrupts-ENABLED regime: [intr_ms_facts], [intr_config],
        [intr_frame] (+[intr_frame_retarget]), [intr_handler_spec],
        [intr_inv] (+allocation);
+     - the DELIVERABLE-CAUSE layer the [mie] pin buys: [s_cause_ok] (the
+       two scause words S-mode can ever be trapped with), [trap_scause]
+       (the tower the trap leaves in the cell) and
+       [s_cause_ok_of_dispatch], which closes the two against
+       WpIntrCore's [s_dispatch_MIE_S];
      - the SIE-AGNOSTIC v2 bundle (the smode_config successor):
        [sconf_ms_facts] (the SIE-free common fact set), [sconf]
-       (SIE unpinned, ghost half tied to the live bit, menvcfg bundled),
+       (SIE unpinned, [mie] PINNED at [MIE_S], ghost half tied to the
+       live bit, menvcfg bundled),
        the kernel-code capability [sie_cap m avail] -- the
        [kv_frame_slots + avail] free-stack slots below sp (sp moves trade
        against [avail] via [sie_cap_push]/[sie_cap_pop]), the TRANSLATION
@@ -95,6 +101,69 @@ Proof.
   split; [rewrite roundtrip_SD; exact H9 |].
   split; [rewrite roundtrip_MPP; exact H10 |].
   exact (roundtrip_TVM_false elp_v ms H11).
+Qed.
+
+(* ===================================================================== *)
+(* THE CAUSE SET [RiscvFetchExec.MIE_S] IMPLIES.  [sconf] pins [mie] to    *)
+(* that constant (see the conjunct there); because the S-mode dispatch set *)
+(* [s_pending] is masked by [mie], no cause but S-timer (5) and S-external *)
+(* (9) can EVER be delivered, whatever [mip] holds -- which is exactly the *)
+(* two [devintr] recognises.                                               *)
+(*                                                                        *)
+(* [s_cause_ok] is that conclusion, spelled in the scause WORDS the trap   *)
+(* writes.  It is stated HERE, at leaf altitude, rather than as            *)
+(* [SpecDevintr.devintr_ret sc <> 0]: this file sits far below SpecDevintr, *)
+(* and the trap handler's contract has to be able to say it.  kernelvec    *)
+(* converts one to the other with a [vm_compute] per arm.                  *)
+(* ===================================================================== *)
+Definition s_cause_ok (sc : mword 64) : Prop :=
+  sc = (mword_of_int 0x8000000000000005 : mword 64) \/
+  sc = (mword_of_int 0x8000000000000009 : mword 64).
+
+(* ---------------------------------------------------------------------- *)
+(* THE SCAUSE WORD THE TRAP WRITES, and the two literals it can be.        *)
+(*                                                                        *)
+(* [trap_scause sc_old i] is the exact two-step tower [trap_handler]       *)
+(* leaves in scause: bit 63 := the interrupt flag, then bits 62..0 := the  *)
+(* zero-extended cause code.  It is NAMED here rather than re-[pose]d      *)
+(* inside the engine's proof, because the engine is the ONLY consumer and  *)
+(* two spellings of the same tower would have to be kept in step by hand.  *)
+(* [RiscvExtras.scause_tower] collapses the pair to a concatenation, after *)
+(* which the word is a closed literal and [vm_compute] finishes -- the old *)
+(* scause value drops out entirely, which is the whole content.            *)
+(*                                                                        *)
+(* Combined with §2b's dispatch confinement (WpIntrCore.v), this is the    *)
+(* engine's obligation [s_cause_ok] discharged: [mie] pinned at [MIE_S]    *)
+(* admits only causes 5 and 9, and each writes one of the two literals.    *)
+(* ---------------------------------------------------------------------- *)
+Definition trap_scause (sc_old : mword 64) (i : InterruptType) : mword 64 :=
+  update_subrange_vec_dec
+    (update_subrange_vec_dec sc_old (64 - 1) (64 - 1)
+       (bool_to_bit (trapCause_is_interrupt (Interrupt i))))
+    (64 - 2) 0
+    (zero_extend' (64 - 1) (trapCause_bits_forwards (Interrupt i))).
+
+Lemma scause_of_S_Timer (sc_old : mword 64) :
+  trap_scause sc_old I_S_Timer = (mword_of_int 0x8000000000000005 : mword 64).
+Proof.
+  unfold trap_scause. rewrite scause_tower. vm_compute. reflexivity.
+Qed.
+
+Lemma scause_of_S_External (sc_old : mword 64) :
+  trap_scause sc_old I_S_External = (mword_of_int 0x8000000000000009 : mword 64).
+Proof.
+  unfold trap_scause. rewrite scause_tower. vm_compute. reflexivity.
+Qed.
+
+Lemma s_cause_ok_of_dispatch (mip_v mdv ms sc_old : mword 64) (meip seip : mword 1)
+    (i : InterruptType) (pr : Privilege) :
+  s_dispatch mip_v meip seip MIE_S mdv ms = Some (i, pr) ->
+  s_cause_ok (trap_scause sc_old i).
+Proof.
+  intros Hd.
+  destruct (s_dispatch_MIE_S mip_v mdv ms meip seip i pr Hd) as [-> | ->].
+  - left. apply scause_of_S_Timer.
+  - right. apply scause_of_S_External.
 Qed.
 
 (* the SIE-AGNOSTIC common fact set: [intr_ms_facts] minus the SIE pin.
@@ -303,9 +372,19 @@ Section IntrDefs.
         mstatus ↦ᵣ ms ∗
         ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
         ⌜ intr_ms_facts ms ⌝) ∗
-     (∃ mie_v mdv0 : mword 64,
-        mie ↦ᵣ mie_v ∗ mideleg ↦ᵣ mdv0 ∗
-        ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝) ∗
+     (* [mie] IS PINNED HERE TOO, and it has to be: this is the SAME machine
+        as [sconf]'s (§6), reached and left by [intr_config_of_v2] /
+        [v2_of_intr_config], and a conversion cannot INVENT the pin.  Were
+        this conjunct left existential, the round trip
+        sconf -> intr_config -> sconf would silently launder [mie = MIE_S]
+        away and the enabled regime -- the only one in which a cause is ever
+        actually DELIVERED -- would be the one place the deliverable-cause
+        argument does not hold.  No instruction between the two conversions
+        writes [mie] (nothing in the kernel ever does), so pinning it costs
+        the engines nothing: they read the value and hand it back. *)
+     (∃ mdv0 : mword 64,
+        mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv0 ∗
+        ⌜ and_vec MIE_S (not_vec mdv0) = zeros' 64 ⌝) ∗
      (∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v))%I.
@@ -494,9 +573,20 @@ Section IntrDefs.
         ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
         sret_tie ms ∗
         ⌜ sconf_ms_facts ms ⌝) ∗
-     (∃ mie_v mdv0 : mword 64,
-        mie ↦ᵣ mie_v ∗ mideleg ↦ᵣ mdv0 ∗
-        ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝) ∗
+     (* [mie] IS PINNED, exactly as [menvcfg] is below and for the same
+        reason: a boot-established constant no later instruction touches
+        ([start] writes [sie] once, `SIE_SEIE | SIE_STIE`, and never writes
+        [mie] at all).  Pinning it is what makes the DELIVERABLE CAUSE SET
+        computable -- [s_pending] is masked by [mie], so at [MIE_S] only
+        bits 5 and 9 can ever be pending and the scause a trap writes is
+        one of [s_cause_ok]'s two literals.  That fact is what keeps
+        kerneltrap's [printk] arm dead, hence printk-general out of the
+        cone; see claude-notes/projects/kerneltrap.md.  [mideleg] stays
+        existential: `mideleg = 0xffff` removes nothing, so the restriction
+        comes entirely from [mie] and no proof needs the value. *)
+     (∃ mdv0 : mword 64,
+        mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv0 ∗
+        ⌜ and_vec MIE_S (not_vec mdv0) = zeros' 64 ⌝) ∗
      (∃ menvcfg0 : mword 64,
         menvcfg ↦ᵣ menvcfg0 ∗
         ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝ ∗
@@ -1111,7 +1201,11 @@ Section IntrDefs.
      [rd <> csp_rs1] IN PLACE (same premise slot, so no call site changes
      arity): [sie_cap] is keyed on sp, and the register file pins tp
      (HartTp.v), so neither may be a generic write's destination.  Discharge
-     with [ltac:(rdok)] wherever [ltac:(vm_compute; discriminate)] used to sit. *)
+     with [ltac:(rdok)] wherever [ltac:(vm_compute; discriminate)] used to sit.
+     UNCHANGED by the read-side work below: [rd_ok] is named in 28 files and is
+     a premise on a public spec surface (SpecUart.v), and it stays the premise
+     of every write-only leaf.  A leaf that ALSO reads a caller-varying
+     register states [ops_ok] instead, whose first conjunct is this. *)
   Definition rd_ok (rd : mword 5) : Prop :=
     rd <> csp_rs1 /\ Regidx rd <> Regidx Rtp.
 
@@ -1119,6 +1213,201 @@ Section IntrDefs.
   Proof. by intros [H _]. Qed.
   Lemma rd_ok_tp (rd : mword 5) : rd_ok rd -> Regidx rd <> Regidx Rtp.
   Proof. by intros [_ H]. Qed.
+
+  (* THE READ-SIDE PREMISE, AND WHY A LEAF NEEDS ONE AT ALL.  [sie_cap_gpr]
+     owns [gpr_file (tp_pin m)] (HartTp.v): the register file is held at the
+     map [m] with tp's slot OVERRIDDEN by [cid_word_of cpu_id].  So [rget m k]
+     -- a lookup in [tp_pin m] -- DEPENDS ON THE AMBIENT HART, at exactly one
+     register, k = tp, and agrees at every other ([HartTp.rget_hart_indep]).
+
+     Today that is harmless: [WpSmodeIntr.wp_instr_s_sconf]'s σ-callback sits
+     at the ambient hart, so a leaf's σ-obligation and its caller's value
+     premise are spelled at the SAME [CID] and no premise is needed.  A later
+     change moves that callback INSIDE [WpNext.wp_next b p], so that an
+     instruction can execute on the hart a trap returned to.  From then on the
+     leaf's obligation arrives about [rget (CID := C1) m rs] while the caller
+     supplied a fact about [rget (CID := C0) m rs] -- and those differ
+     precisely when [rs = tp].  [src_ok] is the side condition that rules the
+     one bad register out.
+
+     DO NOT DELETE THIS AS REDUNDANT.  Nothing in the tree CONSUMES it yet; it
+     is landed ahead of the funnel change so that the sweep over 33 leaves and
+     their ~1200 call sites is not entangled with that edit.  What it buys is
+     PROVED here, not merely asserted: see [rget_src_indep] below.
+
+     GUARDED ON THE SIE INDEX, and the guard is not conservatism -- it is what
+     makes the premise true of the existing tree.  At [b = false] the callback
+     is pinned by [WpNext.wp_next_off] and the hart provably does not move, so
+     nothing is needed EVEN AT tp; and tp really is read there, because
+     [mycpu] / [cpuid] / [scheduler] each inline a [c.mv rd,tp]
+     ([CodeMycpu.myi_08] is [RTYPE (Regidx 4, zreg, Regidx 15, ADD)]) and all
+     of them run after [intr_off()].  An UNGUARDED [Regidx rs <> Regidx Rtp]
+     would outlaw those three proofs outright, and would force a separate leaf
+     family for the tp reads.
+
+     SUFFICIENT, NOT MINIMAL, and deliberately so: [WpNext.wp_next] pins the
+     hart under [b = false \/ p = zero_reg], so a leaf run at [b = true] with
+     NO CURRENT PROC does not really need the guard either.  Threading [p]
+     through here would widen [ops_ok]'s arity for a hatch that no ALU leaf's
+     caller is in a position to use (the no-proc paths are boot and the
+     scheduler's idle loop, both interrupts-off), so the guard is stated on
+     the SIE index alone. *)
+  Definition src_ok (b : bool) (rs : mword 5) : Prop :=
+    b = true -> Regidx rs <> Regidx Rtp.
+
+  (* THE OPERAND SIDE CONDITION of a register-READING gpr-write leaf: the
+     write-side [rd_ok] together with the read-side guard on each source.  It
+     replaces [rd_ok rd] IN THE SAME PREMISE SLOT, which is the whole point of
+     the shape: [rd_ok] itself is unchanged (28 files name it, and it is a
+     premise in a public spec surface, SpecUart.v), while the 3673 call sites
+     that fill the slot with an opaque positional [ltac:(rdok)] keep working
+     because [rdok] closes an [ops_ok] goal too.  A leaf with a single source
+     spells it [ops_ok b rd rs rs]; a leaf that reads NO caller-varying
+     register keeps plain [rd_ok rd] and builds this from it via
+     [ops_ok_self] / [ops_ok_conc]. *)
+  Definition ops_ok (b : bool) (rd rs1 rs2 : mword 5) : Prop :=
+    rd_ok rd /\ src_ok b rs1 /\ src_ok b rs2.
+
+  (* the sp-MOVER twin, for [WpSconfAlu.wp_gpr_write_s_sconf_cap]: there [rd]
+     MAY be sp -- that is the whole instruction, and the caller pays for it
+     with a [sie_cap] transformer instead of [rd_ok]'s sp conjunct -- but the
+     tp half and the entire READ side are identical, so the source guard is
+     stated once, in [src_ok], and shared. *)
+  Definition ops_ok_sp (b : bool) (rd rs1 rs2 : mword 5) : Prop :=
+    Regidx rd <> Regidx Rtp /\ src_ok b rs1 /\ src_ok b rs2.
+
+  Lemma ops_ok_rd (b : bool) (rd rs1 rs2 : mword 5) :
+    ops_ok b rd rs1 rs2 -> rd_ok rd.
+  Proof. by intros [H _]. Qed.
+  Lemma ops_ok_s1 (b : bool) (rd rs1 rs2 : mword 5) :
+    ops_ok b rd rs1 rs2 -> src_ok b rs1.
+  Proof. by intros [_ [H _]]. Qed.
+  Lemma ops_ok_s2 (b : bool) (rd rs1 rs2 : mword 5) :
+    ops_ok b rd rs1 rs2 -> src_ok b rs2.
+  Proof. by intros [_ [_ H]]. Qed.
+
+  Lemma ops_ok_sp_rd (b : bool) (rd rs1 rs2 : mword 5) :
+    ops_ok_sp b rd rs1 rs2 -> Regidx rd <> Regidx Rtp.
+  Proof. by intros [H _]. Qed.
+  Lemma ops_ok_sp_s1 (b : bool) (rd rs1 rs2 : mword 5) :
+    ops_ok_sp b rd rs1 rs2 -> src_ok b rs1.
+  Proof. by intros [_ [H _]]. Qed.
+  Lemma ops_ok_sp_s2 (b : bool) (rd rs1 rs2 : mword 5) :
+    ops_ok_sp b rd rs1 rs2 -> src_ok b rs2.
+  Proof. by intros [_ [_ H]]. Qed.
+
+  (* an [ops_ok] weakens to the cap engine's [ops_ok_sp] *)
+  Lemma ops_ok_to_sp (b : bool) (rd rs1 rs2 : mword 5) :
+    ops_ok b rd rs1 rs2 -> ops_ok_sp b rd rs1 rs2.
+  Proof. intros [Hrd Hs]. split; [ exact (rd_ok_tp _ Hrd) | exact Hs ]. Qed.
+
+  (* THE TWO CONSTRUCTORS a leaf that keeps [rd_ok rd] uses to feed the
+     engines' widened premise.  A leaf reads nothing a caller can vary when
+     its engine operands are [rd] itself (every compressed rd = rs1 form, plus
+     the UTYPE / AUIPC writers that read no register at all) or a CONCRETE
+     register (sp for c.addi4spn, x0 for c.li / li).  Both derive from
+     [rd_ok rd] alone, so those leaves gain NO premise. *)
+  Lemma src_ok_ne (b : bool) (rs : mword 5) :
+    Regidx rs <> Regidx Rtp -> src_ok b rs.
+  Proof. by intros H _. Qed.
+
+  Lemma ops_ok_self (b : bool) (rd : mword 5) : rd_ok rd -> ops_ok b rd rd rd.
+  Proof.
+    intros Hrd. pose proof (src_ok_ne b rd (rd_ok_tp _ Hrd)) as Hs.
+    split; [ exact Hrd | split; exact Hs ].
+  Qed.
+
+  Lemma ops_ok_conc (b : bool) (rd rs1 rs2 : mword 5) :
+    rd_ok rd -> Regidx rs1 <> Regidx Rtp -> Regidx rs2 <> Regidx Rtp ->
+    ops_ok b rd rs1 rs2.
+  Proof.
+    intros Hrd H1 H2. split; [ exact Hrd | split ].
+    - exact (src_ok_ne b _ H1).
+    - exact (src_ok_ne b _ H2).
+  Qed.
+
+  Lemma ops_ok_sp_conc (b : bool) (rd rs1 rs2 : mword 5) :
+    Regidx rd <> Regidx Rtp ->
+    Regidx rs1 <> Regidx Rtp -> Regidx rs2 <> Regidx Rtp ->
+    ops_ok_sp b rd rs1 rs2.
+  Proof.
+    intros Hrd H1 H2. split; [ exact Hrd | split ].
+    - exact (src_ok_ne b _ H1).
+    - exact (src_ok_ne b _ H2).
+  Qed.
+
+  (* ===================================================================== *)
+  (* THE PAYOFF: what [src_ok] actually buys, so the premise is proved and   *)
+  (* not merely asserted.  This is the fact the later funnel change consumes *)
+  (* verbatim -- at [b = true] a source operand's value does not depend on   *)
+  (* which hart the σ-callback is instantiated at.  (At [b = false] the hart *)
+  (* cannot move, so no premise and no lemma are needed; that asymmetry IS   *)
+  (* [src_ok]'s guard.)                                                     *)
+  (* ===================================================================== *)
+  Lemma rget_src_indep (b : bool) (m : regfile) (rs : mword 5) :
+    b = true -> src_ok b rs ->
+    forall c1 c2 : CpuId, rget (CID := c1) m rs = rget (CID := c2) m rs.
+  Proof. intros Hb Hrs. exact (rget_hart_indep m rs (Hrs Hb)). Qed.
+
+  (* ... and for a leaf's two sources at once, which is the shape a converted
+     leaf's σ-obligation will arrive in: the engine reads [rget m rsa] and
+     [rget m rsb], and both have to survive the hart rebinding. *)
+  Lemma rget_ops_indep (b : bool) (m : regfile) (rd rs1 rs2 : mword 5) :
+    b = true -> ops_ok b rd rs1 rs2 ->
+    forall c1 c2 : CpuId,
+      rget (CID := c1) m rs1 = rget (CID := c2) m rs1
+      /\ rget (CID := c1) m rs2 = rget (CID := c2) m rs2.
+  Proof.
+    intros Hb Hops c1 c2. split.
+    - exact (rget_src_indep b m rs1 Hb (ops_ok_s1 _ _ _ _ Hops) c1 c2).
+    - exact (rget_src_indep b m rs2 Hb (ops_ok_s2 _ _ _ _ Hops) c1 c2).
+  Qed.
+
+  (* THE FORM A CONVERTED LEAF ACTUALLY USES.  Inside the funnel's σ-callback a
+     leaf does not hold a bare [b = true]: it holds the [WpNext.wp_next] GUARD
+     for the hart the callback was instantiated at.  The two cases of that
+     guard are exactly the two reasons a source read is safe, and they are
+     complementary -- at [b = true] the guard says nothing and [src_ok] does
+     the work; at [b = false] the guard PINS the hart and [src_ok] is vacuous
+     (which is WHY it is guarded on [b] and not stated unconditionally).  So
+     the leaf gets one rewrite and never case-splits on [b] by hand.
+
+     The guard is spelled out rather than written [wp_next b pv _] because this
+     file is below [WpNext.v] in the dependency order; the shapes coincide.
+
+     MEASURED, on the two engines that already carry [ops_ok]: with this lemma
+     [wp_gpr_write_s_sconf{,_base}] convert to the wrapped funnel in three
+     lines each, and nothing else in their proofs moves.  The 72 OTHER leaves
+     whose pure premises mention [rget m rs] for a caller-chosen [rs] (24 in
+     WpSconfBtype.v, 20 in WpSconfMem.v, the rest across WpSconfLock /
+     WpSconfUartAccess / WpPlic / WpVirtioDev / WpSmodeHalf / WpSconfCsr /
+     WpSconfCtl / ProofBreadParts) cannot use it yet: they have no [src_ok] to
+     feed it, and giving them one changes call-site ARITY at ~1750 references.
+     That widening is the PREREQUISITE of the funnel move, not a follow-up. *)
+  Lemma rget_next_indep (b : bool) (pv : mword 64) (CIDn : CpuId)
+      (m : regfile) (rs : mword 5) :
+    (b = false \/ pv = zero_reg -> (CIDn : CPU) = (CID : CPU)) ->
+    src_ok b rs ->
+    rget (CID := CIDn) m rs = rget (CID := CID) m rs.
+  Proof.
+    intros Hs Hrs. destruct b.
+    - exact (rget_src_indep true m rs eq_refl Hrs CIDn CID).
+    - rewrite (_ : (CIDn : CpuId) = CID);
+        [ reflexivity | exact (Hs (or_introl eq_refl)) ].
+  Qed.
+
+  (* the two-source form, for a leaf whose engine reads [rsa] and [rsb] *)
+  Lemma rget_next_ops_indep (b : bool) (pv : mword 64) (CIDn : CpuId)
+      (m : regfile) (rd rs1 rs2 : mword 5) :
+    (b = false \/ pv = zero_reg -> (CIDn : CPU) = (CID : CPU)) ->
+    ops_ok b rd rs1 rs2 ->
+    rget (CID := CIDn) m rs1 = rget (CID := CID) m rs1
+    /\ rget (CID := CIDn) m rs2 = rget (CID := CID) m rs2.
+  Proof.
+    intros Hs Hops. split.
+    - exact (rget_next_indep b pv CIDn m rs1 Hs (ops_ok_s1 _ _ _ _ Hops)).
+    - exact (rget_next_indep b pv CIDn m rs2 Hs (ops_ok_s2 _ _ _ _ Hops)).
+  Qed.
 
   (* THE sp BRIDGE.  The bundle owns [gpr_file (tp_pin m)] while [sie_cap] and
      [intr_frame] are keyed on [m !!! Regidx csp_rs1], and a step engine takes
@@ -1634,15 +1923,50 @@ Ltac tp_refold Hrdtp H := iEval (rewrite (tp_pin_upd _ _ _ Hrdtp)) in H.
 (* THE call-site discharge for [rd_ok], replacing the [ltac:(vm_compute;
    discriminate)] that used to sit in the [rd <> csp_rs1] premise slot.
    Written name-free: an Ltac body cannot reference a hypothesis by literal
-   name (durable-notes).  The two conjuncts need DIFFERENT scripts --
+   name (durable-notes).  The conjuncts need DIFFERENT scripts --
    [rd <> csp_rs1] is an [mword 5] disequality [vm_compute; discriminate]
    settles, while [Regidx rd <> Regidx Rtp] has to go through [Regidx]'s
-   injectivity first. *)
+   injectivity first, and [src_ok]'s guarded conjunct is an implication.
+   So they are three NAMED pieces, composed by [rdok] below. *)
+Ltac rdok_tpne :=
+  let H1 := fresh in let H2 := fresh in
+  intro H1; injection H1 as H2; vm_compute in H2; congruence.
+
+Ltac rdok_rd := split; [ vm_compute; discriminate | rdok_tpne ].
+
+(* [src_ok b rs] is [b = true -> Regidx rs <> Regidx Rtp], and WHICH of two
+   routes closes it is decided by the call site's [b]:
+     - [b] is the literal [false] (every push_off'd proof): the antecedent is
+       absurd and [discriminate] finishes -- and this is the ONLY route open
+       for a tp SOURCE, which is exactly how ProofMycpu / ProofCpuid /
+       ProofScheduler keep their inlined [c.mv rd,tp] leaf calls working;
+     - [b] is [true] or still a variable: then [rs] is a concrete register at
+       the call site, and the same [Regidx]-injectivity script settles it.
+   The [assumption] arm is for a leaf-internal use where a caller has already
+   handed the disequality down. *)
+Ltac rdok_src :=
+  let Hb := fresh in
+  intro Hb;
+  first [ discriminate Hb
+        | clear Hb; rdok_tpne
+        | clear Hb; assumption ].
+
+(* THE call-site discharge -- unchanged in NAME and in how it is passed
+   ([ltac:(rdok)] sitting positionally in the premise slot at 3673 sites).  It
+   now ALSO closes the widened [ops_ok] / [ops_ok_sp] goals that the
+   register-READING leaves state in that slot instead of [rd_ok]; that is what
+   makes widening the slot's CONTENT free at every call site.
+   Dispatch on the GOAL, not on whether [split] succeeds: [rd_ok] is itself a
+   conjunction, so a bare [split] cannot tell the shapes apart and would
+   silently run the wrong script on the wrong conjunct. *)
 Ltac rdok :=
-  split;
-  [ vm_compute; discriminate
-  | let H1 := fresh in let H2 := fresh in
-    intro H1; injection H1 as H2; vm_compute in H2; congruence ].
+  lazymatch goal with
+  | |- ops_ok _ _ _ _    => split; [ rdok_rd   | split; [ rdok_src | rdok_src ] ]
+  | |- ops_ok_sp _ _ _ _ => split; [ rdok_tpne | split; [ rdok_src | rdok_src ] ]
+  | |- src_ok _ _        => rdok_src
+  | |- rd_ok _           => rdok_rd
+  | _                    => rdok_rd
+  end.
 
 (* THE READ-SIDE TWIN of [rdok]: rewrite [rget m k] to [m !!! Regidx k] at a
    non-tp index, discharging the [Regidx] injectivity side condition with the
@@ -1670,3 +1994,14 @@ Ltac rgne :=
 Ltac rdok_split Hrdok :=
   pose proof (rd_ok_sp _ Hrdok);
   pose proof (rd_ok_tp _ Hrdok).
+
+(* THE [ops_ok] TWIN of [rdok_split], for a register-READING leaf/engine whose
+   premise slot now carries [ops_ok] instead: pose the same two [rd_ok]
+   projections the body already uses ([Hrdsp] for the sp [congruence]s,
+   [Hrdtp] to feed [tp_refold]) PLUS the two source guards, so the body reads
+   exactly as it did before the premise was widened. *)
+Ltac ops_ok_split Hops :=
+  pose proof (rd_ok_sp _ (ops_ok_rd _ _ _ _ Hops));
+  pose proof (rd_ok_tp _ (ops_ok_rd _ _ _ _ Hops));
+  pose proof (ops_ok_s1 _ _ _ _ Hops);
+  pose proof (ops_ok_s2 _ _ _ _ Hops).

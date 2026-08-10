@@ -78,7 +78,7 @@ Section WpSconfSrliw.
       (pc : mword 64) (rd rs1 : mword 5) (shamt : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs1 ->
     sign_extend' 64 (shift_bits_right (subrange_vec_dec (rget m rs1) 31 0 : mword 32) shamt)
       = wval ->
     sie_cap_gpr m n b p -∗
@@ -89,10 +89,10 @@ Section WpSconfSrliw.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs1
               (SHIFTIWOP (shamt, Regidx rs1, Regidx rd, SRLIW)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva _.
       rewrite (exec_execute_SHIFTIWOP_SRLIW_gpr rs1 rd shamt s_pc).

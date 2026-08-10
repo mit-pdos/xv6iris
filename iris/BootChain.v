@@ -447,12 +447,14 @@ Section BootRun.
               (ti_ea_ra_bound _ Hn) (ti_ea_s0_bound _ Hn)
               with "Hmm Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
                     Hmenv Hmcen Hstc Hgot Hstk Htext").
-    (* Everything the M-mode side computed arrives ABSTRACT, with the seven
-       facts the bridge wants; the two mstatus premises are one lemma each off
-       the exported [mstatus_kernel_facts]. *)
+    (* Everything the M-mode side computed arrives ABSTRACT, with the eight
+       facts the bridge wants (the eighth is [mief = MIE_S], the pin
+       [IntrDefs.sconf] needs -- see claude-notes/projects/kerneltrap.md);
+       the two mstatus premises are one lemma each off the exported
+       [mstatus_kernel_facts]. *)
     iIntros (Mf msf satpf medelegf midelegf mief menvcfgf stimecmpf mcounterenf
              pmpcfgf pmpaddrf)
-      "(%Hsp & %Htpf & %Hkf & %Hmenvl & %Hmiez & %Hsatpm & %Hpmpo)
+      "(%Hsp & %Htpf & %Hkf & %Hmenvl & %Hmiez & %Hmiev & %Hsatpm & %Hpmpo)
        Hhs Hpriv Hmst Hpmpc Hpmpa Hpc Hfile Hmh Hmepc Hsatp Hmede Hmdl Hmie
        Hmenv Hmcen Hstc Hgot Hstk".
     (* the two stack-location bounds: [sp0_uint] rewrites only at ITS OWN
@@ -472,7 +474,7 @@ Section BootRun.
               pmpcfgf pmpaddrf (register_lookup tlb rs)
               (noff_val 0) iv zero_reg _ _ _ _
               Hsp Htpf (mstatus_kernel_SIE _ Hkf) (sconf_ms_facts_of_kernel _ Hkf)
-              Hmenvl Hmiez Hsatpm Hpmpo
+              Hmenvl Hmiez Hmiev Hsatpm Hpmpo
               ltac:(exact (st_tpv_of_nat _ Hn))
               boot_stack_depth_bridge
               Hlo Hhi
@@ -503,7 +505,7 @@ End BootRun.
 (* ====================================================================== *)
 
 Section BootSecondary.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -554,7 +556,7 @@ End BootSecondary.
 (* ====================================================================== *)
 
 Section BootPrimary.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

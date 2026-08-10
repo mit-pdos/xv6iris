@@ -165,7 +165,7 @@ Local Ltac widx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 (*  Vocabulary: the frame in three strengths, and the continuation.       *)
 (* ===================================================================== *)
 Section WriteiDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   (* writei's 112-byte frame.  Slot k sits at [sp0 - 8k], i.e. at
@@ -317,7 +317,7 @@ Definition wi_sp (m M : regfile) : Prop :=
 (*  +0xd6 .. +0xe6 : THE RETURN.                                          *)
 (* ===================================================================== *)
 Section WriteiRet.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma wi_ret `{GEN : GenId} `{CID0 : CpuId} 
@@ -673,7 +673,7 @@ End WriteiRet.
 (*  +0xcc .. +0xd4 : iupdate, a0 := tot, restore s3.  THREE PATHS JOIN.   *)
 (* ===================================================================== *)
 Section WriteiJoin.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma wi_join `{GEN : GenId} `{CID0 : CpuId} 
@@ -965,7 +965,7 @@ End WriteiJoin.
 (*  bmap's s4 lesson at five registers instead of one.                    *)
 (* ===================================================================== *)
 Section WriteiSize.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma wi_size `{GEN : GenId} `{CID0 : CpuId} 
@@ -1532,7 +1532,7 @@ End WriteiSize.
 (*  [wi_blocks_step] is exactly the decrease that pays for it.            *)
 (* ===================================================================== *)
 Section WriteiLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Ltac reg_neq := vm_compute; discriminate.
@@ -3066,7 +3066,7 @@ End WriteiLoop.
 (*  +0x00 .. +0x4a : the prologue, the three -1 exits and the n = 0 arm.  *)
 (* ===================================================================== *)
 Section WriteiMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

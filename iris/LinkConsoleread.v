@@ -31,7 +31,7 @@ Require Import SpecConsoleread.
 
 Module Consoleread : CONSOLEREAD.
   Axiom wp_consoleread_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname)
       (γs : list gname) (j : nat) (γlp : gname)

@@ -190,6 +190,23 @@ are working on that effort — the relevant `projects/` file.
   worklist spells out the exact chain that makes it work in `kfork`'s
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
+- **[`cwd-ref.md`](projects/cwd-ref.md)** — filling the `ProcInv.cwd_ref`
+  hole (S5 of the above, promoted to its own file). `cwd_ref` is still `emp`
+  while `SpecIdup.v` is now stated over the REAL inode cache, so the tree is
+  inconsistent about the hole and `kfork` has to carry five icache premises
+  no caller can discharge. Has the target shape (NO null arm, so
+  `cwd_ref v ⊢ ⌜v ≠ 0⌝` and a live process's non-null cwd is a free
+  projection of `proc_priv` that no `proc_slots_recast` ever re-establishes;
+  the fraction existential, because fork halves it; and a
+  `proc_priv_nocwd` split for the construction window between allocproc's
+  return and kfork's `sd a0,336(s4)`, which is the only place a LIVE process
+  has a null cwd), the
+  measured layering fix (the `IrefSlots -> FileInv` cycle is one edge wide
+  and exists for `NFILE`; factor the reference out of the invariant into a
+  new low `InodeRef.v`), why the itable gname must be CANONICAL rather than
+  threaded, the routing (S4b again, for iref slots), and the ordering —
+  **after** kfork lands, with kfork's contract simplification as the
+  acceptance test.
 - **[`main-boot.md`](projects/main-boot.md)** — `main()`. BOTH ARMS ARE
   PROVEN (main.c 178/178 bytes; axiom footprint = printk-general + userinit
   + kerneltrap): `CodeMain.v`, `StartedInv.v` (the `started` flag as a

@@ -45,7 +45,7 @@ Import Defs.
 Definition K_virtio_disk_intr : nat := 22%nat.
 
 Definition wp_virtio_disk_intr_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
      (γs : list gname)
     (γu : uart_names) (γd : disk_names) (γk : gname)
@@ -75,7 +75,7 @@ Definition wp_virtio_disk_intr_sconf_body
 
 Module Type VIRTIODISKINTR.
   Parameter wp_virtio_disk_intr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
       (γu : uart_names) (γd : disk_names) (γk : gname)

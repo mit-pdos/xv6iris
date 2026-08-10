@@ -55,7 +55,7 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
 Require Import ArrCursor.
-Require Import FdSlots.
+Require Export FdSlots.
 Require Import WpLock.
 Require Import PipeInv.
 Require Import IcacheRef.
@@ -71,7 +71,9 @@ Local Open Scope Z_scope.
    lock is the first member and &ftable.lock = &ftable (SpecFileinit.v). *)
 Definition ftable_addr : mword 64 := mword_of_int KernelSyms.ftable.
 
-Definition NFILE : nat := 100%nat.
+(* [NFILE] moved to [FdSlots.v] to break the IrefSlots -> FileInv cycle;
+   it is still in scope here through this file's own [Require Import
+   FdSlots], and [Require Export] keeps it visible to FileInv's importers. *)
 Definition file_stride : Z := 40.               (* the loop's [addi s1,s1,40] *)
 Definition file_base : Z := KernelSyms.ftable + 24.
 

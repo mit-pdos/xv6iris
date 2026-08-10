@@ -204,7 +204,7 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
     (MkFsNames 1%positive 1%positive 1%positive)
     ∅ 0 (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)
     1%positive
-    (MkIcNames 1%positive (fun _ => 1%positive) (fun _ => 1%positive)
+    (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
                (fun _ => 1%positive))
     1%positive 0 0 0%nat 0 (DfracOwn 1) (DfracOwn 1)).
 
@@ -293,8 +293,7 @@ Section SpecFileclose.
      inside [cov] and outside the log -- which is what mkfs lays out and
      what [C7]'s [ireg_alloc] will establish once and for all. *)
   Definition fileclose_ic_env (fn : fclose_names) : iProp Σ :=
-    (⌜icn_ref (fcn_ic fn) = icfg_iref⌝ ∗
-     ⌜fcn_dev fn = icfg_dev⌝ ∗
+    (⌜fcn_dev fn = icfg_dev⌝ ∗
      ⌜fcn_nib fn = icfg_nib⌝ ∗
      ⌜0 < fcn_size fn <= BPB⌝ ∗
      ⌜0 <= fcn_bmapstart fn⌝ ∗
@@ -309,7 +308,7 @@ Section SpecFileclose.
      ⌜cov_below (fcn_cov fn) (fcn_size fn)⌝ ∗
      is_itable2 (fcn_tlock fn) (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn)
                 (fcn_cov fn) (fcn_logstart fn) (fcn_nib fn) (fcn_dev fn) ∗
-     itable_inv (icn_ref (fcn_ic fn)) ∗
+     itable_inv ∗
      ic_escrows (fcn_ic fn) (fcn_fs fn) (fcn_ireg fn) (fcn_cov fn)
                 (fcn_logstart fn) ∗
      ireg_inv (fcn_ireg fn) (fcn_fs fn) (fcn_inodestart fn) (fcn_nib fn) ∗

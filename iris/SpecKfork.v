@@ -51,24 +51,27 @@
      - success: falls through the ordinary `ld s2,32(sp); ld s3,24(sp);
        ld s4,16(sp)` sequence.
 
-   THE PRECONDITION IS GENERIC IN THE ALLOCATOR'S COUNT ([on : option nat]),
-   NOT COUNTED -- kfork calls allocproc with no page budget
-   (claude-notes/projects/proc-struct-resources.md, "S7 -- allocproc in the
-   UNCOUNTED regime"), so both of allocproc's own [freeproc] failure tails
-   are LIVE code here, and [kfork_post]'s first disjunct has to cover both
-   of [allocproc_post]'s "no free slot" shapes (untouched count, or a
-   resealed one that RAN a tail and can no longer say how many pages are
-   left).
+   THERE IS NO PAGE COUNT.  kfork is reached from [sys_fork] and from
+   nowhere else, so it never runs in the allocator's COUNTED regime: the
+   precondition is [kalloc_env γa None] outright, not a generic
+   [on : option nat].  Two things follow and both simplify the contract.
 
-   THE COUNT IS GONE THE MOMENT [uvmcopy] IS CALLED, REGARDLESS OF WHICH ARM
-   KFORK TAKES.  [uvmcopy]'s own contract only runs in the allocator's
-   STEADY STATE ([kalloc_env γa None] -- and so does [freeproc]'s), so
-   between allocproc's own [avail_sub on nc] and the [uvmcopy] call, kfork's
-   proof must reseal ([KvmSpec.kalloc_env_seal]).  That makes EVERY arm past
-   "allocproc found a slot" -- both the uvmcopy-failure arm and the success
-   arm -- report [kalloc_env γa None] and nothing sharper; only the very
-   first "no free slot" arm can still report the caller's own [on]
-   unchanged (the one arm where [uvmcopy] never ran at all).
+   First, allocproc is called with no budget, so both of its own [freeproc]
+   failure tails are LIVE code here (claude-notes/projects/
+   proc-struct-resources.md, "S7 -- allocproc in the UNCOUNTED regime").
+
+   Second, and this is what shrinks [kfork_post]: at [None] every arm
+   reports the SAME thing.  [uvmcopy] and [freeproc] are stated only at
+   [kalloc_env γa None], so the two arms past "found a slot" were always
+   going to report it; and the "no free slot" arm, which used to be able to
+   hand the caller's own [on] back untouched, now hands back [None] too --
+   while [allocproc_post]'s third disjunct degenerates, since
+   [avail_sub None n] is [None] and [avail_zero None] is [True], so its
+   "the allocator ran dry after n pages" witness says nothing.  So
+   [kalloc_env γa None] is hoisted OUT of the disjunction, beside
+   [proc_priv], and the three arms collapse to TWO: the return value is
+   either -1 or the child's pid, and that is the whole of what the arms
+   still distinguish.
 
    NOTHING ABOUT THE CHILD COMES BACK, on EITHER of the two arms that reach
    a stable final state for it.  On the uvmcopy-failure arm, [freeproc]
@@ -98,7 +101,46 @@
    than through a separate premise on [myproc()]'s result (myproc's own
    contract, [SpecMyproc.v], returns exactly THAT [p]), and kfork is no
    different: [pme] is both [cpu_own]'s process index and the parent [p] the
-   C source calls [myproc()] to get. *)
+   C source calls [myproc()] to get.
+
+   THE CWD REFERENCE IS INSIDE THE TWO [proc_priv] BLOCKS, WHICH IS WHY
+   THIS CONTRACT NO LONGER NAMES AN INODE.  kfork runs
+   [np->cwd = idup(p->cwd)], and [SpecIdup.v] wants a real
+   [IcacheInv.inode_ref] on the entry [p->cwd] names.  That used to be a
+   PREMISE -- together with [pv_cwd Vp = ientry ck] and the four parameters
+   [ck cq cdev cinum] -- because [ProcInv.cwd_ref] was [emp] and the
+   parent's own block could not produce it.  It is real now
+   ([InodeRef.iref_at]), so the parent's block DOES produce it: the slot,
+   the device and the inum are read off [cwd_ref (pv_cwd Vp)] inside
+   [ProofKforkB4], idup's two halves go back into the parent's block and
+   into the CHILD's, and nothing about an inode appears here or in
+   [kfork_post].
+
+   What is left of the icache is only what the LOCK needs:
+   [IcacheEscrow.is_itable2 γil cn γfs γic cov logstart nib icfg_dev] (which drags
+   the disk and log fabric -- [γfs], [cov], [logstart], [nib] -- along) and
+   [itable_inv].  No coherence side condition ties the caller's lock to
+   [ProcInv.cwd_ref]'s reference: both are stated over the same canonical
+   [IcacheInv.iref_name] by construction, so there is nothing left to
+   equate; [InodeRef.v]'s header explains why the authority's gname is
+   canonical instead of threaded.
+
+   THE CHILD IS HANDED OVER AS A DEFICIT BLOCK AND COMES BACK WHOLE.
+   allocproc returns [ProcInv.proc_priv_nocwd] -- a process whose [p->cwd]
+   is still 0 holds no reference and does not satisfy [proc_priv] -- and
+   kfork's [sd a0,336(s4)] at +0xac is what closes the construction window,
+   with idup's second half.  That is the whole reason idup returns two.
+
+   AND THE [iref_slot] IS NOT A PREMISE EITHER.  What makes [ip->ref++]
+   safe is one unit of [IrefSlots]' fixed supply, and it comes out of
+   ALLOCPROC with the child's block -- allocproc is the function that took
+   the slot out of [procs_inv], and a dormant process parks
+   [iref_slots (1 + IREFSPARE)] exactly as it parks [fd_slots FDSPARE].
+   The [1] is the child's own cwd unit: while [np->cwd] is 0 the process
+   holds the unit itself, and the [sd a0,336(s4)] is where it stops --
+   spent on the reference [idup] creates, and parked in the itable against
+   it from then on.  That bijection is what makes
+   [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE] literally true. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -120,6 +162,12 @@ Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
+Require Import DiskPtsto.
+Require Import FsBlocks.
+Require Import InodeRegion.
+Require Import IrefSlots.
+Require Import IcacheInv.
+Require Import IcacheEscrow.
 Require Import SpecAllocpid.
 Require Import SpecAllocproc.
 Require Import WaitInv.
@@ -137,39 +185,40 @@ Local Open Scope Z_scope.
 Definition K_kfork : nat := 56%nat.
 
 Definition kfork_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa γf : gname) (lvl : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-    (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
+    (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
+    (pme : mword 64) (C : iProp Σ)
+    (b : bool) (pid_p : mword 32) (Vp : pprivate)
     (K : nat) (mr : regfile) (rv : mword 64) : iProp Σ :=
   ( sie_cap_gpr mr K b pme ∗
     cpu_own lvl eb pme C b ∗
+    (* THE PARENT COMES BACK VERBATIM on every arm -- kfork only reads it.
+       Its cwd reference comes back INSIDE it: idup halves the fraction on
+       the success path and does not run at all on the two failure paths,
+       and [ProcInv.cwd_ref] hides the fraction, so the block is stated at
+       the very same [Vp] either way. *)
     proc_priv γf pme pid_p Vp ∗
-    ( (* --- allocproc itself found no slot: the same "not found" shape as
-           [SpecAllocproc.allocproc_post]'s own first/third disjuncts,
-           because kfork does nothing to the allocator's count between
-           allocproc's return and its own [return -1] on this arm --- *)
-      (⌜ rv = (mword_of_int (-1) : mword 64) ⌝ ∗
-       ( kalloc_env γa on
-         ∨ (∃ n : nat, ⌜ (n <= K_allocproc)%nat /\ avail_zero (avail_sub on n) ⌝ ∗
-            kalloc_env γa None) ))
-    ∨ (* --- uvmcopy failed: freeproc ran, the child is fully reclaimed
-           (back in [procs_inv], nothing owed to the caller), and the
-           allocator has been resealed to the steady state uvmcopy and
-           freeproc both require --- *)
-      (⌜ rv = (mword_of_int (-1) : mword 64) ⌝ ∗ kalloc_env γa None)
-    ∨ (* --- success: the child is parked RUNNABLE (also back in
-           [procs_inv], also nothing owed), and [rv] is its pid,
-           sign-extended exactly as the `lw`/`mv a0,s1` pair leaves it --- *)
-      (∃ pidv : mword 32,
-         ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝ ∗ kalloc_env γa None) ) )%I.
+    (* THE ALLOCATOR'S STATE IS THE SAME ON EVERY ARM, so it is stated ONCE
+       here rather than per-disjunct.  See the header: with no page count
+       there is nothing left for the arms to disagree about. *)
+    kalloc_env γa None ∗
+    (* ... and what IS left is only the return value.  Nothing about the
+       CHILD appears: on the failure arm freeproc returned it to
+       [procs_inv], on the success arm the RUNNABLE park swallowed it. *)
+    ( (* allocproc found no slot, or uvmcopy failed *)
+      ⌜ rv = (mword_of_int (-1) : mword 64) ⌝
+    ∨ (* the child's pid, sign-extended exactly as `lw`/`mv a0,s1` leaves it *)
+      (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝) ) )%I.
 
 Definition wp_kfork_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ,
+      !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
-    (γa γp γw γl γf : gname)  (γs : list gname)
+    (γa γp γw γl γf γil γic : gname)  (γs : list gname)
+    (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
     (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-    (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate) :=
+    (b : bool) (pid_p : mword 32) (Vp : pprivate) :=
   let pcE : mword 64 := mword_of_int KernelSyms.kfork in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
   (K_kfork <= K)%nat ->
@@ -177,6 +226,13 @@ Definition wp_kfork_sconf_body
      (lvl+2), and -- once the lock is held -- uvmcopy/freeproc/filedup/idup
      at (S lvl)+1 = lvl+2 again. *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
+  (* THE PARENT HAS A WORKING DIRECTORY.  [ProcInv.cwd_ref] is two-armed on
+     the pointer -- a process between [p->cwd = 0] and its next chdir owns
+     no reference -- and xv6's fork runs [np->cwd = idup(p->cwd)] with no
+     null test, so this premise is the honest reading of the code and not a
+     convenience.  It is what [ProofKforkB4]'s [ld a0,336(s5)] picks the
+     live arm with. *)
+  pv_cwd Vp <> (zero_reg : mword 64) ->
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗
@@ -185,23 +241,28 @@ Definition wp_kfork_sconf_body
   is_lock γp alp_pid_lock "nextpid"%string nextpid_res -∗
   is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
   is_ftable γl γf -∗
-  kalloc_env γa on -∗
+  is_itable2 γil cn γfs γic cov logstart nib icfg_dev -∗
+  itable_inv -∗
+  kalloc_env γa None -∗
   proc_priv γf pme pid_p Vp -∗
   wp_next b pme (fun (CID : CpuId) =>
     ∀ (mr : regfile),
       ⌜ callee_saved m mr ⌝ -∗
       pc_is ret_tgt -∗
-      kfork_post γa γf lvl eb pme C on b pid_p Vp K mr
+      kfork_post γa γf cn lvl eb pme C b pid_p Vp K mr
         (mr !!! Regidx (mword_of_int 10 : mword 5)) -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ,
+             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
-      (γa γp γw γl γf : gname) (γs : list gname)
+      (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
-      (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate),
-      wp_kfork_sconf_body γa γp γw γl γf γs m lvl K eb pme C on b pid_p Vp.
+      (b : bool) (pid_p : mword 32) (Vp : pprivate),
+      wp_kfork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
+        m lvl K eb pme C b pid_p Vp.
 End KFORK.

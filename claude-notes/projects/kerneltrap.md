@@ -247,46 +247,565 @@ still satisfies `sconf_ms_facts`.  It is currently `Local`; drop that (a
 add SPP/SPIE rows to the ladder (`lift_SPP`/`lift_SPIE` at L3,
 `mstatus_legalized_SPP`/`_SPIE` at L4 in `WpGprCsrwC.v`).
 
-## What kerneltrap needs that the current `intr_handler_spec` does NOT hand over
+## STEP 10 — THE HANDLER CONTRACT, AND WHY IT IS *SMALLER* THAN IT LOOKS
 
-This is the real blocker, and it is the other half of
-`completed/explicit-cpuid.md`'s **STAGE 2** ("gated on kerneltrap actually
-being proved").  Today `intr_handler_spec` gives the handler only registers,
-config cells, and `intr_frame`; kernelvec gets away with it because the
-kerneltrap axiom does nothing.  A real kerneltrap needs:
+This is the only thing left, and it is the other half of
+`completed/explicit-cpuid.md`'s **STAGE 2**.  Today `intr_handler_spec` hands
+the handler RAW CELLS (`cur_privilege`, `mstatus` at `trap_ms elp ms`,
+`mie`/`mideleg`, `sepc`, `gpr_file`, `intr_frame`) and takes them back at the
+SAME hart; kernelvec gets away with it because the kerneltrap axiom does
+nothing.  A real kerneltrap needs the trap CSRs, `cpu_hart`, `cpu_claim`, a
+stack budget, and a hart change.
 
-1. **The trap-scratch CSRs** (`scause`, `stval`, and `sepc` at a pinned value).
-   They live in `sie_arm true` at the interrupted instruction and must be
-   handed to the handler and taken back.
-2. **`cpu_hart 0 ? p`** — this hart's `cpus[cid]` cells plus the counting
-   token.  Also in `sie_arm true`.  devintr's whole cone (acquire/push_off)
-   touches `c->noff`.
-3. **A deeper stack carve.**  `kv_frame_slots = 32` covers kernelvec's own
-   frame only.  It must cover the whole trap path: kernelvec (32) + kerneltrap
-   (6) + max(devintr = 40, myproc, yield's cone).  Changing that constant
-   re-tunes every `K ≤ n` premise in the tree — budget for it.
-4. **The persistent device/proc credentials** — `devintr_caps`, `procs_inv`,
-   `panic_wp_any`, `kernel_text`.  All persistent, so they can be
-   closed over at `intr_inv` allocation exactly as `hw_config`/`minstret_inv`/
-   `kernel_text` already are in `kernelvec_handler_spec`; they never need to
-   appear in the handler contract's footprint.
-5. **`cpu_claim p`** — exclusive, per-thread, and the only thing the yield arm
-   needs (see "the open fork", now closed, below).  It already rides
-   `sie_arm true` under a disjunction keyed on `p = zero_reg`, which is
-   exactly the shape `wp_next`'s second escape hatch ("no current proc ⇒ same
-   hart") assumes.
-6. **Hart migration.**  `yield` parks and resumes elsewhere, so the handler's
-   continuation is at a NEW hart and `wp_exec_step_intr`'s `iLöb` has to be
-   hart-generic.  This is Stage 2 verbatim, including its cut: canonical
-   per-hart ghost names `sie_name : CPU -> gname` mirroring `strans_name`, plus
-   a persistent `□ ∀ c, ∃ h, intr_inv (CID:=c) h`.
+**The design: state the handler contract in the FOLDED BUNDLE, at the
+interrupts-OFF index, and let the handler give the bundle back at the ENABLED
+index on the hart it ends up on.**
 
-Also: `intr_handler_spec`'s post should stop pinning mstatus to
-`sret_ms5 (trap_ms elp ms)` and instead re-establish `sconf` with SIE = '1'.
-The engine does not need mstatus back exactly — the interrupted code owns it
-existentially inside `sconf` — and pinning it is not provable of a real
-handler, whose push_off/pop_off pairs leave `legalize_sstatus_val`-shaped
-mstatus values rather than the literal original.
+```coq
+Definition intr_handler_spec (handler : mword 64) : iProp Σ :=
+  (□ ∀ (m : regfile) (av : nat) (p : mword 64) (pc0 sc tv : mword 64),
+      ⌜ ret_pc pc0 = pc0 ⌝ -∗
+      ⌜ s_cause_ok sc ⌝ -∗                (* the taken cause is 5 or 9 *)
+      (* THE POST-TRAP STATE.  SIE is already 0 (the trap cleared it), so the
+         bundle comes at index [false] and its mstatus is [trap_ms elp ms] --
+         which no one has to name, because the bundle quantifies it.  The
+         avail is [kv_frame_slots + av]: the RESERVE the enabled index was
+         carrying, re-indexed as the handler's usable budget (below). *)
+      sie_cap_gpr m (kv_frame_slots + av) false p -∗
+      sret_bits ('b"1") ('b"1") -∗       (* SPP = 1, SPIE = old SIE = 1 *)
+      sepc ↦ᵣ pc0 -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
+      cpu_hart 0 false p -∗              (* the cells + the count, at '0' *)
+      cpu_claim p -∗
+      intr_handler_avail -∗              (* persistent; the sret needs it *)
+      pc_is handler -∗
+      wp_next true p (fun (CID : CpuId) =>
+        sie_cap_gpr m av true p -∗ pc_is pc0 -∗ WP (Loop : expr riscv_lang)) -∗
+      WP (Loop : expr riscv_lang))%I.
+```
+
+Everything the old contract threaded piecewise is inside the bundle, and the
+five things it did NOT thread are exactly the five conjuncts the ENABLED ARM
+holds — so the trap does not INVENT them, it MOVES them:
+
+| what the handler gets | where it came from |
+| --- | --- |
+| `sepc`/`scause`/`stval` at pinned values | `sie_arm true`'s existentials, written by the trap |
+| `sret_bits '1 '1` | the arm's travelling half, re-pinned by the trap (SPP := 1, SPIE := old SIE = 1) |
+| `cpu_hart 0 false p` | the arm's `cpu_hart 0 true p`, retuned by the ghost flip |
+| `cpu_claim p` | the arm's, verbatim |
+| `intr_handler_avail` | the arm's `∃h, intr_inv h` + the □ spec read out of it |
+
+**THE POSTCONDITION IS THE ENGINE'S OWN PRECONDITION, AT A NEW HART.**  That
+is the whole point of the shape: `wp_exec_step_intr`'s Löb hypothesis is
+`∀ CID, sie_cap_gpr m av true p -∗ pc_is pc0 -∗ … -∗ WP Loop`, and the
+handler's continuation hands back precisely that.  No re-assembly, no
+`intr_config`, no `intr_frame`.
+
+### Four things this dissolves
+
+- **`intr_config` and `intr_frame` GO AWAY**, along with `intr_config_of_v2` /
+  `v2_of_intr_config` and the funnel's assemble/disassemble dance.  Every
+  conjunct of both is already inside the bundle: menvcfg (pinned `MENVCFG_S`)
+  and mie/mideleg in `sconf`, `tlb_res_pt` in `strans_inv`'s KPT arm, the
+  stack in `sie_cap`.
+- **The engine needs NO `handler` parameter.**  `sie_arm true p` already
+  carries `∃ handler, intr_inv handler`, and the handler returns the arm, so
+  the credential crosses inside the resource that crosses anyway and the engine
+  reads the □ spec out of the invariant it just got — no `handler` argument on
+  `wp_exec_step_intr` / `wp_instr_s_intr`, and no hart-generic credential
+  threaded from boot.  **This does NOT dissolve the definitional cycle**; see
+  the next section, which is the one place the shape costs something.
+- **kernelvec stops doing stack surgery.**  It gets a standard
+  `sie_cap_gpr m av false p` and pushes its 32-slot frame with the ordinary
+  `wp_caddi16sp_push_s_sconf` mover, like every other function — instead of
+  peeling `intr_frame`'s raw `stack_own` and re-addressing 17 sparse windows as
+  `pa_stk` slots by hand.
+- **The `printk`/`panic` arms stay dead**, because `s_cause_ok sc` is what the
+  engine now proves and hands over (below), and it is exactly the premise
+  `wp_kerneltrap_sconf` already takes.
+
+### THE CYCLE IS REAL AND THE FIXPOINT IS UNAVOIDABLE
+
+`completed/explicit-cpuid.md` predicted a definitional cycle here and proposed
+a persistent `□ ∀ c, ∃ h, intr_inv (CID:=c) h` as the cut.  **The cut does not
+work and the cycle does not go away.**  Both facts are worth writing down,
+because the first is tempting and the second is not obvious:
+
+- **The proposed cut is unobtainable.**  Hart *k*'s `intr_inv` is allocated by
+  hart *k*'s own `trapinithart`, and hart 0 enables interrupts (in
+  `scheduler`) long before hart 5 has started — so a `∀ c` credential cannot
+  be minted at boot.  A ghost registry of "harts that have initialised" would
+  have to be *closed* by whoever migrates the thread, i.e. by the resuming
+  hart's scheduler, which delivers exactly `intr_handler_avail` for that
+  hart — and that is the recursive thing again.
+- **The cycle is inherent, not an artefact of this shape.**  It is
+  `"enabled execution here" ⇒ "a handler is installed here" ⇒ "the handler
+  restores enabled execution (anywhere)"`.  Any resource that means the first
+  must carry the third.  Concretely: `intr_handler_spec` mentions
+  `sie_cap_gpr … true` (post) and `intr_handler_avail` (pre), both of which
+  reach `intr_inv`, whose body is `□(b='1' -∗ intr_handler_spec h)`.  Today
+  there is no cycle only because the contract forbids migration — its
+  postcondition names raw cells and the engine reuses its OWN hart's
+  `intr_inv`.
+- **It is GUARDED, so `fixpoint` closes it.**  The recursive occurrence sits
+  under `inv` (`inv_contractive`) and under the `▷` in `intr_handler_avail`.
+  So `intr_handler_spec` is `iris.algebra.ofe`'s Banach `fixpoint` of a
+  contractive `ihs_pre : (CPU -d> mword 64 -d> iPropO Σ) → …`, hart-indexed
+  because the recursion crosses harts, with `Persistent` from
+  `iris.bi.lib.fixpoint_banach`'s `fixpoint_persistent` (the body is `□ …`).
+
+**Only `intr_handler_spec` is the fixpoint variable.**  `intr_inv`,
+`intr_handler_avail`, `sie_arm`, `sie_cap` and `sie_cap_gpr` become `Φ`-taking
+`_of` forms inside the recursion and are re-tied to their public names
+afterwards, so **every one of them keeps its current spelling and arity** and
+not one of the ~700 files that mention `sie_cap_gpr` is affected.  The
+hart-crossing needs no explicit-hart twins of the resource vocabulary either:
+`CpuId` is a class synonym for `CPU`, so the recursion instantiates the
+existing definitions at `(CID := c)`.
+
+### THE STACK ACCOUNTING HAD TO CHANGE, AND IT IS A REAL BUG IN THE OLD SHAPE
+
+`sie_cap m avail b p` used to own `stack_own sp (kv_frame_slots + avail)` at
+BOTH arms: `kv_frame_slots` reserved for a potential trap frame, `avail`
+usable.  **With a real handler that is not merely wasteful, it is
+unsatisfiable.**  The handler runs interrupts-off, so its own bundle also
+demands the reserve, and it needs `kv_frame_slots` of USABLE stack; funding
+`sie_cap m kv_frame_slots false p` therefore costs
+`kv_frame_slots + kv_frame_slots` slots while the trap can only hand over
+`kv_frame_slots`.  No value of the constant closes the gap — it is
+`R >= R + H` with `H > 0`.  This is why `ProofKernelvec.v` never built a
+`sie_cap` for its callee: the legacy 17-`kv_cell` contract was the only shape
+that could be funded.
+
+**The fix: the reserve becomes ARM-DEPENDENT, and it is spelled as a LEFT
+summand so that it VANISHES BY CONVERSION at the disabled index.**
+
+```coq
+Definition trap_res (b : bool) : nat := if b then kv_frame_slots else 0.
+
+Definition sie_cap (m : regfile) (avail : nat) (b : bool) (p : mword 64) : iProp Σ :=
+  (stack_own (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
+   strans_inv ∗ sie_arm b p)%I.
+```
+
+Only code that CAN be trapped pays the reserve, which is what breaks the
+circularity: the handler runs interrupts-off, so its bundle carries no reserve
+of its own and the trap's reserve is free to become its budget.  Three things
+fall out, and each is the reason to prefer this spelling over the two
+alternatives:
+
+- **The trap's stack handover is a PURE RE-INDEXING — the same `stack_own`,
+  not a split.**  `sie_cap m av true p` and `sie_cap m (kv_frame_slots + av)
+  false p` have the *syntactically identical* carve `kv_frame_slots + av`, so
+  the trap hands the whole capability over and the stack conjunct is never
+  touched.  Same for the sret, in reverse.  And the handler's budget is
+  `kv_frame_slots + av ≥ kv_frame_slots`, so `kerneltrap_stack ≤ av'` is
+  `46 ≤ 78 + av` — `lia`, with no premise anywhere.
+- **`trap_res false + avail` is DEFINITIONALLY `avail`** (`Nat.add` recurses on
+  its first argument), which is why the summand goes on the LEFT.  So every
+  interrupts-off statement in the tree — every boot lemma, all of devintr's
+  cone — is unchanged as written, and `iExact`/`iFrame` see through the index.
+  Writing `avail + trap_res b` instead would leave `av + 0` stuck against `av`
+  at thousands of sites.
+- **No `K ≤ n` premise moves and no constant is retuned.**  The sp movers
+  (`_push`/`_pop`/`_grow`/`_shrink`/`_retarget`) keep their premises verbatim;
+  `trap_res b` is an opaque `nat` atom that `lia` carries through
+  `trap_res b + avail = k + (trap_res b + (avail - k))`.  What DOES change is
+  the avail INDEX at the six unbalanced seams — `push_off`/`acquire` exit at
+  `trap_res b + av`, `pop_off`/`release` enter there and exit at `av` — which
+  is exactly what makes a balanced push/pop pair compose back to `av`
+  syntactically, so no balanced caller changes at all.  `sie_cap_acc` (the old
+  reserve-peeling accessor) has no remaining user and goes away with
+  `intr_frame`.
+
+Rejected alternatives, both isomorphic to this one under
+`avail ↦ avail - trap_res b` but worse at the seams: (a) carve `= avail` with a
+pure `⌜b = true → kv_frame_slots ≤ avail⌝` — then a frame push must PRESERVE
+the fact, so `sie_cap_push` needs `k + kv_frame_slots ≤ avail` and every
+function's `K` grows by 78; (b) keeping the arm-blind carve and enlarging
+`kv_frame_slots` — the `R >= R + H` obstruction above, unsatisfiable at any
+value.  The one thing that genuinely cannot be avoided is the arm-dependence
+itself: code that cannot be interrupted must not pay the reserve, or the
+handler cannot be funded out of it.
+
+### THE ENGINE OWES THE CAUSE, AND `mie` IS WHAT PAYS FOR IT
+
+`devintr` recognises S-timer (5) and S-external (9) only, so the dead
+`printk` arm rests on "no other cause can be delivered to S-mode".  As
+established above (RESOLVED), that follows from `mie` alone: `start()` writes
+`sie` exactly once (`SIE_SEIE | SIE_STIE`, bits 9 and 5), never writes `mie`,
+and `mie` is 0 at reset — verified again against `xv6-riscv/kernel/start.c`,
+which has no `w_mie` at all.  So:
+
+- **`sconf` pins the value**: `mie ↦ᵣ MIE_S` (the literal `0x220`) replacing
+  the existential `∃ mie_v`, with `mideleg` still existential under
+  `and_vec MIE_S (not_vec mdv0) = zeros' 64`.  The fact enters the tier at
+  `BootBridge.sconf_intro`, which already takes the `and_vec` premise from
+  `SpecEntry.wp_entry_boot`'s post — that post gains `⌜ mief = MIE_S ⌝`, which
+  its proof can only already know (it computes the value to discharge the
+  `and_vec` fact).
+- **`s_cause_ok`** (IntrDefs, leaf altitude — it cannot mention
+  `SpecDevintr.devintr_ret`, which lives far above):
+  `s_cause_ok sc := sc = SCAUSE_STIMER \/ sc = SCAUSE_SEXT`, two literals.
+  kernelvec turns it into `devintr_ret sc ≠ 0` with a `vm_compute` per arm.
+- The engine proves it: `s_pending mip meip seip MIE_S mdv` is masked by
+  `and_vec MIE_S mdv ⊆ {bit 5, bit 9}`, so `findPendingInterrupt` can only
+  return S-timer or S-external, and the scause word the trap writes is one of
+  the two literals.  `clock_inv`'s fully-existential `mip` is untouched.
+
+### THE SRET IS A LEAF NOW
+
+kernelvec's `sret` used to be `wp_sret_gpr_pt`, a raw-cell endpoint that just
+writes mstatus.  It is now the mirror image of the trap and belongs at the
+sconf altitude:
+
+```coq
+wp_sret_s_sconf :
+  (kv_frame_slots <= av)%nat ->
+  sie_cap_gpr m av false p -∗ sret_bits ('b"1") ('b"1") -∗
+  sepc ↦ᵣ ep -∗ (∃ v, scause ↦ᵣ v) -∗ (∃ v, stval ↦ᵣ v) -∗
+  cpu_hart 0 false p -∗ cpu_claim p -∗ intr_handler_avail -∗
+  pc_is pc -∗ instr pc … SRET -∗
+  (sie_cap_gpr m av true p -∗ pc_is ep -∗ WP Loop) -∗ WP Loop
+```
+
+It does the ghost flip '0' → '1' with all four pieces in hand (`sconf`'s tied
+half, `sie_arm false`'s eighth, `cpu_hart`'s `intr_count 0 false` eighth, and
+the invariant quarter borrowed from the `intr_inv` inside
+`intr_handler_avail`), re-seals `intr_inv` with the □ handler spec that came
+in, re-ties `sret_bits` at the post-sret `(SPP, SPIE) = ('0','1')`, and folds
+everything back into `sie_arm true p`.  No `wp_next` wrapper: an `sret` cannot
+be trapped (interrupts are off when it executes).
+
+### THE ONE RESOURCE THAT HAS TO BE THREADED, AND WHY
+
+`intr_handler_avail` is PERSISTENT but PER-HART (`intr_inv` owns this hart's
+`stvec` and this hart's SIE quarter), so the copy the handler was entered with
+is useless after a park: the `sret` runs on the RESUMING hart.  The resuming
+hart's copy exists — it comes out of the dispatch payload, and
+`SpecSched`'s postcondition already hands it over — but `SpecYield` currently
+swallows it.  So:
+
+- `SpecYield`/`ProofYield`: expose `intr_handler_avail` in the `wp_next`
+  continuation (it is persistent, so unconditionally, at either `eb`).
+- `SpecKerneltrap`/`ProofKerneltrap`: take it in the precondition, return it
+  in the continuation — from the premise on the no-yield path (where
+  `wp_next` is instantiated at `cpu_id`) and from yield's post on the yield
+  path.
+
+This is the ONLY new threading the whole step introduces; everything else
+either rides the bundle or is already persistent and hart-free
+(`devintr_caps`, `procs_inv`, `panic_wp_any`, `kernel_text`), and those are
+closed over at `intr_inv` allocation exactly as `hw_config` / `minstret_inv` /
+`kernel_text` already are in `kernelvec_handler_spec`.
+
+### WHY THE LEAF SWEEP IS MECHANICAL
+
+`wp_instr_s_sconf`'s σ-callback has to move inside `wp_next b p`: after the
+absorbing engine has run, the instruction executes on the hart the LAST trap
+returned to.  Stage 1 already restated every leaf's CONCLUSION as
+`wp_next b p (fun CID => …)` and re-threaded every whole-function proof
+through `wp_next_chain`, so what changes in each of the ~150 leaves is the
+plumbing between the two:
+
+```coq
+-  iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
++  iIntros (CID Hs) (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+   …
+-  iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]"). iPureIntro. done.
++  iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]"). iPureIntro. exact Hs.
+```
+
+Framing is always SOUND across the rebinding — a resource at `CID0` stays
+owned — so nothing can go silently wrong: a leaf that framed a PER-HART
+resource (a register cell, a `cid_word`-addressed cpu field, a `sie_gname`
+ghost) across its own step simply fails to `iFrame`, and the fix is either
+"this leaf is `b = false`-only, rewrite by the pin fact" or "this resource
+belongs in the arm".  Note that all the trap-CSR / satp / stvec leaves are
+already interrupts-off-only for exactly this reason.
+
+## HOW THIS IS BEING LANDED — the decomposition, and why it exists
+
+Step 10 was first attempted as ONE branch (`kerneltrap-stage2`), and that branch
+reached a state with **no green checkpoint anywhere in sight**: `IntrDefs.v`
+mid-restructure, the engine and funnel rewritten, ~11 files red and ~300 never
+attempted behind them.  Everything in it is proven, but nothing in it was
+*landable*.
+
+It has since been cut into slices that each reach green on `main` on their own.
+**Do that.  The parked branch is a reference for the atomic core, not a thing to
+merge.**
+
+### Landed on `main`
+
+- **`sconf` pins `mie`, and the cause layer** (`394f6126`).  `MIE_S` beside
+  `MENVCFG_S`; `sconf` and `intr_config` both pin it; `s_cause_ok`,
+  `trap_scause`, the two scause literals and `s_dispatch_MIE_S` proved.  Full
+  build green, assumption ledger unchanged.  `s_cause_ok` has no consumer yet —
+  it is the API the handler contract will use, and that is the intended shape of
+  an independently-landable slice.
+- **`ops_ok`, the operand side condition** (`3217149b`).  `src_ok b rs :=
+  b = true -> Regidx rs <> Regidx Rtp`, `ops_ok b rd rs1 rs2`, the projections
+  and constructors, the `rdok` Ltac dispatching over all four shapes, and the
+  payoff lemmas `rget_hart_indep` / `rget_src_indep` / `rget_ops_indep`.
+  33 leaves + 4 engines widened, 12 keep plain `rd_ok`, and **zero of 1192 call
+  sites changed** — the slot's content widened while its position did not, and
+  every site fills it with the positional opaque `ltac:(rdok)`.
+
+### In flight / queued, each independently landable
+
+3. **Expose `wp_next` in the engine and funnel** — `wp_exec_step_intr`,
+   `wp_instr_s_intr`, `wp_instr_s_sconf`, plus their ~60 consumers.  Branch
+   `wp-next-funnel`.  Requires slice 2 (`ops_ok`) and nothing else.
+4. **The `trap_res` arm-dependent carve** + the arm-blind `stack_own` sweep +
+   `SwtchCtx`'s parked record + `BootBridge`'s index.
+5. **`wp_next_retarget`** in `WpNext.v`.
+6. **`wp_sret_s_sconf`**, the SIE-enabling sret leaf.
+7. **`SpecYield`/`ProofYield` exposing `intr_handler_avail`.**
+8. **Cleanups with no users**: delete `sie_cap_acc`; delete the five dead
+   `Hdeepaddr` asserts; decide whether `sie_cap_grow`/`_shrink` should exist.
+
+### The atomic core, and why it cannot be cut further
+
+The fixpoint, the folded-bundle `intr_handler_spec`, the engine's trap arm
+actually re-entering at the resuming hart, `ProofKernelvec.v`, and deleting
+`KERNELTRAP_RETURNS`.  **All of it except `ProofKernelvec` is already WRITTEN AND
+GREEN on the parked branch** — `kerneltrap-stage2:a6a67d6c` is `IntrDefs.v` with
+the two-section split, the `ihs_*` layer and the contractive `fixpoint`;
+`:78bc0283` is the hart-generic engine and funnel.  Read those rather than
+re-deriving from the sketches below; what they need is rebasing onto the landed
+slices, not reinventing.  **Checked: a "folded bundle but same hart" contract does
+NOT avoid the fixpoint.**  The moment the handler owns the re-enable, its `sret`
+must flip the SIE ghost, which needs the invariant quarter, which needs
+`intr_inv` in its precondition — and `intr_inv`'s body holds the handler spec.
+Same-hart does not help.
+
+### Two rules this decomposition earned
+
+- **A weakening makes a lemma easier to PROVE and harder to USE.**  Wrapping a
+  callback in `wp_next` is provable from the existing proof by instantiating at
+  `cpu_id` — but every CONSUMER above it must then prove the hart-generic form,
+  and that obligation propagates to the top of the tier.  There is no free half:
+  once `wp_exec_step_intr`'s callback moves, `wp_instr_s_intr`'s and
+  `wp_instr_s_sconf`'s must move too, and the ~60 leaf proofs with them.  This is
+  the same trade `completed/explicit-cpuid.md` made at the leaf-conclusion level;
+  budget for it in whichever tier you touch.
+- **Landing a slice flushes out breakage the tangled branch was HIDING.**
+  `BootChain.v` destructures `wp_entry_boot`'s post positionally (7 conjuncts,
+  now 8) and passes `boot_bridge` 13 positional premises (now 14).  On the parked
+  branch it sits behind the funnel files and was never *attempted*, so the mie
+  work there was proven but never carried through the boot chain.  Two sites,
+  found only because the slice had to go green alone.
+
+### Three rejected designs, recorded so they are not re-invented
+
+The `tp`-read problem — `sie_cap_gpr` owns `gpr_file (tp_pin m)`, so `rget m k`
+depends on the ambient hart at exactly `k = tp`, and once the funnel's callback
+can be rebound the σ-obligation and the caller's value premise sit at different
+harts.  Three shapes were tried and dropped before `ops_ok`:
+
+- **A hart-indexed value** (`wval : CpuId -> mword 64`).  Correct, and it is what
+  the parked branch does, but it infects 44 call sites and every map tower above
+  them for a situation that only arises where the hart is provably fixed.
+- **A `b = false`-only duplicate of the write engine** for the one `tp`-reading
+  instruction.  A leaf x index cross-product, i.e. exactly what the guiding
+  principle exists to prevent — and unnecessary, because guarding the condition
+  on `b` makes it vacuous there anyway.
+- **The "f-form"** — name the written FUNCTION of the sources rather than the
+  value, so the obligation never mentions `rget`.  This looks like it removes the
+  obligation and does not: the postcondition then carries
+  `f (rget m rsa) (rget m rsb)` and the caller must still show `rget m rs` is
+  `m !!! Regidx rs`, i.e. discharge the same non-`tp` fact as a rewrite instead of
+  a premise — while losing the ability to name a simplified `wval` up front.
+  Cost with no payoff.
+
+What made `ops_ok` work instead: **guard the condition on `b`.**  The
+hart-dependence only bites at `b = true`; at `b = false` the callback is pinned by
+`wp_next_off`, *including* at `tp`.  All three sites that genuinely read `tp`
+(`ProofMycpu`, `ProofCpuid`, `ProofScheduler.v:439` — `c.mv rd,tp`, via the
+`wp_cmv` leaf) run after `intr_off()`, so the guard is vacuous exactly where it
+has to be and their existing `ltac:(rdok)` closes it by `discriminate` on
+`false = true`.  An UNGUARDED `rs <> Rtp` would have made all three unprovable.
+Note `ProofCpuid`'s `tp_idx` is an `intros`-bound variable, not a literal, so the
+`discriminate` route is the ONLY one available there — do not tighten the guard.
+And `wp_cmv` IS the `tp`-reading leaf: leaving it on plain `rd_ok` would have made
+the whole exercise vacuous, which is the trap a hand-written leaf list falls into.
+
+### When slice 3 lands, two follow-ons are already identified
+
+- `WpSconfVc.v` wants an `ops_ok_of_guards` beside its `rd_ok_of_guards`: its VC
+  executor already derives the source-side facts (`is_tp_false` →
+  `Hrs1ok`/`Hrs2ok`), so it is wiring, not new reasoning.
+- `SpecMemsetParts.v:121` already hand-rolls standalone `Regidx ra1/ra4 <>
+  Regidx Rtp` premises for read-only registers — independent corroboration of the
+  design, and a candidate to fold into `src_ok`.
+## THE CAUSE LEMMA IS PROVED — where each piece goes, and five transplant traps
+
+`CauseProbe.v` (committed, green, `Closed under the global context`) has the
+whole chain.  Homes:
+
+- `WpIntrCore.v` §2, beside `s_dispatch`: `s_pending_unsigned`,
+  `Ltac pend_bit`, the five `pend_*` bit lemmas, `s_dispatch_MIE_S`,
+  `mie_s_unsigned`, `eqvec1_false`, and the MIE_S-specific
+  `bit_zero_of_mask`.  Everything they need is already in scope there.
+- `RiscvExtras.v`'s Z section: the generic `z_bit_div`, `bv_wrap_width0`,
+  `bv_wrap_63_range`, `z_top_bit_of_lor`, and `scause_tower` (which is fully
+  generic — put it beside `usvd_zeros64` / `usvd_get_bottom_44`).
+- `IntrDefs.v`, beside `s_cause_ok`: `trap_scause`, `scause_of_S_Timer`,
+  `scause_of_S_External`, `s_cause_ok_of_dispatch`.
+
+**Constructor names are `I_S_Timer` / `I_S_External`** (with the `I_` prefix),
+and `s_dispatch`'s argument order is `s_dispatch mip meip seip mie mdv ms`.
+
+Five traps found the hard way; none is guessable and each cost a cycle:
+
+1. **The bit lemma cannot be generic in the bit index.**
+   `subrange_vec_dec v k k : mword (k - k + 1)` is convertible to `mword 1`
+   only when `k` is a LITERAL, so `∀ k` does not typecheck.  Hence one
+   `Ltac pend_bit k` and five concrete instances.
+2. **`bitblast` does not exist in stdpp 1.12** — only `bv_simplify` /
+   `bv_solve`, and `bv_solve` ends in `lia`, so it cannot close `Z.lor`/shift
+   goals.  The tower is hand-driven.
+3. **`erewrite !bv_concat_unsigned` must be run TWICE**, with
+   `rewrite !bv_extract_unsigned` in between: the latter *creates* new
+   `bv_unsigned (bv_concat …)` subterms, so one `!` pass leaves the inner
+   concat unrewritten — and the symptom looks like a broken `rewrite !`.
+4. **`Z.shiftr_0_r` also rewrites `Z.shiftl x 0`.**  `Z.shiftr a n` is
+   `Z.shiftl a (-n)` transparently, so keyed matching hits `shiftl` and
+   silently eats the wrong subterm.  Use an explicitly instantiated
+   `Z.shiftl_0_r`.
+5. **The finishing `rewrite (z_top_bit_of_lor … _ Hb (bv_wrap_63_range _))` is
+   written with holes ON PURPOSE**, so its pattern matches whichever
+   `bv_wrap 63 ?z` shape survives normalization; a fully instantiated version
+   is brittle.  And width normalization needs three `change` layers:
+   `MachineWord.Z_idx <lit>` → `N` literal, then `N`-arithmetic, then
+   `Z.of_N <lit>` → `Z` literal.
+
+When transplanting, note `trap_scause` duplicates `WpIntrInv.v`'s `c1v`/`c2v`
+`pose`s — either restate the lemmas on the raw update tower or have
+`WpIntrInv` use `trap_scause`.  The latter is cleaner.
+
+## THE ARM-BLIND `stack_own` CLASS — the complete list, enumerated once
+
+Making the carve arm-dependent created ONE new bug class, and it is the kind
+that is invisible to a grep for the changed name: **a raw `stack_own` written
+to MATCH a `sie_cap`'s carve.**  It used to denote `kv_frame_slots + n` at both
+arms and now denotes `trap_res b + n`, so every such site is correct at
+`b = true` and wrong at `b = false`.  Enumerated exhaustively (2026-08-09) so
+the sweep does not have to be re-derived; all of these are currently MASKED by
+the engine-rewrite breakage rather than fixed:
+
+- **`WpSconfCsr.v:530` and `:591` — the load-bearing one.**
+  `wp_csrr_sstatus_s_sconf` (and its neighbour) take the bundle at a GENERIC
+  `b` and hand the continuation a raw `stack_own … (kv_frame_slots + n)`.
+  Every sconf-tier `csrr sstatus` goes through it.  Correct statement is
+  `trap_res b + n`; the proof's own `destruct b` shows the `false` arm failing.
+- **`ProofSysDup.v:144`, `ProofSysClose.v:129`, `ProofSysPipe.v:403`** — three
+  copies of the same local `sp_bounds` helper, at generic `b`.  Same fix, and
+  the closing `unfold kv_frame_slots. lia.` becomes
+  `destruct bb; unfold trap_res, kv_frame_slots; lia` (the bound must hold at
+  both arms).
+- **`ProofKernelvec.v:1614`** — the split-the-carve site.  This one is
+  *supposed* to name the reserve literally; it goes away with the rewrite.
+
+Checked and NOT instances — strike them from any sweep: `BootBridge.v`'s five
+sites are internally consistent (`avail = kv_frame_slots + K` at index
+`false`); and `ProofWalk.v:165`, `ProofMappages.v:184`, `ProofKinit.v:74`,
+`ProofFreerange.v:143`/`:286` are pure `pa_stk` associativity asserts that hold
+at either carve **and are DEAD** — `Hdeepaddr` is never used in any of those
+four files.  They are vestiges of the old deep-end shape and should just be
+deleted.  Related discovery: **nothing outside `IntrDefs.v` uses
+`sie_cap_grow` / `sie_cap_shrink` at all**, so the address-arithmetic half of
+the expected ripple is empty.
+
+## THE ENGINE, CONCRETELY — and the one lemma it needs that does not exist yet
+
+`wp_exec_step_intr` must become HART-GENERIC, which means two things about
+where it can live and how it is proved:
+
+- **It cannot sit in a section that fixes `CpuId`.**  The Löb has to be taken
+  over a statement quantifying the hart, so the binder must be dischargeable:
+  state it with `` `{CID0 : CpuId} `` at top level (as `WpNext.v` does) and
+  prove it with `iLöb as "IH" forall (CID0)`.
+- **Its σ-callback moves inside `wp_next true p`.**  After the absorbing loop
+  has run, the instruction executes on the hart the LAST trap returned to, so
+  the caller must supply a hart-generic callback.  This is the change that
+  propagates to `wp_instr_s_sconf` and hence to the ~150 leaves.
+
+Target statement:
+
+```coq
+Lemma wp_exec_step_intr `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId} `{CID0 : CpuId}
+    (pc0 : mword 64) (m : regfile) (av : nat) (p : mword 64) :
+  ret_pc pc0 = pc0 ->
+  sie_cap_gpr m av true p -∗
+  pc_is pc0 -∗
+  wp_next true p (fun (CID : CpuId) =>
+    ∀ σ, ⌜ exec (dispatchInterrupt Supervisor) σ = Some (None, σ) ⌝ -∗
+         sconf -∗ sie_cap m av true p -∗ gpr_file (tp_pin m) -∗ pc_is pc0 -∗
+         mstate_interp σ ={⊤ ∖ ↑minstretN}=∗
+         ∃ (retval : mword 32) (s_exec : mstate), … (* as today *)) -∗
+  WP (Loop : expr riscv_lang).
+```
+
+Note there is **no `handler` and no `root_ppn` parameter any more**: the
+handler comes out of the `∃ h, intr_inv h` inside `sie_arm true`, and the
+translation slot rides folded inside `sie_cap` (only the funnel's fetch opens
+it).  The callback gets the hart_state-LESS residue, as today — the engine
+holds `hart_state` across the step.
+
+### `WpNext.wp_next_retarget` — the missing piece
+
+Re-entering the Löb at the resuming hart needs the caller's own
+`wp_next true p K` *at the new hart*, and what is in hand is the one at the
+old hart.  Those are different propositions, so it needs a transport — the
+third instance of the pattern `cpu_own_transport` / `trap_csrs_ext_transport`
+already established (**a hart-indexed resource that survives a possible
+migration needs a transport lemma, not a frame**), and it belongs beside them
+in `WpNext.v`:
+
+```coq
+Lemma wp_next_retarget `{GEN : GenId} (CID0 CID1 : CpuId) (b : bool) (p : mword 64) K :
+  (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+  wp_next (CID0 := CID0) b p K -∗ wp_next (CID0 := CID1) b p K.
+Proof.
+  intros Heq. iIntros "H" (CID Hs). iApply "H".
+  iPureIntro. intros Hb. rewrite (Hs Hb). exact (Heq Hb).
+Qed.
+```
+
+Why it is sound rather than a fudge, and it is worth seeing both halves:
+at `p ≠ zero_reg` and `b = true` the guard is vacuous, so `wp_next true p K`
+is just `∀ CID, K CID` and re-supplying it anywhere is free; at
+`p = zero_reg` the handler contract's own `wp_next` guarantees it came back
+on the SAME hart (`wp_next_idle`), which is precisely the hypothesis `Heq`.
+**This is where `wp_next`'s second escape hatch finally pays for itself** —
+`completed/explicit-cpuid.md` introduced it for `scheduler()` and recorded the
+obligation "no current proc ⇒ the trap returns on the same hart" as a debt
+against Stage 2; this lemma is the place that debt is called in.
+
+### The pending arm, step by step
+
+1. Destructure the bundle; take the arm's eighth, `∃h, intr_inv h`, the trap
+   CSRs, the travelling `sret_bits` half, `cpu_claim`, `cpu_hart 0 true p`.
+2. `wp_exec_step_retire_or_intr`, then on the trap branch: the existing tower
+   of `reg_update`s (mstatus SPP:=1 / SPIE:=SIE / SIE:=0, scause, stval, sepc,
+   cur_privilege, nextPC := stvec) — unchanged from today.
+3. **Flip the SIE ghost to '0'.**  This is new and it is why the arm has to be
+   opened: it needs all four pieces, and all four are in hand — `sconf`'s tied
+   half (1/2), the arm's eighth (1/8), `cpu_hart`'s `intr_count 0 true` eighth
+   (1/8), and the invariant quarter borrowed across the step.  Re-seal
+   `intr_inv` at '0'; the guarded handler implication is then vacuous, which is
+   fine because the □ spec was already read out before the flip.
+4. Assemble the handler's precondition: `sie_cap_gpr m (kv_frame_slots + av)
+   false p` (the stack conjunct is **untouched** — `trap_res true + av` and
+   `trap_res false + (kv_frame_slots + av)` are the same term), the three trap
+   CSRs at pinned values, `sret_bits '1 '1`, `cpu_hart 0 false p`,
+   `cpu_claim p`, `intr_handler_avail`, `pc_is handler`.
+5. Prove `s_cause_ok` of the scause word from `mie = MIE_S` — **done and
+   green in `CauseProbe.v`**, transplant it (below).
+6. Apply the handler spec; in its `wp_next` continuation, `wp_next_retarget`
+   the caller's callback to the new hart and `iApply "IH"`.
 
 ## DONE: `SpecYield`/`SpecSched` are now `forall eb`
 
@@ -382,20 +901,18 @@ consumers and its `eb = true` instance made `b` true.
    symbolically; `boot_stack_slots K_main` went 86 -> 132 slots (1056 bytes,
    still inside `_entry`'s 4096-byte slice).
 
-9. **THE OPEN FORK — where preemption's resources live.**  See the section
-   below.  This is what the old notes deferred as "should be made against
-   kerneltrap's real contract, not guessed"; the contract now exists, so the
-   question is answerable, and it is bigger than a wiring change.
+9. ~~THE OPEN FORK — where preemption's resources live~~ **closed by
+   park-to-lock** (section below).
 
 10. **The `intr_handler_spec` upgrade + `ProofKernelvec.v` rewiring**
-   (explicit-cpuid Stage 2).  The handler contract must start
-   handing the handler the trap CSRs, `cpu_hart`, the `sret_bits` mirror at
-   `('b"1", 'b"1")`, a deep enough `kv_frame_slots`, the persistent device/proc
-   credentials, `kt_proc_res`, and a hart-generic Loeb.  It also owes the two
-   facts kerneltrap takes as premises: pin `mie` in `sconf` (see RESOLVED
-   above) and expose the taken cause out of `wp_exec_step_intr`'s trap arm.
-   When it lands, delete `KERNELTRAP_RETURNS`, `KerneltrapRet`, `kv_cell` and
-   `kt_clobbered`; nothing else refers to them.
+   (explicit-cpuid Stage 2) — the only thing left, and IN PROGRESS as a series
+   of independently-landable slices rather than one branch.  What is landed,
+   what is queued and in what order:
+   **[HOW THIS IS BEING LANDED](#how-this-is-being-landed--the-decomposition-and-why-it-exists)**.
+   The design itself is in `STEP 10` and the sections after it: the fixpoint in
+   `THE CYCLE IS REAL`, the carve in `THE STACK ACCOUNTING HAD TO CHANGE`, the
+   cause layer in `THE CAUSE LEMMA IS PROVED`, the `stack_own` bug class in
+   `THE ARM-BLIND stack_own CLASS`, and the engine in `THE ENGINE, CONCRETELY`.
 
 ## THE FORK THAT WAS OPEN HERE IS CLOSED — by park-to-lock
 

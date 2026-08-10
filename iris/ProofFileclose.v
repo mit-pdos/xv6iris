@@ -1246,7 +1246,7 @@ Section ProofFileclose.
                                  #Hicenv & Hbm) Hpid]".
           subst n. subst eb. subst p.
           rewrite /fileclose_ic_env.
-          iDestruct "Hicenv" as "(%Hciref & %Hcdev & %Hcnib & %Hsz & %Hbm0 &
+          iDestruct "Hicenv" as "(%Hcdev & %Hcnib & %Hsz & %Hbm0 &
                                   %Hbmcov & %Hbmlog & %Hist0 & %Hinumgeo &
                                   %Hcovb & #Hitab & #Hitinv & #Hescrows &
                                   #Hireg & #Hslks)".
@@ -1260,7 +1260,7 @@ Section ProofFileclose.
           (* the reference is at the CACHE's authority and device; iput names
              them through the [ic_names] its other premises are stated at.
              The two pure ties in [fileclose_ic_env] are what bridge them. *)
-          iEval (rewrite -Hciref -Hcdev) in "Href".
+          iEval (rewrite -Hcdev) in "Href".
           assert (Hinb : bv_unsigned inum < 16 * Z.of_nat (fcn_nib fn))
             by (rewrite Hcnib; exact Hinumb).
           destruct (Hinumgeo inum Hinb) as [Hiblk Hiblog].

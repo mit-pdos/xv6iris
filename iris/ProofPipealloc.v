@@ -63,6 +63,7 @@ Require Import SpecFilealloc SpecKalloc SpecInitlock SpecIput SpecFileclose.
 Require Import IrefSlots InodeRegion.
 Require Import SpecPipealloc.
 From Kernel Require KernelSyms.
+Require Import InodeRef.
 Local Open Scope Z_scope.
 
 

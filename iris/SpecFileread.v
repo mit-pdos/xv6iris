@@ -259,7 +259,7 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkFsNames 1%positive 1%positive 1%positive)
-    1%positive (MkIcNames 1%positive (fun _ => 1%positive) (fun _ => 1%positive)
+    1%positive (MkIcNames (fun _ => 1%positive) (fun _ => 1%positive)
                           (fun _ => 1%positive))
     1%positive 1%positive
     ∅ 0 0 (mword_of_int 0) (mword_of_int 0) 0%nat 0%nat 1%Qp (DfracOwn 1)
@@ -316,7 +316,7 @@ Section SpecFileread.
         the [ref] words, the entry's content escrow, the inode region.  They
         replace v1's [inode_parked] sleeplock, its [inode_key] shadow half,
         its [i_ref] fraction and its whole-inode-block [fsblock]. *)
-     itable_inv (icn_ref (frn_ic fn)) ∗
+     itable_inv ∗
      ic_escrow (frn_ic fn) (frn_fs fn) (frn_ireg fn) (frn_cov fn)
                (frn_logstart fn) (frn_ik fn) ∗
      ireg_inv (frn_ireg fn) (frn_fs fn) (frn_inodestart fn) (frn_nib fn) ∗
@@ -327,7 +327,7 @@ Section SpecFileread.
         iunlock brings it back, so what fileread hands its own caller is a
         reference at SOME fraction -- [ic_swap_park] pins the device and the
         inum but not the share (§13.1e), exactly as brelse does in bio. *)
-     IcacheRef.inode_ref (icn_ref (frn_ic fn)) (frn_ik fn) (frn_q fn)
+     IcacheRef.inode_ref (frn_ik fn) (frn_q fn)
                (frn_dev fn) (frn_inum fn) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗
@@ -348,7 +348,7 @@ Section SpecFileread.
      fileread simply passes the [q'] it got.  (v1 had the same shape one
      field over: its [vv'] was existential for the identical reason.) *)
   Definition fileread_fs_out (fn : fread_names) (Cf : fcontent) : iProp Σ :=
-    ((∃ q' : Qp, IcacheRef.inode_ref (icn_ref (frn_ic fn)) (frn_ik fn) q'
+    ((∃ q' : Qp, IcacheRef.inode_ref (frn_ik fn) q'
                            (frn_dev fn) (frn_inum fn)) ∗
      sb_inodestart ↦₄{frn_dqs fn}
        (mword_of_int (frn_inodestart fn) : mword 32) ∗

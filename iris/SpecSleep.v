@@ -60,7 +60,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 
-Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
@@ -135,7 +135,7 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
        re-acquire of lk, and there is no re-acquire.
    [Rk] and [locked γk cpu_id] are still CONSUMED: the interior
    release(lk) at +0x1e really runs.                                     *)
-Definition wp_sleep_gen_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sleep_gen_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (Rk Dk : iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
@@ -164,7 +164,7 @@ Definition wp_sleep_gen_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   WP (Loop : expr riscv_lang).
 
 (* the static-kernel-lock instance, which is what acquiresleep takes *)
-Definition wp_sleep_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sleep_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
@@ -189,14 +189,14 @@ Definition wp_sleep_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
 
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
 
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
       wp_sleep_sconf_body γs j γl γk lka sk Rk m av eb C.
   Parameter wp_sleep_locks :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
@@ -222,7 +222,7 @@ End SLEEP.
 
    [wp_sleep_sconf_body] is the [Tk := emp], [Dk := False] instance
    (via WpLock.is_lock_openable); ProofSleep.SleepOfGen restates it. *)
-Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)
     (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
@@ -277,7 +277,7 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type SLEEP_GEN.
   Parameter wp_sleep_gen_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
@@ -286,7 +286,7 @@ Module Type SLEEP_GEN.
   (* Route B (2), in the [lock_openable]-generic form the proof lives in;
      [SLEEP.wp_sleep_locks] is its static instance. *)
   Parameter wp_sleep_gen_locks :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (Rk Dk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),

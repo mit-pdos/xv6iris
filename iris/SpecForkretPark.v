@@ -66,7 +66,7 @@ Local Open Scope Z_scope.
 Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 
 Definition forkret_park_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
      (γs : list gname)
     (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) : Prop :=
@@ -75,11 +75,17 @@ Definition forkret_park_body
     ctx_cells (p_context pa) (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
     proc_priv γf pa pid V -∗
     fd_slots FDSPARE -∗
+    (* the iref allowance travels beside the block for [FDSPARE]'s reason:
+       a syscall borrows from it for references in flight, so it cannot live
+       INSIDE [proc_priv], whose every accessor swallows the block.  The
+       cwd's own unit is NOT here -- a live process has a real [cwd_ref] and
+       the unit is parked in the itable against it. *)
+    iref_slots IREFSPARE -∗
     |==> ▷ proc_ctx γs pa.
 
 Module Type FORKRET_PARK.
   Parameter forkret_park :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate),

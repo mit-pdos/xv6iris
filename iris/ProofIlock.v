@@ -346,7 +346,7 @@ Definition il_sp (m M : regfile) : Prop :=
 
 Section IlockDefs.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
 
   (* ilock's 32-byte frame: ra@24 s0@16 s1@8, and slot 4 (s2's) held
      ANONYMOUSLY -- the cached arm never writes it. *)
@@ -386,7 +386,7 @@ End IlockDefs.
 (* ===================================================================== *)
 Section IlockEpilogue.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
 
   Local Lemma il_epilogue `{GEN : GenId} `{CID0 : CpuId} 
       (j : nat) (gfs : fs_names) (gi : gname) (gisl : gname) (bn : bio_names)
@@ -617,7 +617,7 @@ End IlockEpilogue.
 (* ===================================================================== *)
 Section IlockLoad.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
 
   Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId} 
       (gs : list gname) (j : nat) (gl : gname)
@@ -1795,7 +1795,7 @@ End IlockLoad.
 
 Section ProofIlockMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_ilock_sconf 
@@ -1969,17 +1969,17 @@ Section ProofIlockMain.
     iApply (wp_lw_au_ilock true (mword_of_int (KernelSyms.ilock + 0x0e)) Ra5 Ra0
               (mword_of_int 8 : mword 12) R3 (K - 4)%nat
               (fun v => (⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗
-                         iref_tok (icn_ref cn) k q)%I)
+                         iref_tok k q)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) b
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc Hi0e [Hrt]").
     { rewrite Hrefadr Hipe.
-      iMod (iref_load_au (⊤ ∖ ↑minstretN) (icn_ref cn) k q
+      iMod (iref_load_au (⊤ ∖ ↑minstretN) k q
               ltac:(solve_ndisj) with "Hitbl Hrt") as (v) "[Hcell Hback]".
       iModIntro. iExists v. iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback" with "Hcell") as "[%Hb Hrt]". iModIntro. by iFrame. }
     iIntros (refv CID8 Hq8) "Hcg Hpc [%Hrefp Hrt]".
-    iAssert (inode_ref (icn_ref cn) k q dev inum) with "[Hrt Hrid]" as "Href".
+    iAssert (inode_ref k q dev inum) with "[Hrt Hrid]" as "Href".
     { rewrite /inode_ref. iFrame. }
     set (R4 := <[Regidx Ra5 := regval_into_reg (sign_extend' 64 refv)]> R3).
     assert (HR4a5 : R4 !!! Regidx Ra5 = (sign_extend' 64 refv : mword 64))

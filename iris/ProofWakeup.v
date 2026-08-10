@@ -99,7 +99,7 @@ Definition wkl_regs (M : regfile) (spF chan : mword 64)
 Module WakeupProof (Myproc : MYPROC) (Acquire : ACQUIRE) (Release : RELEASE) (WakeupParts : WAKEUPPARTS) : WAKEUP.
 
 Section ProofWakeup.
-  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ}.
   (* NO [Context `{GEN : GenId} `{CID : CpuId}]: the loop lemma is applied at the hart the
      prologue's own [wp_next] hands back, which a section variable could not
      express.  Every lemma below takes its own implicit [CID0]. *)

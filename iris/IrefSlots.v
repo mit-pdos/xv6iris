@@ -45,7 +45,7 @@ From iris.algebra Require Import auth numbers.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own.
 Require Import ProcGeom.
-Require Import FileInv.
+Require Import FdSlots.   (* [NFILE]; NOT FileInv -- see FdSlots.v *)
 Local Open Scope Z_scope.
 
 (* references a single syscall may hold in locals at once; see the header *)
@@ -113,6 +113,11 @@ Section IrefSlots.
      slots is far below what an [int] can hold, so incrementing it is safe.
      This is where "there are only so many places to keep an inode" turns
      into "ip->ref++ does not overflow". *)
+  (* AT [positive], not [nat]: the count column of [IcacheRef.icacheUR] is
+     [positiveR] (a live slot has at least one reference and the algebra
+     has no zero).  The kfork line's [natR] retype of this statement is
+     deferred with the rest of the count-0-share vocabulary -- see
+     projects/reconcile-fork-icache.md, T5. *)
   Lemma iref_slots_no_overflow (n : positive) :
     iref_slots_auth -∗ iref_slots (Pos.to_nat n) -∗
     ⌜(Z.pos n < 2 ^ 31)%Z /\ (Z.pos (Pos.succ n) < 2 ^ 31)%Z⌝.

@@ -91,6 +91,7 @@ Require Import SpecBread SpecBrelse.
 Require Import SpecInstallTrans SpecWriteHead.
 Require Import SpecInitlog.
 From Kernel Require KernelSyms.
+Require Import InodeRef.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error
@@ -203,7 +204,7 @@ Local Ltac regne :=
 Local Ltac ilidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 
 Section InitlogDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   (* BORROW the block's first word out of its byte list, and give it back.
@@ -269,7 +270,7 @@ End InitlogDefs.
 (* ===================================================================== *)
 
 Section ProofInitlog.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

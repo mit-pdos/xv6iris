@@ -1116,10 +1116,192 @@ the evidence for every offset. This file is only the worklist.
       is empty because `proc_pub` quantifies the state a SLEEPING->RUNNABLE
       move changes.
 
-- [ ] **S11 — `kfork`. CONTRACT LANDED, PROOF NOT WRITTEN.**  The last
-      function of the process-lifetime cone (allocproc / kexit / kwait are
-      done).  `SpecKfork.v` + `CodeKfork.v` are in and compiling; what is
-      left is `ProofKforkParts.v` / `ProofKfork.v` / `LinkKfork.v`.
+- [x] **S11 — `kfork` PROVEN AND LINKED**, and with it the process-lifetime
+      cone is closed (allocproc / kexit / kwait / kfork).  `proof_coverage`
+      reads it `proven`; proc.c is 25/28 functions, 87.5% of bytes.
+      `Print Assumptions Kfork.wp_kfork_sconf` is the five `rv64d.*`
+      platform axioms + funext + **`ForkretPark.forkret_park` and nothing
+      else** -- notably NOT `Iput`, because idup is proven now and filedup
+      never reaches it.
+
+      Ten files: `SpecKfork.v` / `CodeKfork.v` / `ProofKforkParts.v` /
+      `ProofKfork.v` / `ProofKforkB1..B7.v` / `ProofKforkMain.v` /
+      `LinkKfork.v`.  The B-files are one straight-line stretch each and
+      `ProofKforkMain.v` is only the three-way glue; that split is what made
+      the function tractable, and the next section is what it cost.
+
+      **THE ONE ASSUMPTION** is `SpecForkretPark.FORKRET_PARK`, argued at
+      length in that file's header: parking a fresh process at RUNNABLE
+      needs a `▷ proc_ctx`, which is a Löb argument about `forkret`, and
+      nothing in the tree produces a fresh one.  Proving
+      `forkret`/`usertrapret`/`userret` (projects/uservec.md) retires it and
+      changes nothing else.
+
+      Proven and reusable:
+      * `ProofKforkParts.kfk_epi` -- the epilogue at +0xfc
+        (`c.mv a0,s1` + the ra/s0/s1/s5 restores + the frame pop + `ret`).
+        `ProofFilecloseParts.fc_epi` is the template it was written from and
+        the two are worth diffing if either changes.
+      * `ProofKfork.kfk_exit_alloc` (+0x10a) and `ProofKfork.kfk_tail_succ`
+        (+0xf6..+0xfa), plus `kfk_frame` -- the frame predicate that takes
+        the three LAZY slots existentially, which is what lets the three
+        exits share one epilogue statement.
+      * `ProofKforkParts.kfk_um_below_child` -- the pure fact that licenses
+        `np->sz = p->sz`: uvmcopy's post says where the child's map came
+        from, not what bounds it, and the bound needs all three of its
+        clauses plus `ud_um Pnew = ∅` (which is what `upt_desc` is).
+      * `ProofKforkParts.tf_page_word_upd` -- the WRITE twin of
+        `ProcInv.tf_page_word` the trapframe copy needs;
+        `kfk_tf_disp` / `kfk_tf_step` / `kfk_tf_inj` -- its address
+        arithmetic and its `bne a5,a3` exit test (the test is where
+        `page_valid` of the trapframe page is load-bearing: it is what rules
+        out wraparound, and `proc_priv_tfp_valid` reads it off
+        `ProcPtOwn.proc_pt_wf` rather than taking it as a premise).
+      * `ProofKforkParts.kfk_pname_bytes` / `kfk_bytes_pname` --
+        `ProcInv.pname_cells` as the `seq`-indexed byte big-op
+        `SpecSafestrcpy.v` states its buffers over.
+      * `ProofKforkParts.kfk_of_priv` -- the child's `proc_priv` taken apart
+        into `SpecFreeproc`'s three pieces with BOTH address-space slots at
+        `Some`, which is the case allocproc's own two tails never exercise
+        and the one the uvmcopy-failure tail is in.
+
+      These bridges live in `ProofKforkParts.v` rather than in `ProcInv.v`
+      so that landing them does not rebuild the whole tree; each is a
+      candidate to be lifted the next time someone is in that file anyway.
+
+      **One accessor `ProcInv.v` is missing, found by writing B4:**
+      `proc_priv_name`, the exact sibling of `proc_priv_cwd` — borrow
+      `pname_cells` out of the block and put back a (possibly different)
+      array of the same length.  `ProofKforkB4.v` builds it privately as
+      `kfk_name_open`; safestrcpy is not the last writer of a proc's name
+      that will want it (exec is the other), so lift it the next time
+      anyone is in `ProcInv.v`.  Note the rebuild needs a literal `MkPPriv`
+      because there is no `upd_name` beside `upd_ofile`/`upd_sz`/`upd_cwd`;
+      adding one is the tidier half of the same change.
+
+      **THE PARK HAPPENS AT THE FIRST RELEASE, NOT AT THE RUNNABLE ONE**, and
+      the reason is one `vm_compute`: `ProcGeom.needs_ctx st` is
+      `st = RUNNABLE || st = SLEEPING || **st = USED**`, so the moment kfork
+      releases `np->lock` at +0xc4 — still at USED, before the wait_lock
+      crossing — the lock invariant already demands a live `▷ proc_ctx`.  So
+      `SpecForkretPark.forkret_park` runs ONCE, there, swallowing the child's
+      `proc_priv` and its `fd_slots FDSPARE`; and the later USED → RUNNABLE
+      crossing at +0xec then moves NO resource at all — `needs_ctx`,
+      `is_running`, `inv_dormant` and `not_running` all agree between the two
+      states, so it is a bare `SchedCtx.proc_slots_recast`.  Anyone reading
+      the C and expecting the park to pair with `np->state = RUNNABLE` will
+      get this backwards.
+
+      **`st = USED` AT THE RE-ACQUIRE COSTS NOTHING, AND THE DESIGN ALREADY
+      SAID SO.**  The obvious worry — kfork releases `np->lock`, and when it
+      re-acquires at +0xe6 the lock hands back a `proc_lock_res` at an
+      arbitrary `st` — is answered by never giving up the claimant's half of
+      the state mirror: split `proc_held`'s `pstate_whole _ USED` with
+      `pstate_whole_split`/`unclaimed_USED`, hand `pstate_lock _ USED` to the
+      released lock and KEEP `pstate_at_hlf _ USED` as an ordinary ghost
+      across the wait_lock crossing.  `ProcGeom.pstate_lock_claimed` then
+      reads `st = USED` straight off it, and its own comment names this
+      caller: *"this is what lets yield/sleep/exit learn `st = RUNNING`, and
+      kfork `st = USED`, without reading the cell."*
+
+      **SPLITTING A FUNCTION ACROSS PARALLEL PROVERS: WHAT IT COSTS.**
+      kfork's seven straight-line stretches were proved independently and
+      then glued.  Every block compiled on its own; **six defects were
+      found only by attempting the composition, and every one of them was
+      invisible to `coqc`.**  Five were the same shape — a fact TRUE INSIDE
+      a block that its interface flattened away:
+
+      * a dropped `cpu_own` (an affine BI discards it silently);
+      * frame slots quantified existentially where the exit that reloads
+        them needs the specific value;
+      * the child's `V` handed back unconstrained where the next block
+        needs `pv_ofile`/`pv_cwd`;
+      * the saved context abstracted to `own_ctx` where the park needs
+        `is_kstack` + `ctx_cells` at their literal heads;
+      * the resuming hart quantified with NO crossing premise — which makes
+        the continuation's antecedent not merely awkward but UNPROVABLE
+        (`wp_next _ false _ K` is `K CIDh`, so supplying it means proving
+        the continuation at an adversarial hart).
+
+      The sixth is structural and is kwait's rule again: **N continuations
+      each needing the caller's ONE linear exit is unsound by typing.**
+      Thread the exit through as an abstract `R` and hand it back to
+      whichever arm runs (S10's `kw_exit_fn`); do not let each closure
+      capture a copy.
+
+      Three more were over-strong register premises (below) and one whole
+      instruction range (+0x66..+0x7a) was in no block at all, found by
+      walking the offsets against the assignments.
+
+      **The rule: when a block is stated by one party and consumed by
+      another, check the INTERFACE by hand — the compiler checks neither
+      side against the other.**  Prefer stating a block's postcondition as
+      the STRONGEST thing its proof establishes, not the weakest thing that
+      typechecks; every one of the five was a weakening nobody needed.
+
+      **Two rules the block proofs paid for, both general:**
+
+      * **A BLOCK'S "agrees with the entry map" PREMISE MUST EXCLUDE EVERY
+        REGISTER THE FUNCTION HAS REPURPOSED BY THAT POINT, and getting it
+        wrong COMPILES.**  `ProofKforkB1`'s tail runs with s4 = the child,
+        not the caller's s4 (the prologue spilled it at +0x1a and +0x1c
+        overwrote it), so a premise `forall r, is_cs_idx r -> r ∉
+        {sp,s0,s1,s5} -> Mt r = m r` together with `Mt s4 = proc_addr j`
+        forces `proc_addr j = m s4` — unsatisfiable at the only call site.
+        The block proves fine, because its own body never uses the premise
+        at s4; the defect surfaces only when the capstone tries to apply it.
+        **Check each such premise against the block's own register
+        assignment, not against the epilogue's.**
+      * **"A release at level >= 1 must be closed with `wp_next_off_intro`"
+        IS ONLY TRUE AT A LITERAL LEVEL.**  `SpecRelease`'s exit index is
+        `match n with O => eb | S _ => false end`, so at a SYMBOLIC `n` the
+        goal's index is a `match` on a variable and `wp_next_off_intro :
+        K CID0 -∗ wp_next false p K` cannot apply at all.  Close it with
+        ordinary `iIntros (CID Hs mr)` and reconcile with the caller's own
+        `b` through **`IntrDefs.cpu_own_eb_agree`**, which reads
+        `b = match lvl with O => eb | S _ => false end` off `sie_cap_gpr` +
+        `cpu_own`.  `ProofKkill.v` (its `Hbmatch`), `ProofWakeup.v` and
+        `ProofAllocproc.v` all do exactly this.  The `wp_next_off_intro`
+        rule still holds for the stretches pinned at the literal `false`.
+
+      **What is left**, in the order it should be written (bottom up, each
+      a separately-`Qed`'d block, per the argraw lesson in S3a):
+      1. the uvmcopy-failure tail (+0x7c..+0x8c) -- `freeproc` then
+         `release` then `-1`, over `kfk_of_priv` and `kfk_tail_succ`'s
+         sibling reload of s4 alone;
+      2. the trapframe copy loop (+0x34..+0x62) -- a bounded fuel induction,
+         nine turns of four words, over `tf_page_word_upd`;
+      3. the rotated filedup scan (+0x8e..+0xa2) -- fuel induction with a
+         CALL in the body, `ProofFdalloc.v`'s `Hloop` shape;
+      4. idup / safestrcpy / the pid read (+0xa4..+0xc0);
+      5. the two lock crossings and the RUNNABLE park (+0xc2..+0xf4);
+      6. the prologue, myproc, allocproc and the three-way post destruct;
+      7. the capstone, the `Module Type` functor and `LinkKfork.v`.
+
+      **THE ONE DESIGN CHANGE THIS EFFORT FORCED, AND IT IS NOT LOCAL:
+      `idup` STOPPED BEING ASSUMED.**  `SpecKfork.v` was written when
+      `SpecIdup.v` was an `Axiom` over `ProcInv.cwd_ref` (which is `emp`);
+      upstream `8f5470a3` proved idup for real against `IcacheInv.v`, so its
+      contract now wants `is_itable γil γi`, `itable_inv γi`, one
+      `IrefSlots.iref_slot` and an actual `IcacheInv.inode_ref γi ck cq dev
+      inum` on the entry `p->cwd` names.  `cwd_ref` cannot produce any of
+      that, so **kfork's contract now carries all five**, plus the premise
+      `pv_cwd Vp = ientry ck`, and hands the parent's reference back at an
+      existential fraction (idup halves it, and the two failure arms never
+      call idup -- `∃ q'` is the only statement true on every path).  The
+      child's half is dropped: it belongs in the child's `cwd_ref`, and
+      there is nowhere to put it.  See `SpecKfork.v`'s header.
+
+      **This makes S5 the next thing worth doing, not a nice-to-have.**  All
+      five premises disappear the moment `cwd_ref` becomes real, and the
+      `ientry` premise becomes a consequence of the parent's own block.
+      Until then kfork's contract asks its caller for something no caller in
+      the tree can produce -- honest, but unusable, so `sys_fork` should not
+      be attempted before either kfork's proof or S5 lands.  Note also that
+      the tree is now INCONSISTENT about this hole: `iput` is still stated
+      over the `emp` placeholder while `idup` is stated over the real model,
+      so whichever of them a function calls decides which vocabulary its
+      contract inherits.
 
       **What landed alongside, all of it reusable and none of it
       kfork-specific:**
@@ -1144,10 +1326,9 @@ the evidence for every offset. This file is only the worklist.
         only the trailing store fires, at `n-1`.  Verified against a literal
         simulation of the disassembly over 55992 cases before the proof was
         attempted — cheap, and it retired the off-by-one question outright.
-      * **`SpecIdup.v` / `LinkIdup.v`** — ASSUMED, `SpecIput.v`'s pattern and
-        `SpecIput.v`'s reason: `ProcInv.cwd_ref` is `FileInv.inode_ref`,
-        which is `emp`, so nothing about `ip->ref`/`itable.lock` is statable
-        until the inode layer exists.
+      * **`SpecIdup.v` / `LinkIdup.v`** — landed here ASSUMED and have since
+        been PROVEN against the real icache; see "the one design change this
+        effort forced" above for what that did to kfork's contract.
       * **`SpecForkretPark.v` / `LinkForkretPark.v` — a NEW assumption, and
         the one worth arguing about.**  Parking a fresh process at RUNNABLE
         needs `SchedCtx.proc_slots pa RUNNABLE`, hence `▷ proc_ctx pa`, hence
@@ -1195,16 +1376,49 @@ the evidence for every offset. This file is only the worklist.
       `Hloop` is the shape; `ProofKexit.v`'s fd loop is the content twin):
       the trapframe copy (+0x4a..+0x62, 9 iterations x 4 words, end pointer
       `p->tf + 288`) and the ROTATED fd scan (+0x8e..+0xa2 — increment at the
-      TOP, entry jumps to +0x96, exit `beq s1,s3` at `&p->ofile[16]`).
-      `ProcInv` wants a WRITE twin of `tf_page_word` for the first.
+      TOP, entry jumps to +0x96, exit `beq s1,s3` at `&p->ofile[16]`, which
+      is `&p->cwd` — `ProcGeom.p_ofile pa 16` and `p_cwd pa` are the same
+      address, so the exit test needs no new geometry).  The WRITE twin of
+      `tf_page_word` the first one wants is
+      `ProofKforkParts.tf_page_word_upd`.
 
-- [ ] **S5 — `cwd_ref`.** Currently `emp`, a deliberate hole with `file_ref`'s
-      shape. Needs an inode model (per-slot fractional auth over `itable`)
-      that does not exist yet. Fill it and no caller restates. Two consumers
-      are now written against it and neither will need restating:
-      `ProcInv.proc_priv_cwd` (borrow the cell AND the reference, put back a
-      matching pair — sys_chdir's move as well as kexit's) and
-      `SpecIput.v`'s precondition.
+      **The fd scan holds TWO `proc_priv` blocks open at once** — the
+      parent's slot `i` and the child's — and that is fine, they are
+      separate resources.  What is worth knowing before writing it: the
+      PARENT's block comes back at literally the same `Vp`, because
+      `ofile_slot`'s file disjunct quantifies the fraction existentially and
+      filedup only halves it; only the child's `pv_ofile` moves.  The child's
+      null slot is what supplies filedup's `fd_slot`
+      (`ProcInv.ofile_slot_null`), and `ofile_slot_file` installs the
+      duplicate — so the ledger closes per iteration and nothing has to be
+      routed outside the loop after all.
+
+- [x] **S5 — `cwd_ref` IS REAL, and kfork's contract is clean.** Its own
+      file, [`cwd-ref.md`](cwd-ref.md), has the design and what is left.
+      `ProcInv.cwd_ref v := ∃ q, InodeRef.iref_at v q` — no null arm, so
+      "a live process has a non-null cwd" is a PROJECTION of the block and
+      no state transition re-establishes it. The price is the construction
+      window (allocproc returns a process whose cwd it has not set), paid by
+      `proc_priv_nocwd` + `proc_priv_split_cwd`; only the REFERENCE splits
+      off, not the `p_cwd` cell, so `proc_dormant` / `SpecFreeproc` /
+      `BootCarveMain` were untouched. The `IrefSlots -> FileInv` cycle was
+      broken by moving `NFILE` to `FdSlots.v`; the itable's gname went
+      canonical; and the iref-slot supply is routed
+      (`proc_dormant` parks `iref_slots (1 + IREFSPARE)`, procinit
+      distributes, allocproc hands out, kexit rejoins what iput returns).
+
+      **The acceptance test passed:** `SpecKfork` shed `ck`, `cq`, `cdev`,
+      `cinum`, the `inode_ref` premise, the `iref_slot`, the
+      `pv_cwd Vp = ientry ck` side condition and `kfork_post`'s `∃ q'`.
+      `ProofKforkB4.kfk_cwd_ref_any` — the hole that conjured the child's
+      reference while idup's second half went on the floor — is DELETED; the
+      store at +0xac consumes that half. What is left of the icache in
+      kfork's contract is the lock and the invariant.
+
+      **What S5 still owes is the FILE TABLE's half** —
+      `FileInv.file_payload`'s FD_INODE arm, which is what unblocks a real
+      `SpecIput`. Three drops are marked with `###` banners until it lands:
+      kexit's reference, fileclose's returned slot, boot's `NFILE` units.
 
 - [x] **S6 — `kexit` PROVEN AND LINKED**, and with it **`sys_exit`** — its own
       file, [`kexit.md`](../completed/kexit.md). What it forced into this

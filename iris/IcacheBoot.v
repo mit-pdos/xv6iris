@@ -360,7 +360,7 @@ End IcacheBootRegion.
 (* ===================================================================== *)
 
 Section IcacheBootPool.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
@@ -468,7 +468,7 @@ Lemma ci_inums_empty : ci_inums ∅ = (∅ : gset Z).
 Proof. rewrite /ci_inums map_to_list_empty //. Qed.
 
 Section IcacheBootTable.
-  Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
@@ -568,6 +568,13 @@ Section IcacheBootTable.
      because this file sits below the fileclose spec. *)
   Lemma icache_boot (E : coPset) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) :
+    (* THE COUNT AUTHORITY, at the empty table.  A PREMISE rather than an
+       allocation, because the authority's gname is CANONICAL -- it is
+       [IcacheRef.icfg_iref] of the ambient cache, the same one every
+       reference in the system is stated over -- so this lemma cannot mint
+       it and then claim to have built THE itable.  [IcacheRef.icfg_alloc]
+       is what discharges it. *)
+    own icfg_iref (● (∅ : gmap nat (Qp * positive)) : icacheUR) -∗
     itable_lock ↦₄ (mword_of_int 0 : mword 32) -∗
     lock_name itable_lock "itable"%string -∗
     lock_cpu itable_lock ↦₈ (zero_reg : mword 64) -∗
@@ -577,14 +584,14 @@ Section IcacheBootTable.
     ipool γfs γi cov logstart (region_inums nib)
     ={E}=∗ ∃ (γl : gname) (cn : ic_names),
       is_itable2 γl cn γfs γi cov logstart nib dv ∗
-      itable_inv (icn_ref cn) ∗
+      itable_inv ∗
       ic_escrows cn γfs γi cov logstart ∗
       ([∗ list] k ∈ seq 0 NINODE,
          ∃ γil γisl : gname,
            is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string
                         (ic_tok cn k)).
   Proof.
-    iIntros "Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
+    iIntros "Hauth Hlkw #Hnm Hcpu Hsl Hraw Hsupply Hpool".
     (* ---- take the fifty entries apart, and name the identity values ---- *)
     iDestruct (ientry_raw_split with "Hraw")
       as "(Hdev & Hinum & Href & Hvalid & Hmirror)".
@@ -598,13 +605,11 @@ Section IcacheBootTable.
     iDestruct (fun_of_big
                  (fun k p => i_dev (ientry k) ↦₄ p.1 ∗ i_inum (ientry k) ↦₄ p.2)%I
                  NINODE 0 with "Hid") as (dvs) "Hid".
-    (* ---- the count authority, and the escrow layer's gnames ---- *)
-    iMod (own_alloc (● (∅ : gmap nat (Qp * positive)))) as (γref) "Hauth";
-      [by apply auth_auth_valid |].
+    (* ---- the count authority's two halves, and the escrow gnames ---- *)
     iDestruct (itable_half_split with "Hauth") as "[HhalfI HhalfL]".
-    iMod (ic_names_alloc γref dvs) as (cn) "(%Hcn & Htok & Hmid & Hgid)".
+    iMod (ic_names_alloc dvs) as (cn) "(Htok & Hmid & Hgid)".
     (* ---- the [ref]-word invariant ---- *)
-    iMod (inv_alloc icacheN E (itable_body γref)
+    iMod (inv_alloc icacheN E itable_body
             with "[HhalfI Href]") as "#Hitinv".
     { iNext. iExists ∅. iFrame "HhalfI". iSplitR; [iPureIntro; exact icM_wf_empty |].
       iApply iref_cells_boot. iExact "Href". }
@@ -632,7 +637,7 @@ Section IcacheBootTable.
     (* ---- the itable lock's resource, and the lock ---- *)
     iAssert (itable_res2 cn γfs γi cov logstart nib dv)%I
       with "[HhalfL Hsupply Hslots Hpool]" as "Hres".
-    { iExists ∅, ∅. rewrite Hcn. iFrame "HhalfL".
+    { iExists ∅, ∅. iFrame "HhalfL".
       iSplitR; [iPureIntro; exact icM_wf_empty |].
       iSplitR; [iPureIntro; exact (ic_ci_wf_empty nib dv) |].
       iFrame "Hsupply".
@@ -653,7 +658,7 @@ Section IcacheBootTable.
       iIntros "[Hf Ht]". iApply (sl_fresh_new with "Hf Ht"). }
     iMod (big_sepL_fupd with "Hsl") as "Hsl".
     iModIntro. iExists γl, cn.
-    rewrite /is_itable2 Hcn. iFrame "Hlock Hitinv Hescrows Hsl".
+    rewrite /is_itable2. iFrame "Hlock Hitinv Hescrows Hsl".
   Qed.
 
 End IcacheBootTable.

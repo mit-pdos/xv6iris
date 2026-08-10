@@ -379,7 +379,7 @@ End IgetAuLeaves.
 Module IgetProof (Acquire : ACQUIRE) (Release : RELEASE) : IGET.
 
 Section ProofIget.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -755,7 +755,7 @@ Section ProofIget.
         sie_cap_gpr (CID := CIDt) mt (K - 6)%nat b p -∗
         cpu_own (CID := CIDt) n eb p C b -∗
         pc_is (CID := CIDt) (mword_of_int (KernelSyms.iget + 0x8c) : mword 64) -∗
-        IcacheRef.inode_ref (icn_ref cn) kk q dev inum -∗
+        IcacheRef.inode_ref kk q dev inum -∗
         WP (Loop : expr riscv_lang)))%I).
     iAssert TAILC
       with "[Hcont Hf1 Hf2 Hf3 Hf4 Hf5 Hf6]" as "Hcont2".
@@ -968,7 +968,7 @@ Section ProofIget.
       cpu_own (S n) eb p C false -∗
       arm_pay n eb p -∗
       locked γl cpu_id -∗
-      itable_half (icn_ref cn) M -∗
+      itable_half M -∗
       iref_slots_auth -∗
       ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn M ci i0) -∗
       ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
@@ -1003,7 +1003,7 @@ Section ProofIget.
         cpu_own (S n) eb p C false -∗
         arm_pay n eb p -∗
         locked γl cpu_id -∗
-        itable_half (icn_ref cn) M -∗
+        itable_half M -∗
         iref_slots_auth -∗
         ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn M ci i0) -∗
         ipool γfs γi cov logstart (region_inums nib ∖ ci_inums ci) -∗
@@ -1260,8 +1260,8 @@ Section ProofIget.
             assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
             iApply (wp_sw_au_iget false (mword_of_int (KernelSyms.iget + 0x78)) Ra5 Rs3
                       (mword_of_int 8 : mword 12) V1 (K - 6)%nat
-                      (itable_half (icn_ref cn) (<[e := ((1/2/2)%Qp, 1%positive)]> M) ∗
-                       iref_tok (icn_ref cn) e (1/2/2)%Qp)%I
+                      (itable_half (<[e := ((1/2/2)%Qp, 1%positive)]> M) ∗
+                       iref_tok e (1/2/2)%Qp)%I
                       (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
                       with "Hcg Hpc Hi78 [Hhalf] [-]").
             { rewrite Hpa78 Hsv78.
@@ -1271,7 +1271,7 @@ Section ProofIget.
               iDestruct (iref_cells_acc_upd M e He with "Hcells") as "[Hcell Hcback]".
               iModIntro. iExists (iref_word M e). iFrame "Hcell". iIntros "Hcell".
               iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-              iMod (iref_alloc_step (icn_ref cn) M e (1/2/2)%Qp HMe ig_quarter_le
+              iMod (iref_alloc_step M e (1/2/2)%Qp HMe ig_quarter_le
                       with "Hauth") as "[Hauth Htok2]".
               iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
               iMod ("Hclose2" with "[Ha Hcell Hcback]") as "_".
@@ -1494,12 +1494,12 @@ Section ProofIget.
       { rewrite (rget_ne Mr Rs1 ltac:(nz)) HMs1. reflexivity. }
       iApply (wp_lw_au_iget true (mword_of_int (KernelSyms.iget + 0x44)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) Mr (K - 6)%nat
-                (fun v => (⌜v = iref_word M j⌝ ∗ itable_half (icn_ref cn) M)%I)
+                (fun v => (⌜v = iref_word M j⌝ ∗ itable_half M)%I)
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
                 ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
                 with "Hcg Hpc Hi44 [Hhalf] [-]").
       { rewrite Hpa44.
-        iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) (icn_ref cn) M j
+        iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) M j
                 ltac:(solve_ndisj) Hk with "Hinv Hhalf") as "[Hcell Hback]".
         iModIntro. iExists (iref_word M j). iFrame "Hcell". iIntros "Hcell".
         iMod ("Hback" with "Hcell") as "Hhalf". iModIntro. by iFrame. }
@@ -1742,12 +1742,12 @@ Section ProofIget.
         assert (Hqv : ✓ (qj + qj'/2)%Qp) by (apply ig_frac_valid; by apply Qp.sub_Some).
         iApply (wp_sw_au_iget true (mword_of_int (KernelSyms.iget + 0x58)) Ra5 Rs1
                   (mword_of_int 8 : mword 12) L4 (K - 6)%nat
-                  (itable_half (icn_ref cn) (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
-                   iref_tok (icn_ref cn) j (qj'/2)%Qp)%I
+                  (itable_half (<[j := ((qj + qj'/2)%Qp, Pos.succ nj)]> M) ∗
+                   iref_tok j (qj'/2)%Qp)%I
                   (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
                   with "Hcg Hpc Hi58 [Hhalf] [-]").
         { rewrite Hpa58 Hstv.
-          iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) (icn_ref cn) M j qj (qj'/2)%Qp nj
+          iMod (iref_incr_store_au (⊤ ∖ ↑minstretN) M j qj (qj'/2)%Qp nj
                   ltac:(solve_ndisj) HMj Hqv Hno1 with "Hinv Hhalf") as "[Hcell Hback2]".
           iModIntro. iExists (iref_word M j). iFrame "Hcell". iIntros "Hcell".
           iMod ("Hback2" with "Hcell") as "[Hhalf Htok2]". iModIntro. iFrame. }

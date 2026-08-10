@@ -123,7 +123,7 @@
 
    The brief described [ic_swap_checkout] as splitting the winner's
    reference in half -- q/2 deposited into OUT, q/2 kept.  THAT IS NOT AN
-   ENTAILMENT: [iref_tok γ k q] is [own γ (◯ {[k := (q,1)]})] and two
+   ENTAILMENT: [iref_tok k q] is [own icfg_iref (◯ {[k := (q,1)]})] and two
    half-fraction tokens compose to [{[k := (q,2)]}], a different element, so
    splitting a reference's FRACTION also splits its COUNT and needs the
    authority (that is exactly [iref_dup_step], which is idup's shape and
@@ -175,7 +175,6 @@ Local Open Scope Z_scope.
    token's gname and the recycle token's gname.  The itable spinlock's own
    gname stays a separate argument, exactly as [is_itable] takes it. *)
 Record ic_names := MkIcNames {
-  icn_ref : gname;          (* the count authority (IcacheInv's γ)       *)
   icn_esc : nat -> gname;   (* entry k's CHECKOUT token                  *)
   icn_mid : nat -> gname;   (* entry k's RECYCLE token                   *)
   icn_id  : nat -> gname;   (* entry k's LIVE / EMPTY agreement          *)
@@ -185,6 +184,7 @@ Section IcacheEscrow.
   Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
+  Context `{ICFG : icfg}.
 
   (* ------------------------------------------------------------------ *)
   (*  Timeless instances the arms are built out of                       *)
@@ -422,7 +422,7 @@ Section IcacheEscrow.
   Definition ic_out (cn : ic_names) (k : nat) : iProp Σ :=
     (∃ (q : Qp) (dev inum : mword 32),
        ic_tok cn k ∗
-       inode_ref (icn_ref cn) k q dev inum ∗
+       inode_ref k q dev inum ∗
        ic_mid cn k ∗
        ic_id cn k (1/2) true dev inum)%I.
 
@@ -569,7 +569,7 @@ Section IcacheEscrow.
   Lemma ic_swap_checkout cn γfs γi cov logstart k (q : Qp) (dev inum : mword 32) :
     ic_escrow_body cn γfs γi cov logstart k -∗
     ic_tok cn k -∗
-    inode_ref (icn_ref cn) k q dev inum -∗
+    inode_ref k q dev inum -∗
     ic_escrow_body cn γfs γi cov logstart k ∗
     (∃ v : bool,
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
@@ -621,7 +621,7 @@ Section IcacheEscrow.
     ic_payload γfs γi cov logstart k inum v -∗
     ic_escrow_body cn γfs γi cov logstart k ∗
     ic_tok cn k ∗
-    (∃ q : Qp, inode_ref (icn_ref cn) k q dev inum).
+    (∃ q : Qp, inode_ref k q dev inum).
   Proof.
     iIntros "Hbody Hid Hin Hvld Hpay".
     iDestruct "Hbody" as "[Hpk | [Hout | [Hmid | [Hvg | Hhd]]]]".
@@ -661,11 +661,11 @@ Section IcacheEscrow.
       (M : gmap nat (Qp * positive)) (q qt qi : Qp) (dev inum : mword 32) :
     M !! k = Some (qt, 1%positive) ->
     ic_escrow_body cn γfs γi cov logstart k -∗
-    itable_half (icn_ref cn) M -∗
-    iref_tok (icn_ref cn) k q -∗
+    itable_half M -∗
+    iref_tok k q -∗
     inode_ident k (DfracOwn qi) dev inum -∗
-    itable_half (icn_ref cn) M ∗
-    iref_tok (icn_ref cn) k q ∗
+    itable_half M ∗
+    iref_tok k q ∗
     inode_ident k (DfracOwn qi) dev inum ∗
     (∃ v : bool,
        i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
@@ -941,8 +941,8 @@ Section IcacheEscrow.
     i_valid (ientry k) ↦₄ valid_word v -∗
     i_valid (ientry k) ↦₄ valid_word v ∗
     (∃ (q : Qp) (dev inum : mword 32),
-       inode_ref (icn_ref cn) k q dev inum ∗
-       (inode_ref (icn_ref cn) k q dev inum -∗
+       inode_ref k q dev inum ∗
+       (inode_ref k q dev inum -∗
         ic_escrow_body cn γfs γi cov logstart k)).
   Proof.
     iIntros "Hbody Hvld".
@@ -982,7 +982,7 @@ Section IcacheEscrow.
      constructor, exported so ProofIput need not unfold [ic_escrow_body]. *)
   Lemma ic_close_out cn γfs γi cov logstart k (q : Qp) (dev inum : mword 32) :
     ic_tok cn k -∗
-    inode_ref (icn_ref cn) k q dev inum -∗
+    inode_ref k q dev inum -∗
     ic_mid cn k -∗
     ic_id cn k (1/2) true dev inum -∗
     ic_escrow_body cn γfs γi cov logstart k.
@@ -1051,12 +1051,12 @@ Section IcacheEscrow.
       (M : gmap nat (Qp * positive)) (q qt : Qp) (v : bool) (dev inum : mword 32) :
     M !! k = Some (qt, 1%positive) ->
     ic_escrow_body cn γfs γi cov logstart k -∗
-    itable_half (icn_ref cn) M -∗
-    iref_tok (icn_ref cn) k q -∗
+    itable_half M -∗
+    iref_tok k q -∗
     ic_id cn k (1/2) true dev inum -∗
     ic_payload γfs γi cov logstart k inum v -∗
-    itable_half (icn_ref cn) M ∗
-    iref_tok (icn_ref cn) k q ∗
+    itable_half M ∗
+    iref_tok k q ∗
     ic_id cn k (1/2) true dev inum ∗
     ic_payload γfs γi cov logstart k inum v ∗
     i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev ∗
@@ -1272,7 +1272,7 @@ Section IcacheEscrow.
   Definition itable_res2 (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) (dv : mword 32) : iProp Σ :=
     (∃ (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)),
-       itable_half (icn_ref cn) M ∗
+       itable_half M ∗
        ⌜icM_wf M⌝ ∗ ⌜ic_ci_wf M ci nib dv⌝ ∗
        iref_slots_auth ∗
        ([∗ list] k ∈ seq 0 NINODE, islot2 cn M ci k) ∗
@@ -1374,9 +1374,8 @@ Section IcacheEscrowAlloc.
   (* the whole layer's names, at a given reference authority: NINODE
      checkout tokens, NINODE recycle tokens and NINODE identification
      variables (all [false] -- every entry starts empty), all fresh. *)
-  Lemma ic_names_alloc (γref : gname) (dvs : nat -> mword 32 * mword 32) :
+  Lemma ic_names_alloc (dvs : nat -> mword 32 * mword 32) :
     ⊢ |==> ∃ cn : ic_names,
-      ⌜icn_ref cn = γref⌝ ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_tok cn k) ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_mid cn k) ∗
       ([∗ list] k ∈ seq 0 NINODE, ic_id cn k 1 false (dvs k).1 (dvs k).2).
@@ -1384,8 +1383,8 @@ Section IcacheEscrowAlloc.
     iMod (ic_tok_fun_alloc NINODE 0) as (fesc) "Hesc".
     iMod (ic_tok_fun_alloc NINODE 0) as (fmid) "Hmid".
     iMod (ic_id_fun_alloc dvs NINODE 0) as (fid) "Hid".
-    iModIntro. iExists (MkIcNames γref fesc fmid fid).
-    iSplitR; [done |]. rewrite /ic_tok /ic_mid /ic_id.
+    iModIntro. iExists (MkIcNames fesc fmid fid).
+    rewrite /ic_tok /ic_mid /ic_id.
     cbn [icn_esc icn_mid icn_id].
     iFrame.
   Qed.

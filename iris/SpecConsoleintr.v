@@ -52,7 +52,7 @@ From Kernel Require KernelSyms.
 (* consoleintr's own frame plus its deepest callee (wakeup, 18). *)
 Definition consoleintr_stack : nat := 32%nat.
 
-Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
      (m : regfile) (γs : list gname)
     (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool) :=
   let rettgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
@@ -77,7 +77,7 @@ Definition wp_consoleintr_sconf_body `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sie
 
 Module Type CONSOLEINTR.
   Parameter wp_consoleintr_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId}
        (m : regfile) (γs : list gname)
       (pme : mword 64) (lvl K : nat) (eb : bool) (C : iProp Σ) (b : bool),
       wp_consoleintr_sconf_body m γs pme lvl K eb C b.

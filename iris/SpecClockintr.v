@@ -66,7 +66,7 @@ Import Defs.
 
 
 Section SpecClockintr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* "this hart keeps time": the branch clockintr tests, [cpuid() == 0]. *)
@@ -106,7 +106,7 @@ End SpecClockintr.
    xv6 agrees on both counts: clockintr runs only from devintr, inside the
    trap handler, with SIE already off.  Stated at the literal [false] there is
    no [wp_next] wrapper at all ([wp_next_off] would collapse it). *)
-Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
      (γl : gname) (γs : list gname)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat) :=
   let pcE : mword 64 := mword_of_int KernelSyms.clockintr in
@@ -131,7 +131,7 @@ Definition wp_clockintr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type CLOCKINTR.
   Parameter wp_clockintr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
        (γl : gname) (γs : list gname)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ) (av : nat),
       wp_clockintr_sconf_body γl γs m n eb p C av.

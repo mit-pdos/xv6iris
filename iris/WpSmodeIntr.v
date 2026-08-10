@@ -46,14 +46,18 @@
    (they depend on it only through sp, which the pin does not move).
 
    On top: the agnostic gpr-write engines [wp_gpr_write_s_sconf]
-   (premise [rd_ok rd], which replaces the old [rd <> csp_rs1] in the
-   same slot: [sie_cap] is keyed on sp and transported by
-   [sie_cap_retarget], sp-moving instructions re-carve their stack
-   explicitly, and tp is pinned to the hart), and the pilot leaf
-   [wp_cli_s_sconf].  All three hand their continuation back through
-   [wp_next b] -- with interrupts enabled the instruction can be trapped
-   and the thread resumed on a DIFFERENT hart, and the rebound [CID]
-   binder makes every resource in the continuation about that hart.  *)
+   (premise [ops_ok b rd rsa rsb], which occupies the slot the old
+   [rd <> csp_rs1] did: its [rd_ok] conjunct says [sie_cap] is keyed on sp
+   and transported by [sie_cap_retarget] -- sp-moving instructions re-carve
+   their stack explicitly -- and that tp is pinned to the hart; its two
+   [src_ok] conjuncts guard the READS, see IntrDefs.v), and the pilot leaf
+   [wp_cli_s_sconf] (which reads x0 only, so it keeps plain [rd_ok rd] and
+   builds the engine's premise with [ops_ok_conc]).  All three hand their
+   continuation back through [wp_next b] -- with interrupts enabled the
+   instruction can be trapped and the thread resumed on a DIFFERENT hart,
+   and the rebound [CID] binder makes every resource in the continuation
+   about that hart.  That rebinding is also why the READ side of [ops_ok]
+   exists: see §3.  *)
 From Stdlib Require Import ZArith Bool Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -315,11 +319,14 @@ Section WpSmodeIntr.
       iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
       assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
         by (rewrite Hb0; vm_compute; reflexivity).
-      iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+      (* [mie] is PINNED at [MIE_S] by [sconf] -- only [mideleg] is bound,
+         and [Hmm] arrives already at the literal cause set, so the leaf
+         below is instantiated at [MIE_S] with nothing to rewrite. *)
+      iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
       iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
       iDestruct "Hpc" as "[Hpcr Hnpc]".
       iApply (wp_instr_s_config_regime strans_regime pc is_rvc i
-                ms mie_v mdv0 menvcfg0 (dq := DfracOwn 1)
+                ms MIE_S mdv0 menvcfg0 (dq := DfracOwn 1)
                 HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
                 with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpcr Hinstr").
       iIntros (σ Hpceq) "Hpriv Hms Hmie Hmdl Hmenv Htr Hsi".
@@ -332,7 +339,7 @@ Section WpSmodeIntr.
         iSplitL "Hms Hhalf Hspp".
         { iExists ms. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
         iSplitL "Hmie Hmdl".
-        { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+        { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
       { iFrame "Hstk". iFrame "Htr". iExact "Hq0". }
@@ -342,21 +349,34 @@ Section WpSmodeIntr.
   Qed.
 
   (* =================================================================== *)
-  (* §3 The generic gpr-write engines over the funnel.  [rd_ok rd] (which *)
-  (* replaces the old [rd <> csp_rs1] IN THE SAME PREMISE SLOT): [sie_cap] *)
-  (* is keyed on sp and transported across non-sp writes by               *)
-  (* [sie_cap_retarget] (sp-moving instructions re-carve their stack       *)
-  (* explicitly instead), and the register file PINS tp (HartTp.v), so a   *)
-  (* generic write may target neither.  The continuation is wrapped in     *)
-  (* [wp_next b]: at [b = true] the instruction can be trapped and the     *)
-  (* thread resumed on a DIFFERENT hart, and every resource inside the     *)
-  (* lambda is then about THAT hart (the binder is named [CID]).           *)
+  (* §3 The generic gpr-write engines over the funnel.  Premise              *)
+  (* [ops_ok b rd rsa rsb] (IntrDefs.v), which occupies the slot the old     *)
+  (* [rd <> csp_rs1] did, so no call site changes arity:                     *)
+  (*   - WRITE side, its [rd_ok rd] conjunct: [sie_cap] is keyed on sp and   *)
+  (*     transported across non-sp writes by [sie_cap_retarget] (sp-moving   *)
+  (*     instructions re-carve their stack explicitly instead), and the      *)
+  (*     register file PINS tp (HartTp.v), so a generic write may target     *)
+  (*     neither.                                                           *)
+  (*   - READ side, its two [src_ok b] conjuncts: the engine reads           *)
+  (*     [rget m rsa] / [rget m rsb], and [rget] depends on the AMBIENT HART *)
+  (*     at exactly tp.  Nothing here consumes that yet -- the σ-callback    *)
+  (*     below still sits at the caller's hart, so the two spellings         *)
+  (*     coincide.  It is landed now because the LATER move of that callback *)
+  (*     inside [wp_next] is what makes them differ, and doing the leaf      *)
+  (*     sweep separately keeps the two changes independently reviewable.    *)
+  (*     DO NOT DROP IT AS REDUNDANT; see IntrDefs.rget_src_indep for the    *)
+  (*     fact it buys.                                                      *)
+  (* The continuation is wrapped in [wp_next b]: at [b = true] the           *)
+  (* instruction can be trapped and the thread resumed on a DIFFERENT hart,  *)
+  (* and every resource inside the lambda is then about THAT hart (the       *)
+  (* binder is named [CID]) -- which is precisely why the read side needs a  *)
+  (* premise at [b = true] and needs nothing at [b = false].                 *)
   (* =================================================================== *)
   Lemma wp_gpr_write_s_sconf
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rsa rsb ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2 ->
        (if Z.eqb (uint rsa) 0 then zero_reg
@@ -375,8 +395,9 @@ Section WpSmodeIntr.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hbexec)
+    iIntros (Hrd Hops Hbexec)
       "Hcg Hpc Hinstr Hcont".
+    pose proof (ops_ok_rd _ _ _ _ Hops) as Hrdok.
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iApply (wp_instr_s_sconf m n b pc true base
@@ -430,7 +451,7 @@ Section WpSmodeIntr.
       (pc : mword 64) (rd rsa rsb : mword 5) (base : instruction) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rsa rsb ->
     (forall s_pc : mstate,
        register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4 ->
        (if Z.eqb (uint rsa) 0 then zero_reg
@@ -449,8 +470,9 @@ Section WpSmodeIntr.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hbexec)
+    iIntros (Hrd Hops Hbexec)
       "Hcg Hpc Hinstr Hcont".
+    pose proof (ops_ok_rd _ _ _ _ Hops) as Hrdok.
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iApply (wp_instr_s_sconf m n b pc false base
@@ -522,10 +544,16 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    (* c.li reads x0 and nothing else, so the engine's source guard is
+       DERIVED here rather than demanded of the caller: this leaf keeps its
+       plain [rd_ok rd] premise. *)
+    pose proof (ops_ok_conc b rd (zero_extend' 5 ('b"00"))
+                  (zero_extend' 5 ('b"00")) Hrdok
+                  ltac:(rdok_tpne) ltac:(rdok_tpne)) as Hops.
     unshelve iApply (wp_gpr_write_s_sconf pc rd
               (zero_extend' 5 ('b"00")) (zero_extend' 5 ('b"00"))
               (ITYPE (sign_extend' 12 imm, zreg, Regidx rd, ADDI)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     intros s_pc Hnpc Hva _.
     change zreg with (Regidx (zero_extend' 5 ('b"00") : mword 5)).

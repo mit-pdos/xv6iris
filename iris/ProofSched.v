@@ -177,7 +177,7 @@ Module SchedProof (Myproc : MYPROC) (Holding : HOLDING) (Swtch : SWTCH) : SCHED.
 (* and [rget_tp] reads it off with no hypothesis at all.                   *)
 (* ===================================================================== *)
 Section SchedPostSwtch.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   Lemma sched_post_swtch `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
@@ -554,7 +554,7 @@ Section SchedPostSwtch.
 End SchedPostSwtch.
 
 Section ProofSched.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sched_sconf 

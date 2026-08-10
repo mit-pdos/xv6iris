@@ -26,7 +26,7 @@
 
    ==== WHAT THE CONTRACT SAYS ==========================================
 
-   iput DESTROYS one inode reference: [IcacheRef.inode_ref (icn_ref cn) k q
+   iput DESTROYS one inode reference: [IcacheRef.inode_ref k q
    dev inum] goes in and nothing comes back but one [iref_slot], the
    ledger unit that makes iget/iput a matched pair against the fixed
    IREFSLOTS supply.  On the last close of an unlinked inode it also
@@ -117,7 +117,7 @@ Definition iput_units : nat := 3%nat.
 
 Definition wp_iput_sconf_body
     `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-      !uartGhostG Σ, !fsLogG Σ, !logG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
     (gs : list gname) (j : nat) (gl : gname)          (* the running process *)
@@ -180,7 +180,7 @@ Definition wp_iput_sconf_body
   (* the itable spinlock over the v2 resource; §13.11's trailing device *)
   is_itable2 gtl cn gfs gi cov logstart nib dev -∗
   (* the [ref] words *)
-  itable_inv (icn_ref cn) -∗
+  itable_inv -∗
   (* THIS slot's escrow -- iput knows its slot, so unlike iget it needs no
      ic_escrows family *)
   ic_escrow cn gfs gi cov logstart k -∗
@@ -189,7 +189,7 @@ Definition wp_iput_sconf_body
   (* the entry's sleeplock, over the CHECKOUT TOKEN alone *)
   is_sleeplock gil gisl (i_lock ip) "inode"%string (ic_tok cn k) -∗
   (* ---- THE REFERENCE BEING DESTROYED ---- *)
-  inode_ref (icn_ref cn) k q dev inum -∗
+  inode_ref k q dev inum -∗
   (* ---- itrunc / iupdate's own resources ---- *)
   sb_bmapstart ↦₄{dqb} (mword_of_int bmapstart : mword 32) -∗
   sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
@@ -239,7 +239,7 @@ Definition wp_iput_sconf_body
 Module Type IPUT.
   Parameter wp_iput_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)

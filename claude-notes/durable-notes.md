@@ -108,6 +108,85 @@ change that produced it.
 - **A slow `Qed` is usually proof-term SIZE, not conversion — and `rocq compile -profile <f>.json` is what tells you which.** It breaks each `Qed` into `HConstr.of_constr` / `Typeops.execute` / `close_proof` / `sort_and_universes_of_constr`; measured across this tree only ~25 % is `Typeops` (real typechecking) and the rest is term-size-linear plumbing that re-walks every *occurrence* of a shared subterm. The one-command tell is **`Set Debug "hconstr".`**, which prints each `Qed`'s `tree size` and `bindings` (the DAG): a high **tree/bindings ratio** means a small proof with an exponentially unfolded term. To localise it inside a lemma, bisect with an `Axiom cheat_ : forall (A : Type), A.` stub (unlike `Admitted` this still runs `Qed`). See `optimization.md` for the whole method and for the `unfold set_reg` 3^N trap it found.
 - **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
 
+## Typeclass sweeps: the three traps that do not look like typeclass problems
+
+Adding a class constraint to a bottom-of-the-tree predicate (e.g. giving
+`ProcInv.proc_priv` an `!irefNameG Σ`) is a mechanical sweep with three
+failure modes that produce errors naming something else entirely.
+
+- **A class that is not IMPORTED becomes a fresh VARIABLE, silently.** Rocq's
+  backtick binders do implicit generalization, so `` Context `{!irefNameG Σ} ``
+  in a file where `irefNameG` is not in scope does not fail — it *invents* a
+  section variable `irefNameG : gFunctors → Type`. Everything then elaborates
+  against a bogus binder and the error surfaces far away as
+  **`UNDEFINED EVARS` with `?Σ` unresolved on unrelated constants**
+  (`riscvGS0 of word_pointsto`, `riscvGS0 of pc_is`). The tell is the printed
+  local context containing both `irefNameG` and `irefNameG0`. Fix: `Require
+  Export` the class from the file that puts it in the predicate's type
+  (`ProcInv.v` exports `InodeRef.v` for exactly this), or `Require Import` it
+  at each site. Verify with
+  `grep -L 'Require .*\(ProcInv\|InodeRef\)' $(grep -l irefNameG *.v)`.
+- **A class that carries another class as a FIELD instance must not be
+  bound alongside it.** `Class irefNameG Σ := { irefname_icacheG :: icacheG Σ;
+  iref_name : gname }` means a context with BOTH `!icacheG Σ` and
+  `!irefNameG Σ` has two `icacheG` instances, and predicates that take
+  `{!icacheG Σ}` get different ones in different places. The propositions
+  then print IDENTICALLY and fail to unify — the symptom is
+  **`iSpecialize: cannot instantiate (P -∗ Q) with P`** where the two `P`s
+  are character-for-character the same. Fix: drop the standalone `!icacheG Σ`
+  and let the bundling class supply it. (Six files needed this: the kfork
+  chain and fileread.)
+- **MOVING a class's `Class` declaration to a lower file breaks every
+  `Require Export` chain built on the OLD location, silently.** When
+  `irefNameG` moved from `InodeRef.v` into `IcacheInv.v` (so `itable_inv`/
+  `itable_half`/`iref_tok` could be stated over it directly, retiring their
+  explicit `γ` parameter), `InodeRef.v` still only `Require Import
+  IcacheInv`d it — so a file like `ProcInv.v` that does `Require Export
+  InodeRef` no longer re-exports `irefNameG` at all, and every one of ITS
+  `Require Export ProcInv` downstream files hits trap one (`irefNameG` /
+  `irefNameG0` both in context) despite `ProcInv.v` itself compiling fine in
+  isolation. **The fix is always to promote the broken link's `Require
+  Import` to `Require Export`**, not to patch every downstream site — the
+  chain is supposed to carry the class, and the mid-chain file is where it
+  broke. Check every `Require Import <file-you-moved-the-class-out-of>` in
+  files the class's own definitions/notations appear in.
+
+A further shape shows up once the class reaches BOOT: **a class that carries
+a ghost NAME cannot be a functor constraint the adequacy theorem assumes.**
+`irefNameG` holds `iref_name : gname`, so `xv6Σ` cannot supply it and the
+top-level corollary has nothing to instantiate it with. It has to be minted
+inside the boot fupd and handed out EXISTENTIALLY, exactly as
+`FdSlots.fd_slots_alloc` does for `fdslotG` — see `InodeRef.iref_name_alloc`
+and `BootShared.boot_shared_alloc`'s `∃ (_ : irefNameG Σ)`. What the
+adequacy theorem may assume is the FUNCTOR half (`icacheG`, an `inG`).
+Corollary: do not bundle an allocated-at-boot class (`irefslotG`) into a
+name-carrying one — the boot lemma then cannot build it piecemeal. That was
+tried and reverted here.
+
+Two smaller traps in the same area: a lemma whose statement pins its PROP
+only through the body (`⊢ |==> ∃ _ : C Σ, True`) leaves `BUpd ?PROP`
+unresolved — annotate (`(True : iProp Σ)`). And a section variable that a
+`Lemma`'s *statement* does not mention but its proof needs is fine for an
+ordinary hypothesis, yet an unresolved *instance* evar for it surfaces only
+as **"Attempt to save an incomplete proof"** at `Qed`; `Show Existentials.`
+before the `Qed` names it in one line.
+
+All of the first three are invisible to a per-file `coqc` of the file you
+edited; they appear only where the predicate is USED, and can appear only
+once every `.vo` in the tree is actually fresh (a stale sibling `.vo` — see
+the "Stale `.vo` trap" bullet above — reproduces trap one's exact symptom
+and wastes time chasing a phantom fix). Do the sweep by fixing exactly the
+files the build names, in both the `_body` Definition and the `Module Type`
+Parameter — a `Parameter` binder list that disagrees with the `Definition` it
+seals fails at `Module` instantiation with *"Signature components for field
+… do not match"*, which reads as a spec/proof mismatch and is not one. Once
+every file compiles standalone, validate with a full `make proofs` (or
+`make -f CoqMakefile -j16 -k` from `iris/`) rather than trusting a chain of
+individual `coqc` runs — those load whatever `.vo` already sits on disk for
+every dependency, so two files edited in the same sweep but checked out of
+dependency order can each "pass" against a stale sibling and still fail
+together under `make`.
+
 ## Changing the kernel SOURCE: what an image shift breaks, and how to find it
 
 Done once, 2026-08-06, for a 6-byte fix inside `writei` (`kernel-defects.md`
@@ -230,6 +309,46 @@ explicit `wp_*_s_sconf` argument and once inside a companion
 `add_vec … sign_extend'` assert or `set`. Update both, or the file fails
 again at the same offset.
 
+## A WEAKENING IS CHEAP TO PROVE AND EXPENSIVE TO USE — plan the sweep accordingly
+
+Strengthening a lemma's HYPOTHESIS weakens the lemma, so it stays provable from
+the existing proof by instantiating the stronger hypothesis at whatever the old
+one supplied.  That is genuinely free.  **What is not free is every CONSUMER**,
+which must now establish the stronger form — and that obligation propagates up
+the whole tier, not one level.  Both halves showed up in the same change:
+wrapping `WpIntrInv.wp_exec_step_intr`'s σ-callback in `WpNext.wp_next` costs the
+engine's own proof one `iApply … $! cpu_id` with the guard closed by
+`reflexivity`, and costs its consumers `wp_instr_s_intr` → `wp_instr_s_sconf` →
+~60 leaf proofs, because each in turn has to invoke ITS caller's callback at the
+rebound hart.  **There is no independent half of such a change**: if you are
+tempted to land "just the bottom lemma", check whether its immediate consumer can
+still call its own continuation.  (`completed/explicit-cpuid.md` made exactly this
+trade one tier lower, and its Stage-1/Stage-2 split is the same observation.)
+
+Two mitigations worth reaching for before budgeting the full sweep:
+
+- **A consumer that can DISCHARGE the stronger form pays nothing.**  For
+  `wp_next`, `wp_next_off_intro` (interrupts off) and `wp_next_idle` (no current
+  proc) collapse the obligation outright, so the interrupts-off-only leaves — the
+  ones threading per-hart registers, which would have been the hard cases — are
+  free.  Look for the collapse lemma first and count what it covers.
+- **Widen an EXISTING premise slot instead of adding one.**  A new premise changes
+  arity and therefore every call site; widening what an existing slot MEANS costs
+  nothing wherever the slot is discharged by an opaque `ltac:(…)`.  Measured on
+  this tree: `IntrDefs.rd_ok` → `ops_ok` over the read operands touched 33 leaves
+  and 4 engines and **zero of 1192 call sites**, because all 1192 fill that slot
+  with the positional `ltac:(rdok)`.  This is the second time the trick has paid
+  (`rd_ok` itself replaced an older `rd <> csp_rs1` the same way), so it is worth
+  designing FOR: keep such side conditions in one named, Ltac-discharged
+  predicate rather than as loose conjuncts.
+
+Corollary on picking the premise: **guard a side condition on the index that makes
+it necessary.**  `src_ok b rs := b = true -> Regidx rs <> Regidx Rtp` is provable
+at every site, whereas the unguarded `rs <> Rtp` is UNPROVABLE at the three places
+that legitimately read `tp` (all of which run interrupts-off, where the condition
+is not needed).  An unguarded side condition that is false somewhere real forces a
+duplicate leaf family; a guarded one is discharged by `discriminate`.
+
 ## Write the checker for a refactor's SILENT failure mode, before the sweep
 
 If a change has a way of going wrong that still compiles, that way WILL be
@@ -340,6 +459,15 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   a `--check` error that fails CI, not a silent adjustment. So **adding a file
   to `iris/` means adding it to `_CoqProject`**; without the check, forgetting
   is invisible in both directions at once (never built, still counted).
+- **AND SPELL THE `Link` INSTANTIATION UNQUALIFIED.** The script matches a
+  functor application with `^\s*Module\s+(\w+)\s*:=\s*(\w+)((?:\s+\w+)*)\s*\.`,
+  and `(\w+)` does not match a DOTTED name — so
+  `Module Kfork := ProofKforkMain.Kfork Myproc ….` makes a proven, linked,
+  axiom-clean function read **`assumed`**, with no error anywhere. Follow the
+  tree's convention: name the functor `<F>Proof` in the proof file, `Require
+  Import` it, and write `Module <F> := <F>Proof …` with a bare name. (Cost
+  one debugging round on kfork; the same trap is one character away from
+  every new `Link` file.)
 - **Spell the entry pc so the report can SEE the symbol.** The script matches
   `KernelSyms.<f>` textually, either as `pc_is (mword_of_int KernelSyms.<f>)` or
   — the form to prefer — a `let pcE : mword 64 := mword_of_int KernelSyms.<f> in`

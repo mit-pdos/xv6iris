@@ -50,7 +50,11 @@ Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import FdSlots FileInv.
-Require Import IcacheRef.   (* [inode_held]: what [p->cwd] owns *)
+(* [IcacheRef.inode_held]: what [p->cwd] owns, and [IrefSlots.iref_slots]:
+   the supply a dormant block parks.  Exported, because a consumer of
+   [proc_priv] that has to name the reference should not have to know which
+   of the two files it came from. *)
+Require Export InodeRef.
 Require Import KallocInv PageFields ByteBuf.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
@@ -161,7 +165,14 @@ Section ProcInv.
   Definition ofile_cells (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
     ([∗ list] fd ↦ v ∈ fs, p_ofile pa fd ↦₈ v)%I.
 
-  Context `{!lockG Σ, !fileG Σ, !fdslotG Σ}.
+  (* [irefNameG] carries the itable's reference authority CANONICALLY --
+     there is exactly one itable per system, and threading its gname would
+     put a filesystem ghost NAME on [proc_priv], hence on the thirty-three
+     spec files that mention it, purely so a process can name its cwd.
+     [FdSlots] and [IrefSlots] already do this and [IrefSlots.v]'s header
+     spells out the argument.  What propagates is the CLASS -- capacity, no
+     resource, no change to any statement's shape. *)
+  Context `{!lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   (* A LIVE fd slot: the cell, and -- when non-null -- an actual reference on
      the [struct file] it points at.  [file_ref] is deliberately neither
@@ -612,6 +623,147 @@ Section ProcInv.
   Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
     (proc_priv_core pa pid V ∗ proc_ofiles γf pa (pv_ofile V))%I.
 
+  (* ---- THE CONSTRUCTION WINDOW -------------------------------------
+     [cwd_ref] has no null arm, so a process whose [p->cwd] is still 0 does
+     not satisfy [proc_priv] -- and allocproc returns exactly such a
+     process, which kfork then holds for 150 bytes before its
+     [sd a0,336(s4)].  So the reference SPLITS OFF, the same move S4c made
+     for the fd table: a block with a deficit is not [proc_priv ∗ anything],
+     so split at the component the callee does not touch.
+
+     Note this splits only the REFERENCE, not the [p_cwd] CELL: the cell
+     stays inside [proc_fields], so [proc_dormant], [SpecFreeproc] and every
+     other consumer of [proc_fields] is untouched.  A holder of the deficit
+     block still owns the cell and writes it with
+     [proc_priv_nocwd_cwd]. *)
+  Definition proc_priv_nocwd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) : iProp Σ :=
+    (⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
+     ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+     p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+     proc_fields pa (DfracOwn 1) V ∗
+     proc_pt_at pa (pv_upt V) ∗
+     tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+     proc_ofiles γf pa (pv_ofile V))%I.
+
+  Lemma proc_priv_split_cwd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V ⊣⊢ proc_priv_nocwd γf pa pid V ∗ cwd_ref (pv_cwd V).
+  Proof.
+    rewrite /proc_priv /proc_priv_core /proc_priv_nocwd.
+    iSplit.
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+      iFrame "Hc". iSplitR; [done|]. iSplitR; [done|]. iFrame.
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hc]".
+      iSplitR "Ho"; [|iExact "Ho"].
+      iSplitR; [done|]. iSplitR; [done|]. iFrame.
+  Qed.
+
+  (* the deficit block's [p->cwd] CELL, borrowed and replaced -- what the
+     [sd] that installs a working directory needs.  [proc_priv_cwd] cannot
+     serve: it hands out the reference too, and during the window there is
+     none. *)
+  Lemma proc_priv_nocwd_cwd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗
+    p_cwd pa ↦₈ pv_cwd V ∗
+    (∀ v' : mword 64,
+       p_cwd pa ↦₈ v' -∗ proc_priv_nocwd γf pa pid (upd_cwd V v')).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iFrame "Hcwd". iIntros (v') "Hcwd".
+    rewrite /proc_priv_nocwd /proc_fields.
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iFrame.
+  Qed.
+
+  (* the cwd cell AND the pid quarter out of the deficit block, because
+     kexit needs both at once and for [proc_priv_cwd_pid]'s reason: begin_op
+     / iput / end_op each take [p_pid pa ↦₄{dq} _], while the cwd cell has
+     to stay out across all three -- from the [ld a0,336(s3)] that reads the
+     pointer iput destroys to the [sd x0,336(s3)] that clears it.  kexit
+     splits the REFERENCE off first ([proc_priv_split_cwd]) and spends it,
+     so what it holds across the call is the deficit block; this is the
+     accessor at that altitude. *)
+  Lemma proc_priv_nocwd_cwd_pid (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗
+    p_cwd pa ↦₈ pv_cwd V ∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
+    (∀ v' : mword 64,
+       p_cwd pa ↦₈ v' -∗ p_pid pa ↦₄{DfracOwn (1/4)} pid -∗
+       proc_priv_nocwd γf pa pid (upd_cwd V v')).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
+    rewrite Hq word4_pointsto_frac_split.
+    iDestruct "Hpid" as "[Hq1 Hq2]".
+    iFrame "Hcwd Hq1". iIntros (v') "Hcwd Hq1".
+    rewrite /proc_priv_nocwd /proc_fields.
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [done|]. iSplitR; [done|].
+    rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iFrame.
+  Qed.
+
+  (* and the deficit block's own projections, for a holder that has not yet
+     installed a cwd.  (The [pv_cwd V <> 0] projection is NOT among them --
+     during the window it is false.) *)
+  Lemma proc_priv_nocwd_ofile_len (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗ ⌜length (pv_ofile V) = NOFILE⌝.
+  Proof. iIntros "(_ & _ & _ & _ & _ & _ & [%Hlen _])". done. Qed.
+
+  Lemma proc_priv_nocwd_sz_maxsz (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗ ⌜uint (pv_sz V) <= uvm_maxsz⌝.
+  Proof. iIntros "(%Hszb & _)". done. Qed.
+
+  Lemma proc_priv_nocwd_um_below (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗ ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝.
+  Proof. iIntros "(_ & %Hbel & _)". done. Qed.
+
+  Lemma proc_priv_nocwd_pid (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
+    (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_nocwd γf pa pid V).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
+    rewrite Hq word4_pointsto_frac_split.
+    iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
+    iIntros "Hq1". rewrite /proc_priv_nocwd Hq word4_pointsto_frac_split.
+    iSplitR; [done|]. iSplitR; [done|]. iFrame.
+  Qed.
+
+  Lemma proc_priv_nocwd_ofile (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (fd : nat) (v : mword 64) :
+    pv_ofile V !! fd = Some v ->
+    proc_priv_nocwd γf pa pid V -∗
+    ofile_slot γf pa fd v ∗
+    (∀ v', ofile_slot γf pa fd v' -∗
+       proc_priv_nocwd γf pa pid (upd_ofile V fd v')).
+  Proof.
+    iIntros (Hfd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & [%Hlen Ho])".
+    iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
+    iIntros (v') "Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
+    rewrite /proc_priv_nocwd /proc_ofiles.
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [iPureIntro; exact Hszb|].
+    iSplitR; [iPureIntro; exact Hbel|].
+    iFrame "Hpid Hf Hpt Htfp Ho". iPureIntro.
+    rewrite length_insert. exact Hlen.
+  Qed.
+
   (* the split, as an equivalence -- everything below and every landed spec
      keeps using [proc_priv] and never sees the core *)
   Lemma proc_priv_split (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
@@ -636,32 +788,46 @@ Section ProcInv.
      invariant keeps it); everything else is a straight repackaging.
        The coherence conjunct is the caller's, and it costs allocproc
      nothing: the table it just built has an EMPTY user map, and
-     [ProcPtOwn.um_below_empty] holds at any size. *)
-  Lemma proc_priv_intro (γf : gname) (pa : mword 64) (pid : mword 32)
+     [ProcPtOwn.um_below_empty] holds at any size.
+       It produces the DEFICIT block: allocproc's [p->cwd] is still 0 at this
+     point, and [cwd_ref] has no null arm, so there is no [proc_priv] to be
+     had here and there should not be.  The caller that installs a working
+     directory closes the window with [proc_priv_split_cwd]. *)
+  Lemma proc_priv_nocwd_intro (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) (P : uptd) (ws : list (mword 64)) :
     (uint (pv_sz V) <= uvm_maxsz)%Z ->
     um_below (pv_sz V) (ud_um P) ->
-    (* NO WORKING DIRECTORY YET.  allocproc's block comes out of
-       [proc_dormant UNUSED], which pins [pv_cwd V = 0] ([proc_dormant_unused]
-       hands the fact over), and xv6 agrees: allocproc does not touch
-       p->cwd -- userinit and fork are what install one.  Before C6b
-       [cwd_ref] was [emp] and this premise was not needed; it is not a
-       restriction, it is the fact that was being silently assumed. *)
-    pv_cwd V = (zero_reg : mword 64) ->
     p_pid pa ↦₄{DfracOwn (1/2)} pid -∗
     proc_fields pa (DfracOwn 1) V -∗
     proc_pt_at pa P -∗
     tf_page (ud_tfp P) ws -∗
     proc_ofiles γf pa (pv_ofile V) -∗
+    proc_priv_nocwd γf pa pid (upd_pt V P ws).
+  Proof.
+    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho".
+    rewrite /proc_priv_nocwd.
+    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [iPureIntro; exact Hsz|].
+    iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpid Hf Hpt Htf Ho".
+  Qed.
+
+  Lemma proc_priv_intro (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (P : uptd) (ws : list (mword 64)) :
+    (uint (pv_sz V) <= uvm_maxsz)%Z ->
+    um_below (pv_sz V) (ud_um P) ->
+    p_pid pa ↦₄{DfracOwn (1/2)} pid -∗
+    proc_fields pa (DfracOwn 1) V -∗
+    proc_pt_at pa P -∗
+    tf_page (ud_tfp P) ws -∗
+    proc_ofiles γf pa (pv_ofile V) -∗
+    cwd_ref (pv_cwd V) -∗
     proc_priv γf pa pid (upd_pt V P ws).
   Proof.
-    iIntros (Hsz Hbel Hcwd) "Hpid Hf Hpt Htf Ho".
-    rewrite /proc_priv /proc_priv_core.
-    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
-    iSplitR "Ho"; [|iFrame "Ho"].
-    iSplitR; [iPureIntro; exact Hsz|].
-    iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpid Hf Hpt Htf".
-    rewrite Hcwd. iApply cwd_ref_null.
+    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho Hc".
+    iDestruct (proc_priv_nocwd_intro γf pa pid V P ws Hsz Hbel
+                 with "Hpid Hf Hpt Htf Ho") as "H".
+    iApply proc_priv_split_cwd. iFrame "H".
+    by cbn [upd_pt pv_cwd].
   Qed.
 
   (* ---- projections: what callers actually use ---- *)
@@ -764,7 +930,7 @@ Section ProcInv.
      while the cwd cell has to stay out across all three -- from the
      [ld a0,336(s3)] that reads the pointer iput destroys to the
      [sd x0,336(s3)] that clears it, which is the first moment [cwd_ref] can
-     be re-supplied ([cwd_ref_null]).  Each of [proc_priv_cwd] and
+     be re-supplied).  Each of [proc_priv_cwd] and
      [proc_priv_pid] consumes the whole block, so they do not nest; this is
      their conjunction, proved once.  sys_chdir wants the same pair. *)
   Lemma proc_priv_cwd_pid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
@@ -1119,6 +1285,16 @@ Section ProcInv.
           dormant blocks hold between them, so boot routes the WHOLE supply
           and nothing is left over. *)
        fd_slots FDSPARE ∗
+       (* ... and the SAME accounting for inode references, one supply over.
+          The [1] is the CWD'S OWN UNIT: a dormant block is at [pv_cwd = 0]
+          in both its states, so it holds no reference and therefore holds
+          the free unit itself.  [IREFSPARE] is the allowance for references
+          a syscall keeps in LOCALS before they reach a home.  That
+          disjunction -- either a live cwd reference with a unit parked
+          against it in the itable, or a null cwd and the unit here -- is
+          what makes [IrefSlots.IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE]
+          literally true rather than merely plausible. *)
+       iref_slots (1 + IREFSPARE) ∗
        own_ctx (p_context pa) ∗
        (* The address-space cells, keyed on WHICH dormant state -- tied to
           [st], not a free disjunction.  A ZOMBIE still owns a live user
@@ -1170,6 +1346,7 @@ Section ProcInv.
        ofile_cells pa (pv_ofile V) ∗
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        fd_slots FDSPARE ∗
+       iref_slots (1 + IREFSPARE) ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
              proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
@@ -1180,11 +1357,11 @@ Section ProcInv.
     proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
   Proof.
     iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Haddr".
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Haddr".
       iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hctx Haddr".
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hctx Haddr".
       iPureIntro; exact Hfacts.
   Qed.
 
@@ -1208,11 +1385,12 @@ Section ProcInv.
        p_trapframe pa ↦₈ (zero_reg : mword 64))%I.
 
   Lemma proc_dormant_seal (pa : mword 64) :
-    proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗ proc_dormant pa UNUSED.
+    proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗
+    iref_slots (1 + IREFSPARE) -∗ proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs Hir".
     iDestruct (fd_slots_split with "Hs") as "[Hs Hsp]".
-    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hctx". iSplit; [done|].
+    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hir Hctx". iSplit; [done|].
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iSplitL "Hs".
     { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
@@ -1233,6 +1411,12 @@ Section ProcInv.
     p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
     p_trapframe pa ↦₈ (zero_reg : mword 64) ∗
     fd_slots FDSPARE ∗
+    (* the CWD'S UNIT and the iref allowance come out together and stay
+       OUTSIDE the private block, for [FDSPARE]'s reason: every [proc_priv]
+       accessor is borrow-and-return and its wand swallows the block, so a
+       syscall holding its allowance inside could not then pass the block to
+       a callee.  The [1] is what kfork spends on [idup]. *)
+    iref_slots (1 + IREFSPARE) ∗
     ∃ (V : pprivate) (pid : mword 32),
       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
        pv_cwd V = (zero_reg : mword 64) /\
@@ -1240,9 +1424,9 @@ Section ProcInv.
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
       proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
-    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp".
+    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp Hir".
     iExists V, pid. iSplit; [done|]. iFrame "Hpid Hf".
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].
     iAssert ([∗ list] fd ↦ v ∈ replicate NOFILE (zero_reg : mword 64),
@@ -1282,16 +1466,23 @@ Section ProcInv.
      trapframe page wait()/freeproc will reclaim -- except the allowance,
      which travels BESIDE [proc_priv] (FdSlots.v's [FDSPARE] note), and the
      context, which is the swtch's.  So this is a repackaging, not a
-     construction, and nothing about the process has to be re-established. *)
+     construction, and nothing about the process has to be re-established.
+
+     IT TAKES THE DEFICIT BLOCK, and that is forced rather than convenient:
+     a ZOMBIE's [p->cwd] is 0, so it holds no [cwd_ref] and a [proc_priv] at
+     this [V] does not exist.  kexit arrives in exactly that state -- it has
+     already spent its reference on [iput] -- so the premise is the one it
+     can actually pay. *)
   Lemma proc_priv_to_dormant_zombie (γf : gname) (pa : mword 64)
       (pid : mword 32) (V : pprivate) :
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd V = (zero_reg : mword 64) ->
-    proc_priv γf pa pid V -∗ fd_slots FDSPARE -∗ proc_dormant_noctx pa ZOMBIE.
+    proc_priv_nocwd γf pa pid V -∗ fd_slots FDSPARE -∗
+    iref_slots (1 + IREFSPARE) -∗ proc_dormant_noctx pa ZOMBIE.
   Proof.
-    iIntros (Hof Hcwd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & _) Ho] Hsp".
+    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp Hir".
     iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho") as "[Ho Hs]".
-    iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp".
+    iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp Hir".
     rewrite bool_decide_eq_true_2; [| reflexivity].
     iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpt Htfp".
   Qed.

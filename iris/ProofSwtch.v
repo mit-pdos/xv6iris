@@ -40,7 +40,7 @@ From iris.base_logic.lib Require Import invariants ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto.
+Require Import RiscvLang RiscvPtsto RiscvFetchExec.   (* MIE_S: the pinned cause set *)
 Require Import RegFile.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
@@ -106,7 +106,10 @@ Section ProofSwtch.
     iDestruct "Hmsx" as (ms) "(Hms & Hhalf & Hspp & %Hmsf)".
     pose proof Hmsf as Hmsf'.
     destruct Hmsf' as (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
-    iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    (* [mie] is PINNED at [MIE_S] by [sconf] (only [mideleg] is existential),
+       so the block/ret leaves below are instantiated at that literal and
+       [Hmm] is already the no-M-destined-pending fact at [MIE_S]. *)
+    iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvx" as (menvcfg0)
       "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     (* ---- [Hcg]'s [sie_cap_gpr] is pinned at the literal [b = false] (both
@@ -175,7 +178,7 @@ Section ProofSwtch.
     iApply (wp_vc_block_s_den_r strans_regime swtch_prog
               (VSt KernelSyms.swtch vregs_init swtch_heap0 [])
               (VSt (KernelSyms.swtch + 0x68) swtch_regs1 swtch_heap1 [])
-              rho ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
+              rho ms MIE_S mdv0 menvcfg0 (dq:=DfracOwn 1)
               HSIE HMPRV HSXL Hmm HMXR Hpmm HPBMTE Hmenvval0 swtch_run
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
                     Hpc Hfile Hcode [Holdcells Hnewcells] []").
@@ -250,7 +253,7 @@ Section ProofSwtch.
     iApply (wp_cret_s_zca_r_later strans_regime
               (mword_of_int (KernelSyms.swtch + 0x68) : mword 64)
               (mword_of_int 1 : mword 5) (vregs_den rho swtch_regs1)
-              ms mie_v mdv0 menvcfg0 (dq:=DfracOwn 1)
+              ms MIE_S mdv0 menvcfg0 (dq:=DfracOwn 1)
               HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
               ltac:(intro Hc0; vm_compute in Hc0; discriminate) Hlpe
               with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr
@@ -265,7 +268,7 @@ Section ProofSwtch.
       iSplitL "Hms Hhalf Hspp".
       { iExists ms. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iSplitL "Hmie Hmdl".
-      { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+      { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
     (* ---- the target record's resume wand is [∀ h g m eb'] and demands
        cpu_own at the record's INDEX p (= our own p); supply our bundle at

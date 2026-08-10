@@ -61,6 +61,7 @@ Require Import CodeDevintr.
 Require Import SpecPlicClaim SpecPlicComplete SpecUartintr SpecVirtioDiskIntr SpecClockintr.
 Require Import SpecDevintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import InodeRef.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -71,7 +72,7 @@ Module DevintrProof (PlicClaim : PLIC_CLAIM) (PlicComplete : PLIC_COMPLETE)
                     (Clockintr : CLOCKINTR) : DEVINTR.
 
 Section ProofDevintr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -494,7 +495,7 @@ Section ProofDevintr.
     (* ===================== +0x08: csrr a4,scause ===================== *)
     iPoseProof (dii_08 with "Htext") as "Hi08".
     iApply (wp_csrr_scause_s_sconf (mword_of_int (KernelSyms.devintr + 0x08)) a4_idx
-              A1 (av - 4)%nat false dq sc
+              A1 (av - 4)%nat dq sc
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hsc Hpc Hi08 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hsc Hpc".

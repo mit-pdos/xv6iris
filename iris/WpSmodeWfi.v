@@ -535,7 +535,9 @@ Section WpSmodeWfi.
     iDestruct (ghost_var_agree with "Hhalf Hcnt") as %Hb0.
     assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
       by (rewrite Hb0; vm_compute; reflexivity).
-    iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    (* [mie] is PINNED at [MIE_S] by [sconf], so only [mideleg] is bound
+       here and [Hmm] is already the fact at the literal cause set. *)
+    iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
     iDestruct "Hmenvx" as (menvcfg0)
       "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
     iPoseProof "Hhw" as "#Hhwc".
@@ -563,7 +565,7 @@ Section WpSmodeWfi.
     { rewrite /mstate_interp. rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     set (σa := set_reg σ (R_bool minstret_increment) mib).
     (* the ENTER step goes through run_hart_active: dispatch must be None *)
-    iDestruct (dispatchInterrupt_none_S_from_regs σa misa0 ms mie_v mdv0
+    iDestruct (dispatchInterrupt_none_S_from_regs σa misa0 ms MIE_S mdv0
                  HmisaS Hmm HSIE with "Hsi Hmisa Hms Hmie Hmdl") as %Hdisp.
     iDestruct "Hsi" as "[Hreg Hmem]".
     iDestruct (reg_valid    with "Hreg Hpcr")  as %Lpc.
@@ -640,7 +642,7 @@ Section WpSmodeWfi.
         iSplitL "Hms Hhalf Hspp".
         { iExists ms. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
         iSplitL "Hmie Hmdl".
-        { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+        { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
       iSplitL "Hstk Htr Harm". { iFrame "Hstk Htr Harm". }

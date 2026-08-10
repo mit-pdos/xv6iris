@@ -394,12 +394,17 @@ Lemma st_boot_ms_kernel_facts (ms : mword 64) :
   mstatus_kernel_facts ms -> mstatus_kernel_facts (cms5 (st_ms1 ms)).
 Proof. intros H. exact (cms5_kernel_facts _ (st_ms1_kernel_facts _ H)). Qed.
 
-(* The other three CSR facts the boot contract exports, off a RESET entry
+(* The other four CSR facts the boot contract exports, off a RESET entry
    machine in the three registers they are computed from.  (satp needs no
    premise: writing 0 selects Bare whatever the old value was, since
    [satp_legalized]'s Bare arm returns the WRITTEN value.)  A client could not
    discharge these itself -- the entry mstatus is hidden inside
-   [mmode_config] -- which is why they are exported rather than assumed. *)
+   [mmode_config] -- which is why they are exported rather than assumed.
+   The last conjunct pins [mie] to the exact constant [MIE_S], not merely to a
+   relation with mideleg, because the S-mode config bundle ([IntrDefs.sconf])
+   pins it in turn: the set of interrupt causes that can ever be DELIVERED is
+   masked by [mie], so only at a known [mie] is that set computable at all --
+   see claude-notes/projects/kerneltrap.md. *)
 Lemma st_boot_csr_facts (menvcfg0 mie0 mideleg0 satp0 : mword 64) :
   menvcfg0 = (mword_of_int 0 : mword 64) ->
   mie0 = (mword_of_int 0 : mword 64) ->
@@ -408,7 +413,8 @@ Lemma st_boot_csr_facts (menvcfg0 mie0 mideleg0 satp0 : mword 64) :
     (ti_menv1 (st_menv_adue menvcfg0)) = MENVCFG_S /\
   and_vec (st_mie1 mie0 mideleg0) (not_vec (st_mdl1 mideleg0)) = zeros' 64 /\
   _get_Satp64_Mode (Mk_Satp64 (satp_legalized satp0 (mword_of_int 0)))
-    = ('b"0000" : mword 4).
+    = ('b"0000" : mword 4) /\
+  st_mie1 mie0 mideleg0 = MIE_S.
 Proof.
   intros -> -> ->.
   split_and!;

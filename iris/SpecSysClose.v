@@ -81,7 +81,7 @@ Local Open Scope Z_scope.
 Definition sys_close_stack : nat := 72%nat.
 
 Section SpecSysClose.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   (* sys_close's result, keyed by the returned a0.  In the success case the
      descriptor named by the argument is null and one file reference is

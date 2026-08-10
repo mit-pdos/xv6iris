@@ -142,7 +142,7 @@ Qed.
 Module ArgfdProof (Argint : ARGINT) (Myproc : MYPROC) : ARGFD.
 
 Section ProofArgfd.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* =================================================================== *)

@@ -147,7 +147,7 @@ Module MainProof
   : MAIN.
 
 Section ProofMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -693,6 +693,7 @@ Section ProofMain.
     ([∗ list] i ∈ seq 0 NPROC,
        (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗ proc_pub (proc_addr i)) -∗
     fd_slots (NPROC * (NOFILE + FDSPARE)) -∗
+    iref_slots (NPROC * (1 + IREFSPARE)) -∗
     ([∗ list] i ∈ seq 0 NPROC, hart_full i (0%fin : CPU)) -∗
     ([∗ list] i ∈ seq 0 NPROC, pstate_full i UNUSED) -∗
     ( ∀ (γa : gname) (γs : list gname) (m' : regfile)
@@ -716,7 +717,7 @@ Section ProofMain.
     intros Hn Hphystop Hs1 Hprun Hlen.
     subst phystop s1entry.
     iIntros "Hcg #Htext #Hkdata #Hpanic Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt".
-    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hparks Hpst Hcont".
+    iIntros "Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs Hparks Hpst Hcont".
     iPoseProof (mni_6e with "Htext") as "Hi6e".
     iPoseProof (mni_72 with "Htext") as "Hi72".
     iPoseProof (mni_76 with "Htext") as "Hi76".
@@ -823,7 +824,7 @@ Section ProofMain.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpr) in "Hpc".
     iApply (Procinit.wp_procinit_sconf V4 n false p0 ltac:(lia)
-              with "Hcg Htext Hkdata Hpc Hlpid Hlwait Hprocs Hfds").
+              with "Hcg Htext Hkdata Hpc Hlpid Hlwait Hprocs Hfds Hirs").
     iApply wp_next_off_intro.
     iIntros (mpr) "Hcg Hpc %Hcspr _ _ Hready".
     assert (Hretpr : ret_pc (V4 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
@@ -1416,7 +1417,7 @@ Section ProofMain.
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
     iDestruct "Hglobals" as "(Hdevsw & Hflags & Hkmem24 & Hkpt & Hprocs & Hppub &
-                             Hfds & Hinitproc & Hbufl & Hbufn & Hbhead & Hinl &
+                             Hfds & Hirs & Hinitproc & Hbufl & Hbufn & Hbhead & Hinl &
                              Hdiskptr & Hdiskfree & Hdusedidx & Hdslots)".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iDestruct "Hdiskfree" as (free0) "Hdiskfree".
@@ -1439,7 +1440,7 @@ Section ProofMain.
     iApply (mn_grp_kvm m2 (K - 2)%nat p0 ps s1entry phystop tlbvec0
               Hn50 Hphystop Hs1 Hprun Hlen
               with "Hcg Htext Hkdata Hpany Hpc Hcpu Hlkmem Hkmem24 Hpages Hkpt
-                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds
+                    Hsbit Htlb Hunset Hkauth Hlpid Hlwait Hprocs Hppub Hfds Hirs
                     Hparks Hpst").
     iIntros (γa γs m3 root pas)
       "Hcg Hpc Hcpu Hkenv #Hpinv Hstvec #Hkinv #Hkptp #Htramp #Hkstx".

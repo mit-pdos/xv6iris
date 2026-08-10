@@ -410,7 +410,7 @@ Local Ltac nz  := vm_compute; discriminate.
 
 Section IputCommon.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -449,8 +449,8 @@ Section IputCommon.
      [iref_close_store_au]'s side condition is dischargeable.  [iref_lookup]
      keeps only the [q = qt <-> n = 1] equivalence; this is the same
      [singleton_included_l] argument, keeping the strict branch's witness. *)
-  Lemma ip_ref_sub (γ : gname) (M : gmap nat (Qp * positive)) (k : nat) (q : Qp) :
-    itable_half γ M -∗ iref_tok γ k q -∗
+  Lemma ip_ref_sub (M : gmap nat (Qp * positive)) (k : nat) (q : Qp) :
+    itable_half M -∗ iref_tok k q -∗
     ⌜∃ (qt : Qp) (nn : positive), M !! k = Some (qt, nn) /\
        (nn = 1%positive \/ ∃ qr : Qp, (qt - q)%Qp = Some qr)⌝.
   Proof.
@@ -490,7 +490,7 @@ End IputCommon.
 
 Section IputTail.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
   Notation Rs0  := (mword_of_int 8 : mword 5).
@@ -790,18 +790,18 @@ Section IputTail.
     kernel_text -∗
     is_lock gtl itable_lock "itable"%string
       (itable_res2 cn gfs gi cov logstart nib dev) -∗
-    itable_inv (icn_ref cn) -∗
+    itable_inv -∗
     ic_escrow cn gfs gi cov logstart k -∗
     pc_is (mword_of_int (KernelSyms.iput + 0x20) : mword 64) -∗
     sie_cap_gpr M (K - 4)%nat false pj -∗
     cpu_own 1 true pj C false -∗
     arm_pay 0 true pj -∗
     locked gtl cpu_id -∗
-    itable_half (icn_ref cn) Mt -∗
+    itable_half Mt -∗
     iref_slots_auth -∗
     ([∗ list] i0 ∈ seq 0 NINODE, islot2 cn Mt ci i0) -∗
     ipool gfs gi cov logstart (region_inums nib ∖ ci_inums ci) -∗
-    IcacheRef.inode_ref (icn_ref cn) k q dev inum -∗
+    IcacheRef.inode_ref k q dev inum -∗
     pa_stk sp0 1 ↦₈ (m !!! Regidx Rra) -∗
     pa_stk sp0 2 ↦₈ (m !!! Regidx Rs0) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx Rs1) -∗
@@ -868,12 +868,12 @@ Section IputTail.
     { rewrite (rget_ne M Rs1 ltac:(nz)) HMs1. reflexivity. }
     iApply (wp_lw_au_iput true (mword_of_int (KernelSyms.iput + 0x20)) Ra5 Rs1
               (mword_of_int 8 : mword 12) M (K - 4)%nat
-              (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half (icn_ref cn) Mt)%I)
+              (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half Mt)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc Hi20 [Hhalf] [-]").
     { rewrite Hpa.
-      iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) (icn_ref cn) Mt k
+      iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) Mt k
               ltac:(solve_ndisj) Hk with "Hinv Hhalf") as "[Hcell Hback2]".
       iModIntro. iExists (iref_word Mt k). iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback2" with "Hcell") as "Hhalf". iModIntro. by iFrame. }
@@ -946,12 +946,12 @@ Section IputTail.
       { apply ci_inums_spec. exists k, (dev, inum). split; [exact Hcik | reflexivity]. }
       iApply (wp_sw_au_iput true (mword_of_int (KernelSyms.iput + 0x24)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) D2 (K - 4)%nat
-                (itable_half (icn_ref cn) (delete k Mt))
+                (itable_half (delete k Mt))
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
                 with "Hcg Hpc Hi24 [Hhalf Hrtok] [-]").
       { rewrite Hpa2 Hstv.
         replace (Z.pos 1 - 1)%Z with 0%Z by lia.
-        iMod (iref_close_last_store_au (⊤ ∖ ↑minstretN) (icn_ref cn) Mt k qt
+        iMod (iref_close_last_store_au (⊤ ∖ ↑minstretN) Mt k qt
                 ltac:(solve_ndisj) HMk with "Hinv Hhalf Hrtok") as "[Hcell Hback2]".
         iModIntro. iExists (iref_word Mt k). iFrame "Hcell". iIntros "Hcell".
         iMod ("Hback2" with "Hcell") as "Hhalf". by iModIntro. }
@@ -1009,11 +1009,11 @@ Section IputTail.
       pose proof Hqrest as Hqt'. apply Qp.sub_Some in Hqt'.  (* qt = q + qrest *)
       iApply (wp_sw_au_iput true (mword_of_int (KernelSyms.iput + 0x24)) Ra5 Rs1
                 (mword_of_int 8 : mword 12) D2 (K - 4)%nat
-                (itable_half (icn_ref cn) (<[k := (qrest, npred)]> Mt))
+                (itable_half (<[k := (qrest, npred)]> Mt))
                 (⊤ ∖ ↑minstretN ∖ ↑icacheN) false ltac:(solve_ndisj)
                 with "Hcg Hpc Hi24 [Hhalf Hrtok] [-]").
       { rewrite Hpa2 Hstv Hzs.
-        iMod (iref_close_store_au (⊤ ∖ ↑minstretN) (icn_ref cn) Mt k q qt qrest npred
+        iMod (iref_close_store_au (⊤ ∖ ↑minstretN) Mt k q qt qrest npred
                 ltac:(solve_ndisj) HMk' Hqrest with "Hinv Hhalf Hrtok") as "[Hcell Hback2]".
         iModIntro. iExists (iref_word Mt k). iFrame "Hcell". iIntros "Hcell".
         iMod ("Hback2" with "Hcell") as "Hhalf". by iModIntro. }
@@ -1069,7 +1069,7 @@ End IputTail.
 
 Section ProofIput.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
-            !uartGhostG Σ, !fsLogG Σ, !logG Σ, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !uartGhostG Σ, !fsLogG Σ, !logG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra  := (mword_of_int 1 : mword 5).
@@ -1319,12 +1319,12 @@ Section ProofIput.
     { rewrite (rget_ne macq Rs1 ltac:(nz)) Hms1. reflexivity. }
     iApply (wp_lw_au_iput true (mword_of_int (KernelSyms.iput + 0x18)) Ra4 Rs1
               (mword_of_int 8 : mword 12) macq (K - 4)%nat
-              (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half (icn_ref cn) Mt)%I)
+              (fun v => (⌜v = iref_word Mt k⌝ ∗ itable_half Mt)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(nz) ltac:(rdok) ltac:(solve_ndisj)
               with "Hcg Hpc Hi18 [Hhalf] [-]").
     { rewrite Hpa18.
-      iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) (icn_ref cn) Mt k
+      iMod (iref_load_locked_au (⊤ ∖ ↑minstretN) Mt k
               ltac:(solve_ndisj) Hk with "Hinv Hhalf") as "[Hcell Hback2]".
       iModIntro. iExists (iref_word Mt k). iFrame "Hcell". iIntros "Hcell".
       iMod ("Hback2" with "Hcell") as "Hhalf". iModIntro. by iFrame. }
@@ -1424,7 +1424,7 @@ Section ProofIput.
     iApply (wp_lw_au_iput true (mword_of_int (KernelSyms.iput + 0x3c)) Ra5 Rs1
               (mword_of_int 64 : mword 12) E2 (K - 4)%nat
               (fun w => (∃ v : bool, ⌜w = valid_word v⌝ ∗
-                  itable_half (icn_ref cn) Mt ∗ iref_tok (icn_ref cn) k q ∗
+                  itable_half Mt ∗ iref_tok k q ∗
                   (if v
                    then i_dev (ientry k) ↦₄{DfracOwn q} dev ∗
                         i_dev (ientry k) ↦₄{DfracOwn qr} dev ∗

@@ -1,0 +1,314 @@
+(* ProofSysFork.v -- whole-function WP for sys_fork(), the thinnest wrapper
+   in the tree and the first CALLER kfork has ever had.
+
+     uint64 sys_fork(void) { return kfork(); }
+
+   Nine instructions (KernelInstrs @ 0x80002910).  The frame is byte-identical
+   to sys_getpid's / cpuid's (0x1141 / 0xe406 / 0xe022 / 0x0800 ... 0x60a2 /
+   0x6402 / 0x0141 / 0x8082), so this file is [ProofSysGetpid.v] with the
+   [c.lw a0,48(a0)] deleted and [myproc] replaced by [kfork]: gcc emits no
+   cast at all, so a0 comes back from the callee and leaves untouched.
+
+   WHAT MAKES IT WORTH PROVING is not the nine instructions -- it is that
+   kfork's contract now HAS a payer.  Until [ProcInv.cwd_ref] became real,
+   kfork demanded an [IcacheInv.inode_ref] on the entry [p->cwd] names plus
+   an [IrefSlots.iref_slot], and no caller could produce either; the
+   contract was honest and unusable.  This proof is the check that it is
+   usable now, and it needs nothing kfork-specific to run: every premise it
+   forwards is either persistent or the syscall's own state.
+
+   The save/restore of ra/s0 SPANS the kfork call, so the final
+   [callee_saved] does not factor through the two halves and is discharged
+   componentwise -- the [cs_through] shape, exactly as in ProofSysGetpid. *)
+From Stdlib Require Import ZArith Lia List.
+From stdpp Require Import gmap bitvector.definitions bitvector.tactics.
+From iris.proofmode Require Import proofmode.
+From iris.program_logic Require Import language lifting.
+From iris.base_logic.lib Require Import ghost_var invariants gen_heap.
+Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
+Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
+Require Import RiscvLang RiscvPtsto.
+Require Import RegFile WpMmodeLeafBase.
+Require Import SmodeCore.
+Require Import StackOwn CalleeSaved.
+Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
+Require Import IntrDefs HartTp WpNext.
+Require Import WpLock.
+Require Import ProcGeom CpuOwn.
+Require Import SpecPanic.
+Require Import KallocInv.
+Require Import FdSlots FileInv ProcInv.
+Require Import SchedCtx.
+Require Import DiskPtsto.
+Require Import FsBlocks.
+Require Import InodeRegion.
+Require Import IrefSlots.
+Require Import IcacheInv.
+Require Import IcacheEscrow.
+Require Import KvmSpec.
+Require Import SpecAllocpid.
+Require Import SpecAllocproc.
+Require Import SpecProcinit.
+Require Import WaitInv.
+Require Import SpecKfork.
+Require Import SpecSysFork.
+From Kernel Require KernelInstrs.
+From Kernel Require KernelSyms.
+Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import CodeSysFork.
+Import Defs.
+Local Open Scope Z_scope.
+
+(* sys_fork's balanced 16-byte frame: entry [addi sp,-16] and exit
+   [addi sp,+16] cancel (identical to sys_getpid's / cpuid's). *)
+Lemma sf_frame_cancel (X : mword 64) :
+  add_vec (add_vec X (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))
+          (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6))) = X.
+Proof.
+  assert (add_vec_unsigned : forall x y : mword 64,
+            bv_unsigned (add_vec x y) = bv_wrap 64 (bv_unsigned x + bv_unsigned y)).
+  { intros x y. unfold add_vec, Operators_mwords.word_binop, Operators_mwords.with_word',
+      SailStdpp.Values.with_word, to_word, get_word, MachineWord.MachineWord.add.
+    rewrite bv_add_unsigned. reflexivity. }
+  apply bv_eq. rewrite !add_vec_unsigned. rewrite bv_wrap_add_idemp_l.
+  assert (HA : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6)) : mword 64)
+             = 18446744073709551600) by (vm_compute; reflexivity).
+  assert (HB : bv_unsigned (sign_extend' 64 (sign_extend' 12 (mword_of_int 16 : mword 6)) : mword 64)
+             = 16) by (vm_compute; reflexivity).
+  rewrite HA HB. rewrite <- Z.add_assoc.
+  replace (18446744073709551600 + 16) with (bv_modulus 64) by (vm_compute; reflexivity).
+  rewrite bv_wrap_add_modulus_1. apply bv_wrap_bv_unsigned.
+Qed.
+
+Module SysForkProof (Kfork : KFORK) : SYSFORK.
+
+Section ProofSysFork.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+            !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* =================================================================== *)
+  (*  THE CAPSTONE.                                                       *)
+  (* =================================================================== *)
+  Lemma wp_sys_fork_sconf
+      (γa γp γw γl γf γil γic : gname) (γs : list gname)
+      (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
+      (m : regfile) (lvl av : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+      (b : bool) (pid : mword 32) (V : pprivate)
+    : wp_sys_fork_sconf_body γa γp γw γl γf γil γic γs cn γfs cov logstart nib
+                             m lvl av eb p C b pid V.
+  Proof.
+    cbv beta delta [wp_sys_fork_sconf_body].
+    intros pcE ret_tgt Hav Hlvl Hcwdnz.
+    unfold K_sys_fork in Hav.
+    set (imm_entry := (mword_of_int 48 : mword 6)).
+    set (imm_dealloc := (mword_of_int 16 : mword 6)).
+    set (nzimm_s0 := (mword_of_int 4 : mword 8)).
+    set (sp0 := m !!! Regidx csp_rs1).
+    set (ra0 := m !!! Regidx (mword_of_int 1 : mword 5)).
+    set (s00 := m !!! Regidx (mword_of_int 8 : mword 5)).
+    set (sp' := add_vec (m !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_entry))).
+    set (M1 := <[Regidx csp_rs1 := regval_into_reg sp']> m).
+    set (M2 := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1).
+    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
+             #Hitbl #Hitinv Henv Hpriv Hcont".
+    iPoseProof (sf_00 with "Htext") as "Hi00".
+    iPoseProof (sf_02 with "Htext") as "Hi02".
+    iPoseProof (sf_04 with "Htext") as "Hi04".
+    iPoseProof (sf_06 with "Htext") as "Hi06".
+    iPoseProof (sf_08 with "Htext") as "Hi08".
+    iPoseProof (sf_0c with "Htext") as "Hi0c".
+    iPoseProof (sf_0e with "Htext") as "Hi0e".
+    iPoseProof (sf_10 with "Htext") as "Hi10".
+    iPoseProof (sf_12 with "Htext") as "Hi12".
+    assert (Hcsp1 : M1 !!! Regidx csp_rs1 = sp') by (apply upd_eq).
+    assert (Hpush : sp' = pa_stk (m !!! Regidx csp_rs1) 2).
+    { unfold sp', pa_stk, add_vec_int, imm_entry.
+      apply f_equal. apply bv_eq; vm_compute; reflexivity. }
+    (* ---- +0x00: c.addi sp,-16 (frame push) ---- *)
+    iApply (wp_caddi_sp_push_s_sconf pcE imm_entry m av 2 b ltac:(lia) Hpush
+              with "Hcg Hpc Hi00 [-]").
+    iIntros (CID1 Hs1) "Hcg Hframe Hpc".
+    assert (Hpp02 : add_vec_int (pcE : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x02)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp02) in "Hpc".
+    iDestruct (stack_own_2_elim with "Hframe") as (vr24 vs16) "[Hbra Hbs0]".
+    assert (Hpa1 : add_vec (M1 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
+    { rewrite Hcsp1. unfold sp', sp0, pa_stk, add_vec_int, imm_entry. rewrite add_vec_off2.
+      f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    assert (Hpa2 : add_vec (M1 !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
+    { rewrite Hcsp1. unfold sp', sp0, pa_stk, add_vec_int, imm_entry. rewrite add_vec_off2.
+      f_equal; try (apply bv_eq; vm_compute; reflexivity). }
+    iEval (rewrite -Hpa1) in "Hbra".
+    iEval (rewrite -Hpa2) in "Hbs0".
+    (* ---- +0x02: c.sdsp ra,8(sp) ---- *)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x02)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5) M1 (av - 2)%nat vr24 b
+              with "Hcg Hpc Hi02 Hbra [-]").
+    iIntros (CID2 Hs2) "Hcg Hpc Hbra".
+    assert (Hpp04 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x02) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x04)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp04) in "Hpc".
+    (* ---- +0x04: c.sdsp s0,0(sp) ---- *)
+    iApply (wp_csdsp_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x04)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5) M1 (av - 2)%nat vs16 b
+              with "Hcg Hpc Hi04 Hbs0 [-]").
+    iIntros (CID3 Hs3) "Hcg Hpc Hbs0".
+    assert (Hpp06 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x04) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x06)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp06) in "Hpc".
+    assert (Hra0v : forall (CID' : CpuId), rget (CID := CID') M1 (mword_of_int 1 : mword 5) = ra0).
+    { intros CID'; rgne. unfold M1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]. }
+    assert (Hs00v : forall (CID' : CpuId), rget (CID := CID') M1 (mword_of_int 8 : mword 5) = s00).
+    { intros CID'; rgne. unfold M1; rewrite upd_ne; [reflexivity | vm_compute; discriminate]. }
+    iEval (rewrite Hra0v) in "Hbra".
+    iEval (rewrite Hs00v) in "Hbs0".
+    (* ---- +0x06: c.addi4spn s0,sp,16 ---- *)
+    iApply (wp_caddi4spn_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x06)) (Cregidx (mword_of_int 0)) nzimm_s0 (mword_of_int 8 : mword 5) M1 (av - 2)%nat b
+              ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi06 [-]").
+    iIntros (CID4 Hs4) "Hcg Hpc".
+    assert (Hpp08 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x06) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x08)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp08) in "Hpc".
+    change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg (add_vec (M1 !!! Regidx csp_rs1) (sign_extend' 64 (caddi4spn_imm nzimm_s0)))]> M1) with M2.
+    (* ---- +0x08: jal ra,kfork ---- *)
+    iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x08)) (mword_of_int 1 : mword 5) (mword_of_int 2093918 : mword 21)
+              M2 (av - 2)%nat b ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              with "Hcg Hpc Hi08 [-]").
+    iIntros (CID5 Hs5) "Hcg Hpc".
+    set (Bj := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x08) : mword 64) 4)]> M2).
+    change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x08) : mword 64) 4)]> M2) with Bj.
+    assert (Hjmp : add_vec (mword_of_int (KernelSyms.sys_fork + 0x08) : mword 64) (sign_extend' 64 (mword_of_int 2093918 : mword 21)) = mword_of_int KernelSyms.kfork)
+      by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hjmp) in "Hpc".
+    assert (HBjra : Bj !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x08) : mword 64) 4) by (rewrite /Bj upd_eq; reflexivity).
+    (* [Hcpu] rode through the four leaf steps untouched, so it is still
+       anchored at the ENTRY hart -- re-anchor it before crossing. *)
+    iDestruct (cpu_own_transport CID CID5 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    (* ---- kfork(): a0 = -1 or the child's pid; the parent's block back ---- *)
+    iApply (Kfork.wp_kfork_sconf γa γp γw γl γf γil γic γs cn γfs cov logstart nib
+              Bj lvl (av - 2)%nat eb p C b pid V
+              ltac:(lia) Hlvl Hcwdnz
+              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
+                    Hitbl Hitinv Henv Hpriv [-]").
+    iIntros (CID6 Hs6 MF) "%HcsMF Hpc Hpost".
+    iDestruct "Hpost" as "(Hcg & Hcpu & Hpriv & Henv & %Hrv)".
+    assert (Hpc0c : ret_pc (Bj !!! Regidx (mword_of_int 1 : mword 5)) = mword_of_int (KernelSyms.sys_fork + 0x0c))
+      by (rewrite HBjra; apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpc0c) in "Hpc".
+    (* ---- the frame is still where we left it: sp survived the call ---- *)
+    assert (HMFsp : MF !!! Regidx csp_rs1 = sp').
+    { rewrite (callee_saved_lookup HcsMF csp_rs1 ltac:(vm_compute; reflexivity)).
+      rewrite /Bj upd_ne; [| vm_compute; discriminate].
+      rewrite /M2 upd_ne; [| vm_compute; discriminate].
+      exact Hcsp1. }
+    assert (Hpa1' : add_vec (MF !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 1 : mword 6) ('b"000"))) = pa_stk sp0 1).
+    { rewrite HMFsp -Hcsp1. exact Hpa1. }
+    assert (Hpa2' : add_vec (MF !!! Regidx csp_rs1) (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
+    { rewrite HMFsp -Hcsp1. exact Hpa2. }
+    iEval (rewrite Hpa1 -Hpa1') in "Hbra".
+    iEval (rewrite Hpa2 -Hpa2') in "Hbs0".
+    (* ---- +0x0c: c.ldsp ra,8(sp) ---- *)
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x0c)) (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 5) MF (av - 2)%nat ra0 b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi0c Hbra [-]").
+    iIntros (CID8 Hs8) "Hcg Hpc Hbra".
+    assert (Hpp0e : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x0c) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x0e)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp0e) in "Hpc".
+    set (E0c := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg ra0]> MF).
+    change (<[Regidx (mword_of_int 1 : mword 5) := regval_into_reg ra0]> MF) with E0c.
+    (* ---- +0x0e: c.ldsp s0,0(sp) ---- *)
+    assert (HE0csp : E0c !!! Regidx csp_rs1 = MF !!! Regidx csp_rs1)
+      by (rewrite /E0c upd_ne; [reflexivity | vm_compute; discriminate]).
+    iEval (rewrite -HE0csp) in "Hbs0".
+    iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x0e)) (mword_of_int 0 : mword 6) (mword_of_int 8 : mword 5) E0c (av - 2)%nat s00 b
+              ltac:(vm_compute; discriminate) ltac:(rdok)
+              with "Hcg Hpc Hi0e Hbs0 [-]").
+    iIntros (CID9 Hs9) "Hcg Hpc Hbs0".
+    assert (Hpp10 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x0e) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x10)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp10) in "Hpc".
+    set (E0e := <[Regidx (mword_of_int 8 : mword 5) := regval_into_reg s00]> E0c).
+    change (<[Regidx (mword_of_int 8 : mword 5) := regval_into_reg s00]> E0c) with E0e.
+    (* ---- +0x10: c.addi sp,16 (frame pop) ---- *)
+    assert (HE0esp : E0e !!! Regidx csp_rs1 = sp').
+    { rewrite /E0e upd_ne; [| vm_compute; discriminate].
+      rewrite HE0csp. exact HMFsp. }
+    assert (Hwv : add_vec (E0e !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)) = sp0).
+    { rewrite HE0esp. unfold sp', imm_dealloc, imm_entry, sp0. apply sf_frame_cancel. }
+    assert (Hpop : E0e !!! Regidx csp_rs1
+                   = pa_stk (add_vec (E0e !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc))) 2).
+    { rewrite Hwv HE0esp. exact Hpush. }
+    iEval (rewrite Hpa1') in "Hbra".
+    iEval (rewrite HE0csp Hpa2') in "Hbs0".
+    iDestruct (stack_own_2_intro sp0 with "Hbra Hbs0") as "Hframe".
+    iEval (rewrite -Hwv) in "Hframe".
+    iApply (wp_caddi_sp_pop_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x10)) imm_dealloc E0e
+              (av - 2)%nat 2 b Hpop
+              with "Hcg Hpc Hi10 Hframe [-]").
+    iIntros (CID10 Hs10) "Hcg Hpc".
+    assert (Hnk : ((av - 2) + 2)%nat = av) by lia.
+    iEval (rewrite Hnk) in "Hcg".
+    assert (Hpp12 : add_vec_int (mword_of_int (KernelSyms.sys_fork + 0x10) : mword 64) 2 = mword_of_int (KernelSyms.sys_fork + 0x12)) by (apply bv_eq; vm_compute; reflexivity).
+    iEval (rewrite Hpp12) in "Hpc".
+    set (E10 := <[Regidx csp_rs1 := regval_into_reg (add_vec (E0e !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> E0e).
+    change (<[Regidx csp_rs1 := regval_into_reg (add_vec (E0e !!! Regidx csp_rs1) (sign_extend' 64 (sign_extend' 12 imm_dealloc)))]> E0e) with E10.
+    (* ---- +0x12: c.ret ---- *)
+    assert (HE10ra : E10 !!! Regidx (mword_of_int 1 : mword 5) = ra0).
+    { rewrite /E10 upd_ne; [| vm_compute; discriminate].
+      rewrite /E0e upd_ne; [| vm_compute; discriminate].
+      rewrite /E0c upd_eq. reflexivity. }
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.sys_fork + 0x12)) (mword_of_int 1 : mword 5) E10 av b
+              ltac:(vm_compute; discriminate)
+              with "Hcg Hpc Hi12 [-]").
+    iIntros (CID11 Hs11) "Hcg Hpc".
+    assert (Hra_final : ret_pc (E10 !!! Regidx (mword_of_int 1 : mword 5)) = ret_tgt)
+      by (rewrite HE10ra; reflexivity).
+    iEval (rewrite Hra_final) in "Hpc".
+    (* ---- the postcondition ---- *)
+    (* sp and s0 were saved/restored ACROSS the kfork call, so
+       [callee_saved m E10] does not factor through the two halves: each
+       conjunct goes on its own.  Everything but sp/s0 rides through. *)
+    assert (HE10csp : E10 !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
+      by (rewrite /E10 upd_eq; exact Hwv).
+    assert (HE10s0 : E10 !!! Regidx (mword_of_int 8 : mword 5) = m !!! Regidx (mword_of_int 8 : mword 5)).
+    { rewrite /E10 upd_ne; [| vm_compute; discriminate].
+      rewrite /E0e upd_eq. reflexivity. }
+    assert (Hthr : forall r : mword 5, is_cs_idx r = true ->
+                     r <> csp_rs1 -> r <> mword_of_int 8 ->
+                     E10 !!! Regidx r = m !!! Regidx r).
+    { intros r Hr Ncsp N8.
+      assert (N1 : r <> mword_of_int 1) by (intro He; rewrite He in Hr; vm_compute in Hr; discriminate).
+      rewrite /E10 upd_ne; [| congruence].
+      rewrite /E0e upd_ne; [| congruence].
+      rewrite /E0c upd_ne; [| congruence].
+      rewrite (callee_saved_lookup HcsMF r Hr).
+      rewrite /Bj upd_ne; [| congruence].
+      rewrite /M2 upd_ne; [| congruence].
+      rewrite /M1 upd_ne; [| congruence]. reflexivity. }
+    (* a0 is NOT callee-saved, so kfork's value is still in it *)
+    assert (HE10a0 : E10 !!! Regidx (mword_of_int 10 : mword 5)
+                     = MF !!! Regidx (mword_of_int 10 : mword 5)).
+    { rewrite /E10 upd_ne; [| vm_compute; discriminate].
+      rewrite /E0e upd_ne; [| vm_compute; discriminate].
+      rewrite /E0c upd_ne; [reflexivity | vm_compute; discriminate]. }
+    iSpecialize ("Hcont" $! CID11 with "[%]"); [wp_next_chain|].
+    (* [Hcpu] has sat at [CID6] (kfork's own resumed hart) since the
+       crossing; the four leaf steps since then never touched it. *)
+    iDestruct (cpu_own_transport CID6 CID11 lvl eb p C b ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
+    iApply ("Hcont" $! E10 with "[%] Hcg Hcpu Hpc Hpriv Henv [%]").
+    - unfold callee_saved.
+      split_and!.
+      + exact HE10csp.
+      + exact HE10s0.
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+      + apply Hthr; vm_compute; first [reflexivity | discriminate].
+    - rewrite HE10a0. exact Hrv.
+  Qed.
+
+End ProofSysFork.
+
+End SysForkProof.

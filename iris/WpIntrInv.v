@@ -258,7 +258,11 @@ Section WpIntrInv.
     iIntros "Hhs Hcfg Hpc Hfile HF Hbody".
     iDestruct "Hcfg" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepcx & Hscausex & Hstvalx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hsie & %Hmsf)".
-    iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+    (* [mie] is PINNED at [MIE_S] by [intr_config] (only [mideleg] is
+       existential), which is what makes the DELIVERABLE CAUSE SET below
+       computable: [Hmm] already speaks about the literal, and the handler
+       contract is instantiated at it. *)
+    iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
     pose proof Hmsf as Hmsf'.
     destruct Hmsf' as (HSIE1 & HMPRV0 & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM).
     iPoseProof "Hhw" as "#Hhwc".
@@ -268,7 +272,7 @@ Section WpIntrInv.
     pose proof (elp_no_lp elp0 Help_np) as Help0.
     iApply (wp_exec_step_retire_or_intr with "Hminv Hhs").
     iIntros (σ) "Hsi".
-    iDestruct (dispatch_S_transient σ misa0 mie_v mdv0 ms HmisaS Hmm
+    iDestruct (dispatch_S_transient σ misa0 MIE_S mdv0 ms HmisaS Hmm
                  with "Hsi Hmisa Hmie Hmdl Hms") as %Hdisp0.
     match type of Hdisp0 with _ = Some (?D, _) =>
       destruct D as [[i p] |] eqn:Hdres end.
@@ -347,7 +351,7 @@ Section WpIntrInv.
       (* ---- the invariant's handler WP discharges the whole handler ---- *)
       iAssert (intr_handler_spec handler) with "[]" as "#Hsp".
       { iApply "Hspec". iPureIntro. exact Hb1. }
-      iApply ("Hsp" $! root_ppn elp0 ms pc0 mie_v mdv0 m
+      iApply ("Hsp" $! root_ppn elp0 ms pc0 MIE_S mdv0 m
                 with "[%] [%] [%] Hhs Hpriv Hms Hmie Hmdl Hsepc [$Hpcr $Hnpc] Hfile HF").
       { exact Hmsf. }
       { exact Hpc0. }
@@ -365,7 +369,7 @@ Section WpIntrInv.
       { iExists (sret_ms5 (trap_ms elp0 ms)). iFrame "Hms Hsie".
         iPureIntro. exact (intr_ms_facts_roundtrip elp0 ms Hmsf). }
       iSplitL "Hmie Hmdl".
-      { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+      { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
       iFrame "Hsepcx".
       iSplitL "Hscause". { iExists c2v. iFrame "Hscause". }
       iExists (zeros' 64). iFrame "Hstval".
@@ -379,7 +383,7 @@ Section WpIntrInv.
         iSplitL "Hms Hsie".
         { iExists ms. iFrame "Hms Hsie". iPureIntro. exact Hmsf. }
         iSplitL "Hmie Hmdl".
-        { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+        { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iFrame "Hsepcx Hscausex Hstvalx". }
       iModIntro. iLeft.
       iExists retval, s_exec.

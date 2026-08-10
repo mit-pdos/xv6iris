@@ -129,7 +129,7 @@ Proof. intro H. rewrite length_insert. exact H. Qed.
 Module FreeprocProof (KF : KFREE) (PFP : PROC_FREEPAGETABLE) : FREEPROC.
 
 Section ProofFreeproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation FR := KernelSyms.freeproc.

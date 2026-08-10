@@ -38,6 +38,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeArgint.
+Require Import InodeRef.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -67,7 +68,7 @@ Qed.
 Module ArgintProof (Argraw : ARGRAW) : ARGINT.
 
 Section ProofArgint.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

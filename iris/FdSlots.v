@@ -51,6 +51,15 @@ Local Open Scope Z_scope.
    have the borrow-and-return shape, whose wand swallows the block: a syscall
    that held its allowance *out* of [proc_priv] could not then pass
    [proc_priv] to a callee, which is precisely what sys_pipe does. *)
+(* THE FTABLE'S LENGTH.  It lives here rather than in [FileInv.v] -- where
+   it is the array's own bound and would naturally sit -- because
+   [IrefSlots.IREFSLOTS] counts one iref unit per FD_INODE/FD_DEVICE ftable
+   entry and so needs [NFILE], and [IrefSlots] must stay BELOW [FileInv]:
+   [IcacheInv] requires [IrefSlots], and [FileInv] has to be able to require
+   [IcacheInv] once [inode_ref] stops being a placeholder.  That one import
+   was the whole of the cycle. *)
+Definition NFILE : nat := 100%nat.
+
 Definition FDSPARE : nat := 4%nat.
 
 (* The supply: NOFILE descriptors plus the allowance, per process. *)

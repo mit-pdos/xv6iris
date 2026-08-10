@@ -162,7 +162,7 @@ Local Open Scope Z_scope.
 Definition K_iget : nat := 16%nat.
 
 Definition wp_iget_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
       !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
@@ -187,7 +187,7 @@ Definition wp_iget_sconf_body
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
   is_itable2 γl cn γfs γi cov logstart nib dev -∗
   (* the [ref] words *)
-  itable_inv (icn_ref cn) -∗
+  itable_inv -∗
   (* EVERY entry's content -- the scan cannot name its slot in advance *)
   ic_escrows cn γfs γi cov logstart -∗
   (* "iget: no inodes" IS REACHABLE -- see the header *)
@@ -202,13 +202,13 @@ Definition wp_iget_sconf_body
     ⌜ callee_saved m mr
       /\ (k < NINODE)%nat
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-    inode_ref (icn_ref cn) k q dev inum -∗
+    inode_ref k q dev inum -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
 Module Type IGET.
   Parameter wp_iget_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ,
              !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)

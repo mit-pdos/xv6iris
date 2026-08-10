@@ -213,7 +213,7 @@ Module KexitProof (Myproc : MYPROC) (Fileclose : FILECLOSE)
 (* The prologue.  No call in it, so [CID] can be a section variable.      *)
 (* ===================================================================== *)
 Section KexitPro.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* +0x00 .. +0x10: carve the 6-slot frame, save ra/s0..s4, set s0, and
@@ -723,7 +723,7 @@ End KexitLoop.
 (* every leaf and callee collapses through [wp_next_off].                  *)
 (* ===================================================================== *)
 Section KexitPark.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !fileG Σ}.
 
   (* the [C]-payload extraction sched's [emp] slot needs.  Its OWN hart
      binder: the call site is past an interrupts-enabled stretch, so a lemma
@@ -756,12 +756,18 @@ Section KexitPark.
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
-    proc_priv γf pj pid V -∗
+    (* the cwd's unit REJOINED with the allowance: [iput] handed the [1]
+       back when it destroyed the reference. *)
+    iref_slots (1 + IREFSPARE) -∗
+    (* THE DEFICIT BLOCK: by the time kexit parks, [p->cwd] is 0 and the
+       reference it named is gone, so there is no [proc_priv] at this [V]
+       and there should not be. *)
+    proc_priv_nocwd γf pj pid V -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hgl Heb Hav Hregs Hof Hcwd. subst eb.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
-    iIntros "Hcg Hown #Htext Hpc #Hprocs #Hpanic #Hwl Hinit Hsp Hpriv".
+    iIntros "Hcg Hown #Htext Hpc #Hprocs #Hpanic #Hwl Hinit Hsp Hir Hpriv".
     iDestruct (procs_inv_len with "Hprocs") as "%Hlen".
     iPoseProof (kxi_60 with "Htext") as "Hi60".
     iPoseProof (kxi_64 with "Htext") as "Hi64".
@@ -1179,11 +1185,11 @@ Section KexitPark.
     iApply (Sched.wp_sched_sconf (CID := CIDa)  γs j γl ZOMBIE ch0 PD av true
               Hj Hgl park_ok_ZOMBIE ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlkp Hstate Hpg Hchan Hkilled Hxstate Hpidh]
-                    [Hpriv Hsp] Hpay Hcpuemp Hoc Htag Hvc [-]").
+                    [Hpriv Hsp Hir] Hpay Hcpuemp Hoc Htag Hvc [-]").
     { rewrite /proc_held. iFrame "Hlkp Hstate Hpg Hchan".
       iExists kl, (trunc32 (rget (CID := CIDa) mlk (mword_of_int 20 : mword 5))), pidv.
       iFrame "Hkilled Hxstate Hpidh". }
-    { iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp"). }
+    { iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp Hir"). }
     (* THE POST-RESUME ARM.  A dispatched zombie returns here and panics --
        which is why forgetting its record costs nothing. *)
     iIntros (CIDz Hsz mf ch') "%Hcsz Hcg Hpc Hheld Htc #Havail Hcpuemp Hoc Htag' Hvc".
@@ -1265,8 +1271,7 @@ Section KexitRest.
     (* iput(p->cwd) has no null test, so there must BE a working directory *)
     pv_cwd V <> (zero_reg : mword 64) ->
     (* the C6b ties: the reference [cwd_ref] carries names the cache through
-       the [icfg] class, iput names it through [cn] *)
-    icn_ref cn = icfg_iref ->
+       the [icfg] class, and so does iput's contract *)
     dev = icfg_dev ->
     nib = icfg_nib ->
     (0 < size <= BPB)%Z ->
@@ -1293,7 +1298,7 @@ Section KexitRest.
     bslots bn 3 -∗
     (* ---- the inode cache's persistent set, and the two regions ---- *)
     is_itable2 γtl cn γfs γi cov logstart nib dev -∗
-    itable_inv (icn_ref cn) -∗
+    itable_inv -∗
     ic_escrows cn γfs γi cov logstart -∗
     ireg_inv γi γfs inodestart nib -∗
     ic_sleeplocks cn -∗
@@ -1302,16 +1307,17 @@ Section KexitRest.
     bitmap_res γfs bmapstart cov logstart size us -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
+    iref_slots IREFSPARE -∗
     proc_priv γf pj pid V -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj Hj Hgl Heb Hav Hgeom Hregs Hof Hcwdnz Hciref Hcdev Hcnib
+    intros pj Hj Hgl Heb Hav Hgeom Hregs Hof Hcwdnz Hcdev Hcnib
            Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb. subst eb.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
     iIntros "Hcg Hown #Htext Hpc #Hprocs #Hpanic #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl".
     iIntros "#Hitab #Hitinv #Hescrows #Hireg #Hslks Hsbb Hsbi Hbmres".
-    iIntros "Hinit Hsp Hpriv".
+    iIntros "Hinit Hsp Hir Hpriv".
     (* the cwd cell, its reference, and the pid quarter -- all three out at
        once; see the header. *)
     iDestruct (proc_priv_cwd_pid γf pj pid V with "Hpriv") as "(Hcwd & Href & Hpidq & Hpback)".
@@ -1322,7 +1328,7 @@ Section KexitRest.
     iDestruct "Href" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href)".
     iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
     iDestruct (ic_sleeplocks_acc _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
-    iEval (rewrite -Hciref -Hcdev) in "Href".
+    iEval (rewrite -Hcdev) in "Href".
     assert (Hinb : bv_unsigned inum < 16 * Z.of_nat nib)
       by (rewrite Hcnib; exact Hinumb).
     destruct (Hinumgeo inum Hinb) as [Hiblk Hiblog].
@@ -1469,8 +1475,11 @@ Section KexitRest.
     assert (Heo_s4 : meo !!! Regidx (mword_of_int 20 : mword 5) = sv).
     { rewrite (callee_saved_lookup Hcseo (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity)).
       exact HQ3s4. }
-    (* +0x5c sd x0,336(s3) : p->cwd = 0, the first moment [cwd_ref] can be
-       re-supplied ([ProcInv.cwd_ref_null]). *)
+    (* +0x5c sd x0,336(s3) : p->cwd = 0.  The reference is GONE -- iput
+       consumed it -- and what goes back into the block is [cwd_ref_null],
+       the empty arm: a null [p->cwd] names no inode.  The block that
+       results is then split back down to the DEFICIT one, because that is
+       what the ZOMBIE park takes and the cwd arm it drops is [emp]. *)
     assert (Hrgeo19 : rget (CID := CID7) meo (mword_of_int 19 : mword 5)
                       = meo !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
     iApply (wp_sd_zero_s_sconf (CID := CID7) (mword_of_int (KX + 0x5c))
@@ -1482,8 +1491,17 @@ Section KexitRest.
     assert (Hpp60 : add_vec_int (mword_of_int (KX + 0x5c) : mword 64) 4 = mword_of_int (KX + 0x60))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp60) in "Hpc".
-    iDestruct ("Hpback" $! (zero_reg : mword 64) with "Hcwd [] Hpidq") as "Hpriv".
-    { iApply cwd_ref_null. }
+    (* THE UNIT iput HANDED BACK, rejoined with the allowance.  This is the
+       [1] of the ZOMBIE block's [iref_slots (1 + IREFSPARE)]: while the
+       process had a working directory the unit was parked in the itable
+       against the reference; iput freed it, and a dormant block holds it
+       itself.  That bijection is what makes
+       [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE] literally true. *)
+    iDestruct (iref_slots_combine 1 IREFSPARE with "Hislot Hir") as "Hir".
+    iPoseProof cwd_ref_null as "Hcz".
+    iDestruct ("Hpback" $! (zero_reg : mword 64) with "Hcwd Hcz Hpidq") as "Hpriv".
+    iEval (rewrite proc_priv_split_cwd) in "Hpriv".
+    iDestruct "Hpriv" as "[Hpriv _]".
     iDestruct (cpu_own_transport CID7 CID8 0 true pj C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv dqi meo av true C b pid
@@ -1492,7 +1510,7 @@ Section KexitRest.
               ltac:(split; [exact Heo_s3 | split; [exact Heo_s4 | intro r; apply rf_to_gmap_dom]])
               ltac:(cbn [upd_cwd pv_ofile]; exact Hof)
               ltac:(cbn [upd_cwd pv_cwd]; reflexivity)
-              with "Hcg Hown Htext Hpc Hprocs Hpanic Hwl Hinit Hsp Hpriv").
+              with "Hcg Hown Htext Hpc Hprocs Hpanic Hwl Hinit Hsp Hir Hpriv").
   Qed.
 
 End KexitRest.
@@ -1532,13 +1550,13 @@ Section ProofKexit.
     iIntros "Hcg Hown #Htext Hpc #Hprocs #Hpanic #Hwl #Hft".
     iIntros "#Hkmem Hav0".
     iIntros "#Hbio #Hlog #Hseam #Hgen #Hdev #Hgeo #Hdlk Hbsl #Hicenv Hbm".
-    iIntros "Hinit Hsp Hpriv".
+    iIntros "Hinit Hsp Hir Hpriv".
     (* the cache's persistent set and the pure geometry, out of the one
        bundle fileclose's contract already indexes them by *)
     rewrite /fileclose_ic_env.
     cbn [fcn_ic fcn_dev fcn_nib fcn_size fcn_bmapstart fcn_inodestart
          fcn_cov fcn_logstart fcn_fs fcn_ireg fcn_tlock] in *.
-    iDestruct "Hicenv" as "(%Hciref & %Hcdev & %Hcnib & %Hsize & %Hbm0 &
+    iDestruct "Hicenv" as "(%Hcdev & %Hcnib & %Hsize & %Hbm0 &
                             %Hbmcov & %Hbmlog & %Hist0 & %Hinumgeo & %Hcovb &
                             #Hitab & #Hitinv & #Hescrows & #Hireg & #Hslks)".
     assert (Hdom : forall r : regidx, r ∈ dom (rf_to_gmap m))
@@ -1820,7 +1838,7 @@ Section ProofKexit.
                     (av - 6)%nat true C b Hj eq_refl eq_refl eq_refl
                     ltac:(unfold fileclose_stack, K_iput; lia)
                     with "Htext Hft Hpanic") as "Hloop".
-      iSpecialize ("Hloop" with "[Hinit Hsp Hframe]").
+      iSpecialize ("Hloop" with "[Hinit Hsp Hir Hframe]").
       { iIntros (CIDx Hsx Mx Vx) "%Hxregs %Hxof %Hxcwd Hcg Hown Hpc Hpriv Hpenv Hfenv".
         iDestruct "Hfenv" as (usx) "Hfenv".
         iDestruct "Hfenv" as "(_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ &
@@ -1835,11 +1853,11 @@ Section ProofKexit.
                   Mx (av - 6)%nat true C b pid Vx
                   Hj Hgl eq_refl ltac:(lia) Hgeom Hxregs Hxof
                   ltac:(rewrite Hxcwd; exact Hcwdnz)
-                  Hciref Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
+                  Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
                   with "Hcg Hown Htext Hpc Hprocs Hpanic Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl
                         Hitab Hitinv Hescrows Hireg Hslks Hsbb Hsbi Hbmres
-                        Hinit Hsp Hpriv"). }
+                        Hinit Hsp Hir Hpriv"). }
       iApply ("Hloop" $! 0%nat A5 V with "[%] [%] [%] Hcg Hown Hpc Hpriv Hpenv Hfenv").
       + unfold NOFILE. lia.
       + split; [exact HA5s1|]. split; [exact HA5s2|]. split; [exact HA5s3|].

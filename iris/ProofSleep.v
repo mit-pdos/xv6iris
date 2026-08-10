@@ -173,7 +173,7 @@ Module SleepGenProof (Myproc : MYPROC) (Acquire : ACQUIRE) (AcquireGen : ACQUIRE
 (* exactly why acquire's contract takes the hart-generic form.             *)
 (* ===================================================================== *)
 Section SleepPostSched.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   Lemma sleep_post_sched `{GEN : GenId} `{CID0 : CpuId}
        (γs : list gname)
@@ -599,7 +599,7 @@ Section SleepPostSched.
 End SleepPostSched.
 
 Section ProofSleep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* extract the opaque context-slot payload, leaving the bundle at slot
@@ -1495,7 +1495,7 @@ End SleepGenProof.
 Module SleepOfGen (G : SLEEP_GEN) : SLEEP.
 
 Section OfGen.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_sleep_sconf 

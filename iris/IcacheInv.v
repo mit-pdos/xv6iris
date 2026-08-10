@@ -283,11 +283,12 @@ Qed.
 
 Section IcacheGhost.
   Context `{!icacheG Σ}.
+  Context `{ICFG : icfg}.
 
   (* [itable_half] and [iref_tok] are [IcacheRef.v]'s. *)
 
-  Lemma itable_half_agree γ M1 M2 :
-    itable_half γ M1 -∗ itable_half γ M2 -∗ ⌜M1 = M2⌝.
+  Lemma itable_half_agree M1 M2 :
+    itable_half M1 -∗ itable_half M2 -∗ ⌜M1 = M2⌝.
   Proof.
     rewrite /itable_half. iIntros "H1 H2".
     iDestruct (own_valid_2 with "H1 H2") as %Hv.
@@ -298,21 +299,21 @@ Section IcacheGhost.
 
   (* the two halves ARE the authority: this is how a lock holder that has
      opened the [ref]-word invariant gets the right to update. *)
-  Lemma itable_half_op γ M :
-    itable_half γ M ∗ itable_half γ M ⊣⊢ own γ (● M).
+  Lemma itable_half_op M :
+    itable_half M ∗ itable_half M ⊣⊢ own icfg_iref (● M).
   Proof.
     rewrite /itable_half -own_op -auth_auth_dfrac_op dfrac_op_own Qp.half_half.
     done.
   Qed.
 
-  Lemma itable_half_join γ M :
-    itable_half γ M -∗ itable_half γ M -∗ own γ (● M).
+  Lemma itable_half_join M :
+    itable_half M -∗ itable_half M -∗ own icfg_iref (● M).
   Proof.
     iIntros "H1 H2". iApply itable_half_op. iFrame.
   Qed.
 
-  Lemma itable_half_split γ M :
-    own γ (● M) -∗ itable_half γ M ∗ itable_half γ M.
+  Lemma itable_half_split M :
+    own icfg_iref (● M) -∗ itable_half M ∗ itable_half M.
   Proof. iIntros "H". by iApply itable_half_op. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -325,8 +326,8 @@ Section IcacheGhost.
      no other reference to this inode exists anywhere in the system.  The
      fourth is its converse, which is what tells a would-be last closer that
      it is NOT the last one. *)
-  Lemma iref_lookup γ M k q :
-    itable_half γ M -∗ iref_tok γ k q -∗
+  Lemma iref_lookup M k q :
+    itable_half M -∗ iref_tok k q -∗
     ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (qt ≤ 1)%Qp /\
        (n = 1%positive -> q = qt) /\ (q = qt -> n = 1%positive)⌝.
   Proof.
@@ -357,9 +358,9 @@ Section IcacheGhost.
      BioInv.bref_tok_free_absurd's mirror, against the HALF authority --
      [singleton_included_l] reads through any dfrac, exactly as in
      [iref_lookup] above. *)
-  Lemma iref_tok_free_absurd γ M k q :
+  Lemma iref_tok_free_absurd M k q :
     M !! k = None ->
-    itable_half γ M -∗ iref_tok γ k q -∗ False.
+    itable_half M -∗ iref_tok k q -∗ False.
   Proof.
     rewrite /itable_half /iref_tok. iIntros (HM) "Ha Hf".
     iDestruct (own_valid_2 with "Ha Hf")
@@ -376,8 +377,8 @@ Section IcacheGhost.
      any second one -- which is how iput's authority-side opening of the
      escrow kills the checked-out arm.  The count component's inclusion is
      the whole content: [(q1,1) ⋅ (q2,1) = (q1+q2, 2)]. *)
-  Lemma iref_tok_two_lookup γ M k q1 q2 :
-    itable_half γ M -∗ iref_tok γ k q1 -∗ iref_tok γ k q2 -∗
+  Lemma iref_tok_two_lookup M k q1 q2 :
+    itable_half M -∗ iref_tok k q1 -∗ iref_tok k q2 -∗
     ⌜∃ (qt : Qp) (n : positive), M !! k = Some (qt, n) /\ (2 <= Pos.to_nat n)%nat⌝.
   Proof.
     rewrite /itable_half /iref_tok. iIntros "Ha H1 H2".
@@ -385,7 +386,7 @@ Section IcacheGhost.
                    : icacheUR)
                   = ◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]}).
     { rewrite -auth_frag_op singleton_op -pair_op frac_op. reflexivity. }
-    iAssert (own γ (◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]})) with "[H1 H2]" as "Hf".
+    iAssert (own icfg_iref (◯ {[ k := ((q1 + q2)%Qp, 2%positive) ]})) with "[H1 H2]" as "Hf".
     { rewrite -Hop own_op. iFrame. }
     iDestruct (own_valid_2 with "Ha Hf")
       as %[_ [Hincl _]]%auth_both_dfrac_valid_discrete.
@@ -401,8 +402,8 @@ Section IcacheGhost.
   Qed.
 
   (* a reference's slot is in range -- what the scan's index bound needs *)
-  Lemma iref_tok_in_range γ M k q :
-    icM_wf M -> itable_half γ M -∗ iref_tok γ k q -∗ ⌜(k < NINODE)%nat⌝.
+  Lemma iref_tok_in_range M k q :
+    icM_wf M -> itable_half M -∗ iref_tok k q -∗ ⌜(k < NINODE)%nat⌝.
   Proof.
     intros [Hdom _]. iIntros "Ha Hf".
     iDestruct (iref_lookup with "Ha Hf") as %(qt & n & HM & _).
@@ -430,11 +431,11 @@ Section IcacheGhost.
      [iref_dup_step] (idup's shape) cannot serve.  The budget of §13.1b caps
      the minted fraction at 1/2, because the escrow's parked arm owns the
      other half of [i_inum] permanently. *)
-  Lemma iref_alloc_step γ M k (q : Qp) :
+  Lemma iref_alloc_step M k (q : Qp) :
     M !! k = None ->
     (q ≤ 1/2)%Qp ->
-    own γ (● M) ==∗
-    own γ (● (<[k := (q, 1%positive)]> M)) ∗ iref_tok γ k q.
+    own icfg_iref (● M) ==∗
+    own icfg_iref (● (<[k := (q, 1%positive)]> M)) ∗ iref_tok k q.
   Proof.
     iIntros (HM Hq) "Ha".
     assert (Hv : ✓ q).
@@ -447,11 +448,11 @@ Section IcacheGhost.
      reference at fraction [qn] taken from the table's RETAINED share.  The
      incrementer holds no reference of its own, so the entry grows by exactly
      the minted amount -- BioInv.bio_incr_step verbatim. *)
-  Lemma iref_incr_step γ M k qt (n : positive) (qn : Qp) :
+  Lemma iref_incr_step M k qt (n : positive) (qn : Qp) :
     M !! k = Some (qt, n) ->
     ✓ (qt + qn)%Qp ->
-    own γ (● M) ==∗
-    own γ (● (<[k := ((qt + qn)%Qp, Pos.succ n)]> M)) ∗ iref_tok γ k qn.
+    own icfg_iref (● M) ==∗
+    own icfg_iref (● (<[k := ((qt + qn)%Qp, Pos.succ n)]> M)) ∗ iref_tok k qn.
   Proof.
     iIntros (HM Hq) "Ha". rewrite /iref_tok.
     iMod (own_update _ _ _ (ic_incr_upd M k qt qn n HM Hq) with "Ha") as "H".
@@ -461,11 +462,11 @@ Section IcacheGhost.
   (* idup, and iget's cache-hit arm: [ref++].  The new reference's fraction
      comes out of the CALLER's own -- nothing is conjured, which is why the
      invariant's leftover share is untouched. *)
-  Lemma iref_dup_step γ M k q qt (n : positive) :
+  Lemma iref_dup_step M k q qt (n : positive) :
     M !! k = Some (qt, n) ->
-    own γ (● M) -∗ iref_tok γ k q ==∗
-    own γ (● (<[k := (qt, Pos.succ n)]> M)) ∗
-    iref_tok γ k (q/2)%Qp ∗ iref_tok γ k (q/2)%Qp.
+    own icfg_iref (● M) -∗ iref_tok k q ==∗
+    own icfg_iref (● (<[k := (qt, Pos.succ n)]> M)) ∗
+    iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp.
   Proof.
     iIntros (HM) "Ha Hf".
     iMod (own_update_2 _ _ _ (● (<[k := (qt, Pos.succ n)]> M)
@@ -492,10 +493,10 @@ Section IcacheGhost.
      SOMEWHERE, and it goes back into the outstanding total.  That is why
      the frac component tracks OUTSTANDING share rather than being pinned
      at 1. *)
-  Lemma iref_close_step γ M k q qt (n : positive) (qr : Qp) :
+  Lemma iref_close_step M k q qt (n : positive) (qr : Qp) :
     M !! k = Some (qt, Pos.succ n) ->
     (qt - q)%Qp = Some qr ->
-    own γ (● M) -∗ iref_tok γ k q ==∗ own γ (● (<[k := (qr, n)]> M)).
+    own icfg_iref (● M) -∗ iref_tok k q ==∗ own icfg_iref (● (<[k := (qr, n)]> M)).
   Proof.
     iIntros (HM Hsub) "Ha Hf".
     apply Qp.sub_Some in Hsub.       (* qt = q + qr *)
@@ -537,9 +538,9 @@ Section IcacheGhost.
      the outstanding total has already shrunk.  What makes this closer the
      last one is the COUNT: [positiveR] has no unit, so no frame can sit
      beside a fragment recording count 1. *)
-  Lemma iref_close_last_step γ M k (qt : Qp) :
+  Lemma iref_close_last_step M k (qt : Qp) :
     M !! k = Some (qt, 1%positive) ->
-    own γ (● M) -∗ iref_tok γ k qt ==∗ own γ (● (delete k M)).
+    own icfg_iref (● M) -∗ iref_tok k qt ==∗ own icfg_iref (● (delete k M)).
   Proof.
     iIntros (HM) "Ha Hf".
     iApply (own_update_2 _ _ _ (● (delete k M)) with "Ha Hf").
@@ -570,6 +571,7 @@ End IcacheGhost.
 
 Section IcacheRefInv.
   Context `{!riscvGS Σ, !icacheG Σ}.
+  Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
 
   Definition icacheN : namespace := nroot .@ "icache".
@@ -580,13 +582,13 @@ Section IcacheRefInv.
   (* The invariant's half of the authority sits BESIDE the cells, so the
      cells and the counts can never disagree, and a thread holding the
      other half (the itable lock's) is the only one that can move either. *)
-  Definition itable_body (γ : gname) : iProp Σ :=
+  Definition itable_body : iProp Σ :=
     (∃ M : gmap nat (Qp * positive),
-       itable_half γ M ∗ ⌜icM_wf M⌝ ∗ iref_cells M)%I.
+       itable_half M ∗ ⌜icM_wf M⌝ ∗ iref_cells M)%I.
 
-  Definition itable_inv (γ : gname) : iProp Σ := inv icacheN (itable_body γ).
+  Definition itable_inv : iProp Σ := inv icacheN itable_body.
 
-  Global Instance itable_inv_persistent γ : Persistent (itable_inv γ).
+  Global Instance itable_inv_persistent : Persistent itable_inv.
   Proof. apply _. Qed.
 
   Local Lemma seq_ninode_lookup (k : nat) :
@@ -642,19 +644,19 @@ Section IcacheRefInv.
      is the resource they need: the atomic-update argument
      [WpSconfMem.wp_load_s_sconf_au] takes at width 4, with
      [Em := Eo ∖ ↑icacheN] and
-     [Ψ v := ⌜0 < bv_unsigned v < 2^31⌝ ∗ iref_tok γ k q].
+     [Ψ v := ⌜0 < bv_unsigned v < 2^31⌝ ∗ iref_tok k q].
 
      The two bounds are exactly what [InodeLock.inode_ref_spos] turns into
      "[bge x0,a5] falls through", i.e. into "the panic is dead" -- so this
      lemma REPLACES [SpecIlock.v]'s [i_ref ip ↦₄{dqr} refv] premise, which
      no icache can supply (see the file header and the design note).       *)
-  Lemma iref_load_au (Eo : coPset) (γ : gname) (k : nat) (q : Qp) :
+  Lemma iref_load_au (Eo : coPset) (k : nat) (q : Qp) :
     ↑icacheN ⊆ Eo ->
-    itable_inv γ -∗ iref_tok γ k q -∗
+    itable_inv -∗ iref_tok k q -∗
     |={Eo, Eo ∖ ↑icacheN}=> ∃ v : mword 32,
       i_ref (ientry k) ↦₄ v ∗
       (i_ref (ientry k) ↦₄ v ={Eo ∖ ↑icacheN, Eo}=∗
-         ⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗ iref_tok γ k q).
+         ⌜0 < bv_unsigned v < 2 ^ 31⌝ ∗ iref_tok k q).
   Proof.
     iIntros (HE) "#Hinv Htok".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -681,13 +683,13 @@ Section IcacheRefInv.
      map inside the invariant IS [M] ([itable_half_agree]) and the word the
      [lw] sees is [iref_word M k].  That is what makes the [addiw] between
      the load and the store mean "the count, plus one". *)
-  Lemma iref_load_locked_au (Eo : coPset) (γ : gname)
+  Lemma iref_load_locked_au (Eo : coPset) 
       (M : gmap nat (Qp * positive)) (k : nat) :
     ↑icacheN ⊆ Eo -> (k < NINODE)%nat ->
-    itable_inv γ -∗ itable_half γ M -∗
+    itable_inv -∗ itable_half M -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
-      (i_ref (ientry k) ↦₄ iref_word M k ={Eo ∖ ↑icacheN, Eo}=∗ itable_half γ M).
+      (i_ref (ientry k) ↦₄ iref_word M k ={Eo ∖ ↑icacheN, Eo}=∗ itable_half M).
   Proof.
     iIntros (HE Hk) "#Hinv Hhalf".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -708,18 +710,18 @@ Section IcacheRefInv.
      word changes.  [Hno] -- that the incremented count is still an [int] --
      is what re-establishes [icM_wf]; it is NOT provable here and comes from
      the caller's [IrefSlots.iref_slots_no_overflow]. *)
-  Lemma iref_dup_store_au (Eo : coPset) (γ : gname)
+  Lemma iref_dup_store_au (Eo : coPset) 
       (M : gmap nat (Qp * positive)) (k : nat) (q qt : Qp) (n : positive) :
     ↑icacheN ⊆ Eo ->
     M !! k = Some (qt, n) ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    itable_inv γ -∗ itable_half γ M -∗ iref_tok γ k q -∗
+    itable_inv -∗ itable_half M -∗ iref_tok k q -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half γ (<[k := (qt, Pos.succ n)]> M) ∗
-         iref_tok γ k (q/2)%Qp ∗ iref_tok γ k (q/2)%Qp).
+         itable_half (<[k := (qt, Pos.succ n)]> M) ∗
+         iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp).
   Proof.
     iIntros (HE HMk Hno) "#Hinv Hhalf Htok".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -729,7 +731,7 @@ Section IcacheRefInv.
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_dup_step γ M k q qt n HMk with "Hauth Htok") as "(Hauth & Ht1 & Ht2)".
+    iMod (iref_dup_step M k q qt n HMk with "Hauth Htok") as "(Hauth & Ht1 & Ht2)".
     iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
     iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
     { iNext. iExists (<[k := (qt, Pos.succ n)]> M). iFrame "Ha".
@@ -762,19 +764,19 @@ Section IcacheRefInv.
      table's [1/2 - qt], so the sum never passes 1/2), and [Hno] -- that the
      incremented count is still an [int] -- comes from
      [IrefSlots.iref_slots_no_overflow] exactly as in ProofIdup. *)
-  Lemma iref_incr_store_au (Eo : coPset) (γ : gname)
+  Lemma iref_incr_store_au (Eo : coPset) 
       (M : gmap nat (Qp * positive)) (k : nat) (qt qn : Qp) (n : positive) :
     ↑icacheN ⊆ Eo ->
     M !! k = Some (qt, n) ->
     ✓ (qt + qn)%Qp ->
     (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
-    itable_inv γ -∗ itable_half γ M -∗
+    itable_inv -∗ itable_half M -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half γ (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
-         iref_tok γ k qn).
+         itable_half (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
+         iref_tok k qn).
   Proof.
     iIntros (HE HMk Hq Hno) "#Hinv Hhalf".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -784,7 +786,7 @@ Section IcacheRefInv.
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_incr_step γ M k qt n qn HMk Hq with "Hauth") as "(Hauth & Htok)".
+    iMod (iref_incr_step M k qt n qn HMk Hq with "Hauth") as "(Hauth & Htok)".
     iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
     iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
     { iNext. iExists (<[k := ((qt + qn)%Qp, Pos.succ n)]> M). iFrame "Ha".
@@ -844,17 +846,17 @@ Section IcacheRefInv.
      goes DOWN, so [icM_wf]'s bound is re-established from the bound the
      invariant already carried ([icM_wf_count] at [Pos.succ n]).  That
      asymmetry with the two increment wrappers is the whole difference. *)
-  Lemma iref_close_store_au (Eo : coPset) (γ : gname)
+  Lemma iref_close_store_au (Eo : coPset) 
       (M : gmap nat (Qp * positive)) (k : nat) (q qt qr : Qp) (n : positive) :
     ↑icacheN ⊆ Eo ->
     M !! k = Some (qt, Pos.succ n) ->
     (qt - q)%Qp = Some qr ->
-    itable_inv γ -∗ itable_half γ M -∗ iref_tok γ k q -∗
+    itable_inv -∗ itable_half M -∗ iref_tok k q -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos n) : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half γ (<[k := (qr, n)]> M)).
+         itable_half (<[k := (qr, n)]> M)).
   Proof.
     iIntros (HE HMk Hsub) "#Hinv Hhalf Htok".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -864,7 +866,7 @@ Section IcacheRefInv.
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_close_step γ M k q qt n qr HMk Hsub with "Hauth Htok") as "Hauth".
+    iMod (iref_close_step M k q qt n qr HMk Hsub with "Hauth Htok") as "Hauth".
     iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
     iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
     { iNext. iExists (<[k := (qr, n)]> M). iFrame "Ha".
@@ -888,16 +890,16 @@ Section IcacheRefInv.
      the free-slot shape iget's scan looks for.  The closer must present
      the WHOLE outstanding share [qt]; REF-1 ([iref_lookup] at count one)
      is what tells it that its own [q] is that share. *)
-  Lemma iref_close_last_store_au (Eo : coPset) (γ : gname)
+  Lemma iref_close_last_store_au (Eo : coPset) 
       (M : gmap nat (Qp * positive)) (k : nat) (qt : Qp) :
     ↑icacheN ⊆ Eo ->
     M !! k = Some (qt, 1%positive) ->
-    itable_inv γ -∗ itable_half γ M -∗ iref_tok γ k qt -∗
+    itable_inv -∗ itable_half M -∗ iref_tok k qt -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half γ (delete k M)).
+         itable_half (delete k M)).
   Proof.
     iIntros (HE HMk) "#Hinv Hhalf Htok".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -907,7 +909,7 @@ Section IcacheRefInv.
     iDestruct (iref_cells_acc_del M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_close_last_step γ M k qt HMk with "Hauth Htok") as "Hauth".
+    iMod (iref_close_last_step M k qt HMk with "Hauth Htok") as "Hauth".
     iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
     iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
     { iNext. iExists (delete k M). iFrame "Ha".
@@ -931,6 +933,7 @@ End IcacheRefInv.
 
 Section IcacheTable.
   Context `{!riscvGS Σ, !lockG Σ, !icacheG Σ, !irefslotG Σ}.
+  Context `{ICFG : icfg}.
   Context `{GEN : GenId}.
 
   (* [inode_ident] and [inode_ref] are [IcacheRef.v]'s; only the JOIN
@@ -1018,15 +1021,15 @@ Section IcacheTable.
     | Some (q, n) => (islot_rest k q ∗ iref_slots (Pos.to_nat n))%I
     end.
 
-  Definition itable_res (γ : gname) : iProp Σ :=
+  Definition itable_res : iProp Σ :=
     (∃ M : gmap nat (Qp * positive),
-       itable_half γ M ∗ ⌜icM_wf M⌝ ∗ iref_slots_auth ∗
+       itable_half M ∗ ⌜icM_wf M⌝ ∗ iref_slots_auth ∗
        [∗ list] k ∈ seq 0 NINODE, islot M k)%I.
 
-  Definition is_itable (γl γ : gname) : iProp Σ :=
-    is_lock γl itable_lock "itable"%string (itable_res γ).
+  Definition is_itable (γl : gname) : iProp Σ :=
+    is_lock γl itable_lock "itable"%string itable_res.
 
-  Global Instance is_itable_persistent γl γ : Persistent (is_itable γl γ).
+  Global Instance is_itable_persistent γl : Persistent (is_itable γl).
   Proof. apply _. Qed.
 
   (* The lock resource's slot accessor, in the form a WRITER needs: the map

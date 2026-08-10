@@ -130,7 +130,7 @@ Local Open Scope Z_scope.
 Definition sys_pipe_stack : nat := 82%nat.
 
 Section SpecSysPipe.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
 
   (* sys_pipe's result, keyed by the returned a0, over the process state [W]
      the syscall ends with -- i.e. the incoming [V] with copyout's page-table

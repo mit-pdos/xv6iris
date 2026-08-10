@@ -460,7 +460,7 @@ Section WpBfreeSllw.
       (pc : mword 64) (rd rs1 rs2 : mword 5) (wval : mword 64)
       (m : regfile) (n : nat) (b : bool) :
     uint rd <> 0 ->
-    rd_ok rd ->
+    ops_ok b rd rs1 rs2 ->
     sign_extend' 64
       (shift_bits_left (subrange_vec_dec (rget m rs1) 31 0 : mword 32)
          (subrange_vec_dec
@@ -474,10 +474,10 @@ Section WpBfreeSllw.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrd Hrdok Hwval) "Hcg Hpc Hinstr Hcont".
+    iIntros (Hrd Hops Hwval) "Hcg Hpc Hinstr Hcont".
     unshelve iApply (wp_gpr_write_s_sconf_base pc rd rs1 rs2
               (RTYPEW (Regidx rs2, Regidx rs1, Regidx rd, SLLW)) wval m n b
-              Hrd Hrdok _
+              Hrd Hops _
               with "Hcg Hpc Hinstr Hcont").
     - intros s_pc Hnpc Hva Hvb.
       rewrite (exec_execute_RTYPEW_SLLW_gpr rs2 rs1 rd s_pc).
@@ -516,7 +516,7 @@ Local Ltac bfidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  Vocabulary: the frame, the byte accessor, the continuation.           *)
 (* ===================================================================== *)
 Section BfreeDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* bfree's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
@@ -595,7 +595,7 @@ Definition bf_sp (m M : regfile) : Prop :=
 (*  +0x4a .. +0x5e : log_write, brelse and the epilogue.                  *)
 (* ===================================================================== *)
 Section BfreeTail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   Local Lemma bf_tail `{GEN : GenId} `{CID0 : CpuId} 
@@ -989,7 +989,7 @@ End BfreeTail.
 (*  +0x00 .. +0x46 : the prologue, bread, the bit test and the clear.     *)
 (* ===================================================================== *)
 Section ProofBfreeMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
