@@ -294,9 +294,18 @@ out 2026-08-09):**
     always MAY truncate, so the bundle is unconditional; premises:
     the `nib` bound, `cov_below cov size` (bfree's, via itrunc),
     itrunc/iupdate's geometry premises threaded.
-  Retires `LinkIput.v`'s axiom and the last fs-side assumption in
-  kexit's cone; finish with Print Assumptions over kexit's linked
-  theorem.
+  C6a retires `LinkIput.v`'s axiom for every consumer EXCEPT
+  kexit/fileclose, which hold the `emp` placeholder
+  (`FileInv.inode_ref` — ProofFileclose:1225's fraction mismatch only
+  typechecks BECAUSE it is emp) and bridge through a clearly-marked
+  `LinkIputCompat.v` axiom until **C6b**: the placeholder retirement
+  (design §3's icacheG-carried-names route; FileInv.file_payload's
+  FD_INODE arm carries cn/k/dev/inum + the `fc_ip C = ientry k` tie;
+  ProcInv.cwd_ref; SpecFileclose/ProofFileclose/ProofKexit thread).
+  The kexit-cone Print Assumptions audit comes fully clean only after
+  C6b. Decode landed 2346c26a (ipi_, 138 B; the walk validated the
+  whole choreography, incl. the SHARED ref-- tail both arms fall into
+  and the +0x18-read-then-REF-1 ordering).
 
 ## C7 — the boot wiring (`ireg_alloc` + pool stocking)
 
