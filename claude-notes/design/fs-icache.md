@@ -1806,3 +1806,43 @@ coordination between the two working lines:
 Either path then reaches C8 (SpecIlock/SpecFileread over shares) with
 the same bracket vocabulary. The trade is: A pays in re-proof and a
 weaker (discipline-shaped) ledger; B pays in cross-line coordination.
+
+### 14.5 Path A sharpened to an impossibility: under natR, carving a
+### share is a NON-EVENT (2026-08-10, exploring "how hard is A")
+
+The decisive algebraic fact: at `prodR fracR natR`,
+
+    (q, 1) = (q − s, 1) ⋅ (s, 0)
+
+is ⋅-DECOMPOSITION, not an update. Owning a reference definitionally IS
+owning a smaller reference beside a share; nothing fires, no invariant
+opens, no ghost moves. So no ledger — invariant-side, authority-side,
+or otherwise — can count shares, because a ledger counts EVENTS and
+share-creation is not one. Every witness clause of §14.2/§14.3 is
+therefore only ASSUMABLE under natR, never OWNABLE, and iput's eviction
+needs it owned. Under `positiveR` the same decomposition does not exist
+(no zero in the count), so carving REQUIRES a real update against some
+other ghost — which is precisely the event Path B's auth-guarded ledger
+counts. The algebra choice is not a cost trade-off: it decides whether
+"share" is a countable event.
+
+Consequently Plan A has exactly three completions, none of which is
+"adopt natR and rework iput":
+1. iput stays unprovable (regression; rejected);
+2. A+B — natR retype PLUS Path B's separate share ghost, with the
+   count-0 elements never used by any contract: sound, but the retype
+   buys only textual compatibility with origin's two share commits,
+   and the unused free-split capability is a standing hazard (any
+   future proof that uses it silently divorces the ledger from the
+   truth it is supposed to bound);
+3. a third RA where share-creation is auth-mediated inside the same
+   map — a redesign, i.e. Path B in different clothes.
+
+RECOMMENDATION SHARPENED: the A-vs-B question as posed in §14.4
+dissolves — B (or an A+B hybrid where natR is adopted knowingly as
+compatibility-only) are the only sound endpoints. What origin's line
+loses under B: the two share commits' proofs port (idup's share form
+becomes a ledger-carve + upgrade against the new ghost — same shape,
+one extra fupd) and fp_iq survives verbatim as the ledger's
+proportional accounting. What B must add that A never had to state:
+nothing — the ledger was needed either way; B just makes it sound.
