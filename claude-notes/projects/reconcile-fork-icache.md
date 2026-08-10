@@ -157,3 +157,31 @@ inside it, so origin's 28-commit kfork line is a real ancestor of main.
   `positive` with a pointer to T5 at the site. Verified by grep that no
   file in the kfork/sys_fork cone consumes `iref_shr_at` / `inode_shr` /
   count-0 shares.
+
+## T5 EXECUTION: Plan B trial (authorized 2026-08-10, user ruling)
+
+Design: fs-icache.md §14.5 (A's impossibility) + §14.6 (B's shape and
+sizing). Staging, one branch + gate per stage:
+
+- **B1** — the definitional layer: `γlive` (per-slot fractional
+  liveness, auth in `itable_body` beside the ref-word cells, clause
+  tying its support to `dom M`); `inode_shr k s dev inum :=
+  inode_ident k s ∗ live_frac k s`; the carve/gather lemmas (the ONLY
+  minters — auth-guarded events, §14.5's requirement) + upgrade
+  (share→reference under the lock, origin's idup shape); the six
+  store-AU lemmas re-framed over the grown body; iput's last close
+  retires the pool inside its existing invariant opening (ProofIput's
+  REF-1 sites untouched — §14.6's mass argument). ProofIdup and every
+  itable_inv opener ride through with one extra framed conjunct.
+- **B2** — C8: SpecIlock/SpecIunlock/SpecFileread over `inode_shr`;
+  the escrow OUT arm gains the share-shaped alternative (refuted at
+  REF-1 by ident-mass overflow, §14.6); ProofIlock re-proof +
+  fileread/iunlock repairs.
+- **B3** — origin's share commits ported: SpecIdup's share form
+  (carve+upgrade), ProofKforkB4's shorter block, fp_iq's payload arm.
+  Partly deferrable.
+
+The canonical-pairing convention (tok fraction = ident fraction in
+`inode_ref`) is LOAD-BEARING and must be stated in IcacheRef's header:
+it is what makes shares unable to outlive their parent and iput's
+witness a mass corollary.
