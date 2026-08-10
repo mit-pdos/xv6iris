@@ -826,3 +826,18 @@ subterm matching" on a term you can see. Restate the fact you want at the `u_*`
 spelling in one line closed by `exact` (conversion does the work), then rewrite
 with the restatement. Same reflex for any Pt4kWalk fact reached from the `u_*`
 side.
+
+## ssreflect `set` binds the GOAL's instance, and hart-indexed terms
+## print identically (found proving memcmp, 2026-08-10)
+
+`set (M := <[r := … rget M2 rs …]> M2)` matches up to conversion and
+captures the GOAL's occurrence — whose `rget` carries the hart the
+branch just peeled (`CID3`), not the ambient `CID` you typed. A later
+`rewrite` with an ambient-hart register fact then fails with "does not
+match any subterm" while the printed goal shows the very term,
+character-identical. The same idiom succeeds elsewhere in the same file
+wherever the harts coincide, which is what makes it maddening. Fix:
+state register facts CID-generically up front —
+`assert (∀ CID', rget (CID := CID') M2 r = v)` — and rewrite with that
+(the prologue's ra/s0 facts already follow this pattern; follow it for
+every register that survives a hart-peeling branch).
