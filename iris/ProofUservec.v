@@ -1363,6 +1363,10 @@ Section UservecAllPt.
     { unfold user_cfg. rewrite Hdqc.
       iFrame "Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse". }
     subst M7 M6 M5 M4 M3 M2.
+    (* the continuation is sealed (SpecUservec.uservec_post) so that its
+       ~50-wand type is not re-embedded in the proof term at every one of the
+       proof's ~600 steps; open it here, once, at the return. *)
+    iEval (rewrite /uservec_post) in "Hcont".
     iSpecialize ("Hcont" $! g ms_v sc_v stval_v sepc_v with "[%]"); [ exact Hok |].
     iApply ("Hcont" with "Hhs Hpriv Hms Hsc Hstval Hsepc Hsscr Hktlb Hufr Hdata Hcfg Hpc Hfile
              Hk0 Hk8 Hk16 Hk32

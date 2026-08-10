@@ -48,6 +48,155 @@ Corollary for the sweep: any `ltac:(set_solver)` / `ltac:(lia)` appearing as a
 positional argument in a `Proof<F>.v` capstone is a suspect, because that is
 exactly where the context is widest.
 
+## WHY `Qed` IS EXPENSIVE, MEASURED END TO END (2026-08-10)
+
+Re-measured on the 921-file tree (clean `-j32` build: **wall 623 s, ΣCPU
+13444 s, `Qed` 1997 s = 14.9 % of ΣCPU**; in a heavy `Proof<F>.v` the `Qed`
+alone is ~25 % of the file).  The section below it ("`Qed` time is term size")
+is right; this section pins down *how* the term gets big, what the ceiling on
+each remedy is, and which remedy was built, measured and REJECTED.
+
+### 1. Only a sixth of `Qed` is typechecking; the rest is four tree walks
+
+`rocq compile -profile <f>.json` on `ProofUservec` (one 17 s `Qed`, isolated,
+83 s file):
+
+| phase | s | what it is |
+|---|---|---|
+| `HConstr.of_constr` | 6.57 | build the sharing DAG — **walks the TREE** |
+| `close_proof` (self) | 3.33 | incl. `global_vars_set` over the body — **TREE** |
+| `Typeops.execute` | 3.18 | the only real typechecking; DAG-linear (memoized on `HConstr.refcount`) |
+| `interp-delayed-qed` (self) | 2.43 | plumbing |
+| `sort_and_universes_of_constr` | 1.54 | `universes_of_body_type` (vernac) + `check_wellformed_universes` (kernel) — **TREE, twice** |
+
+A `Qed` therefore walks the whole proof term **four times** around one
+DAG-linear typecheck.  Each walk is a `Constr.fold` with no memo, i.e. linear
+in the number of *occurrences*, not of distinct subterms.
+
+### 2. The terms are 200–700× bigger as trees than as DAGs
+
+`-d hconstr` (the CLI form of `Set Debug "hconstr"`) per `Qed`:
+
+| proof | tree | bindings (DAG) | ratio |
+|---|---|---|---|
+| `ProofUservec.wp_uservec_pt` | 39,006,927 | 53,456 | 730× |
+| `ProofVirtioDiskInit` | 39,888,709 | 76,585 | 521× |
+| `ProofCopyout` | 11,828,826 | 63,813 | 185× |
+
+### 3. The law: `tree ≈ 2 × (#proofmode steps) × |Δ|`
+
+Every proofmode step's proof term mentions the *whole* Iris context twice — the
+input and the output environment of the `tac_*` lemma it applies.  So the tree
+is the context term copied once per step per environment.  Measured by
+truncating `ProofUservec` with an axiom stub (`Axiom cheat_ : forall (A:Type), A.`
+then `exact (cheat_ _).`, which unlike `Admitted` still runs `Qed`):
+
+| cut point | tree | per added step |
+|---|---|---|
+| after the opening `iIntros` | 38,792 | |
+| + 10 `iPoseProof` | 1,141,943 | |
+| + 34 more `iPoseProof` | 2,980,875 | **~54,000 nodes/step** |
+| + 1 `iApply` | 3,485,989 | |
+
+Forty-four *trivial* `iPoseProof (uvi_X with "Hkt")` cost 54k tree nodes EACH,
+while `bindings` grows by only ~50 per step.  That ratio is the whole story:
+**`Qed` time is the size of the Iris CONTEXT times the number of steps it
+survives.**  It also means splitting a proof into `Qed`-sealed chunks buys
+nothing by itself — each chunk still carries its own context.
+
+### 4. NEGATIVE RESULT — this cannot be fixed in the Rocq kernel with sharing
+
+The obvious kernel fix is to memoize the four walks on the *physical* identity
+of each subterm: if the term is a DAG in memory, re-walking every occurrence is
+avoidable.  It was built and measured.  Rocq 9.0.1 was rebuilt from the opam
+sources with dune (`/shared/xv6rocq/_opam/.opam-switch/sources/rocq-runtime.9.0.1`,
+`dune build -p rocq-runtime`, `dune install --prefix`, then run with
+`OCAMLPATH=<inst>/lib:<switch>/lib ROCQLIB=<inst>/lib/coq` — note ROCQLIB is what
+selects the `rocqworker`, so it must point INSIDE the patched install or you
+silently measure the switch's stock worker).  `kernel/hConstr.ml`'s `of_constr`
+got a physical-identity memo keyed on `(constr address, rels range)` and
+`Typeops.execute` was made to memoize unconditionally (refcounts become a lower
+bound once whole subtrees are reused).
+
+**The proof terms have almost no physical sharing:** `ProofUservec` 384,314 memo
+hits out of 37.9 M walk steps (**1 %**), `ProofCopyout` 173,319 of 11.0 M
+(**1.6 %**), `ProofVirtioDiskInit` 191,711 of 36.3 M (**0.5 %**).  (Those are a
+LOWER bound: the memo buckets on `Hashtbl.hash_param 4 16` with the bucket
+length capped at 8, so a physically-shared subterm can be missed.  Re-running
+with `hash_param 32 64` and no cap to get the exact figure does not terminate in
+10 min — the hash itself then costs more than the walk — so the cheap-hash run
+is the practical measurement.)  The independent corroboration is **RSS**: a
+27–40 M-node term at 2.1–2.7 GB is ~70 bytes a node, i.e. the tree really is
+materialised; a 50 k-node DAG would be megabytes.  There is nothing for the
+kernel to exploit here.  **Do not repeat this experiment.**
+
+### 5. What DOES work
+
+Two measured levers on `ProofUservec` (isolated `rocq compile`; baseline
+**83.2 s file / 17.16 s `Qed` / 39.0 M tree**):
+
+- **Seal the continuation.**  `SpecUservec.wp_uservec_pt_body` spelled its
+  ~50-wand continuation inline; extracting it into `Definition uservec_post`
+  (+ `Global Typeclasses Opaque`, + one `iEval (rewrite /uservec_post) in "Hcont"`
+  at the return) gives **63.5 s / 14.14 s / 27.2 M tree** — that one hypothesis
+  was **30 % of the whole proof term**.  Corroborated in-build (the measurement
+  that does not drift): **user 159.9 s → 140.1 s, RSS 2.67 GB → 2.14 GB**.  Note
+  the whole-build ΣCPU says nothing here — across the two clean builds Σuser
+  moved +4.7 % and Σreal +41 % while ΣRSS was identical to 0.1 %, i.e. pure
+  scheduling noise, exactly as the measurement-discipline rule below warns.
+  This is the rule already in this file
+  ("SEAL A WHOLE-FUNCTION PROOF'S CONTINUATION"); what is new is *why* it pays
+  and by how much: the payoff is proportional to the number of proof steps the
+  hypothesis survives, so it is largest in the longest proofs.  There are **41
+  remaining inline continuations of ≥12 wands** in the tree (find them with a
+  regex for a `( ∀ … WP …) -∗` block and count its `-∗`); the worst are
+  `ProofSysPause.v:285` (83 wands), `ProofPipewrite.v:499` (67),
+  `SpecUsertrap.v:187` (60), `ProofKernelvec.v:282` (47), `WpUmodeStep.v:211`
+  and `ProofKforkB6.v:150` (44).
+- **`Proof using`.**  `global_vars_set` (walk #2 above) runs only when the proof
+  entry has no `secctx`, i.e. when there is no `Proof using` annotation *and*
+  the lemma sits in a `Section` with variables — which is every one of the
+  tree's 17,774 `Proof.`s.  `Set Default Proof Using "All"` on the sealed file:
+  `Qed` **14.14 s → 11.72 s (−17 %)**, file 63.5 s → 59.1 s.
+  - **But do NOT set it globally as `"Type*"` or `"All"`** — measured: a
+    tree-wide `-set "Default Proof Using=Type*"` build dies at `PtTreeAdue.v:440`
+    with *"The term p0 has type mword 64 while it is expected to have type
+    mword 44"*, because the annotation changes which section variables a lemma
+    is generalized over and therefore its ARGUMENT LIST, and the tree applies
+    lemmas positionally.  The safe form is the per-lemma *minimal* set — exactly
+    what Rocq computes by default — obtained from `Set Suggest Proof Using` and
+    written back mechanically; the constant is then identical and nothing
+    downstream moves.
+- **Do not `unfold` an address/value abstraction that lives in the CONTEXT.**
+  `ProofUservec` opens with `unfold tf_pa`, so all 35 trapframe points-to
+  hypotheses carry the address spelled out as the
+  `zero_extend'/concat_vec/subrange_vec_dec/bits_of_virtaddr/mword_of_int
+  (TRAPFRAME + k)` chain — ~260 nodes each instead of ~12 — for all ~600 steps.
+  `iClear`-ablation puts that at **27 % of the proof term** (below).  If a leaf
+  needs the unfolded form, unfold it at the leaf, or `set` the unfolded address
+  to a local name so the context carries a variable.
+
+### 6. Which hypothesis is big: ablate with `iClear`, do not read the proof
+
+Insert `iClear "…"` **before** the block of steps you are measuring — clearing
+at the end measures nothing, because the earlier steps have already paid — and
+diff the tree size.  On `ProofUservec` across the 44-`iPoseProof` block
+(baseline 2,980,875 with the continuation already sealed):
+
+| ablation | tree | Δ |
+|---|---|---|
+| the 35 `tf_pa` trapframe cells | 2,167,301 | **−27 %** |
+| everything except `Hkt` | 2,064,101 | −31 % |
+| the (already sealed) continuation | 2,979,791 | 0 |
+| `Hutlb`/`Hdata` (page-table + data bundles) | 2,979,790 | 0 |
+| `gpr_file` | 2,980,952 | 0 |
+| the nine config cells | 2,967,848 | 0 |
+
+The same probe measures the floor: with the context emptied a proofmode step
+still costs ~6 k tree nodes (the goal plus the `tac_*` plumbing, twice), so
+~600 steps have a ~3.6 M-node irreducible term at this proof length.  Anything
+above that is context you chose to carry.
+
 ## WHERE `Qed` TIME ACTUALLY GOES: proof-term TREE size, not typechecking
 
 Measured 2026-08-05 with `rocq compile -profile`, which breaks a `Qed` down by
