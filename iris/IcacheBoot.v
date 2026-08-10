@@ -481,12 +481,18 @@ Section IcacheBootTable.
      [kmem+24] conjuncts are the same claim and the precedent for it.
      The sleeplock at +16 is NOT here -- it is iinit's, and comes back as
      [sl_fresh]. *)
-  Definition ientry_raw (k : nat) : iProp Σ :=
-    ((∃ dev : mword 32, i_dev (ientry k) ↦₄ dev) ∗
-     (∃ inum : mword 32, i_inum (ientry k) ↦₄ inum) ∗
-     i_ref (ientry k) ↦₄ (mword_of_int 0 : mword 32) ∗
-     (∃ w : mword 32, i_valid (ientry k) ↦₄ w) ∗
-     inode_raw (ientry k))%I.
+  (* stated at the ADDRESS, with the index form right below it: the boot
+     byte-carve ([BootCarveMain.boot_inode_entries]) produces the entries as
+     an [ArrCursor] family, whose per-element predicate is applied to the
+     element's address and cannot mention the index at all. *)
+  Definition ientry_raw_at (ip : mword 64) : iProp Σ :=
+    ((∃ dev : mword 32, i_dev ip ↦₄ dev) ∗
+     (∃ inum : mword 32, i_inum ip ↦₄ inum) ∗
+     i_ref ip ↦₄ (mword_of_int 0 : mword 32) ∗
+     (∃ w : mword 32, i_valid ip ↦₄ w) ∗
+     inode_raw ip)%I.
+
+  Definition ientry_raw (k : nat) : iProp Σ := ientry_raw_at (ientry k).
 
   (* [BioInv.tok_fun_alloc]'s trick in the other direction: a big-op of
      EXISTENTIALS over [seq j n] yields ONE function of the index.  The
@@ -537,7 +543,7 @@ Section IcacheBootTable.
       ([∗ list] k ∈ seq 0 NINODE, ∃ w : mword 32, i_valid (ientry k) ↦₄ w) ∗
       ([∗ list] k ∈ seq 0 NINODE, inode_raw (ientry k)).
   Proof.
-    rewrite /ientry_raw.
+    rewrite /ientry_raw /ientry_raw_at.
     rewrite big_sepL_sep. apply bi.sep_mono_r.
     rewrite big_sepL_sep. apply bi.sep_mono_r.
     rewrite big_sepL_sep. apply bi.sep_mono_r.

@@ -59,6 +59,15 @@ userinit, and kerneltrap via Kernelvec). What the proof taught, worth keeping:
 - `main_globals_raw` additions the assemblies demanded: the
   panicking/panicked pair (printk_flags_inv allocation), the per-proc
   `p_chan` + `proc_pub` publics (procs_inv_alloc), `∃v, initproc ↦₈ v`.
+  Added 2026-08-10: `[∗ list] k ∈ seq 0 NINODE, IcacheBoot.ientry_raw k`,
+  the itable ENTRIES iinit does not touch (`ref` at pinned zero, the rest
+  contents-existential) — the other half of `icache_boot`'s physical
+  input. **Carried and dropped by `ProofMain` for now**: `icache_boot`
+  also wants the stocked inode pool, which needs the fs block layer in
+  main (`fs-icache.md` C7 owed (ii)). One gotcha for whoever consumes it:
+  `main_globals_raw` states it at `SpecIinit.NINODE` and `icache_boot`
+  wants `IcacheRef.NINODE` — same 50, different constant, so the bridge
+  is a conversion the client has to spell out.
 - The deposit wand delivers `printk_env`, `procs_inv`, the assembled
   disk interface (`is_lock γk d_lock "virtio_disk" (disk_res …)` +
   `disk_geom`), AND the shared kernel table (`kpt_inv root`, the `↦₈□`
@@ -440,7 +449,7 @@ Boot arm, the raw global inventory (each spinlock as
 | `plicinit` | `plic_inv` | — (the invariant's `plic_ok` is preserved, nothing is owed back) |
 | `plicinithart` | `dev_inv γd γv` | — |
 | `binit` | `lk_raw bcache`, `NBUF × sl_raw (buf_lock (bnode k))`, `NBUF × blink_raw`, `blink_raw bhead` | `lk_fresh`, `NBUF × sl_fresh "buffer"`, `bcache_lru bhead (blist 0 NBUF)` |
-| `iinit` | `lk_raw itable`, `NINODE × sl_raw (inode_lock i)` | `lk_fresh`, `NINODE × sl_fresh "inode"` |
+| `iinit` | `lk_raw itable`, `NINODE × sl_raw (inode_lock i)` (the `NINODE × ientry_raw` beside them are NOT iinit's — they ride past it to `icache_boot`) | `lk_fresh`, `NINODE × sl_fresh "inode"` |
 | `fileinit` | `lk_raw ftable` | `lk_fresh ftable "ftable"` |
 | `virtio_disk_init` | `lk_raw disk_lock`, `disk_{desc,avail,used} ↦₈`, 8 × `disk_free+j ↦ₘ`, `disk_inv γv` + the config-tracker half `disk_cfg_is γv ½ c0` at `⌜virtio_live c0 = false⌝`, `kalloc_env` with ≥3 pages | `vdi_post` |
 | `userinit` | G3 | — |
