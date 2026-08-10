@@ -1363,6 +1363,52 @@ Section IntrDefs.
     - exact (rget_src_indep b m rs2 Hb (ops_ok_s2 _ _ _ _ Hops) c1 c2).
   Qed.
 
+  (* THE FORM A CONVERTED LEAF ACTUALLY USES.  Inside the funnel's σ-callback a
+     leaf does not hold a bare [b = true]: it holds the [WpNext.wp_next] GUARD
+     for the hart the callback was instantiated at.  The two cases of that
+     guard are exactly the two reasons a source read is safe, and they are
+     complementary -- at [b = true] the guard says nothing and [src_ok] does
+     the work; at [b = false] the guard PINS the hart and [src_ok] is vacuous
+     (which is WHY it is guarded on [b] and not stated unconditionally).  So
+     the leaf gets one rewrite and never case-splits on [b] by hand.
+
+     The guard is spelled out rather than written [wp_next b pv _] because this
+     file is below [WpNext.v] in the dependency order; the shapes coincide.
+
+     MEASURED, on the two engines that already carry [ops_ok]: with this lemma
+     [wp_gpr_write_s_sconf{,_base}] convert to the wrapped funnel in three
+     lines each, and nothing else in their proofs moves.  The 72 OTHER leaves
+     whose pure premises mention [rget m rs] for a caller-chosen [rs] (24 in
+     WpSconfBtype.v, 20 in WpSconfMem.v, the rest across WpSconfLock /
+     WpSconfUartAccess / WpPlic / WpVirtioDev / WpSmodeHalf / WpSconfCsr /
+     WpSconfCtl / ProofBreadParts) cannot use it yet: they have no [src_ok] to
+     feed it, and giving them one changes call-site ARITY at ~1750 references.
+     That widening is the PREREQUISITE of the funnel move, not a follow-up. *)
+  Lemma rget_next_indep (b : bool) (pv : mword 64) (CIDn : CpuId)
+      (m : regfile) (rs : mword 5) :
+    (b = false \/ pv = zero_reg -> (CIDn : CPU) = (CID : CPU)) ->
+    src_ok b rs ->
+    rget (CID := CIDn) m rs = rget (CID := CID) m rs.
+  Proof.
+    intros Hs Hrs. destruct b.
+    - exact (rget_src_indep true m rs eq_refl Hrs CIDn CID).
+    - rewrite (_ : (CIDn : CpuId) = CID);
+        [ reflexivity | exact (Hs (or_introl eq_refl)) ].
+  Qed.
+
+  (* the two-source form, for a leaf whose engine reads [rsa] and [rsb] *)
+  Lemma rget_next_ops_indep (b : bool) (pv : mword 64) (CIDn : CpuId)
+      (m : regfile) (rd rs1 rs2 : mword 5) :
+    (b = false \/ pv = zero_reg -> (CIDn : CPU) = (CID : CPU)) ->
+    ops_ok b rd rs1 rs2 ->
+    rget (CID := CIDn) m rs1 = rget (CID := CID) m rs1
+    /\ rget (CID := CIDn) m rs2 = rget (CID := CID) m rs2.
+  Proof.
+    intros Hs Hops. split.
+    - exact (rget_next_indep b pv CIDn m rs1 Hs (ops_ok_s1 _ _ _ _ Hops)).
+    - exact (rget_next_indep b pv CIDn m rs2 Hs (ops_ok_s2 _ _ _ _ Hops)).
+  Qed.
+
   (* THE sp BRIDGE.  The bundle owns [gpr_file (tp_pin m)] while [sie_cap] and
      [intr_frame] are keyed on [m !!! Regidx csp_rs1], and a step engine takes
      ONE map -- so every funnel that feeds an engine has to reconcile the two.

@@ -99,6 +99,48 @@ Section WpNext.
       rewrite (_ : CID = CID0); [ iExact "H" | exact Hc ].
   Qed.
 
+  (* THE ELIMINATION FORM AN ENGINE USES, at an EXPLICIT hart.  A layer whose
+     own step neither pins nor moves the hart (it sits between two [wp_next]s)
+     transports its caller's hart-generic continuation straight to whatever
+     hart its OWN callback was instantiated at, carrying the guard along.
+     Stating it once keeps the guard bookkeeping out of every Iris proof.
+
+     [CID0] IS PINNED EXPLICITLY IN THE [wp_next] BELOW, and it has to be: with
+     two [CpuId] hypotheses in scope, instance resolution would fill the
+     definition's own [CID0] slot from the LAST one -- [CIDn] -- and the guard
+     would silently degrade to the tautology [CIDn = CIDn].  Every statement in
+     this file that mentions two harts is spelled out for that reason. *)
+  Lemma wp_next_at `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K
+      (CIDn : CpuId) :
+    (b = false \/ p = zero_reg -> (CIDn : CPU) = (CID0 : CPU)) ->
+    wp_next (CID0 := CID0) b p K -∗ K CIDn.
+  Proof. iIntros (Hs) "H". iApply ("H" $! CIDn). iPureIntro. exact Hs. Qed.
+
+  (* ... and the SAME-HART instance of it: an engine that provably returns to
+     the hart it started on (STAGE 1 -- the absorbing Löb is at a fixed hart,
+     a trap returns where it came from) consumes the hart-generic obligation
+     its STATEMENT demands of callers here, with the guard closed by
+     [reflexivity].  Unlike [wp_next_off] this needs no condition on [b] or
+     [p]: it is the direction that is always available.
+
+     THIS IS THE LEMMA THAT MAKES THE FUNNEL'S OWN CONVERSION FREE, AND THE
+     ONE THAT MARKS WHERE THE STAGING HAS TO STOP.  Wrapping
+     [WpSmodeIntr.wp_instr_s_sconf]'s σ-callback in [wp_next b p] is provable
+     by exactly this: the funnel consumes the leaf's hart-generic obligation at
+     its own hart and its body is unchanged.  Wrapping the callbacks of the two
+     engines BELOW it ([WpIntrInv.wp_exec_step_intr],
+     [WpSmodeIntr.wp_instr_s_intr]) is NOT, and [wp_next_here] is precisely the
+     step that is then unavailable: the funnel would have to PRODUCE a
+     hart-generic callback for the absorbing engine, and its '1' arm frames
+     PER-HART residue at the entry hart across that engine -- the [sret_bits]
+     halves, the SIE eighth, [cpu_hart]'s per-cpu cells, [strans_bit], and
+     [intr_inv] itself.  Only the trap handler can hand those back at the
+     resuming hart, so that half of the move belongs with [intr_handler_spec] /
+     [intr_frame], not here. *)
+  Lemma wp_next_here `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :
+    wp_next b p K -∗ K CID0.
+  Proof. iApply (wp_next_at b p K CID0). intros _. reflexivity. Qed.
+
   (* Chaining: the conditional equalities compose, which is what lets a
      [b]-GENERIC whole-function proof thread one implication per instruction
      and still discharge its own continuation at the end -- with no case split
