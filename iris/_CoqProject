@@ -884,6 +884,7 @@ LinkBfree.v
 LinkConsoleread.v
 LinkFileread.v
 LinkForkretPark.v
+LinkKfork.v
 LinkIdup.v
 ProofIdup.v
 SpecIlock.v
@@ -905,6 +906,14 @@ ProofFileread.v
 ProofFilereadParts.v
 ProofKfork.v
 ProofKforkParts.v
+ProofKforkB1.v
+ProofKforkB2.v
+ProofKforkB3.v
+ProofKforkB4.v
+ProofKforkB5.v
+ProofKforkB6.v
+ProofKforkB7.v
+ProofKforkMain.v
 ProofSafestrcpy.v
 ProofStrncpy.v
 SpecBfree.v

@@ -1116,17 +1116,26 @@ the evidence for every offset. This file is only the worklist.
       is empty because `proc_pub` quantifies the state a SLEEPING->RUNNABLE
       move changes.
 
-- [ ] **S11 — `kfork`. CONTRACT LANDED; THE EXIT BLOCKS AND THE BRIDGES ARE
-      PROVEN; THE BODY IS NOT.**  The last function of the process-lifetime
-      cone (allocproc / kexit / kwait are done).
+- [x] **S11 — `kfork` PROVEN AND LINKED**, and with it the process-lifetime
+      cone is closed (allocproc / kexit / kwait / kfork).  `proof_coverage`
+      reads it `proven`; proc.c is 25/28 functions, 87.5% of bytes.
+      `Print Assumptions Kfork.wp_kfork_sconf` is the five `rv64d.*`
+      platform axioms + funext + **`ForkretPark.forkret_park` and nothing
+      else** -- notably NOT `Iput`, because idup is proven now and filedup
+      never reaches it.
 
-      **Where it stands (2026-08-09).**  `SpecKfork.v`, `CodeKfork.v`,
-      `ProofKforkParts.v` and `ProofKfork.v` are all in `_CoqProject`, all
-      compile, and none has an `admit` or an `Axiom`.  What `ProofKfork.v`
-      contains today is the bottom of the control flow -- the shared
-      epilogue and the two straight-line stretches that reach it -- and NOT
-      the whole-function theorem, so `proof_coverage.py` still reads kfork
-      as unproven and there is no `LinkKfork.v` yet.
+      Ten files: `SpecKfork.v` / `CodeKfork.v` / `ProofKforkParts.v` /
+      `ProofKfork.v` / `ProofKforkB1..B7.v` / `ProofKforkMain.v` /
+      `LinkKfork.v`.  The B-files are one straight-line stretch each and
+      `ProofKforkMain.v` is only the three-way glue; that split is what made
+      the function tractable, and the next section is what it cost.
+
+      **THE ONE ASSUMPTION** is `SpecForkretPark.FORKRET_PARK`, argued at
+      length in that file's header: parking a fresh process at RUNNABLE
+      needs a `▷ proc_ctx`, which is a Löb argument about `forkret`, and
+      nothing in the tree produces a fresh one.  Proving
+      `forkret`/`usertrapret`/`userret` (projects/uservec.md) retires it and
+      changes nothing else.
 
       Proven and reusable:
       * `ProofKforkParts.kfk_epi` -- the epilogue at +0xfc
@@ -1194,6 +1203,41 @@ the evidence for every offset. This file is only the worklist.
       reads `st = USED` straight off it, and its own comment names this
       caller: *"this is what lets yield/sleep/exit learn `st = RUNNING`, and
       kfork `st = USED`, without reading the cell."*
+
+      **SPLITTING A FUNCTION ACROSS PARALLEL PROVERS: WHAT IT COSTS.**
+      kfork's seven straight-line stretches were proved independently and
+      then glued.  Every block compiled on its own; **six defects were
+      found only by attempting the composition, and every one of them was
+      invisible to `coqc`.**  Five were the same shape — a fact TRUE INSIDE
+      a block that its interface flattened away:
+
+      * a dropped `cpu_own` (an affine BI discards it silently);
+      * frame slots quantified existentially where the exit that reloads
+        them needs the specific value;
+      * the child's `V` handed back unconstrained where the next block
+        needs `pv_ofile`/`pv_cwd`;
+      * the saved context abstracted to `own_ctx` where the park needs
+        `is_kstack` + `ctx_cells` at their literal heads;
+      * the resuming hart quantified with NO crossing premise — which makes
+        the continuation's antecedent not merely awkward but UNPROVABLE
+        (`wp_next _ false _ K` is `K CIDh`, so supplying it means proving
+        the continuation at an adversarial hart).
+
+      The sixth is structural and is kwait's rule again: **N continuations
+      each needing the caller's ONE linear exit is unsound by typing.**
+      Thread the exit through as an abstract `R` and hand it back to
+      whichever arm runs (S10's `kw_exit_fn`); do not let each closure
+      capture a copy.
+
+      Three more were over-strong register premises (below) and one whole
+      instruction range (+0x66..+0x7a) was in no block at all, found by
+      walking the offsets against the assignments.
+
+      **The rule: when a block is stated by one party and consumed by
+      another, check the INTERFACE by hand — the compiler checks neither
+      side against the other.**  Prefer stating a block's postcondition as
+      the STRONGEST thing its proof establishes, not the weakest thing that
+      typechecks; every one of the five was a weakening nobody needed.
 
       **Two rules the block proofs paid for, both general:**
 

@@ -189,7 +189,7 @@ Section KforkPrologue.
       (γa γp γw γl γf γil γi : gname) (γs : list gname)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
-      (ck : nat) (cq : Qp) (cdev cinum : mword 32) :
+      (ck : nat) (cq : Qp) (cdev cinum : mword 32) (R : iProp Σ) :
     let sp0 : mword 64 := m !!! Regidx csp_rs1 in
     let ra0 : mword 64 := m !!! Regidx Rra in
     let s00 : mword 64 := m !!! Regidx Rs0 in
@@ -213,6 +213,15 @@ Section KforkPrologue.
     inode_ref γi ck cq cdev cinum -∗
     kalloc_env γa on -∗
     proc_priv γf pme pid_p Vp -∗
+    (* THE CALLER'S EXIT, THREADED -- kwait's [kw_exit_fn] recipe.  The three
+       continuations below are three DIFFERENT closures and exactly one of
+       them runs, but a caller has only ONE exit and it is linear, so making
+       each closure capture its own copy is unsound by typing (claude-notes,
+       S10: "splitting it into two closures instead is unsound-by-typing:
+       whichever arm does not run would have to drop one").  So the exit
+       rides through as an abstract [R] and each continuation receives it
+       back as its LAST argument. *)
+    R -∗
     (* ---- Hcont10a : allocproc found no free slot ---- *)
     wp_next b pme (fun (CID : CpuId) =>
       ∀ (Mt : regfile),
@@ -234,6 +243,7 @@ Section KforkPrologue.
         ( kalloc_env γa on
           ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
              kalloc_env γa None) ) -∗
+        R -∗
         WP (Loop : expr riscv_lang)) -∗
     (* ---- Hcont7c : uvmcopy failed ---- *)
     (* [wp_next]'s own reference hart is bound EXPLICITLY (rather than left to
@@ -287,6 +297,7 @@ Section KforkPrologue.
         cpu_own (S lvl) eb pme C false -∗
         (∃ q' : Qp, inode_ref γi ck q' cdev cinum) -∗
         kalloc_env γa None -∗
+        R -∗
         WP (Loop : expr riscv_lang))) -∗
     (* ---- Hcont4a : uvmcopy succeeded -- the trapframe copy loop's head --- *)
     (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
@@ -355,13 +366,14 @@ Section KforkPrologue.
         is_itable γil γi -∗
         itable_inv γi -∗
         iref_slot -∗
+        R -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros sp0 ra0 s00 s10 s50 HK Hlvl Hcwd.
     unfold K_kfork in HK.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
-             #Hitinv Hiref Hiref2 Henv Hpv Hcont10a Hcont7c Hcont4a".
+             #Hitinv Hiref Hiref2 Henv Hpv HR Hcont10a Hcont7c Hcont4a".
     set (K1 := (K - 8)%nat).
     iPoseProof (kfk_000 with "Htext") as "Hi000".
     iPoseProof (kfk_002 with "Htext") as "Hi002".
@@ -630,7 +642,7 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv']").
+      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv'] HR").
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
       + iExists cq. iExact "Hiref2".
@@ -957,7 +969,8 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "Hcpu").
         iSpecialize ("Hcont7c" with "[Hiref2]").
         { iExists cq. iExact "Hiref2". }
-        iApply ("Hcont7c" with "Henv'").
+        iSpecialize ("Hcont7c" with "Henv'").
+        iApply ("Hcont7c" with "HR").
       + (* =============================================================
            uvmcopy SUCCEEDED -- +0x02c falls through.
            ============================================================= *)
@@ -1193,7 +1206,7 @@ Section KforkPrologue.
                   (upd_pt (upd_sz Vc (pv_sz Vp)) P' (pv_tf Vc))
                   (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv HCpriv
-                        Hheld Hhart Hfdsp [Hks Hctx] Harmpay Hcpu [Hiref2] [Henv'] Hwlock Hftbl Hitbl Hitinv Hiref").
+                        Hheld Hhart Hfdsp [Hks Hctx] Harmpay Hcpu [Hiref2] [Henv'] Hwlock Hftbl Hitbl Hitinv Hiref HR").
         * exact HN10sp.
         * exact HN10s4.
         * exact HN10s5.
@@ -1231,7 +1244,7 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv']").
+      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv'] HR").
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
       + iExists cq. iExact "Hiref2".

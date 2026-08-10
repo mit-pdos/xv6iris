@@ -335,6 +335,15 @@ and axioms each proven function rests on. `--format text|md|html|json`.
   a `--check` error that fails CI, not a silent adjustment. So **adding a file
   to `iris/` means adding it to `_CoqProject`**; without the check, forgetting
   is invisible in both directions at once (never built, still counted).
+- **AND SPELL THE `Link` INSTANTIATION UNQUALIFIED.** The script matches a
+  functor application with `^\s*Module\s+(\w+)\s*:=\s*(\w+)((?:\s+\w+)*)\s*\.`,
+  and `(\w+)` does not match a DOTTED name — so
+  `Module Kfork := ProofKforkMain.Kfork Myproc ….` makes a proven, linked,
+  axiom-clean function read **`assumed`**, with no error anywhere. Follow the
+  tree's convention: name the functor `<F>Proof` in the proof file, `Require
+  Import` it, and write `Module <F> := <F>Proof …` with a bare name. (Cost
+  one debugging round on kfork; the same trap is one character away from
+  every new `Link` file.)
 - **Spell the entry pc so the report can SEE the symbol.** The script matches
   `KernelSyms.<f>` textually, either as `pc_is (mword_of_int KernelSyms.<f>)` or
   — the form to prefer — a `let pcE : mword 64 := mword_of_int KernelSyms.<f> in`

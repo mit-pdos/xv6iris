@@ -182,10 +182,23 @@ Proof. unfold K_kfork. lia. Qed.
 Lemma wpk_K_ge56 (K : nat) : (K_kfork <= K)%nat -> (56 <= K)%nat.
 Proof. unfold K_kfork. lia. Qed.
 
-Module Kfork (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
+(* Re-anchoring a [wp_next] FORWARD, i.e. handing the caller's exit -- which
+   is anchored at the function's entry hart -- to a block that resumed
+   somewhere else.  [ProofKwait.kw_next_reanchor] is the same four lines,
+   but it is section-local to a file this one must not depend on. *)
+Lemma kfk_reanchor `{!riscvGS Σ} `{GEN : GenId} (CIDa CIDb : CpuId)
+    (b : bool) (pv : mword 64) (K : forall (CID : CpuId), iProp Σ) :
+  (b = false \/ pv = zero_reg -> (CIDb : CPU) = (CIDa : CPU)) ->
+  wp_next (CID0 := CIDa) b pv K -∗ wp_next (CID0 := CIDb) b pv K.
+Proof.
+  intros Hch. iIntros "H" (CID Hs). iApply ("H" $! CID). iPureIntro.
+  intro Hb. rewrite (Hs Hb). exact (Hch Hb).
+Qed.
+
+Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
              (FP : FREEPROC) (RL : RELEASE) (AQ : ACQUIRE)
              (FD : FILEDUP) (ID : IDUP) (SS : SAFESTRCPY)
-             (FRP : FORKRET_PARK).
+             (FRP : FORKRET_PARK) : KFORK.
 
   Module B6 := KforkPrologue MP AP UC.
   Module B1 := KforkB1 FP RL.
@@ -220,6 +233,7 @@ Section KforkArms.
   Lemma kfork_arm2
       (γa γf γi γl2 : gname) (γs : list gname)
       (m : regfile) (K lvl : nat) (eb b : bool) (pme : mword 64) (C : iProp Σ)
+      (on : option nat)
       (pid_p : mword 32) (Vp : pprivate) (ck : nat) (cdev cinum : mword 32)
       (sp0 ra0 s00 s10 s50 : mword 64) (npa : mword 64) (j : nat)
       (pid_c : mword 32) (ch : mword 64) (Vc : pprivate) (Mt : regfile) :
@@ -253,7 +267,10 @@ Section KforkArms.
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
         pc_is (ret_pc ra0) -∗
-        kfork_post γa γf γi lvl eb pme C None b pid_p Vp ck cdev cinum K mr
+        (* generic in [on]: this arm produces [kfork_post]'s SECOND disjunct,
+           which does not mention the count, so pinning [None] here would
+           only stop the caller handing its own [on] through. *)
+        kfork_post γa γf γi lvl eb pme C on b pid_p Vp ck cdev cinum K mr
           (mr !!! Regidx Ra0) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -614,19 +631,111 @@ Section KforkArms.
 
 End KforkArms.
 
-(* [wp_kfork_sconf] itself, and hence [Module Kfork ... : KFORK], is NOT
-   attempted below: it is blocked on the fifth seam documented at the top
-   of this file (a missing crossing premise on [ProofKforkB6.kfk_prologue]'s
-   [Hcont7c]/[Hcont4a]).  [kfork_arm1]/[kfork_arm2]/[kfork_arm3] above are
-   otherwise complete and hypothesis-free, and ready to be glued together
-   with three [iApply (kfork_armN (CID0 := ...) ...)] bullets -- one per
-   [B6.kfk_prologue] continuation -- the moment that premise lands; see the
-   file header for exactly what each bullet needs and why it does not
-   compose today.  (Note for whoever resumes this: [kfork_arm1]/2/3 must be
-   called from OUTSIDE the section that declares them, i.e. from a fresh
-   [Section] opened after [End KforkArms.] above, because their [CID0]/[GEN]
-   need to be overridable per call site via [(CID0 := ...)] -- a
-   still-open section's [Context CID0] is one fixed shared variable, not a
-   per-use argument, and rejects that override with "Wrong argument name
-   CID0".) *)
-End Kfork.
+(* =================================================================== *)
+(*  THE CAPSTONE.                                                       *)
+(*                                                                      *)
+(*  A FRESH SECTION, deliberately: [kfork_arm1/2/3] must be applied with *)
+(*  [(CID0 := ...)] overridden per call site, and a still-open section's *)
+(*  [Context CID0] is one fixed shared variable, not a per-use argument  *)
+(*  -- it rejects the override with "Wrong argument name CID0".          *)
+(*                                                                      *)
+(*  [B6.kfk_prologue] takes the caller's exit as an abstract [R] and     *)
+(*  hands it back to whichever of its three continuations runs, so the   *)
+(*  single linear [Hcont] is supplied ONCE here and each closure         *)
+(*  RECEIVES it rather than capturing a copy.                            *)
+(* =================================================================== *)
+Section KforkMain.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+            !icacheG Σ, !irefslotG Σ}.
+  Context `{GEN : GenId} `{CID0 : CpuId}.
+
+  Notation Rra := (mword_of_int 1 : mword 5).
+  Notation Rs0 := (mword_of_int 8 : mword 5).
+  Notation Rs1 := (mword_of_int 9 : mword 5).
+  Notation Ra0 := (mword_of_int 10 : mword 5).
+  Notation Rs5 := (mword_of_int 21 : mword 5).
+
+  Lemma wp_kfork_sconf
+      (γa γp γw γl γf γil γi : gname) (γs : list gname)
+      (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
+      (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
+      (ck : nat) (cq : Qp) (cdev cinum : mword 32) :
+    wp_kfork_sconf_body γa γp γw γl γf γil γi γs m lvl K eb pme C on b
+      pid_p Vp ck cq cdev cinum.
+  Proof.
+    cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
+    intros HK Hlvl Hcwd.
+    iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
+             #Hitbl #Hitinv Hiref Hiref2 Henv Hpv Hcont".
+    (* the SIE index the two lock-holding exits come back at *)
+    iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
+    iApply (B6.kfk_prologue γa γp γw γl γf γil γi γs m lvl K eb pme C on b
+              pid_p Vp ck cq cdev cinum
+              (wp_next b pme (fun (CID : CpuId) =>
+                 (∀ mr : regfile,
+                    ⌜ callee_saved m mr ⌝ -∗
+                    pc_is (ret_pc (m !!! Regidx Rra)) -∗
+                    kfork_post γa γf γi lvl eb pme C on b pid_p Vp ck cdev cinum
+                      K mr (mr !!! Regidx Ra0) -∗
+                    WP (Loop : expr riscv_lang))%I))
+              HK Hlvl Hcwd
+              with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
+                    Hitbl Hitinv Hiref Hiref2 Henv Hpv Hcont [] [] []").
+    - (* ---- arm 1: allocproc found no free slot, +0x10a ---- *)
+      iIntros (CID1 Hx1 Mt) "%HMtsp %HMtthr Hcg Hcpu #Ht Hpc Hframe Hpv Hir Hke HR".
+      iApply (kfork_arm1 (CID0 := CID1) γa γf γi m K lvl eb b pme C on pid_p Vp
+                ck cdev cinum (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
+                (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5) Mt
+                (wpk_K_ge8 K HK) eq_refl eq_refl eq_refl eq_refl eq_refl
+                HMtsp HMtthr
+                with "Hcg Hcpu Ht Hpc Hframe Hpv Hir Hke [HR]").
+      iApply (kfk_reanchor CID0 CID1 b pme _ Hx1 with "HR").
+    - (* ---- arm 2: uvmcopy failed, +0x7c ---- *)
+      iIntros (CIDh Hxh). iIntros (CID2 Hx2 Mt npa j γl2 pid_c ch Vc).
+      iIntros "%HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
+      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hctx Hpay Hcpu Hir Hke HR".
+      destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
+      iApply (kfork_arm2 (CID0 := CID2) γa γf γi γl2 γs m K lvl eb b pme C on
+                pid_p Vp ck cdev cinum (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
+                (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
+                npa j pid_c ch Vc Mt
+                (wpk_K_ge52 K HK) Hlvl Hbeq
+                eq_refl eq_refl eq_refl eq_refl eq_refl
+                HMtsp ltac:(rewrite HMts4 Hnpa; reflexivity) Hnpa HjN Hgamma
+                Hofn Hcwdn HMtthr
+                with "Hprocs Hcg Hcpu Hpay Ht Hpc Hframe Hpv HCp Hheld Hhart
+                      Hfd Hctx Hir Hke [HR]").
+      (* the crossing fact by NAME, never as an inline [ltac:] in argument
+         position: the hole's expected type is still an evar there, which is
+         durable-notes' diverging-ltac trap. *)
+      assert (Hcr2 : b = false \/ pme = zero_reg -> (CID2 : CPU) = (CID0 : CPU)).
+      { intro Hd. rewrite (Hx2 (or_introl eq_refl)). exact (Hxh Hd). }
+      iApply (kfk_reanchor CID0 CID2 b pme _ Hcr2 with "HR").
+    - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
+      iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst).
+      iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures".
+      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hctx Hpay Hcpu Hir
+               Hke #Hwl #Hft #Hit #Hiti Hirs HR".
+      destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
+      destruct Htfs as (Htfsrc & Htfdst).
+      iApply (kfork_arm3 (CID0 := CID3) γa γf γil γi γw γl γs m K lvl eb b pme C
+                on pid_p Vp ck cdev cinum (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
+                (m !!! Regidx Rs0) (m !!! Regidx Rs1) (m !!! Regidx Rs5)
+                Mt npa j γl2 pid_c ch Vc' tfsrc tfdst
+                (wpk_K_ge56 K HK) Hlvl Hbeq Hcwd
+                eq_refl eq_refl eq_refl eq_refl eq_refl
+                HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
+                Hnpa HjN Hgamma Hofn Hcwdn
+                with "Ht Hpanic Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hheld Hhart
+                      Hfd Hctx Hpay Hir Hke Hwl Hft Hit Hiti Hirs [HR]").
+      (* the crossing fact by NAME, never as an inline [ltac:] in argument
+         position: the hole's expected type is still an evar there, which is
+         durable-notes' diverging-ltac trap. *)
+      assert (Hcr3 : b = false \/ pme = zero_reg -> (CID3 : CPU) = (CID0 : CPU)).
+      { intro Hd. rewrite (Hx3 (or_introl eq_refl)). exact (Hxh Hd). }
+      iApply (kfk_reanchor CID0 CID3 b pme _ Hcr3 with "HR").
+  Qed.
+
+End KforkMain.
+
+End KforkProof.
