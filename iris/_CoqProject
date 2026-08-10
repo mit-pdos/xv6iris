@@ -235,6 +235,8 @@ SpecMemsetPage.v
 ProofMemsetPage.v
 LinkMemsetPage.v
 SpecMemmove.v
+CodeMemcmp.v
+CodeMemcpy.v
 CodeMemmove.v
 ProofMemmove.v
 LinkMemmove.v

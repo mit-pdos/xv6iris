@@ -438,6 +438,18 @@
   2
  ],
  [
+  "CodeMemcmp.v",
+  "memcmp",
+  "mci_",
+  2
+ ],
+ [
+  "CodeMemcpy.v",
+  "memcpy",
+  "mcpi_",
+  2
+ ],
+ [
   "CodeStrncpy.v",
   "strncpy",
   "sncp_",
