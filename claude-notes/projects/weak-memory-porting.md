@@ -423,6 +423,64 @@ the GPR file, the one-turn `untilMT`), live there. A new shape file requires
 it; it does not re-declare them. (Batch 1's four shape files each had their
 own copy — 40 lemmas of duplication, retired.)
 
+## 2h. WHOLE-FUNCTION CHAINS OVER THE HOISTED LEAVES (from wwp_timerinit)
+
+`iris/WkTimerinit.v` is the first whole-function chain built entirely by
+applying the hoisted leaves (21 instructions, one leaf application each,
+~1650 lines ≈ 3× the SC file — vs `WkEntryNew`'s 9.8× inline price).
+Statement = the SC statement under §1's swaps; `ti_*`/`m_*` vocabulary
+imported unchanged. The traps, all of which COMPILE until late:
+
+1. **The gpr-file accessors take raw `gpr_pt`, not the plain register
+   points-to the leaves hand back** — every fold-the-cell-back step needs
+   the REVERSE `gpr_pt_nz` rewrite, not a second forward application.
+2. **A load's two-cell reinsertion is NOT symmetric with a store's**: the
+   base cell round-trips unchanged but the destination's new value must
+   survive as a distinct `<[rd:=v]>` layer to match the SC file's named
+   maps (the SC leaf is file-based and never re-touches the base, so its
+   maps have no base reinsertion at all). Collapsing both keys with the
+   store-shaped lemma silently produces the wrong map shape.
+3. **A CSR read whose value is only known when the leaf returns** (csrr
+   time's `tv`) cannot use `gpr_file_insert_acc` (which fixes the
+   reinsertion value at extraction time) — use the ∀-target
+   generalization (`WkTimerinit.gpr_file_reinsert_acc`; hoist it on next
+   touch).
+4. **The TOR leaves' 16-premise lists have TWO `eq_refl`-closable slots
+   that are not adjacent** — an extra `eq_refl` inserted off by one
+   type-checks as "one too many args" only at Qed-adjacent unification.
+5. **`vwp_hold_mono` must be bumped per leaf for every carried stack
+   word** — each `vwp_hold` is indexed by a specific view and every leaf
+   mints a fresh one; a skipped bump surfaces as an `iSpecialize`
+   mismatch far from the omission.
+6. **`vm_compute; reflexivity` can fail on propositionally-equal
+   bitvector constructions** — close with a `bv_eq`-backed reflexivity
+   (the `decode_bridge_ms_bv` recipe), not bare `vm_compute`.
+7. Concurrent-agent note: transient "inconsistent assumptions" errors
+   from OTHER files rebuilding underneath you clear on their own — poll,
+   never `make`, never touch the flagged files.
+8. **`rewrite !vwp_hold_sep` SHATTERS `wpt8`.**  A frame bundle is
+   `vwp_hold (w1 ∗ w2 ∗ rest)`, but `wpt8` is ITSELF a `∗`-chain
+   (alignment + `acc_wf` + eight byte points-tos), so the `!` recurses
+   into it and `iFrame` is left with nothing to match the unshattered
+   `vwp_hold (wpt8 …)` hypothesis against.  Peel ONE `∗` at a time
+   (`iEval (rewrite vwp_hold_sep). iSplitL "H"; [iExact "H"|]. …`), in
+   both directions.  The failure reads as `This proof is focused, but
+   cannot be unfocused this way` at the closing brace — nowhere near the
+   rewrite.
+9. **A store leaf's payload `R` is `⌜True⌝ : vProp Σ`, not `emp`** —
+   built with `iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HR". {
+   rewrite vwp_hold_pure. done. }`.  Passing `emp%I` and discharging it
+   with the `[//]` spec pattern fails as `iSpecialize: (IAnon N) not
+   found`, which names neither the payload nor the leaf.
+10. **Bump ONE bundled `vwp_hold`, not each word.**  Bundle the whole
+   frame (both own slots + the callee's 2-slot sub-frame + the deep
+   rest) into a single `vwp_hold` right after the prologue's stores;
+   each later instruction then costs exactly one `vwp_hold_mono` line
+   instead of five.  Split it only at the call site and at the final
+   re-bundle.  Feed the leaves the cells at their NAMED values
+   (`-(rf_lookup m k) Lk` after `gpr_pt_nz`), which also makes the
+   store's ea premise `eq_refl`.
+
 ## 3. What needs thought: the racy sites, and only those
 
 A function that OWNS its memory — directly or through a lock — ports
@@ -542,6 +600,25 @@ Every one of these type-checks and is wrong or vacuous.
    `wmem_restrict σ W` pin it.  A `Section Context` cannot do this (it will
    not accept a hole), which is why `wP_eff_of_leaf_base` is one `Lemma` with
    a commented premise list rather than a Section — keep it that way.
+12. **A TRANSPARENT `kb_word_at` IN A LEAF'S FETCH WORD IS A 100× COMPILE
+   CLIFF** — and it does not fail, it just never finishes, so it reads as
+   "Iris is slow" rather than as a bug.  `kb_word_at A` is four lookups in
+   the whole `KernelInstrs.kernel_bytes` map.  `vm_compute` dispatches it in
+   microseconds (measured: 0.0 s), but the UNIFIER inside `iApply` reduces
+   with LAZY conversion, so a leaf instantiated at
+   `h := subrange_vec_dec (kb_word_at …) 15 0` makes every unification step
+   walk that map.  Measured on `wwp_start`: ONE `wwp_addi_rvc_leaf` did not
+   finish in 10 minutes at `kb_word_at` and takes 2.7 s at
+   `mword_of_int 0x1141`; the decode-fact file went 9 min → 15 s and the
+   whole 39-instruction chain from >30 min (never finished) → 53 s.
+   **Define every instruction word as a closed `mword_of_int` literal**
+   (`WkTimerinit` did this from the start; `WkStartAux` §0 now carries the
+   39 of them with the derivation in a header comment) and tie it back to
+   the image ONLY in the `stkb_*` byte-window lemmas, whose `kb_win` proof
+   is a `vm_compute` and so is cheap.  Price of the literal form: the
+   `subrange_vec_dec w 15 0 = h` conjunct needs `apply bv_eq` before its
+   `vm_compute`.  **The same rule applies to any image-derived term a leaf
+   is INSTANTIATED at** — if `iApply` can see it, it must be a literal.
 11. **A domain-growth argument can never exclude a VALUE-PRESERVING write.**
    This is why the fetch needs a syntactic `exec_eff` mirror and cannot be
    detected: running it at the confined memory and observing

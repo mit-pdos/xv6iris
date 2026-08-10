@@ -1900,10 +1900,27 @@ All leaves are alignment-generic (`al4` a parameter): F_Base shapes via
 `wP_eff_of_leaf_regonly` + `wcert_regonly`, compressed shapes via
 `WeakLeafTor.wP_eff_of_leaf_rvc` at `es_x := []` + `wcert_nowrite`.
 
-**What remains for `wwp_start`/`wwp_timerinit`: only the two
-whole-function chains themselves** and the composed
-`SpecEntry`/`ProofEntry`/`LinkEntry` cone (until those land,
-`wwp_entry` stays a plain lemma exactly as SC's `wp_entry` is).
+**BOTH WHOLE-FUNCTION CHAINS ARE IN (2026-08).** `iris/WkTimerinit.v`
+(`wwp_timerinit`, 21 instructions, 1652 lines) and `iris/WkStartNew.v`
+(`wwp_start`, the whole 39-instruction `start()` INCLUDING the
+`timerinit` call, 1701 lines) over `iris/WkStartAux.v` (786 lines: the
+encoding words, byte windows, decode facts and register drivers).
+Statements = the SC statements under the porting table's swaps; footprint
+= funext + the 5 platform axioms, i.e. SC parity. What remains for the
+boot path is the composed `SpecEntry`/`ProofEntry`/`LinkEntry` cone
+(until that lands, `wwp_entry`/`wwp_start` stay plain lemmas exactly as
+SC's `wp_entry`/`wp_start` are).
+
+**THE COMPILE-TIME CLIFF THAT SHAPED THE FILE LAYOUT** (worth an hour to
+anyone porting the next chain — full detail in
+[`weak-memory-porting.md`](weak-memory-porting.md) §4.12): an
+instruction word left as a transparent `kb_word_at` application is fine
+for `vm_compute` (0.0 s) but pathological for the UNIFIER inside
+`iApply`, which reduces lazily and re-walks the whole `kernel_bytes` map
+at every step. One leaf did not finish in 10 minutes; at a
+`mword_of_int` literal it takes 2.7 s. `WkStartAux` §0 therefore carries
+39 closed literals, and the decode layer sits in its own file so the
+theorem's edit-compile loop is ~50 s rather than minutes.
 
 ## M4 — the sweep
 
@@ -1920,7 +1937,7 @@ numbers come from; the prices below replace M4-prep's).
 | 1 | the memory `execute` mirrors, by SHAPE | **DONE — all five shapes, 3897 lines** (`WeakLeafEff8.v` 557, `WeakLeafEff8s.v` 598, `WeakLeafBase4.v` 1395, `WeakLeafAmo4.v` 1119, + the shared `WeakLeafEffCommon.v` 228) | vs the 30–60-lines-per-shape estimate: a shape is ≈ 800 lines, because the whole `vmem_read`/`vmem_write` cone below the `execute` must be mirrored too (same transitive-cone lesson as 0b). Three of the five needed their SC lemma written as well |
 | 2 | the M-mode leaf libraries through `WeakFunnel.wwp_instr` (`WpMmodeLoad`, `WpMmodeStore`, `WpMmodeLeaf*`) | **COMPLETE — all five leaves**: `ld` 472 (`WeakLeafLd8.v`), `sd` 433 (`WeakLeafSd8.v`), `lw`/`lwu` 439 (`WeakLeafLw4.v`, one parametric leaf), `sw` 406 (`WeakLeafSw4.v`), `amoswap.w.aq` ≈685/leaf + ~400 one-time (`WeakLeafAmo4Leaf.v` — the invariant-form lock leaf, slots under `wwp_acquire_loop_real` DEFINITIONALLY). All five green on the FIRST compile. See the per-leaf blocks + "THE FIFTH LEAF" | consolidation hoists DONE (see the fifth-leaf block); batch 3 opens |
 | 3 | `WpLock` clients | ≈ 0 — **but the payoff is GATED ON 6c** (2026-08 tier audit): the kernel's real acquire/release are SCONF functions (`wp_amoswap_lockopen_s_sconf` & co.); the M3b/M3c lock library validated the SHAPE at M-mode altitude, not the kernel's lock code. The tier-agnostic halves (`wlock_inv`/`wis_lock`/`wlocked`, `wacquire_core`/`wrelease_core`) transfer now | `iris/WeakWord8.v` covers `cpu`/`name` |
-| 4 | the straight-line M-mode function proofs | **THE VERTICAL SLICE IS IN: `wwp_entry`** (`iris/WkEntryNew.v` + `WkEntryEff.v` — the whole 8-instruction `_entry` chain, one Qed, statement = the SC statement under the porting-table swaps, footprint byte-identical to SC `wp_entry`; first consumer of all FOUR fetch-alignment arms). **Price: 2073 lines ≈ 9.8× the SC proof file** — see "THE FIRST FUNCTION PORT" block; the ~150–220-per-register-only-instruction inline cost is the argument for hoisting weak register-leaf lemmas before any bigger sweep. `start`/`timerinit` BLOCKED on three named seams (same block) | the M-mode tier is ONLY the boot path (tier audit); everything else = batch 6c. `sie_cap_gpr`-threading specs do NOT transfer (contain `stack_own` → `↦w₈` respell, `strans_inv` → P4) |
+| 4 | the straight-line M-mode function proofs | **THE VERTICAL SLICE IS IN: `wwp_entry`** (`iris/WkEntryNew.v` + `WkEntryEff.v` — the whole 8-instruction `_entry` chain, one Qed, statement = the SC statement under the porting-table swaps, footprint byte-identical to SC `wp_entry`; first consumer of all FOUR fetch-alignment arms). **Price: 2073 lines ≈ 9.8× the SC proof file** — see "THE FIRST FUNCTION PORT" block; the ~150–220-per-register-only-instruction inline cost is the argument for hoisting weak register-leaf lemmas before any bigger sweep. **`start`/`timerinit` ARE NOW IN TOO** — `WkTimerinit.v` (21 instrs, 1652 lines ≈ 3× the SC file) and `WkStartNew.v` + `WkStartAux.v` (39 instrs, 2487 lines together), both one `Qed`, both at SC's axiom footprint; over the hoisted leaves a whole-function chain costs ≈ 3× its SC twin, vs `WkEntryNew`'s 9.8× inline price | the M-mode tier is ONLY the boot path (tier audit); everything else = batch 6c. `sie_cap_gpr`-threading specs do NOT transfer (contain `stack_own` → `↦w₈` respell, `strans_inv` → P4) |
 | 5 | `WeakStarted`'s `wstarted_oneshot` invariant conjunct, then `ProofMainSecondary` | **FIRST HALF DONE (2026-08)** — the escrow conjunct, the reader, the WP rule and the wait smoke test; see the "BATCH 5 FIRST HALF" block below. Remaining: the racy `lw` leaf's `wstarted_gain` discharge from the model, the pred-R fence generalization, then `ProofMainSecondary` — which is a PURE-SCONF file, so the cone itself is gated on 6c | the racy-load rule was landed; the escrow now is too |
 | 6 | the sconf tier | **DESIGNED (block below); no decision pending** | see "BATCH 6 — THE sconf/WALK DESIGN" |
 | 7 | the virtio cone | M5 | |
