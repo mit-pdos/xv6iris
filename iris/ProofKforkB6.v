@@ -220,6 +220,12 @@ Section KforkPrologue.
         ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
             r <> Rs0 -> r <> Rs1 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
         sie_cap_gpr Mt (K - 8)%nat b pme -∗
+        (* [cpu_own] is handed on, not dropped.  Both of allocproc_post's
+           not-found arms return it at the CALLER's level and index, and
+           [SpecKfork.kfork_post] needs it unconditionally -- an affine BI
+           lets a proof drop it silently, which is exactly how it went
+           missing from this continuation the first time. *)
+        cpu_own lvl eb pme C b -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
@@ -255,7 +261,13 @@ Section KforkPrologue.
         sie_cap_gpr Mt (K - 8)%nat false pme -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x7c) : mword 64) -∗
-        kfk_frame sp0 ra0 s00 s10 s50 -∗
+        (* slot 6 PINNED: s4 was spilled at +0x1a and the uvmcopy-failure
+           tail reloads it at +0x8a, so that exit has to know which value it
+           gets back.  Slots 4/5 stay existential -- s2/s3 are spilled only
+           at +0x30/+0x32, i.e. after uvmcopy has already SUCCEEDED, so on
+           this path they were never written. *)
+        (∃ w4 w5 : mword 64,
+           kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
         proc_priv γf pme pid_p Vp -∗
         proc_priv γf npa pid_c Vc -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
@@ -281,11 +293,20 @@ Section KforkPrologue.
         ⌜ ud_tfp (pv_upt Vp) = tfsrc /\ ud_tfp (pv_upt Vc') = tfdst ⌝ -∗
         ⌜ forall r : mword 5, is_cs_idx r = true -> r <> csp_rs1 ->
             r <> Rs0 -> r <> Rs1 -> r <> Rs4 -> r <> Rs5 -> Mt !!! Regidx r = m !!! Regidx r ⌝ -∗
-        ⌜ npa = proc_addr j /\ (j < NPROC)%nat /\ γs !! j = Some γl2 ⌝ -∗
+        (* the child is still FRESH: uvmcopy touched only its page table, and
+           [upd_pt]/[upd_sz] preserve both of these.  The uvmcopy-failure
+           continuation states the same two facts about [Vc]; the success
+           one has to state them about [Vc'] or the fd scan cannot start. *)
+        ⌜ npa = proc_addr j /\ (j < NPROC)%nat /\ γs !! j = Some γl2 /\
+          pv_ofile Vc' = replicate NOFILE (zero_reg : mword 64) /\
+          pv_cwd Vc' = (zero_reg : mword 64) ⌝ -∗
         sie_cap_gpr Mt (K - 8)%nat false pme -∗
         kernel_text -∗
         pc_is (mword_of_int (KF + 0x4a) : mword 64) -∗
-        kfk_frame sp0 ra0 s00 s10 s50 -∗
+        (* all three lazy slots PINNED here: by +0x4a s2, s3 and s4 have all
+           been spilled, and [ProofKfork.kfk_tail_succ] reloads all three. *)
+        kfk_frame_at sp0 ra0 s00 s10 s50
+          (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
         proc_priv γf pme pid_p Vp -∗
         proc_priv γf npa pid_c Vc' -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
@@ -564,6 +585,11 @@ Section KforkPrologue.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi016 [-]").
       iNext. iIntros (CID12 Hs12) "Hcg Hpc".
+      (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
+         [allocproc_post] at CID11 and the continuation is at CID12, and the
+         two print IDENTICALLY.  durable-notes' rule. *)
+      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b
+                   ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
       { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".
         iSplitL "Hb4"; [iExists u4; iExact "Hb4"|].
@@ -571,7 +597,7 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv']").
+      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv']").
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
       + iExists cq. iExact "Hiref2".
@@ -861,11 +887,19 @@ Section KforkPrologue.
         { reflexivity. } { reflexivity. } { exact HszbC. } { exact HbelC. }
         iEval (rewrite (kfk_priv_close_id Vp)) in "HPpriv".
         iEval (rewrite (kfk_priv_close_id Vc)) in "HCpriv".
-        iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
-        { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".
-          iSplitL "Hb4"; [iExists u4; iExact "Hb4"|].
-          iSplitL "Hb5"; [iExists u5; iExact "Hb5"|].
-          iSplitL "Hb6"; [iExists (rget mf6 Rs4); iExact "Hb6"|].
+        (* [rget] is indexed by the AMBIENT [CpuId], so a fact stated with
+           [rget] here does not rewrite into a hypothesis the store leaf
+           produced at an earlier hart -- the two print identically.
+           durable-notes' rule: normalise with [rgne] and state the fact in
+           the [!!!] form. *)
+        assert (Hslot6 : mf6 !!! Regidx Rs4 = m !!! Regidx Rs4)
+          by (apply HBthr; vm_compute; first [reflexivity | discriminate]).
+        iAssert (∃ w4 w5 : mword 64,
+                   kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4))%I
+          with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
+        { iExists u4, u5. rewrite /kfk_frame_at.
+          iEval (rgne) in "Hb6". iEval (rewrite Hslot6) in "Hb6".
+          iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
         iSpecialize ("Hcont7c" $! CID11).
         iSpecialize ("Hcont7c" $! CID20 with "[%]"); [wp_next_chain|].
@@ -1104,11 +1138,21 @@ Section KforkPrologue.
                      with "[%] [%] [%] [%] HCsz HCpg HCpt HCtf HCtfpg") as "HCpriv".
         { exact Hroot2. } { exact Htf2. } { exact HszbP. } { exact HbelC'. }
         iEval (rewrite (kfk_priv_close_id Vp)) in "HPpriv".
-        iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
-        { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".
-          iSplitL "Hb4"; [iExists (rget mf9 Rs2); iExact "Hb4"|].
-          iSplitL "Hb5"; [iExists (rget mf9 Rs3); iExact "Hb5"|].
-          iSplitL "Hb6"; [iExists (rget mf6 Rs4); iExact "Hb6"|].
+        (* same [rget]/[!!!] normalisation as the failure arm above *)
+        assert (Hslot6' : mf6 !!! Regidx Rs4 = m !!! Regidx Rs4)
+          by (apply HBthr; vm_compute; first [reflexivity | discriminate]).
+        assert (Hslot4' : mf9 !!! Regidx Rs2 = m !!! Regidx Rs2)
+          by (apply HDthr; vm_compute; first [reflexivity | discriminate]).
+        assert (Hslot5' : mf9 !!! Regidx Rs3 = m !!! Regidx Rs3)
+          by (apply HDthr; vm_compute; first [reflexivity | discriminate]).
+        iAssert (kfk_frame_at sp0 ra0 s00 s10 s50
+                   (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4))
+          with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
+        { rewrite /kfk_frame_at.
+          iEval (rgne) in "Hb4". iEval (rewrite Hslot4') in "Hb4".
+          iEval (rgne) in "Hb5". iEval (rewrite Hslot5') in "Hb5".
+          iEval (rgne) in "Hb6". iEval (rewrite Hslot6') in "Hb6".
+          iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
         iSpecialize ("Hcont4a" $! CID11).
         iSpecialize ("Hcont4a" $! CID28 with "[%]"); [wp_next_chain|].
@@ -1125,7 +1169,9 @@ Section KforkPrologue.
         * exact HN10a3.
         * split; [reflexivity | cbn [upd_pt pv_upt]; exact Htf2].
         * intros r Hr Ncsp N8' N9' N20 N21. apply HN10thr; assumption.
-        * split_and!; [reflexivity | exact HjN | exact Hgamma].
+        * split_and!; [reflexivity | exact HjN | exact Hgamma
+                      | cbn [upd_pt upd_sz pv_ofile]; exact HVcof
+                      | cbn [upd_pt upd_sz pv_cwd]; exact HVccwd].
         * iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
           iSplitR; [iPureIntro; rewrite -Hrestlen; reflexivity | iExact "Hctx"].
         * iExists cq. iExact "Hiref2".
@@ -1140,6 +1186,11 @@ Section KforkPrologue.
                 ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi016 [-]").
       iNext. iIntros (CID12 Hs12) "Hcg Hpc".
+      (* [cpu_own] is the one bundle no leaf re-anchors: it came out of
+         [allocproc_post] at CID11 and the continuation is at CID12, and the
+         two print IDENTICALLY.  durable-notes' rule. *)
+      iDestruct (cpu_own_transport CID11 CID12 lvl eb pme C b
+                   ltac:(wp_next_chain) with "Hcpu") as "Hcpu".
       iAssert (kfk_frame sp0 ra0 s00 s10 s50) with "[Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8]" as "Hframe_alloc".
       { rewrite /kfk_frame. iFrame "Hb1 Hb2 Hb3 Hb7".
         iSplitL "Hb4"; [iExists u4; iExact "Hb4"|].
@@ -1147,7 +1198,7 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv']").
+      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv']").
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
       + iExists cq. iExact "Hiref2".

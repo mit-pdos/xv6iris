@@ -94,6 +94,39 @@ Section ProofKfork.
      word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 ∗
      (∃ w8, word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8))%I.
 
+  (* ... AND THE SAME FRAME WITH THE LAZY SLOTS PINNED.                   *)
+  (*                                                                      *)
+  (* [kfk_frame] is right for the allocproc-failure exit, which reaches the *)
+  (* epilogue having written none of s2/s3/s4 -- there is nothing to say    *)
+  (* about slots 4/5/6 and the epilogue never reads them.  It is WRONG for  *)
+  (* the two uvmcopy-side exits: by then s4 (and on the success path s2 and *)
+  (* s3) HAVE been spilled, and the blocks that reload them need to know    *)
+  (* WHICH value they will get back -- [ProofKforkB1.kfk_exit_uvmcopy]      *)
+  (* wants slot 6 at [m !!! Regidx Rs4], [kfk_tail_succ] wants all three at *)
+  (* the caller's s2/s3/s4.  An existential slot cannot supply that, so the *)
+  (* two mid-function continuations carry this form and weaken to           *)
+  (* [kfk_frame] only at the exit that does not care.                       *)
+  Definition kfk_frame_at (sp0 ra0 s00 s10 s50 w4 w5 w6 : mword 64) : iProp Σ :=
+    (word_pointsto (pa_stk sp0 1) (DfracOwn 1) ra0 ∗
+     word_pointsto (pa_stk sp0 2) (DfracOwn 1) s00 ∗
+     word_pointsto (pa_stk sp0 3) (DfracOwn 1) s10 ∗
+     word_pointsto (pa_stk sp0 4) (DfracOwn 1) w4 ∗
+     word_pointsto (pa_stk sp0 5) (DfracOwn 1) w5 ∗
+     word_pointsto (pa_stk sp0 6) (DfracOwn 1) w6 ∗
+     word_pointsto (pa_stk sp0 7) (DfracOwn 1) s50 ∗
+     (∃ w8, word_pointsto (pa_stk sp0 8) (DfracOwn 1) w8))%I.
+
+  Lemma kfk_frame_at_weaken (sp0 ra0 s00 s10 s50 w4 w5 w6 : mword 64) :
+    kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 w6 -∗ kfk_frame sp0 ra0 s00 s10 s50.
+  Proof.
+    rewrite /kfk_frame_at /kfk_frame.
+    iIntros "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
+    iFrame "Hb1 Hb2 Hb3 Hb7 Hb8".
+    iSplitL "Hb4"; [iExists w4; iExact "Hb4"|].
+    iSplitL "Hb5"; [iExists w5; iExact "Hb5"|].
+    iExists w6; iExact "Hb6".
+  Qed.
+
   (* The epilogue, restated over [kfk_frame] so the three exits agree on one
      shape.  It is [ProofKforkParts.kfk_epi] with the three lazy slots
      existentially quantified. *)
