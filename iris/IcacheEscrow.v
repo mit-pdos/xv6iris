@@ -739,7 +739,7 @@ Section IcacheEscrow.
     ipool γfs γi cov logstart ({[z]} ∪ P).
   Proof.
     intros Hz. rewrite /ipool (big_sepS_insert _ P z Hz).
-    iIntros "H1 H2". iFrame.
+    iIntros "H1 H2". iSplitL "H1"; [iExact "H1" | iExact "H2"].
   Qed.
 
   (* the round trip, so a read-only user needs no set algebra of its own *)

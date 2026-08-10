@@ -478,9 +478,8 @@ Section ProofIdup.
              already live, so §13.2's three clauses are preserved. *)
         iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange).
         split_and!; [| exact Hinj | exact Hrange].
-        rewrite dom_insert_L Hdom.
-        assert (Hkin : k ∈ dom M) by (apply elem_of_dom; by eexists).
-        set_solver. }
+        rewrite (dom_insert_lookup_L M k (qt, Pos.succ cnt) (mk_is_Some _ _ HMk)).
+        exact Hdom. }
       iPureIntro. destruct Hwf as [Hdom Hcnt'].  split.
       - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
         rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
