@@ -240,6 +240,12 @@ CodeMemcpy.v
 CodeMemmove.v
 ProofMemmove.v
 LinkMemmove.v
+SpecMemcmp.v
+ProofMemcmp.v
+LinkMemcmp.v
+SpecMemcpy.v
+ProofMemcpy.v
+LinkMemcpy.v
 SpecKfree.v
 ProofKfree.v
 LinkKfree.v
