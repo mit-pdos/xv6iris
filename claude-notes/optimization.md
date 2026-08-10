@@ -260,6 +260,35 @@ representation (Rocq 9.0's `Corelib.Strings.PrimString` literals are ONE term
 node regardless of length, and its comparison is a kernel primitive), which is
 an upstream change, not something to do in this tree.
 
+**NEGATIVE RESULT — sealing the name does NOT help, and cannot.**  The obvious
+reflex is to stop the tactics peeking inside the string: `Opaque`,
+`Typeclasses Opaque`, or an abstract module-type seal.  Measured (ten
+references to one 10-char name, `-d hconstr`):
+
+| how the name is written | tree |
+|---|---|
+| literal, ten times | 1354 |
+| behind a plain `Definition` | 154 |
+| behind a `Definition` + `Opaque` | 154 |
+| behind a `Definition` + `Typeclasses Opaque` | 154 |
+
+Opacity is a REDUCTION control, not a representation change: the ~121 nodes of
+`"Hi_csrw_ss"` *are* the term, with no definition being unfolded to produce
+them, so sealing buys exactly nothing over naming it.  And the thing that does
+shrink it — referring to a constant, 1 node instead of 121 — **breaks
+`envs_lookup`**, because the proof mode has to COMPARE names and `pm_eval` is
+`cbv` with a delta whitelist: a name behind a constant that is not in the
+whitelist does not reduce (measured: stuck), and names are generated per proof,
+so they can never be in a fixed whitelist.  `Opaque` is worse still — stuck
+even under `vm_compute`.  A module-type seal is the same story one level up: it
+also removes the literal notation, and comparison goes behind an interface the
+reducers cannot run.
+
+The only thing that works is changing the REPRESENTATION so one name is one
+node, which is why a primitive string is the answer and an opaque one is not: a
+primitive string is sealed against the kernel too, but it comes with a
+comparison the reducers can execute.
+
 **Measuring it without patching anything: `iIntros "?"` gives `IAnon p`**, a
 positive literal of a few nodes.  So the A/B "descriptive names vs anonymous"
 prices a compact ident representation on STOCK Iris, and does so
