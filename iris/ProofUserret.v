@@ -49,7 +49,11 @@ Section UserretAllPt.
       vs2 vs3 vs4 vs5 vs6 vs7 vs8 vs9 vs10 vs11 vt3 vt4 vt5 vt6 va0f dqm.
   Proof.
     cbv beta delta [wp_userret_pt_body].
-    unfold tf_pa, userret_gpr.
+    (* [tf_pa] deliberately NOT unfolded here — see the twin note in
+       ProofUservec.v: folded it is ~12 term nodes per trapframe cell instead
+       of ~260, and the cells ride in the context for the whole proof.  Worth
+       30 % of this file's proof term.  claude-notes/optimization.md. *)
+    unfold userret_gpr.
     intros HSIE HMPRV HSXL HTVM HMXR Hmm Hpmm HPBMTE Hmenvval0 Hsenvval0 Hwf HTSR Hsup
       Ha0 HuMode Huasid Huppn.
     iIntros "#Hkt #Hhw #Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsenv Hsepc

@@ -95,6 +95,79 @@ Definition satp_rooted (v : mword 64) (root : mword 44) : Prop :=
    everything usertrap needs beyond the boundary, for the process whose
    user table is [pt] and whose kernel stack top is [ksp]).  The module
    type instantiates it with its own [usertrap_res]. *)
+Definition usertrap_post `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    (R : uptd -> mword 64 -> iProp Σ) (C : ucfg) (pt : uptd) (kroot : mword 44) (m : regfile) : iProp Σ :=
+  let tfp := ud_tfp pt in
+  let ret_tgt : mword 64 := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5)) in
+  ( ∀ (pt' : uptd) (mf : regfile)
+      (ms' usatp uepc sc' stval' vksat' : mword 64)
+      (ksp' vkhart' : bv 64)
+      (v40 v48 v56 v64 v72 v80 v88 v96 v104 v120 v128 v136 v144 v152 v160
+       v168 v176 v184 v192 v200 v208 v216 v224 v232 v240 v248 v256 v264
+       v272 v280 v112 : bv 64),
+    ⌜ud_root pt' = ud_root pt⌝ -∗
+    ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
+    ⌜udata_cov (ud_um pt') (ud_data pt')⌝ -∗
+    ⌜upt_acc_wf (ud_um pt')⌝ -∗
+    ⌜upt_map_wf (ud_um pt')⌝ -∗
+    ⌜usertrap_ret_ms ms'⌝ -∗
+    ⌜callee_saved m mf⌝ -∗
+    ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = usatp⌝ -∗
+    ⌜satp_rooted usatp (ud_root pt')⌝ -∗
+    ⌜satp_rooted vksat' kroot⌝ -∗
+    hart_state ↦ᵣ HART_ACTIVE tt -∗
+    cur_privilege ↦ᵣ Supervisor -∗
+    mstatus ↦ᵣ ms' -∗
+    scause ↦ᵣ sc' -∗
+    stval ↦ᵣ stval' -∗
+    sepc ↦ᵣ uepc -∗
+    pc_is ret_tgt -∗
+    gpr_file mf -∗
+    tlb_inv_pt kroot -∗
+    pt_frame (upt_tree_spec (ud_root pt') (ud_tfp pt') (ud_um pt')) -∗
+    udata_own (ud_data pt') -∗
+    user_cfg C -∗
+    (* the trapframe's kernel words, re-armed for the NEXT trap *)
+    tf_pa tfp 0 ↦ₚ₈ vksat' -∗
+    tf_pa tfp 8 ↦ₚ₈ ksp' -∗
+    tf_pa tfp 16 ↦ₚ₈ (mword_of_int KernelSyms.usertrap : mword 64) -∗
+    tf_pa tfp 24 ↦ₚ₈ uepc -∗
+    tf_pa tfp 32 ↦ₚ₈ vkhart' -∗
+    (* the 31 save slots, holding the registers userret restores *)
+    tf_pa tfp 40 ↦ₚ₈ v40 -∗
+    tf_pa tfp 48 ↦ₚ₈ v48 -∗
+    tf_pa tfp 56 ↦ₚ₈ v56 -∗
+    tf_pa tfp 64 ↦ₚ₈ v64 -∗
+    tf_pa tfp 72 ↦ₚ₈ v72 -∗
+    tf_pa tfp 80 ↦ₚ₈ v80 -∗
+    tf_pa tfp 88 ↦ₚ₈ v88 -∗
+    tf_pa tfp 96 ↦ₚ₈ v96 -∗
+    tf_pa tfp 104 ↦ₚ₈ v104 -∗
+    tf_pa tfp 120 ↦ₚ₈ v120 -∗
+    tf_pa tfp 128 ↦ₚ₈ v128 -∗
+    tf_pa tfp 136 ↦ₚ₈ v136 -∗
+    tf_pa tfp 144 ↦ₚ₈ v144 -∗
+    tf_pa tfp 152 ↦ₚ₈ v152 -∗
+    tf_pa tfp 160 ↦ₚ₈ v160 -∗
+    tf_pa tfp 168 ↦ₚ₈ v168 -∗
+    tf_pa tfp 176 ↦ₚ₈ v176 -∗
+    tf_pa tfp 184 ↦ₚ₈ v184 -∗
+    tf_pa tfp 192 ↦ₚ₈ v192 -∗
+    tf_pa tfp 200 ↦ₚ₈ v200 -∗
+    tf_pa tfp 208 ↦ₚ₈ v208 -∗
+    tf_pa tfp 216 ↦ₚ₈ v216 -∗
+    tf_pa tfp 224 ↦ₚ₈ v224 -∗
+    tf_pa tfp 232 ↦ₚ₈ v232 -∗
+    tf_pa tfp 240 ↦ₚ₈ v240 -∗
+    tf_pa tfp 248 ↦ₚ₈ v248 -∗
+    tf_pa tfp 256 ↦ₚ₈ v256 -∗
+    tf_pa tfp 264 ↦ₚ₈ v264 -∗
+    tf_pa tfp 272 ↦ₚ₈ v272 -∗
+    tf_pa tfp 280 ↦ₚ₈ v280 -∗
+    tf_pa tfp 112 ↦ₚ₈ v112 -∗
+    R pt' (autocast (T := mword) (ksp' : mword 64)) -∗
+    WP (Loop : expr riscv_lang)).
+
 Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (R : uptd -> mword 64 -> iProp Σ)
     (C : ucfg) (pt : uptd) (kroot : mword 44)
@@ -184,74 +257,7 @@ Definition wp_usertrap_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fi
      root and the trapframe page are stable), [mf] the returned register
      file (callee-saved restored, a0 = the user satp), the [v*] the user
      register values userret will restore. *)
-  ( ∀ (pt' : uptd) (mf : regfile)
-      (ms' usatp uepc sc' stval' vksat' : mword 64)
-      (ksp' vkhart' : bv 64)
-      (v40 v48 v56 v64 v72 v80 v88 v96 v104 v120 v128 v136 v144 v152 v160
-       v168 v176 v184 v192 v200 v208 v216 v224 v232 v240 v248 v256 v264
-       v272 v280 v112 : bv 64),
-    ⌜ud_root pt' = ud_root pt⌝ -∗
-    ⌜ud_tfp pt' = ud_tfp pt⌝ -∗
-    ⌜udata_cov (ud_um pt') (ud_data pt')⌝ -∗
-    ⌜upt_acc_wf (ud_um pt')⌝ -∗
-    ⌜upt_map_wf (ud_um pt')⌝ -∗
-    ⌜usertrap_ret_ms ms'⌝ -∗
-    ⌜callee_saved m mf⌝ -∗
-    ⌜mf !!! Regidx (mword_of_int 10 : mword 5) = usatp⌝ -∗
-    ⌜satp_rooted usatp (ud_root pt')⌝ -∗
-    ⌜satp_rooted vksat' kroot⌝ -∗
-    hart_state ↦ᵣ HART_ACTIVE tt -∗
-    cur_privilege ↦ᵣ Supervisor -∗
-    mstatus ↦ᵣ ms' -∗
-    scause ↦ᵣ sc' -∗
-    stval ↦ᵣ stval' -∗
-    sepc ↦ᵣ uepc -∗
-    pc_is ret_tgt -∗
-    gpr_file mf -∗
-    tlb_inv_pt kroot -∗
-    pt_frame (upt_tree_spec (ud_root pt') (ud_tfp pt') (ud_um pt')) -∗
-    udata_own (ud_data pt') -∗
-    user_cfg C -∗
-    (* the trapframe's kernel words, re-armed for the NEXT trap *)
-    tf_pa tfp 0 ↦ₚ₈ vksat' -∗
-    tf_pa tfp 8 ↦ₚ₈ ksp' -∗
-    tf_pa tfp 16 ↦ₚ₈ (mword_of_int KernelSyms.usertrap : mword 64) -∗
-    tf_pa tfp 24 ↦ₚ₈ uepc -∗
-    tf_pa tfp 32 ↦ₚ₈ vkhart' -∗
-    (* the 31 save slots, holding the registers userret restores *)
-    tf_pa tfp 40 ↦ₚ₈ v40 -∗
-    tf_pa tfp 48 ↦ₚ₈ v48 -∗
-    tf_pa tfp 56 ↦ₚ₈ v56 -∗
-    tf_pa tfp 64 ↦ₚ₈ v64 -∗
-    tf_pa tfp 72 ↦ₚ₈ v72 -∗
-    tf_pa tfp 80 ↦ₚ₈ v80 -∗
-    tf_pa tfp 88 ↦ₚ₈ v88 -∗
-    tf_pa tfp 96 ↦ₚ₈ v96 -∗
-    tf_pa tfp 104 ↦ₚ₈ v104 -∗
-    tf_pa tfp 120 ↦ₚ₈ v120 -∗
-    tf_pa tfp 128 ↦ₚ₈ v128 -∗
-    tf_pa tfp 136 ↦ₚ₈ v136 -∗
-    tf_pa tfp 144 ↦ₚ₈ v144 -∗
-    tf_pa tfp 152 ↦ₚ₈ v152 -∗
-    tf_pa tfp 160 ↦ₚ₈ v160 -∗
-    tf_pa tfp 168 ↦ₚ₈ v168 -∗
-    tf_pa tfp 176 ↦ₚ₈ v176 -∗
-    tf_pa tfp 184 ↦ₚ₈ v184 -∗
-    tf_pa tfp 192 ↦ₚ₈ v192 -∗
-    tf_pa tfp 200 ↦ₚ₈ v200 -∗
-    tf_pa tfp 208 ↦ₚ₈ v208 -∗
-    tf_pa tfp 216 ↦ₚ₈ v216 -∗
-    tf_pa tfp 224 ↦ₚ₈ v224 -∗
-    tf_pa tfp 232 ↦ₚ₈ v232 -∗
-    tf_pa tfp 240 ↦ₚ₈ v240 -∗
-    tf_pa tfp 248 ↦ₚ₈ v248 -∗
-    tf_pa tfp 256 ↦ₚ₈ v256 -∗
-    tf_pa tfp 264 ↦ₚ₈ v264 -∗
-    tf_pa tfp 272 ↦ₚ₈ v272 -∗
-    tf_pa tfp 280 ↦ₚ₈ v280 -∗
-    tf_pa tfp 112 ↦ₚ₈ v112 -∗
-    R pt' (autocast (T := mword) (ksp' : mword 64)) -∗
-    WP (Loop : expr riscv_lang)) -∗
+  usertrap_post R C pt kroot m -∗
   WP (Loop : expr riscv_lang).
 
 Module Type USERTRAP.

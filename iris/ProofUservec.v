@@ -57,7 +57,12 @@ Section UservecAllPt.
         w272 w280 w112 dqk.
   Proof.
     cbv beta zeta delta [wp_uservec_pt_body].
-    unfold tf_pa, uservec_gpr.
+    (* [tf_pa] deliberately NOT unfolded here: its 35 trapframe cells ride in
+       the Iris context for every one of this proof's ~600 steps, and every
+       step's proof term embeds the whole context twice, so an unfolded
+       address (~260 nodes vs ~12) is 14 % of the proof TERM.  The leaves
+       unify through the definition. See claude-notes/optimization.md. *)
+    unfold uservec_gpr.
     intros Hstvec Hdqc HkMode Hkasid Hkppn.
     iIntros "#Hkt #Hhw #Hinv #Hclaim Hframe Hsscr Hkfr
              Hk0 Hk8 Hk16 Hk32

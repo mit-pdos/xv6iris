@@ -176,6 +176,63 @@ Two measured levers on `ProofUservec` (isolated `rocq compile`; baseline
   needs the unfolded form, unfold it at the leaf, or `set` the unfolded address
   to a local name so the context carries a variable.
 
+### 5b. THE SWEEP WAS RUN (2026-08-10).  Two files moved; three sweeps were measured and REJECTED
+
+The three levers above were then applied tree-wide, ranked by the metric that
+predicts them — **`Qed` seconds per proof step**, which is `|Δ|` up to a
+constant and needs no extra build (group each `*.v.timing`'s sentences, divide
+the `Qed` total by the count of tactic sentences).  The top of that ranking:
+
+| ms `Qed`/step | `Qed` s | steps | file |
+|---|---|---|---|
+| 124 | 37.8 | 305 | `ProofUservec` |
+| 111 | 45.5 | 410 | `ProofWriteHead` |
+| 110 | 24.1 | 218 | `ProofUserret` |
+| 89 | 34.0 | 382 | `ProofInitlog` |
+| 78 | 87.5 | 1127 | `ProofVirtioDiskInit` |
+
+**What paid** — dropping `tf_pa` from the opening `unfold` of the two
+trampoline proofs, i.e. letting the 32–35 trapframe cells keep a folded
+address.  Both still compile with no other edit:
+
+| | tree | isolated |
+|---|---|---|
+| `ProofUservec` (after the `uservec_post` seal) | 27.2 M → **23.5 M** | 63.5 s → **58.5 s** |
+| `ProofUserret` | 26.5 M → **18.6 M (−30 %)** | 60.4 s → **45.2 s (−25 %)** |
+
+**What did NOT pay, all three measured — do not redo these:**
+
+- **Sealing the other whole-function continuations.**  156 files have a
+  continuation of ≥8 wands as the last premise of a `wp_*_body` / helper
+  lemma.  Sealed `SpecWriteHead`'s (21 lines, correctly bounded so the wand
+  count is preserved — `ProofWriteHead` then compiles UNTOUCHED, so the seal
+  *is* a drop-in) and measured: tree 6,919,556 → 6,876,143 (**−0.6 %**), 46.4 s
+  → 46.3 s.  The reason is structural: outside the two trampoline proofs the
+  tree ALREADY names its continuations (`wh_cont`, `sp_join7`, `uv_step_obl`,
+  `kw_exit_fn`, `vdrw_pN_exit`, …), so the body's own continuation survives only
+  the handful of steps in a thin capstone.  `ProofUservec` was the outlier
+  because it is a 1300-line monolith carrying a 50-wand continuation.
+  (`SpecUsertrap.usertrap_post` was sealed anyway — usertrap has no proof yet
+  and its continuation is the tree's largest remaining at 60 wands, so this is
+  shaping the spec before the monolith is written, not a measured win.)
+- **`Proof using` tree-wide.**  The −17 % quoted in §5 was a single-shot
+  comparison across batches and did not survive.  Interleaved, min of three, on
+  `ProofUservec` with the exact set Rocq itself suggests (`Set Suggest Proof
+  Using` → `Proof using .`): `Qed` **12.38 s → 11.68 s, −5.2 %**, and on
+  `ProofCopyout` it was inside the noise in the *wrong* direction (9.52 s →
+  10.44 s).  5 % of `Qed` is 0.75 % of the build, for an annotation on all
+  17,774 proofs.  Not worth it; `pusing.py` in the session scratch does the
+  rewrite safely (the suggested set is what the default computes, so no
+  constant changes) if that trade ever looks better.
+- **The rest of the `unfold`-in-context sweep.**  Sixteen other sites match
+  "an `unfold` between `Proof.` and the first `iIntros`" (`pa_stk,
+  add_vec_int` in ProofKernelvec/Scheduler/Copyinstr/SysSbrk/SysDup/Argfd/Binit,
+  `b_data`/`buf_base` in ProofWriteHead/ProofInitlog, `ISLOTSZ` in ProofIlock).
+  **Every one is a false positive**: they are tiny pure address lemmas closed by
+  `reflexivity`/`f_equal`/`lia`, with no Iris context at all.  The anti-pattern
+  only bites when the unfolded abstraction appears in a hypothesis that a *long*
+  proof carries, which in this tree meant `tf_pa` and nothing else.
+
 ### 6. Which hypothesis is big: ablate with `iClear`, do not read the proof
 
 Insert `iClear "…"` **before** the block of steps you are measuring — clearing
