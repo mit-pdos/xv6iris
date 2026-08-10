@@ -869,6 +869,7 @@ ProofWritei.v
 SpecReadi.v
 IrefSlots.v
 IcacheInv.v
+InodeRef.v
 InodeLock.v
 InodeRegion.v
 IcacheEscrow.v
