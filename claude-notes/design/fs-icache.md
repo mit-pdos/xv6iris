@@ -1420,6 +1420,44 @@ and re-established automatically at every split; `iref_alloc_step`'s
 mint at ¼ (the worklist's choice) respects it, and IcacheInv's header
 comment "(0, ½]" must be corrected to "(0, ½)".
 
+### 13.9 §13.7's dom-⊆ was ALSO wrong: a non-live slot holds no payload,
+### and iput's last close does the eviction (C5's blocker C)
+
+xv6's scan hit-test requires `ref > 0`, and the recycle takes the FIRST
+ref-0 slot — never consulting a ref-0 slot's identity. So under `dom M
+⊆ dom ci` the state {slot 0: ref-0 cached B, recycle B into slot 1} is
+reachable, ci-injectivity is FALSE, and two escrow arms would hold
+inum B's bundle against `dinode_at_excl`. Confirmed by trace (C5's
+report). The fix — enabled by §13.8's virgin arm, which removed §13.7's
+boot motivation:
+
+* `ic_ci_wf` REVERTS to `dom ci = dom M`. `islot2`'s (None, Some) arm
+  dies as unreachable; `ic_open_parked_free`/`_dev` die.
+* **iput's last close moves the parked bundle back to the pool and
+  re-forms the arm as the EMPTY shape** — the mirror of the recycle's
+  ghost flip, all lock-internal: the closer (REF-1, under the lock)
+  holds table+own identity = ½ each cell; the arm's halves complete
+  them; the empty arm takes dev FULL + inum ½ + ghost false; ci and M
+  delete together; the pool insert is fresh (inum ∈ ci pre-delete).
+  The EVICTION ARGUMENT (loaded shape → allocated pool shape, via
+  PARKED-MEANS-FLUSHED §13.1d) is iput's, where the flush semantics
+  actually hold — iget evicts NOTHING, ever.
+* iget's recycle collapses to ONE variant (always from the empty arm),
+  selected with no case split: the scan's empty-slot invariant `M !! j
+  = None` gives `ci !! j = None` under the restored tie.
+* RENAME virgin→EMPTY (`ic_empty_arm`), `ic_id` reads "live / has a
+  payload", not "was ever identified" — identification is no longer
+  monotone (a last close un-identifies), and the ghost + all four
+  refuters are unchanged by the rename.
+* The scan's live-slot invariant (∀ scanned live slot, identity ≠
+  (dev, inum)) now IS `inum ∉ ci_inums` at the sentinel — exactly
+  `ipool_acc`'s premise.
+
+C6's SpecIput inherits: the last-close arm's postcondition is pure
+(the reference is consumed, nothing comes back); the eviction is
+internal. `K_iget` tightens to 16 (6-slot frame + the lock pair's 10)
+while nothing consumes it.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
