@@ -1491,6 +1491,28 @@ recycle stores need AU store leaves against `icEscN` (a local
 `wp_sw_au` restatement at `Em := ⊤ ∖ ↑minstretN ∖ ↑icEscN`) — the
 cells live in an `inv`, not in the lock.
 
+### 13.11 The table is SINGLE-DEVICE, said out loud (C5b's third gap —
+### and §10.2's prophecy landing)
+
+The scan's strongest invariant is pair-shaped (xv6's hit test
+short-circuits on the device compare without loading the inum), but
+`ipool_acc`'s membership premise is INUM-keyed — and a live slot
+caching the same inum on a DIFFERENT device satisfies the former while
+refuting the latter (and would break ci-injectivity and
+`dinode_at_excl` besides). §10.2 recorded exactly this hazard when
+borrowing bio's device pin ("breaks the moment entries are keyed by
+(dev, inum) across devices... invisible until it fails"). The fix is
+bio's, one token wide: `ic_ci_wf M ci nib dv` gains
+`∀ k p, ci !! k = Some p -> fst p = dv`; `itable_res2`/`is_itable2`
+gain a trailing `dv`; `SpecIget`/`SpecIdup` instantiate it at the
+`dev` binder they already carry (no new premise — "no constraint on
+dev" becomes "the table is this device's"). The scan's pair invariant
+then collapses to `ii ≠ inum` at every live slot, membership follows,
+and the recycle re-establishes the device clause by construction.
+`SpecIlock`/`SpecIunlock` are untouched (they take `ic_escrow` and
+`bio_ctx`, not the table). A future multi-device xv6 re-keys
+`dinode_at` by (dev, inum) — recorded, not owed.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`

@@ -37,6 +37,16 @@
    so both of those ride through its critical section untouched -- the flip
    from [is_itable] is a re-framing, not a re-proof (§13.4).
 
+   It is instantiated AT THE CALLER'S [dev], because the table is
+   single-device (§13.11): the region and the pool are inum-keyed, so
+   "cached" has to be decidable from inums alone, which holds exactly when
+   every cached entry names one device -- [BioInv]'s [bv_dev V] for the
+   inode cache.  idup neither reads nor writes an identity cell, so for IT
+   the parameter is pure pass-through; it is iget's recycle that has to
+   re-establish the clause, and iget's scan that would otherwise be unable
+   to.  The caller supplies the same [dev] its reference already names, so
+   this costs nothing at any call site.
+
    [itable_inv γ] is where the [ref] WORDS live -- not in [itable.lock]'s
    resource.  idup writes one while holding the lock, so it opens the
    invariant and joins the two halves of the authority; that the halves meet
@@ -109,7 +119,7 @@ Definition wp_idup_sconf_body
   sie_cap_gpr m K b p -∗
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
-  is_itable2 γl cn γfs γi cov logstart nib -∗
+  is_itable2 γl cn γfs γi cov logstart nib dev -∗
   itable_inv (icn_ref cn) -∗
   panic_wp_any -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)

@@ -216,7 +216,21 @@ out 2026-08-09):**
 
 - C4: `idup` never touches dinode blocks or the sleeplock payload —
   expect zero ripple; verify by build.
-- C5: `CodeIget.v` LANDED (2026-08-09: scratch-verified — 17 shards
+- C5: **DONE 2026-08-10 — iget PROVEN AND LINKED** (ProofIget.v 2034
+  lines; coverage 146 proven / 78%). Took FOUR definitional corrections
+  found by proof-forward tracing (§13.8 virgin→empty arm + strictly
+  positive retained share, §13.9 the strict dom tie + iput-side
+  eviction, §13.10 the identity-carrying ghost, §13.11 the
+  single-device pin — §10.2's recorded prophecy landing). Proof
+  surprises worth keeping: `ra` is NOT in `is_cs_idx` (thread `Rra`
+  facts by explicit `upd_ne` chains); `bv_unsigned_in_range _ x` (the
+  index is N — a Z-scope literal fails LATER as a lia witness error);
+  `cbn [snd]`, never `simpl`, for pair projections near `bv_unsigned`;
+  `sw zero` needs `IntrDefs.sie_cap_gpr_x0`; a scan at literal
+  `b = false` collapses through `wp_next_off_intro` and needs no CpuId
+  in its fuel induction; prove the shared tail BEFORE the loop and
+  hand it in as the loop's last `-∗`. Original decode notes:
+  `CodeIget.v` LANDED (2026-08-09: scratch-verified — 17 shards
   addition-only, siblings byte-identical except CodeStrncmp's
   pre-existing import-position quirk; manifest row `["CodeIget.v",
   "iget", "igi_", 2]`). SpecIget's worked design (statement is

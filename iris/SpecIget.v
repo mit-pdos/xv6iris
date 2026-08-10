@@ -67,9 +67,23 @@
    take its bundle out of the pool ([ipool_acc]).  The scan's own loop
    invariant -- no slot in the range already scanned carries (dev, inum) --
    is what shows the inum is not among the CACHED ones, and the two together
-   are the pool membership fact.  There is deliberately NO premise on [dev]:
-   iget writes whatever device it was given into the recycled entry, and
-   only ilock's later bread cares what it means.
+   are the pool membership fact.
+
+   ...EXCEPT THAT THE SCAN'S INVARIANT IS PAIR-SHAPED AND THE POOL IS NOT
+   (§13.11).  xv6's hit test is [ip->dev == dev && ip->inum == inum], and
+   the dev compare at +0x4c short-circuits to the loop step BEFORE
+   [ip->inum] is ever loaded, so a scan that misses proves only that no live
+   slot carries THE PAIR -- while the pool, the region and [dinode_at] are
+   keyed on the inum ALONE (one file system).  A live slot at (dev', inum)
+   would leave the recycle with no bundle to withdraw, a second [dinode_at]
+   for one inum against [InodeRegion.dinode_at_excl], and [ci]-injectivity
+   broken.  The two readings coincide exactly when the cache holds ONE
+   device, which is now said out loud: [is_itable2] carries the table's
+   device and is instantiated HERE at iget's own [dev].  So there is still
+   no separate premise on [dev] -- the argument simply IS the table's
+   device, the way [dev] is [BioInv.bv_dev V] on the buffer side -- and iget
+   writes it into the recycled entry as before, with only ilock's later
+   bread caring what it means.
 
    ---- THE POSTCONDITION IS UNIFORM ACROSS THE TWO ARMS -----------------
 
@@ -171,7 +185,7 @@ Definition wp_iget_sconf_body
   cpu_own n eb p C b -∗
   kernel_text -∗ pc_is pcE -∗
   (* the itable spinlock: the identity cells, [ci] and the uncached pool *)
-  is_itable2 γl cn γfs γi cov logstart nib -∗
+  is_itable2 γl cn γfs γi cov logstart nib dev -∗
   (* the [ref] words *)
   itable_inv (icn_ref cn) -∗
   (* EVERY entry's content -- the scan cannot name its slot in advance *)

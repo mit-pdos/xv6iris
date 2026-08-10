@@ -278,9 +278,13 @@ Qed.
 Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
 
 (* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
-   ([icn_id], design §13.8): a two-state agreement between the escrow's arm
-   and the table's [islot2] share, saying whether the entry's identity cells
-   have ever been written.  It lives HERE, as a field of [icacheG], rather
+   ([icn_id], design §13.8 as widened by §13.10): an agreement between the
+   escrow's arm and the table's [islot2] share carrying (is the entry LIVE,
+   and what do its two identity cells hold).  The two words are not
+   bookkeeping: a recycler's stores land in cells the arm then owns WHOLE
+   (EMPTY's dev, MID's inum -- each is a discriminator and so admits no
+   retained fraction), and this agreement is the only thing that carries
+   their values across the openings.  It lives HERE, as a field of [icacheG], rather
    than as an extra [!ghost_varG Σ bool] on every section that mentions the
    escrow -- nine spec and proof files already carry [icacheG], and this way
    they need no edit at all.  ([FsCrash.v]'s header records the tree's other
@@ -289,9 +293,10 @@ Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
    an exclusive token can only be held by one of them.) *)
 Class icacheG (Σ : gFunctors) := IcacheG {
   icache_inG :: inG Σ icacheUR;
-  icache_idG :: ghost_varG Σ bool;
+  icache_idG :: ghost_varG Σ (bool * mword 32 * mword 32);
 }.
-Definition icacheΣ : gFunctors := #[GFunctor icacheUR; ghost_varΣ bool].
+Definition icacheΣ : gFunctors :=
+  #[GFunctor icacheUR; ghost_varΣ (bool * mword 32 * mword 32)].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 
