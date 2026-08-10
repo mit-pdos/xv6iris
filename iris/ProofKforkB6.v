@@ -242,7 +242,16 @@ Section KforkPrologue.
        [CID0] if the entry [b] was [true] and a migration happened inside
        myproc/allocproc.  The caller instantiates [CIDh] at whichever hart is
        ambient the moment it reaches this exit. *)
-    (∀ CIDh : CpuId, wp_next (CID0 := CIDh) false pme (fun (CID : CpuId) =>
+    (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
+       "prove the continuation at a hart nobody has said anything about":
+       [wp_next _ false _ K] is [K CIDh] ([WpNext.wp_next_off]), so supplying
+       it means proving [K CIDh] for an ADVERSARIAL [CIDh], and the caller's
+       own exit continuation is anchored at [CID0] with no way to re-anchor.
+       The fact is true and this proof already has it -- [wp_next_chain] over
+       the leaves run so far -- it was simply never surfaced. *)
+    (∀ CIDh : CpuId,
+       ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
+       wp_next (CID0 := CIDh) false pme (fun (CID : CpuId) =>
       ∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Vc : pprivate),
         ⌜ Mt !!! Regidx csp_rs1 = pa_stk sp0 8 ⌝ -∗
@@ -280,7 +289,16 @@ Section KforkPrologue.
         kalloc_env γa None -∗
         WP (Loop : expr riscv_lang))) -∗
     (* ---- Hcont4a : uvmcopy succeeded -- the trapframe copy loop's head --- *)
-    (∀ CIDh : CpuId, wp_next (CID0 := CIDh) false pme (fun (CID : CpuId) =>
+    (* THE CROSSING PREMISE IS NOT OPTIONAL.  Without it this antecedent is
+       "prove the continuation at a hart nobody has said anything about":
+       [wp_next _ false _ K] is [K CIDh] ([WpNext.wp_next_off]), so supplying
+       it means proving [K CIDh] for an ADVERSARIAL [CIDh], and the caller's
+       own exit continuation is anchored at [CID0] with no way to re-anchor.
+       The fact is true and this proof already has it -- [wp_next_chain] over
+       the leaves run so far -- it was simply never surfaced. *)
+    (∀ CIDh : CpuId,
+       ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
+       wp_next (CID0 := CIDh) false pme (fun (CID : CpuId) =>
       ∀ (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
         (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate)
         (tfsrc tfdst : mword 44),
@@ -916,7 +934,7 @@ Section KforkPrologue.
           iEval (rgne) in "Hb6". iEval (rewrite Hslot6) in "Hb6".
           iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
-        iSpecialize ("Hcont7c" $! CID11).
+        iSpecialize ("Hcont7c" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont7c" $! CID20 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont7c" $! mf9 npa j γl2 pid_c ch Vc
                   with "[%] [%] [%] [%] [%] [%]").
@@ -1169,7 +1187,7 @@ Section KforkPrologue.
           iEval (rgne) in "Hb6". iEval (rewrite Hslot6') in "Hb6".
           iFrame "Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7".
           iExists u8; iExact "Hb8". }
-        iSpecialize ("Hcont4a" $! CID11).
+        iSpecialize ("Hcont4a" $! CID11 with "[%]"); [wp_next_chain|].
         iSpecialize ("Hcont4a" $! CID28 with "[%]"); [wp_next_chain|].
         iApply ("Hcont4a" $! N10 npa j γl2 pid_c ch
                   (upd_pt (upd_sz Vc (pv_sz Vp)) P' (pv_tf Vc))

@@ -2,45 +2,100 @@
    (ProofKforkB1..B7, ProofKfork's two exits, ProofKforkParts' epilogue)
    into SpecKfork.KFORK's [wp_kfork_sconf].
 
-   STATUS: NOT COMPLETE, but the three earlier gaps this file's previous
-   revision found (missing [cpu_own] on the allocproc-not-found arm,
-   [kfk_frame]'s existential swallowing the uvmcopy-failure arm's slot-6
-   value, [Hcont4a]'s missing ofile/cwd conjunct on the child block) have
-   all been FIXED in [ProofKforkB6.v]/[ProofKfork.v], and the fixes are
-   used below.  Every Lemma in this file is fully proved (no
-   [admit]/[Admitted]/[Axiom]/[Parameter]):
+   STATUS: [kfork_arm1]/[kfork_arm2]/[kfork_arm3] are complete,
+   HYPOTHESIS-FREE matches for [Hcont10a]/[Hcont7c]/[Hcont4a]'s own bodies
+   (no [admit]/[Admitted]/[Axiom]/[Parameter] anywhere in this file), and
+   all four seams the earlier rounds found (missing [cpu_own] on the
+   allocproc-not-found arm; [kfk_frame]'s existential swallowing the
+   uvmcopy-failure arm's slot-6 value; [Hcont4a]'s missing ofile/cwd
+   conjunct on the child block; [Hcont4a]'s [own_ctx] being too weak for
+   [SpecForkretPark.forkret_park]) are fixed and used below.
 
-     - [kfork_arm1] is a complete, HYPOTHESIS-FREE match for [Hcont10a]'s
-       own body (allocproc found no slot) -- [ProofKfork.kfk_exit_alloc]
-       plus [kfork_post]'s first disjunct.
-     - [kfork_arm2] is a complete, HYPOTHESIS-FREE match for [Hcont7c]'s
-       own body (uvmcopy failed) -- [ProofKforkB1.kfk_exit_uvmcopy] plus
-       [kfork_post]'s second disjunct.
-     - [kfork_arm3] closes [Hcont4a]'s own body (uvmcopy succeeded) all the
-       way through [ProofKforkB2] (the trapframe copy loop), [ProofKforkB7]
-       (my own block), [ProofKforkB3] (the whole 16-iteration fd scan),
-       [ProofKforkB4] (idup/safestrcpy/pid), [ProofKforkB5] (the two lock
-       crossings and the RUNNABLE park), and [ProofKfork.kfk_tail_succ],
-       reaching [kfork_post]'s THIRD disjunct -- given exactly ONE extra
-       premise, documented in its own header as a SEAM: [Hcont4a] hands
-       the scheduler context as the generic [SwtchCtx.own_ctx (p_context
-       npa)], but [SpecForkretPark.forkret_park] (run inside
-       [ProofKforkB5.kfk_b5]) needs the RAW, SPECIFIC shape ([is_kstack] +
-       [ctx_cells] at the literal [forkret_pc :: add_vec ks 4096 :: rest]),
-       which a generic 14-word existential cannot supply.
+   [wp_kfork_sconf] ITSELF IS BLOCKED ON A FIFTH SEAM, in
+   [ProofKforkB6.kfk_prologue]'s statement of [Hcont7c]/[Hcont4a] --
+   documented in full where the attempt stops, right after this comment.
+   Unlike the first four, this one is NOT worked around here: per the
+   brief's rule ("if a goal can't be closed, STOP and report the precise
+   goal/lemma/premise"), [wp_kfork_sconf] is left unproved (no attempted
+   [Proof]/[Qed] below) rather than admitted, and [Module Kfork ... :
+   KFORK] is not written.
 
-   Because that one fact only becomes nameable INSIDE [Hcont4a]'s own
-   binders (the child's address [npa] does not exist before then), it
-   cannot be discharged by adding a top-level hypothesis to a
-   [wp_kfork_sconf]-shaped lemma the way the three earlier gaps could --
-   the fix has to be inside [ProofKforkB6.kfk_prologue] itself (expose
-   [is_kstack npa ks ∗ ctx_cells (p_context npa) (forkret_pc ::
-   add_vec ks 4096 :: rest)] in [Hcont4a] in place of [own_ctx (p_context
-   npa)], exactly mirroring how the three earlier gaps were fixed).  So
-   this file does NOT define [Module Kfork ... : KFORK]: doing so would
-   require completing [wp_kfork_sconf], which is exactly the one step
-   blocked on that fix.  [kfork_arm3] is otherwise ready to plug in
-   unchanged the moment it lands. *)
+   THE GAP.  [Hcont10a] (kfk_prologue's FIRST continuation, at +0x016) is
+   stated directly as [wp_next b pme K1] -- the SAME [(b, pme)] pair, and
+   hence the SAME implicit [CID0] (kfk_prologue's own Context variable,
+   unified with this file's outer [wp_kfork_sconf]'s own entry hart), as
+   [wp_kfork_sconf_body]'s own trailing continuation ("Hcont").  So
+   [kfork_arm1] discharges "Hcont" trivially: destructure "Hcont10a"'s own
+   [∀CID, ⌜cross⌝-*K1 CID] to get a crossing fact [Hcrossx : b=false\/
+   pme=zero_reg -> CIDx=CID0] "for free", and use exactly that fact
+   (plus [CpuOwn.cpu_own_transport]) to re-anchor "Hcont" at [CIDx].
+
+   [Hcont7c]/[Hcont4a] (at +0x02c) are stated DIFFERENTLY: each is wrapped
+   in an EXTRA [∀ CIDh : CpuId], and the [wp_next] INSIDE that binder is
+   pinned at the LITERAL [false] (not the caller's symbolic [b]), with
+   NO further premise connecting [CIDh] to anything:
+
+     (∀ CIDh : CpuId, wp_next (CID0 := CIDh) false pme (fun CID => ...)) -∗
+
+   Since [false = false] is trivially true, [wp_next (CID0 := CIDh) false
+   pme K ⊣⊢ K CIDh] ([WpNext.wp_next_off]) FOR ANY [CIDh] -- so proving
+   this antecedent is, after [iIntros (CIDh)], EXACTLY proving [K CIDh]
+   for a [CIDh] that is otherwise TOTALLY UNCONSTRAINED (swap the two
+   quantifiers: [∀CIDh ∀CID, ⌜CID=CIDh⌝-*K CID] ≡ [∀CID, K CID]).  [K]'s
+   own body threads [sie_cap_gpr Mt (K-8) false pme] / [cpu_own (S lvl)
+   eb pme C false] -- both canonically hart-indexed AT THAT SAME [CIDh]
+   (WpNext.v's own "every resource inside K is about the hart we resume
+   on" shadowing discipline: [sie_gname := sie_name cpu_id] with [cpu_id]
+   resolved, at STATEMENT-elaboration time, to the innermost [CpuId] in
+   scope, which is [CIDh]/[CID], never kfk_prologue's own outer [CID0]).
+   To close [K CIDh] one eventually has to re-anchor wp_kfork_sconf's own
+   "Hcont" (anchored at [CID0], via [WpNext.wp_next_trans]/
+   [CpuOwn.cpu_own_transport]) at [CIDh] -- which needs EXACTLY the
+   crossing fact [b = false \/ pme = zero_reg -> (CIDh:CPU) = (CID0:CPU)].
+   Nothing in [Hcont7c]/[Hcont4a]'s premise list supplies it: not the pure
+   register/[npa]/[γl2] facts, not [ProcGeom.hart_at_any npa]
+   ([ProcGeom.v:909]), not [IntrDefs.arm_pay lvl eb pme]
+   ([IntrDefs.v:848], itself just another [CIDh]-indexed resource with no
+   crossing content) -- and it cannot be recovered from anything still
+   held at the top of [wp_kfork_sconf], because "Hcg"/"Hown" (the only
+   things that WERE at [CID0]) were already handed to [kfk_prologue] as
+   its own precondition.
+
+   THIS FACT DOES EXIST -- but only INSIDE [kfk_prologue]'s own, already
+   compiled proof, as an internal, unexposed byproduct of ITS OWN
+   [wp_next_chain] bookkeeping through myproc/allocproc/uvmcopy.
+   Concretely, at the two call sites (ProofKforkB6.v:890-893 for
+   [Hcont7c], and the identical pattern at :1172-1173 for [Hcont4a]):
+
+     iSpecialize ("Hcont7c" $! CID11).
+     iSpecialize ("Hcont7c" $! CID20 with "[%]"); [wp_next_chain|].
+     assert (Hchain7c : false = false \/ pme = zero_reg -> (CID20:CPU) = (CID11:CPU))
+       by wp_next_chain.
+
+   [kfk_prologue] instantiates its own [∀CIDh] at [CID11] -- a SPECIFIC
+   hart it already knows (from its own earlier, internal crossing chain,
+   never surfaced in [Hcont7c]/[Hcont4a]'s TYPE) relates correctly to its
+   own [CID0].  A caller constructing the antecedent, however, must supply
+   a proof for [∀CIDh], i.e. for adversarial [CIDh] too -- which is where
+   this gets stuck.  [Hcont10a] never has this problem because it carries
+   no such extra binder at all.
+
+   THE FIX -- for [ProofKforkB6.kfk_prologue], not this file -- is to add
+   exactly the missing crossing premise to [Hcont7c]/[Hcont4a], mirroring
+   [CpuOwn.cpu_own_transport]'s own shape:
+
+     (∀ CIDh : CpuId,
+        ⌜ b = false \/ pme = zero_reg -> (CIDh : CPU) = (CID0 : CPU) ⌝ -∗
+        wp_next (CID0 := CIDh) false pme (fun CID => ...)) -∗
+
+   With that premise in hand, [kfork_arm2]/[kfork_arm3]'s own continuation
+   slot becomes constructible from "Hcont" exactly the way [kfork_arm1]
+   already does it (destructure the new premise, then
+   [WpNext.wp_next_trans]/[CpuOwn.cpu_own_transport] to re-anchor).
+   [kfork_arm1], [kfork_arm2] and [kfork_arm3] below are otherwise ready
+   to plug in unchanged the moment it lands; only [wp_kfork_sconf]'s own
+   proof (INSIDE Section KforkCapstone) needs the three
+   [iApply (kfork_armN ...)] bullets re-added. *)
 From Stdlib Require Import Eqdep_dec ZArith Lia List.
 From stdpp Require Import gmap list list_monad bitvector.definitions bitvector.tactics.
 From iris.proofmode Require Import proofmode.
@@ -114,6 +169,18 @@ Local Open Scope Z_scope.
 Set Printing Depth 40.
 
 Notation KF := KernelSyms.kfork (only parsing).
+
+(* ---- numeric side conditions, by name, over plain nat -- never inline
+   [ltac:(lia)] under this file's heavy mword/bitvector import context
+   (durable-notes.md: the zify hook answers "Cannot find witness" whenever
+   a [bv_unsigned] is merely in the ambient proof context, not just the
+   goal). ---- *)
+Lemma wpk_K_ge8 (K : nat) : (K_kfork <= K)%nat -> (8 <= K)%nat.
+Proof. unfold K_kfork. lia. Qed.
+Lemma wpk_K_ge52 (K : nat) : (K_kfork <= K)%nat -> (52 <= K)%nat.
+Proof. unfold K_kfork. lia. Qed.
+Lemma wpk_K_ge56 (K : nat) : (K_kfork <= K)%nat -> (56 <= K)%nat.
+Proof. unfold K_kfork. lia. Qed.
 
 Module Kfork (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
              (FP : FREEPROC) (RL : RELEASE) (AQ : ACQUIRE)
@@ -336,8 +403,7 @@ Section KforkArms.
       (ck : nat) (cdev cinum : mword 32)
       (sp0 ra0 s00 s10 s50 : mword 64)
       (Mt : regfile) (npa : mword 64) (j : nat) (γl2 : gname)
-      (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate) (tfsrc tfdst : mword 44)
-      (ks : mword 64) (rest : list (mword 64)) :
+      (pid_c : mword 32) (ch : mword 64) (Vc' : pprivate) (tfsrc tfdst : mword 44) :
     (56 <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
     match lvl with O => eb | S _ => false end = b ->
@@ -356,7 +422,6 @@ Section KforkArms.
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
     pv_ofile Vc' = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd Vc' = (zero_reg : mword 64) ->
-    length rest = 12%nat ->
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
@@ -370,7 +435,11 @@ Section KforkArms.
     SchedCtx.proc_held cpu_id j γl2 USED ch -∗
     ProcGeom.hart_at_any npa -∗
     FdSlots.fd_slots FDSPARE -∗
-    SwtchCtx.own_ctx (p_context npa) -∗
+    (∃ (ks : mword 64) (rest : list (mword 64)),
+       ⌜length rest = 12%nat⌝ ∗
+       ProcInv.is_kstack npa ks ∗
+       SwtchCtx.ctx_cells (p_context npa)
+         (SpecAllocproc.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
     IntrDefs.arm_pay lvl eb pme -∗
     (∃ q' : Qp, inode_ref γi ck q' cdev cinum) -∗
     kalloc_env γa None -∗
@@ -379,9 +448,6 @@ Section KforkArms.
     is_itable γil γi -∗
     itable_inv γi -∗
     iref_slot -∗
-    (* SEAM (see header): the raw context, unavailable from [own_ctx] above. *)
-    ProcInv.is_kstack npa ks -∗
-    SwtchCtx.ctx_cells (p_context npa) (SpecForkretPark.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -393,11 +459,12 @@ Section KforkArms.
   Proof.
     intros HK Hlvl Hbeq Hcwd Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMts5
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
-      Hofnull Hcwdnull Hrestlen.
+      Hofnull Hcwdnull.
     subst tfsrc tfdst.
     iIntros "#Htext #Hpanic #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv
-             Hheld Hhart Hfd Hctx Hpay Hiref Hkalloc Hwlock Hft
-             Hitb Hitinv Hirs Hks Hkctx Hcont".
+             Hheld Hhart Hfd Hctxex Hpay Hiref Hkalloc Hwlock Hft
+             Hitb Hitinv Hirs Hcont".
+    iDestruct "Hctxex" as (ks rest) "(%Hrestlen & Hks & Hkctx)".
     rewrite /kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
     iDestruct "Hb8" as (w8) "Hb8".
@@ -463,7 +530,7 @@ Section KforkArms.
     iSpecialize ("Hb3app" with "Htext Hft Hpanic").
     iSpecialize ("Hb3app" $! 0%nat Mx
       with "[%] [%] [Hb1 Hb2 Hb3 Hb4 Hb5 Hb6 Hb7 Hb8
-                     Hheld Hhart Hfd Hctx Hpay Hiref Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hcont]
+                     Hheld Hhart Hfd Hpay Hiref Hkalloc Hwlock Hitb Hitinv Hirs Hks Hkctx Hcont]
             Hcg Hcpu Hpc Hpv [HCpriv]").
     - unfold NOFILE. lia.
     - split_and!.
@@ -546,4 +613,20 @@ Section KforkArms.
   Qed.
 
 End KforkArms.
+
+(* [wp_kfork_sconf] itself, and hence [Module Kfork ... : KFORK], is NOT
+   attempted below: it is blocked on the fifth seam documented at the top
+   of this file (a missing crossing premise on [ProofKforkB6.kfk_prologue]'s
+   [Hcont7c]/[Hcont4a]).  [kfork_arm1]/[kfork_arm2]/[kfork_arm3] above are
+   otherwise complete and hypothesis-free, and ready to be glued together
+   with three [iApply (kfork_armN (CID0 := ...) ...)] bullets -- one per
+   [B6.kfk_prologue] continuation -- the moment that premise lands; see the
+   file header for exactly what each bullet needs and why it does not
+   compose today.  (Note for whoever resumes this: [kfork_arm1]/2/3 must be
+   called from OUTSIDE the section that declares them, i.e. from a fresh
+   [Section] opened after [End KforkArms.] above, because their [CID0]/[GEN]
+   need to be overridable per call site via [(CID0 := ...)] -- a
+   still-open section's [Context CID0] is one fixed shared variable, not a
+   per-use argument, and rejects that override with "Wrong argument name
+   CID0".) *)
 End Kfork.
