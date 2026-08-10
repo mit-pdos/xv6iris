@@ -494,7 +494,7 @@ Section ProofDevintr.
     (* ===================== +0x08: csrr a4,scause ===================== *)
     iPoseProof (dii_08 with "Htext") as "Hi08".
     iApply (wp_csrr_scause_s_sconf (mword_of_int (KernelSyms.devintr + 0x08)) a4_idx
-              A1 (av - 4)%nat false dq sc
+              A1 (av - 4)%nat dq sc
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hsc Hpc Hi08 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hsc Hpc".

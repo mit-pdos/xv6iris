@@ -1372,6 +1372,57 @@ Section WpSconfCsr.
       vm_compute in Hbad. discriminate.
   Qed.
 
+  (* ===================================================================== *)
+  (* THE PINNED INDEX: WHY THE SEVEN LEAVES BELOW SAY [false] AND NOT [b].  *)
+  (*                                                                        *)
+  (* Every leaf from here to the end of the section threads a PER-HART       *)
+  (* resource EXPLICITLY, beside the bundle: a trap-CSR cell ([stvec],       *)
+  (* [sepc], [scause], [stval] -- each a single register of THIS hart), or   *)
+  (* the travelling SPP/SPIE ghost half ([sret_bits], i.e.                   *)
+  (* [era_sp{p,ie}_name cpu_id]).  Their postconditions live under           *)
+  (* [wp_next _ p (fun CID => ...)], whose binder shadows the ambient [CID]  *)
+  (* -- so every resource written inside the continuation is about the hart  *)
+  (* execution RESUMES on, not the hart the instruction started on           *)
+  (* (WpNext.v).                                                            *)
+  (*                                                                        *)
+  (* At [b = true] a trap can be taken AT THIS INSTRUCTION and the thread    *)
+  (* resumed on a different hart.  A [b]-generic version of these leaves     *)
+  (* would then read/write the ENTRY hart's CSR (that is the only cell the   *)
+  (* premise could possibly be about -- it is the one the step executes on)  *)
+  (* and hand it straight back as the RESUMING hart's.  So at [b = true]     *)
+  (* these postconditions are FALSE, not merely unprovable: they equate two  *)
+  (* different harts' state.  Nothing exploits that today only because a     *)
+  (* trap currently returns on the hart it came from; it stops being an      *)
+  (* accident and starts being a soundness hole the moment migration is      *)
+  (* real.  Pinning the index at the literal [false] is therefore a          *)
+  (* correction, not a restriction -- every call site was already at         *)
+  (* [false] (ProofTrapinithart, ProofKerneltrapParts, ProofDevintr: the     *)
+  (* trap-handler tier, which runs with interrupts off by construction).     *)
+  (*                                                                        *)
+  (* DO NOT "GENERALISE" THE INDEX BACK.  If you need one of these           *)
+  (* instructions at [b = true], the missing piece is not a weaker index:    *)
+  (* it is a statement that says which hart each cell belongs to, i.e. the   *)
+  (* [sie_cap] enabled arm's own existentially-quantified trap CSRs, or a    *)
+  (* payload transported across the crossing the way the csrci/csrsi flip    *)
+  (* family does it.                                                        *)
+  (*                                                                        *)
+  (* The [wp_next false p (fun CID => ...)] WRAPPER STAYS.  It is not the    *)
+  (* problem (at [false] it collapses by [wp_next_off]), and every call site *)
+  (* discharges it with [iApply wp_next_off_intro], which needs the head to  *)
+  (* still be [wp_next].                                                    *)
+  (*                                                                        *)
+  (* THIS DOES NOT APPLY TO THE SIE-FLIP FAMILY ABOVE                        *)
+  (* ([wp_csrci_sstatus_s_sconf] & co.), which is legitimately [b]-generic:  *)
+  (* the write that DISABLES interrupts is genuinely applied at [b = true]   *)
+  (* on its input side (pinning it would make push_off unstatable), and it   *)
+  (* handles the crossing through its [b]-guarded payloads                   *)
+  (* ([intr_count_pre], [trap_csrs_pay], [cpu_claim_pay], [cpu_cells_pay]).  *)
+  (* Nor to [wp_csrr_sstatus_s_sconf], which threads nothing extra (its      *)
+  (* [hart_state] cell comes OUT of the bundle and returns INTO              *)
+  (* [sie_cap_gpr_at]), nor to [WpSconfTimer]'s [wp_csrr_time_s_sconf],      *)
+  (* which owns no cell at all.                                             *)
+  (* ===================================================================== *)
+
   (* ---- csrw stvec,rs1 -- installs the trap vector.  The [stvec] cell is
      threaded EXPLICITLY: only the Bare arm of the translation slot owns it,
      so between kvminithart and trapinithart it rides client-side.  The
@@ -1379,26 +1430,31 @@ Section WpSconfCsr.
      field is not the reserved encoding, which is exactly what
      [legalize_tvec] would otherwise silently rewrite.  Taking the value as
      an explicit [wval] (rather than leaving [m !!! Regidx rs1] in the
-     post) keeps the stored term closed at the call site. ---- *)
+     post) keeps the stored term closed at the call site.
+
+     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
+     INDEX] above.  At [b = true] the post would hand [stvec ↦ᵣ wval] back
+     as the RESUMING hart's stvec while the instruction wrote the ENTRY
+     hart's, which is FALSE rather than unprovable. ---- *)
   Lemma wp_csrw_stvec_s_sconf
       (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (b : bool) (tv0 wval : mword 64) :
+      (m : regfile) (n : nat) (tv0 wval : mword 64) :
     uint rs1 <> 0 ->
     rget m rs1 = wval ->
     trapVectorMode_forwards (_get_Mtvec_Mode wval) <> TV_Reserved ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m n false p -∗
     stvec ↦ᵣ tv0 -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr m n false p -∗
       stvec ↦ᵣ wval -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval Hmode) "Hcg Hstv Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc false
+    iApply (wp_instr_s_sconf m n false pc false
               (CSRReg (csr_stvec, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1466,37 +1522,48 @@ Section WpSconfCsr.
      The post hands back [sie_cap_gpr_at msf] -- the mstatus-EXPOSING
      flavour (IntrDefs) -- because SPP and SPIE are the entire point: they
      are what kernelvec's [sret] reads.  Close it with
-     [sie_cap_gpr_at_close] as soon as they have been recorded. ---- *)
+     [sie_cap_gpr_at_close] as soon as they have been recorded.
+
+     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
+     INDEX] above.  Here the crossing would corrupt a GHOST rather than a
+     cell: [sret_bits] is [era_sp{p,ie}_name cpu_id], the travelling half of
+     THIS hart's SPP/SPIE tie, and the post re-ties it at the [msf] this
+     instruction installed.  At [b = true] that hands the entry hart's
+     freshly-tied half back as the RESUMING hart's -- FALSE, not merely
+     unprovable.  (At [b = true] the premise was in any case vacuous: the
+     enabled arm owns the travelling half, so no caller could supply it --
+     but a vacuous premise in front of a false conclusion is exactly the
+     shape that survives a future refactor and then bites, which is why the
+     index is pinned rather than left to the arm.)  The SIE premise reads
+     [sie_bit false] for the same reason, and is what says the restore does
+     not move SIE. ---- *)
   Lemma wp_csrw_sstatus_s_sconf
       (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (b : bool) (ms0 : mword 64) (vspp vspie : mword 1) :
+      (m : regfile) (n : nat) (ms0 : mword 64) (vspp vspie : mword 1) :
     uint rs1 <> 0 ->
     rget m rs1 = sstatus_read ms0 ->
     sconf_ms_facts ms0 ->
-    _get_Mstatus_SIE ms0 = sie_bit b ->
-    sie_cap_gpr m n b p -∗
+    _get_Mstatus_SIE ms0 = sie_bit false ->
+    sie_cap_gpr m n false p -∗
     (* THE TRAVELLING SPP HALF.  This is the one instruction that MOVES SPP,
        so it needs both halves: the tie inside [sconf] and this one, which
-       interrupts-off code holds (it rides in [trap_csrs]).  At [b = true]
-       the enabled arm holds it instead and no caller can supply it -- the
-       instance is then vacuous, which is right: SPP is not a value enabled
-       code may pin. *)
+       interrupts-off code holds (it rides in [trap_csrs]). *)
     sret_bits vspp vspie -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW)) -∗
-    wp_next b p (fun (CID : CpuId) =>
+    wp_next false p (fun (CID : CpuId) =>
       ∀ msf : mword 64,
       ⌜ _get_Mstatus_SIE  msf = _get_Mstatus_SIE  ms0 ⌝ -∗
       ⌜ _get_Mstatus_SPP  msf = _get_Mstatus_SPP  ms0 ⌝ -∗
       ⌜ _get_Mstatus_SPIE msf = _get_Mstatus_SPIE ms0 ⌝ -∗
-      sie_cap_gpr_at msf m n b p -∗
+      sie_cap_gpr_at msf m n false p -∗
       sret_bits (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval Hms0f Hsie0) "Hcg Hsppc Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc false
+    iApply (wp_instr_s_sconf m n false pc false
               (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1507,7 +1574,7 @@ Section WpSconfCsr.
       "(#Hmisa & _ & _ & _ & _ & %HmisaS & %HmisaC & %HmisaU & _)".
     (* the live SIE bit is the arm index *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-    iDestruct (sie_arm_half_agree b p ms with "Hhalf Harm") as %Hsie_ms.
+    iDestruct (sie_arm_half_agree false p ms with "Hhalf Harm") as %Hsie_ms.
     (* the four field equalities [flip_core] wants: both sides are the
        constants [sconf_ms_facts] pins, on [ms0] and on [ms] respectively. *)
     pose proof Hmsf  as (_ & _ & HMXR  & _ & HXS  & HFS  & HVS  & _ & _ & _).
@@ -1603,25 +1670,32 @@ Section WpSconfCsr.
      handler running with interrupts off holds the trap CSRs itself).
      Unlike stvec's, the written word does NOT land verbatim: sepc's write
      legalizes through [mepc_val], so the post-value carries the wrapper --
-     a caller writing back a 2-aligned epc collapses it. ---- *)
+     a caller writing back a 2-aligned epc collapses it.
+
+     THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED
+     INDEX] above.  At [b = true] the post would hand [sepc ↦ᵣ mepc_val
+     wval] back as the RESUMING hart's sepc while the instruction wrote the
+     ENTRY hart's, which is FALSE rather than unprovable -- and sepc is the
+     worst cell to get wrong, since it is what the eventual [sret] jumps
+     to. ---- *)
   Lemma wp_csrw_sepc_s_sconf
       (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (b : bool) (ep0 wval : mword 64) :
+      (m : regfile) (n : nat) (ep0 wval : mword 64) :
     uint rs1 <> 0 ->
     rget m rs1 = wval ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m n false p -∗
     sepc ↦ᵣ ep0 -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr m n false p -∗
       sepc ↦ᵣ mepc_val wval -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrs1 Hwval) "Hcg Hsepc Hpc Hinstr Hcont".
-    iApply (wp_instr_s_sconf m n b pc false
+    iApply (wp_instr_s_sconf m n false pc false
               (CSRReg (csr_sepc, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
     iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1692,15 +1766,25 @@ Section WpSconfCsr.
   (* [rg] is a [register_bitvector_64] rather than a [register] so that    *)
   (* the cell's value type is definitionally [mword 64]; [Hnpc_ne] is what *)
   (* migrates its lookup across the nextPC bump, and is a [vm_compute] at  *)
-  (* every instance.  Note [sie_cap] is untouched: at [b = true] its arm   *)
-  (* holds trap-CSR cells of its OWN under existentials, and this leaf     *)
-  (* never opens it -- so a caller at that arm must be lending a share it  *)
-  (* got from somewhere else.                                              *)
+  (* every instance.                                                       *)
+  (*                                                                       *)
+  (* THE INDEX IS THE LITERAL [false], not a parameter -- see [THE PINNED   *)
+  (* INDEX] above; pinning it HERE pins all three instances below with it.  *)
+  (* The cell is threaded in AND back out, so at [b = true] the             *)
+  (* [R_bitvector_64 rg ↦ᵣ{dq} v] in the post would be the RESUMING hart's  *)
+  (* cell, while the read that pinned [v] -- and the [rd] value derived     *)
+  (* from it, which is the whole point of the leaf -- happened on the ENTRY *)
+  (* hart.  That is FALSE, not merely unprovable.  The arbitrary fraction   *)
+  (* does not rescue it: a share of the wrong hart's cell is still the      *)
+  (* wrong hart's cell.  (The [b]-generic form was in any case unusable at  *)
+  (* the enabled arm: [sie_cap true] holds trap-CSR cells of its OWN under  *)
+  (* existentials and this leaf never opens it, so a caller there had to be *)
+  (* lending a share it got from somewhere else.)                          *)
   (* ------------------------------------------------------------------- *)
   Lemma wp_csrr_ro_s_sconf
       (pc : mword 64) (csrn : mword 12) (rg : register_bitvector_64)
       (f : mword 64 -> mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (b : bool) (dq : dfrac) (v : mword 64) :
+      (m : regfile) (n : nat) (dq : dfrac) (v : mword 64) :
     uint rd <> 0 ->
     rd_ok rd ->
     register_beq (R_bitvector_64 rg) nextPC = false ->
@@ -1713,12 +1797,12 @@ Section WpSconfCsr.
                   set_reg s (R_bitvector_64 (gpr_of_Z (uint rd)))
                     (regval_into_reg
                        (f (register_lookup (R_bitvector_64 rg) s.(sregs))))) ) ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m n false p -∗
     R_bitvector_64 rg ↦ᵣ{dq} v -∗
     pc_is pc -∗
     instr pc false (CSRReg (csrn, zreg, Regidx rd, CSRRS)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (f v)]> m) n b p -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (f v)]> m) n false p -∗
       R_bitvector_64 rg ↦ᵣ{dq} v -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
@@ -1727,7 +1811,7 @@ Section WpSconfCsr.
     iIntros (Hrd Hrdok Hne Hexec) "Hcg Hcell Hpc Hinstr Hcont".
     pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
-    iApply (wp_instr_s_sconf m n b pc false
+    iApply (wp_instr_s_sconf m n false pc false
               (CSRReg (csrn, zreg, Regidx rd, CSRRS))
               with "Hcg Hpc Hinstr").
     iIntros (sigma Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
@@ -1772,56 +1856,70 @@ Section WpSconfCsr.
       by (symmetry; apply upd_ne; congruence).
     tp_refold Hrdtp "Hfile".
     iDestruct (sie_cap_retarget m
-                 (<[Regidx rd := regval_into_reg (f v)]> m) n b Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg (f v)]> m) n false Hsp with "Hcap") as "Hcap".
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hrest] Hcap Hfile") as "Hcg".
     iApply ("Hcont" $! cpu_id with "[] Hcg Hcell [$Hpc' $Hnpc]").
     iPureIntro. done.
   Qed.
 
   (* ---- the three instances.  scause and stval read their cell verbatim;
-     sepc's read runs [align_pc], so its value carries [mepc_val]. ---- *)
+     sepc's read runs [align_pc], so its value carries [mepc_val].
+
+     ALL THREE INHERIT THE PINNED INDEX from [wp_csrr_ro_s_sconf] -- they
+     could not be [b]-generic even if one wanted them to be, since the
+     generic leaf they are five lines of is not.  See [THE PINNED INDEX]
+     above: each threads one of THIS hart's trap-CSR cells in and back out,
+     so at [b = true] the post would be about the resuming hart's cell while
+     the read happened on the entry hart's, which is FALSE rather than
+     unprovable. ---- *)
 
   Lemma wp_csrr_scause_s_sconf
       (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (b : bool) (dq : dfrac) (sc : mword 64) :
+      (m : regfile) (n : nat) (dq : dfrac) (sc : mword 64) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m n false p -∗
     scause ↦ᵣ{dq} sc -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_scause, zreg, Regidx rd, CSRRS)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg sc]> m) n b p -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg sc]> m) n false p -∗
       scause ↦ᵣ{dq} sc -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf pc csr_scause scause (fun x => x) rd m n b dq sc
+    iApply (wp_csrr_ro_s_sconf pc csr_scause scause (fun x => x) rd m n dq sc
               Hrd Hrdok ltac:(vm_compute; reflexivity)).
     intros s Hpriv HS _.
     exact (exec_execute_csrr_scause_gpr_S rd s Hrd Hpriv HS).
   Qed.
 
+  (* stval: NO CALL SITE TODAY (kerneltrap's usermode arm will be the first).
+     It is kept because it is the third five-line instance of a leaf that
+     exists precisely to be instantiated three times, and because deleting
+     it would leave the [f]-generic proof looking over-general.  Its index is
+     pinned like its siblings' -- a future first caller will be in the
+     trap-handler tier, i.e. at interrupts-off, exactly as the others are. *)
   Lemma wp_csrr_stval_s_sconf
       (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (b : bool) (dq : dfrac) (tv : mword 64) :
+      (m : regfile) (n : nat) (dq : dfrac) (tv : mword 64) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m n false p -∗
     stval ↦ᵣ{dq} tv -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stval, zreg, Regidx rd, CSRRS)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b p -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n false p -∗
       stval ↦ᵣ{dq} tv -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf pc csr_stval stval (fun x => x) rd m n b dq tv
+    iApply (wp_csrr_ro_s_sconf pc csr_stval stval (fun x => x) rd m n dq tv
               Hrd Hrdok ltac:(vm_compute; reflexivity)).
     intros s Hpriv HS _.
     exact (exec_execute_csrr_stval_gpr_S rd s Hrd Hpriv HS).
@@ -1833,22 +1931,22 @@ Section WpSconfCsr.
      collapses the wrapper itself; the leaf does not assume it. *)
   Lemma wp_csrr_sepc_s_sconf
       (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (b : bool) (dq : dfrac) (ep : mword 64) :
+      (m : regfile) (n : nat) (dq : dfrac) (ep : mword 64) :
     uint rd <> 0 ->
     rd_ok rd ->
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m n false p -∗
     sepc ↦ᵣ{dq} ep -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_sepc, zreg, Regidx rd, CSRRS)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (mepc_val ep)]> m) n b p -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (mepc_val ep)]> m) n false p -∗
       sepc ↦ᵣ{dq} ep -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros (Hrd Hrdok).
-    iApply (wp_csrr_ro_s_sconf pc csr_sepc sepc mepc_val rd m n b dq ep
+    iApply (wp_csrr_ro_s_sconf pc csr_sepc sepc mepc_val rd m n dq ep
               Hrd Hrdok ltac:(vm_compute; reflexivity)).
     intros s Hpriv HS HC.
     exact (exec_execute_csrr_sepc_gpr_S rd s Hrd Hpriv HS HC).

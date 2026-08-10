@@ -354,7 +354,7 @@ Section ProofKerneltrapParts.
     (* ---- +0x0e: csrr s2,sepc ---- *)
     iPoseProof (kti_0e with "Htext") as "Hi0e".
     iApply (wp_csrr_sepc_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x0e)) s2_idx
-              A1 (av - 6)%nat false (DfracOwn 1) ep
+              A1 (av - 6)%nat (DfracOwn 1) ep
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hsepc Hpc Hi0e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hsepc Hpc".
@@ -397,7 +397,7 @@ Section ProofKerneltrapParts.
     (* ---- +0x16: csrr a5,scause ---- *)
     iPoseProof (kti_16 with "Htext") as "Hi16".
     iApply (wp_csrr_scause_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x16)) a5_idx
-              A3 (av - 6)%nat false (DfracOwn 1) sc
+              A3 (av - 6)%nat (DfracOwn 1) sc
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hscause Hpc Hi16 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hscause Hpc".
@@ -630,7 +630,7 @@ Section ProofKerneltrapParts.
     (* ---- +0x36: csrw sepc,s2 -- restore the trapped pc ---- *)
     iPoseProof (kti_36 with "Htext") as "Hi36".
     iApply (wp_csrw_sepc_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x36)) s2_idx
-              M k false epold ep
+              M k epold ep
               ltac:(vm_compute; discriminate) ltac:(rgne; exact HMs2)
               with "Hcg Hsepc Hpc Hi36 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hsepc Hpc".
@@ -642,7 +642,7 @@ Section ProofKerneltrapParts.
        instruction that moves SPP/SPIE, so it takes the mirror. ---- *)
     iPoseProof (kti_3a with "Htext") as "Hi3a".
     iApply (wp_csrw_sstatus_s_sconf (mword_of_int (KernelSyms.kerneltrap + 0x3a)) s1_idx
-              M k false ms0 va vb
+              M k ms0 va vb
               ltac:(vm_compute; discriminate) ltac:(rgne; exact HMs1) Hms0f
               ltac:(cbn [sie_bit]; exact Hsie0)
               with "Hcg Hmir Hpc Hi3a [-]").
