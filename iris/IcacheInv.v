@@ -37,7 +37,7 @@ From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.algebra Require Import auth gmap frac numbers.
 From iris.proofmode Require Import proofmode.
-From iris.base_logic.lib Require Import gen_heap invariants own.
+From iris.base_logic.lib Require Import gen_heap invariants own ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvPtsto RiscvExtras.
@@ -277,8 +277,21 @@ Qed.
    xv6's comment above iput asserts.                                      *)
 Definition icacheUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
 
-Class icacheG (Σ : gFunctors) := IcacheG { icache_inG :: inG Σ icacheUR }.
-Definition icacheΣ : gFunctors := #[GFunctor icacheUR].
+(* The second field is [IcacheEscrow]'s per-slot IDENTIFICATION ghost
+   ([icn_id], design §13.8): a two-state agreement between the escrow's arm
+   and the table's [islot2] share, saying whether the entry's identity cells
+   have ever been written.  It lives HERE, as a field of [icacheG], rather
+   than as an extra [!ghost_varG Σ bool] on every section that mentions the
+   escrow -- nine spec and proof files already carry [icacheG], and this way
+   they need no edit at all.  ([FsCrash.v]'s header records the tree's other
+   route out of the same problem, reusing [WpLock.lock_tok_excl]; that one
+   cannot serve here, because BOTH sides must be able to READ the state and
+   an exclusive token can only be held by one of them.) *)
+Class icacheG (Σ : gFunctors) := IcacheG {
+  icache_inG :: inG Σ icacheUR;
+  icache_idG :: ghost_varG Σ bool;
+}.
+Definition icacheΣ : gFunctors := #[GFunctor icacheUR; ghost_varΣ bool].
 Global Instance subG_icacheΣ {Σ} : subG icacheΣ Σ -> icacheG Σ.
 Proof. solve_inG. Qed.
 
@@ -860,6 +873,61 @@ Section IcacheRefInv.
     iModIntro. iFrame.
   Qed.
 
+  (* THE SAME WRITE, FOR AN INCREMENTER THAT HOLDS NO REFERENCE.
+     [iref_dup_store_au] above is idup's shape: a caller token goes in and
+     two halves come out.  [iget]'s cache-HIT arm has no token of its own --
+     it found the entry by SCANNING -- so the new reference cannot be split
+     off anything the opener brought, and is minted from the share the TABLE
+     retained instead ([islot_rest_at], design §13.1b/§13.1e).  That is
+     exactly [iref_incr_step] rather than [iref_dup_step], and it is why the
+     entry's outstanding fraction GROWS by [qn] here where it stayed put in
+     idup.  BioInv's [bio_incr_step] and its store wrapper are the precedent.
+
+     Both side conditions are the CALLER's, for the same reasons as above:
+     [✓ (qt + qn)] is the fraction budget (the caller takes [qn] out of the
+     table's [1/2 - qt], so the sum never passes 1/2), and [Hno] -- that the
+     incremented count is still an [int] -- comes from
+     [IrefSlots.iref_slots_no_overflow] exactly as in ProofIdup. *)
+  Lemma iref_incr_store_au (Eo : coPset) (γ : gname)
+      (M : gmap nat (Qp * positive)) (k : nat) (qt qn : Qp) (n : positive) :
+    ↑icacheN ⊆ Eo ->
+    M !! k = Some (qt, n) ->
+    ✓ (qt + qn)%Qp ->
+    (Z.pos (Pos.succ n) < 2 ^ 31)%Z ->
+    itable_inv γ -∗ itable_half γ M -∗
+    |={Eo, Eo ∖ ↑icacheN}=>
+      i_ref (ientry k) ↦₄ iref_word M k ∗
+      (i_ref (ientry k) ↦₄ (mword_of_int (Z.pos (Pos.succ n)) : mword 32)
+         ={Eo ∖ ↑icacheN, Eo}=∗
+         itable_half γ (<[k := ((qt + qn)%Qp, Pos.succ n)]> M) ∗
+         iref_tok γ k qn).
+  Proof.
+    iIntros (HE HMk Hq Hno) "#Hinv Hhalf".
+    iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
+    iDestruct "Hbody" as (M') "(>Ha & >%Hwf & >Hcells)".
+    iDestruct (itable_half_agree with "Ha Hhalf") as %->.
+    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
+    iModIntro. iFrame "Hcell". iIntros "Hcell".
+    iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
+    iMod (iref_incr_step γ M k qt n qn HMk Hq with "Hauth") as "(Hauth & Htok)".
+    iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
+    iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
+    { iNext. iExists (<[k := ((qt + qn)%Qp, Pos.succ n)]> M). iFrame "Ha".
+      iSplitR.
+      { iPureIntro. destruct Hwf as [Hdom Hcnt]. split.
+        - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
+          rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
+        - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
+          + rewrite lookup_insert in Hj. apply Some_inj in Hj.
+            injection Hj as _ Hn. subst nj. exact Hno.
+          + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
+            by apply (Hcnt j qj). }
+      iApply ("Hback" $! ((qt + qn)%Qp, Pos.succ n)).
+      rewrite /iref_word lookup_insert. iExact "Hcell". }
+    iModIntro. iFrame.
+  Qed.
+
 End IcacheRefInv.
 
 (* ===================================================================== *)
@@ -940,18 +1008,32 @@ Section IcacheTable.
          i_inum :  1  =  ½ (the escrow, forever)
                       +  q (the references)  +  (½ - q)  (the table)
 
-     and a reference's fraction therefore ranges in (0, ½].  The table's
-     retained share is now an [inode_ident] like every other share.
+     and a reference's fraction therefore ranges in (0, ½) -- STRICTLY, and
+     that is what the [None] arm below is about.  The table's retained share
+     is now an [inode_ident] like every other share.
 
      [islot_rest_at] pins the two values (the pool's slot->inum map wants
      them pinned, §13.2); [islot_rest] is the ∃-bound form the plain
-     [itable_res] uses.  The [Qp.sub] shape is unchanged: [None] is the
-     [q = ½] case, where the whole shared half is out and the table keeps
-     nothing of either cell. *)
+     [itable_res] uses.
+
+     THE [None] ARM IS [False], NOT [emp] (design §13.8, C5's blocker B).
+     [None] is the [q ≥ ½] case -- the whole shared half handed out, the
+     table keeping nothing of either cell.  Written [emp] that state is
+     PERMITTED, and then two things become unprovable at a slot in it: iget's
+     cache-hit arm, which must mint a positive identity fraction OUT of the
+     retained share ([IcacheInv.iref_incr_store_au] supplies only the count
+     fragment), and any plain read of [ip->dev] / [ip->inum] under the lock,
+     which iget's scan does fifty times.  The state is unreachable in the
+     code -- [iref_alloc_step] mints at ¼, a hit mints strictly less than the
+     remainder, [iref_dup_step] does not move [q] and [iref_close_step]
+     shrinks it -- but "unreachable" is not a fact any invariant here states.
+     Writing [False] makes the positivity RESOURCE-CARRIED, so it is
+     re-established automatically at every split and no wf clause has to
+     mention fractions. *)
   Definition islot_rest_at (k : nat) (q : Qp) (dev inum : mword 32) : iProp Σ :=
     match (1/2 - q)%Qp with
     | Some q' => inode_ident k (DfracOwn q') dev inum
-    | None => emp%I
+    | None => False%I
     end.
 
   Definition islot_rest (k : nat) (q : Qp) : iProp Σ :=
@@ -1045,10 +1127,9 @@ Section IcacheTable.
         iEval (rewrite -Et) in "H". iExact "H".
       + iDestruct (word4_frac_join with "Hn Hn'") as "H".
         iEval (rewrite -Et) in "H". iExact "H".
-    - apply Qp.sub_None in Et.
-      assert (qt = (1/2)%Qp) as -> by
-        (apply (anti_symm (≤)%Qp); [exact Hle | exact Et]).
-      iIntros "[Hd Hn] _". iFrame.
+    - (* [q ≥ 1/2] is now [False] in the arm itself (§13.8), so there is
+         nothing to reason about: the retained share is never empty. *)
+      iIntros "_ (%d0 & %n0 & [])".
   Qed.
 
 End IcacheTable.

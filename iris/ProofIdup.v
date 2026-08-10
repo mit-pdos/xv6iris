@@ -369,17 +369,18 @@ Section ProofIdup.
     iDestruct "Href" as "[Hrtok Hrident]".
     iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt & _ & _).
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
-    (* [ci] is live exactly where [M] is (§13.2's first wf clause), so the
-       slot's identity values are readable off [ci !! k] -- which is what
-       makes [islot2]'s two mismatched arms unreachable. *)
+    (* [ci] records exactly the LIVE slots (§13.9's restored [dom ci = dom
+       M]), so the slot's identity values are readable off [ci !! k] -- which
+       is what makes [islot2]'s mismatched arms unreachable. *)
     assert (Hcik : exists di : mword 32 * mword 32, ci !! k = Some di).
     { destruct Hciwf as [Hdom _].
-      assert (Hin : k ∈ dom ci) by (rewrite Hdom; apply elem_of_dom; by eexists).
+      assert (Hin : k ∈ dom ci)
+        by (rewrite Hdom; apply elem_of_dom; by eexists).
       apply elem_of_dom in Hin. exact Hin. }
     destruct Hcik as [[cdev cinum] Hcik].
-    iDestruct (islots2_acc_upd M ci k Hk with "Hslots") as "[Hslot Hback]".
+    iDestruct (islots2_acc_upd cn M ci k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /islot2 HMk Hcik) in "Hslot".
-    iDestruct "Hslot" as "(Hrest & Hiu)".
+    iDestruct "Hslot" as "(Hrest & Hiu & Hgid)".
     (* the iref-slot conservation law: the caller's unit plus the ones the
        table already holds for this entry are within the fixed supply, so the
        count is safely below what an int holds -- before AND after. *)
@@ -470,15 +471,15 @@ Section ProofIdup.
     iEval (rewrite Qp.div_2) in "Hsplit".
     iDestruct ("Hsplit" with "Hrident") as "[Hid1 Hid2]".
     iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> M) ci
-                 with "[%] [%] [Hrest Hiu]") as "Hslots".
+                 with "[%] [%] [Hrest Hiu Hgid]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     { intros j Hj. reflexivity. }
-    { rewrite /islot2 lookup_insert Hcik. iFrame "Hrest Hiu". }
+    { rewrite /islot2 lookup_insert Hcik. iFrame "Hrest Hiu Hgid". }
     iAssert (itable_res2 cn γfs γi cov logstart nib) with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
     { iExists (<[k := (qt, Pos.succ cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
       iSplitR; [| iSplitR; [| iExact "Hslots"]].
       2:{ (* [ci] did not move, and [M]'s domain did not either: the slot was
-             already live, so §13.2's three clauses are preserved. *)
+             already live, so §13.2/§13.9's three clauses are preserved. *)
         iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange).
         split_and!; [| exact Hinj | exact Hrange].
         rewrite dom_insert_L Hdom.

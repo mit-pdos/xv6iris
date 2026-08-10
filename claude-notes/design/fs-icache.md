@@ -1377,6 +1377,87 @@ no-two-`dinode_at`-for-one-inum consistency is maintained by the moves
 asserted as an invariant — the pool formula over `ci` plus the arms'
 shapes is all the proofs need.
 
+### 13.8 The virgin state is a FOURTH ARM with the dev cell FULL, the
+### `icn_id` agreement ghost, and `islot_rest_at`'s None arm is False
+### (C5's two confirmed blockers, both fixed here)
+
+§13.7's clause 3 (virgin as a payload disjunct) is UNREFUTABLE by an
+ilock winner: same arm, same cells as the ordinary unloaded payload,
+and the only distinguishing ghost (`M !! k = None`) is authority-side.
+Confirmed empirically (ProofIlock:2162). The fix — and where §13.7's
+"dev cell FULL" actually belonged:
+
+* **VIRGIN is a fourth arm of `ic_escrow_body`**, not a payload shape:
+  `∃ dev inum w, i_dev ↦₄ dev (FULL — the virgin discriminator) ∗
+  i_inum ↦₄{½} inum ∗ i_valid ↦₄ w ∗ inode_raw ∗ ic_mid`. `islot2`'s
+  never-identified (None, None) arm keeps ONLY the inum half — the
+  virgin arm's full dev IS the table's missing share. The
+  (None, Some) identified-ref-0 arm is `islot_free_at` (both cells at
+  ½) — §13.7's asymmetric budget there was unsatisfiable against
+  `ic_parked`'s permanent dev half.
+* Refuters, each from what its opener already holds: ilock's checkout
+  and iput's `ic_open_auth_ref` — the opener's reference carries a dev
+  fraction vs virgin's full cell; park/`ic_open_out` — full valid vs
+  full valid; +0x7c — `ic_mid` exclusivity.
+* **The residual** (a recycler at `ci !! k = None` cannot tell virgin
+  from an anomalous identified-parked state) closes with a per-slot
+  two-state agreement ghost: `icn_id : nat -> gname` in `ic_names`,
+  `ghost_var (icn_id cn k) (1/2) (b : bool)` — the escrow-side half
+  rides the arms (virgin: false; parked/out/mid: true), the table-side
+  half rides `islot2` ((None,None): false; the two identified arms:
+  true). The lock holder proves identification state by agreement; the
+  recycle-from-virgin flips both halves (it holds both at that
+  opening). Identification is monotone in the code but the ghost does
+  not need to know that.
+
+And independently (C5's blocker B): **`islot_rest_at`'s `(1/2 − q) =
+None` arm becomes `False`**, not `emp`. At `emp`, the state `qt = ½`
+(all retained identity gone) is permitted though unreachable, and the
+hit arm's mint — a positive identity fraction out of the retained
+share — is unprovable there, as is any plain read of the identity
+cells under the lock. With `False` the positivity is resource-carried
+and re-established automatically at every split; `iref_alloc_step`'s
+mint at ¼ (the worklist's choice) respects it, and IcacheInv's header
+comment "(0, ½]" must be corrected to "(0, ½)".
+
+### 13.9 §13.7's dom-⊆ was ALSO wrong: a non-live slot holds no payload,
+### and iput's last close does the eviction (C5's blocker C)
+
+xv6's scan hit-test requires `ref > 0`, and the recycle takes the FIRST
+ref-0 slot — never consulting a ref-0 slot's identity. So under `dom M
+⊆ dom ci` the state {slot 0: ref-0 cached B, recycle B into slot 1} is
+reachable, ci-injectivity is FALSE, and two escrow arms would hold
+inum B's bundle against `dinode_at_excl`. Confirmed by trace (C5's
+report). The fix — enabled by §13.8's virgin arm, which removed §13.7's
+boot motivation:
+
+* `ic_ci_wf` REVERTS to `dom ci = dom M`. `islot2`'s (None, Some) arm
+  dies as unreachable; `ic_open_parked_free`/`_dev` die.
+* **iput's last close moves the parked bundle back to the pool and
+  re-forms the arm as the EMPTY shape** — the mirror of the recycle's
+  ghost flip, all lock-internal: the closer (REF-1, under the lock)
+  holds table+own identity = ½ each cell; the arm's halves complete
+  them; the empty arm takes dev FULL + inum ½ + ghost false; ci and M
+  delete together; the pool insert is fresh (inum ∈ ci pre-delete).
+  The EVICTION ARGUMENT (loaded shape → allocated pool shape, via
+  PARKED-MEANS-FLUSHED §13.1d) is iput's, where the flush semantics
+  actually hold — iget evicts NOTHING, ever.
+* iget's recycle collapses to ONE variant (always from the empty arm),
+  selected with no case split: the scan's empty-slot invariant `M !! j
+  = None` gives `ci !! j = None` under the restored tie.
+* RENAME virgin→EMPTY (`ic_empty_arm`), `ic_id` reads "live / has a
+  payload", not "was ever identified" — identification is no longer
+  monotone (a last close un-identifies), and the ghost + all four
+  refuters are unchanged by the rename.
+* The scan's live-slot invariant (∀ scanned live slot, identity ≠
+  (dev, inum)) now IS `inum ∉ ci_inums` at the sentinel — exactly
+  `ipool_acc`'s premise.
+
+C6's SpecIput inherits: the last-close arm's postcondition is pure
+(the reference is consumed, nothing comes back); the eviction is
+internal. `K_iget` tightens to 16 (6-slot frame + the lock pair's 10)
+while nothing consumes it.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`

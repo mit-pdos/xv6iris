@@ -35,7 +35,11 @@ import sys
 # still reachable by qualified name, so it counts, but an indented `assert`
 # or a tactic-level name does not.
 DECL = re.compile(
-    r"^(?:Local\s+|Global\s+|Program\s+|#\[[^\]]*\]\s*)*"
+    # \s* : declarations inside a Section are indented, and a column-0
+    # anchor made the tool blind to ALL of them -- a false green on
+    # exactly the sweeps it exists to guard (found 2026-08-10, when it
+    # reported CLEAN across two deleted Section-local lemmas).
+    r"^\s*(?:Local\s+|Global\s+|Program\s+|#\[[^\]]*\]\s*)*"
     r"(Lemma|Theorem|Corollary|Remark|Fact|Proposition|Definition|Fixpoint"
     r"|CoFixpoint|Inductive|Record|Class|Instance|Axiom|Parameter|Hypothesis"
     r"|Module Type|Module|Notation|Ltac)\s+"

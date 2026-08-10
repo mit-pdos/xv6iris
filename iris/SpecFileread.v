@@ -259,7 +259,8 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
        (fun _ => (1%positive, 1%positive)) (fun _ => 1%positive)
        (fun _ => 1%positive))
     (MkFsNames 1%positive 1%positive 1%positive)
-    1%positive (MkIcNames 1%positive (fun _ => 1%positive) (fun _ => 1%positive))
+    1%positive (MkIcNames 1%positive (fun _ => 1%positive) (fun _ => 1%positive)
+                          (fun _ => 1%positive))
     1%positive 1%positive
     ∅ 0 0 (mword_of_int 0) (mword_of_int 0) 0%nat 0%nat 1%Qp (DfracOwn 1)
     (mword_of_int 0) (DfracOwn 1)).
