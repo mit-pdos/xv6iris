@@ -798,6 +798,10 @@ SpecSysWait.v
 CodeSysWait.v
 ProofSysWait.v
 LinkSysWait.v
+SpecSysFork.v
+CodeSysFork.v
+ProofSysFork.v
+LinkSysFork.v
 SpecSysExit.v
 CodeSysExit.v
 ProofSysExit.v
