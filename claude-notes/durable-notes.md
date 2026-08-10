@@ -260,7 +260,12 @@ and it is cheap enough to run on every touched file:
   per-line, space-separated regex misses both and quietly leaves `(A & & B)`.
 - **`tools/lemma_diff.py [--ref REF]`** — reports top-level declarations that
   VANISHED relative to a git ref, plus `Admitted`/`admit`/`Abort` and any new
-  `Axiom`/`Parameter`/`Hypothesis`. A sweep's characteristic failure is not a
+  `Axiom`/`Parameter`/`Hypothesis`. **Until 2026-08-10 its regex was anchored
+  at column 0 and therefore blind to every Section-indented declaration —
+  i.e. to essentially all of the Iris layer — and it reported CLEAN across
+  real deletions.** The guard against silent sweeps was itself silently
+  failing, which is this section's lesson eating itself: when a checker's
+  verdict surprises you in the GOOD direction, check the checker. A sweep's characteristic failure is not a
   red build; it is a file that compiles because something was quietly dropped —
   a lemma deleted instead of restated, a `Module Type` that lost a `Parameter`.
   Every line it prints is a thing to justify, not necessarily a bug (a
