@@ -50,6 +50,7 @@ Require Import SmodeCore.
 Require Import CalleeSaved KernelText.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
+Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
@@ -141,11 +142,67 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  ROUTE B, LEMMA (1): sched ENTERED AT noff >= 2 DIVERGES.              *)
+(* ===================================================================== *)
+(* sched() asserts [mycpu()->noff == 1] and calls panic("sched locks")
+   otherwise (proc.c).  A thread that reaches sched holding a SECOND
+   spinlock therefore never returns, so its contract is a bare
+   [WP (Loop)] with NO postcondition and NO [wp_next]: nothing past the
+   panic is reachable and there is no crossing.
+
+   This is the bottom lemma of design fs-icache.md 13.12's Route B --
+   the route that makes iput's NESTED [acquiresleep(&ip->lock)] (fs.c:348,
+   taken while itable.lock is held) sound WITHOUT a liveness argument:
+   its sleeping branch runs into exactly this panic, and the caller's
+   [panic_wp_any] closes it.  REF-1 makes the divergence unreachable in
+   practice; we do not prove that, we permit it -- the ilock/iget live
+   panics are the precedent.
+
+   THE PREMISE SET IS MINIMAL -- exactly what the walk from sched+0x00 to
+   the [bne] at +0x30 consumes.  Everything [wp_sched_sconf_body] threads
+   for the swtch -- [park_pay], [trap_csrs], [own_ctx], [hart_full],
+   the [sched_vc] slot, the state/chan cells of [proc_held] -- is DROPPED:
+   the crossing is never reached, and the [p->state] read at +0x34 sits
+   past the branch.  [procs_inv] stays because the inlined
+   holding(&p->lock) at +0x14 needs the lock invariant, and [locked]
+   because that is what holding is told to expect and hands back.
+
+   The [cpu_own] index is the literal [false] for the same reason as in
+   [wp_sched_sconf_body]: the enabled arm demands noff = 0.  The slot [C]
+   is an ordinary caller frame and is simply dropped on the floor.       *)
+Definition wp_sched_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γs : list gname) (j : nat) (γl : gname)
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.sched in
+  let pj := proc_addr j in
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  (16 <= av)%nat ->
+  (* myproc()'s inlined push_off/pop_off transiently reaches noff+1, and
+     the [bne] refutation needs the level to be a genuine int -- the same
+     bound [cpu_cells] already carries, restated so it is usable BEFORE
+     the bundle is opened (myproc consumes it whole). *)
+  (Z.of_nat n + 3 < 2 ^ 31)%Z ->
+  sie_cap_gpr m av false pj -∗
+  kernel_text -∗ pc_is pcE -∗
+  procs_inv γs -∗
+  locked γl cpu_id -∗
+  (* THE POINT: a SECOND lock is held. *)
+  cpu_own (S (S n)) eb pj C false -∗
+  panic_wp_any -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type SCHED.
   Parameter wp_sched_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      
+
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool),
       wp_sched_sconf_body γs j γl st ch m av eb.
+  Parameter wp_sched_locks :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γs : list gname) (j : nat) (γl : gname)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
+      wp_sched_locks_body γs j γl m av eb C n.
 End SCHED.
