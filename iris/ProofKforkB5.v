@@ -187,21 +187,6 @@ Section ProofKforkB5.
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9.
     iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv #Hwl Hheld Hhart Hpriv Hfd Hirsp Hks Hctx Hcont".
-    iPoseProof (kfk_0c2 with "Htext") as "Hi_c2".
-    iPoseProof (kfk_0c4 with "Htext") as "Hi_c4".
-    iPoseProof (kfk_0c8 with "Htext") as "Hi_c8".
-    iPoseProof (kfk_0cc with "Htext") as "Hi_cc".
-    iPoseProof (kfk_0d0 with "Htext") as "Hi_d0".
-    iPoseProof (kfk_0d4 with "Htext") as "Hi_d4".
-    iPoseProof (kfk_0d8 with "Htext") as "Hi_d8".
-    iPoseProof (kfk_0dc with "Htext") as "Hi_dc".
-    iPoseProof (kfk_0e0 with "Htext") as "Hi_e0".
-    iPoseProof (kfk_0e4 with "Htext") as "Hi_e4".
-    iPoseProof (kfk_0e6 with "Htext") as "Hi_e6".
-    iPoseProof (kfk_0ea with "Htext") as "Hi_ea".
-    iPoseProof (kfk_0ec with "Htext") as "Hi_ec".
-    iPoseProof (kfk_0f0 with "Htext") as "Hi_f0".
-    iPoseProof (kfk_0f2 with "Htext") as "Hi_f2".
     (* -------------------------------------------------------------- *)
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via FORKRET_PARK  *)
     (* on the raw context allocproc left, before releasing.               *)
@@ -215,12 +200,14 @@ Section ProofKforkB5.
       as "Hslots".
     iDestruct (SchedCtx.proc_lock_res_intro γs γl (proc_addr j) USED ch
                  with "Hpstcell Hplock Hpchan Hppub Hslots") as "HRused".
+    iPoseProof (kfk_0c2 with "Htext") as "Hi_c2".
     (* -------------------------------------------------------------- *)
     (* +0x0c2 c.mv a0,s4  -- regime OFF (np's lock still held)            *)
     (* -------------------------------------------------------------- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KF + 0xc2)) Ra0 Rs4 Mt (K - 8)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_c2 [-]").
+              iClear "Hi_c2".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M1 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (Mt !!! Regidx Rs4))]> Mt).
     assert (HM1a0 : M1 !!! Regidx Ra0 = (proc_addr j)).
@@ -235,10 +222,12 @@ Section ProofKforkB5.
                           (sign_extend' 64 (mword_of_int 2092886 : mword 21))
                         = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
+    iPoseProof (kfk_0c4 with "Htext") as "Hi_c4".
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xc4)) Rra (mword_of_int 2092886 : mword 21)
               M1 (K - 8)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi_c4 [-]").
+              iClear "Hi_c4".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt_rel1) in "Hpc".
     set (M2 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0xc4) : mword 64) 4)]> M1).
@@ -263,6 +252,7 @@ Section ProofKforkB5.
     iEval (rewrite Hpc_c8) in "Hpc".
     iEval (rewrite -Hb) in "Hcg". iEval (rewrite -Hb) in "Hown".
     assert (Hcs_0_r1 : callee_saved Mt mr1) by (eapply callee_saved_trans; [exact Hcs_0_2 | exact Hcs_2_r1]).
+    iPoseProof (kfk_0c8 with "Htext") as "Hi_c8".
     (* -------------------------------------------------------------- *)
     (* +0x0c8 / +0x0cc auipc+addi -> wait_lock_addr -- regime GENERIC     *)
     (* -------------------------------------------------------------- *)
@@ -270,6 +260,7 @@ Section ProofKforkB5.
               mr1 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_c8 [-]").
     iIntros (CID2 Hs2) "Hcg Hpc".
+    iClear "Hi_c8".
     set (M3 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KF + 0xc8) : mword 64) (auipc_off (mword_of_int 16 : mword 20)))]> mr1).
     assert (HM3a0 : M3 !!! Regidx Ra0
@@ -278,10 +269,12 @@ Section ProofKforkB5.
     assert (Hpp_cc : add_vec_int (mword_of_int (KF + 0xc8) : mword 64) 4 = mword_of_int (KF + 0xcc))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_cc) in "Hpc".
+    iPoseProof (kfk_0cc with "Htext") as "Hi_cc".
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xcc)) Ra0 Ra0 (mword_of_int 1570 : mword 12)
               M3 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_cc [-]").
     iIntros (CID3 Hs3) "Hcg Hpc".
+    iClear "Hi_cc".
     set (M4 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget M3 Ra0) (sign_extend' 64 (mword_of_int 1570 : mword 12)))]> M3).
     assert (HM4a0 : M4 !!! Regidx Ra0 = SpecProcinit.wait_lock_addr).
@@ -296,11 +289,13 @@ Section ProofKforkB5.
                           (sign_extend' 64 (mword_of_int 2092738 : mword 21))
                         = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
+    iPoseProof (kfk_0d0 with "Htext") as "Hi_d0".
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xd0)) Rra (mword_of_int 2092738 : mword 21)
               M4 (K - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi_d0 [-]").
     iIntros (CID4 Hs4) "Hcg Hpc".
+    iClear "Hi_d0".
     iEval (rewrite Htgt_acq1) in "Hpc".
     set (M5 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0xd0) : mword 64) 4)]> M4).
     assert (HM5ra : M5 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0xd0) : mword 64) 4)
@@ -336,8 +331,10 @@ Section ProofKforkB5.
     assert (Hea_d4 : add_vec (rget mr5 Rs4) (sign_extend' 64 (mword_of_int 56 : mword 12)) = ProcGeom.p_parent (proc_addr j)).
     { assert (Hr : rget mr5 Rs4 = mr5 !!! Regidx Rs4) by (rgne; reflexivity).
       rewrite Hr Hr5s4. apply WaitInv.p_parent_sext. }
+    iPoseProof (kfk_0d4 with "Htext") as "Hi_d4".
     iApply (wp_sd_s_sconf (mword_of_int (KF + 0xd4)) Rs5 Rs4 (mword_of_int 56 : mword 12)
               mr5 (K - 8)%nat vold false with "Hcg Hpc Hi_d4 [Hpcell] [-]").
+              iClear "Hi_d4".
     { iEval (rewrite Hea_d4). iExact "Hpcell". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcell".
     iEval (rewrite Hea_d4) in "Hpcell".
@@ -349,12 +346,14 @@ Section ProofKforkB5.
     assert (Hpp_d8 : add_vec_int (mword_of_int (KF + 0xd4) : mword 64) 4 = mword_of_int (KF + 0xd8))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_d8) in "Hpc".
+    iPoseProof (kfk_0d8 with "Htext") as "Hi_d8".
     (* -------------------------------------------------------------- *)
     (* +0x0d8 / +0x0dc auipc+addi -> wait_lock_addr -- regime OFF          *)
     (* -------------------------------------------------------------- *)
     iApply (wp_auipc_s_sconf (mword_of_int (KF + 0xd8)) Ra0 (mword_of_int 16 : mword 20)
               mr5 (K - 8)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_d8 [-]").
+              iClear "Hi_d8".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M6 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (mword_of_int (KF + 0xd8) : mword 64) (auipc_off (mword_of_int 16 : mword 20)))]> mr5).
@@ -364,9 +363,11 @@ Section ProofKforkB5.
     assert (Hpp_dc : add_vec_int (mword_of_int (KF + 0xd8) : mword 64) 4 = mword_of_int (KF + 0xdc))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp_dc) in "Hpc".
+    iPoseProof (kfk_0dc with "Htext") as "Hi_dc".
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xdc)) Ra0 Ra0 (mword_of_int 1554 : mword 12)
               M6 (K - 8)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_dc [-]").
+              iClear "Hi_dc".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M7 := <[Regidx Ra0 := regval_into_reg
                   (add_vec (rget M6 Ra0) (sign_extend' 64 (mword_of_int 1554 : mword 12)))]> M6).
@@ -382,10 +383,12 @@ Section ProofKforkB5.
                           (sign_extend' 64 (mword_of_int 2092858 : mword 21))
                         = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
+    iPoseProof (kfk_0e0 with "Htext") as "Hi_e0".
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xe0)) Rra (mword_of_int 2092858 : mword 21)
               M7 (K - 8)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi_e0 [-]").
+              iClear "Hi_e0".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt_rel2) in "Hpc".
     set (M8 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0xe0) : mword 64) 4)]> M7).
@@ -413,6 +416,7 @@ Section ProofKforkB5.
     assert (Hcs_r5_r6 : callee_saved mr5 mr6) by (eapply callee_saved_trans; [exact Hcs_r5_8 | exact Hcs_8_r6]).
     assert (Hcs_0_r6 : callee_saved Mt mr6) by (eapply callee_saved_trans; [exact Hcs_0_r5 | exact Hcs_r5_r6]).
     assert (Hr6s4 : mr6 !!! Regidx Rs4 = (proc_addr j)) by (rewrite (callee_saved_lookup Hcs_0_r6 Rs4 ltac:(vm_compute; reflexivity)); exact Hm20).
+    iPoseProof (kfk_0e4 with "Htext") as "Hi_e4".
     (* -------------------------------------------------------------- *)
     (* +0x0e4 c.mv a0,s4  -- regime GENERIC                               *)
     (* -------------------------------------------------------------- *)
@@ -420,6 +424,7 @@ Section ProofKforkB5.
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_e4 [-]").
     iIntros (CID7 Hs7) "Hcg Hpc".
+    iClear "Hi_e4".
     set (M9 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (rget mr6 Rs4))]> mr6).
     assert (HM9a0 : M9 !!! Regidx Ra0 = (proc_addr j)).
     { rewrite /M9 upd_eq. rgne. rewrite Hr6s4. apply add_vec_zero_l. }
@@ -433,11 +438,13 @@ Section ProofKforkB5.
                           (sign_extend' 64 (mword_of_int 2092716 : mword 21))
                         = mword_of_int KernelSyms.acquire)
       by (apply bv_eq; vm_compute; reflexivity).
+    iPoseProof (kfk_0e6 with "Htext") as "Hi_e6".
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xe6)) Rra (mword_of_int 2092716 : mword 21)
               M9 (K - 8)%nat b
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi_e6 [-]").
     iIntros (CID8 Hs8) "Hcg Hpc".
+    iClear "Hi_e6".
     iEval (rewrite Htgt_acq2) in "Hpc".
     set (M10 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0xe6) : mword 64) 4)]> M9).
     assert (HM10ra : M10 !!! Regidx Rra = add_vec_int (mword_of_int (KF + 0xe6) : mword 64) 4)
@@ -473,10 +480,12 @@ Section ProofKforkB5.
     assert (Hwval3 : add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6)))
                      = (mword_of_int 3 : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
+    iPoseProof (kfk_0ea with "Htext") as "Hi_ea".
     iApply (wp_cli_s_sconf (mword_of_int (KF + 0xea)) Ra5 (mword_of_int 3 : mword 6)
               (mword_of_int 3 : mword 64) mr9 (K - 8)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) Hwval3
               with "Hcg Hpc Hi_ea [-]").
+              iClear "Hi_ea".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M11 := <[Regidx Ra5 := regval_into_reg (mword_of_int 3 : mword 64)]> mr9).
     assert (HM11a5 : M11 !!! Regidx Ra5 = (mword_of_int 3 : mword 64)) by (rewrite /M11; apply upd_eq).
@@ -492,8 +501,10 @@ Section ProofKforkB5.
                      = ProcGeom.p_state (proc_addr j)).
     { assert (Hr : rget M11 Rs4 = M11 !!! Regidx Rs4) by (rgne; reflexivity).
       rewrite Hr HM11s4. apply ProcGeom.p_state_sext. }
+    iPoseProof (kfk_0ec with "Htext") as "Hi_ec".
     iApply (wp_sw_s_sconf (mword_of_int (KF + 0xec)) Ra5 Rs4 (mword_of_int 24 : mword 12)
               M11 (K - 8)%nat USED false with "Hcg Hpc Hi_ec [Hpst2] [-]").
+              iClear "Hi_ec".
     { iEval (rewrite Hea_ec). iExact "Hpst2". }
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpst2".
     assert (Hstored : trunc32 (rget M11 Ra5) = RUNNABLE).
@@ -511,12 +522,14 @@ Section ProofKforkB5.
                  with "Hslots2") as "Hslots3".
     iDestruct (SchedCtx.proc_lock_res_intro γs γl (proc_addr j) RUNNABLE ch2
                  with "Hpst2 Hplock3 Hpchan2 Hppub2 Hslots3") as "HR3".
+    iPoseProof (kfk_0f0 with "Htext") as "Hi_f0".
     (* -------------------------------------------------------------- *)
     (* +0x0f0 c.mv a0,s4  -- regime OFF                                  *)
     (* -------------------------------------------------------------- *)
     iApply (wp_cmv_s_sconf (mword_of_int (KF + 0xf0)) Ra0 Rs4 M11 (K - 8)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi_f0 [-]").
+              iClear "Hi_f0".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (M12 := <[Regidx Ra0 := regval_into_reg (add_vec zero_reg (M11 !!! Regidx Rs4))]> M11).
     assert (HM12a0 : M12 !!! Regidx Ra0 = (proc_addr j)).
@@ -531,10 +544,12 @@ Section ProofKforkB5.
                           (sign_extend' 64 (mword_of_int 2092840 : mword 21))
                         = mword_of_int KernelSyms.release)
       by (apply bv_eq; vm_compute; reflexivity).
+    iPoseProof (kfk_0f2 with "Htext") as "Hi_f2".
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xf2)) Rra (mword_of_int 2092840 : mword 21)
               M12 (K - 8)%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi_f2 [-]").
+              iClear "Hi_f2".
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rewrite Htgt_rel3) in "Hpc".
     set (M13 := <[Regidx Rra := regval_into_reg (add_vec_int (mword_of_int (KF + 0xf2) : mword 64) 4)]> M12).

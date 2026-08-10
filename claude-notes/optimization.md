@@ -274,6 +274,44 @@ posing each immediately before its `iApply` is the outstanding fix there.
 (Contrast the ProofEndOp measurement above, −2.7 %: the driver is entry SIZE ×
 lifetime, not entry count, and EndOp's entries are small.)
 
+**5c-bis. POSE LATE, CLEAR EARLY — done, and its limits.**  Acting on the
+measurement above, the two trampoline monoliths had their instruction facts
+moved from an up-front block to just before each `iApply`, with an `iClear`
+after the last use.  Isolated, on top of everything else in this section:
+
+| | tree | isolated |
+|---|---|---|
+| `ProofUservec` | 23.5 M → **16.1 M** | 58.5 s → **38.9 s** |
+| `ProofUserret` | 18.6 M → **13.7 M** | 45.2 s → **35.2 s** |
+
+End to end for those two files: **83.2 s → 38.9 s (−53 %)** and **60.4 s →
+35.2 s (−42 %)**; proof terms 39.0 M → 16.1 M and 26.5 M → 13.7 M.
+
+**The sweep over the other ~200 up-front pose blocks mostly does NOT apply, and
+the reason is worth knowing.**  A mechanical version of the transform
+(`poselate.py` in the session scratch: move each pose to the start of the
+sentence containing its first use, `iClear` after the last, with guards for
+`{ }` focus blocks, bullets, comment lines, and per-proof name scoping) was run
+over the 46 files whose blocks are ≥15 poses.  **Six landed** (`ProofKfree` 36,
+`ProofVirtioDiskRw` 36, `WpTimerinit` 20, `ProofKinit` 18, `ProofKvminithart`
+17, `ProofKforkB5` 15); 27 failed and auto-reverted; 13 had nothing movable.
+Three structural reasons, all of which also tell you when to do it BY HAND:
+
+- **Loops.** In an `iLöb`/`iInduction` body a textually-single use runs on every
+  iteration, so `iClear` after it kills the back edge (`iSpecialize: "HiXX" not
+  found`).  Only straight-line proofs can be swept — which is exactly what
+  uservec and userret are.
+- **Branches.** If the uses are spread over two arms, moving the pose into the
+  first arm starves the second.
+- **Name reuse.** Short generic names (`Hi00`, `Hi16`) recur in every lemma of a
+  file, so "first use" must be resolved inside the enclosing `Proof.`…`Qed.`,
+  not the file.  (Getting this wrong is what made the first two sweep passes
+  look like a broken idea rather than a broken script.)
+
+Write NEW whole-function proofs this way from the start — pose the instruction
+fact on the line above the `iApply` that eats it — and the question never
+arises.
+
 **Third: the asymptotics, and why they are hard to fix.**  `tree ≈ 2 × N × |Δ|`
 because each step's `tac_*` names the whole environment.  The only asymptotic
 fix is for the proof term to NAME the environment rather than spell it —

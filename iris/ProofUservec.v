@@ -99,49 +99,6 @@ Section UservecAllPt.
     iEval (rewrite Hsb) in "Hnpc".
     (* ============ the 44 instruction resources ============ *)
     iPoseProof (uvi_csrw_sscratch with "Hkt") as "Hi_csrw_ss".
-    iPoseProof (uvi_lui with "Hkt") as "Hi_lui".
-    iPoseProof (uvi_addiw with "Hkt") as "Hi_addiw".
-    iPoseProof (uvi_slli with "Hkt") as "Hi_slli".
-    iPoseProof (uvi_sd_ra with "Hkt") as "Hi_sd_ra".
-    iPoseProof (uvi_sd_sp with "Hkt") as "Hi_sd_sp".
-    iPoseProof (uvi_sd_gp with "Hkt") as "Hi_sd_gp".
-    iPoseProof (uvi_sd_tp with "Hkt") as "Hi_sd_tp".
-    iPoseProof (uvi_sd_t0 with "Hkt") as "Hi_sd_t0".
-    iPoseProof (uvi_sd_t1 with "Hkt") as "Hi_sd_t1".
-    iPoseProof (uvi_sd_t2 with "Hkt") as "Hi_sd_t2".
-    iPoseProof (uvi_csd_s0 with "Hkt") as "Hi_csd_s0".
-    iPoseProof (uvi_csd_s1 with "Hkt") as "Hi_csd_s1".
-    iPoseProof (uvi_csd_a1 with "Hkt") as "Hi_csd_a1".
-    iPoseProof (uvi_csd_a2 with "Hkt") as "Hi_csd_a2".
-    iPoseProof (uvi_csd_a3 with "Hkt") as "Hi_csd_a3".
-    iPoseProof (uvi_csd_a4 with "Hkt") as "Hi_csd_a4".
-    iPoseProof (uvi_csd_a5 with "Hkt") as "Hi_csd_a5".
-    iPoseProof (uvi_sd_a6 with "Hkt") as "Hi_sd_a6".
-    iPoseProof (uvi_sd_a7 with "Hkt") as "Hi_sd_a7".
-    iPoseProof (uvi_sd_s2 with "Hkt") as "Hi_sd_s2".
-    iPoseProof (uvi_sd_s3 with "Hkt") as "Hi_sd_s3".
-    iPoseProof (uvi_sd_s4 with "Hkt") as "Hi_sd_s4".
-    iPoseProof (uvi_sd_s5 with "Hkt") as "Hi_sd_s5".
-    iPoseProof (uvi_sd_s6 with "Hkt") as "Hi_sd_s6".
-    iPoseProof (uvi_sd_s7 with "Hkt") as "Hi_sd_s7".
-    iPoseProof (uvi_sd_s8 with "Hkt") as "Hi_sd_s8".
-    iPoseProof (uvi_sd_s9 with "Hkt") as "Hi_sd_s9".
-    iPoseProof (uvi_sd_s10 with "Hkt") as "Hi_sd_s10".
-    iPoseProof (uvi_sd_s11 with "Hkt") as "Hi_sd_s11".
-    iPoseProof (uvi_sd_t3 with "Hkt") as "Hi_sd_t3".
-    iPoseProof (uvi_sd_t4 with "Hkt") as "Hi_sd_t4".
-    iPoseProof (uvi_sd_t5 with "Hkt") as "Hi_sd_t5".
-    iPoseProof (uvi_sd_t6 with "Hkt") as "Hi_sd_t6".
-    iPoseProof (uvi_csrr_sscratch with "Hkt") as "Hi_csrr_ss".
-    iPoseProof (uvi_sd_a0 with "Hkt") as "Hi_sd_a0".
-    iPoseProof (uvi_ld_sp with "Hkt") as "Hi_ld_sp".
-    iPoseProof (uvi_ld_tp with "Hkt") as "Hi_ld_tp".
-    iPoseProof (uvi_ld_t0 with "Hkt") as "Hi_ld_t0".
-    iPoseProof (uvi_ld_t1 with "Hkt") as "Hi_ld_t1".
-    iPoseProof (uvi_sfence1 with "Hkt") as "Hi_sf1".
-    iPoseProof (uvi_csrw_satp with "Hkt") as "Hi_csrw_satp".
-    iPoseProof (uvi_sfence2 with "Hkt") as "Hi_sf2".
-    iPoseProof (uvi_cjalr_t0 with "Hkt") as "Hi_cjalr".
     (* ---- csrw sscratch, a0 @ 0x00 ---- *)
     iApply (wp_ucsrw_sscratch_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x00 false (mword_of_int 10) g sscr0
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -159,9 +116,11 @@ Section UservecAllPt.
               ltac:(intros _; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb [$Hpcc $Hnpc] Hfile Hi_csrw_ss").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile".
+    iClear "Hi_csrw_ss".
     assert (Hpcx_0x00 : add_vec_int (uva 0x00) (if false then 2 else 4) = uva 0x04)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x00) in "Hpc".
+    iPoseProof (uvi_lui with "Hkt") as "Hi_lui".
     (* ---- lui a0, 0x2000 @ 0x04 ---- *)
     iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x04 false ai_lui g
               (g !!! Regidx (mword_of_int 10) : mword 64)
@@ -185,6 +144,7 @@ Section UservecAllPt.
               ltac:(intros _; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_lui").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
+    iClear "Hi_lui".
     assert (Hpcx_0x04 : add_vec_int (uva 0x04) (if false then 2 else 4) = uva 0x08)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x04) in "Hpc".
@@ -192,6 +152,7 @@ Section UservecAllPt.
                       !!! Regidx (mword_of_int 10)
                     = regval_into_reg (mword_of_int 33554432 : mword 64))
       by (apply upd_eq).
+    iPoseProof (uvi_addiw with "Hkt") as "Hi_addiw".
     (* ---- c.addiw a0, -1 @ 0x08 ---- *)
     iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x08 true ai_addiw (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> g)
               (regval_into_reg (mword_of_int 33554432 : mword 64))
@@ -218,6 +179,7 @@ Section UservecAllPt.
               ltac:(intros _; vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_addiw").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
+    iClear "Hi_addiw".
     assert (Hpcx_0x08 : add_vec_int (uva 0x08) (if true then 2 else 4) = uva 0x0a)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x08) in "Hpc".
@@ -225,6 +187,7 @@ Section UservecAllPt.
                       !!! Regidx (mword_of_int 10)
                     = regval_into_reg (mword_of_int 33554431 : mword 64))
       by (apply upd_eq).
+    iPoseProof (uvi_slli with "Hkt") as "Hi_slli".
     (* ---- c.slli a0, 13 @ 0x0a ---- *)
     iApply (wp_ualu_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x0a true ai_slli (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554431 : mword 64)]> (<[Regidx (mword_of_int 10) := regval_into_reg (mword_of_int 33554432 : mword 64)]> g))
               (regval_into_reg (mword_of_int 33554431 : mword 64))
@@ -251,6 +214,7 @@ Section UservecAllPt.
               ltac:(intro Hf; vm_compute in Hf; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_slli").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile".
+    iClear "Hi_slli".
     assert (Hpcx_0x0a : add_vec_int (uva 0x0a) (if true then 2 else 4) = uva 0x0c)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x0a) in "Hpc".
@@ -354,6 +318,7 @@ Section UservecAllPt.
     assert (Hg31 : M2 !!! Regidx (mword_of_int 31) = (g !!! Regidx (mword_of_int 31) : mword 64)).
     { unfold M2. rewrite upd_ne; [reflexivity |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
+    iPoseProof (uvi_sd_ra with "Hkt") as "Hi_sd_ra".
     (* ---- sd x1, 40(a0) @ 0x0c ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x0c 40 (mword_of_int 1) false M2 (w40 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -377,10 +342,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_ra Htf40").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf40".
+    iClear "Hi_sd_ra".
     iEval (rewrite Hg1) in "Htf40".
     assert (Hpcx_0x0c : add_vec_int (uva 0x0c) (if false then 2 else 4) = uva 0x10)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x0c) in "Hpc".
+    iPoseProof (uvi_sd_sp with "Hkt") as "Hi_sd_sp".
     (* ---- sd x2, 48(a0) @ 0x10 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x10 48 (mword_of_int 2) false M2 (w48 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -404,10 +371,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_sp Htf48").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf48".
+    iClear "Hi_sd_sp".
     iEval (rewrite Hg2) in "Htf48".
     assert (Hpcx_0x10 : add_vec_int (uva 0x10) (if false then 2 else 4) = uva 0x14)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x10) in "Hpc".
+    iPoseProof (uvi_sd_gp with "Hkt") as "Hi_sd_gp".
     (* ---- sd x3, 56(a0) @ 0x14 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x14 56 (mword_of_int 3) false M2 (w56 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -431,10 +400,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_gp Htf56").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf56".
+    iClear "Hi_sd_gp".
     iEval (rewrite Hg3) in "Htf56".
     assert (Hpcx_0x14 : add_vec_int (uva 0x14) (if false then 2 else 4) = uva 0x18)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x14) in "Hpc".
+    iPoseProof (uvi_sd_tp with "Hkt") as "Hi_sd_tp".
     (* ---- sd x4, 64(a0) @ 0x18 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x18 64 (mword_of_int 4) false M2 (w64 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -458,10 +429,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_tp Htf64").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf64".
+    iClear "Hi_sd_tp".
     iEval (rewrite Hg4) in "Htf64".
     assert (Hpcx_0x18 : add_vec_int (uva 0x18) (if false then 2 else 4) = uva 0x1c)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x18) in "Hpc".
+    iPoseProof (uvi_sd_t0 with "Hkt") as "Hi_sd_t0".
     (* ---- sd x5, 72(a0) @ 0x1c ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x1c 72 (mword_of_int 5) false M2 (w72 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -485,10 +458,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t0 Htf72").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf72".
+    iClear "Hi_sd_t0".
     iEval (rewrite Hg5) in "Htf72".
     assert (Hpcx_0x1c : add_vec_int (uva 0x1c) (if false then 2 else 4) = uva 0x20)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x1c) in "Hpc".
+    iPoseProof (uvi_sd_t1 with "Hkt") as "Hi_sd_t1".
     (* ---- sd x6, 80(a0) @ 0x20 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x20 80 (mword_of_int 6) false M2 (w80 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -512,10 +487,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t1 Htf80").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf80".
+    iClear "Hi_sd_t1".
     iEval (rewrite Hg6) in "Htf80".
     assert (Hpcx_0x20 : add_vec_int (uva 0x20) (if false then 2 else 4) = uva 0x24)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x20) in "Hpc".
+    iPoseProof (uvi_sd_t2 with "Hkt") as "Hi_sd_t2".
     (* ---- sd x7, 88(a0) @ 0x24 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x24 88 (mword_of_int 7) false M2 (w88 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -539,10 +516,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t2 Htf88").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf88".
+    iClear "Hi_sd_t2".
     iEval (rewrite Hg7) in "Htf88".
     assert (Hpcx_0x24 : add_vec_int (uva 0x24) (if false then 2 else 4) = uva 0x28)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x24) in "Hpc".
+    iPoseProof (uvi_csd_s0 with "Hkt") as "Hi_csd_s0".
     iEval (change (uvai_csd_tgt 0 12) with (uvai_sd 8 96)) in "Hi_csd_s0".
     (* ---- sd x8, 96(a0) @ 0x28 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x28 96 (mword_of_int 8) true M2 (w96 : mword 64)
@@ -567,10 +546,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_s0 Htf96").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf96".
+    iClear "Hi_csd_s0".
     iEval (rewrite Hg8) in "Htf96".
     assert (Hpcx_0x28 : add_vec_int (uva 0x28) (if true then 2 else 4) = uva 0x2a)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x28) in "Hpc".
+    iPoseProof (uvi_csd_s1 with "Hkt") as "Hi_csd_s1".
     iEval (change (uvai_csd_tgt 1 13) with (uvai_sd 9 104)) in "Hi_csd_s1".
     (* ---- sd x9, 104(a0) @ 0x2a ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x2a 104 (mword_of_int 9) true M2 (w104 : mword 64)
@@ -595,10 +576,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_s1 Htf104").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf104".
+    iClear "Hi_csd_s1".
     iEval (rewrite Hg9) in "Htf104".
     assert (Hpcx_0x2a : add_vec_int (uva 0x2a) (if true then 2 else 4) = uva 0x2c)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x2a) in "Hpc".
+    iPoseProof (uvi_csd_a1 with "Hkt") as "Hi_csd_a1".
     iEval (change (uvai_csd_tgt 3 15) with (uvai_sd 11 120)) in "Hi_csd_a1".
     (* ---- sd x11, 120(a0) @ 0x2c ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x2c 120 (mword_of_int 11) true M2 (w120 : mword 64)
@@ -623,10 +606,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a1 Htf120").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf120".
+    iClear "Hi_csd_a1".
     iEval (rewrite Hg11) in "Htf120".
     assert (Hpcx_0x2c : add_vec_int (uva 0x2c) (if true then 2 else 4) = uva 0x2e)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x2c) in "Hpc".
+    iPoseProof (uvi_csd_a2 with "Hkt") as "Hi_csd_a2".
     iEval (change (uvai_csd_tgt 4 16) with (uvai_sd 12 128)) in "Hi_csd_a2".
     (* ---- sd x12, 128(a0) @ 0x2e ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x2e 128 (mword_of_int 12) true M2 (w128 : mword 64)
@@ -651,10 +636,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a2 Htf128").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf128".
+    iClear "Hi_csd_a2".
     iEval (rewrite Hg12) in "Htf128".
     assert (Hpcx_0x2e : add_vec_int (uva 0x2e) (if true then 2 else 4) = uva 0x30)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x2e) in "Hpc".
+    iPoseProof (uvi_csd_a3 with "Hkt") as "Hi_csd_a3".
     iEval (change (uvai_csd_tgt 5 17) with (uvai_sd 13 136)) in "Hi_csd_a3".
     (* ---- sd x13, 136(a0) @ 0x30 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x30 136 (mword_of_int 13) true M2 (w136 : mword 64)
@@ -679,10 +666,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a3 Htf136").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf136".
+    iClear "Hi_csd_a3".
     iEval (rewrite Hg13) in "Htf136".
     assert (Hpcx_0x30 : add_vec_int (uva 0x30) (if true then 2 else 4) = uva 0x32)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x30) in "Hpc".
+    iPoseProof (uvi_csd_a4 with "Hkt") as "Hi_csd_a4".
     iEval (change (uvai_csd_tgt 6 18) with (uvai_sd 14 144)) in "Hi_csd_a4".
     (* ---- sd x14, 144(a0) @ 0x32 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x32 144 (mword_of_int 14) true M2 (w144 : mword 64)
@@ -707,10 +696,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a4 Htf144").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf144".
+    iClear "Hi_csd_a4".
     iEval (rewrite Hg14) in "Htf144".
     assert (Hpcx_0x32 : add_vec_int (uva 0x32) (if true then 2 else 4) = uva 0x34)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x32) in "Hpc".
+    iPoseProof (uvi_csd_a5 with "Hkt") as "Hi_csd_a5".
     iEval (change (uvai_csd_tgt 7 19) with (uvai_sd 15 152)) in "Hi_csd_a5".
     (* ---- sd x15, 152(a0) @ 0x34 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x34 152 (mword_of_int 15) true M2 (w152 : mword 64)
@@ -735,10 +726,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_csd_a5 Htf152").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf152".
+    iClear "Hi_csd_a5".
     iEval (rewrite Hg15) in "Htf152".
     assert (Hpcx_0x34 : add_vec_int (uva 0x34) (if true then 2 else 4) = uva 0x36)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x34) in "Hpc".
+    iPoseProof (uvi_sd_a6 with "Hkt") as "Hi_sd_a6".
     (* ---- sd x16, 160(a0) @ 0x36 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x36 160 (mword_of_int 16) false M2 (w160 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -762,10 +755,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_a6 Htf160").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf160".
+    iClear "Hi_sd_a6".
     iEval (rewrite Hg16) in "Htf160".
     assert (Hpcx_0x36 : add_vec_int (uva 0x36) (if false then 2 else 4) = uva 0x3a)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x36) in "Hpc".
+    iPoseProof (uvi_sd_a7 with "Hkt") as "Hi_sd_a7".
     (* ---- sd x17, 168(a0) @ 0x3a ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x3a 168 (mword_of_int 17) false M2 (w168 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -789,10 +784,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_a7 Htf168").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf168".
+    iClear "Hi_sd_a7".
     iEval (rewrite Hg17) in "Htf168".
     assert (Hpcx_0x3a : add_vec_int (uva 0x3a) (if false then 2 else 4) = uva 0x3e)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x3a) in "Hpc".
+    iPoseProof (uvi_sd_s2 with "Hkt") as "Hi_sd_s2".
     (* ---- sd x18, 176(a0) @ 0x3e ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x3e 176 (mword_of_int 18) false M2 (w176 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -816,10 +813,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s2 Htf176").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf176".
+    iClear "Hi_sd_s2".
     iEval (rewrite Hg18) in "Htf176".
     assert (Hpcx_0x3e : add_vec_int (uva 0x3e) (if false then 2 else 4) = uva 0x42)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x3e) in "Hpc".
+    iPoseProof (uvi_sd_s3 with "Hkt") as "Hi_sd_s3".
     (* ---- sd x19, 184(a0) @ 0x42 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x42 184 (mword_of_int 19) false M2 (w184 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -843,10 +842,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s3 Htf184").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf184".
+    iClear "Hi_sd_s3".
     iEval (rewrite Hg19) in "Htf184".
     assert (Hpcx_0x42 : add_vec_int (uva 0x42) (if false then 2 else 4) = uva 0x46)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x42) in "Hpc".
+    iPoseProof (uvi_sd_s4 with "Hkt") as "Hi_sd_s4".
     (* ---- sd x20, 192(a0) @ 0x46 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x46 192 (mword_of_int 20) false M2 (w192 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -870,10 +871,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s4 Htf192").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf192".
+    iClear "Hi_sd_s4".
     iEval (rewrite Hg20) in "Htf192".
     assert (Hpcx_0x46 : add_vec_int (uva 0x46) (if false then 2 else 4) = uva 0x4a)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x46) in "Hpc".
+    iPoseProof (uvi_sd_s5 with "Hkt") as "Hi_sd_s5".
     (* ---- sd x21, 200(a0) @ 0x4a ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x4a 200 (mword_of_int 21) false M2 (w200 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -897,10 +900,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s5 Htf200").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf200".
+    iClear "Hi_sd_s5".
     iEval (rewrite Hg21) in "Htf200".
     assert (Hpcx_0x4a : add_vec_int (uva 0x4a) (if false then 2 else 4) = uva 0x4e)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x4a) in "Hpc".
+    iPoseProof (uvi_sd_s6 with "Hkt") as "Hi_sd_s6".
     (* ---- sd x22, 208(a0) @ 0x4e ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x4e 208 (mword_of_int 22) false M2 (w208 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -924,10 +929,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s6 Htf208").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf208".
+    iClear "Hi_sd_s6".
     iEval (rewrite Hg22) in "Htf208".
     assert (Hpcx_0x4e : add_vec_int (uva 0x4e) (if false then 2 else 4) = uva 0x52)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x4e) in "Hpc".
+    iPoseProof (uvi_sd_s7 with "Hkt") as "Hi_sd_s7".
     (* ---- sd x23, 216(a0) @ 0x52 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x52 216 (mword_of_int 23) false M2 (w216 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -951,10 +958,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s7 Htf216").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf216".
+    iClear "Hi_sd_s7".
     iEval (rewrite Hg23) in "Htf216".
     assert (Hpcx_0x52 : add_vec_int (uva 0x52) (if false then 2 else 4) = uva 0x56)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x52) in "Hpc".
+    iPoseProof (uvi_sd_s8 with "Hkt") as "Hi_sd_s8".
     (* ---- sd x24, 224(a0) @ 0x56 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x56 224 (mword_of_int 24) false M2 (w224 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -978,10 +987,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s8 Htf224").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf224".
+    iClear "Hi_sd_s8".
     iEval (rewrite Hg24) in "Htf224".
     assert (Hpcx_0x56 : add_vec_int (uva 0x56) (if false then 2 else 4) = uva 0x5a)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x56) in "Hpc".
+    iPoseProof (uvi_sd_s9 with "Hkt") as "Hi_sd_s9".
     (* ---- sd x25, 232(a0) @ 0x5a ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x5a 232 (mword_of_int 25) false M2 (w232 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1005,10 +1016,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s9 Htf232").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf232".
+    iClear "Hi_sd_s9".
     iEval (rewrite Hg25) in "Htf232".
     assert (Hpcx_0x5a : add_vec_int (uva 0x5a) (if false then 2 else 4) = uva 0x5e)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x5a) in "Hpc".
+    iPoseProof (uvi_sd_s10 with "Hkt") as "Hi_sd_s10".
     (* ---- sd x26, 240(a0) @ 0x5e ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x5e 240 (mword_of_int 26) false M2 (w240 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1032,10 +1045,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s10 Htf240").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf240".
+    iClear "Hi_sd_s10".
     iEval (rewrite Hg26) in "Htf240".
     assert (Hpcx_0x5e : add_vec_int (uva 0x5e) (if false then 2 else 4) = uva 0x62)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x5e) in "Hpc".
+    iPoseProof (uvi_sd_s11 with "Hkt") as "Hi_sd_s11".
     (* ---- sd x27, 248(a0) @ 0x62 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x62 248 (mword_of_int 27) false M2 (w248 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1059,10 +1074,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_s11 Htf248").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf248".
+    iClear "Hi_sd_s11".
     iEval (rewrite Hg27) in "Htf248".
     assert (Hpcx_0x62 : add_vec_int (uva 0x62) (if false then 2 else 4) = uva 0x66)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x62) in "Hpc".
+    iPoseProof (uvi_sd_t3 with "Hkt") as "Hi_sd_t3".
     (* ---- sd x28, 256(a0) @ 0x66 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x66 256 (mword_of_int 28) false M2 (w256 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1086,10 +1103,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t3 Htf256").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf256".
+    iClear "Hi_sd_t3".
     iEval (rewrite Hg28) in "Htf256".
     assert (Hpcx_0x66 : add_vec_int (uva 0x66) (if false then 2 else 4) = uva 0x6a)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x66) in "Hpc".
+    iPoseProof (uvi_sd_t4 with "Hkt") as "Hi_sd_t4".
     (* ---- sd x29, 264(a0) @ 0x6a ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x6a 264 (mword_of_int 29) false M2 (w264 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1113,10 +1132,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t4 Htf264").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf264".
+    iClear "Hi_sd_t4".
     iEval (rewrite Hg29) in "Htf264".
     assert (Hpcx_0x6a : add_vec_int (uva 0x6a) (if false then 2 else 4) = uva 0x6e)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x6a) in "Hpc".
+    iPoseProof (uvi_sd_t5 with "Hkt") as "Hi_sd_t5".
     (* ---- sd x30, 272(a0) @ 0x6e ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x6e 272 (mword_of_int 30) false M2 (w272 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1140,10 +1161,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t5 Htf272").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf272".
+    iClear "Hi_sd_t5".
     iEval (rewrite Hg30) in "Htf272".
     assert (Hpcx_0x6e : add_vec_int (uva 0x6e) (if false then 2 else 4) = uva 0x72)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x6e) in "Hpc".
+    iPoseProof (uvi_sd_t6 with "Hkt") as "Hi_sd_t6".
     (* ---- sd x31, 280(a0) @ 0x72 ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x72 280 (mword_of_int 31) false M2 (w280 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1167,10 +1190,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_t6 Htf280").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf280".
+    iClear "Hi_sd_t6".
     iEval (rewrite Hg31) in "Htf280".
     assert (Hpcx_0x72 : add_vec_int (uva 0x72) (if false then 2 else 4) = uva 0x76)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x72) in "Hpc".
+    iPoseProof (uvi_csrr_sscratch with "Hkt") as "Hi_csrr_ss".
     (* ---- csrr t0, sscratch @ 0x76 ---- *)
     iApply (wp_ucsrr_sscratch_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x76 false (mword_of_int 5) M2
               (g !!! Regidx (mword_of_int 10) : mword 64)
@@ -1190,6 +1215,7 @@ Section UservecAllPt.
               ltac:(intro Hf; vm_compute in Hf; discriminate)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile Hi_csrr_ss").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hsscr Hutlb Hpc Hfile".
+    iClear "Hi_csrr_ss".
     assert (Hpcx_0x76 : add_vec_int (uva 0x76) (if false then 2 else 4) = uva 0x7a)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x76) in "Hpc".
@@ -1199,6 +1225,7 @@ Section UservecAllPt.
       intro He. injection He as He2. vm_compute in He2. congruence. }
     assert (Hg112 : M3 !!! Regidx (mword_of_int 5) = (g !!! Regidx (mword_of_int 10) : mword 64)).
     { unfold M3. rewrite upd_eq. reflexivity. }
+    iPoseProof (uvi_sd_a0 with "Hkt") as "Hi_sd_a0".
     (* ---- sd t0, 112(a0) @ 0x7a ---- *)
     iApply (wp_usd_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x7a 112 (mword_of_int 5) false M3 (w112 : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1222,10 +1249,12 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_sd_a0 Htf112").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Htf112".
+    iClear "Hi_sd_a0".
     iEval (rewrite Hg112) in "Htf112".
     assert (Hpcx_0x7a : add_vec_int (uva 0x7a) (if false then 2 else 4) = uva 0x7e)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x7a) in "Hpc".
+    iPoseProof (uvi_ld_sp with "Hkt") as "Hi_ld_sp".
     (* ---- ld x2, 8(a0) @ 0x7e ---- *)
     iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x7e 8 (mword_of_int 2) false M3 vksp
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1250,6 +1279,7 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_ld_sp Hk8").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hk8".
+    iClear "Hi_ld_sp".
     assert (Hpcx_0x7e : add_vec_int (uva 0x7e) (if false then 2 else 4) = uva 0x82)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x7e) in "Hpc".
@@ -1257,6 +1287,7 @@ Section UservecAllPt.
     assert (Ha0_4 : M4 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M4. rewrite upd_ne; [exact Ha0_3 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
+    iPoseProof (uvi_ld_tp with "Hkt") as "Hi_ld_tp".
     (* ---- ld x4, 32(a0) @ 0x82 ---- *)
     iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x82 32 (mword_of_int 4) false M4 vkhart
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1281,6 +1312,7 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_ld_tp Hk32").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hk32".
+    iClear "Hi_ld_tp".
     assert (Hpcx_0x82 : add_vec_int (uva 0x82) (if false then 2 else 4) = uva 0x86)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x82) in "Hpc".
@@ -1288,6 +1320,7 @@ Section UservecAllPt.
     assert (Ha0_5 : M5 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M5. rewrite upd_ne; [exact Ha0_4 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
+    iPoseProof (uvi_ld_t0 with "Hkt") as "Hi_ld_t0".
     (* ---- ld x5, 16(a0) @ 0x86 ---- *)
     iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x86 16 (mword_of_int 5) false M5 vktr
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1312,6 +1345,7 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_ld_t0 Hk16").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hk16".
+    iClear "Hi_ld_t0".
     assert (Hpcx_0x86 : add_vec_int (uva 0x86) (if false then 2 else 4) = uva 0x8a)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x86) in "Hpc".
@@ -1319,6 +1353,7 @@ Section UservecAllPt.
     assert (Ha0_6 : M6 !!! Regidx (mword_of_int 10) = mword_of_int TRAPFRAME).
     { unfold M6. rewrite upd_ne; [exact Ha0_5 |].
       intro He. injection He as He2. vm_compute in He2. congruence. }
+    iPoseProof (uvi_ld_t1 with "Hkt") as "Hi_ld_t1".
     (* ---- ld x6, 0(a0) @ 0x8a ---- *)
     iApply (wp_uld_pt (ud_root pt) (ud_tfp pt) (ud_um pt) 0x8a 0 (mword_of_int 6) false M6 vksat
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1343,6 +1378,7 @@ Section UservecAllPt.
               ltac:(vm_compute; reflexivity)
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hi_ld_t1 Hk0").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hutlb Hpc Hfile Hk0".
+    iClear "Hi_ld_t1".
     assert (Hpcx_0x8a : add_vec_int (uva 0x8a) (if false then 2 else 4) = uva 0x8e)
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpcx_0x8a) in "Hpc".
@@ -1355,6 +1391,10 @@ Section UservecAllPt.
       - unfold M6. rewrite upd_eq. reflexivity.
       - intro He. injection He as He2. vm_compute in He2. congruence. }
     iDestruct (uv_utlb_map_wf with "Hutlb") as %Hwfu.
+    iPoseProof (uvi_sfence1 with "Hkt") as "Hi_sf1".
+    iPoseProof (uvi_csrw_satp with "Hkt") as "Hi_csrw_satp".
+    iPoseProof (uvi_sfence2 with "Hkt") as "Hi_sf2".
+    iPoseProof (uvi_cjalr_t0 with "Hkt") as "Hi_cjalr".
     iApply (wp_uservec_exit_pt kroot (ud_root pt) (ud_tfp pt) (ud_um pt) M7
               (vksat : mword 64)
               ms_v (uc_mie C) (uc_mideleg C) MENVCFG_S
@@ -1362,6 +1402,10 @@ Section UservecAllPt.
               with "Hhw Hinv Hhs Hpriv Hms Hmie Hmdl Hmenv Hclaim Hutlb Hkfr Hpc Hfile
                     Hi_sf1 Hi_csrw_satp Hi_sf2 Hi_cjalr").
     iIntros "Hhs Hpriv Hms Hmie Hmdl Hmenv Hktlb Hufr Hpc Hfile".
+    iClear "Hi_sf1".
+    iClear "Hi_csrw_satp".
+    iClear "Hi_sf2".
+    iClear "Hi_cjalr".
     iEval (rewrite Ht0v) in "Hpc".
     (* rebuild the config bundle *)
     iAssert (user_cfg C) with "[Hstvec Hmie Hmdl Hmedl Hmip Hmenv Hsenv Hmse Hsse]" as "Hcfg".
