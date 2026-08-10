@@ -365,7 +365,7 @@ Module EitherCopyoutProof (Myproc : MYPROC) (Copyout : COPYOUT) (Memmove : MEMMO
   : EITHER_COPYOUT.
 
 Section ProofEitherCopyout.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=
@@ -1048,7 +1048,7 @@ Module EitherCopyinProof (Myproc : MYPROC) (Copyin : COPYIN) (Memmove : MEMMOVE)
   : EITHER_COPYIN.
 
 Section ProofEitherCopyin.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

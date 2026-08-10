@@ -61,7 +61,7 @@ Proof. rewrite /p_killed. f_equal; apply bv_eq; vm_compute; reflexivity. Qed.
 Module KilledProof (Acquire : ACQUIRE) (Release : RELEASE) : KILLED.
 
 Section ProofKilled.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation kl_s0 := (mword_of_int 8 : mword 5).

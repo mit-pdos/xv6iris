@@ -62,6 +62,7 @@ From iris.base_logic.lib Require Import own.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import RiscvPtsto RiscvExtras.
+Require Export IrefSlots.
 Require Export IcacheInv.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
@@ -80,6 +81,23 @@ Proof.
   unfold ISLOTSZ, KernelSyms.itable in Heq.
   assert (Hz : bv_unsigned (zero_reg : mword 64) = 0%Z) by (by vm_compute).
   rewrite Hz in Heq. lia.
+Qed.
+
+(* ALLOCATING THE NAME, at boot.  [FdSlots.fd_slots_alloc]'s shape and for
+   its reason: the class carries a ghost NAME, so it cannot be a functor
+   constraint the adequacy theorem simply assumes -- it has to be created
+   inside the boot fupd and handed out existentially.
+
+   What it allocates is the itable authority at the EMPTY map, and it hands
+   nothing back: the itable is not wired into boot yet ([SpecIinit] is not
+   proven), so the authority has no home.  When it is, this lemma returns
+   [own iref_name (● ∅)] and iinit builds [itable_inv] from it. *)
+Lemma iref_name_alloc `{!icacheG Σ} :
+  ⊢ |==> ∃ _ : irefNameG Σ, (True : iProp Σ).
+Proof.
+  iMod (own_alloc (● (∅ : gmap nat (Qp * nat)) : icacheUR)) as (γ) "_".
+  { by apply auth_auth_valid. }
+  iModIntro. iExists (IrefNameG Σ _ γ). done.
 Qed.
 
 Section InodeRef.

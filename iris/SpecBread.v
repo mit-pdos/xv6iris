@@ -63,7 +63,7 @@ Import Defs.
 Definition K_bread : nat := 40%nat.
 
 Definition wp_bread_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -137,7 +137,7 @@ Definition wp_bread_sconf_body
 
 Module Type BREAD.
   Parameter wp_bread_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ, !uartGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname)

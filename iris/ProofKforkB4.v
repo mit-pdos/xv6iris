@@ -138,7 +138,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (*  THE MISSING ACCESSOR: [p->name], built exactly like [proc_priv_cwd].  *)
 (* ===================================================================== *)
 Section KforkB4Res.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
 
   (* Worth adding to ProcInv.v as [proc_priv_name], next to [proc_priv_cwd]:
      same shape (open [proc_fields], hand out the one field, take back a
@@ -234,7 +234,9 @@ Section KforkB4Proof.
     panic_wp_any -∗
     is_itable2 γil cn γfs γic cov logstart nib -∗
     itable_inv -∗
-    iref_slot -∗
+    (* the child's iref units: the [1] is what [idup] spends here, and
+       [IREFSPARE] rides through to the park. *)
+    iref_slots (1 + IREFSPARE) -∗
     proc_priv γf pme pid_p Vp -∗
     (* THE CHILD IS STILL IN THE CONSTRUCTION WINDOW: allocproc left
        [np->cwd] at 0 and nothing has set it, so there is no [proc_priv] at
@@ -254,11 +256,13 @@ Section KforkB4Proof.
             pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
             pv_cwd Vc' = pv_cwd Vp /\ length (pv_name Vc') = PNAMELEN⌝ ∗
            proc_priv γf npa pid_c Vc') -∗
+        iref_slots IREFSPARE -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hms5 Hms4.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hitb #Hitinv Hirs Hparent Hchild Hcont".
+    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hitb #Hitinv Hir Hparent Hchild Hcont".
+    iDestruct (iref_slots_split 1 IREFSPARE with "Hir") as "[Hirs Hirsp]".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
     iPoseProof (kfk_0a8 with "Htext") as "Hi0a8".
     iPoseProof (kfk_0ac with "Htext") as "Hi0ac".
@@ -565,7 +569,7 @@ Section KforkB4Proof.
         rewrite Hcwd. repeat split; reflexivity.
       - iExact "Hchild4". }
     iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].
-    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hparent3 HchildFinal").
+    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hparent3 HchildFinal Hirsp").
     exact (conj HMfcs HMfs1).
   Qed.
 

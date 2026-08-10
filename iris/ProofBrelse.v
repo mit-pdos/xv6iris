@@ -86,6 +86,7 @@ Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecBrelse.
 From Kernel Require KernelSyms.
+Require Import InodeRef.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)
@@ -111,7 +112,7 @@ Module BrelseProof (Hsl : HOLDINGSLEEP) (Rsl : RELEASESLEEP)
                    (Aq : ACQUIRE) (Rl : RELEASE) : BRELSE.
 
 Section ProofBrelse.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 

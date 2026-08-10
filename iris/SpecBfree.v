@@ -98,7 +98,7 @@ Local Open Scope Z_scope.
 Definition K_bfree : nat := 44%nat.
 
 Definition wp_bfree_gen_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -199,7 +199,7 @@ Definition wp_bfree_gen_body
   WP (Loop : expr riscv_lang).
 
 Definition wp_bfree_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -296,7 +296,7 @@ Module Type BFREE.
      set-forgetting instance at [cr = false], kept as its own parameter so
      that balloc and every other caller is unchanged. *)
   Parameter wp_bfree_gen :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
@@ -316,7 +316,7 @@ Module Type BFREE.
                         pidv dq dqb m K eb C b.
 
   Parameter wp_bfree_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       

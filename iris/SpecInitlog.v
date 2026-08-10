@@ -118,7 +118,7 @@ Definition K_initlog : nat := 56%nat.
 Definition log_name_str : Z := 0x800074f8.
 
 Definition wp_initlog_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -236,7 +236,7 @@ Definition wp_initlog_sconf_body
 
 Module Type INITLOG.
   Parameter wp_initlog_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
       `{GEN : GenId} `{CID : CpuId}
       

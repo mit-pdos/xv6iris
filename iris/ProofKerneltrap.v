@@ -57,6 +57,7 @@ Require Import CodeKerneltrap.
 Require Import SpecDevintr SpecMyproc SpecYield.
 Require Import SpecKerneltrap ProofKerneltrapParts.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import InodeRef.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -66,7 +67,7 @@ Module KerneltrapProof (Devintr : DEVINTR) (Myproc : MYPROC) (Yield : YIELD)
   : KERNELTRAP.
 
 Section ProofKerneltrap.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

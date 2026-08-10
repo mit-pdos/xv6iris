@@ -84,7 +84,7 @@ Notation IT := KernelSyms.itrunc.
 (*  The continuation: itrunc's postcondition, as a resource               *)
 (* ===================================================================== *)
 Section ItruncCont.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Definition it_cont `{GEN : GenId} `{CID0 : CpuId}
@@ -170,7 +170,7 @@ Proof. vm_compute; reflexivity. Qed.
 (*  budget still owed is iupdate's one unit.                              *)
 (* ===================================================================== *)
 Section ItruncTail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma it_tail `{GEN : GenId} `{CID0 : CpuId} 
@@ -605,7 +605,7 @@ End ItruncTail.
 (*  Fuel induction over NDIRECT - k, the lw_scan idiom.                    *)
 (* ===================================================================== *)
 Section ItruncDLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   (* what the loop hands on at +0x32, once every direct entry is gone *)
@@ -1149,7 +1149,7 @@ End ItruncDLoop.
 (*  store, no map, and no [inode_map] traffic at all.                      *)
 (* ===================================================================== *)
 Section ItruncELoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Definition it_eexit `{GEN : GenId} `{CID0 : CpuId} 
@@ -1651,7 +1651,7 @@ End ItruncELoop.
 (*  clears the cell, restores s4 and rejoins the tail at +0x38.            *)
 (* ===================================================================== *)
 Section ItruncIArm.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   (* what the arm hands to the tail: the inode names nothing at all *)
@@ -2343,7 +2343,7 @@ End ItruncIArm.
 (*  and the shared tail.                                                  *)
 (* ===================================================================== *)
 Section ItruncMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Lemma wp_itrunc_sconf `{GEN : GenId} `{CID : CpuId}       (γs : list gname) (j : nat) (γl : gname)

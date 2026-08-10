@@ -79,7 +79,7 @@ Module FilecloseProof (Acquire : ACQUIRE) (Release : RELEASE)
                       (Iput : IPUT) (EndOp : END_OP) : FILECLOSE.
 
 Section ProofFileclose.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -1339,7 +1339,18 @@ Section ProofFileclose.
                     ltac:(unfold K_iput; lia) Hgeom
                     ltac:(unfold iput_units; lia) Hjlt Hgl HB3a0 eq_refl
                     with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlog Hpid Hprocs Hdev Hgeo Hdlk Hbsl Hcwd Hop [-]").
-          iIntros (CIDf6 Hsf6 mi ni) "%Hics Hcg Hcnt Hpc Hpid Hbsl %Hni Hop".
+          iIntros (CIDf6 Hsf6 mi ni) "%Hics Hcg Hcnt Hpc Hpid Hbsl Hirfree %Hni Hop".
+          (* ### THE FILE TABLE'S HALF OF THE SAME HOLE, WRITTEN DOWN. ###
+             iput handed back the iref-slot unit its reference freed, and
+             this file has nowhere to put it: the [struct file]'s inode
+             reference is not modelled yet ([FileInv.file_payload]'s
+             FD_INODE arm is still a placeholder), so there is no ftable
+             slot to park it in.  It is DROPPED.  When that arm becomes
+             real, this unit goes back into the file's slot -- it is one of
+             the [NFILE] units of [IrefSlots.IREFSLOTS] -- and the drop
+             below goes away with it.  claude-notes/projects/cwd-ref.md,
+             "STILL TO DO -- the consumers". *)
+          iClear "Hirfree".
           pose proof Hics as Hics_cs.
           assert (Hpcb4 : ret_pc (B3 !!! Regidx Rra) = mword_of_int (FC + 0xb4)).
           { rewrite HB3ra. apply bv_eq; vm_compute; reflexivity. }

@@ -61,6 +61,7 @@ Require Import CodeDevintr.
 Require Import SpecPlicClaim SpecPlicComplete SpecUartintr SpecVirtioDiskIntr SpecClockintr.
 Require Import SpecDevintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import InodeRef.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -71,7 +72,7 @@ Module DevintrProof (PlicClaim : PLIC_CLAIM) (PlicComplete : PLIC_COMPLETE)
                     (Clockintr : CLOCKINTR) : DEVINTR.
 
 Section ProofDevintr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

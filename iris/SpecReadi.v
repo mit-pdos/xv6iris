@@ -170,7 +170,7 @@ Definition rd_delivered (data : nat -> list (bv 8)) (dst_olds : nat -> bv 8)
   else dst_olds i.
 
 Definition wp_readi_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
@@ -311,7 +311,7 @@ Definition wp_readi_sconf_body
 
 Module Type READI.
   Parameter wp_readi_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       

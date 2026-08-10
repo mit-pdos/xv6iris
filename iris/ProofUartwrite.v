@@ -289,7 +289,7 @@ Proof. rewrite /uw_bytes seq_S fmap_app. reflexivity. Qed.
 (* ===================================================================== *)
 
 Section UwProps.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
 
   (* ra/s0/s1/s5, saved unconditionally in the prologue *)
@@ -422,7 +422,7 @@ Local Ltac nz := vm_compute; discriminate.
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 
 Section UwBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
 
   (* ------------------------------------------------------------------ *)
@@ -1084,7 +1084,7 @@ End UwBodies.
 (* ===================================================================== *)
 
 Section ProofUartwrite.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

@@ -96,8 +96,8 @@ Notation KF := KernelSyms.kfork (only parsing).
 Module KforkPrologue (Myproc : MYPROC) (Allocproc : ALLOCPROC_GEN) (Uvmcopy : UVMCOPY).
 
 Section KforkPrologue.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ,
-            !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ,
+            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -259,7 +259,6 @@ Section KforkPrologue.
     is_ftable γl γf -∗
     is_itable2 γil cn γfs γic cov logstart nib -∗
     itable_inv -∗
-    iref_slot -∗
     kalloc_env γa on -∗
     proc_priv γf pme pid_p Vp -∗
     (* THE CALLER'S EXIT, THREADED -- kwait's [kw_exit_fn] recipe.  The three
@@ -340,6 +339,7 @@ Section KforkPrologue.
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
+        IrefSlots.iref_slots (1 + IREFSPARE) -∗
         SwtchCtx.own_ctx (p_context npa) -∗
         IntrDefs.arm_pay lvl eb pme -∗
         cpu_own (S lvl) eb pme C false -∗
@@ -388,6 +388,10 @@ Section KforkPrologue.
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
+        (* the child's iref units, out of the dormant block allocproc took
+           the slot from: the [1] is the cwd unit ProofKforkB4 spends on
+           [idup], [IREFSPARE] is the allowance that parks with the child. *)
+        IrefSlots.iref_slots (1 + IREFSPARE) -∗
         (* THE RAW CONTEXT, not [own_ctx].  The success path's park
            ([SpecForkretPark.forkret_park], run inside ProofKforkB5 at
            kfork's FIRST release) needs the kstack and the saved context at
@@ -411,7 +415,6 @@ Section KforkPrologue.
         is_ftable γl γf -∗
         is_itable2 γil cn γfs γic cov logstart nib -∗
         itable_inv -∗
-        iref_slot -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
@@ -419,7 +422,7 @@ Section KforkPrologue.
     intros sp0 ra0 s00 s10 s50 HK Hlvl.
     unfold K_kfork in HK.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
-             #Hitinv Hiref Henv Hpv HR Hcont10a Hcont7c Hcont4a".
+             #Hitinv Henv Hpv HR Hcont10a Hcont7c Hcont4a".
     set (K1 := (K - 8)%nat).
     iPoseProof (kfk_000 with "Htext") as "Hi000".
     iPoseProof (kfk_002 with "Htext") as "Hi002".
@@ -696,7 +699,7 @@ Section KforkPrologue.
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
          =================================================================== *)
       iDestruct "Hp2" as (j γl2 ch pid_c Vc root tfp ks rest nc)
-        "(%Hpures & Hheld & Hhart & Hcpriv & Hfdsp & Hks & Hctx & Hcg & Hcpu & Harmpay & Henv')".
+        "(%Hpures & Hheld & Hhart & Hcpriv & Hfdsp & Hirsp & Hks & Hctx & Hcg & Hcpu & Harmpay & Henv')".
       destruct Hpures as (Hrv & HjN & Hgamma & HVcupt & HVcof & HVccwd & Hrestlen & Hncle).
       assert (HBa0 : mf6 !!! Regidx Ra0 = proc_addr j) by exact Hrv.
       set (npa := proc_addr j).
@@ -1007,6 +1010,7 @@ Section KforkPrologue.
         iSpecialize ("Hcont7c" with "Hheld").
         iSpecialize ("Hcont7c" with "Hhart").
         iSpecialize ("Hcont7c" with "Hfdsp").
+        iSpecialize ("Hcont7c" with "Hirsp").
         iSpecialize ("Hcont7c" with "[Hctx]").
         { iExists (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest).
           iSplitR; [iPureIntro; rewrite -Hrestlen; reflexivity | iExact "Hctx"]. }
@@ -1249,7 +1253,7 @@ Section KforkPrologue.
                   (upd_pt (upd_sz Vc (pv_sz Vp)) P' (pv_tf Vc))
                   (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv HCpriv
-                        Hheld Hhart Hfdsp [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv Hiref HR").
+                        Hheld Hhart Hfdsp Hirsp [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv HR").
         * exact HN10sp.
         * exact HN10s4.
         * exact HN10s5.

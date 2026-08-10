@@ -211,8 +211,8 @@ Module KforkProof (MP : MYPROC) (AP : ALLOCPROC_GEN) (UC : UVMCOPY)
   Module B5 := KforkB5 AQ RL FRP.
 
 Section KforkArms.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ,
-            !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ,
+            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -263,6 +263,7 @@ Section KforkArms.
     SchedCtx.proc_held cpu_id j γl2 USED ch -∗
     ProcGeom.hart_at_any npa -∗
     FdSlots.fd_slots FDSPARE -∗
+    IrefSlots.iref_slots (1 + IREFSPARE) -∗
     SwtchCtx.own_ctx (p_context npa) -∗
     kalloc_env γa None -∗
     wp_next b pme (fun (CID : CpuId) =>
@@ -278,7 +279,7 @@ Section KforkArms.
       Hofnull Hcwdnull HMtthr.
     subst npa.
     iIntros "#Hprocs Hcg Hcpu Hpay #Htext Hpc Hframe
-             Hpv HCpriv Hheld Hhart Hfd Hctx Hkalloc Hcont".
+             Hpv HCpriv Hheld Hhart Hfd Hir Hctx Hkalloc Hcont".
     iDestruct "Hframe" as (w4 w5) "Hframe".
     rewrite /ProofKfork.kfk_frame_at.
     iDestruct "Hframe" as "(Hb1 & Hb2 & Hb3 & Hb4 & Hb5 & Hb6 & Hb7 & Hb8)".
@@ -288,7 +289,7 @@ Section KforkArms.
     { iExists w5. iExact "Hb5". }
     iDestruct (SchedCtx.procs_inv_lookup γs j γl2 Hgamma with "Hprocs") as "#Hislock".
     iDestruct (ProofKforkParts.kfk_of_priv γf (proc_addr j) pid_c Vc Hofnull Hcwdnull
-                 with "HCpriv Hfd Hctx") as "(Hfprest & Hfppt & Hfptf)".
+                 with "HCpriv Hfd Hir Hctx") as "(Hfprest & Hfppt & Hfptf)".
     iApply (B1.kfk_exit_uvmcopy γs γa γl2 j ch Vc pid_c (pv_upt Vc) (pv_tf Vc)
               m Mt K sp0 ra0 s00 s10 s50 pme eb C lvl
               HK Hlvl Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMtthr
@@ -462,7 +463,7 @@ Section KforkArms.
     is_ftable γl γf -∗
     is_itable2 γil cn γfs γic cov logstart nib -∗
     itable_inv -∗
-    iref_slot -∗
+    iref_slots (1 + IREFSPARE) -∗
     wp_next b pme (fun (CID : CpuId) =>
       ∀ mr : regfile,
         ⌜ callee_saved m mr ⌝ -∗
@@ -565,7 +566,7 @@ Section KforkArms.
                 ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx [-]").
       iApply wp_next_off_intro.
-      iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4".
+      iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
       destruct Hp4 as (Hthr4 & Hpid4).
       iDestruct "Hpvcx4" as (Vc4) "(%HVc4 & Hpvcx4)".
       assert (Hmf4s4 : mf4 !!! Regidx Rs4 = npa).
@@ -585,7 +586,7 @@ Section KforkArms.
                 pme ks pid_c Vc4 ch rest (sign_extend' 64 pid_c) C
                 ltac:(lia) ltac:(lia) HjN Hgamma Hrestlen eq_refl Hmf4s4 Hmf4s5 Hpid4
                 with "Hsc4 Hown4 Hpay Htext Hpc4 Hpanic Hprocs Hwlock
-                      Hheld Hhart Hpvcx4 Hfd Hks Hkctx [-]").
+                      Hheld Hhart Hpvcx4 Hfd Hirsp Hks Hkctx [-]").
       (* [b] is symbolic here (B5's own exit index): an ordinary crossing,
          not [wp_next_off_intro] -- the brief's correction (a). *)
       iIntros (CID5 Hcross5 mf5) "%Hcs5 Hsc5 Hown5 Hpc5".
@@ -642,8 +643,8 @@ End KforkArms.
 (*  RECEIVES it rather than capturing a copy.                            *)
 (* =================================================================== *)
 Section KforkMain.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ,
-            !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ,
+            !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -664,7 +665,7 @@ Section KforkMain.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
     intros HK Hlvl.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
-             #Hitbl #Hitinv Hiref Henv Hpv Hcont".
+             #Hitbl #Hitinv Henv Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
     iDestruct (cpu_own_eb_agree with "Hcg Hcpu") as %Hbeq.
     (* [B6.kfk_prologue] is still generic in the allocator's count; kfork
@@ -682,7 +683,7 @@ Section KforkMain.
                     WP (Loop : expr riscv_lang))%I))
               HK Hlvl
               with "Hcg Hcpu Htext Hpc Hpanic Hprocs Hplock Hwlock Hftbl
-                    Hitbl Hitinv Hiref Henv Hpv Hcont [] [] []").
+                    Hitbl Hitinv Henv Hpv Hcont [] [] []").
     - (* ---- arm 1: allocproc found no free slot, +0x10a ---- *)
       iIntros (CID1 Hx1 Mt) "%HMtsp %HMtthr Hcg Hcpu #Ht Hpc Hframe Hpv Hke HR".
       (* THE COLLAPSE.  allocproc's two not-found disjuncts are the same
@@ -702,7 +703,7 @@ Section KforkMain.
     - (* ---- arm 2: uvmcopy failed, +0x7c ---- *)
       iIntros (CIDh Hxh). iIntros (CID2 Hx2 Mt npa j γl2 pid_c ch Vc).
       iIntros "%HMtsp %HMts4 %HMts5 %HMta0 %HMtthr %Hpures".
-      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hctx Hpay Hcpu Hke HR".
+      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hir Hctx Hpay Hcpu Hke HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       iApply (kfork_arm2 (CID0 := CID2) γa γf γl2 γs cn m K lvl eb b pme C
                 pid_p Vp (m !!! Regidx csp_rs1) (m !!! Regidx Rra)
@@ -713,7 +714,7 @@ Section KforkMain.
                 HMtsp ltac:(rewrite HMts4 Hnpa; reflexivity) Hnpa HjN Hgamma
                 Hofn Hcwdn HMtthr
                 with "Hprocs Hcg Hcpu Hpay Ht Hpc Hframe Hpv HCp Hheld Hhart
-                      Hfd Hctx Hke [HR]").
+                      Hfd Hir Hctx Hke [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument
          position: the hole's expected type is still an evar there, which is
          durable-notes' diverging-ltac trap. *)
@@ -723,8 +724,8 @@ Section KforkMain.
     - (* ---- arm 3: uvmcopy succeeded, the copy loop's head at +0x4a ---- *)
       iIntros (CIDh Hxh). iIntros (CID3 Hx3 Mt npa j γl2 pid_c ch Vc' tfsrc tfdst).
       iIntros "%HMtsp %HMts4 %HMts5 %HMta5 %HMta4 %HMta3 %Htfs %HMtthr %Hpures".
-      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hctx Hpay Hcpu
-               Hke #Hwl #Hft #Hit #Hiti Hirs HR".
+      iIntros "Hcg #Ht Hpc Hframe Hpv HCp Hheld Hhart Hfd Hirs Hctx Hpay Hcpu
+               Hke #Hwl #Hft #Hit #Hiti HR".
       destruct Hpures as (Hnpa & HjN & Hgamma & Hofn & Hcwdn).
       destruct Htfs as (Htfsrc & Htfdst).
       iApply (kfork_arm3 (CID0 := CID3) γa γf γil γic γw γl γs

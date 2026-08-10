@@ -56,7 +56,7 @@ Local Open Scope Z_scope.
 Module ArgstrProof (Argraw : ARGRAW) (Fetchstr : FETCHSTR) : ARGSTR.
 
 Section ProofArgstr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

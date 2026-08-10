@@ -84,7 +84,7 @@ Proof. unfold NARG. lia. Qed.
 Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
 
 Section ProofSysExit.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -117,7 +117,7 @@ Section ProofSysExit.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpanic
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
-             #Hdlk Hbs Hip Hfds Hpriv".
+             #Hdlk Hbs Hip Hfds Hirs Hpriv".
     iPoseProof (se_00 with "Htext") as "Hi00".
     iPoseProof (se_02 with "Htext") as "Hi02".
     iPoseProof (se_04 with "Htext") as "Hi04".
@@ -302,7 +302,7 @@ Section ProofSysExit.
               Hfn Hj Hgl (sex_Kke av Hav) Hgeo Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hpanic Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
-                    Hip Hfds Hpriv").
+                    Hip Hfds Hirs Hpriv").
   Qed.
 
 End ProofSysExit.

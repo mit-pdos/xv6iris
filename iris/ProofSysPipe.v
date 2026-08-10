@@ -371,7 +371,7 @@ Module SysPipeProof (Myproc : MYPROC) (Argaddr : ARGADDR) (Pipealloc : PIPEALLOC
   : SYSPIPE.
 
 Section ProofSysPipe.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

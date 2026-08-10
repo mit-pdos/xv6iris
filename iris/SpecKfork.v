@@ -131,14 +131,16 @@
    kfork's [sd a0,336(s4)] at +0xac is what closes the construction window,
    with idup's second half.  That is the whole reason idup returns two.
 
-   ONE PREMISE IS STILL UNROUTED: the [IrefSlots.iref_slot] that makes
-   [ip->ref++] safe.  It should ride beside a dormant process the way
-   [fd_slots FDSPARE] already does, and come out of allocproc with the
-   block; that is the remaining half of S5 (claude-notes/projects/
-   cwd-ref.md, "THE ROUTING").  It is consumed and not returned -- it is
-   spent on exactly the path that calls idup, and claiming it back on the
-   others would be a stronger post than the code delivers, for no
-   consumer. *)
+   AND THE [iref_slot] IS NOT A PREMISE EITHER.  What makes [ip->ref++]
+   safe is one unit of [IrefSlots]' fixed supply, and it comes out of
+   ALLOCPROC with the child's block -- allocproc is the function that took
+   the slot out of [procs_inv], and a dormant process parks
+   [iref_slots (1 + IREFSPARE)] exactly as it parks [fd_slots FDSPARE].
+   The [1] is the child's own cwd unit: while [np->cwd] is 0 the process
+   holds the unit itself, and the [sd a0,336(s4)] is where it stops --
+   spent on the reference [idup] creates, and parked in the itable against
+   it from then on.  That bijection is what makes
+   [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE] literally true. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap list bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -183,8 +185,7 @@ Local Open Scope Z_scope.
 Definition K_kfork : nat := 56%nat.
 
 Definition kfork_post
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ,
-      !irefslotG Σ}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γf : gname) (cn : ic_names) (lvl : nat) (eb : bool)
     (pme : mword 64) (C : iProp Σ)
@@ -211,8 +212,8 @@ Definition kfork_post
       (∃ pidv : mword 32, ⌜ rv = (sign_extend' 64 pidv : mword 64) ⌝) ) )%I.
 
 Definition wp_kfork_sconf_body
-    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ,
-      !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+    `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ,
+      !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa γp γw γl γf γil γic : gname)  (γs : list gname)
     (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
@@ -235,7 +236,6 @@ Definition wp_kfork_sconf_body
   is_ftable γl γf -∗
   is_itable2 γil cn γfs γic cov logstart nib -∗
   itable_inv -∗
-  iref_slot -∗
   kalloc_env γa None -∗
   proc_priv γf pme pid_p Vp -∗
   wp_next b pme (fun (CID : CpuId) =>
@@ -249,8 +249,8 @@ Definition wp_kfork_sconf_body
 
 Module Type KFORK.
   Parameter wp_kfork_sconf :
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ,
-             !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ,
+             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa γp γw γl γf γil γic : gname) (γs : list gname)
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)

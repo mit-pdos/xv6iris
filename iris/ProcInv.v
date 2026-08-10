@@ -168,7 +168,7 @@ Section ProcInv.
      [FdSlots] and [IrefSlots] already do this and [IrefSlots.v]'s header
      spells out the argument.  What propagates is the CLASS -- capacity, no
      resource, no change to any statement's shape. *)
-  Context `{!lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
 
   (* A LIVE fd slot: the cell, and -- when non-null -- an actual reference on
      the [struct file] it points at.  [file_ref] is deliberately neither
@@ -1292,6 +1292,16 @@ Section ProcInv.
           dormant blocks hold between them, so boot routes the WHOLE supply
           and nothing is left over. *)
        fd_slots FDSPARE ∗
+       (* ... and the SAME accounting for inode references, one supply over.
+          The [1] is the CWD'S OWN UNIT: a dormant block is at [pv_cwd = 0]
+          in both its states, so it holds no reference and therefore holds
+          the free unit itself.  [IREFSPARE] is the allowance for references
+          a syscall keeps in LOCALS before they reach a home.  That
+          disjunction -- either a live cwd reference with a unit parked
+          against it in the itable, or a null cwd and the unit here -- is
+          what makes [IrefSlots.IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE]
+          literally true rather than merely plausible. *)
+       iref_slots (1 + IREFSPARE) ∗
        own_ctx (p_context pa) ∗
        (* The address-space cells, keyed on WHICH dormant state -- tied to
           [st], not a free disjunction.  A ZOMBIE still owns a live user
@@ -1343,6 +1353,7 @@ Section ProcInv.
        ofile_cells pa (pv_ofile V) ∗
        ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
        fd_slots FDSPARE ∗
+       iref_slots (1 + IREFSPARE) ∗
        (if bool_decide (st = ZOMBIE)
         then ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
              proc_pt_at pa (pv_upt V) ∗ tf_page (ud_tfp (pv_upt V)) (pv_tf V)
@@ -1353,11 +1364,11 @@ Section ProcInv.
     proc_dormant pa st ⊣⊢ proc_dormant_noctx pa st ∗ own_ctx (p_context pa).
   Proof.
     iSplit.
-    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hctx & Haddr)".
-      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Haddr".
+    - iIntros "(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Hctx & Haddr)".
+      iFrame "Hctx". iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Haddr".
       iPureIntro; exact Hfacts.
-    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Haddr) Hctx]".
-      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hctx Haddr".
+    - iIntros "[(%V & %pid & %Hfacts & Hpid & Hf & Ho & Hs & Hsp & Hir & Haddr) Hctx]".
+      iExists V, pid. iFrame "Hpid Hf Ho Hs Hsp Hir Hctx Haddr".
       iPureIntro; exact Hfacts.
   Qed.
 
@@ -1381,11 +1392,12 @@ Section ProcInv.
        p_trapframe pa ↦₈ (zero_reg : mword 64))%I.
 
   Lemma proc_dormant_seal (pa : mword 64) :
-    proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗ proc_dormant pa UNUSED.
+    proc_dormant_nofd pa -∗ fd_slots (NOFILE + FDSPARE) -∗
+    iref_slots (1 + IREFSPARE) -∗ proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hctx & Hpg & Htf) Hs Hir".
     iDestruct (fd_slots_split with "Hs") as "[Hs Hsp]".
-    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hctx". iSplit; [done|].
+    iExists V, pid. iFrame "Hpid Hf Ho Hsp Hir Hctx". iSplit; [done|].
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
     iSplitL "Hs".
     { iApply fd_slots_to_any. by rewrite Hof length_replicate. }
@@ -1406,6 +1418,12 @@ Section ProcInv.
     p_pagetable pa ↦₈ (zero_reg : mword 64) ∗
     p_trapframe pa ↦₈ (zero_reg : mword 64) ∗
     fd_slots FDSPARE ∗
+    (* the CWD'S UNIT and the iref allowance come out together and stay
+       OUTSIDE the private block, for [FDSPARE]'s reason: every [proc_priv]
+       accessor is borrow-and-return and its wand swallows the block, so a
+       syscall holding its allowance inside could not then pass the block to
+       a callee.  The [1] is what kfork spends on [idup]. *)
+    iref_slots (1 + IREFSPARE) ∗
     ∃ (V : pprivate) (pid : mword 32),
       ⌜pv_ofile V = replicate NOFILE (zero_reg : mword 64) /\
        pv_cwd V = (zero_reg : mword 64) /\
@@ -1413,9 +1431,9 @@ Section ProcInv.
       p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
       proc_fields pa (DfracOwn 1) V ∗ proc_ofiles γf pa (pv_ofile V).
   Proof.
-    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hctx & Haddr)".
+    iIntros "(%V & %pid & [%Hof [%Hcwd %Hsz]] & Hpid & Hf & Ho & Hs & Hsp & Hir & Hctx & Haddr)".
     rewrite bool_decide_eq_false_2; [| vm_compute; discriminate].
-    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp".
+    iDestruct "Haddr" as "[Hpg Htf]". iFrame "Hctx Hpg Htf Hsp Hir".
     iExists V, pid. iSplit; [done|]. iFrame "Hpid Hf".
     rewrite /proc_ofiles /ofile_cells Hof length_replicate. iSplit; [done|].
     iAssert ([∗ list] fd ↦ v ∈ replicate NOFILE (zero_reg : mword 64),
@@ -1466,11 +1484,12 @@ Section ProcInv.
       (pid : mword 32) (V : pprivate) :
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd V = (zero_reg : mword 64) ->
-    proc_priv_nocwd γf pa pid V -∗ fd_slots FDSPARE -∗ proc_dormant_noctx pa ZOMBIE.
+    proc_priv_nocwd γf pa pid V -∗ fd_slots FDSPARE -∗
+    iref_slots (1 + IREFSPARE) -∗ proc_dormant_noctx pa ZOMBIE.
   Proof.
-    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp".
+    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp Hir".
     iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho") as "[Ho Hs]".
-    iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp".
+    iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp Hir".
     rewrite bool_decide_eq_true_2; [| reflexivity].
     iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpt Htfp".
   Qed.

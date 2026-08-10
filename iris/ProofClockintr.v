@@ -60,6 +60,7 @@ Require Import CodeClockintr.
 Require Import SpecCpuid SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecClockintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
+Require Import InodeRef.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -73,7 +74,7 @@ Module ClockintrProof (Cpuid : CPUID) (Acquire : ACQUIRE) (Release : RELEASE)
                       (Wakeup : WAKEUP) : CLOCKINTR.
 
 Section ProofClockintr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation ra_idx := (mword_of_int 1 : mword 5).

@@ -79,7 +79,7 @@ Import Defs.
 Definition K_begin_op : nat := 26%nat.
 
 Definition wp_begin_op_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
       !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -121,7 +121,7 @@ Definition wp_begin_op_sconf_body
 
 Module Type BEGIN_OP.
   Parameter wp_begin_op_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
              !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)

@@ -151,12 +151,32 @@ failure modes that produce errors naming something else entirely.
   broke. Check every `Require Import <file-you-moved-the-class-out-of>` in
   files the class's own definitions/notations appear in.
 
-All three are invisible to a per-file `coqc` of the file you edited; they
-appear only where the predicate is USED, and can appear only once every
-`.vo` in the tree is actually fresh (a stale sibling `.vo` — see the "Stale
-`.vo` trap" bullet above — reproduces trap one's exact symptom and wastes
-time chasing a phantom fix). Do the sweep by fixing exactly the files the
-build names, in both the `_body` Definition and the `Module Type`
+A further shape shows up once the class reaches BOOT: **a class that carries
+a ghost NAME cannot be a functor constraint the adequacy theorem assumes.**
+`irefNameG` holds `iref_name : gname`, so `xv6Σ` cannot supply it and the
+top-level corollary has nothing to instantiate it with. It has to be minted
+inside the boot fupd and handed out EXISTENTIALLY, exactly as
+`FdSlots.fd_slots_alloc` does for `fdslotG` — see `InodeRef.iref_name_alloc`
+and `BootShared.boot_shared_alloc`'s `∃ (_ : irefNameG Σ)`. What the
+adequacy theorem may assume is the FUNCTOR half (`icacheG`, an `inG`).
+Corollary: do not bundle an allocated-at-boot class (`irefslotG`) into a
+name-carrying one — the boot lemma then cannot build it piecemeal. That was
+tried and reverted here.
+
+Two smaller traps in the same area: a lemma whose statement pins its PROP
+only through the body (`⊢ |==> ∃ _ : C Σ, True`) leaves `BUpd ?PROP`
+unresolved — annotate (`(True : iProp Σ)`). And a section variable that a
+`Lemma`'s *statement* does not mention but its proof needs is fine for an
+ordinary hypothesis, yet an unresolved *instance* evar for it surfaces only
+as **"Attempt to save an incomplete proof"** at `Qed`; `Show Existentials.`
+before the `Qed` names it in one line.
+
+All of the first three are invisible to a per-file `coqc` of the file you
+edited; they appear only where the predicate is USED, and can appear only
+once every `.vo` in the tree is actually fresh (a stale sibling `.vo` — see
+the "Stale `.vo` trap" bullet above — reproduces trap one's exact symptom
+and wastes time chasing a phantom fix). Do the sweep by fixing exactly the
+files the build names, in both the `_body` Definition and the `Module Type`
 Parameter — a `Parameter` binder list that disagrees with the `Definition` it
 seals fails at `Module` instantiation with *"Signature components for field
 … do not match"*, which reads as a spec/proof mismatch and is not one. Once

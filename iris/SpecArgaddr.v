@@ -55,7 +55,7 @@ Import Defs.
    since the two functions have identical frames. *)
 Definition argaddr_stack : nat := 18%nat.
 
-Definition wp_argaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_argaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
     (old : mword 64) (dqt : dfrac) (b : bool) :=
@@ -87,7 +87,7 @@ Definition wp_argaddr_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ
 
 Module Type ARGADDR.
   Parameter wp_argaddr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (i : nat) (tfp : mword 44) (ws : list (mword 64)) (v : mword 64)
       (old : mword 64) (dqt : dfrac) (b : bool),
       wp_argaddr_sconf_body m av n eb p C i tfp ws v old dqt b.

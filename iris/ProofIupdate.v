@@ -121,7 +121,7 @@ Local Ltac iuidx := first [ vm_compute; reflexivity | vm_compute; discriminate ]
 (*  continuation.                                                         *)
 (* ===================================================================== *)
 Section IupdateDefs.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   (* iupdate's 32-byte frame: ra@24 s0@16 s1@8 s2@0 *)
@@ -200,7 +200,7 @@ Definition iu_sp (m M : regfile) : Prop :=
 (*  +0x66 .. +0x7c : log_write, brelse, and the epilogue.                 *)
 (* ===================================================================== *)
 Section IupdateTail.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
 
   Local Lemma iu_tail `{GEN : GenId} `{CID0 : CpuId}
@@ -622,7 +622,7 @@ End IupdateTail.
 (*  memmove.                                                              *)
 (* ===================================================================== *)
 Section ProofIupdateMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

@@ -127,7 +127,7 @@ End PstateUsedHelper.
 Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE) (FP : FORKRET_PARK).
 
 Section ProofKforkB5.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).
@@ -172,6 +172,7 @@ Section ProofKforkB5.
     ProcGeom.hart_at_any (ProcGeom.proc_addr j) -∗
     ProcInv.proc_priv γf (ProcGeom.proc_addr j) pid_c Vc -∗
     FdSlots.fd_slots FDSPARE -∗
+    IrefSlots.iref_slots IREFSPARE -∗
     ProcInv.is_kstack (ProcGeom.proc_addr j) ks -∗
     SwtchCtx.ctx_cells (ProcGeom.p_context (ProcGeom.proc_addr j))
       (SpecForkretPark.forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) -∗
@@ -185,7 +186,7 @@ Section ProofKforkB5.
     WP (Loop : expr riscv_lang).
   Proof.
     intros HK Hlvl Hj Hgl Hrest Hb Hm20 Hm21 Hm9.
-    iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv #Hwl Hheld Hhart Hpriv Hfd Hks Hctx Hcont".
+    iIntros "Hcg Hown Hpay #Htext Hpc #Hpanic #Hpinv #Hwl Hheld Hhart Hpriv Hfd Hirsp Hks Hctx Hcont".
     iPoseProof (kfk_0c2 with "Htext") as "Hi_c2".
     iPoseProof (kfk_0c4 with "Htext") as "Hi_c4".
     iPoseProof (kfk_0c8 with "Htext") as "Hi_c8".
@@ -205,7 +206,7 @@ Section ProofKforkB5.
     (* MOVE 1a: build [proc_lock_res γs γl (proc_addr j)] at USED, via FORKRET_PARK  *)
     (* on the raw context allocproc left, before releasing.               *)
     (* -------------------------------------------------------------- *)
-    iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid_c Vc Hrest with "Hks Hctx Hpriv Hfd")
+    iMod (FP.forkret_park γs γf (proc_addr j) ks rest pid_c Vc Hrest with "Hks Hctx Hpriv Hfd Hirsp")
       as "Hpctx".
     iDestruct "Hheld" as "(Htok & Hpstcell & Hpwhole & Hpchan & Hppub)".
     iEval (rewrite kfkb5_pwhole_used) in "Hpwhole".

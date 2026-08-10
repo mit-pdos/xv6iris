@@ -49,9 +49,17 @@
 
    WHAT THAT COSTS TODAY, precisely: kexit holds a real [cwd_ref] and must
    DROP it here rather than spend it (ProofKexit.v, at the [ld a0,336(s3)]),
-   and this contract returns no [IrefSlots.iref_slot] for the reference it
-   destroys.  Both go away together with the file-table half, and both are
-   marked at their sites.
+   which is marked at its site and goes away with the file-table half.
+
+   THE POSTCONDITION'S [iref_slot] IS NOT PART OF THAT HOLE, and it is
+   true of the code: iput decrements [ip->ref], and [IcacheInv.islot] parks
+   one unit of the fixed supply per outstanding reference, so a reference
+   destroyed frees exactly one place for another.  kexit NEEDS it -- the
+   ZOMBIE [ProcInv.proc_dormant] it builds parks [1 + IREFSPARE], the [1]
+   being the cwd unit this call hands back -- and the accounting law
+   [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE] is false without it.
+   [fileclose]'s last closer gets one too and currently drops it; that drop
+   is the file table's half of the same hole and is marked there.
 
    The budget is a SPEND-AT-MOST clause, the shape [SpecBmap.v] fixed and
    for the same reason: [log_op] moves only through [LogInv.log_spend_step]
@@ -120,7 +128,7 @@ Definition K_iput : nat := 60%nat.
 Definition iput_units : nat := MAXOPBLOCKS.
 
 Definition wp_iput_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γs : list gname) (j : nat) (γl : gname)          (* the running process *)
@@ -177,6 +185,8 @@ Definition wp_iput_sconf_body
       pc_is ret_tgt -∗
       p_pid pj ↦₄{dq} pidv -∗
       bslots bn 3 -∗
+      (* THE PLACE THE DESTROYED REFERENCE FREED -- see the header. *)
+      iref_slot -∗
       (* at most [iput_units] gone, and none gained *)
       ⌜((n - iput_units)%nat <= n')%nat /\ (n' <= n)%nat⌝ -∗
       log_op γ n' -∗
@@ -185,7 +195,7 @@ Definition wp_iput_sconf_body
 
 Module Type IPUT.
   Parameter wp_iput_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)

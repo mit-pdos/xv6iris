@@ -146,7 +146,7 @@ Proof.
 Qed.
 
 Section AslProps.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
 
   (* The shared exit-path continuation (control at +0x28), and the wait-loop
      invariant (control at +0x1c).  Both are [wp_next]s ANCHORED at the
@@ -219,7 +219,7 @@ Local Ltac reg_neq :=
 (*  [wp_next]-shaped [asl_loop] / [asl_exit] / [Hcont] at its own hart.    *)
 (* ===================================================================== *)
 Section AslBodies.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
 
   (* ---- the exit path: +0x28 (locked:=1) .. +0x44 (c.ret) ---- *)
   Lemma asl_exit_body `{GEN : GenId} `{CID : CpuId} (CID0 : CPU) (γs : list gname) (j : nat)
@@ -760,7 +760,7 @@ End AslBodies.
 (* ===================================================================== *)
 
 Section ProofAcquiresleep.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma wp_acquiresleep_sconf 

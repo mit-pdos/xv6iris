@@ -116,7 +116,7 @@ Definition K_iupdate : nat := 44%nat.
    lives in InodeInv.v, where ilock's contract can also name it. *)
 
 Definition wp_iupdate_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -219,7 +219,7 @@ Definition wp_iupdate_sconf_body
 
 Module Type IUPDATE.
   Parameter wp_iupdate_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
 

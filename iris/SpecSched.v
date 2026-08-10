@@ -59,7 +59,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.
 
 
-Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
     (m : regfile) (av : nat) (eb : bool) :=
@@ -143,7 +143,7 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
 
 Module Type SCHED.
   Parameter wp_sched_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname) (j : nat) (γl : gname) (st : mword 32) (ch : mword 64)
       (m : regfile) (av : nat) (eb : bool),

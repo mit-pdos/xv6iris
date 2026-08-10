@@ -80,7 +80,7 @@ Local Open Scope Z_scope.
 Definition consoleread_stack : nat := 62%nat.
 
 Definition wp_consoleread_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa : gname) (γf : gname) 
     (γs : list gname) (j : nat) (γlp : gname)
@@ -128,7 +128,7 @@ Definition wp_consoleread_sconf_body
 
 Module Type CONSOLEREAD.
   Parameter wp_consoleread_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γf : gname) (γs : list gname) (j : nat) (γlp : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)

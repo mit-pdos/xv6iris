@@ -87,7 +87,7 @@ Import Defs.
 Definition K_sys_exit : nat := (4 + K_kexit)%nat.
 
 Definition wp_sys_exit_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
@@ -148,13 +148,16 @@ Definition wp_sys_exit_sconf_body
   (* the process itself: its private block (trapframe included) and its
      fd-slot allowance *)
   fd_slots FDSPARE -∗
+  (* ... and its iref allowance, which kexit rejoins with the cwd unit iput
+     hands back to build the ZOMBIE block *)
+  iref_slots IREFSPARE -∗
   proc_priv γf pj pid V -∗
   (* NO continuation: sys_exit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
 
 Module Type SYSEXIT.
   Parameter wp_sys_exit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)

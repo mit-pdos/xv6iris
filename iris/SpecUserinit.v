@@ -73,7 +73,7 @@ Definition K_userinit : nat := 50%nat.
 Definition userinit_pages : nat := 8%nat.
 
 Definition wp_userinit_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γa : gname)  (γs : list gname)
     (m0 : regfile) (K : nat)
@@ -111,7 +111,7 @@ Definition wp_userinit_sconf_body
 
 Module Type USERINIT.
   Parameter wp_userinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γs : list gname)
       (m0 : regfile) (K : nat)

@@ -110,7 +110,7 @@ Qed.
 Module SysCloseProof (Argfd : ARGFD) (Myproc : MYPROC) (Fileclose : FILECLOSE) : SYSCLOSE.
 
 Section ProofSysClose.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

@@ -84,7 +84,7 @@ Local Open Scope Z_scope.
 Notation FRP := KernelSyms.freeproc.
 
 Section SpecFreeproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* p->pagetable, and what comes with it.  The [Some] arm's two pure facts
@@ -121,6 +121,10 @@ Section SpecFreeproc.
      ofile_cells pa (pv_ofile V) ∗
      ([∗ list] _ ∈ pv_ofile V, fd_slot) ∗
      fd_slots FDSPARE ∗
+     (* the cwd's own unit and the iref allowance, exactly as in
+        [ProcInv.proc_dormant] -- this predicate IS that block minus its
+        address-space disjunct, so it parks what the block parks. *)
+     iref_slots (1 + IREFSPARE) ∗
      own_ctx (p_context pa))%I.
 
   (* ------------------------------------------------------------------ *)
@@ -141,9 +145,9 @@ Section SpecFreeproc.
         fp_rest pa V pid ∗ fp_pt pa (pv_sz V) None ∗ fp_tf pa None.
   Proof.
     rewrite /proc_dormant fp_unused_not_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hctx & Hpg & Htf)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hctx & Hpg & Htf)".
     iExists V, pid. rewrite /fp_rest /fp_pt /fp_tf.
-    iFrame "Hpid Hf Hof Hu Hsp Hctx Hpg Htf". iPureIntro. exact Hpure.
+    iFrame "Hpid Hf Hof Hu Hsp Hir Hctx Hpg Htf". iPureIntro. exact Hpure.
   Qed.
 
   Lemma fp_to_dormant_unused (pa : mword 64) (V : pprivate) (pid : mword 32)
@@ -151,9 +155,9 @@ Section SpecFreeproc.
     fp_rest pa V pid -∗ fp_pt pa szv None -∗ fp_tf pa None -∗
     proc_dormant pa UNUSED.
   Proof.
-    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hctx) Hpg Htf".
+    iIntros "(%Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hctx) Hpg Htf".
     rewrite /fp_pt /fp_tf /proc_dormant fp_unused_not_zombie.
-    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hctx Hpg Htf".
+    iExists V, pid. iFrame "Hpid Hf Hof Hu Hsp Hir Hctx Hpg Htf".
     iPureIntro. exact Hpure.
   Qed.
 
@@ -183,7 +187,7 @@ Section SpecFreeproc.
         fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
   Proof.
     rewrite /proc_dormant fp_zombie_is_zombie.
-    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hctx & %Hbel & Hpt & Htfp)".
+    iIntros "(%V & %pid & %Hpure & Hpid & Hf & Hof & Hu & Hsp & Hir & Hctx & %Hbel & Hpt & Htfp)".
     iExists V, pid.
     (* both [page_valid]s come out of the table: the trapframe's from
        [proc_pt_wf], the root's from the tree's node claim. *)
@@ -192,8 +196,8 @@ Section SpecFreeproc.
     iDestruct (proc_pt_wf_get with "Hpt") as %Hwf.
     iDestruct (proc_pt_root_valid with "Hpt") as %Hroot.
     rewrite /fp_rest /fp_pt /fp_tf.
-    iSplitL "Hpid Hf Hof Hu Hsp Hctx".
-    { iFrame "Hpid Hf Hof Hu Hsp Hctx". iPureIntro. exact Hpure. }
+    iSplitL "Hpid Hf Hof Hu Hsp Hir Hctx".
+    { iFrame "Hpid Hf Hof Hu Hsp Hir Hctx". iPureIntro. exact Hpure. }
     iSplitL "Hpg Hpt".
     { iFrame "Hpg Hpt". iPureIntro.
       split; [exact Hbel | exact (proj2 (proj2 Hpure))]. }
@@ -263,7 +267,7 @@ Module Type FREEPROC.
     (* NO [!fileG Σ]: the contract reaches [ProcInv.proc_dormant], which uses
        only the fd-SLOT ghost, so Rocq prunes [fileG] from the body and the
        Parameter must not re-introduce it. *)
-    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fdslotG Σ}
+    forall `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fdslotG Σ, !irefslotG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (mm : regfile)
       (j : nat) (γl : gname) (V : pprivate) (pid st : mword 32) (ch : mword 64)

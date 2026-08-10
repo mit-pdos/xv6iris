@@ -163,7 +163,7 @@ From Kernel Require KernelSyms.
 Definition K_main : nat := 52%nat.
 
 Section SpecMain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -236,6 +236,10 @@ Section SpecMain.
         (∃ ch : mword 64, p_chan (proc_addr i) ↦₈ ch) ∗
         proc_pub (proc_addr i)) ∗
      fd_slots (NPROC * (NOFILE + FDSPARE)) ∗
+     (* ... and the iref supply's proc-layer share: 1 + IREFSPARE per
+        process, the [1] being its cwd unit.  The remaining [NFILE] units of
+        [IrefSlots.IREFSLOTS] are the file table's. *)
+     iref_slots (NPROC * (1 + IREFSPARE)) ∗
      (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) ∗
      ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) ∗
      ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) ∗
@@ -372,7 +376,7 @@ End SpecMain.
 
 Module Type MAIN.
   Parameter wp_main_boot_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       
       (m : regfile) (K : nat)

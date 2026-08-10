@@ -372,7 +372,7 @@ Module AllocprocCore (Acquire : ACQUIRE) (Release : RELEASE) (Allocpid : ALLOCPI
                      (FP : FREEPROC) : ALLOCPROC_GEN.
 
 Section ProofAllocproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   (* The section's hart is called [CID0], NOT [CID]: the loop invariant, the
      epilogue and every leaf continuation bind a fresh [CID], and a section
      variable of that name would be shadowed by them -- while the lemma's own
@@ -869,7 +869,7 @@ Section ProofAllocproc.
         iMod (pstate_whole_update (proc_addr k) UNUSED USED with "Hpg") as "Hpg".
         iModIntro.
         iDestruct (proc_dormant_unused γf (proc_addr k) with "Hdorm")
-          as "(Hctx & Hpgcell & Htfcell & Hspare & Hrest)".
+          as "(Hctx & Hpgcell & Htfcell & Hspare & Hirsp & Hrest)".
         iDestruct "Hrest" as (V pid0) "([%Hof [%Hcwd %Hszb]] & Hpidhalf & Hfields & Hofiles)".
         iDestruct "Hpub" as (kl xs pid1) "(Hkilled & Hxstate & Hpidinv)".
         iDestruct (p_pid_join (proc_addr k) pid1 pid0 with "Hpidinv Hpidhalf") as "[%Hpideq Hpidfull]".
@@ -1130,12 +1130,12 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa T2 k γl V pidn USED ch None None
                     (K - 4)%nat eb pme C (S lvl)
                     (ap_K44 K HK) (ap_lvlS lvl Hlvl) HT2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell] Henv [-]").
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx] [Hpgcell] [Htfcell] Henv [-]").
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
-            iFrame "Hpidown Hfields Hofc Hofs Hspare Hctx". }
+            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx". }
           { rewrite /fp_pt. iExact "Hpgcell". }
           { rewrite /fp_tf. iEval (rewrite -Htfz). iExact "Htfcell". }
           iApply wp_next_off_intro.
@@ -1475,12 +1475,12 @@ Section ProofAllocproc.
           iApply (FP.wp_freeproc_sconf (CID := CIDf) γa U2 k γl V pidn USED ch None (Some (tfp, tfws))
                     (K - 4)%nat eb pme C (S lvl)
                     (ap_K44 K HK) (ap_lvlS lvl Hlvl) HU2a0
-                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hctx] [Hpgcell] [Htfcell Htfpage] Henv [-]").
+                    with "Hcg Hcpu Htext Hpc [Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv] [Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx] [Hpgcell] [Htfcell Htfpage] Henv [-]").
           { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
             iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
           { rewrite /fp_rest. iSplitR.
             { iPureIntro. split; [exact Hof|]. split; [exact Hcwd|]. exact Hszb. }
-            iFrame "Hpidown Hfields Hofc Hofs Hspare Hctx". }
+            iFrame "Hpidown Hfields Hofc Hofs Hspare Hirsp Hctx". }
           { rewrite /fp_pt. iExact "Hpgcell". }
           { rewrite /fp_tf. cbn [fst snd].
             iEval (rewrite -Hbasetf) in "Htfcell". iFrame "Htfcell Htfpage".
@@ -1918,7 +1918,7 @@ Section ProofAllocproc.
         iSplitL "Hlocked Hstate Hpg Hchan Hkilled Hxstate Hpidinv".
         { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan".
           iExists kl, xs, pidn. iFrame "Hkilled Hxstate Hpidinv". }
-        iFrame "Hpark Hpriv Hspare Hks".
+        iFrame "Hpark Hpriv Hspare Hirsp Hks".
         iSplitL "Hc0 Hc1 Hcrest".
         { rewrite ctx_cells_run !big_sepL_cons Nat.mul_0_r RiscvExtras.pa_add_0.
           iFrame "Hc0 Hc1 Hcrest". }
@@ -2143,7 +2143,7 @@ End AllocprocCore.
 Module AllocprocSeal (Core : ALLOCPROC_GEN) : ALLOCPROC.
 
 Section SealAllocproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Lemma wp_allocproc_sconf

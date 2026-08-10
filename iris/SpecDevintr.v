@@ -109,7 +109,7 @@ Definition devintr_ret (sc : mword 64) : mword 64 :=
 (* ===================================================================== *)
 
 Section DevintrCaps.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
@@ -158,7 +158,7 @@ End DevintrCaps.
 Definition devintr_stack : nat := 40%nat.
 
 Definition wp_devintr_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
     (γs : list gname) (pd pav pu : mword 64)
@@ -187,7 +187,7 @@ Definition wp_devintr_sconf_body
 
 Module Type DEVINTR.
   Parameter wp_devintr_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γtx γdk γtl : gname)
       (γs : list gname) (pd pav pu : mword 64)

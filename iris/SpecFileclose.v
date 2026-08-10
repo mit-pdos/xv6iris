@@ -180,7 +180,7 @@ Global Instance fclose_names_inhabited : Inhabited fclose_names :=
     ∅ 0 (mword_of_int 0) (mword_of_int 0) (DfracOwn 1)).
 
 Section SpecFileclose.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
             !fsCrashG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
@@ -501,7 +501,7 @@ Section SpecFileclose.
 End SpecFileclose.
 
 Definition wp_fileclose_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γfl γf : gname)            (* ftable.lock, ftable  *)
@@ -537,7 +537,7 @@ Definition wp_fileclose_sconf_body
 
 Module Type FILECLOSE.
   Parameter wp_fileclose_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
              !fsCrashG Σ}
       `{GEN : GenId} `{CID : CpuId}

@@ -169,7 +169,7 @@ Section ProofProcinit.
   Context `{!sieG Σ}.
   Context `{!lockG Σ}.
   Context `{!fileG Σ}.
-  Context `{!fdslotG Σ}.
+  Context `{!fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   (* NOTE: no shared [Context `{GEN : GenId} `{CID : CpuId}] here -- the epilogue/loop
      lemmas below apply EACH OTHER at a hart that a [wp_next] crossing may
      have migrated to, so each needs its OWN implicit per-lemma [CID]
@@ -225,19 +225,23 @@ Section ProofProcinit.
   Lemma proc_seal_list (l : list nat) :
     ([∗ list] i ∈ l, proc_raw (proc_addr i)) -∗
     fd_slots (length l * (NOFILE + FDSPARE)) -∗
+    iref_slots (length l * (1 + IREFSPARE)) -∗
     [∗ list] i ∈ l, proc_seal (proc_addr i).
   Proof.
-    induction l as [|x l IH]; iIntros "Hraw Hsl"; [done|].
+    induction l as [|x l IH]; iIntros "Hraw Hsl Hir"; [done|].
     iDestruct "Hraw" as "[Hx Hraw]".
     cbn [length].
     replace (S (length l) * (NOFILE + FDSPARE))%nat
       with ((NOFILE + FDSPARE) + length l * (NOFILE + FDSPARE))%nat by lia.
+    replace (S (length l) * (1 + IREFSPARE))%nat
+      with ((1 + IREFSPARE) + length l * (1 + IREFSPARE))%nat by lia.
     iDestruct (fd_slots_split with "Hsl") as "[Hs1 Hsl]".
-    iSplitL "Hx Hs1".
+    iDestruct (iref_slots_split with "Hir") as "[Hi1 Hir]".
+    iSplitL "Hx Hs1 Hi1".
     - iDestruct "Hx" as (vst vks) "(Hlk & Hst & Hks & Hdorm)".
       iExists vst, vks. iFrame "Hlk Hst Hks".
-      iApply (proc_dormant_seal with "Hdorm Hs1").
-    - iApply (IH with "Hraw Hsl").
+      iApply (proc_dormant_seal with "Hdorm Hs1 Hi1").
+    - iApply (IH with "Hraw Hsl Hir").
   Qed.
 
   (* ================================================================= *)
@@ -927,7 +931,7 @@ Section ProofProcinit.
     pose (name_nextpid := (mword_of_int nextpid_str : mword 64)).
     pose (name_waitlock := (mword_of_int waitlock_str : mword 64)).
     pose (name_proc := (mword_of_int proc_str : mword 64)).
-    iIntros "Hcg #Htext #Hkdata Hpc Hpid Hwait Hraws Hslots Hcont".
+    iIntros "Hcg #Htext #Hkdata Hpc Hpid Hwait Hraws Hslots Hirslots Hcont".
     (* ---- the three string literals, read out of the data image ---- *)
     assert (Hnextpid : forall j bt, cstring_bytes "nextpid"%string !! j = Some bt ->
                         KernelData.kernel_data !! (nextpid_str + Z.of_nat j)%Z = Some bt).
@@ -953,9 +957,10 @@ Section ProofProcinit.
       vm_compute in Hj; discriminate. }
     iPoseProof (kernel_data_string proc_str "proc"%string name_proc eq_refl ltac:(unfold text_end, proc_str; lia) Hprocstr
                   with "Hkdata") as "#Hstr_proc".
-    (* ---- route the fd-slot supply, once ---- *)
-    iDestruct (proc_seal_list (seq 0 NPROC) with "Hraws [Hslots]") as "Hseals".
+    (* ---- route both supplies, once ---- *)
+    iDestruct (proc_seal_list (seq 0 NPROC) with "Hraws [Hslots] [Hirslots]") as "Hseals".
     { rewrite length_seq. iExact "Hslots". }
+    { rewrite length_seq. iExact "Hirslots". }
     (* ---- the frame geometry ---- *)
     assert (Hspr8 : spr = pa_stk sp0 8).
     { unfold spr, pa_stk, add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }

@@ -9,25 +9,39 @@ OF WORK below. Tree green, coverage unchanged (146 proven / 78%), and
 `Print Assumptions Kfork.wp_kfork_sconf` is still the five `rv64d.*`
 platform axioms + funext + `forkret_park` — no `Iput`.
 
-**WHAT IS LEFT**, in the order it should be done:
+**THE `iref_slot` ROUTING IS ALSO DONE.** `ProcInv.proc_dormant` parks
+`iref_slots (1 + IREFSPARE)` beside its `fd_slots FDSPARE`; allocproc hands
+both out with the deficit block; kfork spends the `1` on `idup` and parks
+`IREFSPARE` with the child; kexit rejoins the unit `iput` returns with its
+allowance to build the ZOMBIE block; freeproc's `fp_rest` carries them;
+boot mints the supply (`iref_slots_alloc`) and routes
+`NPROC*(1 + IREFSPARE)` through `main_globals_raw` to procinit. **kfork's
+`iref_slot` premise is gone.**
 
-1. **The `iref_slot` routing** (the "THE ROUTING" section below, untouched).
-   kfork still takes an `IrefSlots.iref_slot` as a premise; it should come
-   out of `proc_dormant` with the block, the way `fd_slots FDSPARE` does.
-   This is what makes `IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE` true
-   rather than merely plausible.
-2. **The file table's half** — `FileInv.file_payload`'s FD_INODE arm, which
-   is what unblocks a real `SpecIput`. See "STILL TO DO — the consumers"
-   and the two marked holes listed under WHAT IS STILL DISHONEST.
+**WHAT IS LEFT: the file table's half** — `FileInv.file_payload`'s FD_INODE
+arm, which is what unblocks a real `SpecIput`. See "STILL TO DO — the
+consumers" and the marked holes under WHAT IS STILL DISHONEST.
 
-**WHAT IS STILL DISHONEST, and both sites carry a `###` banner:**
+**WHAT IS STILL DISHONEST, and every site carries a `###` banner:**
 
 - `SpecIput`'s reference premise is still `FileInv.inode_ref ip 1` (= `emp`).
   It CANNOT be strengthened until the file-table half lands, because the
   other caller — `fileclose`, which is PROVEN — can supply nothing stronger.
   Consequence: **`ProofKexit` DROPS its real `cwd_ref` at the `iput` call**
-  (`iClear "Href"`, banner at the `proc_priv_split_cwd`), and iput returns
-  no `iref_slot`. `grep -n 'REMAINING DISHONESTY' iris/ProofKexit.v`.
+  (`iClear "Href"`, banner at the `proc_priv_split_cwd`).
+  `grep -n 'REMAINING DISHONESTY' iris/ProofKexit.v`.
+  Its POSTCONDITION's `iref_slot` is *not* part of that hole and is true of
+  the code — kexit needs it and the accounting law is false without it.
+- **`ProofFileclose` drops the `iref_slot` iput hands back** — the file's
+  inode reference is not modelled, so there is no ftable slot to park it in.
+  `grep -n "FILE TABLE'S HALF" iris/ProofFileclose.v`.
+- **`BootShared` drops the supply's `NFILE` units** for the same reason —
+  `IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE` and only the proc share has a
+  home. `grep -n 'NFILE UNITS ARE DROPPED' iris/BootShared.v`.
+- **`InodeRef.iref_name_alloc` throws away the itable authority it mints.**
+  The name has to exist at boot (a class carrying a gname cannot be a
+  functor constraint the adequacy theorem assumes), but `SpecIinit` is not
+  proven, so `own iref_name (● ∅)` has no home yet.
 - What this commit DID delete: `ProofKforkB4.kfk_cwd_ref_any` (the child's
   reference is now idup's second half — `kfk_child_cwd`), and
   `ProofFileclose`'s laundering of a file payload into a "cwd" reference
@@ -249,7 +263,7 @@ do propagate, and that part is unavoidable").
 > each `Module Type`'s binder list against the `_body` it seals rather than
 > adding the class everywhere by regex.
 
-## THE ROUTING: EXACTLY `fd_slots FDSPARE`, and it is S4b again
+## THE ROUTING: EXACTLY `fd_slots FDSPARE`, and it is S4b again — **DONE**
 
 With no null arm, the `iref_slot` unit has nowhere to hide inside `cwd_ref`,
 and that is the right answer: it is routed the way the fd allowance already

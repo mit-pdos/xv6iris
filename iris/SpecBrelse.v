@@ -54,7 +54,7 @@ Import Defs.
 Definition K_brelse : nat := 26%nat.
 
 Definition wp_brelse_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γs : list gname)
@@ -96,7 +96,7 @@ Definition wp_brelse_sconf_body
 
 Module Type BRELSE.
   Parameter wp_brelse_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
       (γs : list gname)

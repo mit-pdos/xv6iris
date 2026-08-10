@@ -111,7 +111,7 @@ Lemma proc_end_is_tickslock : pacur NPROC = mword_of_int KernelSyms.tickslock.
 Proof. unfold pacur, acur, proc_size, NPROC. apply bv_eq; vm_compute; reflexivity. Qed.
 
 Section SpecProcinit.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
 
   (* ---- what a lock looks like before and after initlock ---- *)
   Definition lk_raw (lk : mword 64) : iProp Σ :=
@@ -146,7 +146,7 @@ End SpecProcinit.
    this composition check takes them; nothing in procinit's own contract
    does. *)
 Section ProcinitSeals.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (γ : gname)  (γs : list gname).
 
@@ -196,7 +196,7 @@ End ProcinitSeals.
 (*  [WpLock.newlock_delayed] and the two passes below.                  *)
 (* ------------------------------------------------------------------ *)
 Section ProcinitProcsInv.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context (γ : gname) .
 
@@ -319,7 +319,7 @@ Section ProcinitProcsInv.
 
 End ProcinitProcsInv.
 
-Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
+Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64) :=
   let pcE : mword 64 := mword_of_int KernelSyms.procinit in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (* procinit's own frame is 8 slots (addi sp,sp,-64: ra, s0..s6); initlock
@@ -335,6 +335,12 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
   (* THE supply being routed: NOFILE + FDSPARE units per process, i.e. the
      WHOLE of [FDSLOTS] -- nothing is left over. *)
   fd_slots (NPROC * (NOFILE + FDSPARE)) -∗
+  (* ... and the SAME for inode references: 1 + IREFSPARE per process, the
+     [1] being the process's own cwd unit (its cwd is null, so it holds the
+     unit rather than a reference).  That is all of [IREFSLOTS] except the
+     [NFILE] units the file table holds -- see [IrefSlots.v]'s header for
+     why the supply is exactly NPROC*(1 + IREFSPARE) + NFILE. *)
+  iref_slots (NPROC * (1 + IREFSPARE)) -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
@@ -348,6 +354,6 @@ Definition wp_procinit_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ,
 
 Module Type PROCINIT.
   Parameter wp_procinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64),
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ} `{GEN : GenId} `{CID : CpuId} (m : regfile) (K : nat) (b : bool) (p : mword 64),
       wp_procinit_sconf_body m K b p.
 End PROCINIT.

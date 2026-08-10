@@ -86,7 +86,7 @@ Proof.
 Qed.
 
 Section KforkB7.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Ra5 := (mword_of_int 15 : mword 5).

@@ -129,7 +129,7 @@ Local Open Scope Z_scope.
 Definition sys_pipe_stack : nat := 82%nat.
 
 Section SpecSysPipe.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
 
   (* sys_pipe's result, keyed by the returned a0, over the process state [W]
      the syscall ends with -- i.e. the incoming [V] with copyout's page-table
@@ -157,7 +157,7 @@ Section SpecSysPipe.
 End SpecSysPipe.
 
 Definition wp_sys_pipe_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa : gname)  (γfl γf : gname)
     (fn : fclose_names) (on : option nat)
@@ -218,7 +218,7 @@ Definition wp_sys_pipe_sconf_body
 
 Module Type SYSPIPE.
   Parameter wp_sys_pipe_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa : gname) (γfl γf : gname)
       (fn : fclose_names) (on : option nat)

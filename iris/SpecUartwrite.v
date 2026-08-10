@@ -76,7 +76,7 @@ Local Open Scope Z_scope.
    (acquire and release want 10). *)
 Definition uartwrite_stack : nat := 32%nat.
 
-Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
+Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}
     `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
     (γu : uart_names) (γv : disk_names) 
     (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
@@ -123,7 +123,7 @@ Definition wp_uartwrite_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
 
 Module Type UARTWRITE.
   Parameter wp_uartwrite_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
       (γu : uart_names) (γv : disk_names) (γs : list gname) (j : nat) (γlp : gname) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ)

@@ -45,6 +45,7 @@ Require Import BootConfig.
 Require Import BootChain BootShared.
 Require Import RiscvAdequacy.
 Require Import FsCrash.
+Require Import IrefSlots IcacheInv InodeRef.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -104,10 +105,16 @@ Definition XV6_DISK_BYTES : nat := (2000 * 1024)%nat.
 
 Section SystemBoot.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ}.
-  Context `{!fdslotGpreS Σ, !uartGhostG Σ, !diskGhostG Σ}.
+  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ,
+            !uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId}.
 
-  Lemma xv6_boot_era (g : gstate) :
+  (* [icacheG] is the itable authority's FUNCTOR constraint; the itable's
+     NAME is minted inside ([InodeRef.iref_name_alloc], through
+     [boot_shared_alloc]) and leaves existentially, exactly as [fdslotG]
+     does.  That is why the adequacy theorem can assume it: a functor
+     constraint is capacity, and [xv6Σ] supplies it. *)
+  Lemma xv6_boot_era `{!icacheG Σ} (g : gstate) :
     boot_facts g ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC XV6_DISK_BYTES g
     ={⊤}=∗
@@ -119,7 +126,7 @@ Section SystemBoot.
   Proof.
     intro Hbf. iIntros "Hres".
     iMod (boot_shared_alloc g XV6_DISK_BYTES Hbf with "Hres")
-      as (Hfd γd γv)
+      as (Hfd Hir Hicn γd γv)
       "(%Hdimg & #Htext & #Hdata & #Hpanic & #Hstarted & #Hdev & #Hwinv &
         #Hcinv & #Hcert & Hharts & Hlk & Hgl & Hpark & Hpst & Huart &
         Hdlab & Hcfg & Hclaim & #Hdone & Hkpt & Hkmap & Hdisk & Hmir & Hpages)".
@@ -170,7 +177,8 @@ End SystemBoot.
 (* ---------------------------------------------------------------------- *)
 
 Theorem xv6_power_adequacy Σ
-    `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotGpreS Σ}
+    `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotGpreS Σ,
+      !irefslotGpreS Σ, !icacheG Σ}
     (g : gstate)
     (* the ONLY hypotheses about the machine: it is off, and nothing has ever
        run.  Everything else a boot needs -- RAM total and holding the loaded
@@ -200,7 +208,7 @@ Proof.
      [riscv_eraGS] to [HE], so §2's statement at the composed instance IS
      this obligation (crash.md's M0 gotcha, in the direction that works). *)
   intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ gen g' Hbf).
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ _ gen _ g' Hbf).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -227,7 +235,7 @@ Qed.
 
 Theorem xv6_fs_adequacy Σ
     `{!riscvGpreS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotGpreS Σ,
-      !fsCrashG Σ}
+      !irefslotGpreS Σ, !icacheG Σ, !fsCrashG Σ}
     (g : gstate) (cov : gset Z) (logstart : Z)
     (D0 : gmap Z (list (bv 8)))
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false)
@@ -249,7 +257,7 @@ Proof.
                  iSplitR; [iPureIntro; exact Hseq | iExact "HP"])
            Hgen0 Hpow).
   intros F HE gen g' Hbf.
-  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ gen g' Hbf).
+  exact (@xv6_boot_era Σ (RiscvGS Σ F HE) _ _ _ _ _ _ _ _ gen _ g' Hbf).
 Qed.
 
 (* ---------------------------------------------------------------------- *)
@@ -257,7 +265,8 @@ Qed.
 (* ---------------------------------------------------------------------- *)
 
 Definition xv6Σ : gFunctors :=
-  #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ; fsCrashΣ ].
+  #[ riscvΣ; sieΣ; lockΣ; kallocΣ; fileΣ; fdslotΣ; irefslotΣ; icacheΣ;
+     fsCrashΣ ].
 
 Corollary xv6_power_adequacy_xv6Σ (g : gstate)
     (Hgen0 : g.(ggen) = 0%nat) (Hpow : g.(gpow) = false) :

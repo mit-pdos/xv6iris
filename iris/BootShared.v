@@ -41,6 +41,7 @@ Require Import RiscvAdequacy.
 Require Import BootReset.   (* the garbage-anchored register clause's bridge *)
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
+Require Import IrefSlots IcacheInv InodeRef.
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:
@@ -228,7 +229,8 @@ Proof. exact (fun H => H). Qed.
 (* ====================================================================== *)
 
 Section BootBss.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+            !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId}.
 
@@ -351,7 +353,8 @@ Proof.
 Qed.
 
 Section BootBssChain.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
+            !irefNameG Σ, !irefslotG Σ}.
   Context `{!uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId}.
 
@@ -393,6 +396,12 @@ Section BootBssChain.
     boot_facts g ->
     kmap_static_claims -∗
     fd_slots FDSLOTS -∗
+    (* the iref supply's PROC-LAYER SHARE.  The remaining [NFILE] units of
+       [IrefSlots.IREFSLOTS] belong to the file table, which does not park
+       them yet ([FileInv.file_payload]'s FD_INODE arm is still a
+       placeholder), so boot mints the whole supply and routes this part;
+       the file share is dropped at the mint site, marked there. *)
+    iref_slots (NPROC * (1 + IREFSPARE)) -∗
     boot_raw_ran g img_end ram_hi -∗
       started_addr ↦₄ started_clear ∗
       main_locks_raw ∗
@@ -404,7 +413,7 @@ Section BootBssChain.
          ([∗ list] p ∈ ps, page_own p)).
   Proof.
     intro Hbf. pose proof (boot_mem_of_facts g Hbf) as Hmem.
-    iIntros "#Hcl Hfd H".
+    iIntros "#Hcl Hfd Hir H".
     (* ---- 0x8000a220 panicked, 0x8000a224 panicking ---- *)
     iDestruct (bss_cut g img_end KernelSyms.panicked (KernelSyms.panicked + 4)
                  ram_hi ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H")
@@ -600,7 +609,7 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hpkd Hpki Hkm Hkpt Hpr1 Hpr2 Hfd Hip Hbsl Hbln Hhd Hino
+    iSplitL "Hdr Hdw Hpkd Hpki Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Hbsl Hbln Hhd Hino
              Hdd Hda Hdu Hdf Hdi Hslots".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
@@ -612,6 +621,7 @@ Section BootBssChain.
       iSplitL "Hpr1"; [iExact "Hpr1" |].
       iSplitL "Hpr2"; [iExact "Hpr2" |].
       iSplitL "Hfd"; [iExact "Hfd" |].
+      iSplitL "Hir"; [iExact "Hir" |].
       iSplitL "Hip"; [iExists vip; iExact "Hip" |].
       iSplitL "Hbsl"; [iExact "Hbsl" |].
       iSplitL "Hbln"; [iExact "Hbln" |].
@@ -687,7 +697,11 @@ End BootBssChain.
 
 Section BootAlloc.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ}.
-  Context `{!fdslotGpreS Σ, !uartGhostG Σ, !diskGhostG Σ}.
+  (* [icacheG] rather than [irefNameG]: the itable's NAME does not exist
+     yet at this point -- [iref_name_alloc] mints it below and it leaves as
+     an existential, exactly like [fdslotG]. *)
+  Context `{!fdslotGpreS Σ, !irefslotGpreS Σ, !icacheG Σ,
+            !uartGhostG Σ, !diskGhostG Σ}.
   Context `{GEN : GenId}.
 
   (* The two PER-HART GHOST BUNDLES, NAMED -- and the naming is load-bearing:
@@ -838,7 +852,8 @@ Section BootAlloc.
   Lemma boot_shared_alloc (g : gstate) (ndisk : nat) :
     boot_facts g ->
     power_boot_res riscv_eraGS gen_id boot_D NPROC ndisk g
-    ={⊤}=∗ ∃ (_ : fdslotG Σ) (γd : uart_names) (γv : disk_names),
+    ={⊤}=∗ ∃ (_ : fdslotG Σ) (_ : irefslotG Σ) (_ : irefNameG Σ)
+             (γd : uart_names) (γv : disk_names),
       ⌜dn_img γv = disk_img_name⌝ ∗
       (* --- the shared persistents --- *)
       kernel_text ∗ kernel_data ∗ panic_wp_any ∗
@@ -904,8 +919,24 @@ Section BootAlloc.
                  entry_got_bytes with "Hcl Hkdata") as "#Hword".
     (* ---- the fd-slot supply (no memory footprint: a pure ghost) ---- *)
     iMod fd_slots_alloc as (Hfd) "[_ Hfdslots]".
+    (* ---- the iref-slot supply, likewise a pure ghost ---- *)
+    iMod iref_slots_alloc as (Hir) "[_ Hirslots]".
+    (* ---- the itable's canonical name (no memory footprint either) ---- *)
+    iMod iref_name_alloc as (Hicn) "_".
+    (* ### THE FILE TABLE'S NFILE UNITS ARE DROPPED HERE. ###
+       [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE]; the proc layer's share
+       is routed through [main_globals_raw], and the [NFILE] units belong to
+       the ftable, one per FD_INODE file's inode reference.  Nothing holds
+       them yet because [FileInv.file_payload]'s inode arm is still a
+       placeholder, so they go nowhere.  When that arm becomes real, split
+       them out here and hand them to [SpecFileinit] the way [fd_slots] are
+       handed to procinit.  claude-notes/projects/cwd-ref.md, "STILL TO DO
+       -- the consumers". *)
+    iEval (rewrite /IREFSLOTS) in "Hirslots".
+    iDestruct (iref_slots_split (NPROC * (1 + IREFSPARE)) NFILE with "Hirslots")
+      as "[Hirslots _]".
     (* ---- the .bss, in address order ---- *)
-    iDestruct (boot_bss_carve g Hbf with "Hcl Hfdslots Hbss") as
+    iDestruct (boot_bss_carve g Hbf with "Hcl Hfdslots Hirslots Hbss") as
       "(Hstartcell & Hlocks & Hglobals & Hharts & Hpages)".
     (* ---- the device fabric ---- *)
     iMod (uart_ghosts_alloc (g.(gdev).(duart))) as (γd)
@@ -964,7 +995,7 @@ Section BootAlloc.
     iMod (started_inv_alloc ⊤ (main_deposit γd γv) with "Hstartcell")
       as "#Hstarted".
     (* ================================================================ *)
-    iModIntro. iExists Hfd, γd, γv.
+    iModIntro. iExists Hfd, Hir, Hicn, γd, γv.
     iSplitR; [iPureIntro; exact Himg |].
     iSplitR; [iExact "Hktext" |].
     iSplitR; [iExact "Hkdata" |].

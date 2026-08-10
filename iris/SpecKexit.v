@@ -134,7 +134,7 @@ Import Defs.
 Definition K_kexit : nat := 74%nat.
 
 Definition wp_kexit_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
@@ -195,6 +195,12 @@ Definition wp_kexit_sconf_body
   (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
   (* the process itself: its private block and its fd-slot allowance *)
   fd_slots FDSPARE -∗
+  (* the iref ALLOWANCE.  Only [IREFSPARE], not [1 + IREFSPARE]: the cwd's
+     own unit is not the caller's to bring -- it is parked in the itable
+     against the reference [p->cwd] holds, and [iput] hands it back at the
+     [ld a0,336(s3)].  The two rejoin into the [1 + IREFSPARE] the ZOMBIE
+     block parks. *)
+  iref_slots IREFSPARE -∗
   proc_priv γf pj pid V -∗
   (* NO continuation: kexit does not return.  See the header. *)
   WP (Loop : expr riscv_lang).
@@ -213,26 +219,27 @@ Definition wp_kexit_sconf_body
 (* (SpecProcinit.proc_ready_lock_res is the same kind of check.)             *)
 (* ---------------------------------------------------------------------- *)
 Section KexitSeals.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (V : pprivate) :
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd V = (zero_reg : mword 64) ->
     proc_priv_nocwd γf (proc_addr j) pid V -∗ fd_slots FDSPARE -∗
+    iref_slots (1 + IREFSPARE) -∗
     park_pay (proc_addr j) ZOMBIE.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
-    iIntros "Hpriv Hsp".
+    iIntros "Hpriv Hsp Hir".
     iApply (proc_priv_to_dormant_zombie γf (proc_addr j) pid V Hof Hcwd
-              with "Hpriv Hsp").
+              with "Hpriv Hsp Hir").
   Qed.
 
 End KexitSeals.
 
 Module Type KEXIT.
   Parameter wp_kexit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)

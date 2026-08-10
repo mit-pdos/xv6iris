@@ -97,7 +97,7 @@ Proof. lia. Qed.
 
 Module KforkB1 (FP : FREEPROC) (RL : RELEASE).
 Section KforkB1Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

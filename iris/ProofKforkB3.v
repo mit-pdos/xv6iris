@@ -228,7 +228,7 @@ Proof. lia. Qed.
 Module KforkB3 (FD : FILEDUP).
 
 Section KforkB3Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rs0 := (mword_of_int 8 : mword 5).

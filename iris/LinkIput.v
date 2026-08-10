@@ -28,11 +28,12 @@ Require Import WpLock FdSlots WpUart.
 Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
+Require Import InodeRef.
 Require Import SpecIput.
 
 Module Iput : IPUT.
   Axiom wp_iput_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γs : list gname) (j : nat) (γl : gname)

@@ -226,7 +226,7 @@ Qed.
 Module SchedulerProof (Acquire : ACQUIRE) (Release : RELEASE) (Swtch : SWTCH) : SCHEDULER.
 
 Section ProofScheduler.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* register indices, named once *)

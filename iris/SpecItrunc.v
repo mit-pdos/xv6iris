@@ -139,7 +139,7 @@ Proof.
 Qed.
 
 Section ItruncSpec.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, !logG Σ}.
 
   (* "THE BITMAP BLOCK'S LOG SLOT IS PAID FOR, and u units remain for
@@ -182,7 +182,7 @@ Section ItruncSpec.
 End ItruncSpec.
 
 Definition wp_itrunc_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
       !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
 
@@ -325,7 +325,7 @@ Definition wp_itrunc_sconf_body
 
 Module Type ITRUNC.
   Parameter wp_itrunc_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !bioG Σ, !diskGhostG Σ,
              !uartGhostG Σ, !fsLogG Σ, !logG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       

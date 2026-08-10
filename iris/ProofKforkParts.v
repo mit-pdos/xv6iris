@@ -487,7 +487,7 @@ End ProofKforkParts.
 (*  THE RESOURCE-LEVEL BRIDGES.                                         *)
 (* =================================================================== *)
 Section KforkRes.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
   (* ---- the WRITE twin of [ProcInv.tf_page_word] ------------------- *)
@@ -674,7 +674,7 @@ End KforkRes.
 (*  [proc_pt_wf]'s last conjunct -- see [proc_priv_tfp_valid].            *)
 (* =================================================================== *)
 Section KforkFreeproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* IT TAKES THE DEFICIT BLOCK, and that is forced: the premise
@@ -688,13 +688,14 @@ Section KforkFreeproc.
     pv_cwd V = (zero_reg : mword 64) ->
     proc_priv_nocwd γf pa pid V -∗
     fd_slots FDSPARE -∗
+    iref_slots (1 + IREFSPARE) -∗
     own_ctx (p_context pa) -∗
     SpecFreeproc.fp_rest pa V pid ∗
     SpecFreeproc.fp_pt pa (pv_sz V) (Some (pv_upt V)) ∗
     SpecFreeproc.fp_tf pa (Some (ud_tfp (pv_upt V), pv_tf V)).
   Proof.
     intros Hof Hcwd.
-    iIntros "Hpv Hsp Hctx".
+    iIntros "Hpv Hsp Hir Hctx".
     iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as "%Hpv".
     iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
     iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho")
@@ -704,7 +705,7 @@ Section KforkFreeproc.
     cbn [fst snd].
     iSplitR "Hpg Hptt Htfc Htfp".
     { iSplitR; [iPureIntro; split_and!; [exact Hof | exact Hcwd | exact Hszb]|].
-      iFrame "Hpid Hf Hcells Hunits Hsp Hctx". }
+      iFrame "Hpid Hf Hcells Hunits Hsp Hir Hctx". }
     iSplitL "Hpg Hptt".
     { iFrame "Hpg Hptt". iPureIntro. split; [exact Hbel | exact Hszb]. }
     iFrame "Htfc Htfp". iPureIntro. exact Hpv.
