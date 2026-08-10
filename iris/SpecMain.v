@@ -133,6 +133,12 @@ Require Import StartedInv.
 (* the callees, for the vocabulary main's precondition is stated in *)
 Require Import SpecConsoleinit.
 Require Import SpecProcinit.
+(* [IcacheBoot.ientry_raw] -- the fifty itable ENTRIES' cells, which iinit
+   does not touch and [IcacheBoot.icache_boot] takes.  Imported BEFORE
+   [SpecIinit] on purpose: only [IcacheBoot]'s own names come in (Import is
+   not transitive), but keeping the order makes the [NINODE] below
+   unambiguously [SpecIinit]'s if that ever changes. *)
+Require Import IcacheBoot.
 Require Import SpecIinit SpecVirtioDiskInit.
 Require Import SpecFreerange SpecPrintkGen.
 Require Import ProcGeom FdSlots CpuOwn SchedCtx.
@@ -245,6 +251,18 @@ Section SpecMain.
      ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) ∗
      blink_raw bhead ∗
      ([∗ list] i ∈ seq 0 NINODE, sl_raw (inode_lock i)) ∗
+     (* ...and the REST of each itable entry, which iinit never touches:
+        dev/inum/valid, the dinode mirror's metadata and addrs cells, and
+        [ref] at CONCRETE zero.  These are [IcacheBoot.icache_boot]'s
+        [ientry_raw]s -- the ghost step from iinit's postcondition to the
+        inode cache's precondition consumes them beside the fifty
+        [sl_fresh]es.  [ref]'s pinned zero is [IcacheInv.iref_cells ∅]'s
+        requirement and is a loader FACT (the itable is .bss past the
+        image), on the [d_used_idx] / [kmem+24] precedent above.
+        NOT YET CONSUMED: [icache_boot] also needs the stocked inode pool,
+        which needs the fs BLOCK layer wired into main (fs-icache.md C7
+        owed (ii)); until then main carries these and drops them. *)
+     ([∗ list] k ∈ seq 0 NINODE, ientry_raw k) ∗
      (∃ pd pav pu : mword 64,
         disk_desc ↦₈ pd ∗ disk_avail ↦₈ pav ∗ disk_used ↦₈ pu) ∗
      (∃ free0 : nat -> bv 8,

@@ -1416,9 +1416,13 @@ Section ProofMain.
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
+    (* [Hient] -- the fifty itable entries' cells -- is carried and DROPPED
+       here: its only consumer is [IcacheBoot.icache_boot], whose other input
+       (the stocked inode pool) needs the fs BLOCK layer wired into main.
+       See claude-notes/projects/fs-icache.md, C7 owed (ii). *)
     iDestruct "Hglobals" as "(Hdevsw & Hflags & Hkmem24 & Hkpt & Hprocs & Hppub &
                              Hfds & Hirs & Hinitproc & Hbufl & Hbufn & Hbhead & Hinl &
-                             Hdiskptr & Hdiskfree & Hdusedidx & Hdslots)".
+                             Hient & Hdiskptr & Hdiskfree & Hdusedidx & Hdslots)".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iDestruct "Hdiskfree" as (free0) "Hdiskfree".
     (* main's boot arm reaches kinit -> freerange -> kfree -> acquire and
