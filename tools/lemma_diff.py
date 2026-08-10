@@ -114,14 +114,18 @@ def main():
         old = at_ref(args.ref, path)
         lines = []
 
-        if old is not None:
-            before, after = decls(old), decls(new)
-            for name, kw in before.items():
-                if name not in after:
-                    lines.append(f"  GONE      {kw} {name}")
-            for name, kw in after.items():
-                if kw in ASSUMED and name not in before:
-                    lines.append(f"  NEWAXIOM  {kw} {name}")
+        # A NEW file (old is None) must still be scanned: every assumed-kind
+        # declaration in it is a NEW assumption.  Skipping it hid a bridging
+        # Axiom in a brand-new Link file (2026-08-10, the same audit that
+        # found the untracked-file gap above).
+        before = decls(old) if old is not None else {}
+        after = decls(new)
+        for name, kw in before.items():
+            if name not in after:
+                lines.append(f"  GONE      {kw} {name}")
+        for name, kw in after.items():
+            if kw in ASSUMED and name not in before:
+                lines.append(f"  NEWAXIOM  {kw} {name}")
 
         for m in ADMIT.finditer(new):
             ln = new.count("\n", 0, m.start()) + 1
