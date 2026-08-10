@@ -45,7 +45,7 @@ From iris.algebra Require Import auth numbers.
 From iris.proofmode Require Import proofmode.
 From iris.base_logic.lib Require Import own.
 Require Import ProcGeom.
-Require Import FileInv.
+Require Import FdSlots.   (* [NFILE]; NOT FileInv -- see FdSlots.v *)
 Local Open Scope Z_scope.
 
 (* references a single syscall may hold in locals at once; see the header *)
