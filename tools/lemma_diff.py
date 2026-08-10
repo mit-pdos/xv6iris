@@ -75,7 +75,15 @@ def changed_files(ref, directory):
         ["git", "diff", "--name-only", ref, "--", directory],
         capture_output=True, text=True, check=True,
     ).stdout.split()
-    return [p for p in out if p.endswith(".v")]
+    # UNTRACKED files are invisible to `git diff --name-only <ref>` -- and a
+    # brand-new file is exactly where a new Axiom hides (found 2026-08-10:
+    # a bridging Axiom in a new Link file was not counted; the tool said
+    # "2 things to justify" when the honest count was 3).  Union them in.
+    untracked = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "--", directory],
+        capture_output=True, text=True, check=True,
+    ).stdout.split()
+    return sorted(set(p for p in out + untracked if p.endswith(".v")))
 
 
 def main():
@@ -106,14 +114,18 @@ def main():
         old = at_ref(args.ref, path)
         lines = []
 
-        if old is not None:
-            before, after = decls(old), decls(new)
-            for name, kw in before.items():
-                if name not in after:
-                    lines.append(f"  GONE      {kw} {name}")
-            for name, kw in after.items():
-                if kw in ASSUMED and name not in before:
-                    lines.append(f"  NEWAXIOM  {kw} {name}")
+        # A NEW file (old is None) must still be scanned: every assumed-kind
+        # declaration in it is a NEW assumption.  Skipping it hid a bridging
+        # Axiom in a brand-new Link file (2026-08-10, the same audit that
+        # found the untracked-file gap above).
+        before = decls(old) if old is not None else {}
+        after = decls(new)
+        for name, kw in before.items():
+            if name not in after:
+                lines.append(f"  GONE      {kw} {name}")
+        for name, kw in after.items():
+            if kw in ASSUMED and name not in before:
+                lines.append(f"  NEWAXIOM  {kw} {name}")
 
         for m in ADMIT.finditer(new):
             ln = new.count("\n", 0, m.start()) + 1
