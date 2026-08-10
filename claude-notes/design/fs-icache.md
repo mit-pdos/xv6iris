@@ -1775,3 +1775,34 @@ live references.
   origin's b4902e13 is the template; escrow + ProofIget retype
   mechanically; ProofIdup/SpecIdup/ProofKforkB4 take origin's versions
   ported to dev/icfg_dev; ProofIput's two sites rework on the witness.
+
+### 14.4 THE OPEN RULING (pending, 2026-08-10): natR convergence vs the
+### separate share ghost
+
+Two viable shapes for T5, DELIBERATELY LEFT UNDECIDED pending
+coordination between the two working lines:
+
+- **Path A — adopt origin's natR** (`prodR fracR natR`, count-0 shares
+  in the same map): converges the algebra with the kfork line; takes
+  their idup/ProofKforkB4 improvements as written; COSTS the full
+  retype (IcacheRef/IcacheInv/escrow/ProofIget — mechanical, their
+  b4902e13 is the template) PLUS reworking ProofIput's two REF-1 sites
+  against §14.2(c)'s bracket machinery — and the bracket count must be
+  invariant-side, because natR fragment splits are free (⋅-valid) and
+  CANNOT be forced through a carve lemma: the ledger would bound
+  nothing it doesn't own.
+- **Path B — keep positiveR, add a SEPARATE authority-guarded share
+  ghost** (per-slot share-mass + bracket count inside itable_inv;
+  carve/gather/upgrade lemmas are the only mints because the ghost is
+  auth'd there): REF-1 and therefore ProofIput/ProofIget/the escrow
+  survive UNTOUCHED; purely additive; the witness clause
+  ("share-mass > 0 → an open bracket against a live reference") is
+  owned by the invariant rather than assumed as discipline. COSTS:
+  origin's line must port its idup-over-shares/kfork-B4 onto it (the
+  upgrade step maps directly: ghost-mass → fragment under the lock),
+  and the two lines must agree or the next pull re-collides on the
+  algebra a third time.
+
+Either path then reaches C8 (SpecIlock/SpecFileread over shares) with
+the same bracket vocabulary. The trade is: A pays in re-proof and a
+weaker (discipline-shaped) ledger; B pays in cross-line coordination.
