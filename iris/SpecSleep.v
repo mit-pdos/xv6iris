@@ -115,14 +115,92 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} 
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
+(* ===================================================================== *)
+(*  ROUTE B, LEMMA (2): sleep ENTERED AT noff >= 2 DIVERGES.              *)
+(* ===================================================================== *)
+(* sleep(chan, lk) takes p->lock and releases lk, so a thread that enters
+   it holding TWO levels (its condition lock plus something else) reaches
+   sched() still at noff >= 2 -- and sched panics ("sched locks",
+   [SpecSched.wp_sched_locks_body]).  This is design fs-icache.md 13.12's
+   middle lemma: it is what makes the LOCKED branch of a nested
+   [acquiresleep] safe.
+
+   Relative to [wp_sleep_sconf_body] the postcondition and the [wp_next]
+   crossing are gone (there is no return), and with them:
+     - [arm_pay 0 eb pj] and the [eb = true] premise.  They exist to hand
+       the trap CSRs and the cpu claim across the swtch; the swtch is
+       never reached, and at noff >= 2 the enabled arm is unreachable
+       anyway, so [eb] is unconstrained;
+     - the credential [Tk].  It exists to be presented again at the
+       re-acquire of lk, and there is no re-acquire.
+   [Rk] and [locked γk cpu_id] are still CONSUMED: the interior
+   release(lk) at +0x1e really runs.                                     *)
+Definition wp_sleep_gen_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γs : list gname) (j : nat) (γl : gname)
+    (γk : gname) (lka : mword 64) (Rk Dk : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.sleep in
+  let pj := proc_addr j in
+  let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
+  (22 <= av)%nat ->
+  (* the interior acquire transiently reaches [S (S (S n))] + 1 *)
+  (Z.of_nat n + 4 < 2 ^ 31)%Z ->
+  (* the two dead-state refutations the interior release needs; the third
+     ([Tk] vs [Dk]) is not owed, [Tk] having dropped *)
+  (forall i : CPU, ⊢ locked γk i -∗ Dk -∗ False) ->
+  (forall i : CPU, ⊢ locked_pre γk i -∗ Dk -∗ False) ->
+  sie_cap_gpr m av false pj -∗
+  cpu_own (S (S n)) eb pj C false -∗
+  kernel_text -∗ pc_is pcE -∗
+  procs_inv γs -∗
+  lock_openable γk lka Rk Dk -∗
+  locked γk cpu_id -∗
+  Rk -∗
+  panic_wp_any -∗
+  WP (Loop : expr riscv_lang).
+
+(* the static-kernel-lock instance, which is what acquiresleep takes *)
+Definition wp_sleep_locks_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+    (γs : list gname) (j : nat) (γl : gname)
+    (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
+    (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat) :=
+  let pcE : mword 64 := mword_of_int KernelSyms.sleep in
+  let pj := proc_addr j in
+  let chan : mword 64 := m !!! Regidx (mword_of_int 10 : mword 5) in
+  let lk0 : mword 64 := m !!! Regidx (mword_of_int 11 : mword 5) in
+  (j < NPROC)%nat ->
+  γs !! j = Some γl ->
+  add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
+  (22 <= av)%nat ->
+  (Z.of_nat n + 4 < 2 ^ 31)%Z ->
+  sie_cap_gpr m av false pj -∗
+  cpu_own (S (S n)) eb pj C false -∗
+  kernel_text -∗ pc_is pcE -∗
+  procs_inv γs -∗
+  is_lock γk lka sk Rk -∗
+  locked γk cpu_id -∗
+  Rk -∗
+  panic_wp_any -∗
+  WP (Loop : expr riscv_lang).
+
 Module Type SLEEP.
   Parameter wp_sleep_sconf :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
-      
+
       (γs : list gname) (j : nat) (γl : gname)
       (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
       wp_sleep_sconf_body γs j γl γk lka sk Rk m av eb C.
+  Parameter wp_sleep_locks :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γs : list gname) (j : nat) (γl : gname)
+      (γk : gname) (lka : mword 64) (sk : string) (Rk : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
+      wp_sleep_locks_body γs j γl γk lka sk Rk m av eb C n.
 End SLEEP.
 
 (* ===================================================================== *)
@@ -205,4 +283,12 @@ Module Type SLEEP_GEN.
       (γk : gname) (lka : mword 64) (Rk Tk Dk : iProp Σ)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ),
       wp_sleep_gen_sconf_body γs j γl γk lka Rk Tk Dk m av eb C.
+  (* Route B (2), in the [lock_openable]-generic form the proof lives in;
+     [SLEEP.wp_sleep_locks] is its static instance. *)
+  Parameter wp_sleep_gen_locks :
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ} `{GEN : GenId} `{CID : CpuId}
+      (γs : list gname) (j : nat) (γl : gname)
+      (γk : gname) (lka : mword 64) (Rk Dk : iProp Σ)
+      (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (n : nat),
+      wp_sleep_gen_locks_body γs j γl γk lka Rk Dk m av eb C n.
 End SLEEP_GEN.
