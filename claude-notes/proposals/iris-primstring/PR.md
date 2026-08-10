@@ -220,12 +220,11 @@ itself, `ltac_tactics.v:21` and `:1015`).
 
 ## What is still open
 
-1. **`string_ident.v`.** `iIntros (%H)` uses Ltac2 to turn a proofmode name into
-   a Coq identifier, and it consumes a Stdlib string. With `INamed` holding a
-   primitive string this needs either a pstring → Ltac2-string unquoting step
-   (`Constr.Unsafe` gained a primitive-string case in Rocq 9.0) or the
-   `ident`-to-`string` direction implemented in Gallina and `vm_compute`d. This
-   is the one part of the patch we have not prototyped.
+1. ~~`string_ident.v`.~~ **Checked: not affected.** `iIntros (%H)` goes through
+   `IPure (IGallinaNamed s)`, and `gallina_ident` (`intro_patterns.v:5`) is a
+   *separate* type carrying a Stdlib `string` that never becomes an `ident`.
+   Since this design leaves the parsing layer on Stdlib strings,
+   `string_ident.v` and the Ltac2 bridge are untouched.
 2. **Minimum Rocq version.** `PrimString` is Rocq ≥ 9.0 (Coq 8.20 has it under
    `Coq.Strings.PrimString`). Supporting older versions means a compatibility
    shim selecting the representation, which would negate much of the simplicity;
