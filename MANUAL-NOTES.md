@@ -62,6 +62,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - log_write tracks set of blocks, to ensure they fit within MAXOPBLOCKS after absorption
 - ghost var for SPP flag in sstatus: owned when interrupts disabled, otherwise in sie invariant
 - unsynchronized access to ip->ref in ilock, could be tricky to prove under weak memory
+- proved intr_handler_spec is contractive to enable recursive defn (inside sie_cap_gpr)
+- interesting sharing pattern: multiple struct file holders need to share access to single inode ref
 
 Big things that still need to be done/explored:
 
