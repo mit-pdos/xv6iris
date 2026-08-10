@@ -246,6 +246,70 @@ with the raw block — which is where it was always going to have to come
 from, since allocproc is the function that took the slot out of
 `procs_inv`.
 
+## THE ALGEBRA CHANGE THE FILE TABLE NEEDS (decided, not yet done)
+
+`FileInv.file_payload`'s FD_INODE/FD_DEVICE arm cannot hold a real
+reference as it stands, and the reason is the CMRA, not the encoding.
+
+```coq
+icacheUR := authUR (gmapUR nat (prodR fracR positiveR))
+iref_tok γ k q := own γ (◯ {[ k := (q, 1%positive) ]})
+```
+
+The count in a FRAGMENT is 1 because a fragment IS one reference; the count
+in the AUTHORITY is `n = ip->ref`. `q` is not a fraction "of the reference"
+— it is that reference's share of the IDENTITY fields, i.e. literally the
+dfrac on `i_dev`/`i_inum` (`inode_ident`), and the table keeps `1 - qt` in
+`islot_rest`. Any positive share lets you READ dev/inum; the whole thing
+lets you WRITE them, which is what `iget` does when it recycles a slot.
+`iref_lookup`'s biconditional `n = 1 ↔ q = qt` is REF-1 exclusivity, and the
+`←` direction works because `fracR` has no unit.
+
+**So splitting a fragment duplicates its `1`.** `IcacheInv.ic_pos_op_add`
+states it outright: the count's `⋅` IS `Pos.add`. Three fds sharing one
+`struct file` would compose to `ip->ref == 3`, and xv6's `filedup` bumps
+`f->ref` and never touches `ip->ref`. `positiveR` has no zero, so the
+algebra cannot express "a share of THIS reference" at all.
+
+**The fix, agreed: a count-0 fragment.** `positiveR → natR`, and then
+
+| | fragment | who holds it | needs itable lock? |
+|---|---|---|---|
+| the logical reference | `(q, 1)` — `iref_tok` | the ftable slot / the cwd | — |
+| a usable share | `(q, 0)` — `iref_share` (NEW) | each fd-holder, each `ilock` caller | **no** |
+
+`iref_share` splits symmetrically, so `file_payload_split` goes through, and
+`iref_tok γ k (q1+q2) ⊣⊢ iref_tok γ k q1 ∗ iref_share γ k q2`.
+
+Parking the reference in the ftable slot ALONE does not work and the reason
+is worth keeping: it would only be reachable under `ftable.lock`, and
+`fileread` calls `ilock(f->ip)` with no such lock, concurrently on multiple
+harts. Only the indivisible `1` may be parked; the shares must travel.
+
+Two consequences, both to be handled with the change:
+
+- **`icM_wf` gains `1 <= n`.** With `positiveR` a live slot had `n >= 1` for
+  free; at `natR` it must be stated, or `(q,0)`-only slots become legal and
+  `iref_word_live`'s `0 < ip->ref` fails. (Confirmed: that is the first
+  thing that breaks.)
+- **`iref_lookup`'s `n = 1 -> q = qt` WEAKENS** and must be restated — a
+  lone reference no longer holds the whole identity, since shares are out.
+  The converse `q = qt -> n = 1` survives (every fragment carries positive
+  `q`), and that is the direction the last closer uses: it rejoins all
+  shares to `qt`, THEN learns it is alone. This is the one non-mechanical
+  step in `IcacheInv.v`; everything else there is arithmetic.
+
+### A LIVE MIS-SPECIFICATION THIS UNCOVERED, independent of the change
+
+**`SpecIlock.v:201` and `SpecFileread.v:328` take `inode_ref … q` — a WHOLE
+reference at fraction q — where they should take a SHARE.** As written,
+three fds reading the same file hold three references, i.e. `ip->ref == 3`,
+which no code ever wrote. Both are satisfiable today only because the
+predicate is `emp`. `SpecIlock.v:40` already names the obstruction
+("`iref_tok`'s fraction and its count move together") without drawing the
+conclusion. A share is enough for `ilock`: `q > 0` gives `k ∈ dom M`, hence
+the slot is live and `ip->ref > 0`, so `InodeLock.inode_ref_spos` survives.
+
 ## ORDER OF WORK
 
 **Do NOT start this until kfork's proof has landed.** It touches `ProcInv.v`,
