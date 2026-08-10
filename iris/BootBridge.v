@@ -253,6 +253,14 @@ Section BootBridge.
   Lemma sconf_intro (ms mie_v mdv0 menvcfg0 : mword 64) :
     sconf_ms_facts ms ->
     and_vec mie_v (not_vec mdv0) = zeros' 64 ->
+    (* [sconf] PINS [mie] at [MIE_S] (the deliverable cause set has to be
+       computable; see IntrDefs.v §6), so the boot value must BE that
+       constant.  Kept as a parameter plus this premise rather than written
+       as the constant in the cell below, because the caller's [mief] comes
+       out of [SpecEntry.wp_entry_boot]'s postcondition abstract and that
+       postcondition exports this very equation -- so the premise is
+       discharged by the conjunct that is already there. *)
+    mie_v = MIE_S ->
     menvcfg0 = MENVCFG_S ->
     hw_config -∗ minstret_inv -∗
     cur_privilege ↦ᵣ Supervisor -∗
@@ -264,11 +272,13 @@ Section BootBridge.
     mie ↦ᵣ mie_v -∗ mideleg ↦ᵣ mdv0 -∗ menvcfg ↦ᵣ menvcfg0 -∗
     sconf.
   Proof.
-    iIntros (Hms Hmie ->) "#Hhw #Hmin Hpriv Hmst Hg Hspp Hmie Hmdl Hmenv".
+    iIntros (Hms Hmie -> ->) "#Hhw #Hmin Hpriv Hmst Hg Hspp Hmie Hmdl Hmenv".
     rewrite /sconf. iFrame "Hhw Hmin Hpriv".
     iSplitL "Hmst Hg Hspp".
     { iExists ms. iFrame "Hmst Hg Hspp". iPureIntro. exact Hms. }
-    iSplitL "Hmie Hmdl". { iExists mie_v, mdv0. iFrame. iPureIntro. exact Hmie. }
+    (* only [mideleg] is existential now: [mie] is the literal on both sides
+       after the [mie_v = MIE_S] substitution, and [Hmie] came along. *)
+    iSplitL "Hmie Hmdl". { iExists mdv0. iFrame. iPureIntro. exact Hmie. }
     iExists MENVCFG_S. iFrame "Hmenv". iPureIntro.
     split_and!; vm_compute; reflexivity.
   Qed.
@@ -298,6 +308,11 @@ Section BootBridge.
     sconf_ms_facts msf ->
     menvcfgf = MENVCFG_S ->
     and_vec mief (not_vec midelegf) = zeros' 64 ->
+    (* [sconf] pins [mie] at [MIE_S], so the boot value has to be it.  This is
+       not a new obligation on the M-mode side: [SpecEntry.wp_entry_boot]'s
+       postcondition already exports [mief = MIE_S] beside the [and_vec] fact
+       above, so the call site has it in hand. *)
+    mief = MIE_S ->
     _get_Satp64_Mode (Mk_Satp64 satpf) = ('b"0000" : mword 4) ->
     (* PMP entry 0 as [pmp_config] wants it *)
     mb_pmp_open pmpcfgf pmpaddrf ->
@@ -358,7 +373,7 @@ Section BootBridge.
       ghost_var sie_gname (1/4) ('b"0" : mword 1) ∗
       main_hart_raw tlbvec0.
   Proof.
-    iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
+    iIntros (Hsp Htpf Hsie Hmsf Hmenv Hmiez Hmieval Hsatpm Hpmp Htp Hn Hlo Hhi Hnv)
             "#Hhw #Hmin Hhs Hpriv Hmst Hpcf Hpad Hfile Hsatp Hmdl Hmie Hmenv
              Hstk Hbit Hbit2 Hg2 Hg4a Hg4b Htlb Hsepc Hscause Hstval
              Hspp1 Hspp2 Hstv Hnoff Hint Hproc Hctx".
@@ -406,7 +421,7 @@ Section BootBridge.
     iMod (sret_bits_update vspp1a vspp1b vspp2a vspp2b
             (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) with "Hspp1 Hspp2")
       as "[Hspp1 Hspp2]".
-    iDestruct (sconf_intro msf mief midelegf MENVCFG_S Hmsf Hmiez eq_refl
+    iDestruct (sconf_intro msf mief midelegf MENVCFG_S Hmsf Hmiez Hmieval eq_refl
                  with "Hhw Hmin Hpriv Hmst Hg2 Hspp1 Hmie Hmdl Hmenv") as "Hsconf".
     (* --- cpus[cid] --- *)
     iDestruct (cpu_own_init_boot p0 nv iv cpu_ctx_free Hnv

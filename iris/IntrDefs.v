@@ -12,9 +12,15 @@
      - the interrupts-ENABLED regime: [intr_ms_facts], [intr_config],
        [intr_frame] (+[intr_frame_retarget]), [intr_handler_spec],
        [intr_inv] (+allocation);
+     - the DELIVERABLE-CAUSE layer the [mie] pin buys: [s_cause_ok] (the
+       two scause words S-mode can ever be trapped with), [trap_scause]
+       (the tower the trap leaves in the cell) and
+       [s_cause_ok_of_dispatch], which closes the two against
+       WpIntrCore's [s_dispatch_MIE_S];
      - the SIE-AGNOSTIC v2 bundle (the smode_config successor):
        [sconf_ms_facts] (the SIE-free common fact set), [sconf]
-       (SIE unpinned, ghost half tied to the live bit, menvcfg bundled),
+       (SIE unpinned, [mie] PINNED at [MIE_S], ghost half tied to the
+       live bit, menvcfg bundled),
        the kernel-code capability [sie_cap m avail] -- the
        [kv_frame_slots + avail] free-stack slots below sp (sp moves trade
        against [avail] via [sie_cap_push]/[sie_cap_pop]), the TRANSLATION
@@ -95,6 +101,69 @@ Proof.
   split; [rewrite roundtrip_SD; exact H9 |].
   split; [rewrite roundtrip_MPP; exact H10 |].
   exact (roundtrip_TVM_false elp_v ms H11).
+Qed.
+
+(* ===================================================================== *)
+(* THE CAUSE SET [RiscvFetchExec.MIE_S] IMPLIES.  [sconf] pins [mie] to    *)
+(* that constant (see the conjunct there); because the S-mode dispatch set *)
+(* [s_pending] is masked by [mie], no cause but S-timer (5) and S-external *)
+(* (9) can EVER be delivered, whatever [mip] holds -- which is exactly the *)
+(* two [devintr] recognises.                                               *)
+(*                                                                        *)
+(* [s_cause_ok] is that conclusion, spelled in the scause WORDS the trap   *)
+(* writes.  It is stated HERE, at leaf altitude, rather than as            *)
+(* [SpecDevintr.devintr_ret sc <> 0]: this file sits far below SpecDevintr, *)
+(* and the trap handler's contract has to be able to say it.  kernelvec    *)
+(* converts one to the other with a [vm_compute] per arm.                  *)
+(* ===================================================================== *)
+Definition s_cause_ok (sc : mword 64) : Prop :=
+  sc = (mword_of_int 0x8000000000000005 : mword 64) \/
+  sc = (mword_of_int 0x8000000000000009 : mword 64).
+
+(* ---------------------------------------------------------------------- *)
+(* THE SCAUSE WORD THE TRAP WRITES, and the two literals it can be.        *)
+(*                                                                        *)
+(* [trap_scause sc_old i] is the exact two-step tower [trap_handler]       *)
+(* leaves in scause: bit 63 := the interrupt flag, then bits 62..0 := the  *)
+(* zero-extended cause code.  It is NAMED here rather than re-[pose]d      *)
+(* inside the engine's proof, because the engine is the ONLY consumer and  *)
+(* two spellings of the same tower would have to be kept in step by hand.  *)
+(* [RiscvExtras.scause_tower] collapses the pair to a concatenation, after *)
+(* which the word is a closed literal and [vm_compute] finishes -- the old *)
+(* scause value drops out entirely, which is the whole content.            *)
+(*                                                                        *)
+(* Combined with §2b's dispatch confinement (WpIntrCore.v), this is the    *)
+(* engine's obligation [s_cause_ok] discharged: [mie] pinned at [MIE_S]    *)
+(* admits only causes 5 and 9, and each writes one of the two literals.    *)
+(* ---------------------------------------------------------------------- *)
+Definition trap_scause (sc_old : mword 64) (i : InterruptType) : mword 64 :=
+  update_subrange_vec_dec
+    (update_subrange_vec_dec sc_old (64 - 1) (64 - 1)
+       (bool_to_bit (trapCause_is_interrupt (Interrupt i))))
+    (64 - 2) 0
+    (zero_extend' (64 - 1) (trapCause_bits_forwards (Interrupt i))).
+
+Lemma scause_of_S_Timer (sc_old : mword 64) :
+  trap_scause sc_old I_S_Timer = (mword_of_int 0x8000000000000005 : mword 64).
+Proof.
+  unfold trap_scause. rewrite scause_tower. vm_compute. reflexivity.
+Qed.
+
+Lemma scause_of_S_External (sc_old : mword 64) :
+  trap_scause sc_old I_S_External = (mword_of_int 0x8000000000000009 : mword 64).
+Proof.
+  unfold trap_scause. rewrite scause_tower. vm_compute. reflexivity.
+Qed.
+
+Lemma s_cause_ok_of_dispatch (mip_v mdv ms sc_old : mword 64) (meip seip : mword 1)
+    (i : InterruptType) (pr : Privilege) :
+  s_dispatch mip_v meip seip MIE_S mdv ms = Some (i, pr) ->
+  s_cause_ok (trap_scause sc_old i).
+Proof.
+  intros Hd.
+  destruct (s_dispatch_MIE_S mip_v mdv ms meip seip i pr Hd) as [-> | ->].
+  - left. apply scause_of_S_Timer.
+  - right. apply scause_of_S_External.
 Qed.
 
 (* the SIE-AGNOSTIC common fact set: [intr_ms_facts] minus the SIE pin.
@@ -303,9 +372,19 @@ Section IntrDefs.
         mstatus ↦ᵣ ms ∗
         ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
         ⌜ intr_ms_facts ms ⌝) ∗
-     (∃ mie_v mdv0 : mword 64,
-        mie ↦ᵣ mie_v ∗ mideleg ↦ᵣ mdv0 ∗
-        ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝) ∗
+     (* [mie] IS PINNED HERE TOO, and it has to be: this is the SAME machine
+        as [sconf]'s (§6), reached and left by [intr_config_of_v2] /
+        [v2_of_intr_config], and a conversion cannot INVENT the pin.  Were
+        this conjunct left existential, the round trip
+        sconf -> intr_config -> sconf would silently launder [mie = MIE_S]
+        away and the enabled regime -- the only one in which a cause is ever
+        actually DELIVERED -- would be the one place the deliverable-cause
+        argument does not hold.  No instruction between the two conversions
+        writes [mie] (nothing in the kernel ever does), so pinning it costs
+        the engines nothing: they read the value and hand it back. *)
+     (∃ mdv0 : mword 64,
+        mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv0 ∗
+        ⌜ and_vec MIE_S (not_vec mdv0) = zeros' 64 ⌝) ∗
      (∃ v : mword 64, sepc ↦ᵣ v) ∗
      (∃ v : mword 64, scause ↦ᵣ v) ∗
      (∃ v : mword 64, stval ↦ᵣ v))%I.
@@ -494,9 +573,20 @@ Section IntrDefs.
         ghost_var sie_gname (1/2) (_get_Mstatus_SIE ms) ∗
         sret_tie ms ∗
         ⌜ sconf_ms_facts ms ⌝) ∗
-     (∃ mie_v mdv0 : mword 64,
-        mie ↦ᵣ mie_v ∗ mideleg ↦ᵣ mdv0 ∗
-        ⌜ and_vec mie_v (not_vec mdv0) = zeros' 64 ⌝) ∗
+     (* [mie] IS PINNED, exactly as [menvcfg] is below and for the same
+        reason: a boot-established constant no later instruction touches
+        ([start] writes [sie] once, `SIE_SEIE | SIE_STIE`, and never writes
+        [mie] at all).  Pinning it is what makes the DELIVERABLE CAUSE SET
+        computable -- [s_pending] is masked by [mie], so at [MIE_S] only
+        bits 5 and 9 can ever be pending and the scause a trap writes is
+        one of [s_cause_ok]'s two literals.  That fact is what keeps
+        kerneltrap's [printk] arm dead, hence printk-general out of the
+        cone; see claude-notes/projects/kerneltrap.md.  [mideleg] stays
+        existential: `mideleg = 0xffff` removes nothing, so the restriction
+        comes entirely from [mie] and no proof needs the value. *)
+     (∃ mdv0 : mword 64,
+        mie ↦ᵣ MIE_S ∗ mideleg ↦ᵣ mdv0 ∗
+        ⌜ and_vec MIE_S (not_vec mdv0) = zeros' 64 ⌝) ∗
      (∃ menvcfg0 : mword 64,
         menvcfg ↦ᵣ menvcfg0 ∗
         ⌜ eq_vec (_get_MEnvcfg_PBMTE menvcfg0) ('b"0") = true ⌝ ∗

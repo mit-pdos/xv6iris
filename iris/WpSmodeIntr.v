@@ -315,11 +315,14 @@ Section WpSmodeIntr.
       iDestruct (ghost_var_agree with "Hhalf Hq0") as %Hb0.
       assert (HSIE : eq_vec (_get_Mstatus_SIE ms) ('b"1") = false)
         by (rewrite Hb0; vm_compute; reflexivity).
-      iDestruct "Hmiex" as (mie_v mdv0) "(Hmie & Hmdl & %Hmm)".
+      (* [mie] is PINNED at [MIE_S] by [sconf] -- only [mideleg] is bound,
+         and [Hmm] arrives already at the literal cause set, so the leaf
+         below is instantiated at [MIE_S] with nothing to rewrite. *)
+      iDestruct "Hmiex" as (mdv0) "(Hmie & Hmdl & %Hmm)".
       iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval0)".
       iDestruct "Hpc" as "[Hpcr Hnpc]".
       iApply (wp_instr_s_config_regime strans_regime pc is_rvc i
-                ms mie_v mdv0 menvcfg0 (dq := DfracOwn 1)
+                ms MIE_S mdv0 menvcfg0 (dq := DfracOwn 1)
                 HSIE HMPRV HSXL Hmm HPBMTE Hmenvval0
                 with "Hhw Hminv Hhs Hpriv Hms Hmie Hmdl Hmenv Htr Hpcr Hinstr").
       iIntros (σ Hpceq) "Hpriv Hms Hmie Hmdl Hmenv Htr Hsi".
@@ -332,7 +335,7 @@ Section WpSmodeIntr.
         iSplitL "Hms Hhalf Hspp".
         { iExists ms. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
         iSplitL "Hmie Hmdl".
-        { iExists mie_v, mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
+        { iExists mdv0. iFrame "Hmie Hmdl". iPureIntro. exact Hmm. }
         iExists menvcfg0. iFrame "Hmenv". iPureIntro.
         repeat split; assumption. }
       { iFrame "Hstk". iFrame "Htr". iExact "Hq0". }

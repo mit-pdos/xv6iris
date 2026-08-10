@@ -204,6 +204,113 @@ Proof.
 Qed.
 
 (* ===================================================================== *)
+(* §2b WHICH CAUSE CAN BE DELIVERED: the dispatch is CONFINED by [mie].    *)
+(*                                                                        *)
+(* [IntrDefs.sconf] pins [mie] at [MIE_S] = 0x220 (bits 5 and 9), because  *)
+(* xv6's [start] writes [sie] exactly once and never writes [mie] at all,  *)
+(* and [mie] is 0 at reset.  [s_pending] is MASKED by [mie], so at that    *)
+(* value no bit outside {5, 9} can ever be pending -- whatever [mip] holds *)
+(* (it lives in [clock_inv] and may be rewritten by a tick at every step,  *)
+(* so nothing can be pinned about it) and whatever [mideleg] holds.        *)
+(* [findPendingInterrupt] therefore can only answer S-timer or S-external, *)
+(* which is exactly the pair [devintr] recognises -- and THAT is what      *)
+(* keeps kerneltrap's [printk] arm dead, hence printk-general out of the   *)
+(* handler's cone.  See claude-notes/projects/kerneltrap.md.               *)
+(*                                                                        *)
+(* The confinement is proved bit by bit, and THE BIT LEMMA CANNOT BE       *)
+(* GENERIC IN THE BIT INDEX: [subrange_vec_dec v k k : mword (k - k + 1)]  *)
+(* is convertible to [mword 1] only when [k] is a LITERAL, so a [forall k] *)
+(* statement does not even typecheck.  Hence one [Ltac] and five concrete  *)
+(* instances -- one per non-S bit [findPendingInterrupt] tests before it    *)
+(* reaches the two S ones.                                                 *)
+(* ===================================================================== *)
+
+Lemma mie_s_unsigned : bv_unsigned MIE_S = 0x220.
+Proof. vm_compute. reflexivity. Qed.
+
+(* a 1-bit word whose value is 0 is not '1' -- the shape every
+   [findPendingInterrupt] test is in. *)
+Lemma eqvec1_false (x : mword 1) : bv_unsigned x = 0 -> eq_vec x ('b"1") = false.
+Proof.
+  intros H. apply not_true_is_false. rewrite eq_vec_true_iff. intros ->.
+  assert (H1 : bv_unsigned ('b"1" : mword 1) = 1) by (vm_compute; reflexivity).
+  rewrite H1 in H. discriminate.
+Qed.
+
+(* a bit the MIE_S mask does not enable reads as 0, whatever the other two
+   operands are.  [Z.land] is commutative-associative here only up to the
+   [s_pending] spelling, so the mask sits in the middle exactly as
+   [s_pending_unsigned] leaves it. *)
+Lemma bit_zero_of_mask (a b k : Z) :
+  0 <= k -> Z.testbit 0x220 k = false ->
+  Z.land a (Z.land 0x220 b) / 2 ^ k mod 2 = 0.
+Proof.
+  intros Hk Hm.
+  rewrite (z_bit_div (Z.land a (Z.land 0x220 b)) k ltac:(lia)).
+  rewrite !Z.land_spec. rewrite Hm. rewrite andb_false_l. rewrite andb_false_r.
+  reflexivity.
+Qed.
+
+(* the pending set's unsigned value, with the pinned mask made a literal *)
+Lemma s_pending_unsigned (mip_v mdv : mword 64) (meip seip : mword 1) :
+  bv_unsigned (s_pending mip_v meip seip MIE_S mdv)
+  = Z.land (bv_unsigned (s_mip_bits mip_v meip seip)) (Z.land 0x220 (bv_unsigned mdv)).
+Proof.
+  unfold s_pending.
+  rewrite !and_vec64_unsigned. rewrite mie_s_unsigned. reflexivity.
+Qed.
+
+Ltac pend_bit k :=
+  apply eqvec1_false;
+  unfold Mk_Minterrupts, _get_Minterrupts_MEI, _get_Minterrupts_MSI,
+         _get_Minterrupts_MTI, _get_Minterrupts_SSI, _get_Minterrupts_LCOFI;
+  match goal with
+  | |- bv_unsigned (subrange_vec_dec ?v _ _) = 0 =>
+      let H := fresh "Hb" in
+      assert (H : bv_unsigned (subrange_vec_dec v k k : mword 1)
+                  = bv_unsigned v / 2 ^ k mod 2)
+        by (apply (subrange_dec_unsigned v k k (2 ^ k) 2);
+            [lia | lia | reflexivity | reflexivity]);
+      rewrite H
+  end;
+  rewrite s_pending_unsigned;
+  apply bit_zero_of_mask; [lia | vm_compute; reflexivity].
+
+Section PendBits.
+  Context (mip_v mdv : mword 64) (meip seip : mword 1).
+  Let p := s_pending mip_v meip seip MIE_S mdv.
+
+  Lemma pend_MEI : eq_vec (_get_Minterrupts_MEI (Mk_Minterrupts p)) ('b"1") = false.
+  Proof. unfold p. pend_bit 11. Qed.
+  Lemma pend_MSI : eq_vec (_get_Minterrupts_MSI (Mk_Minterrupts p)) ('b"1") = false.
+  Proof. unfold p. pend_bit 3. Qed.
+  Lemma pend_MTI : eq_vec (_get_Minterrupts_MTI (Mk_Minterrupts p)) ('b"1") = false.
+  Proof. unfold p. pend_bit 7. Qed.
+  Lemma pend_SSI : eq_vec (_get_Minterrupts_SSI (Mk_Minterrupts p)) ('b"1") = false.
+  Proof. unfold p. pend_bit 1. Qed.
+  Lemma pend_LCOFI : eq_vec (_get_Minterrupts_LCOFI (Mk_Minterrupts p)) ('b"1") = false.
+  Proof. unfold p. pend_bit 13. Qed.
+End PendBits.
+
+(* THE CONFINEMENT.  Note the constructor names carry the [I_] prefix. *)
+Lemma s_dispatch_MIE_S (mip_v mdv ms : mword 64) (meip seip : mword 1)
+    (i : InterruptType) (pr : Privilege) :
+  s_dispatch mip_v meip seip MIE_S mdv ms = Some (i, pr) ->
+  i = I_S_Timer \/ i = I_S_External.
+Proof.
+  unfold s_dispatch.
+  destruct (andb _ _); [| discriminate].
+  unfold findPendingInterrupt. cbv zeta.
+  rewrite pend_MEI. rewrite pend_MSI. rewrite pend_MTI.
+  destruct (eq_vec (_get_Minterrupts_SEI _) ('b"1")).
+  - cbn match. intros H. right. congruence.
+  - rewrite pend_SSI.
+    destruct (eq_vec (_get_Minterrupts_STI _) ('b"1")).
+    + cbn match. intros H. left. congruence.
+    + rewrite pend_LCOFI. cbn match. discriminate.
+Qed.
+
+(* ===================================================================== *)
 (* §3 The S-mode interrupt trap reduction.                                *)
 (* ===================================================================== *)
 

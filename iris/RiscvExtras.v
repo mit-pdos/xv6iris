@@ -1400,6 +1400,122 @@ Proof.
   change (44 + 20) with 64. exact Hr.
 Qed.
 
+(* ====================================================================== *)
+(* THE TOP-BIT / BOTTOM-FIELD TOWER, and the Z-level bit toolkit it needs. *)
+(*                                                                         *)
+(* The S-mode trap writes scause as TWO nested [update_subrange_vec_dec]s   *)
+(* -- bit 63 gets the interrupt flag, then bits 62..0 get the zero-extended *)
+(* cause code -- and the pair is exactly a CONCATENATION of the two fields, *)
+(* which is what makes the resulting word a computable literal (a plain     *)
+(* [vm_compute] on the tower cannot get anywhere: the OLD scause value is   *)
+(* symbolic, and the fact that it is entirely overwritten is the content).  *)
+(* [scause_tower] is that collapse; it is stated at the generic 64 = 1 + 63 *)
+(* split and mentions nothing about interrupts, so it lives here beside     *)
+(* [usvd_zeros64] / [usvd_get_bottom_44] rather than in the interrupt tier. *)
+(*                                                                         *)
+(* NONE of this can be handed to a bitvector automation: [bitblast] does    *)
+(* not exist in stdpp 1.12, and [bv_solve] ends in [lia], which cannot see  *)
+(* through [Z.lor] / [Z.shiftl].  Hence the hand-driven Z layer below.      *)
+(* ====================================================================== *)
+
+(* bit [k] of [x], read as the [k]-th binary digit.  The bridge from the
+   [/ 2^k mod 2] shape [subrange_dec_unsigned] produces to [Z.testbit],
+   where [Z.land_spec] is available. *)
+Lemma z_bit_div (x k : Z) : 0 <= k -> x / 2 ^ k mod 2 = Z.b2z (Z.testbit x k).
+Proof.
+  intros Hk.
+  rewrite <- (Z.shiftr_div_pow2 x k Hk).
+  rewrite Zmod_odd.
+  rewrite <- Z.bit0_odd.
+  rewrite (Z.shiftr_spec x k 0 ltac:(lia)).
+  rewrite Z.add_0_l.
+  destruct (Z.testbit x k); reflexivity.
+Qed.
+
+Lemma bv_wrap_width0 (z : Z) : bv_wrap 0 z = 0.
+Proof. unfold bv_wrap, bv_modulus. change (2 ^ Z.of_N 0) with 1. apply Z.mod_1_r. Qed.
+
+(* the top bit of the concatenation [b :: r] is [b] *)
+Lemma z_top_bit_of_lor (bu r : Z) :
+  0 <= bu < 2 -> 0 <= r < 2 ^ 63 ->
+  bv_wrap 1 (Z.shiftr (Z.lor (Z.shiftl bu 63) r) 63) = bu.
+Proof.
+  intros Hb Hr.
+  rewrite Z.shiftr_lor.
+  rewrite (Z.shiftl_mul_pow2 bu 63 ltac:(lia)).
+  rewrite (Z.shiftr_div_pow2 (bu * 2 ^ 63) 63 ltac:(lia)).
+  rewrite (Z.div_mul bu (2 ^ 63) ltac:(apply Z.pow_nonzero; lia)).
+  rewrite (Z.shiftr_div_pow2 r 63 ltac:(lia)).
+  rewrite (Z.div_small r (2 ^ 63) ltac:(lia)).
+  rewrite Z.lor_0_r.
+  apply bv_wrap_small. unfold bv_modulus. change (2 ^ Z.of_N 1) with 2. lia.
+Qed.
+
+Lemma bv_wrap_63_range (z : Z) : 0 <= bv_wrap 63 z < 2 ^ 63.
+Proof.
+  pose proof (bv_wrap_in_range 63 z) as H.
+  unfold bv_modulus in H. change (Z.of_N 63) with 63 in H. exact H.
+Qed.
+
+(* WRITING BIT 63 AND THEN BITS 62..0 IS A CONCATENATION -- whatever the old
+   word was.  Three things in this script are not guessable and each cost a
+   compile round:
+     - [erewrite !bv_concat_unsigned] must be run TWICE, with
+       [rewrite !bv_extract_unsigned] in between: the latter CREATES fresh
+       [bv_unsigned (bv_concat ...)] subterms, so one [!] pass leaves the
+       inner concat unrewritten and the symptom looks like a broken [rewrite !].
+     - [Z.shiftr_0_r] ALSO rewrites [Z.shiftl x 0]: [Z.shiftr a n] is
+       transparently [Z.shiftl a (-n)], so keyed matching hits [shiftl] and
+       silently eats the wrong subterm.  Hence the explicitly instantiated
+       [Z.shiftl_0_r] / [Z.shiftr_0_r] pair.
+     - the finishing rewrite is written WITH HOLES on purpose, so its pattern
+       matches whichever [bv_wrap 63 ?z] shape survives normalisation; a fully
+       instantiated version is brittle.  And width normalisation needs three
+       [change] layers: [MachineWord.Z_idx <lit>] -> [N] literal, then
+       [N]-arithmetic, then [Z.of_N <lit>] -> [Z] literal. *)
+Lemma scause_tower (v : mword 64) (b : mword 1) (w : mword 63) :
+  update_subrange_vec_dec (update_subrange_vec_dec v (64 - 1) (64 - 1) b) (64 - 2) 0 w
+  = concat_vec b w.
+Proof.
+  pose proof (bv_unsigned_in_range _ b) as Hb.
+  pose proof (bv_unsigned_in_range _ w) as Hw.
+  pose proof (bv_unsigned_in_range _ v) as Hv.
+  unfold bv_modulus in Hb, Hw, Hv.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 1)) with 2 in Hb.
+  change (2 ^ Z.of_N (MachineWord.Z_idx 63)) with (2 ^ 63) in Hw.
+  apply bv_eq.
+  unfold update_subrange_vec_dec, concat_vec.
+  rewrite ?autocast_id.
+  unfold to_word_idx, Values.to_word.
+  rewrite ?MachineWord.MachineWord.cast_idx_refl.
+  unfold get_word, MachineWord.MachineWord.update_slice,
+         MachineWord.MachineWord.slice, MachineWord.MachineWord.concat.
+  erewrite !bv_concat_unsigned by (cbn; lia).
+  rewrite !bv_extract_unsigned.
+  erewrite !bv_concat_unsigned by (cbn; lia).
+  rewrite !bv_extract_unsigned.
+  change (MachineWord.Z_idx 64) with 64%N.
+  change (MachineWord.Z_idx 63) with 63%N.
+  change (MachineWord.Z_idx 1) with 1%N.
+  change (MachineWord.Z_idx 0) with 0%N.
+  change (MachineWord.Z_idx (64 - 1)) with 63%N.
+  change (MachineWord.Z_idx (64 - 1 - (64 - 1 - 1))) with 1%N.
+  change (MachineWord.Z_idx (64 - 2 - (0 - 1))) with 63%N.
+  change (0 + 63)%N with 63%N.
+  change (64 - 63 - 0)%N with 1%N.
+  change (63 + 1)%N with 64%N.
+  change (64 - 1 - 63)%N with 0%N.
+  change (1 + 63)%N with 64%N.
+  change (Z.of_N 0) with 0.
+  change (Z.of_N 63) with 63.
+  change (Z.of_N 64) with 64.
+  rewrite !bv_wrap_width0.
+  rewrite Z.shiftl_0_l. rewrite Z.lor_0_l. rewrite Z.lor_0_r.
+  rewrite ?(Z.shiftl_0_r (bv_unsigned w)). rewrite ?(Z.shiftr_0_r (bv_unsigned v)).
+  rewrite (z_top_bit_of_lor (bv_unsigned b) _ Hb (bv_wrap_63_range _)).
+  reflexivity.
+Qed.
+
 (* [zero_extend'] and a full-range [subrange_vec_dec] at width 44 -- the two
    wrappers [legalize_satp]'s PPN mask puts around the field before writing it
    back, both identities at this platform's [physaddr_bits]. *)

@@ -224,6 +224,21 @@ Qed.
 Definition MISA_C : mword 64 := mword_of_int 0x800000000014112D.
 Definition MENVCFG_S : mword 64 := mword_of_int 0xA000000000000000.
 
+(* THE INTERRUPT-ENABLE MASK THIS KERNEL RUNS AT, from [start] onward and
+   forever: [start] writes [sie] exactly once (`w_sie(r_sie() | SIE_SEIE |
+   SIE_STIE)`, bits 9 and 5), never writes [mie] at all, and [mie] is 0 at
+   reset.  It sits beside [MENVCFG_S] for exactly the same reason: both are
+   boot-established constants that the M-mode boot proof PRODUCES
+   ([WpStartNew.st_boot_csr_facts]) and the S-mode config bundle
+   ([IntrDefs.sconf]) then PINS, so the constant has to be nameable from
+   both sides of the M->S bridge.
+
+   What pinning it buys: the S-mode dispatch set is masked by [mie], so at
+   this value only S-timer (5) and S-external (9) can ever be delivered --
+   which is exactly the pair [devintr] recognises, and hence what keeps
+   kerneltrap's [printk] arm dead.  See claude-notes/projects/kerneltrap.md. *)
+Definition MIE_S : mword 64 := mword_of_int 0x220.
+
 (* [cfg_ok s]: the config precondition the fast concrete-state decode bridge
    (WpDecodeBridge) needs -- either a Machine state with mseccfg = 0, or a
    Supervisor state with menvcfg = MENVCFG_S (the constant post-boot value).
