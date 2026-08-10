@@ -132,7 +132,6 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import DinodeEnc.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.

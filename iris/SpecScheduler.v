@@ -43,7 +43,6 @@ Require Import SpecPanic.
 Require Import FdSlots.
 Require Export SwtchCtx.
 Require Import CpuOwn.
-Require Import ProcGeom.
 Require Import SchedCtx.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Import Defs.

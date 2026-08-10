@@ -49,7 +49,6 @@ Require Import WpNext.
 Require Import WpLock.
 Require Import FdSlots.
 Require Import ProcGeom CpuOwn.
-Require Import SchedCtx.
 Require Import DiskPtsto WpUart.
 Require Import SpecDevintr.
 From Kernel Require KernelSyms.

@@ -62,7 +62,6 @@ Require Import IcacheEscrow.
 Require Import KptGhost.
 Require Import MinstretInv.
 Require Import RiscvFetchExec.
-Require Import SpecPanic.
 Require Import CodeIunlock.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecIunlock.

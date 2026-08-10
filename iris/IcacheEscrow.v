@@ -102,8 +102,6 @@ Require Import WpLock.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import DinodeEnc.
-Require Import LogInv.
-Require Import FsCrash.
 Require Import InodeInv.
 Require Import InodeLock.
 Require Import InodeRegion.

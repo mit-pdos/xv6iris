@@ -26,20 +26,19 @@ Require Import RiscvLang RiscvPtsto.
 Require Import RiscvModelBytes.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import RegFile HartTp WpNext WpGpr.
+Require Import RegFile HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
-Require Import IntrDefs WpSmodeIntr.
+Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn.
 Require Import WpLock.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfVc WpSconfBtype.
-Require Import WpSmodeHalf.
-Require Import ByteCursor ByteBuf.
+Require Import ByteBuf.
 Require Import SpecPanic.
 Require Import FdSlots.
 Require Import ProcGeom.
@@ -49,7 +48,7 @@ Require Import WpUart.
 Require Import BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import BitmapEnc BitmapInv.
+Require Import BitmapInv.
 Require Import BlockWords.
 Require Import DinodeEnc.
 Require Import InodeInv.
