@@ -29,6 +29,7 @@ Require Import WeakWord8.
 Require Import WeakEffSkel WeakPmpEff WeakTickEff WeakLeafEffCommon.
 Require Import WeakFetchEff WeakFetchRvc WeakFetch2.
 Require Import WeakFunnel WeakFunnelCfg WpDecodeBridge.
+Require Import WeakLeafM.
 Require Import RiscvLang RiscvPtsto RiscvExec RiscvTryStep RiscvFetchExec RiscvExtras.
 Require Import MinstretInv InstrBytes.
 Require Import RegFile WpGpr WpMmodeLeafBase.
@@ -794,3 +795,42 @@ Proof.
     + apply bool_decide_eq_true in E2. subst j. rewrite rf_lookup in H2. exact (eq_sym H2).
     + reflexivity.
 Qed.
+
+(* ====================================================================== *)
+(** ** 5. THE PER-INSTRUCTION TOKENS ([WeakLeafM.winstr_m]) -- this file's
+    [CodeStart.sti_*] analogue.  One lemma per instruction, assembled from
+    the facts §1-§2 already prove; a caller then spends ONE [iPoseProof] and
+    never mentions a decode fact again. *)
+
+Section WkStartTokens.
+  Context `{!riscvGS Σ, !weakGS Σ}.
+  Context `{GEN : GenId} `{CID : CpuId}.
+
+  (* c.lui a4, 0xffffe   (start + 0xc) *)
+  Lemma wsti_35 (kbs : gmap Arch.pa (bv 8)) :
+    wkb_covers kbs ->
+    wkernel_text kbs -∗
+    winstr_m st_pc35 true (UTYPE (sign_extend' 20 si35, Regidx ti_a4, LUI)).
+  Proof.
+    intros Hcov. iIntros "Ht".
+    iApply (winstr_m_of_text kbs st_pc35 (F_RVC sth_35) stw_35
+              (UTYPE (sign_extend' 20 si35, Regidx ti_a4, LUI))
+              ltac:(vm_compute; reflexivity)
+              ltac:(apply acc_wf_of_leb; vm_compute; reflexivity)
+              ltac:(ram_win)
+              ltac:(split; [apply bv_eq; vm_compute; reflexivity
+                           | vm_compute; reflexivity])
+              ltac:(vm_compute; reflexivity)
+              (fun t _ HC _ _ _ => ex_intro _ (C_LUI (si35, Regidx ti_a4))
+                 (conj (kd_7779 t HC)
+                       (conj stlpad_35 (exec_execute_C_LUI si35 (Regidx ti_a4)))))
+              (conj stgood_35
+                 (ex_intro _ (C_LUI (si35, Regidx ti_a4))
+                    (conj stdec_35 (conj stlpad_35
+                       (conj stgoodexp_35
+                             (exec_execute_C_LUI si35 (Regidx ti_a4)))))))
+              with "Ht").
+    iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0xc) stw_35 Hcov stkb_35).
+  Qed.
+
+End WkStartTokens.

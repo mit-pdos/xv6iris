@@ -929,6 +929,7 @@ WeakLeafJump.v
 WeakLeafCsrrM.v
 WkStackOwn.v
 WkGprAcc.v
+WeakLeafM.v
 WkTimerinit.v
 WkStartAux.v
 WkStartNew.v

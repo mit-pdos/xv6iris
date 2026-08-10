@@ -74,7 +74,7 @@ Require Import WpGprCsrrCommon WpGprCsrwCommon.
 Require Import WpGprCsrrA WpGprCsrrB WpGprCsrwA WpGprCsrwB WpGprCsrwC.
 Require Import WpGprMretWp.
 Require Import StackOwn WpTimerinit.
-Require Import WkStackOwn WkGprAcc WkTimerinit.
+Require Import WkStackOwn WkGprAcc WkTimerinit WeakLeafM.
 Require Import WeakLeafSdspOff WeakLeafTor.
 Require Import WeakLeafItype WeakLeafUtypeShift WeakLeafRtypeW WeakLeafJump.
 Require Import WeakLeafCsrrM WeakLeafCsrw WeakLeafCsrw2 WeakLeafCsrw3.
@@ -504,26 +504,13 @@ Section WkStartThm.
     assert (P34 : add_vec_int st_pc34 4 = st_pc35) by (vm_compute; reflexivity).
     iEval (rewrite P34) in "Hpc". iEval (rewrite P34) in "Hnpc".
 
-    (* ---- 35. c.lui a4, 0xffffe ---- *)
-    assert (Hal2_35 : is_aligned_vaddr (Virtaddr st_pc35) 2 = true) by (vm_compute; reflexivity).
-    assert (Hal4_35 : is_aligned_vaddr (Virtaddr st_pc35) 4 = true) by (vm_compute; reflexivity).
-    assert (Hacc_35 : acc_wf st_pc35 4) by (apply acc_wf_of_leb; vm_compute; reflexivity).
-    assert (Hram_35 : forall j : nat, (j < 4)%nat -> addr_is_ram (pa_add st_pc35 j)) by ram_win.
-    assert (Hcond_35 : subrange_vec_dec stw_35 15 0 = sth_35 /\ isRVC sth_35 = true)
-      by (split; [apply bv_eq; vm_compute; reflexivity | vm_compute; reflexivity]).
-    iAssert (winstr_bytes st_pc35 (F_RVC sth_35)) as "#Hbs35".
-    { iApply (winstr_bytes_of_text kbs st_pc35 (F_RVC sth_35) stw_35 Hal2_35 Hacc_35 Hram_35
-                Hcond_35 with "Htext").
-      iPureIntro. exact (wkb_window kbs (KernelSyms.start + 0xc) stw_35 Hcov stkb_35). }
-    iApply (wwp_lui_rvc_leaf true st_pc35 sth_35 ti_a4 (sign_extend' 20 si35)
-              (C_LUI (si35, Regidx ti_a4)) (st_m34 m sp0 ms0) st_pc35
-              pmpcfg0 (1/2)%Qp D_m D_none dstateM ws34
-              Hgid HpmpU Hal2_35 Hal4_35 Hnz_a4
-              (fun t _ HC _ _ _ => ex_intro _ (C_LUI (si35, Regidx ti_a4))
-                 (conj (kd_7779 t HC) (conj stlpad_35 (exec_execute_C_LUI si35 (Regidx ti_a4)))))
-              (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
-              D_m_mi stgood_35 stdec_35 stgoodexp_35 (exec_execute_C_LUI si35 (Regidx ti_a4))
-              with "Hmm HpcfA Hpc Hnpc Hfile Hbs35 Hhws").
+    (* ---- 35. c.lui a4, 0xffffe.  RE-PORTED against the SC-shaped interface
+       ([WeakLeafM.wwp_lui] + the [wsti_35] token): compare the block below
+       with [WpStartNew]'s six lines for the same instruction. ---- *)
+    iPoseProof (wsti_35 kbs Hcov with "Htext") as "#Hi35".
+    iApply (wwp_lui st_pc35 true ti_a4 (sign_extend' 20 si35) (st_m34 m sp0 ms0)
+              pmpcfg0 (1/2)%Qp ws34 Hgid HpmpU Hnz_a4
+              with "Hmm HpcfA [$Hpc $Hnpc] Hfile Hi35 Hhws").
     iIntros (ws35) "%Hwsle35 Hmm HpcfA Hpc Hfile Hhws".
     iDestruct (vwp_hold_mono _ ws34 ws35 Hwsle35 with "Hstk") as "Hstk".
     iEval (change (<[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si35))]>
