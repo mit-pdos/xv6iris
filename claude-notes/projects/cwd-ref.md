@@ -417,17 +417,38 @@ i.e. from exactly what a LAST CLOSER holds. Adding a parked-reference
 disjunct to `off_body` reuses that argument verbatim; no new exclusivity
 principle is needed.
 
-So:
+**THE SHARE'S FRACTION MUST BE PROPORTIONAL, NOT EXISTENTIAL.** An earlier
+draft of this section said `∃ q0, iref_shr_at v q0`, on the grounds that an
+existential fraction is freely splittable AND joinable so
+`file_payload_split` goes through for free. **That is wrong, and the reason
+is `iref_close_last_step`:** it requires the closer to hold `iref_tok k qt`
+— the ENTIRE outstanding slice — and `islot_rest_join` rejoins that with the
+table's leftover `1/2 - qt` to give back a free slot. So every sliver handed
+out has to come back. With an existential fraction a holder may split and
+drop half, and then `qt` over-counts forever and the itable entry can never
+be freed. Not unsound; an unfreeable inode.
+
+So the arm carries the holder's file fraction TIMES a per-slot constant:
 
 ```coq
-FileInv.inode_ref v q := (∃ q0, InodeRef.iref_shr_at v q0)%I
+FileInv.inode_ref v q := InodeRef.iref_shr_at v (q * <the file's inode slice>)
 ```
 
-— the fraction EXISTENTIAL, which is what makes `P ⊣⊢ P ∗ P` hold in both
-directions (split at `q0/2`, join by `iref_shr_at_split`), so
-`file_payload_split` goes through unchanged and `inode_ref_split` becomes a
-two-line proof instead of `left_id`. `off_body` gains a
-parked/withdrawn disjunct carrying `∃ q, iref_at ip q`.
+and `file_payload_split` is then distributivity, `(q1 + q2) * Q = q1*Q +
+q2*Q`, over `iref_shr_at_split`. The constant is per-slot and fixed for the
+file's whole life, so it belongs in `fpnames` — the payload-names record
+that exists for exactly this and is already agreed across holders by
+`fpay_tok`. `off_body` gains a parked/withdrawn disjunct carrying
+`∃ q, iref_at ip q`.
+
+**AND THAT IS WHY THE PROPORTION IS LOAD-BEARING RATHER THAN TIDY.** Under
+`positiveR`, "`ip->ref == 1`" implied "I hold the whole outstanding slice",
+so a closer could conclude it was the last reference in the system. Count-0
+shares break that implication — a lone reference may now sit beside shares —
+and only the converse survives (`q = qt -> n = 1`). A closer must therefore
+GATHER EVERYTHING BACK FIRST and only then learn it is alone, and the
+proportional accounting is what makes the gather add up to exactly what was
+handed out.
 
 **WHAT MAKES THIS CHEAPER THAN IT LOOKS: nothing produces an FD_INODE file
 yet.** `sys_open` / `create` / `namei` are unproven (sysfile.c is 5/16); the
