@@ -363,8 +363,10 @@ Section ProofIdup.
       by (rewrite (callee_saved_lookup Hacqpins_cs (mword_of_int 9) ltac:(vm_compute; reflexivity)); exact HmAs1).
     (* ===== the critical section (literal [false], no hart threading) ===== *)
     iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hslots & Hpool)".
-    iDestruct "Href" as "[Hrtok Hrident]".
-    iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt & _ & _ & _).
+    iDestruct "Href" as "[Hrtok Hrident]".   (* [Hrtok] is a SHARE now *)
+    (* a SHARE is enough to find the slot: it is in [dom M], which is all
+       the [lw]/[sw] pair needs. *)
+    iDestruct (iref_share_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt & _).
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     (* [ci] is live exactly where [M] is (§13.2's first wf clause), so the
        slot's identity values are readable off [ci !! k] -- which is what
@@ -450,21 +452,18 @@ Section ProofIdup.
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
     iApply (wp_sw_au_idup true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) D2 (K - 4)%nat
-              (itable_half (<[k := (qt, S cnt)]> M) ∗
-               iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp)%I
+              (itable_half (<[k := (qt, S cnt)]> M) ∗ iref_tok k q)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(solve_ndisj)
               with "Hcg Hpc Hi1c [Hhalf Hrtok] [-]").
     { rewrite Hpa2 Hstv.
-      iMod (iref_dup_store_au (⊤ ∖ ↑minstretN) M k q qt cnt
+      iMod (iref_upgrade_store_au (⊤ ∖ ↑minstretN) M k q qt cnt
               ltac:(solve_ndisj) HMk Hno with "Hinv Hhalf Hrtok") as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hback" with "Hcell") as "(Hhalf & Ht1 & Ht2)". iModIntro. iFrame. }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc (Hhalf & Ht1 & Ht2)".
-    (* rebuild the lock's resource at the new map *)
-    iDestruct (inode_ident_split k (q/2) (q/2) dev inum) as "[Hsplit _]".
-    iEval (rewrite Qp.div_2) in "Hsplit".
-    iDestruct ("Hsplit" with "Hrident") as "[Hid1 Hid2]".
+      iMod ("Hback" with "Hcell") as "(Hhalf & Ht1)". iModIntro. iFrame. }
+    iApply wp_next_off_intro. iIntros "Hcg Hpc (Hhalf & Ht1)".
+    (* the identity cells ride straight through: the increment moves the
+       COUNT and nothing else, so there is no fraction to re-split. *)
     iDestruct ("Hback" $! (<[k := (qt, S cnt)]> M) ci
                  with "[%] [%] [Hrest Hiu]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
@@ -663,9 +662,8 @@ Section ProofIdup.
     iDestruct (cpu_own_transport CIDr CIDe6 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
-    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Ht1 Hid1] [Ht2 Hid2]").
-    3:{ rewrite /inode_ref. iFrame "Ht2 Hid2". }
-    2:{ rewrite /inode_ref. iFrame "Ht1 Hid1". }
+    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Ht1 Hrident]").
+    2:{ rewrite /inode_ref. iFrame "Ht1 Hrident". }
     (* callee_saved m P5, and a0 = ip *)
     split; [| exact HP5a0].
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

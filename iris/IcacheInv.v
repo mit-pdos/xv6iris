@@ -717,36 +717,47 @@ Section IcacheGhost.
     rewrite own_op. iDestruct "H" as "[$ $]". done.
   Qed.
 
-  (* idup, and iget's cache-hit arm: [ref++].  The new reference's fraction
-     comes out of the CALLER's own -- nothing is conjured, which is why the
-     invariant's leftover share is untouched. *)
-  Lemma iref_dup_step M k q qt (n : nat) :
+  (* idup: [ref++] TURNS A SHARE INTO A REFERENCE, at the same fraction.
+
+     This is the count-0 fragment's whole point read the other way round.
+     The caller arrives holding [q] of the entry's identity with NO count --
+     which is already enough to keep the entry alive, since a positive share
+     blocks [iref_close_last_step]'s [q = qt] -- and leaves holding the same
+     [q] WITH one.  The fraction does not move; only [n] goes up, which is
+     exactly what the [sw] to [ip->ref] does.
+
+     THAT IS WHY IT IS SIMPLER THAN THE OLD SHAPE.  idup used to take a
+     REFERENCE and hand back two half-references, because a share could not
+     be spoken of: the count component had no zero.  Halving was the only
+     way to make two out of one, and it meant a caller's fraction shrank
+     with every [fork].  It does not any more -- kfork's parent sheds a
+     share, gets a reference back for the child, and rejoins.
+
+     Nothing is conjured: the new reference's fraction is the share's own,
+     so the invariant's leftover [1/2 - qt] is untouched and no budget
+     premise is needed.  (Contrast [iref_incr_step], iget's hit arm, which
+     holds nothing of the caller's and must mint from that leftover.) *)
+  Lemma iref_upgrade_step M k q qt (n : nat) :
     M !! k = Some (qt, n) ->
-    own iref_name (● M) -∗ iref_tok k q ==∗
-    own iref_name (● (<[k := (qt, S n)]> M)) ∗
-    iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp.
+    own iref_name (● M) -∗ iref_share k q ==∗
+    own iref_name (● (<[k := (qt, S n)]> M)) ∗ iref_tok k q.
   Proof.
     iIntros (HM) "Ha Hf".
     iMod (own_update_2 _ _ _ (● (<[k := (qt, S n)]> M)
-                              ⋅ ◯ {[k := (q, 2%nat)]}) with "Ha Hf") as "H".
+                              ⋅ ◯ {[k := (q, 1%nat)]}) with "Ha Hf") as "H".
     { apply auth_update.
-      apply (singleton_local_update _ k (qt, n) (q, 1%nat)
-                                      (qt, S n) (q, 2%nat) HM).
+      apply (singleton_local_update _ k (qt, n) (q, 0%nat)
+                                      (qt, S n) (q, 1%nat) HM).
       apply local_update_discrete. intros mz Hv Hz.
       destruct Hv as [Hvq Hvn]. split; [by split|].
       destruct mz as [[qf nf]|]; destruct Hz as [Hq Hn]; simpl in Hq, Hn.
       - split; simpl; [exact Hq|].
-        assert (Hn' : n = (1 + nf)%nat) by exact Hn.
-        assert (Hg : S n = (2 + nf)%nat) by lia.
+        assert (Hn' : n = (0 + nf)%nat) by exact Hn.
+        assert (Hg : S n = (1 + nf)%nat) by lia.
         rewrite ic_nat_op_add. exact Hg.
-      - split; simpl; [exact Hq|]. by rewrite Hn. }
-    rewrite own_op. iDestruct "H" as "[$ Hfrag]".
-    rewrite /iref_tok /iref_frag.
-    assert (Hsp : ({[k := (q, 2%nat)]} : gmap nat (Qp * nat))
-                  = {[k := ((q/2)%Qp, 1%nat)]} ⋅ {[k := ((q/2)%Qp, 1%nat)]}).
-    { rewrite singleton_op. f_equal. rewrite -pair_op.
-      by rewrite frac_op Qp.div_2. }
-    rewrite Hsp auth_frag_op own_op. iDestruct "Hfrag" as "[$ $]". done.
+      - split; simpl; [exact Hq|].
+        assert (Hn' : n = 0%nat) by exact Hn. by rewrite Hn'. }
+    rewrite own_op. iDestruct "H" as "[$ $]". done.
   Qed.
 
   (* iput, [--ref > 0]: the departing reference's fraction has to go
@@ -979,17 +990,16 @@ Section IcacheRefInv.
      word changes.  [Hno] -- that the incremented count is still an [int] --
      is what re-establishes [icM_wf]; it is NOT provable here and comes from
      the caller's [IrefSlots.iref_slots_no_overflow]. *)
-  Lemma iref_dup_store_au (Eo : coPset) (M : gmap nat (Qp * nat)) (k : nat) (q qt : Qp) (n : nat) :
+  Lemma iref_upgrade_store_au (Eo : coPset) (M : gmap nat (Qp * nat)) (k : nat) (q qt : Qp) (n : nat) :
     ↑icacheN ⊆ Eo ->
     M !! k = Some (qt, n) ->
     (Z.of_nat (S n) < 2 ^ 31)%Z ->
-    itable_inv -∗ itable_half M -∗ iref_tok k q -∗
+    itable_inv -∗ itable_half M -∗ iref_share k q -∗
     |={Eo, Eo ∖ ↑icacheN}=>
       i_ref (ientry k) ↦₄ iref_word M k ∗
       (i_ref (ientry k) ↦₄ (mword_of_int (Z.of_nat (S n)) : mword 32)
          ={Eo ∖ ↑icacheN, Eo}=∗
-         itable_half (<[k := (qt, S n)]> M) ∗
-         iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp).
+         itable_half (<[k := (qt, S n)]> M) ∗ iref_tok k q).
   Proof.
     iIntros (HE HMk Hno) "#Hinv Hhalf Htok".
     iMod (inv_acc Eo icacheN with "Hinv") as "[Hbody Hclose]"; [exact HE|].
@@ -999,7 +1009,7 @@ Section IcacheRefInv.
     iDestruct (iref_cells_acc_upd M k Hk with "Hcells") as "[Hcell Hback]".
     iModIntro. iFrame "Hcell". iIntros "Hcell".
     iDestruct (itable_half_join with "Ha Hhalf") as "Hauth".
-    iMod (iref_dup_step M k q qt n HMk with "Hauth Htok") as "(Hauth & Ht1 & Ht2)".
+    iMod (iref_upgrade_step M k q qt n HMk with "Hauth Htok") as "(Hauth & Ht1)".
     iDestruct (itable_half_split with "Hauth") as "[Ha Hhalf]".
     iMod ("Hclose" with "[Ha Hcell Hback]") as "_".
     { iNext. iExists (<[k := (qt, S n)]> M). iFrame "Ha".
@@ -1112,12 +1122,32 @@ Section IcacheTable.
     iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
   Qed.
 
+  (* [inode_shr] UPGRADES to [inode_ref] at the same fraction -- the
+     points-to twin of [iref_upgrade_step].  The identity cells ride
+     straight through; only the ghost fragment's count moves. *)
+
   Lemma inode_ref_split_shr k q1 q2 dev inum :
     inode_ref k (q1 + q2) dev inum ⊣⊢
     inode_ref k q1 dev inum ∗ inode_shr k q2 dev inum.
   Proof.
     rewrite /inode_ref /inode_shr iref_tok_split_share inode_ident_split.
     iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
+  Qed.
+
+  (* SHEDDING A SHARE from a reference, in the form a caller uses it: the
+     count stays, half the identity slice leaves.  A [Lemma] rather than
+     [rewrite -(Qp.div_2 q) inode_ref_split_shr] at the call site, because
+     that rewrite fires inside the proofmode's goal and leaves the split's
+     evar out of [q]'s scope -- durable-notes' inline-rewrite trap. *)
+  Lemma inode_ref_shed k q dev inum :
+    inode_ref k q dev inum -∗
+    inode_ref k (q/2)%Qp dev inum ∗ inode_shr k (q/2)%Qp dev inum.
+  Proof.
+    iIntros "H".
+    iDestruct (bi.equiv_entails_1_1 _ _
+                 (inode_ref_split_shr k (q/2) (q/2) dev inum) with "[H]")
+      as "[$ $]".
+    { rewrite Qp.div_2. iExact "H". }
   Qed.
 
   (* ---- THE IDENTITY BUDGET (design §13.1b, as corrected by §13.1e) ----

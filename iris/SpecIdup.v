@@ -44,6 +44,24 @@
    proof.  See [IcacheInv.v]'s header for why the words cannot live in the
    lock (ilock and iunlock read them holding nothing).
 
+   ---- IT TAKES A SHARE AND HANDS BACK A REFERENCE ----------------------
+
+   [ip->ref++] does not need a reference to start from.  It needs a claim
+   that the entry cannot be freed underneath it, and a count-0 SHARE is
+   already that: a positive share blocks [IcacheInv.iref_close_last_step]'s
+   [q = qt], so the entry stays.  What the increment then does is turn that
+   claim into a reference of its own, at the SAME fraction -- which is
+   exactly the [n -> n+1] the [sw] performs and nothing else.
+
+   THE OLD SHAPE WAS AN ARTEFACT OF THE ALGEBRA.  This contract used to take
+   a REFERENCE and hand back TWO HALF-references, because a share could not
+   be spoken of at all: the count component was [positiveR], which has no
+   zero, so halving was the only way to make two things out of one.  It cost
+   the caller a factor of two on every call -- kfork's parent halved its cwd
+   fraction on every [fork].  It does not any more: the parent sheds a share
+   ([IcacheInv.inode_ref_split_shr]), hands it over, and gets a reference
+   back for the child.
+
    [iref_slot] is what makes the increment SAFE, and it is not bookkeeping.
    [ip->ref++] is unconditional, so it cannot re-establish "the count is
    still an int" on its own -- the missing step is false at 2^31 - 1 and no
@@ -111,7 +129,8 @@ Definition wp_idup_sconf_body
   panic_wp_any -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
-  inode_ref k q dev inum -∗
+  (* A SHARE, not a reference -- see the header. *)
+  inode_shr k q dev inum -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
@@ -119,8 +138,8 @@ Definition wp_idup_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-    inode_ref k (q/2)%Qp dev inum -∗
-    inode_ref k (q/2)%Qp dev inum -∗
+    (* ... and ONE reference back, at the share's own fraction *)
+    inode_ref k q dev inum -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

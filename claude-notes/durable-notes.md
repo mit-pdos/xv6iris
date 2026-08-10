@@ -108,6 +108,35 @@ change that produced it.
 - **A slow `Qed` is usually proof-term SIZE, not conversion — and `rocq compile -profile <f>.json` is what tells you which.** It breaks each `Qed` into `HConstr.of_constr` / `Typeops.execute` / `close_proof` / `sort_and_universes_of_constr`; measured across this tree only ~25 % is `Typeops` (real typechecking) and the rest is term-size-linear plumbing that re-walks every *occurrence* of a shared subterm. The one-command tell is **`Set Debug "hconstr".`**, which prints each `Qed`'s `tree size` and `bindings` (the DAG): a high **tree/bindings ratio** means a small proof with an exponentially unfolded term. To localise it inside a lemma, bisect with an `Axiom cheat_ : forall (A : Type), A.` stub (unlike `Admitted` this still runs `Qed`). See `optimization.md` for the whole method and for the `unfold set_reg` 3^N trap it found.
 - **`coqc` offloads `Qed` kernel-checking to an async `rocqworker` subprocess, and `coqc -time` does NOT count that worker's time.** So `-time`'s per-sentence sum can be tiny (e.g. 14 s) while the real `/usr/bin/time` wall is minutes — the gap is the async `Qed`, NOT machine contention. A pathological `Qed` (e.g. a whole-function proof term over a transparent, eagerly-reducible register-map tower) hides this way. To see it: `/usr/bin/time -v coqc …` (wall + RSS), not `-time`. Also: a killed/`pkill`-ed `coqc` can leave orphan/zombie `rocqworker`s (`ps -eo pid,ppid,stat,comm | grep rocqworker`; `Z`/defunct = harmless, a live orphan holds a worker slot and can stall the next build) — reap them before re-measuring, and prefer `pkill -x rocqworker`/kill-by-PID over `pkill -f coqc`.
 
+## `rewrite -(Qp.div_2 q)` INSIDE THE PROOFMODE PUTS THE SPLIT'S EVAR OUT OF SCOPE
+
+The idiom for "split a fractional resource in half" is to rewrite `q` into
+`q/2 + q/2` and then apply the split equivalence. Written at a CALL SITE
+inside an Iris proof — `iEval (rewrite -(Qp.div_2 q) foo_split) in "H"`, or
+`rewrite foo_split` on the goal — it fails with
+
+    Unable to unify "?b@{q:=(q / 2 + q / 2)%Qp}" with "<the split's RHS>"
+    (cannot instantiate "?b" because "q" is not in its scope)
+
+because the rewrite abstracts over `q` before the split's own evar is
+solved. Bit twice in one session (`ProofKexit`, `ProofKforkB4`). The fix is
+never to write it inline: state the halving as its OWN lemma, where the goal
+is closed and the rewrite is the last step —
+
+```coq
+Lemma foo_shed x q : foo x q -∗ foo x (q/2) ∗ bar x (q/2).
+Proof.
+  iIntros "H".
+  iDestruct (bi.equiv_entails_1_1 _ _ (foo_split x (q/2) (q/2)) with "[H]")
+    as "[$ $]".
+  { rewrite Qp.div_2. iExact "H". }
+Qed.
+```
+
+— and call THAT. `InodeRef.iref_at_shr` and `IcacheInv.inode_ref_shed` are
+the two instances. Same family as the inline-`ltac:` trap: a hole whose
+expected type is still an evar at splice time.
+
 ## Typeclass sweeps: the three traps that do not look like typeclass problems
 
 Adding a class constraint to a bottom-of-the-tree predicate (e.g. giving

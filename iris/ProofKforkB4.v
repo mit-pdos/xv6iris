@@ -281,6 +281,11 @@ Section KforkB4Proof.
        than premised on the caller. *)
     iDestruct (proc_priv_cwd γf pme pid_p Vp with "Hparent") as "(Hpcwd & Hpcref & Hpback)".
     iDestruct "Hpcref" as (cq ck cdev cinum) "[[%Hcwd %Hcklt] Hiref]".
+    (* THE PARENT SHEDS A SHARE AND KEEPS ITS REFERENCE.  idup takes a share
+       and hands back a reference at the same fraction, so the parent's own
+       reference survives the call at [cq/2] and the child's arrives at
+       [cq/2] -- one halving, and only because the two have to add up. *)
+    iDestruct (inode_ref_shed with "Hiref") as "[Hpkeep Hiref]".
     assert (Hpa0a4 : add_vec (rget m Rs5) (sign_extend' 64 (mword_of_int 336 : mword 12))
                      = p_cwd pme).
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
@@ -291,9 +296,13 @@ Section KforkB4Proof.
               with "Hcg Hpc Hi0a4 Hpcwd [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcwd".
     iEval (rewrite Hpa0a4) in "Hpcwd".
-    (* the parent's block cannot close yet: its reference is on its way
-       into idup.  It closes at [Hparent2] below, around idup's FIRST half
-       -- the cell never changed, only the fraction, which [cwd_ref] hides. *)
+    (* the parent's block closes as soon as the cell comes back: the
+       reference it keeps never left, only the SHARE did. *)
+    iAssert (cwd_ref (pv_cwd Vp)) with "[Hpkeep]" as "Hpcref1".
+    { rewrite Hcwd. iExists (cq/2)%Qp, ck, cdev, cinum.
+      iFrame "Hpkeep". iPureIntro. done. }
+    iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
+    iEval (rewrite upd_cwd_id) in "Hparent2".
     set (M0 := <[Regidx Ra0 := regval_into_reg (pv_cwd Vp)]> m).
     change (<[Regidx Ra0 := regval_into_reg (pv_cwd Vp)]> m) with M0.
     assert (HM0a0 : M0 !!! Regidx Ra0 = ientry ck) by (rewrite /M0 upd_eq; exact Hcwd).
@@ -332,16 +341,11 @@ Section KforkB4Proof.
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
     iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart nib
-              ck cq cdev cinum M1 lvl eb pme C (K - 8)%nat false
+              ck (cq/2)%Qp cdev cinum M1 lvl eb pme C (K - 8)%nat false
               (kfk_b4_stack_idup K HK) Hlvl HM1a0
               with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hiref [-]").
     iApply wp_next_off_intro.
-    iIntros (mr) "Hcg Hown Hpc %Hidup_post Href1 Href2".
-    iDestruct (kfk_child_cwd ck (cq/2)%Qp cdev cinum Hcklt
-                 with "Href1") as "Hpcref1".
-    iEval (rewrite -Hcwd) in "Hpcref1".
-    iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
-    iEval (rewrite upd_cwd_id) in "Hparent2".
+    iIntros (mr) "Hcg Hown Hpc %Hidup_post Href2".
     destruct Hidup_post as [Hcs_idup Hidup_a0].
     assert (Hpc0ac : ret_pc (M1 !!! Regidx Rra) = mword_of_int (KF + 0xac)).
     { rewrite HM1ra. apply bv_eq; vm_compute; reflexivity. }
