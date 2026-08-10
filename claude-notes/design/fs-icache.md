@@ -1657,3 +1657,121 @@ only the ref word and `M`), so its repair is re-framing, not re-proving.
 two guard lemmas survive unchanged. The escrow file is ADDITIVE
 (`IcacheEscrow.v`), so the tree stays green until the SpecIlock flip.
 
+
+---
+
+## 14. T5's GATE: the whole-outstanding-share witness (DESIGN IN
+## PROGRESS, 2026-08-10)
+
+Under `natR` count-0 shares, `iref_lookup` loses `n = 1 -> q = qt`, and
+`ProofIput.v`'s two eviction derivations (:924, :1387) stand exactly on
+it. The surviving direction (`q = qt -> n = 1`) is only usable if
+`q = qt` is SUPPLIED — and no resource on either line supplies it. The
+counterexample that kills the naive plans: a second reference to the
+same inode (p->cwd beside an open file) means iput's caller cannot know
+it is last, so "the caller gathered its shares" is not "no shares
+exist". The premise `∃ q, iref_at ip q` (origin's step-3 target) is
+insufficient; so is any caller-local bookkeeping alone.
+
+### 14.1 The load-bearing observation: every share use is BRACKET-SHAPED
+
+Both consumers that exist or are designed carve a share and return it
+WITHIN one contract's execution, while the parent reference is held or
+parked somewhere that survives the bracket:
+
+- kfork (d69678b3): `inode_ref_shed` before the `ld`, upgraded back to
+  a reference at idup's return — the share never crosses kfork's
+  boundary.
+- C8's future ilock/fileread share: carved from the file payload's
+  parked reference at fileread's entry, returned before its exit.
+- fileclose's gather (origin's design): by construction complete at
+  fraction 1, before iput.
+
+If shares NEVER cross a contract boundary — a discipline the tree can
+enforce by simply never stating a share in a Spec's pre/postcondition,
+except as a within-call bracket pair — then at every iput call, shares
+outstanding belong to brackets of OTHER live references' holders. At
+`ip->ref == 1` the caller's reference is the only live one, so no
+bracket is open, so share mass is zero. The DISCIPLINE makes the
+invariant true; the question is its RESOURCE encoding, because iput's
+proof needs it inside the escrow/authority opening, not as prose.
+
+### 14.2 Candidate encodings, with their failure modes
+
+(a) **Share column in the authority**: value becomes
+`(Qp × nat-refs × nat-shares)`; `n_shares` moves at carve/gather; iput
+at `(qt, 1, 0)` derives `q = qt` (sum over one fragment). FAILS as
+stated: `n_shares = 0` at the eviction must come from somewhere, and
+the caller cannot attest an authority-side count it never sees; the
+eviction branch at `n_shares > 0` would be unprovable-not-refutable.
+Needs (c)'s tie to become dischargeable.
+
+(b) **Per-slot share-free token** (`ishr_zero k`, taken by the first
+carver, returned by the last gather): a counter problem disguised as a
+token — multiple concurrent carvers from different references need a
+counted pool, at which point it IS (a)'s column as a ledger. Same
+discharge problem.
+
+(c) **Bracket receipts tied to the REFERENCE (the promising one)**:
+carving from a reference yields `share ∗ receipt`, and the receipt is
+lodged where the PARENT reference's own transfer is blocked until
+gather — concretely, redefine
+
+    inode_ref' k q dev inum n_open :=
+      iref_tok k (q, 1) ∗ inode_ident q ∗ shed_ledger k n_open
+
+with `SpecIput` (and every contract that consumes a reference) taking
+`inode_ref' … 0` — a reference with NO open brackets. `shed_ledger` is
+per-reference ghost state... and references are anonymous, so the
+ledger must ride the fragment itself. THE SHAPE THAT WORKS WITHOUT NEW
+GHOSTS: carve by SPLITTING THE FRACTION — `(q,1) ⇝ (q−s,1) ∗ (s,0)` —
+so the parent's own recorded fraction DROPS while its share is out,
+and gather restores it. Then "no open brackets" is `⌜the reference is
+at its full allotted fraction⌝ — which only the holder knows, and
+which is EXACTLY the accounting origin's `fp_iq` constant makes
+arithmetical for file payloads (allotment = q·fp_iq) and trivial for
+cwd (allotment = the mint fraction, never carved across a boundary).
+The remaining gap: at ip->ref == 1, `qt = q_caller + Σ shares`, and
+shares from OTHER references are impossible only by the bracket
+discipline — whose resource form is precisely that a contract-crossing
+reference is at full allotment, so a live-but-bracketless second
+reference contributes no shares. This closes IF every share's
+(s,0) fragment is unreachable outside brackets — i.e. if no Spec
+mentions a bare share. That is checkable by grep and enforceable by
+convention, but it is a META-theorem about the spec set, not a
+resource; the honest formal statement is per-slot:
+
+    ishr_mass k = qt − Σ (live references' fractions)
+
+held as an authority-side invariant clause `ishr_mass k = 0 ∨ (some
+reference's bracket is open)` — and "bracket open" IS representable:
+the bracket pair mints an exclusive `bracket_tok k` at carve and
+consumes it at gather, with the invariant clause `n_shares k > 0 →
+bracket_tok k is OUT`. iput's eviction holds the lock; if it can also
+hold/witness `bracket_tok k` IN (i.e., in the invariant), then
+n_shares = 0 follows. Multiple concurrent brackets per slot: the tok
+becomes a count — but now it is a count the INVARIANT owns and the
+BRACKETS borrow, so the discharge is: iput at ref==1 opens the
+invariant and finds the bracket count intact BECAUSE any open bracket
+belongs to a live reference's holder, and REF-1 says the caller is the
+only one, and the caller (per its contract, `inode_ref'` at zero
+brackets) has none open. THAT is the witness: REF-1 + the caller's
+zero-bracket reference + the invariant clause tying open brackets to
+live references.
+
+### 14.3 What remains to nail down (next design session)
+
+- The invariant clause's exact form: "every open bracket is tagged
+  with a live reference" needs the tag — a bracket_tok minted AGAINST
+  a specific fragment, which anonymous fragments complicate. Candidate:
+  key brackets by SLOT and count them in the authority's third column,
+  with the CLAUSE `n_shares k ≤ Σ over fragments of (their open
+  brackets)` — made inductive by carve/gather moving both sides.
+- Whether `inode_ref'`'s bracket count can stay OUT of the fragment
+  (keeping origin's `(Qp × nat)` value) by putting the per-slot bracket
+  count in `islot2`/the escrow instead — the arms already carry per-slot
+  state, and iput's eviction already opens both.
+- The retype inventory is already scoped (reconcile round 1/2 notes):
+  origin's b4902e13 is the template; escrow + ProofIget retype
+  mechanically; ProofIdup/SpecIdup/ProofKforkB4 take origin's versions
+  ported to dev/icfg_dev; ProofIput's two sites rework on the witness.
