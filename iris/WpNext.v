@@ -141,6 +141,40 @@ Section WpNext.
     wp_next b p K -∗ K CID0.
   Proof. iApply (wp_next_at b p K CID0). intros _. reflexivity. Qed.
 
+  (* RE-ANCHORING A CALLER'S OBLIGATION AT ANOTHER HART.  A layer whose own
+     step MOVED the hart -- a parking function whose [swtch] resumed
+     elsewhere, and, at Stage 2, the absorbing engine re-entering its Löb on
+     the hart the last trap returned to -- holds its caller's [wp_next] at the
+     hart it STARTED on and has to discharge one at the hart it ENDED on.
+     Those are different propositions (the guard's right-hand side names the
+     anchor), so this is a TRANSPORT, not a frame: the third instance of the
+     shape [IntrDefs.cpu_own_transport] / [IntrDefs.trap_csrs_ext_transport]
+     already established -- A HART-INDEXED RESOURCE THAT SURVIVES A POSSIBLE
+     MIGRATION NEEDS A TRANSPORT LEMMA, NOT A FRAME.
+
+     Sound rather than a fudge, and both halves are worth seeing.  At
+     [p <> zero_reg] and [b = true] the guard is vacuous, so [wp_next true p K]
+     is just [forall CID, K CID] and re-supplying it anywhere is free -- which
+     is exactly the case a parking function is in ([proc_addr_nonzero] refutes
+     the idle hatch).  At [p = zero_reg] the mover's OWN [wp_next] guarantees
+     it came back on the same hart ([wp_next_idle]), and that is precisely the
+     hypothesis [Heq].
+
+     THIS IS WHERE [wp_next]'s SECOND ESCAPE HATCH IS CALLED IN.  The hatch was
+     introduced for [scheduler()] (claude-notes/completed/explicit-cpuid.md),
+     which recorded "no current proc => the trap returns on the same hart" as a
+     debt against Stage 2; [Heq] is the place that debt is paid, and Stage 2's
+     [IntrDefs.intr_handler_spec] is what will discharge it for the trap
+     arm. *)
+  Lemma wp_next_retarget `{GEN : GenId} (CID0 CID1 : CpuId) (b : bool)
+      (p : mword 64) K :
+    (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+    wp_next (CID0 := CID0) b p K -∗ wp_next (CID0 := CID1) b p K.
+  Proof.
+    intros Heq. iIntros "H" (CID Hs). iApply "H".
+    iPureIntro. intros Hb. rewrite (Hs Hb). exact (Heq Hb).
+  Qed.
+
   (* Chaining: the conditional equalities compose, which is what lets a
      [b]-GENERIC whole-function proof thread one implication per instruction
      and still discharge its own continuation at the end -- with no case split

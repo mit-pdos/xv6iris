@@ -818,14 +818,15 @@ Section ProofYield.
               Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27
               with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpuemp HC Hown' Htag' Hvc' Hr24 Hr16 Hr8 Hgap [Hcont]").
     (* yield's own [wp_next true pj] obligation, re-anchored at the resuming
-       hart.  The index is the LITERAL [true] (a parking function's always
-       is), so the only pinning condition left is [pj = zero_reg], which
+       hart -- [WpNext.wp_next_retarget], the transport for exactly this.  The
+       index is the LITERAL [true] (a parking function's always is), so the
+       only pinning condition left is [pj = zero_reg], which
        [proc_addr_nonzero] refutes -- the obligation transports to ANY hart,
        at either [eb]. *)
-    iIntros (CIDx Hsx).
-    iSpecialize ("Hcont" $! CIDx with "[%]").
+    assert (Hrt : true = false \/ proc_addr j = zero_reg ->
+                  (CIDs : CPU) = (CID : CPU)).
     { intros [Hf | Hz]; [discriminate | exfalso; exact (proc_addr_nonzero j Hj Hz)]. }
-    iExact "Hcont".
+    iApply (wp_next_retarget _ _ _ _ _ Hrt with "Hcont").
   Qed.
 
 End ProofYield.

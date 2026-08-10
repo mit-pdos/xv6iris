@@ -41,6 +41,12 @@ Require Import WpLock SpecProcinit.
    transitive, so each file whose predicate is named below has to be imported
    here even though [SpecMain] already requires all of them. *)
 Require Import ProcGeom UserPtTree ProcInv SwtchCtx SchedCtx.
+(* the itable's ENTRIES (not just their sleeplocks): [IcacheBoot.ientry_raw]
+   is the shape [icache_boot] takes, and [IcacheRef]/[InodeInv]/[InodeLock]
+   are the field addresses it is stated over.  IMPORTED BEFORE [SpecIinit],
+   deliberately: [IcacheRef] has its own [NINODE], and every [NINODE] in this
+   file is [SpecIinit]'s (they are the same 50, but not the same constant). *)
+Require Import DinodeEnc IcacheRef InodeInv InodeLock IcacheBoot.
 Require Import SleepLock BcacheInv SpecIinit.
 Require Import DiskInv SpecVirtioDiskInit.
 Require Import SpecMain.
@@ -66,6 +72,14 @@ Lemma z_mod8_mod4 (A : Z) : A mod 8 = 0 -> A mod 4 = 0.
 Proof.
   intro H. apply Z.mod_divide in H; [| lia]. apply Z.mod_divide; [lia |].
   apply (Z.divide_trans 4 8); [exists 2; reflexivity | exact H].
+Qed.
+
+(* ...and the same one step further down, for the four HALFWORD fields of the
+   dinode mirror ([InodeInv.i_type] and its three siblings). *)
+Lemma z_mod8_mod2 (A : Z) : A mod 8 = 0 -> A mod 2 = 0.
+Proof.
+  intro H. apply Z.mod_divide in H; [| lia]. apply Z.mod_divide; [lia |].
+  apply (Z.divide_trans 2 8); [exists 4; reflexivity | exact H].
 Qed.
 
 (* the two window-bookkeeping steps a stride family's per-element carve needs,
@@ -229,6 +243,36 @@ Proof. reflexivity. Qed.
 Lemma inode_lock_of_z (i : nat) :
   inode_lock i = pa_of_z (inode_lock_base + inode_stride * Z.of_nat i).
 Proof. reflexivity. Qed.
+
+(* THE ITABLE'S ENTRY ARRAY, at the ENTRY rather than at its sleeplock.
+   [SpecIinit]'s cursor walks the sleeplocks from [itable+40] because that is
+   what iinit's loop does; the entries themselves start 16 bytes earlier, at
+   [itable+24] (just past the 24-byte spinlock), and their 136-byte records
+   are what the byte carve has to cut -- one family, not two, since the two
+   ranges OVERLAP and no two big-ops can both own them (the [bnode_raw]
+   precedent below).  The array ends exactly at [IcacheRef.ientry NINODE],
+   i.e. at the next symbol; the old sleeplock-anchored window ran 16 bytes
+   past it. *)
+Definition inode_entry_base : Z := KernelSyms.itable + 24.
+
+Lemma ientry_of_z (k : nat) :
+  ientry k = pa_of_z (inode_entry_base + inode_stride * Z.of_nat k).
+Proof. reflexivity. Qed.
+
+(* the family's element address, offset to the sleeplock inside it, IS
+   [SpecIinit]'s cursor -- the address bridge between the two spellings, and
+   the reason one family can discharge both of [main_globals_raw]'s inode
+   big-ops.  ([IcacheBoot.inode_lock_is_ientry_lock] is the same fact stated
+   the other way round, over [IcacheRef]'s [i_lock] and [ientry].) *)
+Lemma i_lock_of_entry (k : nat) :
+  i_lock (pa_of_z (inode_entry_base + inode_stride * Z.of_nat k))
+  = inode_lock k.
+Proof.
+  assert (E16 : (sign_extend' 64 (mword_of_int 16 : mword 12) : mword 64)
+                = mword_of_int 16) by (apply bv_eq; vm_compute; reflexivity).
+  rewrite /i_lock inode_lock_of_z /pa_of_z E16 addv_moi_moi.
+  f_equal. unfold inode_entry_base, inode_lock_base. lia.
+Qed.
 
 Lemma proc_addr_of_z (i : nat) :
   proc_addr i = pa_of_z (KernelSyms.proc + proc_size * Z.of_nat i).
@@ -758,39 +802,252 @@ Section BootCarveMain.
       rewrite (bnode_of_z k). iExact "Hk".
   Qed.
 
-  (* the NINODE inode sleeplocks: the same family, at the itable's stride, and
-     with nothing else per element. *)
-  Lemma boot_inode_locks (g : gstate) :
+  (* ------------------------------------------------------------------ *)
+  (* A RUN OF WORD CELLS inside a record, contents existential:          *)
+  (* [boot_ctx_cells] at width 4, and in the same [pa_of_z base] +       *)
+  (* [mword_of_int (off + 4*j)] spelling -- which IS [InodeInv.i_addr]   *)
+  (* at [off = 80], so its consumer needs no address rewriting at all.   *)
+  (* ------------------------------------------------------------------ *)
+  Lemma boot_word4_cells (g : gstate) (C : Z) (n : nat) (off : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    text_end <= C + off -> C + off + 4 * Z.of_nat n <= ram_hi ->
+    (C + off) mod 4 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g (C + off) (C + off + 4 * Z.of_nat n)
+    -∗ (∃ l : list (bv 32), ⌜length l = n⌝ ∗
+          [∗ list] j ↦ a ∈ l,
+            add_vec (pa_of_z C) (mword_of_int (off + 4 * Z.of_nat j)) ↦₄ a).
+  Proof.
+    intro Hmem. revert off. induction n as [|k IH]; intros off Hlo Hhi Hal.
+    - iIntros "_ _". iExists []. iSplitR; [done |]. done.
+    - iIntros "#Hcl H".
+      assert (Hd1 : C + off <= C + off + 4) by lia.
+      assert (Hd2 : C + off + 4 <= C + off + 4 * Z.of_nat (S k)) by lia.
+      assert (Eo : C + (off + 4) = C + off + 4) by lia.
+      assert (Ehi : C + off + 4 * Z.of_nat (S k)
+                    = C + (off + 4) + 4 * Z.of_nat k) by lia.
+      assert (Elo : C + off + 4 = C + (off + 4)) by lia.
+      assert (Hchi : C + off + 4 <= ram_hi) by lia.
+      assert (Hilo : text_end <= C + (off + 4)) by lia.
+      assert (Hihi : C + (off + 4) + 4 * Z.of_nat k <= ram_hi) by lia.
+      assert (Hial : (C + (off + 4)) mod 4 = 0)
+        by (rewrite Eo; exact (z_mod_addo 4 (C + off) 4 Hal eq_refl)).
+      assert (Ehd : off + 4 * Z.of_nat 0%nat = off) by lia.
+      iDestruct (boot_ran_split g (C + off) (C + off + 4)
+                   (C + off + 4 * Z.of_nat (S k)) Hd1 Hd2 with "H") as "[Hc H]".
+      iDestruct (boot_ran_cell4 g (C + off) Hmem Hlo Hchi Hal with "Hcl Hc")
+        as (v) "Hc".
+      iDestruct (boot_ran_eq g _ _ (C + (off + 4))
+                   (C + (off + 4) + 4 * Z.of_nat k) Elo Ehi with "H") as "H".
+      iDestruct (IH (off + 4) Hilo Hihi Hial with "Hcl H") as (l) "[%Hlen Hl]".
+      iExists (v :: l). iSplitR; [iPureIntro; cbn [length]; by rewrite Hlen |].
+      rewrite big_sepL_cons. iSplitL "Hc".
+      + rewrite Ehd off_of_z. iExact "Hc".
+      + iApply (big_sepL_mono with "Hl"). iIntros (j a _) "Ha".
+        rewrite (_ : off + 4 * Z.of_nat (S j) = off + 4 + 4 * Z.of_nat j); [| lia].
+        iExact "Ha".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (* ONE itable ENTRY, out of its own 136 bytes.                          *)
+  (*                                                                    *)
+  (* [bnode_raw]'s situation exactly: the entry's window carries BOTH    *)
+  (* things [main_globals_raw] asks of the table -- iinit's sleeplock at *)
+  (* +16 and [IcacheBoot.ientry_raw_at]'s cells around it -- so it is    *)
+  (* ONE family plus [big_sepL_sep], never two traversals of the same    *)
+  (* range.  The layout (fs.h's [struct inode]):                          *)
+  (*                                                                    *)
+  (*   +0  dev    +4  inum   +8  ref   [+12 padding]                     *)
+  (*   +16 lock (struct sleeplock, 44 B)          [+60 padding]          *)
+  (*   +64 valid                                                        *)
+  (*   +68 type   +70 major  +72 minor  +74 nlink  +76 size              *)
+  (*   +80 addrs[13]                              [+132 padding]         *)
+  (*                                                                    *)
+  (* [ref] IS PINNED TO ZERO, and that is why the lemma takes [img_end]  *)
+  (* rather than [text_end]: [IcacheInv.iref_cells ∅] wants that exact   *)
+  (* word, and the itable is .bss past the image so the loader's zero is *)
+  (* a FACT ([BootCarve.boot_ran_cell4_bss]), not an assumption.  The    *)
+  (* [d_used_idx] and [kmem+24] conjuncts of [main_globals_raw] are the  *)
+  (* same claim and the precedent.  Everything else is contents-         *)
+  (* existential, which is all the cache's boot step needs.              *)
+  (* ------------------------------------------------------------------ *)
+  Local Definition inode_node_raw (a : Arch.pa) : iProp Σ :=
+    (sl_raw (i_lock a) ∗ ientry_raw_at a)%I.
+
+  Lemma boot_inode_entry (g : gstate) (A : Z) :
+    (forall x : Z, ram_lo <= x < ram_hi ->
+       g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
+    img_end <= A -> A + 136 <= ram_hi -> A mod 8 = 0 ->
+    kmap_static_claims -∗ boot_raw_ran g A (A + 136)
+    -∗ inode_node_raw (pa_of_z A).
+  Proof.
+    intros Hmem Hbss Hhi Hal. iIntros "#Hcl H".
+    assert (Hlo : text_end <= A)
+      by exact (z_lo_trans text_end img_end A ltac:(vm_compute; discriminate) Hbss).
+    assert (Hal4 : A mod 4 = 0) by exact (z_mod8_mod4 A Hal).
+    assert (Hal2 : A mod 2 = 0) by exact (z_mod8_mod2 A Hal).
+    (* the sign-extended 12-bit field displacements, once each *)
+    assert (E0 : (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64)
+                 = mword_of_int 0) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E4 : (sign_extend' 64 (mword_of_int 4 : mword 12) : mword 64)
+                 = mword_of_int 4) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E8 : (sign_extend' 64 (mword_of_int 8 : mword 12) : mword 64)
+                 = mword_of_int 8) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E16 : (sign_extend' 64 (mword_of_int 16 : mword 12) : mword 64)
+                  = mword_of_int 16) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E64 : (sign_extend' 64 (mword_of_int 64 : mword 12) : mword 64)
+                  = mword_of_int 64) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E68 : (sign_extend' 64 (mword_of_int 68 : mword 12) : mword 64)
+                  = mword_of_int 68) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E70 : (sign_extend' 64 (mword_of_int 70 : mword 12) : mword 64)
+                  = mword_of_int 70) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E72 : (sign_extend' 64 (mword_of_int 72 : mword 12) : mword 64)
+                  = mword_of_int 72) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E74 : (sign_extend' 64 (mword_of_int 74 : mword 12) : mword 64)
+                  = mword_of_int 74) by (apply bv_eq; vm_compute; reflexivity).
+    assert (E76 : (sign_extend' 64 (mword_of_int 76 : mword 12) : mword 64)
+                  = mword_of_int 76) by (apply bv_eq; vm_compute; reflexivity).
+    (* ---- +0: dev ---- *)
+    iDestruct (boot_ran_split g A (A + 4) (A + 136) ltac:(lia) ltac:(lia)
+                 with "H") as "[H0 H]".
+    iDestruct (boot_ran_cell4 g A Hmem Hlo ltac:(lia) Hal4 with "Hcl H0")
+      as (vdev) "H0".
+    (* ---- +4: inum ---- *)
+    iDestruct (boot_ran_split g (A + 4) (A + 4 + 4) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[H1 H]".
+    iDestruct (boot_ran_cell4 g (A + 4) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 4 Hal4 eq_refl)) with "Hcl H1")
+      as (vinum) "H1".
+    (* ---- +8: ref, PINNED to the loader's zero ---- *)
+    iDestruct (boot_ran_split g (A + 4 + 4) (A + 8) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 8) (A + 8 + 4) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[H2 H]".
+    iDestruct (boot_ran_cell4_bss g (A + 8) (mword_of_int 0 : mword 32) Hmem
+                 ltac:(lia) ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 8 Hal4 eq_refl))
+                 ltac:(intros j _; apply nth_byte_zero; vm_compute; reflexivity)
+                 with "Hcl H2") as "H2".
+    (* ---- +16: the sleeplock iinit initialises ---- *)
+    iDestruct (boot_ran_split g (A + 8 + 4) (A + 16) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 16) (A + 16 + 44) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[Hs H]".
+    iDestruct (boot_sl_raw g (A + 16) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 8 A 16 Hal eq_refl)) with "Hcl Hs")
+      as "Hs".
+    (* ---- +64: valid ---- *)
+    iDestruct (boot_ran_split g (A + 16 + 44) (A + 64) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 64) (A + 64 + 4) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[H3 H]".
+    iDestruct (boot_ran_cell4 g (A + 64) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 64 Hal4 eq_refl)) with "Hcl H3")
+      as (vvalid) "H3".
+    (* ---- +68 .. +76: the dinode mirror's five metadata cells ---- *)
+    iDestruct (boot_ran_split g (A + 64 + 4) (A + 68) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 68) (A + 68 + 2) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[H4 H]".
+    iDestruct (boot_ran_cell2 g (A + 68) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 2 A 68 Hal2 eq_refl)) with "Hcl H4")
+      as (vtype) "H4".
+    iDestruct (boot_ran_split g (A + 68 + 2) (A + 70) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 70) (A + 70 + 2) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[H5 H]".
+    iDestruct (boot_ran_cell2 g (A + 70) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 2 A 70 Hal2 eq_refl)) with "Hcl H5")
+      as (vmajor) "H5".
+    iDestruct (boot_ran_split g (A + 70 + 2) (A + 72) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 72) (A + 72 + 2) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[H6 H]".
+    iDestruct (boot_ran_cell2 g (A + 72) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 2 A 72 Hal2 eq_refl)) with "Hcl H6")
+      as (vminor) "H6".
+    iDestruct (boot_ran_split g (A + 72 + 2) (A + 74) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 74) (A + 74 + 2) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[H7 H]".
+    iDestruct (boot_ran_cell2 g (A + 74) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 2 A 74 Hal2 eq_refl)) with "Hcl H7")
+      as (vnlink) "H7".
+    iDestruct (boot_ran_split g (A + 74 + 2) (A + 76) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 76) (A + 76 + 4) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[H8 H]".
+    iDestruct (boot_ran_cell4 g (A + 76) Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 76 Hal4 eq_refl)) with "Hcl H8")
+      as (vsize) "H8".
+    (* ---- +80: the thirteen addrs cells ---- *)
+    iDestruct (boot_ran_split g (A + 76 + 4) (A + 80) (A + 136) ltac:(lia)
+                 ltac:(lia) with "H") as "[_ H]".
+    iDestruct (boot_ran_split g (A + 80) (A + 80 + 4 * Z.of_nat 13%nat)
+                 (A + 136) ltac:(lia) ltac:(lia) with "H") as "[H9 _]".
+    iDestruct (boot_word4_cells g A 13%nat 80 Hmem ltac:(lia) ltac:(lia)
+                 ltac:(exact (z_mod_addo 4 A 80 Hal4 eq_refl)) with "Hcl H9")
+      as (l) "[%Hlen Hl]".
+    (* ---- assemble ---- *)
+    rewrite /inode_node_raw /ientry_raw_at /inode_raw /inode_meta
+            /i_lock /i_dev /i_inum /i_ref /i_valid
+            /i_type /i_major /i_minor /i_nlink /i_size.
+    (* [i_dev]'s displacement is 0, so [off_of_z] leaves [pa_of_z (A + 0)] *)
+    rewrite E0 E4 E8 E16 E64 E68 E70 E72 E74 E76 !off_of_z Z.add_0_r.
+    iSplitL "Hs"; [iExact "Hs" |].
+    iSplitL "H0"; [iExists vdev; iExact "H0" |].
+    iSplitL "H1"; [iExists vinum; iExact "H1" |].
+    iSplitL "H2"; [iExact "H2" |].
+    iSplitL "H3"; [iExists vvalid; iExact "H3" |].
+    iSplitL "H4 H5 H6 H7 H8".
+    { iExists (MkDinode vtype vmajor vminor vnlink vsize l).
+      cbn [di_type di_major di_minor di_nlink di_size].
+      iSplitL "H4"; [iExact "H4" |]. iSplitL "H5"; [iExact "H5" |].
+      iSplitL "H6"; [iExact "H6" |]. iSplitL "H7"; [iExact "H7" |].
+      iExact "H8". }
+    iExists l. iSplitR; [iPureIntro; exact Hlen |]. iExact "Hl".
+  Qed.
+
+  (* the NINODE entries: the family, at the itable's stride and anchored at
+     the ENTRY array's own base.  Gives both of [main_globals_raw]'s inode
+     conjuncts -- the sleeplocks iinit takes, and the cells [icache_boot]
+     takes. *)
+  Lemma boot_inode_entries (g : gstate) :
     (forall x : Z, ram_lo <= x < ram_hi ->
        g.(gmem) !! pa_of_z x = Some (boot_byte x)) ->
     kmap_static_claims -∗
-    boot_raw_ran g inode_lock_base
-                   (inode_lock_base + inode_stride * Z.of_nat NINODE)
-    -∗ ([∗ list] i ∈ seq 0 NINODE, sl_raw (inode_lock i)).
+    boot_raw_ran g inode_entry_base
+                   (inode_entry_base + inode_stride * Z.of_nat NINODE)
+    -∗ ([∗ list] i ∈ seq 0 NINODE, sl_raw (inode_lock i)) ∗
+       ([∗ list] k ∈ seq 0 NINODE, ientry_raw k).
   Proof.
     intro Hmem. iIntros "#Hcl H".
-    iDestruct (boot_stride_family_seq g sl_raw
-                 inode_lock_base inode_stride NINODE
+    iDestruct (boot_stride_family_seq g inode_node_raw
+                 inode_entry_base inode_stride NINODE
                  ltac:(unfold inode_stride; lia)
                  ltac:(intros i A Hi HA _ _;
-                       destruct (z_stride_side inode_lock_base inode_stride NINODE
-                                   44 text_end ram_hi i A Hi HA
+                       destruct (z_stride_side inode_entry_base inode_stride NINODE
+                                   136 img_end ram_hi i A Hi HA
                                    ltac:(unfold inode_stride; lia)
                                    ltac:(vm_compute; discriminate)
                                    ltac:(vm_compute; discriminate)
                                    ltac:(vm_compute; reflexivity)
                                    ltac:(vm_compute; reflexivity))
                          as (Q1 & Q2 & Q3);
-                       assert (T1 : A <= A + 44) by lia;
-                       assert (T2 : A + 44 <= A + inode_stride)
+                       assert (T1 : A <= A + 136) by lia;
+                       assert (T2 : A + 136 <= A + inode_stride)
                          by (unfold inode_stride; lia);
                        iIntros "#Hcl H";
-                       iDestruct (boot_ran_split g A (A + 44) (A + inode_stride)
+                       iDestruct (boot_ran_split g A (A + 136) (A + inode_stride)
                                     T1 T2 with "H") as "[H _]";
-                       iApply (boot_sl_raw g A Hmem Q1 Q2 Q3 with "Hcl H"))
+                       iApply (boot_inode_entry g A Hmem Q1 Q2 Q3 with "Hcl H"))
                  with "Hcl H") as "H".
-    iApply (big_sepL_mono with "H"). iIntros (n i _) "Hi".
-    rewrite (inode_lock_of_z i). iExact "Hi".
+    rewrite /inode_node_raw big_sepL_sep. iDestruct "H" as "[H1 H2]".
+    iSplitL "H1".
+    - iApply (big_sepL_mono with "H1"). iIntros (n k _) "Hk".
+      rewrite (i_lock_of_entry k). iExact "Hk".
+    - iApply (big_sepL_mono with "H2"). iIntros (n k _) "Hk".
+      rewrite /ientry_raw -(ientry_of_z k). iExact "Hk".
   Qed.
 
   (* ------------------------------------------------------------------ *)

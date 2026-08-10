@@ -484,27 +484,104 @@ Proof gotchas worth keeping:
   because `ic_names_alloc`'s `dvs` must be chosen AT the values the
   loader left in the cells, and those arrive existentially bound.
 
-**OWED after C7, precisely (all outside the icache):**
-- (i) `BootCarveMain.boot_inode_locks` keeps only bytes `[+16,+60)` of
-  each 136-byte entry and DROPS the rest, so `ientry_raw k` has no
-  producer yet. It is mechanical: the bytes are in the same
-  `boot_raw_ran`, and the concrete-zero `i_ref` conjunct is
-  `BootCarve.boot_ran_cell4_bss` (itable is past `img_end`, so the
-  loader's zero is a fact, not an assumption — the `d_used_idx` /
-  `kmem+24` conjuncts in `SpecMain.main_globals_raw` are the precedent).
-  A new conjunct in `main_globals_raw` and a `boot_inode_entries` lemma.
+**OWED after C7 — STAGE-0 CLASSIFICATION OF `icache_boot`'s INPUTS
+(2026-08-10).** The fupd takes eight things; classifying them is what
+decides how much of the boot wiring can land, and the answer is smaller
+than the C7 write-up assumed:
+
+| input | status |
+| --- | --- |
+| `itable_lock ↦₄ 0`, `lock_name`, `lock_cpu ↦₈ 0` | iinit's post, at main+0x92 — **have it** |
+| fifty `sl_fresh (i_lock (ientry k)) "inode"` | iinit's post — **have it** |
+| fifty `ientry_raw k` | **(a) LANDED 2026-08-10**, below |
+| `iref_slots_auth` | minted in `boot_shared_alloc` (`IrefSlots.iref_slots_alloc`); main gets only the `iref_slots` FRAGMENT share, the auth is dropped at the mint site — a routing fix, small |
+| `ipool γfs γi cov logstart (region_inums nib)` | **(b)** — blocked on the fs-block mint |
+| `own icfg_iref (● ∅)` | **(c)** — blocked on the ambient-icfg tie |
+
+**THE POOL IS AN INPUT TO `icache_boot`, NOT JUST TO `ireg_inv`, AND THAT
+IS THE WHOLE STORY.** `itable_res2` (the itable lock's resource) contains
+the pool, and `is_itable2` is `newlock` over `itable_res2` — so without
+(b) there is no lock, and without the lock there is no `is_itable2`. The
+publishable set is therefore **empty**, not "the itable/escrow/sleeplock
+half": `ic_escrows` and the fifty `is_sleeplock`s alone are over an
+existential `cn : ic_names` that the table's later `newlock` would have
+to be built at, so splitting `icache_boot` in two to publish them early
+would hand a client a `cn` with nothing to use it on. Do not split it.
+
+- (i) — **DONE 2026-08-10.** `BootCarveMain.boot_inode_entries` replaces
+  `boot_inode_locks`: ONE `boot_stride_family_seq` over the ENTRY array
+  (`inode_entry_base = itable+24`, stride 136, 50) whose per-element
+  `inode_node_raw` yields both `sl_raw (inode_lock k)` and
+  `IcacheBoot.ientry_raw_at`'s cells — the `bnode_raw` precedent, forced
+  here because the sleeplock window `[+16,+60)` and the entry's other
+  cells are in the SAME 136 bytes and two big-ops cannot both own them.
+  `SpecMain.main_globals_raw` gained the `[∗ list] k ∈ seq 0 NINODE,
+  ientry_raw k` conjunct; `ProofMain` carries and drops it (named
+  `Hient`, with the blocker at the site). Three things worth keeping:
+  - **the old window was 16 bytes off the array.** `inode_lock_base +
+    inode_stride*NINODE` = `itable+6840`, but the entry array ends at
+    `itable+6824` (= `IcacheRef.ientry NINODE` = the `log` symbol), so
+    the sleeplock-anchored cut claimed 16 bytes of `log` and dropped the
+    array's first 16. The new cut is exactly the array.
+  - `ientry_raw` was split into `ientry_raw_at (ip : mword 64)` plus
+    `ientry_raw k := ientry_raw_at (ientry k)`. Forced: a
+    `boot_stride_family_seq` predicate is applied to the element's
+    ADDRESS and cannot mention the index. `icache_boot`'s statement is
+    unchanged.
+  - the thirteen `addrs` cells come out of a new `boot_word4_cells`
+    (`boot_ctx_cells` at width 4), stated in the `add_vec (pa_of_z C)
+    (mword_of_int (off + 4*j))` spelling which IS `InodeInv.i_addr` at
+    `off = 80` — so its consumer needs no address rewriting, and in
+    particular the `!off_of_z` sweep must NOT unfold `i_addr` (the
+    offset depends on the bound `j` and the rewrite would not fire).
+    `i_dev`'s displacement is 0, so that sweep leaves `pa_of_z (A + 0)`
+    and wants one `Z.add_0_r`.
+  - **one gotcha left for (iii):** `main_globals_raw` states the big-op
+    at `SpecIinit.NINODE` (every other `NINODE` in `SpecMain` /
+    `BootCarveMain` is that one), while `icache_boot` wants
+    `IcacheRef.NINODE`. Same 50, different constant — convertible, but
+    the client has to spell the bridge out. `BootCarveMain` imports
+    `IcacheRef` BEFORE `SpecIinit` so the unqualified name in that file
+    stays `SpecIinit`'s.
 - (ii) **`FsBoot.fs_boot_bundle` HAS ZERO CONSUMERS.** main never
   receives the disk-image byte mint and never allocates `bio_ctx`/`γfs`,
   so there is no `fsblock` anywhere at main's altitude and hence no
-  input for `ireg_alloc`. Wiring the fs BLOCK layer into main (binit's
-  seam, the `disk_bytes γv 0 (disk_read dk 0 ndisk)` precondition, and
-  the deposit into `started_inv`) is a separate cycle and blocks (iii).
+  input for `ireg_alloc` — and hence, per the table above, none for
+  `ipool` and none for `icache_boot` at all. Wiring the fs BLOCK layer
+  into main (binit's seam, the `disk_bytes γv 0 (disk_read dk 0 ndisk)`
+  precondition, and the deposit into `started_inv`) is a separate cycle
+  and blocks (iii) **entirely**, not partly.
 - (iii) publishing `is_itable2` / `itable_inv` / `ic_escrows` /
   `ic_sleeplocks` / `ireg_inv` out of `SpecMain`'s postcondition (they
   belong in the `started_inv P` deposit wand, beside `printk_env` and
-  `procs_inv`).
+  `procs_inv`). Blocked on (ii) and (c); nothing of it is publishable
+  early.
 - (iv) the image-wf layer that discharges `ipool_alloc`'s allocated half
   for the real mkfs image (bitmap/`ialloc` effort).
+- (c) **THE AMBIENT-`icfg` TIE — EXAMINED 2026-08-10 AND DELIBERATELY
+  NOT DONE; it is structural, not mechanical.** `IcacheRef.icfg` is a
+  class of DATA (`icfg_iref : gname`, `icfg_dev`, `icfg_nib`) and a
+  superclass field of `FileInv.fileG`, so it is fixed *before* any fupd
+  runs — `SystemAdequacy.xv6_boot_era` takes `!fileG Σ` as an ambient
+  Context and `xv6Σ` instantiates it through `Local Instance
+  adequacy_icfg : icfg := MkIcfg 1%positive _ 0`, a hardcoded gname
+  nobody ever allocated. So `own icfg_iref (● ∅)` cannot be minted
+  anywhere below adequacy. The kpt-boot-token route does exist, but it
+  is not a boot-token change: it requires **restating `xv6_boot_era` and
+  both `xv6_power_adequacy` / `xv6_fs_adequacy` over `fileG`'s four
+  capability fields** (`inG Σ fileUR`, `pipeG`, `icacheG`, `cinvG`)
+  instead of `fileG`, running `IcacheRef.icfg_alloc` inside the era
+  fupd, and *building* the `fileG` instance from the fresh `ICFG` —
+  after which every downstream lemma (`boot_shared_alloc`,
+  `boot_hart_primary`, `SpecMain`, …) must be applied at that
+  constructed instance, which is precisely FileInv.v's "two instance
+  paths print identically and do not unify" trap at the top of the
+  tree. That is a change to the **statement of the system adequacy
+  theorem**, and it buys nothing today because (b) blocks `icache_boot`
+  regardless. Worth doing WITH (ii), in one cycle, not before —
+  and the payoff when it happens is real: `adequacy_icfg` disappears,
+  so the concrete-Σ theorems stop assuming a cache identity nobody
+  allocated.
 
 Original brief (kept for the record):
 

@@ -523,16 +523,20 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hhd H]".
     iDestruct (boot_blink_raw g (buf_base + buf_stride * Z.of_nat NBUF) Hmem
                  ltac:(zlit) ltac:(zlit) ltac:(zeq) with "Hcl Hhd") as "Hhd".
-    (* ---- itable.lock and the 50 inode sleeplocks ---- *)
+    (* ---- itable.lock, then the 50 ENTRIES: one window, one family, both
+           of [main_globals_raw]'s inode conjuncts.  The window is the entry
+           ARRAY's ([itable+24], ending exactly at the next symbol), not the
+           sleeplock cursor's -- which started 16 bytes later and ran 16
+           bytes past the array's end. ---- *)
     iDestruct (bss_cut g (buf_base + buf_stride * Z.of_nat NBUF + 88)
                  KernelSyms.itable (KernelSyms.itable + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hlk9 H]".
-    iDestruct (bss_cut g (KernelSyms.itable + 24) inode_lock_base
-                 (inode_lock_base + inode_stride * Z.of_nat NINODE) ram_hi
+    iDestruct (bss_cut g (KernelSyms.itable + 24) inode_entry_base
+                 (inode_entry_base + inode_stride * Z.of_nat NINODE) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hino H]".
-    iDestruct (boot_inode_locks g Hmem with "Hcl Hino") as "Hino".
+    iDestruct (boot_inode_entries g Hmem with "Hcl Hino") as "[Hino Hient]".
     (* ---- devsw[1]'s read/write slots ---- *)
-    iDestruct (bss_cut g (inode_lock_base + inode_stride * Z.of_nat NINODE)
+    iDestruct (bss_cut g (inode_entry_base + inode_stride * Z.of_nat NINODE)
                  (KernelSyms.devsw + 16) (KernelSyms.devsw + 24) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hdr H]".
     iDestruct (boot_ran_cell8 g (KernelSyms.devsw + 16) Hmem ltac:(zlit)
@@ -610,7 +614,7 @@ Section BootBssChain.
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
     iSplitL "Hdr Hdw Hpkd Hpki Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Hbsl Hbln Hhd Hino
-             Hdd Hda Hdu Hdf Hdi Hslots".
+             Hient Hdd Hda Hdu Hdf Hdi Hslots".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
       { iExists vdr, vdw. rewrite /devsw_console_read /devsw_console_write.
@@ -627,6 +631,7 @@ Section BootBssChain.
       iSplitL "Hbln"; [iExact "Hbln" |].
       iSplitL "Hhd"; [rewrite bhead_of_z; iExact "Hhd" |].
       iSplitL "Hino"; [iExact "Hino" |].
+      iSplitL "Hient"; [iExact "Hient" |].
       iSplitL "Hdd Hda Hdu".
       { iExists vdd, vda, vdu.
         rewrite disk_desc_of_z disk_avail_of_z disk_used_of_z.
