@@ -31,8 +31,8 @@
 
    The FRACTION is existential for the same reason [ofile_slot] hides a
    descriptor's: [SpecIdup] HALVES the caller's share, so a predicate
-   pinned at 1 could not survive [fork] -- today's [cwd_ref v :=
-   inode_ref v 1] is satisfiable only because the predicate is [emp].
+   pinned at 1 could not survive [fork] -- the old [cwd_ref v :=
+   inode_ref v 1] was satisfiable only because the predicate was [emp].
 
    ---- WHY THE AUTHORITY'S GNAME IS CANONICAL --------------------------
 
@@ -95,6 +95,15 @@ Section InodeRef.
        ⌜ v = ientry k /\ (k < NINODE)%nat ⌝ ∗
        inode_ref iref_name k q dev inum)%I.
 
+  (* [q] OF SOMEBODY ELSE'S REFERENCE to the inode at [v] -- see
+     [IcacheInv]'s algebra header.  This is what an fd holds of the inode
+     its [struct file] names, and it is NOT a reference: closing it is not
+     an [iput]. *)
+  Definition iref_shr_at (v : mword 64) (q : Qp) : iProp Σ :=
+    (∃ (k : nat) (dev inum : mword 32),
+       ⌜ v = ientry k /\ (k < NINODE)%nat ⌝ ∗
+       inode_shr iref_name k q dev inum)%I.
+
   (* A HELD REFERENCE IMPLIES A NON-NULL POINTER, with no side condition --
      this is what lets a live process's [p->cwd <> 0] be read off its own
      block instead of being an invariant conjunct that every state
@@ -107,36 +116,63 @@ Section InodeRef.
   Qed.
 
   (* ================================================================= *)
-  (*  THERE IS NO [iref_at_split], AND THAT IS THE POINT.                *)
+  (*  SPLITTING SHEDS A SHARE; IT DOES NOT SPLIT THE REFERENCE.          *)
   (*                                                                     *)
-  (*  [IcacheInv.iref_tok γ k q] is [own γ (◯ {[k := (q, 1%positive)]})]  *)
-  (*  -- the COUNT component is pinned at 1 in every token, and           *)
-  (*  [positiveR]'s op is ADDITION.  So two tokens compose to             *)
-  (*  [(q1 + q2, 2)]: TWO references, not one reference split in half.    *)
-  (*  An inode reference is a UNIT with a count, not a divisible          *)
-  (*  resource, and turning one into two is exactly what [idup] does --   *)
-  (*  which is why it bumps [ip->ref] and spends an [IrefSlots.iref_slot] *)
-  (*  to do it.                                                          *)
+  (*  This is what [IcacheInv]'s count-0 fragment buys, and the shape is  *)
+  (*  xv6's: [filedup] bumps [f->ref] and does NOT bump [ip->ref], so     *)
+  (*  every fd sharing a [struct file] shares ONE inode reference.  The   *)
+  (*  reference belongs to the ftable SLOT; what travels to each holder   *)
+  (*  is an [iref_shr_at], and only the LAST closer -- the one that       *)
+  (*  rejoins the whole share, which is what                              *)
+  (*  [FileInv.file_close_last_step] already computes -- gets an          *)
+  (*  [iref_at] back and may spend it on [iput].                          *)
   (*                                                                     *)
-  (*  THIS BLOCKS PUTTING A REAL REFERENCE IN [FileInv.file_payload]'s    *)
-  (*  FD_INODE / FD_DEVICE ARM.  [file_payload_split] splits the payload  *)
-  (*  at [q1 + q2] and is what makes a [file_ref] splittable for          *)
-  (*  [filedup]; with a real [inode_ref] in that arm it is FALSE.  It     *)
-  (*  typechecks today only because the placeholder is [emp].            *)
-  (*                                                                     *)
-  (*  And that is not an accident of the encoding -- it is xv6:           *)
-  (*  [filedup] bumps [f->ref] and does NOT bump [ip->ref], so two        *)
-  (*  descriptors sharing a [struct file] share ONE inode reference.      *)
-  (*  The reference therefore belongs to the file SLOT, not to each       *)
-  (*  fractional holder, and only the LAST closer -- the one that         *)
-  (*  rejoins [q = 1], which is what [FileInv.file_close_last_step]       *)
-  (*  already computes -- may spend it on [iput].  Deciding how to say    *)
-  (*  that in [file_payload] is a file-table design question and is       *)
-  (*  tracked in claude-notes/projects/cwd-ref.md.                        *)
-  (*                                                                     *)
-  (*  NONE OF THIS BLOCKS THE PROCESS SIDE: a process holds exactly one   *)
-  (*  cwd reference, never a fraction of one, so [ProcInv.cwd_ref] can    *)
-  (*  be [∃ q, iref_at v q] today.                                        *)
+  (*  Turning one reference into TWO is a different operation and it is   *)
+  (*  [idup]: it bumps [ip->ref] and spends an [IrefSlots.iref_slot] to   *)
+  (*  do it.  Nothing here can manufacture that, which is the point.      *)
   (* ================================================================= *)
+
+  Lemma iref_at_split (v : mword 64) (q1 q2 : Qp) :
+    iref_at v (q1 + q2) ⊣⊢ iref_at v q1 ∗ iref_shr_at v q2.
+  Proof.
+    rewrite /iref_at /iref_shr_at. iSplit.
+    - iIntros "(%k & %dev & %inum & %Hv & Href)".
+      rewrite inode_ref_split_shr. iDestruct "Href" as "[H1 H2]".
+      iSplitL "H1"; iExists k, dev, inum; by iFrame.
+    - iIntros "[(%k1 & %d1 & %i1 & [%Hv1 %Hk1] & H1)
+                (%k2 & %d2 & %i2 & [%Hv2 %Hk2] & H2)]".
+      assert (Hk : k2 = k1).
+      { apply (ientry_inj k2 k1); [lia|lia|]. by rewrite -Hv1 -Hv2. }
+      subst k2.
+      iDestruct (inode_ref_shr_agree with "H1 H2") as %[-> ->].
+      iExists k1, d2, i2. iSplitR; [by iPureIntro|].
+      rewrite inode_ref_split_shr. iFrame.
+  Qed.
+
+  Lemma iref_shr_at_split (v : mword 64) (q1 q2 : Qp) :
+    iref_shr_at v (q1 + q2) ⊣⊢ iref_shr_at v q1 ∗ iref_shr_at v q2.
+  Proof.
+    rewrite /iref_shr_at. iSplit.
+    - iIntros "(%k & %dev & %inum & %Hv & Href)".
+      rewrite inode_shr_split. iDestruct "Href" as "[H1 H2]".
+      iSplitL "H1"; iExists k, dev, inum; by iFrame.
+    - iIntros "[(%k1 & %d1 & %i1 & [%Hv1 %Hk1] & H1)
+                (%k2 & %d2 & %i2 & [%Hv2 %Hk2] & H2)]".
+      assert (Hk : k2 = k1).
+      { apply (ientry_inj k2 k1); [lia|lia|]. by rewrite -Hv1 -Hv2. }
+      subst k2.
+      iDestruct (inode_shr_agree with "H1 H2") as %[-> ->].
+      iExists k1, d2, i2. iSplitR; [by iPureIntro|].
+      rewrite inode_shr_split. iFrame.
+  Qed.
+
+  (* a SHARE also proves the pointer non-null: same projection as
+     [iref_at_nonzero], and it is what an fd holder reads [f->ip] with. *)
+  Lemma iref_shr_at_nonzero (v : mword 64) (q : Qp) :
+    iref_shr_at v q -∗ ⌜ v <> (zero_reg : mword 64) ⌝.
+  Proof.
+    iIntros "(%k & %dev & %inum & [%Hv %Hk] & _)".
+    iPureIntro. rewrite Hv. apply ientry_nonzero. lia.
+  Qed.
 
 End InodeRef.

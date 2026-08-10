@@ -449,8 +449,8 @@ Section IcacheEscrow.
      the cells -- which is why §13's read-only variant is not a separate
      lemma. *)
   Lemma ic_open_auth_ref cn γfs γi cov logstart k
-      (M : gmap nat (Qp * positive)) (q qt qi : Qp) (dev inum : mword 32) :
-    M !! k = Some (qt, 1%positive) ->
+      (M : gmap nat (Qp * nat)) (q qt qi : Qp) (dev inum : mword 32) :
+    M !! k = Some (qt, 1%nat) ->
     ic_escrow_body cn γfs γi cov logstart k -∗
     itable_half (icn_ref cn) M -∗
     iref_tok (icn_ref cn) k q -∗
@@ -505,7 +505,7 @@ Section IcacheEscrow.
      [ic_close_parked] closes it at a normal parked arm.  BioInv's
      [escrow_open_free] / [escrow_close_mid] are the same two-lemma split. *)
   Lemma ic_open_parked_free cn γfs γi cov logstart k
-      (M : gmap nat (Qp * positive)) (inumT : mword 32) :
+      (M : gmap nat (Qp * nat)) (inumT : mword 32) :
     M !! k = None ->
     ic_escrow_body cn γfs γi cov logstart k -∗
     itable_half (icn_ref cn) M -∗
@@ -540,7 +540,7 @@ Section IcacheEscrow.
      table's inum half against MID's full cell -- which is why the inum half
      is taken and handed straight back. *)
   Lemma ic_open_parked_free_dev cn γfs γi cov logstart k
-      (M : gmap nat (Qp * positive)) (devT inumT : mword 32) :
+      (M : gmap nat (Qp * nat)) (devT inumT : mword 32) :
     M !! k = None ->
     ic_escrow_body cn γfs γi cov logstart k -∗
     itable_half (icn_ref cn) M -∗
@@ -700,7 +700,7 @@ Section IcacheEscrow.
      full scan misses, and the scan's loop invariant is what proves it); and
      every cached inum is inside the inode region, which is what makes
      [mword_of_int] faithful on the pool's keys. *)
-  Definition ic_ci_wf (M : gmap nat (Qp * positive))
+  Definition ic_ci_wf (M : gmap nat (Qp * nat))
       (ci : gmap nat (mword 32 * mword 32)) (nib : nat) : Prop :=
     dom ci = dom M
     /\ (forall (k1 k2 : nat) (p1 p2 : mword 32 * mword 32),
@@ -768,18 +768,18 @@ Section IcacheEscrow.
      mismatched arms are [False]: [dom ci = dom M] is a wf clause, so they
      are unreachable, and stating them as [False] is what makes a slot
      accessor able to read [ci !! k] off [M !! k]. *)
-  Definition islot2 (M : gmap nat (Qp * positive))
+  Definition islot2 (M : gmap nat (Qp * nat))
       (ci : gmap nat (mword 32 * mword 32)) (k : nat) : iProp Σ :=
     match M !! k, ci !! k with
     | None, None => islot_free k
     | Some (q, n), Some (dev, inum) =>
-        (islot_rest_at k q dev inum ∗ iref_slots (Pos.to_nat n))%I
+        (islot_rest_at k q dev inum ∗ iref_slots n)%I
     | _, _ => False%I
     end.
 
   Definition itable_res2 (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat) : iProp Σ :=
-    (∃ (M : gmap nat (Qp * positive)) (ci : gmap nat (mword 32 * mword 32)),
+    (∃ (M : gmap nat (Qp * nat)) (ci : gmap nat (mword 32 * mword 32)),
        itable_half (icn_ref cn) M ∗
        ⌜icM_wf M⌝ ∗ ⌜ic_ci_wf M ci nib⌝ ∗
        iref_slots_auth ∗
@@ -798,12 +798,12 @@ Section IcacheEscrow.
   (* the slot accessor a WRITER needs: BOTH pure maps may come back changed,
      provided they changed only at [k].  [IcacheInv.islots_acc_upd]'s shape
      and proof, with one more map to carry. *)
-  Lemma islots2_acc_upd (M : gmap nat (Qp * positive))
+  Lemma islots2_acc_upd (M : gmap nat (Qp * nat))
       (ci : gmap nat (mword 32 * mword 32)) (k : nat) :
     (k < NINODE)%nat ->
     ([∗ list] j ∈ seq 0 NINODE, islot2 M ci j) -∗
       islot2 M ci k ∗
-      (∀ (M' : gmap nat (Qp * positive)) (ci' : gmap nat (mword 32 * mword 32)),
+      (∀ (M' : gmap nat (Qp * nat)) (ci' : gmap nat (mword 32 * mword 32)),
          ⌜forall j, j <> k -> M' !! j = M !! j⌝ -∗
          ⌜forall j, j <> k -> ci' !! j = ci !! j⌝ -∗
          islot2 M' ci' k -∗

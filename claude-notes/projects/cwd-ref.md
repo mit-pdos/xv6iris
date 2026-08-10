@@ -246,10 +246,10 @@ with the raw block — which is where it was always going to have to come
 from, since allocproc is the function that took the slot out of
 `procs_inv`.
 
-## THE ALGEBRA CHANGE THE FILE TABLE NEEDS (decided, not yet done)
+## THE COUNT-0 FRAGMENT (DONE — the algebra is landed)
 
-`FileInv.file_payload`'s FD_INODE/FD_DEVICE arm cannot hold a real
-reference as it stands, and the reason is the CMRA, not the encoding.
+`FileInv.file_payload`'s FD_INODE/FD_DEVICE arm could not hold a real
+reference under the old CMRA, and the reason was the CMRA, not the encoding:
 
 ```coq
 icacheUR := authUR (gmapUR nat (prodR fracR positiveR))
@@ -262,54 +262,84 @@ in the AUTHORITY is `n = ip->ref`. `q` is not a fraction "of the reference"
 dfrac on `i_dev`/`i_inum` (`inode_ident`), and the table keeps `1 - qt` in
 `islot_rest`. Any positive share lets you READ dev/inum; the whole thing
 lets you WRITE them, which is what `iget` does when it recycles a slot.
-`iref_lookup`'s biconditional `n = 1 ↔ q = qt` is REF-1 exclusivity, and the
-`←` direction works because `fracR` has no unit.
-
-**So splitting a fragment duplicates its `1`.** `IcacheInv.ic_pos_op_add`
-states it outright: the count's `⋅` IS `Pos.add`. Three fds sharing one
+Splitting a fragment therefore DUPLICATED its `1` — three fds sharing a
 `struct file` would compose to `ip->ref == 3`, and xv6's `filedup` bumps
-`f->ref` and never touches `ip->ref`. `positiveR` has no zero, so the
-algebra cannot express "a share of THIS reference" at all.
+`f->ref` and never touches `ip->ref`. `positiveR` has no zero, so "a share
+of THIS reference" was inexpressible.
 
-**The fix, agreed: a count-0 fragment.** `positiveR → natR`, and then
+**`positiveR → natR`, and a fragment's count is now how many LOGICAL
+REFERENCES it carries:**
 
 | | fragment | who holds it | needs itable lock? |
 |---|---|---|---|
 | the logical reference | `(q, 1)` — `iref_tok` | the ftable slot / the cwd | — |
-| a usable share | `(q, 0)` — `iref_share` (NEW) | each fd-holder, each `ilock` caller | **no** |
+| a usable share | `(q, 0)` — `iref_share` | each fd-holder, each `ilock` caller | **no** |
 
-`iref_share` splits symmetrically, so `file_payload_split` goes through, and
-`iref_tok γ k (q1+q2) ⊣⊢ iref_tok γ k q1 ∗ iref_share γ k q2`.
+Parking the reference in the ftable slot ALONE would not have worked, and
+the reason is worth keeping: it would only be reachable under `ftable.lock`,
+and `fileread` calls `ilock(f->ip)` with no such lock, concurrently on
+multiple harts. Only the indivisible `1` is parked; the shares travel.
 
-Parking the reference in the ftable slot ALONE does not work and the reason
-is worth keeping: it would only be reachable under `ftable.lock`, and
-`fileread` calls `ilock(f->ip)` with no such lock, concurrently on multiple
-harts. Only the indivisible `1` may be parked; the shares must travel.
+### The API, as landed
 
-Two consequences, both to be handled with the change:
+`IcacheInv.v` — `iref_frag γ k q c` is the general fragment and
+`iref_tok`/`iref_share` are `c = 1` / `c = 0`; the ONE lookup lemma is
+`iref_frag_lookup` and the named instances derive from it.
+`iref_frag_op` is the split, with `iref_share_split` and
+`iref_tok_split_share` (`iref_tok γ k (q1+q2) ⊣⊢ iref_tok γ k q1 ∗
+iref_share γ k q2`) as its two uses. At the points-to level `inode_shr`
+mirrors `inode_ref`, with `inode_shr_split` and `inode_ref_split_shr`.
+`InodeRef.v` lifts both to a pointer: `iref_shr_at`, `iref_at_split`
+(`iref_at v (q1+q2) ⊣⊢ iref_at v q1 ∗ iref_shr_at v q2`) and
+`iref_shr_at_split`. **The file's old "there is no `iref_at_split`, and
+that is the point" comment block is gone — it described the old algebra.**
 
-- **`icM_wf` gains `1 <= n`.** With `positiveR` a live slot had `n >= 1` for
-  free; at `natR` it must be stated, or `(q,0)`-only slots become legal and
-  `iref_word_live`'s `0 < ip->ref` fails. (Confirmed: that is the first
-  thing that breaks.)
-- **`iref_lookup`'s `n = 1 -> q = qt` WEAKENS** and must be restated — a
-  lone reference no longer holds the whole identity, since shares are out.
-  The converse `q = qt -> n = 1` survives (every fragment carries positive
-  `q`), and that is the direction the last closer uses: it rejoins all
-  shares to `qt`, THEN learns it is alone. This is the one non-mechanical
-  step in `IcacheInv.v`; everything else there is arithmetic.
+### The two things that actually changed shape
 
-### A LIVE MIS-SPECIFICATION THIS UNCOVERED, independent of the change
+- **`icM_wf` gained `1 <= n`** (third conjunct). At `positiveR` a live slot
+  had `n >= 1` from the type; at `natR` a slot whose fragments are all
+  shares would otherwise be legal and `iref_word_live`'s `0 < ip->ref`
+  false. `icM_wf_insert` / `icM_wf_delete` discharge all three conjuncts in
+  one place, so the openings no longer re-prove them inline.
+- **`iref_lookup` lost `n = 1 -> q = qt`.** A lone reference no longer holds
+  the whole identity, because shares are out. What survives — and what the
+  consumer actually wants — is `q = qt -> n = 1`: the last closer rejoins
+  every share to `qt` FIRST, and only then learns it is alone.
+
+**The one non-obvious consequence:** `iref_close_last_step`'s "no frame can
+sit beside me" argument moved from the COUNT to the FRACTION. At `positiveR`
+the count carried it (no unit, so no frame); at `natR` a count-0 frame is
+exactly the thing to rule out, and only `Qp.add_id_free` rules it out. The
+lemma is now stated at an arbitrary `n`, since holding `qt` forces `n = 1`
+anyway. The same swap fixes `iref_close_step`'s two frame-free cases.
+
+`IrefSlots.iref_slots_no_overflow` moved from `positive` to `nat` with it.
+
+### STILL TO DO — the consumers
+
+Nothing yet HOLDS an `iref_share`; this landed the algebra, and the tree is
+green with coverage unchanged (146 proven, 78%). What it unblocks:
+
+- `FileInv.file_payload`'s FD_INODE/FD_DEVICE arm becomes
+  `iref_shr_at (fc_ip C) q`, and `file_payload_split` goes through on
+  `iref_shr_at_split`. The last closer's rejoin to `q = 1` — which
+  `file_close_last_step` already computes — is what yields the `iref_at`
+  that `iput` needs.
+- `ProcInv.cwd_ref v := ∃ q, iref_at v q` (this needed no algebra change
+  and can land independently).
+
+### A LIVE MIS-SPECIFICATION THIS UNCOVERED
 
 **`SpecIlock.v:201` and `SpecFileread.v:328` take `inode_ref … q` — a WHOLE
-reference at fraction q — where they should take a SHARE.** As written,
-three fds reading the same file hold three references, i.e. `ip->ref == 3`,
-which no code ever wrote. Both are satisfiable today only because the
-predicate is `emp`. `SpecIlock.v:40` already names the obstruction
-("`iref_tok`'s fraction and its count move together") without drawing the
-conclusion. A share is enough for `ilock`: `q > 0` gives `k ∈ dom M`, hence
-the slot is live and `ip->ref > 0`, so `InodeLock.inode_ref_spos` survives.
-
+reference at fraction q — where they should take a SHARE (`inode_shr`).**
+As written, three fds reading the same file hold three references, i.e.
+`ip->ref == 3`, which no code ever wrote. Both are satisfiable today only
+because the predicate is `emp`. `SpecIlock.v:40` already names the
+obstruction ("`iref_tok`'s fraction and its count move together") without
+drawing the conclusion — and that obstruction is now GONE. A share is
+enough for `ilock`: `q > 0` gives `k ∈ dom M`, hence the slot is live and
+`ip->ref > 0`, so `InodeLock.inode_ref_spos` survives. `ilock` is PROVEN, so
+this one costs a re-proof of `ProofIlock.v`, not just a restatement.
 ## ORDER OF WORK
 
 **Do NOT start this until kfork's proof has landed.** It touches `ProcInv.v`,
@@ -317,8 +347,8 @@ which is near the bottom of the tree — a full rebuild, ~45 min — and kfork's
 six block proofs are written against the current shapes. The right sequence
 is:
 
-1. land `kfork` proven and linked against today's contract (five icache
-   premises and all);
+1. ~~land `kfork` proven and linked against today's contract (five icache
+   premises and all)~~ — **DONE**, commit `8f5470a3`;
 2. then this project, with **kfork's contract simplification as the
    acceptance test**: `SpecKfork.v` should shed `γil`, `γi`, `ck`, `cq`,
    `cdev`, `cinum`, the `iref_slot`, the `inode_ref`, the `is_itable` /

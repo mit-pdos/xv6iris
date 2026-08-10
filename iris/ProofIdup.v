@@ -364,7 +364,7 @@ Section ProofIdup.
     (* ===== the critical section (literal [false], no hart threading) ===== *)
     iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hslots & Hpool)".
     iDestruct "Href" as "[Hrtok Hrident]".
-    iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt & _ & _).
+    iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt & _ & _ & _).
     assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
     (* [ci] is live exactly where [M] is (§13.2's first wf clause), so the
        slot's identity values are readable off [ci !! k] -- which is what
@@ -381,8 +381,7 @@ Section ProofIdup.
        table already holds for this entry are within the fixed supply, so the
        count is safely below what an int holds -- before AND after. *)
     iDestruct (iref_slots_combine with "Hiu Hislot") as "Hiu".
-    assert (Hsucc : (Pos.to_nat cnt + 1)%nat = Pos.to_nat (Pos.succ cnt))
-      by (rewrite Pos2Nat.inj_succ; lia).
+    assert (Hsucc : (cnt + 1)%nat = S cnt) by lia.
     iEval (rewrite Hsucc) in "Hiu".
     iDestruct (iref_slots_no_overflow with "Hiauth Hiu") as %[Hno _].
     iPoseProof (idi_18 with "Htext") as "Hi18".
@@ -392,7 +391,7 @@ Section ProofIdup.
     iPoseProof (idi_22 with "Htext") as "Hi22".
     iPoseProof (idi_26 with "Htext") as "Hi26".
     iPoseProof (idi_2a with "Htext") as "Hi2a".
-    assert (Hiw : iref_word M k = (mword_of_int (Z.pos cnt) : mword 32))
+    assert (Hiw : iref_word M k = (mword_of_int (Z.of_nat cnt) : mword 32))
       by (rewrite /iref_word HMk; reflexivity).
     (* +0x18 c.lw a5,8(s1) -- ATOMIC-UPDATE read: the ref word is in
        [itable_inv], not in the lock's resource. *)
@@ -414,8 +413,8 @@ Section ProofIdup.
     iApply wp_next_off_intro. iIntros "Hcg Hpc [%Hvld Hhalf]".
     subst vld. iEval (rewrite Hiw) in "Hcg".
     set (D1 := <[Regidx Ra5 := regval_into_reg
-                  (sign_extend' 64 (mword_of_int (Z.pos cnt) : mword 32))]> macq).
-    assert (HD1a5 : D1 !!! Regidx Ra5 = sign_extend' 64 (mword_of_int (Z.pos cnt) : mword 32))
+                  (sign_extend' 64 (mword_of_int (Z.of_nat cnt) : mword 32))]> macq).
+    assert (HD1a5 : D1 !!! Regidx Ra5 = sign_extend' 64 (mword_of_int (Z.of_nat cnt) : mword 32))
       by (rewrite /D1; apply upd_eq).
     assert (HD1s1 : D1 !!! Regidx Rs1 = ientry k)
       by (rewrite /D1 upd_ne; [exact Hms1 | vm_compute; discriminate]).
@@ -435,12 +434,12 @@ Section ProofIdup.
     assert (HD2s1 : D2 !!! Regidx Rs1 = ientry k)
       by (rewrite /D2 upd_ne; [exact HD1s1 | vm_compute; discriminate]).
     (* the stored word IS the successor count -- the [c.addiw] arithmetic *)
-    assert (Hstv : trunc32 (rget D2 Ra5) = (mword_of_int (Z.pos (Pos.succ cnt)) : mword 32)).
+    assert (Hstv : trunc32 (rget D2 Ra5) = (mword_of_int (Z.of_nat (S cnt)) : mword 32)).
     { rewrite (rget_ne D2 Ra5 ltac:(vm_compute; discriminate)).
       rewrite /D2 upd_eq. unfold regval_into_reg. rewrite HD1a5.
-      rewrite (moi32_storeval_succ (Z.pos cnt) ltac:(lia)
-                 ltac:(pose proof Hno as Hx; rewrite Pos2Z.inj_succ in Hx; lia)).
-      f_equal. rewrite Pos2Z.inj_succ. lia. }
+      rewrite (moi32_storeval_succ (Z.of_nat cnt) ltac:(lia)
+                 ltac:(pose proof Hno as Hx; rewrite Nat2Z.inj_succ in Hx; lia)).
+      f_equal. rewrite Nat2Z.inj_succ. lia. }
     assert (Hpp1c : add_vec_int (mword_of_int (KernelSyms.idup + 0x1a) : mword 64) 2 = mword_of_int (KernelSyms.idup + 0x1c))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1c) in "Hpc".
@@ -451,7 +450,7 @@ Section ProofIdup.
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
     iApply (wp_sw_au_idup true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) D2 (K - 4)%nat
-              (itable_half (icn_ref cn) (<[k := (qt, Pos.succ cnt)]> M) ∗
+              (itable_half (icn_ref cn) (<[k := (qt, S cnt)]> M) ∗
                iref_tok (icn_ref cn) k (q/2)%Qp ∗ iref_tok (icn_ref cn) k (q/2)%Qp)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(solve_ndisj)
@@ -466,28 +465,21 @@ Section ProofIdup.
     iDestruct (inode_ident_split k (q/2) (q/2) dev inum) as "[Hsplit _]".
     iEval (rewrite Qp.div_2) in "Hsplit".
     iDestruct ("Hsplit" with "Hrident") as "[Hid1 Hid2]".
-    iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> M) ci
+    iDestruct ("Hback" $! (<[k := (qt, S cnt)]> M) ci
                  with "[%] [%] [Hrest Hiu]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     { intros j Hj. reflexivity. }
     { rewrite /islot2 lookup_insert Hcik. iFrame "Hrest Hiu". }
     iAssert (itable_res2 cn γfs γi cov logstart nib) with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
-    { iExists (<[k := (qt, Pos.succ cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
+    { iExists (<[k := (qt, S cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
       iSplitR; [| iSplitR; [| iExact "Hslots"]].
       2:{ (* [ci] did not move, and [M]'s domain did not either: the slot was
              already live, so §13.2's three clauses are preserved. *)
         iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange).
         split_and!; [| exact Hinj | exact Hrange].
-        rewrite (dom_insert_lookup_L M k (qt, Pos.succ cnt) (mk_is_Some _ _ HMk)).
+        rewrite (dom_insert_lookup_L M k (qt, S cnt) (mk_is_Some _ _ HMk)).
         exact Hdom. }
-      iPureIntro. destruct Hwf as [Hdom Hcnt'].  split.
-      - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
-        rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
-      - intros j qj nj Hj. destruct (decide (j = k)) as [->|Hne].
-        + rewrite lookup_insert in Hj. apply Some_inj in Hj.
-          injection Hj as _ Hn. subst nj. exact Hno.
-        + rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym].
-          by apply (Hcnt' j qj). }
+      iPureIntro. apply (icM_wf_insert M k qt (S cnt) Hwf Hk Hno). lia. }
     assert (Hpp1e : add_vec_int (mword_of_int (KernelSyms.idup + 0x1c) : mword 64) 2 = mword_of_int (KernelSyms.idup + 0x1e))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp1e) in "Hpc".

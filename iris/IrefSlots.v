@@ -6,7 +6,7 @@
    [ref == 0] mean "free" and what [IcacheInv.iref_word_live] turns into
    "ilock's [ref < 1] panic is dead" -- but
 
-     forall n, Z.pos n < 2^31 -> Z.pos (Pos.succ n) < 2^31
+     forall n, Z.of_nat n < 2^31 -> Z.of_nat (S n) < 2^31
 
    is FALSE at n = 2^31 - 1, so no unconditional increment can re-establish
    the bound and no axiom may assert that it does.  [SpecFiledup.v]'s header
@@ -113,9 +113,9 @@ Section IrefSlots.
      slots is far below what an [int] can hold, so incrementing it is safe.
      This is where "there are only so many places to keep an inode" turns
      into "ip->ref++ does not overflow". *)
-  Lemma iref_slots_no_overflow (n : positive) :
-    iref_slots_auth -∗ iref_slots (Pos.to_nat n) -∗
-    ⌜(Z.pos n < 2 ^ 31)%Z /\ (Z.pos (Pos.succ n) < 2 ^ 31)%Z⌝.
+  Lemma iref_slots_no_overflow (n : nat) :
+    iref_slots_auth -∗ iref_slots n -∗
+    ⌜(Z.of_nat n < 2 ^ 31)%Z /\ (Z.of_nat (S n) < 2 ^ 31)%Z⌝.
   Proof.
     iIntros "Ha Hf".
     iDestruct (iref_slots_bound with "Ha Hf") as %Hle.
@@ -123,8 +123,6 @@ Section IrefSlots.
     assert (E31 : (2 ^ 31 = 2147483648)%Z) by (vm_compute; reflexivity).
     assert (EI : IREFSLOTS = 420%nat) by (vm_compute; reflexivity).
     rewrite EI in Hle.
-    assert (Hz : (Z.pos n <= 420)%Z).
-    { rewrite -positive_nat_Z. lia. }
     rewrite E31. lia.
   Qed.
 
