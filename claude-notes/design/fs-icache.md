@@ -1846,3 +1846,50 @@ becomes a ledger-carve + upgrade against the new ghost — same shape,
 one extra fupd) and fp_iq survives verbatim as the ledger's
 proportional accounting. What B must add that A never had to state:
 nothing — the ledger was needed either way; B just makes it sound.
+
+### 14.6 Plan B simplifies: iput needs NO witness at all — mass
+### conservation IS the witness (2026-08-10, sizing B)
+
+Keep `inode_ref k q dev inum := iref_tok k q ∗ inode_ident k q`
+CANONICALLY PAIRED (tok fraction = ident fraction — what every
+contract already states). Then:
+- a share = ident fraction carved from a reference, so its parent's
+  holder is short on ident and CANNOT meet any contract that spends
+  the reference — shares cannot outlive their parent;
+- at REF-1 the caller's canonical q + the table's (½−q) + the escrow
+  arm's ½ sum to the whole ident mass, so no share exists ANYWHERE, as
+  a corollary of `word4` fraction arithmetic, not a premise. The
+  eviction assembles full cells exactly as today. ProofIput:924/:1387
+  are UNTOUCHED (positiveR's REF-1 intact).
+- Free ident splits without the carve lemma are harmless: they make a
+  pair of fractions the holder keeps, not a share (no liveness), and
+  the holder's own contract obligations force the mass back.
+
+What the new ghost is actually FOR — not iput, but the SHARE's own
+liveness: a share-holder must refute ilock's `ref < 1` panic without a
+tok. One per-slot fractional liveness ghost (`γlive`, auth in
+`itable_body` beside the ref words, clause tying its support to
+`dom M`), minted/consumed ONLY by the carve/gather lemmas (the
+auth-guarded EVENT positiveR forces, per §14.5), retired whole by the
+last close inside the same invariant opening. So:
+`inode_shr k s dev inum := inode_ident k s ∗ live_frac k s`.
+
+C8's recorded escrow blocker ALSO dissolves: a share-holding ilock
+deposits `inode_shr` in a share-shaped OUT alternative, and iput's
+authority-side opener refutes that arm at REF-1 by the same ident-mass
+overflow (caller q + table (½−q) + arm's ½-resident + the share's s
+exceeds 1). No tok needed in the arm for that refutation.
+
+SIZING (in this project's demonstrated agent-run currency):
+- B1: γlive + carve/gather/upgrade + itable_body's extra conjunct
+  re-framed through the six store-AU lemmas + iput's last close
+  retiring the pool — one C3a-scale run.
+- B2: C8 contracts (SpecIlock/SpecIunlock/SpecFileread over
+  `inode_shr`) + the share-shaped OUT arm + ProofIlock's re-proof +
+  fileread/iunlock repairs — one to two C3b/c-scale runs (the bulk).
+- B3: port origin's two share commits (idup = carve+upgrade,
+  ProofKforkB4's shorter block, fp_iq's payload arm) — one run,
+  partly deferrable.
+Total ≈ 3–4 agent runs + one design pass: comparable to cycle C3
+alone, and far below §14.4's estimate, which budgeted ledger machinery
+for iput that B turns out not to need.
