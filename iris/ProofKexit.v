@@ -201,7 +201,7 @@ Module KexitProof (Myproc : MYPROC) (Fileclose : FILECLOSE)
 (* The prologue.  No call in it, so [CID] can be a section variable.      *)
 (* ===================================================================== *)
 Section KexitPro.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* +0x00 .. +0x10: carve the 6-slot frame, save ra/s0..s4, set s0, and
@@ -352,7 +352,7 @@ End KexitPro.
 (* carries its own [CID0] binder.                                          *)
 (* ===================================================================== *)
 Section KexitLoop.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ}.
 
@@ -707,7 +707,7 @@ End KexitLoop.
 (* every leaf and callee collapses through [wp_next_off].                  *)
 (* ===================================================================== *)
 Section KexitPark.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
 
   (* the [C]-payload extraction sched's [emp] slot needs.  Its OWN hart
      binder: the call site is past an interrupts-enabled stretch, so a lemma
@@ -740,7 +740,10 @@ Section KexitPark.
     is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
     (mword_of_int KernelSyms.initproc : mword 64) ↦₈{dqi} ip -∗
     fd_slots FDSPARE -∗
-    proc_priv γf pj pid V -∗
+    (* THE DEFICIT BLOCK: by the time kexit parks, [p->cwd] is 0 and the
+       reference it named is gone, so there is no [proc_priv] at this [V]
+       and there should not be. *)
+    proc_priv_nocwd γf pj pid V -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hj Hgl Heb Hav Hregs Hof Hcwd. subst eb.
@@ -1220,7 +1223,7 @@ End KexitPark.
 (* and nothing log-shaped survives them.                                   *)
 (* ===================================================================== *)
 Section KexitRest.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ}.
 
   Lemma kx_rest `{GEN : GenId} `{CID0 : CpuId}
@@ -1263,9 +1266,30 @@ Section KexitRest.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
     iIntros "Hcg Hown #Htext Hpc #Hprocs #Hpanic #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl Hinit Hsp Hpriv".
-    (* the cwd cell, its reference, and the pid quarter -- all three out at
-       once; see the header. *)
-    iDestruct (proc_priv_cwd_pid γf pj pid V with "Hpriv") as "(Hcwd & Href & Hpidq & Hpback)".
+    (* ### THE ONE REMAINING DISHONESTY IN kexit, WRITTEN DOWN.  ###
+       Split the REFERENCE off the block first: [ProcInv.cwd_ref] is real
+       now ([InodeRef.iref_at]), and after the [sd x0,336(s3)] below there
+       is no [proc_priv] at [pv_cwd = 0] to rebuild -- the ZOMBIE park takes
+       the deficit block ([proc_priv_to_dormant_zombie]).
+
+       [Href] IS THEN DROPPED RATHER THAN SPENT, because [SpecIput]'s
+       reference premise is still [FileInv.inode_ref ip 1], i.e. [emp].
+       That is not iput's fault and not fixable here: the other caller,
+       [fileclose], can supply nothing stronger until the file table's
+       payload arm becomes real, and iput is assumed, so strengthening its
+       premise would break a PROVEN function.  See SpecIput.v's header and
+       claude-notes/projects/cwd-ref.md, "STILL TO DO -- the consumers".
+       When that lands, pass [Href] to iput and take the [iref_slot] it
+       returns; a grep for this banner finds the work. *)
+    iDestruct (proc_priv_split_cwd γf pj pid V with "Hpriv") as "[Hpriv Href]".
+    iDestruct (proc_priv_nocwd_cwd_pid γf pj pid V with "Hpriv")
+      as "(Hcwd & Hpidq & Hpback)".
+    iClear "Href".
+    (* iput's reference premise is [FileInv.inode_ref ip 1], i.e. [emp] --
+       the placeholder the banner above is about.  Named rather than passed
+       as a [[]] goal so the day the premise becomes real, this line is
+       where [Href] goes. *)
+    iAssert (FileInv.inode_ref (pv_cwd V) 1) as "Hiputref"; [done|].
     iPoseProof (kxi_4c with "Htext") as "Hi4c".
     iPoseProof (kxi_50 with "Htext") as "Hi50".
     iPoseProof (kxi_54 with "Htext") as "Hi54".
@@ -1354,7 +1378,7 @@ Section KexitRest.
               cov logstart dev (pv_cwd V) MAXOPBLOCKS pid (DfracOwn (1/4)) Q2 av true C b
               ltac:(unfold K_iput; lia) Hgeom ltac:(unfold iput_units; lia) Hj Hgl HQ2a0 eq_refl
               with "Hcg Hown Htext Hpc Hpanic Hbio Hlog Hpidq Hprocs
-                    Hdev Hgeo Hdlk Hbsl Href Hop [-]").
+                    Hdev Hgeo Hdlk Hbsl Hiputref Hop [-]").
     iIntros (CID5 Hs5 mip n') "%Hcsip Hcg Hown Hpc Hpidq Hbsl %Hn' Hop".
     assert (Hpc58 : ret_pc (Q2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x58))
@@ -1402,8 +1426,9 @@ Section KexitRest.
     assert (Heo_s4 : meo !!! Regidx (mword_of_int 20 : mword 5) = sv).
     { rewrite (callee_saved_lookup Hcseo (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity)).
       exact HQ3s4. }
-    (* +0x5c sd x0,336(s3) : p->cwd = 0, the first moment [cwd_ref] can be
-       re-supplied ([ProcInv.cwd_ref_null]). *)
+    (* +0x5c sd x0,336(s3) : p->cwd = 0.  Nothing is re-supplied here --
+       there is no [cwd_ref] at [zero_reg] to introduce, which is exactly
+       why the ZOMBIE block is the deficit one. *)
     assert (Hrgeo19 : rget (CID := CID7) meo (mword_of_int 19 : mword 5)
                       = meo !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
     iApply (wp_sd_zero_s_sconf (CID := CID7) (mword_of_int (KX + 0x5c))
@@ -1415,8 +1440,7 @@ Section KexitRest.
     assert (Hpp60 : add_vec_int (mword_of_int (KX + 0x5c) : mword 64) 4 = mword_of_int (KX + 0x60))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp60) in "Hpc".
-    iDestruct ("Hpback" $! (zero_reg : mword 64) with "Hcwd [] Hpidq") as "Hpriv".
-    { iApply cwd_ref_null. }
+    iDestruct ("Hpback" $! (zero_reg : mword 64) with "Hcwd Hpidq") as "Hpriv".
     iDestruct (cpu_own_transport CID7 CID8 0 true pj C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv dqi meo av true C b pid
@@ -1434,7 +1458,7 @@ End KexitRest.
 (* The whole function.                                                    *)
 (* ===================================================================== *)
 Section ProofKexit.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ,
             !kallocG Σ}.
 

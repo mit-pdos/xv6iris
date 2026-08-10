@@ -66,7 +66,7 @@ Local Open Scope Z_scope.
 Definition forkret_pc : mword 64 := mword_of_int KernelSyms.forkret.
 
 Definition forkret_park_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
      (γs : list gname)
     (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
     (pid : mword 32) (V : pprivate) : Prop :=
@@ -79,7 +79,7 @@ Definition forkret_park_body
 
 Module Type FORKRET_PARK.
   Parameter forkret_park :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
        (γs : list gname)
       (γf : gname) (pa ks : mword 64) (rest : list (mword 64))
       (pid : mword 32) (V : pprivate),

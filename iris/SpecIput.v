@@ -28,15 +28,30 @@
    whole of it, and it is the whole of what its callers -- kexit here, and
    sys_chdir / sys_unlink / fileclose later -- actually depend on.
 
-   The reference is [ProcInv.cwd_ref ip].  There is no inode model in this
-   tree yet, so that predicate is literally [emp] (design/proc-struct.md,
-   "holes to be honest about"): it is a PLACEHOLDER with the shape of
-   [ofile_slot]'s file clause, deliberately introduced so that the contracts
-   which surrender an inode reference can be written NOW and gain content
-   later without being restated.  This spec is one of those contracts.  When
-   the inode layer lands, [cwd_ref] becomes "ip names a live itable entry
-   and this is one of its references" and iput's precondition here does not
-   change a character.
+   ==== THE REFERENCE PREMISE IS THE REMAINING HOLE ======================
+
+   It is [FileInv.inode_ref ip 1], which is literally [emp].  It used to be
+   spelled [ProcInv.cwd_ref ip] -- the SAME proposition, but named after the
+   process side and dragging a [ProcInv] import into a filesystem contract,
+   which is what forced [fileclose] to launder a file's payload into a "cwd"
+   reference at its [iput] call.  That laundering is gone; the name here is
+   now the one whose content it actually is.
+
+   [ProcInv.cwd_ref] IS REAL NOW ([InodeRef.iref_at]), and this premise is
+   deliberately NOT it.  The blocker is the other caller: the last
+   [fileclose] of an FD_INODE file must hand this function the reference its
+   [struct file] held, and [FileInv.file_payload]'s inode arm is still a
+   placeholder because parking ONE reference behind FRACTIONAL payload
+   holders is an unsolved file-table design question -- see
+   claude-notes/projects/cwd-ref.md, "STILL TO DO -- the consumers".
+   Strengthening this premise before that lands would break fileclose, which
+   is proven.
+
+   WHAT THAT COSTS TODAY, precisely: kexit holds a real [cwd_ref] and must
+   DROP it here rather than spend it (ProofKexit.v, at the [ld a0,336(s3)]),
+   and this contract returns no [IrefSlots.iref_slot] for the reference it
+   destroys.  Both go away together with the file-table half, and both are
+   marked at their sites.
 
    The budget is a SPEND-AT-MOST clause, the shape [SpecBmap.v] fixed and
    for the same reason: [log_op] moves only through [LogInv.log_spend_step]
@@ -150,8 +165,8 @@ Definition wp_iput_sconf_body
   (* three buffer slots: the inode block is held across the indirect
      block's bread and across log_write, as in bmap *)
   bslots bn 3 -∗
-  (* THE REFERENCE BEING DESTROYED -- today a placeholder, see the header *)
-  cwd_ref ip -∗
+  (* THE REFERENCE BEING DESTROYED -- still a placeholder, see the header *)
+  FileInv.inode_ref ip 1 -∗
   (* this operation's reservation *)
   log_op γ n -∗
   wp_next b pj (fun (CID : CpuId) =>

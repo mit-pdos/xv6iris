@@ -84,7 +84,7 @@ Proof. unfold NARG. lia. Qed.
 Module SysExitProof (Argint : ARGINT) (Kexit : KEXIT) : SYSEXIT.
 
 Section ProofSysExit.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
             !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 

@@ -1,5 +1,41 @@
 # Project: filling `cwd_ref` — the inode-reference hole
 
+**STATUS (2026-08-10): `cwd_ref` IS REAL AND kfork's CONTRACT IS CLEAN.**
+`ProcInv.cwd_ref v := ∃ q, InodeRef.iref_at v q`, the construction-window
+split is in (`proc_priv_nocwd`), `cwd_ref_null` is retired, and `SpecKfork`
+has shed `ck`, `cq`, `cdev`, `cinum`, the `inode_ref` premise and the
+`pv_cwd Vp = ientry ck` side condition — the acceptance test named in ORDER
+OF WORK below. Tree green, coverage unchanged (146 proven / 78%), and
+`Print Assumptions Kfork.wp_kfork_sconf` is still the five `rv64d.*`
+platform axioms + funext + `forkret_park` — no `Iput`.
+
+**WHAT IS LEFT**, in the order it should be done:
+
+1. **The `iref_slot` routing** (the "THE ROUTING" section below, untouched).
+   kfork still takes an `IrefSlots.iref_slot` as a premise; it should come
+   out of `proc_dormant` with the block, the way `fd_slots FDSPARE` does.
+   This is what makes `IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE` true
+   rather than merely plausible.
+2. **The file table's half** — `FileInv.file_payload`'s FD_INODE arm, which
+   is what unblocks a real `SpecIput`. See "STILL TO DO — the consumers"
+   and the two marked holes listed under WHAT IS STILL DISHONEST.
+
+**WHAT IS STILL DISHONEST, and both sites carry a `###` banner:**
+
+- `SpecIput`'s reference premise is still `FileInv.inode_ref ip 1` (= `emp`).
+  It CANNOT be strengthened until the file-table half lands, because the
+  other caller — `fileclose`, which is PROVEN — can supply nothing stronger.
+  Consequence: **`ProofKexit` DROPS its real `cwd_ref` at the `iput` call**
+  (`iClear "Href"`, banner at the `proc_priv_split_cwd`), and iput returns
+  no `iref_slot`. `grep -n 'REMAINING DISHONESTY' iris/ProofKexit.v`.
+- What this commit DID delete: `ProofKforkB4.kfk_cwd_ref_any` (the child's
+  reference is now idup's second half — `kfk_child_cwd`), and
+  `ProofFileclose`'s laundering of a file payload into a "cwd" reference
+  (`SpecIput` no longer names `ProcInv.cwd_ref`, so there is nothing to
+  launder into).
+
+---
+
 This is S5 of [`proc-struct-resources.md`](proc-struct-resources.md), promoted
 to its own file because it stopped being blocked and started being urgent.
 

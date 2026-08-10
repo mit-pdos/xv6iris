@@ -487,7 +487,7 @@ End ProofKforkParts.
 (*  THE RESOURCE-LEVEL BRIDGES.                                         *)
 (* =================================================================== *)
 Section KforkRes.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId}.
 
   (* ---- the WRITE twin of [ProcInv.tf_page_word] ------------------- *)
@@ -541,6 +541,42 @@ Section KforkRes.
     iSplitR; [iPureIntro; exact Hszb|].
     iSplitR; [iPureIntro; exact Hbel|].
     iFrame "Hpid Hf Hpg Htfc Hptt Htfp Hc".
+  Qed.
+
+  (* the same two, on the DEFICIT block: the child travels as
+     [proc_priv_nocwd] from allocproc's return until kfork's
+     [sd a0,336(s4)] installs its working directory, so every accessor
+     applied to the child in that window needs this shape.  Neither touches
+     [p->cwd], which is why they are twins and not weakenings. *)
+  Lemma proc_priv_nocwd_tf_upd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗
+    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) ∗
+    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+    (∀ ws' : list (mword 64),
+       p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) -∗
+       tf_page (ud_tfp (pv_upt V)) ws' -∗
+       proc_priv_nocwd γf pa pid (upd_pt V (pv_upt V) ws')).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iFrame "Htfc Htfp".
+    iIntros (ws') "Htfc Htfp".
+    rewrite /proc_priv_nocwd /proc_pt_at.
+    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [iPureIntro; exact Hszb|].
+    iSplitR; [iPureIntro; exact Hbel|].
+    iFrame "Hpid Hf Hpg Htfc Hptt Htfp Ho".
+  Qed.
+
+  Lemma proc_priv_nocwd_tfp_valid (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗ ⌜page_valid (page_base (ud_tfp (pv_upt V)))⌝.
+  Proof.
+    iIntros "(_ & _ & _ & _ & Hpt & _)".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(_ & _ & Hptt)".
+    iDestruct (proc_pt_wf_get with "Hptt") as "%Hwf".
+    iPureIntro. exact (proj2 (proj2 (proj2 (proj2 Hwf)))).
   Qed.
 
   (* [upd_pt] at the SAME descriptor and the SAME contents is the identity --
@@ -638,13 +674,19 @@ End KforkRes.
 (*  [proc_pt_wf]'s last conjunct -- see [proc_priv_tfp_valid].            *)
 (* =================================================================== *)
 Section KforkFreeproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
+  (* IT TAKES THE DEFICIT BLOCK, and that is forced: the premise
+     [pv_cwd V = 0] and [ProcInv.cwd_ref] having no null arm together make
+     [proc_priv] at this [V] uninhabited.  The child kfork hands freeproc
+     has never had a working directory -- allocproc left the cell at 0 and
+     uvmcopy failed before the [sd a0,336(s4)] -- so the deficit block is
+     exactly what the caller holds. *)
   Lemma kfk_of_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd V = (zero_reg : mword 64) ->
-    proc_priv γf pa pid V -∗
+    proc_priv_nocwd γf pa pid V -∗
     fd_slots FDSPARE -∗
     own_ctx (p_context pa) -∗
     SpecFreeproc.fp_rest pa V pid ∗
@@ -653,8 +695,8 @@ Section KforkFreeproc.
   Proof.
     intros Hof Hcwd.
     iIntros "Hpv Hsp Hctx".
-    iDestruct (proc_priv_tfp_valid with "Hpv") as "%Hpv".
-    iDestruct "Hpv" as "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & _) Ho]".
+    iDestruct (proc_priv_nocwd_tfp_valid with "Hpv") as "%Hpv".
+    iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
     iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho")
       as "[Hcells Hunits]".
     rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".

@@ -37,6 +37,7 @@ From Kernel Require KernelInstrs.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import KernelRvcDecode.
+Require Import InodeRef.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -47,7 +48,7 @@ Local Open Scope Z_scope.
 Module ArgaddrProof (Argraw : ARGRAW) : ARGADDR.
 
 Section ProofArgaddr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

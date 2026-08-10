@@ -127,7 +127,7 @@ End PstateUsedHelper.
 Module KforkB5 (AQ : ACQUIRE) (RL : RELEASE) (FP : FORKRET_PARK).
 
 Section ProofKforkB5.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
   Notation Ra0 := (mword_of_int 10 : mword 5).

@@ -372,7 +372,7 @@ Module AllocprocCore (Acquire : ACQUIRE) (Release : RELEASE) (Allocpid : ALLOCPI
                      (FP : FREEPROC) : ALLOCPROC_GEN.
 
 Section ProofAllocproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
   (* The section's hart is called [CID0], NOT [CID]: the loop invariant, the
      epilogue and every leaf continuation bind a fresh [CID], and a section
      variable of that name would be shadowed by them -- while the lemma's own
@@ -1875,7 +1875,7 @@ Section ProofAllocproc.
         { rewrite /proc_pt_at. cbn [ud_root ud_tfp].
           iFrame "Hpt". iSplitL "Hpgcell"; [iExact "Hpgcell"|].
           iEval (rewrite -Hbasetf) in "Htfcell". iExact "Htfcell". }
-        iDestruct (proc_priv_intro γf (proc_addr k) pidn V (upt_desc (pt_base t) tfp) tfws
+        iDestruct (proc_priv_nocwd_intro γf (proc_addr k) pidn V (upt_desc (pt_base t) tfp) tfws
                      Hszb (um_below_empty (pv_sz V))
                      with "Hpidown Hfields Hptat [Htfpage] Hofiles") as "Hpriv".
         { cbn [ud_tfp]. iExact "Htfpage". }
@@ -2143,7 +2143,7 @@ End AllocprocCore.
 Module AllocprocSeal (Core : ALLOCPROC_GEN) : ALLOCPROC.
 
 Section SealAllocproc.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Lemma wp_allocproc_sconf

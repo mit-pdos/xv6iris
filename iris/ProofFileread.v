@@ -233,9 +233,9 @@ Module FilereadProof (Piperead : PIPEREAD) (Ilock : ILOCK) (Readi : READI)
                      (Iunlock : IUNLOCK) (Consoleread : CONSOLEREAD) : FILEREAD.
 
 Section ProofFileread.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).

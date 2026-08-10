@@ -264,9 +264,9 @@ Global Instance fread_names_inhabited : Inhabited fread_names :=
     (mword_of_int 0) (DfracOwn 1)).
 
 Section SpecFileread.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
             !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-            !icacheG Σ, !irefslotG Σ, !iregG Σ}.
+            !irefslotG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   (* ---- the FD_DEVICE arm's environment ---- *)
@@ -405,9 +405,9 @@ Section SpecFileread.
 End SpecFileread.
 
 Definition wp_fileread_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-      !icacheG Σ, !irefslotG Σ, !iregG Σ}
+      !irefslotG Σ, !iregG Σ}
     `{GEN : GenId} `{CID : CpuId}
     
     (γa : gname) (γf : gname)                    (* kalloc, the file table  *)
@@ -465,9 +465,9 @@ Definition wp_fileread_sconf_body
 
 Module Type FILEREAD.
   Parameter wp_fileread_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ,
-             !icacheG Σ, !irefslotG Σ, !iregG Σ}
+             !irefslotG Σ, !iregG Σ}
       `{GEN : GenId} `{CID : CpuId}
       
       (γa : gname) (γf : gname)

@@ -22,8 +22,9 @@
    comes back unchanged relative to [M] -- exactly the shape
    [ProofKforkB2.kfk_tf_copy_loop] uses for the same reason.
 
-   THE RESOURCE: the child's [ProcInv.proc_priv], opened with
-   [ProofKforkParts.proc_priv_tf_upd] (which lends the [p_trapframe] cell
+   THE RESOURCE: the child's [ProcInv.proc_priv_nocwd] -- it is still in
+   the construction window, its [p->cwd] is 0 -- opened with
+   [ProofKforkParts.proc_priv_nocwd_tf_upd] (which lends the [p_trapframe] cell
    WHOLE plus the bare [tf_page], and takes back a possibly-different
    [ws']) -- the accessor for both the [ld] (reads the pointer) and the
    [sd] (writes trapframe word 14, [ProcGeom.tf_arg_idx 0]) here. *)
@@ -85,7 +86,7 @@ Proof.
 Qed.
 
 Section KforkB7.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Ra5 := (mword_of_int 15 : mword 5).
@@ -118,7 +119,7 @@ Section KforkB7.
     sie_cap_gpr M n false p -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0x66) : mword 64) -∗
-    proc_priv γf npa pid_c V -∗
+    proc_priv_nocwd γf npa pid_c V -∗
     wp_next false p (fun (CID : CpuId) =>
       ∀ Mx : regfile,
         ⌜ Mx !!! Regidx Rs1 = p_ofile pme 0 /\ Mx !!! Regidx Rs2 = p_ofile npa 0 /\
@@ -128,7 +129,7 @@ Section KforkB7.
               r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> Mx !!! Regidx r = M !!! Regidx r) ⌝ -∗
         sie_cap_gpr Mx n false p -∗
         pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
-        proc_priv γf npa pid_c (upd_pt V (pv_upt V) (<[(14%nat) := zero_reg]> (pv_tf V))) -∗
+        proc_priv_nocwd γf npa pid_c (upd_pt V (pv_upt V) (<[(14%nat) := zero_reg]> (pv_tf V))) -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -141,7 +142,7 @@ Section KforkB7.
     iPoseProof (kfk_076 with "Htext") as "Hi076".
     iPoseProof (kfk_07a with "Htext") as "Hi07a".
     (* ---- open the child's proc_priv for the read+write on its trapframe ---- *)
-    iDestruct (proc_priv_tf_upd with "Hpv") as "(Htf & Htfp & Hclose)".
+    iDestruct (proc_priv_nocwd_tf_upd with "Hpv") as "(Htf & Htfp & Hclose)".
     iDestruct (kfkb7_tf_len with "Htfp") as %Hlen14.
     assert (Hidx14 : (14 < length (pv_tf V))%nat) by (rewrite Hlen14; unfold TFWORDS; lia).
     destruct (lookup_lt_is_Some_2 (pv_tf V) (14%nat) Hidx14) as [w14 Hw14].

@@ -85,7 +85,7 @@ Import Defs.
    callees: kwait's 60 (argaddr's is 18). *)
 Definition sys_wait_stack : nat := (4 + K_kwait)%nat.
 
-Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
     (γa γf γw : gname)  (γs : list gname) (j : nat) (γl : gname)
     (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
     (pid : mword 32) (V : pprivate) (v0 : mword 64) :=
@@ -121,7 +121,7 @@ Definition wp_sys_wait_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG �
 
 Module Type SYSWAIT.
   Parameter wp_sys_wait_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ} `{GEN : GenId} `{CID : CpuId}
       (γa γf γw : gname) (γs : list gname) (j : nat) (γl : gname)
       (m : regfile) (av : nat) (eb : bool) (C : iProp Σ) (b : bool)
       (pid : mword 32) (V : pprivate) (v0 : mword 64),

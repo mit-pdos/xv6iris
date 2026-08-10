@@ -91,7 +91,7 @@ Proof. unfold upd_upt. by destruct V. Qed.
 Module FetchstrProof (Myproc : MYPROC) (Copyinstr : COPYINSTR) (Strlen : STRLEN) : FETCHSTR.
 
 Section ProofFetchstr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

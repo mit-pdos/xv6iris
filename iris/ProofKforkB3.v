@@ -228,7 +228,7 @@ Proof. lia. Qed.
 Module KforkB3 (FD : FILEDUP).
 
 Section KforkB3Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rs0 := (mword_of_int 8 : mword 5).
@@ -283,13 +283,13 @@ Section KforkB3Proof.
           cpu_own n eb pme C b -∗
           pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
-          proc_priv γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
+          proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
           WP (Loop : expr riscv_lang)) -∗
       sie_cap_gpr M (K - 8)%nat b pme -∗
       cpu_own n eb pme C b -∗
       pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
       proc_priv γf pme pid_p Vp -∗
-      proc_priv γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
+      proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
       WP (Loop : expr riscv_lang)).
   Proof.
     intros HK Hn HV0.
@@ -318,13 +318,13 @@ Section KforkB3Proof.
               cpu_own n eb pme C b -∗
               pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
               proc_priv γf pme pid_p Vp -∗
-              proc_priv γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
+              proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
               WP (Loop : expr riscv_lang)) -∗
           sie_cap_gpr M (K - 8)%nat b pme -∗
           cpu_own n eb pme C b -∗
           pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
-          proc_priv γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
+          proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) -∗
           WP (Loop : expr riscv_lang)))%I
       with "[]" as "Hloop".
     { iIntros (fuel). iInduction fuel as [|fuel IHf] "IHf".
@@ -346,7 +346,7 @@ Section KforkB3Proof.
           cpu_own n eb pme C b -∗
           pc_is (mword_of_int (KF + 0x8e) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
-          proc_priv γf npa pid_c (kfk_childV V0 (pv_ofile Vp) (S i)) -∗
+          proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) (S i)) -∗
           WP (Loop : expr riscv_lang)))%I
         with "[Hqx]" as "Htail".
       { iIntros (CIDta Hsta Mt) "%Hregst Hcg Hown Hpc Hpv Hpv2".
@@ -560,7 +560,7 @@ Section KforkB3Proof.
         { unfold kfk_childV. cbn [pv_ofile].
           rewrite (kfk_ofile_at_lookup_i (pv_ofile Vp) (pv_ofile V0) i HlenVp Hi).
           rewrite HV0. apply lookup_replicate. split; [reflexivity | lia]. }
-        iDestruct (proc_priv_ofile γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) i
+        iDestruct (proc_priv_nocwd_ofile γf npa pid_c (kfk_childV V0 (pv_ofile Vp) i) i
                      (zero_reg : mword 64) Hvc with "Hpv2") as "[Hslot2 Hback2]".
         iDestruct (ofile_slot_null with "Hslot2") as "[Hcell2 Hfds]".
         (* ---- +0x9a: jal ra,filedup ---- *)

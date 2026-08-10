@@ -50,6 +50,7 @@ Require Import UserPtTree ProcPtOwn.
 Require Import SwtchCtx.
 Require Import WpLock.
 Require Import FdSlots FileInv.
+Require Export InodeRef.
 Require Import KallocInv PageFields ByteBuf.
 From Kernel Require KernelSyms.
 Require Import RiscvExtras.
@@ -160,7 +161,14 @@ Section ProcInv.
   Definition ofile_cells (pa : mword 64) (fs : list (mword 64)) : iProp Σ :=
     ([∗ list] fd ↦ v ∈ fs, p_ofile pa fd ↦₈ v)%I.
 
-  Context `{!lockG Σ, !fileG Σ, !fdslotG Σ}.
+  (* [irefNameG] carries the itable's reference authority CANONICALLY --
+     there is exactly one itable per system, and threading its gname would
+     put a filesystem ghost NAME on [proc_priv], hence on the thirty-three
+     spec files that mention it, purely so a process can name its cwd.
+     [FdSlots] and [IrefSlots] already do this and [IrefSlots.v]'s header
+     spells out the argument.  What propagates is the CLASS -- capacity, no
+     resource, no change to any statement's shape. *)
+  Context `{!lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
 
   (* A LIVE fd slot: the cell, and -- when non-null -- an actual reference on
      the [struct file] it points at.  [file_ref] is deliberately neither
@@ -522,17 +530,35 @@ Section ProcInv.
   (* =================================================================== *)
   (* THE resource that rides alongside [cur_proc p].                      *)
   (* =================================================================== *)
-  (* [cwd]: there is no inode model in the tree yet, so the "cwd names a
-     live inode" clause is [emp] for now -- deliberately a hole with the
-     shape of [ofile_slot]'s, so it can be filled without restating any
-     caller.  See the "holes" section of design/proc-struct.md.
+  (* [cwd]: a live process HOLDS ONE REFERENCE to the inode its working
+     directory names.  This was a placeholder equal to [emp] until the
+     icache landed; it is now [InodeRef.iref_at], the real thing.
 
-     It is the WHOLE of [FileInv.inode_ref], the same placeholder a
-     FD_INODE / FD_DEVICE [file_ref] carries fractionally as its payload:
-     p->cwd holds a reference outright, and the last [fileclose] of an inode
-     file recovers fraction 1 of one and hands it to [iput] -- which is why
-     the two must be the same predicate rather than two holes. *)
-  Definition cwd_ref (v : mword 64) : iProp Σ := inode_ref v 1.
+     THE FRACTION IS EXISTENTIAL, for the same reason [ofile_slot] hides a
+     descriptor's: [SpecIdup] HALVES the caller's share, so a predicate
+     pinned at 1 could not survive a [fork].  The slot index is existential
+     too and nothing is lost by it -- [IcacheInv.ientry_inj] recovers it
+     from the pointer.
+
+     THERE IS NO [v = zero_reg] DISJUNCT, AND THAT IS THE POINT.  "A live
+     process has a non-null cwd" must not be a fact any state transition
+     re-establishes: [SchedCtx.proc_slots_recast] moves SLEEPING -> RUNNABLE
+     -> RUNNING for free, and it stays free only because [proc_slots]
+     mentions neither [proc_ctx]'s nor [proc_dormant]'s contents.  With no
+     null arm nothing has to be said at all: [cwd_ref_nonzero] below is a
+     PROJECTION of the block, three lines from [ientry_nonzero].
+
+     The price is that [proc_priv] must not cover the CONSTRUCTION WINDOW --
+     allocproc returns a live process whose cwd it has not set, and kfork
+     holds it that way for 150 bytes.  That is what [proc_priv_nocwd] is
+     for; see [proc_priv_split_cwd]. *)
+  Definition cwd_ref (v : mword 64) : iProp Σ := (∃ q : Qp, iref_at v q)%I.
+
+  Lemma cwd_ref_nonzero (v : mword 64) :
+    cwd_ref v -∗ ⌜v <> (zero_reg : mword 64)⌝.
+  Proof.
+    iIntros "(%q & Hr)". by iApply (iref_at_nonzero with "Hr").
+  Qed.
 
   (* [p->sz] NEVER EXCEEDS MAXVA.  This is a real invariant of a live
      process -- exec and growproc are the only writers and both bound the
@@ -579,6 +605,147 @@ Section ProcInv.
   Definition proc_priv (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) : iProp Σ :=
     (proc_priv_core pa pid V ∗ proc_ofiles γf pa (pv_ofile V))%I.
 
+  (* ---- THE CONSTRUCTION WINDOW -------------------------------------
+     [cwd_ref] has no null arm, so a process whose [p->cwd] is still 0 does
+     not satisfy [proc_priv] -- and allocproc returns exactly such a
+     process, which kfork then holds for 150 bytes before its
+     [sd a0,336(s4)].  So the reference SPLITS OFF, the same move S4c made
+     for the fd table: a block with a deficit is not [proc_priv ∗ anything],
+     so split at the component the callee does not touch.
+
+     Note this splits only the REFERENCE, not the [p_cwd] CELL: the cell
+     stays inside [proc_fields], so [proc_dormant], [SpecFreeproc] and every
+     other consumer of [proc_fields] is untouched.  A holder of the deficit
+     block still owns the cell and writes it with
+     [proc_priv_nocwd_cwd]. *)
+  Definition proc_priv_nocwd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) : iProp Σ :=
+    (⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
+     ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+     p_pid pa ↦₄{DfracOwn (1/2)} pid ∗
+     proc_fields pa (DfracOwn 1) V ∗
+     proc_pt_at pa (pv_upt V) ∗
+     tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+     proc_ofiles γf pa (pv_ofile V))%I.
+
+  Lemma proc_priv_split_cwd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V ⊣⊢ proc_priv_nocwd γf pa pid V ∗ cwd_ref (pv_cwd V).
+  Proof.
+    rewrite /proc_priv /proc_priv_core /proc_priv_nocwd.
+    iSplit.
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+      iFrame "Hc". iSplitR; [done|]. iSplitR; [done|]. iFrame.
+    - iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hc]".
+      iSplitR "Ho"; [|iExact "Ho"].
+      iSplitR; [done|]. iSplitR; [done|]. iFrame.
+  Qed.
+
+  (* the deficit block's [p->cwd] CELL, borrowed and replaced -- what the
+     [sd] that installs a working directory needs.  [proc_priv_cwd] cannot
+     serve: it hands out the reference too, and during the window there is
+     none. *)
+  Lemma proc_priv_nocwd_cwd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗
+    p_cwd pa ↦₈ pv_cwd V ∗
+    (∀ v' : mword 64,
+       p_cwd pa ↦₈ v' -∗ proc_priv_nocwd γf pa pid (upd_cwd V v')).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iFrame "Hcwd". iIntros (v') "Hcwd".
+    rewrite /proc_priv_nocwd /proc_fields.
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [done|]. iSplitR; [done|]. iFrame "Hpid".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iFrame.
+  Qed.
+
+  (* the cwd cell AND the pid quarter out of the deficit block, because
+     kexit needs both at once and for [proc_priv_cwd_pid]'s reason: begin_op
+     / iput / end_op each take [p_pid pa ↦₄{dq} _], while the cwd cell has
+     to stay out across all three -- from the [ld a0,336(s3)] that reads the
+     pointer iput destroys to the [sd x0,336(s3)] that clears it.  kexit
+     splits the REFERENCE off first ([proc_priv_split_cwd]) and spends it,
+     so what it holds across the call is the deficit block; this is the
+     accessor at that altitude. *)
+  Lemma proc_priv_nocwd_cwd_pid (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗
+    p_cwd pa ↦₈ pv_cwd V ∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
+    (∀ v' : mword 64,
+       p_cwd pa ↦₈ v' -∗ p_pid pa ↦₄{DfracOwn (1/4)} pid -∗
+       proc_priv_nocwd γf pa pid (upd_cwd V v')).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    rewrite /proc_fields. iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
+    rewrite Hq word4_pointsto_frac_split.
+    iDestruct "Hpid" as "[Hq1 Hq2]".
+    iFrame "Hcwd Hq1". iIntros (v') "Hcwd Hq1".
+    rewrite /proc_priv_nocwd /proc_fields.
+    cbn [upd_cwd pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [done|]. iSplitR; [done|].
+    rewrite Hq word4_pointsto_frac_split. iFrame "Hq1 Hq2".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro; exact Hnl. }
+    iFrame.
+  Qed.
+
+  (* and the deficit block's own projections, for a holder that has not yet
+     installed a cwd.  (The [pv_cwd V <> 0] projection is NOT among them --
+     during the window it is false.) *)
+  Lemma proc_priv_nocwd_ofile_len (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗ ⌜length (pv_ofile V) = NOFILE⌝.
+  Proof. iIntros "(_ & _ & _ & _ & _ & _ & [%Hlen _])". done. Qed.
+
+  Lemma proc_priv_nocwd_sz_maxsz (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗ ⌜uint (pv_sz V) <= uvm_maxsz⌝.
+  Proof. iIntros "(%Hszb & _)". done. Qed.
+
+  Lemma proc_priv_nocwd_um_below (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗ ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝.
+  Proof. iIntros "(_ & %Hbel & _)". done. Qed.
+
+  Lemma proc_priv_nocwd_pid (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗
+    p_pid pa ↦₄{DfracOwn (1/4)} pid ∗
+    (p_pid pa ↦₄{DfracOwn (1/4)} pid -∗ proc_priv_nocwd γf pa pid V).
+  Proof.
+    iIntros "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    assert (Hq : (1/2)%Qp = (1/4 + 1/4)%Qp) by compute_done.
+    rewrite Hq word4_pointsto_frac_split.
+    iDestruct "Hpid" as "[Hq1 Hq2]". iFrame "Hq1".
+    iIntros "Hq1". rewrite /proc_priv_nocwd Hq word4_pointsto_frac_split.
+    iSplitR; [done|]. iSplitR; [done|]. iFrame.
+  Qed.
+
+  Lemma proc_priv_nocwd_ofile (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (fd : nat) (v : mword 64) :
+    pv_ofile V !! fd = Some v ->
+    proc_priv_nocwd γf pa pid V -∗
+    ofile_slot γf pa fd v ∗
+    (∀ v', ofile_slot γf pa fd v' -∗
+       proc_priv_nocwd γf pa pid (upd_ofile V fd v')).
+  Proof.
+    iIntros (Hfd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & [%Hlen Ho])".
+    iDestruct (big_sepL_insert_acc with "Ho") as "[$ Hback]"; first exact Hfd.
+    iIntros (v') "Hslot". iDestruct ("Hback" $! v' with "Hslot") as "Ho".
+    rewrite /proc_priv_nocwd /proc_ofiles.
+    cbn [upd_ofile pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [iPureIntro; exact Hszb|].
+    iSplitR; [iPureIntro; exact Hbel|].
+    iFrame "Hpid Hf Hpt Htfp Ho". iPureIntro.
+    rewrite length_insert. exact Hlen.
+  Qed.
+
   (* the split, as an equivalence -- everything below and every landed spec
      keeps using [proc_priv] and never sees the core *)
   Lemma proc_priv_split (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
@@ -603,7 +770,29 @@ Section ProcInv.
      invariant keeps it); everything else is a straight repackaging.
        The coherence conjunct is the caller's, and it costs allocproc
      nothing: the table it just built has an EMPTY user map, and
-     [ProcPtOwn.um_below_empty] holds at any size. *)
+     [ProcPtOwn.um_below_empty] holds at any size.
+       It produces the DEFICIT block: allocproc's [p->cwd] is still 0 at this
+     point, and [cwd_ref] has no null arm, so there is no [proc_priv] to be
+     had here and there should not be.  The caller that installs a working
+     directory closes the window with [proc_priv_split_cwd]. *)
+  Lemma proc_priv_nocwd_intro (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) (P : uptd) (ws : list (mword 64)) :
+    (uint (pv_sz V) <= uvm_maxsz)%Z ->
+    um_below (pv_sz V) (ud_um P) ->
+    p_pid pa ↦₄{DfracOwn (1/2)} pid -∗
+    proc_fields pa (DfracOwn 1) V -∗
+    proc_pt_at pa P -∗
+    tf_page (ud_tfp P) ws -∗
+    proc_ofiles γf pa (pv_ofile V) -∗
+    proc_priv_nocwd γf pa pid (upd_pt V P ws).
+  Proof.
+    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho".
+    rewrite /proc_priv_nocwd.
+    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR; [iPureIntro; exact Hsz|].
+    iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpid Hf Hpt Htf Ho".
+  Qed.
+
   Lemma proc_priv_intro (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) (P : uptd) (ws : list (mword 64)) :
     (uint (pv_sz V) <= uvm_maxsz)%Z ->
@@ -613,14 +802,14 @@ Section ProcInv.
     proc_pt_at pa P -∗
     tf_page (ud_tfp P) ws -∗
     proc_ofiles γf pa (pv_ofile V) -∗
+    cwd_ref (pv_cwd V) -∗
     proc_priv γf pa pid (upd_pt V P ws).
   Proof.
-    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho".
-    rewrite /proc_priv /proc_priv_core /cwd_ref.
-    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
-    iSplitR "Ho"; [|iFrame "Ho"].
-    iSplitR; [iPureIntro; exact Hsz|].
-    iSplitR; [iPureIntro; exact Hbel|]. iFrame "Hpid Hf Hpt Htf".
+    iIntros (Hsz Hbel) "Hpid Hf Hpt Htf Ho Hc".
+    iDestruct (proc_priv_nocwd_intro γf pa pid V P ws Hsz Hbel
+                 with "Hpid Hf Hpt Htf Ho") as "H".
+    iApply proc_priv_split_cwd. iFrame "H".
+    by cbn [upd_pt pv_cwd].
   Qed.
 
   (* ---- projections: what callers actually use ---- *)
@@ -724,7 +913,7 @@ Section ProcInv.
      while the cwd cell has to stay out across all three -- from the
      [ld a0,336(s3)] that reads the pointer iput destroys to the
      [sd x0,336(s3)] that clears it, which is the first moment [cwd_ref] can
-     be re-supplied ([cwd_ref_null]).  Each of [proc_priv_cwd] and
+     be re-supplied).  Each of [proc_priv_cwd] and
      [proc_priv_pid] consumes the whole block, so they do not nest; this is
      their conjunction, proved once.  sys_chdir wants the same pair. *)
   Lemma proc_priv_cwd_pid (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
@@ -759,11 +948,27 @@ Section ProcInv.
     iExact "Hc".
   Qed.
 
-  (* "no working directory" owes no reference.  A LEMMA rather than a
-     [rewrite /cwd_ref] at the call site, because it is exactly the fact the
-     real predicate will have to keep: a null [p->cwd] names no inode. *)
-  Lemma cwd_ref_null : ⊢ cwd_ref (zero_reg : mword 64).
-  Proof. rewrite /cwd_ref. auto. Qed.
+  (* [cwd_ref_null] IS GONE, and its absence is the predicate's content.
+     While [cwd_ref] was [emp] a caller could conjure one at [zero_reg];
+     now a null [p->cwd] names no inode and there is nothing to introduce
+     ([cwd_ref_nonzero] is the refutation).  Its one consumer, kexit's
+     [sd x0,336(s3)], does not need it: kexit takes the block apart with
+     [proc_priv_split_cwd], spends the reference on [iput], and rebuilds a
+     ZOMBIE [proc_dormant] -- which has never contained a [cwd_ref]. *)
+
+  (* A LIVE PROCESS HAS A NON-NULL WORKING DIRECTORY, as a projection of the
+     block rather than a conjunct anybody maintains.  This is what the
+     no-null-arm shape buys, and it is free: the block travels with the
+     running thread and is swallowed into [▷ proc_ctx] by the park, so the
+     fact rides inside the Löb'd obligation and no [proc_slots_recast] ever
+     looks at it. *)
+  Lemma proc_priv_cwd_nonzero (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜pv_cwd V <> (zero_reg : mword 64)⌝.
+  Proof.
+    iIntros "[(_ & _ & _ & _ & _ & _ & Hc) _]".
+    by iApply (cwd_ref_nonzero with "Hc").
+  Qed.
 
   (* The array's length, which a caller needs BEFORE it knows which
      descriptor it wants: an fd below NOFILE always has a slot to look up. *)
@@ -1250,14 +1455,20 @@ Section ProcInv.
      trapframe page wait()/freeproc will reclaim -- except the allowance,
      which travels BESIDE [proc_priv] (FdSlots.v's [FDSPARE] note), and the
      context, which is the swtch's.  So this is a repackaging, not a
-     construction, and nothing about the process has to be re-established. *)
+     construction, and nothing about the process has to be re-established.
+
+     IT TAKES THE DEFICIT BLOCK, and that is forced rather than convenient:
+     a ZOMBIE's [p->cwd] is 0, so it holds no [cwd_ref] and a [proc_priv] at
+     this [V] does not exist.  kexit arrives in exactly that state -- it has
+     already spent its reference on [iput] -- so the premise is the one it
+     can actually pay. *)
   Lemma proc_priv_to_dormant_zombie (γf : gname) (pa : mword 64)
       (pid : mword 32) (V : pprivate) :
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd V = (zero_reg : mword 64) ->
-    proc_priv γf pa pid V -∗ fd_slots FDSPARE -∗ proc_dormant_noctx pa ZOMBIE.
+    proc_priv_nocwd γf pa pid V -∗ fd_slots FDSPARE -∗ proc_dormant_noctx pa ZOMBIE.
   Proof.
-    iIntros (Hof Hcwd) "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & _) Ho] Hsp".
+    iIntros (Hof Hcwd) "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho) Hsp".
     iDestruct (proc_ofiles_null_split γf pa (pv_ofile V) Hof with "Ho") as "[Ho Hs]".
     iExists V, pid. iSplit; [by iPureIntro|]. iFrame "Hpid Hf Ho Hs Hsp".
     rewrite bool_decide_eq_true_2; [| reflexivity].

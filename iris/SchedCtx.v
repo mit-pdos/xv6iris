@@ -81,7 +81,7 @@ Proof.
 Qed.
 
 Section SchedCtx.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
   (* the NPROC per-proc lock gnames. *)
   Context (γs : list gname).

@@ -80,7 +80,7 @@ Local Open Scope Z_scope.
 Definition sys_close_stack : nat := 72%nat.
 
 Section SpecSysClose.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
 
   (* sys_close's result, keyed by the returned a0.  In the success case the
      descriptor named by the argument is null and one file reference is
@@ -96,7 +96,7 @@ Section SpecSysClose.
 End SpecSysClose.
 
 Definition wp_sys_close_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
       !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
      (γl γf : gname) (fn : fclose_names) (on : option nat)
     (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
@@ -140,7 +140,7 @@ Definition wp_sys_close_sconf_body
 
 Module Type SYSCLOSE.
   Parameter wp_sys_close_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !kallocG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !kallocG Σ,
              !bioG Σ, !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ} `{GEN : GenId} `{CID : CpuId}
        (γl γf : gname) (fn : fclose_names) (on : option nat)
       (m : regfile) (av : nat) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)

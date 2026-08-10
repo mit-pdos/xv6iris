@@ -111,7 +111,7 @@ Proof. vm_compute. reflexivity. Qed.
 Module FetchaddrProof (Myproc : MYPROC) (Copyin : COPYIN) : FETCHADDR.
 
 Section ProofFetchaddr.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Local Ltac reg_neq :=

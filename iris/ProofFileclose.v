@@ -1222,9 +1222,14 @@ Section ProofFileclose.
           iAssert (fileclose_fs_env fn n eb p) with "[Henv]" as "Henv".
           { rewrite /fileclose_env bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Henv". }
-          iAssert (cwd_ref (fc_ip Cf)) with "[Hpl]" as "Hcwd".
+          (* the payload's inode arm IS iput's reference premise -- both are
+             [FileInv.inode_ref], and there is no longer a "cwd" to launder
+             it into: [SpecIput] used to name [ProcInv.cwd_ref], which was
+             the same proposition under a process-side name (SpecIput.v's
+             header).  This is now a plain unfolding of [file_payload]. *)
+          iAssert (FileInv.inode_ref (fc_ip Cf) 1) with "[Hpl]" as "Hcwd".
           { rewrite /file_payload bool_decide_eq_false_2; [|exact Hnpipe].
-            rewrite Hib. rewrite /cwd_ref. iExact "Hpl". }
+            rewrite Hib. iExact "Hpl". }
           rewrite /fileclose_fs_env.
           iDestruct "Henv" as "(%Hn0 & %Heb & %Hpj & %Hjlt & %Hgl & %Hgeom &
                                 #Hprocs & #Hbio & #Hlog & #Hseam &

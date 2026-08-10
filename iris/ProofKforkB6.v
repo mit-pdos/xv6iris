@@ -96,8 +96,8 @@ Notation KF := KernelSyms.kfork (only parsing).
 Module KforkPrologue (Myproc : MYPROC) (Allocproc : ALLOCPROC_GEN) (Uvmcopy : UVMCOPY).
 
 Section KforkPrologue.
-  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ,
-            !icacheG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !sieG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ,
+            !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -178,7 +178,53 @@ Section KforkPrologue.
     iFrame "Hpid".
     iSplitL "Hsz Hcwd Hnm".
     { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
-    iFrame "Hpg Htfc Hptt Htfp".
+    iFrame "Hpg Htfc Hptt Htfp Hc".
+  Qed.
+
+  (* the same, on the DEFICIT block: the CHILD is still in the construction
+     window here -- allocproc left [np->cwd] at 0 -- so uvmcopy's
+     destination side opens a [proc_priv_nocwd].  Neither this nor its
+     [proc_priv] twin touches [p->cwd]. *)
+  Lemma kfk_priv_open_nocwd (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
+    proc_priv_nocwd γf pa pid V -∗
+    ⌜uint (pv_sz V) <= uvm_maxsz⌝ ∗
+    ⌜um_below (pv_sz V) (ud_um (pv_upt V))⌝ ∗
+    p_sz pa ↦₈ pv_sz V ∗
+    p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) ∗
+    proc_pt (pv_upt V) ∗
+    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) ∗
+    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+    (∀ (P' : uptd) (szv : mword 64) (ws' : list (mword 64)),
+       ⌜ud_root P' = ud_root (pv_upt V)⌝ -∗
+       ⌜ud_tfp P' = ud_tfp (pv_upt V)⌝ -∗
+       ⌜uint szv <= uvm_maxsz⌝ -∗
+       ⌜um_below szv (ud_um P')⌝ -∗
+       p_sz pa ↦₈ szv -∗
+       p_pagetable pa ↦₈ page_base (ud_root (pv_upt V)) -∗
+       proc_pt P' -∗
+       p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) -∗
+       tf_page (ud_tfp (pv_upt V)) ws' -∗
+       proc_priv_nocwd γf pa pid (upd_pt (upd_sz V szv) P' ws')).
+  Proof.
+    iIntros "Hpv".
+    iDestruct (proc_priv_nocwd_sz_maxsz with "Hpv") as "#Hszb".
+    iDestruct (proc_priv_nocwd_um_below with "Hpv") as "#Hbel".
+    iDestruct "Hpv" as "(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Ho)".
+    rewrite /proc_fields /proc_pt_at.
+    iDestruct "Hf" as "(Hsz & Hcwd & %Hnl & Hnm)".
+    iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iSplitR; [done|]. iSplitR; [done|].
+    iFrame "Hsz Hpg Hptt Htfc Htfp".
+    iIntros (P' szv ws') "%Hroot %Htf %Hszb' %Hbel' Hsz Hpg Hptt Htfc Htfp".
+    rewrite /proc_priv_nocwd /proc_fields /proc_pt_at.
+    cbn [upd_pt upd_sz pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    rewrite Hroot Htf.
+    iSplitR; [iPureIntro; exact Hszb'|].
+    iSplitR; [iPureIntro; exact Hbel'|].
+    iFrame "Hpid".
+    iSplitL "Hsz Hcwd Hnm".
+    { iFrame "Hsz Hcwd Hnm". iPureIntro. exact Hnl. }
+    iFrame "Hpg Htfc Hptt Htfp Ho".
   Qed.
 
   (* closing [kfk_priv_open]'s wand with NOTHING changed is the identity. *)
@@ -194,7 +240,7 @@ Section KforkPrologue.
       (cn : ic_names) (γfs : fs_names) (cov : gset Z) (logstart : Z) (nib : nat)
       (m : regfile) (lvl K : nat) (eb : bool) (pme : mword 64) (C : iProp Σ)
       (on : option nat) (b : bool) (pid_p : mword 32) (Vp : pprivate)
-      (ck : nat) (cq : Qp) (cdev cinum : mword 32) (R : iProp Σ) :
+      (R : iProp Σ) :
     let sp0 : mword 64 := m !!! Regidx csp_rs1 in
     let ra0 : mword 64 := m !!! Regidx Rra in
     let s00 : mword 64 := m !!! Regidx Rs0 in
@@ -202,7 +248,6 @@ Section KforkPrologue.
     let s50 : mword 64 := m !!! Regidx Rs5 in
     (K_kfork <= K)%nat ->
     (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-    pv_cwd Vp = ientry ck ->
     sie_cap_gpr m K b pme -∗
     cpu_own lvl eb pme C b -∗
     kernel_text -∗
@@ -215,7 +260,6 @@ Section KforkPrologue.
     is_itable2 γil cn γfs γic cov logstart nib -∗
     itable_inv (icn_ref cn) -∗
     iref_slot -∗
-    inode_ref (icn_ref cn) ck cq cdev cinum -∗
     kalloc_env γa on -∗
     proc_priv γf pme pid_p Vp -∗
     (* THE CALLER'S EXIT, THREADED -- kwait's [kw_exit_fn] recipe.  The three
@@ -244,7 +288,6 @@ Section KforkPrologue.
         pc_is (mword_of_int (KF + 0x10a) : mword 64) -∗
         kfk_frame sp0 ra0 s00 s10 s50 -∗
         proc_priv γf pme pid_p Vp -∗
-        (∃ q' : Qp, inode_ref (icn_ref cn) ck q' cdev cinum) -∗
         ( kalloc_env γa on
           ∨ (∃ n : nat, ⌜(n <= K_allocproc)%nat /\ avail_zero (avail_sub on n)⌝ ∗
              kalloc_env γa None) ) -∗
@@ -293,14 +336,13 @@ Section KforkPrologue.
         (∃ w4 w5 : mword 64,
            kfk_frame_at sp0 ra0 s00 s10 s50 w4 w5 (m !!! Regidx Rs4)) -∗
         proc_priv γf pme pid_p Vp -∗
-        proc_priv γf npa pid_c Vc -∗
+        proc_priv_nocwd γf npa pid_c Vc -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
         SwtchCtx.own_ctx (p_context npa) -∗
         IntrDefs.arm_pay lvl eb pme -∗
         cpu_own (S lvl) eb pme C false -∗
-        (∃ q' : Qp, inode_ref (icn_ref cn) ck q' cdev cinum) -∗
         kalloc_env γa None -∗
         R -∗
         WP (Loop : expr riscv_lang))) -∗
@@ -342,7 +384,7 @@ Section KforkPrologue.
         kfk_frame_at sp0 ra0 s00 s10 s50
           (m !!! Regidx Rs2) (m !!! Regidx Rs3) (m !!! Regidx Rs4) -∗
         proc_priv γf pme pid_p Vp -∗
-        proc_priv γf npa pid_c Vc' -∗
+        proc_priv_nocwd γf npa pid_c Vc' -∗
         SchedCtx.proc_held cpu_id j γl2 USED ch -∗
         ProcGeom.hart_at_any npa -∗
         FdSlots.fd_slots FDSPARE -∗
@@ -364,7 +406,6 @@ Section KforkPrologue.
              (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest)) -∗
         IntrDefs.arm_pay lvl eb pme -∗
         cpu_own (S lvl) eb pme C false -∗
-        (∃ q' : Qp, inode_ref (icn_ref cn) ck q' cdev cinum) -∗
         kalloc_env γa None -∗
         is_lock γw wait_lock_addr "wait_lock"%string wait_res -∗
         is_ftable γl γf -∗
@@ -375,10 +416,10 @@ Section KforkPrologue.
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros sp0 ra0 s00 s10 s50 HK Hlvl Hcwd.
+    intros sp0 ra0 s00 s10 s50 HK Hlvl.
     unfold K_kfork in HK.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl #Hitbl
-             #Hitinv Hiref Hiref2 Henv Hpv HR Hcont10a Hcont7c Hcont4a".
+             #Hitinv Hiref Henv Hpv HR Hcont10a Hcont7c Hcont4a".
     set (K1 := (K - 8)%nat).
     iPoseProof (kfk_000 with "Htext") as "Hi000".
     iPoseProof (kfk_002 with "Htext") as "Hi002".
@@ -647,10 +688,9 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv'] HR").
+      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Henv'] HR").
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
-      + iExists cq. iExact "Hiref2".
       + iLeft. iExact "Henv'".
     - (* ===================================================================
          arm 2 -- FOUND.  Destructure the found-arm's whole bundle.
@@ -708,7 +748,7 @@ Section KforkPrologue.
              at once, held through the whole rest of this block. ---- *)
       iDestruct (kfk_priv_open with "Hpv") as
         "(%HszbP & %HbelP & HPsz & HPpg & HPpt & HPtf & HPtfpg & HPwand)".
-      iDestruct (kfk_priv_open with "Hcpriv") as
+      iDestruct (kfk_priv_open_nocwd with "Hcpriv") as
         "(%HszbC & %HbelC & HCsz & HCpg & HCpt & HCtf & HCtfpg & HCwand)".
       (* +0x01e ld a2,72(s5) -- a2 := p->sz *)
       assert (Hszaddr_p : add_vec (N1 !!! Regidx Rs5) (sign_extend' 64 (mword_of_int 72 : mword 12))
@@ -972,8 +1012,6 @@ Section KforkPrologue.
           iSplitR; [iPureIntro; rewrite -Hrestlen; reflexivity | iExact "Hctx"]. }
         iSpecialize ("Hcont7c" with "Harmpay").
         iSpecialize ("Hcont7c" with "Hcpu").
-        iSpecialize ("Hcont7c" with "[Hiref2]").
-        { iExists cq. iExact "Hiref2". }
         iSpecialize ("Hcont7c" with "Henv'").
         iApply ("Hcont7c" with "HR").
       + (* =============================================================
@@ -1211,7 +1249,7 @@ Section KforkPrologue.
                   (upd_pt (upd_sz Vc (pv_sz Vp)) P' (pv_tf Vc))
                   (ud_tfp (pv_upt Vp)) (ud_tfp (pv_upt Vc))
                   with "[%] [%] [%] [%] [%] [%] [%] [%] [%] Hcg Htext Hpc Hframe_alloc HPpriv HCpriv
-                        Hheld Hhart Hfdsp [Hks Hctx] Harmpay Hcpu [Hiref2] [Henv'] Hwlock Hftbl Hitbl Hitinv Hiref HR").
+                        Hheld Hhart Hfdsp [Hks Hctx] Harmpay Hcpu [Henv'] Hwlock Hftbl Hitbl Hitinv Hiref HR").
         * exact HN10sp.
         * exact HN10s4.
         * exact HN10s5.
@@ -1225,7 +1263,6 @@ Section KforkPrologue.
                       | cbn [upd_pt upd_sz pv_cwd]; exact HVccwd].
         * iExists ks, rest. iSplitR; [iPureIntro; exact Hrestlen|].
           iFrame "Hks Hctx".
-        * iExists cq. iExact "Hiref2".
         * iExact "Henv'".
     - (* ---- arm 3: a failure tail ran, budget resealed ---- *)
       iDestruct "Hp3" as "(%Hrv & %Hwit & Hcg & Hcpu & Henv')".
@@ -1249,10 +1286,9 @@ Section KforkPrologue.
         iSplitL "Hb6"; [iExists u6; iExact "Hb6"|].
         iExists u8; iExact "Hb8". }
       iSpecialize ("Hcont10a" $! CID12 with "[%]"); [wp_next_chain|].
-      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Hiref2] [Henv'] HR").
+      iApply ("Hcont10a" $! mf6 with "[%] [%] Hcg Hcpu Htext Hpc Hframe_alloc Hpv [Henv'] HR").
       + exact HBsp.
       + intros r Hr Ncsp N8 N9 N21. apply HBthr; assumption.
-      + iExists cq. iExact "Hiref2".
       + destruct Hwit as (n & Hn1 & Hn2). iRight. iExists n. iSplitR; [iPureIntro; split; assumption|]. iExact "Henv'".
   Qed.
 

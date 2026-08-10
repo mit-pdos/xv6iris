@@ -134,7 +134,7 @@ Import Defs.
 Definition K_kexit : nat := 74%nat.
 
 Definition wp_kexit_sconf_body
-    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+    `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
       !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
     `{GEN : GenId} `{CID : CpuId}
     (γft γf γw : gname)                               (* ftable lock, ftable, wait *)
@@ -204,21 +204,22 @@ Definition wp_kexit_sconf_body
 (*                                                                          *)
 (* The one thing an unproven contract cannot be trusted about is whether it  *)
 (* asks for enough.  The load-bearing case is the park: what kexit holds at  *)
-(* the [jal sched] -- the private block with every descriptor nulled and the *)
-(* cwd dropped, plus the FDSPARE allowance that travels beside it -- has to  *)
+(* the [jal sched] -- the DEFICIT block (every descriptor nulled and the cwd *)
+(* reference already spent on iput, so there is no [proc_priv] at this V),   *)
+(* plus the FDSPARE allowance that travels beside it -- has to               *)
 (* BE [SchedCtx.park_pay _ ZOMBIE], or the park cannot be taken and the      *)
 (* contract is unprovable for a reason no reader would see.  It is, with no  *)
 (* side condition beyond the two facts the loop and the iput establish.      *)
 (* (SpecProcinit.proc_ready_lock_res is the same kind of check.)             *)
 (* ---------------------------------------------------------------------- *)
 Section KexitSeals.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
   Lemma kexit_park_pay (γf : gname) (j : nat) (pid : mword 32) (V : pprivate) :
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd V = (zero_reg : mword 64) ->
-    proc_priv γf (proc_addr j) pid V -∗ fd_slots FDSPARE -∗
+    proc_priv_nocwd γf (proc_addr j) pid V -∗ fd_slots FDSPARE -∗
     park_pay (proc_addr j) ZOMBIE.
   Proof.
     intros Hof Hcwd. rewrite /park_pay inv_dormant_ZOMBIE.
@@ -231,7 +232,7 @@ End KexitSeals.
 
 Module Type KEXIT.
   Parameter wp_kexit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ, !bioG Σ,
+    forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ, !bioG Σ,
              !diskGhostG Σ, !uartGhostG Σ, !fsLogG Σ, !logG Σ, !fsCrashG Σ, !kallocG Σ}
       `{GEN : GenId} `{CID : CpuId}
       (γft γf γw : gname)

@@ -138,7 +138,7 @@ Proof. apply bv_eq; vm_compute; reflexivity. Qed.
 (*  THE MISSING ACCESSOR: [p->name], built exactly like [proc_priv_cwd].  *)
 (* ===================================================================== *)
 Section KforkB4Res.
-  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ}.
+  Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ}.
 
   (* Worth adding to ProcInv.v as [proc_priv_name], next to [proc_priv_cwd]:
      same shape (open [proc_fields], hand out the one field, take back a
@@ -167,29 +167,27 @@ Section KforkB4Res.
     iExact "Hc".
   Qed.
 
-  (* ################################################################### *)
-  (*  THIS LEMMA IS THE HOLE, WRITTEN DOWN.  DELETE IT WHEN S5 LANDS.     *)
-  (*                                                                      *)
-  (*  [ProcInv.cwd_ref v] is [FileInv.inode_ref v 1], and THAT is         *)
-  (*  literally [emp] -- so it is derivable at ANY [v], not just at        *)
-  (*  [zero_reg] the way [ProcInv.cwd_ref_null] is.  Its one use below     *)
-  (*  (the [sd a0,336(s4)] at +0xac) conjures the CHILD's cwd reference    *)
-  (*  out of nothing while idup's second half is dropped on the floor.     *)
-  (*                                                                      *)
-  (*  That is sound today and it is not a shortcut anyone chose: the       *)
-  (*  placeholder [FileInv.inode_ref] and the real [IcacheInv.inode_ref]   *)
-  (*  idup returns are DIFFERENT PREDICATES with no bridge between them,   *)
-  (*  so there is no honest route from one to the other to take.           *)
-  (*                                                                      *)
-  (*  When claude-notes/projects/cwd-ref.md lands, this lemma must be      *)
-  (*  deleted and the use at +0xac must instead CONSUME the second         *)
-  (*  [inode_ref (icn_ref cn) ck (cq/2) cdev cinum] that idup hands back -- which is *)
-  (*  the whole reason idup returns two halves.  That is the ONE           *)
-  (*  proof-side edit this file needs; everything else here is about the   *)
-  (*  name array and the pid read and is unaffected.                       *)
-  (* ################################################################### *)
-  Lemma kfk_cwd_ref_any (v : mword 64) : ⊢ (cwd_ref v : iProp Σ).
-  Proof. unfold cwd_ref, FileInv.inode_ref. done. Qed.
+  (* THE CHILD'S OWN cwd REFERENCE, out of idup's SECOND half.
+
+     This is what the hole that used to sit here has become.  While
+     [ProcInv.cwd_ref] was [emp] the child's reference could be conjured at
+     any [v] and idup's second half was dropped on the floor; now the two
+     are the same predicate and the store at +0xac consumes the half, which
+     is the whole reason idup returns two.
+
+     [icn_ref cn = iref_name] is the one pure premise that ties the itable
+     the caller holds the LOCK for to the canonical authority [cwd_ref] is
+     stated over ([InodeRef.v]'s header: there is exactly one itable per
+     system, so threading its gname through [proc_priv] would put a
+     filesystem ghost name on thirty-three spec files). *)
+  Lemma kfk_child_cwd (cn : ic_names) (k : nat) (q : Qp) (dev inum : mword 32) :
+    icn_ref cn = iref_name ->
+    (k < NINODE)%nat ->
+    inode_ref (icn_ref cn) k q dev inum -∗ cwd_ref (ientry k).
+  Proof.
+    iIntros (Hnm Hk) "Href". rewrite Hnm.
+    iExists q, k, dev, inum. iFrame "Href". iPureIntro. done.
+  Qed.
 
 End KforkB4Res.
 
@@ -199,7 +197,7 @@ End KforkB4Res.
 Module KforkB4 (ID : IDUP) (SS : SAFESTRCPY).
 
 Section KforkB4Proof.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !icacheG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefNameG Σ, !irefslotG Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId} `{CID0 : CpuId}.
 
   Notation Rra := (mword_of_int 1 : mword 5).
@@ -219,13 +217,16 @@ Section KforkB4Proof.
   Lemma kfk_b4
       (γf γil γic : gname) (cn : ic_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (nib : nat)
-      (ck : nat) (cq : Qp) (cdev cinum : mword 32)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
       (m : regfile) (K lvl : nat) (eb : bool) (C : iProp Σ) :
     (22 <= K)%nat ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
-    pv_cwd Vp = ientry ck ->
+    (* the itable this block holds the lock for IS the one [cwd_ref] names.
+       This replaces the old [pv_cwd Vp = ientry ck] premise and the
+       [inode_ref] that came with it: the parent's reference is inside its
+       OWN block now, and the slot it names is read off it. *)
+    icn_ref cn = iref_name ->
     m !!! Regidx Rs5 = pme ->
     m !!! Regidx Rs4 = npa ->
     sie_cap_gpr m (K - 8)%nat false pme -∗
@@ -236,9 +237,11 @@ Section KforkB4Proof.
     is_itable2 γil cn γfs γic cov logstart nib -∗
     itable_inv (icn_ref cn) -∗
     iref_slot -∗
-    inode_ref (icn_ref cn) ck cq cdev cinum -∗
     proc_priv γf pme pid_p Vp -∗
-    proc_priv γf npa pid_c Vc -∗
+    (* THE CHILD IS STILL IN THE CONSTRUCTION WINDOW: allocproc left
+       [np->cwd] at 0 and nothing has set it, so there is no [proc_priv] at
+       this [Vc].  The [sd a0,336(s4)] below is what closes the window. *)
+    proc_priv_nocwd γf npa pid_c Vc -∗
     wp_next false pme (fun (CID : CpuId) =>
       ∀ mf : regfile,
         ⌜(forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
@@ -251,14 +254,13 @@ Section KforkB4Proof.
         (∃ Vc' : pprivate,
            ⌜pv_sz Vc' = pv_sz Vc /\ pv_upt Vc' = pv_upt Vc /\
             pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
-            pv_cwd Vc' = ientry ck /\ length (pv_name Vc') = PNAMELEN⌝ ∗
+            pv_cwd Vc' = pv_cwd Vp /\ length (pv_name Vc') = PNAMELEN⌝ ∗
            proc_priv γf npa pid_c Vc') -∗
-        inode_ref (icn_ref cn) ck (cq/2)%Qp cdev cinum -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hcwd Hms5 Hms4.
-    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hitb #Hitinv Hirs Hiref Hparent Hchild Hcont".
+    intros HK Hlvl Hnm Hms5 Hms4.
+    iIntros "Hcg Hown #Htext Hpc #Hpanic #Hitb #Hitinv Hirs Hparent Hchild Hcont".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
     iPoseProof (kfk_0a8 with "Htext") as "Hi0a8".
     iPoseProof (kfk_0ac with "Htext") as "Hi0ac".
@@ -270,7 +272,14 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* +0xa4: ld a0,336(s5) -- a0 := p->cwd.                          *)
     (* ------------------------------------------------------------- *)
+    (* THE PARENT'S OWN REFERENCE, out of its own block.  The slot index,
+       the device and the inum come out with it -- [cwd_ref] hides them
+       existentially and [IcacheInv.ientry_inj] is what makes hiding them
+       lossless -- so [pv_cwd Vp = ientry ck] is now DERIVED here rather
+       than premised on the caller. *)
     iDestruct (proc_priv_cwd γf pme pid_p Vp with "Hparent") as "(Hpcwd & Hpcref & Hpback)".
+    iDestruct "Hpcref" as (cq ck cdev cinum) "[[%Hcwd %Hcklt] Hiref]".
+    iEval (rewrite -Hnm) in "Hiref".
     assert (Hpa0a4 : add_vec (rget m Rs5) (sign_extend' 64 (mword_of_int 336 : mword 12))
                      = p_cwd pme).
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
@@ -281,9 +290,9 @@ Section KforkB4Proof.
               with "Hcg Hpc Hi0a4 Hpcwd [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcwd".
     iEval (rewrite Hpa0a4) in "Hpcwd".
-    (* restore the parent's block immediately: nothing changed *)
-    iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref") as "Hparent2".
-    iEval (rewrite upd_cwd_id) in "Hparent2".
+    (* the parent's block cannot close yet: its reference is on its way
+       into idup.  It closes at [Hparent2] below, around idup's FIRST half
+       -- the cell never changed, only the fraction, which [cwd_ref] hides. *)
     set (M0 := <[Regidx Ra0 := regval_into_reg (pv_cwd Vp)]> m).
     change (<[Regidx Ra0 := regval_into_reg (pv_cwd Vp)]> m) with M0.
     assert (HM0a0 : M0 !!! Regidx Ra0 = ientry ck) by (rewrite /M0 upd_eq; exact Hcwd).
@@ -326,7 +335,12 @@ Section KforkB4Proof.
               (kfk_b4_stack_idup K HK) Hlvl HM1a0
               with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hiref [-]").
     iApply wp_next_off_intro.
-    iIntros (mr) "Hcg Hown Hpc %Hidup_post Href1 _".
+    iIntros (mr) "Hcg Hown Hpc %Hidup_post Href1 Href2".
+    iDestruct (kfk_child_cwd cn ck (cq/2)%Qp cdev cinum Hnm Hcklt
+                 with "Href1") as "Hpcref1".
+    iEval (rewrite -Hcwd) in "Hpcref1".
+    iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
+    iEval (rewrite upd_cwd_id) in "Hparent2".
     destruct Hidup_post as [Hcs_idup Hidup_a0].
     assert (Hpc0ac : ret_pc (M1 !!! Regidx Rra) = mword_of_int (KF + 0xac)).
     { rewrite HM1ra. apply bv_eq; vm_compute; reflexivity. }
@@ -338,7 +352,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     (* +0xac: sd a0,336(s4) -- np->cwd := a0 (= ientry ck).           *)
     (* ------------------------------------------------------------- *)
-    iDestruct (proc_priv_cwd γf npa pid_c Vc with "Hchild") as "(Hccwd & _ & Hcback)".
+    iDestruct (proc_priv_nocwd_cwd γf npa pid_c Vc with "Hchild") as "(Hccwd & Hcback)".
     assert (Hpa0ac : add_vec (rget mr Rs4) (sign_extend' 64 (mword_of_int 336 : mword 12))
                      = p_cwd npa).
     { rewrite (rget_ne mr Rs4 ltac:(vm_compute; discriminate)) Hmrs4. apply p_cwd_sext. }
@@ -351,8 +365,14 @@ Section KforkB4Proof.
     assert (Hstoreval : rget mr Ra0 = ientry ck).
     { rewrite (rget_ne mr Ra0 ltac:(vm_compute; discriminate)). exact Hidup_a0. }
     iEval (rewrite Hstoreval) in "Hccwd".
-    iDestruct (kfk_cwd_ref_any (ientry ck)) as "Hccref2".
-    iDestruct ("Hcback" $! (ientry ck) with "Hccwd Hccref2") as "Hchild2".
+    iDestruct (kfk_child_cwd cn ck (cq/2)%Qp cdev cinum Hnm Hcklt
+                 with "Href2") as "Hccref2".
+    iDestruct ("Hcback" $! (ientry ck) with "Hccwd") as "Hchild2".
+    (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)
+    iAssert (proc_priv γf npa pid_c (upd_cwd Vc (ientry ck))) with "[Hchild2 Hccref2]"
+      as "Hchild2".
+    { iApply proc_priv_split_cwd. iFrame "Hchild2".
+      by cbn [upd_cwd pv_cwd]. }
     set (Vc2 := upd_cwd Vc (ientry ck)).
     (* the store touches no register *)
     set (M2 := mr).
@@ -539,16 +559,16 @@ Section KforkB4Proof.
     iAssert (∃ Vc' : pprivate,
                ⌜pv_sz Vc' = pv_sz Vc /\ pv_upt Vc' = pv_upt Vc /\
                 pv_tf Vc' = pv_tf Vc /\ pv_ofile Vc' = pv_ofile Vc /\
-                pv_cwd Vc' = ientry ck /\ length (pv_name Vc') = PNAMELEN⌝ ∗
+                pv_cwd Vc' = pv_cwd Vp /\ length (pv_name Vc') = PNAMELEN⌝ ∗
                proc_priv γf npa pid_c Vc')%I
       with "[Hchild4]" as "HchildFinal".
     { iExists Vc3.
       iSplitR.
       - iPureIntro. rewrite /Vc3 /Vc2 /upd_cwd. cbn [pv_sz pv_upt pv_tf pv_ofile pv_cwd].
-        repeat split; reflexivity.
+        rewrite Hcwd. repeat split; reflexivity.
       - iExact "Hchild4". }
     iSpecialize ("Hcont" $! CID0 with "[%]"); [intros _; reflexivity |].
-    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hparent3 HchildFinal Href1").
+    iApply ("Hcont" $! Mf with "[%] Hcg Hown Hpc Hparent3 HchildFinal").
     exact (conj HMfcs HMfs1).
   Qed.
 

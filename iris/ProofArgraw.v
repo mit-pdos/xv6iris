@@ -165,7 +165,7 @@ End ArgrawDispatch.
 Module ArgrawProof (Myproc : MYPROC) : ARGRAW.
 
 Section ProofArgraw.
-  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !fileG Σ}.
+  Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefNameG Σ, !fileG Σ}.
   Context `{GEN : GenId} `{CID : CpuId}.
 
 
