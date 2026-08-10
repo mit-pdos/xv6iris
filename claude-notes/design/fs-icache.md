@@ -1458,6 +1458,39 @@ C6's SpecIput inherits: the last-close arm's postcondition is pure
 internal. `K_iget` tightens to 16 (6-slot frame + the lock pair's 10)
 while nothing consumes it.
 
+### 13.10 The agreement ghost carries the IDENTITY, not just liveness
+### (C5b's blocker: the recycle's values fall off the full cells)
+
+A cell a recycler stores is ∃-bound in the arm it closes into, and
+both discriminators (EMPTY's full dev, MID's full inum) forbid the
+recycler a retainable fraction — so `dev` is unrecoverable across
+[+0x6e, +0x72) and `inum` across [+0x72, +0x7c), and neither the
+postcondition's `inode_ref … dev inum` nor the `ci`/pool rebuild can
+name its values. bio dodges this only because its full mid-cell pins
+to a VIEW CONSTANT (one device) with the other cell retainable at ½;
+the icache has two per-call values and one retainable half, so one
+always falls off. The fix (C5b's, adopted):
+
+    ic_id cn k q (v : bool)  ⟶  ic_id cn k q (v : bool, dev inum : mword 32)
+
+coupled to the arm's cells in all four arms and to `ci !! k` in
+`islot2`'s live arm / to the cells in `islot_empty` (whose bare ∃inum
+now ties to the tuple, and whose dev — which has no table cell — is
+pinned by the ghost alone). The table half, held continuously by the
+lock-holding recycler, pins EMPTY's full dev; the half kept across the
+MID window pins MID's full inum; the +0x6e and +0x72 openings update
+both halves (in hand at exactly those two points, as §13.8 argued for
+the flip). Exported swap/open lemma SIGNATURES are unchanged;
+ProofIdup frames the ghost through at its `ci !! k` values. The
+`icacheG` class field widens to `ghost_varG Σ (bool * mword 32 *
+mword 32)`.
+
+Also from C5b's trace: +0x20/+0x76 are compressed `c.li`
+(`wp_cli_s_sconf`, not the base-form `wp_li4_s_sconf`), and the three
+recycle stores need AU store leaves against `icEscN` (a local
+`wp_sw_au` restatement at `Em := ⊤ ∖ ↑minstretN ∖ ↑icEscN`) — the
+cells live in an `inv`, not in the lock.
+
 ### 13.4 What breaks and what stays
 
 `ProofIdup` consumes `is_itable`/`itable_res` and is proven — the `ci`
