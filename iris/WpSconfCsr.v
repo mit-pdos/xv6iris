@@ -1749,14 +1749,24 @@ Section WpSconfCsr.
   (* ---- csrw sstatus,rs1 -- THE S-STATUS RESTORE, and the one leaf whose
      postcondition EXPOSES mstatus.
 
-     The written word is taken as [sstatus_read ms0] for a well-formed
-     source mstatus [ms0] rather than as an abstract word with a field
-     predicate: that IS the only way the instruction is used (kerneltrap
-     writes back the sstatus an earlier csrr saved), and it makes the four
-     field premises [flip_core] wants derivable inside the leaf instead of
-     inflicted on the caller.
+     THE WRITTEN WORD IS ABSTRACT, carrying the five field premises
+     [flip_core] wants.  It was once taken as [sstatus_read ms0] for a
+     well-formed source mstatus, on the grounds that a RESTORE (kerneltrap
+     writing back the sstatus an earlier csrr saved) is the only way the
+     instruction is used -- and that stopped being true at prepare_return,
+     whose word is a read-modify-write:
 
-     THE WRITE MUST NOT MOVE SIE -- premise [_get_Mstatus_SIE ms0 = sie_bit
+         x = r_sstatus(); x &= ~SSTATUS_SPP; x |= SSTATUS_SPIE; w_sstatus(x);
+
+     No mstatus [ms0] has [sstatus_read ms0 = x] for free there; proving one
+     does means a whole-word identity over [lower_mstatus]'s nest of slice
+     updates, where the five field facts are each three lines
+     ([WpGprCsrwC]'s [bv_extract_and] / [bv_extract_or] block).  So the
+     restore shape is now the COROLLARY [wp_csrw_sstatus_s_sconf] below,
+     which discharges the five from [sconf_ms_facts ms0] exactly as this
+     leaf's body used to.
+
+     THE WRITE MUST NOT MOVE SIE -- premise [_get_Sstatus_SIE wval = sie_bit
      b].  A restore whose saved SIE differs from the live one would have to
      move all THREE ghost pieces and re-seal the interrupt invariant; that
      is what the csrci/csrsi flip leaves are for, and duplicating their
@@ -1782,13 +1792,20 @@ Section WpSconfCsr.
      index is pinned rather than left to the arm.)  The SIE premise reads
      [sie_bit false] for the same reason, and is what says the restore does
      not move SIE. ---- *)
-  Lemma wp_csrw_sstatus_s_sconf
+  Lemma wp_csrw_sstatus_val_s_sconf
       (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (ms0 : mword 64) (vspp vspie : mword 1) :
+      (m : regfile) (n : nat) (wval : mword 64) (vspp vspie : mword 1) :
     uint rs1 <> 0 ->
-    rget m rs1 = sstatus_read ms0 ->
-    sconf_ms_facts ms0 ->
-    _get_Mstatus_SIE ms0 = sie_bit false ->
+    rget m rs1 = wval ->
+    _get_Sstatus_SIE wval = sie_bit false ->
+    (* the four S-fields [sconf] PINS: the write must not disturb them, and
+       since [sconf_ms_facts] fixes each to a constant the premise can be
+       stated against that constant rather than against the live mstatus
+       (which the caller cannot see). *)
+    _get_Sstatus_MXR wval = ('b"0" : mword 1) ->
+    _get_Sstatus_FS  wval = extStatus_map_forwards Off ->
+    _get_Sstatus_VS  wval = extStatus_map_forwards Off ->
+    _get_Sstatus_XS  wval = extStatus_map_forwards Off ->
     sie_cap_gpr m n false p -∗
     (* THE TRAVELLING SPP HALF.  This is the one instruction that MOVES SPP,
        so it needs both halves: the tie inside [sconf] and this one, which
@@ -1798,16 +1815,16 @@ Section WpSconfCsr.
     instr pc false (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW)) -∗
     wp_next false p (fun (CID : CpuId) =>
       ∀ msf : mword 64,
-      ⌜ _get_Mstatus_SIE  msf = _get_Mstatus_SIE  ms0 ⌝ -∗
-      ⌜ _get_Mstatus_SPP  msf = _get_Mstatus_SPP  ms0 ⌝ -∗
-      ⌜ _get_Mstatus_SPIE msf = _get_Mstatus_SPIE ms0 ⌝ -∗
+      ⌜ _get_Mstatus_SIE  msf = sie_bit false ⌝ -∗
+      ⌜ _get_Mstatus_SPP  msf = _get_Sstatus_SPP  wval ⌝ -∗
+      ⌜ _get_Mstatus_SPIE msf = _get_Sstatus_SPIE wval ⌝ -∗
       sie_cap_gpr_at msf m n false p -∗
       sret_bits (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hrs1 Hwval Hms0f Hsie0) "Hcg Hsppc Hpc Hinstr Hcont".
+    iIntros (Hrs1 Hwval HWsie HWmxr0 HWfs0 HWvs0 HWxs0) "Hcg Hsppc Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m n false pc false
               (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
@@ -1826,38 +1843,26 @@ Section WpSconfCsr.
     (* the live SIE bit is the arm index *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct (sie_arm_half_agree false p ms with "Hhalf Harm") as %Hsie_ms.
-    (* the four field equalities [flip_core] wants: both sides are the
-       constants [sconf_ms_facts] pins, on [ms0] and on [ms] respectively. *)
-    pose proof Hmsf  as (_ & _ & HMXR  & _ & HXS  & HFS  & HVS  & _ & _ & _).
-    pose proof Hms0f as (_ & _ & HMXR0 & _ & HXS0 & HFS0 & HVS0 & _ & _ & _).
-    apply eq_vec_true_iff in HMXR. apply eq_vec_true_iff in HMXR0.
-    assert (HWsie : _get_Sstatus_SIE (sstatus_read ms0) = _get_Mstatus_SIE ms0)
-      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSIE_lower).
-    assert (HWspp : _get_Sstatus_SPP (sstatus_read ms0) = _get_Mstatus_SPP ms0)
-      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSPP_lower).
-    assert (HWspie : _get_Sstatus_SPIE (sstatus_read ms0) = _get_Mstatus_SPIE ms0)
-      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSPIE_lower).
-    assert (HWmxr : _get_Sstatus_MXR (sstatus_read ms0) = _get_Mstatus_MXR ms).
-    { unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; rewrite WpGprCsrwC.sMXR_lower.
-      rewrite HMXR0 HMXR. reflexivity. }
-    assert (HWfs : _get_Sstatus_FS (sstatus_read ms0) = _get_Mstatus_FS ms).
-    { unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; rewrite WpGprCsrwC.sFS_lower.
-      rewrite HFS0 HFS. reflexivity. }
-    assert (HWvs : _get_Sstatus_VS (sstatus_read ms0) = _get_Mstatus_VS ms).
-    { unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; rewrite WpGprCsrwC.sVS_lower.
-      rewrite HVS0 HVS. reflexivity. }
-    assert (HWxs : _get_Sstatus_XS (sstatus_read ms0) = _get_Mstatus_XS ms).
-    { unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; rewrite WpGprCsrwC.sXS_lower.
-      rewrite HXS0 HXS. reflexivity. }
-    set (ms1 := legalize_sstatus_val ms (sstatus_read ms0)).
-    destruct (flip_core ms (sstatus_read ms0) (_get_Mstatus_SIE ms0)
+    (* the four field equalities [flip_core] wants: the premises pin [wval]'s
+       side to a constant, [sconf_ms_facts] pins [ms]'s side to the same one. *)
+    pose proof Hmsf as (_ & _ & HMXR & _ & HXS & HFS & HVS & _ & _ & _).
+    apply eq_vec_true_iff in HMXR.
+    assert (HWmxr : _get_Sstatus_MXR wval = _get_Mstatus_MXR ms)
+      by (rewrite HWmxr0 HMXR; reflexivity).
+    assert (HWfs : _get_Sstatus_FS wval = _get_Mstatus_FS ms)
+      by (rewrite HWfs0 HFS; reflexivity).
+    assert (HWvs : _get_Sstatus_VS wval = _get_Mstatus_VS ms)
+      by (rewrite HWvs0 HVS; reflexivity).
+    assert (HWxs : _get_Sstatus_XS wval = _get_Mstatus_XS ms)
+      by (rewrite HWxs0 HXS; reflexivity).
+    set (ms1 := legalize_sstatus_val ms wval).
+    destruct (flip_core ms wval (sie_bit false)
                 Hmsf HWsie HWmxr HWfs HWvs HWxs)
       as (Hf_sie & Hf_spp & Hf_spie & Hf_facts).
     fold ms1 in Hf_sie, Hf_spp, Hf_spie, Hf_facts.
-    rewrite HWspp in Hf_spp. rewrite HWspie in Hf_spie.
-    (* the ghost half does not move: both indices are [sie_bit b] *)
+    (* the ghost half does not move: both indices are [sie_bit false] *)
     assert (Hhalf_eq : _get_Mstatus_SIE ms1 = _get_Mstatus_SIE ms)
-      by (rewrite Hf_sie Hsie0 Hsie_ms; reflexivity).
+      by (rewrite Hf_sie Hsie_ms; reflexivity).
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
     iDestruct (reg_valid    with "Hreg Hms")   as %Lms.
     iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
@@ -1873,7 +1878,7 @@ Section WpSconfCsr.
     iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hr1c") as %Lva.
     iDestruct ("Hfb" with "Hr1c") as "Hfile".
     assert (Lrs1 : register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs)
-                   = sstatus_read ms0).
+                   = wval).
     { rewrite -Hwval. unfold rget. rewrite rf_lookup. rewrite -Lva.
       replace (Z.eqb (uint rs1) 0) with false by (symmetry; apply Z.eqb_neq; exact Hrs1).
       reflexivity. }
@@ -1912,6 +1917,65 @@ Section WpSconfCsr.
       iFrame "Hhw Hminv Hpriv Hmiex Hmenvx".
       iExists ms'. iFrame "Hms' Hhalf' Hspp'". iPureIntro. exact Hmsf'. }
     rewrite /sie_cap. iFrame "Hstk Htr Harm Hfile".
+  Qed.
+
+  (* ---- THE RESTORE SHAPE: the written word is one an earlier [csrr
+     sstatus] read, so the five field premises above come from that mstatus'
+     [sconf_ms_facts] and the S-view/M-view field agreement
+     ([WpGprCsrwC.sX_lower]).  This is kerneltrap's [csrw sstatus,s1] and
+     kernelvec's route to [sret]; the statement is unchanged from before the
+     leaf above was generalized, so its call sites are untouched. ---- *)
+  Lemma wp_csrw_sstatus_s_sconf
+      (pc : mword 64) (rs1 : mword 5)
+      (m : regfile) (n : nat) (ms0 : mword 64) (vspp vspie : mword 1) :
+    uint rs1 <> 0 ->
+    rget m rs1 = sstatus_read ms0 ->
+    sconf_ms_facts ms0 ->
+    _get_Mstatus_SIE ms0 = sie_bit false ->
+    sie_cap_gpr m n false p -∗
+    sret_bits vspp vspie -∗
+    pc_is pc -∗
+    instr pc false (CSRReg (csr_sstatus, Regidx rs1, zreg, CSRRW)) -∗
+    wp_next false p (fun (CID : CpuId) =>
+      ∀ msf : mword 64,
+      ⌜ _get_Mstatus_SIE  msf = _get_Mstatus_SIE  ms0 ⌝ -∗
+      ⌜ _get_Mstatus_SPP  msf = _get_Mstatus_SPP  ms0 ⌝ -∗
+      ⌜ _get_Mstatus_SPIE msf = _get_Mstatus_SPIE ms0 ⌝ -∗
+      sie_cap_gpr_at msf m n false p -∗
+      sret_bits (_get_Mstatus_SPP msf) (_get_Mstatus_SPIE msf) -∗
+      pc_is (add_vec_int pc 4) -∗
+      WP (Loop : expr riscv_lang)) -∗
+    WP (Loop : expr riscv_lang).
+  Proof.
+    iIntros (Hrs1 Hwval Hms0f Hsie0) "Hcg Hsppc Hpc Hinstr Hcont".
+    pose proof Hms0f as (_ & _ & HMXR0 & _ & HXS0 & HFS0 & HVS0 & _ & _ & _).
+    apply eq_vec_true_iff in HMXR0.
+    (* the S-view of a lowered mstatus agrees field by field with its M-view *)
+    assert (HWsie : _get_Sstatus_SIE (sstatus_read ms0) = _get_Mstatus_SIE ms0)
+      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSIE_lower).
+    assert (HWspp : _get_Sstatus_SPP (sstatus_read ms0) = _get_Mstatus_SPP ms0)
+      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSPP_lower).
+    assert (HWspie : _get_Sstatus_SPIE (sstatus_read ms0) = _get_Mstatus_SPIE ms0)
+      by (unfold sstatus_read; rewrite WpGprCsrwC.subrange_full; apply WpGprCsrwC.sSPIE_lower).
+    iApply (wp_csrw_sstatus_val_s_sconf pc rs1 m n (sstatus_read ms0) vspp vspie
+              Hrs1 Hwval
+              ltac:(rewrite HWsie; exact Hsie0)
+              ltac:(unfold sstatus_read; rewrite WpGprCsrwC.subrange_full
+                      WpGprCsrwC.sMXR_lower; exact HMXR0)
+              ltac:(unfold sstatus_read; rewrite WpGprCsrwC.subrange_full
+                      WpGprCsrwC.sFS_lower; exact HFS0)
+              ltac:(unfold sstatus_read; rewrite WpGprCsrwC.subrange_full
+                      WpGprCsrwC.sVS_lower; exact HVS0)
+              ltac:(unfold sstatus_read; rewrite WpGprCsrwC.subrange_full
+                      WpGprCsrwC.sXS_lower; exact HXS0)
+              with "Hcg Hsppc Hpc Hinstr [-]").
+    iApply wp_next_off_intro.
+    iIntros (msf) "%Hf_sie %Hf_spp %Hf_spie Hcgat Hsppc Hpc".
+    iSpecialize ("Hcont" $! cpu_id with "[]"); [iPureIntro; done|].
+    iApply ("Hcont" $! msf with "[%] [%] [%] Hcgat Hsppc Hpc").
+    - rewrite Hf_sie Hsie0. reflexivity.
+    - rewrite Hf_spp HWspp. reflexivity.
+    - rewrite Hf_spie HWspie. reflexivity.
   Qed.
 
   (* ---- csrw sepc,rs1 -- restores the trapped pc.  The [sepc] cell is

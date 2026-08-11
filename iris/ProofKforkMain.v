@@ -484,7 +484,7 @@ Section KforkArms.
     iDestruct "Hb8" as (w8) "Hb8".
     iDestruct (ProofKforkParts.proc_priv_tfp_valid with "Hpv") as %Hpvsrc.
     iDestruct (ProofKforkParts.proc_priv_nocwd_tfp_valid with "HCpriv") as %Hpvdst.
-    iDestruct (ProofKforkParts.proc_priv_tf_upd with "Hpv") as "(Htf_p & Htfp_p & Hclose_p)".
+    iDestruct (proc_priv_tf_upd with "Hpv") as "(Htf_p & Htfp_p & Hclose_p)".
     iDestruct (ProofKforkParts.proc_priv_nocwd_tf_upd with "HCpriv") as "(Htf_c & Htfp_c & Hclose_c)".
     iDestruct (ProofKforkB7.kfkb7_tf_len with "Htfp_p") as %Hlenp.
     iDestruct (ProofKforkB7.kfkb7_tf_len with "Htfp_c") as %Hlenc.
@@ -497,7 +497,7 @@ Section KforkArms.
     iIntros (mf) "%Hpf Hcg Hpc Htfp_p Htfp_c".
     destruct Hpf as (Hcsmf & Hmfa5 & Hmfa4).
     iDestruct ("Hclose_p" $! (pv_tf Vp) with "Htf_p Htfp_p") as "Hpv".
-    iEval (rewrite ProofKforkParts.upd_pt_id) in "Hpv".
+    iEval (rewrite upd_tf_id) in "Hpv".
     iDestruct ("Hclose_c" $! (pv_tf Vp) with "Htf_c Htfp_c") as "HCpriv".
     set (V1 := upd_pt Vc' (pv_upt Vc') (pv_tf Vp)).
     change (upd_pt Vc' (pv_upt Vc') (pv_tf Vp)) with V1.

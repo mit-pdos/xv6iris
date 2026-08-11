@@ -486,64 +486,19 @@ Section KforkRes.
   Context `{!riscvGS Σ, !lockG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.
   Context `{GEN : GenId}.
 
-  (* ---- the WRITE twin of [ProcInv.tf_page_word] ------------------- *)
-  (* The read accessor rebuilds the page at the value it lent out, which
-     is right for argraw and wrong for a COPY: the child's trapframe words
-     are stored, not read back.  Same one-line [big_sepL_insert_acc]
-     proof, with the wand quantified over the new value. *)
-  Lemma tf_page_word_upd (tfp : mword 44) (ws : list (mword 64))
-      (i : nat) (w : mword 64) :
-    ws !! i = Some w ->
-    tf_page tfp ws -∗
-    a_tf_word tfp i ↦₈ w ∗
-    (∀ w' : mword 64, a_tf_word tfp i ↦₈ w' -∗ tf_page tfp (<[i := w']> ws)).
-  Proof.
-    rewrite /tf_page /tf_words. iIntros (Hi) "(%Hlen & Hws & Htail)".
-    iDestruct (big_sepL_insert_acc _ _ i w Hi with "Hws") as "[$ Hback]".
-    iIntros (w') "Hc". iDestruct ("Hback" $! w' with "Hc") as "Hws".
-    iSplitR; [iPureIntro; by rewrite length_insert|].
-    iFrame "Hws Htail".
-  Qed.
+  (* [ProcInv.tf_page_word_upd] and [ProcInv.proc_priv_tf_upd] -- the WRITE
+     twins of [tf_page_word] / [proc_priv_tf] -- were born here, for the
+     trapframe copy loop.  They now live in [ProcInv] beside the accessors
+     they mirror, because prepare_return's four kernel-slot stores need them
+     too and a whole-function proof must not reach into another function's
+     parts file.  Only the DEFICIT-block twin below is still kfork's own:
+     nothing else writes a [proc_priv_nocwd] trapframe. *)
 
-  (* ---- the WRITE twin of [ProcInv.proc_priv_tf] --------------------- *)
-  (* [proc_priv_tf]'s wand rebuilds the block at the CONTENTS it lent out,
-     which is right for a syscall-argument read and useless for a copy: the
-     child's trapframe is 36 words of new data by the time the loop is done.
-     This lends the same two things and takes back a DIFFERENT [ws'].
-
-     It hands the [p_trapframe] cell out WHOLE rather than at the quarter
-     [proc_priv_tf] splits off, for two reasons: the [ld a5,88(s4)] at +0x66
-     wants a fraction and does not care which, and [ProcInv]'s
-     [word_split14] / [word_join14] are [Local], so a quarter cannot be
-     split here at all.  No length side condition is needed on the way back:
-     [tf_page] carries [length ws = TFWORDS] itself. *)
-  Lemma proc_priv_tf_upd (γf : gname) (pa : mword 64) (pid : mword 32)
-      (V : pprivate) :
-    proc_priv γf pa pid V -∗
-    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) ∗
-    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
-    (∀ ws' : list (mword 64),
-       p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) -∗
-       tf_page (ud_tfp (pv_upt V)) ws' -∗
-       proc_priv γf pa pid (upd_pt V (pv_upt V) ws')).
-  Proof.
-    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
-    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
-    iFrame "Htfc Htfp".
-    iIntros (ws') "Htfc Htfp".
-    rewrite /proc_priv /proc_priv_core /proc_pt_at.
-    cbn [upd_pt pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
-    iSplitR "Ho"; [| iFrame "Ho"].
-    iSplitR; [iPureIntro; exact Hszb|].
-    iSplitR; [iPureIntro; exact Hbel|].
-    iFrame "Hpid Hf Hpg Htfc Hptt Htfp Hc".
-  Qed.
-
-  (* the same two, on the DEFICIT block: the child travels as
+  (* the same accessor, on the DEFICIT block: the child travels as
      [proc_priv_nocwd] from allocproc's return until kfork's
      [sd a0,336(s4)] installs its working directory, so every accessor
-     applied to the child in that window needs this shape.  Neither touches
-     [p->cwd], which is why they are twins and not weakenings. *)
+     applied to the child in that window needs this shape.  It does not touch
+     [p->cwd], which is why it is a twin and not a weakening. *)
   Lemma proc_priv_nocwd_tf_upd (γf : gname) (pa : mword 64) (pid : mword 32)
       (V : pprivate) :
     proc_priv_nocwd γf pa pid V -∗

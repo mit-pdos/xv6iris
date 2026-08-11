@@ -1051,6 +1051,43 @@ Section ProcInv.
     iSplitR; [done|]. iSplitR; [done|]. iFrame.
   Qed.
 
+  (* THE WRITE TWIN, standing to [proc_priv_tf] as [tf_page_word_upd] stands
+     to [tf_page_word]: the wand takes back a DIFFERENT [ws'], and the block
+     is rebuilt at [upd_tf V ws'].  Every trapframe WRITER needs it --
+     prepare_return's four kernel slots, kfork's copy loop, syscall's a0.
+
+     It hands the [p_trapframe] cell out WHOLE rather than at the quarter
+     [proc_priv_tf] splits off: a store's base-register load wants a fraction
+     and does not care which, and the whole cell is what the callers already
+     thread.  No length side condition is owed on the way back -- [tf_page]
+     carries [length ws = TFWORDS] itself. *)
+  Lemma proc_priv_tf_upd (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V -∗
+    p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) ∗
+    tf_page (ud_tfp (pv_upt V)) (pv_tf V) ∗
+    (∀ ws' : list (mword 64),
+       p_trapframe pa ↦₈ page_base (ud_tfp (pv_upt V)) -∗
+       tf_page (ud_tfp (pv_upt V)) ws' -∗
+       proc_priv γf pa pid (upd_tf V ws')).
+  Proof.
+    iIntros "[(%Hszb & %Hbel & Hpid & Hf & Hpt & Htfp & Hc) Ho]".
+    rewrite /proc_pt_at. iDestruct "Hpt" as "(Hpg & Htfc & Hptt)".
+    iFrame "Htfc Htfp".
+    iIntros (ws') "Htfc Htfp".
+    rewrite /proc_priv /proc_priv_core /proc_pt_at.
+    cbn [upd_tf pv_sz pv_upt pv_tf pv_ofile pv_cwd pv_name].
+    iSplitR "Ho"; [| iFrame "Ho"].
+    iSplitR; [iPureIntro; exact Hszb|].
+    iSplitR; [iPureIntro; exact Hbel|].
+    iFrame "Hpid Hf Hpg Htfc Hptt Htfp Hc".
+  Qed.
+
+  (* [upd_tf] at the contents it lent out is the identity -- the record eta a
+     round trip through the accessor above needs when it changed nothing. *)
+  Lemma upd_tf_id (V : pprivate) : upd_tf V (pv_tf V) = V.
+  Proof. by destruct V. Qed.
+
   (* =================================================================== *)
   (* WHAT A CHANGE OF ADDRESS SPACE NEEDS -- one accessor.                *)
   (* =================================================================== *)
