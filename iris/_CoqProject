@@ -875,6 +875,7 @@ WeakPromiseBridge.v
 WeakRobust.v
 WeakRobustTrace.v
 WeakRobustGraph.v
+WeakRobustAcyc.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
 WeakInterp.v

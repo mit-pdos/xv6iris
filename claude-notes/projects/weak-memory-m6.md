@@ -281,14 +281,46 @@ floor that sees every observation.
       reads of position p always sit trace-AFTER fulfil(p) (a lemma to
       prove in the graph file), rf edges never conflict with po, and
       every potential D-cycle is genuinely CROSS-agent — the LB shape.
-      Per-class refutation of cycles: SCowned — a foreign read of an
-      unpublished message exhibits the violation in the pf prefix under
-      construction (where the premise lives); SCfenced — timestamp
-      arithmetic: `fence rw,w` has pr = true, so any read po-before the
-      fenced store has its read timestamp below the store's `EXT`-pinned
-      timestamp (this is why fenced-LB refutes: the two pins give
-      ts_y > ts_x > ts_y); SCexcl — the `excl_ok` window + `ak_latest`
-      value pinning.  Expect the acyclicity proof to be a per-class
+      Per-class refutation of cycles — **CORRECTED 2026-08-11 after the
+      infrastructure slice landed; the original fenced sketch below is
+      WRONG and kept only as the record of the mistake.**  The original
+      sketch said SCfenced cycles die because `fence rw,w` (pr = true)
+      pins reads po-before the fenced store below its timestamp.
+      COUNTEREXAMPLE: LB with the fence BEFORE the load on both harts
+      (`fence rw,w; load x; store y` ∥ symmetric) — both stores are
+      po-after a release fence, yet the full machine reaches
+      r1 = r2 = 1 (nothing after the fence raises `w_vwNew`, so EXT
+      passes), and RVWMO allows it (no load→store ppo without a
+      dependency) while the promise-free machine excludes it
+      (po ∪ rf cycle).  So "store po-after `fence rw,w`" does NOT make
+      early promotion harmless: the pin only covers reads po-BEFORE the
+      fence.  **The load-bearing premise is READER-side acquire
+      discipline**: every cross-agent read of an SCfenced/SCexcl
+      message is acquire-shaped — label `aq = true`, or followed by a
+      pr∧sw fence (`fence r,rw`) strictly before the reader's next
+      fulfil.  That is exactly the kernel's actual discipline (the
+      `lw; fence r,rw` racy readers, the `amoswap.w.aq` locks) and it
+      is Iris-checkable at the enumerated racy-read rules.  With it the
+      argument UNIFIES: segment lemma S1 — a disciplined read of ts
+      followed in the same trace by a fulfil of ts' forces ts < ts'
+      (aq: `w_vwNew ⊔= vpost ≥ ts` directly, forwarding disabled by
+      `fwd_view_aq`; fence: `w_vrOld ≥ ts` then the fence ships it into
+      `w_vwNew`; EXT at the fulfil) — so the message timestamp strictly
+      increases around any cycle whose cross rf edges are all
+      disciplined; contradiction.  S1's fence arm needs one auxiliary
+      invariant, `fwd_own`: a forward-bank entry always points to an
+      OWN-authored log position (banks start empty; only own stores
+      insert), so a FOREIGN read is never forwarded and `w_vrOld`
+      really rises to ts.  SCowned cross edges are NOT covered by S1 —
+      they are refuted by φ, and that refutation needs the pf prefix
+      the W2b construction builds (φ speaks about pf RUNS), so
+      **acyclicity-under-φ is not standalone: the owned arm folds into
+      W2b's induction**, and the standalone theorem takes
+      "every cross rf edge is disciplined" as its premise.
+      `class_pins` from the infrastructure slice therefore concretizes
+      to: cls-soundness (an SCexcl message's fulfil is an LRmw; an
+      SCfenced message's readers are acquire-disciplined), leaving
+      SCowned to φ.  Expect the acyclicity proof to be a per-class
       height/measure argument mixing timestamps (fenced/excl arms) with
       the violation contradiction (owned arm).  NOTE after W4 slice 2:
       D stays EVENT-level (a machine step is atomic in the pf
