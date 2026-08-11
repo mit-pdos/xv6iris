@@ -2586,3 +2586,220 @@ file.  Mirror scratch (`N5bCheck.*`) deleted.
    no-inodes exit at +0x7a are in the N5a decode above; do not redo it.
 4. N5d (ireclaim + fsinit) is still gated on nothing but its own work;
    `ROOTDEV`'s hoist (N5a item 4) is still owed.
+
+### N5c — `SpecIalloc` is LANDED and FROZEN; the proof is PARKED GREEN behind one frontier
+
+**WHAT LANDED IN THE BUILD: one file and one `_CoqProject` row.**
+`iris/SpecIalloc.v` (axiom-free, compiles green) and its row after
+`LinkPrepareReturn.v`.  **NOT landed: `iris/ProofIalloc.v`,
+`iris/LinkIalloc.v`, and their rows** — the proof is parked as
+`claude-notes/projects/fs-namei-ialloc-wip.v` (692 lines, md5
+`510d026a227a37a23ab7ffcd1a5c9858`), which carries its own resume header.
+Nothing in the tree depends on the parked file's one axiom.
+
+`python3 tools/lemma_diff.py --ref HEAD`: **one line**, the expected
+spec-seal `NEWAXIOM Parameter wp_ialloc_sconf` in `SpecIalloc.v`.  No
+`Admitted`, no `cheat_`, no `Axiom` anywhere in `iris/`.
+
+#### (a) The §16 machinery FITS THE DECODE EXACTLY — no repair needed
+
+The stage brief's two stop-and-report conditions were both checked against
+`CodeIalloc.v` instruction by instruction and **both are clear**:
+
+1. **`fresh_shape` vs the actual stores.**  The claim block writes exactly
+   two things: `jal memset` at +0x90 with `a2 = 64 / a1 = 0 / a0 = s3`
+   (`li a2,64` at +0x88, `c.li a1,0` at +0x8c, `c.mv a0,s3` at +0x8e), and
+   `sh s6,0(s3)` at +0x94 — decoded as
+   `STORE (0, Regidx 22, Regidx 19, 2)`, i.e. width **2** (a halfword) at
+   offset **0** of `dip`, from **s6 = type**.  There is NO second store.
+   So nlink is untouched and stays 0, size stays 0, all thirteen addrs stay
+   0, and N5b's `InodeRegion.fresh_shape` (`di_type ≠ 0 ∧ di_size = 0 ∧
+   di_addrs = replicate 13 0`, deliberately silent on nlink) is **exactly**
+   what the code leaves.  The record is named `SpecIalloc.ialloc_fresh ty`
+   and `ialloc_fresh_shape` / `ialloc_fresh_wf` are proven and closed.
+2. **The buffer↔region coupling at the claim.**  `ireg_claim_au`'s premise
+   list is `↑iregN ⊆ E`, `bv_unsigned inum < 16 * nib`, `diblk_wf ds`,
+   `di_type (ds !!! islot inum) = 0`, `fresh_shape dn'` — every one of which
+   the scan has in hand at +0x52: `ds` and `diblk_wf ds` from
+   `ireg_read_blk` against the handle's machinery half, the type-0 fact from
+   the `lh a5,0(s3)` the branch tests, the bound from the loop invariant.
+   **It takes no caller resource and pays out `True`**, so ialloc's contract
+   carries no region resource in either direction.  Nothing had to move.
+
+#### (b) `SpecIalloc.wp_ialloc_sconf_body` — the exact shape create drives
+
+Premises (in order): `K_ialloc = 48 <= K`; `log_geom_ok cov logstart`;
+`0 <= inodestart`; **`InodeInv.ireg_blocks_ok inodestart nib cov logstart`**
+(the quantified bread/log_write block premise — the scan cannot name its
+block in advance); the three geometry premises **`1 < ninodes`**,
+**`ninodes <= 16 * Z.of_nat nib`**, **`ninodes < 2 ^ 31`**;
+`bv_unsigned ty <> 0`; `printk_gen_contract γpr γu γd`; `(j < NPROC)%nat`;
+`γs !! j = Some γl`; `a0 = sign_extend' 64 dev`;
+`a1 = sign_extend' 64 (ty : mword 16)`; `eb = true`.
+
+Resources in: the sconf bundle, `panic_wp_any`, `kernel_data`,
+`printk_env`, `bio_ctx`, `log_ctx`, `sb_ninodes ↦₄{dqn}`,
+`sb_inodestart ↦₄{dqs}`, **`ireg_inv γi γfs inodestart nib` (persistent, and
+the ONLY region resource)**, `p_pid`, `procs_inv`, `dev_inv`, `disk_geom`,
+the virtio lock, `bslots bn 2`, `is_itable2 gtl cn γfs γi cov logstart nib
+dev`, `itable_inv`, `ic_escrows cn γfs γi cov logstart`, `iref_slot`,
+`log_op γ (S u)`.
+
+Postcondition — `∀ mf alloc kslot q inum dn'`, with `sb_ninodes`,
+`sb_inodestart`, `p_pid`, `bslots bn 2` back unconditionally, then
+
+```coq
+(if alloc
+ then ⌜mf !!! a0 = ientry kslot
+       /\ (kslot < NINODE)%nat
+       /\ 0 < bv_unsigned inum < ninodes
+       /\ bv_unsigned inum < 16 * Z.of_nat nib
+       /\ dn' = ialloc_fresh ty
+       /\ di_type dn' = ty
+       /\ fresh_shape dn'⌝ ∗
+      inode_ref kslot q dev inum ∗ log_op γ u
+ else ⌜mf !!! a0 = (mword_of_int 0 : mword 64)⌝ ∗
+      iref_slot ∗ log_op γ (S u))
+```
+
+Three things about it that were decided and should not be re-litigated:
+
+- **NO `dev = icfg_dev` / `nib = icfg_nib` premise.**  The brief listed them;
+  they turned out to be unnecessary and they would only weaken the contract.
+  ialloc is device-generic exactly as iget is, so the payout is the RAW
+  `IcacheRef.inode_ref kslot q dev inum` (dirlookup's shape) plus the pure
+  bound `bv_unsigned inum < 16 * nib`, out of which a caller that owns the
+  two ties builds `IcacheRef.inode_held` itself.  `create` has both ties.
+- **The `dn'` clause is documentation, not a stable fact.**  It says what the
+  claim WROTE, not what the region holds at return: by then another hart may
+  already have ilocked the new inode.  What actually hands `create` the fresh
+  record is ilock's third fill arm (`ireg_withdraw`), which is N5b's and needs
+  nothing from here.  It costs nothing to state and it pins `ty`.
+- **`iref_slot` is spent on the claim arm and returned on the dry arm** —
+  dirlookup's discipline verbatim, because the tail `jal iget` at +0xaa is
+  only reached from the claim.
+
+#### (c) THE NEW PREMISE, and where it must eventually be discharged
+
+**`ninodes <= 16 * Z.of_nat nib` did not exist anywhere in the tree.**  The
+scan's bound is read out of `sb.ninodes` (a plain fractional cell), while
+both `ireg_claim_au` and `iget` want `bv_unsigned inum < 16 * nib`; nothing
+tied the superblock field to the region's block count.  It is THREADED here,
+not discharged, and its home is **`SpecFsinit`** — the `memmove` at fsinit
++0x26 is where every superblock cell is born (N5a's ledger), so the tie
+belongs beside the `icfg_dev = ROOTDEV` / `0 < icfg_nib` premises that
+ledger already parks there.  **N5d owes it.**  `1 < ninodes` and
+`ninodes < 2 ^ 31` belong in the same place.
+
+#### (d) The +0x12 arm is DEAD, and that is a deliberate copy of balloc
+
+`bgeu a5,a4` at +0x12 with `a5 = 1` is the empty-region exit, and it jumps
+to the printk **without having pushed s1..s6** — i.e. into a second
+EPILOGUE SHAPE, not a second behaviour.  `1 < ninodes` refutes it, which is
+`SpecBalloc`'s `0 < size` killing the identical arm at the identical
+offset.  Consequence worth knowing: the two live exits then BOTH reach
++0x80 with all callee-saved registers at their entry values (the dry arm
+restores s1..s6 at +0x66..+0x70, the claim arm at +0xae..+0xb8), so the
+shared epilogue at +0x80..+0x86 pops only ra and s0 and is uniform.
+
+#### (e) What is PROVEN in the parked file, and what the frontier is
+
+PROVEN and `Closed under the global context`:
+
+- `ia_msg` = "ialloc: no inodes" + newline, at **`ia_msg_addr = 0x80007430`**
+  (`auipc a0,0x4 / addi a0,a0,850` at +0x72/+0x76 off `ialloc = 0x8000306c`),
+  with `ia_msg_bytes` (19 bytes incl. the NUL) and `ia_msg_fmt` — the named
+  pure lemmas `kernel_data_string` takes;
+- `ia_dzero` and **`ia_dzero_bytes`** (`j < 64 -> dinode_bytes ia_dzero !!! j
+  = bv_0 8`), the bridge from "memset wrote 64 zero bytes" to a record;
+- `ia_fresh_of_zero` (`ialloc_fresh ty` IS `ia_dzero` with the type halfword
+  replaced — exactly what the `sh` does to `dislot`'s first cell);
+- **`ia_win_acc`**, the RAW 64-byte slot window out of a block's byte image
+  and back at a new record.  `DinodeSlot.diblk_slot_acc` is this composed
+  with `dislot_acc_gen`; ialloc needs the raw form too because `SpecMemset`
+  takes and returns a byte window and not the six typed cells.
+
+THE FRONTIER: **five `exact (cheat_ _)`**, one per block lemma, and every
+one of the five carries its FULL, TYPECHECKED statement — premise list,
+register facts and resource list all verified by `Qed`.  `ia_epilogue`
+(+0x80..+0x86), `ia_out` (+0x66..+0x7e), `ia_claim` (+0x88..+0xba),
+`ia_scan` (+0x30..+0x64, stated as a `∀ fuel, wp_next ...` wand because
+bread sleeps), `wp_ialloc_sconf` (+0x00..+0x2e).  The vocabulary they share
+— `ia_frame` (8 slots: ra@56 s0@48 s1@40 s2@32 s3@24 s4@16 s5@8 s6@0),
+`ia_arms`, `ia_cont`, `ia_thr2` / `ia_thr8` / `ia_sp` — is landed.  The
+remaining work is proof obligation against a fixed interface, not design.
+
+#### SURPRISES (numbered)
+
+1. **THE MIRROR IS NO LONGER AT `b29fb1bd` AND IS BEING USED BY ANOTHER
+   STAGE.**  Mid-run it was synced forward to `50c9ebc0` ("usertrap's
+   decode layer, and syscall's contract stated as ASSUMED") and a full
+   `make -j` gate was started on it by that other stage.  Two concrete
+   consequences: (i) **an scp of `iris/_CoqProject` to the mirror is not
+   safe** — mine was silently overwritten by theirs at 17:51, and had the
+   timing gone the other way I would have put rows for files they do not
+   have into THEIR `CoqMakefile`; (ii) while their gate runs, EVERY
+   single-file `coqc` fails with *"Compiled library X makes inconsistent
+   assumptions over library Y"* naming files you never touched — the same
+   error N5a's ledger blamed on `InodeInv.v` edits, but the real cause is a
+   **concurrent rebuild churning the `.vo` digests**.  Poll
+   `ps aux | grep rocqworker` until it is 0 before believing any red.
+2. **`islot` is AMBIGUOUS** in any file that imports both `DinodeEnc` and
+   `IcacheInv`: `IcacheInv.islot : gmap nat (Qp * positive) -> nat -> iProp`
+   shadows `DinodeEnc.islot : bv 32 -> nat`, and the error is
+   *"The term `inum` has type `mword 32` while it is expected to have type
+   `gmap nat (Qp * positive)`"* — which reads like an argument-order slip
+   and is not one.  Say `DinodeEnc.islot`.  (`InodeRegion.v` states
+   `ireg_claim_au` with the bare name only because it never imports the
+   icache.)
+3. **`vm_compute; reflexivity` does not close a `bv` equality.**  Both
+   `length_replicate` on a literal and the 64-way `dinode_bytes ia_dzero`
+   case split failed with *"Unable to unify `0%bv` with `0%bv`"* — the
+   well-formedness components differ.  Go through `apply bv_eq` first (the
+   tree's `pcw` idiom) or, where the goal has already reduced to
+   `13%nat = 13%nat`, plain `reflexivity`.
+4. **A `wp_next` inside a lemma STATEMENT needs an ambient `CpuId`.**
+   `ia_scan`'s loop wand is `∀ fuel, wp_next b (proc_addr j) (fun CIDl =>
+   ... ∀ CIDc, ...)`; the outer `wp_next`'s implicit `CID0` cannot come from
+   the inner binder, so the lemma needs its own `CIDe : CpuId` binder and an
+   explicit `wp_next (CID0 := CIDe)`.  Error: *"Could not find an instance
+   for CpuId"*, pointing at the `wp_next` and not at the binder list.
+
+#### Build evidence (EC2 mirror, synced at `50c9ebc0`, NOT `b29fb1bd`)
+
+No full gate was run — another stage's was already in flight and
+`full.sh` truncates `/tmp/full.log` (N5b trap 8).  Both files were checked
+single-file, after waiting for that gate to go quiet, with the mirror's own
+four `-R` flags:
+
+```
+coqc -R . xv6iris -R ../model-xv6iris Riscv -R ../kernel-rocq Kernel \
+     -R ../user-rocq User -w -notation-overridden <f>
+```
+
+`SpecIalloc.v` **RC=0**, `ProofIalloc.v` **RC=0** (only the standing
+`notation-incompatible-prefix` warnings).  `Print Assumptions` on
+`ialloc_fresh_shape`, `ialloc_fresh_wf`, `ia_win_acc`, `ia_dzero_bytes` and
+`ia_msg_bytes`: **"Closed under the global context"**, all five.  The
+parked file's only assumption is its own `cheat_`, and it is outside the
+build.  Mirror scratch (`SpecIalloc.*`, `ProofIalloc.*`, `IaChk.*`,
+`/tmp/ia.log`) deleted; the mirror's working tree was left clean.
+
+md5s: `iris/SpecIalloc.v b0651936f9123cc483b294112978a9b0`,
+`claude-notes/projects/fs-namei-ialloc-wip.v 510d026a227a37a23ab7ffcd1a5c9858`.
+
+#### What N5d should know
+
+1. **`SpecIalloc.v` is FROZEN** — write `SpecIreclaim` / `SpecFsinit`
+   against it.  In particular `SpecFsinit` now owes THREE superblock ties,
+   not one: `1 < ninodes`, `ninodes <= 16 * Z.of_nat nib` and
+   `ninodes < 2 ^ 31`, beside the `icfg_dev = ROOTDEV` / `0 < icfg_nib`
+   pair N5a parked there, and `ROOTDEV`'s hoist (N5a item 4) is still owed.
+2. **ireclaim reuses almost all of the parked file's vocabulary**: its scan
+   is ialloc's with `lh a4,6(a5)` (nlink) added, the same `ireg_read_blk` +
+   `ireg_blk_slot` decode, the same `sb_ninodes` bound and the same
+   `ireg_blocks_ok` premise.  `ia_win_acc` is not needed (ireclaim never
+   writes a dinode); `DinodeSlot.diblk_slot_acc` is enough.
+3. **Do not put `ProofIalloc.v` / `LinkIalloc.v` rows in `_CoqProject`**
+   until the five block lemmas are proven — the parked file compiles only
+   because of its `cheat_`.
