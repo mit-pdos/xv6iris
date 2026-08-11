@@ -1967,8 +1967,38 @@ SC proof.  Three named risks in §6 of the design.
   **No exact fragment is needed at the racy sites**; one persistent `ws_lb`
   serves the owned and racy layers alike.
 
-Risks §6.1 (read fragments) and §6.3 (the boundary seam) remain unchecked,
-and obligations §5.2–§5.6 remain unbuilt.
+- `iris/WeakPtOwn.v` — obligation §5.4, the OBJECTIVE points-to, and with it
+  risk §6.1 (read fragments) RESOLVED.  `wpt_own a dq v := ∃ t,
+  wlat_pointsto a dq t v ∗ wflr_lb a t`, where `wflr_lb` is the persistent
+  per-hart ghost floor.  The whole idea is one substitution: `wpt`'s second
+  conjunct `⊒(view_byte a t)` constrains THE ASSERTION'S OWN monPred index
+  (hence subjective); `coh_lb (γ c) a t` is the same content as a ghost fact
+  about a NAMED HART (hence an iProp, hence objective, hence persistent and
+  never rebased).  It generalises `WeakVProp.wpt_img`, which is exactly the
+  `t = 0` case.
+
+  Fractions need no new machinery, which is the §6.1 answer: the floor lives
+  inside the points-to, so it is per-fragment by construction — two harts
+  sharing 1/2 hold two different `coh_lb`s, each separately true, and there
+  is no single view to split.  `wpt_own_split`'s → direction is free and its
+  ← direction has exactly `wpt_split`'s content (timestamp agreement from the
+  ghost_map element).
+
+  DROP-IN: `wpt_own_to_wpt` / `wpt_own_of_wpt` say that under the authority
+  at the true state, `↦o` and `↦w` are interchangeable — so every rule
+  already stated over `wpt` applies by sandwiching and nothing is
+  re-derived.  `wpt_own_load_rule` is `wpt_load_rule` minus its rebasing
+  side condition and threaded post-state, i.e. SC's shape verbatim.
+
+  DESIGN CHANGE, recorded in the note's new §3a: this replaces §5.3's
+  "coverage as a `wmstate_interp` conjunct over a registry".  Preservation is
+  then free (`ws_le` monotonicity), and the whole soundness burden moves to
+  the acquire handing out a points-to that already carries the right floor —
+  i.e. onto §5.5 / risk §6.3.
+
+Remaining: obligations §5.2 (re-base `wmstate_interp`), §5.5 (the
+acquire/release boundary), §5.6 (one leaf, one function, measure); risk §6.3
+(the boundary seam) now carries all the residual soundness risk.
 
 ## M4 — the sweep
 

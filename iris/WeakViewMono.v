@@ -261,6 +261,47 @@ Section view.
     by iMod (ws_coh_update with "Hc") as "$".
   Qed.
 
+  (** THE SINGLE-BYTE FLOOR — "the duplicable view lower-bound resource".
+      [coh_lb γ a t] says this hart's coherence floor at byte [a] is at least
+      [t], and nothing else.  It is the [iProp] twin of [WeakVProp]'s
+      [⊒(view_byte a t)] receipt: same content, but a ghost fact about a
+      NAMED hart rather than a constraint on the ASSERTION'S OWN index — which
+      is exactly what makes an assertion carrying it objective. *)
+  Definition coh_lb (γ : gname) (a : Z) (t : nat) : iProp Σ :=
+    own γ (◯ discrete_fun_singleton a (MaxNat t)).
+
+  Global Instance coh_lb_persistent γ a t : Persistent (coh_lb γ a t).
+  Proof. apply _. Qed.
+  Global Instance coh_lb_timeless γ a t : Timeless (coh_lb γ a t).
+  Proof. apply _. Qed.
+
+  Lemma coh_lb_valid γ w a t :
+    ws_coh_auth γ w -∗ coh_lb γ a t -∗ ⌜(t ≤ coh w a)%nat⌝.
+  Proof.
+    iIntros "Ha Hf".
+    iDestruct (own_valid_2 with "Ha Hf") as %Hv. iPureIntro.
+    move: Hv. rewrite -assoc -auth_frag_op.
+    rewrite auth_both_valid_discrete => -[Hincl _].
+    apply (discrete_fun_included_spec_1 _ _ a) in Hincl.
+    rewrite discrete_fun_lookup_op discrete_fun_lookup_singleton in Hincl.
+    rewrite /coh_fun max_nat_op in Hincl.
+    apply max_nat_included in Hincl. simpl in Hincl. lia.
+  Qed.
+
+  (** Minting one: any floor the authority actually has may be handed out,
+      and being persistent it never has to be handed back. *)
+  Lemma coh_lb_get γ w a t :
+    (t ≤ coh w a)%nat -> ws_coh_auth γ w -∗ coh_lb γ a t.
+  Proof.
+    iIntros (Hle) "Ha". iApply (own_mono with "Ha").
+    etrans; [|apply cmra_included_r]. apply auth_frag_mono.
+    exists (coh_fun w). intros a'. rewrite discrete_fun_lookup_op.
+    destruct (decide (a' = a)) as [->|Hne].
+    - rewrite discrete_fun_lookup_singleton /coh_fun max_nat_op.
+      rewrite Nat.max_r; [done|exact Hle].
+    - rewrite discrete_fun_lookup_singleton_ne //.
+  Qed.
+
   Lemma ws_coh_lb_valid γ w w0 :
     ws_coh_auth γ w -∗ ws_coh_lb γ w0 -∗ ⌜∀ a, (coh w0 a ≤ coh w a)%nat⌝.
   Proof.

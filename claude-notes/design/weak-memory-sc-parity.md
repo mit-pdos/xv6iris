@@ -1,10 +1,16 @@
 # SC parity for lock-disciplined code (PROPOSAL — §5.1 built, §6.2 settled)
 
-> **Status.**  Obligation §5.1 (the algebra) is landed in
-> `iris/WeakViewMono.v`; risk §6.2 (exactness vs lower bounds) is checked and
-> resolved in `iris/WeakViewRacy.v`.  Obligations §5.2–§5.6 are NOT built,
-> and nothing in the tree consumes the new algebra yet — `WeakGhost.hart_ws`
-> is still the exact-valued `ghost_var` every leaf threads.
+> **Status.**  Landed: §5.1 (the algebra, `iris/WeakViewMono.v`) and §5.4
+> (`↦o` with fractions, `iris/WeakPtOwn.v`).  Risks §6.2 and §6.1 are both
+> checked and resolved (`iris/WeakViewRacy.v`, `iris/WeakPtOwn.v`).
+> Obligations §5.2, §5.3, §5.5, §5.6 are NOT built, and nothing in the tree
+> consumes any of it yet — `WeakGhost.hart_ws` is still the exact-valued
+> `ghost_var` every leaf threads.
+>
+> **One design change from what §3 below proposes**, made while building
+> §5.4 and load-bearing for the §6.1 result: the coverage fact lives INSIDE
+> the points-to, as a per-hart `coh_lb` conjunct, rather than as a global
+> `wmstate_interp` invariant over a registry of owned locations.  See §3a.
 
 Sibling of [`weak-memory.md`](weak-memory.md), which is the RVWMO model
 proper.  This file is about a narrower question:
@@ -154,6 +160,59 @@ What is missing is stating it ONCE as a `wmstate_interp` conjunct instead of
 re-carrying it in every assertion.  With it, `wpt_own`'s load and store
 rules are SC's verbatim, at `iProp` altitude.
 
+### 3a. What was actually built, and why it differs
+
+`iris/WeakPtOwn.v`.  The registry-plus-invariant shape above turned out to
+be the wrong factoring.  What is built instead is:
+
+```coq
+Definition wpt_own (a : Z) (dq : dfrac) (v : bv 8) : iProp Σ :=
+  ∃ t, wlat_pointsto a dq t v ∗ wflr_lb a t.
+```
+
+where `wflr_lb a t` is the persistent, per-hart ghost floor from
+`WeakViewMono` — `coh_lb (γ c) a t ∨ mono_nat_lb_own (vrNew (γ c)) t`,
+matching `flr (ws_view ws) a = max (w_vrNew ws) (coh ws a)` on the nose so
+that both directions of the bridge below are exact.
+
+Read the two side by side and the whole idea is one substitution:
+
+| | second conjunct | altitude |
+|---|---|---|
+| `WeakVProp.wpt` | `⊒(view_byte a t)` — *the index THIS ASSERTION is read at covers `t`* | `vProp`, subjective |
+| `WeakPtOwn.wpt_own` | `coh_lb (γ c) a t` — *hart `c`'s floor at `a` covers `t`* | `iProp`, objective |
+
+Same content; the difference is that one constrains the assertion's own
+`monPred` index and the other is a ghost fact about a **named hart**.  That
+is what makes it objective, and being a lower bound on monotone ghost state
+it is also persistent — so it survives every intervening step for free.
+
+This is not a new axiom, it is the generalisation of something already in
+the tree: `WeakVProp.wpt_img` is exactly the `t = 0` case, objective because
+`view_byte a 0` is the bottom view.  Its header says the converse is false
+for `t > 0` — "a hart that has not observed that timestamp cannot read the
+byte".  Naming the hart is what repairs that.
+
+**The drop-in theorem** is what makes this cheap rather than a rewrite:
+
+```coq
+Lemma wpt_own_to_wpt a dq v w : ws_auth γv w -∗ wpt_own γv a dq v -∗
+                                ws_auth γv w ∗ vwp_hold (a ↦w{dq} v) w.
+Lemma wpt_own_of_wpt a dq v w : (* the exact converse *)
+```
+
+Under the authority at the true state the two points-to's are
+**interchangeable**, so every rule already stated over `wpt` — the whole of
+`WeakVProp`, `WeakInstr`, `WeakStore` — applies to `↦o` by sandwiching, and
+nothing has to be re-derived.  `wpt_own_load_rule` is `wpt_load_rule` with
+its rebasing side condition and its threaded post-state deleted, which is
+the SC shape verbatim.
+
+**What this costs.**  Soundness now rests on the acquire handing out a
+points-to that already carries the right floor, rather than on a global
+invariant.  That is the same obligation as before, moved: §5.5 and risk §6.3
+now carry all of it, and §5.3 as originally written is not needed.
+
 ### The boundary — deliberately two points-to's
 
 - **`↦o` (objective, `iProp`, SC rules)** — private and lock-protected
@@ -226,9 +285,17 @@ intervening step for free.
      `g` itself.  `coh_fun_incl` is three lines.
 2. **Re-base `wmstate_interp`** on the new authority and repair
    `hart_ws_agree`'s consumers.
-3. **The coverage invariant** as a `wmstate_interp` conjunct + its two
-   obligations (acquire establishes, step preserves).
-4. **`wpt_own` and its two rules**, stated in SC's shape.
+3. ~~**The coverage invariant** as a `wmstate_interp` conjunct.~~ — **NOT
+   NEEDED** in this form; superseded by §3a, which carries the floor inside
+   the points-to.  Preservation comes free from `ws_le` monotonicity (the
+   floor is a lower bound on monotone ghost state); establishment is
+   obligation 5.
+4. **`wpt_own` and its two rules**, stated in SC's shape. — **LANDED**,
+   `iris/WeakPtOwn.v`: the points-to, the `Fractional`/`AsFractional`
+   instances, agreement/validity/persist, `Objective`, the drop-in bridge
+   both ways, `wpt_own_load_rule` and `wpt_own_flat_lookup` in SC's shape,
+   and `wpt_own_survives_step` (whose proof does not use its `ws_le`
+   hypothesis — there is nothing to rebase).
 5. **The `↦o` / `↦w` boundary**: acquire moves ownership INTO the covered
    registry, release moves it OUT.
 6. **One leaf** end to end, then one function, then measure against SC.
@@ -240,11 +307,26 @@ intervening step for free.
 Recorded so the next person does not have to rediscover them.  None of the
 below has been checked.
 
-1. **Read fragments.**  `dq < 1` shared across harts is the case I trust
-   least.  The coverage argument should still go through — every fragment
-   was obtained through a synchronising edge — but the invariant has to be
-   stated per-fragment-holder, not per-exclusive-owner, and it is not
-   obvious the ghost accounting supports that.
+1. ~~**Read fragments.**~~ — **RESOLVED by §3a's factoring**, which is most
+   of the reason for that factoring.  The worry was that coverage has to be
+   stated per-fragment-holder rather than per-exclusive-owner, and that the
+   ghost accounting might not support it.  Putting `wflr_lb` inside the
+   points-to makes it per-fragment **by construction**: each fragment
+   carries its own hart's floor, two harts sharing `dq = 1/2` hold two
+   DIFFERENT `coh_lb`s, and each is separately true.  There is no single
+   "the view" that has to be split, so there is no accounting to get wrong.
+
+   `WeakPtOwn.wpt_own_split` is the `⊣⊢`.  The `→` direction is free — the
+   element halves, the floor is persistent and duplicates.  The `←`
+   direction has exactly the content the subjective `wpt_split` has and no
+   more: two points-to for one byte may a priori carry different timestamps,
+   and element agreement forces them equal before the fractions recombine.
+   `wpt_own_load_rule` is stated at arbitrary `dq`, so a fractional
+   objective points-to reads exactly like a full one.
+
+   The residual obligation is not gone, it MOVED: an acquire must hand out a
+   points-to already carrying the right floor.  That is now entirely §5.5 /
+   risk 3 below.
 2. ~~**Exactness vs lower bounds.**~~ — **CHECKED, AND IT IS FINE.**
    `iris/WeakViewRacy.v`.  The worry was that `WeakRacy.wp_wracy_load`
    quantifies over the ADMISSIBLE READ RESULTS, computed from the hart's
