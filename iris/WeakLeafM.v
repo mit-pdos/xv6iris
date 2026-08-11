@@ -224,7 +224,8 @@ Section WeakLeafM.
       continuation with the [ws]/[ws_le] pair added. *)
   Lemma wwp_lui (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (rd : mword 5) (imm : mword 20) (m : regfile)
-      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate) :
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
@@ -234,6 +235,7 @@ Section WeakLeafM.
     gpr_file m -∗
     winstr_m pc is_rvc (UTYPE (imm, Regidx rd, LUI)) -∗
     hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
     ( ∀ ws' : wstate,
       ⌜ws_le ws ws'⌝ -∗
       mmode_config (DfracOwn q) -∗
@@ -241,11 +243,12 @@ Section WeakLeafM.
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
       hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
     intros Hgid Hpmp Hnz.
-    iIntros "Hmm Hpcf [Hpc Hnpc] Hfile #Hi Hhws Hcont".
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hfile #Hi Hhws HF Hcont".
     destruct is_rvc.
     - iDestruct (winstr_m_rvc with "Hi") as
         (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
@@ -256,7 +259,8 @@ Section WeakLeafM.
                 D_m_mi Hgood Hdec Hg0 Hexp
                 with "Hmm Hpcf Hpc Hnpc Hfile Hb Hhws").
       iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hhws".
-      iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws"). exact Hle.
+      iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+      iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws HF"). exact Hle.
     - iDestruct (winstr_m_base with "Hi") as
         (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
       iApply (wwp_lui_leaf (is_aligned_vaddr (Virtaddr pc) 4)
@@ -266,7 +270,8 @@ Section WeakLeafM.
                 D_m_mi Hgood Hdec
                 with "Hmm Hpcf Hpc Hnpc Hfile Hb Hhws").
       iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hhws".
-      iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws"). exact Hle.
+      iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+      iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws HF"). exact Hle.
   Qed.
 
 End WeakLeafM.

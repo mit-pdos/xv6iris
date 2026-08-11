@@ -509,10 +509,9 @@ Section WkStartThm.
        with [WpStartNew]'s six lines for the same instruction. ---- *)
     iPoseProof (wsti_35 kbs Hcov with "Htext") as "#Hi35".
     iApply (wwp_lui st_pc35 true ti_a4 (sign_extend' 20 si35) (st_m34 m sp0 ms0)
-              pmpcfg0 (1/2)%Qp ws34 Hgid HpmpU Hnz_a4
-              with "Hmm HpcfA [$Hpc $Hnpc] Hfile Hi35 Hhws").
-    iIntros (ws35) "%Hwsle35 Hmm HpcfA Hpc Hfile Hhws".
-    iDestruct (vwp_hold_mono _ ws34 ws35 Hwsle35 with "Hstk") as "Hstk".
+              pmpcfg0 (1/2)%Qp ws34 _ Hgid HpmpU Hnz_a4
+              with "Hmm HpcfA [$Hpc $Hnpc] Hfile Hi35 Hhws Hstk").
+    iIntros (ws35) "%Hwsle35 Hmm HpcfA Hpc Hfile Hhws Hstk".
     iEval (change (<[Regidx ti_a4 := regval_into_reg (luival (sign_extend' 20 si35))]>
                      (st_m34 m sp0 ms0))
              with (st_m35 m sp0 ms0)) in "Hfile".
