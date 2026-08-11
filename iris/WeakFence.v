@@ -132,6 +132,40 @@ Proof. intros Ht a. rewrite flr_scl_eq /flr /acq_view_r /=. lia. Qed.
 Lemma view_scl_acq_vwOld ws t : (t ≤ w_vwOld ws)%nat → view_scl t ⊑ acq_view ws.
 Proof. intros Ht a. rewrite flr_scl_eq flr_acq_view. lia. Qed.
 
+(** *** WHICH FENCE KINDS DELIVER A READ.
+
+    The delivery lemmas were originally stated at [Barrier_RISCV_rw_rw] only,
+    because that is the kind [acq_view]'s identity ([ws_view_fence_rw]) is
+    about.  But the fence xv6's [main] spin loop actually executes is
+    [fence r,rw] (gcc's [__ATOMIC_ACQUIRE] load fence, [kernel.asm] at
+    [main+0x18]) — pred R, no W — and a scalar view a LOAD gained sits under
+    [w_vrOld], which a pred-R fence already carries.
+    [acq_pred_r] is that property, abstracted over the kind so no delivery
+    lemma has to be duplicated per fence: it says the read frontier
+    [acq_view_r] is below the hart's index after the fence. *)
+Definition acq_pred_r (b : barrier_kind) : Prop :=
+  ∀ ws : wstate, acq_view_r ws ⊑ ws_view (barrier_post ws b).
+
+Lemma acq_pred_r_rw_rw : acq_pred_r Barrier_RISCV_rw_rw.
+Proof. intros ws. rewrite ws_view_barrier_rw_rw. apply acq_view_r_acq_view. Qed.
+
+Lemma acq_pred_r_rw_r : acq_pred_r Barrier_RISCV_rw_r.
+Proof. intros ws. rewrite ws_view_barrier_rw_r. apply acq_view_r_acq_view. Qed.
+
+Lemma acq_pred_r_r_rw : acq_pred_r Barrier_RISCV_r_rw.
+Proof. intros ws. rewrite (ws_view_fence_r ws true). reflexivity. Qed.
+
+Lemma acq_pred_r_r_r : acq_pred_r Barrier_RISCV_r_r.
+Proof. intros ws. rewrite ws_view_barrier_r_r. reflexivity. Qed.
+
+(** ... and the delivery itself, at any such kind. *)
+Lemma view_scl_acq_pred_r (b : barrier_kind) (ws : wstate) (t : nat) :
+  acq_pred_r b → (t ≤ w_vrOld ws)%nat →
+  view_scl t ⊑ ws_view (barrier_post ws b).
+Proof.
+  intros Hb Ht. etrans; [by apply view_scl_acq_vrOld|apply Hb].
+Qed.
+
 (* ====================================================================== *)
 (** ** 2. [∇] at the [vwp_hold] altitude, and the fence rule *)
 

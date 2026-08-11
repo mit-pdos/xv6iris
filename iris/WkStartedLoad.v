@@ -70,22 +70,15 @@ Local Open Scope Z_scope.
 (* ====================================================================== *)
 (** ** 1. The load's own gain, and the byte that witnesses a non-clear word *)
 
-(** WHAT THE RACY [lw] LEAF OWES ITS CALLER (header): for every byte of the
-    flag word, the timestamp at which the byte the load RETURNED was
-    admissible is covered by the successor's read floor.  Note that this
-    SUBSUMES [WeakRacy.wadm] — it is the admissibility with the view attached,
-    which is precisely the half [wp_wracy_load]'s [Q] cannot carry. *)
-Definition wstarted_gain (rak : akinfo) (a : Arch.pa) (σ σ' : wmstate)
-    (w : bv 32) : Prop :=
-  forall j : nat, (j < 4)%nat ->
-    exists t : nat, wbyte_ok σ rak (acc_addr a j) t (nth_byte w j) /\
-                    (t <= w_vrOld (wm_ws σ'))%nat.
-
-Lemma wstarted_gain_wadm rak a σ σ' w :
-  wstarted_gain rak a σ σ' w -> wadm σ rak a 4 w.
-Proof.
-  intros Hg j Hj. destruct (Hg j ltac:(lia)) as (t & Hok & _). by exists t.
-Qed.
+(** HISTORICAL NOTE.  This file used to open with a [wstarted_gain]
+    definition — "for every byte of the flag word, the timestamp at which the
+    byte the load RETURNED was admissible is covered by the successor's read
+    floor" — taken as a PREMISE, on the grounds that it is a per-instruction
+    ISA obligation of §2c's kind.  It is not: [WeakRacy.wgain] is the same
+    statement and [WeakRacy.exec_of_wrun_gain] PROVES it, from the same
+    traversal that produces [wadm], for any hart that has not stored to the
+    window ([WeakRacy.wunwritten]).  What the leaf still owes is
+    [WeakRacy.wreads_win], which carries no weak-memory content at all. *)
 
 (** A word that is not the cleared one differs from it at some byte — the
     witness the collapse is applied at. *)
@@ -141,14 +134,24 @@ Section wp_started_load.
     destruct Hle as (_ & Hold & _). lia.
   Qed.
 
-  (** ... and the [fence rw,rw] cashes it. *)
+  (** ... and any PRED-R fence cashes it.  The kernel's is [fence r,rw]
+      ([kernel.asm], [main+0x18] — gcc's [__ATOMIC_ACQUIRE] load fence), not
+      [fence rw,rw]; [WeakFence.acq_pred_r] is the property that makes the
+      difference invisible here. *)
+  Lemma wstarted_rcpt_deliver_gen P (σ : wmstate) (ws' : wstate)
+      (b : barrier_kind) :
+    acq_pred_r b ->
+    wV_fence b σ ws' ->
+    wstarted_rcpt P (wm_ws σ) -∗ vwp_hold P ws'.
+  Proof.
+    intros Hb HQ. iIntros "H". iDestruct "H" as (T) "[%HT HP]".
+    by iApply (wstarted_deliver_gen P σ ws' T b Hb HT HQ with "HP").
+  Qed.
+
   Lemma wstarted_rcpt_deliver P (σ : wmstate) (ws' : wstate) :
     wV_fence Barrier_RISCV_rw_rw σ ws' ->
     wstarted_rcpt P (wm_ws σ) -∗ vwp_hold P ws'.
-  Proof.
-    intros HQ. iIntros "H". iDestruct "H" as (T) "[%HT HP]".
-    by iApply (wstarted_deliver P σ ws' T HT HQ with "HP").
-  Qed.
+  Proof. exact (wstarted_rcpt_deliver_gen P σ ws' _ acq_pred_r_rw_rw). Qed.
 
 (* ====================================================================== *)
 (** ** 3. THE WAITER'S LOAD — one racy [lw] through the escrow
@@ -177,6 +180,7 @@ Section wp_started_load.
          ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr pc j)⌝ ∗
          ⌜Pp σ⌝ ∗
          ⌜wstarted_img_clear σ a⌝ ∗
+         ⌜wunwritten (wm_ws σ) a 4⌝ ∗
          wlat_interp (wm_img σ) (wm_log σ) ∗
          (∃ t0 : mstate,
             ⌜exec (riscv_step false) (wflat_st σ) = Some (tt, t0)⌝) ∗
@@ -189,26 +193,30 @@ Section wp_started_load.
               (⌜w = lock_zero⌝ ∨ ⌜w ≠ lock_zero⌝ ∗ wstarted_rcpt P (wm_ws σ')) -∗
               |={∅, ⊤ ∖ ↑wstartedN}=> wmstate_rest σ' ∗ WWP Loop))%I.
 
+  (** THE TWO PREMISES THAT REPLACED THE VIEW OBLIGATION.  [ak_coh rak = false]
+      says this is a weak-tier access (a coherent fetch/walker read moves no
+      view and so gains nothing); [Hreads] says the step READS the window,
+      which is the whole per-instruction residue of the old [wstarted_gain]
+      and contains no weak-memory content.  The reader's own side condition —
+      "I have never stored to the flag" — is [wunwritten], and it comes out of
+      the caller's σ-callback like [wstarted_img_clear] does. *)
   Lemma wwp_started_load (a : Arch.pa) P `{!Persistent P}
       (pc : SailStdpp.Values.mword 64) (rak : akinfo)
       (Pp : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) :
     gen_id = 0%nat →
     acc_wf pc 4 →
     acc_wf a 4 →
+    ak_coh rak = false →
     (∀ σ σ' : wmstate, Q σ σ' → wm_log σ' = wm_log σ) →
-    (∀ (σ σ' : wmstate) (tick : bool) (w : bv 32),
-       Q σ σ' →
-       exec (riscv_step tick) (wpatch_st σ a 4 w) = Some (tt, wpatch_st σ' a 4 w) →
-       wadm σ rak a 4 w →
-       wstarted_gain rak a σ σ' w) →
+    (∀ (tick : bool) (σ : wmstate), Pp σ → wreads_win a 4 tick σ) →
     wracy_cert (fin_to_nat cpu_id) pc a 4 rak Pp Q →
     inv wstartedN (wstarted_body a P) -∗
     wstarted_ld_cb a P pc rak Pp Q -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccpc Hacca Hquiet Hgain Hcert) "#Hinv Hk".
+    iIntros (Hgid Haccpc Hacca Hakc Hquiet Hreads Hcert) "#Hinv Hk".
     rewrite /wstarted_ld_cb.
-    iApply (wp_wracy_load pc a 4 rak Pp Q Hgid Haccpc Hacca Hcert).
+    iApply (wp_wracy_load_gain pc a 4 rak Pp Q Hgid Haccpc Hacca Hakc Hcert).
     iIntros (σ) "Hσ".
     (* the log lower bound the escrow's snapshot is read against — persistent,
        so taking it costs the caller nothing *)
@@ -221,15 +229,19 @@ Section wp_started_load.
     iDestruct (wlat4_flat_gen σ a (DfracOwn 1) te v Hwf Hacca with "Hlat Hw")
       as %[Hflat _].
     iMod ("Hk" $! σ with "Hlat Hrest")
-      as "(%Hpc & %Htext & %HP & %Himg & Hlat & Ht0 & Hcont)".
+      as "(%Hpc & %Htext & %HP & %Himg & %Hun & Hlat & Ht0 & Hcont)".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iSplitR.
     { iPureIntro. exists v.
       exact (read_bytes_of_bytes (wflat (wm_img σ) (wm_log σ)) a 4 v Hflat). }
     iDestruct "Ht0" as (t0) "%Hex0".
     iSplitR; [iExists t0; by iPureIntro|].
-    iNext. iIntros (tick σ' w) "%Hadm %Hex %Hpost %HQ".
+    iNext. iIntros (tick σ' w) "%Hadm %Hex %Hpost %HQ %Hgd".
+    (* the patch-independence arm cannot happen at a LOAD *)
+    assert (Hgain : wgain σ σ' rak a 4 w).
+    { destruct Hgd as [Hg|Huni]; [exact Hg|].
+      exfalso. exact (Hreads tick σ HP (ex_intro _ σ' Huni)). }
     iAssert (wstarted_body a P) with "[Hw Hhist]" as "Hbody".
     { iExists te, v. iFrame "Hw". iExact "Hhist". }
     (* THE COLLAPSE, in the non-clear arm *)
@@ -239,7 +251,7 @@ Section wp_started_load.
     { destruct (decide (w = lock_zero)) as [->|Hne].
       { iModIntro. iFrame "Hlat Hbody". iLeft. by iPureIntro. }
       destruct (bv32_ne_zero_byte w Hne) as (j & Hj & Hbne).
-      destruct (Hgain σ σ' tick w HQ Hex Hadm j Hj) as (t & Hok & Hcov).
+      destruct (Hgain j ltac:(simpl; lia)) as (t & Hok & Hcov).
       iDestruct (wstarted_observe a P σ rak j t (nth_byte w j)
                    Himg Hj Hok Hbne with "Hlbσ Hlat Hbody")
         as "(Hlat & Hbody & _ & Hrcpt)".
@@ -278,16 +290,17 @@ Section wp_started_load.
                  vwp_hold P (wm_ws σ') -∗
                  |={∅,⊤}=> wmstate_interp σ' ∗ WWP Loop)))%I.
 
-  Lemma wwp_started_fence P (pc : SailStdpp.Values.mword 64)
-      (Pf : wmstate -> Prop) :
+  Lemma wwp_started_fence_gen P (pc : SailStdpp.Values.mword 64)
+      (Pf : wmstate -> Prop) (b : barrier_kind) :
     gen_id = 0%nat →
     acc_wf pc 4 →
-    wstep_cert (fin_to_nat cpu_id) pc Pf (wQ_fence Barrier_RISCV_rw_rw) →
+    acq_pred_r b →
+    wstep_cert (fin_to_nat cpu_id) pc Pf (wQ_fence b) →
     wstarted_fence_cb P pc Pf -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccpc Hcert) "Hk". rewrite /wstarted_fence_cb.
-    iApply (wwp_fence_step pc Barrier_RISCV_rw_rw Pf Hgid Haccpc Hcert).
+    iIntros (Hgid Haccpc Hb Hcert) "Hk". rewrite /wstarted_fence_cb.
+    iApply (wwp_fence_step pc b Pf Hgid Haccpc Hcert).
     iIntros (σ) "Hσ".
     iMod ("Hk" $! σ with "Hσ") as "(%Hpc & %Htext & %HP & Hrcpt & Hc)".
     iDestruct "Hc" as (t0 t1) "(%Hex0 & %Hex1 & Hcont)".
@@ -296,14 +309,44 @@ Section wp_started_load.
     iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
     iNext. iIntros (tick σ') "%Hpost %HQ".
     iApply ("Hcont" $! tick σ' with "[%]"); [exact Hpost|].
-    by iApply (wstarted_rcpt_deliver P σ (wm_ws σ') HQ with "Hrcpt").
+    by iApply (wstarted_rcpt_deliver_gen P σ (wm_ws σ') b Hb HQ with "Hrcpt").
+  Qed.
+
+  Lemma wwp_started_fence P (pc : SailStdpp.Values.mword 64)
+      (Pf : wmstate -> Prop) :
+    gen_id = 0%nat →
+    acc_wf pc 4 →
+    wstep_cert (fin_to_nat cpu_id) pc Pf (wQ_fence Barrier_RISCV_rw_rw) →
+    wstarted_fence_cb P pc Pf -∗
+    WWP Loop.
+  Proof.
+    iIntros (Hgid Haccpc Hcert).
+    iApply (wwp_started_fence_gen P pc Pf _ Hgid Haccpc acq_pred_r_rw_rw Hcert).
+  Qed.
+
+  (** THE KERNEL'S OWN FENCE: [fence r,rw] at [main+0x18]. *)
+  Lemma wwp_started_fence_r P (pc : SailStdpp.Values.mword 64)
+      (Pf : wmstate -> Prop) :
+    gen_id = 0%nat →
+    acc_wf pc 4 →
+    wstep_cert (fin_to_nat cpu_id) pc Pf (wQ_fence Barrier_RISCV_r_rw) →
+    wstarted_fence_cb P pc Pf -∗
+    WWP Loop.
+  Proof.
+    iIntros (Hgid Haccpc Hcert).
+    iApply (wwp_started_fence_gen P pc Pf _ Hgid Haccpc acq_pred_r_r_rw Hcert).
   Qed.
 
 (* ====================================================================== *)
-(** ** 5. SMOKE TEST: [lw] ; [fence rw,rw], the handoff end to end
+(** ** 5. SMOKE TEST: [lw] ; [fence r,rw], the handoff end to end
 
-    xv6's secondary-hart wait is [while (started == 0) ; __sync_synchronize()],
-    and this is its LAST iteration composed at the WP altitude: the racy load
+    xv6's secondary-hart wait is
+
+      while (__atomic_load_n(&started, __ATOMIC_ACQUIRE) == 0) ;
+
+    which gcc compiles to [lw a5,0(a4) ; fence r,rw ; sext.w ; beqz] with the
+    acquire fence INSIDE the loop ([kernel.asm], [main+0x16 .. +0x1e]).  This
+    is its LAST iteration composed at the WP altitude: the racy load
     observes a non-clear flag and collapses the escrow into a receipt, the
     fence cashes the receipt, and the payload [P] arrives at the reader's own
     index.  Nothing glues the two steps but [wstep_post] / [wstep_post_racy] —
@@ -321,14 +364,11 @@ Section wp_started_load.
     acc_wf pcl 4 →
     acc_wf pcf 4 →
     acc_wf a 4 →
+    ak_coh rak = false →
     (∀ σ σ' : wmstate, Ql σ σ' → wm_log σ' = wm_log σ) →
-    (∀ (σ σ' : wmstate) (tick : bool) (w : bv 32),
-       Ql σ σ' →
-       exec (riscv_step tick) (wpatch_st σ a 4 w) = Some (tt, wpatch_st σ' a 4 w) →
-       wadm σ rak a 4 w →
-       wstarted_gain rak a σ σ' w) →
+    (∀ (tick : bool) (σ : wmstate), Pl σ → wreads_win a 4 tick σ) →
     wracy_cert (fin_to_nat cpu_id) pcl a 4 rak Pl Ql →
-    wstep_cert (fin_to_nat cpu_id) pcf Pf (wQ_fence Barrier_RISCV_rw_rw) →
+    wstep_cert (fin_to_nat cpu_id) pcf Pf (wQ_fence Barrier_RISCV_r_rw) →
     inv wstartedN (wstarted_body a P) -∗
     (∀ σ : wmstate,
        wlat_interp (wm_img σ) (wm_log σ) -∗
@@ -337,6 +377,7 @@ Section wp_started_load.
          ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr pcl j)⌝ ∗
          ⌜Pl σ⌝ ∗
          ⌜wstarted_img_clear σ a⌝ ∗
+         ⌜wunwritten (wm_ws σ) a 4⌝ ∗
          wlat_interp (wm_img σ) (wm_log σ) ∗
          (∃ t0 : mstate,
             ⌜exec (riscv_step false) (wflat_st σ) = Some (tt, t0)⌝) ∗
@@ -355,21 +396,22 @@ Section wp_started_load.
                 (WWP Loop ∨ wstarted_fence_cb P pcf Pf))) -∗
     WWP Loop.
   Proof.
-    iIntros (Hgid Haccl Haccf Hacca Hquiet Hgain Hcertl Hcertf) "#Hinv Hk".
-    iApply (wwp_started_load a P pcl rak Pl Ql Hgid Haccl Hacca Hquiet Hgain
-              Hcertl with "Hinv").
+    iIntros (Hgid Haccl Haccf Hacca Hakc Hquiet Hreads Hcertl Hcertf) "#Hinv Hk".
+    iApply (wwp_started_load a P pcl rak Pl Ql Hgid Haccl Hacca Hakc Hquiet
+              Hreads Hcertl with "Hinv").
     iIntros (σ) "Hlat Hrest".
     iMod ("Hk" $! σ with "Hlat Hrest")
-      as "(%Hpc & %Htext & %HP & %Himg & Hlat & Ht0 & Hcont)".
+      as "(%Hpc & %Htext & %HP & %Himg & %Hun & Hlat & Ht0 & Hcont)".
     iDestruct "Ht0" as (t0) "%Hex0".
     iModIntro. iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
-    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|]. iFrame "Hlat".
+    iSplitR; [by iPureIntro|]. iSplitR; [by iPureIntro|].
+    iSplitR; [by iPureIntro|]. iFrame "Hlat".
     iSplitR; [iExists t0; by iPureIntro|].
     iNext. iIntros (tick σ' w) "%Hadm %Hex %Hpost %HQ Harm".
     iMod ("Hcont" $! tick σ' w with "[%] [%] [%] [%] Harm") as "[$ Hnext]";
       [exact Hadm|exact Hex|exact Hpost|exact HQ|].
     iModIntro. iDestruct "Hnext" as "[Hloop|Hf]"; [iExact "Hloop"|].
-    iApply (wwp_started_fence P pcf Pf Hgid Haccf Hcertf with "Hf").
+    iApply (wwp_started_fence_r P pcf Pf Hgid Haccf Hcertf with "Hf").
   Qed.
 
 End wp_started_load.
@@ -379,5 +421,4 @@ End wp_started_load.
    [wstarted_reader], and §§1–2 here); the three WP-level lemmas below name
    [riscv_step] and so carry the five sail platform axioms
    ([plat_term_write] + the reservation quartet), like the rest of the tree. *)
-Print Assumptions wstarted_gain_wadm.
 Print Assumptions bv32_ne_zero_byte.

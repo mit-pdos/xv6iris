@@ -701,6 +701,49 @@ Lemma load_post_run_fwd ws aq base ts :
   w_fwd (load_post_run ws aq base ts) = w_fwd ws.
 Proof. apply load_post_bytes_fwd. Qed.
 
+(** THE MULTI-BYTE READ GAIN.  [load_post_vrOld_nofwd] says a single
+    non-forwarded byte read of timestamp [t] leaves [t ≤ w_vrOld]; this is the
+    same fact for the FOLD the interpreter actually builds
+    ([WeakInterp.wread_post]), and it is what turns "the load returned byte
+    [b]" into "the timestamp [b] came from is covered by my read floor" — the
+    reader half of every fence-mediated handoff.
+
+    The side condition is per-BYTE ([w_fwd ws !! a = None], "this hart has not
+    stored to that byte"), not the global [w_fwd ws = ∅] the M0 corollary
+    used: a hart that has stored elsewhere still reads a foreign flag
+    unforwarded. *)
+Lemma load_post_fold_vrOld aq vpre ats ws a t :
+  (a, t) ∈ ats → w_fwd ws !! a = None →
+  (t ≤ w_vrOld (foldl (λ w at_, load_post_at w aq vpre at_.1 at_.2) ws ats))%nat.
+Proof.
+  revert ws. induction ats as [|at_ l IH]; intros ws Hin Hfwd.
+  { by apply elem_of_nil in Hin. }
+  apply elem_of_cons in Hin as [<-|Hin].
+  - (* the head IS our byte: the step raises [w_vrOld] past [t], the rest of
+       the fold only raises it further *)
+    simpl.
+    etrans; [|apply (load_post_fold_le aq vpre l (load_post_at ws aq vpre a t))].
+    rewrite /load_post_at /= (fwd_view_miss ws aq a t Hfwd). lia.
+  - apply IH; [exact Hin|]. by rewrite load_post_at_fwd.
+Qed.
+
+Lemma load_post_bytes_vrOld ws aq ats a t :
+  (a, t) ∈ ats → w_fwd ws !! a = None →
+  (t ≤ w_vrOld (load_post_bytes ws aq ats))%nat.
+Proof. apply load_post_fold_vrOld. Qed.
+
+Lemma load_post_run_vrOld ws aq base ts j :
+  (j < length ts)%nat → w_fwd ws !! (base + Z.of_nat j)%Z = None →
+  (ts !!! j ≤ w_vrOld (load_post_run ws aq base ts))%nat.
+Proof.
+  intros Hj Hfwd. apply (load_post_bytes_vrOld _ _ _ (base + Z.of_nat j)%Z);
+    [|exact Hfwd].
+  apply elem_of_list_lookup_2 with j.
+  destruct (lookup_lt_is_Some_2 ts j Hj) as [t Ht].
+  rewrite lookup_zip_with (lookup_seq_lt 0 (length ts) j Hj) Ht /=.
+  by rewrite (list_lookup_total_correct ts j t Ht).
+Qed.
+
 Lemma load_post_at_coh ws aq vpre a t :
   (t ≤ coh (load_post_at ws aq vpre a t) a)%nat.
 Proof. rewrite /load_post_at coh_upd_eq. lia. Qed.

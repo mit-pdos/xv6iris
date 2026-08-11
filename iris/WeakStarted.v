@@ -532,12 +532,29 @@ Section weak_started.
   (** (c) THE DELIVERY, at the [fence rw,rw]: everything frozen at a scalar
       view the hart has already READ is delivered to its index.  This is the
       whole reader-side content, and it is one application of
-      [WeakInstr.wwp_fence_scl]. *)
+      [WeakInstr.wwp_fence_scl].  ANY pred-R fence does it
+      ([WeakFence.acq_pred_r]) — which matters, because the fence xv6's spin
+      loop executes is [fence r,rw], not [fence rw,rw]. *)
+  Lemma wstarted_deliver_gen P (σ : wmstate) (ws' : wstate) (t : nat)
+      (b : barrier_kind) :
+    acq_pred_r b ->
+    (t <= w_vrOld (wm_ws σ))%nat ->
+    wV_fence b σ ws' ->
+    monPred_at P (view_scl t) ⊢ vwp_hold P ws'.
+  Proof. intros Hb Ht HQ. by apply (wwp_fence_scl_gen P σ ws' t b). Qed.
+
   Lemma wstarted_deliver P (σ : wmstate) (ws' : wstate) (t : nat) :
     (t <= w_vrOld (wm_ws σ))%nat ->
     wV_fence Barrier_RISCV_rw_rw σ ws' ->
     monPred_at P (view_scl t) ⊢ vwp_hold P ws'.
-  Proof. intros Ht HQ. by apply (wwp_fence_scl P σ ws' t). Qed.
+  Proof. exact (wstarted_deliver_gen P σ ws' t _ acq_pred_r_rw_rw). Qed.
+
+  (** The kernel's own kind: [fence r,rw] at [main+0x18]. *)
+  Lemma wstarted_deliver_r P (σ : wmstate) (ws' : wstate) (t : nat) :
+    (t <= w_vrOld (wm_ws σ))%nat ->
+    wV_fence Barrier_RISCV_r_rw σ ws' ->
+    monPred_at P (view_scl t) ⊢ vwp_hold P ws'.
+  Proof. exact (wstarted_deliver_gen P σ ws' t _ acq_pred_r_r_rw). Qed.
 
   (** (d) THE OBSERVATION — the one-shot collapse at the escrow.
 
@@ -604,25 +621,28 @@ Section weak_started.
       [WeakMem.load_post_vrOld_nofwd] / [wstarted_read_vrOld] is what
       discharges it for a hart with an empty forward bank. *)
   Lemma wstarted_reader (a : Arch.pa) P `{!Persistent P}
-      (σ σf : wmstate) (ws' : wstate) (ak : akinfo) (j t : nat) (b : bv 8) :
+      (σ σf : wmstate) (ws' : wstate) (ak : akinfo) (j t : nat) (b : bv 8)
+      (bk : barrier_kind) :
     wstarted_img_clear σ a ->
     (j < 4)%nat ->
     wbyte_ok σ ak (acc_addr a j) t b ->
     b <> nth_byte lock_zero 0 ->
     (t <= w_vrOld (wm_ws σf))%nat ->
-    wV_fence Barrier_RISCV_rw_rw σf ws' ->
+    acq_pred_r bk ->
+    wV_fence bk σf ws' ->
     wlog_lb (wm_log σ) -∗
     (wlat_interp (wm_img σ) (wm_log σ) : iProp Σ) -∗
     wstarted_body a P -∗
     wlat_interp (wm_img σ) (wm_log σ) ∗ wstarted_body a P ∗
       ⌜b = nth_byte lock_one j⌝ ∗ vwp_hold P ws'.
   Proof.
-    intros Himg Hj Hok Hne Hgain HQ. iIntros "#Hlbσ Hi Hbody".
+    intros Himg Hj Hok Hne Hgain Hbk HQ. iIntros "#Hlbσ Hi Hbody".
     iDestruct (wstarted_observe a P σ ak j t b Himg Hj Hok Hne
                  with "Hlbσ Hi Hbody") as "(Hi & Hbody & %Hbb & HT)".
     iDestruct "HT" as (T) "[%HTle #HP0]".
     iFrame "Hi Hbody". iSplitR; [by iPureIntro|].
-    iApply (wstarted_deliver P σf ws' T with "HP0"); [lia|exact HQ].
+    iApply (wstarted_deliver_gen P σf ws' T bk with "HP0");
+      [exact Hbk|lia|exact HQ].
   Qed.
 
 End weak_started.

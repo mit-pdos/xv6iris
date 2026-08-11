@@ -620,6 +620,210 @@ Proof.
 Qed.
 
 (* ====================================================================== *)
+(** ** 4b. THE GAIN: the racy read's VIEW content, taken from the model
+
+    [wadm] says WHICH byte values the run could have returned.  It does not
+    say at which timestamp, and a handoff needs exactly that: the fence that
+    cashes a receipt consumes [t ≤ w_vrOld], "the timestamp I read is under my
+    read floor".  That pairing used to be a per-instruction PREMISE
+    ([WkStartedLoad.wstarted_gain], porting guide §2c) because
+    [wracy_cert]'s [Q] is a relation on STATES and cannot name the word the
+    load returned.
+
+    It does not have to be.  The bridge's own induction knows the timestamp
+    list the racy read took — [wread_ok]'s [ts] — and [WeakMem]'s read step
+    puts it under [w_vrOld] on the spot ([load_post_run_vrOld]); every later
+    step only raises the floor ([WeakInterp.wrun_ws_le]).  So the gain comes
+    out of the SAME traversal that produces [wadm], under one side condition
+    that is about the READER and not about the instruction: the hart has not
+    stored to the window, so its read is not FORWARDED (a forwarded load takes
+    the view the store banked, not the timestamp — [WeakMem.fwd_view]).
+
+    WHAT IS LEFT FOR THE LEAF is the one thing a generic traversal cannot
+    know: whether the run took the racy read at all.  A run that never touches
+    the window is patch-INDEPENDENT — it produces the same answer for every
+    word one writes there — and that is the second disjunct below, in the
+    shape that refutes itself at any load: the destination register would have
+    to hold every word at once. *)
+
+(** The window is not in this hart's forward bank.  Implied by "this hart has
+    never stored to the window"; for a secondary hart waiting on [started],
+    which only ever reads the flag, it is immediate. *)
+Definition wunwritten (ws : wstate) (ra : Arch.pa) (rn : N) : Prop :=
+  forall j : nat, (j < N.to_nat rn)%nat -> w_fwd ws !! (acc_addr ra j) = None.
+
+(** [wadm] with the timestamps pinned under the SUCCESSOR's read floor. *)
+Definition wgain (s0 s' : wmstate) (rak : akinfo) (ra : Arch.pa) (rn : N)
+    (w : bv (8 * rn)) : Prop :=
+  forall j : nat, (j < N.to_nat rn)%nat ->
+    exists t : nat, wbyte_ok s0 rak (acc_addr ra j) t (nth_byte w j) /\
+                    (t <= w_vrOld (wm_ws s'))%nat.
+
+Lemma wgain_wadm s0 s' rak ra rn (w : bv (8 * rn)) :
+  wgain s0 s' rak ra rn w -> wadm s0 rak ra rn w.
+Proof. intros Hg j Hj. destruct (Hg j Hj) as (t & Hok & _). by exists t. Qed.
+
+Lemma wgain_mono s0 s' s'' rak ra rn (w : bv (8 * rn)) :
+  ws_le (wm_ws s') (wm_ws s'') ->
+  wgain s0 s' rak ra rn w -> wgain s0 s'' rak ra rn w.
+Proof.
+  intros Hle Hg j Hj. destruct (Hg j Hj) as (t & Hok & Ht).
+  exists t. split; [exact Hok|]. destruct Hle as (_ & Hold & _). lia.
+Qed.
+
+(** The forward bank is untouched by everything the pre-racy phase may do. *)
+Lemma wread_post_fwd s ak pa ts :
+  w_fwd (wm_ws (wread_post s ak pa ts)) = w_fwd (wm_ws s).
+Proof.
+  rewrite /wread_post. destruct (ak_coh ak); [done|]. apply load_post_run_fwd.
+Qed.
+
+Lemma barrier_post_fwd ws b : w_fwd (barrier_post ws b) = w_fwd ws.
+Proof. by destruct b. Qed.
+
+(** THE READ STEP'S OWN GAIN, at the fold the interpreter builds. *)
+Lemma wread_post_vrOld (s : wmstate) (ak : akinfo) (pa : Arch.pa) (n : N)
+    (ts : list nat) (j : nat) :
+  ak_coh ak = false ->
+  wunwritten (wm_ws s) pa n ->
+  length ts = N.to_nat n ->
+  (j < N.to_nat n)%nat ->
+  (ts !!! j <= w_vrOld (wm_ws (wread_post s ak pa ts)))%nat.
+Proof.
+  intros Hcoh Hun Hlen Hj. rewrite /wread_post Hcoh /=.
+  apply load_post_run_vrOld; [lia|]. exact (Hun j Hj).
+Qed.
+
+(** THE STRENGTHENED BRIDGE.  [exec_of_wrun_racy_gen] with the gain threaded
+    through the induction, and the patch-independence escape hatch for a run
+    that never read the window. *)
+Lemma exec_of_wrun_gain_gen tid ra rn rak {X} (m : M X) :
+  acc_wf ra rn ->
+  ak_coh rak = false ->
+  forall (s0 s : wmstate),
+    wstep_ok_racy tid ra rn rak true m s ->
+    wm_img s = wm_img s0 -> wm_log s = wm_log s0 -> ws_le (wm_ws s0) (wm_ws s) ->
+    w_fwd (wm_ws s) = w_fwd (wm_ws s0) ->
+    wunwritten (wm_ws s0) ra rn ->
+    wlog_wf (wm_log s) ->
+    is_Some (wread_bytes s0 rak ra rn (coh_ts s0 ra rn)) ->
+  forall x s', wrun tid m s x s' ->
+    exists w : bv (8 * rn),
+      wadm s0 rak ra rn w /\
+      exec m (wpatch_st s ra rn w) = Some (x, wpatch_st s' ra rn w) /\
+      wlog_wf (wm_log s') /\
+      (wgain s0 s' rak ra rn w \/
+       forall u : bv (8 * rn),
+         exec m (wpatch_st s ra rn u) = Some (x, wpatch_st s' ra rn u)).
+Proof.
+  intros Hracc Hakc.
+  induction m as [y|T oc k IH];
+    intros s0 s Hok Himg Hlog Hle Hfwd Hun Hwf Hrd x s' Hrun.
+  - (* the run never took the racy read: the CANONICAL word serves, and the
+       whole step is patch-independent *)
+    destruct Hrun as [-> ->]. destruct Hrd as [w0 Hw0].
+    exists w0. split_and!; [|reflexivity|exact Hwf|right; reflexivity].
+    exact (wadm_of_wread_ok _ _ _ _ _ _ (wread_bytes_spec _ _ _ _ _ _ Hw0)).
+  - destruct oc; simpl in Hok, Hrun |- *;
+      try (exact (IH _ s0 _ Hok Himg Hlog Hle Hfwd Hun Hwf Hrd _ _ Hrun));
+      try (exfalso; exact Hrun);
+      try (exfalso; exact Hok).
+    + (* MemRead *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_read _ _ _) as [[w0 d']|] eqn:Hdr; [|exfalso; exact Hrun].
+        exact (IH _ s0 _ (Hok w0 d' eq_refl) Himg Hlog Hle Hfwd Hun Hwf Hrd
+                 _ _ Hrun).
+      * destruct Hok as (Hacc & [(Hdisj & Hpin & Hk)|(_ & Hpa & Hn & Hak & Hk)]).
+        -- (* a pinned read away from the window *)
+           destruct Hrun as (w0 & ts & Hokr & Hrun).
+           pose proof (wread_pinned_ts _ _ _ _ _ _ Hpin Hokr) as Hts.
+           rewrite Hts in Hokr, Hrun.
+           pose proof (wread_bytes_complete _ _ _ _ _ _ Hokr) as Hrb.
+           destruct (IH _ s0 _ (Hk w0 Hrb)
+                       ltac:(etrans; [apply wread_post_img|exact Himg])
+                       ltac:(etrans; [apply wread_post_log|exact Hlog])
+                       ltac:(etrans; [exact Hle|apply wread_post_ws_le])
+                       ltac:(etrans; [apply wread_post_fwd|exact Hfwd])
+                       Hun (wlog_wf_read_post _ _ _ _ Hwf) Hrd _ _ Hrun)
+             as (w & Hadm & Hex & Hwf' & Hdisj').
+           exists w. rewrite (wread_bytes_read_bytes s _ _ _ Hwf Hacc) in Hrb.
+           split_and!; [exact Hadm| |exact Hwf'|].
+           { rewrite wpatch_st_read_post in Hex.
+             rewrite (read_bytes_patch_disj
+                        (wflat (wm_img s) (wm_log s)) ra rn w _ _
+                        Hracc Hacc Hdisj) Hrb. exact Hex. }
+           destruct Hdisj' as [Hg|Huni]; [by left|right].
+           intros u. specialize (Huni u).
+           rewrite wpatch_st_read_post in Huni.
+           rewrite (read_bytes_patch_disj
+                      (wflat (wm_img s) (wm_log s)) ra rn u _ _
+                      Hracc Hacc Hdisj) Hrb. exact Huni.
+        -- (* THE RACY READ — and this is where the gain is minted *)
+           subst n. rewrite Hpa in Hacc Hk |- *. rewrite Hak in Hk.
+           destruct Hrun as (w0 & ts & Hokr & Hrun).
+           rewrite Hpa Hak in Hokr, Hrun.
+           exists w0.
+           pose proof (wread_bytes_complete _ _ _ _ _ _ Hokr) as Hrb.
+           destruct (exec_of_wrun_win tid ra rn rak w0 _ Hracc _
+                       (Hk ts w0 Hrb) (wlog_wf_read_post _ _ _ _ Hwf) _ _ Hrun)
+             as [Hex Hwf'].
+           rewrite wpatch_st_read_post in Hex.
+           rewrite /wpatch_st /=.
+           rewrite (read_bytes_of_bytes
+                      (write_bytes (wflat (wm_img s) (wm_log s)) ra rn w0)
+                      ra rn w0
+                      (fun j Hj => write_bytes_lookup_at
+                                     (wflat (wm_img s) (wm_log s)) ra rn w0 j
+                                     Hracc Hj)).
+           assert (Hadm0 : wadm s0 rak ra rn w0).
+           { eapply wadm_down; [exact Himg|exact Hlog|exact Hle|].
+             exact (wadm_of_wread_ok _ _ _ _ _ _ Hokr). }
+           split_and!; [exact Hadm0|exact Hex|exact Hwf'|left].
+           (* the timestamps the read took are under the successor's floor *)
+           destruct Hokr as [Hlen Hbytes].
+           eapply (wgain_mono s0 (wread_post s rak ra ts) s');
+             [exact (wrun_ws_le _ _ _ _ _ Hrun)|].
+           intros j Hj. exists (ts !!! j). split.
+           ++ eapply wbyte_ok_down; [exact Himg|exact Hlog|exact Hle|].
+              apply Hbytes. lia.
+           ++ exact (wread_post_vrOld s rak ra rn ts j Hakc
+                       (fun i Hi => eq_trans (f_equal (fun mm => mm !! acc_addr ra i)
+                                                Hfwd) (Hun i Hi))
+                       Hlen Hj).
+    + (* MemWrite: forbidden before the racy read *)
+      destruct (dev_addr _) eqn:Hd.
+      * destruct (dev_write _ _ _ _) as [d'|] eqn:Hdw; [|exfalso; exact Hrun].
+        exact (IH _ s0 _ (Hok d' eq_refl) Himg Hlog Hle Hfwd Hun Hwf Hrd
+                 _ _ Hrun).
+      * destruct Hok as (Hb & _). discriminate.
+    + (* Barrier *)
+      refine (IH tt s0 _ Hok Himg Hlog _ _ Hun Hwf Hrd _ _ Hrun).
+      * etrans; [exact Hle|apply barrier_post_le].
+      * etrans; [apply barrier_post_fwd|exact Hfwd].
+Qed.
+
+Lemma exec_of_wrun_gain tid ra rn rak {X} (m : M X) :
+  acc_wf ra rn ->
+  ak_coh rak = false ->
+  forall s, wlog_wf (wm_log s) ->
+    is_Some (wread_bytes s rak ra rn (coh_ts s ra rn)) ->
+    wunwritten (wm_ws s) ra rn ->
+    wstep_ok_racy tid ra rn rak true m s ->
+  forall x s', wrun tid m s x s' ->
+    exists w : bv (8 * rn),
+      wadm s rak ra rn w /\
+      exec m (wpatch_st s ra rn w) = Some (x, wpatch_st s' ra rn w) /\
+      wlog_wf (wm_log s') /\
+      (wgain s s' rak ra rn w \/
+       forall u : bv (8 * rn),
+         exec m (wpatch_st s ra rn u) = Some (x, wpatch_st s' ra rn u)).
+Proof.
+  intros Hracc Hakc s Hwf Hrd Hun Hok x s' Hrun.
+  exact (exec_of_wrun_gain_gen tid ra rn rak m Hracc Hakc s s Hok eq_refl
+           eq_refl (reflexivity _) eq_refl Hun Hwf Hrd x s' Hrun).
+Qed.
+
+(* ====================================================================== *)
 (** ** 5. Reducibility, and the [wexec_covers] mirror
 
     [WeakExec.wp_wrun_step] asks for ONE witness that the weak machine can
@@ -874,7 +1078,110 @@ Section rule.
     - exact (proj2 (Hc tick) χ σ' χ' Hwex).
   Qed.
 
+  (** THE SAME RULE WITH THE VIEW GAIN ATTACHED (§4b).
+
+      Two premises more than [wp_wracy_load], both about the READER rather
+      than about the instruction: the access is not a coherent-tier one
+      ([ak_coh rak = false] — a fetch/walker read moves no view, so there is
+      nothing to gain), and the hart has not stored to the window
+      ([wunwritten], supplied per state by the caller's own callback, exactly
+      like the pinnedness facts).
+
+      One conclusion more: besides the racy word and its admissibility, the
+      continuation is told that either the timestamps behind that word are
+      under the successor's read floor — which is what a fence cashes — or the
+      step never looked at the window at all.  A leaf kills the second arm
+      with [wreads_win]. *)
+  Lemma wp_wracy_load_gain (pc : SailStdpp.Values.mword 64)
+      (ra : Arch.pa) (rn : N) (rak : akinfo)
+      (P : wmstate -> Prop) (Q : wmstate -> wmstate -> Prop) :
+    gen_id = 0%nat ->
+    acc_wf pc 4 ->
+    acc_wf ra rn ->
+    ak_coh rak = false ->
+    wracy_cert (fin_to_nat cpu_id) pc ra rn rak P Q ->
+    (∀ σ, wmstate_interp σ ={⊤,∅}=∗
+       ⌜register_lookup PC (wm_regs σ) = pc⌝ ∗
+       ⌜∀ j : nat, (j < 4)%nat → pinned_read σ (acc_addr pc j)⌝ ∗
+       ⌜P σ⌝ ∗
+       ⌜wunwritten (wm_ws σ) ra rn⌝ ∗
+       ⌜is_Some (read_bytes (wflat (wm_img σ) (wm_log σ)) ra rn)⌝ ∗
+       (∃ t0 : mstate,
+          ⌜exec (riscv_step false) (wflat_st σ) = Some (tt, t0)⌝) ∗
+       ▷ (∀ (tick : bool) (σ' : wmstate) (w : bv (8 * rn)),
+            ⌜wadm σ rak ra rn w⌝ -∗
+            ⌜exec (riscv_step tick) (wpatch_st σ ra rn w)
+             = Some (tt, wpatch_st σ' ra rn w)⌝ -∗
+            ⌜wstep_post_racy σ σ'⌝ -∗
+            ⌜Q σ σ'⌝ -∗
+            ⌜wgain σ σ' rak ra rn w ∨
+             ∀ u : bv (8 * rn),
+               exec (riscv_step tick) (wpatch_st σ ra rn u)
+               = Some (tt, wpatch_st σ' ra rn u)⌝
+            ={∅,⊤}=∗ wmstate_interp σ' ∗
+                     WWP Loop)) -∗
+    WWP Loop.
+  Proof.
+    iIntros (Hgid Haccpc Hracc Hakc Hcert) "H".
+    iApply (wp_wrun_step with "[H]"); [exact Hgid|].
+    iIntros (σ) "Hσ".
+    iDestruct "Hσ" as "(%Hbnd & %Hwf & Hrest)".
+    iMod ("H" $! σ with "[Hrest]")
+      as "(%Hpc & %Htext & %HP & %Hun & %Hrd & Ht0 & Hk)".
+    { rewrite /wmstate_interp.
+      iSplitR; [iPureIntro; exact Hbnd|].
+      iSplitR; [iPureIntro; exact Hwf|]. iExact "Hrest". }
+    iDestruct "Ht0" as (t0) "%Hex0".
+    assert (Hc : ∀ tick : bool,
+              wstep_ok_racy (Some (fin_to_nat cpu_id)) ra rn rak true
+                (riscv_step tick) σ ∧
+              (∀ χ σ' χ',
+                 wexec (Some (fin_to_nat cpu_id)) (riscv_step tick) χ σ
+                 = Some (tt, σ', χ') → Q σ σ'))
+      by (intros tick; exact (Hcert σ tick Hpc Haccpc Htext HP)).
+    assert (Hcoh : is_Some (wread_bytes σ rak ra rn (coh_ts σ ra rn))).
+    { rewrite (wread_bytes_read_bytes σ rak ra rn Hwf Hracc). exact Hrd. }
+    iModIntro.
+    iSplitR.
+    { iPureIntro.
+      destruct (wexec_of_exec_racy (Some (fin_to_nat cpu_id)) ra rn rak
+                  (riscv_step false) Hracc true σ (proj1 (Hc false)) Hwf
+                  tt t0 Hex0) as (χ & σ0 & χ' & Hw & _).
+      by exists χ, σ0, χ'. }
+    iNext. iIntros (tick σ' Hrun).
+    destruct (exec_of_wrun_gain (Some (fin_to_nat cpu_id)) ra rn rak
+                (riscv_step tick) Hracc Hakc σ Hwf Hcoh Hun (proj1 (Hc tick))
+                tt σ' Hrun) as (w & Hadm & Hex & Hwf' & Hg).
+    destruct (wrun_wexec_racy (Some (fin_to_nat cpu_id)) ra rn rak
+                (riscv_step tick) true σ (proj1 (Hc tick)) tt σ' Hrun)
+      as (χ & χ' & Hwex).
+    iApply ("Hk" $! tick σ' w with "[%] [%] [%] [%] [%]").
+    - exact Hadm.
+    - exact Hex.
+    - rewrite /wstep_post_racy. split_and!.
+      + exact (wrun_img _ _ _ _ _ Hrun).
+      + exact (wrun_log_app _ _ _ _ _ Hrun).
+      + exact (wrun_ws_le _ _ _ _ _ Hrun).
+      + exact Hwf'.
+      + exact (wrun_ws_bounded _ _ _ _ _ Hrun Hbnd).
+    - exact (proj2 (Hc tick) χ σ' χ' Hwex).
+    - exact Hg.
+  Qed.
+
 End rule.
+
+(** THE LEAF-SIDE REFUTATION of the patch-independence arm: "this step READS
+    the window".  A load does: it writes the window's word into its
+    destination register, and the register imprint is injective, so two
+    different patches leave two different successors.  Note what this is NOT
+    — it says nothing about views, timestamps or the weak machine; it is an
+    ordinary SC fact about the instruction, of exactly the kind every leaf
+    already proves. *)
+Definition wreads_win (ra : Arch.pa) (rn : N) (tick : bool) (σ : wmstate)
+    : Prop :=
+  ¬ (∃ σ' : wmstate, ∀ u : bv (8 * rn),
+       exec (riscv_step tick) (wpatch_st σ ra rn u)
+       = Some (tt, wpatch_st σ' ra rn u)).
 
 (* ====================================================================== *)
 (** ** 7. The [lw]-shaped racy leaf: collapsing the ∀ into a DISJUNCTION

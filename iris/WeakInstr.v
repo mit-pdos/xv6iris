@@ -842,15 +842,34 @@ Section leaves.
   (** [fence rw,rw] delivers everything deposited at a SCALAR view the hart
       has already read — the [started]/MP shape, and the reader half of a
       fence-mediated handoff. *)
+  Lemma wwp_fence_scl_gen R (σ : wmstate) (ws' : wstate) (t : nat)
+      (b : barrier_kind) :
+    acq_pred_r b →
+    wV_fence b σ ws' →
+    (t ≤ w_vrOld (wm_ws σ))%nat →
+    monPred_at R (view_scl t) ⊢ vwp_hold R ws'.
+  Proof.
+    intros Hb HQ Ht. rewrite /vwp_hold. apply monPred_mono.
+    etrans; [by apply (view_scl_acq_pred_r b (wm_ws σ) t)|].
+    by apply ws_view_mono.
+  Qed.
+
   Lemma wwp_fence_scl R (σ : wmstate) (ws' : wstate) (t : nat) :
     wV_fence Barrier_RISCV_rw_rw σ ws' →
     (t ≤ w_vrOld (wm_ws σ))%nat →
     monPred_at R (view_scl t) ⊢ vwp_hold R ws'.
-  Proof.
-    intros HQ Ht. etrans; [|by apply (wwp_fence_deliver R σ ws')].
-    apply vwp_acq_intro. etrans; [|apply acq_view_r_acq_view].
-    by apply view_scl_acq_vrOld.
-  Qed.
+  Proof. exact (wwp_fence_scl_gen R σ ws' t _ acq_pred_r_rw_rw). Qed.
+
+  (** THE ACQUIRE FENCE THE KERNEL ACTUALLY EXECUTES.  xv6's secondary-hart
+      wait is [__atomic_load_n(&started, __ATOMIC_ACQUIRE)], and gcc puts the
+      ordering in a [fence r,rw] AFTER the load, inside the loop
+      ([kernel.asm], [main+0x18]).  Pred-R is enough: the timestamp being
+      delivered is one this hart READ. *)
+  Lemma wwp_fence_scl_r R (σ : wmstate) (ws' : wstate) (t : nat) :
+    wV_fence Barrier_RISCV_r_rw σ ws' →
+    (t ≤ w_vrOld (wm_ws σ))%nat →
+    monPred_at R (view_scl t) ⊢ vwp_hold R ws'.
+  Proof. exact (wwp_fence_scl_gen R σ ws' t _ acq_pred_r_r_rw). Qed.
 
   (** [fence rw,w] — the RELEASE fence.  Promise-free, a predecessor-W fence
       constrains nothing (design doc, Decision 1), so its leaf carries no

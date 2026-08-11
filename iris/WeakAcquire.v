@@ -436,11 +436,21 @@ Section wp_lock.
       ([WeakMem.load_post_vrOld_nofwd] leaves that after the load) is
       delivered to the hart's own index by the [fence rw,rw].  This is
       [WeakStarted.wstarted_deliver] at the WP altitude's successor. *)
+  Lemma wwp_started_fence_deliver_gen (Pl : vProp Σ) (σ σ' : wmstate) (t : nat)
+      (b : barrier_kind) :
+    acq_pred_r b →
+    (t ≤ w_vrOld (wm_ws σ))%nat →
+    wQ_fence b σ σ' →
+    monPred_at Pl (view_scl t) ⊢ vwp_hold Pl (wm_ws σ').
+  Proof.
+    intros Hb Ht HQ. exact (wstarted_deliver_gen Pl σ (wm_ws σ') t b Hb Ht HQ).
+  Qed.
+
   Lemma wwp_started_fence_deliver (Pl : vProp Σ) (σ σ' : wmstate) (t : nat) :
     (t ≤ w_vrOld (wm_ws σ))%nat →
     wQ_fence Barrier_RISCV_rw_rw σ σ' →
     monPred_at Pl (view_scl t) ⊢ vwp_hold Pl (wm_ws σ').
-  Proof. intros Ht HQ. exact (wstarted_deliver Pl σ (wm_ws σ') t Ht HQ). Qed.
+  Proof. exact (wwp_started_fence_deliver_gen Pl σ σ' t _ acq_pred_r_rw_rw). Qed.
 
 (* ====================================================================== *)
 (** ** 8. SMOKE TEST: two instructions in a row, each its own [wp_winstr]
