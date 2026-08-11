@@ -258,6 +258,23 @@ Definition wp_kerneltrap_sconf_body
      SPIE = 1.  This is the [sret_bits] travelling half, which is what
      carries the fact past the four instructions before the check. *)
   sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
+  (* THE HANDLER IS INSTALLED -- persistent, and it goes STRAIGHT BACK OUT,
+     because what the caller actually needs is the RESUMING hart's copy and
+     the only thing that can produce that is the crossing itself.
+
+     Why in and out rather than just out: on the two non-yield paths nothing
+     moves the hart and nothing manufactures an [intr_handler_avail], so this
+     copy IS the postcondition's; on the yield path it is dropped and the
+     dispatch payload's fresh one takes its place ([SpecYield]).  A caller
+     therefore gets back a copy about whichever hart it resumes on, and never
+     has to know which case it was in.
+
+     Why the caller needs it at all: kernelvec's [sret] flips SIE '0' -> '1'
+     and so must re-seal [intr_inv] at '1' with the handler spec in hand.
+     kernelvec can pay this premise -- [intr_inv] is persistent and the
+     handler spec at a LATER is exactly its own Löb hypothesis, which is where
+     the recursion in this cone is closed. *)
+  intr_handler_avail -∗
   cpu_own 0 false p C false -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
@@ -279,6 +296,8 @@ Definition wp_kerneltrap_sconf_body
       ⌜ _get_Mstatus_SIE  ms_f = ('b"0" : mword 1) ⌝ -∗
       sie_cap_gpr_at ms_f mf av false p -∗
       sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
+      (* at the RESUMING hart -- see the premise *)
+      intr_handler_avail -∗
       cpu_own 0 false p C false -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
          resuming hart, so their values are existential *)

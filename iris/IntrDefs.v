@@ -209,6 +209,43 @@ Lemma intr_ms_facts_iff (ms : mword 64) :
   <-> (eq_vec (_get_Mstatus_SIE ms) ('b"1") = true /\ sconf_ms_facts ms).
 Proof. unfold intr_ms_facts, sconf_ms_facts. tauto. Qed.
 
+(* WHAT AN [sret] DOES TO THE THREE BITS THE sconf TIER TRACKS, over a
+   SYMBOLIC entry mstatus -- the sret twin of [WpSieFlipBits.csrsi_sie_flip],
+   and stated in exactly the shape its leaf consumes.
+
+   The three outputs are all CONSTANT, which is the point: SIE comes from
+   SPIE and the caller pins that at '1' (the trap it is returning from was
+   taken with interrupts enabled), while SPP := 0 and SPIE := 1 are what SRET
+   writes unconditionally.  So the leaf's postcondition can name the tie it
+   hands back without naming the entry mstatus -- and [sconf_ms_facts]
+   survives because every field in it sits outside the five bits SRET
+   touches (1, 5, 8, 17, 23).
+
+   The SIE conclusion is where the round trip is CLOSED: no bit theory here
+   knows that this SPIE is the one the trap saved, only that restoring it
+   yields '1' -- the identification is the caller's, and it is carried by the
+   [sret_bits] travelling half. *)
+Lemma sret_sconf_flip (ms : mword 64) :
+  sconf_ms_facts ms ->
+  _get_Mstatus_SPIE ms = ('b"1" : mword 1) ->
+  _get_Mstatus_SIE  (sret_ms5 ms) = ('b"1" : mword 1) /\
+  _get_Mstatus_SPP  (sret_ms5 ms) = ('b"0" : mword 1) /\
+  _get_Mstatus_SPIE (sret_ms5 ms) = ('b"1" : mword 1) /\
+  sconf_ms_facts (sret_ms5 ms).
+Proof.
+  intros (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM) Hspie.
+  split; [ rewrite sret_ms5_SIE; exact Hspie |].
+  split; [ apply sret_ms5_SPP |].
+  split; [ apply sret_ms5_SPIE |].
+  unfold sconf_ms_facts.
+  rewrite sret_ms5_MPRV sret_ms5_SXL sret_ms5_MXR sret_ms5_TSR
+          sret_ms5_XS sret_ms5_FS sret_ms5_VS sret_ms5_SD
+          sret_ms5_MPP sret_ms5_TVM.
+  split_and!; try assumption.
+  (* MPRV is written to '0' outright, so its [eq_vec .. '1'] is computable *)
+  vm_compute. reflexivity.
+Qed.
+
 Section IntrDefs.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -284,6 +321,22 @@ Section IntrDefs.
     _get_Mstatus_SPP ms' = _get_Mstatus_SPP ms ->
     _get_Mstatus_SPIE ms' = _get_Mstatus_SPIE ms ->
     sret_tie ms -∗ sret_tie ms'.
+  Proof. intros H1 H2. rewrite /sret_tie H1 H2. iIntros "$". Qed.
+
+  (* RE-STATING THE TIE AT THE LITERAL VALUES ITS BITS ARE KNOWN TO HAVE, and
+     it has to be a LEMMA rather than a rewrite at the use site.  Knowing
+     [_get_Mstatus_SPP ms = 'b"1"] does not make the hypothesis [sret_tie ms]
+     usable where [sret_bits ('b"1") ('b"1")] is wanted: the projections are
+     hidden behind the definition, so there is nothing in the hypothesis for
+     [rewrite Hspp] to find, and going the other way (rewriting the GOAL's
+     literals backwards) is ambiguous the moment both bits are the same
+     literal.  Doing the substitution in a lemma STATEMENT sidesteps both.
+     [iSpecialize] failing with *"cannot instantiate (sret_bits 'b"1" 'b"1"
+     -∗ …) with (sret_tie ms0)"* is this. *)
+  Lemma sret_tie_vals (ms : mword 64) (a b : mword 1) :
+    _get_Mstatus_SPP ms = a ->
+    _get_Mstatus_SPIE ms = b ->
+    sret_tie ms -∗ sret_bits a b.
   Proof. intros H1 H2. rewrite /sret_tie H1 H2. iIntros "$". Qed.
 
   (* [sie_ghost_alloc] / [sie_ghost_flip]* stay GHOST-GENERIC: they are
@@ -826,6 +879,33 @@ Section IntrDefs.
     - by rewrite bi.sep_emp.
     - by rewrite bi.emp_sep.
   Qed.
+
+  (* THE SAME COMPLEMENT SHAPE, FOR THE PERSISTENT HALF.  A parking function
+     re-delivers the RESUMING hart's [intr_handler_avail] -- sched's dispatch
+     payload carries it ([SchedCtx.dispatch_payload]) and the resumed thread
+     needs it because the one thing a returning TRAP still has to do is
+     [sret], which flips SIE '0' -> '1' and so must re-seal [intr_inv] at '1'
+     with the handler spec in hand.  It is stated as the [eb]-complement, and
+     the [emp] arm is forced rather than chosen: at [eb = true] the returned
+     bundle's [sie_arm true p] holds only [∃ h, intr_inv h], NOT the handler
+     WP -- that lives behind the invariant's [□ (b = '1' -∗ spec)], and
+     extracting it needs a LATER stripped, i.e. a program step, which a
+     postcondition does not have.  At [eb = false] there is no arm at all and
+     the payload is simply handed across, so the arm that any caller can
+     actually use is the one this exists for.  ([eb = false] is also
+     kerneltrap's, and kerneltrap is the only caller that wants it.)  *)
+  Definition intr_handler_avail_ext (eb : bool) : iProp Σ :=
+    (if eb then emp else intr_handler_avail)%I.
+
+  Global Instance intr_handler_avail_ext_persistent eb :
+    Persistent (intr_handler_avail_ext eb).
+  Proof. rewrite /intr_handler_avail_ext. destruct eb; apply _. Qed.
+
+  (* the whole copy covers either arm -- a producer that HAS it (sched's
+     dispatch payload does, unconditionally) never has to case-split. *)
+  Lemma intr_handler_avail_ext_intro (eb : bool) :
+    intr_handler_avail -∗ intr_handler_avail_ext eb.
+  Proof. iIntros "#H". rewrite /intr_handler_avail_ext. destruct eb; [done | iExact "H"]. Qed.
 
   Definition intr_restore : iProp Σ :=
     (intr_handler_avail ∗ trap_csrs)%I.
@@ -1962,6 +2042,21 @@ Lemma trap_csrs_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
 Proof.
   intros Heq. destruct eb.
   - (* [emp]: no hart in the term *) rewrite /trap_csrs_ext. iIntros "$".
+  - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
+Qed.
+
+(* SO DOES THE PERSISTENT COMPLEMENT, and being persistent buys it nothing
+   here: [intr_handler_avail]'s handler WP names this hart's registers and its
+   invariant this hart's ghost, so it is hart-indexed like the rest and needs
+   the same two-arm argument.  (Persistence only means the transport does not
+   have to give the source copy back.) *)
+Lemma intr_handler_avail_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+    (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
+  (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+  intr_handler_avail_ext (CID := CID0) eb -∗ intr_handler_avail_ext (CID := CID1) eb.
+Proof.
+  intros Heq. destruct eb.
+  - (* [emp]: no hart in the term *) rewrite /intr_handler_avail_ext. iIntros "$".
   - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
 Qed.
 
