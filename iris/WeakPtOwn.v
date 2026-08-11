@@ -84,10 +84,20 @@ Section ptown.
       floor is the max of the hart's scalar read floor and its per-byte
       coherence floor.  So the lower-bound resource is a disjunction: EITHER
       witness suffices, and having both directions exact is what makes
-      [wpt_own_of_wpt] below a true converse rather than a one-way street. *)
+      [wpt_own_of_wpt] below a true converse rather than a one-way street.
+
+      THE THIRD DISJUNCT is degenerate on purpose: a floor of 0 is below
+      every hart's view at every byte, so it needs no evidence at all.
+      Without it [wflr_lb a 0] would only be obtainable under a [|==>]
+      (both ghost witnesses at 0 are units, and minting a unit is an
+      update), and that [|==>] would then infect every structural law in
+      [WeakObj] — a modality on the whole logic, bought for a fact that is
+      trivially true.  It also makes [WeakPtPub.wpt_pub_0] convert with no
+      authority at all, which is what the pre-existing [wpt_img] wanted. *)
   Definition wflr_lb (a : Z) (t : nat) : iProp Σ :=
     (coh_lb (wvn_coh γv) a t ∨
-     mono_nat_lb_own (wsn_vrNew (wvn_scal γv)) t)%I.
+     mono_nat_lb_own (wsn_vrNew (wvn_scal γv)) t ∨
+     ⌜t = 0%nat⌝)%I.
 
   Global Instance wflr_lb_persistent a t : Persistent (wflr_lb a t).
   Proof. apply _. Qed.
@@ -97,12 +107,13 @@ Section ptown.
   Lemma wflr_lb_valid w a t :
     ws_auth γv w -∗ wflr_lb a t -∗ ⌜(t ≤ flr (ws_view w) a)%nat⌝.
   Proof.
-    iIntros "[Hs Hc] [Hlb|Hlb]".
+    iIntros "[Hs Hc] [Hlb|[Hlb|%Hz]]".
     - iDestruct (coh_lb_valid with "Hc Hlb") as %Hle.
       iPureIntro. rewrite flr_ws_view. lia.
     - iDestruct "Hs" as "(_ & _ & A3 & _ & _)".
       iDestruct (mono_nat_lb_own_valid with "A3 Hlb") as %[_ Hle].
       iPureIntro. rewrite flr_ws_view. lia.
+    - iPureIntro. lia.
   Qed.
 
   Lemma wflr_lb_get w a t :
@@ -111,9 +122,37 @@ Section ptown.
     iIntros (Hle) "[Hs Hc]". rewrite flr_ws_view in Hle.
     destruct (decide (t ≤ coh w a)%nat) as [Ht|Ht].
     - iLeft. by iApply (coh_lb_get with "Hc").
-    - iRight. iDestruct "Hs" as "(_ & _ & A3 & _ & _)".
+    - iRight. iLeft. iDestruct "Hs" as "(_ & _ & A3 & _ & _)".
       iDestruct (mono_nat_lb_own_get with "A3") as "#L".
       iApply (mono_nat_lb_own_le with "L"). lia.
+  Qed.
+
+  (** [wflr_lb a ·] is a SEMILATTICE of floors: weakenable, joinable, and
+      trivial at 0.  [WeakObj] needs exactly these three to lift the floor
+      from a byte to a whole view, and hence to a whole predicate.
+
+      The join is where the disjunction pays for itself.  [Nat.max t1 t2]
+      IS one of [t1], [t2], so the joined floor is always witnessed by
+      whichever disjunct the larger one came from — no case where a coh
+      witness and a scalar witness have to be combined into something that
+      is neither. *)
+  Lemma wflr_lb_le a t t' : (t ≤ t')%nat -> wflr_lb a t' -∗ wflr_lb a t.
+  Proof.
+    iIntros (Hle) "[Hlb|[Hlb|%Hz]]".
+    - iLeft. by iApply (coh_lb_le with "Hlb").
+    - iRight. iLeft. by iApply (mono_nat_lb_own_le with "Hlb").
+    - iRight. iRight. iPureIntro. lia.
+  Qed.
+
+  Lemma wflr_lb_0 a : ⊢ wflr_lb a 0.
+  Proof. iRight. by iRight. Qed.
+
+  Lemma wflr_lb_join a t1 t2 :
+    wflr_lb a t1 -∗ wflr_lb a t2 -∗ wflr_lb a (Nat.max t1 t2).
+  Proof.
+    iIntros "H1 H2". destruct (decide (t1 ≤ t2)%nat) as [Hle|Hle].
+    - rewrite Nat.max_r; [|lia]. iExact "H2".
+    - rewrite Nat.max_l; [|lia]. iExact "H1".
   Qed.
 
   (* ------------------------------------------------------------------ *)

@@ -159,7 +159,7 @@ Section pub.
     vrNew_lb T -∗ wpt_pub T a dq v -∗ wpt_own a dq v.
   Proof.
     iIntros "#Hlb [%t [%Ht He]]". iExists t. iFrame "He".
-    iRight. by iApply (mono_nat_lb_own_le with "Hlb").
+    iRight. iLeft. by iApply (mono_nat_lb_own_le with "Hlb").
   Qed.
 
   (** ACQUIRE, from [amo_acq_gain]'s [⊑] and the authority.  Note this one

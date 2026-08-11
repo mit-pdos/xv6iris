@@ -288,6 +288,21 @@ Section view.
     apply max_nat_included in Hincl. simpl in Hincl. lia.
   Qed.
 
+  (** Weakening one.  Needed wherever a floor is JOINED with another: the
+      join of two floors is whichever is larger, so the smaller one is
+      always reached by this. *)
+  Lemma coh_lb_le γ a t t' :
+    (t ≤ t')%nat -> coh_lb γ a t' -∗ coh_lb γ a t.
+  Proof.
+    iIntros (Hle) "H". iApply (own_mono with "H").
+    apply auth_frag_mono. exists (discrete_fun_singleton a (MaxNat t')).
+    intros b. rewrite discrete_fun_lookup_op.
+    destruct (decide (b = a)) as [->|Hne].
+    - rewrite !discrete_fun_lookup_singleton max_nat_op.
+      by rewrite Nat.max_r.
+    - by rewrite !discrete_fun_lookup_singleton_ne // left_id.
+  Qed.
+
   (** Minting one: any floor the authority actually has may be handed out,
       and being persistent it never has to be handed back. *)
   Lemma coh_lb_get γ w a t :
