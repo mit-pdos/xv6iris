@@ -22,7 +22,7 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn.
-Require Import VcGen WpSconfVc.
+Require Import WpSconfVc.
 Require Import KallocInv.
 Require Import CommonWalk PtTree.
 Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys *)

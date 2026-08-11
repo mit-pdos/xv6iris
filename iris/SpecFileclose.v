@@ -125,7 +125,6 @@ Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheRef.

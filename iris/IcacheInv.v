@@ -62,7 +62,6 @@ Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.Mac
 Require Import RiscvPtsto RiscvExtras.
 Require Import WpLock.
 Require Import LogInv.
-Require Import FsCrash.
 Require Export IcacheRef.   (* the geometry, the algebra, [inode_ref] *)
 Require Import InodeInv.
 Require Import IrefSlots.

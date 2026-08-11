@@ -86,10 +86,7 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import SpecPanic.
 Require Import DiskPtsto.
-Require Import FsBlocks LogInv FsCrash.
-Require Import DinodeEnc.
-Require Import InodeInv.
-Require Import InodeLock.
+Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.

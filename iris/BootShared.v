@@ -41,7 +41,8 @@ Require Import RiscvAdequacy.
 Require Import BootReset.   (* the garbage-anchored register clause's bridge *)
 From Kernel Require KernelData.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:

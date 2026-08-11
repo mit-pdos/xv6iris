@@ -98,9 +98,7 @@ Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import VcGen.
 Require Import IntrDefs.
-Require Import KptGhost.
 Require Import MinstretInv.
-Require Import RiscvFetchExec.
 Require Import CpuOwn.
 Require Import DiskPtsto DiskInv.
 Require Import BufOwn.

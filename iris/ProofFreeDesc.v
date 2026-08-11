@@ -54,7 +54,7 @@ Require Import SpecWakeup.
 Require Import CodeFreeDesc.
 Require Import SpecFreeDesc.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 
 Local Open Scope Z_scope.

@@ -114,7 +114,7 @@ Require Import FdSlots FileInv.
 Require Import ProcInv.
 Require Import SchedCtx.
 Require Import KallocInv.
-Require Import IcacheRef IcacheInv IcacheEscrow IrefSlots InodeRegion.
+Require Import IcacheEscrow IrefSlots InodeRegion.
 Require Import SpecFileclose.
 Require Import WaitInv.
 Require Import WpUart.

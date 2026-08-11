@@ -23,7 +23,6 @@ Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import KMap.   (* mem_page_to_phys: kalloc-page ↦ₘ → ↦ₚ for the PT node *)
 Require Import WpLock.
-Require Import VcGen.
 Require Import CommonWalk PtTree.
 Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys / pt_node_claim_from_static *)
 Require Import PtBuild KvmSpec.

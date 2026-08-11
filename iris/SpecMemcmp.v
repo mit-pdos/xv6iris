@@ -44,7 +44,6 @@ Require Import RegFile WpNext.
 Require Import SmodeCore.
 Require Import CalleeSaved.
 Require Import IntrDefs.
-Require Import ByteBuf.
 From Kernel Require KernelSyms.
 Import Defs.
 Local Open Scope Z_scope.

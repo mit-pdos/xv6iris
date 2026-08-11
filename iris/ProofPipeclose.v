@@ -69,7 +69,7 @@ Require Import SpecAcquire SpecRelease SpecWakeup SpecKfree.
 Require Import CodePipeclose.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SpecPipeclose.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 
 Local Ltac peel n := do n (rewrite upd_ne; [| vm_compute; discriminate]).

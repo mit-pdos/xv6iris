@@ -63,13 +63,13 @@ Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import FdSlots FileInv.
 Require Import KallocInv.
-Require Import ProcGeom ProcInv.
+Require Import ProcGeom.
+Require Import IrefSlots.
 Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
 Require Import WpLock.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecPipeclose SpecBeginOp SpecIput SpecEndOp.
-Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
-Require Import BitmapInv DinodeEnc InodeInv.
+Require Import IrefSlots InodeRegion.
 Require Import SpecFileclose.
 Require Import CodeFileclose ProofFilecloseParts.
 From Kernel Require KernelSyms.

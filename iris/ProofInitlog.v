@@ -91,7 +91,7 @@ Require Import SpecBread SpecBrelse.
 Require Import SpecInstallTrans SpecWriteHead.
 Require Import SpecInitlog.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IrefSlots.
 Local Open Scope Z_scope.
 
 (* a whole-function WP goal is enormous; keep a failing tactic's error

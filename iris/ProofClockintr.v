@@ -60,7 +60,7 @@ Require Import CodeClockintr.
 Require Import SpecCpuid SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecClockintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 
 Local Open Scope Z_scope.

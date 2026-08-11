@@ -55,7 +55,7 @@ Require Import CodeSleeplock.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 Local Open Scope Z_scope.
 

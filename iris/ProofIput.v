@@ -86,33 +86,32 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import RiscvFetchExec.
-Require Import MemAccessGen.
 Require Import RegFile.
 Require Import InstrBytes.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import MinstretInv.
-Require Import KptGhost.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved KernelText.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl WpSconfVc.
+Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
 Require Import WpAu4.
 Require Import WpSmodeHalf.
 Require Import WpSmodeIntr.
 Require Import IntrDefs.
 Require Import CpuOwn.
 Require Import ProcGeom.
-Require Import ProcInv.
-Require Import SchedCtx.
+Require Import IcacheRef.
+Require Import IrefSlots.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Require Import WpUart.
-Require Import DiskPtsto DiskInv.
+Require Import DiskPtsto.
 Require Import BioInv.
-Require Import FsBlocks LogInv FsCrash.
+Require Import FsBlocks LogInv.
 Require Import BitmapInv.
 Require Import InodeInv.
 Require Import DinodeEnc.
@@ -121,10 +120,8 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import SleepLock.
 Require Import FdSlots.
 Require Import CodeIput.
-Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecAcquiresleep SpecReleasesleep.
 Require Import SpecItrunc SpecIupdate.

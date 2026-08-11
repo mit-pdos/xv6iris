@@ -10,7 +10,6 @@
    fileclose and kexit (and hence sys_close, sys_exit, sys_pipe and
    pipealloc) consume it directly, and the bridging axiom that used to
    stand between them -- [LinkIputCompat.v] -- is deleted.               *)
-Require Import SpecIput.
 Require Import LinkAcquire LinkRelease LinkAcquiresleep LinkReleasesleep
                LinkItrunc LinkIupdate ProofIput.
 

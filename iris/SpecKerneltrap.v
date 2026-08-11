@@ -52,7 +52,7 @@ Require Import ProcGeom CpuOwn.
 Require Import DiskPtsto WpUart.
 Require Import SpecDevintr.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IrefSlots.
 Local Open Scope Z_scope.
 Import Defs.
 

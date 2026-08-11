@@ -80,7 +80,7 @@ Require Import SpecHoldingsleep SpecVirtioDiskRw.
 Require Import SpecBwrite.
 Require Import CodeBwrite.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IrefSlots.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.

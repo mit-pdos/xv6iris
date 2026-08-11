@@ -57,7 +57,7 @@ Require Import CodeKerneltrap.
 Require Import SpecDevintr SpecMyproc SpecYield.
 Require Import SpecKerneltrap ProofKerneltrapParts.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 
 Local Open Scope Z_scope.

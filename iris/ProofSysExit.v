@@ -41,7 +41,7 @@ Require Import ProcInv.
 Require Import KallocInv.
 Require Import UserPtTree.
 Require Import IrefSlots InodeRegion.
-Require Import IrefSlots InodeRegion IcacheRef IcacheInv IcacheEscrow.
+Require Import IrefSlots InodeRegion IcacheEscrow.
 Require Import SpecFileclose.
 Require Import WpUart.
 Require Import DiskPtsto.

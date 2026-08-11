@@ -23,7 +23,7 @@ Require Import UserretDefs UserretPt.
 Require Import UservecDefs UservecPt UservecExitPt.
 Require Import WpIntrCore.
 Require Import UserPtTree UserExec UserKernelBridge.
-Require Import SpecUserret SpecUservec.
+Require Import SpecUservec.
 From Kernel Require Import KernelInstrs.
 From Kernel Require KernelSyms.
 Local Open Scope Z_scope.

@@ -37,7 +37,7 @@ Require Import SpecSysKill.
 From Kernel Require KernelInstrs KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import CodeSysKill.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 Local Open Scope Z_scope.
 Set Printing Depth 40.

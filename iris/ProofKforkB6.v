@@ -49,11 +49,10 @@ Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
-Require Import WpSmodeIntr.
 Require Import HartTp.
 Require Import IntrDefs.
 Require Import ProcGeom.
-Require Import PageGeom PageFields.
+Require Import PageGeom.
 Require Import PtBuild.
 Require Import UserPtTree.
 Require Import ProcPtOwn.
@@ -64,7 +63,6 @@ Require Import ProcInv.
 Require Import KallocInv.
 Require Import SchedCtx.
 Require Import KvmSpec.
-Require Import InodeInv.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
@@ -75,7 +73,6 @@ Require Import SpecAllocpid.
 Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecPanic.
-Require Import SpecFreeproc.
 Require Import SpecMyproc.
 Require Import SpecAllocproc.
 Require Import SpecUvmcopy.

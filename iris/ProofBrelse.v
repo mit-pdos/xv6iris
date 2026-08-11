@@ -86,7 +86,7 @@ Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecBrelse.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IrefSlots.
 Local Open Scope Z_scope.
 
 (* ------------------------------------------------------------------ *)

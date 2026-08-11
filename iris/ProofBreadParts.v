@@ -30,19 +30,9 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import RiscvFetchExec.
-Require Import MemAccessGen.
-Require Import RegFile.
-Require Import InstrBytes.
 Require Import VcGen.
-Require Import MinstretInv.
-Require Import KptGhost.
 Require Import SmodeCore.
-Require Import HartTp WpNext.
-Require Import IntrDefs.
 Require Import WpLock.
-Require Import WpSconfMem.
-Require Import WpAu4.
 Require Import BufOwn.
 Require Import DiskPtsto.
 Require Import BufOwn BcacheInv BioInv.
