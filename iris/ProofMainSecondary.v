@@ -60,7 +60,7 @@ Require Import SpecPanic StartedInv.
 Require Import SpecCpuid SpecPrintk SpecPrintkGen.
 Require Import SpecKvminithart SpecTrapinithart SpecPlicinithart.
 Require Import SpecScheduler SpecKernelvec.
-Require Import SpecBootDevCaps SpecDevintr DiskInv.
+Require Import SpecBootDevCaps SpecDevintr SpecClockintr DiskInv.
 Require Import SpecMainSecondary.
 Require Import CodeMain.
 Require Import KernelRvcDecode.
@@ -567,6 +567,9 @@ Section ProofMainSecondary.
        and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
     (kv_frame_slots + 20 <= n)%nat ->
     (bv_unsigned cid_word < Z.of_nat dev_ncpu)%Z ->
+    (* NOT hart 0, which is what makes [tick_keeper]'s cheap arm available:
+       [tick_hart] is [cpuid() == 0] and a secondary never keeps time. *)
+    cid_word <> (zero_reg : mword 64) ->
     p0 = zero_reg ->
     sie_cap_gpr m n false p0 -∗ kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (KernelSyms.main + 0x32) : mword 64) -∗
@@ -586,7 +589,7 @@ Section ProofMainSecondary.
     disk_geom γv pd pav pu -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros Hn Hdc Hp0.
+    intros Hn Hdc Hcidne Hp0.
     iIntros "Hcg #Htext #Hpanic Hpc Hcpu Hq Hsbit Htlb Htcsr #Hkinv #Hkptp #Hdev #Hpinv #Hdlock #Hgeom".
     iPoseProof (mni_32 with "Htext") as "Hi32".
     iPoseProof (mni_36 with "Htext") as "Hi36".
@@ -645,12 +648,19 @@ Section ProofMainSecondary.
     (* the handler contract's credentials: five in hand, three assumed --
        SpecBootDevCaps.v says which and why. *)
     iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
-    iPoseProof (BootDevCaps.boot_dev_caps γd γs) as "Hbdc".
-    iDestruct "Hbdc" as (γtx γtl) "(#Htxl & #Htimc & #Htick)".
-    iAssert (devintr_caps γd γv γtx γk γtl γs pd pav pu) as "#Hcaps".
+    iPoseProof (BootDevCaps.boot_dev_caps γd) as "Hbdc".
+    iDestruct "Hbdc" as (γtx) "(#Htxl & #Htimc)".
+    (* THE TICK KEEPER IS NOT ASSUMED HERE EITHER, and on a secondary it is
+       free: [tick_hart] is [cpuid() == 0] and this arm's premise is
+       [cid_word <> zero_reg], so the left disjunct closes it and the ghost
+       name is irrelevant (reuse the disk lock's). *)
+    iAssert (tick_keeper γk γs) as "#Htick".
+    { iLeft. iPureIntro. rewrite /tick_hart.
+      apply eq_vec_false_iff. exact Hcidne. }
+    iAssert (devintr_caps γd γv γtx γk γk γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
       iFrame "Hdev Htxl Hgeom Hdlock Htimc Htick Hpinv Hpanic". }
-    iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γtx γk γtl γs pd pav pu
+    iPoseProof (Kernelvec.kernelvec_handler_spec γd γv γtx γk γk γs pd pav pu
                   Hnproc with "Hhw Hmin Htext Hcaps") as "#Hkvs".
     iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
                  kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
@@ -735,7 +745,7 @@ Section ProofMainSecondary.
               with "Hcg Htext Hkdata Hpanic Hpc Hcpu Hpenv").
     iIntros (m3) "Hcg Hpc Hcpu".
     iApply (ms_inithart_sched γd γv γs γk pd pav pu m3 (K - 2)%nat p0 root tlbvec0
-              Hn20 Hdc Hp0
+              Hn20 Hdc Hcid Hp0
               with "Hcg Htext Hpany Hpc Hcpu Hq Hsbit Htlb Htcsr Hkinv Hkptp Hdev Hpinv
                     Hdlock Hgeom").
   Qed.

@@ -43,6 +43,7 @@ From Kernel Require KernelData.
 From Kernel Require KernelSyms.
 Require Import IcacheRef.
 Require Import IrefSlots.
+Require Import TicksInv UartTxInv.
 Local Open Scope Z_scope.
 
 (* a syscall-altitude goal contains [ProcInv.tf_page]'s 4096-conjunct big-op:
@@ -426,8 +427,15 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hpki H]".
     iDestruct (boot_ran_cell4 g KernelSyms.panicking Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hpki") as (vpki) "Hpki".
+    (* ---- 0x8000a22c tx_busy: the flag tx_lock protects.  It used to be one
+           of the gaps this chain skips; main needs it to bring the lock up. ---- *)
+    iDestruct (bss_cut g (KernelSyms.panicking + 4) KernelSyms.tx_busy
+                 (KernelSyms.tx_busy + 4) ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Htb H]".
+    iDestruct (boot_ran_cell4 g KernelSyms.tx_busy Hmem ltac:(zlit)
+                 ltac:(zlit) ltac:(zeq) with "Hcl Htb") as (vtb) "Htb".
     (* ---- 0x8000a230 started: PINNED zero, the escrow's left disjunct ---- *)
-    iDestruct (bss_cut g (KernelSyms.panicking + 4) KernelSyms.started
+    iDestruct (bss_cut g (KernelSyms.tx_busy + 4) KernelSyms.started
                  (KernelSyms.started + 4) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hst H]".
     iDestruct (boot_ran_cell4_bss g KernelSyms.started started_clear Hmem
@@ -445,8 +453,17 @@ Section BootBssChain.
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hip H]".
     iDestruct (boot_ran_cell8 g KernelSyms.initproc Hmem ltac:(zlit)
                  ltac:(zlit) ltac:(zeq) with "Hcl Hip") as (vip) "Hip".
+    (* ---- 0x8000a248 ticks: the tick counter tickslock protects.  main needs
+           it to ALLOCATE that lock (is_tickslock = is_lock … ticks_res), which
+           is what the handler contract's [tick_keeper] asks of the tick
+           hart. ---- *)
+    iDestruct (bss_cut g (KernelSyms.initproc + 8) KernelSyms.ticks
+                 (KernelSyms.ticks + 4) ram_hi
+                 ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Htk H]".
+    iDestruct (boot_ran_cell4 g KernelSyms.ticks Hmem ltac:(zlit)
+                 ltac:(zlit) ltac:(zeq) with "Hcl Htk") as (vtk) "Htk".
     (* ---- 0x8000a250 stack0[8][4096]: the per-hart stack family ---- *)
-    iDestruct (bss_cut g (KernelSyms.initproc + 8) KernelSyms.stack0
+    iDestruct (bss_cut g (KernelSyms.ticks + 4) KernelSyms.stack0
                  (KernelSyms.stack0 + 4096 * Z.of_nat NCPU) ram_hi
                  ltac:(zlit) ltac:(zlit) ltac:(zlit) with "H") as "[Hstk H]".
     iDestruct (boot_stride_family_seq g hart_stack_raw KernelSyms.stack0 4096 NCPU
@@ -614,7 +631,7 @@ Section BootBssChain.
     iSplitL "Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11".
     { iApply (boot_main_locks_raw g Hmem with
                 "Hcl Hlk1 Hlk2 Hlk3 Hlk4 Hlk5 Hlk6 Hlk7 Hlk8 Hlk9 Hlk10 Hlk11"). }
-    iSplitL "Hdr Hdw Hpkd Hpki Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Hbsl Hbln Hhd Hino
+    iSplitL "Hdr Hdw Hpkd Hpki Hkm Hkpt Hpr1 Hpr2 Hfd Hir Hip Htk Htb Hbsl Hbln Hhd Hino
              Hient Hdd Hda Hdu Hdf Hdi Hslots".
     { rewrite /main_globals_raw.
       iSplitL "Hdr Hdw".
@@ -628,6 +645,8 @@ Section BootBssChain.
       iSplitL "Hfd"; [iExact "Hfd" |].
       iSplitL "Hir"; [iExact "Hir" |].
       iSplitL "Hip"; [iExists vip; iExact "Hip" |].
+      iSplitL "Htk"; [iExists vtk; rewrite /a_ticks; iExact "Htk" |].
+      iSplitL "Htb"; [iExists vtb; rewrite /a_tx_busy; iExact "Htb" |].
       iSplitL "Hbsl"; [iExact "Hbsl" |].
       iSplitL "Hbln"; [iExact "Hbln" |].
       iSplitL "Hhd"; [rewrite bhead_of_z; iExact "Hhd" |].

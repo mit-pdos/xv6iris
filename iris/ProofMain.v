@@ -82,7 +82,7 @@ Require Import SpecKinit SpecKvminit SpecKvminithart SpecProcinit.
 Require Import SpecTrapinit SpecTrapinithart SpecPlicinit SpecPlicinithart.
 Require Import SpecBinit SpecIinit SpecFileinit SpecVirtioDiskInit.
 Require Import SpecUserinit SpecScheduler SpecKernelvec SpecFreerange.
-Require Import SpecBootDevCaps SpecDevintr.
+Require Import SpecBootDevCaps SpecDevintr SpecClockintr TicksInv.
 Require Import KMap.
 Require Import SpecMain.
 Require Import CodeMain.
@@ -880,6 +880,9 @@ Section ProofMain.
     kernel_text -∗ kernel_data -∗ dev_inv γd γv -∗
     pc_is (mword_of_int (KernelSyms.main + 0x7e) : mword 64) -∗
     lk_raw (mword_of_int KernelSyms.tickslock) -∗
+    (* the tick counter, so this group can bring tickslock UP: trapinit
+       initialises the lock's words and this is the resource it protects. *)
+    (∃ t : mword 32, a_ticks ↦₄ t) -∗
     (∃ v : mword 64, stvec ↦ᵣ v) -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     (* IT HANDS OUT THE WRITTEN CELL AND THE GHOST QUARTER, NOT [intr_res],
@@ -889,9 +892,10 @@ Section ProofMain.
        on.  So the two pieces ride raw to the chain's tail, which is where
        [intr_res] is folded and where [trap_csrs_raw] was already waiting to
        be completed. *)
-    ( ∀ (m' : regfile),
+    ( ∀ (m' : regfile) (γtl : gname),
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
+        is_tickslock γtl -∗
         stvec ↦ᵣ (mword_of_int KernelSyms.kernelvec : mword 64) -∗
         ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
         WP (Loop : expr riscv_lang)) -∗
@@ -901,7 +905,7 @@ Section ProofMain.
     (* [cid_word] is a [Definition] over [cpu_id]; naming the delta-expanded
        form once is what lets [rget_tp]'s output be rewritten below. *)
     assert (Hcidz : cid_word_of cpu_id = (zero_reg : mword 64)) by exact Hcid.
-    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hltick Hstvec Hq Hcont".
+    iIntros "Hcg #Htext #Hkdata #Hdev Hpc Hltick Hticks Hstvec Hq Hcont".
     iPoseProof (dev_inv_plic with "Hdev") as "#Hpinv".
     iPoseProof (mni_7e with "Htext") as "Hi7e".
     iPoseProof (mni_82 with "Htext") as "Hi82".
@@ -925,7 +929,19 @@ Section ProofMain.
     iApply (Trapinit.wp_trapinit_sconf T1 n vtl vtn vtc false p0 ltac:(lia)
               with "Hcg Htext Hkdata Hpc Htw Htn Htc").
     iApply wp_next_off_intro.
-    iIntros (mt) "Hcg Hpc %Hcsti _ _ _".
+    iIntros (mt) "Hcg Hpc %Hcsti Htw2 #Htn2 Htc2".
+    (* ---- tickslock comes UP here: trapinit left its words initialised, and
+           the resource it protects is the [ticks] counter.  This is what the
+           handler contract's [tick_keeper] conjunct wants from the TICK hart
+           (hart 0); a secondary discharges it by its left arm instead. ---- *)
+    iDestruct "Hticks" as (t0) "Hticks".
+    (* a fupd in front of a [WP (Loop)] goal: the tree's idiom is to peel it
+       with [fupd_wp] first (ProofIupdate.v records the same). *)
+    iApply fupd_wp.
+    iMod (newlock ⊤ (mword_of_int KernelSyms.tickslock : mword 64) "time"%string
+            ticks_res with "Htn2 Htw2 Htc2 [Hticks]") as (γtl) "#Htl".
+    { iApply (ticks_res_intro t0 with "Hticks"). }
+    iModIntro.
     assert (Hretti : ret_pc (T1 !!! Regidx (mword_of_int 1 : mword 5) : mword 64)
                      = (mword_of_int (KernelSyms.main + 0x82) : mword 64)).
     { rewrite /T1 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
@@ -1005,7 +1021,7 @@ Section ProofMain.
                      = (mword_of_int (KernelSyms.main + 0x8e) : mword 64)).
     { rewrite /T4 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretph) in "Hpc".
-    iApply ("Hcont" $! mph with "Hcg Hpc Hstvec Hq").
+    iApply ("Hcont" $! mph γtl with "Hcg Hpc Htl Hstvec Hq").
   Qed.
 
   (* =================================================================== *)
@@ -1427,12 +1443,20 @@ Section ProofMain.
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hkauth Hpages".
     iDestruct "Hlocks" as "(Hlcons & Hltx & Hlpr & Hlkmem & Hlpid & Hlwait &
                             Hltick & Hlbc & Hlit & Hlft & Hldisk)".
-    (* [Hient] -- the fifty itable entries' cells -- is carried and DROPPED
+    (* [Htxb] -- the [tx_busy] flag -- is carried and DROPPED here for the same
+       kind of reason [Hient] is: its consumer would be the [newlock] that
+       brings tx_lock up, and THAT IS NOT CURRENTLY PROVABLE -- the
+       transmitter token [uart_tx_own] is already committed to the printk
+       lock's [pr_res] (uartputc_sync needs it and takes no lock), and one
+       exclusive token cannot sit in two locks.  See SpecBootDevCaps.v: the
+       cell is carved and threaded so that the day the UART's ownership story
+       is settled, the boot side is already done.
+       [Hient] -- the fifty itable entries' cells -- is carried and DROPPED
        here: its only consumer is [IcacheBoot.icache_boot], whose other input
        (the stocked inode pool) needs the fs BLOCK layer wired into main.
        See claude-notes/projects/fs-icache.md, C7 owed (ii). *)
     iDestruct "Hglobals" as "(Hdevsw & Hflags & Hkmem24 & Hkpt & Hprocs & Hppub &
-                             Hfds & Hirs & Hinitproc & Hbufl & Hbufn & Hbhead & Hinl &
+                             Hfds & Hirs & Hinitproc & Hticks & Htxb & Hbufl & Hbufn & Hbhead & Hinl &
                              Hient & Hdiskptr & Hdiskfree & Hdusedidx & Hdslots)".
     iDestruct "Hhart" as "(Hsbit & Htlb & Htcsr)".
     iDestruct "Hdiskfree" as (free0) "Hdiskfree".
@@ -1461,8 +1485,8 @@ Section ProofMain.
       "Hcg Hpc Hcpu Hkenv #Hpinv Hkpt Hstvec #Hkinv #Hkptp #Htramp #Hkstx".
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
-              with "Hcg Htext Hkdata Hdev Hpc Hltick Hstvec Hq").
-    iIntros (m4) "Hcg Hpc Hstvec Hq".
+              with "Hcg Htext Hkdata Hdev Hpc Hltick Hticks Hstvec Hq").
+    iIntros (m4 γtl) "Hcg Hpc #Htl Hstvec Hq".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
     iApply (mn_grp_fs γa γs γv γd m4 (K - 2)%nat p0 ps c0 free0
@@ -1479,8 +1503,13 @@ Section ProofMain.
            [LinkBootDevCaps]' one assumed boot interface -- see that file for
            why they are missing and where they belong. ---- *)
     iDestruct (procs_inv_len with "Hpinv") as %Hnproc.
-    iPoseProof (BootDevCaps.boot_dev_caps γd γs) as "Hbdc".
-    iDestruct "Hbdc" as (γtx γtl) "(#Htxl & #Htimc & #Htick)".
+    iPoseProof (BootDevCaps.boot_dev_caps γd) as "Hbdc".
+    iDestruct "Hbdc" as (γtx) "(#Htxl & #Htimc)".
+    (* THE TICK KEEPER IS NOT ASSUMED: hart 0 IS the tick hart
+       ([tick_hart] is [cpuid() == 0]), so it owes the real arm -- the lock
+       trapinit's group brought up, plus [procs_inv] and [panic_wp_any]. *)
+    iAssert (tick_keeper γtl γs) as "#Htick".
+    { iRight. iFrame "Htl Hpinv Hpany". }
     iAssert (devintr_caps γd γv γtx γk γtl γs pd pav pu) as "#Hcaps".
     { rewrite /devintr_caps.
       iFrame "Hdev Htxl Hgeom Hdlock Htimc Htick Hpinv Hpany". }

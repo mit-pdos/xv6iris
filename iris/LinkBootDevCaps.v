@@ -1,4 +1,4 @@
-(* LinkBootDevCaps.v -- the three unminted boot credentials, ASSUMED.
+(* LinkBootDevCaps.v -- the two unminted boot credentials, ASSUMED.
 
    See SpecBootDevCaps.v for what they are, why nothing mints them yet, and
    where they belong (the whole-system adequacy composition).  This is the ONE
@@ -27,6 +27,6 @@ Module BootDevCaps : BOOT_DEV_CAPS.
   Axiom boot_dev_caps :
     forall `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !irefslotG Σ}
       `{!uartGhostG Σ, !diskGhostG Σ}
-      `{GEN : GenId} `{CID : CpuId} (γu : uart_names) (γs : list gname),
-      ⊢ boot_dev_caps_body γu γs.
+      `{GEN : GenId} `{CID : CpuId} (γu : uart_names),
+      ⊢ boot_dev_caps_body γu.
 End BootDevCaps.

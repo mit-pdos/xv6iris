@@ -156,7 +156,7 @@ Require Import VirtioQueue VirtioProto DiskInv.
    named [lockG]/[fileG] instead, and [printk_env]/[procs_inv] then cannot
    resolve their [lockG] instance (spec-modules.md's Link-file gotcha, in a
    Spec file). *)
-Require Import WpLock FileInv.
+Require Import WpLock FileInv TicksInv UartTxInv.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 From Kernel Require KernelSyms.
 
@@ -258,6 +258,17 @@ Section SpecMain.
         [IrefSlots.IREFSLOTS] are the file table's. *)
      iref_slots (NPROC * (1 + IREFSPARE)) ∗
      (∃ v0 : mword 64, (mword_of_int KernelSyms.initproc : mword 64) ↦₈ v0) ∗
+     (* [ticks], the tick counter tickslock protects.  It is here for the same
+        reason [lk_raw tickslock] is: a static global the init sequence brings
+        under a lock.  main needs it to ALLOCATE that lock -- [is_tickslock] is
+        [is_lock … ticks_res], and [ticks_res] is this cell -- which is what
+        the handler contract's [tick_keeper] conjunct asks of the tick hart. *)
+     (∃ t : mword 32, a_ticks ↦₄ t) ∗
+     (* [tx_busy], the flag tx_lock protects (with the accepted-trace ghost).
+        Same story as [ticks]: main needs it to ALLOCATE the lock, which is
+        what the handler contract's [is_txlock] conjunct asks for -- uartintr
+        is on kerneltrap's cone. *)
+     (∃ b : mword 32, a_tx_busy ↦₄ b) ∗
      ([∗ list] k ∈ seq 0 NBUF, sl_raw (buf_lock (bnode k))) ∗
      ([∗ list] k ∈ seq 0 NBUF, blink_raw (bnode k)) ∗
      blink_raw bhead ∗

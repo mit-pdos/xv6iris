@@ -1203,29 +1203,48 @@ contracts (userinit, printk-general, consoleintr) + funext + the platform
 axioms; **`kernelvec_handler_spec`'s own ledger stays clean** (5 platform
 axioms + funext + consoleintr).
 
-**HOW TO DISCHARGE IT** — the next task in this cone, and none of it is
-interrupt work:
+**ONE OF THE THREE IS ALREADY DISCHARGED, AND THE OTHER TWO ARE NOW DIAGNOSED
+RATHER THAN GUESSED.**
 
-- `timer_cap` = `sstc_enabled ∗ stimecmp_inv` (`TimerCap.timer_cap_intro`
-  takes the `mcounteren` and `stimecmp` cells and allocates the invariant).
-  Both cells exist on the M-mode side; the question is whether
-  `BootBridge`/`SpecEntry`'s post hands them to S-mode or drops them.  Start
-  there: if they are dropped, that post gains two conjuncts and the
-  allocation happens in main's kvm group.
-- `tick_keeper γtl γs` is `SpecClockintr`'s hart-indexed disjunction, and its
-  cheap arm is `⌜tick_hart = false⌝` — so a hart that is not the tick hart
-  needs NOTHING.  The tick hart's arm needs `is_tickslock γtl` (main's
-  `mn_grp_trap` already holds `lk_raw tickslock` and could keep the lock it
-  makes) plus the ticks ghost.  This is the one of the three that is likely
-  provable today with no interface change.
-- `is_txlock γtx γu` is uartinit's: `mn_grp_printk`'s console-init group
-  creates the tx lock and does not thread it out.  Widen its continuation.
+- **`tick_keeper γtl γs` — DONE, no axiom.**  The boot hart owes the real arm
+  and pays it: trapinit initialises tickslock's words, `SpecMain`'s bundle now
+  carries the `ticks` counter they protect (`BootShared` carves it out of the
+  bss gap the chain used to skip), and `mn_grp_trap` runs `newlock` right
+  after the trapinit call.  A secondary hart owes only `⌜tick_hart = false⌝`,
+  which its `cid_word <> zero_reg` premise gives outright — so it needs no
+  lock and no name (it instantiates the ghost with the disk lock's).  Two
+  gotchas, both recorded in the code: a `newlock` in front of a `WP (Loop)`
+  goal needs `iApply fupd_wp` first **and an `iModIntro` after** (forgetting
+  the second makes the NEXT `iIntros` fail with "goal is not a wand"), and the
+  ticks cell has to be carved in address order between `initproc` and
+  `stack0`.
+- **`is_txlock γtx γu` — NOT unplumbed but UNPROVABLE, and this is the useful
+  finding.**  `is_txlock` is `is_lock … (tx_res γu)`, and `tx_res` holds the
+  EXCLUSIVE transmitter token `uart_tx_own` — which **printkinit has already
+  committed to the printk lock's `pr_res`**, because uartputc_sync needs the
+  token and (in the C) takes no lock at all.  One exclusive token cannot sit
+  in two locks, so no amount of boot plumbing produces this credential: the
+  UART's ownership story has to be settled first (the tension
+  `projects/uart-driver.md` records, now with a concrete consequence).  The
+  boot side is nevertheless finished — the `tx_busy` cell the lock protects is
+  carved and threaded, and dropped in main's chain with a comment saying why —
+  so the day the design lands, nothing at the boot end has to be rediscovered.
+- **`timer_cap` — mechanical, and every piece exists.**
+  `SpecEntry.wp_entry_boot`'s post already hands back `mcounteren ↦ᵣ` and
+  `stimecmp ↦ᵣ`, and `TimerCap.timer_cap_intro` turns them into the
+  credential.  What is missing is ONE pure conjunct in that post,
+  `_get_Counteren_TM mcounterenf = '1'` — which timerinit provably wrote, so
+  the ENTRY proof already knows it; this is the identical move that put
+  `mief = MIE_S` in the same list.  Then allocate `timer_cap` in the boot
+  chain (not in main: the credential is PERSISTENT and each hart allocates its
+  own from its own two cells) and pass it to both main arms.  Touches a proven
+  M-mode file (`WpEntryNew`), `BootChain`, and the two main specs.
 
-The right order is `tick_keeper` (probably free) → `is_txlock` (thread one
-lock out of one group) → `timer_cap` (may move a boot-bridge conjunct).  Each
-shrinks the axiom rather than replacing it, so land them one at a time: the
-axiom's statement is a three-way `∗`, and each conjunct can be deleted from it
-independently.
+So the axiom is now two conjuncts, and they are of two different KINDS: one is
+blocked on a driver design question, the other is three files of threading.
+Do `timer_cap` next; leave `is_txlock` to the UART effort and delete it from
+the axiom's `∗` when that lands (the statement is flat, so each conjunct
+retires independently).
 
 ### Two rules this decomposition earned
 
