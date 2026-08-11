@@ -297,6 +297,57 @@ Proof.
   - intros Hz. exists (image_dinode dss z). exact (ireg_M0_lookup dss nib z Hz).
 Qed.
 
+(* ---------------------------------------------------------------------- *)
+(*  THE MARKER HALF OF THE MINT (§16.4)                                     *)
+(* ---------------------------------------------------------------------- *)
+
+(* The region's map carries a SECOND entry per inum, at [imark_key]'s
+   negative shadow of it: [InodeRegion.imark], the per-inum token that says
+   "this inum's record fragment is not in the region".  It is minted here,
+   in the same [ghost_map_alloc] as the records, and after that it is only
+   ever MOVED -- never updated, never created -- so its value is irrelevant
+   and this is the constant it is minted at. *)
+Definition dinode_mark : dinode :=
+  MkDinode (bv_0 16) (bv_0 16) (bv_0 16) (bv_0 16) (bv_0 32) [].
+
+Definition mark_inums (nib : nat) : gset Z :=
+  list_to_set ((fun j : nat => imark_key (Z.of_nat j)) <$> seq 0 (16 * nib)).
+
+Lemma mark_inums_neg (nib : nat) (y : Z) : y ∈ mark_inums nib -> y < 0.
+Proof.
+  rewrite /mark_inums elem_of_list_to_set elem_of_list_fmap.
+  intros (j & -> & _). rewrite /imark_key. lia.
+Qed.
+
+Definition ireg_MK (nib : nat) : gmap Z dinode :=
+  gset_to_gmap dinode_mark (mark_inums nib).
+
+Lemma ireg_M0_MK_disj (dss : list (list dinode)) (nib : nat) :
+  ireg_M0 dss nib ##ₘ ireg_MK nib.
+Proof.
+  apply map_disjoint_spec. intros z d1 d2 H1 H2.
+  destruct (ireg_M0_lookup_Some dss nib z d1 H1) as [Hz _].
+  apply region_inums_spec in Hz.
+  rewrite /ireg_MK lookup_gset_to_gmap in H2.
+  destruct (decide (z ∈ mark_inums nib)) as [Hm|Hm].
+  - pose proof (mark_inums_neg nib z Hm). lia.
+  - rewrite option_guard_False in H2; [discriminate | exact Hm].
+Qed.
+
+(* the two index lists the region's [∗ set]s unfold to, both duplicate-free *)
+Lemma region_list_nodup (nib : nat) :
+  base.NoDup (Z.of_nat <$> seq 0 (16 * nib)).
+Proof.
+  apply NoDup_fmap_2_strong; [intros x y _ _ H; lia | apply NoDup_seq].
+Qed.
+
+Lemma mark_list_nodup (nib : nat) :
+  base.NoDup ((fun j : nat => imark_key (Z.of_nat j)) <$> seq 0 (16 * nib)).
+Proof.
+  apply NoDup_fmap_2_strong;
+    [intros x y _ _ H; rewrite /imark_key in H; lia | apply NoDup_seq].
+Qed.
+
 Section IcacheBootRegion.
   Context `{!riscvGS Σ, !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
 
@@ -313,6 +364,74 @@ Section IcacheBootRegion.
     rewrite big_sepM_dom ireg_M0_dom //.
   Qed.
 
+  (* THE REGION'S INUMS, RE-INDEXED AS (block, slot).  [ireg_M0] is a flat
+     inum-keyed map and [ireg_body]'s per-block conjunct is a nested
+     [seq 0 nib] / [seq 0 16]; this is the one bridge between them, and it
+     is what §16.4's per-slot arm made necessary (before it, the blocks'
+     conjunct held no ghost elements at all). *)
+  Local Lemma seq16_flatten (n : nat) (Phi : nat -> iProp Σ) :
+    ([∗ list] j ∈ seq 0 (16 * n), Phi j)
+    ⊢ [∗ list] bi ∈ seq 0 n, [∗ list] i ∈ seq 0 16, Phi (16 * bi + i)%nat.
+  Proof.
+    revert Phi. induction n as [|n IH]; intros Phi.
+    { cbn [seq]. iIntros "_". done. }
+    replace (16 * S n)%nat with (16 + 16 * n)%nat by lia.
+    rewrite seq_app big_sepL_app.
+    iIntros "[Hhd Htl]".
+    replace (seq 0 (S n)) with (0%nat :: seq 1 n) by reflexivity.
+    rewrite big_sepL_cons.
+    iSplitL "Hhd".
+    { iApply (big_sepL_mono with "Hhd"). intros idx i Hi.
+      apply lookup_seq in Hi as [-> _].
+      replace (16 * 0 + (0 + idx))%nat with (0 + idx)%nat by lia. done. }
+    assert (Hseq : seq (0 + 16) (16 * n) = Nat.add 16 <$> seq 0 (16 * n)).
+    { rewrite fmap_add_seq.
+      replace (0 + 16)%nat with (16 + 0)%nat by lia. reflexivity. }
+    rewrite Hseq big_sepL_fmap.
+    iPoseProof (IH (fun j => Phi (16 + j)%nat) with "Htl") as "Htl".
+    assert (Hs1 : seq 1 n = S <$> seq 0 n) by (rewrite fmap_S_seq; reflexivity).
+    rewrite Hs1 big_sepL_fmap.
+    iApply (big_sepL_mono with "Htl"). intros idx bi Hbi.
+    iIntros "H". iApply (big_sepL_mono with "H"). intros idx2 i Hi.
+    replace (16 * S bi + i)%nat with (16 + (16 * bi + i))%nat by lia. done.
+  Qed.
+
+  (* ...and the same bridge for the MARKER half, whose keys are the negative
+     shadows of the very same inums *)
+  Lemma imark_of_marks (γi : gname) (nib : nat) :
+    ([∗ map] y ↦ d ∈ ireg_MK nib, y ↪[γi] d)
+    ⊢ [∗ set] z ∈ region_inums nib, imark γi z.
+  Proof.
+    rewrite /ireg_MK big_sepM_gset_to_gmap.
+    rewrite /mark_inums (big_sepS_list_to_set _ _ (mark_list_nodup nib)).
+    rewrite big_sepL_fmap.
+    rewrite /region_inums (big_sepS_list_to_set _ _ (region_list_nodup nib)).
+    rewrite big_sepL_fmap.
+    iIntros "H". iApply (big_sepL_mono with "H"). intros idx j Hj.
+    iIntros "H". rewrite /imark. iExists dinode_mark. iExact "H".
+  Qed.
+
+  Lemma ireg_slots_of_set (γi : gname) (dss : list (list dinode)) (nib : nat) :
+    ([∗ set] z ∈ region_inums nib, ireg_slot γi z (image_dinode dss z))
+    ⊢ [∗ list] bi ∈ seq 0 nib,
+        [∗ list] i ∈ seq 0 16,
+          ireg_slot γi (16 * Z.of_nat bi + Z.of_nat i)%Z ((dss !!! bi) !!! i).
+  Proof.
+    rewrite /region_inums (big_sepS_list_to_set _ _ (region_list_nodup nib)).
+    rewrite big_sepL_fmap.
+    iIntros "H".
+    iPoseProof (seq16_flatten nib
+                  (fun j => ireg_slot γi (Z.of_nat j)
+                              (image_dinode dss (Z.of_nat j))) with "H") as "H".
+    iApply (big_sepL_mono with "H"). intros idx bi Hbi.
+    iIntros "H". iApply (big_sepL_mono with "H"). intros idx2 i Hi.
+    apply lookup_seq in Hi as [-> Hilt].
+    assert (Hz : Z.of_nat (16 * bi + (0 + idx2))%nat
+                 = (16 * Z.of_nat bi + Z.of_nat (0 + idx2))%Z) by lia.
+    rewrite Hz (image_dinode_slot dss bi (0 + idx2) ltac:(lia)).
+    done.
+  Qed.
+
   (* THE REGION'S BOOT ALLOCATION.  In: the [nib] inode blocks' client halves,
      straight out of [FsBoot.fs_boot_bundle]'s [cov ∖ log_region_set] big-op.
      Out: the region invariant and one exclusive [dinode_at] per inum of the
@@ -321,6 +440,14 @@ Section IcacheBootRegion.
      The only premises are arithmetic: each block is a block, and the region's
      inums fit a [uint32] (so [mword_of_int] round-trips on the pool's keys,
      [IcacheEscrow.region_inum_faithful]). *)
+  (* WHAT IT PAYS OUT IS NOW CONDITIONAL (§16.4).  A FREE inum's record
+     fragment STAYS in the region -- that is the whole point of §16.3, and
+     it is what gives ialloc's claim something to retag -- so what comes out
+     for it is the MARKER; an ALLOCATED inum's fragment comes out as before.
+     One [InodeRegion.ireg_out] covers both, and the pool's two arms consume
+     exactly the two cases.  The mint is strictly CHEAPER than it was: an
+     all-free image now needs no image-wf premise and no pool contents
+     beyond markers ([ipool_alloc_all_free] below). *)
   Lemma ireg_alloc (E : coPset) (γfs : fs_names) (inodestart : Z) (nib : nat)
       (bss : nat -> list (bv 8)) :
     16 * Z.of_nat nib <= 2 ^ 32 ->
@@ -332,36 +459,61 @@ Section IcacheBootRegion.
       ⌜forall bi : nat, (bi < nib)%nat -> bss bi = diblk_bytes (dss !!! bi)⌝ ∗
       ireg_inv γi γfs inodestart nib ∗
       ([∗ set] z ∈ region_inums nib,
-         dinode_at γi (mword_of_int z : mword 32) (image_dinode dss z)).
+         ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)).
   Proof.
     intros Hnib Hlen.
     destruct (image_decode nib bss Hlen) as (dss & Hl & Hwf & He).
     iIntros "Hblks".
-    iMod (ghost_map_alloc (ireg_M0 dss nib)) as (γi) "[Ha Hels]".
+    iMod (ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)) as (γi) "[Ha Hels]".
+    iDestruct (big_sepM_union with "Hels") as "[Hels Hmks]";
+      [apply ireg_M0_MK_disj |].
     iDestruct (ireg_M0_big (fun z dn => (z ↪[γi] dn)%I) dss nib with "Hels")
       as "Hels".
-    iAssert (ireg_body γi γfs inodestart nib)%I with "[Ha Hblks]" as "Hbody".
-    { iExists (ireg_M0 dss nib). iFrame "Ha".
-      iApply (big_sepL_mono with "Hblks").
+    iDestruct (imark_of_marks γi nib with "Hmks") as "Hmks".
+    iDestruct (big_sepS_sep_2 with "Hels Hmks") as "Hall".
+    (* per inum: one of the two ghost entries stays in the region's arm and
+       the other one is the payout *)
+    iAssert ([∗ set] z ∈ region_inums nib,
+               (ireg_slot γi z (image_dinode dss z) ∗
+                ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)))%I
+      with "[Hall]" as "Hall".
+    { iApply (big_sepS_mono with "Hall"). intros z Hz.
+      iIntros "[Hfrag Hmk]".
+      rewrite /ireg_out /dinode_at (region_inum_faithful nib z Hnib Hz).
+      case_decide as Hty.
+      - iSplitR "Hmk"; [| iExact "Hmk"].
+        rewrite /ireg_slot. iLeft.
+        iSplitR; [iPureIntro; left; exact Hty | iExact "Hfrag"].
+      - iSplitR "Hfrag"; [| iExact "Hfrag"].
+        rewrite /ireg_slot. iRight.
+        iSplitR; [iPureIntro; exact Hty | iExact "Hmk"]. }
+    rewrite big_sepS_sep.
+    iDestruct "Hall" as "[Hslots Hout]".
+    iDestruct (ireg_slots_of_set γi dss nib with "Hslots") as "Hslots".
+    iAssert (ireg_body γi γfs inodestart nib)%I
+      with "[Ha Hblks Hslots]" as "Hbody".
+    { iExists (ireg_M0 dss nib ∪ ireg_MK nib). iFrame "Ha".
+      iDestruct (big_sepL_sep_2 with "Hblks Hslots") as "H".
+      iApply (big_sepL_mono with "H").
       intros idx bi Hbi. apply lookup_seq in Hbi as [-> Hidx].
-      iIntros "H". rewrite /ireg_blk. iExists (dss !!! idx).
+      iIntros "[Hb Hsl]". rewrite /ireg_blk. iExists (dss !!! idx).
       iSplitR.
       { iPureIntro.
         apply (Forall_lookup_1 _ dss idx); [exact Hwf |].
         apply list_lookup_lookup_total_lt. lia. }
       iSplitR.
       { iPureIntro. intros i Hi.
+        apply lookup_union_Some_l.
         rewrite (ireg_M0_lookup dss nib _); last first.
         { apply region_inums_spec. lia. }
         rewrite (image_dinode_slot dss idx i Hi) //. }
-      rewrite -(He idx Hidx). iExact "H". }
+      rewrite -(He idx Hidx).
+      iSplitL "Hb"; [iExact "Hb" | iExact "Hsl"]. }
     iMod (inv_alloc iregN E (ireg_body γi γfs inodestart nib) with "[Hbody]")
       as "#Hinv"; [by iNext |].
     iModIntro. iExists γi, dss.
     iSplitR; [done |]. iSplitR; [done |]. iSplitR; [iPureIntro; exact He |].
-    iFrame "Hinv".
-    iApply (big_sepS_mono with "Hels"). intros z Hz.
-    rewrite /dinode_at (region_inum_faithful nib z Hnib Hz). done.
+    iFrame "Hinv". iExact "Hout".
   Qed.
 
 End IcacheBootRegion.
@@ -375,14 +527,11 @@ Section IcacheBootPool.
             !diskGhostG Σ, !fsLogG Σ, !iregG Σ}.
   Context `{GEN : GenId}.
 
+  (* THE FREE ARM IS A BARE MARKER since §16.4 -- no record, no type premise *)
   Lemma ipool_shape_free (γfs : fs_names) (γi : gname) (cov : gset Z)
-      (logstart : Z) (inum : mword 32) (dn : dinode) :
-    bv_unsigned (di_type dn) = 0 ->
-    dinode_at γi inum dn -∗ ipool_shape γfs γi cov logstart inum.
-  Proof.
-    iIntros (H0) "Hdn". rewrite /ipool_shape. iRight.
-    iExists dn. iFrame "Hdn". done.
-  Qed.
+      (logstart : Z) (inum : mword 32) :
+    imark γi (bv_unsigned inum) -∗ ipool_shape γfs γi cov logstart inum.
+  Proof. iIntros "Hmk". rewrite /ipool_shape. iRight. iExact "Hmk". Qed.
 
   (* THE SECOND PREMISE IS §15(a)'S DIRECTORY-WF CLAUSE, and it joins the
      image-wf family for exactly the reason [inode_ok] did: it is a fact
@@ -425,8 +574,7 @@ Section IcacheBootPool.
          dinode_at γi (mword_of_int z : mword 32) dn ∗
          ind_res γfs bm ∗ inode_blocks γfs bm data) -∗
     ([∗ set] z ∈ R ∖ A,
-       ∃ dn : dinode,
-         ⌜bv_unsigned (di_type dn) = 0⌝ ∗ dinode_at γi (mword_of_int z : mword 32) dn) -∗
+       imark γi (bv_unsigned (mword_of_int z : mword 32))) -∗
     ipool γfs γi cov logstart R.
   Proof.
     iIntros (Hsub) "Ha Hf".
@@ -437,26 +585,29 @@ Section IcacheBootPool.
       iApply (ipool_shape_alloc _ _ _ _ _ dn bm data Hok Hdok
                 with "Hdn Hind Hblk").
     - rewrite /ipool. iApply (big_sepS_mono with "Hf"). intros z _.
-      iIntros "(%dn & %H0 & Hdn)".
-      iApply (ipool_shape_free _ _ _ _ _ dn H0 with "Hdn").
+      iIntros "Hmk". iApply (ipool_shape_free with "Hmk").
   Qed.
 
   (* ...and the case that needs no image theory at all: an image whose inodes
      are ALL free.  This is what makes [ipool_alloc]'s first premise a real
      obligation rather than a vacuous one -- the shape is satisfiable, in one
-     line, from [ireg_alloc]'s output alone. *)
+     line, from [ireg_alloc]'s output alone.  Since §16.4 it is even cheaper:
+     what the free inums hand over is the MARKER, and their records never
+     leave the region at all. *)
   Lemma ipool_alloc_all_free (γfs : fs_names) (γi : gname) (cov : gset Z)
       (logstart : Z) (dss : list (list dinode)) (nib : nat) :
     (forall z : Z, z ∈ region_inums nib ->
        bv_unsigned (di_type (image_dinode dss z)) = 0) ->
     ([∗ set] z ∈ region_inums nib,
-       dinode_at γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
+       ireg_out γi (mword_of_int z : mword 32) (image_dinode dss z)) -∗
     ipool γfs γi cov logstart (region_inums nib).
   Proof.
     iIntros (H0) "H". rewrite /ipool.
     iApply (big_sepS_mono with "H"). intros z Hz.
-    iIntros "Hdn".
-    iApply (ipool_shape_free _ _ _ _ _ (image_dinode dss z) (H0 z Hz) with "Hdn").
+    iIntros "Hout".
+    iApply ipool_shape_free.
+    iApply (ireg_out_free_inv γi (mword_of_int z : mword 32)
+              (image_dinode dss z) (H0 z Hz) with "Hout").
   Qed.
 
 End IcacheBootPool.

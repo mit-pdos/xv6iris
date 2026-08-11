@@ -218,6 +218,12 @@ Definition wp_itrunc_sconf_body
   (* the inum is one the inode REGION covers -- iupdate's premise, which
      replaced the block-half premise and its [diblk_wf ds] (design §11.3) *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
+  (* THE INODE IS ALLOCATED (fs-icache §16.4).  itrunc's closing iupdate
+     flushes [di_trunc dn], which keeps [dn]'s type, and the region's arm
+     only lets an allocated record's fragment stay OUT of the invariant --
+     a type-0 flush is iput's free path instead.  iput, the only caller,
+     has it from the locked inode's [InodeLock.inode_ok]. *)
+  bv_unsigned (di_type dn) <> 0 ->
   (* the map is well-formed: this is what says every block it names is a
      covered home block, and -- via injectivity -- that the 269 frees are
      269 DISTINCT blocks, so the free pool really does grow by

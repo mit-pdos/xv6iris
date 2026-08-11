@@ -117,6 +117,7 @@ Require Import BufOwn BcacheInv BioInv.
 Require Import FsBlocks LogInv.
 Require Import BlockWords.
 Require Import DinodeEnc.
+Require Import FsCrash.
 Require Import InodeInv.
 Require Import DirentEnc.
 Require Import DirView.
@@ -581,7 +582,39 @@ Section IlockLoad.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, !bioG Σ, !diskGhostG Σ,
             !uartGhostG Σ, !fsLogG Σ, ICFG : icfg, !icacheG Σ, !irefslotG Σ, !iregG Σ}.
 
-  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId} 
+  (* ------------------------------------------------------------------ *)
+  (*  A CLAIMED INODE'S BUNDLE, OUT OF NOTHING (§16.4's fill sub-arm)     *)
+  (* ------------------------------------------------------------------ *)
+
+  (* ialloc's claim leaves the record at [InodeRegion.fresh_shape] and the
+     fragment inside the region invariant; the FIRST fill withdraws it and
+     has to build a full [IcacheEscrow.ic_loaded] payload around it.  There
+     is nothing to inherit -- no pool bundle ever existed for this inum --
+     so every piece comes from [bm_empty], and these three lemmas are the
+     pieces.  ([InodeInv.bm_empty_wf], [bm_covers_nonpos],
+     [inode_sized_zero] and [DirView.dir_ok_size_zero] do the rest, at the
+     call site.) *)
+  Local Lemma il_bmcells_empty : bm_cells bm_empty = replicate 13 (bv_0 32).
+  Proof. rewrite /bm_cells /bm_empty /NDIRECT. cbn. reflexivity. Qed.
+
+  Local Lemma il_ind_res_empty (gfs : fs_names) : ⊢ ind_res gfs bm_empty.
+  Proof.
+    rewrite /ind_res /ind_blk /ind_tok.
+    destruct (decide (bv_unsigned (bm_ind bm_empty) = 0)) as [_|Hc];
+      [iSplitL; done | exfalso; apply Hc; reflexivity].
+  Qed.
+
+  Local Lemma il_blocks_empty (gfs : fs_names) (data : nat -> list (bv 8)) :
+    ⊢ inode_blocks gfs bm_empty data.
+  Proof.
+    rewrite /inode_blocks.
+    iApply big_sepL_intro. iIntros "!>" (t x Hx).
+    rewrite /blk_res bm_empty_get.
+    destruct (decide (bv_unsigned (bv_0 32) = 0)) as [_|Hc];
+      [done | exfalso; apply Hc; reflexivity].
+  Qed.
+
+  Local Lemma il_load `{GEN : GenId} `{CID0 : CpuId}
       (gs : list gname) (j : nat) (gl : gname)
       (gu : uart_names) (gd : disk_names) (gk : gname)
       (pd pav pu : mword 64)
@@ -659,25 +692,13 @@ Section IlockLoad.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hireg #Hprocs #Hdevi #Hdgeom
               #Hdlock Hframe Hppid Hidev Hinumc Hsb Hsl
               Hstok Hpid Hdep Hvalid Hraw Hpool Hcont".
-    (* THE POOL ENTRY, reshuffled so that only the type test cares which of
-       §13.3's two shapes it is: BOTH carry the region fragment, and the
-       loads / the memmove / the brelse touch only the BUFFER's bytes and
-       this entry's own cells -- never the file's blocks. *)
-    iAssert (∃ dn : dinode,
-               dinode_at gi inum dn ∗
-               ((∃ (bm : blkmap) (data : nat -> list (bv 8)),
-                   ⌜inode_ok cov logstart dn bm data⌝ ∗
-                   ⌜dir_ok icfg_nib dn data⌝ ∗
-                   ind_res gfs bm ∗ inode_blocks gfs bm data)
-                ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
-      with "[Hpool]" as (dn) "[Hdn Hrest]".
-    { rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | Hfr]".
-      - iDestruct "Hal" as (dn0 bm0 data0) "(%Hok0 & %Hdok0 & Hdn & Hind & Hblk)".
-        iExists dn0. iFrame "Hdn". iLeft. iExists bm0, data0.
-        iSplitR; [iPureIntro; exact Hok0 |].
-        iSplitR; [iPureIntro; exact Hdok0 |]. iFrame.
-      - iDestruct "Hfr" as (dn0) "(%Ht0 & Hdn)".
-        iExists dn0. iFrame "Hdn". iRight. iPureIntro. exact Ht0. }
+    (* THE POOL ENTRY STAYS OPAQUE UNTIL THE BUFFER HAS BEEN READ (§16.4).
+       Before §16.4 both of §13.3's shapes carried the region fragment, so
+       the record could be named here; now the FREE shape is a bare marker
+       and the record is only knowable off the block the bread returns.  The
+       case analysis therefore moves down to the [ireg_read_blk] below, and
+       everything between here and the type test runs on the shapes' common
+       part -- the BUFFER's bytes and this entry's own cells. *)
     iDestruct "Hraw" as "[Hmeta0 Haddrs0]".
     iDestruct "Hmeta0" as (d0) "(Hmty & Hmmaj & Hmmin & Hmnl & Hmsz)".
     iDestruct "Haddrs0" as (l0) "[%Hl0len Haddrs0]".
@@ -917,17 +938,81 @@ Section IlockLoad.
     iDestruct (il_held_L with "Hheld") as "[HL Hbackl]".
     iEval (rewrite Hbno) in "HL".
     iApply fupd_wp.
-    iMod (ireg_read ⊤ gi gfs inodestart nib inum dn
-            (IBLOCK inum inodestart) bs0
-            ltac:(solve_ndisj) Hinlt eq_refl with "Hireg Hdn HL")
-      as "(%Hdsx & Hdn & HL)".
-    iModIntro.
-    iEval (rewrite -Hbno) in "HL".
-    iDestruct ("Hbackl" with "HL") as "Hheld".
-    destruct Hdsx as (ds & Hdswf0 & Hbs0 & Hagr).
+    (* THE BLOCK, FRAGMENT-FREE.  §16.4's fill does not know which record is
+       its own until it has decoded the buffer, because the marker shape
+       carries none -- so the coupling comes through [ireg_read_blk], which
+       needs only the machinery half, and the record is the slot the inum's
+       arithmetic lands on. *)
+    iMod (ireg_read_blk ⊤ gi gfs inodestart nib (ireg_bi inum) bs0
+            ltac:(solve_ndisj) (ireg_bi_lt inum nib Hinlt) with "Hireg [HL]")
+      as "(%Hdsx & HL)".
+    { rewrite -(ireg_bi_iblock inum inodestart). iExact "HL". }
+    iEval (rewrite -(ireg_bi_iblock inum inodestart)) in "HL".
+    destruct Hdsx as (ds & Hdswf0 & Hbs0).
     subst bs0.
     destruct Hdswf0 as [Hdslen Hdsall].
     assert (Hdswf : diblk_wf ds) by (split; assumption).
+    pose (dn := ds !!! islot inum).
+    assert (Hagr : ds !!! islot inum = dn) by reflexivity.
+    clearbody dn.
+    (* NOW the pool entry's shape matters, and there are THREE cases, not
+       two (§16.4): the allocated bundle (unchanged); a MARKER over a type-0
+       record, which is the free inode ilock panics on; and a MARKER over a
+       NONZERO type, which is ialloc's claim -- the fragment is still in the
+       region and [ireg_withdraw] takes it out, [fresh_shape] in hand.  The
+       marker is what makes that exhaustive: it refutes the region's OUT arm
+       outright, so no itable-wide uniqueness argument is needed. *)
+    iAssert (|={⊤}=>
+               ((IBLOCK inum inodestart) ↪[fs_L gfs]{#(1/2)} (diblk_bytes ds)) ∗
+               ((dinode_at gi inum dn ∗
+                 (∃ (bm : blkmap) (data : nat -> list (bv 8)),
+                    ⌜inode_ok cov logstart dn bm data⌝ ∗
+                    ⌜dir_ok icfg_nib dn data⌝ ∗
+                    ind_res gfs bm ∗ inode_blocks gfs bm data))
+                ∨ ⌜bv_unsigned (di_type dn) = 0⌝))%I
+      with "[Hpool HL]" as ">[HL Hrest]".
+    { rewrite /ipool_shape. iDestruct "Hpool" as "[Hal | Hmk]".
+      - iDestruct "Hal" as (dn0 bm0 data0) "(%Hok0 & %Hdok0 & Hdn & Hind & Hblk)".
+        iMod (ireg_read ⊤ gi gfs inodestart nib inum dn0
+                (IBLOCK inum inodestart) (diblk_bytes ds)
+                ltac:(solve_ndisj) Hinlt eq_refl with "Hireg Hdn HL")
+          as "(%Hex & Hdn & HL)".
+        destruct Hex as (ds1 & Hwf1 & Hbs1 & Hagr1).
+        assert (Hds1 : ds1 = ds)
+          by exact (diblk_bytes_inj ds1 ds Hwf1 Hdswf (eq_sym Hbs1)).
+        subst ds1. rewrite Hagr in Hagr1. subst dn0.
+        iModIntro. iFrame "HL". iLeft. iFrame "Hdn".
+        iExists bm0, data0.
+        iSplitR; [iPureIntro; exact Hok0 |].
+        iSplitR; [iPureIntro; exact Hdok0 |]. iFrame.
+      - destruct (decide (bv_unsigned (di_type dn) = 0)) as [Ht0 | Htnz].
+        + iModIntro. iFrame "HL". iRight. iPureIntro. exact Ht0.
+        + iMod (ireg_withdraw ⊤ gi gfs inodestart nib inum ds
+                  (IBLOCK inum inodestart) (diblk_bytes ds)
+                  ltac:(solve_ndisj) Hinlt eq_refl Hdswf eq_refl
+                  ltac:(rewrite Hagr; exact Htnz)
+                  with "Hireg Hmk HL") as "(%Hfresh & Hdn & HL)".
+          rewrite Hagr in Hfresh.
+          iEval (rewrite Hagr) in "Hdn".
+          destruct Hfresh as (Hfty & Hfsz & Hfad).
+          iModIntro. iFrame "HL". iLeft. iFrame "Hdn".
+          iExists bm_empty, (fun _ => replicate BSIZE (bv_0 8)).
+          iSplitR.
+          { iPureIntro. rewrite /inode_ok. split_and!.
+            - exact (bm_empty_wf cov logstart).
+            - apply bm_covers_nonpos. rewrite Hfsz. lia.
+            - rewrite Hfad il_bmcells_empty. reflexivity.
+            - exact Hfty.
+            - rewrite Hfsz.
+              pose proof (Nat2Z.is_nonneg MAXFILE).
+              pose proof (Nat2Z.is_nonneg BSIZE). nia.
+            - apply bm_empty_holes. intros i. reflexivity.
+            - exact inode_sized_zero. }
+          iSplitR; [iPureIntro; exact (dir_ok_size_zero icfg_nib dn _ Hfsz) |].
+          iSplitL; [iApply il_ind_res_empty | iApply il_blocks_empty]. }
+    iModIntro.
+    iEval (rewrite -Hbno) in "HL".
+    iDestruct ("Hbackl" with "HL") as "Hheld".
     assert (Hslotlen : (islot inum < length ds)%nat)
       by (rewrite Hdslen; exact Hslotlt).
     (* the addrs LENGTH -- v1 got it from [inode_ok]; the region's own
@@ -1627,7 +1712,7 @@ Section IlockLoad.
     iPoseProof (ili_a2 with "Htext") as "Hia2".
     iPoseProof (ili_a6 with "Htext") as "Hia6".
     iPoseProof (ili_aa with "Htext") as "Hiaa".
-    iDestruct "Hrest" as "[Hal | %Ht0]"; last first.
+    iDestruct "Hrest" as "[[Hdn Hal] | %Ht0]"; last first.
     { (* ===== FREE INODE: the branch is TAKEN, and ilock DIVERGES ===== *)
       assert (Htk2 : add_vec (mword_of_int (KernelSyms.ilock + 0x9c) : mword 64)
                        (sign_extend' 64 (sign_extend' 13

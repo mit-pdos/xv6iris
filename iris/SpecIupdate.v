@@ -210,8 +210,15 @@ Definition wp_iupdate_sconf_body
       inode_meta ip dn -∗
       inode_map γfs ip bm -∗
       sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-      (* THE FLUSH: this inum's on-disk record is now the in-memory one *)
-      dinode_at γi inum dn -∗
+      (* THE FLUSH: this inum's on-disk record is now the in-memory one.
+         CONDITIONAL since fs-icache §16.4: for an allocated [dn] this is
+         the retagged [InodeRegion.dinode_at] as before, and for a type-0
+         [dn] -- iput's [ip->type = 0; iupdate(ip)], the one place an inode
+         goes back to the free pool -- the fragment is ABSORBED into the
+         region invariant and what comes back is [InodeRegion.imark], the
+         marker the free pool arm now carries.  One contract, because the
+         two cases differ only in the payout. *)
+      ireg_out γi inum dn -∗
       bslots bn 2 -∗
       log_op γ u -∗
       WP (Loop : expr riscv_lang)) -∗
