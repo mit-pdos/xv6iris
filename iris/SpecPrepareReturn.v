@@ -163,13 +163,15 @@ Definition wp_prepare_return_sconf_body
       (* INTERRUPTS ARE OFF, and the reserve the enabled arm was holding is
          now usable stack -- the standard csrci index move. *)
       sie_cap_gpr mf (trap_res true + av)%nat false p -∗
-      intr_count 0%nat false -∗
+      (* THE PER-CPU BUNDLE, REASSEMBLED AT THE DISABLED INDEX.  [cpu_own] at
+         [b = true] is the pure fact plus the caller's frame [C] -- the cells
+         and the counting token live inside [sie_arm true], and the [csrci]
+         is what hands them over.  So this ONE conjunct is the whole of what
+         comes back: [cpu_hart 0 false p] (the cells the arm freed, at [n = 0]
+         where the intena arm is existential and the [eb] index is dead, plus
+         [intr_count 0 false]) alongside the [C] that came in.  Listing the
+         cells or the token again beside it would promise them twice. *)
       cpu_own 0%nat false p C false -∗
-      (* the per-cpu cells the dismantled arm freed.  Spelled as [cpu_cells]
-         rather than [cpu_cells_pay true p]: the index is PINNED here, so the
-         wrapper adds nothing and would drag a Wp leaf file into a Spec's
-         require closure. *)
-      cpu_cells 0%nat true p -∗
       (* ---- what the flip paid out, MINUS [intr_res] ---- *)
       (* the trap-scratch cells.  sepc is PINNED at the legalized user pc:
          the write goes through [mepc_val] (bit 0 cleared), like every sepc
