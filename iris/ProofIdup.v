@@ -84,11 +84,7 @@ Section ProofIdup.
   Notation Ra0  := (mword_of_int 10 : mword 5).
   Notation Ra5  := (mword_of_int 15 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* [ProofFiledup.sie_b_agree], verbatim: [b] and [n]/[eb] are two
      presentations of the same SIE state, and the ghost eighth they share
@@ -410,9 +406,12 @@ Section ProofIdup.
              [ci] alone and so is literally the hypothesis. *)
         iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange & Hdev).
         split_and!; [| exact Hinj | exact Hrange | exact Hdev].
-        rewrite dom_insert_L Hdom.
-        assert (Hkin : k ∈ dom M) by (apply elem_of_dom; by eexists).
-        set_solver. }
+        (* NOT [set_solver]: from inside this whole-function proof it
+           rescans the entire Iris context -- 80 s for one domain identity
+           (optimization.md).  [k] is already in [dom M], so the re-insert
+           does not move the domain at all. *)
+        rewrite (dom_insert_lookup_L M k _ (mk_is_Some _ _ HMk)).
+        exact Hdom. }
       iPureIntro. destruct Hwf as [Hdom Hcnt'].  split.
       - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
         rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.

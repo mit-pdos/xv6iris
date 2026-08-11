@@ -94,11 +94,7 @@ Section ProofFilealloc.
      written register is [c]-excluded by an explicit hypothesis (congruence),
      or it is not callee-saved at all, and then [is_cs_idx c = true] separates
      them.  a0/a4/a5/ra are the latter kind. *)
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* [b] (from [sie_cap_gpr]'s arm) and [n],[eb] (from [cpu_own]'s count) are
      two independent presentations of the same SIE state; see

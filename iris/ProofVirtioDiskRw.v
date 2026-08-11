@@ -98,9 +98,12 @@ Section ProofVirtioDiskRw.
 
   (* the same, for a SYMBOLIC callee-saved register (an [is_cs_idx r = true]
      must be in context) *)
+  (* [congruence] LAST: ahead of the named lemma it builds a congruence
+     closure over the whole whole-function context on every peel layer
+     (optimization.md / CalleeSaved.reg_ne_side). *)
   Local Ltac regne :=
-    first [ congruence
-          | apply vdrw_cs_ne; [ assumption | vm_compute; reflexivity ] ].
+    first [ apply vdrw_cs_ne; [ assumption | vm_compute; reflexivity ]
+          | congruence ].
 
   (* =================================================================== *)
   (* P1: +0x000 .. +0x036                                                *)

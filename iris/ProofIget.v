@@ -339,11 +339,7 @@ Section ProofIget.
   Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
   Local Ltac nz  := vm_compute; discriminate.
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Local Lemma sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool) (p : mword 64) (C : iProp Σ) :
@@ -560,9 +556,9 @@ Section ProofIget.
               mA !!! Regidx c = m !!! Regidx c).
     { intros c Hcs N2 N8 N18 N20.
       rewrite /mA upd_ne; [| regne]. rewrite /R6 upd_ne; [| regne].
-      rewrite /R5 upd_ne; [| regne]. rewrite /R4 upd_ne; [| congruence].
-      rewrite /R3 upd_ne; [| congruence]. rewrite /R2 upd_ne; [| congruence].
-      rewrite /R1 upd_ne; [reflexivity | congruence]. }
+      rewrite /R5 upd_ne; [| regne]. rewrite /R4 upd_ne; [| regne].
+      rewrite /R3 upd_ne; [| regne]. rewrite /R2 upd_ne; [| regne].
+      rewrite /R1 upd_ne; [reflexivity | regne]. }
     iDestruct (cpu_own_transport CID CID13 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iApply (Acquire.wp_acquire_sconf γl "itable"%string
@@ -642,8 +638,16 @@ Section ProofIget.
                   (add_vec (D4 !!! Regidx Ra3) (sign_extend' 64 (mword_of_int 900 : mword 12)))]> D4).
     assert (HD5a3 : D5 !!! Regidx Ra3 = (mword_of_int KernelSyms.log : mword 64)).
     { rewrite /D5 upd_eq /D4 upd_eq. pcw. }
-    assert (HD5s1 : D5 !!! Regidx Rs1 = ientry 0)
-      by (rewrite /D5 upd_ne; [exact HD3s1 | nz]).
+    (* PEEL BOTH LAYERS.  [D5] and [D4] both write a3, so peeling only [D5]
+       and closing with [exact HD3s1] leaves the [D4] layer to CONVERSION --
+       [rf_upd D3 (Regidx Ra3) v (Regidx Rs1)] against [D3 (Regidx Rs1)],
+       decided in the kernel over the transparent update tower.  That single
+       missing [rewrite /D4 upd_ne] was 401 s in CI, the most expensive
+       statement in the build, while the peel below it (four explicit layers
+       to a syntactically matching [exact]) costs nothing.  Never let an
+       [exact] cross an update layer; see optimization.md. *)
+    assert (HD5s1 : D5 !!! Regidx Rs1 = ientry 0).
+    { rewrite /D5 upd_ne; [| nz]. rewrite /D4 upd_ne; [exact HD3s1 | nz]. }
     assert (HD5s3 : D5 !!! Regidx Rs3 = (zero_reg : mword 64)).
     { rewrite /D5 upd_ne; [| nz]. rewrite /D4 upd_ne; [| nz].
       rewrite /D3 upd_ne; [| nz]. rewrite /D2 upd_ne; [| nz]. exact HD1s3. }
@@ -651,8 +655,8 @@ Section ProofIget.
               c <> Rs1 -> c <> Rs3 -> D5 !!! Regidx c = macq !!! Regidx c).
     { intros c Hcs N9 N19.
       rewrite /D5 upd_ne; [| regne]. rewrite /D4 upd_ne; [| regne].
-      rewrite /D3 upd_ne; [| congruence]. rewrite /D2 upd_ne; [| congruence].
-      rewrite /D1 upd_ne; [reflexivity | congruence]. }
+      rewrite /D3 upd_ne; [| regne]. rewrite /D2 upd_ne; [| regne].
+      rewrite /D1 upd_ne; [reflexivity | regne]. }
     assert (Hpp32 : add_vec_int (mword_of_int (KernelSyms.iget + 0x2e) : mword 64) 4 = mword_of_int (KernelSyms.iget + 0x32)) by pcw.
     iEval (rewrite Hpp32) in "Hpc".
     (* +0x32 c.j : into the do-while at +0x44 *)
@@ -837,9 +841,9 @@ Section ProofIget.
                 c <> csp_rs1 -> c <> Rs0 -> c <> Rs1 -> c <> Rs2 -> c <> Rs3 -> c <> Rs4 ->
                 P8 !!! Regidx c = m !!! Regidx c).
       { intros c Hcs N2 N8 N9 N18 N19 N20.
-        rewrite /P8 upd_ne; [| congruence]. rewrite /P7 upd_ne; [| congruence].
-        rewrite /P6 upd_ne; [| congruence]. rewrite /P5 upd_ne; [| congruence].
-        rewrite /P4 upd_ne; [| congruence]. rewrite /P3 upd_ne; [| congruence].
+        rewrite /P8 upd_ne; [| regne]. rewrite /P7 upd_ne; [| regne].
+        rewrite /P6 upd_ne; [| regne]. rewrite /P5 upd_ne; [| regne].
+        rewrite /P4 upd_ne; [| regne]. rewrite /P3 upd_ne; [| regne].
         rewrite /P2 upd_ne; [| regne]. rewrite /P1 upd_ne; [| regne].
         by apply Hmtcs. }
       unfold callee_saved.
@@ -977,7 +981,7 @@ Section ProofIget.
           by (rewrite /N1 upd_ne; [reflexivity | nz]).
         assert (HN1cs : forall c : mword 5, is_cs_idx c = true -> c <> Rs1 -> c <> Rs3 ->
                   N1 !!! Regidx c = macq !!! Regidx c).
-        { intros c Hcs N9 N19. rewrite /N1 upd_ne; [| congruence]. by apply HScs. }
+        { intros c Hcs N9 N19. rewrite /N1 upd_ne; [| regne]. by apply HScs. }
         assert (Hpp40 : add_vec_int (mword_of_int (KernelSyms.iget + 0x3c) : mword 64) 4
                         = mword_of_int (KernelSyms.iget + 0x40)) by pcw.
         iEval (rewrite Hpp40) in "Hpc".
@@ -1162,9 +1166,10 @@ Section ProofIget.
               iDestruct (word4_pointsto_half_split with "Hdcell") as "[Hd1 Hd2]".
               iDestruct "Hvld" as (wv) "Hvld".
               iMod ("Hclose2" with "[Hd1 Hincell Hvld Hraw Hbundle Hgid1]") as "_".
-              { iNext. iApply ic_close_mid. rewrite /ic_mid_arm.
-                iExists dev, inum, wv. iFrame "Hd1 Hincell Hvld Hgid1".
-                rewrite /ic_unloaded. iFrame "Hraw Hbundle". }
+              { iNext. iApply ic_close_mid.
+                iApply (ic_mk_mid_arm cn γfs γi cov logstart e dev inum wv
+                          with "Hd1 Hincell Hvld [Hraw Hbundle] Hgid1").
+                iApply (ic_mk_unloaded with "Hraw Hbundle"). }
               iModIntro. iFrame "Hd2 Hgid2 Hmt". }
             iApply wp_next_off_intro. iIntros "Hcg Hpc (Hd2 & Hgid2 & Hmt)".
             assert (Hpp76 : add_vec_int (mword_of_int (KernelSyms.iget + 0x72) : mword 64) 4
@@ -1720,9 +1725,12 @@ Section ProofIget.
           iSplitR; [| iSplitR; [| iExact "Hslots"]].
           2:{ iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange & Hdv).
               split_and!; [| exact Hinj | exact Hrange | exact Hdv].
-              rewrite dom_insert_L Hdom.
-              assert (Hjin : j ∈ dom M) by (apply elem_of_dom; by eexists).
-              set_solver. }
+              (* NOT [set_solver]: from inside a whole-function proof it
+                 rescans the entire Iris context -- 145 s for this one domain
+                 identity (optimization.md).  [j] is already in [dom M], so
+                 the re-insert does not move the domain at all. *)
+              rewrite (dom_insert_lookup_L M j _ (mk_is_Some _ _ HMj)).
+              exact Hdom. }
           iPureIntro. destruct Hwf as [Hdom Hcnt']. split.
           - intros i Hi. destruct (decide (i = j)) as [->|Hne]; [exact Hk|].
             rewrite lookup_insert_ne in Hi; [|by apply not_eq_sym]. by apply Hdom.
@@ -1825,7 +1833,7 @@ Section ProofIget.
                   c <> Rs2 -> c <> Rs3 -> c <> Rs4 ->
                   Z1 !!! Regidx c = m !!! Regidx c).
         { intros c Hcs N2 N8 N9 N18 N19 N20.
-          rewrite /Z1 upd_ne; [| congruence].
+          rewrite /Z1 upd_ne; [| regne].
           rewrite (Hmrcs c Hcs N9 N19). by apply Hmcs. }
         assert (Hpp68 : add_vec_int (mword_of_int (KernelSyms.iget + 0x66) : mword 64) 2
                         = mword_of_int (KernelSyms.iget + 0x68)) by pcw.
@@ -1928,7 +1936,7 @@ Section ProofIget.
             by (rewrite /L2 upd_ne; [exact HL1ra | nz]).
           assert (HL2cs : forall c : mword 5, is_cs_idx c = true -> c <> Rs1 -> c <> Rs3 ->
                     L2 !!! Regidx c = macq !!! Regidx c).
-          { intros c Hcs N9 N19. rewrite /L2 upd_ne; [| congruence]. by apply HL1cs. }
+          { intros c Hcs N9 N19. rewrite /L2 upd_ne; [| regne]. by apply HL1cs. }
           assert (Hpp3c2 : add_vec_int (mword_of_int (KernelSyms.iget + 0x3a) : mword 64) 2
                            = mword_of_int (KernelSyms.iget + 0x3c)) by pcw.
           iEval (rewrite Hpp3c2) in "Hpc".

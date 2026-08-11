@@ -125,11 +125,7 @@ Section ProofBrelse.
   Notation Rs2  := (mword_of_int 18 : mword 5).
   Notation Rtp  := (mword_of_int 4 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* Peel every [rget m k] in sight down to a raw [m !!! Regidx k].  Every
      register index brelse names is a concrete non-tp literal, so [rgne]'s
@@ -624,15 +620,12 @@ Section ProofBrelse.
        which is a reference fragment, two word cells and a lock token, all
        timeless -- with one [iMod] inside the accessor's own fupd. *)
     { iInv "Hesc" as "Hbody" "Hclose".
-      iAssert (▷ (buf_escrow_body bn V k ∗
-                  (∃ q : Qp, bref_tok bn k q ∗
-                     b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
-                     b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗ bown bn k)))%I
-        with "[Hbody Hvalid Hbdev Hbuf Hbpayload]" as "Hsw".
-      { iNext. iApply (escrow_swap_park bn V k true dev bno bs
-                         with "Hbody Hvalid Hbdev Hbuf Hbpayload"). }
-      iDestruct "Hsw" as "[Hbody Hpark]".
-      iMod "Hpark".
+      (* [escrow_swap_park_now] does the [iNext] AND the withdrawn bundle's
+         later-strip inside BioInv, where the context is five hypotheses
+         wide.  Done here it was 34 s in one [iMod] -- the cost is the
+         CONTEXT, not the bundle (optimization.md). *)
+      iMod (escrow_swap_park_now _ bn V k true dev bno bs
+              with "Hbody Hvalid Hbdev Hbuf Hbpayload") as "[Hbody Hpark]".
       iModIntro. iExists vr24. iFrame "Hr24".
       iIntros "Hcell". iEval (rgpeel) in "Hcell".
       iMod ("Hclose" with "[Hbody]") as "_". { iNext. iExact "Hbody". }

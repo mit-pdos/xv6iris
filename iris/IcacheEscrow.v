@@ -660,26 +660,101 @@ Section IcacheEscrow.
     Persistent (ic_escrows cn γfs γi cov logstart).
   Proof. apply _. Qed.
 
+  (* The arms' [Timeless]es are proven STRUCTURALLY -- one connective per
+     step, [apply _] only at the leaves.  One monolithic [apply _] over an
+     arm backtracks across the whole ∃/∗ tower: 2-3 s each, ~11 s of this
+     file, for facts whose every leaf instance already exists.  Same rule as
+     [FileOff.off_body_timeless]; see optimization.md.
+
+     THE DISPATCH MUST BE SYNTACTIC, i.e. a [lazymatch] on the goal and NOT
+     a [first [apply bi.sep_timeless | …]].  [apply] unifies up to delta, so
+     the [first] form peels straight THROUGH a named abstraction that
+     already has its own instance -- through [ic_unloaded] into
+     [ipool_shape]'s disjunction and [inode_blocks]' 268-element big-op --
+     and then backtracks over all of it: measured 33 s and 42 s on
+     [ic_mid_arm] and [ic_escrow_body], i.e. an order of magnitude WORSE
+     than the monolithic [apply _] it replaced.  Matching [bi_sep]/[bi_or]/
+     [bi_exist] as syntax stops at [ic_unloaded] and lets [apply _] use
+     [ic_unloaded_timeless], which is the whole point. *)
+  Local Ltac tl_struct :=
+    lazymatch goal with
+    | |- Timeless (bi_exist _) => apply bi.exist_timeless; intro; tl_struct
+    | |- Timeless (bi_sep _ _) => apply bi.sep_timeless; [tl_struct | tl_struct]
+    | |- Timeless (bi_or _ _) => apply bi.or_timeless; [tl_struct | tl_struct]
+    | |- _ => apply _
+    end.
+
   Global Instance ic_parked_timeless cn γfs γi cov logstart k :
     Timeless (ic_parked cn γfs γi cov logstart k).
-  Proof. rewrite /ic_parked. apply _. Qed.
+  Proof. rewrite /ic_parked. tl_struct. Qed.
 
   Global Instance ic_out_timeless cn k : Timeless (ic_out cn k).
-  Proof. rewrite /ic_out. apply _. Qed.
+  Proof. rewrite /ic_out. tl_struct. Qed.
 
   Global Instance ic_mid_arm_timeless cn γfs γi cov logstart k :
     Timeless (ic_mid_arm cn γfs γi cov logstart k).
-  Proof. rewrite /ic_mid_arm. apply _. Qed.
+  Proof. rewrite /ic_mid_arm. tl_struct. Qed.
 
   Global Instance ic_empty_arm_timeless cn k : Timeless (ic_empty_arm cn k).
-  Proof. rewrite /ic_empty_arm /inode_raw. apply _. Qed.
+  Proof. rewrite /ic_empty_arm /inode_raw. tl_struct. Qed.
 
   Global Instance ic_held_timeless cn k : Timeless (ic_held cn k).
-  Proof. rewrite /ic_held. apply _. Qed.
+  Proof. rewrite /ic_held. tl_struct. Qed.
 
   Global Instance ic_escrow_body_timeless cn γfs γi cov logstart k :
     Timeless (ic_escrow_body cn γfs γi cov logstart k).
-  Proof. rewrite /ic_escrow_body. apply _. Qed.
+  Proof. rewrite /ic_escrow_body. tl_struct. Qed.
+
+  (* ------------------------------------------------------------------ *)
+  (*  THE ARMS' CONSTRUCTORS                                             *)
+  (*                                                                     *)
+  (*  A caller that has the pieces of an arm in hand must NOT assemble it *)
+  (*  with [iExists …; iFrame]: framing searches the goal, and an arm's    *)
+  (*  payload conjunct ([ic_payload] / [ic_unloaded]) is a disjunction of  *)
+  (*  existentials over [inode_blocks]' 268-element big-op, re-searched    *)
+  (*  once per hypothesis.  Measured at ProofIput's two close sites and    *)
+  (*  ProofIget's re-tag: 172 s, 101 s and 48 s in three sentences.        *)
+  (*  Assembled HERE instead, structurally and where the context is six    *)
+  (*  hypotheses wide, it is free -- and a caller writes one [iApply].     *)
+  (*  (optimization.md, BioInv's "split structurally and [iExact]".)       *)
+  (* ------------------------------------------------------------------ *)
+  Lemma ic_mk_parked cn γfs γi cov logstart k (dev inum : mword 32) (v : bool) :
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄{DfracOwn (1/2)} inum -∗
+    i_valid (ientry k) ↦₄ valid_word v -∗
+    ic_payload γfs γi cov logstart k inum v -∗
+    ic_mid cn k -∗
+    ic_id cn k (1/2) true dev inum -∗
+    ic_parked cn γfs γi cov logstart k.
+  Proof.
+    iIntros "Hd Hn Hv Hp Hm Hg". rewrite /ic_parked. iExists dev, inum, v.
+    iSplitL "Hd"; [iExact "Hd" |]. iSplitL "Hn"; [iExact "Hn" |].
+    iSplitL "Hv"; [iExact "Hv" |]. iSplitL "Hp"; [iExact "Hp" |].
+    iSplitL "Hm"; [iExact "Hm" | iExact "Hg"].
+  Qed.
+
+  Lemma ic_mk_mid_arm cn γfs γi cov logstart k (dev inum w : mword 32) :
+    i_dev (ientry k) ↦₄{DfracOwn (1/2)} dev -∗
+    i_inum (ientry k) ↦₄ inum -∗
+    i_valid (ientry k) ↦₄ w -∗
+    ic_unloaded γfs γi cov logstart k inum -∗
+    ic_id cn k (1/2) true dev inum -∗
+    ic_mid_arm cn γfs γi cov logstart k.
+  Proof.
+    iIntros "Hd Hn Hv Hu Hg". rewrite /ic_mid_arm. iExists dev, inum, w.
+    iSplitL "Hd"; [iExact "Hd" |]. iSplitL "Hn"; [iExact "Hn" |].
+    iSplitL "Hv"; [iExact "Hv" |].
+    iSplitL "Hu"; [iExact "Hu" | iExact "Hg"].
+  Qed.
+
+  Lemma ic_mk_unloaded γfs γi cov logstart k (inum : mword 32) :
+    inode_raw (ientry k) -∗
+    ipool_shape γfs γi cov logstart inum -∗
+    ic_unloaded γfs γi cov logstart k inum.
+  Proof.
+    iIntros "Hr Hp". rewrite /ic_unloaded.
+    iSplitL "Hr"; [iExact "Hr" | iExact "Hp"].
+  Qed.
 
   (* ------------------------------------------------------------------ *)
   (*  4.  THE SWAPS AND THE OPENINGS                                     *)
@@ -722,8 +797,15 @@ Section IcacheEscrow.
       iDestruct (word4_pointsto_agree with "Hrn Hin") as %<-.
       iDestruct ("Hresb" with "[$Hrd $Hrn]") as "Hres".
       iMod (ic_dep_checkout cn k d with "Htok") as "[Hdep1 Hdep2]".
-      iModIntro. iFrame "Hdep2". iSplitR "Hid Hin Hvld Hpay".
+      (* structurally: the goal's FIRST conjunct is [ic_escrow_body], five
+         arms each existentially quantifying [ic_payload] over
+         [inode_blocks]' 268-element big-op, and any framing search walks it
+         before it reaches the deposit -- 100 s for this one [iFrame]
+         (optimization.md's 2026-08-11 section). *)
+      iModIntro.
+      iSplitR "Hdep2 Hid Hin Hvld Hpay".
       { iRight; iLeft. rewrite /ic_out. iExists d, dev, inum. iFrame. }
+      iSplitL "Hdep2"; [iExact "Hdep2" |].
       iExists v. iFrame.
     - iDestruct "Hout" as (d' dev' inum') "(Hdep' & _ & _ & _)".
       iExFalso. iApply (ic_tok_deposit_excl with "Htok Hdep'").
@@ -778,7 +860,11 @@ Section IcacheEscrow.
       iDestruct (word4_pointsto_agree with "Hrd Hid") as %->.
       iDestruct (word4_pointsto_agree with "Hrn Hin") as %->.
       iDestruct ("Hresb" with "[$Hrd $Hrn]") as "Hres".
-      iModIntro. iFrame "Htok Hres".
+      (* structurally, for the reason at [ic_swap_checkout] above: 102 s
+         when the two names were framed against a goal whose first conjunct
+         is the whole five-armed body. *)
+      iModIntro.
+      iSplitR "Htok Hres"; [| iSplitL "Htok"; [iExact "Htok" | iExact "Hres"]].
       iLeft. rewrite /ic_parked. iExists dev, inum, v. iFrame.
     - iDestruct "Hmid" as (dev' inum' w) "(_ & _ & Hvld' & _ & _)".
       iExFalso. iApply (ic_word4_excl with "Hvld Hvld'").
@@ -1045,7 +1131,12 @@ Section IcacheEscrow.
         iExact "Haddrs". }
       rewrite /ipool_shape. iLeft. iExists dn, bm, data. iFrame.
       iPureIntro; exact Hok. }
-    iModIntro. iFrame "Hgf2 Hpool".
+    (* the two right-hand conjuncts go out structurally: [iFrame "Hgf2
+       Hpool"] would search the [ic_escrow_body] conjunct -- five arms, each
+       an existential over [ic_payload]/[inode_raw] -- for each of the two
+       names (88 s measured; see [ipool_insert] below and optimization.md). *)
+    iModIntro.
+    iSplitR "Hgf2 Hpool"; [| iSplitL "Hgf2"; [iExact "Hgf2" | iExact "Hpool"]].
     iApply ic_close_empty. rewrite /ic_empty_arm.
     iExists dev, inum, (valid_word v). iFrame.
   Qed.
@@ -1405,7 +1496,13 @@ Section IcacheEscrow.
     ipool γfs γi cov logstart ({[z]} ∪ P).
   Proof.
     intros Hz. rewrite /ipool (big_sepS_insert _ P z Hz).
-    iIntros "H1 H2". iFrame.
+    (* structurally, NOT [iFrame]: the goal's left conjunct is an
+       [ipool_shape], whose body is a disjunction of existentials over
+       [inode_blocks]' 268-element big-op, and a bare [iFrame] searches all
+       of it per hypothesis (106 s measured -- optimization.md's BioInv
+       rule: naming fixes the CONTEXT-side scan, a big GOAL still costs a
+       goal-side one, so split and [iExact]). *)
+    iIntros "H1 H2". iSplitL "H1"; [iExact "H1" | iExact "H2"].
   Qed.
 
   (* the round trip, so a read-only user needs no set algebra of its own *)

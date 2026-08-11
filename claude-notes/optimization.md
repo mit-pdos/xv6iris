@@ -48,6 +48,203 @@ Corollary for the sweep: any `ltac:(set_solver)` / `ltac:(lia)` appearing as a
 positional argument in a `Proof<F>.v` capstone is a suspect, because that is
 exactly where the context is widest.
 
+## THE FIVE SHAPES THAT MADE THE ICACHE FILES THE WHOLE BUILD (2026-08-11)
+
+CI's build-profile step summary listed thirteen non-`Qed` statements above 30 s,
+totalling **~1860 s of CI CPU** (locally ~1050 s), and **every one of them was
+one of five shapes**.  None was in the proof's argument — each was a general
+purpose tactic left to search a context or a goal that had grown large.  Read
+this list before writing a new whole-function proof or a new resource
+abstraction; all five are cheap to avoid up front and expensive to find later.
+
+**Result, per-file tactic seconds (in-build, `-j24`):** `ProofIget` 772 -> 110,
+`ProofIput` 401 -> 89, `IcacheEscrow` 225 -> 15, `ProofIdup` 85 -> 18,
+`ProofBrelse` 80 -> 58, `IcacheBoot` 52 -> 8, `SpecFileclose` 33 -> 6, `FileOff`
+17 -> 7 — **1665 s -> 311 s over the eight files**, and after it the tree has no
+non-`Qed` sentence above 8 s.  (The two icache proofs' remaining time is almost
+all their `Qed`.)
+
+| CI s | site | shape |
+|---|---|---|
+| 401 | `ProofIget.v:631` | an `exact` that crosses an update layer |
+| 211 | `IcacheEscrow.v:875` | `iFrame` into a big GOAL |
+| 197 | `IcacheEscrow.v:1214` | `iFrame` into a big GOAL |
+| 172 | `ProofIput.v:1390` | `iFrame` into a big GOAL |
+| 145 | `ProofIget.v:1702` | `set_solver` in a capstone |
+| 101 | `ProofIput.v:1512` | `iFrame` into a big GOAL |
+| 98 | `IcacheBoot.v:667` | `iFrame` into a big GOAL |
+| 80 | `ProofIdup.v:415` | `set_solver` in a capstone |
+| 69 | `SpecFileclose.v:590` | `$` framing past an `∃` over a 15-conjunct env |
+| 49 | `FileOff.v:167` | one `apply _` for a whole `Timeless` |
+| 48 | `ProofIget.v:1152` | `iFrame` into a big GOAL |
+| 38 | `ProofIput.v:989` | `set_solver` in a capstone |
+| 34 | `ProofBrelse.v:635` | `iMod` at a `▷` inside a whole-function proof |
+
+The shape recurs the moment anyone touches this layer: the B2 share-layer commit
+(`33de6e4f`) landed two more of exactly #3 in `IcacheEscrow` alone —
+`ic_swap_checkout`'s `iFrame "Hdep2"` and `ic_swap_park`'s `iFrame "Htok Hres"`,
+**100 s and 102 s**, both framing across a goal whose FIRST conjunct is the
+five-armed `ic_escrow_body`.  If a swap lemma's conclusion is
+`ic_escrow_body ∗ <what comes out>`, hand the pieces over with `iSplitR`/`iExact`
+and never with `iFrame`, named or not.
+
+### 1. `congruence` as a peel's side-goal closer — now ONE canonical tactic
+
+`ProofIget`'s `Local Ltac regne` read `first [ congruence | apply
+not_eq_sym; apply is_cs_idx_true_neq; … ]`, i.e. the whole-context closer
+FIRST, and eighteen more `congruence`s sat inline in its `_thr`/`_cs`
+transports.  This is the trap already recorded below ("`congruence` as the
+fallback branch of a per-layer peel"), except worse: as the first alternative
+it ran on every layer of every peel.
+
+The fix is not a per-file reordering.  **`CalleeSaved.reg_ne_side` is now THE
+discharge for `upd_ne`'s side goal**, and the 38 files that had a hand-rolled
+copy say `Local Ltac regne := reg_ne_side.`  Its branch order is the point:
+
+1. the disequality already in context, via `regidx_inj` and a name-free inner
+   `match goal` — this is the branch a save/restore frame's transport wants,
+   and it is the only branch that COMPUTES NOTHING;
+2. `is_cs_idx_true_neq`, either orientation;
+3. both keys concrete (`vm_compute; discriminate`);
+4. `congruence`, last, purely so no existing call site can lose completeness.
+
+Order 1-before-2 is worth measuring for: each `is_cs_idx` branch runs a
+`vm_compute` that FAILS on a symbolic key, ~0.2 s a time, so putting them
+first costs ~0.4 s per call for nothing.  On the six shapes this tree's peels
+produce, `reg_ne_side` is ≤1 ms each.
+
+### 2. An `exact` that crosses an update layer is a kernel conversion
+
+`ProofIget`'s single most expensive statement — **401 s in CI, 225 s locally,
+the most expensive statement in the whole build** — was
+
+```coq
+assert (HD5s1 : D5 !!! Regidx Rs1 = ientry 0)
+  by (rewrite /D5 upd_ne; [exact HD3s1 | nz]).
+```
+
+`D5` and `D4` both write a3.  Peeling only `D5` leaves the goal at `D4 !!!
+Regidx Rs1`, and `exact HD3s1` then asks the KERNEL to convert `rf_upd D3
+(Regidx Ra3) v (Regidx Rs1)` down to `D3 (Regidx Rs1)` over the transparent
+`rf_upd`/`bool_decide`/`mword_of_int` tower.  Adding the one missing
+`rewrite /D4 upd_ne` makes the `exact` syntactic and the statement free.
+
+**The tell is that the sentence right below it is cheap**: `HD5s3`, four
+explicit layers down to a syntactically matching `exact HD1s3`, costs nothing.
+So the rule is not "peels are expensive" — it is **never let an `exact`/
+`reflexivity` cross an update layer; peel every layer down to the map the
+named fact is actually about.**  Audit for it mechanically: for each `rewrite
+/A upd_ne; [exact H…]`, check that `A`'s `set` body's base map is the one `H`
+is stated over.  (A regex audit over the tree finds ~80 candidates, almost all
+false positives from hypothesis-naming conventions; the `.v.timing` files are
+the reliable filter — only the real one is expensive.)
+
+### 3. A named `iFrame` still pays a GOAL-side search — give the resource a constructor
+
+BioInv's entry below already says naming the hypotheses fixes only the
+context-side scan.  The icache files are what that costs when the GOAL is an
+arm of an escrow: `ic_parked`'s fourth conjunct is `ic_payload`, whose loaded
+shape is an existential over `inode_meta` (5 cells), `inode_addrs` (13-element
+big-op), `ind_res` and `inode_blocks` (**a 268-element big-op**).  A bare or
+named `iFrame` re-searches all of it once per hypothesis — 172 s, 101 s, 98 s,
+92 s, 88 s and 107 s across six sentences.
+
+The fix that scales is **not** an `iSplitL`/`iExact` chain at each call site
+but a **constructor lemma next to the definition**: `IcacheEscrow.ic_mk_parked`
+/ `ic_mk_mid_arm` / `ic_mk_unloaded` take the arm's pieces as wands and
+assemble it structurally, where the context is six hypotheses wide and the
+goal-side search is a no-op.  A caller then writes one `iApply (ic_mk_parked …
+with "Hd Hn Hv Hp Hm Hg")`.  **Give every multi-conjunct resource abstraction a
+constructor lemma when you define it**, for the same reason it already gets an
+accessor: otherwise every user pays a search.
+
+(`Typeclasses Opaque` on the payload definitions would also stop the descent,
+and is the right tool for a resource nobody destructs — but this layer's
+proofs `iDestruct` straight into `ic_payload`/`ipool_shape`, so the seal would
+break them.  The constructor costs nothing and needs no seal.)
+
+### 4. Never leave a big `Timeless`/`Persistent` goal to one `apply _`
+
+`FileOff.off_body_timeless` was `rewrite /off_body /off_resident /off_mark.
+apply _.` — **49 s in CI (12.7 s locally, three quarters of the file)** for a
+fact whose every leaf instance already exists.  The cost is BACKTRACKING: one
+`apply _` over an `∃/∗/∨` tower explores the whole space, and the points-to
+abstractions underneath it are transparent to instance search.  Spelling the
+connectives out —
+
+```coq
+apply bi.exist_timeless; intro ip.
+apply bi.sep_timeless; [apply _ |].
+apply bi.or_timeless.
+- apply bi.exist_timeless; intro v. apply bi.sep_timeless; [apply _ | apply _].
+- apply bi.sep_timeless; [apply _ | apply _].
+```
+
+— is **~0 s**, and it is the same proof.  Where a file has several such
+instances, a recursive helper does it uniformly (`IcacheEscrow`'s `tl_struct`).
+
+**Its dispatch must be SYNTACTIC.**  The obvious spelling — `first [ apply
+bi.exist_timeless; intro; tl_struct | apply bi.sep_timeless; [tl_struct |
+tl_struct] | … | apply _ ]` — was measured and is a REGRESSION: `apply` unifies
+up to delta, so it peels straight *through* a named abstraction that already has
+its own instance (through `ic_unloaded` into `ipool_shape`'s disjunction and
+`inode_blocks`' 268-element big-op) and then backtracks over all of it — **33 s
+and 42 s** on `ic_mid_arm` and `ic_escrow_body`, an order of magnitude worse than
+the monolithic `apply _` it replaced.  Match the connectives as SYNTAX instead:
+
+```coq
+Local Ltac tl_struct :=
+  lazymatch goal with
+  | |- Timeless (bi_exist _) => apply bi.exist_timeless; intro; tl_struct
+  | |- Timeless (bi_sep _ _) => apply bi.sep_timeless; [tl_struct | tl_struct]
+  | |- Timeless (bi_or _ _)  => apply bi.or_timeless;  [tl_struct | tl_struct]
+  | |- _ => apply _
+  end.
+```
+
+That stops at `ic_unloaded` and lets `apply _` use `ic_unloaded_timeless`, which
+is the whole point: **descend through the connectives, never through a name.**
+All six instances then cost ≤0.6 s.  Keep the
+`destruct`/`case_decide` that an `if`-shaped payload needs and run the helper
+after it.
+
+### 5. A modality step at a `▷` costs the CONTEXT, so pay it in a lemma
+
+`ProofBrelse`'s park did `iAssert (▷ (body ∗ bundle))`, split it, and then
+`iMod "Hpark"` to get the reference out from under the later — **34 s in CI**.
+The `Timeless` search on that exact bundle, measured standalone, is **0.4 s**:
+the other 33 s is the whole-function context the `iMod` had to re-normalise.
+So the later comes off in `BioInv.escrow_swap_park_now`, a lemma over the same
+five hypotheses, and brelse writes one `iMod (escrow_swap_park_now …)`.
+
+Gotcha when writing such a lemma: **its conclusion must be a FANCY update, not
+`|==>`.**  `IsExcept0 (|={E1,E2}=> P)` holds unconditionally, but
+`is_except_0_bupd` needs `IsExcept0 P`, so `iMod` at a `▷` under a `|==>` goal
+fails with *"iMod: cannot eliminate modality"* — which reads like a missing
+`Timeless` instance and is not.  Take the mask as a parameter and let the call
+site unify it.
+
+Same family as the `iNext` rule below: never pay a context-proportional
+modality step inside a whole-function proof when a lemma can pay it once.
+
+### 6. `set_solver` again — and the `dom` lemma that removes the goal
+
+Three copies of the same domain identity (`ProofIget`, `ProofIput`,
+`ProofIdup`, 145/38/80 s) came from `rewrite dom_insert_L Hdom` followed by
+`set_solver` on `dom Mt = {[k]} ∪ dom Mt`.  The `set_solver` rule below is
+already unambiguous, but the better fix is not to create the goal:
+`k` is already in `dom Mt`, so
+
+```coq
+assert (Hkin : is_Some (Mt !! k)) by (by eexists).
+rewrite (dom_insert_lookup_L Mt k _ Hkin). exact Hdom.
+```
+
+`dom_insert_lookup_L : is_Some (m !! i) → dom (<[i:=x]> m) = dom m` closes it
+with no set reasoning at all.  **Reach for `dom_insert_lookup_L` rather than
+`dom_insert_L` whenever the key is already in the domain** — which, in a
+reference-count table's "the slot was already live" arm, it always is.
+
 ## WHY `Qed` IS EXPENSIVE, MEASURED END TO END (2026-08-10)
 
 Re-measured on the 921-file tree (clean `-j32` build: **wall 623 s, ΣCPU
@@ -736,6 +933,7 @@ In descending value, the remaining levers are:
   - **Peel ONE layer at a time; never unfold the whole `set`-chain first.** A threading proof builds the loop-head register file as a 20–30-layer `set`-chain (`M9 := <[…]> M8`, …). Unfolding the whole chain (`rewrite /M9 /M8 … /W1`) makes one giant nested term and then peels it, so every peel re-traverses it — O(depth²), and worse if it re-elaborates inline in an `iApply`. Unfold one layer and peel it immediately, keeping the goal one update deep (O(depth)). Gotcha: this MUST be `first [peel | unfold-var]`, NOT a `lazymatch` with the var-branch first — the pattern `?M !!! _` also matches an exposed update, so `lazymatch` commits to `is_var` (which fails) and never reaches the peel branch, silently stalling after one unfold.
   - **Try the HIT lemma (`upd_eq`) BEFORE the miss lemma at every layer, and guard the disequality with `reg_neq`.** When the lookup key IS in the chain (sp/s1/s3 and every register the code reads back), the peel terminates at `<[k:=v]> m !!! k`. Miss-first order attempts `rewrite upd_ne` there, whose side goal `k <> k` is FALSE, and **`vm_compute; discriminate` fails CATASTROPHICALLY slowly (~4–8 s per call) trying to refute a true `mword`/`bv`-record equality** (`discriminate` exhaustively hunts a discriminating position in two equal records and finds none). Hit-first makes the terminating layer resolve instantly and never attempts a false disequality; miss layers pay only one cheap failed *unification* of `upd_eq` before falling through. The same pathology bites EVERY hand-written inline `repeat (rewrite upd_ne; [| vm_compute; discriminate])` (the `repeat`'s last, failing, iteration at the hit layer where it stops) — do NOT reorder each by hand, guard the disequality discharge ONCE and swap it in everywhere. `reg_neq` (ProofWalk.v / ProofMappages.v): `lazymatch goal with |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate) end`. `unify a b` settles convertible-or-not cheaply — a MISS fails on the syntactically-distinct index arg (`mword_of_int 15` vs `…18`) WITHOUT reducing the `mword`, so `discriminate` only ever runs on a genuine miss; a HIT makes `unify` succeed so `reg_neq` `fail`s FAST (no doomed `discriminate`), which is exactly what the enclosing `repeat`/`first` wants at a terminating hit. Sound: `reg_neq` can only *succeed* via the else-branch on a true miss.
   - **Auditing an existing file for the unfold-all-first anti-pattern: watch for a DELIBERATE partial peel that stops early to reuse an already-proven intermediate fact — blindly swapping in the interleaved `peel_reg`-style step breaks those.** ProofProcMapstacks.v had ~40 manual `rewrite /V_n /V_(n-1) … /V_1. repeat (rewrite upd_ne; …)` call sites; mechanically replacing ALL of them with one `peel_reg_step := repeat first [upd_eq | upd_ne;[|reg_neq] | is_var+unfold]` (no final `reflexivity`, so the caller's own closing tactic — `exact H`/`reflexivity`/`vm_compute`/`apply lemma` — still runs after) cut the file's isolated `coqc` wall time from **8m37s to ~35s (≈14.6×)**, `Qed`-clean, verified by a full incremental rebuild. But a handful of sites intentionally unfold only a PREFIX of the chain and then hand off to a named fact proven earlier for that exact intermediate layer (e.g. `rewrite /W10 /W9. repeat (…). exact HW8a1.`, where `HW8a1` is a fact about `W8` — an interior link, not the chain's true base). `peel_reg_step` doesn't know to stop at the prefix's end; it keeps peeling past it, so a trailing manual `rewrite /Wxx upd_eq` or `exact H<interior-var>` no longer matches (`Error: The LHS of upd_eq … does not match any subterm of the goal`, or a failed `exact`). **Detect these before substituting:** a site is SAFE to collapse to `peel_reg_step` when its explicit unfold list is EXHAUSTIVE all the way down to the chain's genuine non-`set` base (a lemma-bound parameter like `mm`/`Mf`/`mr0` that `unfold` cannot open further) — then `peel_reg_step`'s maximal peel lands on the exact same residual regardless of interleaving order, so vm_compute/reflexivity/`exact <fact-about-the-true-base>` closers all still apply. A site is UNSAFE (leave it as-is, or fix it by hand) when the unfold list stops short of that base AND the trailing tactic keys off that specific stopping point (another explicit `rewrite /Vk …`, or `exact` of a fact about an interior chain variable). Grep for the shape first (`rewrite(?: /\w+)+\.\s*repeat \(…\)`), then check each match's tail before swapping.
+- **THE `upd_ne` SIDE GOAL HAS ONE ANSWER: `CalleeSaved.reg_ne_side`** (section below).  Write `Local Ltac regne := reg_ne_side.` and never hand-roll the alternation; a `congruence` anywhere but LAST in it is measured at 4-80 s per call.  The history that established this:
 - **`congruence` as the fallback branch of a per-layer peel tactic is a 4 s-per-call trap — and it hides in the CALLEE-SAVED-AGREEMENT peel, which every whole-function proof has.** A "the registers this function never touches still agree" transport (`uu_thr` / `ua_thr` style: `∀ c, is_cs_idx c = true -> c ∉ {written} -> mj !!! c = mm !!! c`) peels the register-map `set`-chain with `rewrite upd_ne`, whose side goal is `Regidx c <> Regidx k` — **lookup key ≠ update key, in that order**, so a proof via `is_cs_idx_true_neq` needs `not_eq_sym`. When `k` is itself callee-saved that route does not apply and the natural fallback is `congruence`; in `ProofUvmalloc.v` that single fallback branch was **~120 s of a 168 s file**. Replace it with, in order,
   `refine (not_eq_sym (is_cs_idx_true_neq _ _ _ Hcs)); vm_compute; reflexivity`
   and then, after `subst`, an explicit
@@ -772,8 +970,10 @@ In descending value, the remaining levers are:
 - **Strip only the GOAL's later with `iApply bi.later_intro`; reach for `iNext` only when a HYPOTHESIS's `▷` has to come off too.** `iNext` is `iModIntro` at `▷`, so it runs `MaybeIntoLaterN` over every hypothesis in both environments: its cost tracks the proof's CONTEXT, not the goal, and in a whole-function WP proof that is ~1.1 s per call — once per instruction whose leaf leaves a `▷` on the goal. `bi.later_intro : P ⊢ ▷ P` turns the goal `▷ Q` into `Q` and touches nothing else: ~0.06 s, a ~20× difference for the same effect. In practice the only steps that need the real `iNext` are the **Löb back edges**, where `IH` (and any `▷`-guarded exits bundle like `HEX`) must be stripped before it can be applied.
   - **The tell that a file has this backwards** is an `iNext` followed, a few lines later, by `iAssert (▷ X)%I with "[H]" as "H". { iNext. iExact "H". }` — that block is *repairing* a `▷` the `iNext` stripped and the proof still wanted, so BOTH tactics are the expensive one and the pair does no net work. `▷ sched_vc` (the scheduler valid-context every S-mode whole-function proof carries) is the usual victim; grep `{ iNext. iExact` to find them. Replacing the pair with a single `iApply bi.later_intro` — keeping a real `iNext` at the 1–3 back-edge sites per file — measured **ProofPiperead 144 s → 96 s (−33 %)**, **ProofPipewrite 97 s → 74 s (−24 %)**, and the same edit applies to `ProofSysPause`. The inner `{ iNext. iExact "H". }` alone is ALWAYS safe to swap (goal `▷ X`, hypothesis `X`); the outer one is not, so convert it and let the build tell you which sites are the back edges.
   - **A/B this one with `-async-proofs off`.** With the async `Qed` worker on, the two variants hide different amounts of kernel work where `-time-file` cannot see it, and the per-sentence sums ranked them BACKWARDS here (they made the slower variant look 3 % faster). With async off the same comparison, interleaved over three reps, was unambiguous in both files.
+- **Prove a big `Timeless`/`Persistent` instance STRUCTURALLY, never with one `apply _`.** One `apply _` over an `∃/∗/∨` tower backtracks across the whole space: 49 s for `FileOff.off_body_timeless`, 2-3 s each for `IcacheEscrow`'s five arms. Peel one connective per step (`bi.exist_timeless` / `bi.sep_timeless` / `bi.or_timeless`) with `apply _` only at the leaves — same proof, ~0 s. A recursive helper (`IcacheEscrow`'s `tl_struct`) does it uniformly across a file — but its dispatch MUST be a syntactic `lazymatch goal with |- Timeless (bi_sep _ _) => …`, never `first [apply bi.sep_timeless | …]`: `apply` unifies up to delta, so the `first` form peels straight *through* a named abstraction that already has an instance and then backtracks over everything underneath it (measured 33 s and 42 s on `ic_mid_arm`/`ic_escrow_body` — an order of magnitude WORSE than the monolithic `apply _` it replaced).
 - **Give every big-resource abstraction with a `Persistent`/`Timeless` instance a `Typeclasses Opaque` right next to it** — otherwise each `#`-intro/`iDestruct` re-derives the instance by unfolding and descending into the resource. Measured at **5.1 s for one `iIntros "#Hdlock"`** on `is_lock … (disk_res …)`; see the `ProofEndOp`/`ProofPiperead` section above for the diagnostic (split the `iIntros` one name per sentence) and the candidate list.
 - **Do not write `[-]` as the last element of a leaf `iApply`'s spec pattern.** `iApply (wp_X … with "Hcg Hpc Hi [-]")` and `… with "Hcg Hpc Hi")` leave the same goal, but `[-]` forces an explicit `envs_split` of the whole spatial context on every instruction. −13 % on `ProofEndOp` over 110 sites. Safe whenever the omitted premise is the last one, which for a `wp_next`-continuation leaf it always is.
+- **AND THE GOAL SIDE: give every multi-conjunct resource abstraction a CONSTRUCTOR lemma when you define it.** Naming the hypotheses fixes only the context-side scan; framing also searches the GOAL, so a named `iFrame` at a goal whose conjuncts include a big payload is just as slow — 172 s, 107 s, 98 s, 92 s and 88 s across the icache arms, whose `ic_payload` hides a 268-element big-op (`IcacheEscrow.ic_mk_parked` / `ic_mk_mid_arm` / `ic_mk_unloaded` are the fix, and the 2026-08-11 section at the top of this file has the numbers).
 - **Never bare `iFrame` in a large Iris context — name the hypotheses.** `iFrame` searches the WHOLE spatial context for something to match each conjunct of the goal, so its cost scales with (context size × #conjuncts). Rebuilding `pipe_res` (9 separating conjuncts) with a bare `iFrame` in `ProofPipeclose`'s arm — a context holding the three join wands (`EPI`/`JOIN`/`TAILS`), ~20 `instr` facts and the frame cells — **did not terminate** (RSS climbing through 2.6 GB while `coqc -time` sat on that one sentence). `iFrame "Hnm Hnr Hnw Hro Hwo Hst0 Hst1 Hdat Hslack"` — the same nine, by name — is instant. Diagnostic: `coqc -time` flushes per sentence as it goes, so a stalled build's *last printed* sentence is the one BEFORE the culprit; the culprit is the next one in the file.
 - **Never `vm_compute` a goal containing a symbolic `mword` variable** (a ∀-quantified pointer `p`/`head`/`spr`) or a concrete built-up `mstate` (a tower of `set_reg`/`update_subrange`) — it tries to normalize 64-bit modular arithmetic symbolically and does not terminate (looks like a multi-minute hang). Compute only the CLOSED offset (`replace (<offset> : mword 64) with (mword_of_int 0) by (apply bv_eq; vm_compute; reflexivity)`, then close `add_vec p 0 = p` with `avi0`/`kv_addv_zero`); or prove the pure fact against an ABSTRACT state and `apply` it. Diagnostic: two `coqc -time` runs dying at the exact same char = the next sentence hangs (not a wall-clock cap).
 - **A guard fixed by `change`/plain cast pushes a slow non-VM conversion to `Qed`** (minutes). Close it with `replace g with v by (vm_compute; reflexivity)` so the kernel gets a vm-cast instead. For CSR/extension dispatch guards use `csr_dispatch_eq` (ExecCommon.v) — a positive `cbv delta [eq_vec get_word … bool_decide] iota zeta beta; reflexivity` that decides only the guard primitives and leaves `currentlyEnabled`/`hartSupports` folded (~1.7 s → ~0.02 s). NEVER `cbv -[…]` (negative delta) to collapse a Sail dispatch guard — it unfolds a def with a huge normal form and OOMs the box (125 GB).
@@ -796,46 +996,33 @@ In descending value, the remaining levers are:
   - **Minimal repro (for regression testing):** `set (d := zimm12 (caddi16sp_imm imm6)) in *; destruct (Z.ltb d vsp_half)` on the reduced `Hstep` is 28 s; byte-identical with `sign_extend' 12 imm6` is 1.7 s.
   - **General rule:** this bites ANY "`cbn`/`unfold` a Sail/bv computation into a hypothesis, then destruct guards over it" proof. The `vc_store8_sp` store-step lemmas are latent instances (cheap today only because `zoff6`/`zimm12 imm` offsets are simple); refactor them the same way (a `store8_sp_inv`) if a store ever gets an autocast-heavy offset.
 
-## `upd_ne`'s side goal when the written register IS callee-saved
+## `upd_ne`'s side goal: use `CalleeSaved.reg_ne_side`, and never roll your own
 
-The standard name-free peel branch (`apply not_eq_sym; apply
-is_cs_idx_true_neq; [vm_compute; reflexivity | assumption]`) does not apply
-when the register being written is itself callee-saved — every frame register
-of a `thr`-style transport. The tempting fallback is `congruence`, which is
-the 3.6x trap above. The replacement that works, and stays name-free:
+Every register-map peel leaves `Regidx <lookup key> <> Regidx <update key>`, and
+this has been rediscovered file by file often enough that it is now ONE tactic:
+**`reg_ne_side` in `CalleeSaved.v`**, next to `is_cs_idx_true_neq` and
+`regidx_inj`.  A proof file writes `Local Ltac regne := reg_ne_side.` and
+nothing else; 38 files do.  What it encodes, and why each part is there:
 
-```coq
-| let He := fresh "Hxx" in
-  intro He; injection He as He; subst;
-  lazymatch goal with H : ?a <> ?a |- _ => exact (H eq_refl) end
-```
-
-(`subst` turns the excluded-register hypothesis `c <> k` into `k <> k`.)
-Needed in prologue and epilogue peels; a loop body whose writes are all
-caller-saved is covered by the `is_cs_idx_true_neq` branch alone.
-
-## The peel branch for a callee-saved *written* register, name-free
-
-The `subst`-based variant recorded above still fails on a `thr`-style
-transport that excludes NINE saved registers: any Ltac that *mentions* a
-hypothesis introduced by its own `injection` dies at definition time ("The
-reference Hx2 was not found") — the durable-notes trap. The robust form binds
-everything in the match:
-
-```coq
-| lazymatch goal with
-  | |- Regidx ?x <> Regidx ?y =>
-      match goal with
-      | H : x <> y |- _ => exact (fun Hq => H (regidx_inj x y Hq))
-      end
-  end ]
-```
-
-`match` (not `lazymatch`) over the hypotheses is what makes it pick the right
-one of the nine disequalities. **`regidx_inj` (`Regidx x = Regidx y -> x = y`)
-lives in `CalleeSaved.v`**, next to `is_cs_idx_true_neq` — it must be a named
-top-level lemma, not an inline `injection`, precisely so the branch can stay
-name-free.
+- The `is_cs_idx_true_neq` branch (either orientation) covers a CALLER-saved
+  written register.  It does not apply when the written register is itself
+  callee-saved — every frame register of a `thr`-style transport — which is
+  what made people reach for `congruence`.
+- For those, the disequality is already in the transport's own premises
+  (`c <> Rs1`, …), and the branch that uses it must stay NAME-FREE, because an
+  Ltac body cannot mention a hypothesis its own `injection` introduced ("The
+  reference Hx2 was not found", the durable-notes trap).  Hence
+  `lazymatch goal with |- Regidx ?x <> Regidx ?y => match goal with H : x <> y
+  |- _ => exact (fun Hq => H (regidx_inj x y Hq)) end end`, with
+  **`match` (not `lazymatch`) over the hypotheses** so it picks the right one
+  of the six-to-nine disequalities such a transport carries.  `regidx_inj`
+  (`Regidx x = Regidx y -> x = y`) is a named lemma precisely so this stays
+  name-free.
+- That branch goes **FIRST**: it computes nothing, whereas each `is_cs_idx`
+  branch runs a `vm_compute` that FAILS on a symbolic key, ~0.2 s a time.
+- `congruence` is the LAST alternative and nothing in the tree should reach it.
+  Ahead of the others it was **~80 s per call** in `ProofIget` — see the
+  2026-08-11 section at the top of this file.
 
 ## A missing bullet at the END of a `split_and!` block is invisible to every obvious probe
 

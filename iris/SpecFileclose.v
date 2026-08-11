@@ -586,8 +586,15 @@ Section SpecFileclose.
       [iFrame "Hf Hpid"|].
     iDestruct (fileclose_env_frame fn on us n eb p Cf with "Hp Hf")
       as "[$ Hback]".
-    iIntros "Hout". iDestruct ("Hback" with "Hout") as "[$ (%us' & Hf)]".
-    iDestruct (fileclose_fs_env_split_pid with "Hf") as "[Hf $]".
+    iIntros "Hout". iDestruct ("Hback" with "Hout") as "[Hpo (%us' & Hf)]".
+    iDestruct (fileclose_fs_env_split_pid with "Hf") as "[Hf Hpid]".
+    (* structurally: the [$] that used to frame the pid cell had to search
+       past [∃ us', fileclose_fs_env_nopid …] -- fifteen conjuncts including
+       [procs_inv], [bio_ctx], [log_ctx] and the whole [fileclose_ic_env] --
+       instantiating the existential with an evar on the way.  69 s in this
+       one sentence (optimization.md). *)
+    iSplitL "Hpo"; [iExact "Hpo" |].
+    iSplitR "Hpid"; [| iExact "Hpid"].
     iExists us'. iExact "Hf".
   Qed.
 

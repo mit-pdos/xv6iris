@@ -349,11 +349,7 @@ Section IputCommon.
   Notation Rs2  := (mword_of_int 18 : mword 5).
   Notation Rz   := (mword_of_int 0 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* [ProofIdup.sie_b_agree], verbatim. *)
   Lemma ip_sie_b_agree (m : regfile) (n K0 : nat) (eb b : bool)
@@ -426,11 +422,7 @@ Section IputTail.
   Notation Ra0  := (mword_of_int 10 : mword 5).
   Notation Ra5  := (mword_of_int 15 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* ---- the part BEHIND the store: +0x26 (a0 := &itable) .. +0x3a (c.ret).
      Factored out because the two close arms differ only in the store's
@@ -985,9 +977,13 @@ Section IputTail.
             by apply (Hcnt' i qi). }
       { destruct Hciwf as (Hdom & Hinj & Hrange & Hdv). split_and!;
           [| exact Hinj | exact Hrange | exact Hdv].
-        rewrite dom_insert_L Hdom.
-        assert (Hkin : k ∈ dom Mt) by (apply elem_of_dom; by eexists).
-        set_solver. }
+        (* NOT [set_solver]: from inside this whole-function proof it
+           rescans the entire Iris context -- 38 s for one domain identity
+           (this file's own note at [ip_diff_sub] above, and
+           optimization.md).  [k] is already in [dom Mt], so the re-insert
+           does not move the domain at all. *)
+        rewrite (dom_insert_lookup_L Mt k _ (mk_is_Some _ _ HMk)).
+        exact Hdom. }
   Qed.
 
 End IputTail.
@@ -1010,11 +1006,7 @@ Section ProofIput.
   Notation Rs2  := (mword_of_int 18 : mword 5).
   Notation Rz   := (mword_of_int 0 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* the record iput leaves on disk: itrunc's, with the type zeroed by the
      [sh] at +0x66.  [bv_unsigned (di_type ...) = 0] is exactly
@@ -1388,8 +1380,9 @@ Section ProofIput.
         iModIntro. iExists true. iFrame. done.
       - (* UNLOADED: read-only, everything goes straight back *)
         iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hmt Hgida]") as "_".
-        { iNext. iApply ic_close_parked. rewrite /ic_parked.
-          iExists dev, inum, false. iFrame. }
+        { iNext. iApply ic_close_parked.
+          iApply (ic_mk_parked cn gfs gi cov logstart k dev inum false
+                    with "Hidv Hinh Hvld Hpayl Hmt Hgida"). }
         iModIntro. iExists false. iFrame. done. }
     iIntros (wvld).
     iApply wp_next_off_intro. iIntros "Hcg Hpc HPsi".
@@ -1511,8 +1504,9 @@ Section ProofIput.
       iDestruct (word4_pointsto_frac_split (i_inum (ientry k)) q qr inum with "Hn2")
         as "[Hrn Htn]".
       iMod ("Hclose" with "[Hidv Hinh Hvld Hpayl Hmt Hgida]") as "_".
-      { iNext. iApply ic_close_parked. rewrite /ic_parked.
-        iExists dev, inum, true. iFrame. }
+      { iNext. iApply ic_close_parked.
+        iApply (ic_mk_parked cn gfs gi cov logstart k dev inum true
+                  with "Hidv Hinh Hvld Hpayl Hmt Hgida"). }
       iModIntro.
       iDestruct ("Hback" $! Mt ci with "[%] [%] [Htd Htn Hiu Hgid]") as "Hslots";
         [ intros i Hi; reflexivity | intros i Hi; reflexivity | | ].

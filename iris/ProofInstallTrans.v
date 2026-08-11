@@ -548,11 +548,7 @@ Notation Rs9  := (mword_of_int 25 : mword 5).
 Notation Rs10 := (mword_of_int 26 : mword 5).
 Notation Rs11 := (mword_of_int 27 : mword 5).
 
-Local Ltac regne :=
-  first [ congruence
-        | apply not_eq_sym; apply is_cs_idx_true_neq;
-          [vm_compute; reflexivity | assumption]
-        | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+Local Ltac regne := reg_ne_side.
 
 Local Ltac rgne :=
   rewrite rget_ne;

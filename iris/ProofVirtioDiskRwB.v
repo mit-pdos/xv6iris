@@ -200,9 +200,12 @@ Section ProofVirtioDiskRwB.
     | |- ?a <> ?b => tryif unify a b then fail else (vm_compute; discriminate)
     end.
 
+  (* [congruence] LAST: ahead of the named lemma it builds a congruence
+     closure over the whole whole-function context on every peel layer
+     (optimization.md / CalleeSaved.reg_ne_side). *)
   Local Ltac regne :=
-    first [ congruence
-          | apply vdrw_cs_ne; [ assumption | vm_compute; reflexivity ] ].
+    first [ apply vdrw_cs_ne; [ assumption | vm_compute; reflexivity ]
+          | congruence ].
 
   (* =================================================================== *)
   (* P2.3a  ONE [free_desc] call of the partial-free tail.                *)

@@ -195,11 +195,7 @@ Notation Ra1 := (mword_of_int 11 : mword 5).
 Notation Ra2 := (mword_of_int 12 : mword 5).
 Notation Ra5 := (mword_of_int 15 : mword 5).
 
-Local Ltac regne :=
-  first [ apply not_eq_sym; apply is_cs_idx_true_neq;
-          [vm_compute; reflexivity | assumption]
-        | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption]
-        | congruence ].
+Local Ltac regne := reg_ne_side.
 
 Local Ltac ilidx := first [ vm_compute; reflexivity | vm_compute; discriminate ].
 

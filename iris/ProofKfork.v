@@ -74,11 +74,7 @@ Section ProofKfork.
   Notation Rs4 := (mword_of_int 20 : mword 5).
   Notation Rs5 := (mword_of_int 21 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* THE FRAME, as every exit sees it.  Slots 4/5/6 (s2/s3/s4) are lazily
      spilled, so which of them holds a saved register and which holds junk

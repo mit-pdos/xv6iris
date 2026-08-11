@@ -94,11 +94,7 @@ Section ProofPipealloc.
   Notation Rs4 := (mword_of_int 20 : mword 5).
   Notation Rz  := (mword_of_int 0 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   Lemma wp_pipealloc_sconf
       (γfl γf : gname) (γkl : gname) (γk : gname * gname) (fl : mword 64)

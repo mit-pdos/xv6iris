@@ -106,11 +106,7 @@ Section ProofBpin.
   Notation Ra5  := (mword_of_int 15 : mword 5).
   Notation Rtp  := (mword_of_int 4 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* the value the [c.addiw a5,a5,1] leaves for the store, as a function of
      the loaded word -- what joins the two arms of the critical section. *)
