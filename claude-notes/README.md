@@ -246,6 +246,13 @@ are working on that effort — the relevant `projects/` file.
   over user VAs), the interrupt-absorbing step engine with hart-switching
   continuations, the Umode leaf WPs, and the sync program's function proofs
   (start/main + the sync/exit ecall stubs).
+- **[`weak-memory-sc-parity.md`](design/weak-memory-sc-parity.md)** — PROPOSAL,
+  nothing built: making a lock-disciplined function's proof under the weak
+  model be LITERALLY its SC proof, via a monotone view ghost state (so the
+  hart's weak state is an opaque threaded token with persistent lower
+  bounds) plus an objective `↦o` for owned memory, leaving the subjective
+  `↦w` only at the racy sites.  Carries the measured breakdown of where the
+  current 3× actually comes from.
 - **[`weak-memory.md`](projects/weak-memory.md)** — the weak-memory effort's
   staged worklist (M0 model spike → base logic → vProp surface → vertical
   slice → sweep → devices → the LB robustness theorem), with a

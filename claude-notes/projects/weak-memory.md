@@ -1922,6 +1922,27 @@ at every step. One leaf did not finish in 10 minutes; at a
 39 closed literals, and the decode layer sits in its own file so the
 theorem's edit-compile loop is ~50 s rather than minutes.
 
+## SC PARITY FOR LOCK-DISCIPLINED CODE (2026-08 — PROPOSAL, nothing built)
+
+Design: [`../design/weak-memory-sc-parity.md`](../design/weak-memory-sc-parity.md).
+
+Batch 4's chains measured at ~3x their SC twins, and the breakdown says ~15
+of the ~25 lines an instruction costs were an INTERFACE tax and exactly ONE
+was weak-memory content.  Two of the three causes are already fixed on the
+branch (`iris/WeakLeafM.v`'s `winstr_m` token, and leaf frame threading);
+instruction 35 of `wwp_start` went 28 -> 11 lines against SC's 6.
+
+The residue -- the `ws` binder and its `ws_le` -- is an artifact of two
+representation choices, not of weak memory: `hart_ws` is an EXACT-valued
+`ghost_var` (so every leaf must name both states), and `wpt` carries the
+view receipt that is, by `WeakVProp`'s own comment, "the entire difference
+between this and the SC points-to".  The proposal replaces the first with
+monotone ghost state (`ws_le` is pointwise <= on every field, with no
+non-monotone component) and splits the second into an objective `↦o` for
+lock-protected memory and the current subjective `↦w` for the racy sites
+only.  Target: a lock-disciplined function's proof above the leaves IS its
+SC proof.  Three named risks in §6 of the design; none checked.
+
 ## M4 — the sweep
 
 **Batches and their prices** (from M4-prep's measurements; the ORDER is
