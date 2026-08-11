@@ -32,8 +32,8 @@ name: Dead imports
 
 on:
   schedule:
-    # 01:00 UTC nightly.  Cron here is always UTC.
-    - cron: "0 1 * * *"
+    # 08:00 UTC nightly.  Cron here is always UTC.
+    - cron: "0 8 * * *"
   workflow_dispatch:
 
 # Never cancel a run in progress: a --verify pass is hours long, and a
