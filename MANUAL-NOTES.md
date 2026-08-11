@@ -10,7 +10,7 @@ Some high-level ideas that might be interesting for some eventual paper:
 - fupd-style spec for stepping one cycle, which enables opening inv like minstret_inv
 - interrupt handling with a WP for the address in stvec (kernelvec)
 - intr_inv and WP wrapper wp_instr_s_intr does induction over any number of interrupts
-- sie_inv owns free stack locations, requires sufficient depth for interrupt/kernelvec
+- sie_inv owns free stack locations, requires sufficient depth for interrupt/kernelvec, gives more stack when interrupts disabled
 - swtch spec
 - acquire/release separation logic spec; holding token is CPU-specific (can transfer across swtch but cannot have another CPU do the release)
 - kalloc/kfree separation-logic-style specs
