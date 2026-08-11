@@ -101,9 +101,6 @@ Definition wp_sys_fork_sconf_body
   (K_sys_fork <= av)%nat ->
   (* propagates to kfork's own nesting bound *)
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
-  (* kfork's own premise, threaded: [ProcInv.cwd_ref] is two-armed on the
-     pointer and xv6's fork calls [idup(p->cwd)] with no null test. *)
-  pv_cwd V <> (zero_reg : mword 64) ->
   sie_cap_gpr m av b p -∗
   cpu_own lvl eb p C b -∗
   kernel_text -∗ pc_is pcE -∗

@@ -540,43 +540,40 @@ Section ProcInv.
      was no inode model; design/proc-struct.md's "holes to be honest about"
      records the hole and design/fs-icache.md §3 the route out of it.)
 
-     TWO ARMS, on the pointer itself.  A process between [p->cwd = 0] and
-     its next chdir -- which is every process kexit has walked past, and
-     every slot the boot carve hands out -- has no working directory and
-     owns no reference; a live one names an itable entry, and an entry
-     address is never null ([IcacheRef.ientry_ne_zero]), so the two arms
-     cannot be confused.  kexit's contract asks for the second by asking
-     [pv_cwd V <> 0]: xv6's kexit calls iput(p->cwd) unconditionally, so
-     that premise is the honest reading of the code and not a convenience. *)
-  Definition cwd_ref (v : mword 64) : iProp Σ :=
-    (if decide (v = (zero_reg : mword 64)) then emp else inode_held v)%I.
+     THERE IS NO [v = zero_reg] ARM, AND THAT IS THE POINT.  A null
+     [p->cwd] is not a state this predicate describes -- it is a state in
+     which the block does not hold this conjunct at all, which is what
+     [proc_priv_nocwd] is for.  The two mechanisms are alternatives, not
+     partners: with a null arm, [proc_priv] no longer implies
+     [pv_cwd V <> 0], and every contract that reaches [iput(p->cwd)] --
+     kexit, kfork, and their syscall wrappers -- has to carry that fact as
+     a PREMISE its own callers must then supply.  Without one it is a
+     PROJECTION of the block ([proc_priv_cwd_nonzero]), free at every
+     altitude, and the construction window (allocproc's return, kfork's
+     150 bytes before the [sd a0,336(s4)], kexit's tail after [iput]) is
+     covered by the deficit block instead.
 
-  (* the live arm, in the form a consumer uses it *)
-  (* "no working directory" owes no reference.  A LEMMA rather than a
-     [rewrite /cwd_ref] at the call site, because it is exactly the fact the
-     real predicate keeps: a null [p->cwd] names no inode. *)
-  Lemma cwd_ref_null : ⊢ cwd_ref (zero_reg : mword 64).
-  Proof.
-    rewrite /cwd_ref.
-    destruct (decide ((zero_reg : mword 64) = (zero_reg : mword 64)))
-      as [_ | Hne]; [auto | by destruct (Hne eq_refl)].
-  Qed.
+     That matters beyond tidiness because of WHERE the fact would have to
+     travel: [SchedCtx.proc_slots_recast] moves SLEEPING -> RUNNABLE ->
+     RUNNING for free, and stays free only because [proc_slots] mentions
+     neither [proc_ctx]'s nor [proc_dormant]'s contents.  A [cwd <> 0]
+     conjunct anywhere near it would break exactly that; as a projection it
+     rides inside the Löb'd obligation and no recast ever looks at it. *)
+  Definition cwd_ref (v : mword 64) : iProp Σ := inode_held v.
 
-  Lemma cwd_ref_held (v : mword 64) :
-    v <> (zero_reg : mword 64) -> cwd_ref v -∗ inode_held v.
-  Proof.
-    intros Hne. rewrite /cwd_ref.
-    destruct (decide (v = (zero_reg : mword 64))) as [Hz | _];
-      [by destruct (Hne Hz) | iIntros "$"].
-  Qed.
+  (* The two directions, kept as NAMES so consumers do not unfold: they are
+     definitional now, but they were not, and the call sites read better
+     for saying which way they are going. *)
+  Lemma cwd_ref_held (v : mword 64) : cwd_ref v -∗ inode_held v.
+  Proof. iIntros "$". Qed.
 
   Lemma cwd_ref_of_held (v : mword 64) : inode_held v -∗ cwd_ref v.
-  Proof.
-    iIntros "H". rewrite /cwd_ref.
-    iDestruct (inode_held_ne_zero with "H") as %Hne.
-    destruct (decide (v = (zero_reg : mword 64))) as [Hz | _];
-      [by destruct (Hne Hz) | iExact "H"].
-  Qed.
+  Proof. iIntros "$". Qed.
+
+  (* ... and the projection the missing arm buys. *)
+  Lemma cwd_ref_nonzero (v : mword 64) :
+    cwd_ref v -∗ ⌜v <> (zero_reg : mword 64)⌝.
+  Proof. iIntros "H". by iApply (inode_held_ne_zero with "H"). Qed.
 
   (* [p->sz] NEVER EXCEEDS MAXVA.  This is a real invariant of a live
      process -- exec and growproc are the only writers and both bound the
@@ -965,6 +962,19 @@ Section ProcInv.
 
   (* The array's length, which a caller needs BEFORE it knows which
      descriptor it wants: an fd below NOFILE always has a slot to look up. *)
+  (* A LIVE PROCESS HAS A NON-NULL WORKING DIRECTORY, as a projection of the
+     block rather than a conjunct anybody maintains.  This is what the
+     no-null-arm shape buys, and it is what kexit / kfork / sys_fork /
+     sys_exit used to take as a premise their callers could not discharge
+     from anything but another copy of the same premise. *)
+  Lemma proc_priv_cwd_nonzero (γf : gname) (pa : mword 64) (pid : mword 32)
+      (V : pprivate) :
+    proc_priv γf pa pid V -∗ ⌜pv_cwd V <> (zero_reg : mword 64)⌝.
+  Proof.
+    iIntros "[(_ & _ & _ & _ & _ & _ & Hc) _]".
+    by iApply (cwd_ref_nonzero with "Hc").
+  Qed.
+
   Lemma proc_priv_ofile_len (γf : gname) (pa : mword 64) (pid : mword 32) (V : pprivate) :
     proc_priv γf pa pid V -∗ ⌜length (pv_ofile V) = NOFILE⌝.
   Proof. iIntros "[_ [%Hlen _]]". done. Qed.

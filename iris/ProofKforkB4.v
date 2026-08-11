@@ -234,7 +234,6 @@ Section KforkB4Proof.
        on the pointer -- a process between [p->cwd = 0] and its next chdir
        owns no reference -- and xv6's fork does [np->cwd = idup(p->cwd)]
        with no null test, so this is the honest reading of the code. *)
-    pv_cwd Vp <> (zero_reg : mword 64) ->
     sie_cap_gpr m (K - 8)%nat false pme -∗
     cpu_own lvl eb pme C false -∗
     kernel_text -∗
@@ -268,7 +267,7 @@ Section KforkB4Proof.
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hlvl Hms5 Hms4 Hcwdnz.
+    intros HK Hlvl Hms5 Hms4.
     iIntros "Hcg Hown #Htext Hpc #Hpanic #Hitb #Hitinv Hir Hparent Hchild Hcont".
     iDestruct (iref_slots_split 1 IREFSPARE with "Hir") as "[Hirs Hirsp]".
     iPoseProof (kfk_0a4 with "Htext") as "Hi0a4".
@@ -293,7 +292,7 @@ Section KforkB4Proof.
        hidden -- it is the cache's [icfg_dev] (design §13.11's
        single-device pin), which is what lets the itable this block holds
        the lock for be named without a coherence premise. *)
-    iDestruct (cwd_ref_held (pv_cwd Vp) Hcwdnz with "Hpcref") as "Hpcref".
+    iDestruct (cwd_ref_held (pv_cwd Vp) with "Hpcref") as "Hpcref".
     iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hiref)".
     set (cdev := icfg_dev).
     assert (Hpa0a4 : add_vec (rget m Rs5) (sign_extend' 64 (mword_of_int 336 : mword 12))

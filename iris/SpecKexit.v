@@ -172,10 +172,10 @@ Definition wp_kexit_sconf_body
   eb = true ->
   (* THE PROCESS HAS A WORKING DIRECTORY.  [begin_op(); iput(p->cwd);] is
      unconditional in xv6 -- there is no null test -- so a caller that
-     cannot exhibit one is calling iput on a null pointer.  Before C6b
-     [cwd_ref] was [emp] and this premise was invisible; it is not new
-     strength, it is the assumption the [emp] was hiding. *)
-  pv_cwd V <> (zero_reg : mword 64) ->
+     cannot exhibit one is calling iput on a null pointer.  IT IS NOT A
+     PREMISE ANY MORE: [ProcInv.cwd_ref] has no null arm, so
+     [proc_priv_cwd_nonzero] projects it straight out of the block this
+     contract already takes. *)
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0 eb pj C b -∗

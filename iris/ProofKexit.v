@@ -1268,8 +1268,6 @@ Section KexitRest.
     log_geom_ok cov logstart ->
     kxt_regs M pj sv ->
     pv_ofile V = replicate NOFILE (zero_reg : mword 64) ->
-    (* iput(p->cwd) has no null test, so there must BE a working directory *)
-    pv_cwd V <> (zero_reg : mword 64) ->
     (* the C6b ties: the reference [cwd_ref] carries names the cache through
        the [icfg] class, and so does iput's contract *)
     dev = icfg_dev ->
@@ -1311,20 +1309,24 @@ Section KexitRest.
     proc_priv γf pj pid V -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros pj Hj Hgl Heb Hav Hgeom Hregs Hof Hcwdnz Hcdev Hcnib
+    intros pj Hj Hgl Heb Hav Hgeom Hregs Hof Hcdev Hcnib
            Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb. subst eb.
     destruct Hregs as (Hs3 & Hs4 & Hdom).
     iIntros "Hcg Hown #Htext Hpc #Hprocs #Hpanic #Hwl".
     iIntros "#Hbio #Hlog Hseam Hgen #Hdev #Hgeo #Hdlk Hbsl".
     iIntros "#Hitab #Hitinv #Hescrows #Hireg #Hslks Hsbb Hsbi Hbmres".
     iIntros "Hinit Hsp Hir Hpriv".
-    (* the cwd cell, its reference, and the pid quarter -- all three out at
-       once; see the header. *)
-    iDestruct (proc_priv_cwd_pid γf pj pid V with "Hpriv") as "(Hcwd & Href & Hpidq & Hpback)".
-    (* THE WORKING DIRECTORY'S REFERENCE, unpacked.  [cwd_ref] is two-armed
-       on the pointer; the premise says which arm, and the live one IS the
-       inode reference iput consumes. *)
-    iDestruct (cwd_ref_held (pv_cwd V) Hcwdnz with "Href") as "Href".
+    (* THE REFERENCE COMES OFF THE BLOCK FIRST.  [cwd_ref] has no null arm,
+       so once [p->cwd] is zeroed there is no [proc_priv] at this [V] to
+       rebuild -- the tail runs on the DEFICIT block, which is also what
+       the ZOMBIE park takes.  Splitting here rather than round-tripping
+       through [proc_priv] is what lets the premise
+       [pv_cwd V <> 0] disappear: it is now a projection
+       ([proc_priv_cwd_nonzero]) and nothing downstream needs it stated. *)
+    iDestruct (proc_priv_split_cwd γf pj pid V with "Hpriv") as "[Hpriv Href]".
+    iDestruct (proc_priv_nocwd_cwd_pid γf pj pid V with "Hpriv")
+      as "(Hcwd & Hpidq & Hpback)".
+    iDestruct (cwd_ref_held (pv_cwd V) with "Href") as "Href".
     iDestruct "Href" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href)".
     iDestruct (ic_escrows_acc _ _ _ _ _ kk Hkk with "Hescrows") as "#Hescrow".
     iDestruct (ic_sleeplocks_acc _ kk Hkk with "Hslks") as (gil gisl) "#Hslk".
@@ -1476,10 +1478,9 @@ Section KexitRest.
     { rewrite (callee_saved_lookup Hcseo (mword_of_int 20 : mword 5) ltac:(vm_compute; reflexivity)).
       exact HQ3s4. }
     (* +0x5c sd x0,336(s3) : p->cwd = 0.  The reference is GONE -- iput
-       consumed it -- and what goes back into the block is [cwd_ref_null],
-       the empty arm: a null [p->cwd] names no inode.  The block that
-       results is then split back down to the DEFICIT one, because that is
-       what the ZOMBIE park takes and the cwd arm it drops is [emp]. *)
+       consumed it -- and nothing goes back in its place: the block has
+       been the DEFICIT one since the split above, which is exactly what
+       the ZOMBIE park takes. *)
     assert (Hrgeo19 : rget (CID := CID7) meo (mword_of_int 19 : mword 5)
                       = meo !!! Regidx (mword_of_int 19 : mword 5)) by (rgne; reflexivity).
     iApply (wp_sd_zero_s_sconf (CID := CID7) (mword_of_int (KX + 0x5c))
@@ -1498,10 +1499,7 @@ Section KexitRest.
        itself.  That bijection is what makes
        [IREFSLOTS = NPROC*(1 + IREFSPARE) + NFILE] literally true. *)
     iDestruct (iref_slots_combine 1 IREFSPARE with "Hislot Hir") as "Hir".
-    iPoseProof cwd_ref_null as "Hcz".
-    iDestruct ("Hpback" $! (zero_reg : mword 64) with "Hcwd Hcz Hpidq") as "Hpriv".
-    iEval (rewrite proc_priv_split_cwd) in "Hpriv".
-    iDestruct "Hpriv" as "[Hpriv _]".
+    iDestruct ("Hpback" $! (zero_reg : mword 64) with "Hcwd Hpidq") as "Hpriv".
     iDestruct (cpu_own_transport CID7 CID8 0 true pj C b ltac:(wp_next_chain)
                  with "Hown") as "Hown".
     iApply (kx_park (CID0 := CID8)  γf γw γs j γl ip sv dqi meo av true C b pid
@@ -1545,7 +1543,7 @@ Section ProofKexit.
                           on fn m av eb C b pid V.
   Proof.
     cbv beta delta [wp_kexit_sconf_body].
-    intros pcE pj Hfn Hj Hgl HK Hgeom Heb Hcwdnz. subst eb. subst fn.
+    intros pcE pj Hfn Hj Hgl HK Hgeom Heb. subst eb. subst fn.
     unfold K_kexit in HK.
     iIntros "Hcg Hown #Htext Hpc #Hprocs #Hpanic #Hwl #Hft".
     iIntros "#Hkmem Hav0".
@@ -1852,7 +1850,6 @@ Section ProofKexit.
                   dqb dqs ip (m !!! Regidx (mword_of_int 10 : mword 5)) dqi
                   Mx (av - 6)%nat true C b pid Vx
                   Hj Hgl eq_refl ltac:(lia) Hgeom Hxregs Hxof
-                  ltac:(rewrite Hxcwd; exact Hcwdnz)
                   Hcdev Hcnib Hsize Hbm0 Hbmcov Hbmlog Hist0 Hinumgeo Hcovb
                   with "Hcg Hown Htext Hpc Hprocs Hpanic Hwl
                         Hbio Hlog Hseam Hgen Hdev Hgeo Hdlk Hbsl

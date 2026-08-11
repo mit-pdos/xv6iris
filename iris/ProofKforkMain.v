@@ -439,9 +439,6 @@ Section KforkArms.
     npa = proc_addr j -> (j < NPROC)%nat -> γs !! j = Some γl2 ->
     pv_ofile Vc' = replicate NOFILE (zero_reg : mword 64) ->
     pv_cwd Vc' = (zero_reg : mword 64) ->
-    (* the PARENT has a working directory -- SpecKfork's premise, threaded
-       to [B4.kfk_b4]'s [ld a0,336(s5)] *)
-    pv_cwd Vp <> (zero_reg : mword 64) ->
     kernel_text -∗
     panic_wp_any -∗
     procs_inv γs -∗
@@ -478,7 +475,7 @@ Section KforkArms.
   Proof.
     intros HK Hlvl Hbeq Hmsp Hmra Hms0 Hms1 Hms5 HMtsp HMts4 HMts5
       HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr Hnpa HjN Hgamma
-      Hofnull Hcwdnull Hpcwdnz.
+      Hofnull Hcwdnull.
     subst tfsrc tfdst.
     iIntros "#Htext #Hpanic #Hprocs Hcg Hcpu Hpc Hframe Hpv HCpriv
              Hheld Hhart Hfd Hctxex Hpay Hkalloc Hwlock Hft
@@ -566,7 +563,7 @@ Section KforkArms.
       iApply (B4.kfk_b4 γf γil γic cn γfs cov logstart nib pid_p pid_c Vp
                 (kfk_childV V2 (pv_ofile Vp) NOFILE) pme npa
                 Mx2 K (S lvl) eb C
-                ltac:(lia) ltac:(lia) Hd4 Hd3 Hpcwdnz
+                ltac:(lia) ltac:(lia) Hd4 Hd3
                 with "Hsc Hown Htext Hpcx Hpanic Hitb Hitinv Hirs Hpvx Hpvcx [-]").
       iApply wp_next_off_intro.
       iIntros (mf4) "%Hp4 Hsc4 Hown4 Hpc4 Hpvx4 Hpvcx4 Hirsp".
@@ -666,7 +663,7 @@ Section KforkMain.
       m lvl K eb pme C b pid_p Vp.
   Proof.
     cbv beta delta [wp_kfork_sconf_body]. cbn zeta.
-    intros HK Hlvl Hpcwdnz.
+    intros HK Hlvl.
     iIntros "Hcg Hcpu #Htext Hpc #Hpanic #Hprocs #Hplock #Hwlock #Hftbl
              #Hitbl #Hitinv Henv Hpv Hcont".
     (* the SIE index the two lock-holding exits come back at *)
@@ -739,7 +736,7 @@ Section KforkMain.
                 (wpk_K_ge56 K HK) Hlvl Hbeq
                 eq_refl eq_refl eq_refl eq_refl eq_refl
                 HMtsp HMts4 HMts5 HMta5 HMta4 HMta3 Htfsrc Htfdst HMtthr
-                Hnpa HjN Hgamma Hofn Hcwdn Hpcwdnz
+                Hnpa HjN Hgamma Hofn Hcwdn
                 with "Ht Hpanic Hprocs Hcg Hcpu Hpc Hframe Hpv HCp Hheld Hhart
                       Hfd Hctx Hpay Hke Hwl Hft Hit Hiti Hirs [HR]").
       (* the crossing fact by NAME, never as an inline [ltac:] in argument

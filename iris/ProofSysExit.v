@@ -120,7 +120,7 @@ Section ProofSysExit.
                              on fn m av eb C b pid V v0.
   Proof.
     cbv beta delta [wp_sys_exit_sconf_body].
-    intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb Hcwdnz.
+    intros pcE pj Hfn Hj Hgl Hv0 Hav Hgeo Heb.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcpu #Htext #Hdata Hpc #Hprocs #Hpanic
              #Hlk #Hft #Hkl Hkav #Hbio #Hlog #Hcrash #Hcert #Hdev #Hgeom
@@ -308,7 +308,7 @@ Section ProofSysExit.
               cov logstart dev ip dqi γkl γka
               γi cn γtl bmapstart inodestart nib size dqb dqs us
               on fn B2 (av - 4)%nat eb C b pid V
-              Hfn Hj Hgl (sex_Kke av Hav) Hgeo Heb Hcwdnz
+              Hfn Hj Hgl (sex_Kke av Hav) Hgeo Heb
               with "Hcg Hcpu Htext Hpc Hprocs Hpanic Hlk
                     Hft Hkl Hkav Hbio Hlog Hcrash Hcert Hdev Hgeom Hdlk Hbs
                     Hicenv Hbm Hip Hfds Hirs Hpriv").

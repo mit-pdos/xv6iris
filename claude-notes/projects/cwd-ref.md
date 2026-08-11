@@ -24,15 +24,21 @@
 > its claims were superseded when the two lines were merged onto the local
 > icache base; read them with these corrections:
 >
-> * **`ProcInv.cwd_ref` is TWO-ARMED**, not null-arm-free:
->   `cwd_ref v := if decide (v = 0) then emp else IcacheRef.inode_held v`.
->   `cwd_ref_null` therefore survives, `cwd_ref_nonzero` /
->   `proc_priv_cwd_nonzero` do not, and the "a live process has a non-null
->   cwd" projection is instead an explicit premise where a caller needs it
->   (`SpecKfork` and `SpecSysFork` gained `pv_cwd Vp <> 0`; `SpecKexit`
->   already had it). Everything else in the construction-window design --
->   `proc_priv_nocwd`, `proc_priv_split_cwd` and the accessors -- is
->   definition-agnostic and was kept as written here.
+> * ~~**`ProcInv.cwd_ref` is TWO-ARMED**~~ — **REVERTED 2026-08-11.** The
+>   merge briefly carried BOTH mechanisms: a null arm in `cwd_ref` *and*
+>   this file's `proc_priv_nocwd` split. They are alternatives, not
+>   partners, and keeping both cost a premise: with a null arm `proc_priv`
+>   no longer implies `pv_cwd V <> 0`, so `SpecKexit`, `SpecKfork`,
+>   `SpecSysFork` and `SpecSysExit` all had to carry it, and every future
+>   caller would have had to supply it from another copy of itself. The
+>   null arm is gone; `cwd_ref v := IcacheRef.inode_held v`, `cwd_ref_null`
+>   with it, and `cwd_ref_nonzero` / `proc_priv_cwd_nonzero` are back. The
+>   one site that used the null arm — kexit's rebuild after
+>   `sd x0,336(s3)` — round-tripped through `proc_priv` only to split
+>   straight back down to the deficit block, so it now simply stays on the
+>   deficit block from the `proc_priv_split_cwd` before `iput`. Everything
+>   else in the construction-window design is unchanged and was already
+>   definition-agnostic.
 > * **`SpecIput`'s reference premise is REAL** (`IcacheRef.inode_ref`), so
 >   `ProofKexit` spends its `cwd_ref` rather than dropping it, and
 >   `ProofFileclose` recovers a whole reference from the file's payload

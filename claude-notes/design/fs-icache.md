@@ -1810,6 +1810,14 @@ weaker (discipline-shaped) ledger; B pays in cross-line coordination.
 ### 14.5 Path A sharpened to an impossibility: under natR, carving a
 ### share is a NON-EVENT (2026-08-10, exploring "how hard is A")
 
+> **Read §14.6 first.** Its RECOMMENDATION paragraph below still speaks of
+> a "ledger" and of `fp_iq` as "the ledger's proportional accounting".
+> §14.6 removes the ledger entirely — iput needs no witness — so that
+> phrase names a structure the plan no longer has. `fp_iq` survives, but
+> for the FILE layer's own reason (the payload's shares need definite
+> proportional masses or the last closer's gather cannot restore the
+> parent reference to canonical pairing), not for iput's.
+
 The decisive algebraic fact: at `prodR fracR natR`,
 
     (q, 1) = (q − s, 1) ⋅ (s, 0)

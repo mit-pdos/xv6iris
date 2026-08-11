@@ -228,11 +228,10 @@ Definition wp_kfork_sconf_body
   (Z.of_nat lvl + 2 < 2 ^ 31)%Z ->
   (* THE PARENT HAS A WORKING DIRECTORY.  [ProcInv.cwd_ref] is two-armed on
      the pointer -- a process between [p->cwd = 0] and its next chdir owns
-     no reference -- and xv6's fork runs [np->cwd = idup(p->cwd)] with no
-     null test, so this premise is the honest reading of the code and not a
-     convenience.  It is what [ProofKforkB4]'s [ld a0,336(s5)] picks the
-     live arm with. *)
-  pv_cwd Vp <> (zero_reg : mword 64) ->
+     no reference.  xv6's fork runs [np->cwd = idup(p->cwd)] with no null
+     test, and that is still the honest reading of the code -- but it is no
+     longer a PREMISE: [ProcInv.cwd_ref] has no null arm, so the parent's
+     own [proc_priv] carries it ([proc_priv_cwd_nonzero]). *)
   sie_cap_gpr m K b pme -∗
   cpu_own lvl eb pme C b -∗
   kernel_text -∗ pc_is pcE -∗

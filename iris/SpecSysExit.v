@@ -122,8 +122,6 @@ Definition wp_sys_exit_sconf_body
   (* the PARKING premise, inherited from kexit: everything that sleeps or
      parks needs it *)
   eb = true ->
-  (* kexit's, inherited verbatim: [iput(p->cwd)] has no null test *)
-  pv_cwd V <> (zero_reg : mword 64) ->
   sie_cap_gpr m av b pj -∗
   (* entered with no lock held *)
   cpu_own 0%nat eb pj C b -∗
