@@ -224,7 +224,20 @@ Section WpSmodeIntr.
     sie_cap_gpr m n b p -∗
     pc_is pc -∗
     instr pc is_rvc i -∗
-    (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+    (* THE σ-CALLBACK IS HART-GENERIC: after the absorbing engine has run, the
+       instruction executes on the hart the LAST trap returned to, so a leaf
+       must supply this callback at an ARBITRARY hart, with [wp_next]'s guard
+       as its only escape.  The lambda binder is named [CID], shadowing the
+       section's, so every resource in the body picks the rebound hart by
+       instance resolution and the body is textually unchanged.
+
+       WHY IT STOPS HERE.  The funnel's own proof converts for free
+       ([WpNext.wp_next_here]).  The two engines UNDER it cannot: their '1' arm
+       frames per-hart residue across the engine (the travelling [sret_bits]
+       half, the SIE eighth, [cpu_hart]'s cells, [strans_bit], [intr_inv]), and
+       only the trap handler can hand those back at the resuming hart. *)
+    wp_next b p (fun (CID : CpuId) =>
+      ∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
        sconf -∗
        sie_cap m n b p -∗
        gpr_file (tp_pin m) -∗
@@ -242,6 +255,10 @@ Section WpSmodeIntr.
     WP (Loop : expr riscv_lang).
   Proof.
     iIntros "Hcg Hpc Hinstr H".
+    (* consume the caller's hart-generic obligation at THIS hart -- the whole
+       of the funnel's side of the move, and free because Stage 1's absorbing
+       engine still returns where it came from. *)
+    iDestruct (wp_next_here with "H") as "H".
     (* sp is not tp, so the PINNED register file's sp slot IS the map's --
        the bridge between [sie_cap]/[intr_frame] (stated at [m]) and the
        file the bundle actually owns, [gpr_file (tp_pin m)]. *)
@@ -402,7 +419,31 @@ Section WpSmodeIntr.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iApply (wp_instr_s_sconf m n b pc true base
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside the proof, so [rename] moves it out of the
+       way -- which the STATEMENT never sees, so every caller that names this
+       leaf's hart as [(CID := ...)] keeps working.  The alternative, introducing
+       the new hart under a different name, would force a [(CID := ...)]
+       annotation on every hart-indexed term the body writes out ([tp_pin m],
+       [rget m rs]) -- ~480 of them across this tier.  With the rename, the body
+       below is UNCHANGED and picks the rebound hart by instance resolution.
+
+       IT HAS TO COME *AFTER* THE FUNNEL APPLICATION.  Inside a Section, a
+       reference to a SIBLING lemma is resolved through the section variables
+       BY NAME (they are not generalized yet), so renaming [CID] first makes
+       [wp_instr_s_sconf] itself unmentionable:
+         "wp_instr_s_sconf depends on the variable CID which is not declared".
+       Lemmas from OTHER files are already generalized and take the hart as an
+       ordinary instance argument, so they are unaffected -- which is why every
+       tactic below the rename still elaborates. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* the two source reads survive the rebinding: at [b = true] by [ops_ok]'s
+       source guards, at [b = false] because [Hs] pins the hart.  This is the
+       one place the ENTRY hart has to be named, which is why it needed a name
+       at all. *)
+    destruct (rget_next_ops_indep (CID := CID0) b p CID m rd rsa rsb Hs Hops)
+      as [Hra Hrb].
     iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
@@ -422,7 +463,8 @@ Section WpSmodeIntr.
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).
     iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      exact (Hbexec s_pc Lnpc0 (eq_trans Lva0 Hra) (eq_trans Lvb0 Hrb)). }
     iSplitL "Hreg Hmem".
     { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
@@ -442,8 +484,8 @@ Section WpSmodeIntr.
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
     (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
        obligation is discharged by instantiating it here. *)
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* the 4-byte (base-encoding) variant: pc advances by 4 *)
@@ -477,7 +519,31 @@ Section WpSmodeIntr.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iApply (wp_instr_s_sconf m n b pc false base
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside the proof, so [rename] moves it out of the
+       way -- which the STATEMENT never sees, so every caller that names this
+       leaf's hart as [(CID := ...)] keeps working.  The alternative, introducing
+       the new hart under a different name, would force a [(CID := ...)]
+       annotation on every hart-indexed term the body writes out ([tp_pin m],
+       [rget m rs]) -- ~480 of them across this tier.  With the rename, the body
+       below is UNCHANGED and picks the rebound hart by instance resolution.
+
+       IT HAS TO COME *AFTER* THE FUNNEL APPLICATION.  Inside a Section, a
+       reference to a SIBLING lemma is resolved through the section variables
+       BY NAME (they are not generalized yet), so renaming [CID] first makes
+       [wp_instr_s_sconf] itself unmentionable:
+         "wp_instr_s_sconf depends on the variable CID which is not declared".
+       Lemmas from OTHER files are already generalized and take the hart as an
+       ordinary instance argument, so they are unaffected -- which is why every
+       tactic below the rename still elaborates. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* the two source reads survive the rebinding: at [b = true] by [ops_ok]'s
+       source guards, at [b = false] because [Hs] pins the hart.  This is the
+       one place the ENTRY hart has to be named, which is why it needed a name
+       at all. *)
+    destruct (rget_next_ops_indep (CID := CID0) b p CID m rd rsa rsb Hs Hops)
+      as [Hra Hrb].
     iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Lnpc0 : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
@@ -497,7 +563,8 @@ Section WpSmodeIntr.
     iModIntro.
     iExists (set_reg s_pc (R_bitvector_64 (gpr_of_Z (uint rd))) (regval_into_reg wval)).
     iSplitR.
-    { iPureIntro. rewrite Hpceq. fold s_pc. exact (Hbexec s_pc Lnpc0 Lva0 Lvb0). }
+    { iPureIntro. rewrite Hpceq. fold s_pc.
+      exact (Hbexec s_pc Lnpc0 (eq_trans Lva0 Hra) (eq_trans Lvb0 Hrb)). }
     iSplitL "Hreg Hmem".
     { unfold s_pc; rewrite ?sregs_set_reg ?mem_set_reg. iFrame "Hreg Hmem". }
     iIntros "Hhs' Hpc'".
@@ -517,8 +584,8 @@ Section WpSmodeIntr.
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
     (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
        obligation is discharged by instantiating it here. *)
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* =================================================================== *)

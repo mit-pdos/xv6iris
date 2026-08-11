@@ -54,20 +54,20 @@ Import Defs.
 (* the two PLIC interrupt-source ids xv6 raises to priority 1,
    [uart_irq_id] (= 10) and [virtio_irq_id] (= 1), both come from DevModel. *)
 
-Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (b : bool) (p : mword 64) :=
+Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64) :=
   let ra_idx : mword 5 := mword_of_int 1 in
   let pcE := mword_of_int KernelSyms.plicinit in
   let ra0 := m0 !!! Regidx ra_idx in
   let ret_tgt := ret_pc ra0 in
   (2 <= n)%nat ->
-  sie_cap_gpr m0 n b p -∗
+  sie_cap_gpr m0 n false p -∗
   kernel_text -∗ pc_is pcE -∗
   (* the PLIC fabric, borrowed from the invariant around each priority write;
      both writes preserve [plic_ok], so nothing is owed back to the caller *)
   plic_inv -∗
-  wp_next b p (fun (CID : CpuId) =>
+  wp_next false p (fun (CID : CpuId) =>
     ∀ m' : regfile,
-    sie_cap_gpr m' n b p -∗
+    sie_cap_gpr m' n false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m0 m' /\ m' !!! Regidx ra_idx = ra0 ⌝ -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -75,6 +75,6 @@ Definition wp_plicinit_sconf_body `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID 
 
 Module Type PLICINIT.
   Parameter wp_plicinit_sconf :
-    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (b : bool) (p : mword 64),
-      wp_plicinit_sconf_body m0 n b p.
+    forall `{!riscvGS Σ, !sieG Σ} `{GEN : GenId} `{CID : CpuId} (m0 : regfile) (n : nat) (p : mword 64),
+      wp_plicinit_sconf_body m0 n p.
 End PLICINIT.

@@ -757,20 +757,26 @@ described them, and the evidence is in the tree, not in a guess:
    `WpNext.wp_next` a leaf's obligation arrives at the REBOUND hart while its
    caller's premise was stated at the entry hart, and this class is what
    reconciles the two."*
-   **THE REMAINDER IS THREE SITES, and it is the only one left**:
+   **THE REMAINDER IS THREE SITES, and it is the only one left** — **DONE
+   2026-08-11, landed with 3b exactly as this entry prescribed**:
    `SpecUart.v`'s three `_body` leaves (lines 24, 53, 85) build their effective
    address from `rget m rs1`/`rget m rs2` and have neither a slot nor a class.
    They are MODULE-TYPE contracts, so widening them moves arity for their
    instantiators too — which is why they were deferred, and why they should be
    done as the first step of 3b rather than as a slice of their own.
 3b. **The funnel move itself** — `wp_instr_s_sconf`'s σ-callback inside
-   `wp_next b p`, plus its consumers.
+   `wp_next b p`, plus its consumers.  **DONE 2026-08-11, green tree-wide.**
+   (The RED-branch entry this replaced enumerated a "residue" of 10 files in
+   three flavours — a per-hart CELL out of a caller premise, the
+   address-translation regime, a `gpr_file` predicate fixed too early.  All
+   three had ONE cause, and it was not what the entry guessed: nearly every
+   predicate in this tier is PER HART, including every `r ↦ᵣ v`, and a
+   hart-indexed term written FRESH in a proof body resolves its hart from the
+   SECTION slot, so it silently means the entry hart.  What looked like three
+   phenomena was one, and it is an annotation problem, not a design problem.)
 
-   **ATTEMPTED 2026-08-11.  The mechanical part is DONE and lives on branch
-   `wp-next-funnel-2` (`6c379be2`, deliberately RED); the residue is enumerated
-   below and is NOT mechanical.**
-
-   **THE RECIPE, validated.**  Per crossing, three lines and no annotations:
+   **THE CHEAP HALF, and it is exactly what this entry predicted.**  Per
+   crossing, three lines and no annotations:
 
    ```coq
    rename CID into CID0.
@@ -788,9 +794,7 @@ described them, and the evidence is in the tree, not in a guess:
    the **184 call sites across 14 whole-function proofs** that name these
    leaves' harts as `(CID := CIDk)` — `ProofAllocproc` 62, `ProofKexit` 44,
    `ProofKkill` 24, `ProofWakeup` 18 … — keep working.  Renaming the section
-   variable itself would have broken every one of them.  Without the rename the
-   body needs `(CID := CIDn)` on every hart-indexed term it writes out: ~200
-   `tp_pin` + ~280 `rget` occurrences across this tier.
+   variable itself would have broken every one of them.
 
    **The rename must come AFTER the same-section application.**  Inside a
    Section, a reference to a SIBLING lemma resolves through the section
@@ -798,39 +802,34 @@ described them, and the evidence is in the tree, not in a guess:
    `wp_instr_s_sconf` unmentionable from its own file —
    *"wp_instr_s_sconf depends on the variable CID which is not declared in the
    context"*.  Lemmas from other files are already generalized and take the
-   hart as an instance argument, so they are unaffected; only `WpSmodeIntr.v`
-   is subject to this.
+   hart as an instance argument; only `WpSmodeIntr.v` is subject to this.
 
-   **Done: 64 crossings across 13 files** (61 uniform; `ProofKvminithart` has
-   ONE lemma with THREE crossings, so its entry harts are `CID0`/`CID1`/`CID2`)
-   and 47 guard discharges retargeted.  **The two gpr write engines are green**,
-   including the only place that needs the entry hart BY NAME:
+   **64 crossings across 13 files** (61 uniform; `ProofKvminithart` has ONE
+   lemma with THREE crossings, so its entry harts are `CID0`/`CID1`/`CID2`) and
+   47 guard discharges retargeted, plus 51 `$! cpu_id` → `$! CID`.  The only
+   place that needs the entry hart BY NAME is the gpr write engines:
    `rget_next_ops_indep (CID := CID0) b p CID m rd rsa rsb Hs Hops` feeding
-   `Hbexec s_pc Lnpc0 (eq_trans Lva0 Hra) (eq_trans Lvb0 Hrb)`.
+   `Hbexec s_pc Lnpc0 (eq_trans Lva0 Hra) (eq_trans Lvb0 Hrb)` — and the cap
+   engine needs the two-`rget_next_indep` form instead, because it carries
+   `ops_ok_sp`, not `ops_ok`.
 
-   **THE RESIDUE — 10 files, and every error is ONE phenomenon: a leaf that
-   FRAMES A PER-HART RESOURCE ACROSS ITS OWN STEP.**  Three flavours:
+   **THE EXPENSIVE HALF is per-hart-ness, and the whole write-up lives in
+   `durable-notes.md` under "A HART-INDEXED TERM WRITTEN FRESH IN A PROOF MEANS
+   THE *SECTION* HART"** — the list of which predicates are hart-indexed and
+   which only look it, the `(CID := CID)` + `Lpin_rs` recipe, the three shapes
+   no annotation can fix (a cross-hart refutation is not a refutation, so the
+   `destruct b` moves ABOVE the funnel; a `b = false` arm threading a per-hart
+   resource needs the guard collapsed; a caller-supplied `sie_cap` transformer
+   must be quantified `∀ CIDx`), and the scripting hazards.  Volume:
+   **104 annotations in `WpSconfMem`, 210 in `WpSconfBtype`, 25 in
+   `WpSconfAlu`** — scripted, then one build round per residual shape.
 
-   - **a per-hart CELL out of a caller premise.**  `WpSconfTimer:247` holds
-     `mcounteren ↦ᵣ□ mcen` from its `Htcap` premise, at the ENTRY hart, and
-     meets the callback's `reg_interp` at the rebound one.  `WpSconfCsr:614`
-     is the same with the `ghost_var sie_gname (1/2)` tied half.
-   - **the address-translation regime.**  `WpPlic:231`, `WpVirtioDev:322`,
-     `ProofUart:132`, `WpSconfMem:327` apply their translate lemma with
-     `sr_inv strans_regime` at the entry hart.
-   - **one `gpr_file` predicate fixed too early**, in `WpSconfMem`: the
-     `big_sepM`'s `Φ` was determined before the rebinding.
-
-   Each of those needs the per-leaf DECISION this file's leaf-sweep section
-   already anticipated — *either this leaf is `b = false`-only, or the resource
-   belongs in the arm.*  **8 of the 64 sites already pass a literal `false`**
-   (4 in `WpSconfCsr`, 3 in `ProofKvminithart`, 1 in `WpSconfSret`), and there
-   the guard collapses the two harts outright:
-   `assert ((CID : CpuId) = CID0) as -> by exact (Hs (or_introl eq_refl)).`
-   makes the conversion free.  The other 54 are `b`-generic and each needs the
-   call made.  `WpSconfTimer` is the sharpest case: `mcounteren` is a caller
-   premise, so there is nothing to re-derive at the rebound hart, and the leaf
-   must either be pinned to `b = false` or have that cell moved into `sconf`.
+   **The seven interrupts-off leaves are PINNED to `b = false`**, on the
+   criterion this file already had for `wp_csrw_stvec_s_sconf`: a leaf whose
+   post hands back a per-hart cell it just wrote is FALSE at `b = true`, not
+   merely unprovable.  `WpSconfTimer`'s `mcounteren` case — the one this entry
+   called the sharpest — resolved that way, and the cascade cost nothing: all
+   11 affected call sites already passed a literal `false`.
 
    Original measurement, still accurate as a site count: **13 files, 69 call sites**
    (`WpSconfBtype` 29, `WpSconfCsr` 9, `WpSconfCtl` 8, `WpSconfMem` 6,
@@ -886,7 +885,8 @@ described them, and the evidence is in the tree, not in a guess:
 **REVISED, and the revision is the good kind: `4`, `3a`, `5`, `6` and `7` are
 all landed, so THE ONLY THING BETWEEN HERE AND THE CORE IS `3b`** — the funnel
 move, 13 files / 69 call sites, preceded by `SpecUart`'s three-site `SrcOk`
-remainder.  (`6` needed `4` only, not the core — see the correction on its
+remainder (both now essentially done; see `3b`'s entry above for what the slice
+actually cost and where).  (`6` needed `4` only, not the core — see the correction on its
 line; `7` needed nothing but its shape.)  `8` is free at any point.  The core
 comes last and absorbs whatever remains.
 

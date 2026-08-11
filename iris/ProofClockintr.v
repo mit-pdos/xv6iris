@@ -138,7 +138,7 @@ Section ProofClockintr.
     iIntros "#Htcap Hcg #Htext Hpc Hbra Hbs0 Hcont".
     (* ---- +0x0e: rdtime a5 ---- *)
     iPoseProof (cii_0e with "Htext") as "Hi0e".
-    iApply (wp_csrr_time_s_sconf (mword_of_int (KernelSyms.clockintr + 0x0e)) a5_idx M k false
+    iApply (wp_csrr_time_s_sconf (mword_of_int (KernelSyms.clockintr + 0x0e)) a5_idx M k
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Htcap Hcg Hpc Hi0e [-]").
     iIntros (tv). iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -188,7 +188,7 @@ Section ProofClockintr.
     iEval (rewrite Hpc1c) in "Hpc".
     (* ---- +0x1c: csrw stimecmp,a5 -- the new deadline ---- *)
     iPoseProof (cii_1c with "Htext") as "Hi1c".
-    iApply (wp_csrw_stimecmp_s_sconf (mword_of_int (KernelSyms.clockintr + 0x1c)) a5_idx T3 k false
+    iApply (wp_csrw_stimecmp_s_sconf (mword_of_int (KernelSyms.clockintr + 0x1c)) a5_idx T3 k
               ltac:(vm_compute; discriminate)
               with "Htcap Hcg Hpc Hi1c [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".

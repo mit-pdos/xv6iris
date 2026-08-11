@@ -284,7 +284,7 @@ Section ProofPlicComplete.
       rewrite HN3a5 HN3a4. unfold ph_sthb. apply add_vec64_comm. }
     (* ---- 0x1a: c.sw s1,4(a5) -- PLIC_SCLAIM(hart) = irq ---- *)
     iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plic_complete + 0x1a)) true s1_idx a5_idx
-              (mword_of_int 4 : mword 12) N4 (n - 4)%nat false
+              (mword_of_int 4 : mword 12) N4 (n - 4)%nat
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))

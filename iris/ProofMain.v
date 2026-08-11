@@ -962,7 +962,7 @@ Section ProofMain.
               = (mword_of_int KernelSyms.plicinit : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtpl) in "Hpc".
-    iApply (Plicinit.wp_plicinit_sconf T3 n false p0 ltac:(lia)
+    iApply (Plicinit.wp_plicinit_sconf T3 n p0 ltac:(lia)
               with "Hcg Htext Hpc Hpinv").
     iApply wp_next_off_intro.
     iIntros (mpl) "Hcg Hpc %Hcspl".

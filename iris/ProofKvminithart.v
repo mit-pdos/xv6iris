@@ -124,6 +124,12 @@ Section KvminithartBody.
     iApply (wp_instr_s_sconf W2 (K - 2)%nat false (mword_of_int (KernelSyms.kvminithart + 0x08)) false
               (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
               with "Hcg Hpc Hi08").
+    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
+       obligation is discharged by [wp_next]'s OWN introduction rule at the
+       ambient hart -- the same [wp_next_off_intro] every b = false leaf
+       already uses for its own conclusion.  Nothing is renamed and nothing
+       is substituted: the body below is the pre-move proof VERBATIM. *)
+    iApply wp_next_off_intro.
     iIntros (σ1 Hpceq1) "Hsc Hcap Hfile Hnpc Hsi".
     iClear "Hi08".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -251,6 +257,12 @@ Section KvminithartBody.
     iApply (wp_instr_s_sconf S4 (K - 2)%nat false (mword_of_int (KernelSyms.kvminithart + 0x1c)) false
               (CSRReg (mword_of_int 384 : mword 12, Regidx (mword_of_int 15), Regidx (mword_of_int 0), CSRRW))
               with "Hcg Hpc Hi1c").
+    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
+       obligation is discharged by [wp_next]'s OWN introduction rule at the
+       ambient hart -- the same [wp_next_off_intro] every b = false leaf
+       already uses for its own conclusion.  Nothing is renamed and nothing
+       is substituted: the body below is the pre-move proof VERBATIM. *)
+    iApply wp_next_off_intro.
     iIntros (σ2 Hpceq2) "Hsc Hcap Hfile Hnpc Hsi".
     iClear "Hi1c".
     iDestruct "Hsc" as "(#Hhw2 & #Hminv2 & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -326,6 +338,12 @@ Section KvminithartBody.
     iApply (wp_instr_s_sconf S4 (K - 2)%nat false (mword_of_int (KernelSyms.kvminithart + 0x20)) false
               (SFENCE_VMA (Regidx (mword_of_int 0), Regidx (mword_of_int 0)))
               with "Hcg Hpc Hi20").
+    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
+       obligation is discharged by [wp_next]'s OWN introduction rule at the
+       ambient hart -- the same [wp_next_off_intro] every b = false leaf
+       already uses for its own conclusion.  Nothing is renamed and nothing
+       is substituted: the body below is the pre-move proof VERBATIM. *)
+    iApply wp_next_off_intro.
     iIntros (σ3 Hpceq3) "Hsc Hcap Hfile Hnpc Hsi".
     iClear "Hi20".
     iDestruct "Hsc" as "(#Hhw3 & #Hminv3 & Hpriv & Hmsx & Hmiex & Hmenvx)".

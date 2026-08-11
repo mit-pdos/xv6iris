@@ -216,6 +216,100 @@ every dependency, so two files edited in the same sweep but checked out of
 dependency order can each "pass" against a stale sibling and still fail
 together under `make`.
 
+## A HART-INDEXED TERM WRITTEN FRESH IN A PROOF MEANS THE *SECTION* HART
+
+Almost everything in the S-mode tier is per-hart, including things that do not
+look it. `Print`ing their `Arguments` is the only reliable check, and the list
+is long: `reg_pointsto` (i.e. **every `r ↦ᵣ v`** — `reg_name` is the ghost name
+of `cpu_id`), `reg_interp`, `mstate_interp`, `gpr_file`, `gpr_pt_value`,
+`tp_pin`, `rget`, `sconf`, `sie_cap`, `sie_arm`, `sie_gname`, `intr_count`,
+`intr_inv`, `intr_handler_spec`, `sr_transform`, `sr_absorb`, `sr_tmode`,
+`trap_csrs`, and `intr_frame` (it holds `menvcfg ↦ᵣ`, so "it is only a stack
+carve and a TLB arm" is wrong).
+Hart-FREE, despite appearances: `stack_own` (physical stack memory),
+`mem_pointsto` and the whole `word_pointsto` family (memory is shared),
+`ghost_var_agree` and the other generic Iris lemmas, and every
+`exec_execute_*` (they are pure facts about `mstate`).
+Annotating a hart-free term fails loudly — *"Wrong argument name CID (possible
+names: Σ riscvGS0)"* — so read the names before you annotate.
+
+**Why this is the shape and not an accident:** `riscv_irisGS` takes no `CpuId`,
+so `WP e` itself is hart-free, and `gregs_interp` holds EVERY hart's register
+map; `mstate_interp σ` at `CID` is the focused view of the one that is running
+(`gregs_interp_acc` does the focusing). So "the machine" is shared and "the
+registers I can step" are per-hart — which is exactly why a funnel whose engine
+can migrate the thread must hand its σ-callback the interp at an ARBITRARY hart,
+and why the leaves under it have to be hart-generic rather than the funnel
+absorbing the difference.
+
+Inside a proof that introduces a SECOND hart (the funnel's rebound `CID`), a
+hart-indexed term **written fresh** — in an `iAssert`, a pure `assert`, or as a
+lemma application — resolves its `CpuId` from the *section* slot, i.e. it means
+the ENTRY hart, no matter what the surrounding hypotheses are at. Two
+consequences:
+
+- The error prints the SAME TERM TWICE: *`iSpecialize: cannot instantiate (P -∗
+  Q) with P`* where both `P`s are character-for-character equal. (Same symptom
+  as the duplicate-class-instance trap above, different cause.)
+- Unification can still save you: a hart-indexed term appearing as an EXPLICIT
+  argument that is matched against an Iris hypothesis gets its hart from the
+  hypothesis (`gpr_file_lookup_acc (tp_pin m) …` is fine), while the same
+  `tp_pin m` in a PURE `assert` about the map is not. So a proof can be half
+  right and fail 100 lines later.
+
+The recipe for making a leaf's σ-callback hart-generic, validated across
+`WpSconfCsr`/`Mem`/`Alu`/`Btype`/`Lock`/`Ctl` and `ProofUart`:
+
+```coq
+rename CID into CID0.          (* AFTER any same-open-section lemma application *)
+iIntros (CID Hs σ Hpceq) "…".
+assert (Lpin_rs1 : tp_pin (CID := CID) m (Regidx rs1) = rget m rs1)
+  by exact (src_ok_rget_indep m rs1 CID CID0).   (* one per SOURCE register *)
+…                              (* (CID := CID) on every hart-indexed term below *)
+rewrite Lva ?Lpin_rs1 …        (* wherever a read reaches a statement-level fact *)
+iApply ("Hcont" $! CID with …). iPureIntro. exact Hs.
+```
+
+with `destruct (rget_next_ops_indep (CID := CID0) b p CID m rd rsa rsb Hs Hops)`
+(or two `rget_next_indep`s off `ops_ok_sp_s1`/`_s2`, which is what the cap
+engine needs — it carries `ops_ok_sp`, not `ops_ok`) where a step engine's
+`Hbexec` wants the entry hart's operand words. Mechanically, `(CID := CID)` on
+every hart-indexed head in the converted range is right and cheap to script —
+104 annotations in `WpSconfMem`, 210 in `WpSconfBtype` — but **exclude
+`rewrite /name`**: the script that adds them will happily produce `rewrite
+/sie_cap (CID := CID)`, which is a syntax error, not a type error.
+
+### Three shapes no annotation can fix
+
+- **A CROSS-HART REFUTATION IS NOT A REFUTATION.** `wp_csrsi_sstatus_x0`'s
+  already-enabled arm derives `False` from the payload's `sepc` cell and the
+  arm's; `wp_csrci_sstatus_x0`'s from two SIE eighths. Held inside the
+  callback, one is the rebound hart's and the other the entry hart's — and two
+  harts each owning their own `sepc` is perfectly consistent. **Hoist the
+  `destruct b` ABOVE the funnel**, where the caller still holds both at one
+  hart. That pays twice: the surviving arm is often `b = false`, where
+  `wp_next_off_intro` retires the hart question outright and the body needs no
+  annotations at all.
+- **A `b = false` ARM THAT THREADS A PER-HART RESOURCE NEEDS THE GUARD.** If
+  the statement hands in, say, `intr_count_pre b k eb` and the post owes
+  `intr_count (S k) eb`, the `b = false` arm is crossing harts with something
+  nothing transports. Collapse them:
+  `assert (Hcc : CID = CID0) by exact (Hs (or_introl eq_refl)). subst CID.`
+  (`CpuId` is a definitional class, so the guard's `(CID : CPU) = (CID0 : CPU)`
+  IS that equation up to conversion — `exact` crosses it, while `subst` on the
+  un-`assert`ed form fails with *"Cannot find any non-recursive equality"*.)
+  After the `subst`, any `(CID := CID)` already written in that arm must become
+  `(CID := CID0)`. The `b = true` arm usually needs no collapse: there the
+  count premise is a pure fact and everything in the post comes out of the arm,
+  which the callback already delivers at the rebound hart.
+- **A CALLER-SUPPLIED TRANSFORMER MUST BE HART-GENERIC.** A leaf that takes
+  `sie_cap m n b p -∗ sie_cap m' n' b p ∗ P` from its caller and applies it to
+  the capability the callback delivers cannot: `sie_cap` is per-hart. Quantify
+  the premise `∀ CIDx : CpuId`. Every proof of such a transformer is uniform in
+  the hart, so the cost is one `iIntros (CIDx)` per builder — and if the
+  builders all live in the same file as the leaf (as `WpSconfAlu`'s
+  push/pop/16sp wrappers do), no call site outside it changes.
+
 ## Changing the kernel SOURCE: what an image shift breaks, and how to find it
 
 Done once, 2026-08-06, for a 6-byte fix inside `writei` (`kernel-defects.md`

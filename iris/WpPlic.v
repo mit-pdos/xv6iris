@@ -129,7 +129,7 @@ Existing Instance riscv_memGS.
 (* ==================================================================== *)
 
 Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-    (m : regfile) (n : nat) (b : bool) :
+    (m : regfile) (n : nat) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) in
@@ -139,11 +139,11 @@ Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5
   kpt_dev_vpn (svpn_of a8) ->
   (forall p, plic_ok p ->
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   plic_inv -∗
-  wp_next b p (fun (CID : CpuId) =>
-    sie_cap_gpr m n b p -∗
+  wp_next false p (fun (CID : CpuId) =>
+    sie_cap_gpr m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -158,9 +158,15 @@ Proof.
   assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
     by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
   iIntros "Hcg Hpc Hinstr #Hpinv Hcont".
-  iApply (wp_instr_s_sconf m n b pc is_rvc
+  iApply (wp_instr_s_sconf m n false pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
             with "Hcg Hpc Hinstr").
+  (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
+     obligation is discharged by [wp_next]'s OWN introduction rule at the
+     ambient hart -- the same [wp_next_off_intro] every b = false leaf
+     already uses for its own conclusion.  Nothing is renamed and nothing
+     is substituted: the body below is the pre-move proof VERBATIM. *)
+  iApply wp_next_off_intro.
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -286,7 +292,7 @@ Proof.
     iSplitL "Hms Hhalf Hspp".
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n false p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
@@ -299,7 +305,7 @@ Qed.
    before the device invariant was split per device ([plicinithart],
    [plic_complete]): statement verbatim, proof one projection. *)
 Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-    (m : regfile) (n : nat) (b : bool) :
+    (m : regfile) (n : nat) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) in
@@ -309,11 +315,11 @@ Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
   kpt_dev_vpn (svpn_of a8) ->
   (forall p, plic_ok p ->
      exists p', plic_write p (uint a8 - plic_base)%Z storeword = Some p' /\ plic_ok p') ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γd γv -∗
-  wp_next b p (fun (CID : CpuId) =>
-    sie_cap_gpr m n b p -∗
+  wp_next false p (fun (CID : CpuId) =>
+    sie_cap_gpr m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -329,7 +335,7 @@ Proof.
     by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
-  iApply (wp_sw_plic_pinv_s_sconf pc is_rvc rs2 rs1 imm m n b
+  iApply (wp_sw_plic_pinv_s_sconf pc is_rvc rs2 rs1 imm m n
             Hrange Halign Hcanon Hdevvpn Hwrite
             with "Hcg Hpc Hinstr Hpinv Hcont").
 Qed.
@@ -342,7 +348,7 @@ Qed.
    read that holds at all of them -- that is how [plic_claim] learns its result
    is one of the machine's own interrupt ids. *)
 Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1}
-    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) (b : bool) :
+    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   (* the vmem level hands back the value itself now, not the split accumulator *)
@@ -355,13 +361,13 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
   rd_ok rd ->
   (forall p, plic_ok p ->
      exists v p', plic_read p (uint a8 - plic_base)%Z = Some (v, p') /\ plic_ok p' /\ P v) ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   dev_inv γd γv -∗
   ( ∀ v : bv 32,
     ⌜ P v ⌝ -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval v)]> m) n b p -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval v)]> m) n false p -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       WP (Loop : expr riscv_lang))) -∗
   WP (Loop : expr riscv_lang).
@@ -376,9 +382,15 @@ Proof.
   pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
   pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
-  iApply (wp_instr_s_sconf m n b pc is_rvc
+  iApply (wp_instr_s_sconf m n false pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
             with "Hcg Hpc Hinstr").
+  (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
+     obligation is discharged by [wp_next]'s OWN introduction rule at the
+     ambient hart -- the same [wp_next_off_intro] every b = false leaf
+     already uses for its own conclusion.  Nothing is renamed and nothing
+     is substituted: the body below is the pre-move proof VERBATIM. *)
+  iApply wp_next_off_intro.
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -510,12 +522,12 @@ Proof.
     iSplitL "Hms Hhalf Hspp".
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n false p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   (* the leaf's own write commutes with the tp pin *)
   tp_refold Hrdtp "Hfmap".
   iDestruct (sie_cap_retarget m
-               (<[Regidx rd := regval_into_reg (ldval v)]> m) n b Hsp with "Hcap") as "Hcap".
+               (<[Regidx rd := regval_into_reg (ldval v)]> m) n false Hsp with "Hcap") as "Hcap".
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   iSpecialize ("Hcont" $! v with "[%]"); [ exact HPv |].
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]

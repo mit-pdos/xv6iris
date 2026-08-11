@@ -302,7 +302,7 @@ Section ProofPlicinithart.
     { rewrite HN5a4. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x1a: sw a4,128(a5) -- PLIC_SENABLE(hart) = 1026 ---- *)
     iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plicinithart + 0x1a)) false a4_idx a5_idx
-              (mword_of_int 128 : mword 12) N5 (n - 2)%nat false
+              (mword_of_int 128 : mword 12) N5 (n - 2)%nat
               ltac:(rewrite HN5a5; exact (ph_geom_range _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5a5; exact (ph_geom_align _ (ph_senable_geom _ Hhart)))
               ltac:(rewrite HN5a5; exact (ph_geom_canon _ (ph_senable_geom _ Hhart)))
@@ -366,7 +366,7 @@ Section ProofPlicinithart.
     { rewrite HN8z. apply bv_eq; vm_compute; reflexivity. }
     (* ---- 0x28: sw zero,0(a5) -- PLIC_SPRIORITY(hart) = 0 ---- *)
     iApply (wp_sw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plicinithart + 0x28)) false z_idx a5_idx
-              (mword_of_int 0 : mword 12) N8 (n - 2)%nat false
+              (mword_of_int 0 : mword 12) N8 (n - 2)%nat
               ltac:(rewrite HN8a5; exact (ph_geom_range _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8a5; exact (ph_geom_align _ (ph_sthresh_geom _ Hhart)))
               ltac:(rewrite HN8a5; exact (ph_geom_canon _ (ph_sthresh_geom _ Hhart)))

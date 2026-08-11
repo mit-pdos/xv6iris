@@ -211,16 +211,16 @@ Section WpSconfTimer.
   (* ---- rdtime rd: rd := (an arbitrary) mtime reading ---- *)
   Lemma wp_csrr_time_s_sconf
       (pc : mword 64) (rd : mword 5)
-      (m : regfile) (n : nat) (b : bool) :
+      (m : regfile) (n : nat) :
     uint rd <> 0 ->
     rd_ok rd ->
     timer_cap -∗
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m n false p -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
     ( ∀ tv : mword 64,
-      wp_next b p (fun (CID : CpuId) =>
-        sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n b p -∗
+      wp_next false p (fun (CID : CpuId) =>
+        sie_cap_gpr (<[Regidx rd := regval_into_reg tv]> m) n false p -∗
         pc_is (add_vec_int pc 4) -∗
         WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
@@ -230,9 +230,15 @@ Section WpSconfTimer.
     pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
     iDestruct "Htcap" as "[Hen _]".
     iDestruct "Hen" as (mcen) "[#Hmcen %HTM]".
-    iApply (wp_instr_s_sconf m n b pc false
+    iApply (wp_instr_s_sconf m n false pc false
               (CSRReg (csr_time, zreg, Regidx rd, CSRRS))
               with "Hcg Hpc Hinstr").
+    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
+       obligation is discharged by [wp_next]'s OWN introduction rule at the
+       ambient hart -- the same [wp_next_off_intro] every b = false leaf
+       already uses for its own conclusion.  Nothing is renamed and nothing
+       is substituted: the body below is the pre-move proof VERBATIM. *)
+    iApply wp_next_off_intro.
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hrest)".
     iDestruct (reg_valid    with "Hreg Hpriv") as %Lpriv.
@@ -271,7 +277,7 @@ Section WpSconfTimer.
       by (symmetry; apply upd_ne; congruence).
     tp_refold Hrdtp "Hfile".
     iDestruct (sie_cap_retarget m
-                 (<[Regidx rd := regval_into_reg tv]> m) n b Hsp with "Hcap") as "Hcap".
+                 (<[Regidx rd := regval_into_reg tv]> m) n false Hsp with "Hcap") as "Hcap".
     iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hminv $Hpriv $Hrest] Hcap Hfile") as "Hcg".
     iApply ("Hcont" $! tv cpu_id with "[] Hcg [$Hpc' $Hnpc]").
     iPureIntro. done.
@@ -283,14 +289,14 @@ Section WpSconfTimer.
      the postcondition says nothing about the timer at all. ---- *)
   Lemma wp_csrw_stimecmp_s_sconf
       (pc : mword 64) (rs1 : mword 5)
-      (m : regfile) (n : nat) (b : bool) :
+      (m : regfile) (n : nat) :
     uint rs1 <> 0 ->
     timer_cap -∗
-    sie_cap_gpr m n b p -∗
+    sie_cap_gpr m n false p -∗
     pc_is pc -∗
     instr pc false (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW)) -∗
-    wp_next b p (fun (CID : CpuId) =>
-      sie_cap_gpr m n b p -∗
+    wp_next false p (fun (CID : CpuId) =>
+      sie_cap_gpr m n false p -∗
       pc_is (add_vec_int pc 4) -∗
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
@@ -298,9 +304,12 @@ Section WpSconfTimer.
     iIntros (Hrs1) "#Htcap Hcg Hpc Hinstr Hcont".
     iDestruct "Htcap" as "[Hen #Hsinv]".
     iDestruct "Hen" as (mcen) "[#Hmcen %HTM]".
-    iApply (wp_instr_s_sconf m n b pc false
+    iApply (wp_instr_s_sconf m n false pc false
               (CSRReg (csr_stimecmp, Regidx rs1, zreg, CSRRW))
               with "Hcg Hpc Hinstr").
+    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic obligation
+       is discharged by [wp_next]'s OWN introduction rule at the ambient hart. *)
+    iApply wp_next_off_intro.
     iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmenvx" as (menvcfg0) "(Hmenv & %HPBMTE & %Hpmm & %Hlpe & %Hfiom & %Hmenvval)".

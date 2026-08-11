@@ -140,7 +140,7 @@ Section VtLeaves.
                     (add_vec (rget m rs1) (sign_extend' 64 imm)) (xlen - 0 - 1) 0) = a).
     { rewrite subrange_id. rewrite sign_extend'_id. exact Hea. }
     iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
-    iApply (wp_lw_virtio_dev_s_sconf (CID:=CID) γu γd pc rvc false rd rs1 imm m n P false
+    iApply (wp_lw_virtio_dev_s_sconf (CID:=CID) γu γd pc rvc false rd rs1 imm m n P
               ltac:(rewrite Ha8; exact Hr)
               ltac:(rewrite Ha8; exact Hal)
               ltac:(rewrite Ha8; exact Hcan)
@@ -194,7 +194,7 @@ Section VtLeaves.
                     (add_vec (rget m rs1) (sign_extend' 64 imm)) (xlen - 0 - 1) 0) = a).
     { rewrite subrange_id. rewrite sign_extend'_id. exact Hea. }
     iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
-    iApply (wp_sw_virtio_dev_s_sconf (CID:=CID) γu γd pc rvc rs2 rs1 imm m n false
+    iApply (wp_sw_virtio_dev_s_sconf (CID:=CID) γu γd pc rvc rs2 rs1 imm m n
               ltac:(rewrite Ha8; exact Hr)
               ltac:(rewrite Ha8; exact Hal)
               ltac:(rewrite Ha8; exact Hcan)

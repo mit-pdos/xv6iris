@@ -250,7 +250,7 @@ Section ProofPlicClaim.
       rewrite HN3a5 HN3a0. reflexivity. }
     (* ---- 0x16: c.lw a0,4(a5) -- THE CLAIM ---- *)
     iApply (wp_lw_plic_dev_s_sconf (CID := CID) γd γv (mword_of_int (KernelSyms.plic_claim + 0x16)) true false
-              a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok false
+              a0_idx a5_idx (mword_of_int 4 : mword 12) N4 (n - 2)%nat plic_claim_ret_ok
               ltac:(rewrite HN4a5; exact (ph_geom_range _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_align _ (ph_sclaim_geom _ Hhart)))
               ltac:(rewrite HN4a5; exact (ph_geom_canon _ (ph_sclaim_geom _ Hhart)))

@@ -72,6 +72,11 @@ Require Import MstatusBits.
 (* [exec_execute_SRET_menv] -- the SRET reduction with the get_xLPE premise
    pinned by the menvcfg VALUE, which is what [sconf] gives us. *)
 Require Import WpSmodeSret.
+(* [wp_next_off_intro] -- this leaf is pinned to [b = false], so the funnel's
+   hart-generic callback is discharged by wp_next's own introduction rule.
+   (The dead-import sweep removed WpNext while the leaf did not yet consume
+   the funnel through [wp_next]; it does now.) *)
+Require Import WpNext.
 Require Import IntrDefs WpSmodeIntr.
 Import Defs.
 Local Open Scope Z_scope.
@@ -110,6 +115,12 @@ Section WpSconfSret.
     iDestruct "Hcnt" as "[Htok Hhx]".
     iApply (wp_instr_s_sconf m (trap_res true + n)%nat false pc false (SRET tt)
               with "Hcg Hpc Hinstr").
+    (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
+       obligation is discharged by [wp_next]'s OWN introduction rule at the
+       ambient hart -- the same [wp_next_off_intro] every b = false leaf
+       already uses for its own conclusion.  Nothing is renamed and nothing
+       is substituted: the body below is the pre-move proof VERBATIM. *)
+    iApply wp_next_off_intro.
     iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".

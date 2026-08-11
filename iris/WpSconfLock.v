@@ -655,7 +655,20 @@ Section WpSconfLock.
     iApply (wp_instr_s_sconf m n b pc false
               (AMO (AMOSWAP, true, false, Regidx rs2, Regidx rs1, 4, Regidx rd))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg [Hmem Hdev]]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfmap Hnpc [Hreg [Hmem Hdev]]".
+    (* the reads cross the rebinding -- see the [SrcOk] note on the family *)
+    assert (Lpin_rs1 : tp_pin (CID := CID) m (Regidx rs1) = rget m rs1)
+      by exact (src_ok_rget_indep m rs1 CID CID0).
+    assert (Lpin_rs2 : tp_pin (CID := CID) m (Regidx rs2) = rget m rs2)
+      by exact (src_ok_rget_indep m rs2 CID CID0).
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
     iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
     iDestruct "Hmsx" as (ms0) "(Hms & Hhalf & Hspp & %Hmsf)".
@@ -670,12 +683,12 @@ Section WpSconfLock.
     iDestruct "Hbody" as (w st) "(>Hbytes & >Hcpu & >Hg & Hbr)".
     iEval (rewrite /lock_word /word4_pointsto -Hpalk) in "Hbytes".
     iDestruct "Hbytes" as "[%Hpalign4 Hbytes]".
-    iDestruct (reg_valid with "Hreg Hpriv") as %Lpriv.
-    iDestruct (reg_valid with "Hreg Hms")   as %Lms.
-    iDestruct (reg_valid with "Hreg Hmenv") as %Lmenv.
-    iDestruct (reg_valid_dq with "Hreg Hpma")  as %Lpma.
-    iDestruct (reg_valid_dq with "Hreg Hhtif") as %Lhtif.
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
+    iDestruct (reg_valid (CID := CID) with "Hreg Hpriv") as %Lpriv.
+    iDestruct (reg_valid (CID := CID) with "Hreg Hms")   as %Lms.
+    iDestruct (reg_valid (CID := CID) with "Hreg Hmenv") as %Lmenv.
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hpma")  as %Lpma.
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hhtif") as %Lhtif.
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
     assert (Halign4 : is_aligned_vaddr (Virtaddr a8) 4 = true)
       by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
     (* the lock word's OWN base claim + canonicality (peek byte 0, refold) *)
@@ -690,10 +703,10 @@ Section WpSconfLock.
       by (rewrite is_aligned_vaddr_paddr; exact Hpalign4).
     pose proof (off_bound_div pa 4 ltac:(lia) ltac:(exists 1024; lia) Halignp4) as Hoff.
     rewrite (uint_unsigned_n _) in Hoff.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfmap") as "[Hspc Hfb1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hspc") as %Lva.
     iDestruct ("Hfb1" with "Hspc") as "Hfmap".
     assert (Lpriv_pc : register_lookup cur_privilege s_pc.(sregs) = Supervisor)
       by (unfold s_pc; tmig; exact Lpriv).
@@ -718,13 +731,13 @@ Section WpSconfLock.
     assert (Hea_pc : add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                               else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                              (zeros' 64) = pa)
-      by (rewrite Lva; reflexivity).
+      by (rewrite Lva ?Lpin_rs1; reflexivity).
     assert (Ha8_pc : sign_extend' 64 (subrange_vec_dec
                        (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                                  else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                                 (zeros' 64)) (xlen - 0 - 1) 0) = pa)
       by (rewrite Hea_pc subrange_id sign_extend'_id; reflexivity).
-    iDestruct (sr_transform strans_regime (Atomic (AMOSWAP, true, false, Data, Data))
+    iDestruct (sr_transform (CID := CID) strans_regime (Atomic (AMOSWAP, true, false, Data, Data))
                  (add_vec (if Z.eqb (uint rs1) 0 then zero_reg
                            else register_lookup (R_bitvector_64 (gpr_of_Z (uint rs1))) s_pc.(sregs))
                           (zeros' 64))
@@ -734,7 +747,7 @@ Section WpSconfLock.
                  (exec_get_pmlen_amo_S true false s_pc ltac:(rewrite Lms_pc; exact HMXR)
                     ltac:(rewrite Lmenv_pc; exact Hpmm))
                  with "Hreg Htr") as %Htea.
-    unshelve iMod (sr_absorb strans_regime (Atomic (AMOSWAP, true, false, Data, Data)) pa (pa_of ppn pa) ppn KP_rw s_pc _
+    unshelve iMod (sr_absorb (CID := CID) strans_regime (Atomic (AMOSWAP, true, false, Data, Data)) pa (pa_of ppn pa) ppn KP_rw s_pc _
             (or_intror (or_intror (or_intror (ex_intro _ true (ex_intro _ false eq_refl))))) eq_refl
             (lo_canonical pa Hcan) ltac:(reflexivity)
             Lmisa_pc' Lmenv_pc' Lhtif_pc Lpriv_pc LSXL_pc
@@ -753,8 +766,8 @@ Section WpSconfLock.
       by (rewrite (Hprestr pma_regions ltac:(vm_compute; reflexivity)); exact Lpma_pc).
     assert (Lhtif_tr : register_lookup htif_tohost_base s_tr.(sregs) = None)
       by (rewrite (Hprestr htif_tohost_base ltac:(vm_compute; reflexivity)); exact Lhtif_pc).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfmap") as "[Hr2c Hfb2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_tr with "Hreg Hr2c") as %Lv2_tr.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfmap") as "[Hr2c Hfb2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_tr with "Hreg Hr2c") as %Lv2_tr.
     iDestruct ("Hfb2" with "Hr2c") as "Hfmap".
     iDestruct (s_mem_chunk s_tr pa pa 0 4 4 (nth_byte w) ppn (DfracOwn 1)
                  ltac:(lia) ltac:(lia) (fun k => eq_refl) Hoff Hcan
@@ -803,13 +816,13 @@ Section WpSconfLock.
                  (addr_is_ram_not_dev _ Hram0)
                  Hbytesf_tr).
       subst s_x. unfold amoswap_stored, amoswap_loaded.
-      rewrite Lv2_tr. reflexivity. }
-    iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (amoswap_loaded w)) with "Hfmap") as "[Hrdc Hfins]".
-    rewrite (gpr_pt_nz rd _ Hrd).
-    iMod (reg_update _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (amoswap_loaded w))
+      rewrite Lv2_tr ?Lpin_rs2. reflexivity. }
+    iDestruct (gpr_file_insert_acc (tp_pin (CID := CID) m) (Regidx rd) (regval_into_reg (amoswap_loaded w)) with "Hfmap") as "[Hrdc Hfins]".
+    rewrite (gpr_pt_nz (CID := CID) rd _ Hrd).
+    iMod (reg_update (CID := CID) _ (R_bitvector_64 (gpr_of_Z (uint rd))) _ (regval_into_reg (amoswap_loaded w))
             with "Hreg Hrdc") as "[Hreg Hrdc]".
     iDestruct ("Hfins" with "[Hrdc]") as "Hfmap".
-    { rewrite (gpr_pt_nz rd _ Hrd). iExact "Hrdc". }
+    { rewrite (gpr_pt_nz (CID := CID) rd _ Hrd). iExact "Hrdc". }
     (* the leaf's own write commutes with the tp pin *)
     tp_refold (rd_ok_tp _ Hrdok) "Hfmap".
     iDestruct (word4_pointsto_intro pa (DfracOwn 1) w Hpalign4 with "Hbytes") as "Hbytes".
@@ -852,20 +865,20 @@ Section WpSconfLock.
       rewrite (Hprestr nextPC ltac:(vm_compute; reflexivity)).
       unfold s_pc; cbn [sregs]. rewrite register_lookup_set. reflexivity. }
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert sconf with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
+    iAssert (sconf (CID := CID)) with "[Hpriv Hms Hhalf Hspp Hmiex Hmenv]" as "Hsc".
     { iFrame "Hhw Hminv Hpriv Hmiex".
       iSplitL "Hms Hhalf Hspp".
       { iExists ms0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
       iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-    iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
+    iAssert (sie_cap (CID := CID) m n b p) with "[Hstk Htr Harm]" as "Hcap".
     { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
     assert (Hspne : Regidx rd ≠ Regidx csp_rs1) by congruence.
     assert (Hsp : m !!! Regidx csp_rs1
                   = <[Regidx rd := regval_into_reg (amoswap_loaded w)]> m !!! Regidx csp_rs1)
       by (symmetry; apply upd_ne; congruence).
-    iDestruct (sie_cap_retarget m
+    iDestruct (sie_cap_retarget (CID := CID) m
                  (<[Regidx rd := regval_into_reg (amoswap_loaded w)]> m) n b Hsp with "Hcap") as "Hcap".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfmap") as "Hcg".
     iNext.
     (* STAGE 1: the engine resumes on the SAME hart. *)
     iApply ("Hcont" $! w cpu_id with "[] HTc Hcg [$Hpc' $Hnpc] Hpay").

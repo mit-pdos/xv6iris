@@ -349,14 +349,22 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -367,9 +375,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_bne_fall_s_sconf
@@ -394,14 +402,22 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -412,9 +428,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_bltu_fall_s_sconf
@@ -439,14 +455,22 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -457,9 +481,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* BLT-fall, the SIGNED twin of [wp_bltu_fall_s_sconf] at two general
@@ -487,14 +511,22 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -505,9 +537,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* ...and the TAKEN arm of the same two-register BLT (a copy loop's back
@@ -535,25 +567,33 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -573,9 +613,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* BGEU-fall (the freerange loop exit: no more full pages fit). *)
@@ -601,14 +641,22 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -619,9 +667,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* BLTU-taken (the freerange empty-page-list path skips the loop to the
@@ -649,25 +697,33 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BLTU))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -687,9 +743,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* BGEU-taken (the freerange loop back-edge: another full page still fits). *)
@@ -716,25 +772,33 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGEU))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -754,9 +818,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* BGE-fall / BGE-taken over TWO general registers -- the SIGNED twin of
@@ -786,14 +850,22 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -804,9 +876,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_bge_taken_s_sconf
@@ -832,25 +904,33 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -870,9 +950,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_bge_x0_fall_s_sconf
@@ -897,11 +977,19 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -915,9 +1003,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* BLT against x0 -- a [bltz rs1] error test (the -1 return of
@@ -946,11 +1034,19 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -964,9 +1060,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* ...and its TAKEN twin: the [bltz rs1] error test that DID fire (the
@@ -995,22 +1091,30 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BLT))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1033,9 +1137,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1066,11 +1170,19 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BLT))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1085,9 +1197,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_bgtz_taken_s_sconf
@@ -1113,22 +1225,30 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BLT))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1153,9 +1273,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1187,11 +1307,19 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1205,9 +1333,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_bgez_taken_s_sconf
@@ -1233,22 +1361,30 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx (mword_of_int 0), Regidx rs1, BGE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1271,9 +1407,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* BGE against x0 in the rs1 slot -- a [blez rs2] loop-guard (printint's
@@ -1301,22 +1437,30 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx (mword_of_int 0), BGE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1339,9 +1483,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* THE SIDE CONDITION ARRIVES BY INSTANCE RESOLUTION, NOT AS A PREMISE --
@@ -1397,11 +1541,19 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BEQ))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
-    iDestruct (gpr_pt_value rd1 (tp_pin m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
+    iDestruct (gpr_pt_value (CID := CID) rd1 (tp_pin (CID := CID) m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rd1" with "Hrac") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1418,9 +1570,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* WHAT AN [SrcOk] FAILURE LOOKS LIKE, so nobody has to rediscover it.  A
@@ -1486,11 +1638,19 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (sign_extend' 13 (concat_vec imm8 ('b"0")), zreg, creg2reg_idx rs, BNE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
-    iDestruct (gpr_pt_value rd1 (tp_pin m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
+    iDestruct (gpr_pt_value (CID := CID) rd1 (tp_pin (CID := CID) m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rd1" with "Hrac") as "Hfile".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1506,9 +1666,9 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 2)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)
@@ -1540,25 +1700,33 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1578,9 +1746,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_bne_taken_s_sconf
@@ -1606,25 +1774,33 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, Regidx rs2, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
-    iDestruct (gpr_pt_value rs2 (tp_pin m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs2) with "Hfile") as "[Hrbc Hfb_rs2]".
+    iDestruct (gpr_pt_value (CID := CID) rs2 (tp_pin (CID := CID) m (Regidx rs2)) s_pc with "Hreg Hrbc") as %Lvb.
     iDestruct ("Hfb_rs2" with "Hrbc") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1644,9 +1820,9 @@ Section WpSconfBtype.
       by (rewrite ?sregs_set_reg; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_cbeqz_taken_s_sconf
@@ -1675,22 +1851,30 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (imm, zreg, creg2reg_idx rs, BEQ))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
-    iDestruct (gpr_pt_value rd1 (tp_pin m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
+    iDestruct (gpr_pt_value (CID := CID) rd1 (tp_pin (CID := CID) m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rd1" with "Hrac") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1714,9 +1898,9 @@ Section WpSconfBtype.
       by (rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_cbnez_taken_s_sconf
@@ -1745,22 +1929,30 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc true
               (BTYPE (imm, zreg, creg2reg_idx rs, BNE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 2) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 2)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
-    iDestruct (gpr_pt_value rd1 (tp_pin m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rd1) with "Hfile") as "[Hrac Hfb_rd1]".
+    iDestruct (gpr_pt_value (CID := CID) rd1 (tp_pin (CID := CID) m (Regidx rd1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rd1" with "Hrac") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1784,9 +1976,9 @@ Section WpSconfBtype.
       by (rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
 
@@ -1817,22 +2009,30 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, zreg, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1856,9 +2056,9 @@ Section WpSconfBtype.
       by (rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* beqz (x0) fall-through -- moved here from ProofWalk.v. *)
@@ -1884,13 +2084,21 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, zreg, Regidx rs1, BEQ))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc [Hreg Hmem]".
-    assert (Hma : rf_to_gmap (tp_pin m) !! Regidx rs1 = Some (tp_pin m !!! Regidx rs1))
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    assert (Hma : rf_to_gmap (tp_pin (CID := CID) m) !! Regidx rs1 = Some (tp_pin (CID := CID) m !!! Regidx rs1))
       by (rewrite rf_lookup; apply rf_to_gmap_lookup).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -1905,11 +2113,11 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (gpr_file (tp_pin m)) with "[Hfmap]" as "Hfile".
+    iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg'".
-    iApply ("Hcont" $! cpu_id with "[] Hcg' [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg'".
+    iApply ("Hcont" $! CID with "[] Hcg' [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* bnez (x0 as rs2), the uncompressed form -- the back-edge of printk's %p
@@ -1939,22 +2147,30 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, zreg, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
     iDestruct "Hsc" as "[#Hhw Hsc2]".
     iPoseProof "Hhw" as "#Hhwc".
     iDestruct "Hhwc" as (misa0 mseccfg0 pmar0 elp0)
       "(#Hmisa & #Hmseccfg & #Hpma & #Hhtif & #Help & %HmisaS & %HmisaC &
         %HmisaU & %HmisaM & %Hpma_all & %Hseccfg1 & %Hseccfg2 & %Help_np & %HmisaA & %Hmisa_val0 & %Hmseccfg_val0 & #Hkmapb)".
-    iDestruct (reg_valid_dq with "Hreg Hmisa") as %Lmisa.
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iDestruct (reg_valid_dq (CID := CID) with "Hreg Hmisa") as %Lmisa.
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     assert (Hpcv : register_lookup PC s_pc.(sregs) = pc).
     { unfold s_pc; rewrite ?sregs_set_reg.
       rewrite irrelevant_register_set; [ exact Hpceq | vm_compute; reflexivity ]. }
-    iDestruct (gpr_file_lookup_acc (tp_pin m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_file_lookup_acc (tp_pin (CID := CID) m) (Regidx rs1) with "Hfile") as "[Hrac Hfb_rs1]".
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m (Regidx rs1)) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfb_rs1" with "Hrac") as "Hfile".
-    iMod (reg_update _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec pc (sign_extend' 64 imm)) with "Hreg Hnpc") as "[Hreg Hnpc]".
     iModIntro.
     iExists (set_reg s_pc nextPC (add_vec pc (sign_extend' 64 imm))).
     iSplitR.
@@ -1978,9 +2194,9 @@ Section WpSconfBtype.
       by (rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
     iNext.
-    iDestruct (sie_cap_gpr_join with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
-    iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' [$Hhw $Hsc2] Hcap Hfile") as "Hcg".
+    iApply ("Hcont" $! CID with "[] Hcg [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   Lemma wp_bnez_x0_fall_s_sconf
@@ -2005,13 +2221,21 @@ Section WpSconfBtype.
     iApply (wp_instr_s_sconf m n b pc false
               (BTYPE (imm, zreg, Regidx rs1, BNE))
               with "Hcg Hpc Hinstr").
-    iIntros (σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc [Hreg Hmem]".
-    assert (Hma : rf_to_gmap (tp_pin m) !! Regidx rs1 = Some (tp_pin m !!! Regidx rs1))
+    (* FREE THE NAME [CID] FOR THE REBOUND HART.  A section variable is an
+       ordinary context entry inside a proof, so [rename] moves it aside --
+       and the STATEMENT never sees that, so the 184 call sites that name this
+       tier's harts as [(CID := ...)] keep working.  Introducing the new hart
+       under a different name instead would force a [(CID := ...)] annotation on
+       every hart-indexed term the body writes out ([tp_pin m], [rget m rs]);
+       with the rename the body below is UNCHANGED. *)
+    rename CID into CID0.
+    iIntros (CID Hs σ Hpceq) "Hsc Hcap [%Hdom Hfmap] Hnpc [Hreg Hmem]".
+    assert (Hma : rf_to_gmap (tp_pin (CID := CID) m) !! Regidx rs1 = Some (tp_pin (CID := CID) m !!! Regidx rs1))
       by (rewrite rf_lookup; apply rf_to_gmap_lookup).
-    iMod (reg_update _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
+    iMod (reg_update (CID := CID) _ nextPC _ (add_vec_int pc 4) with "Hreg Hnpc") as "[Hreg Hnpc]".
     set (s_pc := set_reg σ nextPC (add_vec_int pc 4)).
     iDestruct (big_sepM_lookup_acc _ _ _ _ Hma with "Hfmap") as "[Hrac Hfba]".
-    iDestruct (gpr_pt_value rs1 (tp_pin m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
+    iDestruct (gpr_pt_value (CID := CID) rs1 (tp_pin (CID := CID) m !!! Regidx rs1) s_pc with "Hreg Hrac") as %Lva.
     iDestruct ("Hfba" with "Hrac") as "Hfmap".
     iModIntro. iExists s_pc.
     iSplitR.
@@ -2026,11 +2250,11 @@ Section WpSconfBtype.
     assert (Lnpc : register_lookup nextPC s_pc.(sregs) = add_vec_int pc 4)
       by (unfold s_pc; rewrite register_lookup_set; reflexivity).
     iEval (rewrite Lnpc) in "Hpc'".
-    iAssert (gpr_file (tp_pin m)) with "[Hfmap]" as "Hfile".
+    iAssert (gpr_file (CID := CID) (tp_pin (CID := CID) m)) with "[Hfmap]" as "Hfile".
     { iSplitR; [iPureIntro; exact Hdom | iExact "Hfmap"]. }
-    iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfile") as "Hcg'".
-    iApply ("Hcont" $! cpu_id with "[] Hcg' [$Hpc' $Hnpc]").
-    iPureIntro. done.
+    iDestruct (sie_cap_gpr_join (CID := CID) with "Hhs' Hsc Hcap Hfile") as "Hcg'".
+    iApply ("Hcont" $! CID with "[] Hcg' [$Hpc' $Hnpc]").
+    iPureIntro. exact Hs.
   Qed.
 
   (* ------------------------------------------------------------------- *)

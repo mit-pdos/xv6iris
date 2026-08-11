@@ -217,7 +217,7 @@ Existing Instance riscv_memGS.
    [wp_lw_virtio_dev_s_sconf] below is the bundle-taking, pure-premise
    restatement for the live driver, whose reads are state-independent. *)
 Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1}
-    (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 32 -> iProp Σ) (b : bool) :
+    (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 32 -> iProp Σ) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   (* the vmem level hands back the value itself now, not the split accumulator *)
@@ -228,7 +228,7 @@ Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names) (pc : mword 64) (is_rvc is_un
   kpt_dev_vpn (svpn_of a8) ->
   uint rd <> 0 ->
   rd_ok rd ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   disk_inv γd -∗
   R -∗
@@ -236,9 +236,9 @@ Lemma wp_lw_virtio_dinv_s_sconf (γd : disk_names) (pc : mword 64) (is_rvc is_un
     virtio_proto γd v -∗ R ==∗
     ∃ w : bv 32, ⌜ virtio_read v (uint a8 - virtio_base)%Z = Some w ⌝ ∗
                  virtio_proto γd v ∗ S w ) -∗
-  wp_next b p (fun (CID : CpuId) =>
+  wp_next false p (fun (CID : CpuId) =>
     ∀ w : bv 32,
-    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b p -∗
+    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S w -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -254,9 +254,15 @@ Proof.
   pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
   pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
   iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
-  iApply (wp_instr_s_sconf m n b pc is_rvc
+  iApply (wp_instr_s_sconf m n false pc is_rvc
             (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4))
             with "Hcg Hpc Hinstr").
+  (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
+     obligation is discharged by [wp_next]'s OWN introduction rule at the
+     ambient hart -- the same [wp_next_off_intro] every b = false leaf
+     already uses for its own conclusion.  Nothing is renamed and nothing
+     is substituted: the body below is the pre-move proof VERBATIM. *)
+  iApply wp_next_off_intro.
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -385,10 +391,10 @@ Proof.
     iSplitL "Hms Hhalf Hspp".
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n false p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_retarget m
-               (<[Regidx rd := regval_into_reg (ldval w)]> m) n b Hsp with "Hcap") as "Hcap".
+               (<[Regidx rd := regval_into_reg (ldval w)]> m) n false Hsp with "Hcap") as "Hcap".
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
      obligation is discharged by instantiating it here. *)
@@ -413,7 +419,7 @@ Qed.
    [wp_sw_virtio_dev_s_sconf] below is the bundle-taking, pure-premise
    restatement for the first kind. *)
 Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-    (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) :
+    (m : regfile) (n : nat) (R S : iProp Σ) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) in
@@ -421,7 +427,7 @@ Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names) (pc : mword 64) (is_rvc : boo
   is_aligned_vaddr (Virtaddr a8) 4 = true ->
   neq_vec (bits_of_virtaddr (Virtaddr a8)) (sign_extend' 64 (subrange_vec_dec (bits_of_virtaddr (Virtaddr a8)) (Z.sub 39 1) 0)) = false ->
   kpt_dev_vpn (svpn_of a8) ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   disk_inv γd -∗
   R -∗
@@ -430,8 +436,8 @@ Lemma wp_sw_virtio_dinv_s_sconf (γd : disk_names) (pc : mword 64) (is_rvc : boo
     ∃ v' : virtio_state,
       ⌜ virtio_write v (uint a8 - virtio_base)%Z storeword = Some v' ⌝ ∗
       ⌜ virtio_isr_ok v' ⌝ ∗ virtio_proto γd v' ∗ S ) -∗
-  wp_next b p (fun (CID : CpuId) =>
-    sie_cap_gpr m n b p -∗
+  wp_next false p (fun (CID : CpuId) =>
+    sie_cap_gpr m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     S -∗
     WP (Loop : expr riscv_lang)) -∗
@@ -447,9 +453,14 @@ Proof.
   assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
     by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
   iIntros "Hcg Hpc Hinstr #Hvinv HR Hacc Hcont".
-  iApply (wp_instr_s_sconf m n b pc is_rvc
+  iApply (wp_instr_s_sconf m n false pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
             with "Hcg Hpc Hinstr").
+  (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic obligation
+     is discharged by [wp_next]'s OWN introduction rule at the ambient hart --
+     the same [wp_next_off_intro] a b = false leaf already uses for its own
+     conclusion.  Nothing is renamed, so the body below is VERBATIM. *)
+  iApply wp_next_off_intro.
   iIntros (σ Hpceq) "Hsc Hcap Hfmap Hnpc Hsi".
   iDestruct "Hcap" as "(Hstk & Htr & Harm)".
   iDestruct "Hsc" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hmenvx)".
@@ -574,7 +585,7 @@ Proof.
     iSplitL "Hms Hhalf Hspp".
     { iExists mstatus0. iFrame "Hms Hhalf Hspp". iPureIntro. exact Hmsf. }
     iExists menvcfg0. iFrame "Hmenv". iPureIntro. repeat split; assumption. }
-  iAssert (sie_cap m n b p) with "[Hstk Htr Harm]" as "Hcap".
+  iAssert (sie_cap m n false p) with "[Hstk Htr Harm]" as "Hcap".
   { rewrite /sie_cap. iFrame "Hstk Harm Htr". }
   iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
   (* STAGE 1: the engine resumes on the SAME hart, so the step's [wp_next]
@@ -600,7 +611,7 @@ Qed.
    what the caller gets is the property [P] it proved of the loaded word at
    EVERY state the invariant admits. *)
 Lemma wp_lw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1}
-    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) (b : bool) :
+    (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   (* the vmem level hands back the value itself now, not the split accumulator *)
@@ -613,13 +624,13 @@ Lemma wp_lw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword
   rd_ok rd ->
   (forall v : virtio_state, virtio_isr_ok v ->
      exists w : bv 32, virtio_read v (uint a8 - virtio_base)%Z = Some w /\ P w) ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   pc_is pc -∗ instr pc is_rvc (LOAD (imm, Regidx rs1, Regidx rd, is_unsigned, 4)) -∗
   dev_inv γu γd -∗
-  wp_next b p (fun (CID : CpuId) =>
+  wp_next false p (fun (CID : CpuId) =>
     ∀ w : bv 32,
     ⌜ P w ⌝ -∗
-    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n b p -∗
+    sie_cap_gpr (<[Regidx rd := regval_into_reg (ldval w)]> m) n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -635,7 +646,7 @@ Proof.
   (* only the DISK half of the fabric is touched, and [↑diskN ⊆ ↑devN] *)
   iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
   iApply (wp_lw_virtio_dinv_s_sconf γd pc is_rvc is_unsigned rd rs1 imm m n
-            emp%I (fun w => ⌜P w⌝%I) b
+            emp%I (fun w => ⌜P w⌝%I)
             Hrange Halign Hcanon Hdevvpn Hrdnz Hrdok
             with "Hcg Hpc Hinstr Hvinv [] [] [-]").
   { done. }
@@ -659,7 +670,7 @@ Qed.
    carry the driver protocol across the store.  §0's
    [virtio_ack_write_ok] / [virtio_notify_write_ok] discharge it. *)
 Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
-    (m : regfile) (n : nat) (b : bool) :
+    (m : regfile) (n : nat) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
   let storeword : mword 32 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) in
@@ -673,11 +684,11 @@ Lemma wp_sw_virtio_dev_s_sconf (γu : uart_names) (γd : disk_names) (pc : mword
        /\ virtio_isr_ok v'
        /\ v_cfg v' = v_cfg v /\ v_seen v' = v_seen v
        /\ v_used_idx v' = v_used_idx v /\ v_disk v' = v_disk v) ->
-  sie_cap_gpr m n b p -∗
+  sie_cap_gpr m n false p -∗
   pc_is pc -∗ instr pc is_rvc (STORE (imm, Regidx rs2, Regidx rs1, 4)) -∗
   dev_inv γu γd -∗
-  wp_next b p (fun (CID : CpuId) =>
-    sie_cap_gpr m n b p -∗
+  wp_next false p (fun (CID : CpuId) =>
+    sie_cap_gpr m n false p -∗
     pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
@@ -694,7 +705,7 @@ Proof.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   iDestruct (dev_inv_disk with "Hdinv") as "#Hvinv".
   iApply (wp_sw_virtio_dinv_s_sconf γd pc is_rvc rs2 rs1 imm m n
-            emp%I emp%I b Hrange Halign Hcanon Hdevvpn
+            emp%I emp%I Hrange Halign Hcanon Hdevvpn
             with "Hcg Hpc Hinstr Hvinv [] [] [-]").
   { done. }
   { iIntros (v Hvok) "Hproto _".

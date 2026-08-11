@@ -622,7 +622,7 @@ Section ProofVirtioDiskRwE.
         [ vm_compute; reflexivity | exact Hvok ]. }
     iApply (wp_sw_virtio_dev_s_sconf (CID := CIDx) (p := proc_addr j) γu γd (mword_of_int (KernelSyms.virtio_disk_rw + 0x18a) : mword 64)
               false (mword_of_int 0 : mword 5) Ra5 (mword_of_int 80 : mword 12)
-              N1 (trap_res true + (K - 12))%nat false
+              N1 (trap_res true + (K - 12))%nat
               ltac:(rewrite Ha8; exact Hgr)
               ltac:(rewrite Ha8; exact Hga)
               ltac:(rewrite Ha8; exact Hgc)

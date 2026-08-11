@@ -393,7 +393,7 @@ Section VdiLeaves.
     iIntros "Hcg Hpc Hinstr #Hdinv Hvc Hcont".
     iApply (wp_sw_virtio_dinv_s_sconf (CID:=CID) γv pc rvc rs2 rs1 imm m n
               (disk_cfg_is γv (DfracOwn (1/2)) c)
-              (disk_cfg_is γv (DfracOwn (1/2)) c') false
+              (disk_cfg_is γv (DfracOwn (1/2)) c')
               ltac:(rewrite Ha8; exact Hr)
               ltac:(rewrite Ha8; exact Hal)
               ltac:(rewrite Ha8; exact Hcan)
@@ -450,7 +450,7 @@ Section VdiLeaves.
     iIntros "Hcg Hpc Hinstr #Hdinv Hvc Hcont".
     iApply (wp_sw_virtio_dinv_s_sconf (CID:=CID) γv pc rvc rs2 rs1 imm m n
               (disk_cfg_is γv (DfracOwn (1/2)) c)
-              (disk_cfg_is γv (DfracOwn (1/2)) virtio_cfg0) false
+              (disk_cfg_is γv (DfracOwn (1/2)) virtio_cfg0)
               ltac:(rewrite Ha8; exact Hr)
               ltac:(rewrite Ha8; exact Hal)
               ltac:(rewrite Ha8; exact Hcan)
@@ -515,7 +515,7 @@ Section VdiLeaves.
               (disk_cfg_is γv (DfracOwn (1/2)) c ∗
                phys_word2 (avail_idx_pa (virtio_init_cfg pd pav pu)) (wrap16 0%nat) ∗
                phys_list pu (replicate 4096 byte_zero))%I
-              (disk_pub γv 0%nat ∗ disk_cfg γv (virtio_init_cfg pd pav pu))%I false
+              (disk_pub γv 0%nat ∗ disk_cfg γv (virtio_init_cfg pd pav pu))%I
               ltac:(rewrite Ha8; exact Hr)
               ltac:(rewrite Ha8; exact Hal)
               ltac:(rewrite Ha8; exact Hcan)
@@ -571,7 +571,7 @@ Section VdiLeaves.
     iIntros "Hcg Hpc Hinstr #Hdinv Hvc Hcont".
     iApply (wp_lw_virtio_dinv_s_sconf (CID:=CID) γv pc rvc false rd rs1 imm m n
               (disk_cfg_is γv (DfracOwn (1/2)) c)
-              (fun x : bv 32 => (⌜x = w⌝ ∗ disk_cfg_is γv (DfracOwn (1/2)) c)%I) false
+              (fun x : bv 32 => (⌜x = w⌝ ∗ disk_cfg_is γv (DfracOwn (1/2)) c)%I)
               ltac:(rewrite Ha8; exact Hr)
               ltac:(rewrite Ha8; exact Hal)
               ltac:(rewrite Ha8; exact Hcan)

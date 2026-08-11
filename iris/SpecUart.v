@@ -20,7 +20,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Import Defs.
 
 Definition wp_lb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64) :=
+    (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64) :=
 let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 (* the vmem level hands back the value itself now, not the split accumulator *)
@@ -49,7 +49,7 @@ wp_next b p (fun (CID : CpuId) =>
 WP (Loop : expr riscv_lang).
 
 Definition wp_sb_uart_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
+    (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
 let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
@@ -81,7 +81,7 @@ WP (Loop : expr riscv_lang).
    handed a disk ghost bundle it has no use for.  [wp_sb_uart_s_sconf] above is
    its bundle-taking restatement, kept verbatim for the existing consumers. *)
 Definition wp_sb_uart_uinv_s_sconf_body `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-    (γd : uart_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
+    (γd : uart_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64) :=
 let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
 let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
 let storebyte : mword 8 := autocast (T := mword) (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 1 8) 1) 0) in
@@ -108,14 +108,14 @@ WP (Loop : expr riscv_lang).
 Module Type UART.
   Parameter wp_lb_uart_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64),
+      (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12) (m : regfile) (n : nat) (R : iProp Σ) (S : bv 8 -> iProp Σ) (b : bool) (p : mword 64),
       wp_lb_uart_s_sconf_body γd γv off pc is_rvc is_unsigned rd rs1 imm m n R S b p.
   Parameter wp_sb_uart_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ, !diskGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64),
+      (γd : uart_names) (γv : disk_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64),
       wp_sb_uart_s_sconf_body γd γv off pc is_rvc rs2 rs1 imm m n R S b p.
   Parameter wp_sb_uart_uinv_s_sconf :
     forall `{!riscvGS Σ, !sieG Σ} `{!uartGhostG Σ} `{GEN : GenId} `{CID : CpuId}
-      (γd : uart_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64),
+      (γd : uart_names) (off : Z) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12) (m : regfile) (n : nat) (R S : iProp Σ) (b : bool) (p : mword 64),
       wp_sb_uart_uinv_s_sconf_body γd off pc is_rvc rs2 rs1 imm m n R S b p.
 End UART.
