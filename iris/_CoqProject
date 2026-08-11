@@ -930,6 +930,7 @@ WeakLeafCsrrM.v
 WkStackOwn.v
 WkGprAcc.v
 WeakLeafM.v
+WeakViewMono.v
 WkTimerinit.v
 WkStartAux.v
 WkStartNew.v
