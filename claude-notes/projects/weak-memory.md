@@ -20,9 +20,53 @@ family — see the block below), **M4 batch 0a** (`iris/WeakEffSkel.v`),
 (`iris/WeakLeafLd8.v`, the `ld`-class 8-byte load, end to end) — whose two
 funnel seams have since been fixed, so its 472-line/3.1× figure IS the
 sweep's unit price.
-**M3 and M4-prep are DONE.**  Next: M4's remaining leaves — read
-[`weak-memory-porting.md`](weak-memory-porting.md) first (§2g is the leaf
-recipe at its post-fix shape), then the batch blocks below.
+**M3 and M4-prep are DONE.**
+
+---
+
+## ⇒ CHECKPOINT — WHERE THIS STANDS AND WHAT IS NEXT (2026-08-11)
+
+*Keep this block current; it is what someone opening this file should read
+first. The detail behind each line is in the dated slice named after it.
+Everything below the checkpoint is history, in the order it happened.*
+
+**DONE.** The sweep (both layers: `WeakLeafM`'s `winstr_m` packaging and
+`WeakLeafO`'s `_o`/`_run` wrappers, all 17 instructions). The objective layer
+re-indexed by CONTEXT, not hart (`WeakCtx`, `cobj`) and the hart-indexed layer
+deleted (`WeakObj`, `WeakPtOwn` both gone; `WeakPtPub` is now hart-free). The
+release store wrapped — `c.sd` was the last leaf without an `_o`/`_run`, and
+its missing constructor turned out to be `ctx_view_lb` plus a fold
+(`WeakCtx` §8). Tree is green at `ce8b6d9b`.
+
+**NEXT, in order.**
+
+1. **Convert call sites to the new-style leaves** — `WkTimerinit` first (21
+   instructions, uses seven of the wrapped ones; smaller than `WkStartNew`).
+   *Unblocked as of `ce8b6d9b`* — it was blocked before and I had not noticed:
+   instructions 10/11 are `c.sdsp` and no `c.sd` wrapper existed, so the other
+   19 sites could never have compiled on their own. Recipe: one
+   `hart_view_to_run` at chain entry, `whart_run ξ q` threaded, one `wsti_NN`
+   token per instruction in a `Wk*Aux` file (pattern: `WkStartAux.wsti_35`,
+   built with `WeakLeafM.winstr_m_of_text`). Converting also changes
+   `wwp_timerinit`'s own statement (`hart_ws`/`vwp_hold` → `whart_run`/`cobj`),
+   so check its callers before starting. This is the batch that demonstrates
+   the step-site parity both layers were built for.
+
+2. **memmove, weak + interruptible** (user request — see the QUEUED slice at
+   the end for the full analysis). Not startable yet; it has four
+   dependencies, and (1) is not one of them, so the two can be reordered if
+   memmove is the priority. Its dependencies are: layer C (`wp_next`-shaped
+   weak leaves), settling what the weak `wp_next` promises across a
+   reschedule, a 1-byte objective store leaf, and the S-mode weak funnel.
+
+**KNOWN LOOSE ENDS**, none blocking: `weak_view_name` in `weakGS` is now
+vestigial (removing it is an adequacy-level change); M5 devices; M6
+store-reordering gap; `sconf` gaining the view token.
+
+For the leaf recipe itself read [`weak-memory-porting.md`](weak-memory-porting.md)
+§2g first, then the batch blocks below.
+
+---
 
 ## MERGED WITH MAIN'S Φ REMOVAL (2026-08)
 
@@ -2972,7 +3016,7 @@ adequacy-level change, deliberately not bundled here.
 the deleted layer; it has exactly the indexing under test, so the three
 reflexivity checks still say what they said.
 
-**STILL TO PRUNE.** `WeakPtOwn`'s `wflr_lb` / `wpt_own` / `↦o` / `vrNew_lb`
+**STILL TO PRUNE.** *(Done in slice 2, immediately below.)* `WeakPtOwn`'s `wflr_lb` / `wpt_own` / `↦o` / `vrNew_lb`
 and all of `WeakPtPub` except the hart-free `wpt_pub` family are now used only
 by each other and by the §5 control. They are the remainder of the old layer
 and should go; `cobj_acquire` / `cobj_release` already supersede
@@ -2980,7 +3024,9 @@ and should go; `cobj_acquire` / `cobj_release` already supersede
 superseded by `wrunning_resume`. Not done here because it is a second
 independent edit and this slice is green.
 
-**NOT STARTED: the call-site conversion.** Still the thing that would validate
+**NOT STARTED: the call-site conversion.** *(Ordering below is right but
+INCOMPLETE — it did not know the conversion was blocked on `c.sd` having no
+wrapper. See the release-store slice.)* Still the thing that would validate
 the sweep — no site in `WkTimerinit` / `WkStartNew` uses a `_run` wrapper yet.
 Note the ordering is now settled by this slice: a converted site needs
 `hart_view_to_run` once at chain entry, then `whart_run ξ q` threaded, then a
@@ -3028,7 +3074,8 @@ yet abstracted, so the explicit form is `@hart_floor CID`, not
 `_CoqProject` order is now `WeakViewMono, WeakCtx, WeakPtPub` — `WeakPtPub`
 sits on `WeakCtx` where it used to sit on `WeakPtOwn`.
 
-**STILL NOT STARTED: the call-site conversion** (unchanged from slice 1).
+**STILL NOT STARTED: the call-site conversion** (unchanged from slice 1 —
+and still blocked at this point, though that was not yet known).
 
 ### The release store is wrapped: `c.sd` gets its `_o`/`_run` (2026-08-11)
 
