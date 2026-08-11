@@ -209,4 +209,75 @@ Section leafo.
     iApply (whart_run_close with "Hmm Hview").
   Qed.
 
+  (* ------------------------------------------------------------------ *)
+  (** ** 4. [addi], both wrappers.
+
+      Included to fix the TEMPLATE, since the remaining sweep is this pair
+      per instruction and nothing else.  Neither proof does anything
+      instruction-specific: [_o] is [hart_view_open] / [ws_update] /
+      [hart_view_close] around the [winstr_m] leaf, and [_run] is
+      [whart_run_open] / [whart_run_close] around [_o]. *)
+  Lemma wwp_addi_o (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+      (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
+    hart_view cpu_id -∗
+    ( mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (add_vec (m !!! Regidx rs1)
+                                     (sign_extend' 64 imm))]> m) -∗
+      hart_view cpu_id -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf Hpc Hfile #Hi [%ws [Hws Hauth]] Hcont".
+    iAssert (vwp_hold (⌜True⌝ : vProp Σ) ws) as "HF".
+    { rewrite vwp_hold_pure. done. }
+    iApply (wwp_addi pc is_rvc rs1 rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
+              Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
+    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
+  Qed.
+
+  Lemma wwp_addi_run (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+      (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    whart_run q -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
+    ( whart_run q -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (add_vec (m !!! Regidx rs1)
+                                     (sign_extend' 64 imm))]> m) -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
+    iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
+    iApply (wwp_addi_o pc is_rvc rs1 rd imm m pmpcfg0 q Hgid Hpmp Hnz
+              with "Hmm Hpcf Hpc Hfile Hi Hview").
+    iIntros "Hmm Hpcf Hpc Hfile Hview".
+    iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
+    iApply (whart_run_close with "Hmm Hview").
+  Qed.
+
 End leafo.

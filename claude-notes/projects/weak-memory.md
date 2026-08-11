@@ -2843,3 +2843,41 @@ the right place for it and the only part needing thought.
 an `sconf` in weak-land. This is a decision to record now and apply when the
 port reaches S-mode. The M-mode side still needs `whart_run` regardless,
 since `mmode_config` is fractional and `sconf` does not help there.
+
+### The sweep, correctly scoped (2026-08-11) — it is TWO layers, not one
+
+I had recorded the remainder as "~19 leaves, each `wwp_X_o` + `wwp_X_run`,
+mechanical, no new proof content." **That was wrong**, and the grep is
+unambiguous: `winstr_m` appears in exactly two files (`WeakLeafM`,
+`WeakLeafO`) and `WeakLeafM` holds exactly **one** leaf, `wwp_lui`. The other
+**20** `WeakLeaf*.v` files are `winstr_bytes`-style — they take the fetched
+bytes plus ~10 decode obligations, which is the per-instruction preamble the
+measurement found costs 266 lines in `WkStartNew`.
+
+Wrapping *those* in `_o` / `_run` form would carry the whole preamble to the
+call site, i.e. it would not give the copy-the-SC-proof property at all. So:
+
+- **Layer A — the `winstr_m` packaging** (`WeakLeafM`). Consumes
+  `winstr_m_rvc` / `winstr_m_base` and dispatches to the RVC and base leaves.
+  ~55 lines of proof per instruction. **This is real work, not wrapping** —
+  it is also what removes the 266 lines, so it is the layer that matters.
+- **Layer B — `_o` + `_run`** (`WeakLeafO`). ~50 lines per instruction,
+  genuinely mechanical: `_o` is `hart_view_open` / `ws_update` /
+  `hart_view_close` around layer A, `_run` is `whart_run_open` / `_close`
+  around `_o`.
+
+**`addi` is now done at both layers** (`wwp_addi`, `wwp_addi_o`,
+`wwp_addi_run`), compiled, specifically to fix the template. It follows
+`wwp_lui` line for line; the two differ only in leaf names, argument list,
+and the post-state `gpr_file` expression. Neither layer-B proof does anything
+instruction-specific.
+
+**Remaining, from the two chains' actual use:** `or_rvc`, `slli_rvc`,
+`add_rvc`, `ori`, `addiw_rvc`, `csrr_menvcfg`, `csrr_mcounteren`,
+`csrr_time`, `csrr_mhartid`, `csrw_menvcfg`, `csrw_mcounteren`,
+`csrw_stimecmp`, `ld8_tor_rvc`, `sd8_tor_rvc`, `jal`, `cjr_rvc`, `mret`.
+Seventeen, at ~105 lines each across both layers — call it ~1800 lines. The
+register-only ALU ones (`or`, `slli`, `add`, `ori`, `addiw`) are the closest
+to `addi` and should go first; the CSR and load/store ones have wider
+signatures and the load/store ones touch memory, so their layer A is not
+purely a rename.

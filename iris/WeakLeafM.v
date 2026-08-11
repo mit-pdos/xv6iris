@@ -59,6 +59,7 @@ Require Import InstrBytes.
 Require Import RegFile WpGpr WpMmodeLeafBase.
 Require Import WpDecode WpDecodeBridge.
 Require Import WeakLeafUtypeShift.
+Require Import WeakLeafItype.
 Require Import WkEntryEff.
 
 Import SailStdpp.Values.
@@ -265,6 +266,64 @@ Section WeakLeafM.
         (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
       iApply (wwp_lui_leaf (is_aligned_vaddr (Virtaddr pc) 4)
                 pc w rd imm m pc pmpcfg0 q D_m dstateM ws
+                Hgid Hpmp Hal2 eq_refl Hnz
+                Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+                D_m_mi Hgood Hdec
+                with "Hmm Hpcf Hpc Hnpc Hfile Hb Hhws").
+      iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hhws".
+      iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+      iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws HF"). exact Hle.
+  Qed.
+
+  (** [addi], the same packaging.  Follows [wwp_lui] line for line — which
+      is the point: the [winstr_m] layer is a TEMPLATE, and the remaining
+      instructions differ only in the leaf names, the argument list and the
+      post-state [gpr_file] expression. *)
+  Lemma wwp_addi (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+      (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    gpr_file m -∗
+    winstr_m pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
+      gpr_file (<[Regidx rd :=
+                  regval_into_reg (add_vec (m !!! Regidx rs1)
+                                     (sign_extend' 64 imm))]> m) -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hfile #Hi Hhws HF Hcont".
+    destruct is_rvc.
+    - iDestruct (winstr_m_rvc with "Hi") as
+        (h i0) "(_ & #Hb & %Hal2 & %Hall & %Hgood & %Hdec & %Hlp0 & %Hg0 & %Hexp)".
+      iApply (wwp_addi_rvc_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+                pc h rs1 rd imm i0 m pc pmpcfg0 q D_m D_none dstateM ws
+                Hgid Hpmp Hal2 eq_refl Hnz
+                Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+                D_m_mi Hgood Hdec Hg0 Hexp
+                with "Hmm Hpcf Hpc Hnpc Hfile Hb Hhws").
+      iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hhws".
+      iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+      iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws HF"). exact Hle.
+    - iDestruct (winstr_m_base with "Hi") as
+        (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+      iApply (wwp_addi_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+                pc w rs1 rd imm m pc pmpcfg0 q D_m dstateM ws
                 Hgid Hpmp Hal2 eq_refl Hnz
                 Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
                 D_m_mi Hgood Hdec
