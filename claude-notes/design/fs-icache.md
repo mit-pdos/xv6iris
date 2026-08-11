@@ -2158,3 +2158,76 @@ gather.** §14.1 observed that every share use is bracket-shaped; §14.6 made
 the bracket a resource; this is the price, and it is the same fact that
 makes shares unable to outlive their parent. Any future caller that wants
 to lend a share across a call must keep the parent's block OPEN across it.
+
+## 15. THE DIRECTORY-WF QUESTION (N4's gate, 2026-08-11): what survives
+## a disk-full dirlink, and where each surviving fact lives
+
+namex locks a DIFFERENT, unknown directory each iteration, so
+SpecDirlookup's two image premises — `16 | di_size` and
+`dir_inums_ok data nrec nib` — cannot be supplied by namex as pure
+premises (ilock's dn/data are existential in its postcondition). They
+would have to be system INVARIANTS riding in the escrow payloads. Are
+they? THIS kernel's balloc RETURNS 0 when dry (stock xv6 panics —
+SpecBalloc.v's header records the difference), so writei genuinely
+short-writes and dirlink's third arm (N3a finding 3, proven live in
+N3d) can write a PREFIX of a 16-byte record. The two facts part ways:
+
+**(a) dir_inums_ok IS an invariant.** Enumerate the directory-data
+writers: dirlink (both arms), sys_unlink's record-zeroing writei
+(zeros — wf), itrunc on a dir (size 0 — vacuous), iupdate (no data),
+filewrite (unreachable for T_DIR — sys_open refuses writable dirs;
+recorded for the sysfile campaign, whose filewrite spec will need the
+fd-type history). dirlink's short arm: it writes only at a FREE slot
+(free records are all-zero — unlink zeroes whole records, holes are
+zero), so the old high byte under the window is 0 and a tot=1 prefix
+stores the halfword `inum mod 256` — which is < 16*nib whether
+16*nib ≥ 256 (mod < 256 ≤ bound) or < 256 (premise makes mod the
+identity). tot ≥ 2 stores the full in-range inum (SpecDirlink already
+carries `bv_unsigned dinum < 16*nib`); tot = 0 leaves the record
+free. A truncated-NAME record (tot ≥ 2, name prefix + old zeros) is
+semantically a VALID record with a different name — no wf impact.
+So: **strengthen `ic_loaded` and `ipool_shape`'s allocated arm with
+one conjunct** `dir_ok nib dn data := bv_unsigned (di_type dn) =
+T_DIR_z -> dir_inums_ok data (nrec-of dn) nib` (nib enters as the
+section/ambient parameter the escrow already sees; if it does not,
+thread it — capacity, no resource). Re-establishment sites, each by
+the holder at its re-park, all short: ProofIlock's fill (from the
+pool's strengthened arm — rides), ProofIget's eviction re-park
+(same data — rides), ProofFileread's iunlock (data unchanged —
+rides), ProofIput's itrunc path (data zeroed — vacuous by
+dir_inum-of-zeros = 0), ProofIupdate/writers via callers (dirlink:
+the analysis above; unlink when it comes: zeros). The BOOT mint
+(ireclaim/fsinit, N5) gains the conjunct as one more clause of the
+EXISTING image-wf IOU — mkfs images satisfy it.
+
+**(b) granularity is NOT an invariant** — the short APPEND leaves
+`size = 16*nrec + tot`, permanently non-granular, and the next scan
+of that directory really does die: readi returns tot < 16 and the
+code calls panic("dirlookup read"). That is panic-SHAPED, which is
+the whole answer: **drop the `16 | size` premise from SpecDirlookup
+and SpecDirlink and make the short-readi branch a live panic arm**
+discharged by panic_wp_any, exactly like ilock's "no type" and the
+Route-B family. No postcondition arm is added — panic never returns,
+so the found/notfound arms simply carry an implicit "…and every
+readi in the scan returned 16" history, which is what rd_clamp gives
+under granularity and what the panic arm gives without it. namex
+then needs NO granularity fact at all. (The alternative — a poison
+ghost — founders on "not poisoned" being locally unknowable: any
+per-inum flag a holder can re-establish freely tells a later reader
+nothing, and one it cannot is exactly the invariant that is false.)
+
+**What does NOT work, for the record:** iget over a garbage inum
+(the reason dir_inums_ok cannot also become a panic arm — an
+out-of-range inum does NOT panic; it would quietly claim a cache slot
+whose inum has no pool bundle, breaking the pool's complement
+accounting — totalising THAT is an escrow redesign, and (a) makes it
+unnecessary); threading dir-wf as a universally-quantified premise
+over inode_ok-admissible states (false in general — undischargeable);
+extending inode_ok itself (its signature has no nib and its users are
+legion — the parallel conjunct in the two escrow payloads is the
+minimal home).
+
+Execution: N4a = (a)'s retrofit + (b)'s two spec/proof reworks;
+N4b = namex + wrappers on top. Recorded consumers: sysfile's create
+must handle dirlink's short arm (a corrupt directory is a real
+post-state); filewrite's future spec owes the fd-type fact.
