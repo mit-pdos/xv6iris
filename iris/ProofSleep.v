@@ -1051,7 +1051,7 @@ Section ProofSleep.
     { iApply (park_pay_needs_ctx (proc_addr j) SLEEPING needs_ctx_SLEEPING). }
     (* SCHED RETURNS ON HART [CIDs].  Everything below runs there, inside
        [sleep_post_sched] at [(CID0 := CIDs)]. *)
-    iIntros (CIDs Hss msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' #Havail Hcpuemp Hown' Htag' Hvc'".
+    iIntros (CIDs Hss msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' Hcpuemp Hown' Htag' Hvc'".
     (* what the post-resume half needs about [msch], read off this tower. *)
     assert (Hsp_msch : msch !!! Regidx csp_rs1 = spd).
     { rewrite (callee_saved_lookup Hcs_sch csp_rs1 ltac:(vm_compute; reflexivity)).

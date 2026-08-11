@@ -3,7 +3,7 @@
 
    These are the accessor-form device leaves of WpSmodePtUart rebased on
    the funnel [wp_instr_s_sconf]: [dev_inv] is opened across the funnel
-   callback's own step (devN is disjoint from minstretN AND intrN, so
+   callback's own step (devN is disjoint from minstretN, so
    the open is arm-blind), the caller does its uart ghost step through
    the accessor wand while the invariant is open, and the translate side
    runs REGIME-BLIND through the derived regime instance [strans_regime]

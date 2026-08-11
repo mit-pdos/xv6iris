@@ -16,7 +16,7 @@
    head's inlined intr_on/intr_off ([csrsi]/[csrci sstatus,2]) flip the SIE
    arm at level 0, which consumes [trap_csrs] (the ∃-valued sepc/scause/stval
    cells -- a taken trap scribbles them, so the enabled arm must own them)
-   and the persistent [intr_handler_avail γ] (trapinithart has installed
+   and [IntrDefs.intr_res] inside them (trapinithart has installed
    kernelvec).  A dispatch round can hand the scan back at eb = true (the
    parked proc's release re-enables), so both are genuinely consumed and
    re-emerge round by round; the spec takes them once, at the boot shape
@@ -83,8 +83,11 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      quantified over EVERY hart, and one hart's copy does not yield it.  Same
      propagation as SpecMain / SpecKinit / SpecUserinit / kalloc_env. *)
   panic_wp_any -∗
+  (* ONE premise where there were two: [trap_csrs] now carries [intr_res] --
+     the installed vector and its contract -- as its fifth member, so the
+     scheduler's level-0 SIE flip gets the handler out of the same bundle it
+     already took the trap cells from. *)
   trap_csrs -∗
-  intr_handler_avail -∗
   WP (Loop : expr riscv_lang).
 
 Module Type SCHEDULER.

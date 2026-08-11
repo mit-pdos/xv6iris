@@ -172,11 +172,6 @@ Section YieldPostSched.
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
     pa_stk sp0 4 ↦₈ vgap -∗
-    (* THE DISPATCHING HART'S OWN COPY, at [CID0] -- where this half runs.
-       It reaches the continuation's hart by [intr_handler_avail_ext_transport], the
-       same two-arm argument the other three hart-indexed carriers here use.
-       Persistent, hence no accounting anywhere below. *)
-    intr_handler_avail_ext eb -∗
     wp_next true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
@@ -185,13 +180,12 @@ Section YieldPostSched.
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
-        intr_handler_avail_ext eb -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Hj Hspd Hsp0 Hsp_msch Hs1_msch
            Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27.
-    iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpuemp HC Hown' Htag Hvc' Hr24 Hr16 Hr8 Hgap #Havail Hcont".
+    iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpuemp HC Hown' Htag Hvc' Hr24 Hr16 Hr8 Hgap Hcont".
     (* frame-slot address bridges: slot k sits at [spd + 8*(4-k)]. *)
     assert (Hspd4 : pa_stk sp0 4 = spd).
     { rewrite -Hspd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
@@ -459,11 +453,10 @@ Section YieldPostSched.
        [cpu_claim] carries the hart tag. *)
     iDestruct (cpu_claim_ext_transport CID0 CIDe5 eb pj ltac:(wp_next_chain)
                  with "Hclmx") as "Hclmx".
-    (* AND THE PERSISTENT ONE, which is hart-indexed too. *)
-    iDestruct (intr_handler_avail_ext_transport CID0 CIDe5 eb pj ltac:(wp_next_chain)
-                 with "Havail") as "#Havail'".
+    (* The handler resource needs no transport of its own any more: it rides
+       inside [trap_csrs_ext], which was already transported above. *)
     iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hext Hclmx Havail'").
+    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hext Hclmx").
     unfold callee_saved. repeat split; assumption.
   Qed.
 
@@ -760,7 +753,7 @@ Section ProofYield.
     { iApply (park_pay_needs_ctx (proc_addr j) RUNNABLE needs_ctx_RUNNABLE). }
     (* SCHED RETURNS ON HART [CIDs].  Everything below runs there, inside
        [yield_post_sched] at [(CID0 := CIDs)]. *)
-    iIntros (CIDs Hss msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' #Havail Hcpuemp Hown' Htag' Hvc'".
+    iIntros (CIDs Hss msch ch') "%Hcs_sch Hcg Hpc Hheld' Htc' Hcpuemp Hown' Htag' Hvc'".
     (* what the post-resume half needs about [msch], read off this tower. *)
     assert (Hsp_msch : msch !!! Regidx csp_rs1 = spd).
     { rewrite (callee_saved_lookup Hcs_sch csp_rs1 ltac:(vm_compute; reflexivity)).
@@ -826,10 +819,7 @@ Section ProofYield.
               Hsp_msch Hs1_msch
               Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27
               with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpuemp HC Hown' Htag' Hvc' Hr24 Hr16 Hr8 Hgap
-                    [] [Hcont]").
-    (* the dispatch payload's own copy, at the hart it dispatched on, weakened
-       to whichever arm the caller's [eb] asks for. *)
-    { iApply (intr_handler_avail_ext_intro eb with "Havail"). }
+                    [Hcont]").
     (* yield's own [wp_next true pj] obligation, re-anchored at the resuming
        hart -- [WpNext.wp_next_retarget], the transport for exactly this.  The
        index is the LITERAL [true] (a parking function's always is), so the

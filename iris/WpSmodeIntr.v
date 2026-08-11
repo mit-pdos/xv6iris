@@ -88,11 +88,16 @@ Section WpSmodeIntr.
   (* =================================================================== *)
   (* [m] is the map the register file is held at -- the CALLER passes
      [tp_pin m] (HartTp.v); nothing here needs to know that. *)
-  Lemma wp_instr_s_intr (handler : mword 64) (root_ppn : mword 44)
+  (* NO [handler] PARAMETER, and [intr_res] is THREADED rather than framed --
+     both inherited from [wp_exec_step_intr] below.  The funnel therefore
+     hands this engine an arm conjunct verbatim and takes it back from the
+     callback, instead of skolemising a handler out of the arm and keeping a
+     persistent copy across the engine. *)
+  Lemma wp_instr_s_intr (root_ppn : mword 44)
       (m : regfile)
       (pc : mword 64) (is_rvc : bool) (i : instruction) :
     ret_pc pc = pc ->
-    intr_inv handler -∗
+    intr_res -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     intr_config -∗
     pc_is pc -∗
@@ -100,6 +105,7 @@ Section WpSmodeIntr.
     intr_frame root_ppn m -∗
     instr pc is_rvc i -∗
     (∀ σ (Hpceq : register_lookup PC σ.(sregs) = pc),
+       intr_res -∗
        intr_config -∗
        gpr_file m -∗
        intr_frame root_ppn m -∗
@@ -116,16 +122,16 @@ Section WpSmodeIntr.
           ▷ WP (Loop : expr riscv_lang))) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros (Hpc0) "#Hintr Hhs Hcfg Hpc Hfile HF Hinstr H".
+    iIntros (Hpc0) "Hintr Hhs Hcfg Hpc Hfile HF Hinstr H".
     iDestruct "Hinstr" as "[%Hnlpad Hr]".
     iDestruct "Hr" as (r) "[%Hrvc [Hbytes Hdec]]".
     iAssert (⌜ match r with F_Base _ => True | F_RVC _ => True | _ => False end ⌝)%I as %Hrok.
     { iEval (rewrite /instr_bytes) in "Hbytes".
       iDestruct "Hbytes" as "[_ Hb]".
       destruct r; [iDestruct "Hb" as %[] | done | done | iDestruct "Hb" as %[] ]. }
-    iApply (wp_exec_step_intr handler pc root_ppn m Hpc0
+    iApply (wp_exec_step_intr pc root_ppn m Hpc0
               with "Hintr Hhs Hcfg Hpc Hfile HF").
-    iIntros (σ) "%Hdisp Hcfg Hpc Hfile HF Hsi".
+    iIntros (σ) "%Hdisp Hintr Hcfg Hpc Hfile HF Hsi".
     (* unbundle the config for the σ-level fetch lookups *)
     iDestruct "Hcfg" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepcx & Hscausex & Hstvalx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hsie & %Hmsf)".
@@ -178,7 +184,7 @@ Section WpSmodeIntr.
       by (rewrite Help_σf; exact Help_np).
     (* rebundle config + frame; run the caller's execute at σf *)
     iMod ("H" $! σf Lpc_σf
-            with "[Hpriv Hms Hsie Hmiex Hsepcx Hscausex Hstvalx]
+            with "Hintr [Hpriv Hms Hsie Hmiex Hsepcx Hscausex Hstvalx]
                   Hfile [Hmenv Htlbinv Hstk] Hnpc [$Hreg $Hmem]")
       as (s_exec) "(%Hexec & [Hreg' Hmem'] & Hcont)".
     { iFrame "Hhw Hminv Hpriv Hmiex Hsepcx Hscausex Hstvalx".
@@ -271,14 +277,14 @@ Section WpSmodeIntr.
     - (* ---- b = true: the interrupt-absorbing engine.  [sie_arm true]
            needs no unfolding: the [if] reduces by conversion, so
            [iDestruct] / [iFrame] / [iExact] see through it. ---- *)
-      iDestruct "Harm" as "(Hq1 & Hhx & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
-      iDestruct "Hhx" as (handler) "#Hintr".
-      (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_inv] owns stvec
-         inside its invariant, and the Bare slot owns the same cell. *)
+      iDestruct "Harm" as "(Hq1 & Hintr & Hsepcx & Hscausex & Hstvalx & Hsppc & Hcpu)".
+      (* Bare ∧ SIE='1' is impossible: the '1' arm's [intr_res] OWNS stvec and
+         the Bare slot owns the same cell.  This used to need an [iInv] under
+         an [fupd_wp] to get at the invariant's copy of the cell; owning it
+         makes the refutation two [iDestruct]s and a conflict. *)
       iDestruct "Htr" as "[(Hbit0 & Hbare & Hbstv) | (Hbit1 & Hkpt)]".
-      { iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-        iApply fupd_wp.
-        iInv "Hinv_i" as (bq) "(>Hq & >Hstv & Hspec)" "Hclose".
+      { iEval (rewrite /intr_res) in "Hintr".
+        iDestruct "Hintr" as (h0 b0) "(_ & _ & _ & Hstv & _)".
         iDestruct "Hbstv" as (v0) "Hbstv".
         iDestruct (reg_pointsto_conflict stvec (DfracOwn 1) with "Hstv Hbstv") as %[]. }
       iDestruct "Hkpt" as (root_ppn) "Htlbinv".
@@ -308,22 +314,21 @@ Section WpSmodeIntr.
       iAssert (intr_frame root_ppn (tp_pin m)) with "[Hmenv Htlbinv Hstk]" as "HF".
       { iApply (intr_frame_retarget root_ppn m (tp_pin m) (eq_sym Hsppin)).
         iFrame "Hmenv Htlbinv Hstk". }
-      iApply (wp_instr_s_intr handler root_ppn (tp_pin m) pc is_rvc i
+      iApply (wp_instr_s_intr root_ppn (tp_pin m) pc is_rvc i
                 Hpc0
                 with "Hintr Hhs Hic Hpc Hfile HF Hinstr").
-      iIntros (σ Hpceq) "Hic Hfile HF Hnpc Hsi".
+      iIntros (σ Hpceq) "Hintr Hic Hfile HF Hnpc Hsi".
       iDestruct (intr_frame_retarget root_ppn (tp_pin m) m Hsppin with "HF") as "HF".
       iDestruct "HF" as "(Hmenv & Htlbinv & Hstk)".
       iMod (v2_of_intr_config vta vtb vca vcb with "Hic Hmenv Hsppt Hsppc")
         as "(Hsc & Hsppc & Hsepcx & Hscausex & Hstvalx)".
       iMod ("H" $! σ Hpceq
-              with "Hsc [Hq1 Hsepcx Hscausex Hstvalx Hsppc Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
+              with "Hsc [Hq1 Hintr Hsepcx Hscausex Hstvalx Hsppc Hcpu Hstk Hdeep Htlbinv Hbit1] Hfile Hnpc Hsi")
         as (s_exec) "(%Hexec & Hsi' & Hcont)".
       { iSplitL "Hstk Hdeep".
         { iApply stack_own_app. iFrame "Hstk Hdeep". }
         iSplitL "Htlbinv Hbit1". { iRight. iFrame "Hbit1". iExists root_ppn. iExact "Htlbinv". }
-        iFrame "Hq1 Hsepcx Hscausex Hstvalx Hsppc Hcpu".
-        iExists handler. iExact "Hintr". }
+        iFrame "Hq1 Hintr Hsepcx Hscausex Hstvalx Hsppc Hcpu". }
       iModIntro. iExists s_exec.
       iSplitR; [iPureIntro; exact Hexec |].
       iFrame "Hsi'". iExact "Hcont".

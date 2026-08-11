@@ -45,20 +45,22 @@
    hart with interrupts off.  Threading [eb] there would have claimed, at
    [eb = false], that yield returns on the hart that called it.
 
-   THE RESUMING HART'S [intr_handler_avail_ext eb] COMES OUT, and it is what
-   makes this contract usable from a trap handler at all.  It is
-   PERSISTENT but PER-HART (its handler WP names this hart's registers, its
-   invariant this hart's ghost), so a caller's own copy is about the wrong
-   hart the moment yield crosses a park -- and the one thing a returning trap
-   must still do is [sret], which flips SIE from '0' to '1' and therefore has
-   to re-seal [intr_inv] at '1' with the handler spec in hand.  sched's
-   dispatch payload already carries the dispatching hart's fresh copy
-   ([SpecSched]); before this it was dropped on ProofYield's floor.
+   THE RESUMING HART'S INSTALLED-HANDLER RESOURCE COMES OUT INSIDE
+   [trap_csrs_ext eb], and it is what makes this contract usable from a trap
+   handler at all: the one thing a returning trap must still do is [sret],
+   which flips SIE from '0' to '1' and therefore needs the handler resource in
+   hand.  It is PER-HART, so a caller's own copy would be about the wrong hart
+   the moment yield crosses a park; sched's dispatch payload carries the
+   dispatching hart's, and it now rides inside the trap-CSR bundle that was
+   already crossing.
 
-   IT IS THE [eb]-COMPLEMENT, not the bare proposition, and the [emp] arm is
-   forced rather than chosen -- see [IntrDefs.intr_handler_avail_ext].
-   [eb = false] is the arm that carries something, and that is kerneltrap's.
-   Persistent, so it costs the caller no accounting either way.
+   THAT USED TO BE A SEPARATE PREMISE, [intr_handler_avail_ext eb], with its
+   own transport and its own forced-[emp] arm at [eb = true].  Both are gone:
+   the resource is a conjunct of [trap_csrs], so the existing
+   [trap_csrs_ext] carrier and [trap_csrs_ext_transport] serve it, and at
+   [eb = true] it comes back inside the returned bundle's [sie_arm true] --
+   where, being owned rather than behind an invariant, it can simply be read
+   out.
 
    The context slot [C] stays ONE hart-independent proposition, carried out of
    the entry bundle and back into the exit bundle unchanged.  A hart-INDEXED
@@ -119,8 +121,6 @@ Definition wp_yield_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       pc_is ret_tgt -∗
       trap_csrs_ext eb -∗
       cpu_claim_ext eb pj -∗
-      (* the RESUMING hart's copy -- see the header *)
-      intr_handler_avail_ext eb -∗
       WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 

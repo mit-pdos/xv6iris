@@ -1,7 +1,7 @@
 (* WpSconfLock.v -- the SIE-agnostic lock-invariant instruction leaves: the
    four kinds of access xv6's spinlock code makes to a [struct spinlock],
    each opening [lock_inv] (WpLock.v) around exactly one step.  [lockN] is
-   disjoint from [minstretN] and [intrN], so the open works in BOTH sie_cap
+   disjoint from [minstretN], so the open works in BOTH sie_cap
    arms -- in particular while the absorbing engine's interrupt invariant is
    closed.
 

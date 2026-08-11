@@ -98,10 +98,17 @@ Section WpSconfSret.
     sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
     intr_count 1 true -∗
     (* the trap CSRs: sepc at the NAMED value the handler restored (the sret
-       reads it), the other two at whatever this hart's trap left. *)
+       reads it), the other two at whatever this hart's trap left.  They are
+       threaded PIECEWISE rather than as the folded [trap_csrs], because sepc
+       is pinned -- so [intr_res], the bundle's fifth member, is its own
+       premise here.  It is the slot [intr_handler_avail] used to occupy,
+       inside [intr_count 1 true]; the difference that matters is that the
+       contract now arrives ATTACHED to the very stvec cell this sret's flip
+       re-forms, so the two cannot be about different vectors. *)
     sepc ↦ᵣ sepc0 -∗
     (∃ v : mword 64, scause ↦ᵣ v) -∗
     (∃ v : mword 64, stval ↦ᵣ v) -∗
+    intr_res -∗
     cpu_cells 0 true p -∗
     cpu_claim p -∗
     pc_is pc -∗
@@ -111,8 +118,7 @@ Section WpSconfSret.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg Hmir Hcnt Hsepc Hscausex Hstvalx Hcells Hclm Hpc Hinstr Hcont".
-    iDestruct "Hcnt" as "[Htok Hhx]".
+    iIntros "Hcg Hmir Htok Hsepc Hscausex Hstvalx Hhx Hcells Hclm Hpc Hinstr Hcont".
     iApply (wp_instr_s_sconf m (trap_res true + n)%nat false pc false (SRET tt)
               with "Hcg Hpc Hinstr").
     (* INTERRUPTS ARE OFF AT THIS LEAF, so the funnel's hart-generic
@@ -197,15 +203,10 @@ Section WpSconfSret.
          tied half, the capability eighth (the whole of [sie_arm false]), the
          count eighth the caller brought, and the invariant quarter. ---- *)
     iDestruct "Hcap" as "(Hstk & Htr & Harm)".
-    iDestruct "Hhx" as (handler) "[#Hintr #Hspec]".
-    iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
-      [solve_ndisj|].
-    iDestruct "Hbody" as (bq) "(>Hqi & >Hstv & _)".
+    iEval (rewrite /intr_res) in "Hhx".
+    iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
     iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi") as "(Hhalf & Hqcap & Hqcnt & Hqi)".
-    iMod ("Hclose" with "[Hqi Hstv]") as "_".
-    { iNext. iExists ('b"1" : mword 1). iFrame "Hqi Hstv".
-      iModIntro. iIntros "%Hb". iExact "Hspec". }
+    iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec") as "Hintr".
     (* ---- THE TIE MOVES: ('1','1') -> ('0','1') on BOTH halves at once. ---- *)
     iMod (sret_bits_update ('b"1") ('b"1") ('b"1") ('b"1") ('b"0") ('b"1")
             with "Hspp Hmir") as "[Hspp Hmir]".
@@ -253,13 +254,10 @@ Section WpSconfSret.
          [trap_res true + n] coming out, both [kv_frame_slots + n] by
          conversion -- so [iExact] closes the stack with no arithmetic. ---- *)
     iAssert (sie_cap m n true p)
-      with "[Hqcap Hqcnt Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
+      with "[Hqcap Hqcnt Hintr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
       iFrame "Htr".
-      iFrame "Hqcap Hsepcx Hscausex Hstvalx Hsppc Hclm".
-      iSplitR "Hcells Hqcnt".
-      { iExists handler. iSplit; [iPureIntro; exact Htvd |].
-        iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
+      iFrame "Hqcap Hintr Hsepcx Hscausex Hstvalx Hsppc Hclm".
       (* [cpu_hart 0 true p] -- the cells the caller handed in, plus the count
          eighth the flip just produced at '1'. *)
       iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }

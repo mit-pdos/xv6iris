@@ -16,7 +16,7 @@
 
    A sealed functor over the eighteen callee interfaces plus KERNELVEC (whose
    handler contract is what turns trapinithart's [stvec ↦ᵣ kernelvec] into the
-   [intr_handler_avail] scheduler wants).  main NEVER RETURNS, so there is no
+   [intr_res] scheduler wants).  main NEVER RETURNS, so there is no
    epilogue, no [callee_saved] obligation and no register to restore -- the only
    register fact the proof threads across the sixteen calls is
    [tp = cid_word], which every callee in the kalloc/lock cone requires.
@@ -876,7 +876,7 @@ Section ProofMain.
     ( ∀ (m' : regfile),
         sie_cap_gpr m' n false p0 -∗
         pc_is (mword_of_int (KernelSyms.main + 0x8e) : mword 64) -∗
-        intr_handler_avail -∗
+        intr_res -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
@@ -935,19 +935,18 @@ Section ProofMain.
                      = (mword_of_int (KernelSyms.main + 0x86) : mword 64)).
     { rewrite /T2 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretth) in "Hpc".
-    (* ---- THE INTERRUPT INVARIANT: kernelvec is installed, so the handler
-           contract is available and the SIE ghost's spare quarter buys the
-           invariant that carries it (main is its only caller). ---- *)
+    (* ---- THE INSTALLED-HANDLER RESOURCE: kernelvec is now in stvec, so the
+           handler contract is available and the SIE ghost's spare quarter
+           joins the cell to make [intr_res] (main is its only producer).
+           This was an [inv_alloc] under an [fupd_wp]; owning the resource
+           makes it a plain [iDestruct], and the contract rides ATTACHED to
+           the cell rather than behind a ghost-guarded implication. ---- *)
     iDestruct (mn_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec with "Hhw Hmin Htext") as "#Hkvs".
-    iApply fupd_wp.
-    iMod (intr_inv_alloc_off ⊤ (mword_of_int KernelSyms.kernelvec : mword 64)
-            kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec") as "#Hii".
-    iAssert (intr_handler_avail) as "#Hintr".
-    { rewrite /intr_handler_avail.
-      iExists (mword_of_int KernelSyms.kernelvec : mword 64).
-      iSplitR; [iExact "Hii"|]. iApply bi.later_intro. iExact "Hkvs". }
-    iModIntro.
+    iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
+                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
+      as "Hintr".
+    { iApply bi.later_intro. iExact "Hkvs". }
     (* ---- +0x86 jal plicinit ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x86)) (mword_of_int 1 : mword 5)
               (mword_of_int 17802 : mword 21) mth n false
@@ -1250,7 +1249,7 @@ Section ProofMain.
     kernel_text -∗ panic_wp_any -∗
     pc_is (mword_of_int (KernelSyms.main + 0xa2) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
-    trap_csrs -∗ intr_handler_avail -∗
+    trap_csrs -∗
     started_inv P -∗
     □ (∀ (γpr' : gname) (γs' : list gname) (γk' : gname) (pd' pav' pu' : mword 64)
          (root' : mword 44) (pas' : nat -> mword 44),
@@ -1276,7 +1275,7 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hn Hp0.
-    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Htcsr #Hintr #Hsinv #Hwand".
+    iIntros "Hcg #Htext #Hpanic Hpc Hcpu Htcsr #Hsinv #Hwand".
     iIntros "#Hpenv #Hpinv #Hdlock #Hgeom #Hkinv #Hkptp #Htramp #Hkstx".
     iPoseProof (mni_a2 with "Htext") as "Hia2".
     iPoseProof (mni_a6 with "Htext") as "Hia6".
@@ -1396,7 +1395,7 @@ Section ProofMain.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
     iApply (Scheduler.wp_scheduler_sconf γs SS n p0 Hp0 ltac:(lia)
-              with "Hcg Hcpu Htext Hpc Hpinv Hpanic Htcsr Hintr").
+              with "Hcg Hcpu Htext Hpc Hpinv Hpanic Htcsr").
   Qed.
 
   (* =================================================================== *)
@@ -1455,7 +1454,7 @@ Section ProofMain.
     (* --- 0x7e .. 0x8a : trap / plic, and the interrupt invariant --- *)
     iApply (mn_grp_trap γd γv m3 (K - 2)%nat p0 Hn50 Hcid
               with "Hcg Htext Hkdata Hdev Hpc Hltick Hstvec Hq").
-    iIntros (m4) "Hcg Hpc #Hintr".
+    iIntros (m4) "Hcg Hpc Hintr".
     (* --- 0x8e .. 0x9e : binit / iinit / fileinit / virtio_disk_init /
            userinit, and the disk lock --- *)
     iApply (mn_grp_fs γa γs γv γd m4 (K - 2)%nat p0 ps c0 free0
@@ -1467,8 +1466,11 @@ Section ProofMain.
     (* --- 0xa2 .. the join : the deposit and the scheduler --- *)
     iApply (mn_grp_started γpr γk γa γs γd γv m5 (K - 2)%nat p0 pd pav pu
               root pas P ltac:(lia) Hp0
-              with "Hcg Htext Hpany Hpc Hcpu Htcsr Hintr Hsinv Hwand Hpenv
+              with "Hcg Htext Hpany Hpc Hcpu [Htcsr Hintr] Hsinv Hwand Hpenv
                     Hpinv Hdlock Hgeom Hkinv Hkptp Htramp Hkstx").
+    (* fold the boot cells and the freshly built handler resource into the
+       [trap_csrs] the scheduler consumes. *)
+    iApply (trap_csrs_of_raw with "Htcsr Hintr").
   Qed.
 
 End ProofMain.

@@ -1230,7 +1230,7 @@ Section ProofPushOff.
       by (apply pop_nv1_zero_iff; exact Hbound).
     assert (Hnoffpos : zopz0zKzJ_s zero_reg (sign_extend' 64 noffv) = false)
       by (apply pop_noff_pos; exact Hbound).
-    iDestruct (intr_count_pos_off with "Hcnt") as "[Htok #Havail]".
+    iDestruct (intr_count_pos_off with "Hcnt") as "Htok".
     iPoseProof (ppi_00 with "Htext") as "Hi00".
     iPoseProof (ppi_02 with "Htext") as "Hi02".
     iPoseProof (ppi_04 with "Htext") as "Hi04".
@@ -1513,7 +1513,7 @@ Section ProofPushOff.
             iSplitL "Hint". { iExact "Hint". }
             iExact "Hproc". }
           destruct eb.
-          - iApply (intr_count_pack_S_on with "Htok Havail").
+          - iApply (intr_count_pack_S_on with "Htok").
           - iApply (intr_count_pack_S_off with "Htok"). }
         iExact "HC". }
       unfold callee_saved. repeat split.
@@ -1843,7 +1843,7 @@ Section ProofPushOff.
           apply pop_storeval_pred. exact Hbound. }
         iApply (wp_csrsi_sstatus_x0_s_sconf (mword_of_int (KernelSyms.pop_off + 0x24)) P7 (av - 2)%nat false
                   with "Hcg [Htok] Htcp [Hnoff Hint Hproc] Hclm Hpc Hi24 [-]").
-        { iApply (intr_count_pack_S_on 0 with "Htok Havail"). }
+        { iApply (intr_count_pack_S_on 0 with "Htok"). }
         { rewrite /cpu_cells.
           iSplitR. { iPureIntro. change (Z.of_nat 0) with 0%Z. lia. }
           iSplitL "Hnoff". { iEval (rewrite Hdec). iExact "Hnoff". }

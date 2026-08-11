@@ -258,23 +258,26 @@ Definition wp_kerneltrap_sconf_body
      SPIE = 1.  This is the [sret_bits] travelling half, which is what
      carries the fact past the four instructions before the check. *)
   sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
-  (* THE HANDLER IS INSTALLED -- persistent, and it goes STRAIGHT BACK OUT,
-     because what the caller actually needs is the RESUMING hart's copy and
-     the only thing that can produce that is the crossing itself.
+  (* THE INSTALLED TRAP VECTOR AND ITS CONTRACT.  In and out, because what
+     the caller actually needs is the RESUMING hart's copy and the only thing
+     that can produce that is the crossing itself: on the two non-yield paths
+     nothing moves the hart, so this very resource IS the postcondition's; on
+     the yield path it goes into the park and the dispatch payload's takes its
+     place ([SpecYield]).  A caller gets back one about whichever hart it
+     resumed on, and never has to know which case it was in.
 
-     Why in and out rather than just out: on the two non-yield paths nothing
-     moves the hart and nothing manufactures an [intr_handler_avail], so this
-     copy IS the postcondition's; on the yield path it is dropped and the
-     dispatch payload's fresh one takes its place ([SpecYield]).  A caller
-     therefore gets back a copy about whichever hart it resumes on, and never
-     has to know which case it was in.
+     Why the caller needs it at all: kernelvec's [sret] flips SIE '0' -> '1',
+     and that flip needs the [intr_res] quarter -- so a returning trap cannot
+     re-enable interrupts without the handler resource in hand.  kernelvec can
+     pay this premise; the handler spec inside it, at a LATER, is exactly its
+     own Löb hypothesis, which is where the recursion in this cone is closed.
 
-     Why the caller needs it at all: kernelvec's [sret] flips SIE '0' -> '1'
-     and so must re-seal [intr_inv] at '1' with the handler spec in hand.
-     kernelvec can pay this premise -- [intr_inv] is persistent and the
-     handler spec at a LATER is exactly its own Löb hypothesis, which is where
-     the recursion in this cone is closed. *)
-  intr_handler_avail -∗
+     IT IS THREADED, NOT PERSISTENT.  It used to be [intr_handler_avail], a
+     duplicable credential -- but the persistence was per-hart and therefore
+     bought nothing across the one boundary (the park) that mattered.  The
+     trap CSRs beside it are threaded piecewise at PINNED values here, which
+     is why this is its own conjunct rather than folded into [trap_csrs]. *)
+  intr_res -∗
   cpu_own 0 false p C false -∗
   kernel_text -∗ pc_is pcE -∗
   sepc ↦ᵣ ep -∗ scause ↦ᵣ sc -∗ stval ↦ᵣ tv -∗
@@ -297,7 +300,7 @@ Definition wp_kerneltrap_sconf_body
       sie_cap_gpr_at ms_f mf av false p -∗
       sret_bits ('b"1" : mword 1) ('b"1" : mword 1) -∗
       (* at the RESUMING hart -- see the premise *)
-      intr_handler_avail -∗
+      intr_res -∗
       cpu_own 0 false p C false -∗
       (* sepc is RESTORED to the trapped pc; scause and stval belong to the
          resuming hart, so their values are existential *)

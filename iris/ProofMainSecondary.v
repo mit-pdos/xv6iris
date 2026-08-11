@@ -14,7 +14,7 @@
    A sealed functor over the seven callee interfaces this arm actually uses
    (cpuid, printk-general, kvminithart, trapinithart, plicinithart, scheduler,
    and KERNELVEC -- whose handler contract is what turns trapinithart's
-   [stvec ↦ᵣ kernelvec] into the [intr_handler_avail] scheduler wants).  main
+   [stvec ↦ᵣ kernelvec] into the [intr_res] scheduler wants).  main
    never returns, so there is no epilogue and no [callee_saved] obligation --
    and since [tp] is PINNED to the hart (HartTp.v) there is no register fact
    left to thread across the calls at all: every callee that used to demand
@@ -569,7 +569,7 @@ Section ProofMainSecondary.
     pc_is (mword_of_int (KernelSyms.main + 0x32) : mword 64) -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
-    strans_bit strans_bit_bare -∗ tlb ↦ᵣ tlbvec0 -∗ trap_csrs -∗
+    strans_bit strans_bit_bare -∗ tlb ↦ᵣ tlbvec0 -∗ trap_csrs_raw -∗
     kpt_inv root -∗
     (mword_of_int KernelSyms.kernel_pagetable : mword 64) ↦₈□
       (zero_extend' 64 (concat_vec root (zeros' 12 : mword 12))) -∗
@@ -627,19 +627,16 @@ Section ProofMainSecondary.
                      = (mword_of_int (KernelSyms.main + 0x3a) : mword 64)).
     { rewrite /Q2 upd_eq. unfold ret_pc. apply bv_eq; vm_compute; reflexivity. }
     iEval (rewrite Hretth) in "Hpc".
-    (* ---- THIS HART'S interrupt invariant: kernelvec is installed, so the
-           handler contract is available and the SIE ghost's spare quarter
-           buys the invariant that carries it. ---- *)
+    (* ---- THIS HART'S installed-handler resource: kernelvec is in stvec, so
+           the contract is available and the SIE ghost's spare quarter joins
+           the cell to make [intr_res].  Was an [inv_alloc] under an
+           [fupd_wp]. ---- *)
     iDestruct (ms_dup_hw with "Hcg") as "(#Hhw & #Hmin & Hcg)".
     iPoseProof (Kernelvec.kernelvec_handler_spec with "Hhw Hmin Htext") as "#Hkvs".
-    iApply fupd_wp.
-    iMod (intr_inv_alloc_off ⊤ (mword_of_int KernelSyms.kernelvec : mword 64)
-            kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec") as "#Hii".
-    iAssert (intr_handler_avail) as "#Hintr".
-    { rewrite /intr_handler_avail.
-      iExists (mword_of_int KernelSyms.kernelvec : mword 64).
-      iSplitR; [iExact "Hii"|]. iApply bi.later_intro. iExact "Hkvs". }
-    iModIntro.
+    iDestruct (intr_res_intro (mword_of_int KernelSyms.kernelvec : mword 64) _
+                 kernelvec_tv_direct kernelvec_stvec_base with "Hq Hstvec []")
+      as "Hintr".
+    { iApply bi.later_intro. iExact "Hkvs". }
     (* ---- +0x3a jal plicinithart ---- *)
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.main + 0x3a)) (mword_of_int 1 : mword 5)
               (mword_of_int 17904 : mword 21) mth n false
@@ -681,8 +678,11 @@ Section ProofMainSecondary.
               = (mword_of_int KernelSyms.scheduler : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Htgtsc) in "Hpc".
+    (* fold the boot cells and the handler resource built at +0x36 into the
+       [trap_csrs] the scheduler consumes. *)
     iApply (Scheduler.wp_scheduler_sconf γs Q4 n p0 Hp0 ltac:(lia)
-              with "Hcg Hcpu Htext Hpc Hpinv Hpanic Htcsr Hintr").
+              with "Hcg Hcpu Htext Hpc Hpinv Hpanic [Htcsr Hintr]").
+    iApply (trap_csrs_of_raw with "Htcsr Hintr").
   Qed.
 
   (* =================================================================== *)

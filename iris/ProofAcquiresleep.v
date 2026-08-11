@@ -583,7 +583,7 @@ Section AslBodies.
   Proof.
     (* NB: [eb] is deliberately NOT substituted here.  This body runs [iNext]
        over [cpu_own], and with [eb] literal [intr_count]'s [if eb] reduces,
-       [iNext] descends into [intr_handler_avail] and strips ITS later, after
+       [iNext] descends into [IntrDefs.intr_res] and strips ITS later, after
        which the resource can no longer be folded back to [cpu_own]. *)
     intros pj Hav Heb Hanch Hasl.
     iIntros "#Htext IH Hexit Hr24 Hr16 Hr8 Hr0 Htok HRc Hpid Hown Hpay Hcg Hpc".

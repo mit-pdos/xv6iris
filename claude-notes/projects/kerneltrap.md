@@ -655,6 +655,174 @@ either rides the bundle or is already persistent and hart-free
 closed over at `intr_inv` allocation exactly as `hw_config` / `minstret_inv` /
 `kernel_text` already are in `kernelvec_handler_spec`.
 
+### SLICE A — **DELETE `intr_inv`: THE BODY BECOMES EXPLICIT OWNERSHIP UNDER `sie_cap`**
+
+The section above is the strongest argument *against* the shape it describes.
+`intr_handler_avail` is persistent, and the whole of it — the `_ext` guard, the
+transport, the `iNext`-strips-the-later repair, the forced `emp` arm at
+`eb = true` — is machinery for working around the fact that **the persistence is
+about ONE HART and therefore buys nothing at the only boundary where a
+duplicable credential would help.**  Take the `inv` away and all of it goes.
+
+**AND IT IS WHAT USER MODE NEEDS.**  `usertrapret` writes
+`stvec := trampoline_uservec`.  Under `inv intrN (… stvec ↦ᵣ h …)` that write is
+not awkward, it is **impossible by construction**: `h` is a parameter of a
+PERSISTENT proposition fixed at allocation, so the cell can be borrowed but only
+ever returned at the SAME `h`, and allocating a second `intr_inv uservec` does
+not help — two live invariants would each claim a full `stvec` cell, so the
+first becomes unusable forever.  Note `WpSconfCsr.wp_csrw_stvec_s_sconf` is
+ALREADY the right shape (`stvec ↦ᵣ tv0` in, `stvec ↦ᵣ wval` out); the invariant
+is the only thing that keeps it inapplicable outside the boot window.
+
+**WHAT `inv` ACTUALLY BUYS HERE: nothing but that persistence.**  The safety
+property — *you cannot set SIE = 1 without an installed handler* — is enforced
+by the GHOST QUARTER, not by the invariant: `sie_ghost_flip` needs all three
+fractions and the quarter only ever travels with the cell.  Moving the body out
+from behind `inv` preserves that argument verbatim.  (Contrast `satp`, which is
+already carried exactly this way: explicitly owned inside `strans_inv`'s two
+arms, `KptShare.tlb_res_pt` / `SRegime.bare_inv`.  `stvec` is the odd one out.)
+
+**THE SHAPE.**  The ex-invariant body, owned, folded into `trap_csrs`:
+
+```coq
+Definition intr_res : iProp Σ :=          (* was: the body of [inv intrN] *)
+  (∃ (h : mword 64) (b : mword 1),
+     ⌜ trapVectorMode_forwards (_get_Mtvec_Mode h) = TV_Direct ⌝ ∗
+     ⌜ stvec_base h = h ⌝ ∗
+     ghost_var sie_gname (1/4) b ∗
+     stvec ↦ᵣ h ∗
+     □ (⌜ b = ('b"1" : mword 1) ⌝ -∗ ▷ intr_handler_spec h))%I.
+
+Definition trap_csrs : iProp Σ :=
+  ((∃ v, sepc ↦ᵣ v) ∗ (∃ v, scause ↦ᵣ v) ∗ (∃ v, stval ↦ᵣ v) ∗
+   (∃ a b, sret_bits a b) ∗ intr_res)%I.
+```
+
+**`trap_csrs` IS THE RIGHT CARRIER AND IT IS THE ONLY ONE THAT DOES NOT COST
+NEW PLUMBING.**  It is already "the per-hart trap-scribbled registers": already
+inside `sie_arm true`, already `trap_csrs_pay`/`_ext`-guarded on exactly the
+unbalanced specs, already on BOTH directions of `SchedCtx.p_sched`, already
+transported.  A linear `stvec` cell needs precisely those roads.  What falls out:
+
+- **`intr_handler_avail`, `_ext`, `_ext_intro`, `_ext_transport`,
+  `intr_restore`, `intr_restore_intro` — DELETED.**  At `sie_arm true` the arm's
+  eighth pins the guard's `b = '1'`, so the handler spec comes out **with no
+  fupd and no invariant open**; the forced-`emp` arm the section above documents
+  exists only because prying it out from behind `inv` needs a step.  Slice 7 is
+  superseded, not extended.
+- **`intr_count`'s payload — DELETED**, hence `_retune_on`/`_off`,
+  `_pack_S_on`/`_off` collapse and `intr_count n eb` is level + eighth again.
+  At levels ≥ 1 the CLIENT already holds `trap_csrs` (push_off hands it out,
+  pop_off takes it back), which is exactly where the body has to be for the
+  re-enabling `csrsi` to consume it.
+- **Six invariant sites get simpler, not harder** — the whole consumer surface:
+  allocation (`ProofMain:944`, `ProofMainSecondary:636`, which stop needing a
+  fupd) and five opens (`WpIntrInv:285` the engine, `WpSconfCsr:890/1149/1514`,
+  `WpSconfSret:191`, `WpSmodeIntr:264`).  No mask arithmetic, no `>` timeless
+  patterns, no re-seal; `WpSmodeIntr`'s Bare ∧ SIE = '1' refutation becomes a
+  direct `reg_pointsto_conflict` on two owned cells.
+
+**⚠️ THE ONE THING THAT SILENTLY BREAKS: THE FIXPOINT'S GUARD.**  "THE CYCLE IS
+REAL" above closes because the recursive occurrence of `intr_handler_spec` sits
+under `inv` (`inv_contractive`).  Delete the `inv` and that occurrence is BARE —
+`ihs_pre` stops being contractive and the Banach `fixpoint` does not exist.  The
+explicit `▷` above is what replaces it, and it is not optional.  The trap IS a
+program step, so the engine strips it where it strips `inv`'s today.
+
+**…AND THAT `▷` MUST BE SEALED: `Global Typeclasses Opaque intr_res`.**  Found
+by building, not by reading.  The `▷` sits INSIDE the definition rather than at
+its head, so `MaybeIntoLaterN`'s structural instances descend through
+`trap_csrs`' separating conjunctions and strip it: after ANY branch's `iNext` a
+hypothesis that was `trap_csrs` is something strictly STRONGER that no longer
+matches `trap_csrs`, and `iSpecialize` then fails as if the resource were
+missing.  This is the hazard durable-notes already records for `cpu_own` and
+`intr_handler_avail` — the difference is that `trap_csrs` is threaded through
+the entire park/lock cone, so the per-site re-seal repair would have to be
+applied at dozens of unrelated proofs (`ProofPipewrite:2224` was the first).
+`Typeclasses Opaque` stops the descent at the constant, so no caller ever holds
+the stronger form.  The cost is that `iDestruct` cannot take it apart by
+`IntoExist` either: the ~6 sites that genuinely open it say `rewrite /intr_res`
+first — which is exactly the set of places that should be looking inside.  **A
+`▷` buried inside a widely-threaded bundle needs the seal; one at the head of a
+narrowly-threaded resource does not.**
+
+**⚠️ THE GHOST-VALUE GUARD ON THE SPEC CANNOT SURVIVE, AND BOOT PAYS FOR IT.**
+The invariant's body read `□ (b = '1' -∗ spec)`, so at SIE = 0 it held a cell
+and no contract.  That worked only because `inv` is persistent: the guard had to
+be discharged solely at the moment of enabling, and the `csrsi` leaf got the
+spec from a *separate* persistent premise (`intr_handler_avail`) whose handler
+it could then unify with the invariant's.  **With ownership that route is
+closed** — a separate spec premise is about some `h'`, the cell in hand is at
+`h`, and nothing ties them, so the enabling flip cannot re-form the resource.
+The contract therefore rides UNCONDITIONALLY, which is also the property the
+whole change exists for (installing a new vector = swapping cell and contract
+together, atomically = usertrapret).
+
+The consequence is that **boot cannot hold one**: before trapinithart there is
+no installed handler, and `SpecMain.main_hart_raw` holds `trap_csrs`.  So
+`IntrDefs` grows `trap_csrs_raw` (the four cells) with
+`trap_csrs_of_raw`/`_to_raw`, `main_hart_raw` is restated over it, and `main`
+folds the full bundle at the one moment the claim first becomes true — the
+`intr_res_intro` that replaced `intr_inv_alloc_off`, where
+`kernelvec_handler_spec` is already in hand two lines above.  Cost: one
+definition, `BootBridge:459`, and one `iApply trap_csrs_of_raw` at ProofMain's
+tail call.
+
+**COSTS, honestly.**  ~10 sites go from duplicating a persistent credential to
+threading a linear one: `ProofKerneltrap` ×3, `ProofMain`,
+`ProofMainSecondary`, `ProofYield`, `ProofSched`, `ProofScheduler`,
+`ProofSysPause`, `ProofAcquiresleep`.  Most are `iAssert (…) as "#Havz"`
+re-seals that simply DISAPPEAR — with the resource sealed there is no later to
+be stripped, so kerneltrap's three continuation sites become `iRename`.
+
+**`SchedCtx.p_sched` turned out to need a DELETION, not the factoring the plan
+predicted.**  The prediction was that the payload must move OUT of the
+disjunction so the parking direction carries it too (today only the DISPATCH
+arm does, because persistence made the return trip free).  That is the right
+requirement and it is already met: `trap_csrs (CID := h)` was factored out of
+the disjunction long ago, and the handler resource is now a conjunct OF it — so
+the `intr_handler_avail (CID := h) ∗` line is simply struck out and the
+requirement is discharged by a carrier that was already crossing in both
+directions.  **This is the single strongest piece of evidence for merging into
+`trap_csrs` rather than keeping a standalone carrier**: the hard part of the
+change was already built, for the cells, years of slices ago.
+
+**THE HANDLER CONTRACT DOES NOT HAVE TO CHANGE IN THIS SLICE.**  Stage 1's
+absorbing Löb is at a FIXED hart, so `wp_exec_step_intr` can simply FRAME the
+cell across the handler run where today it re-seals the invariant, and
+`intr_handler_spec` / `ProofKernelvec` / `SpecKerneltrap` are untouched.
+Threading `intr_res` in and existentially out of `intr_handler_spec` belongs to
+the core — where `WpNext.v:137` already lists `intr_inv` among the per-hart
+residue *"only the trap handler can hand back at the resuming hart"* — and it is
+the same edit that later lets `usertrapret` swap the vector.
+
+**THE MERGE WAS CHECKED BEFORE BEING COMMITTED TO, AND THE OBVIOUS OBJECTION
+DISSOLVES.**  A plain grep says six more specs thread `trap_csrs` than thread
+`intr_handler_avail` — `SpecSleep`, `SpecBread`, `SpecBwrite`, `SpecKwait`,
+`SpecVirtioDiskRw`, `SpecSysPause` — which would mean folding the body in makes
+six sleeping-cone proofs re-establish it across a park.  **All six are PROSE**:
+each mentions `trap_csrs` only in a comment explaining why it does NOT thread
+one (`SpecKwait:87` — *"a second `trap_csrs` makes the eb = true precondition
+unsatisfiable"*; `SpecSysPause:51` — *"`trap_csrs` is exclusive register
+ownership"*).  Strip comments before believing a grep on this tier; the prose
+density here is high enough that the raw counts are meaningless.
+
+The real statement-level carriers of the two families are near-identical, which
+is the whole argument for the merge:
+
+| | statement-level sites |
+| --- | --- |
+| `trap_csrs` / `_pay` / `_ext` | `SpecMain`, `SpecSched`, `SpecScheduler`, `SpecYield`, `SpecPushOff`/`WpSconfCsr:837`, `SchedCtx:275` |
+| `intr_handler_avail` / `_ext` | `SpecSched`, `SpecScheduler`, `SpecYield`, `SpecKerneltrap`, `WpSconfCsr:1405`, `SchedCtx:202/255/275` |
+
+The only asymmetries are `SpecMain`'s boot bundle and `SpecPushOff`'s `_pay`
+index (which gains the body) and `SpecKerneltrap` (which threads the CSRs at
+PINNED values, so it keeps `intr_res` as its own conjunct rather than the folded
+`trap_csrs` — one hypothesis in the slot `intr_handler_avail` occupies today).
+The fallback, if the merge ever does turn ugly, is `intr_res` as a STANDALONE
+linear carrier in `intr_handler_avail`'s current positions — more plumbing,
+smaller blast radius, same deletion of `inv`.
+
 ### WHY THE LEAF SWEEP IS MECHANICAL
 
 `wp_instr_s_sconf`'s σ-callback has to move inside `wp_next b p`: after the
@@ -889,6 +1057,18 @@ remainder (both now essentially done; see `3b`'s entry above for what the slice
 actually cost and where).  (`6` needed `4` only, not the core — see the correction on its
 line; `7` needed nothing but its shape.)  `8` is free at any point.  The core
 comes last and absorbs whatever remains.
+
+**PLUS SLICE `A`** (the section "DELETE `intr_inv`" above), added 2026-08-11 and
+independently landable: `intr_inv` becomes explicit ownership folded into
+`trap_csrs`.  It is NOT ordered against `3b` — the two are independent in
+content, and overlap in exactly two files (`WpSmodeIntr.wp_instr_s_sconf`, whose
+`b = true` arm both slices touch, ~6 lines; and `WpSconfCsr.v`, at different
+lemmas).  They are ordered against each other only by the BUILD: `A` edits
+`IntrDefs.v`, near the bottom of the tree, so it invalidates whatever `3b` has
+compiled.  Run one at a time, or in separate clones.  `A` should come BEFORE the
+core, not after: it deletes resources the core would otherwise have to carry
+through the fixpoint (`intr_handler_avail` and its `_ext` family), and it is
+what supplies the `▷` guard the fixpoint needs once `inv` is gone.
 
 **And the lesson about this list itself: check the tree before believing an
 entry.**  `3a` was written as the big blocker (~2173 references, arity change at

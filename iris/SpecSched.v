@@ -31,9 +31,9 @@
    conjunct is gone -- [tp_pin] makes it true by construction.
 
    What the continuation gets back: same j, state now RUNNING, lock held on
-   the resumed hart, the trap CSRs and that hart's fresh
-   [intr_handler_avail] (the dispatch payload's, which is what a caller's
-   own release/retune needs under the fresh ghost), c->proc back at proc j,
+   the resumed hart, that hart's fresh trap CSRs (the dispatch payload's,
+   [intr_res] included, which is what a caller's own release/retune needs
+   under the fresh ghost), c->proc back at proc j,
    and a FRESH parked scheduler context under ▷ ([sched_vc], which resolves
    at the rebound hart the same way). *)
 From Stdlib Require Import ZArith Lia List.
@@ -83,10 +83,10 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      dropped), because nothing here depends on the value: the trap CSRs are
      threaded EXPLICITLY below rather than taken out of the SIE arm, and the
      post-swtch intena restore + ghost retune already run at both values
-     ([intr_count_retune_on] / [_off]).  [intr_handler_avail] in the
-     postcondition is likewise value-independent: it comes from the DISPATCH
-     payload -- the scheduler that resumes this thread always runs with
-     interrupts on -- not from this thread's own entry stash. *)
+     ([intr_count_retune_on] / [_off]).  The handler resource in the
+     postcondition is likewise value-independent: it rides inside the DISPATCH
+     payload's [trap_csrs] -- the scheduler that resumes this thread always
+     runs with interrupts on -- not this thread's own entry stash. *)
   (16 <= av)%nat ->
   (* TWO INDICES, AND THEY ARE OPPOSITE CONSTANTS.  sched is entered holding
      p->lock at noff == 1, so its OWN resource index is pinned [false]
@@ -115,8 +115,8 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      the parked-scheduler slot content is the ▷ sched_vc premise below.
      sched PRESERVES [eb] across the park -- its intena save/restore is
      exactly the eb retune back to the caller's own state, now realized
-     against the DISPATCHING hart's fresh [intr_handler_avail] (the entry
-     stash is about the wrong hart's ghost). *)
+     against the DISPATCHING hart's fresh [trap_csrs] (the entry stash is
+     about the wrong hart's ghost). *)
   cpu_own 1 eb pj emp false -∗
   own_ctx (p_context pj) -∗
   (* THE HART TAG, WHOLE.  The parking thread merged the slot's half with its
@@ -133,8 +133,9 @@ Definition wp_sched_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       sie_cap_gpr mf av false pj -∗
       pc_is ret_tgt -∗
       proc_held cpu_id j γl RUNNING ch' -∗
+      (* the dispatch payload's, i.e. the RESUMING hart's -- and [intr_res]
+         rides inside it, which is what the caller's own retune needs. *)
       trap_csrs -∗
-      intr_handler_avail -∗
       cpu_own 1 eb pj emp false -∗
       own_ctx (p_context pj) -∗
       hart_full j cpu_id -∗

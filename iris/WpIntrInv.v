@@ -14,13 +14,19 @@
      - 1/4 is the KERNEL-CODE token: client code keeps it to reason about
        whether interrupts are currently enabled or disabled (push_off /
        pop_off bookkeeping);
-     - 1/4 lives in the interrupt INVARIANT [intr_inv] below, together with
-       the [stvec] register and -- keyed on the ghost value being 1 -- a
-       persistent WP for running the interrupt handler ([intr_handler_spec]).
+     - 1/4 rides inside [IntrDefs.intr_res], together with the [stvec]
+       register and -- keyed on the ghost value being 1 -- a WP for running
+       the interrupt handler ([intr_handler_spec], under a [▷]).
 
    Changing SIE therefore requires ALL THREE pieces (1/2 + 1/4 + 1/4 = 1,
-   [sie_ghost_flip]); the flipping instruction opens [intr_inv] across its
-   own step to borrow the invariant quarter.
+   [sie_ghost_flip]), so interrupts cannot be enabled without the installed
+   handler resource in hand.  [intr_res] WAS AN IRIS INVARIANT [intr_inv]
+   until 2026-08-11, and the flipping instruction used to open it across its
+   own step to borrow the quarter; it is now plain ownership riding inside
+   [trap_csrs], and the flip leaves take it as an ordinary resource.  See
+   [IntrDefs.v] §5 for why (the short version: an invariant pins the trap
+   VECTOR forever, which user mode cannot live with, and the persistence it
+   bought was per-hart and therefore useless after a park).
 
    THE ENGINE.  [wp_exec_step_intr] slots into the clock_inv / minstret_inv
    reduction machinery: it is a Löb loop over the joint step rule
@@ -31,9 +37,9 @@
    a tick may rewrite MTIP/STIP at every step, the PLIC wire step may flip
    sig_seip at any time), and cases on the outcome:
 
-     - PENDING: it takes the interrupt -- borrows [stvec] and the handler WP
-       from [intr_inv] for the trap step, drives the trap tower
-       ([exec_handle_interrupt_S]), runs the handler via the invariant's
+     - PENDING: it takes the interrupt -- reads [stvec] and the handler WP
+       out of [intr_res] for the trap step, drives the trap tower
+       ([exec_handle_interrupt_S]), runs the handler via that
        [intr_handler_spec] (which returns idempotently to the interrupted
        pc with SIE re-enabled and the frame [intr_frame] intact), and re-enters
        itself by Löb induction -- so an ARBITRARY number of back-to-back
@@ -223,11 +229,20 @@ Section WpIntrInv.
   (* threaded resource comes back to the callback UNCHANGED; the          *)
   (* callback's obligation is [wp_exec_step_hart_active_inv]'s.           *)
   (* =================================================================== *)
-  Lemma wp_exec_step_intr (handler pc0 : mword 64)
+  (* NO [handler] PARAMETER.  The installed vector is existential inside
+     [intr_res], and the engine reads it out per trap, so nothing above has to
+     name it -- which is what lets the funnel hand this engine an arm conjunct
+     verbatim instead of skolemising a handler out of it first.
+
+     [intr_res] IS THREADED, NOT FRAMED BY THE CALLER: it used to be the
+     persistent [intr_inv handler], which a caller kept its own copy of, and
+     it is now owned, so it goes in here and comes back out to the σ-callback
+     with everything else. *)
+  Lemma wp_exec_step_intr (pc0 : mword 64)
       (root_ppn : mword 44)
       (m : regfile) :
     ret_pc pc0 = pc0 ->
-    intr_inv handler -∗
+    intr_res -∗
     hart_state ↦ᵣ HART_ACTIVE tt -∗
     intr_config -∗
     pc_is pc0 -∗
@@ -235,6 +250,7 @@ Section WpIntrInv.
     intr_frame root_ppn m -∗
     (∀ σ,
        ⌜ exec (dispatchInterrupt Supervisor) σ = Some (None, σ) ⌝ -∗
+       intr_res -∗
        intr_config -∗
        pc_is pc0 -∗
        gpr_file m -∗
@@ -251,11 +267,13 @@ Section WpIntrInv.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpc0.
-    iIntros "#Hintr Hhs Hcfg Hpc Hfile HF Hbody".
-    iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-    iRevert "Hhs Hcfg Hpc Hfile HF Hbody".
+    iIntros "Hintr Hhs Hcfg Hpc Hfile HF Hbody".
+    (* [intr_res] joins the Löb-generalised resources: a trap hands it back,
+       possibly at a different installed vector, so it cannot be fixed outside
+       the loop the way the persistent [intr_inv handler] was. *)
+    iRevert "Hintr Hhs Hcfg Hpc Hfile HF Hbody".
     iLöb as "IH".
-    iIntros "Hhs Hcfg Hpc Hfile HF Hbody".
+    iIntros "Hintr Hhs Hcfg Hpc Hfile HF Hbody".
     iDestruct "Hcfg" as "(#Hhw & #Hminv & Hpriv & Hmsx & Hmiex & Hsepcx & Hscausex & Hstvalx)".
     iDestruct "Hmsx" as (ms) "(Hms & Hsie & %Hmsf)".
     (* [mie] is PINNED at [MIE_S] by [intr_config] (only [mideleg] is
@@ -280,12 +298,16 @@ Section WpIntrInv.
       pose proof (s_dispatch_Some_S _ _ _ _ _ _ _ _ Hdres); subst p.
       (* the destruct folded [Hdres] into [Hdisp0]:
          Hdisp0 : exec (dispatchInterrupt Supervisor) σ = Some (Some (i, Supervisor), σ) *)
-      (* borrow the invariant for this step: stvec (read by the trap), the
-         invariant quarter (agreement pins b = SIE ms = 1), the handler WP *)
-      iInv "Hinv_i" as (b) "(>Hq & >Hstv & #Hspec)" "Hclose".
-      iDestruct (ghost_var_agree with "Hsie Hq") as %Hbv.
-      assert (Hb1 : b = ('b"1" : mword 1)).
-      { rewrite <- Hbv. apply eq_vec_true_iff. exact HSIE1. }
+      (* OPEN [intr_res] for this step: stvec (read by the trap), the vector's
+         two pure facts, and the handler WP.  This is where an [iInv] on
+         [intrN] used to be, together with a [ghost_var_agree] to discharge
+         the invariant body's [b = '1'] guard; the resource carries its
+         contract unconditionally, so both are gone.  The WP arrives UNDER ITS
+         LATER -- the [▷] that replaced [inv]'s guard -- and the trap step's
+         own [iNext] below strips it, so the guard is paid for by a step that
+         exists anyway. *)
+      iEval (rewrite /intr_res) in "Hintr".
+      iDestruct "Hintr" as (handler vb) "(%Htvd & %Hsb & Hq & Hstv & #Hsp)".
       iDestruct "Hsepcx" as (sepc_old) "Hsepc".
       iDestruct "Hscausex" as (scause_old) "Hscause".
       iDestruct "Hstvalx" as (stval_old) "Hstval".
@@ -327,9 +349,22 @@ Section WpIntrInv.
       iMod (reg_update _ sepc _ pc0 with "Hreg Hsepc") as "[Hreg Hsepc]".
       iMod (reg_update _ cur_privilege _ Supervisor with "Hreg Hpriv") as "[Hreg Hpriv]".
       iMod (reg_update _ nextPC _ (stvec_base handler) with "Hreg Hnpc") as "[Hreg Hnpc]".
-      (* re-seal the invariant (same ghost value; the spec is persistent) *)
-      iMod ("Hclose" with "[Hq Hstv]") as "_".
-      { iNext. iExists b. iFrame "Hq Hstv". iExact "Hspec". }
+      (* [intr_res]'s PIECES ride across the handler run separately, and are
+         re-formed in the return continuation below -- where the old proof
+         re-sealed the invariant here and let the handler run outside it.
+         Same effect, and sound for the same reason: the trap does not write
+         stvec, and the ghost quarter stays at '1' while the live bit is 0,
+         which is exactly the stale-but-restored state the sret repairs (the
+         handler ties its own per-trap ghost, ProofKernelvec).  Framing a
+         PER-HART resource here is Stage-1 only: the absorbing Löb re-enters
+         at the hart the trap returned to, which is this one.
+
+         RE-FORMING IT HERE DOES NOT WORK, and the failure is the one
+         durable-notes describes: the [iNext] below descends into the
+         [▷ intr_handler_spec] buried inside [intr_res] and strips it, so the
+         hypothesis becomes STRONGER than [intr_res] and stops matching it --
+         [iSpecialize] on the Löb hypothesis then fails as if the resource
+         were missing.  Re-seal at the point of use instead. *)
       iModIntro. iRight.
       iExists i, Supervisor, s_trap.
       iSplitR; [iPureIntro; exact Hha |].
@@ -348,9 +383,8 @@ Section WpIntrInv.
       iEval (rewrite Hsb) in "Hnpc".
       assert (Htm : ms_c = trap_ms elp0 ms) by reflexivity.
       iEval (rewrite Htm) in "Hms".
-      (* ---- the invariant's handler WP discharges the whole handler ---- *)
-      iAssert (intr_handler_spec handler) with "[]" as "#Hsp".
-      { iApply "Hspec". iPureIntro. exact Hb1. }
+      (* ---- the handler WP discharges the whole handler.  Its later was
+             stripped by the [iNext] above, so ["Hsp"] is now the bare spec. ---- *)
       iApply ("Hsp" $! root_ppn elp0 ms pc0 MIE_S mdv0 m
                 with "[%] [%] [%] Hhs Hpriv Hms Hmie Hmdl Hsepc [$Hpcr $Hnpc] Hfile HF").
       { exact Hmsf. }
@@ -358,12 +392,19 @@ Section WpIntrInv.
       { exact Hmm. }
       (* the handler's return continuation: re-establish the frame + Löb *)
       iIntros "Hhs Hpriv Hms Hmie Hmdl Hsepcx Hpc Hfile HF".
+      (* RE-SEAL [intr_res] AT THE POINT OF USE.  The inner [iNext] is what
+         makes one tactic cover both forms -- it strips the GOAL's later and
+         leaves an already-stripped ["Hsp"] untouched -- so this does not have
+         to know whether the trap step's [iNext] got there first. *)
+      iAssert (intr_res) with "[Hq Hstv]" as "Hintr".
+      { iApply (intr_res_intro handler vb Htvd Hsb with "Hq Hstv").
+        iNext. iExact "Hsp". }
       assert (Hs1 : _get_Mstatus_SIE (sret_ms5 (trap_ms elp0 ms)) = ('b"1" : mword 1))
         by (apply eq_vec_true_iff; exact (roundtrip_SIE_true elp0 ms HSIE1)).
       assert (Hs2 : _get_Mstatus_SIE ms = ('b"1" : mword 1))
         by (apply eq_vec_true_iff; exact HSIE1).
       iEval (rewrite Hs2 -Hs1) in "Hsie".
-      iApply ("IH" with "Hhs [Hpriv Hms Hsie Hmie Hmdl Hsepcx Hscause Hstval] Hpc Hfile HF Hbody").
+      iApply ("IH" with "Hintr Hhs [Hpriv Hms Hsie Hmie Hmdl Hsepcx Hscause Hstval] Hpc Hfile HF Hbody").
       iFrame "Hhw Hminv Hpriv".
       iSplitL "Hms Hsie".
       { iExists (sret_ms5 (trap_ms elp0 ms)). iFrame "Hms Hsie".
@@ -377,7 +418,7 @@ Section WpIntrInv.
          (the destruct folded [Hdres] into [Hdisp0]:
           Hdisp0 : exec (dispatchInterrupt Supervisor) σ = Some (None, σ)) *)
       iSpecialize ("Hbody" $! σ with "[%]"); [exact Hdisp0 |].
-      iMod ("Hbody" with "[Hpriv Hms Hsie Hmie Hmdl Hsepcx Hscausex Hstvalx] Hpc Hfile HF Hsi")
+      iMod ("Hbody" with "Hintr [Hpriv Hms Hsie Hmie Hmdl Hsepcx Hscausex Hstvalx] Hpc Hfile HF Hsi")
         as (retval s_exec) "(%Hha & Hpc' & Hsi' & Hcont)".
       { iFrame "Hhw Hminv Hpriv".
         iSplitL "Hms Hsie".

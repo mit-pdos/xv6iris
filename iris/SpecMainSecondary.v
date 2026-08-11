@@ -30,7 +30,7 @@
    WHAT DOES NOT CROSS.  This hart's own resources enter as preconditions,
    exactly as on the boot arm: its [sie_cap_gpr], its [cpu_own] at
    [cpu_ctx_free], its SIE ghost's spare quarter (each hart allocates its OWN
-   [IntrDefs.intr_inv] out of its own trapinithart's [stvec ↦ᵣ kernelvec] --
+   [IntrDefs.intr_res] out of its own trapinithart's [stvec ↦ᵣ kernelvec] --
    the invariant is per-hart because γ is), and [main_hart_raw] (the Bare
    receipt kvminithart flips, the tlb cell it seals into the KPT arm, and the
    [trap_csrs] the scheduler consumes at the far end).
@@ -142,7 +142,7 @@ Section SpecMainSecondary.
     sie_cap_gpr m K false p0 -∗
     cpu_own 0 false p0 cpu_ctx_free false -∗
     (* the SIE live-bit ghost's INVARIANT quarter: this hart allocates its
-       own [intr_inv] out of its own trapinithart's [stvec ↦ᵣ kernelvec].
+       own [intr_res] out of its own trapinithart's [stvec ↦ᵣ kernelvec].
        The ghost is this hart's canonical [sie_gname] now, not a parameter. *)
     ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
     kernel_text -∗ kernel_data -∗ pc_is pcE -∗

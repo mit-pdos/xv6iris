@@ -90,7 +90,7 @@ Section ProofKerneltrap.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].
     intros pcE ret_tgt Hlen Hav Hsc Hepal.
-    iIntros "Hcg Hmir #Havail Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
+    iIntros "Hcg Hmir Havail Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
     iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
               with "Hcg Hmir Htext Hpc Hsepc Hscause [-]").
@@ -281,16 +281,11 @@ Section ProofKerneltrap.
           by (unfold kerneltrap_stack in Hav; lia).
         iEval (rewrite Hav6) in "Hcgat".
         (* the hart cannot have moved: no yield on this path. *)
-        (* RE-SEAL THE AVAIL.  A branch's [iNext] descends into
-           [intr_handler_avail] and strips the later off the handler spec, so
-           the hypothesis in context is STRONGER than [intr_handler_avail] and
-           no longer matches it -- the same trap [ProofAcquiresleep] documents
-           for [cpu_own], and the same repair [IntrDefs.intr_restore_intro]
-           performs.  [iNext] here is a no-op in the already-stripped case and
-           the real thing otherwise, so one tactic covers both. *)
-        iAssert (intr_handler_avail) as "#Havz".
-        { iDestruct "Havail" as (hz) "[#Hiz #Hsz]".
-          iExists hz. iFrame "Hiz". iNext. iExact "Hsz". }
+        (* NO RE-SEAL NEEDED.  [intr_res] is [Typeclasses Opaque], so a
+           branch's [iNext] cannot descend into it and strip the later off
+           the handler spec -- the repair its predecessor [intr_handler_avail]
+           needed at all three of this proof's continuation sites. *)
+        iRename "Havail" into "Havz".
         iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
         iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
                               Hsepc Hscause Hstval Hpc Hclm").
@@ -363,21 +358,27 @@ Section ProofKerneltrap.
         iApply (Yield.wp_yield_sconf γs j γl Y0 (av - 6)%nat false C
                   Hj Hgl ltac:(unfold kerneltrap_stack in Hav; lia)
                   with "Hcg Hcpu Htext Hpc Hprocs Hpanic
-                        [Hsepc Hscause Hstval Hmir] [Hclm] [-]").
+                        [Hsepc Hscause Hstval Hmir Havail] [Hclm] [-]").
+        (* THE HANDLER RESOURCE GOES INTO THE PARK, as the fifth member of
+           [trap_csrs] -- and comes back out of yield's post as the RESUMING
+           hart's.  It used to be a persistent credential framed around the
+           call and re-delivered separately ([intr_handler_avail_ext]); being
+           owned, it simply travels with the cells it belongs with. *)
         { rewrite /trap_csrs_ext /trap_csrs.
           iSplitL "Hsepc". { iExists ep. iExact "Hsepc". }
           iSplitL "Hscause". { iExists sc. iExact "Hscause". }
           iSplitL "Hstval". { iExists tv. iExact "Hstval". }
-          iExists ('b"1"), ('b"1"). iExact "Hmir". }
+          iSplitL "Hmir". { iExists ('b"1"), ('b"1"). iExact "Hmir". }
+          iExact "Havail". }
         (* THE CLAIM THE TRAP HANDED US, spent on yield.  At [eb = false]
            there is no arm to take it from, which is exactly why a preempting
            trap must arrive holding it. *)
         { rewrite /cpu_claim_ext -Hpj. iExact "Hclm". }
-        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm #Havail_y".
+        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm".
         iEval (rewrite Hpj) in "Hcg". iEval (rewrite Hpj) in "Hcpu".
         (* back, possibly on ANOTHER hart: the trap CSRs are that hart's *)
         rewrite /trap_csrs_ext /trap_csrs.
-        iDestruct "Hext" as "(Hsepc & Hscause & Hstval & Hmir)".
+        iDestruct "Hext" as "(Hsepc & Hscause & Hstval & Hmir & Havail_y)".
         iDestruct "Hsepc" as (ep') "Hsepc".
         iDestruct "Hscause" as (sc') "Hscause".
         iDestruct "Hstval" as (tv') "Hstval".
@@ -420,16 +421,8 @@ Section ProofKerneltrap.
            literal [true], so the left disjunct is absurd, and the right one
            is refuted by [Hpne]: this cpu HAS a current process, which is
            precisely why the yield happened at all. *)
-        (* RE-SEAL THE AVAIL.  A branch's [iNext] descends into
-           [intr_handler_avail] and strips the later off the handler spec, so
-           the hypothesis in context is STRONGER than [intr_handler_avail] and
-           no longer matches it -- the same trap [ProofAcquiresleep] documents
-           for [cpu_own], and the same repair [IntrDefs.intr_restore_intro]
-           performs.  [iNext] here is a no-op in the already-stripped case and
-           the real thing otherwise, so one tactic covers both. *)
-        iAssert (intr_handler_avail) as "#Havz".
-        { iDestruct "Havail_y" as (hz) "[#Hiz #Hsz]".
-          iExists hz. iFrame "Hiz". iNext. iExact "Hsz". }
+        (* NO RE-SEAL NEEDED -- see the twin on the no-yield path above. *)
+        iRename "Havail_y" into "Havz".
         iSpecialize ("Hcont" $! CIDy with "[%]").
         { intros [Hf | Hz]; [ discriminate | exfalso; exact (Hpne Hz) ]. }
         iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
@@ -461,16 +454,8 @@ Section ProofKerneltrap.
         assert (Hav6 : ((av - 6) + 6)%nat = av)
           by (unfold kerneltrap_stack in Hav; lia).
         iEval (rewrite Hav6) in "Hcgat".
-      (* RE-SEAL THE AVAIL.  A branch's [iNext] descends into
-         [intr_handler_avail] and strips the later off the handler spec, so
-         the hypothesis in context is STRONGER than [intr_handler_avail] and
-         no longer matches it -- the same trap [ProofAcquiresleep] documents
-         for [cpu_own], and the same repair [IntrDefs.intr_restore_intro]
-         performs.  [iNext] here is a no-op in the already-stripped case and
-         the real thing otherwise, so one tactic covers both. *)
-      iAssert (intr_handler_avail) as "#Havz".
-      { iDestruct "Havail" as (hz) "[#Hiz #Hsz]".
-        iExists hz. iFrame "Hiz". iNext. iExact "Hsz". }
+      (* NO RE-SEAL NEEDED -- see the twin above. *)
+      iRename "Havail" into "Havz".
       iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
       iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
                             Hsepc Hscause Hstval Hpc Hclm").

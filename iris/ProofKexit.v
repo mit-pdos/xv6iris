@@ -1201,7 +1201,7 @@ Section KexitPark.
     { iApply (kexit_park_pay γf j pid V Hof Hcwd with "Hpriv Hsp Hir"). }
     (* THE POST-RESUME ARM.  A dispatched zombie returns here and panics --
        which is why forgetting its record costs nothing. *)
-    iIntros (CIDz Hsz mf ch') "%Hcsz Hcg Hpc Hheld Htc #Havail Hcpuemp Hoc Htag' Hvc".
+    iIntros (CIDz Hsz mf ch') "%Hcsz Hcg Hpc Hheld Htc Hcpuemp Hoc Htag' Hvc".
     assert (Hpc9a : ret_pc (PD !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KX + 0x9a))
       by (rewrite HPDra; apply bv_eq; vm_compute; reflexivity).

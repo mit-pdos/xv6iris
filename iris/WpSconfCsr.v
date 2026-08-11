@@ -782,13 +782,14 @@ Section WpSconfCsr.
   (* [legalize_sie_clear_idem].                                           *)
   (*                                                                      *)
   (* Choreography ('1' arm): the funnel's σf-callback flips mstatus to    *)
-  (* ms' by reg_update, opens intrN (closed at callback time in BOTH      *)
-  (* arms; lockN-style disjointness from minstretN), [sie_ghost_flip]s    *)
-  (* ALL THREE pieces to '0' (bundle half + capability quarter +          *)
-  (* invariant quarter), reseals the invariant at b := '0' (the handler   *)
-  (* guard is vacuous), and hands the caller the freed '1'-arm payload    *)
-  (* (trap CSRs + stack bound + a persistent intr_inv copy).  The '0'     *)
-  (* arm is the idempotent write, ghosts untouched.                       *)
+  (* ms' by reg_update, reads the quarter out of [intr_res],              *)
+  (* [sie_ghost_flip]s ALL THREE pieces to '0' (bundle half + capability  *)
+  (* quarter + the [intr_res] quarter), re-forms [intr_res] at b := '0'   *)
+  (* (the handler guard is vacuous), and hands the caller the freed       *)
+  (* '1'-arm payload (the trap CSRs, [intr_res] among them, + the stack   *)
+  (* bound).  The '0' arm is the idempotent write, ghosts untouched.      *)
+  (* THIS USED TO OPEN [intrN] ACROSS THE STEP; there is no invariant any *)
+  (* more, so there is no mask side condition either.                     *)
   (* ------------------------------------------------------------------- *)
 (* ===================================================================== *)
 (* THE ARM-FLIP SEAM AND ITS avail INDEX -- READ THIS BEFORE TOUCHING ANY  *)
@@ -904,26 +905,14 @@ Section WpSconfCsr.
       iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hc1)".
       destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
       set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
-      (* the trap-vector invariant: open it for the quarter, flip, reseal *)
-      iDestruct "Hhx" as (handler) "#Hintr".
-      iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-      iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
-        [solve_ndisj|].
-      iDestruct "Hbody" as (bq) "(>Hqi & >Hstv & #Hguard)".
-      iDestruct (ghost_var_agree with "Hq1 Hqi") as %Hbq.
-      (* [intr_handler_spec] is hart-indexed too (Print its Arguments: it takes
-         a [CID]), so this freshly written assertion needs the annotation like
-         every other one: [Hguard] comes out of [Hinv_i], which rode in on the
-         callback's arm at the REBOUND hart, and the sink below ([Hcont]'s
-         re-packed [intr_count]) is at that same hart. *)
-      iAssert (▷ intr_handler_spec (CID := CID) handler)%I as "#Hspec".
-      { iNext. iApply "Hguard". iPureIntro. symmetry. exact Hbq. }
+      (* THE HANDLER RESOURCE: read the quarter out, flip, re-form at '0'.
+         This was an [inv_acc] on [intrN] plus a re-seal; owning [intr_res]
+         turns it into an accessor and a constructor, and the mask side
+         condition ([solve_ndisj]) disappears with the invariant. *)
+      iEval (rewrite /intr_res) in "Hhx".
+      iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
       iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hc1 Hqi") as "(Hhalf & Hq & Htok & Hqi)".
-      iMod ("Hclose" with "[Hqi Hstv]") as "_".
-      { iNext. iExists ('b"0" : mword 1). iFrame "Hqi Hstv".
-        iModIntro. iIntros "%Hb".
-        exfalso. apply (f_equal (@bv_unsigned _)) in Hb.
-        vm_compute in Hb. discriminate. }
+      iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec") as "Hintr".
       (* the machine write: mstatus := ms1, rd := old S-view *)
       iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
       iDestruct (gpr_file_insert_acc (tp_pin m) (Regidx rd) (regval_into_reg (sstatus_read ms0)) with "Hfmap") as "[Hrdc Hfins]".
@@ -971,14 +960,14 @@ Section WpSconfCsr.
       iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
       iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
       iApply ("Hcont" $! ms0 with "[%] [%] Hcg
-                            [Htok] [Hsepcx Hscausex Hstvalx Hsppc] [Hclmx] [Hcells] [$Hpc' $Hnpc]").
+                            [Htok] [Hsepcx Hscausex Hstvalx Hsppc Hintr] [Hclmx] [Hcells] [$Hpc' $Hnpc]").
       { exact Hmsf. }
       { intros _. cbn [sie_bit]. exact Hb1. }
-      { iApply (intr_count_pack_S_on with "Htok").
-        iExists handler. iSplit; [| iExact "Hspec"].
-        iSplit; [iPureIntro; exact Htvd |].
-        iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
-      { iFrame "Hsepcx Hscausex Hstvalx Hsppc". }
+      (* the level-S token is now JUST the eighth: the handler resource it
+         used to carry goes out with the trap CSRs below, where the client
+         needs it and where its matching pop_off takes it back. *)
+      { iApply (intr_count_pack_S_on with "Htok"). }
+      { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr". }
       { rewrite /cpu_claim_pay. iExact "Hclmx". }
       { rewrite /cpu_cells_pay. iExact "Hcells". }
     - (* ---- b = false: the idempotent write; ghosts untouched ---- *)
@@ -1143,9 +1132,12 @@ Section WpSconfCsr.
       WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    iIntros "Hcg Hcnt Hcsrs Hcells Hclm Hpc Hinstr Hcont".
-    iDestruct "Hcnt" as "[Htok Hhx]".
-    iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx & Hsppc)".
+    iIntros "Hcg Htok Hcsrs Hcells Hclm Hpc Hinstr Hcont".
+    (* the handler resource arrives inside [trap_csrs] now, not as
+       [intr_count 1 true]'s payload -- which is what lets the flip re-form it
+       at the SAME installed vector (the old shape had the spec in a separate
+       persistent premise, about an unrelated [h]). *)
+    iDestruct "Hcsrs" as "(Hsepcx & Hscausex & Hstvalx & Hsppc & Hhx)".
     (* REFUTE THE ALREADY-ENABLED CASE ABOVE THE FUNNEL, NOT INSIDE IT.  The
        contradiction is between the payload's sepc cell and the '1' arm's, and
        a register cell is PER HART ([reg_pointsto] takes a [CpuId]): held here,
@@ -1190,15 +1182,12 @@ Section WpSconfCsr.
     (* ---- the real restore: interrupts were off ---- *)
     destruct (csrsi_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_set_val ms0 (mword_of_int 2))).
-    iDestruct "Hhx" as (handler) "[#Hintr #Hspec]".
-    iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
-      [solve_ndisj|].
-    iDestruct "Hbody" as (bq) "(>Hqi & >Hstv & _)".
+    (* the quarter comes straight out of the resource the caller handed in;
+       this used to be an [inv_acc] on [intrN] whose body supplied it. *)
+    iEval (rewrite /intr_res) in "Hhx".
+    iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
     iMod (sie_ghost_flip_on _ _ _ _ _ with "Hhalf Harm Htok Hqi") as "(Hhalf & Hqcap & Hqcnt & Hqi)".
-    iMod ("Hclose" with "[Hqi Hstv]") as "_".
-    { iNext. iExists ('b"1" : mword 1). iFrame "Hqi Hstv".
-      iModIntro. iIntros "%Hb". iExact "Hspec". }
+    iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec") as "Hintr".
     iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
     iModIntro.
     iExists (set_reg s_pc mstatus ms1).
@@ -1227,13 +1216,10 @@ Section WpSconfCsr.
        out, both [kv_frame_slots + n] by conversion -- so [iExact] on the
        untouched [Hstk] closes it with no split and no arithmetic. *)
     iAssert (sie_cap m (trap_res false + n)%nat true p)
-      with "[Hqcap Hqcnt Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
+      with "[Hqcap Hqcnt Hintr Hsepcx Hscausex Hstvalx Hsppc Hclm Hstk Htr Hcells]" as "Hcap".
     { iSplitL "Hstk". { iExact "Hstk". }
       iFrame "Htr".
-      iFrame "Hqcap Hsepcx Hscausex Hstvalx Hsppc Hclm".
-      iSplitR "Hcells Hqcnt".
-      { iExists handler. iSplit; [iPureIntro; exact Htvd |].
-        iSplit; [iPureIntro; exact Hsb |]. iExact "Hinv_i". }
+      iFrame "Hqcap Hintr Hsepcx Hscausex Hstvalx Hsppc Hclm".
       (* [cpu_hart 0 true p] -- the cells the caller handed in, plus the
          count eighth the flip just produced at '1'. *)
       iSplitL "Hcells"; [ iExact "Hcells" | iExact "Hqcnt" ]. }
@@ -1313,11 +1299,10 @@ Section WpSconfCsr.
   (* intr_on() at level 0, from EITHER base state.
        eb = false: the real '0'->'1' flip.  [intr_count 0 false] is just
      the count eighth at '0', so together with the persistent
-     [intr_handler_avail] it IS [intr_count 1 true] -- the pop_off
+     handler resource -- which rides inside [trap_csrs] -- the pop_off
      restore leaf applies verbatim (same four-piece ghost choreography:
-     bundle half + capability eighth + count eighth + invariant quarter,
-     with [trap_csrs] moving INTO the arm's '1' branch alongside an
-     [intr_inv] copy taken from the persistent parameter).
+     bundle half + capability eighth + count eighth + the [intr_res] quarter,
+     with the whole of [trap_csrs] moving INTO the arm's '1' branch).
        eb = true: SIE is ALREADY '1' (ghost agreement between the arm's own
      eighth and the mstatus-tied half), so the write is idempotent on the
      bit and NO ghost moves; the legalized write still changes mstatus's
@@ -1456,7 +1441,6 @@ Section WpSconfCsr.
     (if eb then emp else trap_csrs) -∗
     (if eb then emp else cpu_cells 0 true p) -∗
     cpu_claim_ext eb p -∗
-    intr_handler_avail -∗
     pc_is pc -∗
     instr pc false (CSRImm (csr_sstatus, mword_of_int 2, Regidx (mword_of_int 0), CSRRS)) -∗
     wp_next eb p (fun (CID : CpuId) =>
@@ -1469,29 +1453,31 @@ Section WpSconfCsr.
   Proof.
     destruct eb.
     2:{ (* ---- base state DISABLED: the real flip, via the restore leaf ---- *)
-        iIntros "Hcg Hcnt Hcsrs Hcells Hclm #Havail Hpc Hinstr Hcont".
+        iIntros "Hcg Hcnt Hcsrs Hcells Hclm Hpc Hinstr Hcont".
         iApply (wp_csrsi_sstatus_x0_s_sconf pc m n false
                   with "Hcg [Hcnt] Hcsrs Hcells Hclm Hpc Hinstr Hcont").
-        iApply (intr_count_pack_S_on 0 with "Hcnt Havail"). }
+        iApply (intr_count_pack_S_on 0 with "Hcnt"). }
     (* ---- base state ENABLED: idempotent on SIE, ghosts stand still.  This
            IS [wp_csrsi_sstatus_x0_idem_s_sconf] at index [trap_res true + n];
            the reserve summand is inert here (nothing reads the index), which
            is precisely why that lemma can be stated without it. ---- *)
-    iIntros "Hcg _ _ _ _ _ Hpc Hinstr Hcont".
+    iIntros "Hcg _ _ _ _ Hpc Hinstr Hcont".
     iApply (wp_csrsi_sstatus_x0_idem_s_sconf pc m (trap_res true + n)%nat
               with "Hcg Hpc Hinstr Hcont").
   Qed.
 
   (* intr_off() at level 0, FROM enabled: the '1'->'0' flip of
      [wp_csrci_sstatus_s_sconf] with rd = x0 and no level push.  Same
-     choreography (open intrN, [sie_ghost_flip_off] on all four pieces --
-     bundle half + capability eighth + count eighth + invariant quarter --
-     reseal at '0' where the handler guard is vacuous), but the freed '1'-arm
-     payload lands DIFFERENTLY: the trap CSRs go straight to the caller
-     (level 0 with a now-disabled base owes them explicitly), the [intr_inv]
-     copy is simply dropped (it is persistent, and the caller keeps its own
-     [intr_handler_avail]), and the count eighth comes back at
-     [sie_bit false] -- i.e. [intr_count 0 false], not [intr_count 1 _].
+     choreography ([sie_ghost_flip_off] on all four pieces -- bundle half +
+     capability eighth + count eighth + the [intr_res] quarter -- re-forming
+     [intr_res] at the same installed vector), but the freed '1'-arm payload
+     lands DIFFERENTLY: the trap CSRs go straight to the caller (level 0 with
+     a now-disabled base owes them explicitly), [intr_res] RIDES OUT WITH
+     THEM (it used to be a persistent [intr_inv] copy that could simply be
+     dropped, because the caller kept its own [intr_handler_avail]; owned,
+     there is exactly one and the caller must get it), and the count eighth
+     comes back at [sie_bit false] -- i.e. [intr_count 0 false], not
+     [intr_count 1 _].
 
      THE TWO EIGHTHS ARE NOT THE CALLER'S TO SUPPLY AT [b = true].  This
      leaf used to demand a separate [intr_count 0 true] BESIDE the bundle,
@@ -1580,19 +1566,13 @@ Section WpSconfCsr.
     iDestruct (intr_count_get_on 0 true with "Hq1 Hc1") as "(_ & Hq1 & Hcnt)".
     destruct (csrci_sie_flip ms0 Hmsf) as (Hsie' & Hspp' & Hspie' & Hmsf').
     set (ms1 := legalize_sstatus_val ms0 (sstatus_write_val ms0 (mword_of_int 2))).
-    (* the trap-vector invariant: open it for the quarter, flip, reseal *)
-    iDestruct "Hhx" as (handler) "#Hintr".
-    iDestruct "Hintr" as "(%Htvd & %Hsb & #Hinv_i)".
-    iMod (inv_acc (⊤ ∖ ↑minstretN) intrN with "Hinv_i") as "[Hbody Hclose]";
-      [solve_ndisj|].
-    iDestruct "Hbody" as (bq) "(>Hqi & >Hstv & _)".
+    (* the handler resource: take the quarter out, flip, re-form.  This used
+       to open [intrN] across the step and re-seal it. *)
+    iEval (rewrite /intr_res) in "Hhx".
+    iDestruct "Hhx" as (handler vb) "(%Htvd & %Hsb & Hqi & Hstv & #Hspec)".
     iMod (sie_ghost_flip_off _ _ _ _ _ with "Hhalf Hq1 Hcnt Hqi")
       as "(Hhalf & Hq & Htok & Hqi)".
-    iMod ("Hclose" with "[Hqi Hstv]") as "_".
-    { iNext. iExists ('b"0" : mword 1). iFrame "Hqi Hstv".
-      iModIntro. iIntros "%Hb".
-      exfalso. apply (f_equal (@bv_unsigned _)) in Hb.
-      vm_compute in Hb. discriminate. }
+    iDestruct (intr_res_intro handler _ Htvd Hsb with "Hqi Hstv Hspec") as "Hintr".
     iMod (reg_update _ mstatus _ ms1 with "Hreg Hms") as "[Hreg Hms]".
     iModIntro.
     iExists (set_reg s_pc mstatus ms1).
@@ -1624,10 +1604,10 @@ Section WpSconfCsr.
     iDestruct (sie_cap_gpr_join with "Hhs' Hsc Hcap Hfmap") as "Hcg".
     iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; done|].
     iApply ("Hcont" $! ms0 with "[%] Hcg [Htok]
-                          [Hsepcx Hscausex Hstvalx Hsppc] [Hcells] [$Hpc' $Hnpc]").
+                          [Hsepcx Hscausex Hstvalx Hsppc Hintr] [Hcells] [$Hpc' $Hnpc]").
     { exact Hmsf. }
     { iExact "Htok". }
-    { iFrame "Hsepcx Hscausex Hstvalx Hsppc". }
+    { iFrame "Hsepcx Hscausex Hstvalx Hsppc Hintr". }
     { rewrite /cpu_cells_pay. iExact "Hcells". }
   Qed.
 

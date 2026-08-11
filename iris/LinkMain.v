@@ -2,7 +2,7 @@
 
    Nineteen functor arguments: the eighteen functions main calls, plus
    KERNELVEC (whose handler contract is what turns trapinithart's [stvec ↦ᵣ
-   kernelvec] into the [intr_handler_avail] the scheduler consumes).  Three of
+   kernelvec] into the [intr_res] the scheduler consumes).  Three of
    the callee links are still ASSUMED contracts (an [Axiom] inside their own
    sealed module -- printk's general path, userinit, virtio_disk_init), which is
    exactly the axiom footprint [tools/proof_coverage.py] reports for main. *)

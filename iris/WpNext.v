@@ -134,7 +134,7 @@ Section WpNext.
      hart-generic callback for the absorbing engine, and its '1' arm frames
      PER-HART residue at the entry hart across that engine -- the [sret_bits]
      halves, the SIE eighth, [cpu_hart]'s per-cpu cells, [strans_bit], and
-     [intr_inv] itself.  Only the trap handler can hand those back at the
+     [intr_res] itself.  Only the trap handler can hand those back at the
      resuming hart, so that half of the move belongs with [intr_handler_spec] /
      [intr_frame], not here. *)
   Lemma wp_next_here `{GEN : GenId} `{CID0 : CpuId} (b : bool) (p : mword 64) K :

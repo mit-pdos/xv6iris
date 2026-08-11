@@ -905,7 +905,7 @@ Section SpBodies.
   Proof.
     (* NB: [eb] is deliberately NOT substituted here.  This body runs [iNext]
        over [cpu_own]; with [eb] literal [intr_count]'s [if eb] reduces,
-       [iNext] descends into [intr_handler_avail] and strips ITS later, after
+       [iNext] descends into [IntrDefs.intr_res] and strips ITS later, after
        which the resource can no longer be folded back to [cpu_own]. *)
     intros Hav Heb Hanch Hbs Hls.
     iIntros "#Htext IH Hex0 Hexk Htl Hy1 Hy2 Hy3 Hy4 Hy5 Hy6 Hy8 Hnc Hjoin7

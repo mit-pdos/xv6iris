@@ -284,14 +284,21 @@ Section SpecMain.
   (* ------------------------------------------------------------------- *)
   (* This hart's own translation and trap resources.  [strans_bit bare]   *)
   (* is the still-Bare receipt kvminithart's switch flips; [tlb] is the    *)
-  (* cell it seals into the kernel-page-table arm; [trap_csrs] is what the *)
-  (* scheduler's level-0 SIE flip consumes at the far end.  None of these  *)
-  (* crosses the [started] invariant -- every hart gets its own from its   *)
-  (* own [_entry] -> [start].                                             *)
+  (* cell it seals into the kernel-page-table arm; [trap_csrs_raw] is what *)
+  (* the scheduler's level-0 SIE flip consumes at the far end.  None of    *)
+  (* these crosses the [started] invariant -- every hart gets its own from *)
+  (* its own [_entry] -> [start].                                         *)
+  (*                                                                      *)
+  (* [trap_csrs_raw], NOT [trap_csrs]: the folded bundle carries           *)
+  (* [IntrDefs.intr_res] -- an INSTALLED trap vector together with its     *)
+  (* contract -- and at boot there is no such thing.  main folds the two   *)
+  (* together once trapinithart has written stvec and                     *)
+  (* [kernelvec_handler_spec] is in hand, which is also the moment the     *)
+  (* claim first becomes true.                                            *)
   (* ------------------------------------------------------------------- *)
   Definition main_hart_raw
       (tlbvec0 : vec (option TLB_Entry) (2 ^ 6)) : iProp Σ :=
-    (strans_bit strans_bit_bare ∗ tlb ↦ᵣ tlbvec0 ∗ trap_csrs)%I.
+    (strans_bit strans_bit_bare ∗ tlb ↦ᵣ tlbvec0 ∗ trap_csrs_raw)%I.
 
   (* ------------------------------------------------------------------- *)
   (* main(), entered on the BOOT hart.                                    *)

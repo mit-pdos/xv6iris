@@ -30,10 +30,11 @@
    - The payload also carries the PER-HART trap CSRs [trap_csrs (CID := h)]
      -- yield/sleep hold them across the park (they take acquire's
      [arm_pay] and spend it at their own release), and the scheduler
-     holds exactly one set at every dispatch -- and, on the DISPATCH
-     direction, the resuming hart's [intr_handler_avail g]: the resumed
-     thread's intena retune needs it under the FRESH ghost [g], and its own
-     entry stash (taken under its old hart's ghost) is worthless.
+     holds exactly one set at every dispatch.  [IntrDefs.intr_res] -- the
+     installed vector and its contract -- is a CONJUNCT of that bundle, so
+     the resuming hart's copy crosses with it in both directions; it used to
+     be a separate persistent [intr_handler_avail] on the dispatch direction
+     only.
 
    The lock invariant's context slot is ▷-guarded: the scheduler re-stores a
    parked context from the ▷ valid_context its own swtch handed it, and
@@ -173,12 +174,16 @@ Section SchedCtx.
      function -- so the crossing must carry them; the dispatch side is the
      scheduler, which provably holds exactly one set at every dispatch in
      both [eb] arms.
-     [intr_handler_avail (CID := h)] rides on the DISPATCH direction only: it
-     is the persistent half the resumed thread's intena restore needs, and it
-     must be named at the RESUMING hart's ghost (the SIE ghost is per-hart --
-     [sie_name h] -- so the thread's own pre-park stash is about the wrong
-     name).  That is also why the payload needs no ghost-name argument: [h]
-     determines the name. *)
+     [intr_handler_avail (CID := h)] USED TO RIDE ON THE DISPATCH DIRECTION
+     ONLY -- the persistent half the resumed thread's intena restore needs,
+     named at the RESUMING hart's ghost.  It is gone, and nothing replaced it
+     here: the installed-handler resource is now [IntrDefs.intr_res], a
+     conjunct OF [trap_csrs], so it rides the line above, on BOTH directions.
+     That is not a convenience -- being owned, it must come BACK from a
+     parking thread, or the resumed scheduler would have no handler to
+     dispatch the next one with, and the persistent version simply never had
+     to.  ([h] still determines the ghost name, so the payload needs no
+     ghost-name argument.) *)
   Definition p_sched : CPU -d> ctx_adm -d> mword 64 -d> mword 64 -d>
                        mword 64 -d> mword 64 -d> iPropO Σ :=
     fun h A' c cret tpv p =>
@@ -199,8 +204,7 @@ Section SchedCtx.
           is the scheduler's own record, PINNED at [h] -- cpus[h].context
           can only ever be resumed from hart h's own tp, and the parked
           scheduler's closure holds hart-h register resources. *)
-       (intr_handler_avail (CID := h) ∗
-        ∃ (j : nat) (γl : gname) (ch : mword 64),
+       (∃ (j : nat) (γl : gname) (ch : mword 64),
           ⌜c = p_context (proc_addr j) /\ p = proc_addr j /\ (j < NPROC)%nat /\
            γs !! j = Some γl /\ cret = a_cpu_ctx (cid_word_of h) /\
            A' = Some h⌝ ∗
@@ -246,20 +250,19 @@ Section SchedCtx.
 
   (* build the dispatch payload (what the scheduler supplies at its swtch;
      it has just written c->proc = proc_addr j, so its crossing index IS
-     proc_addr j).  It hands over its own trap CSRs and the persistent
-     handler-avail at ITS ghost -- the dispatched thread's intena restore
-     runs under [g]. *)
+     proc_addr j).  It hands over its own trap CSRs -- the dispatched
+     thread's intena restore reads the handler contract out of them, at ITS
+     hart's ghost. *)
   Lemma p_sched_to_proc (i : CPU) (j : nat) (γl : gname) (ch : mword 64) :
     (j < NPROC)%nat -> γs !! j = Some γl ->
     trap_csrs (CID := i) -∗
-    intr_handler_avail (CID := i) -∗
     proc_held i j γl RUNNING ch -∗
     hart_full j i -∗
     p_sched i (Some i) (p_context (proc_addr j))
       (a_cpu_ctx (cid_word_of i)) (cid_word_of i) (proc_addr j).
   Proof.
-    iIntros (Hj Hgl) "Htc Havail Hheld Htag".
-    iSplit; [done|]. iFrame "Htc". iRight. iSplitL "Havail"; [iExact "Havail"|].
+    iIntros (Hj Hgl) "Htc Hheld Htag".
+    iSplit; [done|]. iFrame "Htc". iRight.
     iExists j, γl, ch. iFrame. done.
   Qed.
 
@@ -272,7 +275,7 @@ Section SchedCtx.
     p_sched i A' (p_context (proc_addr j)) cret tpv p -∗
     ⌜tpv = cid_word_of i⌝ ∗ ⌜cret = a_cpu_ctx (cid_word_of i)⌝ ∗
     ⌜p = proc_addr j⌝ ∗ ⌜A' = Some i⌝ ∗
-    trap_csrs (CID := i) ∗ intr_handler_avail (CID := i) ∗
+    trap_csrs (CID := i) ∗
     ∃ (γl : gname) (ch : mword 64),
       ⌜γs !! j = Some γl⌝ ∗ proc_held i j γl RUNNING ch ∗ hart_full j i.
   Proof.
@@ -280,12 +283,11 @@ Section SchedCtx.
     iDestruct "Hpay" as "[(%Hc & _ & _) | Hpay]".
     { exfalso.
       exact (a_cpu_ctx_ne_p_context (cid_word_of i) j (tp_ok_cid_of i) Hj (eq_sym Hc)). }
-    iDestruct "Hpay" as "(#Havail & Hpay)".
     iDestruct "Hpay" as (j' γl ch) "[%Hfacts Hpay]".
     destruct Hfacts as (Hc & Hp & Hj' & Hgl & Hcret & HA).
     assert (j' = j) as -> by (apply (p_context_proc_addr_inj j' j Hj' Hj); congruence).
     iSplit; [done|]. iSplit; [done|]. iSplit; [done|].
-    iFrame "Htc". iSplitR; [iApply "Havail"|].
+    iFrame "Htc".
     iExists γl, ch. iFrame. done.
   Qed.
 
@@ -314,7 +316,6 @@ Section SchedCtx.
       assert (j' = j) as -> by (apply (proc_addr_inj j' j Hj' Hj); congruence).
       iSplit; [done|]. iSplit; [done|]. iFrame "Htc".
       iExists γl, st, ch. iFrame. done. }
-    iDestruct "Hpay" as "(_ & Hpay)".
     iDestruct "Hpay" as (j' γl ch) "[%Hfacts _]".
     destruct Hfacts as (Hc & _ & Hj' & _).
     exfalso. exact (a_cpu_ctx_ne_p_context (cid_word_of i) j' (tp_ok_cid_of i) Hj' Hc).

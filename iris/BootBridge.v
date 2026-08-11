@@ -456,7 +456,7 @@ Section BootBridge.
     iSplitL "Hhs Hsconf Hcap Hfile".
     { iApply (sie_cap_gpr_join with "Hhs Hsconf Hcap Hfile"). }
     iFrame "Hcpu Hg4a".
-    rewrite /main_hart_raw /trap_csrs.
+    rewrite /main_hart_raw /trap_csrs_raw.
     iFrame "Hbit2 Htlb Hsepc Hscause Hstval".
     iExists (_get_Mstatus_SPP msf), (_get_Mstatus_SPIE msf). iExact "Hspp2".
   Qed.

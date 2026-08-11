@@ -219,7 +219,6 @@ Section SchedPostSwtch.
     (* what the dispatch payload delivered *)
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
-    intr_handler_avail -∗
     own_ctx (p_context pj) -∗
     hart_full j cpu_id -∗
     ▷ sched_vc_at γs cpu_id (a_cpu_ctx cid_word) pj -∗
@@ -229,7 +228,6 @@ Section SchedPostSwtch.
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         proc_held cpu_id j γl RUNNING ch0 -∗
         trap_csrs -∗
-        intr_handler_avail -∗
         cpu_own 1 eb pj emp false -∗
         own_ctx (p_context pj) -∗
         hart_full j cpu_id -∗
@@ -239,7 +237,7 @@ Section SchedPostSwtch.
   Proof.
     intros pj Hav Hspd Hsp0 Hsp_m' Hs2addr Hs3v
            Hm20 Hm21 Hm22 Hm23 Hm24 Hm25 Hm26 Hm27.
-    iIntros "#Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc #Havail Hown Htag Hvc' Hcont".
+    iIntros "#Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc Hown Htag Hvc' Hcont".
     (* frame-slot address bridges: slot k sits at [spd + 8*(6-k)]. *)
     assert (Hb1 : pa_stk sp0 1 = add_vec spd (zero_extend' 64 (concat_vec (mword_of_int 5 : mword 6) ('b"000"))))
       by (rewrite -Hspd; apply sched_frame_bridge; vm_compute; reflexivity).
@@ -347,13 +345,14 @@ Section SchedPostSwtch.
     { rgne. rewrite HE3s3. destruct eb; vm_compute; reflexivity. }
     iEval (rewrite Hstoreval) in "Hint2".
     (* retune the count token from the resumer's base [eb'] to this thread's own
-       saved base [eb].  The '1' arm's payload must be named at the RESUMING
-       hart's ghost [g], so it comes from the DISPATCH payload's own
-       [intr_handler_avail g] -- the pre-park stash was about another name.
-       The intena cell was just restored to [intena_val eb] by the store. *)
+       saved base [eb].  Both directions are IDENTITIES now: the token is the
+       bare '0' eighth at every level ≥ 1, because the handler resource it used
+       to carry rides in [trap_csrs] instead -- which is also what removed the
+       old obligation to name it at the RESUMING hart's ghost.  The intena cell
+       was just restored to [intena_val eb] by the store. *)
     iAssert (intr_count 1 eb) with "[Hcnt2]" as "Hcnt2".
     { destruct eb.
-      - iApply (intr_count_retune_on 0 eb' with "Havail Hcnt2").
+      - iApply (intr_count_retune_on 0 eb' with "Hcnt2").
       - iApply (intr_count_retune_off 0 eb' with "Hcnt2"). }
     (* refold [cpu_own 1 eb pj emp false]. *)
     iAssert (cpu_own 1 eb pj emp false) with "[Hcur2 Hnoff2 Hint2 Hcnt2]" as "Hcpu".
@@ -515,7 +514,7 @@ Section SchedPostSwtch.
       rewrite /E0 upd_ne; [| exact H15].
       exact Hmm. }
     iApply ("Hcont" $! Ef ch'
-              with "[%] Hcg Hpc Hheld' Htc Havail Hcpu Hown Htag Hvc'").
+              with "[%] Hcg Hpc Hheld' Htc Hcpu Hown Htag Hvc'").
     { (* callee_saved m Ef *)
       assert (Hf_sp : Ef !!! Regidx csp_rs1 = m !!! Regidx csp_rs1)
         by (rewrite /Ef upd_eq Hsp_E8 -Hsp0; exact Hpopsp).
@@ -568,10 +567,10 @@ Section ProofSched.
     iIntros "Hcg #Htext Hpc #Hprocs Hheld Hpay Htc Hcpu Hown Htag Hvc Hcont".
     (* the cpu bundle [cpu_own 1 eb pj emp false] arrives whole at level 1;
        it is unfolded to the individual cells + counting token after myproc.
-       NOTE: no handler-avail stash is taken from it.  The return path resumes
-       on a DIFFERENT hart, whose SIE ghost is a different (canonical) name,
-       so a stash copied here would be about the wrong one; the retune uses
-       the dispatch payload's own [intr_handler_avail] instead. *)
+       NOTE: no handler stash is taken from it.  The return path resumes on a
+       DIFFERENT hart, whose SIE ghost is a different (canonical) name, so a
+       stash copied here would be about the wrong one; the resource arrives
+       inside the dispatch payload's own [trap_csrs] instead. *)
     iDestruct "Hheld" as "(Hlocked & Hstate & Hchan & Hpub)".
     iDestruct "Hown" as (ctxvs) "[%Hctxlen Hctxcells]".
     (* ------------------------------------------------------------------ *)
@@ -1313,10 +1312,10 @@ Section ProofSched.
        and everything from here on is at an arbitrary [h]. *)
     clear Hadm'.
     (* resume: elim the SECOND disjunct (dispatched proc).  It delivers the
-       lock at hart [h], hart [h]'s trap CSRs, and its [intr_handler_avail]. *)
+       lock at hart [h] and hart [h]'s trap CSRs ([intr_res] among them). *)
     iDestruct "Hresume" as (A' cret) "[Hvc' Hpay]".
     iDestruct (p_sched_at_proc γs h A' j cret (rget (CID := h) m' (mword_of_int 4 : mword 5)) pj Hj with "Hpay")
-      as "(%Htpv & %Hcret & %Hpidx & %HA' & Htc' & #Havail & Hpay2)".
+      as "(%Htpv & %Hcret & %Hpidx & %HA' & Htc' & Hpay2)".
     subst A'.
     iDestruct "Hpay2" as (γl' ch') "(%Hgl' & Hheld' & Htag')".
     assert (γl' = γl) as -> by (rewrite Hgl in Hgl'; injection Hgl'; auto).
@@ -1457,7 +1456,7 @@ Section ProofSched.
     iApply (sched_post_swtch (CID := h)  γs j γl ch' m m' av eb eb' sp0 spd vgap
               ltac:(lia) ltac:(reflexivity) ltac:(reflexivity)
               Hsp_m' Hs2addr Hs3v Hf20 Hf21 Hf22 Hf23 Hf24 Hf25 Hf26 Hf27
-              with "Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc' Havail [Hctxback] Htag' Hvc' Hcont").
+              with "Htext Hcg Hcpu Hpc Hr1 Hr2 Hr3 Hr4 Hr5 Hgap Hheld' Htc' [Hctxback] Htag' Hvc' Hcont").
     { rewrite /own_ctx. iExists (callee_img Mc). iSplit.
       { iPureIntro. unfold callee_img, ctx_regs. reflexivity. }
       iExact "Hctxback". }

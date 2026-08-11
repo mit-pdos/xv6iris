@@ -285,7 +285,7 @@ Section ProofScheduler.
     cbv beta delta [wp_scheduler_sconf_body].
     intros pcE Hp0 Hav. subst p0.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
-    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hcsrs #Havail".
+    iIntros "Hcg Hcpu #Htext Hpc #Hprocs #Hpanic Hcsrs".
     iAssert (⌜length γs = NPROC⌝)%I as %Hlen.
     { iDestruct "Hprocs" as "[%H _]". iPureIntro. exact H. }
     (* split the entry cpu bundle: the context save area becomes [own_ctx],
@@ -1322,12 +1322,12 @@ Section ProofScheduler.
         (* the cpu context save area's cells go INTO the swtch *)
         iDestruct "Hown" as (ctxvs) "[%Hctxlen Hctxcells]".
         (* the dispatch payload *)
-        (* the dispatch payload: the held lock, the trap CSRs this hart's
-           acquire produced, and this hart's [intr_handler_avail] -- the
-           dispatched thread's own intena retune runs under THIS hart's
-           (now canonical) SIE ghost. *)
+        (* the dispatch payload: the held lock and the trap CSRs this hart's
+           acquire produced -- the installed-handler resource rides inside
+           them, so the dispatched thread's own intena retune runs under THIS
+           hart's (canonical) SIE ghost with nothing extra threaded. *)
         iPoseProof (p_sched_to_proc γs cpu_id jj γl ch Hjj Hgl
-                      with "Hcsrs Havail [Hlocked Hstate Hpg Hchan Hpub] Htag") as "HP".
+                      with "Hcsrs [Hlocked Hstate Hpg Hchan Hpub] Htag") as "HP".
         { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
         (* the TARGET is proc jj's record, which is MIGRATABLE ([None]) -- any
            hart may dispatch any RUNNABLE proc, so its stored continuation is
@@ -1573,7 +1573,7 @@ Section ProofScheduler.
         iEval (rewrite (sc_carve av Hav)) in "Hcg".
         iApply (wp_csrsi_sstatus_x0_enable_s_sconf (mword_of_int (KernelSyms.scheduler + 0x86))
                   false M (av - 10 - kv_frame_slots)%nat
-                  with "Hcg Hcnt Hcsrs Hcells [] Havail Hpc Hi86 [-]").
+                  with "Hcg Hcnt Hcsrs Hcells [] Hpc Hi86 [-]").
         (* the scheduler runs with [c->proc == 0], so the claim it owes the arm
            is the idle one -- [cpu_claim_idle], for free. *)
         { rewrite /cpu_claim_ext. iApply cpu_claim_idle. }
