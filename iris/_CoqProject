@@ -879,6 +879,7 @@ WeakRobustAcyc.v
 WeakRobustLin.v
 WeakAxiomatic.v
 WeakAxiomatic2.v
+WeakAxiomatic3.v
 WeakInterp.v
 WeakLang.v
 WeakGhost.v
