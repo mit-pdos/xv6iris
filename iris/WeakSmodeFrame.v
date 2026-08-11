@@ -33,6 +33,7 @@
     which is the whole reason this file exists. *)
 From Stdlib Require Import ZArith Lia.
 From stdpp Require Import gmap.
+From stdpp Require Import bitvector.definitions.
 From iris.proofmode Require Import proofmode monpred.
 From iris.algebra Require Import dfrac.
 From iris.base_logic.lib Require Import iprop.
@@ -42,7 +43,7 @@ Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto RegFile WpGpr InstrBytes.
 Require Import WpNext.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
-Require Import WeakViewMono WeakWord8 WeakCtx WeakPtOwn WeakObj.
+Require Import WeakViewMono WeakWord8 WeakCtx WeakPtOwn.
 Require Import WeakFunnel WeakLeafM.
 
 Import SailStdpp.Values.
@@ -305,30 +306,34 @@ End framing.
 (** ** 5. THE CONTROL, MACHINE-CHECKED.
 
     The argument above turns entirely on one claim about ELABORATION, so it
-    is checked here rather than asserted.  [wobj]'s hart is an implicit
-    INSTANCE argument ([Arguments wobj {Σ weakGS0 CID} R]), so it is resolved
-    from whatever [CpuId] is innermost -- and inside [wp_next]'s binder that
-    is the RESUMING hart.  [cobj]'s context is an explicit argument
-    ([Arguments cobj {Σ weakViewG0} ξ R]) and cannot be captured. *)
+    is checked here rather than asserted.  The stand-in for the deleted
+    hart-indexed layer is [WeakPtOwn.wpt_own], which has exactly the
+    indexing under test: its hart is an implicit INSTANCE argument, so it is
+    resolved from whatever [CpuId] is innermost -- and inside [wp_next]'s
+    binder that is the RESUMING hart.  [cobj]'s context is an explicit
+    argument ([Arguments cobj {Σ weakViewG0} ξ R]) and cannot be captured. *)
 
 Section control.
   Context `{!weakGS Σ} `{GEN : GenId} `{CID0 : CpuId}.
   Variables (F : vProp Σ) (b : bool) (p : mword 64) (ξ : CtxId).
+  Variables (a : Z) (dq : dfrac) (v : bv 8).
 
-  (** A. Under the binder, [wobj F] means the RESUMING hart's [wobj]. *)
-  Lemma wobj_rebinds :
-    wp_next b p (fun CID : CpuId => wobj F)
-  = wp_next b p (fun CID : CpuId => @wobj _ _ CID F).
+  (** A. Under the binder, a hart-indexed assertion means the RESUMING
+      hart's. *)
+  Lemma hart_indexed_rebinds :
+    wp_next b p (fun CID : CpuId => wpt_own a dq v)
+  = wp_next b p (fun CID : CpuId => @wpt_own _ _ CID a dq v).
   Proof. reflexivity. Qed.
 
   (** B. So it is NOT the frame the caller is holding, which is at [CID0].
       This is the failure: the caller's [wobj F] and the one the
       continuation demands are different propositions, and the only bridge
-      between them -- [WeakObj.wobj_handoff] -- needs BOTH harts'
-      authorities in one step, which is precisely what migrating denies. *)
-  Lemma wobj_not_the_callers_frame :
-    wp_next b p (fun CID : CpuId => wobj F)
-  <> wp_next b p (fun _ : CpuId => @wobj _ _ CID0 F).
+      between them -- the deleted [wobj_handoff], or [WeakPtPub]'s
+      [wpt_region_handoff] -- needs BOTH harts' authorities in one step,
+      which is precisely what migrating denies. *)
+  Lemma hart_indexed_not_the_callers_frame :
+    wp_next b p (fun CID : CpuId => wpt_own a dq v)
+  <> wp_next b p (fun _ : CpuId => @wpt_own _ _ CID0 a dq v).
   Proof. Fail reflexivity. Abort.
 
   (** C. [cobj ξ F] is literally the same term on both sides of the binder,

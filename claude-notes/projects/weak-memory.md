@@ -2953,3 +2953,35 @@ also needs its `wsti_NN` token in `WkStartAux` (the `CodeStart.sti_*`
 analogue) — one `iPoseProof` per instruction, assembled from facts that file
 already proves. That is the batch that will actually demonstrate the
 step-site parity these two layers were built for.
+
+### Cleanup slice 1 (2026-08-11): the objective layer is now context-indexed
+
+`WeakObj.v` **deleted** — fully superseded by `WeakCtx`'s `cobj`. Moved onto
+it: `WeakLeafO` (all 34 `_o`/`_run` wrappers, plus `leaf_hide`) and
+`WeakLockPayload`. `whart_run` gained the context: `whart_run ξ q`.
+
+The M-mode bridge is `WeakCtx.hart_view_to_run : hart_view cpu_id ==∗ ∃ ξ,
+wrunning ξ` — one bupd at the top of a chain, which is the honest reading (a
+boot context comes into existence when execution starts). It **drops** the
+`ws_auth` half: once ownership is context-indexed nothing consumes the
+hart-indexed authority, and carrying both would mean two updates per leaf.
+`weak_view_name` in `weakGS` is consequently **vestigial** — removing it is an
+adequacy-level change, deliberately not bundled here.
+
+`WeakSmodeFrame` §5's control now uses `WeakPtOwn.wpt_own` as the stand-in for
+the deleted layer; it has exactly the indexing under test, so the three
+reflexivity checks still say what they said.
+
+**STILL TO PRUNE.** `WeakPtOwn`'s `wflr_lb` / `wpt_own` / `↦o` / `vrNew_lb`
+and all of `WeakPtPub` except the hart-free `wpt_pub` family are now used only
+by each other and by the §5 control. They are the remainder of the old layer
+and should go; `cobj_acquire` / `cobj_release` already supersede
+`wpt_pub_acquire_lb` / `wpt_own_release`, and `wpt_region_handoff` is
+superseded by `wrunning_resume`. Not done here because it is a second
+independent edit and this slice is green.
+
+**NOT STARTED: the call-site conversion.** Still the thing that would validate
+the sweep — no site in `WkTimerinit` / `WkStartNew` uses a `_run` wrapper yet.
+Note the ordering is now settled by this slice: a converted site needs
+`hart_view_to_run` once at chain entry, then `whart_run ξ q` threaded, then a
+`wsti_NN` token per instruction in the `Wk*Aux` file.

@@ -44,7 +44,7 @@ Require Import Riscv.rv64d_types Riscv.rv64d.
 Require Import RiscvModelBytes.
 Require Import RiscvLang RiscvPtsto.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
-Require Import WeakViewMono WeakPtOwn WeakPtPub WeakObj.
+Require Import WeakViewMono WeakPtOwn WeakPtPub WeakCtx.
 
 (** One entry of the protected structure: an address and the byte it holds.
     Deliberately plain — the point is the SHAPE of the predicate over a
@@ -54,6 +54,7 @@ Record item := Item { it_a : Z; it_v : bv 8 }.
 Section payload.
   Context `{!riscvGS Σ, !weakGS Σ}.
   Context `{CID : CpuId}.
+  Context (ξ : CtxId).
 
   (** Any ghost resource the payload also owns.  Kept abstract so the
       example says something about ALL of them rather than one. *)
@@ -82,49 +83,47 @@ Section payload.
 
       Both are the generic lemma at [R := table_inv l].  Neither mentions
       the list, the nesting, or a byte; neither grows if the payload does.
-      This is the whole claim of [WeakObj], at a payload with real
-      structure. *)
 
-  Lemma table_acquire T l :
-    vrNew_lb T -∗ monPred_at (table_inv l) (view_scl T) -∗ wobj (table_inv l).
-  Proof. apply wobj_acquire. Qed.
+      Since the move to [WeakCtx], both take the CONTEXT's authority rather
+      than a hart's, which is what makes them usable on either side of a
+      migration: the [ξ] here is the same [ξ] on the resuming hart. *)
 
-  Lemma table_release ws T l :
-    (∀ a, (flr (ws_view ws) a ≤ T)%nat) ->
-    ws_auth (weak_view_name cpu_id) ws -∗ wobj (table_inv l) -∗
-    ws_auth (weak_view_name cpu_id) ws ∗ monPred_at (table_inv l) (view_scl T).
-  Proof. apply wobj_release. Qed.
+  Lemma table_acquire V T l :
+    (∀ a, (T ≤ flr V a)%nat) ->
+    ctx_auth ξ V -∗ monPred_at (table_inv l) (view_scl T) -∗
+    ctx_auth ξ V ∗ cobj ξ (table_inv l).
+  Proof. apply cobj_acquire. Qed.
+
+  Lemma table_release V T l :
+    (∀ a, (flr V a ≤ T)%nat) ->
+    ctx_auth ξ V -∗ cobj ξ (table_inv l) -∗
+    ctx_auth ξ V ∗ monPred_at (table_inv l) (view_scl T).
+  Proof. apply cobj_release. Qed.
 
   (* ------------------------------------------------------------------ *)
   (** ** 3. The decomposition, DERIVED.
 
-      A client that has acquired holds [wobj (table_inv l)] and normally
-      peels only the item it touches.  But the full decomposition is
-      available, and every step of it is a structural law from [WeakObj] —
-      no lemma here is specific to this payload's shape. *)
+      Every step is a structural law from [WeakCtx]; no lemma here is
+      specific to this payload's shape. *)
 
   Lemma item_obj x :
-    wobj (item_inv x) ⊣⊢ ⌜(0 < it_a x)%Z⌝ ∗ it_a x ↦o it_v x.
-  Proof. by rewrite /item_inv wobj_sep wobj_pure wpt_own_wobj. Qed.
+    cobj ξ (item_inv x) ⊣⊢ ⌜(0 < it_a x)%Z⌝ ∗ cobj ξ (it_a x ↦w it_v x).
+  Proof. by rewrite /item_inv cobj_sep cobj_pure. Qed.
 
-  (** [wobj] through the [big_sepL]: one rewrite. *)
   Lemma items_obj l :
-    wobj (items_inv l) ⊣⊢
-      [∗ list] x ∈ l, (⌜(0 < it_a x)%Z⌝ ∗ it_a x ↦o it_v x).
+    cobj ξ (items_inv l) ⊣⊢
+      [∗ list] x ∈ l, (⌜(0 < it_a x)%Z⌝ ∗ cobj ξ (it_a x ↦w it_v x)).
   Proof.
-    rewrite /items_inv wobj_big_sepL.
+    rewrite /items_inv cobj_big_sepL.
     apply big_sepL_proper => k x _. apply item_obj.
   Qed.
 
-  (** ... and through all three levels at once.  Compare what this would
-      have cost with [wpt_pub]: a second copy of all three definitions,
-      each carrying a [T]. *)
   Lemma table_obj l :
-    wobj (table_inv l) ⊣⊢
+    cobj ξ (table_inv l) ⊣⊢
       ⌜NoDup (it_a <$> l)⌝ ∗ G ∗
-      [∗ list] x ∈ l, (⌜(0 < it_a x)%Z⌝ ∗ it_a x ↦o it_v x).
+      [∗ list] x ∈ l, (⌜(0 < it_a x)%Z⌝ ∗ cobj ξ (it_a x ↦w it_v x)).
   Proof.
-    by rewrite /table_inv !wobj_sep wobj_pure wobj_embed items_obj.
+    by rewrite /table_inv !cobj_sep cobj_pure cobj_embed items_obj.
   Qed.
 
   (** The same payload as the INVARIANT sees it, for contrast: the frozen
@@ -148,16 +147,15 @@ Section payload.
       What a client of the spinlock sees: the structure goes in objectively
       and comes back objectively, and the two weak-memory side conditions
       are the lock's business, not the client's. *)
-  Lemma table_round_trip ws T l :
-    (∀ a, (flr (ws_view ws) a ≤ T)%nat) ->
-    (T ≤ w_vrNew ws)%nat ->
-    ws_auth (weak_view_name cpu_id) ws -∗ wobj (table_inv l) -∗
-    ws_auth (weak_view_name cpu_id) ws ∗ wobj (table_inv l).
+  Lemma table_round_trip V T l :
+    (∀ a, (flr V a ≤ T)%nat) ->
+    (∀ a, (T ≤ flr V a)%nat) ->
+    ctx_auth ξ V -∗ cobj ξ (table_inv l) -∗
+    ctx_auth ξ V ∗ cobj ξ (table_inv l).
   Proof.
     iIntros (HT Hacq) "Hauth HR".
     iDestruct (table_release with "Hauth HR") as "[Hauth Hpub]"; [exact HT|].
-    iDestruct (vrNew_lb_get _ _ Hacq with "Hauth") as "#Hlb".
-    iFrame "Hauth". by iApply (table_acquire with "Hlb Hpub").
+    by iApply (table_acquire with "Hauth Hpub").
   Qed.
 
 End payload.

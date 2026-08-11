@@ -67,7 +67,7 @@ Require Import RiscvModelBytes RiscvLang RiscvPtsto RiscvExec RegFile.
 Require Import RiscvFetchExec InstrBytes WpGpr WpMmodeLeafBase.
 Require Import RiscvExtras MinstretInv WpGprMretWp.
 Require Import WeakMem WeakInterp WeakLang WeakView WeakVProp WeakGhost.
-Require Import WeakViewMono WeakPtOwn WeakPtPub WeakObj WeakWord8 WeakLeafM.
+Require Import WeakViewMono WeakPtOwn WeakPtPub WeakWord8 WeakCtx WeakLeafM.
 
 Section leafo.
   Context `{!riscvGS Σ, !weakGS Σ}.
@@ -79,15 +79,15 @@ Section leafo.
       [mmode_config] plus this hart's view token.  Non-fractional on
       purpose (see the header); the [q] is [mmode_config]'s and is threaded
       exactly as before. *)
-  Definition whart_run (q : Qp) : iProp Σ :=
-    (mmode_config (DfracOwn q) ∗ hart_view cpu_id)%I.
+  Definition whart_run (ξ : CtxId) (q : Qp) : iProp Σ :=
+    (mmode_config (DfracOwn q) ∗ wrunning ξ)%I.
 
-  Lemma whart_run_open q :
-    whart_run q -∗ mmode_config (DfracOwn q) ∗ hart_view cpu_id.
+  Lemma whart_run_open ξ q :
+    whart_run ξ q -∗ mmode_config (DfracOwn q) ∗ wrunning ξ.
   Proof. iIntros "$". Qed.
 
-  Lemma whart_run_close q :
-    mmode_config (DfracOwn q) -∗ hart_view cpu_id -∗ whart_run q.
+  Lemma whart_run_close ξ q :
+    mmode_config (DfracOwn q) -∗ wrunning ξ -∗ whart_run ξ q.
   Proof. iIntros "H1 H2". iFrame. Qed.
 
   (* ------------------------------------------------------------------ *)
@@ -101,19 +101,20 @@ Section leafo.
 
       No frame appears: see the header.  [Pre] / [Post] are the leaf's own
       resources, and the caller's stay in its context. *)
-  Lemma leaf_hide (Pre Post : iProp Σ) :
+  Lemma leaf_hide (ξ : CtxId) (Pre Post : iProp Σ) :
     (∀ ws : wstate,
         ⊢ Pre -∗ hart_ws cpu_id ws -∗
           (∀ ws' : wstate, ⌜ws_le ws ws'⌝ -∗ Post -∗ hart_ws cpu_id ws' -∗
              WWP Loop) -∗
           WWP Loop) ->
-    Pre -∗ hart_view cpu_id -∗ (Post -∗ hart_view cpu_id -∗ WWP Loop) -∗
+    Pre -∗ wrunning ξ -∗ (Post -∗ wrunning ξ -∗ WWP Loop) -∗
     WWP Loop.
   Proof.
     iIntros (Hleaf) "HPre [%ws [Hws Hauth]] Hcont".
     iApply (Hleaf ws with "HPre Hws").
     iIntros (ws') "%Hle HPost Hws".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "HPost"). iExists ws'. iFrame.
   Qed.
 
@@ -121,7 +122,7 @@ Section leafo.
   (** ** 2. The worked leaf.
 
       Compare with [WeakLeafM.wwp_lui]: no [ws] parameter, no [∀ ws'], no
-      [⌜ws_le ws ws'⌝], no frame in or out, and [hart_view cpu_id] in place
+      [⌜ws_le ws ws'⌝], no frame in or out, and [wrunning ξ] in place
       of [hart_ws cpu_id ws] / [hart_ws cpu_id ws'].
 
       SO THE CALL SITE IS [WpMmodeUtype.wp_lui_gpr]'S PLUS EXACTLY ONE
@@ -131,7 +132,7 @@ Section leafo.
                iIntros "Hmm HpcfA Hpc Hfile".
         NOW    iApply (wwp_lui … ws34 _ … with "… Hi35 Hhws Hstk").
                iIntros (ws35) "%Hwsle35 Hmm HpcfA Hpc Hfile Hhws Hstk".
-        HERE   iApply (wwp_lui_o … with "Hmm HpcfA Hpc Hfile Hi35 Hhws").
+        HERE   iApply (wwp_lui_o ξ … with "Hmm HpcfA Hpc Hfile Hi35 Hhws").
                iIntros "Hmm HpcfA Hpc Hfile Hhws".
 
       [ws34], [%Hwsle35] and [Hstk] are gone.  [Hhws] is NOT, and cannot be
@@ -139,7 +140,7 @@ Section leafo.
       [ghost_var], so it has to be passed to whoever updates it.  Deleting
       it means moving the whole cell into [wmstate_interp] — see the
       worklist entry "the last name". *)
-  Lemma wwp_lui_o (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Lemma wwp_lui_o (ξ : CtxId) (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (rd : mword 5) (imm : mword 20) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -150,12 +151,12 @@ Section leafo.
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc is_rvc (UTYPE (imm, Regidx rd, LUI)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -166,7 +167,8 @@ Section leafo.
     iApply (wwp_lui pc is_rvc rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
@@ -183,20 +185,20 @@ Section leafo.
                iIntros "Hmm HpcfA Hpc Hfile".
 
       No [ws], no [ws_le], no frame, no view token.  The only difference
-      left is the lemma's name and that [Hmm] is bound to [whart_run q]
+      left is the lemma's name and that [Hmm] is bound to [whart_run ξ q]
       rather than [mmode_config (DfracOwn q)]. *)
-  Lemma wwp_lui_run (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Lemma wwp_lui_run (ξ : CtxId) (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (rd : mword 5) (imm : mword 20) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc is_rvc (UTYPE (imm, Regidx rd, LUI)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd := regval_into_reg (luival imm)]> m) -∗
@@ -206,7 +208,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_lui_o pc is_rvc rd imm m pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_lui_o ξ pc is_rvc rd imm m pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hfile Hi Hview").
     iIntros "Hmm Hpcf Hpc Hfile Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
@@ -221,7 +223,7 @@ Section leafo.
       instruction-specific: [_o] is [hart_view_open] / [ws_update] /
       [hart_view_close] around the [winstr_m] leaf, and [_run] is
       [whart_run_open] / [whart_run_close] around [_o]. *)
-  Lemma wwp_addi_o (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Lemma wwp_addi_o (ξ : CtxId) (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -232,14 +234,14 @@ Section leafo.
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd :=
                   regval_into_reg (add_vec (m !!! Regidx rs1)
                                      (sign_extend' 64 imm))]> m) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -250,22 +252,23 @@ Section leafo.
     iApply (wwp_addi pc is_rvc rs1 rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_addi_run (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
+  Lemma wwp_addi_run (ξ : CtxId) (pc : SailStdpp.Values.mword 64) (is_rvc : bool)
       (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc is_rvc (ITYPE (imm, Regidx rs1, Regidx rd, ADDI)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc (if is_rvc then 2 else 4)) -∗
       gpr_file (<[Regidx rd :=
@@ -277,7 +280,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_addi_o pc is_rvc rs1 rd imm m pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_addi_o ξ pc is_rvc rs1 rd imm m pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hfile Hi Hview").
     iIntros "Hmm Hpcf Hpc Hfile Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
@@ -295,7 +298,7 @@ Section leafo.
       becomes the constant the leaf proves. *)
 
   (** *** 5a. [c.or] *)
-  Lemma wwp_or_rvc_o (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_or_rvc_o (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs2 rs1 rd : mword 5) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -306,14 +309,14 @@ Section leafo.
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd :=
                   regval_into_reg (or_vec (m !!! Regidx rs1)
                                      (m !!! Regidx rs2))]> m) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -324,22 +327,23 @@ Section leafo.
     iApply (wwp_or_rvc pc rs2 rs1 rd m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_or_rvc_run (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_or_rvc_run (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs2 rs1 rd : mword 5) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, OR)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd :=
@@ -351,7 +355,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_or_rvc_o pc rs2 rs1 rd m pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_or_rvc_o ξ pc rs2 rs1 rd m pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hfile Hi Hview").
     iIntros "Hmm Hpcf Hpc Hfile Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
@@ -359,7 +363,7 @@ Section leafo.
   Qed.
 
   (** *** 5b. [c.add] / [c.mv] *)
-  Lemma wwp_add_rvc_o (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_add_rvc_o (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs2 rs1 rd : mword 5) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -370,14 +374,14 @@ Section leafo.
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd :=
                   regval_into_reg (add_vec (m !!! Regidx rs1)
                                      (m !!! Regidx rs2))]> m) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -388,22 +392,23 @@ Section leafo.
     iApply (wwp_add_rvc pc rs2 rs1 rd m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_add_rvc_run (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_add_rvc_run (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs2 rs1 rd : mword 5) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc true (RTYPE (Regidx rs2, Regidx rs1, Regidx rd, ADD)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd :=
@@ -415,7 +420,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_add_rvc_o pc rs2 rs1 rd m pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_add_rvc_o ξ pc rs2 rs1 rd m pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hfile Hi Hview").
     iIntros "Hmm Hpcf Hpc Hfile Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
@@ -423,7 +428,7 @@ Section leafo.
   Qed.
 
   (** *** 5c. [c.slli] *)
-  Lemma wwp_slli_rvc_o (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_slli_rvc_o (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs1 rd : mword 5) (shamt : mword 6) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -434,14 +439,14 @@ Section leafo.
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd :=
                   regval_into_reg (shift_bits_left (m !!! Regidx rs1)
                     (subrange_vec_dec shamt (Z.sub log2_xlen 1) 0))]> m) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -452,22 +457,23 @@ Section leafo.
     iApply (wwp_slli_rvc pc rs1 rd shamt m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_slli_rvc_run (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_slli_rvc_run (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs1 rd : mword 5) (shamt : mword 6) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc true (SHIFTIOP (shamt, Regidx rs1, Regidx rd, SLLI)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd :=
@@ -479,7 +485,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_slli_rvc_o pc rs1 rd shamt m pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_slli_rvc_o ξ pc rs1 rd shamt m pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hfile Hi Hview").
     iIntros "Hmm Hpcf Hpc Hfile Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
@@ -487,7 +493,7 @@ Section leafo.
   Qed.
 
   (** *** 5d. [c.addiw] *)
-  Lemma wwp_addiw_rvc_o (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_addiw_rvc_o (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs1 rd : mword 5) (immv : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -498,7 +504,7 @@ Section leafo.
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc true (ADDIW (immv, Regidx rs1, Regidx rd)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
@@ -507,7 +513,7 @@ Section leafo.
                     (subrange_vec_dec
                        (add_vec (m !!! Regidx rs1)
                           (sign_extend' 64 immv)) 31 0))]> m) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -518,22 +524,23 @@ Section leafo.
     iApply (wwp_addiw_rvc pc rs1 rd immv m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_addiw_rvc_run (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_addiw_rvc_run (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs1 rd : mword 5) (immv : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc true (ADDIW (immv, Regidx rs1, Regidx rd)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 2) -∗
       gpr_file (<[Regidx rd :=
@@ -547,7 +554,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_addiw_rvc_o pc rs1 rd immv m pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_addiw_rvc_o ξ pc rs1 rd immv m pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hfile Hi Hview").
     iIntros "Hmm Hpcf Hpc Hfile Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
@@ -555,7 +562,7 @@ Section leafo.
   Qed.
 
   (** *** 5e. [ori] -- the uncompressed one, so the bump is 4. *)
-  Lemma wwp_ori_o (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_ori_o (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -566,14 +573,14 @@ Section leafo.
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd :=
                   regval_into_reg (or_vec (m !!! Regidx rs1)
                                      (sign_extend' 64 imm))]> m) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -584,22 +591,23 @@ Section leafo.
     iApply (wwp_ori pc rs1 rd imm m pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hfile Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hfile"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_ori_run (pc : SailStdpp.Values.mword 64)
+  Lemma wwp_ori_run (ξ : CtxId) (pc : SailStdpp.Values.mword 64)
       (rs1 rd : mword 5) (imm : mword 12) (m : regfile)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     gpr_file m -∗
     winstr_m pc false (ITYPE (imm, Regidx rs1, Regidx rd, ORI)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       gpr_file (<[Regidx rd :=
@@ -611,7 +619,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hfile #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_ori_o pc rs1 rd imm m pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_ori_o ξ pc rs1 rd imm m pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hfile Hi Hview").
     iIntros "Hmm Hpcf Hpc Hfile Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hfile").
@@ -626,7 +634,7 @@ Section leafo.
       proof owns, and hiding it would be a lie, not a simplification. *)
 
   (** *** 6a. [csrr rd, menvcfg] *)
-  Lemma wwp_csrr_menvcfg_o (pc : mword 64) (rd : mword 5)
+  Lemma wwp_csrr_menvcfg_o (ξ : CtxId) (pc : mword 64) (rd : mword 5)
       (menvcfg_in rd0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -638,13 +646,13 @@ Section leafo.
     menvcfg ↦ᵣ menvcfg_in -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg menvcfg_in -∗
       menvcfg ↦ᵣ menvcfg_in -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -656,23 +664,24 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd Hcsr"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_csrr_menvcfg_run (pc : mword 64) (rd : mword 5)
+  Lemma wwp_csrr_menvcfg_run (ξ : CtxId) (pc : mword 64) (rd : mword 5)
       (menvcfg_in rd0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     menvcfg ↦ᵣ menvcfg_in -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg menvcfg_in -∗
@@ -683,7 +692,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hcsr Hrd #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_csrr_menvcfg_o pc rd menvcfg_in rd0 pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_csrr_menvcfg_o ξ pc rd menvcfg_in rd0 pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hview").
     iIntros "Hmm Hpcf Hpc Hrd Hcsr Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrd Hcsr").
@@ -691,7 +700,7 @@ Section leafo.
   Qed.
 
   (** *** 6b. [csrr rd, mcounteren] *)
-  Lemma wwp_csrr_mcounteren_o (pc : mword 64) (rd : mword 5)
+  Lemma wwp_csrr_mcounteren_o (ξ : CtxId) (pc : mword 64) (rd : mword 5)
       (mcen_in : mword 32) (rd0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -703,14 +712,14 @@ Section leafo.
     mcounteren ↦ᵣ mcen_in -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc false (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ
         regval_into_reg (zero_extend' 64 mcen_in) -∗
       mcounteren ↦ᵣ mcen_in -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -722,23 +731,24 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd Hcsr"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_csrr_mcounteren_run (pc : mword 64) (rd : mword 5)
+  Lemma wwp_csrr_mcounteren_run (ξ : CtxId) (pc : mword 64) (rd : mword 5)
       (mcen_in : mword 32) (rd0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     mcounteren ↦ᵣ mcen_in -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc false (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ
@@ -750,7 +760,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hcsr Hrd #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_csrr_mcounteren_o pc rd mcen_in rd0 pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_csrr_mcounteren_o ξ pc rd mcen_in rd0 pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hview").
     iIntros "Hmm Hpcf Hpc Hrd Hcsr Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrd Hcsr").
@@ -758,7 +768,7 @@ Section leafo.
   Qed.
 
   (** *** 6c. [csrr rd, mhartid] *)
-  Lemma wwp_csrr_mhartid_o (pc : mword 64) (rd : mword 5)
+  Lemma wwp_csrr_mhartid_o (ξ : CtxId) (pc : mword 64) (rd : mword 5)
       (mhartid_in rd0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -770,13 +780,13 @@ Section leafo.
     mhartid ↦ᵣ mhartid_in -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg mhartid_in -∗
       mhartid ↦ᵣ mhartid_in -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -788,23 +798,24 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd Hcsr"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_csrr_mhartid_run (pc : mword 64) (rd : mword 5)
+  Lemma wwp_csrr_mhartid_run (ξ : CtxId) (pc : mword 64) (rd : mword 5)
       (mhartid_in rd0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     mhartid ↦ᵣ mhartid_in -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg mhartid_in -∗
@@ -815,7 +826,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hcsr Hrd #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_csrr_mhartid_o pc rd mhartid_in rd0 pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_csrr_mhartid_o ξ pc rd mhartid_in rd0 pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hcsr Hrd Hi Hview").
     iIntros "Hmm Hpcf Hpc Hrd Hcsr Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrd Hcsr").
@@ -823,7 +834,7 @@ Section leafo.
   Qed.
 
   (** *** 6d. [csrr rd, time] *)
-  Lemma wwp_csrr_time_o (pc : mword 64) (rd : mword 5) (rd0 : mword 64)
+  Lemma wwp_csrr_time_o (ξ : CtxId) (pc : mword 64) (rd : mword 5) (rd0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
@@ -833,13 +844,13 @@ Section leafo.
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( ∀ tv : mword 64,
       mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg tv -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -851,22 +862,23 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrd Hi Hws HF").
     iIntros (tv ws') "%Hle Hmm Hpcf Hpc Hrd Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" $! tv with "Hmm Hpcf Hpc Hrd"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_csrr_time_run (pc : mword 64) (rd : mword 5) (rd0 : mword 64)
+  Lemma wwp_csrr_time_run (ξ : CtxId) (pc : mword 64) (rd : mword 5) (rd0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
     ( ∀ tv : mword 64,
-      whart_run q -∗
+      whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg tv -∗
@@ -876,7 +888,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hrd #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_csrr_time_o pc rd rd0 pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_csrr_time_o ξ pc rd rd0 pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrd Hi Hview").
     iIntros (tv) "Hmm Hpcf Hpc Hrd Hview".
     iApply ("Hcont" $! tv with "[Hmm Hview] Hpcf Hpc Hrd").
@@ -891,7 +903,7 @@ Section leafo.
       write-side numbers and legalisers are spelled out. *)
 
   (** *** 7a. [csrw menvcfg, rs1] *)
-  Lemma wwp_csrw_menvcfg_o (pc : mword 64) (rs1 : mword 5)
+  Lemma wwp_csrw_menvcfg_o (ξ : CtxId) (pc : mword 64) (rs1 : mword 5)
       (menvcfg0 : type_of_register menvcfg) (rs1v : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -904,13 +916,13 @@ Section leafo.
     menvcfg ↦ᵣ menvcfg0 -∗
     winstr_m pc false
       (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx rs1, zreg, CSRRW)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       menvcfg ↦ᵣ WpGprCsrwA.menvcfg_legalized menvcfg0 rs1v -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -922,24 +934,25 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_csrw_menvcfg_run (pc : mword 64) (rs1 : mword 5)
+  Lemma wwp_csrw_menvcfg_run (ξ : CtxId) (pc : mword 64) (rs1 : mword 5)
       (menvcfg0 : type_of_register menvcfg) (rs1v : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rs1 <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
     menvcfg ↦ᵣ menvcfg0 -∗
     winstr_m pc false
       (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx rs1, zreg, CSRRW)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
@@ -950,7 +963,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hrs Hcsr #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_csrw_menvcfg_o pc rs1 menvcfg0 rs1v pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_csrw_menvcfg_o ξ pc rs1 menvcfg0 rs1v pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hview").
     iIntros "Hmm Hpcf Hpc Hrs Hcsr Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrs Hcsr").
@@ -958,7 +971,7 @@ Section leafo.
   Qed.
 
   (** *** 7b. [csrw mcounteren, rs1] *)
-  Lemma wwp_csrw_mcounteren_o (pc : mword 64) (rs1 : mword 5)
+  Lemma wwp_csrw_mcounteren_o (ξ : CtxId) (pc : mword 64) (rs1 : mword 5)
       (mcounteren0 : type_of_register mcounteren) (rs1v : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -971,13 +984,13 @@ Section leafo.
     mcounteren ↦ᵣ mcounteren0 -∗
     winstr_m pc false
       (CSRReg (WpGprCsrwA.csr_mcounteren, Regidx rs1, zreg, CSRRW)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       mcounteren ↦ᵣ legalize_mcounteren mcounteren0 rs1v -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -989,24 +1002,25 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_csrw_mcounteren_run (pc : mword 64) (rs1 : mword 5)
+  Lemma wwp_csrw_mcounteren_run (ξ : CtxId) (pc : mword 64) (rs1 : mword 5)
       (mcounteren0 : type_of_register mcounteren) (rs1v : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rs1 <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
     mcounteren ↦ᵣ mcounteren0 -∗
     winstr_m pc false
       (CSRReg (WpGprCsrwA.csr_mcounteren, Regidx rs1, zreg, CSRRW)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
@@ -1017,7 +1031,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hrs Hcsr #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_csrw_mcounteren_o pc rs1 mcounteren0 rs1v pmpcfg0 q
+    iApply (wwp_csrw_mcounteren_o ξ pc rs1 mcounteren0 rs1v pmpcfg0 q
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hrs Hcsr Hi Hview").
     iIntros "Hmm Hpcf Hpc Hrs Hcsr Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrs Hcsr").
@@ -1025,7 +1039,7 @@ Section leafo.
   Qed.
 
   (** *** 7c. [csrw stimecmp, rs1] *)
-  Lemma wwp_csrw_stimecmp_o (pc : mword 64) (rs1 : mword 5)
+  Lemma wwp_csrw_stimecmp_o (ξ : CtxId) (pc : mword 64) (rs1 : mword 5)
       (stimecmp0 : type_of_register stimecmp) (rs1v : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -1038,13 +1052,13 @@ Section leafo.
     stimecmp ↦ᵣ stimecmp0 -∗
     winstr_m pc false
       (CSRReg (WpGprCsrwB.csr_stimecmp, Regidx rs1, zreg, CSRRW)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       stimecmp ↦ᵣ WpGprCsrwB.stimecmp_legalized stimecmp0 rs1v -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -1056,24 +1070,25 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hrs Hcsr Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrs Hcsr"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_csrw_stimecmp_run (pc : mword 64) (rs1 : mword 5)
+  Lemma wwp_csrw_stimecmp_run (ξ : CtxId) (pc : mword 64) (rs1 : mword 5)
       (stimecmp0 : type_of_register stimecmp) (rs1v : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rs1 <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
     stimecmp ↦ᵣ stimecmp0 -∗
     winstr_m pc false
       (CSRReg (WpGprCsrwB.csr_stimecmp, Regidx rs1, zreg, CSRRW)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec_int pc 4) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
@@ -1084,7 +1099,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hrs Hcsr #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_csrw_stimecmp_o pc rs1 stimecmp0 rs1v pmpcfg0 q
+    iApply (wwp_csrw_stimecmp_o ξ pc rs1 stimecmp0 rs1v pmpcfg0 q
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hrs Hcsr Hi Hview").
     iIntros "Hmm Hpcf Hpc Hrs Hcsr Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrs Hcsr").
@@ -1095,7 +1110,7 @@ Section leafo.
   (** ** 8. Control flow. *)
 
   (** *** 8a. [jal rd, imm] *)
-  Lemma wwp_jal_o (pc : mword 64) (rd : mword 5) (imm : mword 21)
+  Lemma wwp_jal_o (ξ : CtxId) (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (rdv0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
@@ -1107,13 +1122,13 @@ Section leafo.
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rdv0 -∗
     winstr_m pc false (JAL (imm, Regidx rd)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       R_bitvector_64 (gpr_of_Z (uint rd))
         ↦ᵣ (regval_into_reg (add_vec_int pc 4)) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -1124,23 +1139,24 @@ Section leafo.
     iApply (wwp_jal pc rd imm rdv0 pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz Htgt with "Hmm Hpcf Hpc Hrd Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hrd"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_jal_run (pc : mword 64) (rd : mword 5) (imm : mword 21)
+  Lemma wwp_jal_run (ξ : CtxId) (pc : mword 64) (rd : mword 5) (imm : mword 21)
       (rdv0 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint rd <> 0 ->
     is_aligned_paddr (Physaddr (add_vec pc (sign_extend' 64 imm))) 4 = true ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rdv0 -∗
     winstr_m pc false (JAL (imm, Regidx rd)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (add_vec pc (sign_extend' 64 imm)) -∗
       R_bitvector_64 (gpr_of_Z (uint rd))
@@ -1151,7 +1167,7 @@ Section leafo.
     intros Hgid Hpmp Hnz Htgt.
     iIntros "Hrun Hpcf Hpc Hrd #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_jal_o pc rd imm rdv0 pmpcfg0 q Hgid Hpmp Hnz Htgt
+    iApply (wwp_jal_o ξ pc rd imm rdv0 pmpcfg0 q Hgid Hpmp Hnz Htgt
               with "Hmm Hpcf Hpc Hrd Hi Hview").
     iIntros "Hmm Hpcf Hpc Hrd Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hrd").
@@ -1159,7 +1175,7 @@ Section leafo.
   Qed.
 
   (** *** 8b. [c.jr ra] *)
-  Lemma wwp_cjr_rvc_o (pc : mword 64) (ra : mword 5) (rav : mword 64)
+  Lemma wwp_cjr_rvc_o (ξ : CtxId) (pc : mword 64) (ra : mword 5) (rav : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
@@ -1169,12 +1185,12 @@ Section leafo.
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
     winstr_m pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (ret_pc rav) -∗
       R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -1185,21 +1201,22 @@ Section leafo.
     iApply (wwp_cjr_rvc pc ra rav pmpcfg0 q ws (⌜True⌝ : vProp Σ)
               Hgid Hpmp Hnz with "Hmm Hpcf Hpc Hra Hi Hws HF").
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hra Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hmm Hpcf Hpc Hra"). iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_cjr_rvc_run (pc : mword 64) (ra : mword 5) (rav : mword 64)
+  Lemma wwp_cjr_rvc_run (ξ : CtxId) (pc : mword 64) (ra : mword 5) (rav : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) :
     gen_id = 0%nat ->
     pmp_allows_all pmpcfg0 ->
     uint ra <> 0 ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
     winstr_m pc true (JALR (zeros' 12, Regidx ra, zreg)) -∗
-    ( whart_run q -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pc_is (ret_pc rav) -∗
       R_bitvector_64 (gpr_of_Z (uint ra)) ↦ᵣ rav -∗
@@ -1209,7 +1226,7 @@ Section leafo.
     intros Hgid Hpmp Hnz.
     iIntros "Hrun Hpcf Hpc Hra #Hi Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_cjr_rvc_o pc ra rav pmpcfg0 q Hgid Hpmp Hnz
+    iApply (wwp_cjr_rvc_o ξ pc ra rav pmpcfg0 q Hgid Hpmp Hnz
               with "Hmm Hpcf Hpc Hra Hi Hview").
     iIntros "Hmm Hpcf Hpc Hra Hview".
     iApply ("Hcont" with "[Hmm Hview] Hpcf Hpc Hra").
@@ -1227,7 +1244,7 @@ Section leafo.
       reaches S-mode.  Until then [mret] stops at [_o], which is honest
       about what it has: the view token in and the view token out, with the
       five M-mode cells passing through individually. *)
-  Lemma wwp_mret_o (pc : mword 64) (newpriv : Privilege)
+  Lemma wwp_mret_o (ξ : CtxId) (pc : mword 64) (newpriv : Privilege)
       (ms_cur mepc0 menvcfg1 : mword 64)
       (pmpcfg0 : type_of_register pmpcfg_n) :
     gen_id = 0%nat ->
@@ -1248,7 +1265,7 @@ Section leafo.
     menvcfg ↦ᵣ menvcfg1 -∗
     mepc ↦ᵣ mepc0 -∗
     winstr_m pc false (MRET tt) -∗
-    hart_view cpu_id -∗
+    wrunning ξ -∗
     ( hart_state ↦ᵣ HART_ACTIVE tt -∗
       cur_privilege ↦ᵣ newpriv -∗
       mstatus ↦ᵣ cms5 ms_cur -∗
@@ -1256,7 +1273,7 @@ Section leafo.
       menvcfg ↦ᵣ menvcfg1 -∗
       mepc ↦ᵣ mepc0 -∗
       pc_is (ret_pc mepc0) -∗
-      hart_view cpu_id -∗
+      wrunning ξ -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
@@ -1269,7 +1286,8 @@ Section leafo.
               (⌜True⌝ : vProp Σ) Hgid Hpmp HmIE Hmprv Hfwd Hnew Hlpe
               with "Hhw Hinv Hhs Hpriv Hms Hpcf Hpc Hmenv Hmepc Hi Hws HF").
     iIntros (ws') "%Hle Hhs Hpriv Hms Hpcf Hmenv Hmepc Hpc Hws _".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
     iApply ("Hcont" with "Hhs Hpriv Hms Hpcf Hmenv Hmepc Hpc").
     iExists ws'. iFrame.
   Qed.
@@ -1283,7 +1301,7 @@ Section leafo.
       no [ws] anywhere in the statement.  [wobj_to_hold] / [wobj_of_hold]
       do the conversion generically, so this proof says nothing about
       [wpt8] in particular. *)
-  Lemma wwp_ld8_tor_rvc_o (pc : mword 64) (rs1 rd : mword 5) (imm : mword 12)
+  Lemma wwp_ld8_tor_rvc_o (ξ : CtxId) (pc : mword 64) (rs1 rd : mword 5) (imm : mword 12)
       (ea : Arch.pa) (v : bv 64) (dqv : dfrac) (q : Qp)
       (pmpcfg0 : type_of_register pmpcfg_n)
       (pmpaddrs : type_of_register pmpaddr_n)
@@ -1302,33 +1320,34 @@ Section leafo.
     R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    hart_view cpu_id -∗
-    wobj (wpt8 ea dqv v) -∗
+    wrunning ξ -∗
+    cobj ξ (wpt8 ea dqv v) -∗
     ( mmode_config (DfracOwn q) -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc 2) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
-      hart_view cpu_id -∗
-      wobj (wpt8 ea dqv v) -∗
+      wrunning ξ -∗
+      cobj ξ (wpt8 ea dqv v) -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
     intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
     iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd #Hi [%ws [Hws Hauth]] Hpt Hcont".
-    iDestruct (wobj_to_hold ws with "Hauth Hpt") as "[Hauth Hpt]".
+    iDestruct (cobj_to_hold ξ ws with "Hauth Hpt") as "[Hauth Hpt]".
     iApply (wwp_ld8_tor_rvc pc rs1 rd imm ea v dqv q pmpcfg0 pmpaddrs
               rs1v rd0 ws Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
               with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hws Hpt").
     iIntros (ws') "%Hle Hmm Hpcf Hpad Hpc Hrs Hrd Hws Hpt".
-    iMod (ws_update _ _ ws' with "Hauth") as "Hauth"; [exact Hle|].
-    iDestruct (wobj_of_hold ws' with "Hauth Hpt") as "[Hauth Hpt]".
+    iMod (ctx_auth_update _ _ (ws_view ws') with "Hauth") as "Hauth";
+      [by apply ws_le_view|].
+    iDestruct (cobj_of_hold ξ ws' with "Hauth Hpt") as "[Hauth Hpt]".
     iApply ("Hcont" with "Hmm Hpcf Hpad Hpc Hrs Hrd [Hws Hauth] Hpt").
     iExists ws'. iFrame.
   Qed.
 
-  Lemma wwp_ld8_tor_rvc_run (pc : mword 64) (rs1 rd : mword 5)
+  Lemma wwp_ld8_tor_rvc_run (ξ : CtxId) (pc : mword 64) (rs1 rd : mword 5)
       (imm : mword 12) (ea : Arch.pa) (v : bv 64) (dqv : dfrac) (q : Qp)
       (pmpcfg0 : type_of_register pmpcfg_n)
       (pmpaddrs : type_of_register pmpaddr_n)
@@ -1340,28 +1359,28 @@ Section leafo.
     uint rd <> 0 ->
     add_vec rs1v (sign_extend' 64 imm) = ea ->
     (forall j : nat, (j < 8)%nat -> addr_is_ram (pa_add ea j)) ->
-    whart_run q -∗
+    whart_run ξ q -∗
     pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
     pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
     pc_is pc -∗
     R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
     R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
     winstr_m pc true (LOAD (imm, Regidx rs1, Regidx rd, false, 8)) -∗
-    wobj (wpt8 ea dqv v) -∗
-    ( whart_run q -∗
+    cobj ξ (wpt8 ea dqv v) -∗
+    ( whart_run ξ q -∗
       pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
       pmpaddr_n ↦ᵣ{DfracOwn q} pmpaddrs -∗
       pc_is (add_vec_int pc 2) -∗
       R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
       R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ (regval_into_reg v) -∗
-      wobj (wpt8 ea dqv v) -∗
+      cobj ξ (wpt8 ea dqv v) -∗
       WWP Loop) -∗
     WWP Loop.
   Proof.
     intros Hgid Hpmp Htor Hnz1 Hnzd Hea Hram.
     iIntros "Hrun Hpcf Hpad Hpc Hrs Hrd #Hi Hpt Hcont".
     iDestruct (whart_run_open with "Hrun") as "[Hmm Hview]".
-    iApply (wwp_ld8_tor_rvc_o pc rs1 rd imm ea v dqv q pmpcfg0 pmpaddrs
+    iApply (wwp_ld8_tor_rvc_o ξ pc rs1 rd imm ea v dqv q pmpcfg0 pmpaddrs
               rs1v rd0 Hgid Hpmp Htor Hnz1 Hnzd Hea Hram
               with "Hmm Hpcf Hpad Hpc Hrs Hrd Hi Hview Hpt").
     iIntros "Hmm Hpcf Hpad Hpc Hrs Hrd Hview Hpt".

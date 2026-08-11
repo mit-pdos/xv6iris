@@ -394,3 +394,30 @@ Section running.
   Qed.
 
 End running.
+
+(* ====================================================================== *)
+(** ** 7. THE M-MODE BRIDGE.
+
+    [WeakAdequacy] hands each hart a [hart_view], which pairs the hart's
+    wstate with [ws_auth (weak_view_name c)] -- the OLD, hart-indexed view
+    authority.  A hart turns that into a context exactly once, at the top of
+    its chain, which is the honest reading anyway: a boot context comes into
+    existence when execution starts.
+
+    The [ws_auth] half is DROPPED.  Once objective ownership is indexed by a
+    context, nothing consumes the hart-indexed authority, and carrying both
+    would mean every leaf performing two updates to keep them in step.  The
+    [weak_view_name] field of [weakGS] is consequently vestigial; removing
+    it is an adequacy-level change and is deliberately not bundled here. *)
+Section bridge.
+  Context `{!weakGS Σ}.
+
+  Lemma hart_view_to_run `{CID : CpuId} :
+    hart_view cpu_id ==∗ ∃ ξ : CtxId, wrunning ξ.
+  Proof.
+    iIntros "[%ws [Hws _]]".
+    iMod (ctx_alloc (ws_view ws)) as (ξ) "Ha".
+    iModIntro. iExists ξ. iApply (wrunning_close with "Hws Ha").
+  Qed.
+
+End bridge.
