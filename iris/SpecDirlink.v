@@ -87,6 +87,36 @@
    record IS [DirentEnc.de_of_name] -- and the size is raised by writei's
    own [wi_dinode].
 
+   ---- THE RANGE CLAUSE IS EXACT (fs-icache.md §15.1(i), retrofitted) ----
+
+   writei's postcondition concedes a DISTURBED REGION of up to BSIZE
+   unspecified bytes above the written window, because a user copy that
+   faults part-way is committed without advancing [tot].  dirlink writes
+   from a KERNEL buffer ([user = false]), where either_copyin cannot fail
+   at all, and SpecWritei now says so: [user = false -> dist = 0].  So the
+   clause below is TWO-way, not three-way, and the third arm -- the SHORT
+   write, [tot < 16] -- differs from the old file in exactly the [tot]
+   bytes it wrote and NOWHERE ELSE.
+
+   That is what a writer needs to re-park [DirView.dir_ok] over a
+   middle-slot link: under the old clause the write could have clobbered
+   up to 64 FOLLOWING records with arbitrary bytes and dir-wf was
+   underivable (§15.1(i)).  [DirView.dir_ok_dirlink] is the derivation the
+   tightened clause unlocks; create (fs-sysfile S5) is its first caller.
+
+   ---- THE LINKED INUM'S RANGE PREMISE ---------------------------------
+
+   [bv_unsigned inum < 16 * nib] on the mword-16 argument is NOT used by
+   dirlink's own proof -- the [sh] stores sixteen bits whatever they are.
+   It is here for the WRITER: [dir_ok] over the new directory needs every
+   live record's inum inside the inode region, and the record dirlink just
+   stored carries [inum].  (On a one-byte short write the stored halfword
+   is [inum mod 256], which the premise still bounds -- the free slot's
+   old high byte is zero.  See [dir_ok_dirlink].)  Stating it now keeps
+   S5 from having to reopen this contract.  It is free for every caller:
+   create's inum comes from ialloc, whose payout carries exactly this
+   bound.
+
    NOTE ON THE NAME.  [s] is DEFINED as [bname 14 fn], the canonical view of
    the caller's own buffer, so the design's two extra caller obligations
    ("length s <= 14", "nonul s") are NOT premises: they are
@@ -248,6 +278,11 @@ Definition wp_dirlink_sconf_body
   IBLOCK dinum inodestart ∈ cov ->
   ~ (IBLOCK dinum inodestart ∈ log_region_set logstart) ->
   bv_unsigned dinum < 16 * Z.of_nat nib ->
+  (* ---- THE LINKED CHILD'S OWN RANGE (unused here, owed to the writer) ----
+     the premise above is the DIRECTORY's inum; this one is the inum being
+     linked, and it is what lets a caller re-park [DirView.dir_ok] over the
+     record dirlink stores.  See the header. *)
+  bv_unsigned inum < 16 * Z.of_nat nib ->
   bitmap_geom_ok cov logstart bmapstart size ->
   printk_gen_contract γpr γu γd ->
   (* ---- iput's premises (itrunc's geometry) ---- *)
@@ -315,7 +350,7 @@ Definition wp_dirlink_sconf_body
   ∀ (mf : regfile) (found : bool)
     (bm' : blkmap) (data' : nat -> list (bv 8)) (dn' dn0' : dinode)
     (n' : nat) (used' : gset Z)
-    (tot dist : nat) (dstb : nat -> bv 8),
+    (tot : nat),
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf K b pj -∗
       cpu_own 0 eb pj C b -∗
@@ -348,7 +383,7 @@ Definition wp_dirlink_sconf_body
              = (mword_of_int (-1) : mword 64)
           /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
           /\ used' ⊆ used
-          /\ tot = 0%nat /\ dist = 0%nat
+          /\ tot = 0%nat
         else (* the append, through writei at [16*k0] *)
           dir_first data nrec s = None
           /\ used ⊆ used'
@@ -360,19 +395,14 @@ Definition wp_dirlink_sconf_body
           /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
           /\ dn0' = dn'
           /\ (tot <= 16)%nat
-          /\ (dist <= BSIZE)%nat
-          /\ (tot = 16%nat -> dist = 0%nat)
-          (* THE RANGE CLAUSE: the record's bytes in the window, writei's
-             bounded disturbed region just after it, everything else as it
-             was *)
+          (* THE RANGE CLAUSE: the record's bytes in the window and NOTHING
+             ELSE.  writei's disturbed region is empty on the kernel arm --
+             see the header, and fs-icache.md §15.1(i). *)
           /\ (forall x : nat,
                 file_byte data' x
                 = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
                   then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
-                  else if decide ((16 * k0 + tot <= x)%nat
-                                  /\ (x < 16 * k0 + tot + dist)%nat)
-                       then dstb (x - (16 * k0 + tot))%nat
-                       else file_byte data x)
+                  else file_byte data x)
           (* the branchless return: 0 exactly when all sixteen went in *)
           /\ ((mf !!! Regidx (mword_of_int 10 : mword 5)
                  = (mword_of_int 0 : mword 64) /\ tot = 16%nat)

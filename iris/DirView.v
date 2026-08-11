@@ -843,12 +843,16 @@ Definition T_DIR_z : Z := 1.
    vacuous; iupdate touches no data; filewrite cannot reach a T_DIR inode
    (sys_open refuses writable directories).  dirlink is the one writer that
    needs an argument rather than a rides: see the N4a ledger in
-   claude-notes/projects/fs-namei.md -- its APPEND arm is fine (a short
-   append leaves [nrec] where it was, so the fragment it wrote is out of
-   range and every record below it is untouched), but its MIDDLE-SLOT arm
-   is NOT derivable from [SpecDirlink] as frozen, because writei's
-   postcondition admits a disturbed region of unspecified bytes after the
-   write.  No site in this tree re-parks after a dirlink yet. *)
+   claude-notes/projects/fs-namei.md.
+
+   ITS MIDDLE-SLOT ARM WAS ONCE UNDERIVABLE (§15.1(i)) and no longer is.
+   writei's postcondition admitted a disturbed region of unspecified bytes
+   after the write, which on an interior slot could have clobbered up to 64
+   FOLLOWING records.  The fs-sysfile S2 retrofit strengthened SpecWritei's
+   KERNEL arm to [dist = 0] -- either_copyin cannot fail there -- and
+   SpecDirlink's clause is now exact.  [dir_ok_dirlink] below is the
+   resulting derivation, for both the append and the middle-slot arm; it is
+   the lemma create (fs-sysfile S5) uses to re-park the parent. *)
 Definition dir_ok (nib : nat) (dn : dinode) (data : nat -> list (bv 8)) : Prop :=
   bv_unsigned (di_type dn) = T_DIR_z ->
   dir_inums_ok data (dir_nrec (bv_unsigned (di_size dn))) nib.
@@ -883,6 +887,189 @@ Qed.
 Lemma dir_ok_eq (nib : nat) (dn dn' : dinode) (data data' : nat -> list (bv 8)) :
   dn = dn' -> data = data' -> dir_ok nib dn data -> dir_ok nib dn' data'.
 Proof. intros -> ->. exact id. Qed.
+
+(* ====================================================================== *)
+(*  8b.  (v) THE WRITER'S CASE: the directory a dirlink just wrote into.    *)
+(*       fs-icache.md §15.1(i), discharged by the fs-sysfile S2 retrofit.   *)
+(* ====================================================================== *)
+
+(* §15.1(i) recorded this as UNDERIVABLE, and it was, for a precise reason:
+   writei's range clause conceded a DISTURBED REGION of up to BSIZE
+   unspecified bytes above the written window, so a middle-slot link could
+   have rewritten up to 64 FOLLOWING records with arbitrary bytes.  The
+   retrofit removes the concession on the KERNEL arm ([SpecWritei]'s new
+   [user = false -> dist = 0]), dirlink's clause is now EXACT, and the
+   derivation below is what that buys.  create (fs-sysfile S5) is its
+   caller: it re-parks the parent directory's escrow bundle after linking
+   the new entry.
+
+   THE THREE CASES AT THE WRITTEN SLOT [k0]:
+
+     tot = 0    nothing was written -- [data'] IS [data] pointwise, and the
+                size did not move either (the slot is at or below [nrec]).
+     tot >= 2   the inum halfword is WHOLLY new, so the record's inum is
+                [inum] and the premise bounds it directly.
+     tot = 1    only the LOW byte is new.  The slot dirlink chose is FREE
+                ([dir_slot_free]), so the old HIGH byte is zero and the
+                stored halfword is [inum mod 256] -- no larger than [inum],
+                hence still in range.  This is §15(a)'s mod-256 argument;
+                §15.1(ii) correctly observed it had no home in the APPEND
+                analysis, and here is where it does belong.
+
+   EVERY OTHER RECORD is untouched: its two inum bytes lie outside
+   [16*k0, 16*k0+tot) because [tot <= 16] and the record windows are
+   16-aligned.  And the record COUNT grows by at most one, only when
+   [k0 = nrec] AND the write was full -- which is the [tot >= 2] case. *)
+
+(* the two bounds [dir_nrec] satisfies, in the one shape the count
+   arithmetic below wants *)
+Lemma dir_nrec_range (sz : Z) :
+  0 <= sz ->
+  Z.of_nat (16 * dir_nrec sz)%nat <= sz
+  /\ sz < Z.of_nat (16 * dir_nrec sz)%nat + 16.
+Proof.
+  intros Hnn. unfold dir_nrec.
+  pose proof (Z.div_mod sz 16 ltac:(lia)) as Hdm.
+  pose proof (Z.mod_pos_bound sz 16 ltac:(lia)) as Hmb.
+  assert (Hd0 : 0 <= sz / 16) by (apply Z.div_pos; lia).
+  rewrite Nat2Z.inj_mul. rewrite Z2Nat.id; [| exact Hd0].
+  change (Z.of_nat 16) with 16. lia.
+Qed.
+
+(* the halfword's VALUE from its two bytes -- what the [tot = 1] link needs,
+   where only the low byte is new and the high one is known zero *)
+Lemma dir_inum_unsigned (data : nat -> list (bv 8)) (k : nat) :
+  bv_unsigned (dir_inum data k)
+  = bv_unsigned (file_byte data (16 * k)%nat)
+    + 2 ^ 8 * bv_unsigned (file_byte data (16 * k + 1)%nat).
+Proof.
+  unfold dir_inum.
+  pose proof (bv_unsigned_in_range 8 (file_byte data (16 * k)%nat)) as H0.
+  pose proof (bv_unsigned_in_range 8 (file_byte data (16 * k + 1)%nat)) as H1.
+  unfold bv_modulus in H0, H1. change (2 ^ Z.of_N 8) with 256 in H0, H1.
+  rewrite Z_to_bv_unsigned. unfold bv_wrap, bv_modulus.
+  change (2 ^ Z.of_N 16) with 65536.
+  cbn [assemble_bytes]. rewrite Z.mod_small; [lia | lia].
+Qed.
+
+(* [dir_record_inum] needs only the record's FIRST TWO bytes; a partially
+   written record supplies exactly those once [tot >= 2] *)
+Lemma dir_inum_of_two (data : nat -> list (bv 8)) (k : nat) (d : dirent) :
+  (forall j, (j < 2)%nat -> file_byte data (16 * k + j)%nat
+                            = dirent_bytes d !!! j) ->
+  dir_inum data k = de_inum d.
+Proof.
+  intros Hb.
+  assert (Hb0 : file_byte data (16 * k + 0)%nat = dirent_bytes d !!! 0%nat)
+    by (apply Hb; lia).
+  assert (Hb1 : file_byte data (16 * k + 1)%nat = dirent_bytes d !!! 1%nat)
+    by (apply Hb; lia).
+  assert (E0 : (16 * k + 0)%nat = (16 * k)%nat) by lia.
+  rewrite E0 in Hb0.
+  assert (Hd0 : dirent_bytes d !!! 0%nat = nth_byte (de_inum d) 0%nat)
+    by (apply dirent_bytes_inum_t; lia).
+  assert (Hd1 : dirent_bytes d !!! 1%nat = nth_byte (de_inum d) 1%nat)
+    by (apply dirent_bytes_inum_t; lia).
+  apply de_half_bytes_inj.
+  rewrite dir_inum_half_bytes. unfold half_bytes.
+  rewrite Hb0. rewrite Hb1. rewrite Hd0. rewrite Hd1. reflexivity.
+Qed.
+
+Lemma dir_ok_dirlink (nib : nat) (dn dn' : dinode)
+    (data data' : nat -> list (bv 8))
+    (inum : bv 16) (s : list (bv 8)) (nrec k0 tot : nat) :
+  nrec = dir_nrec (bv_unsigned (di_size dn)) ->
+  k0 = dir_slot data nrec ->
+  (tot <= 16)%nat ->
+  (* THE LINKED CHILD'S RANGE -- SpecDirlink's new premise *)
+  bv_unsigned inum < 16 * Z.of_nat nib ->
+  (* writei preserves the type and installs [max(size, off+tot)] *)
+  di_type dn' = di_type dn ->
+  bv_unsigned (di_size dn')
+    = Z.max (bv_unsigned (di_size dn)) (Z.of_nat (16 * k0 + tot)) ->
+  (* dirlink's TIGHTENED range clause: no disturbed region *)
+  (forall x : nat,
+     file_byte data' x
+     = if decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat)
+       then dirent_bytes (de_of_name inum s) !!! (x - 16 * k0)%nat
+       else file_byte data x) ->
+  dir_ok nib dn data ->
+  dir_ok nib dn' data'.
+Proof.
+  intros Hnrec Hk0 Htot Hinum Hty Hsz Hrng Hok Hdir'.
+  assert (Hdir : bv_unsigned (di_type dn) = T_DIR_z)
+    by (rewrite <- Hty; exact Hdir').
+  specialize (Hok Hdir).
+  assert (Hsznn : 0 <= bv_unsigned (di_size dn))
+    by exact (proj1 (bv_unsigned_in_range _ (di_size dn))).
+  assert (Hsznn' : 0 <= bv_unsigned (di_size dn'))
+    by exact (proj1 (bv_unsigned_in_range _ (di_size dn'))).
+  destruct (dir_nrec_range (bv_unsigned (di_size dn)) Hsznn) as [Hnr1 Hnr2].
+  destruct (dir_nrec_range (bv_unsigned (di_size dn')) Hsznn') as [Hnr1' Hnr2'].
+  rewrite <- Hnrec in Hnr1, Hnr2.
+  assert (Hk0le : (k0 <= nrec)%nat) by (rewrite Hk0; apply dir_slot_le).
+  (* THE COUNT ARITHMETIC: at most one more record, and only on a FULL
+     write at the very end. *)
+  assert (Hcount : (nrec <= dir_nrec (bv_unsigned (di_size dn')))%nat
+                   /\ (dir_nrec (bv_unsigned (di_size dn')) = nrec
+                       \/ (dir_nrec (bv_unsigned (di_size dn')) = S nrec
+                           /\ k0 = nrec /\ tot = 16%nat))) by lia.
+  destruct Hcount as [Hcle Hcalt].
+  intros k Hk Hlive.
+  (* the two inum bytes of a record OTHER than [k0] are untouched *)
+  assert (Hagree : forall q : nat, q <> k0 -> dir_inum data' q = dir_inum data q).
+  { intros q Hq. unfold dir_inum.
+    rewrite (Hrng (16 * q)%nat). rewrite (Hrng (16 * q + 1)%nat).
+    rewrite decide_False; [| lia]. rewrite decide_False; [| lia]. reflexivity. }
+  destruct (Nat.eq_dec k k0) as [Hkk | Hkn].
+  - (* ======== THE WRITTEN SLOT ======== *)
+    subst k.
+    destruct tot as [| tot1].
+    + (* nothing written: [data'] IS [data], and the size did not move *)
+      assert (Hag0 : dir_inum data' k0 = dir_inum data k0).
+      { unfold dir_inum.
+        rewrite (Hrng (16 * k0)%nat). rewrite (Hrng (16 * k0 + 1)%nat).
+        rewrite decide_False; [| lia]. rewrite decide_False; [| lia].
+        reflexivity. }
+      rewrite Hag0. unfold dir_live in Hlive. rewrite Hag0 in Hlive.
+      apply Hok; [lia | exact Hlive].
+    + destruct tot1 as [| tot2].
+      * (* ---- tot = 1: only the LOW byte is new ---- *)
+        (* a one-byte write cannot have grown the record count, so the slot
+           is a genuine MIDDLE slot and [dir_slot_free] applies *)
+        assert (Hk0n : (k0 < nrec)%nat) by lia.
+        assert (Hfree : dir_inum data k0 = bv_0 16)
+          by (rewrite Hk0; apply dir_slot_free; rewrite <- Hk0; exact Hk0n).
+        assert (Hhi : file_byte data' (16 * k0 + 1)%nat = NUL).
+        { rewrite (Hrng (16 * k0 + 1)%nat). rewrite decide_False; [| lia].
+          rewrite <- dir_inum_byte1. rewrite Hfree. apply nth_byte_bv0. }
+        assert (Hlo : file_byte data' (16 * k0)%nat = nth_byte inum 0%nat).
+        { rewrite (Hrng (16 * k0)%nat). rewrite decide_True; [| lia].
+          replace (16 * k0 - 16 * k0)%nat with 0%nat by lia.
+          rewrite (dirent_bytes_inum_t (de_of_name inum s) 0%nat ltac:(lia)).
+          reflexivity. }
+        rewrite dir_inum_unsigned. rewrite Hhi. rewrite Hlo.
+        assert (HNUL : bv_unsigned NUL = 0) by (vm_compute; reflexivity).
+        rewrite HNUL.
+        rewrite nth_byte_unsigned.
+        change (Z.of_N (8 * N.of_nat 0)) with 0.
+        rewrite Z.shiftr_0_r.
+        pose proof (Z.mod_pos_bound (bv_unsigned inum) (2 ^ 8) ltac:(lia)) as Hmb.
+        pose proof (Z.mod_le (bv_unsigned inum) (2 ^ 8)
+                      (proj1 (bv_unsigned_in_range _ inum)) ltac:(lia)) as Hml.
+        lia.
+      * (* ---- tot >= 2: the whole inum halfword is new ---- *)
+        assert (Hrec : dir_inum data' k0 = inum).
+        { rewrite (dir_inum_of_two data' k0 (de_of_name inum s)); [reflexivity |].
+          intros jj Hjj. rewrite (Hrng (16 * k0 + jj)%nat).
+          rewrite decide_True; [| lia].
+          replace (16 * k0 + jj - 16 * k0)%nat with jj by lia. reflexivity. }
+        rewrite Hrec. exact Hinum.
+  - (* ======== ANY OTHER RECORD: untouched, and below [nrec] ======== *)
+    rewrite (Hagree k Hkn).
+    unfold dir_live in Hlive. rewrite (Hagree k Hkn) in Hlive.
+    apply Hok; [lia | exact Hlive].
+Qed.
 
 (* ...and the way a CONSUMER uses it: namex knows the type, off the very
    [lh]/[li] test that refutes panic("dirlookup not DIR"). *)

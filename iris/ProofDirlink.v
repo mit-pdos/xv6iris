@@ -943,8 +943,13 @@ Section ProofDirlinkMain.
   Proof.
     cbv beta delta [wp_dirlink_sconf_body].
     intros pcE pjv nb ret_tgt nrec s k0 HK Htype Hbmcov Hszb Hinums Hfit
-           Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hbmgeo Hpkc
+           Hlg Hbmwf Hholes Haddrs Hsz31 Hist0 Hiblk Hiblog Hdinb Hcinb Hbmgeo Hpkc
            Hsize Hbms0 Hbmsc Hbmsl Hcovb Hiregb Hnc Hj Hgs Ha0 Ha2 Heb.
+    (* [Hcinb] -- the LINKED inum's range -- is NOT used below: dirlink's
+       [sh] stores sixteen bits whatever they are.  It rides in the contract
+       for the writer-side [DirView.dir_ok] re-park (fs-icache.md §15.1(i),
+       fs-sysfile item 3); see SpecDirlink.v's header. *)
+    clear Hcinb.
     destruct (dl_kb K HK) as (HK10 & HKdl & HKrd & HKip & HKwi & HK2 & HKsum).
     assert (Hpjd : proc_addr j = pjv) by reflexivity.
     (* ---- numeric preliminaries, all over plain Z/nat ---- *)
@@ -1542,8 +1547,7 @@ Section ProofDirlinkMain.
       iDestruct (cpu_own_transport CIDip CIDf 0%nat eb (proc_addr j) C b
                    ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
       iSpecialize ("Hcont" $! CIDf with "[%]"); [wp_next_chain |].
-      iApply ("Hcont" $! mf true bm data dn dn0 nn uu 0%nat 0%nat
-                (fun _ => bv_0 8) with
+      iApply ("Hcont" $! mf true bm data dn dn0 nn uu 0%nat with
                 "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
                  Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%]").
       { exact Hcsf. }
@@ -1650,7 +1654,7 @@ Section ProofDirlinkMain.
                      ∀ (mf : regfile) (found : bool)
                        (bm' : blkmap) (data' : nat -> list (bv 8))
                        (dn' dn0' : dinode) (n' : nat) (used' : gset Z)
-                       (tot dist : nat) (dstb : nat -> bv 8),
+                       (tot : nat),
                          ⌜callee_saved m mf⌝ -∗
                          sie_cap_gpr mf K b (proc_addr j) -∗
                          cpu_own 0 eb (proc_addr j) C b -∗
@@ -1677,7 +1681,7 @@ Section ProofDirlinkMain.
                                 /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
                                 /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
                                 /\ used' ⊆ used
-                                /\ tot = 0%nat /\ dist = 0%nat
+                                /\ tot = 0%nat
                            else dir_first data nrec s = None
                                 /\ used ⊆ used'
                                 /\ blkmap_wf cov logstart bm'
@@ -1688,18 +1692,13 @@ Section ProofDirlinkMain.
                                 /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
                                 /\ dn0' = dn'
                                 /\ (tot <= 16)%nat
-                                /\ (dist <= BSIZE)%nat
-                                /\ (tot = 16%nat -> dist = 0%nat)
                                 /\ (forall x : nat,
                                       file_byte data' x
                                       = if decide ((16 * k0 <= x)%nat
                                                    /\ (x < 16 * k0 + tot)%nat)
                                         then dirent_bytes (de_of_name inum s)
                                                !!! (x - 16 * k0)%nat
-                                        else if decide ((16 * k0 + tot <= x)%nat
-                                                        /\ (x < 16 * k0 + tot + dist)%nat)
-                                             then dstb (x - (16 * k0 + tot))%nat
-                                             else file_byte data x)
+                                        else file_byte data x)
                                 /\ ((mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
                                      /\ tot = 16%nat)
                                     \/ (mf !!! Regidx Ra0
@@ -2040,8 +2039,15 @@ Section ProofDirlinkMain.
                         Hop [-]").
         iIntros (CIDwi Hswi mwi tot bm' data' dn' dn0' nn wrote dist dstb P' used')
           "%Hcswi %Hused %Hwf' %Hholes' %Haddrs' %Hsz' %Hcov' %Hdistb %Hdist0
-           %Hrange %Htie %Harm %Hbud %Hupt Hcg Hcnt Hpc Hppid Hidev Hiinum
+           %Hdistk %Hrange %Htie %Harm %Hbud %Hupt Hcg Hcnt Hpc Hppid Hidev Hiinum
            Hmeta Hmap Hblocks Hsbi Hsbs Hsbb Hbmr Hdat Hsrc Hbsl Hop".
+        (* THE DISTURBED REGION IS EMPTY (fs-icache.md §15.1(i)): dirlink's
+           source is its own stack record, so writei ran on the KERNEL arm
+           and [dist = 0].  Substituting it here is what turns the range
+           clause below from three-way into two-way -- and with it, dir-wf
+           over a middle-slot link from underivable into derivable. *)
+        pose proof (Hdistk eq_refl) as Hdist_zero.
+        subst dist.
         iEval (rewrite HV6a2) in "Hsrc".
         assert (Hpcwi : ret_pc (V6 !!! Regidx Rra : mword 64)
                         = mword_of_int (DK + 0x90)) by (rewrite HV6ra; pcw).
@@ -2170,7 +2176,7 @@ Section ProofDirlinkMain.
         iDestruct (cpu_own_transport CIDwi CIDf 0%nat eb (proc_addr j) C b
                      ltac:(wp_next_chain) with "Hcnt") as "Hcnt".
         iSpecialize ("Hqc" $! CIDf with "[%]"); [wp_next_chain |].
-        iApply ("Hqc" $! mf false bm' data' dn' dn0' nn used' tot dist dstb with
+        iApply ("Hqc" $! mf false bm' data' dn' dn0' nn used' tot with
                   "[%] Hcg Hcnt Hpc Hidev Hiinum Hmeta Hmap Hblocks Hnm Hsbi
                    Hsbs Hsbb Hbmr Hdat Hppid Hbsl Hislot [%] Hop [%]").
         { exact Hcsf. }
@@ -2185,14 +2191,15 @@ Section ProofDirlinkMain.
           split; [exact Hdn' |].
           split; [exact Hdn0' |].
           split; [exact Htotle |].
-          split; [exact Hdistb |].
-          split; [exact Hdist0 |].
           split.
           - intro x. rewrite (Hrange x).
             destruct (decide ((16 * k0 <= x)%nat /\ (x < 16 * k0 + tot)%nat))
-              as [[Hxl Hxr] | Hxn]; [| reflexivity].
-            rewrite (Htie eq_refl (x - 16 * k0)%nat
-                       (dl_subrng (16 * k0)%nat x tot Hxl Hxr)). reflexivity.
+              as [[Hxl Hxr] | Hxn].
+            + rewrite (Htie eq_refl (x - 16 * k0)%nat
+                         (dl_subrng (16 * k0)%nat x tot Hxl Hxr)). reflexivity.
+            + (* THE MIDDLE TEST IS DEAD: [dist = 0] on the kernel arm, so
+                 the disturbed window [16*k0+tot, 16*k0+tot) is empty *)
+              rewrite decide_False; [reflexivity | lia].
           - rewrite Ha0f HV10a0.
             destruct (decide (tot = 16%nat)) as [Hte | Htn].
             + left. split; [reflexivity | exact Hte].
@@ -2391,7 +2398,7 @@ Section ProofDirlinkMain.
                 ∀ (mf : regfile) (found : bool)
                   (bm' : blkmap) (data' : nat -> list (bv 8))
                   (dn' dn0' : dinode) (n' : nat) (used' : gset Z)
-                  (tot dist : nat) (dstb : nat -> bv 8),
+                  (tot : nat),
                     ⌜callee_saved m mf⌝ -∗
                     sie_cap_gpr mf K b (proc_addr j) -∗
                     cpu_own 0 eb (proc_addr j) C b -∗
@@ -2418,7 +2425,7 @@ Section ProofDirlinkMain.
                            /\ mf !!! Regidx Ra0 = (mword_of_int (-1) : mword 64)
                            /\ bm' = bm /\ data' = data /\ dn' = dn /\ dn0' = dn0
                            /\ used' ⊆ used
-                           /\ tot = 0%nat /\ dist = 0%nat
+                           /\ tot = 0%nat
                       else dir_first data nrec s = None
                            /\ used ⊆ used'
                            /\ blkmap_wf cov logstart bm'
@@ -2429,18 +2436,13 @@ Section ProofDirlinkMain.
                            /\ dn' = wi_dinode dn bm' (16 * k0)%nat tot
                            /\ dn0' = dn'
                            /\ (tot <= 16)%nat
-                           /\ (dist <= BSIZE)%nat
-                           /\ (tot = 16%nat -> dist = 0%nat)
                            /\ (forall x : nat,
                                  file_byte data' x
                                  = if decide ((16 * k0 <= x)%nat
                                               /\ (x < 16 * k0 + tot)%nat)
                                    then dirent_bytes (de_of_name inum s)
                                           !!! (x - 16 * k0)%nat
-                                   else if decide ((16 * k0 + tot <= x)%nat
-                                                   /\ (x < 16 * k0 + tot + dist)%nat)
-                                        then dstb (x - (16 * k0 + tot))%nat
-                                        else file_byte data x)
+                                   else file_byte data x)
                            /\ ((mf !!! Regidx Ra0 = (mword_of_int 0 : mword 64)
                                 /\ tot = 16%nat)
                                \/ (mf !!! Regidx Ra0

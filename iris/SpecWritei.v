@@ -69,6 +69,24 @@
    clause usable: without them "the rest of the file is untouched" would be
    unavailable at every offset.
 
+   ...AND THE REGION IS EMPTY ON THE KERNEL ARM (fs-icache.md §15.1(i)).
+   The partially-copied chunk exists only because [either_copyin] can FAIL
+   part-way, and it can only fail on the USER arm: [SpecEitherCopyin]'s
+   post is [r = 0 \/ r = -1] when [user], but a bare [r = 0] when not --
+   the kernel path is a [memmove] with no fault to take.  So the -1 break
+   is DEAD for [user = false] and the third clause
+
+     user = false -> dist = 0
+
+   is provable rather than merely plausible.  It is what lets dirlink's
+   middle-slot write claim EXACTNESS above the record (the up-to-64
+   following records the three-way clause otherwise concedes), and hence
+   what lets a writer re-park [DirView.dir_ok] after a dirlink -- create's
+   obligation in the fs-sysfile campaign.  Stated as its own clause rather
+   than by case-splitting the range clause: consumers on the user arm are
+   untouched, and a kernel-arm consumer rewrites [dist] to 0 and reads the
+   two-way clause off the same line.
+
    WHAT THE "BYTE WRITTEN" IS, AND WHY IT IS AN EXISTENTIAL.  On the KERNEL
    arm the source bytes are the caller's own and the clause pins them.  On
    the USER arm they are copied out of user memory, about which the kernel
@@ -408,6 +426,9 @@ Definition wp_writei_sconf_body
          header. *)
       ⌜(dist <= BSIZE)%nat⌝ -∗
       ⌜(tot = n)%nat -> dist = 0%nat⌝ -∗
+      (* ...and EMPTY OUTRIGHT on the KERNEL arm: either_copyin cannot fail
+         there, so the committed partial chunk never exists.  §15.1(i). *)
+      ⌜user = false -> dist = 0%nat⌝ -∗
       (* THE RANGE CLAUSE -- the whole effect of the write, in one line *)
       ⌜forall k : nat,
          file_byte data' k

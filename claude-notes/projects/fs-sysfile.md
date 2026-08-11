@@ -22,9 +22,11 @@ campaign file.c is 7/7 and sysfile.c is 15/16 (sys_exec pending).
    strengthen SpecWritei's kernel arm, then re-derive SpecDirlink's
    third arm's range clause. Without it create cannot re-park its
    directory (`dir_ok` underivable on the middle-slot arm).
+   **DONE in S2.**
 3. **The linked-inum range premise** is missing from SpecDirlink
    (the existing one is the DIRECTORY's inum); the writer-side dir_ok
    proof adds `bv_unsigned inum < 16*nib` for the linked child.
+   **DONE in S2.**
 4. **The stat hole**: SpecStati.stat_at omits bytes 12..15; filestat
    owns them separately to copyout all 24.
 5. **The fd-type fact**: FileInv's payload is `inode_ref` only on
@@ -111,15 +113,41 @@ Mirror evidence: all 45 files compiled, exit 0, no `Error` in any log
 CodeIreclaim, CodeUsertrap, CodeBalloc) recompiled exit 0 against the
 new shards. `lemma_diff.py --ref HEAD`: 45 files, CLEAN.
 
+## S2 — the dist=0 retrofit LANDED (inheritance items 2+3, and item 4's bonus)
+
+Full write-up in `design/fs-icache.md` §15.2. Headlines:
+
+- **The D1 kernel-arm verdict is EXACTNESS CONFIRMED.** either_copyin's
+  kernel post is a bare `⌜r = 0⌝` (SpecEitherCopyin.either_copyin_post),
+  so writei's committed-partial-chunk break at +0xb0 is unreachable for
+  `user = false`. No other mechanism touches bytes above `off+tot`: the
+  bmap-returns-0 break stops before any copy, and both framed exits pass
+  `dist := 0%nat` literally. §15.1(i)'s ruling stands as written.
+- SpecWritei gains ONE clause, `⌜user = false -> dist = 0%nat⌝`.
+  SpecDirlink drops `dist`/`dstb` from its postcondition binder and its
+  range clause is now two-way. SpecDirlink gains the linked-inum premise
+  (unused by dirlink itself — `clear`ed with a comment).
+- **`DirView.dir_ok_dirlink` is proved**, Closed under the global
+  context. §15.1(i)'s obstacle is gone; S5's create can re-park.
+- Gate: EXIT=0, **1021 vo**, zero `Error`. lemma_diff CLEAN over the 5
+  changed files. Print Assumptions on `Writei.wp_writei_sconf` and
+  `Dirlink.wp_dirlink_sconf`: 5 platform axioms + funext, each.
+
+TRAP FOR LATER STAGES (new): the mirror's Code `.vo` from before S1's
+shard edits are STALE and `make` will not notice — a `one.sh` on any
+proof over a touched Code file dies with *"makes inconsistent
+assumptions over library xv6iris.KernelDecodeNN"*. Run `full.sh` once
+after a git-sync before iterating.
+
 ## The stage ladder
 
 - **S1** (agent): the DECODE stage — 13 Code files (the 12 targets +
   CodeSysExec for the future) via tools/gen_code.py, FULL-generator-
   into-scratch recipe (durable-notes; never --only), manifest rows,
   all 32 shards, scratch-verified, near-full rebuild lands with it.
-- **S2** (agent): the dist=0 retrofit — SpecWritei kernel arm +
-  ProofWritei + SpecDirlink third-arm re-derivation + the linked-inum
-  premise (items 2+3). Touches proven files; ends in a full gate.
+- **S2** (agent) **— LANDED**: the dist=0 retrofit — SpecWritei kernel
+  arm + ProofWritei + SpecDirlink third-arm re-derivation + the
+  linked-inum premise (items 2+3) + `DirView.dir_ok_dirlink`.
 - **S3** (agent): filestat (stat_at + the hole + copyout) and
   filewrite (the loop over writei inside its own transaction;
   fd-type premise per item 5). file.c 7/7.
