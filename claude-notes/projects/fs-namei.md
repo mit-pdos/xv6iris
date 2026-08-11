@@ -52,15 +52,71 @@ usual near-full rebuild lands with it.
    branch writes `name[len] = 0` while the `len >= 14` branch writes no
    terminator at all — `bname_of_buf` / `skipelem_name_view` cover both
    with one canonical view.
-3. **Directory-inode contracts** — dirlookup/dirlink read and write
-   the directory's DATA blocks THROUGH readi/writei's proven contracts
-   (xv6's own loops call readi/writei per 16-byte record with kernel
-   destinations) — so the campaign stacks on the inode layer, not on
-   bread. The directory's content as a pure `gmap name inum` view
-   derived from the data function `data : nat -> list (bv 8)` the
-   bundle carries — a DIRECTORY-typed refinement of inode_ok's data,
-   minted by ilock's postcondition when di_type = T_DIR (a new pure
-   layer, not a new resource).
+3. **Directory-inode contracts** — DESIGNED (coordinator, pre-N3).
+   dirlookup/dirlink read and write the directory's DATA blocks THROUGH
+   readi/writei's proven contracts (xv6's own loops call readi/writei
+   per 16-byte record with kernel destinations) — the campaign stacks
+   on the inode layer, not on bread.
+
+   **The record view (pure, over `InodeInv.file_byte data`):**
+   - `dir_inum data k : bv 16` — the k-th record's inum halfword,
+     assembled little-endian from `file_byte data (16k)` and `(16k+1)`
+     (DinodeEnc.half_bytes's inverse direction; state it so
+     `dirent_bytes_inum` connects it to an encoded record).
+   - `dir_name data k : nat -> bv 8 := fun j => file_byte data (16k+2+j)`
+     — the name bytes as a FUNCTION (namecmp's g), canonicalised by
+     `bname 14`.
+   - `dir_live data k := dir_inum data k ≠ 0`; `dir_match data k s :=
+     dir_live ∧ bname 14 (dir_name data k) = s`.
+   - `dir_first data nrec s : option nat` — the LEAST k < nrec with
+     `dir_match` (dirlookup returns the first hit; nothing proven
+     forbids duplicate names, so first-match is the honest semantics).
+     nrec = size/16.
+   - **SCOPE RULING: no `gmap name inum` view this campaign.** namex
+     only needs dir_first's two arms; the gmap refinement (which needs
+     a no-duplicates directory invariant nobody has minted) belongs to
+     the sysfile/end-to-end effort. Recorded as a future frontier.
+
+   **dirlookup's contract (172B):** premises — `di_type dn = T_DIR`
+   (panic "dirlookup not DIR" refuted by premise, same pattern as
+   ilock's holder arms), **`16 | bv_unsigned (di_size dn)`** (the
+   directory-size granularity invariant: under it every loop readi has
+   off+16 ≤ size, so kernel-arm readi returns EXACTLY 16 and panic
+   "dirlookup read" is dead — mkfs and dirlink both only ever grow
+   directories by whole records), plus readi's own threading
+   (bm_covers, size ≤ MAXFILE*BSIZE, log_geom/blkmap_wf) and iget's
+   (pool shape / live panic arm, icache invariant, budget-free).
+   Resources: the holder's locked-dir bundle (i_dev, i_inum,
+   inode_meta, inode_map, inode_blocks — readi's verbatim), the
+   caller's 14-byte name buffer (any dfrac, handed back), the de
+   scratch is dirlookup's own stack, `poff` two-armed (null ⇒ emp,
+   else a 4-byte cell). Postcondition arms:
+   - FOUND: `dir_first data nrec s = Some k`, a0 = iget's nonzero
+     return for `(dev, dir_inum data k)` with its `inode_ref` (iget's
+     postcondition verbatim), poff (if non-null) holds 16k.
+   - NOT FOUND: `dir_first data nrec s = None`, a0 = 0, everything
+     returned unchanged.
+   The dir bundle comes back untouched either way (readi modifies
+   nothing; iget touches only icache state).
+
+   **dirlink's contract (170B):** runs INSIDE a transaction (its
+   writei can allocate via bmap → log_write), so it threads writei's
+   log resources verbatim, plus dirlookup's premises and iput's
+   (found-arm iputs the child). Postcondition arms:
+   - FOUND (name present): a0 = -1, directory data UNCHANGED, the
+     iget'd child reference already respent by iput (net zero icache
+     resources — thread iput's budget interval).
+   - APPENDED: a0 = 0, the record written at slot k0 = the first free
+     slot (`dir_first`-style least k with ¬dir_live, else nrec), via
+     writei's postcondition: data' agrees with data off [16k0,16k0+16)
+     and holds `dirent_bytes (de_of_name inum s)` there — dirlink
+     strncpy-pads, so the stored record IS `name_pad` (DirentEnc's
+     `de_of_name`/`de_padded` are exactly this). If k0 = nrec, size
+     grows to size+16 (writei's size-update arm) — premise
+     `size + 16 ≤ MAXFILE*BSIZE` kills panic("dirlink") the same way
+     granularity kills the read panic.
+   Also needs the caller's name buffer wf: `length s ≤ 14`, nonul
+   (namex's skipelem output satisfies both — `skipelem_elem_wf`).
 4. **ialloc + the image-wf tie** — ialloc scans dinode blocks via
    bread (NOT through the icache) and claims a type-0 slot via
    dinode_at + wp_log_write_au (iupdate's AU seam, already landed);
