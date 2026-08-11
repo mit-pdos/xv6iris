@@ -308,7 +308,7 @@ Section ProofKkill.
       { rewrite (rget_ne (CID := CIDf) Macq Rs1 ltac:(vm_compute; discriminate)) HA9.
         apply kk_pid_off. }
       iApply (wp_clw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x26)) Ra5 Rs1
-                (mword_of_int 48 : mword 12) Macq av pidc false (dqm := DfracOwn (1/2))
+                (mword_of_int 48 : mword 12) Macq (trap_res b + av)%nat pidc false (dqm := DfracOwn (1/2))
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi26 [Hpidhalf] [-]").
       { iEval (rewrite Hea26). iExact "Hpidhalf". }
@@ -338,7 +338,7 @@ Section ProofKkill.
         assert (Hcmp28r : eq_vec (rget (CID := CIDf) M26 Ra5) (rget (CID := CIDf) M26 Rs2) = true)
           by (rewrite Hrg28_15 Hrg28_18; exact Hcmp28).
         iApply (wp_beq_taken_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x28))
-                  (mword_of_int 22 : mword 13) Rs2 Ra5 M26 av false
+                  (mword_of_int 22 : mword 13) Rs2 Ra5 M26 (trap_res b + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp28r ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi28 [-]").
@@ -354,7 +354,7 @@ Section ProofKkill.
                    ⌜ Mr !!! Regidx Rs1 = proc_addr k /\
                      Mr !!! Regidx csp_rs1 = spd /\
                      kk_cs_rest Mr mb ⌝ -∗
-                   sie_cap_gpr (CID := CIDf) Mr av false pme -∗
+                   sie_cap_gpr (CID := CIDf) Mr (trap_res b + av)%nat false pme -∗
                    pc_is (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x4a)) -∗
                    locked γk CIDf -∗ proc_lock_res γs γk (proc_addr k) -∗
                    WP (LoopE gen_id CIDf : expr riscv_lang))%I
@@ -367,7 +367,7 @@ Section ProofKkill.
           (* +0x4a c.mv a0,s1 *)
           assert (Hrgr9 : rget (CID := CIDf) Mr Rs1 = Mr !!! Regidx Rs1) by (rgne; reflexivity).
           iApply (wp_cmv_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x4a)) Ra0 Rs1
-                    Mr av false ltac:(vm_compute; discriminate) ltac:(rdok)
+                    Mr (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                     with "Hcg Hpc Hi4a [-]").
           iApply wp_next_off_intro. iIntros "Hcg Hpc".
           iEval (rewrite Hrgr9) in "Hcg".
@@ -378,7 +378,7 @@ Section ProofKkill.
           iEval (rewrite Hpp4c) in "Hpc".
           (* +0x4c jal ra,release *)
           iApply (wp_jal_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x4c)) Rra
-                    (mword_of_int 2091906 : mword 21) Mr4a av false
+                    (mword_of_int 2091906 : mword 21) Mr4a (trap_res b + av)%nat false
                     ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi4c [-]").
           iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -404,6 +404,17 @@ Section ProofKkill.
           assert (Hlka2 : add_vec (Mr4c !!! Regidx Ra0)
                             (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k)
             by (rewrite HMr4c_a0; apply addv_sext0).
+          (* This is a NESTED release (level [S lvl]), so its ENTRY index
+             carries the trap reserve AT ITS OWN EXIT ARM -- and the spec
+             spells that arm generically, as [match lvl with O => eb | S _ =>
+             false end], where this proof carries the equal-but-syntactically-
+             different local [b].  The two agree by [Hbmatch] (from
+             [cpu_own_eb_agree]), but only the RESERVE summand needs the spec's
+             spelling, so move [Hcg]'s index over to it and leave the rest of
+             the context on [b]; the [rewrite -Hbmatch] after the [iApply] then
+             brings the release's [match lvl]-phrased continuation back to [b],
+             which is what the code after the call is written against. *)
+          iEval (rewrite Hbmatch) in "Hcg".
           iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
                     (proc_lock_res γs γk (proc_addr k)) Mr4c lvl eb pme C av
                     Hlka2 ltac:(lia)
@@ -445,7 +456,7 @@ Section ProofKkill.
         iPoseProof (kki_44 with "Htext") as "Hi44".
         iPoseProof (kki_46 with "Htext") as "Hi46".
         iApply (wp_cli_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x3e)) Ra5
-                  (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) M26 av false
+                  (mword_of_int 1 : mword 6) (mword_of_int 1 : mword 64) M26 (trap_res b + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   with "Hcg Hpc Hi3e [-]").
@@ -467,7 +478,7 @@ Section ProofKkill.
         { rewrite (rget_ne (CID := CIDf) M3e Rs1 ltac:(vm_compute; discriminate)) HC9.
           apply kk_killed_off. }
         iApply (wp_csw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x40)) Ra5 Rs1
-                  (mword_of_int 40 : mword 12) M3e av kl false
+                  (mword_of_int 40 : mword 12) M3e (trap_res b + av)%nat kl false
                   with "Hcg Hpc Hi40 [Hkilled] [-]").
         { iEval (rewrite Hea40). iExact "Hkilled". }
         iApply wp_next_off_intro. iIntros "Hcg Hpc Hkilled".
@@ -481,7 +492,7 @@ Section ProofKkill.
         { rewrite (rget_ne (CID := CIDf) M3e Rs1 ltac:(vm_compute; discriminate)) HC9.
           apply kk_state_off. }
         iApply (wp_clw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x42)) Ra4 Rs1
-                  (mword_of_int 24 : mword 12) M3e av st false (dqm := DfracOwn 1)
+                  (mword_of_int 24 : mword 12) M3e (trap_res b + av)%nat st false (dqm := DfracOwn 1)
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi42 [Hpst] [-]").
         { iEval (rewrite Hea42). iExact "Hpst". }
@@ -494,7 +505,7 @@ Section ProofKkill.
         iEval (rewrite Hpp44) in "Hpc".
         (* ---- +0x44 c.li a5,2 ---- *)
         iApply (wp_cli_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x44)) Ra5
-                  (mword_of_int 2 : mword 6) (mword_of_int 2 : mword 64) M42 av false
+                  (mword_of_int 2 : mword 6) (mword_of_int 2 : mword 64) M42 (trap_res b + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(apply bv_eq; vm_compute; reflexivity)
                   with "Hcg Hpc Hi44 [-]").
@@ -524,7 +535,7 @@ Section ProofKkill.
           assert (Hcmp46r : eq_vec (rget (CID := CIDf) M44 Ra4) (rget (CID := CIDf) M44 Ra5) = true)
             by (rewrite Hrg46_14 Hrg46_15; exact Hcmp46).
           iApply (wp_beq_taken_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x46))
-                    (mword_of_int 26 : mword 13) Ra5 Ra4 M44 av false
+                    (mword_of_int 26 : mword 13) Ra5 Ra4 M44 (trap_res b + av)%nat false
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmp46r ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi46 [-]").
@@ -541,7 +552,7 @@ Section ProofKkill.
           iPoseProof (kki_64 with "Htext") as "Hi64".
           (* +0x60 c.li a5,3 *)
           iApply (wp_cli_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x60)) Ra5
-                    (mword_of_int 3 : mword 6) (mword_of_int 3 : mword 64) M44 av false
+                    (mword_of_int 3 : mword 6) (mword_of_int 3 : mword 64) M44 (trap_res b + av)%nat false
                     ltac:(vm_compute; discriminate) ltac:(rdok)
                     ltac:(apply bv_eq; vm_compute; reflexivity)
                     with "Hcg Hpc Hi60 [-]").
@@ -563,7 +574,7 @@ Section ProofKkill.
           { rewrite (rget_ne (CID := CIDf) M60 Rs1 ltac:(vm_compute; discriminate)) HE9.
             apply kk_state_off. }
           iApply (wp_csw_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x62)) Ra5 Rs1
-                    (mword_of_int 24 : mword 12) M60 av st false
+                    (mword_of_int 24 : mword 12) M60 (trap_res b + av)%nat st false
                     with "Hcg Hpc Hi62 [Hpst] [-]").
           { iEval (rewrite Hea62). iExact "Hpst". }
           iApply wp_next_off_intro. iIntros "Hcg Hpc Hpst".
@@ -588,7 +599,7 @@ Section ProofKkill.
             by (apply bv_eq; vm_compute; reflexivity).
           iApply (wp_cj_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x64))
                     (sign_extend' 21 (concat_vec (mword_of_int 2035 : mword 11) ('b"0")))
-                    M60 av false ltac:(rewrite Htgt4a; vm_compute; reflexivity)
+                    M60 (trap_res b + av)%nat false ltac:(rewrite Htgt4a; vm_compute; reflexivity)
                     with "Hcg Hpc Hi64 [-]").
           iApply wp_next_off_intro. iNext. iIntros "Hcg Hpc".
           iEval (rewrite Htgt4a) in "Hpc".
@@ -598,7 +609,7 @@ Section ProofKkill.
           assert (Hcmp46r : eq_vec (rget (CID := CIDf) M44 Ra4) (rget (CID := CIDf) M44 Ra5) = false)
             by (rewrite Hrg46_14 Hrg46_15; exact Hcmp46).
           iApply (wp_beq_fall_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x46))
-                    (mword_of_int 26 : mword 13) Ra5 Ra4 M44 av false
+                    (mword_of_int 26 : mword 13) Ra5 Ra4 M44 (trap_res b + av)%nat false
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     Hcmp46r with "Hcg Hpc Hi46 [-]").
           iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -615,7 +626,7 @@ Section ProofKkill.
         assert (Hcmp28r : eq_vec (rget (CID := CIDf) M26 Ra5) (rget (CID := CIDf) M26 Rs2) = false)
           by (rewrite Hrg28_15 Hrg28_18; exact Hcmp28).
         iApply (wp_beq_fall_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x28))
-                  (mword_of_int 22 : mword 13) Rs2 Ra5 M26 av false
+                  (mword_of_int 22 : mword 13) Rs2 Ra5 M26 (trap_res b + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                   Hcmp28r with "Hcg Hpc Hi28 [-]").
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -634,7 +645,7 @@ Section ProofKkill.
         (* +0x2c c.mv a0,s1 *)
         assert (Hrg2c : rget (CID := CIDf) M26 Rs1 = M26 !!! Regidx Rs1) by (rgne; reflexivity).
         iApply (wp_cmv_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x2c)) Ra0 Rs1
-                  M26 av false ltac:(vm_compute; discriminate) ltac:(rdok)
+                  M26 (trap_res b + av)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi2c [-]").
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
         iEval (rewrite Hrg2c) in "Hcg".
@@ -645,7 +656,7 @@ Section ProofKkill.
         iEval (rewrite Hpp2e) in "Hpc".
         (* +0x2e jal ra,release *)
         iApply (wp_jal_s_sconf (CID := CIDf) (mword_of_int (KernelSyms.kkill + 0x2e)) Rra
-                  (mword_of_int 2091936 : mword 21) M2c av false
+                  (mword_of_int 2091936 : mword 21) M2c (trap_res b + av)%nat false
                   ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi2e [-]").
         iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -680,6 +691,9 @@ Section ProofKkill.
         assert (Hlka1 : add_vec (M2e !!! Regidx Ra0)
                           (sign_extend' 64 (mword_of_int 0 : mword 12)) = proc_addr k)
           by (rewrite HM2e_a0; apply addv_sext0).
+        (* Nested release: same [b] vs [match lvl] reserve-spelling step as the
+           +0x4c site above -- see the comment there. *)
+        iEval (rewrite Hbmatch) in "Hcg".
         iApply (Release.wp_release_sconf (CID := CIDf) γk (proc_addr k) "proc"%string
                   (proc_lock_res γs γk (proc_addr k)) M2e lvl eb pme C av
                   Hlka1 ltac:(lia)

@@ -566,6 +566,46 @@ Section BioInv.
       iExFalso. iApply (word4_pointsto_excl with "Hvld' Hvld").
   Qed.
 
+  (* THE SAME SWAP, with the withdrawn bundle already OUT from under the
+     [▷] that [iInv] hands back.  brelse's park runs inside the +0x02
+     store's atomic update and needs the reference NOW, so it must strip
+     that later -- and the cost of doing so is proportional to the Iris
+     CONTEXT it is done in, not to the bundle: the [iMod "Hpark"] at
+     brelse's store measured 34 s, while the identical [Timeless] search on
+     the identical bundle costs 0.4 s here, where the context is five
+     hypotheses wide.  So the later comes off HERE and the caller writes one
+     [iMod].  (Same family as optimization.md's [iNext] rule: never pay a
+     context-proportional modality step inside a whole-function proof when a
+     lemma can pay it once.) *)
+  Lemma escrow_swap_park_now (E : coPset) bn V k (v : bool)
+      (dev bno : mword 32) (bs : list (bv 8)) :
+    ▷ buf_escrow_body bn V k -∗
+    b_valid (bpa k) ↦₄
+      (if v then (mword_of_int 1 : mword 32) else (mword_of_int 0 : mword 32)) -∗
+    b_dev (bpa k) ↦₄{DfracOwn (1/2)} dev -∗
+    buf_own (bpa k) bno (mword_of_int 0 : mword 32) bs -∗
+    buf_pay bn V k v dev bno bs -∗
+    |={E}=> ▷ buf_escrow_body bn V k ∗
+            (∃ q : Qp,
+               bref_tok bn k q ∗
+               b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
+               b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
+               bown bn k).
+  Proof.
+    iIntros "Hbody Hvld Hdev Hbuf Hpay".
+    iAssert (▷ (buf_escrow_body bn V k ∗
+                (∃ q : Qp,
+                   bref_tok bn k q ∗
+                   b_dev (bpa k) ↦₄{DfracOwn q} dev ∗
+                   b_blockno (bpa k) ↦₄{DfracOwn q} bno ∗
+                   bown bn k)))%I
+      with "[Hbody Hvld Hdev Hbuf Hpay]" as "Hsw".
+    { iNext. iApply (escrow_swap_park bn V k v dev bno bs
+                       with "Hbody Hvld Hdev Hbuf Hpay"). }
+    iDestruct "Hsw" as "[Hbody Hpark]". iMod "Hpark".
+    iModIntro. iSplitL "Hbody"; [iExact "Hbody" | iExact "Hpark"].
+  Qed.
+
   (* (c) the miss path's view: with the authority showing no references, A2
      is impossible, and the bcache-retained dev half refutes A3 (whose dev
      cell is full), so the body IS the parked bundle. *)

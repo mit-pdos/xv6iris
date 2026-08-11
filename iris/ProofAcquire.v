@@ -353,7 +353,7 @@ Section ProofAcquire.
     (* ---- 0x10: c.mv a0,s1 ---- *)
     iPoseProof (aqi_10 with "Htext") as "Hi10".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.acquire + 0x10)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              mp (av - 4)%nat false
+              mp (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
     iApply wp_next_off_intro.
@@ -374,7 +374,7 @@ Section ProofAcquire.
     (* ---- 0x12: jal ra,holding ---- *)
     iPoseProof (aqi_12 with "Htext") as "Hi12".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquire + 0x12)) (mword_of_int 1 : mword 5) (mword_of_int 0x1fff88 : mword 21)
-              B1 (av - 4)%nat false
+              B1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi12 [-]").
     iApply wp_next_off_intro.
@@ -396,7 +396,7 @@ Section ProofAcquire.
       replace (sign_extend' 64 (mword_of_int 0 : mword 12)) with (mword_of_int 0 : mword 64)
         by (apply bv_eq; vm_compute; reflexivity).
       apply kv_addv_zero. }
-    iApply (Holding.wp_holding_lockinv_s_sconf γl lk0 R Tc Dc B2 (av - 4)%nat p
+    iApply (Holding.wp_holding_lockinv_s_sconf γl lk0 R Tc Dc B2 (trap_res b + (av - 4))%nat p
               Hlkb ltac:(lia) Href
               with "Hcg Htext Hpc Hlock HTc [-]").
     iIntros (mh) "HTc Hcg Hpc %Hmh".
@@ -409,7 +409,7 @@ Section ProofAcquire.
     (* ---- 0x16: c.li a4,1 ---- *)
     iPoseProof (aqi_16 with "Htext") as "Hi16".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.acquire + 0x16)) (mword_of_int 14 : mword 5) (mword_of_int 1 : mword 6)
-              (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) mh (av - 4)%nat false
+              (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 1 : mword 6)))) mh (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
               with "Hcg Hpc Hi16 [-]").
     iApply wp_next_off_intro.
@@ -433,7 +433,7 @@ Section ProofAcquire.
       assert (Ha0B3t : neq_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) zero_reg = true)
         by (rewrite HB3a0v Ha0h; vm_compute; reflexivity).
       iApply (wp_cbnez_taken_s_sconf (mword_of_int (KernelSyms.acquire + 0x18)) (mword_of_int 14 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
-                B3 (av - 4)%nat false
+                B3 (trap_res b + (av - 4))%nat false
                 ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                 ltac:(rgne; exact Ha0B3t)
                 ltac:(rewrite Htgt34; vm_compute; reflexivity)
@@ -446,7 +446,7 @@ Section ProofAcquire.
       iPoseProof (aqi_3c with "Htext") as "Hi3c".
       (* +0x34 auipc a0 / +0x38 addi a0 : the message pointer *)
       iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.acquire + 0x34)) (mword_of_int 10 : mword 5) (mword_of_int 6 : mword 20)
-                B3 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+                B3 (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi34 [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
@@ -456,7 +456,7 @@ Section ProofAcquire.
         by (apply bv_eq; vm_compute; reflexivity).
       iEval (rewrite Hpp38) in "Hpc".
       iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.acquire + 0x38)) (mword_of_int 10 : mword 5) (mword_of_int 10 : mword 5)
-                (mword_of_int 0x40c : mword 12) P1 (av - 4)%nat false
+                (mword_of_int 0x40c : mword 12) P1 (trap_res b + (av - 4))%nat false
                 ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi38 [-]").
       iApply wp_next_off_intro.
@@ -468,7 +468,7 @@ Section ProofAcquire.
       iEval (rewrite Hpp3c) in "Hpc".
       (* +0x3c jal panic : never returns *)
       iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.acquire + 0x3c)) (mword_of_int 1 : mword 5) (mword_of_int 2096098 : mword 21)
-                P2 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
+                P2 (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
                 with "Hcg Hpc Hi3c [-]").
       iApply wp_next_off_intro.
       iIntros "Hcg Hpc".
@@ -481,7 +481,7 @@ Section ProofAcquire.
     assert (Ha0B3 : neq_vec (B3 !!! Regidx (mword_of_int 10 : mword 5)) zero_reg = false).
     { rewrite HB3a0v Ha0h. vm_compute. reflexivity. }
     iApply (wp_cbnez_fall_s_sconf (mword_of_int (KernelSyms.acquire + 0x18)) (mword_of_int 14 : mword 8) (Cregidx (mword_of_int 2)) (mword_of_int 10 : mword 5)
-              B3 (av - 4)%nat false
+              B3 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(rgne; exact Ha0B3)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
@@ -501,7 +501,7 @@ Section ProofAcquire.
     { intros f k. apply functional_extensionality; intro j.
       unfold insert, regfile_insert, rf_upd, regval_into_reg, lookup_total, regfile_lookup_total.
       case_bool_decide as Heq; [subst; reflexivity | reflexivity]. }
-    iApply (wp_acquire_lock_loop_sconf γl R Tc Dc B3 (av - 4)%nat (B3 !!! Regidx (mword_of_int 15 : mword 5)) lk0 p
+    iApply (wp_acquire_lock_loop_sconf γl R Tc Dc B3 (trap_res b + (av - 4))%nat (B3 !!! Regidx (mword_of_int 15 : mword 5)) lk0 p
               HB3a4 HB3s1 Href
               with "[Hcg] Htext Hpc Hlock HTc [-]").
     { rewrite (Hupd_id B3 (Regidx (mword_of_int 15 : mword 5))). iExact "Hcg". }
@@ -514,7 +514,7 @@ Section ProofAcquire.
       rewrite /B3 upd_ne; [| vm_compute; discriminate].
       rewrite Hcsph. exact HcspB2. }
     iPoseProof (aqi_24 with "Htext") as "Hi24".
-    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcba : mword 21) B8 (av - 4)%nat p
+    iApply (Mycpu.wp_call_mycpu_sconf_cs (mword_of_int (KernelSyms.acquire + 0x24)) (mword_of_int 0xcba : mword 21) B8 (trap_res b + (av - 4))%nat p
               ltac:(apply bv_eq; vm_compute; reflexivity) ltac:(vm_compute; reflexivity)
               ltac:(lia)
               with "Hcg Htext Hpc Hi24 [-]").
@@ -544,7 +544,7 @@ Section ProofAcquire.
        ([lock_refute_False] is hart-generic already). *)
     iApply (wp_csd_lkcpu_lockopen_s_sconf γl lk0 R Dc (mword_of_int (KernelSyms.acquire + 0x28))
               (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 16 : mword 12) Cm (av - 4)%nat false
+              (mword_of_int 16 : mword 12) Cm (trap_res b + (av - 4))%nat false
               Hpacpu Ha0C (Hrefpre cpu_id)
               with "Hcg Hpc Hi28 Hlock Htokp [-]").
     iApply wp_next_off_intro.
@@ -564,7 +564,7 @@ Section ProofAcquire.
     iEval (rewrite HcspA0 Hs1A0) in "Hr8".
     iPoseProof (aqi_2a with "Htext") as "Hi2a".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.acquire + 0x2a)) (mword_of_int 3 : mword 6) (mword_of_int 1 : mword 5)
-              Cm (av - 4)%nat (m !!! Regidx (mword_of_int 1 : mword 5)) false
+              Cm (trap_res b + (av - 4))%nat (m !!! Regidx (mword_of_int 1 : mword 5)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2a [Hr24] [-]").
     { iEval (rewrite HcspC). iExact "Hr24". }
@@ -578,7 +578,7 @@ Section ProofAcquire.
       by (rewrite /E1 upd_ne; [exact HcspC | vm_compute; discriminate]).
     iPoseProof (aqi_2c with "Htext") as "Hi2c".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.acquire + 0x2c)) (mword_of_int 2 : mword 6) (mword_of_int 8 : mword 5)
-              E1 (av - 4)%nat (m !!! Regidx (mword_of_int 8 : mword 5)) false
+              E1 (trap_res b + (av - 4))%nat (m !!! Regidx (mword_of_int 8 : mword 5)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2c [Hr16] [-]").
     { iEval (rewrite HcspE1). iExact "Hr16". }
@@ -592,7 +592,7 @@ Section ProofAcquire.
       by (rewrite /E2 upd_ne; [exact HcspE1 | vm_compute; discriminate]).
     iPoseProof (aqi_2e with "Htext") as "Hi2e".
     iApply (wp_cldsp_s_sconf (mword_of_int (KernelSyms.acquire + 0x2e)) (mword_of_int 1 : mword 6) (mword_of_int 9 : mword 5)
-              E2 (av - 4)%nat (m !!! Regidx (mword_of_int 9 : mword 5)) false
+              E2 (trap_res b + (av - 4))%nat (m !!! Regidx (mword_of_int 9 : mword 5)) false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi2e [Hr8] [-]").
     { iEval (rewrite HcspE2). iExact "Hr8". }
@@ -629,11 +629,11 @@ Section ProofAcquire.
       iSplitL "Hgap". { iExists _. iExact "Hgap". }
       done. }
     iEval (rewrite -Hwv) in "Hframe4".
-    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.acquire + 0x30)) (mword_of_int 2 : mword 6) E3 (av - 4)%nat 4 false Hpop
+    iApply (wp_caddi16sp_pop_s_sconf (mword_of_int (KernelSyms.acquire + 0x30)) (mword_of_int 2 : mword 6) E3 (trap_res b + (av - 4))%nat 4 false Hpop
               with "Hcg Hpc Hi30 Hframe4 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
-    assert (Hnk : ((av - 4) + 4)%nat = av) by lia.
+    assert (Hnk : ((trap_res b + (av - 4)) + 4)%nat = (trap_res b + av)%nat) by lia.
     iEval (rewrite Hnk) in "Hcg".
     change (<[Regidx csp_rs1 := regval_into_reg
         (add_vec (E3 !!! Regidx csp_rs1) (sign_extend' 64 (caddi16sp_imm (mword_of_int 2 : mword 6))))]> E3) with E4.
@@ -646,7 +646,7 @@ Section ProofAcquire.
       rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1. apply upd_eq. }
     iPoseProof (aqi_32 with "Htext") as "Hi32".
-    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.acquire + 0x32)) (mword_of_int 1 : mword 5) E4 av false
+    iApply (wp_cret_s_sconf (mword_of_int (KernelSyms.acquire + 0x32)) (mword_of_int 1 : mword 5) E4 (trap_res b + av)%nat false
               ltac:(vm_compute; discriminate)
               with "Hcg Hpc Hi32 [-]").
     iApply wp_next_off_intro.

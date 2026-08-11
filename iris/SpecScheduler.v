@@ -56,7 +56,23 @@ Definition wp_scheduler_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
      turns into "the scheduler thread cannot migrate".  So the index is the
      literal zero, not a binder. *)
   p0 = zero_reg ->
-  (20 <= av)%nat ->
+  (* [kv_frame_slots + 20], NOT [20] -- ONE reserve, paid ONCE.
+     scheduler() is entered from main() with interrupts OFF, and the [intr_on]
+     inlined at its loop head ([csrsi sstatus,2] at +0x86) is therefore a
+     genuine 0 -> 1 enable at a point where NOBODY holds the trap reserve: it
+     has to fund [kv_frame_slots] out of the scheduler's own budget, exactly
+     like sleep's re-enabling release.  It is funded once and for all: on
+     every later round the arm is already [true] (the dispatch tail's release
+     at level 0 with [intena] re-enabled it), the same [csrsi] is an
+     IDEMPOTENT set that moves neither ghost state nor the index
+     ([WpSconfCsr.wp_csrsi_sstatus_x0_idem_s_sconf]), and the reserve carved
+     on the first round is simply still there.  So the premise is
+     [kv_frame_slots + <loop body need>] with NO factor of two -- carrying the
+     arm-generic enable leaf around the loop instead would demand room to set
+     aside [kv_frame_slots] in a state where they are ALREADY set aside, i.e.
+     [2 * kv_frame_slots + 20], which is the pathology the arm-dependent carve
+     exists to remove. *)
+  (kv_frame_slots + 20 <= av)%nat ->
   sie_cap_gpr m av false p0 -∗
   cpu_own 0 false p0 cpu_ctx_free false -∗
   kernel_text -∗ pc_is pcE -∗

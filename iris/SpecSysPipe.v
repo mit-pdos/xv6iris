@@ -115,7 +115,7 @@ Require Import DiskPtsto.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
 Require Import FsCrash.
-Require Import IcacheRef IcacheInv IcacheEscrow IrefSlots InodeRegion.
+Require Import IrefSlots InodeRegion.
 Require Import SpecFileclose.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

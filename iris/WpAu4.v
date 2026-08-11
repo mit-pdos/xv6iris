@@ -55,10 +55,32 @@ Section Au4Leaves.
   Context `{GEN : GenId} `{CID : CpuId}.
   Context {p : mword 64}.
 
+  (* ==================================================================== *)
+  (* [SrcOk] ON BOTH LEAVES BELOW.  These two are ~15-line wrappers over    *)
+  (* [WpSconfMem.wp_{load,store}_s_sconf_au], and their address base (and,  *)
+  (* for the store, their stored value) is read as [rget m rs] -- a lookup  *)
+  (* in [tp_pin m] (HartTp.v), hart-dependent at exactly rs = tp.  So they  *)
+  (* inherit the family note above [WpSconfMem.wp_load_s_sconf_au]          *)
+  (* verbatim: the side condition rides as an implicit [IntrDefs.SrcOk]     *)
+  (* instance argument, which occupies no positional slot and therefore     *)
+  (* moves no call site, and it must be on the WRAPPER too -- the inner      *)
+  (* application is at a VARIABLE register, so nothing else could discharge *)
+  (* the engine's instance, and an unresolved instance inside an [iApply]   *)
+  (* is SHELVED rather than reported (it would surface as "Attempt to save  *)
+  (* an incomplete proof" at some consumer's [Qed]).  The consuming asserts *)
+  (* in the proofs are the per-register wiring check; do not delete them.   *)
+  (* ==================================================================== *)
+
+  (* [SrcOk] smoke test, as in every converted file -- see IntrDefs.v's
+     checker block.  x9 (s1) is the register bread/bpin hold the buffer
+     pointer in. *)
+  Definition au4_srcok_pos_s1 : SrcOk (mword_of_int 9 : mword 5) := _.
+  Fail Definition au4_srcok_neg : SrcOk Rtp := _.
+
   (* [lw rd, imm(rs1)] with the cell produced and returned inside the
      engine's callback. *)
   Lemma wp_lw_au_s_sconf (cmp : bool)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (av : nat) (Ψ : mword 32 -> iProp Σ) (Em : coPset) (b : bool)
       {dqm : dfrac} :
     uint rd <> 0 ->
@@ -80,6 +102,14 @@ Section Au4Leaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hrd Hrdok HkptEm.
+    (* the class, consumed at [rs1]: the address this leaf promises is the same
+       word at every hart, so the cell the caller produces inside the engine's
+       mask comes back at the same address after a rebinding.  Also the wiring
+       check -- see the note above. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr HAU Hcont".
     iApply (wp_load_s_sconf_au 4 cmp false pc rd rs1 imm m av
               (fun w => sign_extend' 64 w) Ψ Em b
@@ -91,7 +121,7 @@ Section Au4Leaves.
 
   (* [sw rs2, imm(rs1)], same discipline. *)
   Lemma wp_sw_au_s_sconf (cmp : bool)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (av : nat) (Ψ : iProp Σ) (Em : coPset) (b : bool) :
     ↑kptN ⊆ Em ->
     sie_cap_gpr m av b p -∗
@@ -109,6 +139,14 @@ Section Au4Leaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intro HkptEm.
+    (* the class, consumed at [rs1] (address) and [rs2] (stored value) -- two
+       independent instances, and the per-register wiring check. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr HAU Hcont".
     iApply (wp_store_s_sconf_au 4 cmp pc rs2 rs1 imm m av
               (trunc32 (rget m rs2)) Ψ Em b

@@ -37,29 +37,20 @@ Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuil
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto RiscvModelBytes.
-Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
-Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
-Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs.
-Require Import PageGeom PageFields.
+Require Import PageGeom.
 Require Import ProcGeom.
-Require Import PtBuild.
 Require Import UserPtTree.
-Require Import ProcPtOwn.
 Require Import FdSlots FileInv.
 Require Import WpLock.
-Require Import SwtchCtx.
 Require Import ProcInv.
-Require Import KallocInv.
-Require Import SpecFreeproc.
 Require Import ProofKforkParts.
 Require Import CodeKfork.
 From Kernel Require KernelSyms.
@@ -96,11 +87,7 @@ Section KforkB7.
   Notation Rs4 := (mword_of_int 20 : mword 5).
   Notation Rs5 := (mword_of_int 21 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* a non-destructive length fact off [tf_page] -- durable-notes' "iDestruct
      (lem with …) as %pure keeps the spatial input when the conclusion is

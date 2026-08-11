@@ -84,7 +84,6 @@ Require Import WpUart DiskPtsto BioInv FsBlocks LogInv FsCrash.
 Require Import DinodeEnc InodeInv InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
 (* RE-IMPORT: [IcacheInv.islot] shadows [DinodeEnc.islot] and
    [IcacheRef.inode_ref] shadows [FileInv]'s placeholder; neither icache
@@ -250,11 +249,7 @@ Section ProofFileread.
   Notation Rs2 := (mword_of_int 18 : mword 5).
   Notation Rs3 := (mword_of_int 19 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* ---- the type-indexed environment, opened at the type the code read ---- *)
   Local Lemma fr_env_dev (γf' : gname) (k' : nat)

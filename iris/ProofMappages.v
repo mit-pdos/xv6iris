@@ -22,7 +22,7 @@ Require Import IntrDefs WpSmodeIntr.
 Require Import IntrDefs.
 Require Import HartTp WpNext.
 Require Import CpuOwn.
-Require Import VcGen WpSconfVc.
+Require Import WpSconfVc.
 Require Import KallocInv.
 Require Import CommonWalk PtTree.
 Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys *)
@@ -181,9 +181,6 @@ Section ProofMappages.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hsprstk : pa_stk sp0 10 = spr).
     { rewrite /pa_stk /spr /sp0 /add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hdeepaddr : pa_stk (pa_stk sp0 kv_frame_slots) 10 = pa_stk spr kv_frame_slots).
-    { unfold spr, sp0, pa_stk, add_vec_int, kv_frame_slots. rewrite !add_vec_off2.
-      f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iPoseProof (mi_9c with "Htext") as "Hi9c".
     iPoseProof (mi_9e with "Htext") as "Hi9e".
     iPoseProof (mi_a0 with "Htext") as "Hia0".

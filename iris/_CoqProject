@@ -290,6 +290,7 @@ LinkWakeupParts.v
 WpSconfVc.v
 WpSieFlipBits.v
 WpSconfCsr.v
+WpSconfSret.v
 WpPushOffCsr.v
 CodeMycpu.v
 ProcGeom.v

@@ -108,7 +108,7 @@ Section VtLeaves.
   (* ---- the two dev_inv-borrowing virtio leaves, at a CONCRETE address ---- *)
 
   Lemma wp_vt_lw_dev (γu : uart_names) (γd : disk_names)
-      (pc : mword 64) (rvc : bool) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rvc : bool) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (a : mword 64) (off : Z) (P : bv 32 -> Prop)
       (p : mword 64) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = a ->
@@ -127,6 +127,15 @@ Section VtLeaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hg Hoff Hrd Hrdok Hread. destruct Hg as (Hr & Hal & Hcan & Hdv).
+    (* the class, consumed at [rs1] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     assert (Ha8 : sign_extend' 64 (subrange_vec_dec
                     (add_vec (rget m rs1) (sign_extend' 64 imm)) (xlen - 0 - 1) 0) = a).
     { rewrite subrange_id. rewrite sign_extend'_id. exact Hea. }
@@ -145,7 +154,7 @@ Section VtLeaves.
   Qed.
 
   Lemma wp_vt_sw_dev (γu : uart_names) (γd : disk_names)
-      (pc : mword 64) (rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (a : mword 64) (off : Z) (sw : mword 32)
       (p : mword 64) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = a ->
@@ -167,6 +176,17 @@ Section VtLeaves.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hg Hoff Hsw Hwr. destruct Hg as (Hr & Hal & Hcan & Hdv).
+    (* the class, consumed at [rs1 / rs2] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     assert (Hsw' : (autocast (T := mword)
                       (subrange_vec_dec (rget m rs2) (Z.sub (Z.mul 4 8) 1) 0) : mword 32) = sw)
       by exact Hsw.
@@ -366,7 +386,7 @@ Section VtPrologue.
           /\ (forall r : mword 5, is_cs_idx r = true ->
                 r <> csp_rs1 -> r <> s0_idx -> r <> s1_idx ->
                 MA !!! Regidx r = m !!! Regidx r) ⌝ -∗
-        sie_cap_gpr MA (av - 4)%nat false pme -∗
+        sie_cap_gpr MA (trap_res b + (av - 4))%nat false pme -∗
         pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x1e) : mword 64) -∗
         locked γk cpu_id -∗ disk_res γd pd pav pu -∗
         cpu_own (S n) eb pme C false -∗ arm_pay n eb pme -∗
@@ -628,7 +648,7 @@ Section VtEpilogue.
     (* release's own exit index; the caller derives it from its entry
        resources ([CpuOwn.cpu_own] / [sie_arm] ghost agreement). *)
     (match n with O => eb | S _ => false end) = b ->
-    sie_cap_gpr MB (av - 4)%nat false pme -∗
+    sie_cap_gpr MB (trap_res b + (av - 4))%nat false pme -∗
     kernel_text -∗ pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
     is_lock γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) -∗
     locked γk cpu_id -∗ disk_res γd pd pav pu -∗
@@ -667,7 +687,7 @@ Section VtEpilogue.
     (* ---- +0x8a/+0x8e: a0 := &disk.vdisk_lock ---- *)
     iPoseProof (vti_8a with "Htext") as "Hi8a".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a)) a0_idx (mword_of_int 30 : mword 20)
-              MB (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              MB (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi8a [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -680,7 +700,7 @@ Section VtEpilogue.
     iEval (rewrite Hpc8e) in "Hpc".
     iPoseProof (vti_8e with "Htext") as "Hi8e".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x8e)) a0_idx a0_idx
-              (mword_of_int 0xb44 : mword 12) E0 (av - 4)%nat false
+              (mword_of_int 0xb44 : mword 12) E0 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi8e [-]").
     iApply wp_next_off_intro.
@@ -696,7 +716,7 @@ Section VtEpilogue.
     (* ---- +0x92: jal ra,release ---- *)
     iPoseProof (vti_92 with "Htext") as "Hi92".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x92)) ra_idx (mword_of_int 2077324 : mword 21)
-              E1 (av - 4)%nat false
+              E1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi92 [-]").
     iApply wp_next_off_intro.
@@ -717,6 +737,11 @@ Section VtEpilogue.
     { rewrite /E2 upd_ne; [| vm_compute; discriminate].
       rewrite /E1 upd_ne; [| vm_compute; discriminate].
       rewrite /E0 upd_ne; [| vm_compute; discriminate]. exact HMBcsp. }
+    (* the acquire handed this window out at [trap_res b + N]; release wants
+       [trap_res outb + N], and [outb] IS [b] ([cpu_own] forces it, which is
+       what [Hbeq]/[Houtb] records).  Pure re-spelling -- it is what makes
+       the acquire/release pair compose back to [N]. *)
+    iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γk d_lock "virtio_disk"%string (disk_res γd pd pav pu) E2
               n eb pme C (av - 4)%nat
               ltac:(rewrite HE2a0; apply addv_sext0) ltac:(lia)
@@ -1064,7 +1089,7 @@ Section VtDevRam.
      [nr <= nc <= np] plus the persistent lower bound at [nc] -- which is
      exactly the evidence the reclaim accessor wants. *)
   Lemma wp_vt_lhu_used_idx (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (np nr : nat) (p : mword 64) :
     add_vec (rget m rs1) (sign_extend' 64 imm) = (pa_add pu 2%nat : mword 64) ->
     uint rd <> 0 -> rd_ok rd ->
@@ -1081,6 +1106,15 @@ Section VtDevRam.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hea Hrd Hrdok.
+    (* the class, consumed at [rs1] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub #Hlb0 Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & _ & Hstu).
@@ -1146,7 +1180,7 @@ Section VtDevRam.
      [used_elem_pa (v_cfg v) p] the very address the code computes off
      [disk.used]. *)
   Lemma wp_vt_lw_used_elem (γu : uart_names) (γd : disk_names) (pd pav pu : mword 64)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (np c p : nat) (sl : vslot) (pin : _)
       (pp : mword 64) :
     (p < c)%nat ->
@@ -1177,6 +1211,15 @@ Section VtDevRam.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hpc0 Hea Hrd Hrdok.
+    (* the class, consumed at [rs1] -- see [IntrDefs.SrcOk].  This wrapper
+       applies a converted leaf at a VARIABLE register and carries no tp fact
+       of its own, so the class has to be stated here; it is implicit, so this
+       lemma's own call sites (which pass concrete registers) do not move.  The
+       [assert] is the wiring check: it names the register the premise reads. *)
+    assert (Hea_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm)
+              = add_vec (rget (CID := CID) m rs1) (sign_extend' 64 imm))
+      by (intros hh; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hdinv #Hgeom Hpub Hrcpt #Hlbc Hcont".
     iDestruct (sie_cap_gpr_kmap_claims with "Hcg") as "[#Hkm Hcg]".
     iDestruct (disk_geom_static with "Hgeom") as %(_ & _ & Hstu).
@@ -2595,7 +2638,7 @@ Section VtLoopDefs.
       (pme : mword 64) (C : iProp Σ) (sp0 : mword 64) : iProp Σ :=
     (∀ MB : regfile,
        ⌜ vt_regs_ok m MB sp0 ⌝ -∗
-       sie_cap_gpr MB (av - 4)%nat false pme -∗
+       sie_cap_gpr MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x8a) : mword 64) -∗
        cpu_own (S lvl) eb pme C false -∗
        disk_res γd pd pav pu -∗
@@ -2606,7 +2649,7 @@ Section VtLoopDefs.
       (pme : mword 64) (C : iProp Σ) (sp0 : mword 64) : iProp Σ :=
     (∀ MB : regfile,
        ⌜ vt_regs_ok m MB sp0 ⌝ -∗
-       sie_cap_gpr MB (av - 4)%nat false pme -∗
+       sie_cap_gpr MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false pme -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_intr + 0x3e) : mword 64) -∗
        cpu_own (S lvl) eb pme C false -∗
        vt_loop_state γd pd pav pu -∗
@@ -2695,7 +2738,7 @@ Section VtLoopProof.
       by (unfold sl_head; rewrite Hhead; apply Nat2Z.id).
     iEval (rewrite Hslh) in "Hinfob".
     (* ================= CHUNK A: +0x3e .. +0x4e ================= *)
-    iApply (wp_vt_reclaim γu γd pd pav pu MB (av - 4)%nat np c nr h sl pin pme
+    iApply (wp_vt_reclaim γu γd pd pav pu MB (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat np c nr h sl pin pme
               Hs1 Hnrc Hh8 Hhead
               with "Hcg Htext Hpc Hdinv Hgeom Hpub Hrcpt Hlbc Hidx [-]").
     iIntros (M1) "%Hfr1 %Hspo Hcg Hpc Hidx Hpub #Hlbs Hpay".
@@ -2705,21 +2748,21 @@ Section VtLoopProof.
     assert (HM1s1 : M1 !!! Regidx s1_idx = (disk_base : mword 64))
       by (rewrite (HM1thr s1_idx ltac:(reg_neq) ltac:(reg_neq)); exact Hs1).
     iEval (rewrite Hstatus) in "Hstat".
-    iApply (wp_vt_status γd pd pav pu M1 (av - 4)%nat h pme HM1s1 HM1a5 Hh8
+    iApply (wp_vt_status γd pd pav pu M1 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat h pme HM1s1 HM1a5 Hh8
               with "Hcg Htext Hpc Hgeom Hstat [-]").
     iIntros (M2) "%Hfr2 Hcg Hpc Hstat".
     destruct Hfr2 as [HM2a5 HM2thr].
     (* ================= CHUNK C: +0x60 .. +0x6a ================= *)
     assert (HM2s1 : M2 !!! Regidx s1_idx = (disk_base : mword 64))
       by (rewrite (HM2thr s1_idx ltac:(reg_neq) ltac:(reg_neq)); exact HM1s1).
-    iApply (wp_vt_clear_disk M2 (av - 4)%nat h b pme HM2s1 HM2a5 Hh8
+    iApply (wp_vt_clear_disk M2 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat h b pme HM2s1 HM2a5 Hh8
               with "Hcg Htext Hpc Hinfob Hbdisk [-]").
     iIntros (M3) "%Hfr3 Hcg Hpc Hinfob Hbdisk".
     destruct Hfr3 as [HM3a0 HM3thr].
     (* ================= +0x6e: jal ra,wakeup ================= *)
     iPoseProof (vti_6e with "Htext") as "Hi6e".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x6e)) ra_idx
-              (mword_of_int 2082172 : mword 21) M3 (av - 4)%nat false
+              (mword_of_int 2082172 : mword 21) M3 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi6e [-]").
@@ -2745,10 +2788,10 @@ Section VtLoopProof.
       by (rewrite rget_tp; reflexivity).
     assert (HWnz : eq_vec (zero_reg : mword 64) (mycpu_ret (rget W Rtp)) = false)
       by (rewrite rget_tp; exact (mycpu_ret_nonzero cid_word tp_ok_cid)).
-    assert (HwK : (18 <= av - 4)%nat) by lia.
+    assert (HwK : (18 <= trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat) by lia.
     assert (Hwlvl : (Z.of_nat (S lvl) + 1 < 2 ^ 31)%Z) by lia.
     iApply (Wakeup.wp_wakeup_sconf W γs (mycpu_ret cid_word) pme (S lvl)
-              (av - 4)%nat eb C false HwK HWdom Hlen HWmc HWnz Hwlvl
+              (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat eb C false HwK HWdom Hlen HWmc HWnz Hwlvl
               with "Hcg Hown Htext Hpc Hpanic Hpi [-]").
     iApply wp_next_off_intro.
     iIntros (MW) "[%HcsW %HdomW] Hcg Hown #Htext2 Hpc".
@@ -2760,7 +2803,7 @@ Section VtLoopProof.
     { rewrite (callee_saved_lookup HcsW s1_idx ltac:(vm_compute; reflexivity)).
       rewrite /W upd_ne; [| reg_neq].
       rewrite (HM3thr s1_idx ltac:(reg_neq) ltac:(reg_neq)). exact HM2s1. }
-    iApply (wp_vt_advance γu γd pd pav pu MW (av - 4)%nat np nr pme HMWs1
+    iApply (wp_vt_advance γu γd pd pav pu MW (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat np nr pme HMWs1
               with "Hcg Htext Hpc Hdinv Hgeom Hpub Hlbs Hidx [-]").
     iIntros (M5 nc) "%Hfr5 %Hbnd5 #Hlbc2 Hcg Hpc Hpub Hidx".
     destruct Hfr5 as (HM5a5 & HM5a4 & HM5thr).
@@ -2872,7 +2915,7 @@ Section VtLoopProof.
       assert (Hcmp : neq_vec (rget M5 a4_idx) (rget M5 a5_idx) = false).
       { rgne. rgne. rewrite HM5a4 HM5a5 Heq. apply vt_neq_vec_refl. }
       iApply (wp_bne_fall_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x86)) (mword_of_int 8120 : mword 13)
-                a5_idx a4_idx M5 (av - 4)%nat false
+                a5_idx a4_idx M5 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp
                 with "Hcg Hpc Hi86 [-]").
@@ -2893,7 +2936,7 @@ Section VtLoopProof.
       { rgne. rgne. rewrite HM5a4 HM5a5. apply vt_neq_vec_true.
         intro Hc. apply Hne. exact (vt_zext16_inj _ _ Hc). }
       iApply (wp_bne_taken_s_sconf (mword_of_int (KernelSyms.virtio_disk_intr + 0x86)) (mword_of_int 8120 : mword 13)
-                a5_idx a4_idx M5 (av - 4)%nat false
+                a5_idx a4_idx M5 (trap_res (match lvl with O => eb | S _ => false end) + (av - 4))%nat false
                 ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                 Hcmp
                 ltac:(vm_compute; reflexivity)
@@ -2966,13 +3009,16 @@ Section ProofVirtioDiskIntr.
     iIntros (CIDa Hsa MA sp0) "%Hpro Hcg Hpc Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap".
     destruct Hpro as (Hsp0 & HMAcsp & HMAs1 & HMAthr).
     (* ===================== the ISR read/ack ===================== *)
-    iApply (wp_vt_isr γu γd MA (K - 4)%nat pme with "Hcg Htext Hpc Hdinv [-]").
+    iApply (wp_vt_isr γu γd MA (trap_res b + (K - 4))%nat pme with "Hcg Htext Hpc Hdinv [-]").
     iIntros (MI) "%HMIthr Hcg Hpc".
     (* ---- the exit continuation, capturing the epilogue's resources ---- *)
     iAssert (vt_exit (CID:=CIDa) γd pd pav pu m K lvl eb pme C sp0)
       with "[Hcont Htok Hpay Hr24 Hr16 Hr8 Hgap]" as "Hexit".
     { iIntros (MB) "%HregsB Hcg Hpc Hown HR".
       destruct HregsB as (HBcsp & HBs1 & HBthr).
+      (* [vt_exit] is stated where [b] is not in scope, so it spells the window
+         index with [outb]; [Hbeq] folds it back to [b] for the epilogue. *)
+      iEval (rewrite Hbeq) in "Hcg".
       iApply (Epi.wp_vt_epilogue (CID:=CIDa) γk γd pd pav pu m MB K lvl eb pme C sp0 b
                 Hsp0 HBcsp HBthr HKav Hbeq
                 with "Hcg Htext Hpc Hlk Htok HR Hown Hpay Hr24 Hr16 Hr8 Hgap [-]").
@@ -2987,11 +3033,14 @@ Section ProofVirtioDiskIntr.
     rewrite /disk_res_at.
     iDestruct "Hres" as "(%Hdomfl & %Hpkb & %Hdomtr & %Hcoh & %Htriok & %Htridisj & %Hfrfree &
                           Hpub & #Hlbnr & Hauth & Hidx & Hfl & Hpk & Hfree & Hring)".
-    iApply (wp_vt_entry_test γu γd pd pav pu MI (K - 4)%nat np nr pme HMIs1
+    iApply (wp_vt_entry_test γu γd pd pav pu MI (trap_res b + (K - 4))%nat np nr pme HMIs1
               with "Hcg Htext Hpc Hdinv Hgeom Hpub Hlbnr Hidx [-]").
     iSplit.
     - (* ---- the loop is never entered: straight to release ---- *)
       iIntros (ME) "%HMEthr Hcg Hpc Hpub Hidx".
+      (* [vt_exit] spells its window index with [outb] (no [b] in scope where it
+         is defined); [Hbeq] bridges the two spellings. *)
+      iEval (rewrite -Hbeq) in "Hcg".
       iApply ("Hexit" $! ME with "[%] Hcg Hpc Hown [Hpub Hauth Hidx Hfl Hpk Hfree Hring]").
       { split_and!.
         - rewrite (HMEthr csp_rs1 ltac:(reg_neq) ltac:(reg_neq)).
@@ -3009,6 +3058,8 @@ Section ProofVirtioDiskIntr.
         iPureIntro. split_and!; assumption. }
     - (* ---- the loop is entered ---- *)
       iIntros (ME nc) "%HMEthr %Hbnd #Hlbc Hcg Hpc Hpub Hidx".
+      (* [vt_loop] also spells the window index with [outb]. *)
+      iEval (rewrite -Hbeq) in "Hcg".
       iPoseProof (Lp.wp_vt_loop (CID:=CIDa)  γs γu γd pd pav pu m K lvl eb pme C sp0
                     HKav Hlen Hlvl
                     with "Htext Hpanic Hpi Hdinv Hgeom") as "Hloop".

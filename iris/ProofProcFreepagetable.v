@@ -213,7 +213,13 @@ Section ProofProcFreepagetable.
      list entirely; file total 53.77 s -> 27.42 s (1.96x). *)
   Ltac thr_side Hc :=
     intros Hx; injection Hx as Hx2; subst;
-    first [ congruence | vm_compute in Hc; discriminate ].
+    (* the [k <> k] case by NAME-FREE [exact], not [congruence]: a
+       whole-context closer inside a per-layer peel is the ~4 s-per-call trap
+       in claude-notes/optimization.md.  [congruence] stays last only so no
+       call site can lose completeness. *)
+    first [ lazymatch goal with H : ?a <> ?a |- _ => exact (H eq_refl) end
+          | vm_compute in Hc; discriminate
+          | congruence ].
 
   (* the callee-saved registers proc_freepagetable itself writes *)
   Definition pf_thr (mm m : regfile) : Prop :=

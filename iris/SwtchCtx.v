@@ -176,9 +176,19 @@ Section SwtchCtx.
   (* park saves into).                                                        *)
   (* -------------------------------------------------------------------- *)
   (* THE FULL-BUNDLE INTERFACE: a parked coroutine's record stores, beside
-     its saved registers, ITS OWN free stack ([kv_frame_slots + av] slots
-     below the saved sp -- sp is callee-saved and pinned by [callee_img],
-     so on resume the stack re-attaches to the fresh file).  [p] is an
+     its saved registers, ITS OWN free stack ([av] slots below the saved sp
+     -- sp is callee-saved and pinned by [callee_img], so on resume the stack
+     re-attaches to the fresh file).  THE PARKED DEPTH IS PLAIN [av], NOT
+     [kv_frame_slots + av]: the record parks EXACTLY what its own resume wand
+     below requires, and that wand hands in [sie_cap_gpr m av false p] -- at
+     the interrupts-OFF index, whose carve is [trap_res false + av] = [av]
+     ([IntrDefs.trap_res_off]).  A resumed party owes NO trap reserve, and
+     that is not an accident of this record: a swtch resumption always
+     happens holding a lock with interrupts off (level-1 [intr_count]), so
+     [false] is the only index a resumption can be at.  Under the old
+     arm-blind carve these two spellings coincided; they now differ by 78,
+     and parking the larger one would be a record nothing can ever discharge.
+     [p] is an
      INDEX of the context, not a record existential: the protocol pre-sets
      c->proc before every dispatch (the scheduler's c->proc = p store; a
      parking proc never touches it), every wrapper user KNOWS its
@@ -213,7 +223,7 @@ Section SwtchCtx.
       ⌜length vs = 14%nat⌝ ∗
       ⌜eq_vec (access_vec_dec (ret_pc (nth 0 vs (mword_of_int 0))) 0) ('b"0") = true⌝ ∗
       ctx_cells c vs ∗
-      stack_own (nth 1 vs (mword_of_int 0)) (kv_frame_slots + av) ∗
+      stack_own (nth 1 vs (mword_of_int 0)) av ∗
       (∀ (h : CPU) (m : regfile) (eb' : bool),
          ⌜adm A h⌝ -∗
          ⌜callee_img m = vs⌝ -∗

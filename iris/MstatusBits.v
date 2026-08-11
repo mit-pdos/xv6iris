@@ -325,6 +325,19 @@ Lemma sret_ms5_SD (x : mword 64) :
   _get_Mstatus_SD (sret_ms5 x) = _get_Mstatus_SD x.
 Proof. unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_SD. mw_prep; tb1. Qed.
 
+(* THE TWO BITS SRET ITSELF REWRITES, over a symbolic input: SPP := 0
+   (sret_ms3, bit 8) and SPIE := 1 (sret_ms2, bit 5), neither disturbed by
+   the writes above them.  Both are CONSTANT in the result, which is what
+   lets an sret's caller name the tie it hands back without knowing the
+   entry mstatus -- see [IntrDefs.sret_tie] and the sconf-tier sret leaf. *)
+Lemma sret_ms5_SPP (x : mword 64) :
+  _get_Mstatus_SPP (sret_ms5 x) = ('b"0" : mword 1).
+Proof. unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_SPP. mw_prep; tb1. Qed.
+
+Lemma sret_ms5_SPIE (x : mword 64) :
+  _get_Mstatus_SPIE (sret_ms5 x) = ('b"1" : mword 1).
+Proof. unfold sret_ms5, sret_ms4, sret_ms3, sret_ms2, sret_ms1, _get_Mstatus_SPIE. mw_prep; tb1. Qed.
+
 Lemma roundtrip_XS (elp_v : mword 1) (ms : mword 64) :
   _get_Mstatus_XS (sret_ms5 (trap_ms elp_v ms)) = _get_Mstatus_XS ms.
 Proof. rewrite sret_ms5_XS. apply trap_ms_XS. Qed.

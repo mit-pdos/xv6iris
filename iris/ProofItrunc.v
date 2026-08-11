@@ -67,11 +67,7 @@ Local Open Scope Z_scope.
 Module ItruncProof (BR : BREAD) (BF : BFREE) (BL : BRELSE) (IU : IUPDATE)
   : ITRUNC.
 
-Local Ltac regne :=
-  first [ apply not_eq_sym; apply is_cs_idx_true_neq;
-          [vm_compute; reflexivity | assumption]
-        | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption]
-        | congruence ].
+Local Ltac regne := reg_ne_side.
 
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.

@@ -140,8 +140,6 @@ Section ProofFreerange.
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb3 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 3 : mword 6) ('b"000"))) = pa_stk sp0 3).
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hdeepaddr : pa_stk (pa_stk sp0 kv_frame_slots) 6 = pa_stk spr kv_frame_slots).
-    { rewrite Hspr6 !pa_stk_assoc. f_equal; lia. }
     iIntros "#Htext Hcg Hcnt Hpc Hs1c Hs2c Hs3c Hf4 Hf5 Hf6 #Hqcpu Havail Hcont".
     iPoseProof (fri_3e with "Htext") as "Hi3e".
     iPoseProof (fri_40 with "Htext") as "Hi40".
@@ -283,8 +281,6 @@ Section ProofFreerange.
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb6 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 6).
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hdeepaddr : pa_stk (pa_stk sp0 kv_frame_slots) 6 = pa_stk spr kv_frame_slots).
-    { rewrite Hspr6 !pa_stk_assoc. f_equal; lia. }
     iPoseProof (fri_00 with "Htext") as "Hi00".
     iPoseProof (fri_02 with "Htext") as "Hi02".
     iPoseProof (fri_04 with "Htext") as "Hi04".

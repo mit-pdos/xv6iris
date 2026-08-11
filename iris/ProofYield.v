@@ -153,7 +153,7 @@ Section YieldPostSched.
     msch !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5) ->
     kernel_text -∗
     is_lock γl (proc_addr j) "proc"%string (proc_lock_res γs γl (proc_addr j)) -∗
-    sie_cap_gpr msch (av - 4)%nat false pj -∗
+    sie_cap_gpr msch (trap_res eb + (av - 4))%nat false pj -∗
     pc_is (mword_of_int (KernelSyms.yield + 0x1c)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
@@ -172,6 +172,11 @@ Section YieldPostSched.
     pa_stk sp0 2 ↦₈ (m !!! Regidx (mword_of_int 8 : mword 5)) -∗
     pa_stk sp0 3 ↦₈ (m !!! Regidx (mword_of_int 9 : mword 5)) -∗
     pa_stk sp0 4 ↦₈ vgap -∗
+    (* THE DISPATCHING HART'S OWN COPY, at [CID0] -- where this half runs.
+       It reaches the continuation's hart by [intr_handler_avail_ext_transport], the
+       same two-arm argument the other three hart-indexed carriers here use.
+       Persistent, hence no accounting anywhere below. *)
+    intr_handler_avail_ext eb -∗
     wp_next true pj (fun (CID : CpuId) =>
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
@@ -180,12 +185,13 @@ Section YieldPostSched.
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         trap_csrs_ext eb -∗
         cpu_claim_ext eb pj -∗
+        intr_handler_avail_ext eb -∗
         WP (Loop : expr riscv_lang)) -∗
     WP (Loop : expr riscv_lang).
   Proof.
     intros pj Hav Hj Hspd Hsp0 Hsp_msch Hs1_msch
            Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27.
-    iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpuemp HC Hown' Htag Hvc' Hr24 Hr16 Hr8 Hgap Hcont".
+    iIntros "#Htext #Hislock Hcg Hpc Hheld' Htc Hcpuemp HC Hown' Htag Hvc' Hr24 Hr16 Hr8 Hgap #Havail Hcont".
     (* frame-slot address bridges: slot k sits at [spd + 8*(4-k)]. *)
     assert (Hspd4 : pa_stk sp0 4 = spd).
     { rewrite -Hspd. unfold pa_stk, add_vec_int. apply f_equal. apply bv_eq; vm_compute; reflexivity. }
@@ -222,7 +228,7 @@ Section YieldPostSched.
        hart is PINNED and [wp_next_off] collapses the binder. *)
     iPoseProof (ydi_1c with "Htext") as "Hi1c".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.yield + 0x1c)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              msch (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              msch (trap_res eb + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -236,7 +242,7 @@ Section YieldPostSched.
     (* +0x1e: jal release *)
     iPoseProof (ydi_1e with "Htext") as "Hi1e".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x1e)) (mword_of_int 1 : mword 5) (mword_of_int 2092430 : mword 21)
-              D0 (av - 4)%nat false
+              D0 (trap_res eb + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi1e [-]").
     iApply wp_next_off_intro.
@@ -453,8 +459,11 @@ Section YieldPostSched.
        [cpu_claim] carries the hart tag. *)
     iDestruct (cpu_claim_ext_transport CID0 CIDe5 eb pj ltac:(wp_next_chain)
                  with "Hclmx") as "Hclmx".
+    (* AND THE PERSISTENT ONE, which is hart-indexed too. *)
+    iDestruct (intr_handler_avail_ext_transport CID0 CIDe5 eb pj ltac:(wp_next_chain)
+                 with "Havail") as "#Havail'".
     iSpecialize ("Hcont" $! CIDe5 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hext Hclmx").
+    iApply ("Hcont" $! E4 with "[%] Hcg Hcpu Hpc Hext Hclmx Havail'").
     unfold callee_saved. repeat split; assumption.
   Qed.
 
@@ -667,7 +676,7 @@ Section ProofYield.
     (* +0x14: c.li a5,3 *)
     iPoseProof (ydi_14 with "Htext") as "Hi14".
     iApply (wp_cli_s_sconf (mword_of_int (KernelSyms.yield + 0x14)) (mword_of_int 15 : mword 5) (mword_of_int 3 : mword 6)
-              (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6)))) macq (av - 4)%nat false
+              (add_vec zero_reg (sign_extend' 64 (sign_extend' 12 (mword_of_int 3 : mword 6)))) macq (trap_res eb + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) eq_refl
               with "Hcg Hpc Hi14 [-]").
     iApply wp_next_off_intro.
@@ -697,7 +706,7 @@ Section ProofYield.
     (* +0x16: c.sw a5,24(s1) : p->state := RUNNABLE *)
     iPoseProof (ydi_16 with "Htext") as "Hi16".
     iApply (wp_csw_s_sconf (mword_of_int (KernelSyms.yield + 0x16)) (mword_of_int 15 : mword 5) (mword_of_int 9 : mword 5)
-              (mword_of_int 24 : mword 12) C0 (av - 4)%nat RUNNING false
+              (mword_of_int 24 : mword 12) C0 (trap_res eb + (av - 4))%nat RUNNING false
               with "Hcg Hpc Hi16 [Hstate] [-]").
     { iEval (rewrite Hrec_state_g). iExact "Hstate". }
     iApply wp_next_off_intro.
@@ -708,7 +717,7 @@ Section ProofYield.
     (* +0x18: jal sched *)
     iPoseProof (ydi_18 with "Htext") as "Hi18".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.yield + 0x18)) (mword_of_int 1 : mword 5) (mword_of_int 2096940 : mword 21)
-              C0 (av - 4)%nat false
+              C0 (trap_res eb + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
@@ -743,7 +752,7 @@ Section ProofYield.
        lock owns both halves again. *)
     iMod (pstate_whole_update (proc_addr j) RUNNING RUNNABLE with "Hpg") as "Hpg".
     iModIntro.
-    iApply (Sched.wp_sched_sconf γs j γl RUNNABLE ch0 C1 (av - 4)%nat eb
+    iApply (Sched.wp_sched_sconf γs j γl RUNNABLE ch0 C1 (trap_res eb + (av - 4))%nat eb
               Hj Hgl (park_ok_RUNNABLE) ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc [-]").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
@@ -816,7 +825,11 @@ Section ProofYield.
               ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity)
               Hsp_msch Hs1_msch
               Hmsch18 Hmsch19 Hmsch20 Hmsch21 Hmsch22 Hmsch23 Hmsch24 Hmsch25 Hmsch26 Hmsch27
-              with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpuemp HC Hown' Htag' Hvc' Hr24 Hr16 Hr8 Hgap [Hcont]").
+              with "Htext Hislock Hcg Hpc Hheld' Htc' Hcpuemp HC Hown' Htag' Hvc' Hr24 Hr16 Hr8 Hgap
+                    [] [Hcont]").
+    (* the dispatch payload's own copy, at the hart it dispatched on, weakened
+       to whichever arm the caller's [eb] asks for. *)
+    { iApply (intr_handler_avail_ext_intro eb with "Havail"). }
     (* yield's own [wp_next true pj] obligation, re-anchored at the resuming
        hart -- [WpNext.wp_next_retarget], the transport for exactly this.  The
        index is the LITERAL [true] (a parking function's always is), so the

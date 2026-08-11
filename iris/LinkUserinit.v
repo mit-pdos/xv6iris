@@ -23,7 +23,7 @@ Require Import RegFile.
    silently invents fresh binders with those names. *)
 Require Import WpLock KallocInv FdSlots.
 Require Import SpecUserinit.
-Require Import InodeRef.
+Require Import IrefSlots.
 
 Module Userinit : USERINIT.
   Axiom wp_userinit_sconf :

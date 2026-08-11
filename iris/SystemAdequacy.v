@@ -45,7 +45,8 @@ Require Import BootConfig.
 Require Import BootChain BootShared.
 Require Import RiscvAdequacy.
 Require Import FsCrash.
-Require Import InodeRef.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.

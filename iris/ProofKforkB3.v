@@ -63,15 +63,13 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
 Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl WpSconfBtype.
@@ -240,11 +238,7 @@ Section KforkB3Proof.
   Notation Rs4 := (mword_of_int 20 : mword 5).
   Notation Rs5 := (mword_of_int 21 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* THE INVARIANT THE OUTER FUNCTION MUST SUPPLY AND GETS BACK: the generic
      callee-saved chain against the function's own entry map [m0], for every
@@ -258,9 +252,18 @@ Section KforkB3Proof.
       r <> Rs0 -> r <> Rs1 -> r <> Rs2 -> r <> Rs3 -> r <> Rs4 -> r <> Rs5 ->
       M !!! Regidx r = m0 !!! Regidx r.
 
+  (* THE RESERVE IS AN EXPLICIT PARAMETER [r], NOT [trap_res b].
+     This block is ARM-GENERIC in [b] but is applied at [b := false] -- kfork
+     runs the fd scan with np->lock held -- from a window whose index already
+     carries the reserve of the CALLER's arm.  Writing [trap_res b] here would
+     therefore be wrong twice over: it would read [0] at the [false]
+     instantiation, and it would tie the carve to the wrong arm.  So the block
+     is index-generic in an opaque [rsv] that it never inspects; the
+     caller instantiates [rsv := trap_res b] at its own arm.  (Same shape as
+     [ProofAllocproc.ap_tail]; see claude-notes/projects/kerneltrap.md.) *)
   Lemma kfkb3_fd_loop
       (γl γf : gname) (pme npa : mword 64) (pid_p pid_c : mword 32)
-      (Vp V0 : pprivate) (m0 : regfile) (K n : nat) (eb b : bool)
+      (Vp V0 : pprivate) (m0 : regfile) (rsv K n : nat) (eb b : bool)
       (C : iProp Σ) (sp0v s00v : mword 64) :
     (22 <= K)%nat ->
     (Z.of_nat n + 1 < 2 ^ 31)%Z ->
@@ -279,13 +282,13 @@ Section KforkB3Proof.
           ⌜Mx !!! Regidx csp_rs1 = sp0v /\ Mx !!! Regidx Rs0 = s00v /\
             Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
             kfkb3_thr m0 Mx⌝ -∗
-          sie_cap_gpr Mx (K - 8)%nat b pme -∗
+          sie_cap_gpr Mx (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme C b -∗
           pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
           proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
           WP (Loop : expr riscv_lang)) -∗
-      sie_cap_gpr M (K - 8)%nat b pme -∗
+      sie_cap_gpr M (rsv + (K - 8))%nat b pme -∗
       cpu_own n eb pme C b -∗
       pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
       proc_priv γf pme pid_p Vp -∗
@@ -294,7 +297,8 @@ Section KforkB3Proof.
   Proof.
     intros HK Hn HV0.
     iIntros "#Htext #Hft #Hpanic".
-    assert (HK14 : (14 <= (K - 8))%nat) by (apply kfkb3_stack; exact HK).
+    assert (HK14 : (14 <= (rsv + (K - 8)))%nat)
+      by (pose proof (kfkb3_stack K HK); lia).
     assert (HlenV0 : length (pv_ofile V0) = NOFILE)
       by (rewrite HV0 length_replicate; reflexivity).
     (* ================================================================= *)
@@ -314,13 +318,13 @@ Section KforkB3Proof.
               ⌜Mx !!! Regidx csp_rs1 = sp0v /\ Mx !!! Regidx Rs0 = s00v /\
                 Mx !!! Regidx Rs4 = npa /\ Mx !!! Regidx Rs5 = pme /\
                 kfkb3_thr m0 Mx⌝ -∗
-              sie_cap_gpr Mx (K - 8)%nat b pme -∗
+              sie_cap_gpr Mx (rsv + (K - 8))%nat b pme -∗
               cpu_own n eb pme C b -∗
               pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
               proc_priv γf pme pid_p Vp -∗
               proc_priv_nocwd γf npa pid_c (kfk_childV V0 (pv_ofile Vp) NOFILE) -∗
               WP (Loop : expr riscv_lang)) -∗
-          sie_cap_gpr M (K - 8)%nat b pme -∗
+          sie_cap_gpr M (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme C b -∗
           pc_is (mword_of_int (KF + 0x96) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
@@ -342,7 +346,7 @@ Section KforkB3Proof.
             Mt !!! Regidx Rs1 = p_ofile pme i /\ Mt !!! Regidx Rs2 = p_ofile npa i /\
             Mt !!! Regidx Rs3 = p_cwd pme /\ Mt !!! Regidx Rs4 = npa /\
             Mt !!! Regidx Rs5 = pme /\ kfkb3_thr m0 Mt⌝ -∗
-          sie_cap_gpr Mt (K - 8)%nat b pme -∗
+          sie_cap_gpr Mt (rsv + (K - 8))%nat b pme -∗
           cpu_own n eb pme C b -∗
           pc_is (mword_of_int (KF + 0x8e) : mword 64) -∗
           proc_priv γf pme pid_p Vp -∗
@@ -356,7 +360,7 @@ Section KforkB3Proof.
         iPoseProof (kfk_092 with "Htext") as "Hi092".
         (* ---- +0x8e: c.addi s1,s1,8 ---- *)
         iApply (wp_caddi_s_sconf (mword_of_int (KF + 0x8e)) Rs1 (mword_of_int 8 : mword 6)
-                  Mt (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
+                  Mt (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi08e [-]").
         iIntros (CID1 Hst1) "Hcg Hpc".
         set (T1 := <[Regidx Rs1 := regval_into_reg
@@ -388,7 +392,7 @@ Section KforkB3Proof.
           rewrite /T1 upd_ne; [| regne]. apply Htthr; assumption. }
         (* ---- +0x90: c.addi s2,s2,8 ---- *)
         iApply (wp_caddi_s_sconf (mword_of_int (KF + 0x90)) Rs2 (mword_of_int 8 : mword 6)
-                  T1 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
+                  T1 (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                   with "Hcg Hpc Hi090 [-]").
         iIntros (CID2 Hst2) "Hcg Hpc".
         set (T2 := <[Regidx Rs2 := regval_into_reg
@@ -424,7 +428,7 @@ Section KforkB3Proof.
           assert (Hcmp : eq_vec (T2 !!! Regidx Rs1) (T2 !!! Regidx Rs3) = true).
           { rewrite HT2s1 HT2s3 Heos -p_ofile_end. apply eq_vec_refl. }
           iApply (wp_beq_taken_s_sconf (mword_of_int (KF + 0x92)) (mword_of_int 18 : mword 13)
-                    Rs3 Rs1 T2 (K - 8)%nat b
+                    Rs3 Rs1 T2 (rsv + (K - 8))%nat b
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rgne; rgne; exact Hcmp) ltac:(vm_compute; reflexivity)
                     with "Hcg Hpc Hi092 [-]").
@@ -448,7 +452,7 @@ Section KforkB3Proof.
           assert (Hcmp : eq_vec (T2 !!! Regidx Rs1) (T2 !!! Regidx Rs3) = false).
           { rewrite HT2s1 HT2s3 -p_ofile_end. apply eq_vec_false_iff. exact Hne'. }
           iApply (wp_beq_fall_s_sconf (mword_of_int (KF + 0x92)) (mword_of_int 18 : mword 13)
-                    Rs3 Rs1 T2 (K - 8)%nat b
+                    Rs3 Rs1 T2 (rsv + (K - 8))%nat b
                     ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)
                     ltac:(rgne; rgne; exact Hcmp)
                     with "Hcg Hpc Hi092 [-]").
@@ -477,7 +481,7 @@ Section KforkB3Proof.
       assert (Haddr : add_vec (M !!! Regidx Rs1) (sign_extend' 64 (mword_of_int 0 : mword 12))
                      = p_ofile pme i) by (rewrite Hs1; apply addv_sext0).
       iApply (wp_cld_s_sconf (mword_of_int (KF + 0x96)) Ra0 Rs1 (mword_of_int 0 : mword 12)
-                M (K - 8)%nat v b ltac:(vm_compute; discriminate) ltac:(rdok)
+                M (rsv + (K - 8))%nat v b ltac:(vm_compute; discriminate) ltac:(rdok)
                 with "Hcg Hpc Hi096 [Hcell] [-]").
       { iEval (rewrite Haddr). iExact "Hcell". }
       iIntros (CIDl Hstl) "Hcg Hpc Hcell". iEval (rewrite Haddr) in "Hcell".
@@ -510,7 +514,7 @@ Section KforkB3Proof.
         assert (Hz : eq_vec (L1 !!! Regidx Ra0) (zero_reg : mword 64) = true)
           by (rewrite HL1a0; apply eq_vec_true_iff; exact Hvz).
         iApply (wp_cbeqz_taken_s_sconf (mword_of_int (KF + 0x98)) (mword_of_int 251 : mword 8)
-                  (Cregidx (mword_of_int 2)) Ra0 L1 (K - 8)%nat b
+                  (Cregidx (mword_of_int 2)) Ra0 L1 (rsv + (K - 8))%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   Hz ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi098 [-]").
@@ -544,7 +548,7 @@ Section KforkB3Proof.
         assert (Hz : eq_vec (L1 !!! Regidx Ra0) (zero_reg : mword 64) = false)
           by (rewrite HL1a0; apply eq_vec_false_iff; exact Hvnz).
         iApply (wp_cbeqz_fall_s_sconf (mword_of_int (KF + 0x98)) (mword_of_int 251 : mword 8)
-                  (Cregidx (mword_of_int 2)) Ra0 L1 (K - 8)%nat b
+                  (Cregidx (mword_of_int 2)) Ra0 L1 (rsv + (K - 8))%nat b
                   ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate)
                   Hz with "Hcg Hpc Hi098 [-]").
         iIntros (CIDm Hstm) "Hcg Hpc".
@@ -565,7 +569,7 @@ Section KforkB3Proof.
         iDestruct (ofile_slot_null with "Hslot2") as "[Hcell2 Hfds]".
         (* ---- +0x9a: jal ra,filedup ---- *)
         iApply (wp_jal_s_sconf (mword_of_int (KF + 0x9a)) Rra (mword_of_int 8986 : mword 21)
-                  L1 (K - 8)%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
+                  L1 (rsv + (K - 8))%nat b ltac:(vm_compute; discriminate) ltac:(rdok)
                   ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi09a [-]").
         iIntros (CIDn Hstn) "Hcg Hpc".
@@ -601,7 +605,7 @@ Section KforkB3Proof.
         assert (HL2a0k : L2 !!! Regidx Ra0 = fnode k) by (rewrite HL2a0; exact Hfn).
         iDestruct (cpu_own_transport CIDk CIDn n eb pme C b ltac:(wp_next_chain) with "Hown")
           as "Hown".
-        iApply (FD.wp_filedup_sconf γl γf k q Cf L2 n eb pme C (K - 8)%nat b
+        iApply (FD.wp_filedup_sconf γl γf k q Cf L2 n eb pme C (rsv + (K - 8))%nat b
                   HK14 Hn HL2a0k
                   with "Hcg Hown Htext Hpc Hft Hpanic Hfds Href [-]").
         iIntros (CIDo Hsto mr) "Hcg Hown Hpc %Hcsmr Hslota Hslotb".
@@ -630,7 +634,7 @@ Section KforkB3Proof.
         assert (Haddr2 : add_vec (mr !!! Regidx Rs2) (sign_extend' 64 (mword_of_int 0 : mword 12))
                         = p_ofile npa i) by (rewrite Hmrs2; apply addv_sext0).
         iApply (wp_sd_s_sconf (mword_of_int (KF + 0x9e)) Ra0 Rs2 (mword_of_int 0 : mword 12)
-                  mr (K - 8)%nat (zero_reg : mword 64) b
+                  mr (rsv + (K - 8))%nat (zero_reg : mword 64) b
                   with "Hcg Hpc Hi09e [Hcell2] [-]").
         { iEval (rgne; rewrite Haddr2). iExact "Hcell2". }
         iIntros (CIDp Hstp) "Hcg Hpc Hcell2".
@@ -652,7 +656,7 @@ Section KforkB3Proof.
         (* ---- +0xa2: c.j -> +0x8e ---- *)
         iApply (wp_cj_s_sconf (mword_of_int (KF + 0xa2))
                   (sign_extend' 21 (concat_vec (mword_of_int 2038 : mword 11) ('b"0")))
-                  mr (K - 8)%nat b ltac:(vm_compute; reflexivity)
+                  mr (rsv + (K - 8))%nat b ltac:(vm_compute; reflexivity)
                   with "Hcg Hpc Hi0a2 [-]").
         iIntros (CIDq Hstq). iNext. iIntros "Hcg Hpc".
         assert (Htgt8e' : add_vec (mword_of_int (KF + 0xa2) : mword 64)

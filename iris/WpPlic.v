@@ -82,7 +82,53 @@ Existing Instance riscv_memGS.
    only the PLIC ([plicinit]) can use it directly.  The bundle-taking form is
    the restatement [wp_sw_plic_dev_s_sconf] below, kept verbatim for the
    existing consumers. *)
-Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+
+(* ==================================================================== *)
+(* THE READ-SIDE SIDE CONDITION [SrcOk] ON EVERY LEAF IN THIS SECTION.   *)
+(* Read once; each leaf below carries a three-line pointer back here.    *)
+(*                                                                      *)
+(* WHAT IT IS.  These leaves take their operands out of CALLER-CHOSEN    *)
+(* registers, spelled [rget m rs] -- a lookup in [tp_pin m] (HartTp.v),  *)
+(* which is [m] with tp's slot overwritten by THIS HART's id.  So the    *)
+(* value depends on the ambient hart at exactly one register, rs = tp,   *)
+(* and agrees at every other ([HartTp.rget_hart_indep]).  Those operands *)
+(* are computed from the ENTRY map, at the hart we came from, and appear *)
+(* again inside the [wp_next] lambda, where every resource is about the  *)
+(* hart we resume on.  Today the funnel's sigma-callback is instantiated  *)
+(* at the entry hart so the two coincide; once that callback moves       *)
+(* inside [WpNext.wp_next] -- so an instruction can execute on the hart  *)
+(* a trap returned to -- the obligation arrives at the REBOUND hart      *)
+(* while the caller's premise was stated at the ENTRY hart, and they     *)
+(* agree only away from tp.  [IntrDefs.SrcOk rs] is that side condition. *)
+(*                                                                      *)
+(* WHY A CLASS AND NOT A PREMISE.  These leaves have no premise slot     *)
+(* whose MEANING could be widened for free: a store writes no register   *)
+(* at all, and a load's [rd_ok] slot is about the DESTINATION, not the   *)
+(* source.  An ordinary premise would change ARITY at every reference,   *)
+(* each of which would need a positional [ltac:(...)] in the right       *)
+(* place.  An implicit instance argument shifts no positional argument,  *)
+(* so the family converts with ZERO call-site churn -- and it cannot be  *)
+(* [ops_ok] either, whose source conjuncts are guarded on [b = true]     *)
+(* while an address has to be hart-independent at [b = true] as well.    *)
+(* Multi-source leaves take ONE CLASS ARGUMENT PER SOURCE; they resolve  *)
+(* independently, so there is no combinatorial blow-up.                  *)
+(*                                                                      *)
+(* THE PREMISES STAY SPELLED [rget m rs].  Respelling them hart-free as  *)
+(* [m !!! Regidx rs] was MEASURED (on [WpSconfMem.wp_csdsp_s_sconf]) and *)
+(* rejected: it breaks 99 consumer files, because callers normalise with *)
+(* [rget]-shaped rewrites that then have nothing to match.  So the class *)
+(* carries the side condition, the spelling does not move, and the       *)
+(* reconciliation happens INSIDE each proof in one line, via             *)
+(* [IntrDefs.src_ok_rget_indep].                                         *)
+(*                                                                      *)
+(* THAT LINE IS ALSO THE LEAF'S WIRING CHECK, so do not delete it as an  *)
+(* unused hypothesis: it names the register the premise reads, so a      *)
+(* class attached to the wrong parameter fails to typecheck HERE instead  *)
+(* of shelving silently at a consumer's [Qed] -- an unresolved instance  *)
+(* inside an [iApply] is SHELVED, not reported.                          *)
+(* ==================================================================== *)
+
+Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
     (m : regfile) (n : nat) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -103,6 +149,14 @@ Lemma wp_sw_plic_pinv_s_sconf (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5
   WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
+  (* the class, consumed at [rs1 / rs2] -- the one line the funnel change needs,
+     and this leaf's wiring check.  See the family note at the head of this
+     section. *)
+  assert (Hea_all : forall hh : CpuId,
+            add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = ea)
+    by (intros hh; unfold ea; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+  assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+    by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
   iIntros "Hcg Hpc Hinstr #Hpinv Hcont".
   iApply (wp_instr_s_sconf m n b pc is_rvc
             (STORE (imm, Regidx rs2, Regidx rs1, 4))
@@ -244,7 +298,7 @@ Qed.
 (* The bundle-taking RESTATEMENT of the leaf above, for the consumers written
    before the device invariant was split per device ([plicinithart],
    [plic_complete]): statement verbatim, proof one projection. *)
-Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) (imm : mword 12)
+Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc : bool) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
     (m : regfile) (n : nat) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -265,6 +319,14 @@ Lemma wp_sw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
   WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 storeword Hrange Halign Hcanon Hdevvpn Hwrite.
+  (* the class, consumed at [rs1 / rs2] -- the one line the funnel change needs,
+     and this leaf's wiring check.  See the family note at the head of this
+     section. *)
+  assert (Hea_all : forall hh : CpuId,
+            add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = ea)
+    by (intros hh; unfold ea; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+  assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+    by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
   iDestruct (dev_inv_plic with "Hdinv") as "#Hpinv".
   iApply (wp_sw_plic_pinv_s_sconf pc is_rvc rs2 rs1 imm m n b
@@ -279,7 +341,7 @@ Qed.
    kernel's plan admits, and in exchange it may name a property [P] of the value
    read that holds at all of them -- that is how [plic_claim] learns its result
    is one of the machine's own interrupt ids. *)
-Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5)
+Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 64) (is_rvc is_unsigned : bool) (rd rs1 : mword 5) `{!SrcOk rs1}
     (imm : mword 12) (m : regfile) (n : nat) (P : bv 32 -> Prop) (b : bool) :
   let ea := add_vec (rget m rs1) (sign_extend' 64 imm) in
   let a8 := sign_extend' 64 (subrange_vec_dec ea (xlen - 0 - 1) 0) in
@@ -305,6 +367,12 @@ Lemma wp_lw_plic_dev_s_sconf (γd : uart_names) (γv : disk_names) (pc : mword 6
   WP (Loop : expr riscv_lang).
 Proof.
   intros ea a8 ldval Hrange Halign Hcanon Hdevvpn Hrd Hrdok Hread.
+  (* the class, consumed at [rs1] -- the one line the funnel change needs,
+     and this leaf's wiring check.  See the family note at the head of this
+     section. *)
+  assert (Hea_all : forall hh : CpuId,
+            add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = ea)
+    by (intros hh; unfold ea; by rewrite (src_ok_rget_indep m rs1 hh CID)).
   pose proof (rd_ok_sp rd Hrdok) as Hrdsp.
   pose proof (rd_ok_tp rd Hrdok) as Hrdtp.
   iIntros "Hcg Hpc Hinstr #Hdinv Hcont".
@@ -455,5 +523,13 @@ Proof.
   iApply ("Hcont" $! cpu_id with "[] Hcg [$Hpc' $Hnpc]").
   iPureIntro. done.
 Qed.
+
+(* ------------------------------------------------------------------- *)
+(* [SrcOk] SMOKE TEST -- see IntrDefs.v's checker block.  x15/x14 (a5/a4) *)
+(* are the registers plicinit / plic_claim hold the PLIC base in.         *)
+(* ------------------------------------------------------------------- *)
+Definition plic_srcok_pos_a5 : SrcOk (mword_of_int 15 : mword 5) := _.
+Definition plic_srcok_pos_a4 : SrcOk (mword_of_int 14 : mword 5) := _.
+Fail Definition plic_srcok_neg : SrcOk Rtp := _.
 
 End WpPlic.

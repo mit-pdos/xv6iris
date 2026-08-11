@@ -55,7 +55,7 @@ Require Import CodeSleeplock.
 Require Import SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecReleasesleep.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 Local Open Scope Z_scope.
 
@@ -262,7 +262,7 @@ Section ProofReleasesleep.
     iDestruct "Hcell" as (v) "[Hslkw %Hnz]".
     (* ===== sw zero,0(s1) : slk->locked := 0 ===== *)
     iPoseProof (rsl_18 with "Htext") as "Hi18".
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x18)) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) Macq (av - 4)%nat v false
+    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x18)) (mword_of_int 9 : mword 5) (mword_of_int 0 : mword 12) Macq (trap_res b + (av - 4))%nat v false
               with "Hcg Hpc Hi18 [Hslkw] [-]").
     { iEval (rewrite Hslkaddr). iExact "Hslkw". }
     iApply wp_next_off_intro.
@@ -272,7 +272,7 @@ Section ProofReleasesleep.
     iEval (rewrite Hpp1c) in "Hpc".
     (* ===== sw zero,40(s1) : slk->pid := 0 ===== *)
     iPoseProof (rsl_1c with "Htext") as "Hi1c".
-    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x1c)) (mword_of_int 9 : mword 5) (mword_of_int 0x28 : mword 12) Macq (av - 4)%nat pd false
+    iApply (wp_sw_zero_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x1c)) (mword_of_int 9 : mword 5) (mword_of_int 0x28 : mword 12) Macq (trap_res b + (av - 4))%nat pd false
               with "Hcg Hpc Hi1c [Hpid] [-]").
     { iEval (rewrite Hpidaddr). iExact "Hpid". }
     iApply wp_next_off_intro.
@@ -283,7 +283,7 @@ Section ProofReleasesleep.
     (* ===== a0 := s1 (slk) ; jal wakeup ===== *)
     iPoseProof (rsl_20 with "Htext") as "Hi20".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x20)) (mword_of_int 10 : mword 5) (mword_of_int 9 : mword 5)
-              Macq (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              Macq (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -293,7 +293,7 @@ Section ProofReleasesleep.
     iEval (rewrite Hpp22) in "Hpc".
     iPoseProof (rsl_22 with "Htext") as "Hi22".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x22)) (mword_of_int 1 : mword 5) (mword_of_int 2088980 : mword 21)
-              A_wa0 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              A_wa0 (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi22 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -304,7 +304,7 @@ Section ProofReleasesleep.
     assert (HCwkra : Cwk !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.releasesleep + 0x22) : mword 64) 4)
       by (rewrite /Cwk; apply upd_eq).
     (* ===== wakeup(slk): intr_count 1 (unchanged net), noff/intena threaded ===== *)
-    iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq)  Cwk γs (mycpu_ret (cid_word_of CIDacq)) pme 1%nat (av - 4)%nat b C false
+    iApply (Wakeup.wp_wakeup_sconf (CID := CIDacq)  Cwk γs (mycpu_ret (cid_word_of CIDacq)) pme 1%nat (trap_res b + (av - 4))%nat b C false
               ltac:(lia)
               ltac:(intro r; apply rf_to_gmap_dom)
               Hlen
@@ -326,7 +326,7 @@ Section ProofReleasesleep.
     (* ===== a0 := s2 (sl_lk slk) ; jal release ===== *)
     iPoseProof (rsl_26 with "Htext") as "Hi26".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x26)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 5)
-              Mwk (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              Mwk (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi26 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".
@@ -336,7 +336,7 @@ Section ProofReleasesleep.
     iEval (rewrite Hpp28) in "Hpc".
     iPoseProof (rsl_28 with "Htext") as "Hi28".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.releasesleep + 0x28)) (mword_of_int 1 : mword 5) (mword_of_int 2084162 : mword 21)
-              A_ra0 (av - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              A_ra0 (trap_res b + (av - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi28 [-]").
     iApply wp_next_off_intro.
     iIntros "Hcg Hpc".

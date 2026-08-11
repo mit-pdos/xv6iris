@@ -34,22 +34,15 @@ Require Import StackOwn CalleeSaved.
 Require Import VcGen WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import IntrDefs HartTp WpNext.
 Require Import WpLock.
-Require Import ProcGeom CpuOwn.
-Require Import SpecPanic.
+Require Import CpuOwn.
 Require Import KallocInv.
 Require Import FdSlots FileInv ProcInv.
-Require Import SchedCtx.
+Require Import ProcInv.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.
-Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import KvmSpec.
-Require Import SpecAllocpid.
-Require Import SpecAllocproc.
-Require Import SpecProcinit.
-Require Import WaitInv.
 Require Import SpecKfork.
 Require Import SpecSysFork.
 From Kernel Require KernelInstrs.

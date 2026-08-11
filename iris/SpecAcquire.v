@@ -74,8 +74,23 @@ Definition wp_acquire_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
        on acquire's first instruction, before it disables), which is exactly
        the resource-index / wp_next-index divergence documented in the porting
        guide.  Threading [b] out made release -- whose entry is [false] --
-       uncallable. *)
-    sie_cap_gpr mfin av false p -∗
+       uncallable.
+
+       AND [trap_res b + av], NOT [av]: acquire's push_off is the point at
+       which the ARM-DEPENDENT trap reserve of [IntrDefs.sie_cap] moves into
+       the usable count.  The total carve is conserved -- entry carve
+       [trap_res b + av], exit carve [trap_res false + (trap_res b + av)] =
+       [trap_res b + av] -- so this is a pure re-indexing of the SAME stack
+       ownership, not a split: the [kv_frame_slots] an enabled caller was
+       holding against a trap become ordinary usable stack for the
+       interrupts-off critical section, where nothing can trap.  At
+       [b = false] the index is [trap_res false + av], DEFINITIONALLY [av],
+       so an interrupts-off caller reads verbatim as before.  The matching
+       [Release] entry index is [trap_res outb + av] with [outb] forced equal
+       to [b] by [cpu_own], so the acquire/release pair composes back to [av]
+       syntactically and no [kv_frame_slots <= _] premise appears anywhere.
+       [10 <= av] does not move: [av] is still the ENTRY usable count. *)
+    sie_cap_gpr mfin (trap_res b + av)%nat false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗
@@ -104,8 +119,23 @@ Definition wp_acquire_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
        on acquire's first instruction, before it disables), which is exactly
        the resource-index / wp_next-index divergence documented in the porting
        guide.  Threading [b] out made release -- whose entry is [false] --
-       uncallable. *)
-    sie_cap_gpr mfin av false p -∗
+       uncallable.
+
+       AND [trap_res b + av], NOT [av]: acquire's push_off is the point at
+       which the ARM-DEPENDENT trap reserve of [IntrDefs.sie_cap] moves into
+       the usable count.  The total carve is conserved -- entry carve
+       [trap_res b + av], exit carve [trap_res false + (trap_res b + av)] =
+       [trap_res b + av] -- so this is a pure re-indexing of the SAME stack
+       ownership, not a split: the [kv_frame_slots] an enabled caller was
+       holding against a trap become ordinary usable stack for the
+       interrupts-off critical section, where nothing can trap.  At
+       [b = false] the index is [trap_res false + av], DEFINITIONALLY [av],
+       so an interrupts-off caller reads verbatim as before.  The matching
+       [Release] entry index is [trap_res outb + av] with [outb] forced equal
+       to [b] by [cpu_own], so the acquire/release pair composes back to [av]
+       syntactically and no [kv_frame_slots <= _] premise appears anywhere.
+       [10 <= av] does not move: [av] is still the ENTRY usable count. *)
+    sie_cap_gpr mfin (trap_res b + av)%nat false p -∗
     pc_is ret_tgt -∗
     ⌜ callee_saved m mfin ⌝ -∗
     locked γl cpu_id -∗ R -∗

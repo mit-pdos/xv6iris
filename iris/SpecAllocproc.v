@@ -175,7 +175,14 @@ Definition allocproc_post
        is_kstack (proc_addr j) ks ∗
        ctx_cells (p_context (proc_addr j))
          (forkret_pc :: add_vec ks (mword_of_int 4096) :: rest) ∗
-       sie_cap_gpr mr K false pme ∗
+       (* [trap_res b + K], NOT [K]: allocproc RETURNS HOLDING p->lock, so
+          this arm inherits [acquire]'s unbalanced exit index verbatim -- the
+          caller's trap reserve has moved into the usable count for the
+          interrupts-off critical section it is still inside, and it stays
+          there until the caller's own [release] gives it back.  The null arms
+          below released everything, so they exit at [K] with arm [b] and the
+          reserve back inside [sie_cap]'s [trap_res b] summand. *)
+       sie_cap_gpr mr (trap_res b + K)%nat false pme ∗
        cpu_own (S lvl) eb pme C false ∗
        arm_pay lvl eb pme ∗
        kalloc_env γa (avail_sub on nc))

@@ -36,35 +36,27 @@ Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
 Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
-Require Import RiscvFetchExec.
-Require Import MemAccessGen.
 Require Import RegFile.
-Require Import InstrBytes.
 Require Import HartTp WpNext.
 Require Import WpMmodeLeafBase.
 Require Import MinstretInv.
-Require Import KptGhost.
 Require Import SmodeCore.
 Require Import StackOwn.
 Require Import CalleeSaved.
 Require Import KernelRvcDecode.
 Require Import VcGen.
 Require Import WpLock.
-Require Import WpSconfAlu WpSconfMem WpSconfBtype WpSconfCtl.
+Require Import WpSconfAlu WpSconfMem WpSconfCtl.
 Require Import WpAu4.
 Require Import IntrDefs.
 Require Import CpuOwn.
-Require Import InodeInv.
 Require Import DiskPtsto.
-Require Import FsBlocks LogInv FsCrash.
-Require Import DinodeEnc.
-Require Import InodeLock.
+Require Import FsBlocks.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import CodeIdup.
-Require Import SpecPanic.
 Require Import SpecAcquire SpecRelease.
 Require Import SpecIdup.
 From Kernel Require KernelSyms.
@@ -111,11 +103,7 @@ Section ProofIdup.
   Notation Ra0  := (mword_of_int 10 : mword 5).
   Notation Ra5  := (mword_of_int 15 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* [ProofFiledup.sie_b_agree], verbatim: [b] and [n]/[eb] are two
      presentations of the same SIE state, and the ghost eighth they share
@@ -381,7 +369,7 @@ Section ProofIdup.
                   = i_ref (ientry k)).
     { rewrite (rget_ne macq Rs1 ltac:(vm_compute; discriminate)) Hms1. reflexivity. }
     iApply (wp_lw_au_s_sconf true (mword_of_int (KernelSyms.idup + 0x18)) Ra5 Rs1
-              (mword_of_int 8 : mword 12) macq (K - 4)%nat
+              (mword_of_int 8 : mword 12) macq (trap_res b + (K - 4))%nat
               (fun v => (⌜v = iref_word M k⌝ ∗ itable_half M)%I)
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(solve_ndisj)
@@ -405,7 +393,7 @@ Section ProofIdup.
     iEval (rewrite Hpp1a) in "Hpc".
     (* +0x1a c.addiw a5,a5,1 -- NO panic arm here, unlike filedup *)
     iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.idup + 0x1a)) Ra5 (mword_of_int 1 : mword 6)
-              D1 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D1 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1a [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -431,7 +419,7 @@ Section ProofIdup.
                    = i_ref (ientry k)).
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
     iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
-              (mword_of_int 8 : mword 12) D2 (K - 4)%nat
+              (mword_of_int 8 : mword 12) D2 (trap_res b + (K - 4))%nat
               (itable_half (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ∗
                iref_tok k (qr/2)%Qp ∗ live_frac k s)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
@@ -466,9 +454,12 @@ Section ProofIdup.
              [ci] alone and so is literally the hypothesis. *)
         iPureIntro. destruct Hciwf as (Hdom & Hinj & Hrange & Hdev).
         split_and!; [| exact Hinj | exact Hrange | exact Hdev].
-        rewrite dom_insert_L Hdom.
-        assert (Hkin : k ∈ dom M) by (apply elem_of_dom; by eexists).
-        set_solver. }
+        (* NOT [set_solver]: from inside this whole-function proof it
+           rescans the entire Iris context -- 80 s for one domain identity
+           (optimization.md).  [k] is already in [dom M], so the re-insert
+           does not move the domain at all. *)
+        rewrite (dom_insert_lookup_L M k _ (mk_is_Some _ _ HMk)).
+        exact Hdom. }
       iPureIntro. destruct Hwf as [Hdom Hcnt'].  split.
       - intros j Hj. destruct (decide (j = k)) as [->|Hne]; [exact Hk|].
         rewrite lookup_insert_ne in Hj; [|by apply not_eq_sym]. by apply Hdom.
@@ -482,7 +473,7 @@ Section ProofIdup.
     iEval (rewrite Hpp1e) in "Hpc".
     (* +0x1e/+0x22 a0 := &itable ; +0x26 jal release *)
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.idup + 0x1e)) Ra0 (mword_of_int 29 : mword 20)
-              D2 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D2 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D3 := <[Regidx Ra0 := regval_into_reg
@@ -492,7 +483,7 @@ Section ProofIdup.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp22) in "Hpc".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.idup + 0x22)) Ra0 Ra0 (mword_of_int 1708 : mword 12)
-              D3 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D3 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi22 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -505,7 +496,7 @@ Section ProofIdup.
       by (apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpp26) in "Hpc".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.idup + 0x26)) Rra (mword_of_int 2087620 : mword 21)
-              D4 (K - 4)%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
+              D4 (trap_res b + (K - 4))%nat false ltac:(vm_compute; discriminate) ltac:(rdok)
               ltac:(vm_compute; reflexivity) with "Hcg Hpc Hi26 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
     set (D5 := <[Regidx Rra := regval_into_reg
@@ -533,6 +524,12 @@ Section ProofIdup.
       rewrite /D3 upd_ne; [| vm_compute; discriminate]. exact HD2s1. }
     assert (HD5ra : D5 !!! Regidx Rra = add_vec_int (mword_of_int (KernelSyms.idup + 0x26) : mword 64) 4)
       by (rewrite /D5; apply upd_eq).
+    (* the acquire handed the window index out as [trap_res b + N]; release
+       wants it as [trap_res outb + N] with [outb = match n with O => eb
+       | S _ => false end].  Those are the same bool -- [cpu_own] forces
+       it -- so this is a pure re-spelling, and it is what makes the
+       acquire/release pair compose back to [N]. *)
+    iEval (rewrite Houtb) in "Hcg".
     iApply (Release.wp_release_sconf γl itable_lock "itable"%string (itable_res2 cn γfs γi cov logstart nib dev) D5
               n eb p C (K - 4)%nat
               ltac:(rewrite HD5a0; reflexivity)

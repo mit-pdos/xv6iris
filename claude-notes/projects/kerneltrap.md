@@ -418,16 +418,70 @@ alternatives:
   cone — is unchanged as written, and `iExact`/`iFrame` see through the index.
   Writing `avail + trap_res b` instead would leave `av + 0` stuck against `av`
   at thousands of sites.
-- **No `K ≤ n` premise moves and no constant is retuned.**  The sp movers
-  (`_push`/`_pop`/`_grow`/`_shrink`/`_retarget`) keep their premises verbatim;
-  `trap_res b` is an opaque `nat` atom that `lia` carries through
-  `trap_res b + avail = k + (trap_res b + (avail - k))`.  What DOES change is
-  the avail INDEX at the six unbalanced seams — `push_off`/`acquire` exit at
-  `trap_res b + av`, `pop_off`/`release` enter there and exit at `av` — which
-  is exactly what makes a balanced push/pop pair compose back to `av`
-  syntactically, so no balanced caller changes at all.  `sie_cap_acc` (the old
+- **No `K ≤ n` premise moves on the sp movers.**  `_push`/`_pop`/`_grow`/
+  `_shrink`/`_retarget` keep their premises verbatim; `trap_res b` is an opaque
+  `nat` atom that `lia` carries through
+  `trap_res b + avail = k + (trap_res b + (avail - k))`.  `sie_cap_acc` (the old
   reserve-peeling accessor) has no remaining user and goes away with
   `intr_frame`.
+
+**CORRECTION, measured: "no balanced caller changes at all" IS FALSE, and the
+freed reserve must ride `arm_pay`.**  The first draft of this section reasoned
+that since a balanced `push_off`/`pop_off` pair composes back to `av`, only the
+unbalanced seams move.  A balanced pair *does* compose — but **the WINDOW
+BETWEEN them runs at `trap_res b + av`**, and callers at a generic `b` (the
+norm) spell that window's index explicitly.  Cost of routing it through the
+index: **484 in-lock index occurrences across 36 `Proof*.v` files**
+(`ProofPipewrite` 56, `ProofScheduler` 29, `ProofFilealloc` 26, …), each
+needing its arithmetic re-verified.  Two premises also move that the draft said
+would not: the three `sp_bounds` helpers need `(0 < k)` (`stack_own_sp_bounds`
+needs a nonempty carve, and the arm-blind 78 used to cover that at either arm —
+which is precisely why it needed no premise before), and `SpecScheduler`'s
+`20 ≤ av` becomes `kv_frame_slots + 20 ≤ av`, since its inlined `intr_on` is the
+one place that enables interrupts where nobody holds the reserve.
+
+**DECIDED — AND THEN REVERSED, on a design argument that outranks the cost.
+The reserve rides the INDEX: `N -> N+K` on disable, `M -> M-K` on enable with
+`M >= K`.**  The cheaper route below was adopted first and is wrong, for a
+reason worth keeping: **inside the trap handler those `kv_frame_slots` slots ARE
+its ordinary working stack.**  kernelvec pushes its 32-slot frame and kerneltrap
+its 6-slot frame into them with the normal sp movers.  If they arrive as a
+separate `stack_own` conjunct in a handover token, the handler must splice that
+conjunct into its capability by hand before the standard machinery applies — so
+stack use inside the handler looks DIFFERENT from stack use everywhere else.
+That is precisely the bespoke surgery the arm-dependent carve exists to
+eliminate (see the first bullet above: the trap's handover should be a pure
+re-indexing of the same `stack_own`, so the handler gets a standard bundle).
+Paying ~484 mechanical index rewrites to keep ONE uniform notion of usable
+stack is the right trade; the guiding principle is explicit that a clean
+interface beats the effort of reaching it.
+
+The rejected-but-instructive alternative, recorded because it is the obvious
+first idea: **carry the freed reserve in `arm_pay`.**
+`arm_pay n eb p` is already the carrier that crosses exactly this seam — it is
+what `push_off` hands out when it dismantles the arm and what `pop_off` takes
+back, non-`emp` only at level 0 with an enabled base — and it is already
+threaded opaquely as `Hpay` through all 105 acquire/release sites.  So
+`sie_cap`'s definition stays exactly as above, every in-lock index stays at
+`av`, and the flip hands the difference over as a deep-end `stack_own` conjunct
+of `arm_pay` instead of re-indexing.  Verified prerequisite: every call site
+passes `acquire` and `release` the SAME `av` at the same sp (`ProofKfree`
+`(K-4)` both, `ProofSleep` `(av-6)` both), so the conjunct would have ridden
+for free — roughly one rewrite per site against 484.  Cheaper, and rejected
+anyway on the uniformity argument above.
+
+The four arm-FLIP leaves in `WpSconfCsr.v` (`wp_csrci_sstatus_s_sconf`,
+`wp_csrsi_sstatus_x0_s_sconf`, `wp_csrsi_sstatus_x0_enable_s_sconf`,
+`wp_csrci_sstatus_x0_s_sconf`) are **a member of the arm-blind class that the
+enumerated list missed**, and the interesting one: they are the only
+instructions that move the arm, hence the only ones where the reserve appears
+or disappears.  They are proved on branch `trap-res` (`57b6fab7`) at the
+carve-CONSERVING indices under a uniform rule — *a leaf moving the arm
+`b0 → b1` has pre index `trap_res b1 + n` and post index `trap_res b0 + n`*, so
+both sides carve the identical `trap_res b0 + (trap_res b1 + n)` and `iExact` on
+the untouched `Hstk` closes it with no split and no `≤` premise.  Those proofs
+are reusable under the `arm_pay` route (the reserve becomes a raw conjunct
+rather than an index).
 
 Rejected alternatives, both isomorphic to this one under
 `avail ↦ avail - trap_res b` but worse at the seams: (a) carve `= avail` with a
@@ -464,29 +518,75 @@ which has no `w_mie` at all.  So:
   return S-timer or S-external, and the scause word the trap writes is one of
   the two literals.  `clock_inv`'s fully-existential `mip` is untouched.
 
-### THE SRET IS A LEAF NOW
+### THE SRET IS A LEAF NOW — **PROVEN**, in `WpSconfSret.v`
 
 kernelvec's `sret` used to be `wp_sret_gpr_pt`, a raw-cell endpoint that just
-writes mstatus.  It is now the mirror image of the trap and belongs at the
-sconf altitude:
+writes mstatus.  It is now the mirror image of the trap and sits at the sconf
+altitude.  What was proved:
 
 ```coq
 wp_sret_s_sconf :
-  (kv_frame_slots <= av)%nat ->
-  sie_cap_gpr m av false p -∗ sret_bits ('b"1") ('b"1") -∗
-  sepc ↦ᵣ ep -∗ (∃ v, scause ↦ᵣ v) -∗ (∃ v, stval ↦ᵣ v) -∗
-  cpu_hart 0 false p -∗ cpu_claim p -∗ intr_handler_avail -∗
-  pc_is pc -∗ instr pc … SRET -∗
-  (sie_cap_gpr m av true p -∗ pc_is ep -∗ WP Loop) -∗ WP Loop
+  sie_cap_gpr m (trap_res true + n) false p -∗
+  sret_bits ('b"1") ('b"1") -∗ intr_count 1 true -∗
+  sepc ↦ᵣ sepc0 -∗ (∃ v, scause ↦ᵣ v) -∗ (∃ v, stval ↦ᵣ v) -∗
+  cpu_cells 0 true p -∗ cpu_claim p -∗
+  pc_is pc -∗ instr pc false (SRET tt) -∗
+  (sie_cap_gpr m n true p -∗ pc_is (ret_pc sepc0) -∗ WP Loop) -∗ WP Loop
 ```
 
 It does the ghost flip '0' → '1' with all four pieces in hand (`sconf`'s tied
-half, `sie_arm false`'s eighth, `cpu_hart`'s `intr_count 0 false` eighth, and
-the invariant quarter borrowed from the `intr_inv` inside
-`intr_handler_avail`), re-seals `intr_inv` with the □ handler spec that came
-in, re-ties `sret_bits` at the post-sret `(SPP, SPIE) = ('0','1')`, and folds
-everything back into `sie_arm true p`.  No `wp_next` wrapper: an `sret` cannot
-be trapped (interrupts are off when it executes).
+half, `sie_arm false`'s eighth, the count eighth, and the invariant quarter
+borrowed from the `intr_inv` inside `intr_handler_avail`), re-seals `intr_inv`
+with the □ handler spec that came in, re-ties `sret_bits` at the post-sret
+`(SPP, SPIE) = ('0','1')`, and folds everything back into `sie_arm true p`.
+No `wp_next` wrapper: an `sret` cannot be trapped (interrupts are off when it
+executes).
+
+**THE SKETCH THIS REPLACES HAD THE STACK ACCOUNTING BACKWARDS, and it is worth
+keeping because the error survives the carve unnoticed.**  It read
+`(kv_frame_slots <= av) -> sie_cap_gpr m av false p -∗ … sie_cap_gpr m av true p`
+— same `av` both sides, guarded by a `≤`.  That is not a weakening, it is
+resource CREATION: at `b = false` the bundle owns `av` slots, at `b = true` it
+owns `trap_res true + av = kv_frame_slots + av`.  The `≤` premise looks like it
+pays for the reserve and pays for nothing — it is left over from the arm-blind
+era, when the reserve was on both sides and a carve had to be split out by
+hand.  Under the arm-dependent `trap_res` the correct statement needs **no
+arithmetic premise at all**: `trap_res true + n` in, `n` out, both
+`kv_frame_slots + n` after the carve, so the stack conjunct is literally
+untouched and `iExact` closes it.  That is the same shape
+`wp_csrsi_sstatus_x0_s_sconf` already had, which is the tell — **an enabling
+leaf that needs a `≤` premise is mis-stated.**
+
+The premise set also differs from the sketch's `cpu_hart 0 false p ∗
+intr_handler_avail` in a way that is not a difference: `cpu_cells 0 true p ∗
+intr_count 1 true` is the same resources regrouped (`cpu_cells 0 eb p` is
+`eb`-independent at level 0 — the intena cell is existential there — and
+`intr_count 1 true` *is* the '0' eighth plus the avail).  It is spelled the
+second way to match the csrsi twin exactly, and for the reason that twin
+documents: asking for a whole `cpu_hart 0 true p` would ask the caller for the
+count eighth at '1' while its own bundle pins it at '0'.
+
+**Three things the port needed that the sketch did not mention.**
+
+- `MstatusBits.sret_ms5_SPP` / `_SPIE` did not exist (SPP := '0', SPIE := '1',
+  both CONSTANT in the result), and `IntrDefs.sret_sconf_flip` — the sret twin
+  of `WpSieFlipBits.csrsi_sie_flip` — carries `sconf_ms_facts` and the three
+  bits through the tower in the shape the leaf consumes.
+- **The tie actually MOVES here**, which no previous SIE flip did.  Every
+  csrci/csrsi flip left SPP and SPIE alone, so `sret_tie_congr` merely
+  re-expressed the tie at the new mstatus with no ghost update.  SRET writes
+  SPP := 0, so both halves must be updated together (`sret_bits_update`) — and
+  that is only possible because the caller handed the travelling half over.
+  The updated copy at ('0','1') goes into `sie_arm true`'s existential.
+- **The new SIE value is not a literal.**  `csrsi sstatus,2` sets bit 1 and
+  proves SIE = '1' from bit theory; SRET assigns SIE := SPIE, so the '1' comes
+  from the caller's `sret_bits` travelling half via `sconf_at_sret`-style
+  agreement with the tie.  That agreement is also what pins SPP = '1', hence
+  `sret_newpriv ms = Supervisor` — so the privilege write is value-preserving
+  and needs no premise of its own.  **This is the step that closes the round
+  trip**: no bit theory in the tree knows that this SPIE is the one the trap
+  saved; the identification is the caller's, and the travelling half is what
+  carries it.
 
 ### THE ONE RESOURCE THAT HAS TO BE THREADED, AND WHY
 
@@ -524,6 +624,30 @@ swallows it.  So:
   in the continuation — from the premise on the no-yield path (where
   `wp_next` is instantiated at `cpu_id`) and from yield's post on the yield
   path.
+
+**DONE, and one thing bit that this plan did not predict: `iNext` STRIPS THE
+LATER OFF THE HANDLER SPEC INSIDE THE PERSISTENT HYPOTHESIS.**
+`intr_handler_avail` is `∃ h, intr_inv h ∗ ▷ intr_handler_spec h`, and the
+later is not at the top, so `MaybeIntoLaterN`'s structural instances descend
+through the `∃` and the `∗` and strip it.  After any branch's `iNext`, the
+hypothesis in context is STRONGER than `intr_handler_avail` and no longer
+matches it, so `iSpecialize` on the continuation fails with
+*"cannot instantiate … with (∃ x, intr_inv x ∗ intr_handler_spec x)"* — the
+same trap `ProofAcquiresleep` documents for `cpu_own` (it avoids it by NOT
+substituting `eb`, so `intr_count`'s `if eb` never reduces) and the same one
+`IntrDefs.intr_restore_intro` exists to repair.  A top-level persistent
+hypothesis has no such dodge: re-seal it at the point of use.
+
+```coq
+iAssert (intr_handler_avail) as "#Havz".
+{ iDestruct "Havail" as (hz) "[#Hiz #Hsz]".
+  iExists hz. iFrame "Hiz". iNext. iExact "Hsz". }
+```
+
+**That `iNext` is what makes ONE tactic cover BOTH forms** — it strips the
+goal's later, and leaves an already-stripped hypothesis alone — so there is no
+need to know which of kerneltrap's three continuation sites sit behind a branch
+`iNext` and which do not.  (Two of the three do.)
 
 This is the ONLY new threading the whole step introduces; everything else
 either rides the bundle or is already persistent and hart-free
@@ -597,28 +721,118 @@ atomic core as new work, not as a rebase.
   now one `iApply (wp_next_retarget …)`.  It is the ONLY hand-rolled instance in
   the tree — every other `iIntros (CIDk Hsk); iSpecialize … ; iExact "Hcont"` is
   a same-anchor `wp_next_chain` discharge, not a retarget.
+- **The two step-1 independents, as one slice** (slices 6 + 7): `WpSconfSret.v`
+  with `wp_sret_s_sconf`, `MstatusBits.sret_ms5_SPP`/`_SPIE`,
+  `IntrDefs.sret_sconf_flip` and `sret_tie_vals`; plus
+  `IntrDefs.intr_handler_avail_ext` + its transport and intro, threaded through
+  `SpecYield`/`ProofYield` and on through `SpecKerneltrap`/`ProofKerneltrap`.
+  **They went in together because they are one build**: both touch `IntrDefs.v`,
+  which is near the bottom of the tree, so either alone costs the same full
+  ~940-file rebuild as both — and the decomposition's rule is one GREEN
+  CHECKPOINT per landing, not one lemma per commit.
+  `wp_sret_s_sconf` has no consumer yet (kernelvec still calls
+  `wp_sret_gpr_pt`); that is the intended shape of an independently-landable
+  slice, same as `s_cause_ok` in the first one.
 
 ### In flight / queued, each independently landable
 
 **RE-SCOPED 2026-08-10.**  Two of these are much bigger than the line that
 described them, and the evidence is in the tree, not in a guess:
 
-3a. **THE `ops_ok` WIDENING OF THE REMAINING 72 LEAVES — a prerequisite of the
-   funnel move that was not on this list.**  `IntrDefs.v`'s own comment above
-   `rget_next_indep` records it: the 72 leaves whose pure premises mention
-   `rget m rs` for a CALLER-CHOSEN `rs` (24 in `WpSconfBtype.v`, 20 in
-   `WpSconfMem.v`, the rest across `WpSconfLock` / `WpSconfUartAccess` /
-   `WpPlic` / `WpVirtioDev` / `WpSmodeHalf` / `WpSconfCsr` / `WpSconfCtl` /
-   `ProofBreadParts`) have no `src_ok` to feed `rget_next_indep`, and giving
-   them one **changes call-site ARITY at ~1750 references** — unlike slice 2,
-   whose 33 leaves already had a positional `rd_ok` slot to widen in place, so
-   zero of 1192 call sites moved.  Without this, the funnel move is unprovable
-   at every one of those leaves: after the callback moves inside `wp_next`, the
-   leaf's σ-obligation arrives about `rget (CID := CIDn) m rs` while the caller
-   supplied a fact about `rget (CID := CID0) m rs`, and those differ at
-   `rs = tp`.
+3a. ~~**THE `ops_ok` WIDENING OF THE REMAINING 72 LEAVES**~~ — **DONE, by the
+   `SrcOk` slice (`30c177fe`), and the entry that described it as the big
+   blocker is stale.**  The problem was real: those leaves' pure premises are
+   exactly the facts about `rget m rs` for a CALLER-CHOSEN `rs`, they had no
+   positional slot to widen, and adding an ordinary premise would have changed
+   ARITY at ~2173 references.  **Delivering the same side condition as a
+   TYPECLASS instead cost zero call sites** — `` `{!SrcOk rs} `` is filled in by
+   a `Hint Extern`, so nothing positional moved — and every file the entry
+   named now carries it: `WpSconfBtype` (40 refs), `WpSconfMem` (48),
+   `WpSconfLock` (14), `WpSconfUartAccess` (12), `WpVirtioDev` (10),
+   `WpSconfCtl` (10), `WpPlic` (9), `WpSmodeHalf` (8), plus four proof files.
+   (`WpSconfCsr` has none and needs none — its leaves were in slice 2's 33 and
+   carry `ops_ok` in the `rd_ok` slot; `ProofBreadParts` was listed in error,
+   it has no `rget` at all.)  `IntrDefs.v`'s `SrcOk` header states the purpose
+   in exactly these terms: *"Once the funnel's σ-callback moves inside
+   `WpNext.wp_next` a leaf's obligation arrives at the REBOUND hart while its
+   caller's premise was stated at the entry hart, and this class is what
+   reconciles the two."*
+   **THE REMAINDER IS THREE SITES, and it is the only one left**:
+   `SpecUart.v`'s three `_body` leaves (lines 24, 53, 85) build their effective
+   address from `rget m rs1`/`rget m rs2` and have neither a slot nor a class.
+   They are MODULE-TYPE contracts, so widening them moves arity for their
+   instantiators too — which is why they were deferred, and why they should be
+   done as the first step of 3b rather than as a slice of their own.
 3b. **The funnel move itself** — `wp_instr_s_sconf`'s σ-callback inside
-   `wp_next b p`, plus its consumers.  Measured: **13 files, 69 call sites**
+   `wp_next b p`, plus its consumers.
+
+   **ATTEMPTED 2026-08-11.  The mechanical part is DONE and lives on branch
+   `wp-next-funnel-2` (`6c379be2`, deliberately RED); the residue is enumerated
+   below and is NOT mechanical.**
+
+   **THE RECIPE, validated.**  Per crossing, three lines and no annotations:
+
+   ```coq
+   rename CID into CID0.
+   iIntros (CID Hs σ Hpceq) "Hsc Hcap Hfile Hnpc [Hreg Hmem]".
+   …
+   iPureIntro. exact Hs.        (* was: done. *)
+   ```
+
+   The `rename` is the whole trick and it is not optional.  The terse way to
+   retarget a hart — name the `wp_next` lambda binder `CID` so it shadows the
+   section's, and every resource in the body retargets by instance resolution —
+   works in a STATEMENT but **not in a proof**: `iIntros (CID Hs …)` dies with
+   `Error: CID is already used.`  Renaming the section variable out of the way
+   first fixes that, and crucially **the STATEMENT never sees the rename**, so
+   the **184 call sites across 14 whole-function proofs** that name these
+   leaves' harts as `(CID := CIDk)` — `ProofAllocproc` 62, `ProofKexit` 44,
+   `ProofKkill` 24, `ProofWakeup` 18 … — keep working.  Renaming the section
+   variable itself would have broken every one of them.  Without the rename the
+   body needs `(CID := CIDn)` on every hart-indexed term it writes out: ~200
+   `tp_pin` + ~280 `rget` occurrences across this tier.
+
+   **The rename must come AFTER the same-section application.**  Inside a
+   Section, a reference to a SIBLING lemma resolves through the section
+   variables BY NAME (they are not generalized yet), so renaming first makes
+   `wp_instr_s_sconf` unmentionable from its own file —
+   *"wp_instr_s_sconf depends on the variable CID which is not declared in the
+   context"*.  Lemmas from other files are already generalized and take the
+   hart as an instance argument, so they are unaffected; only `WpSmodeIntr.v`
+   is subject to this.
+
+   **Done: 64 crossings across 13 files** (61 uniform; `ProofKvminithart` has
+   ONE lemma with THREE crossings, so its entry harts are `CID0`/`CID1`/`CID2`)
+   and 47 guard discharges retargeted.  **The two gpr write engines are green**,
+   including the only place that needs the entry hart BY NAME:
+   `rget_next_ops_indep (CID := CID0) b p CID m rd rsa rsb Hs Hops` feeding
+   `Hbexec s_pc Lnpc0 (eq_trans Lva0 Hra) (eq_trans Lvb0 Hrb)`.
+
+   **THE RESIDUE — 10 files, and every error is ONE phenomenon: a leaf that
+   FRAMES A PER-HART RESOURCE ACROSS ITS OWN STEP.**  Three flavours:
+
+   - **a per-hart CELL out of a caller premise.**  `WpSconfTimer:247` holds
+     `mcounteren ↦ᵣ□ mcen` from its `Htcap` premise, at the ENTRY hart, and
+     meets the callback's `reg_interp` at the rebound one.  `WpSconfCsr:614`
+     is the same with the `ghost_var sie_gname (1/2)` tied half.
+   - **the address-translation regime.**  `WpPlic:231`, `WpVirtioDev:322`,
+     `ProofUart:132`, `WpSconfMem:327` apply their translate lemma with
+     `sr_inv strans_regime` at the entry hart.
+   - **one `gpr_file` predicate fixed too early**, in `WpSconfMem`: the
+     `big_sepM`'s `Φ` was determined before the rebinding.
+
+   Each of those needs the per-leaf DECISION this file's leaf-sweep section
+   already anticipated — *either this leaf is `b = false`-only, or the resource
+   belongs in the arm.*  **8 of the 64 sites already pass a literal `false`**
+   (4 in `WpSconfCsr`, 3 in `ProofKvminithart`, 1 in `WpSconfSret`), and there
+   the guard collapses the two harts outright:
+   `assert ((CID : CpuId) = CID0) as -> by exact (Hs (or_introl eq_refl)).`
+   makes the conversion free.  The other 54 are `b`-generic and each needs the
+   call made.  `WpSconfTimer` is the sharpest case: `mcounteren` is a caller
+   premise, so there is nothing to re-derive at the rebound hart, and the leaf
+   must either be pinned to `b = false` or have that cell moved into `sconf`.
+
+   Original measurement, still accurate as a site count: **13 files, 69 call sites**
    (`WpSconfBtype` 29, `WpSconfCsr` 9, `WpSconfCtl` 8, `WpSconfMem` 6,
    `ProofUart`/`ProofKvminithart` 3 each, `WpSconfAlu`/`WpSconfTimer`/`WpPlic`/
    `WpVirtioDev` 2 each, `WpSconfLock`/`WpSmodeWfi`/`HartTp` 1 each), plus 61
@@ -645,21 +859,42 @@ described them, and the evidence is in the tree, not in a guess:
    rests on, and it is the thing to verify first, against the 56 files / 210
    sites that name those four.
 5. ~~**`wp_next_retarget`** in `WpNext.v`~~ **done** (above).
-6. **`wp_sret_s_sconf`**, the SIE-enabling sret leaf.  Blocked on 4 (its
-   `kv_frame_slots <= av` premise is only satisfiable under the arm-dependent
-   carve) and on the core (it re-seals `intr_inv` with the □ handler spec).
-7. **`SpecYield`/`ProofYield` exposing `intr_handler_avail`** — **and it is NOT
-   the unconditional exposure this file claimed.**  See the correction below.
-8. **Cleanups with no users**: delete `sie_cap_acc`; delete the five dead
-   `Hdeepaddr` asserts; decide whether `sie_cap_grow`/`_shrink` should exist.
+6. ~~**`wp_sret_s_sconf`**, the SIE-enabling sret leaf~~ **done** — and it was
+   NOT blocked on the core.  The file said it was, on the grounds that it
+   "re-seals `intr_inv` with the □ handler spec"; it does, and that spec
+   arrives as an ORDINARY PERSISTENT PREMISE (`intr_count 1 true`'s payload),
+   which the leaf never looks inside.  A consumer has to produce it — and for
+   kernelvec that means the Löb hypothesis, which IS the core — but the LEAF is
+   insensitive to how `intr_handler_spec` is defined, so it lands before the
+   fixpoint and stays valid after it.  **The general shape: a leaf that
+   threads a persistent parameter through is independent of whatever that
+   parameter turns out to be.**  It WAS blocked on 4, correctly.
+7. ~~**`SpecYield`/`ProofYield` exposing `intr_handler_avail`**~~ **done**, in
+   exactly the `_ext`-guarded shape the correction below prescribed, and
+   threaded on through `SpecKerneltrap`/`ProofKerneltrap` (premise in, same
+   proposition out) in the same slice, because kerneltrap's post is where the
+   core actually reads it and nothing consumes `wp_kerneltrap_sconf` yet.
+8. **Cleanups with no users** — **two of the three are already gone**, checked
+   against the tree: `sie_cap_acc` was deleted by the carve slice (its only
+   remaining trace is one mention in a comment), and there are ZERO `Hdeepaddr`
+   occurrences left anywhere.  What survives is the one open QUESTION:
+   `sie_cap_grow`/`_shrink` still exist in `IntrDefs.v` with no user outside
+   that file — decide whether they should.
 
 ### The order to take them in
 
-`4` and `3a` are INDEPENDENT of each other and of everything else, so they can
-run in parallel; `3b` needs `3a`; `6` needs `4` and the core's `intr_inv`
-re-seal; `7` needs nothing but is only worth landing once its shape is settled
-(the `_ext` guard, below).  `8` is free at any point.  The core comes last and
-absorbs whatever is left.  Both wide slices are mechanical-by-construction and
+**REVISED, and the revision is the good kind: `4`, `3a`, `5`, `6` and `7` are
+all landed, so THE ONLY THING BETWEEN HERE AND THE CORE IS `3b`** — the funnel
+move, 13 files / 69 call sites, preceded by `SpecUart`'s three-site `SrcOk`
+remainder.  (`6` needed `4` only, not the core — see the correction on its
+line; `7` needed nothing but its shape.)  `8` is free at any point.  The core
+comes last and absorbs whatever remains.
+
+**And the lesson about this list itself: check the tree before believing an
+entry.**  `3a` was written as the big blocker (~2173 references, arity change at
+every one) and was already finished by a slice landed the same week under a
+different name, because the typeclass route dissolved the cost the entry was
+built around.  A worklist entry describes a plan, not a state.  Both wide slices are mechanical-by-construction and
 are the natural place to fan out subagents: `3a` is one premise slot per leaf
 plus a positional `ltac:(rdok)` at each reference, `3b` is
 `iIntros (CIDn Hsn)` + `$! cpu_id` → `$! CIDn` + `iPureIntro; exact Hsn`.

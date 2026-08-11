@@ -77,6 +77,33 @@ Section WpSconfLock.
      bundle like the register map.  Implicit, so no call site changes. *)
   Context {p : mword 64}.
 
+  (* ==================================================================== *)
+  (* THE READ-SIDE SIDE CONDITION OF EVERY LEAF IN THIS SECTION.  Read once. *)
+  (*                                                                       *)
+  (* Each lock leaf reads its lock POINTER out of a caller-chosen register, *)
+  (* as [rget m rs1], and the two cpu-word writers additionally read their  *)
+  (* stored value as [rget m rs2].  [rget] is a lookup in [tp_pin m]        *)
+  (* (HartTp.v), so those words depend on the ambient hart at exactly one   *)
+  (* register, rs = tp.  They are computed from the ENTRY map and appear    *)
+  (* again inside the [wp_next] lambda, where the resources are about the   *)
+  (* hart we resume on; once the funnel's sigma-callback moves inside        *)
+  (* [WpNext.wp_next] those two harts differ, and they agree only away from *)
+  (* tp.  [IntrDefs.SrcOk] is that side condition, delivered by INSTANCE    *)
+  (* RESOLUTION because these leaves have no premise slot to widen: the     *)
+  (* stores write no register at all, and the loads' [rd_ok] slot is about  *)
+  (* the DESTINATION, not the lock pointer.  An implicit instance argument  *)
+  (* shifts no positional argument, so the family converts with ZERO        *)
+  (* call-site churn; multi-source leaves take one class argument per        *)
+  (* source and they resolve independently.                                 *)
+  (*                                                                       *)
+  (* The premises stay spelled [rget m rs] (respelling them hart-free was   *)
+  (* measured and broke 99 consumer files), so the reconciliation happens   *)
+  (* INSIDE each proof, in one line, via [IntrDefs.src_ok_rget_indep].      *)
+  (* That line is also the leaf's WIRING CHECK -- it names the register the  *)
+  (* premise reads, so a class attached to the wrong parameter fails here    *)
+  (* rather than shelving silently at a consumer's [Qed].                    *)
+  (* ==================================================================== *)
+
   (* ------------------------------------------------------------------- *)
   (* The lock word at +0.                                                 *)
   (* ------------------------------------------------------------------- *)
@@ -84,7 +111,7 @@ Section WpSconfLock.
   (* holding's [lw a5,0(a0)]: any value, no evidence in or out. *)
   Lemma wp_clw_lockopen_s_sconf
       (γl : gname) (lk : mword 64) (R Tc Dc : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     pa = lk ->
@@ -105,6 +132,12 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpalk Hrd Hrdok Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hlock HTc Hcont".
     iApply (wp_load_s_sconf_au 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w) (fun _ => Tc)
@@ -135,7 +168,7 @@ Section WpSconfLock.
      step resumes on. *)
   Lemma wp_clw_lockopen_locked_s_sconf
       (γl : gname) (lk : mword 64) (R Dc : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let h0 := cpu_id in
@@ -158,6 +191,12 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 Hpalk Hrd Hrdok Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
     iApply (wp_load_s_sconf_au 4 true false pc rd rs1 imm m n
               (fun w => sign_extend' 64 w)
@@ -201,7 +240,7 @@ Section WpSconfLock.
      reference has necessarily gone home by the time release runs. *)
   Lemma wp_sw_zero_lockfin_s_sconf
       (γl : gname) (lk : mword 64) (R Dc Out : iProp Σ)
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     pa = lk ->
@@ -221,6 +260,12 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpalk Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hlock Htok HRes Hfin Hcont".
     rewrite /lock_finisher.
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
@@ -262,7 +307,7 @@ Section WpSconfLock.
      token) determines a fact [phi] about the recorded owner word. *)
   Lemma wp_ld_lkcpu_lockopen_gen (cmp : bool)
       (γl : gname) (lk : mword 64) (R Dc : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (T : iProp Σ) (phi : mword 64 -> Prop) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     pa = lock_cpu lk ->
@@ -285,6 +330,12 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpacpu Hrd Hrdok Hview Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hlock HT Hcont".
     iApply (wp_load_s_sconf_au 8 cmp false pc rd rs1 imm m n
               (fun w => w) (fun c => (⌜phi c⌝ ∗ T)%I)
@@ -314,7 +365,7 @@ Section WpSconfLock.
      holding() may answer either way, and acquire's panic arm is real). *)
   Lemma wp_cld_lkcpu_lockopen_s_sconf
       (γl : gname) (lk : mword 64) (R Tc Dc : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     pa = lock_cpu lk ->
@@ -335,6 +386,12 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpacpu Hrd Hrdok Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hlock HTc Hcont".
     iApply (wp_ld_lkcpu_lockopen_gen true γl lk R Dc pc rd rs1 imm m n
               Tc (fun _ => True) b
@@ -355,7 +412,7 @@ Section WpSconfLock.
      silently rebind them to whichever hart the step resumes on. *)
   Lemma wp_cld_lkcpu_lockopen_locked_s_sconf
       (γl : gname) (lk : mword 64) (R Dc : iProp Σ)
-      (pc : mword 64) (rd rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rd rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let h0 := cpu_id in
@@ -377,6 +434,12 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 cpuv Hpacpu Hrd Hrdok Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
     iApply (wp_ld_lkcpu_lockopen_gen true γl lk R Dc pc rd rs1 imm m n
               (locked γl h0)
@@ -395,7 +458,7 @@ Section WpSconfLock.
      exactly what the instruction stores. *)
   Lemma wp_sd_lkcpu_lockopen_gen (cmp : bool)
       (γl : gname) (lk : mword 64) (R Dc : iProp Σ)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (T T' : iProp Σ) (stn : lock_state) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     pa = lock_cpu lk ->
@@ -417,6 +480,14 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa Hpacpu Hsv Hupd Href.
+    (* the class, consumed at [rs1 / rs2] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hlock HT Hcont".
     iApply (wp_store_s_sconf_au 8 cmp pc rs2 rs1 imm m n
               (rget m rs2) T' (⊤ ∖ ↑minstretN ∖ ↑lockN) b
@@ -445,7 +516,7 @@ Section WpSconfLock.
      closes and the caller gets THE holder token. *)
   Lemma wp_csd_lkcpu_lockopen_s_sconf
       (γl : gname) (lk : mword 64) (R Dc : iProp Σ)
-      (pc : mword 64) (rs2 rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let h0 := cpu_id in
@@ -465,6 +536,14 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 Hpacpu Hmycpu Href.
+    (* the class, consumed at [rs1 / rs2] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     assert (Hsv : lk_cpu_val (Some (h0, true)) = rget m rs2).
     { rewrite lk_cpu_val_held cpus_ptr_cid. exact (eq_sym Hmycpu). }
     iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
@@ -482,7 +561,7 @@ Section WpSconfLock.
      word clear then closes. *)
   Lemma wp_sd_zero_lkcpu_lockopen_s_sconf
       (γl : gname) (lk : mword 64) (R Dc : iProp Σ)
-      (pc : mword 64) (rs1 : mword 5) (imm : mword 12)
+      (pc : mword 64) (rs1 : mword 5) `{!SrcOk rs1} (imm : mword 12)
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (sign_extend' 64 imm) in
     let h0 := cpu_id in
@@ -501,6 +580,12 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 Hpacpu Href.
+    (* the class, consumed at [rs1] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (sign_extend' 64 imm) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
     iIntros "Hcg Hpc Hinstr #Hlock Htok Hcont".
     iDestruct (sie_cap_gpr_split with "Hcg") as "(Hhs & Hsc & Hcap & Hfile)".
     iDestruct (gpr_file_x0 (tp_pin m) (mword_of_int 0 : mword 5) ltac:(vm_compute; reflexivity)
@@ -531,7 +616,7 @@ Section WpSconfLock.
      to whichever hart the step resumes on. *)
   Lemma wp_amoswap_lockopen_s_sconf
       (γl : gname) (lk : mword 64) (R Tc Dc : iProp Σ)
-      (pc : mword 64) (rd rs2 rs1 : mword 5)
+      (pc : mword 64) (rd rs2 rs1 : mword 5) `{!SrcOk rs1} `{!SrcOk rs2}
       (m : regfile) (n : nat) (b : bool) :
     let pa := add_vec (rget m rs1) (zeros' 64) in
     let h0 := cpu_id in
@@ -556,6 +641,14 @@ Section WpSconfLock.
     WP (Loop : expr riscv_lang).
   Proof.
     intros pa h0 Hpalk Hstz Hrd Hrdok Href.
+    (* the class, consumed at [rs1 / rs2] -- the one line the funnel change needs,
+       and this leaf's wiring check.  See the family note at the head of this
+       section. *)
+    assert (Hpa_all : forall hh : CpuId,
+              add_vec (rget (CID := hh) m rs1) (zeros' 64) = pa)
+      by (intros hh; unfold pa; by rewrite (src_ok_rget_indep m rs1 hh CID)).
+    assert (Hsv2_all : forall hh : CpuId, rget (CID := hh) m rs2 = rget (CID := CID) m rs2)
+      by (intros hh; exact (src_ok_rget_indep m rs2 hh CID)).
     rdok_split Hrdok.
     set (a8 := pa). set (ea := pa).
     iIntros "Hcg Hpc Hinstr #Hlock HTc Hcont".
@@ -779,5 +872,12 @@ Section WpSconfLock.
     iPureIntro. done.
   Qed.
 
+
+  (* ------------------------------------------------------------------- *)
+  (* [SrcOk] SMOKE TEST -- see IntrDefs.v's checker block.  x10 (a0) is the *)
+  (* register acquire/release actually hold the lock pointer in.            *)
+  (* ------------------------------------------------------------------- *)
+  Definition lock_srcok_pos_a0 : SrcOk (mword_of_int 10 : mword 5) := _.
+  Fail Definition lock_srcok_neg : SrcOk Rtp := _.
 
 End WpSconfLock.

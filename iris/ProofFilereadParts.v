@@ -392,11 +392,7 @@ Section ProofFilereadParts.
   Notation Rs2 := (mword_of_int 18 : mword 5).
   Notation Rs3 := (mword_of_int 19 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
   (* =================================================================== *)
   (*  +0x58 .. +0x62 -- THE EPILOGUE.  Every exit reaches it.             *)

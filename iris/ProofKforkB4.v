@@ -49,15 +49,12 @@ From iris.program_logic Require Import language weakestpre lifting.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvLang RiscvPtsto RiscvModelBytes.
+Require Import RiscvLang RiscvPtsto.
 Require Import RiscvExtras.
 Require Import RegFile.
 Require Import WpNext.
-Require Import WpMmodeLeafBase.
 Require Import SmodeCore.
-Require Import StackOwn.
 Require Import CalleeSaved.
-Require Import KernelRvcDecode.
 Require Import InstrBytes.
 Require Import KernelText.
 Require Import WpSconfAlu WpSconfMem WpSconfCtl.
@@ -68,7 +65,6 @@ Require Import ProcGeom.
 Require Import FdSlots FileInv.
 Require Import WpLock.
 Require Import ProcInv.
-Require Import InodeInv.
 Require Import DiskPtsto.
 Require Import FsBlocks.
 Require Import InodeRegion.
@@ -208,18 +204,21 @@ Section KforkB4Proof.
   Notation Rs4 := (mword_of_int 20 : mword 5).
   Notation Rs5 := (mword_of_int 21 : mword 5).
 
-  Local Ltac regne :=
-    first [ congruence
-          | apply not_eq_sym; apply is_cs_idx_true_neq;
-            [vm_compute; reflexivity | assumption]
-          | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption] ].
+  Local Ltac regne := reg_ne_side.
 
+  (* [rsv] IS THE CALLER'S TRAP RESERVE, TAKEN AS A PARAMETER.
+     This block runs entirely with np->lock held, so its own arm is PINNED at
+     [false] -- and precisely because of that it cannot name the reserve its
+     caller is carrying ([trap_res] of the caller's arm, which is invisible
+     here).  It is index-generic in [rsv] and never inspects it; kfork
+     instantiates [rsv := trap_res b].  Same shape as [ProofAllocproc.ap_tail]
+     and [ProofKforkB3.kfkb3_fd_loop]. *)
   Lemma kfk_b4
       (γf γil γic : gname) (cn : ic_names) (γfs : fs_names)
       (cov : gset Z) (logstart : Z) (nib : nat)
       (pid_p pid_c : mword 32) (Vp Vc : pprivate)
       (pme npa : mword 64)
-      (m : regfile) (K lvl : nat) (eb : bool) (C : iProp Σ) :
+      (m : regfile) (rsv K lvl : nat) (eb : bool) (C : iProp Σ) :
     (22 <= K)%nat ->
     (Z.of_nat lvl + 1 < 2 ^ 31)%Z ->
     (* the itable this block holds the lock for IS the one [cwd_ref] names,
@@ -234,7 +233,7 @@ Section KforkB4Proof.
        on the pointer -- a process between [p->cwd = 0] and its next chdir
        owns no reference -- and xv6's fork does [np->cwd = idup(p->cwd)]
        with no null test, so this is the honest reading of the code. *)
-    sie_cap_gpr m (K - 8)%nat false pme -∗
+    sie_cap_gpr m (rsv + (K - 8))%nat false pme -∗
     cpu_own lvl eb pme C false -∗
     kernel_text -∗
     pc_is (mword_of_int (KF + 0xa4) : mword 64) -∗
@@ -254,7 +253,7 @@ Section KforkB4Proof.
         ⌜(forall r : mword 5, is_cs_idx r = true -> r <> Rs1 ->
             mf !!! Regidx r = m !!! Regidx r) /\
          mf !!! Regidx Rs1 = sign_extend' 64 pid_c⌝ -∗
-        sie_cap_gpr mf (K - 8)%nat false pme -∗
+        sie_cap_gpr mf (rsv + (K - 8))%nat false pme -∗
         cpu_own lvl eb pme C false -∗
         pc_is (mword_of_int (KF + 0xc2) : mword 64) -∗
         proc_priv γf pme pid_p Vp -∗
@@ -315,7 +314,7 @@ Section KforkB4Proof.
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
     iEval (rewrite -Hpa0a4) in "Hpcwd".
     iApply (wp_ld_s_sconf (mword_of_int (KF + 0xa4)) Ra0 Rs5 (mword_of_int 336 : mword 12)
-              m (K - 8)%nat (pv_cwd Vp) false (dqm := DfracOwn 1)
+              m (rsv + (K - 8))%nat (pv_cwd Vp) false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0a4 Hpcwd [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hpcwd".
@@ -341,7 +340,7 @@ Section KforkB4Proof.
                      = mword_of_int KernelSyms.idup)
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xa8)) Rra (mword_of_int 5256 : mword 21)
-              M0 (K - 8)%nat false
+              M0 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0a8 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -361,8 +360,11 @@ Section KforkB4Proof.
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
     iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart nib
-              ck (cq/2)%Qp cdev cinum M1 lvl eb pme C (K - 8)%nat false
-              (kfk_b4_stack_idup K HK) Hlvl Hcklt HM1a0
+              ck (cq/2)%Qp cdev cinum M1 lvl eb pme C (rsv + (K - 8))%nat false
+              (* the callee's bound is stated with a NAMED constant, so go through
+                 [etransitivity] rather than [lia]: [exact] converts the name to
+                 its literal, and only the [rsv] slack is left for [lia]. *)
+              ltac:(etransitivity; [exact (kfk_b4_stack_idup K HK) | lia]) Hlvl Hcklt HM1a0
               with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hshr [-]").
     iApply wp_next_off_intro.
     iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2)".
@@ -394,7 +396,7 @@ Section KforkB4Proof.
     { rewrite (rget_ne mr Rs4 ltac:(vm_compute; discriminate)) Hmrs4. apply p_cwd_sext. }
     iEval (rewrite -Hpa0ac) in "Hccwd".
     iApply (wp_sd_s_sconf (mword_of_int (KF + 0xac)) Ra0 Rs4 (mword_of_int 336 : mword 12)
-              mr (K - 8)%nat (pv_cwd Vc) false
+              mr (rsv + (K - 8))%nat (pv_cwd Vc) false
               with "Hcg Hpc Hi0ac Hccwd [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc Hccwd".
     iEval (rewrite Hpa0ac) in "Hccwd".
@@ -423,7 +425,7 @@ Section KforkB4Proof.
                     = (mword_of_int 16 : mword 64))
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_cli_s_sconf (mword_of_int (KF + 0xb0)) Ra2 (mword_of_int 16 : mword 6)
-              (mword_of_int 16 : mword 64) M2 (K - 8)%nat false
+              (mword_of_int 16 : mword 64) M2 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) Hwv16
               with "Hcg Hpc Hi0b0 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -441,7 +443,7 @@ Section KforkB4Proof.
     (* +0xb2: addi a1,s5,344 -- a1 := p->name.                        *)
     (* ------------------------------------------------------------- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xb2)) Ra1 Rs5 (mword_of_int 344 : mword 12)
-              M3 (K - 8)%nat false
+              M3 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0b2 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -461,7 +463,7 @@ Section KforkB4Proof.
     (* +0xb6: addi a0,s4,344 -- a0 := np->name.                       *)
     (* ------------------------------------------------------------- *)
     iApply (wp_addi4_s_sconf (mword_of_int (KF + 0xb6)) Ra0 Rs4 (mword_of_int 344 : mword 12)
-              M4 (K - 8)%nat false
+              M4 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0b6 [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -485,7 +487,7 @@ Section KforkB4Proof.
                    = mword_of_int KernelSyms.safestrcpy)
       by (apply bv_eq; vm_compute; reflexivity).
     iApply (wp_jal_s_sconf (mword_of_int (KF + 0xba)) Rra (mword_of_int 2093292 : mword 21)
-              M5 (K - 8)%nat false
+              M5 (rsv + (K - 8))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi0ba [-]").
     iApply wp_next_off_intro. iIntros "Hcg Hpc".
@@ -523,8 +525,8 @@ Section KforkB4Proof.
     (* THE safestrcpy CALL.                                           *)
     (* ------------------------------------------------------------- *)
     iApply (SS.wp_safestrcpy_sconf M6 16%nat (kfk_name_fn (pv_name Vp)) (kfk_name_fn (pv_name Vc2))
-              (K - 8)%nat (DfracOwn 1) false pme
-              (kfk_b4_stack_ss K HK) HM6a2' Hn31
+              (rsv + (K - 8))%nat (DfracOwn 1) false pme
+              ltac:(etransitivity; [exact (kfk_b4_stack_ss K HK) | lia]) HM6a2' Hn31
               with "Hcg Htext Hpc HnmPseq HnmCseq [-]").
     iApply wp_next_off_intro.
     iIntros (mr2 h) "Hcg Hpc HnmPseq' HnmCseq' %Hcs_ss %Ha0_ss %Hpostdisj".
@@ -559,7 +561,7 @@ Section KforkB4Proof.
     (* ------------------------------------------------------------- *)
     iDestruct (proc_priv_pid γf npa pid_c Vc3 with "Hchild3") as "[Hcpid Hcpidback]".
     iApply (wp_lw_s_sconf (mword_of_int (KF + 0xbe)) Rs1 Rs4 (mword_of_int 48 : mword 12)
-              mr2 (K - 8)%nat pid_c false (dqm := DfracOwn (1/4))
+              mr2 (rsv + (K - 8))%nat pid_c false (dqm := DfracOwn (1/4))
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0be [Hcpid] [-]").
     { iEval (rewrite (rget_ne mr2 Rs4 ltac:(vm_compute; discriminate)) Hmr2s4). iExact "Hcpid". }

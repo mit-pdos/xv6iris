@@ -131,9 +131,11 @@ Lemma mn_boot_fmt : pk_kinds mn_boot = [] /\ nonul mn_boot = true /\
 Proof. split_and!; [vm_compute; reflexivity | vm_compute; reflexivity | vm_compute; reflexivity]. Qed.
 
 (* clean-context (mword-free) nat arithmetic, so [lia] never sees a bv *)
+(* the third conjunct is the SCHEDULER's, and it is what [K_main] is sized by:
+   the loop-head enable funds [kv_frame_slots] out of what main hands it. *)
 Lemma mn_bounds (K : nat) : (K_main <= K)%nat ->
-  (2 <= K)%nat /\ (50 <= K - 2)%nat.
-Proof. unfold K_main. lia. Qed.
+  (2 <= K)%nat /\ (50 <= K - 2)%nat /\ (kv_frame_slots + 20 <= K - 2)%nat.
+Proof. unfold K_main, kv_frame_slots. lia. Qed.
 
 (* ===================================================================== *)
 Module MainProof
@@ -212,7 +214,7 @@ Section ProofMain.
     WP (Loop : expr riscv_lang).
   Proof.
     intros Hcid HK.
-    pose proof (mn_bounds K HK) as (Hc2 & Hn50).
+    pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg #Htext Hpc Hcont".
     iPoseProof (mni_00 with "Htext") as "Hi00".
     iPoseProof (mni_02 with "Htext") as "Hi02".
@@ -1240,7 +1242,9 @@ Section ProofMain.
       (m : regfile) (n : nat) (p0 : mword 64) (pd pav pu : mword 64)
       (root : mword 44) (pas : nat -> mword 44)
       (P : iProp Σ) `{!Persistent P} :
-    (20 <= n)%nat ->
+    (* the scheduler this block tail-calls enables interrupts at its loop head
+       and must fund [kv_frame_slots] there; see [SpecScheduler]. *)
+    (kv_frame_slots + 20 <= n)%nat ->
     p0 = zero_reg ->
     sie_cap_gpr m n false p0 -∗
     kernel_text -∗ panic_wp_any -∗
@@ -1410,7 +1414,7 @@ Section ProofMain.
   Proof.
     cbv beta delta [wp_main_boot_sconf_body].
     intros pcE Hcid HK Hphystop Hs1 Hprun Hlen Hlive Hp0.
-    pose proof (mn_bounds K HK) as (Hc2 & Hn50).
+    pose proof (mn_bounds K HK) as (Hc2 & Hn50 & Hnsched).
     iIntros "Hcg Hcpu Hq #Htext #Hkdata Hpc #Hpany #Hsinv #Hwand Hlocks Hglobals".
     iIntros "Hparks Hpst".
     iIntros "#Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hhart Hunset Hkauth Hpages".

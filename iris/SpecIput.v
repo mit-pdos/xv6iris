@@ -83,18 +83,17 @@ Require Import FdSlots.
 Require Import ProcGeom.
 Require Export SwtchCtx.
 Require Import CpuOwn.
-Require Import FileInv.
-Require Import ProcInv.
+Require Import FdSlots.
+Require Import IcacheRef.
+Require Import IrefSlots.
 Require Import SchedCtx.
 Require Import WpUart.
 Require Import DiskPtsto DiskInv.
 Require Import BioInv.
 Require Import FsBlocks LogInv.
-Require Import FsCrash.
 Require Import BitmapInv.
 Require Import DinodeEnc.
 Require Import InodeInv.
-Require Import InodeLock.
 Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.

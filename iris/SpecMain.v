@@ -165,8 +165,19 @@ From Kernel Require KernelSyms.
    callee.  kvminit wants 50, printk 38, kinit 22, virtio_disk_init
    [K_virtio_disk_init] = 18, binit/iinit 12, procinit 10, consoleinit 6,
    plicinithart 4 -- and scheduler needs 20 available at the depth main calls
-   it from, which 50 covers. *)
-Definition K_main : nat := 52%nat.
+   it from, which 50 covers.
+
+   THE SCHEDULER'S TRAP RESERVE IS WHAT SETS THIS, NOT THE kvminit CONE.
+   main's last act is [jal scheduler], which never returns, and scheduler()
+   is entered with interrupts OFF and enables them at its loop head -- an
+   enable at a point where nobody holds the trap reserve, so it funds
+   [kv_frame_slots] out of the budget main hands it ([SpecScheduler]'s
+   premise is [kv_frame_slots + 20 <= av]).  Below main's own 2-slot frame
+   that is [2 + kv_frame_slots + 20 = 100] slices, which dominates the 52 the
+   init cone needs.  The boot bridge hands out [kv_frame_slots + K_main]
+   ([BootBridge.boot_stack_slots]), i.e. 180 slots = 1440 bytes of the
+   4096-byte per-hart stack, so nothing upstream has to change. *)
+Definition K_main : nat := 100%nat.
 
 Section SpecMain.
   Context `{!riscvGS Σ, !sieG Σ, !lockG Σ, !kallocG Σ, !fileG Σ, !fdslotG Σ, !irefslotG Σ}.

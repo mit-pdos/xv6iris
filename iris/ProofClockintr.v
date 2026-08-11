@@ -60,7 +60,7 @@ Require Import CodeClockintr.
 Require Import SpecCpuid SpecAcquire SpecRelease SpecWakeup.
 Require Import SpecClockintr.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -708,6 +708,14 @@ Section ProofClockintr.
         exact HD5sp. }
       (* ===================== release(&tickslock) ===================== *)
       iDestruct (ticks_res_intro _ with "Hticks") as "HR".
+      (* clockintr is entered interrupts-OFF at a level that provably does not
+         unwind to 0 with an enabled base ([Hout]), so its exit arm is [false]
+         and the reserve release owes is ZERO -- [trap_res false + N] IS [N].
+         The rewrite only makes that spelling explicit for the seam. *)
+      assert (Hridx : (av - 2)%nat
+                      = (trap_res (match n with O => eb | S _ => false end)
+                         + (av - 2))%nat) by (rewrite Hout; reflexivity).
+      iEval (rewrite Hridx) in "Hcg".
       iApply (Release.wp_release_sconf γl a_tickslock "time"%string ticks_res E2
                 n eb p C (av - 2)%nat
                 ltac:(rewrite HE2a0; apply addv_sext0)

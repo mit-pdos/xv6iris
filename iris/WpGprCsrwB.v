@@ -384,6 +384,38 @@ Proof.
   unfold satp_accessible. cbn match. apply exec_hartSupports_S.
 Qed.
 
+(* THE SUPERVISOR ARM, AND WHY IT IS ONE LEMMA FOR BOTH ACCESS TYPES.
+
+   satp is the only CSR this kernel touches whose accessibility is not a
+   constant: [satp_accessible Supervisor] READS mstatus and answers
+   TVM = 0, so it cannot go through [exec_check_CSR_result_read_extS] (or
+   any other "is_CSR_accessible csr p acc = currentlyEnabled _" shortcut)
+   the way sepc / scause / stval / sie do.  This is the whole of that
+   difference, stated once.
+
+   [acc] IS A PARAMETER because the 0x180 dispatch arm of
+   [is_CSR_accessible] passes only the privilege on -- the access type is
+   dead there.  So the SAME lemma serves the csrw leaf (UserretDefs.v,
+   satp restore on the userret path) and the csrr leaf (WpSconfCsr.v,
+   prepare_return's [csrr a4,satp]); there is no read/write asymmetry to
+   duplicate.  The TVM premise is discharged from [sconf]'s
+   [sconf_ms_facts] at the Iris layer, whose last conjunct is exactly it. *)
+Lemma exec_is_CSR_accessible_satp_S (acc : CSRAccessType) s :
+  eq_vec (_get_Mstatus_TVM (register_lookup mstatus s.(sregs))) ('b"1") = false ->
+  exec (is_CSR_accessible csr_satp Supervisor acc) s = Some (true, s).
+Proof.
+  intro HTVM.
+  unfold is_CSR_accessible.
+  skip_csr_false_clauses.
+  match goal with |- context[if ?g then _ else _] =>
+    replace g with true by (vm_compute; reflexivity) end. cbn match.
+  unfold satp_accessible. cbn match.
+  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
+  rewrite (mword1_zero_of_ne_one _ HTVM).
+  replace (eq_vec ('b"0" : mword 1) ('b"0")) with true by (vm_compute; reflexivity).
+  apply exec_returnM.
+Qed.
+
 Lemma exec_execute_csrw_satp (rs1 : mword 5) s :
   uint rs1 <> 0 ->
   register_lookup cur_privilege s.(sregs) = Machine ->

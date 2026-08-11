@@ -66,6 +66,8 @@ Some high-level ideas that might be interesting for some eventual paper:
 - interesting sharing pattern: multiple struct file holders need to share access to single inode ref
 - weak memory: monotone view resource to hide view-advance at each instruction, with duplicable lb facts at fences etc
 - weak memory: objective points-to for SC-like memory, fractional for SC-like read-only sharing
+- weak memory: lock invariant is vProp; refers to different view inside lock vs after acquiring lock
+- weak memory: need execution context notion, to soundly frame resources across migration to different CPU
 
 Big things that still need to be done/explored:
 

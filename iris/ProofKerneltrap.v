@@ -57,7 +57,7 @@ Require Import CodeKerneltrap.
 Require Import SpecDevintr SpecMyproc SpecYield.
 Require Import SpecKerneltrap ProofKerneltrapParts.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.
-Require Import InodeRef.
+Require Import IrefSlots.
 Import Defs.
 
 Local Open Scope Z_scope.
@@ -90,7 +90,7 @@ Section ProofKerneltrap.
   Proof.
     cbv beta delta [wp_kerneltrap_sconf_body].
     intros pcE ret_tgt Hlen Hav Hsc Hepal.
-    iIntros "Hcg Hmir Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
+    iIntros "Hcg Hmir #Havail Hcpu #Htext Hpc Hsepc Hscause Hstval #Hcaps Hclm Hcont".
     (* ---- the head: prologue, the three reads, both panic tests ---- *)
     iApply (kt_pro m av ep sc ltac:(unfold kerneltrap_stack in Hav; lia) Hepal
               with "Hcg Hmir Htext Hpc Hsepc Hscause [-]").
@@ -281,8 +281,18 @@ Section ProofKerneltrap.
           by (unfold kerneltrap_stack in Hav; lia).
         iEval (rewrite Hav6) in "Hcgat".
         (* the hart cannot have moved: no yield on this path. *)
+        (* RE-SEAL THE AVAIL.  A branch's [iNext] descends into
+           [intr_handler_avail] and strips the later off the handler spec, so
+           the hypothesis in context is STRONGER than [intr_handler_avail] and
+           no longer matches it -- the same trap [ProofAcquiresleep] documents
+           for [cpu_own], and the same repair [IntrDefs.intr_restore_intro]
+           performs.  [iNext] here is a no-op in the already-stripped case and
+           the real thing otherwise, so one tactic covers both. *)
+        iAssert (intr_handler_avail) as "#Havz".
+        { iDestruct "Havail" as (hz) "[#Hiz #Hsz]".
+          iExists hz. iFrame "Hiz". iNext. iExact "Hsz". }
         iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
-        iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Hcpu
+        iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
                               Hsepc Hscause Hstval Hpc Hclm").
         { exact Hcsf. }
         { exact Hsppf. } { exact Hspief. } { exact Hsief. }
@@ -363,7 +373,7 @@ Section ProofKerneltrap.
            there is no arm to take it from, which is exactly why a preempting
            trap must arrive holding it. *)
         { rewrite /cpu_claim_ext -Hpj. iExact "Hclm". }
-        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm".
+        iIntros (CIDy Hsy myd) "%Hcs_yd Hcg Hcpu Hpc Hext Hclm #Havail_y".
         iEval (rewrite Hpj) in "Hcg". iEval (rewrite Hpj) in "Hcpu".
         (* back, possibly on ANOTHER hart: the trap CSRs are that hart's *)
         rewrite /trap_csrs_ext /trap_csrs.
@@ -410,9 +420,19 @@ Section ProofKerneltrap.
            literal [true], so the left disjunct is absurd, and the right one
            is refuted by [Hpne]: this cpu HAS a current process, which is
            precisely why the yield happened at all. *)
+        (* RE-SEAL THE AVAIL.  A branch's [iNext] descends into
+           [intr_handler_avail] and strips the later off the handler spec, so
+           the hypothesis in context is STRONGER than [intr_handler_avail] and
+           no longer matches it -- the same trap [ProofAcquiresleep] documents
+           for [cpu_own], and the same repair [IntrDefs.intr_restore_intro]
+           performs.  [iNext] here is a no-op in the already-stripped case and
+           the real thing otherwise, so one tactic covers both. *)
+        iAssert (intr_handler_avail) as "#Havz".
+        { iDestruct "Havail_y" as (hz) "[#Hiz #Hsz]".
+          iExists hz. iFrame "Hiz". iNext. iExact "Hsz". }
         iSpecialize ("Hcont" $! CIDy with "[%]").
         { intros [Hf | Hz]; [ discriminate | exfalso; exact (Hpne Hz) ]. }
-        iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Hcpu
+        iApply ("Hcont" $! mf ms_f sc' tv' with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
                               Hsepc Hscause Hstval Hpc [Hclm]").
         { exact Hcsf. }
         { exact Hsppf. } { exact Hspief. } { exact Hsief. }
@@ -441,8 +461,18 @@ Section ProofKerneltrap.
         assert (Hav6 : ((av - 6) + 6)%nat = av)
           by (unfold kerneltrap_stack in Hav; lia).
         iEval (rewrite Hav6) in "Hcgat".
+      (* RE-SEAL THE AVAIL.  A branch's [iNext] descends into
+         [intr_handler_avail] and strips the later off the handler spec, so
+         the hypothesis in context is STRONGER than [intr_handler_avail] and
+         no longer matches it -- the same trap [ProofAcquiresleep] documents
+         for [cpu_own], and the same repair [IntrDefs.intr_restore_intro]
+         performs.  [iNext] here is a no-op in the already-stripped case and
+         the real thing otherwise, so one tactic covers both. *)
+      iAssert (intr_handler_avail) as "#Havz".
+      { iDestruct "Havail" as (hz) "[#Hiz #Hsz]".
+        iExists hz. iFrame "Hiz". iNext. iExact "Hsz". }
       iSpecialize ("Hcont" $! CID with "[]"); [iPureIntro; intros _; reflexivity|].
-      iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Hcpu
+      iApply ("Hcont" $! mf ms_f sc tv with "[%] [%] [%] [%] Hcgat Hmir Havz Hcpu
                             Hsepc Hscause Hstval Hpc Hclm").
       { exact Hcsf. }
       { exact Hsppf. } { exact Hspief. } { exact Hsief. }

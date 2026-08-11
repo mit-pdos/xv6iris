@@ -74,7 +74,7 @@ From iris.algebra Require Import auth gmap frac.
 From iris.base_logic.lib Require Import invariants own ghost_map ghost_var.
 Require Import SailStdpp.ConcurrencyInterface SailStdpp.ConcurrencyInterfaceBuiltins SailStdpp.ConcurrencyInterfaceTypes SailStdpp.Operators_mwords.
 Require Import SailStdpp.Base SailStdpp.TypeCasts SailStdpp.Values SailStdpp.MachineWord.
-Require Import RiscvPtsto RiscvExtras RiscvModelBytes.
+Require Import RiscvPtsto RiscvModelBytes.
 Require Import ArrCursor.
 Require Import WpLock.
 Require Import SleepLock.
@@ -689,7 +689,16 @@ Section IcacheBootTable.
       iIntros "[Hf Ht]". iApply (sl_fresh_new with "Hf Ht"). }
     iMod (big_sepL_fupd with "Hsl") as "Hsl".
     iModIntro. iExists γl, cn.
-    rewrite /is_itable2. iFrame "Hlock Hitinv Hescrows Hsl".
+    (* structurally, NOT [iFrame "…"]: naming the four hypotheses fixes the
+       context-side scan, but the GOAL still holds a fifty-slot big-op of
+       sleeplocks over [ic_tok] and the whole [ic_escrows] family, and a
+       named [iFrame] searches that once per name -- 98 s in this one
+       sentence (optimization.md's BioInv rule). *)
+    rewrite /is_itable2.
+    iSplitR; [iExact "Hlock" |].
+    iSplitR; [iExact "Hitinv" |].
+    iSplitR; [iExact "Hescrows" |].
+    iExact "Hsl".
   Qed.
 
 End IcacheBootTable.

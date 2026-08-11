@@ -79,7 +79,7 @@ Require Import FsBlocks LogInv.
 Require Import FsCrash.
 Require Import IrefSlots InodeRegion.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IrefSlots.
 Local Open Scope Z_scope.
 
 

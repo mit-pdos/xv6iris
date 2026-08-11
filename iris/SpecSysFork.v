@@ -78,7 +78,6 @@ Require Import SpecProcinit.
 Require Import WaitInv.
 Require Import KvmSpec.
 Require Import SpecAllocpid.
-Require Import SpecAllocproc.
 Require Import SpecKfork.
 From Kernel Require KernelSyms.
 Require Import Riscv.rv64d_types Riscv.rv64d Riscv.riscv_extras.

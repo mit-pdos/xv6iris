@@ -21,8 +21,10 @@
        [sconf_ms_facts] (the SIE-free common fact set), [sconf]
        (SIE unpinned, [mie] PINNED at [MIE_S], ghost half tied to the
        live bit, menvcfg bundled),
-       the kernel-code capability [sie_cap m avail] -- the
-       [kv_frame_slots + avail] free-stack slots below sp (sp moves trade
+       the kernel-code capability [sie_cap m avail b] -- the
+       [trap_res b + avail] free-stack slots below sp, i.e. [avail] usable
+       plus the ARM-DEPENDENT trap reserve [trap_res b] (78 at b = true,
+       0 at b = false -- see [trap_res]; sp moves trade
        against [avail] via [sie_cap_push]/[sie_cap_pop]), the TRANSLATION
        SLOT [strans_inv] (Bare-with-stvec ∨ ∃root kernel-PT, consumed
        foldedly via the derived regime [strans_regime]), and the SIE arm
@@ -207,6 +209,43 @@ Lemma intr_ms_facts_iff (ms : mword 64) :
   <-> (eq_vec (_get_Mstatus_SIE ms) ('b"1") = true /\ sconf_ms_facts ms).
 Proof. unfold intr_ms_facts, sconf_ms_facts. tauto. Qed.
 
+(* WHAT AN [sret] DOES TO THE THREE BITS THE sconf TIER TRACKS, over a
+   SYMBOLIC entry mstatus -- the sret twin of [WpSieFlipBits.csrsi_sie_flip],
+   and stated in exactly the shape its leaf consumes.
+
+   The three outputs are all CONSTANT, which is the point: SIE comes from
+   SPIE and the caller pins that at '1' (the trap it is returning from was
+   taken with interrupts enabled), while SPP := 0 and SPIE := 1 are what SRET
+   writes unconditionally.  So the leaf's postcondition can name the tie it
+   hands back without naming the entry mstatus -- and [sconf_ms_facts]
+   survives because every field in it sits outside the five bits SRET
+   touches (1, 5, 8, 17, 23).
+
+   The SIE conclusion is where the round trip is CLOSED: no bit theory here
+   knows that this SPIE is the one the trap saved, only that restoring it
+   yields '1' -- the identification is the caller's, and it is carried by the
+   [sret_bits] travelling half. *)
+Lemma sret_sconf_flip (ms : mword 64) :
+  sconf_ms_facts ms ->
+  _get_Mstatus_SPIE ms = ('b"1" : mword 1) ->
+  _get_Mstatus_SIE  (sret_ms5 ms) = ('b"1" : mword 1) /\
+  _get_Mstatus_SPP  (sret_ms5 ms) = ('b"0" : mword 1) /\
+  _get_Mstatus_SPIE (sret_ms5 ms) = ('b"1" : mword 1) /\
+  sconf_ms_facts (sret_ms5 ms).
+Proof.
+  intros (HMPRV & HSXL & HMXR & HTSR & HXS & HFS & HVS & HSD & HMPP & HTVM) Hspie.
+  split; [ rewrite sret_ms5_SIE; exact Hspie |].
+  split; [ apply sret_ms5_SPP |].
+  split; [ apply sret_ms5_SPIE |].
+  unfold sconf_ms_facts.
+  rewrite sret_ms5_MPRV sret_ms5_SXL sret_ms5_MXR sret_ms5_TSR
+          sret_ms5_XS sret_ms5_FS sret_ms5_VS sret_ms5_SD
+          sret_ms5_MPP sret_ms5_TVM.
+  split_and!; try assumption.
+  (* MPRV is written to '0' outright, so its [eq_vec .. '1'] is computable *)
+  vm_compute. reflexivity.
+Qed.
+
 Section IntrDefs.
   Context `{!riscvGS Σ}.
   Context `{!sieG Σ}.
@@ -282,6 +321,22 @@ Section IntrDefs.
     _get_Mstatus_SPP ms' = _get_Mstatus_SPP ms ->
     _get_Mstatus_SPIE ms' = _get_Mstatus_SPIE ms ->
     sret_tie ms -∗ sret_tie ms'.
+  Proof. intros H1 H2. rewrite /sret_tie H1 H2. iIntros "$". Qed.
+
+  (* RE-STATING THE TIE AT THE LITERAL VALUES ITS BITS ARE KNOWN TO HAVE, and
+     it has to be a LEMMA rather than a rewrite at the use site.  Knowing
+     [_get_Mstatus_SPP ms = 'b"1"] does not make the hypothesis [sret_tie ms]
+     usable where [sret_bits ('b"1") ('b"1")] is wanted: the projections are
+     hidden behind the definition, so there is nothing in the hypothesis for
+     [rewrite Hspp] to find, and going the other way (rewriting the GOAL's
+     literals backwards) is ambiguous the moment both bits are the same
+     literal.  Doing the substitution in a lemma STATEMENT sidesteps both.
+     [iSpecialize] failing with *"cannot instantiate (sret_bits 'b"1" 'b"1"
+     -∗ …) with (sret_tie ms0)"* is this. *)
+  Lemma sret_tie_vals (ms : mword 64) (a b : mword 1) :
+    _get_Mstatus_SPP ms = a ->
+    _get_Mstatus_SPIE ms = b ->
+    sret_tie ms -∗ sret_bits a b.
   Proof. intros H1 H2. rewrite /sret_tie H1 H2. iIntros "$". Qed.
 
   (* [sie_ghost_alloc] / [sie_ghost_flip]* stay GHOST-GENERIC: they are
@@ -433,6 +488,69 @@ Section IntrDefs.
      would otherwise still compile and only fail deep inside the handler
      proof. *)
   Definition kv_frame_slots : nat := 78.
+
+  (* ------------------------------------------------------------------- *)
+  (* THE TRAP RESERVE IS ARM-DEPENDENT, AND THAT IS NOT AN OPTIMISATION  *)
+  (* -- AN ARM-BLIND RESERVE IS UNSATISFIABLE.                          *)
+  (*                                                                     *)
+  (* [sie_cap] used to own [kv_frame_slots + avail] at BOTH arms: the     *)
+  (* reserve was factored out of the index "harmlessly", since the ABI    *)
+  (* never writes below sp.  With a REAL handler that is not merely       *)
+  (* wasteful, it is UNSATISFIABLE.  The handler runs interrupts-off, so  *)
+  (* under an arm-blind reserve its own bundle [sie_cap m H false] also   *)
+  (* demands [kv_frame_slots] RESERVED slots on top of the H slots its    *)
+  (* cone actually needs -- while the trap can only hand over the         *)
+  (* [kv_frame_slots] it reserved.  Funding the handler therefore costs   *)
+  (* R + H and supplies R: it is [R >= R + H] with [H > 0], FALSE at      *)
+  (* every value of the constant, so enlarging [kv_frame_slots] cannot    *)
+  (* fix it.  (This is why ProofKernelvec.v was only ever able to consume *)
+  (* the legacy 17-cell contract instead of building a [sie_cap] for its  *)
+  (* callee.)  Only code that CAN be trapped may pay the reserve; that is *)
+  (* what breaks the circularity, because the handler -- interrupts off,  *)
+  (* hence reserve-free -- can then be funded OUT of the trap's reserve.  *)
+  (*                                                                     *)
+  (* DO NOT "SIMPLIFY" THE SUMMAND.  It is spelled as a LEFT summand,     *)
+  (* [trap_res b + avail], and each of the three properties that buys is  *)
+  (* load-bearing:                                                        *)
+  (*                                                                     *)
+  (* 1. [trap_res false + avail] is DEFINITIONALLY [avail] -- [Nat.add]   *)
+  (*    recurses on its FIRST argument, so [trap_res false + avail]       *)
+  (*    delta/iota-reduces straight to [avail].  That is the whole reason *)
+  (*    the summand goes on the LEFT: every interrupts-off statement in   *)
+  (*    the tree is unchanged AS WRITTEN and [iExact]/[iFrame] see        *)
+  (*    through the index.  Written [avail + trap_res b] instead, the     *)
+  (*    same reduction leaves [av + 0] STUCK against [av] -- at thousands *)
+  (*    of sites, none of which would be fixable by conversion.           *)
+  (* 2. [sie_cap m av true p] and [sie_cap m (kv_frame_slots + av) false  *)
+  (*    p] have the SYNTACTICALLY IDENTICAL carve, so a trap hands the    *)
+  (*    whole capability to the handler with the stack conjunct NEVER     *)
+  (*    TOUCHED (a pure re-indexing, not a split), and the sret does the  *)
+  (*    same in reverse.                                                  *)
+  (* 3. NO [K <= n] PREMISE MOVES.  The sp movers ([_push]/[_pop]/        *)
+  (*    [_grow]/[_shrink]/[_retarget]) keep their premises VERBATIM:      *)
+  (*    [trap_res b] is an opaque [nat] atom that [lia] carries through   *)
+  (*    [trap_res b + avail = k + (trap_res b + (avail - k))].            *)
+  (*                                                                     *)
+  (* Two alternatives were considered and REJECTED, both isomorphic to    *)
+  (* this one under [avail |-> avail - trap_res b] but worse at the       *)
+  (* seams: (a) carve [= avail] with a pure side fact                     *)
+  (* [b = true -> kv_frame_slots <= avail] -- then a frame push must      *)
+  (* PRESERVE the fact, so [sie_cap_push] needs                            *)
+  (* [k + kv_frame_slots <= avail] and every function's [K] grows by 78;  *)
+  (* (b) keep the arm-blind carve and enlarge [kv_frame_slots] -- the     *)
+  (* [R >= R + H] obstruction above, unsatisfiable at any value.          *)
+  (*                                                                     *)
+  (* NOTE the explicit [0%nat]: this file opens [Z_scope], and a bare [0] *)
+  (* in the [if] branch elaborates as [Z] even under the [: nat] result   *)
+  (* annotation.                                                          *)
+  (* ------------------------------------------------------------------- *)
+  Definition trap_res (b : bool) : nat :=
+    if b then kv_frame_slots else 0%nat.
+
+  (* the conversion of property 1, available by name for the rare site
+     that wants to SAY it rather than rely on it silently. *)
+  Lemma trap_res_off (avail : nat) : (trap_res false + avail)%nat = avail.
+  Proof. reflexivity. Qed.
 
   (* menvcfg is pinned to [MENVCFG_S] here rather than parameterized: the
      handler contract below is only PROVABLE at that value (its own fetches
@@ -664,11 +782,14 @@ Section IntrDefs.
   (* [sie_cap] -- the kernel-code capability that EXPOSES the SIE mode as
      its index [b], backed by the ghost QUARTER's value (agreement with
      [sconf]'s tied half pins the live bit).  It owns ALL the free stack
-     below the CURRENT sp -- [kv_frame_slots + avail] slots, factored OUT
-     of the arm and held at BOTH indices (harmless: the ABI never writes
-     below sp).  [avail] is the number of slots AVAILABLE to kernel code;
-     the other [kv_frame_slots] are reserved for a potential interrupt
-     frame.  An sp DECREMENT by k slots consumes k from [avail] (k <=
+     below the CURRENT sp -- [trap_res b + avail] slots.  [avail] is the
+     number of slots AVAILABLE to kernel code; the extra [trap_res b] are
+     reserved for a potential interrupt frame, and that reserve is
+     ARM-DEPENDENT ([kv_frame_slots] at b = true, NOTHING at b = false):
+     only code that can be trapped pays it.  See [trap_res] for why an
+     arm-blind reserve is not merely wasteful but UNSATISFIABLE, and why
+     the summand must stay on the LEFT.
+     An sp DECREMENT by k slots consumes k from [avail] (k <=
      avail -- you cannot go below zero) and hands the freed frame region
      [sp', sp) to the client ([sie_cap_push]); an sp INCREMENT feeds the
      frame back and returns k to [avail] ([sie_cap_pop]).  The [b = true]
@@ -758,6 +879,33 @@ Section IntrDefs.
     - by rewrite bi.sep_emp.
     - by rewrite bi.emp_sep.
   Qed.
+
+  (* THE SAME COMPLEMENT SHAPE, FOR THE PERSISTENT HALF.  A parking function
+     re-delivers the RESUMING hart's [intr_handler_avail] -- sched's dispatch
+     payload carries it ([SchedCtx.dispatch_payload]) and the resumed thread
+     needs it because the one thing a returning TRAP still has to do is
+     [sret], which flips SIE '0' -> '1' and so must re-seal [intr_inv] at '1'
+     with the handler spec in hand.  It is stated as the [eb]-complement, and
+     the [emp] arm is forced rather than chosen: at [eb = true] the returned
+     bundle's [sie_arm true p] holds only [∃ h, intr_inv h], NOT the handler
+     WP -- that lives behind the invariant's [□ (b = '1' -∗ spec)], and
+     extracting it needs a LATER stripped, i.e. a program step, which a
+     postcondition does not have.  At [eb = false] there is no arm at all and
+     the payload is simply handed across, so the arm that any caller can
+     actually use is the one this exists for.  ([eb = false] is also
+     kerneltrap's, and kerneltrap is the only caller that wants it.)  *)
+  Definition intr_handler_avail_ext (eb : bool) : iProp Σ :=
+    (if eb then emp else intr_handler_avail)%I.
+
+  Global Instance intr_handler_avail_ext_persistent eb :
+    Persistent (intr_handler_avail_ext eb).
+  Proof. rewrite /intr_handler_avail_ext. destruct eb; apply _. Qed.
+
+  (* the whole copy covers either arm -- a producer that HAS it (sched's
+     dispatch payload does, unconditionally) never has to case-split. *)
+  Lemma intr_handler_avail_ext_intro (eb : bool) :
+    intr_handler_avail -∗ intr_handler_avail_ext eb.
+  Proof. iIntros "#H". rewrite /intr_handler_avail_ext. destruct eb; [done | iExact "H"]. Qed.
 
   Definition intr_restore : iProp Σ :=
     (intr_handler_avail ∗ trap_csrs)%I.
@@ -1193,7 +1341,7 @@ Section IntrDefs.
 
   Definition sie_cap (m : regfile) (avail : nat) (b : bool)
       (p : mword 64) : iProp Σ :=
-    (stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) ∗
+    (stack_own (m !!! Regidx csp_rs1) (trap_res b + avail) ∗
      strans_inv ∗
      sie_arm b p)%I.
 
@@ -1449,9 +1597,17 @@ Section IntrDefs.
      kernel page table, an interrupt handler, or the trap CSRs: this is
      what makes the whole sconf-tier (memset, the lock/kalloc cone via
      [cpu_own γ 0 false p C], ...) callable during early boot. *)
+  (* THE STACK PREMISE IS PLAIN [avail], NOT [kv_frame_slots + avail]: this
+     produces the capability at [b = false], which by [trap_res_off] owes NO
+     trap reserve.  A boot caller physically holding [kv_frame_slots + K]
+     slots below sp therefore instantiates this at [avail := kv_frame_slots
+     + K] and gets the capability AT THAT INDEX -- which is the honest
+     accounting (BootBridge.v does exactly that).  Instantiating at [K] and
+     dropping the deeper 78 would compile too, and would leave [main] unable
+     to ever fund a trap. *)
   Lemma sie_cap_intro_bare (m : regfile) (avail : nat)
       (v : mword 64) {p : mword 64} :
-    stack_own (m !!! Regidx csp_rs1) (kv_frame_slots + avail) -∗
+    stack_own (m !!! Regidx csp_rs1) avail -∗
     strans_bit ('b"0") -∗
     bare_inv -∗
     stvec ↦ᵣ v -∗
@@ -1596,20 +1752,14 @@ Section IntrDefs.
     iApply (sie_cap_gpr_join with "Hhs Hsc Hcap Hfile").
   Qed.
 
-  (* the funnel's accessor: split off the exact reserved carve (the
-     [intr_frame] stack conjunct); the deep [avail] slots ride outside. *)
-  Lemma sie_cap_acc
-      (m : regfile) (avail : nat) (b : bool) (p : mword 64) :
-    sie_cap m avail b p ⊣⊢
-    stack_own (m !!! Regidx csp_rs1) kv_frame_slots ∗
-    stack_own (pa_stk (m !!! Regidx csp_rs1) kv_frame_slots) avail ∗
-    strans_inv ∗
-    sie_arm b p.
-  Proof.
-    rewrite /sie_cap stack_own_app. iSplit.
-    - iIntros "[[Hkv Hdeep] [Htr Harm]]". iFrame.
-    - iIntros "(Hkv & Hdeep & Htr & Harm)". iFrame.
-  Qed.
+  (* NOTE there is no reserve-PEELING accessor here any more.  The old
+     [sie_cap_acc] split the arm-blind carve into [kv_frame_slots] (to feed
+     [intr_frame]) plus the deep [avail], and with the reserve now
+     arm-dependent that split is exactly what the trap must NOT do: at
+     [b = true] the capability's carve is ALREADY [kv_frame_slots + avail]
+     and the handover is a pure re-indexing to [sie_cap m (kv_frame_slots +
+     avail) false p], leaving the stack conjunct untouched (property 2 at
+     [trap_res]).  It had no users. *)
 
   (* [sie_cap] depends on [m] only through sp (same as [intr_frame]). *)
   Lemma sie_cap_retarget
@@ -1633,8 +1783,10 @@ Section IntrDefs.
     sie_cap m' (avail - k) b p ∗ stack_own (m !!! Regidx csp_rs1) k.
   Proof.
     iIntros (Hk Hsp') "(Hstk & Htr & Harm)". iFrame "Htr Harm".
-    replace (kv_frame_slots + avail)%nat
-      with (k + (kv_frame_slots + (avail - k)))%nat by lia.
+    (* [trap_res b] is an OPAQUE [nat] atom here -- [lia] carries it through
+       untouched, which is why the premise [k <= avail] does not move. *)
+    replace (trap_res b + avail)%nat
+      with (k + (trap_res b + (avail - k)))%nat by lia.
     iDestruct (stack_own_app with "Hstk") as "[Htop Hrest]".
     iFrame "Htop". rewrite Hsp'. iExact "Hrest".
   Qed.
@@ -1650,8 +1802,8 @@ Section IntrDefs.
     sie_cap m' (avail + k) b p.
   Proof.
     iIntros (Hsp) "Hframe (Hstk & Htr & Harm)". iFrame "Htr Harm".
-    replace (kv_frame_slots + (avail + k))%nat
-      with (k + (kv_frame_slots + avail))%nat by lia.
+    replace (trap_res b + (avail + k))%nat
+      with (k + (trap_res b + avail))%nat by lia.
     iApply stack_own_app. iFrame "Hframe". rewrite -Hsp. iExact "Hstk".
   Qed.
 
@@ -1659,7 +1811,7 @@ Section IntrDefs.
      slots below the owned region into [avail]... *)
   Lemma sie_cap_grow
       (m : regfile) (avail k : nat) (b : bool) {p : mword 64} :
-    stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + avail)) k -∗
+    stack_own (pa_stk (m !!! Regidx csp_rs1) (trap_res b + avail)) k -∗
     sie_cap m avail b p -∗
     sie_cap m (avail + k) b p.
   Proof.
@@ -1673,11 +1825,11 @@ Section IntrDefs.
     (k <= avail)%nat ->
     sie_cap m avail b p -∗
     sie_cap m (avail - k) b p ∗
-    stack_own (pa_stk (m !!! Regidx csp_rs1) (kv_frame_slots + (avail - k))) k.
+    stack_own (pa_stk (m !!! Regidx csp_rs1) (trap_res b + (avail - k))) k.
   Proof.
     iIntros (Hk) "(Hstk & Htr & Harm)". iFrame "Htr Harm".
-    replace (kv_frame_slots + avail)%nat
-      with ((kv_frame_slots + (avail - k)) + k)%nat by lia.
+    replace (trap_res b + avail)%nat
+      with ((trap_res b + (avail - k)) + k)%nat by lia.
     iDestruct (stack_own_app with "Hstk") as "[Htop Hdeep]".
     iFrame "Htop Hdeep".
   Qed.
@@ -1893,6 +2045,21 @@ Proof.
   - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
 Qed.
 
+(* SO DOES THE PERSISTENT COMPLEMENT, and being persistent buys it nothing
+   here: [intr_handler_avail]'s handler WP names this hart's registers and its
+   invariant this hart's ghost, so it is hart-indexed like the rest and needs
+   the same two-arm argument.  (Persistence only means the transport does not
+   have to give the source copy back.) *)
+Lemma intr_handler_avail_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
+    (CID0 CID1 : CpuId) (eb : bool) (p : mword 64) :
+  (eb = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
+  intr_handler_avail_ext (CID := CID0) eb -∗ intr_handler_avail_ext (CID := CID1) eb.
+Proof.
+  intros Heq. destruct eb.
+  - (* [emp]: no hart in the term *) rewrite /intr_handler_avail_ext. iIntros "$".
+  - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
+Qed.
+
 (* THE CLAIM'S COMPLEMENT TRANSPORTS THE SAME WAY, AND FOR THE SAME REASON.
    [cpu_claim] became hart-INDEXED when it grew the hart tag beside the state
    half, so a caller-held [cpu_claim_ext] can no longer simply be framed
@@ -2005,3 +2172,193 @@ Ltac ops_ok_split Hops :=
   pose proof (rd_ok_tp _ (ops_ok_rd _ _ _ _ Hops));
   pose proof (ops_ok_s1 _ _ _ _ Hops);
   pose proof (ops_ok_s2 _ _ _ _ Hops).
+
+(* ==================================================================== *)
+(* THE READ-SIDE SIDE CONDITION AS A TYPECLASS -- for the leaves that    *)
+(* HAVE NO PREMISE SLOT TO WIDEN.                                        *)
+(* ==================================================================== *)
+
+(* WHY A CLASS AND NOT A PREMISE.  [src_ok] / [ops_ok] above are free at
+   every call site because they ride in an EXISTING premise slot ([rd_ok]'s),
+   which 1192 sites fill with the positional opaque [ltac:(rdok)]: widening
+   what the slot MEANS costs nothing.  The memory, branch/compare and [c.ret]
+   leaves have no such slot -- their pure premises are exactly the facts about
+   [rget m rs] for a caller-chosen [rs], and nothing else -- so adding an
+   ordinary premise there changes ARITY at ~2173 references, every one of
+   which would have to grow a positional [ltac:(...)] in the right place.
+   Delivering the same side condition by INSTANCE RESOLUTION instead costs no
+   positional slot at all: an implicit [`{!SrcOk rs}] argument is filled in by
+   the [Hint Extern] below, so no call site moves.
+
+   WHAT IT BUYS is what [rget_src_indep] / [rget_next_indep] buy for the
+   widened slot: [sie_cap_gpr] owns [gpr_file (tp_pin m)], so [rget m k] --
+   a lookup in [tp_pin m] -- depends on the ambient hart at exactly one
+   register, [k = tp], and agrees at every other ([HartTp.rget_hart_indep]).
+   Once the funnel's σ-callback moves inside [WpNext.wp_next] a leaf's
+   obligation arrives at the REBOUND hart while its caller's premise was
+   stated at the entry hart, and this class is what reconciles the two.
+   Equivalently, at a non-tp index [HartTp.rget_ne] rewrites the read to the
+   hart-FREE [m !!! Regidx rs], which is the form a converted leaf's
+   statement can then be spelled in.
+
+   UNGUARDED, unlike [src_ok]'s [b = true -> ...], and deliberately.  The
+   guard exists there because three real proofs (mycpu / cpuid / scheduler)
+   read tp at [b = false], and they fill the SAME slot; a leaf that takes
+   this class instead has no [b] to hide behind -- at a variable [b] you
+   would have to prove the unguarded form anyway -- so guarding buys nothing.
+   The corollary is the point: a converted leaf applied at [rs = tp] FAILS,
+   at the call site, with an unsatisfiable-instance error, rather than
+   silently accumulating an obligation nobody can discharge.  That is a
+   feature; it is how we find out that such a call site exists. *)
+Class SrcOk (rs : mword 5) : Prop :=
+  { src_ok_not_tp : Regidx rs <> Regidx Rtp }.
+
+(* THE DECIDING TACTIC IS [rdok_tpne], REUSED VERBATIM: the goal is the same
+   [Regidx rs <> Regidx Rtp] that [rd_ok]'s tp conjunct and [src_ok]'s body
+   are, and it needs the same script ([Regidx]'s injectivity first, then
+   [vm_compute] on the underlying [mword 5]s).  Keeping one script means the
+   class approach and the premise approach cannot drift apart.
+   [constructor] first because [SrcOk] is a record class (one field), so the
+   [Hint Extern] has to build the instance rather than prove the field.
+
+   THE [assumption] ARM IS NOT OPTIONAL, and it is the same arm [rdok_src] has
+   for the same reason: not every call site names a CONCRETE register.  The
+   symbolic-block interpreter [WpSconfVc.v] applies these leaves at a
+   quantified [rs2] and carries the disequality as an ordinary hypothesis
+   ([Hrs2ok : Regidx rs2 <> Regidx Rtp], which it needs anyway to state its
+   own [rget_ne] rewrite), so [rdok_tpne]'s [vm_compute] cannot decide the
+   goal and resolution has to fall back on what the context already proves.
+   WITHOUT THIS ARM THE FAILURE IS THE WORST KIND: an unresolved instance
+   inside a tactic-driven [iApply] is SHELVED rather than reported, so the
+   file compiles for another four hundred lines and then dies at [Qed] with
+   "Attempt to save an incomplete proof", naming neither the class, the
+   register, nor the call site.  (At an [exact]/[pose proof]-shaped
+   application the same failure is immediate and legible -- "Cannot infer the
+   implicit parameter ... whose type is SrcOk Rtp".)  If a converted leaf ever
+   fails this way, look for a call site whose register is a variable before
+   looking anywhere else. *)
+(* THE FOUR ARMS, AS A NAMED TACTIC.  They exist because a call site's
+   source-register argument can carry the fact in FOUR DIFFERENT SHAPES, and an
+   arm that is missing does not produce a missing-arm error -- it produces the
+   shelved-obligation / "Attempt to save an incomplete proof" failure described
+   above, hundreds of lines away.  So the arms are enumerated here, each with
+   the site that motivates it, and every one of them has a positive smoke test
+   at the bottom of this file.  ADD ARMS HERE rather than editing call sites:
+   a new arm costs one [first] branch and nothing at the 2173 references. *)
+Ltac srcok_solve :=
+  first
+    [ (* (1) A CONCRETE register -- the overwhelming majority of call sites
+           ([iApply (wp_csdsp_s_sconf pc uimm (mword_of_int 15) ...)]).  Decided
+           by computation, with the SAME script [rd_ok]'s tp conjunct and
+           [src_ok]'s body use, so the class route and the premise route cannot
+           drift apart. *)
+      rdok_tpne
+    | (* (2) THE FACT VERBATIM IN THE CONTEXT: [Regidx rs <> Regidx Rtp].  This
+           is the symbolic-block interpreter [WpSconfVc.v], which applies these
+           leaves at a QUANTIFIED [rs1]/[rs2] and poses exactly this from
+           [VcGenS.is_tp_false] (it needs it anyway, for its own [rget_ne]
+           rewrites); also [ProofMemset.v]'s [Hra1tp]/[Hra5tp] and
+           [ProofVirtioDiskInit.v]'s [Hrs1tp]/[Hrs2tp], which state it as an
+           ordinary premise.  No [vm_compute] can decide a variable, so without
+           this arm those sites shelve. *)
+      assumption
+    | (* (3) THE WRITE-SIDE PREMISE INSTEAD: the context has [rd_ok rs] and the
+           leaf reads the register it also writes (every compressed rd = rs1
+           form).  [rd_ok]'s second conjunct IS this goal, so project it rather
+           than making the site restate it. *)
+      (apply rd_ok_tp; assumption)
+    | (* (4) THE DISEQUALITY ON THE RAW [mword 5], i.e. [rs <> Rtp] rather than
+           [Regidx rs <> Regidx Rtp] -- which is how [WpUartgetc.v] states its
+           [rs_rhr] premise (it wants the plain register-file value, so it never
+           needed the [Regidx] form).  [Regidx] is a constructor, so one
+           [injection] moves the goal onto the raw words and [congruence] closes
+           it against whichever shape the hypothesis has (this arm also covers a
+           hypothesis written the other way round, [Rtp <> rs]).  NOTE this
+           deliberately does NOT [vm_compute] the way [rdok_tpne] does: at a
+           variable register [vm_compute] normalises [Rtp] to a bitvector
+           literal that no longer matches the un-normalised hypothesis, which is
+           exactly why arm (1) does not already cover this case. *)
+      (let H1 := fresh in let H2 := fresh in
+       intro H1; injection H1 as H2; congruence)
+    ].
+(* NO [ops_ok] ARM, and that is not an oversight: [ops_ok b rd rs1 rs2]'s source
+   conjuncts are [src_ok b rs], i.e. [b = true -> ...], and at a VARIABLE [b]
+   the guarded fact does not imply the unguarded one this class asks for.  A
+   leaf whose caller only has [ops_ok] at a variable [b] belongs on the guarded
+   route, not here (see the leaf-family note in the commit that landed this). *)
+Global Hint Extern 0 (SrcOk _) =>
+  (constructor; srcok_solve) : typeclass_instances.
+
+(* The bridge a converted leaf uses: the class turns the caller's hart-free
+   premise about [m] into the [rget] the funnel hands it, at WHATEVER hart the
+   σ-callback was instantiated at.  Stated as an [∀ c] so a leaf never has to
+   name the hart it happens to be run at today. *)
+Lemma src_ok_rget_all (m : regfile) (rs : mword 5) `{!SrcOk rs} :
+  forall c : CpuId, rget (CID := c) m rs = m !!! Regidx rs.
+Proof. intros c. exact (rget_ne (CID := c) m rs src_ok_not_tp). Qed.
+
+(* ... and the two-hart form, which is [HartTp.rget_hart_indep] under the
+   class: this is the shape the σ-obligation actually arrives in once the
+   callback is rebound (caller's fact at [c2], obligation at [c1]). *)
+Lemma src_ok_rget_indep (m : regfile) (rs : mword 5) `{!SrcOk rs} :
+  forall c1 c2 : CpuId, rget (CID := c1) m rs = rget (CID := c2) m rs.
+Proof. exact (rget_hart_indep m rs src_ok_not_tp). Qed.
+
+(* ==================================================================== *)
+(* THE CHECKER FOR [SrcOk]'S SILENT FAILURE MODE.                        *)
+(* ==================================================================== *)
+
+(* WHY THIS EXISTS AT ALL.  [SrcOk]'s failure inside a tactic-driven [iApply]
+   is a SHELVED goal, not an error: the file compiles for hundreds more lines
+   and dies at [Qed] with "Attempt to save an incomplete proof", naming neither
+   the class, the register, nor the call site.  Per durable-notes' rule for a
+   refactor with a silent failure mode, the checker is written BEFORE the sweep
+   and it checks the two things that can actually go wrong here:
+
+     - the CLASS/HINT ITSELF -- a mis-stated class or a dead [Hint Extern]
+       would make every converted leaf shelve at every call site.  The
+       [srcok_pos_*] / [srcok_neg_*] pairs below pin that down, one per arm of
+       [srcok_solve], plus the negative that says resolution really does FAIL
+       at tp (an accidentally-provable class would make the whole exercise
+       vacuous).  Each converted leaf FILE repeats the concrete pair beside its
+       own leaves, so a file that somehow does not see this hint (import order)
+       fails at itself rather than at a consumer's [Qed].
+     - a leaf's own WIRING, i.e. the class attached to the wrong parameter.
+       That one needs no probe: every converted leaf CONSUMES its class in the
+       proof body, via [src_ok_rget_indep m rs ...] / [src_ok_rget_all m rs ...]
+       naming the same register the statement's premise reads.  Attach the class
+       to the wrong parameter and that line does not typecheck, loudly, in the
+       leaf's own file.  That consumption is not decoration -- it is the wiring
+       check, so DO NOT "simplify" a converted leaf by deleting it. *)
+
+(* arm (1), and the shape 2100-odd of the 2173 references have: a concrete
+   register, decided by [rdok_tpne]'s [vm_compute]. *)
+Definition srcok_pos_concrete : SrcOk (mword_of_int 1 : mword 5) := _.
+Definition srcok_pos_concrete_a5 : SrcOk (mword_of_int 15 : mword 5) := _.
+Definition srcok_pos_sp : SrcOk csp_rs1 := _.
+
+(* THE NEGATIVE, and the reason the class is worth anything: at the thread
+   pointer there is NO instance, so a leaf applied at tp fails AT THE CALL SITE
+   instead of accumulating an obligation nobody can discharge.  If this [Fail]
+   ever stops failing, the class has become provable and every converted leaf's
+   side condition has silently evaporated. *)
+Fail Definition srcok_neg_tp : SrcOk Rtp := _.
+
+(* arms (2)-(4): resolution at a VARIABLE register, from each of the three
+   hypothesis shapes the tree actually carries.  These are the arms whose
+   absence produces the shelved-[Qed] failure, so each gets a positive test. *)
+Definition srcok_pos_assumption (rs : mword 5) (H : Regidx rs <> Regidx Rtp)
+  : SrcOk rs := _.
+Definition srcok_pos_rd_ok (rs : mword 5) (H : rd_ok rs) : SrcOk rs := _.
+Definition srcok_pos_raw_mword (rs : mword 5) (H : rs <> Rtp) : SrcOk rs := _.
+Definition srcok_pos_raw_flipped (rs : mword 5) (H : Rtp <> rs) : SrcOk rs := _.
+
+(* ... and the negative at a variable with NOTHING in the context: resolution
+   must fail, or the arms would be closing goals they have no proof of. *)
+Fail Definition srcok_neg_bare (rs : mword 5) : SrcOk rs := _.
+
+(* the guarded premise does NOT satisfy the unguarded class at a variable [b] --
+   this is the "no [ops_ok] arm" note above, stated as a check so nobody adds
+   such an arm and quietly weakens the class. *)
+Fail Definition srcok_neg_src_ok (b : bool) (rs : mword 5) (H : src_ok b rs)
+  : SrcOk rs := _.

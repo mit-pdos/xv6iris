@@ -80,7 +80,7 @@ Require Import SpecHoldingsleep SpecVirtioDiskRw.
 Require Import SpecBwrite.
 Require Import CodeBwrite.
 From Kernel Require KernelSyms.
-Require Import InodeRef.
+Require Import IrefSlots.
 Local Open Scope Z_scope.
 
 Set Printing Depth 40.
@@ -111,11 +111,7 @@ Notation Rtp := (mword_of_int 4 : mword 5).
 (* the [upd_ne] side goal is [lookup-key <> update-key]; try the two
    [is_cs_idx] readings first and leave [congruence] (the slow closer --
    claude-notes/optimization.md) for the callee-saved writes. *)
-Local Ltac regne :=
-  first [ apply not_eq_sym; apply is_cs_idx_true_neq;
-          [vm_compute; reflexivity | assumption]
-        | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption]
-        | congruence ].
+Local Ltac regne := reg_ne_side.
 
 (* the index side conditions of the register-threading premises below: each is
    either an [is_cs_idx*] membership or a [Regidx] disequality at a literal. *)

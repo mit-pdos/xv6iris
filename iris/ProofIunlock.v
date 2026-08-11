@@ -62,10 +62,7 @@ Require Import InodeRegion.
 Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
-Require Import KptGhost.
 Require Import MinstretInv.
-Require Import RiscvFetchExec.
-Require Import SpecPanic.
 Require Import CodeIunlock.
 Require Import SpecHoldingsleep SpecReleasesleep.
 Require Import SpecIunlock.
@@ -92,11 +89,7 @@ Notation Rs2 := (mword_of_int 18 : mword 5).
 Notation Ra0 := (mword_of_int 10 : mword 5).
 Notation Ra5 := (mword_of_int 15 : mword 5).
 
-Local Ltac regne :=
-  first [ apply not_eq_sym; apply is_cs_idx_true_neq;
-          [vm_compute; reflexivity | assumption]
-        | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption]
-        | congruence ].
+Local Ltac regne := reg_ne_side.
 
 Local Ltac pcw := apply bv_eq; vm_compute; reflexivity.
 Local Ltac nz := vm_compute; discriminate.

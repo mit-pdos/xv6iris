@@ -102,7 +102,7 @@ Definition sp_of (n : nat) : Z := KernelSyms.stack0 + 4096 * (Z.of_nat n + 1).
 (* the depth of the carve below sp0: the hart's own 4096-byte [stack0] slice
    is exactly [uint sp0 - 8*512, uint sp0), which is what makes the ONE range
    serve both [wp_entry_boot]'s [4 <= n] and the bridge's
-   [boot_stack_slots K_main = 86 <= n]. *)
+   [boot_stack_slots K_main = 180 <= n]. *)
 Definition boot_stack_depth : nat := 512%nat.
 
 Lemma boot_stack_depth_entry : (4 <= boot_stack_depth)%nat.
@@ -204,9 +204,18 @@ Proof.
     vm_compute; reflexivity.
 Qed.
 
-(* the secondary arm's stack budget is inside the one the bridge hands out *)
-Lemma K_main_secondary_le : (K_main_secondary <= K_main)%nat.
-Proof. unfold K_main_secondary, K_main. lia. Qed.
+(* the secondary arm's stack budget is inside the one the bridge hands out.
+   The bridge's index is [kv_frame_slots + K_main] -- it names the trap
+   reserve, because that is the depth it physically carves ([BootBridge.v]) --
+   so BOTH arms' budget premises are stated against that sum here rather than
+   against [K_main] alone.  Nothing is retuned: [kv_frame_slots] only ever
+   makes the available budget LARGER. *)
+Lemma K_main_secondary_le : (K_main_secondary <= kv_frame_slots + K_main)%nat.
+Proof. unfold K_main_secondary, K_main, kv_frame_slots. lia. Qed.
+
+(* the boot arm's, likewise: it used to be [le_n K_main] at the call site. *)
+Lemma K_main_boot_le : (K_main <= kv_frame_slots + K_main)%nat.
+Proof. lia. Qed.
 
 (* ...and at the BOOT hart: the id word IS [zero_reg], which is what makes
    main's [beqz a0] take the boot path. *)
@@ -409,8 +418,14 @@ Section BootRun.
     kernel_text -∗
     boot_hart_res rs iv dq -∗
     (* --- and what main's arm then wants of this hart --- *)
+    (* THE avail INDEX IS [kv_frame_slots + K_main], NOT [K_main]: it is what
+       [BootBridge.boot_bridge] hands back, and what it hands back is the
+       carve it actually takes off [sp0] ([boot_stack_slots K] =
+       [2 + (kv_frame_slots + K)]).  See that file's header for why holding
+       it at [K_main] would be a silent 78-slot leak that leaves main unable
+       to fund a trap. *)
     (∀ mf : regfile,
-       sie_cap_gpr mf K_main false zero_reg -∗
+       sie_cap_gpr mf (kv_frame_slots + K_main)%nat false zero_reg -∗
        cpu_own 0 false zero_reg cpu_ctx_free false -∗
        ghost_var sie_gname (1/4) ('b"0" : mword 1) -∗
        main_hart_raw (register_lookup tlb rs) -∗
@@ -526,7 +541,7 @@ Section BootSecondary.
     iIntros "#Htext #Hdata Hres #Hpanic #Hstarted".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
-    iApply (MainSecondary.wp_main_secondary_sconf mf K_main zero_reg γd γv
+    iApply (MainSecondary.wp_main_secondary_sconf mf (kv_frame_slots + K_main)%nat zero_reg γd γv
               (register_lookup tlb rs)
               (cid_word_of_nz _ Hn Hnz)
               (cid_word_of_lt_dev _ Hn)
@@ -600,12 +615,12 @@ Section BootPrimary.
              #Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim #Hdone Hkpt Hkmap Hpages".
     iApply (boot_entry_bridge rs iv dq Hreset with "Htext Hres").
     iIntros (mf) "Hcap Hcpu Hg Hraw Hpc".
-    iApply (Main.wp_main_boot_sconf mf K_main zero_reg ps
+    iApply (Main.wp_main_boot_sconf mf (kv_frame_slots + K_main)%nat zero_reg ps
               (add_vec (and_vec (add_vec (mword_of_int 0x80023558 : mword 64)
                  (mword_of_int 4095 : mword 64)) negPGSIZEv) PGSIZEv)
               (mword_of_int 0x88000000 : mword 64) γd γv l0 b0 c0
               (register_lookup tlb rs) (main_deposit γd γv)
-              (cid_word_of_zero _ Hz) (le_n K_main) eq_refl eq_refl Hprun Hlen
+              (cid_word_of_zero _ Hz) K_main_boot_le eq_refl eq_refl Hprun Hlen
               Hlive eq_refl
               with "Hcap Hcpu Hg Htext Hdata Hpc Hpanic Hstarted [] Hlk Hgl
                     Hpark Hpst Hdev Htx Hsent Hlb Hdlab Hcfg Hclaim Hdone

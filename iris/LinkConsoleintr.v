@@ -25,7 +25,7 @@ Require Import RiscvLang RiscvPtsto SmodeCore.
 Require Import RegFile.
 Require Import FdSlots WpLock.
 Require Import SpecConsoleintr.
-Require Import InodeRef.
+Require Import IrefSlots.
 
 Module Consoleintr : CONSOLEINTR.
   Axiom wp_consoleintr_sconf :

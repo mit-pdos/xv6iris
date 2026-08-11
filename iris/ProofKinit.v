@@ -71,8 +71,6 @@ Section ProofKinit.
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hb2 : add_vec spr (zero_extend' 64 (concat_vec (mword_of_int 0 : mword 6) ('b"000"))) = pa_stk sp0 2).
     { unfold spr, sp0, pa_stk, add_vec_int. rewrite pa_stk_off2. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hdeepaddr : pa_stk (pa_stk sp0 kv_frame_slots) 2 = pa_stk spr kv_frame_slots).
-    { rewrite Hspr2 !pa_stk_assoc. f_equal; lia. }
     (* ===== PROLOGUE: 2-slot frame trade (move_down 2) + save ra/s0 ===== *)
     set (R1 := <[Regidx csp_rs1 := regval_into_reg (add_vec sp0 (sign_extend' 64 (sign_extend' 12 (mword_of_int 48 : mword 6))))]> m).
     assert (Hspm : m !!! Regidx csp_rs1 = sp0) by reflexivity.

@@ -163,8 +163,24 @@ Section FileOff.
        a_fip k ↦₈{DfracOwn (1/2)%Qp} ip ∗
        (off_resident k ∨ (off_mark ip ∗ flive_tok γ k)))%I.
 
+  (* Proven STRUCTURALLY, one connective at a time, not by a single
+     [apply _] over the whole unfolded body.  The monolithic search
+     backtracks across the ∃/∗/∨ tower and the two points-to abstractions
+     underneath it: 12.7 s, three quarters of this file, for a fact whose
+     every leaf instance already exists.  Spelling the connectives out
+     turns it into ~0 s, and it is the same proof.  (The general rule is
+     in claude-notes/optimization.md: never leave a large [Timeless] /
+     [Persistent] / [Absorbing] goal to one [apply _].) *)
   Global Instance off_body_timeless γ k : Timeless (off_body γ k).
-  Proof. rewrite /off_body /off_resident /off_mark. apply _. Qed.
+  Proof.
+    rewrite /off_body /off_resident /off_mark.
+    apply bi.exist_timeless; intro ip.
+    apply bi.sep_timeless; [apply _ |].
+    apply bi.or_timeless.
+    - apply bi.exist_timeless; intro v.
+      apply bi.sep_timeless; [apply _ | apply _].
+    - apply bi.sep_timeless; [apply _ | apply _].
+  Qed.
 
   Definition off_inv (γ : gname) (k : nat) : iProp Σ :=
     inv (offN .@ k) (off_body γ k).

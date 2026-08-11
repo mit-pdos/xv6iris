@@ -23,7 +23,6 @@ Require Import CalleeSaved.
 Require Import KallocInv.
 Require Import KMap.   (* mem_page_to_phys: kalloc-page ↦ₘ → ↦ₚ for the PT node *)
 Require Import WpLock.
-Require Import VcGen.
 Require Import CommonWalk PtTree.
 Require Import KptTree.   (* pt_slot_phys_to_mem / pt_slot_mem_to_phys / pt_node_claim_from_static *)
 Require Import PtBuild KvmSpec.
@@ -162,9 +161,6 @@ Section ProofWalk.
       f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     assert (Hsprstk : pa_stk sp0 8 = spr).
     { rewrite /pa_stk /spr /sp0 /add_vec_int. f_equal; try (apply bv_eq; vm_compute; reflexivity). }
-    assert (Hdeepaddr : pa_stk (pa_stk sp0 kv_frame_slots) 8 = pa_stk spr kv_frame_slots).
-    { unfold spr, sp0, pa_stk, add_vec_int, kv_frame_slots. rewrite !add_vec_off2.
-      f_equal; try (apply bv_eq; vm_compute; reflexivity). }
     iPoseProof (wi_52 with "Htext") as "Hi52".
     iPoseProof (wi_54 with "Htext") as "Hi54".
     iPoseProof (wi_56 with "Htext") as "Hi56".

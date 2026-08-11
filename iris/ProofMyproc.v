@@ -278,7 +278,7 @@ Section ProofMyproc.
        tp read. *)
     iPoseProof (mpi_0e with "Htext") as "Hi0e".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.myproc + 0x0e)) (mword_of_int 15 : mword 5) (mword_of_int 4 : mword 5)
-              MP1 (av - 4)%nat false
+              MP1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi0e [-]").
     iApply wp_next_off_intro.
@@ -291,7 +291,7 @@ Section ProofMyproc.
     iEval (rewrite Hpc10) in "Hpc".
     iPoseProof (mpi_10 with "Htext") as "Hi10".
     iApply (wp_caddiw_s_sconf (mword_of_int (KernelSyms.myproc + 0x10)) (mword_of_int 15 : mword 5) (mword_of_int 0 : mword 6)
-              B1 (av - 4)%nat false
+              B1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi10 [-]").
     iApply wp_next_off_intro.
@@ -305,7 +305,7 @@ Section ProofMyproc.
     iEval (rewrite Hpc12) in "Hpc".
     iPoseProof (mpi_12 with "Htext") as "Hi12".
     iApply (wp_cslli_s_sconf (mword_of_int (KernelSyms.myproc + 0x12)) (Regidx (mword_of_int 15 : mword 5)) (mword_of_int 15 : mword 5) (mword_of_int 7 : mword 6)
-              B2 (av - 4)%nat false
+              B2 (trap_res b + (av - 4))%nat false
               eq_refl ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [-]").
     iApply wp_next_off_intro.
@@ -323,7 +323,7 @@ Section ProofMyproc.
     (* ---- 0x14: auipc a4,0x11 ---- *)
     iPoseProof (mpi_14 with "Htext") as "Hi14".
     iApply (wp_auipc_s_sconf (mword_of_int (KernelSyms.myproc + 0x14)) (mword_of_int 14 : mword 5) (mword_of_int 0x11 : mword 20)
-              B3 (av - 4)%nat false
+              B3 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iApply wp_next_off_intro.
@@ -335,7 +335,7 @@ Section ProofMyproc.
     (* ---- 0x18: addi a4,a4,-1488 ---- *)
     iPoseProof (mpi_18 with "Htext") as "Hi18".
     iApply (wp_addi4_s_sconf (mword_of_int (KernelSyms.myproc + 0x18)) (mword_of_int 14 : mword 5) (mword_of_int 14 : mword 5) (mword_of_int 0xa2e : mword 12)
-              B4 (av - 4)%nat false
+              B4 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
@@ -353,7 +353,7 @@ Section ProofMyproc.
     (* ---- 0x1c: c.add a5,a5,a4 ---- *)
     iPoseProof (mpi_1c with "Htext") as "Hi1c".
     iApply (wp_cadd_s_sconf (mword_of_int (KernelSyms.myproc + 0x1c)) (mword_of_int 15 : mword 5) (mword_of_int 14 : mword 5)
-              B5 (av - 4)%nat false
+              B5 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1c [-]").
     iApply wp_next_off_intro.
@@ -378,7 +378,7 @@ Section ProofMyproc.
     iEval (rewrite /cur_proc /a_cpu_proc) in "Hcur".
     iPoseProof (mpi_1e with "Htext") as "Hi1e".
     iApply (wp_cld_s_sconf (mword_of_int (KernelSyms.myproc + 0x1e)) (mword_of_int 15 : mword 5) (mword_of_int 15 : mword 5) (zero_extend' 12 (concat_vec (mword_of_int 6 : mword 5) ('b"000")))
-              B6 (av - 4)%nat p false (dqm := DfracOwn 1)
+              B6 (trap_res b + (av - 4))%nat p false (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi1e [Hcur] [-]").
     { iEval (rewrite Hpa). iExact "Hcur". }
@@ -393,7 +393,7 @@ Section ProofMyproc.
     (* ---- 0x20: c.mv s1,a5 ---- *)
     iPoseProof (mpi_20 with "Htext") as "Hi20".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.myproc + 0x20)) (mword_of_int 9 : mword 5) (mword_of_int 15 : mword 5)
-              B7 (av - 4)%nat false
+              B7 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi20 [-]").
     iApply wp_next_off_intro.
@@ -408,7 +408,7 @@ Section ProofMyproc.
     (* ---- 0x22: jal ra,pop_off ---- *)
     iPoseProof (mpi_22 with "Htext") as "Hi22".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.myproc + 0x22)) (mword_of_int 1 : mword 5) (mword_of_int 2093856 : mword 21)
-              B8 (av - 4)%nat false
+              B8 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi22 [-]").
     iApply wp_next_off_intro.
@@ -420,6 +420,12 @@ Section ProofMyproc.
     iEval (rewrite Hpcpp) in "Hpc".
     assert (HB9ra : B9 !!! Regidx (mword_of_int 1 : mword 5) = mword_of_int (KernelSyms.myproc + 0x26))
       by (rewrite /B9 upd_eq; apply bv_eq; vm_compute; reflexivity).
+    (* the acquire handed the window index out as [trap_res b + N]; release
+       wants it as [trap_res outb + N] with [outb = match n with O => eb
+       | S _ => false end].  Those are the same bool -- [cpu_own] forces
+       it -- so this is a pure re-spelling, and it is what makes the
+       acquire/release pair compose back to [N]. *)
+    iEval (rewrite Hbmatch) in "Hcg".
     iApply (PushOff.wp_pop_off_sconf B9 (av - 4)%nat n eb p C
               ltac:(lia)
               with "Hcg Hown Hpay Htext Hpc [-]").

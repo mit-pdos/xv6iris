@@ -79,6 +79,57 @@ Proof. intros Hk Hc Heq. injection Heq as Heq'. subst c. rewrite Hc in Hk. discr
 Lemma regidx_inj (x y : mword 5) : Regidx x = Regidx y -> x = y.
 Proof. intro H. injection H as H. exact H. Qed.
 
+(* ---------------------------------------------------------------------- *)
+(*  [reg_ne_side] : THE canonical discharge for [upd_ne]'s side goal.       *)
+(*                                                                         *)
+(*  Every register-map peel leaves [Regidx <lookup key> <> Regidx <update   *)
+(*  key>], and there are exactly three shapes it can have:                  *)
+(*                                                                         *)
+(*    (1) the disequality is already in context, as an index disequality --  *)
+(*        every callee-saved-agreement transport ([..._thr] / [..._cs]) is   *)
+(*        stated with one [c <> Rsk] premise per register the function       *)
+(*        writes, so this is the branch that fires in a save/restore frame;  *)
+(*    (2) the WRITTEN register is caller-saved and the lookup key is         *)
+(*        callee-saved ([is_cs_idx_true_neq], either orientation);           *)
+(*    (3) both keys are concrete literals.                                   *)
+(*                                                                         *)
+(*  (1) FIRST because it is the only branch that computes nothing: the       *)
+(*  [is_cs_idx] branches each run a [vm_compute] that FAILS on a symbolic    *)
+(*  key, ~0.2 s a time, which is pure waste when the hypothesis was there    *)
+(*  all along.                                                              *)
+(*                                                                         *)
+(*  NEVER put [congruence] (or any other whole-context closer) ahead of      *)
+(*  these: it builds a congruence closure over the entire local context,     *)
+(*  and inside a whole-function proof that is a hundred large mword facts.   *)
+(*  Measured at ~80 s PER CALL in [ProofIget] -- 400 s in a single           *)
+(*  [assert], the most expensive statement in the whole build.  It is kept   *)
+(*  here as the LAST alternative purely so no existing call site can lose    *)
+(*  completeness; nothing in the tree should reach it.                       *)
+(*                                                                         *)
+(*  Name-free by construction: an [Ltac] body cannot mention a hypothesis    *)
+(*  introduced by its own [injection] (durable-notes.md), which is why (1)   *)
+(*  goes through [regidx_inj] and an inner [match goal] instead.  The inner  *)
+(*  [match] (not [lazymatch]) is what makes it pick the right one of the     *)
+(*  six-to-nine disequalities such a transport carries.                      *)
+(*  See claude-notes/optimization.md for the measurements.                   *)
+(* ---------------------------------------------------------------------- *)
+Ltac reg_ne_side :=
+  first [ lazymatch goal with
+          | |- Regidx ?x <> Regidx ?y =>
+              first [ match goal with
+                      | H : x <> y |- _ => exact (fun Hq => H (regidx_inj x y Hq))
+                      end
+                    | match goal with
+                      | H : y <> x |- _ =>
+                          exact (fun Hq => H (regidx_inj y x (eq_sym Hq)))
+                      end ]
+          end
+        | apply not_eq_sym; apply is_cs_idx_true_neq;
+          [vm_compute; reflexivity | assumption]
+        | apply is_cs_idx_true_neq; [vm_compute; reflexivity | assumption]
+        | vm_compute; discriminate
+        | congruence ].
+
 
 (* Project one register out of a [callee_saved] fact, uniformly for ANY
    callee-saved index [c] (decided by [is_cs_idx c = true]).  A caller that

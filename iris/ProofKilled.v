@@ -244,7 +244,7 @@ Section ProofKilled.
                     = p_killed (proc_addr j))
       by (rewrite Hmacq_s1; apply kl_killed_off).
     iApply (wp_clw_s_sconf (mword_of_int (KernelSyms.killed + 0x12)) kl_a5 kl_s1
-              (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) macq (av - 4)%nat kl false
+              (zero_extend' 12 (concat_vec (mword_of_int 10 : mword 5) ('b"00"))) macq (trap_res b + (av - 4))%nat kl false
               (dqm := DfracOwn 1)
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi12 [Hkilled] [-]").
@@ -257,7 +257,7 @@ Section ProofKilled.
     iEval (rewrite Hp14) in "Hpc".
     (* +0x14: c.mv s2,a5 -- park the value across release *)
     iPoseProof (kli_14 with "Htext") as "Hi14".
-    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.killed + 0x14)) kl_s2 kl_a5 C1 (av - 4)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.killed + 0x14)) kl_s2 kl_a5 C1 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi14 [-]").
     iApply wp_next_off_intro.
@@ -271,7 +271,7 @@ Section ProofKilled.
     { rewrite /C2 upd_eq add_vec_zero_l /C1 upd_eq. reflexivity. }
     (* +0x16: c.mv a0,s1 *)
     iPoseProof (kli_16 with "Htext") as "Hi16".
-    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.killed + 0x16)) kl_a0 kl_s1 C2 (av - 4)%nat false
+    iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.killed + 0x16)) kl_a0 kl_s1 C2 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi16 [-]").
     iApply wp_next_off_intro.
@@ -289,7 +289,7 @@ Section ProofKilled.
     (* +0x18: jal ra,release *)
     iPoseProof (kli_18 with "Htext") as "Hi18".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.killed + 0x18)) kl_ra (mword_of_int 2091820 : mword 21)
-              C3 (av - 4)%nat false
+              C3 (trap_res b + (av - 4))%nat false
               ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi18 [-]").
     iApply wp_next_off_intro.
@@ -312,6 +312,12 @@ Section ProofKilled.
     { iApply (proc_lock_res_intro γs γl (proc_addr j) st ch with "Hstate Hpg Hchan [-Hslot] Hslot").
       iExists kl, xs, pid. iFrame "Hkilled Hxstate Hpidhalf". }
     (* ===================== release(&p->lock) ===================== *)
+    (* the acquire handed the window index out as [trap_res b + N]; release
+       wants it as [trap_res outb + N] with [outb = match n with O => eb
+       | S _ => false end].  Those are the same bool -- [cpu_own] forces
+       it -- so this is a pure re-spelling, and it is what makes the
+       acquire/release pair compose back to [N]. *)
+    iEval (rewrite -Hbeq) in "Hcg".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
               (proc_lock_res γs γl (proc_addr j)) C4 n eb p C (av - 4)%nat
               Hlka ltac:(lia)

@@ -169,7 +169,6 @@ Require Import IrefSlots.
 Require Import IcacheInv.
 Require Import IcacheEscrow.
 Require Import SpecAllocpid.
-Require Import SpecAllocproc.
 Require Import WaitInv.
 Require Import SpecProcinit.
 Require Import SpecPanic.

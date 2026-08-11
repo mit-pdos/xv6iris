@@ -112,7 +112,7 @@ Section ProofVirtioDiskRwCSeam.
        ⌜forall p T, tr !! p = Some T -> tri_set T ## tri_set (h, m2, t)⌝ -∗
        ⌜is_aligned_paddr (Physaddr (pa_stk sp0 11)) 8 = true
         /\ is_aligned_paddr (Physaddr (pa_stk sp0 12)) 8 = true⌝ -∗
-       sie_cap_gpr M (K - 12)%nat false (proc_addr j) -∗
+       sie_cap_gpr M (trap_res true + (K - 12))%nat false (proc_addr j) -∗
        cpu_own 1 eb (proc_addr j) C false -∗
        arm_pay 0 eb (proc_addr j) -∗
        pc_is (mword_of_int (KernelSyms.virtio_disk_rw + 0x162) : mword 64) -∗
@@ -145,7 +145,7 @@ Section ProofVirtioDiskRwCSeam.
     destruct Hok as (Hhm & Hht & Hmt & Hh8 & Hm8 & Ht8).
     cbn in Hh8, Hm8, Ht8.
     iDestruct "Hgeom" as "(Hdp & _)".
-    iApply (wp_vdrw_p3 (CID := CIDx) (proc_addr j) M (K - 12)%nat pd sp0 b wr sector h m2 t dsk0
+    iApply (wp_vdrw_p3 (CID := CIDx) (proc_addr j) M (trap_res true + (K - 12))%nat pd sp0 b wr sector h m2 t dsk0
               Hh8 Hm8 Ht8 Hregs
               with "Hcg Htext Hpc Hdp Hidx Hbh Hbm Hbt Hbd [-]").
     iIntros (M1) "%F Hcg Hpc Hidx Hchain".

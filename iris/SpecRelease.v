@@ -69,7 +69,22 @@ Definition wp_release_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN :
   (* holding the lock forces the level to be at least 1, hence interrupts
      disabled on entry -- this is not a choice, it is what [cpu_own (S n)]
      already means *)
-  sie_cap_gpr m av false p -∗
+  (* [trap_res outb + av], NOT [av] -- and [av] here is the EXIT usable count.
+     release ends in pop_off, which at [n = 0] with an enabled base RE-ENABLES
+     interrupts, and re-enabling must PUT THE TRAP RESERVE BACK.  The carve is
+     conserved across the flip (entry [trap_res false + (trap_res outb + av)] =
+     [trap_res outb + av], exit [trap_res outb + av]), so this is a pure
+     re-indexing of the same stack ownership; the reserve is paid out of the
+     caller's usable slots -- precisely the ones acquire's push_off freed for
+     it.  Naming the ENTRY index as the sum is what makes the acquire/release
+     pair compose SYNTACTICALLY and kills the [kv_frame_slots <= av] side
+     condition: acquire handed the caller [trap_res b + av], [cpu_own] forces
+     [b = outb] ([CpuOwn.cpu_own_eb_agree]), so the caller's index is ALREADY of
+     this shape.  At [outb = false] (a nested critical section) the index is
+     [trap_res false + av], DEFINITIONALLY [av], so those callers are untouched.
+     [10 <= av] does not move: release's own 10-slot frame comes out of the
+     entry count [trap_res outb + av >= av]. *)
+  sie_cap_gpr m (trap_res outb + av)%nat false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R Dc -∗
   locked γl cpu_id -∗
@@ -95,7 +110,22 @@ Definition wp_release_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GEN : Gen
   let outb := match n with O => eb | S _ => false end in
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
   (10 <= av)%nat ->
-  sie_cap_gpr m av false p -∗
+  (* [trap_res outb + av], NOT [av] -- and [av] here is the EXIT usable count.
+     release ends in pop_off, which at [n = 0] with an enabled base RE-ENABLES
+     interrupts, and re-enabling must PUT THE TRAP RESERVE BACK.  The carve is
+     conserved across the flip (entry [trap_res false + (trap_res outb + av)] =
+     [trap_res outb + av], exit [trap_res outb + av]), so this is a pure
+     re-indexing of the same stack ownership; the reserve is paid out of the
+     caller's usable slots -- precisely the ones acquire's push_off freed for
+     it.  Naming the ENTRY index as the sum is what makes the acquire/release
+     pair compose SYNTACTICALLY and kills the [kv_frame_slots <= av] side
+     condition: acquire handed the caller [trap_res b + av], [cpu_own] forces
+     [b = outb] ([CpuOwn.cpu_own_eb_agree]), so the caller's index is ALREADY of
+     this shape.  At [outb = false] (a nested critical section) the index is
+     [trap_res false + av], DEFINITIONALLY [av], so those callers are untouched.
+     [10 <= av] does not move: release's own 10-slot frame comes out of the
+     entry count [trap_res outb + av >= av]. *)
+  sie_cap_gpr m (trap_res outb + av)%nat false p -∗
   kernel_text -∗ pc_is pcE -∗
   is_lock γl lka s R -∗
   locked γl cpu_id -∗
@@ -133,7 +163,22 @@ Definition wp_release_cancel_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ} `{GE
   (10 <= av)%nat ->
   (⊢ locked γl cpu_id -∗ D -∗ False) ->
   (⊢ locked_pre γl cpu_id -∗ D -∗ False) ->
-  sie_cap_gpr m av false p -∗
+  (* [trap_res outb + av], NOT [av] -- and [av] here is the EXIT usable count.
+     release ends in pop_off, which at [n = 0] with an enabled base RE-ENABLES
+     interrupts, and re-enabling must PUT THE TRAP RESERVE BACK.  The carve is
+     conserved across the flip (entry [trap_res false + (trap_res outb + av)] =
+     [trap_res outb + av], exit [trap_res outb + av]), so this is a pure
+     re-indexing of the same stack ownership; the reserve is paid out of the
+     caller's usable slots -- precisely the ones acquire's push_off freed for
+     it.  Naming the ENTRY index as the sum is what makes the acquire/release
+     pair compose SYNTACTICALLY and kills the [kv_frame_slots <= av] side
+     condition: acquire handed the caller [trap_res b + av], [cpu_own] forces
+     [b = outb] ([CpuOwn.cpu_own_eb_agree]), so the caller's index is ALREADY of
+     this shape.  At [outb = false] (a nested critical section) the index is
+     [trap_res false + av], DEFINITIONALLY [av], so those callers are untouched.
+     [10 <= av] does not move: release's own 10-slot frame comes out of the
+     entry count [trap_res outb + av >= av]. *)
+  sie_cap_gpr m (trap_res outb + av)%nat false p -∗
   kernel_text -∗ pc_is pcE -∗
   lock_openable γl lka R D -∗
   locked γl cpu_id -∗
