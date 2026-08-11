@@ -1,11 +1,15 @@
 # M6 — closing the store-reordering gap (design)
 
-**Status (2026-08-11): not started; this file is the tee-up.** Everything
+**Status (2026-08-11): planned; the live worklist is
+[`projects/weak-memory-m6.md`](../projects/weak-memory-m6.md).** Everything
 below is either (a) established and cited, (b) a decision already taken and
 recorded, or (c) explicitly marked OPEN. Read
 [`weak-memory.md`](weak-memory.md) Decision 1 first — it states the gap and
 why it is safe for this kernel; this file does not repeat that argument, it
-says what has to be PROVED and in what order.
+says what has to be PROVED and in what order. The two questions this file
+originally marked "settle first" (§4's third store class, §5's
+`interference_certify` tension) were settled from the PARM sources on
+2026-08-11 — resolutions inline below and in the worklist's §0.
 
 ---
 
@@ -21,6 +25,15 @@ pieces, only the middle one of which is missing:
 ∘ [ Promising-RISC-V ≡ axiomatic RVWMO (Pulte et al.) ] -- HAVE (published, Coq)
 = adequacy over real RVWMO, with no strengthening in the statement.
 ```
+
+**The toolchain seam (recorded 2026-08-11, decision D-M6-3 in the
+worklist):** the third leg is Coq 8.15 + sflib + hahn and cannot be
+`Require`d from this Rocq 9 tree. The full-promising machine is therefore
+RESTATED natively (per-byte, extending `WeakMem.v`, rules kept syntactically
+parallel to PARM's), and that leg of the composition is a
+definitional-correspondence note — the same epistemic category as the
+model↔hardware seam. A Rocq-9 port of PARM is the upgrade path, not the
+plan.
 
 What we have today, verbatim (`iris/WeakAdequacy.v:91`,
 `Theorem weak_system_adequacy`): given the boot resources and a proof of
@@ -74,7 +87,12 @@ unknown and it is settled:
   > `no_promise` completion beyond what the empty phase admits
 
   — a statement about frozen-memory per-thread runs, which is enormously more
-  tractable than arbitrary interleavings. **Start here.**
+  tractable than arbitrary interleavings. **Start here.** In fact stronger
+  than first recorded (verified in-source 2026-08-11): `Machine.state_exec`
+  (Promising.v:1758) is per-thread `rtc state_step` against the SAME frozen
+  memory with NO interleaving at all — after the promise phase, threads are
+  fully independent, so the Layer-1 simulation is about SINGLE-thread runs
+  over a frozen log.
 - The certified machine (`lcertify/Certify.v`) checks only the STEPPING
   thread post-step. All-threads-certified is preserved only via
   `interference_certify` (certification survives arbitrary memory extension),
@@ -181,31 +199,59 @@ half of a CAS: `read_pte_exclusive` (`Read_RISCV_reserved`) then
 `AkInfo false true false` — exclusive, `ak_latest`, not synchronising
 (`iris/WeakUpdEff.v` header).
 
-So the Layer-2 enumeration needs a third arm, and the question to answer
-first is: **can an exclusive-conditional write be promised at all in PARM?**
-If exclusive writes are excluded from promising (as one would expect of an
-RMW whose read half must read the coherence-latest), this arm is free and
-should be recorded as such. If not, it needs its own argument — note that
-the write value is derived from the `ak_latest` read, so the write is pinned
-to the latest message, which is the natural lever.
-
-This is cheap to settle and should be settled BEFORE designing the tag, since
-it may add a case to it.
+So the Layer-2 enumeration needs a third arm. **RESOLVED (2026-08-11, from
+source): an exclusive-conditional write CAN be promised — the arm is real.**
+`Local.promise` (Promising.v:798) is unconditional and inspects no access
+kind. What pins the arm is the FULFIL rule: `ex = true` fulfilment requires
+`EX: exbank = Some eb ∧ (eb.loc = loc → Memory.exclusive tid loc eb.ts ts)`
+(Promising.v:884–886) — no other agent's write to the location between the
+exclusive read and the conditional write. Combined with the read half being
+`ak_latest`, an early-promoted write-back's value is a function of the
+coherence-latest PTE and its window admits no interposition, so the Layer-1
+move for this arm is **commute-EARLIER** (early promotion ≡ running the
+walker earlier, itself a legal promise-free run), not delay-to-fulfilment.
+The tag (mechanism (A)) gets a third constructor for it: `SCexcl`.
 
 ---
 
-## 5. The open tension to resolve early
+## 5. The interference_certify tension — RESOLVED (2026-08-11, from source)
 
 `interference_certify` as paraphrased — certification survives ANY memory
-extension, on RISC-V — **seems to contradict the critical-section-store
-scenario**: a thread that promised a CS store while the lock was free looks
-uncertifiable once another hart's acquire lands, since its certification run
-must re-execute the AMO, read lock = 1, and spin.
+extension, on RISC-V — seemed to contradict the critical-section-store
+scenario: a thread that promised a CS store while the lock was free looks
+uncertifiable once another hart's acquire lands.
 
-One of the paraphrase, the scenario, or our reading of the lock leaf is
-wrong. Read the exact side conditions in `CertifyProgressRiscV.v`. **The
-resolution determines what the robustness invariant can assume**, so do this
-before writing any Layer-1 statement.
+**Resolution: the scenario's premise is false — such a promise was never
+certifiable, even thread-alone, so `interference_certify`
+(CertifyProgressRiscV.v:1233, premise `CERTIFY` in the OLD memory) never
+applies to it.** The mechanism, and it is the lever Layer 1 needs: on
+RISC-V a successful SC's RESULT carries the write's timestamp as its view
+(`RES: … ifc (ex && arch == riscv) ts`, Promising.v:902); the acquire loop
+BRANCHES on that result, so the timestamp lands in `vcap`; `vcap` is a join
+component of every later write's `view_pre` (Promising.v:873–881); and
+fulfilment requires `EXT: view_pre < ts_promise` (Promising.v:883). A CS
+store promised before the acquire has `ts_promise` below the AMO write's
+own later append, so `EXT` can never hold. Same-flavor riscv-only pins:
+acquire reads join their post-view into `vwn` (Promising.v:852–853); an
+exclusive write's `view_pre` joins the exbank view (Promising.v:876–880).
+
+**What the robustness invariant may therefore assume:** a promise that
+survives into a behavior has a timestamp exceeding every timestamp its
+thread's remaining path to fulfilment can route into `view_pre` (`vwn` via
+acquires, `vcap` via SC-result-fed branches, the exbank view via
+exclusives). This is exactly what makes the fenced arm (ii) sound: a
+certifiable promise of a release-fenced store already has ALL the writer's
+pre-fence stores in the log below it (else `vwo ⊑ view_pre` meets a later
+append and `EXT` fails), so a reader that acquires from the early-read
+promise sees the complete deposit — early read ≡ early execution.
+
+⚠ Our machine dropped `vcap` with dependency tracking (Decision 3), and the
+worklist's D-M6-5 keeps it out of the native full machine as well (polarity:
+a weaker full machine only adds behaviors, the free direction). The `vcap`
+arithmetic above is PARM-side background; the Layer-1 proof works with the
+surviving pins — `w_vwNew` via release fences and acquires, and the rmw
+event's exclusivity window — and D-M6-5 records the escalation rule if
+those turn out not to suffice.
 
 ---
 
@@ -253,18 +299,15 @@ hoc. It does not depend on Layers 1–2 and can be done in parallel.
 
 ---
 
-## 9. Suggested order of attack
+## 9. Order of attack — superseded by the worklist
 
-1. Settle §5's `interference_certify` tension (read `CertifyProgressRiscV.v`).
-2. Settle §4's third store class: can an exclusive-conditional write be
-   promised?
-3. Decide §4 (A) vs (B) for the Layer-2 export.
-4. In parallel and independent of 1–3: §6, the characterization lemma.
-5. Write the violation pattern (§3's crux), now constrained by 1–2.
-6. Layer 1 over the `pf_exec` skeleton (§2 consequence (b)).
-7. Layer 2's certificate emission, per the §4 decision.
-8. Compose; re-run the final `Print Assumptions` diff — baseline axioms plus
-   the declared weak-memory assumptions and nothing else.
+Steps 1–3 of the original list are DONE (2026-08-11): §5 resolved, §4's
+third class resolved (both above), and the Layer-2 mechanism decided —
+(A), the ghost trail, with the third `SCexcl` arm. The staged plan (W1
+full-promising machine natively → W2 violation pattern + Layer 1 → W3
+Layer-2 ghost trail ∥ W4 characterization lemma → W5 composition), with
+its parallelism notes and risk register, lives in
+[`projects/weak-memory-m6.md`](../projects/weak-memory-m6.md).
 
 **Polarity check to keep in mind throughout** (Decision 1's closing note):
 dropping dependency tracking makes the model WEAKER than hardware — free for

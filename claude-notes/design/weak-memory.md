@@ -213,6 +213,16 @@ strengthening is exactly what the declared assumption covers. Keep the two
 directions straight when evaluating any future simplification: adding
 behaviors is free, removing them needs a theorem.
 
+One recorded exception to "strictly stronger", found by W4 slice 1
+(`WeakAxiomatic.v`, 2026-08-11): RVWMO ppo rule 6 — a store with the `.rl`
+annotation is ordered after po-earlier accesses — is NOT enforced by this
+machine (`w_vRel` is inert on the store side promise-free), so on that one
+axis the model is *weaker* than RVWMO. Free for adequacy (weaker adds
+behaviors), and vacuous for this kernel — the image contains no `.rl`
+store (release is fence-based) — but the honest statement of the model's
+relation to RVWMO is "stronger on the writer-order axes covered by the M6
+assumption, weaker on `.rl`-successor ordering and the dropped ppo 9–13".
+
 Why not promises from day 1: (a) no vanilla-Iris logic over promises exists,
 for the transfinite-indexing reason above; (b) reads can observe
 never-to-be-fulfilled promises in doomed runs, so a safety/adequacy statement

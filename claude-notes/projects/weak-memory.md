@@ -2717,14 +2717,17 @@ scheduled before its design item is resolved.
 
 ## M6 — closing the store-reordering gap (research)
 
-**DESIGN NOTE: [`design/weak-memory-m6-robustness.md`](../design/weak-memory-m6-robustness.md)**
-— the standalone tee-up (2026-08-11): the end-state composition against the
-adequacy theorem as it actually stands, what PARM gives us and what it does
-not, the Layer-1/Layer-2 split with the open crux marked, the THIRD store
-class the plan below predates (the walker's CAS write-back), the
-`interference_certify` tension to resolve first, and a suggested order of
-attack.  The bullets below are the original plan and remain accurate; the
-design note supersedes them as the entry point.
+**LIVE WORKLIST: [`projects/weak-memory-m6.md`](weak-memory-m6.md)** — the
+staged plan (2026-08-11), which also records the PARM-source resolutions of
+the two open questions below (`interference_certify`; can an exclusive write
+be promised — yes) and the Layer-2 mechanism decision (ghost trail, three
+arms).  **DESIGN NOTE:
+[`design/weak-memory-m6-robustness.md`](../design/weak-memory-m6-robustness.md)**
+— the tee-up, updated with those resolutions inline: the end-state
+composition against the adequacy theorem as it actually stands, what PARM
+gives us and what it does not, the Layer-1/Layer-2 split with the
+violation-pattern crux marked, and the walker-CAS third store class.  The
+bullets below are the original plan, kept for the record.
 
 Two-layer proof plan (the quantification over all executions is the one
 the Iris proof already pays for — no separate whole-kernel analysis):

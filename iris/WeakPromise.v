@@ -1,0 +1,481 @@
+(** * WeakPromise.v — the FULL promising machine (M6 W1, slice 1)
+
+    The native restatement of the Promising-RISC-V machine that
+    [claude-notes/projects/weak-memory-m6.md] (W1, decisions D-M6-3/4/5)
+    calls for: [WeakMem.v]'s promise-free view machine EXTENDED with
+    per-agent promise sets, so that the robustness theorem (W2) can be
+    stated inside this tree.  Correspondence to snu-sf/promising-arm
+    (@10291375, `Promising.v`) is BY INSPECTION per D-M6-3; every rule
+    below cites the PARM rule it mirrors and the deliberate deltas.
+
+    DELIBERATELY DEPENDENCY-FREE, like [WeakMem.v]: stdpp only — no Iris,
+    no Sail.  Agents are [nat]s indexing a list (harts AND the disk agent,
+    uniformly — D-M6-4); programs are an ABSTRACT per-agent LTS over
+    labels, so no toy language enters the statement and the Sail machine
+    can instantiate it later (W5).
+
+    THE DELIBERATE DELTAS from PARM (all recorded in the worklist):
+
+    - NO register views and NO [vcap]; a write's fulfil pre-view is
+      [fulfil_vpre] = [w_vwNew ⊔ (rl ? w_vrOld ⊔ w_vwOld)], a LOWER BOUND
+      of PARM's [joins [view_loc; view_val; vcap; vwn; ifc rel …]]
+      (Promising.v:873–881).  Lowering the pre-view only admits MORE
+      fulfilments, so this machine is WEAKER than PARM's — the free
+      direction for hardware ⊆ model (D-M6-5).
+    - NO exclusives bank: the kernel's AMO and the walker's CAS are ONE
+      [LRmw] event (read half and write half in one step), carrying
+      PARM's store-exclusive window ([Memory.exclusive], Promising.v:886)
+      as an explicit no-other-agent-writes side condition [excl_ok].
+    - Byte granularity, multi-byte messages: a promise is a whole [wmsg];
+      fulfilment must match the promised message EXACTLY (base, data and
+      tid) — no partial or split fulfilment.  This is the W1 mixed-size
+      decision: a promise/fulfil width mismatch is ruled out by the rule
+      itself, so no cross-width crack exists for W2 to worry about.
+    - Reads with the [lat] (coherent/latest) kind — ifetch, the walker —
+      read the latest message of the WHOLE log, promises included: a
+      promoted-but-unfulfilled write-back is visible to another agent's
+      walker, which is exactly the early-read surface W2's [SCexcl] arm
+      must handle.
+
+    Slice 1 (this file): the machine, its well-formedness invariant, and
+    the fused promise+fulfil derivations that make the promise-free
+    machine a sub-machine.  Slice 2 (NOT here): the front-loading
+    factorization (PARM Thm 7.1's analog) and the erasure bridge to
+    [WeakMem]'s machine as instantiated by [WeakLang]/[WeakLitmus]. *)
+From Stdlib.ssr Require Import ssreflect.
+From stdpp Require Import gmap finite list.
+From stdpp Require Import bitvector.definitions.
+From xv6iris Require Import WeakMem.
+
+Local Open Scope Z_scope.
+
+(* ------------------------------------------------------------------ *)
+(** ** Labels: the event alphabet an agent's program emits
+
+    The label carries the memory system's ANSWERS (timestamps and values
+    read), so a program's data/control dependencies live in its own step
+    relation — the machine never inspects the program state.  Multi-byte
+    accesses are contiguous runs based at [base], byte [j] at address
+    [base + j], exactly [WeakMem]'s [_run] convention. *)
+Inductive wlabel :=
+| LSilent
+    (** program-internal step: no memory interaction *)
+| LLoad (aq lat : bool) (base : Z) (tvs : list (nat * bv 8))
+    (** read [length tvs] bytes; byte [j] reads timestamp [tvs.j.1] with
+        value [tvs.j.2].  [aq] = acquire; [lat] = coherent/latest kind
+        (ifetch, walker — design doc Decision 6). *)
+| LStore (rl : bool) (base : Z) (data : list (bv 8))
+    (** write [data] at [base]; [rl] = release annotation (inert for the
+        kernel, which releases via fences, but kept faithful) *)
+| LRmw (aq rl : bool) (base : Z) (tvs : list (nat * bv 8))
+       (data : list (bv 8))
+    (** the AMO / walker-CAS shape: read half [tvs] and write half [data]
+        in ONE event.  The written data is chosen by the program, which
+        sees the read values through the label — that is where the
+        value dependency of amoswap/CAS lives. *)
+| LFence (pr pw sr sw : bool).
+
+(* ------------------------------------------------------------------ *)
+(** ** Per-agent state and configurations *)
+
+(** [WeakMem.wstate] plus the promise set: the timestamps of this agent's
+    appended-but-not-yet-fulfilled messages (PARM [Local.promises]). *)
+Record wpagent (P : Type) := WPAgent {
+  pa_st   : P;
+  pa_ws   : wstate;
+  pa_prom : gset nat;
+}.
+Add Printing Constructor wpagent.
+Global Arguments WPAgent {P} _ _ _.
+Global Arguments pa_st {P} _.
+Global Arguments pa_ws {P} _.
+Global Arguments pa_prom {P} _.
+
+Record wpcfg (P : Type) := WPCfg {
+  pc_img : image;
+  pc_log : list wmsg;
+  pc_ags : list (wpagent P);
+}.
+Add Printing Constructor wpcfg.
+Global Arguments WPCfg {P} _ _ _.
+Global Arguments pc_img {P} _.
+Global Arguments pc_log {P} _.
+Global Arguments pc_ags {P} _.
+
+(* ------------------------------------------------------------------ *)
+(** ** Side conditions *)
+
+(** The fulfil pre-view (D-M6-5's reduced [view_pre]; see the header). *)
+Definition fulfil_vpre (ws : wstate) (rl : bool) : nat :=
+  Nat.max (w_vwNew ws)
+          (if rl then Nat.max (w_vrOld ws) (w_vwOld ws) else 0%nat).
+
+Lemma fulfil_vpre_bounded ws rl n :
+  ws_bounded ws n → (fulfil_vpre ws rl ≤ n)%nat.
+Proof.
+  intros (Hro & Hwo & _ & Hwn & _). rewrite /fulfil_vpre.
+  destruct rl; lia.
+Qed.
+
+(** [writes_in_by log Q a lo hi]: some message in the window whose tid
+    satisfies [Q] writes byte [a] — [WeakMem.writes_in] refined by author.
+    The instance [Q := (≠ Some i)] is PARM's [Memory.exclusive]. *)
+Definition writes_in_by (log : list wmsg) (Q : option agent → Prop)
+    (a : Z) (lo hi : nat) : Prop :=
+  ∃ t : nat, (lo < t)%nat ∧ (t ≤ hi)%nat ∧
+             ∃ m, log !! (t - 1)%nat = Some m ∧ is_Some (msg_byte m a) ∧
+                  Q (wm_tid m).
+
+Lemma writes_in_by_writes_in log Q a lo hi :
+  writes_in_by log Q a lo hi → writes_in log a lo hi.
+Proof.
+  intros (t & ? & ? & m & ? & ? & ?). exists t. split_and!; [done|done|].
+  by exists m.
+Qed.
+
+(** The read half of a load/rmw: byte [j] of the run may read [(t, v)]. *)
+Definition read_ok (img : image) (log : list wmsg) (ws : wstate)
+    (aq lat : bool) (base : Z) (tvs : list (nat * bv 8)) : Prop :=
+  ∀ j t v, tvs !! j = Some (t, v) →
+    log_byte img log t (base + Z.of_nat j) = Some v ∧
+    readable img log ws (load_vpre ws aq) (base + Z.of_nat j) t ∧
+    (lat = true → ¬ writes_in log (base + Z.of_nat j) t (length log)).
+
+(** The fulfil conditions at timestamp [ts], PARM [writable]
+    (Promising.v:864–886) minus the D-M6-5 components:
+    COH ([lc.(coh) loc < ts], per byte of the run) and EXT
+    ([view_pre < ts]).  The message-match and promise-membership
+    conditions live in the step rule itself. *)
+Definition fulfil_ok (ws : wstate) (rl : bool) (base : Z) (n : nat)
+    (ts : nat) : Prop :=
+  (∀ j, (j < n)%nat → (coh ws (base + Z.of_nat j) < ts)%nat) ∧
+  (fulfil_vpre ws rl < ts)%nat.
+
+(** PARM's [Memory.exclusive]: no OTHER agent's write to byte [j] of the
+    run lands strictly between the read-half timestamp and [ts]. *)
+Definition excl_ok (log : list wmsg) (i : agent) (base : Z)
+    (tvs : list (nat * bv 8)) (ts : nat) : Prop :=
+  ∀ j t v, tvs !! j = Some (t, v) →
+    ¬ writes_in_by log (λ tid, tid ≠ Some i) (base + Z.of_nat j)
+        t (ts - 1)%nat.
+
+(* ------------------------------------------------------------------ *)
+(** ** The machine *)
+
+Section machine.
+  Context {P : Type}.
+  (** The abstract per-agent program: [pstep p l p'] — in state [p] the
+      program can emit label [l] and continue as [p'].  All dependency
+      structure (what the program does with values it read) lives here. *)
+  Context (pstep : P → wlabel → P → Prop).
+
+  Implicit Types cfg : wpcfg P.
+
+  (** One machine step.  [WPPromise] is PARM's [promise_step]
+      (unconditional, program does not move, Promising.v:798); every
+      other rule is a [state_step] arm.  A plain (non-promised) store
+      does not exist as a primitive: it is promise-then-fulfil, exactly
+      as in PARM — see [wpstep_store_now] below for the fused form. *)
+  Inductive wpstep : wpcfg P → wpcfg P → Prop :=
+  | WPPromise cfg i ag base data :
+      pc_ags cfg !! i = Some ag →
+      data ≠ [] →
+      wpstep cfg
+        (WPCfg (pc_img cfg)
+               (pc_log cfg ++ [WMsg base data (Some i)])
+               (<[i := WPAgent (pa_st ag) (pa_ws ag)
+                         ({[S (length (pc_log cfg))]} ∪ pa_prom ag)]>
+                  (pc_ags cfg)))
+  | WPSilent cfg i ag st' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) LSilent st' →
+      wpstep cfg
+        (WPCfg (pc_img cfg) (pc_log cfg)
+               (<[i := WPAgent st' (pa_ws ag) (pa_prom ag)]> (pc_ags cfg)))
+  | WPLoad cfg i ag aq lat base tvs st' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (LLoad aq lat base tvs) st' →
+      read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq lat base tvs →
+      wpstep cfg
+        (WPCfg (pc_img cfg) (pc_log cfg)
+               (<[i := WPAgent st'
+                         (load_post_run (pa_ws ag) aq base (tvs.*1))
+                         (pa_prom ag)]> (pc_ags cfg)))
+  | WPFulfil cfg i ag rl base data ts st' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (LStore rl base data) st' →
+      ts ∈ pa_prom ag →
+      pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i)) →
+      fulfil_ok (pa_ws ag) rl base (length data) ts →
+      wpstep cfg
+        (WPCfg (pc_img cfg) (pc_log cfg)
+               (<[i := WPAgent st'
+                         (store_post_run (pa_ws ag) rl base (length data) ts)
+                         (pa_prom ag ∖ {[ts]})]> (pc_ags cfg)))
+  | WPRmw cfg i ag aq rl base tvs data ts st' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (LRmw aq rl base tvs data) st' →
+      length tvs = length data →
+      ts ∈ pa_prom ag →
+      pc_log cfg !! (ts - 1)%nat = Some (WMsg base data (Some i)) →
+      read_ok (pc_img cfg) (pc_log cfg) (pa_ws ag) aq false base tvs →
+      excl_ok (pc_log cfg) i base tvs ts →
+      fulfil_ok (load_post_run (pa_ws ag) aq base (tvs.*1)) rl base
+                (length data) ts →
+      wpstep cfg
+        (WPCfg (pc_img cfg) (pc_log cfg)
+               (<[i := WPAgent st'
+                         (store_post_run
+                            (load_post_run (pa_ws ag) aq base (tvs.*1))
+                            rl base (length data) ts)
+                         (pa_prom ag ∖ {[ts]})]> (pc_ags cfg)))
+  | WPFence cfg i ag pr pw sr sw st' :
+      pc_ags cfg !! i = Some ag →
+      pstep (pa_st ag) (LFence pr pw sr sw) st' →
+      wpstep cfg
+        (WPCfg (pc_img cfg) (pc_log cfg)
+               (<[i := WPAgent st' (fence_post (pa_ws ag) pr pw sr sw)
+                         (pa_prom ag)]> (pc_ags cfg))).
+
+  (* ---------------------------------------------------------------- *)
+  (** ** Initial configurations and behaviors *)
+
+  Definition wp_init (img : image) (ps : list P) : wpcfg P :=
+    WPCfg img [] (map (λ p, WPAgent p ws_init ∅) ps).
+
+  (** All promises discharged — PARM [Machine.no_promise]
+      (Promising.v:1576). *)
+  Definition no_promises cfg : Prop :=
+    ∀ i ag, pc_ags cfg !! i = Some ag → pa_prom ag = ∅.
+
+  (** A BEHAVIOR — PARM [Machine.exec] (Promising.v:1750): a reachable
+      configuration whose every promise set is empty.  Doomed runs
+      (undischargeable promises) are model artifacts pruned here, which
+      is why full-machine adequacy quantifies over completable prefixes
+      (design doc §2 consequence (a)). *)
+  Definition wp_behavior (img : image) (ps : list P) cfg : Prop :=
+    rtc wpstep (wp_init img ps) cfg ∧ no_promises cfg.
+
+  (* ---------------------------------------------------------------- *)
+  (** ** Well-formedness: the machine invariant
+
+      Views are real timestamps ([ws_bounded], as in the promise-free
+      machine) and every promised timestamp names a real log message by
+      the promising agent.  Slice 2's factorization commutes promise
+      steps forward through OTHER agents' steps; both commutations lean
+      on exactly these bounds. *)
+
+  Definition prom_wf (log : list wmsg) (i : agent) (ag : wpagent P)
+      : Prop :=
+    ∀ ts, ts ∈ pa_prom ag →
+      (0 < ts)%nat ∧ (ts ≤ length log)%nat ∧
+      ∃ m, log !! (ts - 1)%nat = Some m ∧ wm_tid m = Some i.
+
+  Definition cfg_wf cfg : Prop :=
+    ∀ i ag, pc_ags cfg !! i = Some ag →
+      ws_bounded (pa_ws ag) (length (pc_log cfg)) ∧
+      prom_wf (pc_log cfg) i ag.
+
+  Lemma cfg_wf_init img ps : cfg_wf (wp_init img ps).
+  Proof.
+    intros i ag Hlk. rewrite list_lookup_fmap in Hlk.
+    destruct (ps !! i) as [p|]; simplify_eq/=.
+    split; [apply ws_bounded_init|]. intros ts Hts. set_solver.
+  Qed.
+
+  (** Every read timestamp a [read_ok] admits is a real log position —
+      the [Forall] shape [load_post_run_bounded] wants. *)
+  Local Lemma read_ok_ts_bounded img log ws aq lat base tvs :
+    read_ok img log ws aq lat base tvs →
+    Forall (λ t, (t ≤ length log)%nat) (tvs.*1).
+  Proof.
+    intros Hr. apply Forall_lookup_2. intros j t Hj.
+    rewrite list_lookup_fmap in Hj.
+    destruct (tvs !! j) as [[t' v]|] eqn:Htv; simplify_eq/=.
+    destruct (Hr j t v Htv) as (Hb & _ & _).
+    eapply log_byte_bounded. by eexists.
+  Qed.
+
+  Lemma cfg_wf_step cfg cfg' : cfg_wf cfg → wpstep cfg cfg' → cfg_wf cfg'.
+  Proof.
+    intros Hwf Hstep. destruct Hstep.
+    - (* promise: log grows by one; the new promise names the new top *)
+      intros i' ag' Hlk'. simpl in *.
+      rewrite length_app /=.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        destruct (Hwf i ag) as [Hb Hp]; [done|]. split.
+        { eapply ws_bounded_mono; [done|lia]. }
+        intros ts Hts. simpl in Hts.
+        apply elem_of_union in Hts as [->%elem_of_singleton|Hts].
+        * rewrite length_app /=. split_and!; [lia|lia|].
+          eexists. split; [apply list_lookup_middle; lia|done].
+        * destruct (Hp ts Hts) as (?&?&m&Hm&?).
+          rewrite length_app /=. split_and!; [done|lia|].
+          exists m. split; [|done].
+          rewrite lookup_app_l //. apply lookup_lt_Some in Hm. lia.
+      + rewrite list_lookup_insert_ne // in Hlk'.
+        destruct (Hwf i' ag') as [Hb Hp]; [done|]. split.
+        { eapply ws_bounded_mono; [done|lia]. }
+        intros ts Hts. destruct (Hp ts Hts) as (?&?&m&Hm&?).
+        rewrite length_app /=. split_and!; [done|lia|].
+        exists m. split; [|done].
+        rewrite lookup_app_l //. apply lookup_lt_Some in Hm. lia.
+    - (* silent *)
+      intros i' ag' Hlk'. simpl in *.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        by destruct (Hwf i ag).
+      + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
+    - (* load *)
+      intros i' ag' Hlk'. simpl in *.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        destruct (Hwf i ag) as [Hb Hp]; [done|]. split; [|done].
+        apply load_post_run_bounded; [done|].
+        by eapply read_ok_ts_bounded.
+      + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
+    - (* fulfil *)
+      intros i' ag' Hlk'. simpl in *.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        destruct (Hwf i ag) as [Hb Hp]; [done|].
+        destruct (Hp ts) as (?&?&_); [done|]. split.
+        { eapply store_post_run_bounded; [done|lia|lia]. }
+        intros ts' Hts'. simpl in Hts'. apply Hp. set_solver.
+      + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
+    - (* rmw *)
+      intros i' ag' Hlk'. simpl in *.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        destruct (Hwf i ag) as [Hb Hp]; [done|].
+        destruct (Hp ts) as (?&?&_); [done|]. split.
+        { eapply store_post_run_bounded;
+            [apply load_post_run_bounded;
+               [done|by eapply read_ok_ts_bounded]|lia|lia]. }
+        intros ts' Hts'. simpl in Hts'. apply Hp. set_solver.
+      + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
+    - (* fence *)
+      intros i' ag' Hlk'. simpl in *.
+      destruct (decide (i' = i)) as [->|Hne].
+      + rewrite list_lookup_insert in Hlk';
+          [by eapply lookup_lt_Some|simplify_eq/=].
+        destruct (Hwf i ag) as [Hb Hp]; [done|]. split; [|done].
+        by apply fence_post_bounded.
+      + rewrite list_lookup_insert_ne // in Hlk'. by apply Hwf.
+  Qed.
+
+  Lemma cfg_wf_reach cfg cfg' :
+    cfg_wf cfg → rtc wpstep cfg cfg' → cfg_wf cfg'.
+  Proof.
+    intros H0 Hr. induction Hr as [|??? Hs ? IH]; [done|].
+    apply IH. by eapply cfg_wf_step.
+  Qed.
+
+  (* ---------------------------------------------------------------- *)
+  (** ** The fused promise+fulfil derivations
+
+      The promise-free machine's store IS these two steps back to back:
+      append at the fresh top, fulfil immediately.  [EXT] and [COH] hold
+      by construction there — every view is bounded by the log the store
+      tops — which is exactly why the promise-free store rule has no
+      side condition ([WeakMem]'s "the store rule has no admissibility
+      condition to check").  These lemmas are the promise-free ⊆ full
+      inclusion, stated one rule at a time; slice 2's bridge composes
+      them into a machine-level embedding. *)
+
+  Lemma wpstep_store_now cfg i ag rl base data st' :
+    pc_ags cfg !! i = Some ag →
+    pstep (pa_st ag) (LStore rl base data) st' →
+    data ≠ [] →
+    ws_bounded (pa_ws ag) (length (pc_log cfg)) →
+    S (length (pc_log cfg)) ∉ pa_prom ag →
+    rtc wpstep cfg
+      (WPCfg (pc_img cfg)
+             (pc_log cfg ++ [WMsg base data (Some i)])
+             (<[i := WPAgent st'
+                       (store_post_run (pa_ws ag) rl base (length data)
+                          (S (length (pc_log cfg))))
+                       (pa_prom ag)]> (pc_ags cfg))).
+  Proof.
+    intros Hlk Hp Hnn Hb Hfresh.
+    pose proof (lookup_lt_Some _ _ _ Hlk) as Hlen.
+    set ts := S (length (pc_log cfg)).
+    (* step 1: promise the message at the fresh top *)
+    eapply rtc_l.
+    { by eapply (WPPromise cfg i ag base data). }
+    (* step 2: fulfil it immediately *)
+    set mid := WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg base data (Some i)])
+                 (<[i := WPAgent (pa_st ag) (pa_ws ag)
+                           ({[ts]} ∪ pa_prom ag)]> (pc_ags cfg)).
+    eapply rtc_l; [|apply rtc_refl].
+    have Hmidlk : pc_ags mid !! i
+                  = Some (WPAgent (pa_st ag) (pa_ws ag) ({[ts]} ∪ pa_prom ag)).
+    { rewrite /mid /= list_lookup_insert //. }
+    have Hmsg : pc_log mid !! (ts - 1)%nat = Some (WMsg base data (Some i)).
+    { rewrite /mid /=. apply list_lookup_middle. rewrite /ts. lia. }
+    pose proof (WPFulfil mid i _ rl base data ts st' Hmidlk Hp
+                  ltac:(set_solver) Hmsg) as Hful.
+    have Hok : fulfil_ok (pa_ws ag) rl base (length data) ts.
+    { split.
+      - intros j Hj. destruct Hb as (_&_&_&_&_&Hcoh&_).
+        pose proof (Hcoh (base + Z.of_nat j)). rewrite /ts. lia.
+      - pose proof (fulfil_vpre_bounded _ rl _ Hb). rewrite /ts. lia. }
+    specialize (Hful Hok).
+    (* the two agent-list inserts collapse; the promise set returns *)
+    rewrite /mid /= in Hful.
+    have Hprom : ({[ts]} ∪ pa_prom ag) ∖ {[ts]} = pa_prom ag by set_solver.
+    rewrite Hprom list_insert_insert in Hful.
+    exact Hful.
+  Qed.
+
+  (** A promise-free step never leaves promises behind: [wpstep_store_now]
+      starts and ends [no_promises]-clean when the config was clean. *)
+  Lemma no_promises_store_now cfg i ag st' ws' :
+    no_promises cfg →
+    pc_ags cfg !! i = Some ag →
+    no_promises
+      (WPCfg (pc_img cfg) (pc_log cfg ++ [WMsg (0%Z) [] (Some i)])
+             (<[i := WPAgent st' ws' (pa_prom ag)]> (pc_ags cfg))).
+  Proof.
+    intros Hnp Hlk i' ag' Hlk'. simpl in *.
+    destruct (decide (i' = i)) as [->|Hne].
+    - rewrite list_lookup_insert in Hlk';
+        [by eapply lookup_lt_Some|simplify_eq/=].
+      by eapply Hnp.
+    - rewrite list_lookup_insert_ne // in Hlk'. by eapply Hnp.
+  Qed.
+
+End machine.
+
+Global Arguments wpstep {P} _ _ _.
+Global Arguments wp_init {P} _ _.
+Global Arguments no_promises {P} _.
+Global Arguments wp_behavior {P} _ _ _ _.
+Global Arguments cfg_wf {P} _.
+Global Arguments prom_wf {P} _ _ _.
+
+(* ------------------------------------------------------------------ *)
+(** ** Slice-2 goals (stated here as comments so the file is honest
+       about where it is going; see projects/weak-memory-m6.md W1)
+
+    1. FACTORIZATION (PARM Thm 7.1's analog, PtoPF.v): every
+       [wp_behavior] is matched by a run that makes ALL its promise
+       steps first, then only non-promise steps against the frozen log —
+       and the non-promise phase decomposes per agent (PARM
+       [Machine.state_exec] is per-thread rtc against the same memory).
+    2. THE ERASURE BRIDGE: instantiated at the [WeakLitmus]/[WeakLang]
+       program LTS, runs of THIS machine whose stores are all fused
+       promise+fulfil at the top ([wpstep_store_now]'s shape) are
+       exactly the promise-free machine's runs; in particular the RMW
+       rule's [read_ok] + [excl_ok] at a top-of-log write collapses to
+       [WeakMem.latest] (own writes excluded by the coherence window,
+       other agents' by [excl_ok]) — the [amo_latest_unique] dovetail.
+    3. LB LITMUS SANITY: the LB weak outcome is reachable here (promise
+       H0's store of y, read it from H1, fulfil late) and provably
+       unreachable promise-free ([WeakLitmus.lb_inv]). *)
