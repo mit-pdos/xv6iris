@@ -933,6 +933,7 @@ WeakLeafM.v
 WeakViewMono.v
 WeakViewRacy.v
 WeakPtOwn.v
+WeakPtPub.v
 WkTimerinit.v
 WkStartAux.v
 WkStartNew.v
