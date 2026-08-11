@@ -239,29 +239,52 @@ Remaining cosmetics live in the owed-lifts batch under W4.
 
 ### W2 — the violation pattern + Layer 1 (`WeakRobust.v`)
 
-- [ ] The classification vocabulary:
-      `store_class ::= SCowned | SCfenced | SCexcl`, a per-message tag map
-      keyed like the log (timestamp), and the owned→published transition
-      (per byte; publication = the release fence / AMO-release that transfers
-      the bytes' ownership).
-- [ ] Candidate violation predicate (D-M6-2): there is an owned-UNPUBLISHED
-      message `m` by agent `i` and an agent `j ≠ i` whose per-byte view floor
-      has reached `m` — `flr (view j) b ≥ ts m` for some `b ∈ bytes m`.
-      Check the tee-up's fenced empty-predecessor wrinkle is genuinely
-      handled: fenced promises appear in NO pattern (their certifiability
-      pins them, §0), so a release-fenced store with nothing to order
-      promotes harmlessly.
-- [ ] The Layer-1 theorem over W1's factorization: if no promise-free
-      execution of P reaches the violation predicate, every behavior of P is
-      matched by a promise-free execution (same observable states,
-      reducibility transports). Per-class simulation moves: SCowned promises
-      are unread before fulfilment (else the pattern) and DELAY to their
-      fulfilment point; SCfenced promises commute as EARLY EXECUTION (§0's
-      invariant: the deposit is complete below them); SCexcl promises
-      commute-earlier (the `EX` window + `ak_latest` value pinning).
-- [ ] Byte-granularity audit of the whole simulation: every case per byte;
-      the W1 mixed-size rule is what keeps a promise/fulfil width mismatch
-      out.
+DESIGN (2026-08-11, coordinator; the decomposition W1's artifacts make
+possible).  At Layer 1 the classification and publication are
+PARAMETERS — `cls : wmsg → store_class` and a monotone
+`pub : cfg → nat → Prop` — so Layer 1 never depends on the D-M6-6
+plumbing (`wm_ak`, `w_pub`); the Iris side instantiates them.  The
+observation floor witness is `coh`: ANY foreign read or write of a byte
+raises the foreign agent's `coh` past the message's timestamp (a plain
+read raises `coh` but not `w_vrNew`), so `coh` is the tightest per-byte
+floor that sees every observation.
+
+- [x] Vocabulary + violation predicate + Layer-1 goal statement, compiling
+      (`WeakRobust.v` slice 1): `store_class`, the violation predicate
+      (an owned-UNPUBLISHED message by `i` whose bytes a foreign `coh`
+      floor has reached), `violation_free` over pf runs, `mem_of` (the
+      flat memory a run's log denotes), and `robust` — every lat-free
+      `wp_behavior` is matched by a `wp_pf_run` with the same per-agent
+      program states and the same flat memory.
+- [ ] **W2a — the dependency graph.** Over a factorized behavior (promise
+      phase + per-agent state runs), define D = per-agent execution order
+      ∪ (fulfil(m) → read-of-m) edges.  Prove: violation-freedom of the
+      program's pf runs + the three classes ⇒ D acyclic.  A D-cycle is
+      the LB shape; the SCowned arm contradicts the pattern (the read
+      would raise a foreign coh floor over an unpublished message —
+      exhibit it IN THE PF PREFIX being built, which is where the premise
+      lives); the SCfenced arm uses §0's pin (a certifiable fenced
+      promise has the whole deposit below it, so its readers sit after
+      its fulfilment in D already); the SCexcl arm uses the `excl_ok`
+      window + value pinning.
+- [ ] **W2b — the construction.** Topologically sort D; build the pf run
+      by induction over the sort, carrying: a timestamp permutation π
+      (the pf log order is FULFILMENT order, which differs from gmo — an
+      agent may fulfil out of promise order), value-exact read matching
+      (each read returns the SAME byte values at π-mapped timestamps),
+      and a per-agent view relation (expected shape: pf views bounded by
+      the π-image of full-machine views; the exact direction is the
+      first thing the proof will teach — record it here when it does).
+      The `readable`-transport lemma under π is the crux of the crux.
+- [ ] **W2c — observables + transport.** From W2b: same final flat
+      memory + same program states; the reducibility/safety transport
+      corollary in the form W5's composition wants.  Note the full
+      machine is never `wpstep`-stuck (promising is always enabled), so
+      the transported content is about observable states of completable
+      behaviors, not raw stuckness — state it that way.
+- [ ] Byte-granularity audit of the whole simulation: every case per
+      byte; W1's exact-match fulfil rule is what keeps a promise/fulfil
+      width mismatch out.
 
 ### W3 — Layer 2, the state-derived classification (D-M6-6)
 
