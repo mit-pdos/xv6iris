@@ -2265,3 +2265,87 @@ test (off < size) instead of i < nrec.
 cascade through SpecIunlock into every caller; the ambient class is
 already how inode_held names the same bound. Consumers with their own
 nib parameter take nib = icfg_nib (ProofKexit's existing premise).
+
+## 16. `ialloc` CANNOT BE STATED OVER §13.3'S POOL — the free arm's
+## authority is filed under the wrong lock (OPEN, raised 2026-08-11 by
+## fs-namei N5a)
+
+§13.3 left ialloc open ("nothing here prejudges it"). Working the decode
+against the landed layer closes it, negatively: **ialloc's claim step has
+no ghost authority it can reach, and no contract shape fixes that without
+moving where the free arm lives.**
+
+### 16.1 The argument
+
+ialloc's `log_write` (+0x9a) must run `InodeRegion.ireg_write_au`, whose
+first resource premise is the exclusive `dinode_at γi inum dn`. Retagging
+the region's map at that key is `ghost_map_update`, which cannot fire
+without the element, and `ireg_body` holds only the authority plus the
+block halves. So the fragment must come from outside.
+
+A type-0 inum's fragment lives in exactly two places, both lock-protected:
+`IcacheEscrow.ipool` — a conjunct of `itable_res2`, i.e. **inside the
+itable spinlock** — and `ic_unloaded` inside `ic_payload` inside
+`ic_escrow_body`, i.e. **behind that entry's sleeplock**. It cannot be in
+a LOADED entry: `ic_loaded` carries `inode_ok`, which demands
+`di_type ≠ 0`.
+
+Between its `bread` (+0x3c) and its `brelse` (+0xa0) ialloc acquires
+nothing but the buffer; its only `iget` (+0xaa) takes the itable lock
+internally, *after* the claim is committed. So it holds neither lock at
+the claim.
+
+Pushing the obligation to the caller (a `∀ inum, …` loan, or an
+AU family indexed by the discovered inum) is expressible and would let
+ialloc's own proof go through — but its only possible discharger is a
+caller owning the whole pool, and `create` holds the itable lock at no
+point. That moves the hole up a level and hides it.
+
+### 16.2 Why: the model files the free arm under the wrong serialiser
+
+What actually serialises two concurrent `ialloc`s in xv6 is **the buffer**,
+not the itable: `bread` returns the dinode block under its sleeplock, and
+the loser's `bread` returns the cached buffer with the type already set.
+§13.3 files the free inums' authority under the itable lock instead,
+which is a lock ialloc never touches.
+
+### 16.3 The proposed fix: the free arm's fragment moves INTO the region
+
+`ireg_blk` gains, per block, a conjunct
+
+    [∗ list] i ∈ seq 0 16,
+      if decide (bv_unsigned (di_type (ds !!! i)) = 0)
+      then (16 * bi + i)%Z ↪[γi] (ds !!! i) else True
+
+— re-establishable everywhere, because `ireg_couple` already says the
+map's value at every key IS the parked record. Consequences:
+
+- `ipool_shape` becomes ONE-armed (allocated only) and the pool's domain
+  shrinks to the allocated inums. iget's recycle of a free inum parks
+  nothing; ilock on it still panics ("ilock: no type", already live);
+  iput's last close returns nothing.
+- **NEW `ireg_claim_au`** — the mirror of `ireg_write_au`, with the
+  fragment sourced FROM the invariant rather than supplied to it. Given
+  the block's decoded `ds` and `di_type (ds !!! islot inum) = 0`, it
+  produces exactly `SpecLogWrite.wp_log_write_au_body`'s fupd and pays the
+  retagged `dinode_at γi inum dn'` OUT (legal: `dn'` has type ≠ 0). This
+  is ialloc's whole ghost step, and it is guarded by the buffer the
+  caller holds — the right serialiser.
+- **DUAL `ireg_free_au`** for iput's `ip->type = 0; iupdate(ip)`: absorb
+  the fragment back. This makes `ireg_write_au`'s unconditional payout
+  wrong for a type-0 `dn'`, so it gains a `di_type dn' ≠ 0` premise —
+  free for iupdate's ordinary callers (`inode_ok` gives it), and iput's
+  free path uses the dual instead.
+- `IcacheBoot.ipool_shape_free` and `ipool_alloc_all_free` RETIRE;
+  `ireg_alloc` sorts the image's fragments (free stay in, allocated go to
+  the pool). **The boot mint gets strictly cheaper**: an all-free mkfs
+  image then needs no pool contents at all.
+
+Blast radius: `InodeRegion.v` (invariant + two lemmas + one premise),
+`IcacheEscrow.ipool_shape` (one arm), `IcacheBoot.v` (three lemmas), and
+the re-park sites in `ProofIget` / `ProofIput` / `ProofIlock`.
+
+**Not blocked by this ruling:** ireclaim and fsinit. ireclaim only READS
+dinodes — its `lh` of type and nlink need no fragment, only
+`InodeRegion.ireg_read_blk` (landed by N5a) — and then composes six
+already-proven contracts.

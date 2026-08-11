@@ -578,6 +578,49 @@ Section IcacheBootTable.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (*  THE ENTRY SLEEPLOCK FAMILY -- the canonical home                   *)
+  (* ------------------------------------------------------------------ *)
+
+  (* Every entry's inode sleeplock, in the shape [icache_boot] hands it
+     out below.  A contract that cannot know WHICH slot an iget will
+     return takes the family rather than one lock -- exactly as iget takes
+     [ic_escrows] rather than [ic_escrow].  Persistent, so it costs a
+     caller nothing.
+
+     THIS IS THE LOWEST FILE THAT CAN STATE IT (it needs [SleepLock] and
+     [IcacheEscrow.ic_tok], and it is where the family is produced), and
+     it is stated here so that no further contract has to write a fifth
+     copy.  [SpecFileclose.ic_sleeplocks] and [SpecDirlink.ic_sleeplocks]
+     are two earlier, character-identical copies, each with its own
+     consumers that [rewrite /] the QUALIFIED name
+     ([ProofDirlink.dl_slk_acc], [ProofNamex.nx_slk_acc],
+     [SpecFileclose.ic_sleeplocks_acc]); retiring them is a four-line
+     alias change that costs a recompile of ProofDirlink / ProofNamex /
+     ProofFileclose / ProofKexit, and is deliberately NOT bundled with
+     this stage.  New contracts (fs-namei N5's ireclaim and fsinit) name
+     THIS one. *)
+  Definition ic_sleeplocks (cn : ic_names) : iProp Σ :=
+    ([∗ list] kk ∈ seq 0 NINODE,
+       ∃ γil γisl : gname,
+         is_sleeplock γil γisl (i_lock (ientry kk)) "inode"%string
+                      (ic_tok cn kk))%I.
+
+  Global Instance ic_sleeplocks_persistent cn : Persistent (ic_sleeplocks cn).
+  Proof. apply _. Qed.
+
+  Lemma ic_sleeplocks_acc (cn : ic_names) (k : nat) :
+    (k < NINODE)%nat ->
+    (ic_sleeplocks cn -∗
+     ∃ γil γisl : gname,
+       is_sleeplock γil γisl (i_lock (ientry k)) "inode"%string (ic_tok cn k)
+     : iProp Σ).
+  Proof.
+    iIntros (Hk) "H". rewrite /ic_sleeplocks.
+    assert (Hl : seq 0 NINODE !! k = Some k) by (rewrite lookup_seq; lia).
+    iDestruct (big_sepL_lookup _ _ k k Hl with "H") as "$".
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (*  THE BOOT STEP                                                      *)
   (* ------------------------------------------------------------------ *)
 

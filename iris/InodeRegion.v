@@ -395,6 +395,57 @@ Section InodeRegion.
   Qed.
 
   (* ------------------------------------------------------------------ *)
+  (*  THE FRAGMENT-FREE BLOCK READ -- ialloc's and ireclaim's side        *)
+  (* ------------------------------------------------------------------ *)
+
+  (* [ireg_read] above needs a [dinode_at] because it is answering "which
+     record is MINE"; a SCAN does not ask that.  ialloc and ireclaim bread
+     a dinode block and read the type/nlink halfwords of records they hold
+     no fragment for -- all they need is that the bytes bread returned
+     DECODE, i.e. that they are [diblk_bytes] of a well-formed list.  That
+     follows from the caller's machinery half alone (it pins the region's
+     parked bytes), so no fragment is involved and the opening is
+     mask-preserving.
+
+     Stated on the block INDEX rather than on an inum, because the scan
+     names blocks and its sixteen records share one opening.             *)
+  Lemma ireg_read_blk (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (bi : nat) (bsl : list (bv 8)) :
+    ↑iregN ⊆ E ->
+    (bi < nib)%nat ->
+    ireg_inv γi γfs inodestart nib -∗
+    ((inodestart + Z.of_nat bi) ↪[fs_L γfs]{#(1/2)} bsl) ={E}=∗
+    ⌜exists ds : list dinode, diblk_wf ds /\ bsl = diblk_bytes ds⌝ ∗
+    ((inodestart + Z.of_nat bi) ↪[fs_L γfs]{#(1/2)} bsl).
+  Proof.
+    iIntros (HE Hbi) "#Hinv Hhalf".
+    iMod (inv_acc E iregN with "Hinv") as "[Hbody Hclose]"; [exact HE |].
+    iDestruct "Hbody" as (m) "(>Ha & Hblks)".
+    iDestruct (ireg_blks_acc_upd γfs inodestart m nib bi Hbi with "Hblks")
+      as "[Hblk Hback]".
+    iDestruct "Hblk" as (ds) "(>%Hwf & >%Hcp & >Hfsb)".
+    iDestruct (ghost_map_elem_agree with "Hhalf Hfsb") as %Hbytes.
+    iMod ("Hclose" with "[Ha Hfsb Hback]") as "_".
+    { iNext. iExists m. iFrame "Ha".
+      iApply ("Hback" $! m with "[%] [Hfsb]"); [done |].
+      iExists ds. iSplitR; [done |]. iSplitR; [done |]. iExact "Hfsb". }
+    iModIntro. iFrame "Hhalf". iPureIntro. exists ds. split; [exact Hwf | exact Hbytes].
+  Qed.
+
+  (* The scan's per-record consequence: the slot the arithmetic lands on
+     is a well-formed dinode of the decoded list, and the coupling names
+     the region's map value there.  (Pure, and stated so a caller that has
+     just run [ireg_read_blk] can name the record it is about to test.) *)
+  Lemma ireg_blk_slot (ds : list dinode) (i : nat) :
+    diblk_wf ds -> (i < 16)%nat -> dinode_wf (ds !!! i).
+  Proof.
+    intros [Hlen Hall] Hi.
+    assert (Hl : ds !! i = Some (ds !!! i))
+      by (apply list_lookup_lookup_total_lt; lia).
+    exact (Forall_lookup_1 _ _ _ _ Hall Hl).
+  Qed.
+
+  (* ------------------------------------------------------------------ *)
   (*  iupdate's WRITE (§12.2): the atomic update log_write fires          *)
   (* ------------------------------------------------------------------ *)
 
