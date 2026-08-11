@@ -217,20 +217,18 @@ Section loop.
       [[∗ list] j ∈ seq off rem, (pa_add p j) ↦ₘ bs j] with [↦ₘ] swapped for
       the weak byte points-to and each byte made objective.
 
-      PER-BYTE, NOT WRAPPED ONCE, and [WeakCtx.cobj_big_sepL] is why the
-      choice is free: the two spellings are equivalent ([wbuf_bundled]
-      below, which is that lemma's first real consumer).  Per-byte is the
-      one to work with, because then the loop's peel is SC's own -- a
-      [big_opL] on a cons IS a separating conjunction, so [seq_cons] alone
-      splits it and nothing has to be rewritten under a modality. *)
+      IT IS IRIS'S [big_sepL], UNCHANGED.  There is no weak-memory list
+      connective and none is wanted: [cobj] is applied per byte, the list
+      itself is the ordinary one, and the loop's peel below is SC's own
+      [seq_cons] -- a [big_opL] on a cons IS a separating conjunction, so
+      nothing is rewritten under a modality and no lemma about lists and
+      [cobj] is needed.  (One exists -- [WeakCtx.cobj_big_sepL], which
+      commutes [cobj] with [big_sepL] -- and it is what a caller holding a
+      whole region as ONE [cobj] would spend to get bytes out.  This proof
+      never needs it.) *)
   Local Definition wbuf (ξ : CtxId) (p : mword 64) (off rem : nat)
       (bs : nat -> bv 8) : iProp Σ :=
     ([∗ list] j ∈ seq off rem, cobj ξ ((pa_z (pa_add p j)) ↦w bs j))%I.
-
-  Lemma wbuf_bundled (ξ : CtxId) (p : mword 64) (off rem : nat) (bs : nat -> bv 8) :
-    wbuf ξ p off rem bs
-    ⊣⊢ cobj ξ ([∗ list] j ∈ seq off rem, (pa_z (pa_add p j)) ↦w bs j).
-  Proof. rewrite /wbuf. symmetry. apply cobj_big_sepL. Qed.
 
   Lemma wbuf_cons (ξ : CtxId) (p : mword 64) (off rem : nat) (bs : nat -> bv 8) :
     wbuf ξ p off (S rem) bs

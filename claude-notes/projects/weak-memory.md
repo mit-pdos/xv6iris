@@ -3242,12 +3242,16 @@ loop.
 1. **A loop invariant CAN be objective.** The two buffers are `cobj`s and the
    induction is SC's own `induction rem`, unchanged. Nothing in the invariant
    names a hart or a `wstate`, which is what lets it survive migration.
-2. **`cobj_big_sepL` earns its keep, and the per-byte spelling is the one to
-   use.** `wbuf` is `[∗ list] j ∈ seq off rem, cobj ξ (…)`; `wbuf_bundled`
-   (that lemma's first real consumer) says it equals the wrapped-once form.
-   Per-byte is what makes the peel SC's own: a `big_opL` on a cons IS a
-   separating conjunction, so `seq_cons` splits it and nothing is rewritten
-   under a modality.
+2. **The buffer is IRIS'S `big_sepL`, unchanged** — there is no weak-memory
+   list connective and none is wanted. `wbuf` is
+   `[∗ list] j ∈ seq off rem, cobj ξ (…)`: `cobj` per byte, the list
+   ordinary, and the peel is SC's own `seq_cons` (a `big_opL` on a cons IS a
+   separating conjunction), so nothing is rewritten under a modality and no
+   lemma relating `cobj` to lists is used at all. `WeakCtx.cobj_big_sepL`
+   exists and commutes the two, which is what a caller holding a whole
+   region as ONE `cobj` would spend to get bytes out (`WeakLockPayload` does
+   exactly that) — but this proof never needs it, and an earlier draft of
+   this slice wrongly billed it as the prototype's payoff.
 3. **A private 1-byte store owes NOTHING.** `wssb1_spec` is objective-in /
    objective-out with no released timestamp, no floor and no frozen payload —
    the entire release interface `wwp_sd8_tor_rvc_run` carries is absent,
