@@ -687,8 +687,9 @@ Proof.
 Qed.
 
 (** [log_byte] restricted to a prefix agrees with the full log below the
-    cut. *)
-Local Lemma log_byte_take (img : image) (log : list wmsg) (i t : nat)
+    cut.  EXPORTED (it was [Local]): every clipped-discipline argument needs
+    it, and [WeakKpt] §1e had re-proved it verbatim. *)
+Lemma log_byte_take (img : image) (log : list wmsg) (i t : nat)
     (a : Z) :
   (t <= i)%nat -> (i <= length log)%nat ->
   log_byte img (take i log) t a = log_byte img log t a.

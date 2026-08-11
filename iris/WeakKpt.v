@@ -337,17 +337,10 @@ Qed.
 
 (** *** 1e. The clipped discipline: monotone above the install *)
 
-(** [log_byte] on a prefix agrees with the full log below the cut
-    ([WeakVariant]'s local lemma, restated — it is [Local] there). *)
-Lemma log_byte_take_full (img : image) (log : list wmsg) (i t : nat) (a : Z) :
-  (t <= i)%nat -> (i <= length log)%nat ->
-  log_byte img (take i log) t a = log_byte img log t a.
-Proof.
-  intros Ht Hi.
-  rewrite -{2}(take_drop i log).
-  rewrite (log_byte_app img (take i log) (drop i log) t a) //.
-  rewrite length_take. lia.
-Qed.
+(* [log_byte] on a prefix agrees with the full log below the cut.  This was
+   a verbatim copy of [WeakVariant]'s lemma, which was [Local]; it is
+   exported now, so the copy is gone and the three uses below name it
+   directly. *)
 
 (** BIT-MONOTONICITY above the install: with the discipline clipped at
     [T0] and the install writing [a] at [T0], any two writers at or above
@@ -382,17 +375,17 @@ Proof.
         rewrite length_take in H; lia).
   (* the install is inside the prefix, so the prefix latest is ≥ T0 *)
   assert (HinstP : is_Some (log_byte img (take i' log) T0 a)).
-  { rewrite (log_byte_take_full img log i' T0 a ltac:(lia) ltac:(lia)).
+  { rewrite (log_byte_take img log i' T0 a ltac:(lia) ltac:(lia)).
     exact Hinst. }
   assert (HT0L : (T0 <= L)%nat)
     by exact (writes_le_latest_ts img (take i' log) a T0 HinstP).
   (* the prefix latest, read at the full log *)
   assert (Hbf' : log_byte img log L a = Some bf)
-    by (rewrite -(log_byte_take_full img log i' L a HLle ltac:(lia));
+    by (rewrite -(log_byte_take img log i' L a HLle ltac:(lia));
         exact Hbf).
   (* [t] is a writer inside the prefix, hence below its latest *)
   assert (Hbp : log_byte img (take i' log) t a = Some b)
-    by (rewrite (log_byte_take_full img log i' t a ltac:(lia) ltac:(lia));
+    by (rewrite (log_byte_take img log i' t a ltac:(lia) ltac:(lia));
         exact Hb).
   assert (HtL : (t <= L)%nat)
     by (apply (writes_le_latest_ts img (take i' log) a t); by exists b).
