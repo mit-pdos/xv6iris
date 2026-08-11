@@ -958,3 +958,12 @@ LinkIget.v
 SpecKfork.v
 SpecSafestrcpy.v
 SpecStrncpy.v
+SpecStati.v
+ProofStati.v
+LinkStati.v
+SpecNamecmp.v
+ProofNamecmp.v
+LinkNamecmp.v
+SpecIunlockput.v
+ProofIunlockput.v
+LinkIunlockput.v

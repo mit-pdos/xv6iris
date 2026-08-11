@@ -71,8 +71,11 @@ usual near-full rebuild lands with it.
    here or stays a threaded premise.
 5. **Locking discipline** — namex's loop does ilock(dp); dirlookup;
    iunlockput(dp) — iunlockput composes two proven contracts (32
-   bytes, jal iunlock; jal iput — likely the campaign's cheapest
-   proof). The share-vs-reference question at each step: namex HOLDS a
+   bytes, jal iunlock; jal iput). LANDED (N2), and it WAS the cheapest
+   proof — but the composition is not free: iunlock returns a SHARE and
+   iput spends a REFERENCE, so the caller must also hand over the SHORT
+   PARENT it kept back when it carved ilock's share. See "N2's ledger"
+   below. The share-vs-reference question at each step: namex HOLDS a
    reference to the current dir (from iget/namei's caller) and its
    dirlookup returns the CHILD's reference via iget. State stage-0:
    which of the 11 take shares, which references.
@@ -84,9 +87,10 @@ usual near-full rebuild lands with it.
 - **N1** (agent): DONE — `DirentEnc.v` + `PathElems.v` (both pure
   leaves, no `Admitted`, no new assumptions). See layers 1–2 above for
   what they provide and for the two decode findings that constrain N4.
-- **N2**: stati (46B, trivial — inode_meta → stat struct copy),
-  iunlockput (32B, two jals), namecmp (22B, a jal to strncmp).
-  Warm-up proofs validating the layers.
+- **N2**: DONE — stati, iunlockput and namecmp are all PROVEN, LINKED and
+  sealed; `Print Assumptions` on each of the three linked modules gives the
+  5 platform axioms + funext and nothing else. See "N2's ledger" below for
+  the exact names N3/N4 consume.
 - **N3**: dirlookup (172B: the readi-per-record scan; iget's scan-loop
   recipe + readi's contract) + dirlink (170B: the free-slot scan +
   writei append; the two-armed postcondition — found/appended).
@@ -101,3 +105,104 @@ usual near-full rebuild lands with it.
 
 After N5: fs.c is 24/24 and the campaign's exit gate is the shutdown
 (user-standing instruction).
+
+## N2's ledger — what N3/N4 consume
+
+Nine new files, no existing file touched: `Spec`/`Proof`/`Link` for each of
+stati, namecmp, iunlockput, in that `_CoqProject` order.  Module types
+`STATI` / `NAMECMP` / `IUNLOCKPUT`; functor arguments `StatiProof` (none),
+`NamecmpProof (SC : STRNCMP)`, `IunlockputProof (IU : IUNLOCK) (IP : IPUT)`;
+linked modules `Stati` / `Namecmp` / `Iunlockput`.
+
+**`SpecNamecmp.wp_namecmp_sconf_body mm f g K dq1 dq2 b p`** — the resource
+half is SpecStrncmp's verbatim at n = 14 (two `[∗ list] j ∈ seq 0 14,
+pa_add (mm !!! a0/a1) j ↦ₘ{dq} f/g j`, handed back), and the result half is
+the ONE fact dirlookup wants:
+
+    ⌜mr !!! a0 = (mword_of_int 0 : mword 64) <-> bname 14 f = bname 14 g⌝
+
+`K_namecmp = 4`.  No `cpu_own`, no `procs_inv`, no parking premise — namecmp
+neither sleeps nor locks.  N3 pairs the right-hand side with
+`DirentEnc.namecmp_bridge` to read it as `bname 14 f = de_name_str d`.
+The proof file also exports two pure lemmas N3 may want directly:
+`ProofNamecmp.nc_byte_of_zero` (the owed arithmetic step: a 64-bit word
+holding the difference of two BYTES is zero only when the bytes are equal)
+and `ProofNamecmp.nc_res_iff` (`strncmp_res f g 14 res -> (res = 0 <->
+bname 14 f = bname 14 g)`).  N1's prediction was exact: that one step was
+the entire gap, and `SpecStrncmp.strncmp_stop` turned out to be
+`DirentEnc.nc_stop` verbatim once `bb_nonul` and `NUL` are unfolded
+(`nc_stop_of_strncmp` is `exact (fun H => H)`).
+
+**`SpecStati.wp_stati_sconf_body mm ip st dev inum dn dev0 ino0 ty0 nl0 sz0
+K dqd dqn b p`** — `K_stati = 2`, no `cpu_own`, no parking premise, and
+`ip` is an ARBITRARY pointer (stati does no slot arithmetic and has no panic
+to refute).  It takes `i_dev ip ↦₄{dqd} dev`, `i_inum ip ↦₄{dqn} inum` and
+`InodeInv.inode_meta ip dn` — i.e. exactly what a holder destructs out of
+`IcacheEscrow.ic_loaded`, at SpecIlock's own existential `dn` — plus the
+caller's buffer, and hands all four back.
+
+  **struct stat's geometry is NEW VOCABULARY this file introduces**, read
+  off stati's own five stores rather than off `stat.h`:
+  `SpecStati.st_dev`@0, `st_ino`@4, `st_type`@8, `st_nlink`@10,
+  `st_size`@16, bundled as
+
+      SpecStati.stat_at st dev ino ty nl sz
+        = st_dev ↦₄ dev ∗ st_ino ↦₄ ino ∗ st_type ↦₂ ty
+          ∗ st_nlink ↦₂ nl ∗ st_size ↦₈ sz
+
+  BYTES 12..15 ARE DELIBERATELY NOT IN THE BUNDLE — they are the alignment
+  hole before the 8-byte size and stati never writes them, so a caller that
+  has to `copyout` the whole 24-byte struct owns them separately.  That is
+  the thing to know before writing `filestat`/`sys_fstat`.
+
+  The postcondition is `stat_at st dev inum (di_type dn) (di_nlink dn)
+  (zero_extend' 64 (di_size dn))`.  ONLY `size` carries an extension: four
+  of the five pairs load and store at the same width, so the load's
+  extension is undone by the store's truncation, but `lwu a5,76(a0)` feeds
+  an 8-byte `sd`, so `st->size` is the ZERO-extension of `ip->size`.  N1's
+  is_unsigned warning was worth having — the flag is `false` (lh/lw) on the
+  first four loads and `true` (lwu) only on the fifth, and getting it
+  backwards there would have produced a false contract.  `ProofStati` proves
+  one reusable lemma on the way: `trunc16_sext64 : trunc16 (sign_extend' 64
+  w) = w`, the width-2 twin of `RiscvExtras.trunc32_sext64` (it belongs
+  beside `WpSmodeHalf.trunc16`; left in the proof file so nothing below it
+  needs rebuilding).
+
+**`SpecIunlockput.wp_iunlockput_sconf_body`** — `K_iunlockput = 64`
+(= `K_iput + 4`).  Every premise and every resource is one of the two
+callees'; the budget clause is iput's verbatim (`iput_units <= n` in, the
+spend-at-most interval out), and so is the whole postcondition: one
+`iref_slot`, `used' ⊆ used`, and NOTHING inode-shaped.
+
+  **THE SEAM, and the one thing a caller must supply beyond the two
+  callees' unions.**  SpecIunlock v3 hands back a SHARE (`inode_shr k s dev
+  inum`); SpecIput spends a canonical REFERENCE (`inode_ref k q dev inum`).
+  They do not compose on their own — that is §14.6(1) working as designed.
+  What closes the gap is the parent the caller retained when it carved the
+  share off for ilock, so the precondition carries, beside iunlock's
+  `ic_deposit cn k (DepShr s dev inum)` bundle:
+
+      IcacheRef.inode_ref_short k (qi + s)%Qp qi dev inum
+
+  and the proof fires `IcacheRef.inode_ref_gather` at the instruction
+  between the two `jal`s, producing `inode_ref k (qi + s) dev inum` for
+  iput.  **N4's namex must therefore carve rather than lend**: before
+  `ilock(dp)` it splits its reference with `inode_ref_carve` /
+  `inode_ref_shed`, passes the share to ilock, keeps the short parent, and
+  hands BOTH the deposit descriptor and the short parent to iunlockput.
+  After the call it holds no inode resource for `dp` at all.  (`qi` and `s`
+  are free parameters, so `inode_ref_shed`'s `q/2 + q/2` shape instantiates
+  it with no arithmetic.)
+
+  No new lemma was needed anywhere in the icache layer for this — the seam
+  is exactly the carve/gather pair that already existed.
+
+### Build evidence (EC2 mirror, git-synced at 2cee9490)
+
+Each of the nine compiled standalone, exit 0, against the mirror's full
+`.vo` tree.  `tools/lemma_diff.py --ref HEAD` reports no `GONE` and no
+`ADMITTED`; its three `NEWAXIOM` lines are the three `Module Type` seal
+`Parameter`s (`wp_stati_sconf`, `wp_namecmp_sconf`,
+`wp_iunlockput_sconf`), which every `Spec<F>.v` in the tree has and which
+the matching `Proof<F>.v` discharges — the tool flags a `Parameter`
+regardless of whether it sits in a `Module Type`.
