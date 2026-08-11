@@ -1,4 +1,10 @@
-# SC parity for lock-disciplined code (PROPOSAL — nothing here is built)
+# SC parity for lock-disciplined code (PROPOSAL — §5.1 built, §6.2 settled)
+
+> **Status.**  Obligation §5.1 (the algebra) is landed in
+> `iris/WeakViewMono.v`; risk §6.2 (exactness vs lower bounds) is checked and
+> resolved in `iris/WeakViewRacy.v`.  Obligations §5.2–§5.6 are NOT built,
+> and nothing in the tree consumes the new algebra yet — `WeakGhost.hart_ws`
+> is still the exact-valued `ghost_var` every leaf threads.
 
 Sibling of [`weak-memory.md`](weak-memory.md), which is the RVWMO model
 proper.  This file is about a narrower question:
@@ -193,9 +199,31 @@ intervening step for free.
 
 ## 5. Obligations, in the order they should be discharged
 
-1. **The algebra.** `auth (gmap Z max_nat)` × 5 `mono_nat`; `hart_view` with
-   the value existentially hidden; `view_lb` persistent; the update lemma
-   "any `ws_le`-larger state is reachable".
+1. **The algebra.** — **LANDED**, `iris/WeakViewMono.v`.  `auth cohUR` × 5
+   `mono_nat`; `ws_auth` the authority, `ws_lb` the persistent floor,
+   `ws_update` ("any `ws_le`-larger state is reachable", and crucially the
+   caller does not name the old value), `ws_lb_valid` (`ws_le w0 w`),
+   `ws_lb_mono`, `ws_alloc`, and the opaque token `hart_view γ := ∃ w,
+   ws_auth γ w` with `hart_view_step` / `hart_view_snapshot`.
+
+   Two things had to be got right, both recorded in the file:
+
+   - **The coherence camera is NOT `auth (gmap Z max_nat)`.**  `gmap`
+     inclusion is pointwise inclusion in `option`, and `Some x ≼ None` is
+     FALSE — so a state carrying an explicit zero entry is not included in
+     one omitting the key, even though `ws_le` holds (both read `coh _ a =
+     0` through the `default 0`).  Any `ws_le → ≼` lemma against the naive
+     encoding is unprovable.  The camera used is
+     `cohUR := discrete_funUR (λ _ : Z, max_natUR)`, for which pointwise `≤`
+     IS inclusion on the nose.  This matches the intended semantics rather
+     than patching it: `ws_le`'s coherence conjunct is already stated over
+     the TOTAL `coh`, not over the map.
+   - **The `Finite` side condition does not bite.**  Iris states the `↔`
+     between inclusion and pointwise inclusion (`discrete_fun_included_spec`)
+     only for a `Finite` index, which `Z` is not.  It is not needed: that
+     restriction exists because a general camera's difference must be built
+     pointwise by choice, and for a max-camera the witness for `f ≼ g` is
+     `g` itself.  `coh_fun_incl` is three lines.
 2. **Re-base `wmstate_interp`** on the new authority and repair
    `hart_ws_agree`'s consumers.
 3. **The coverage invariant** as a `wmstate_interp` conjunct + its two
@@ -217,15 +245,36 @@ below has been checked.
    was obtained through a synchronising edge — but the invariant has to be
    stated per-fragment-holder, not per-exclusive-owner, and it is not
    obvious the ghost accounting supports that.
-2. **Exactness vs lower bounds.**  A lower bound is sound in the direction
-   owned memory needs: knowing your floor is AT LEAST `V` is what rules out
-   reading stale, and a larger real view only makes reads fresher.  The
-   opposite direction is the risk: `WeakRacy.wp_wracy_load` quantifies over
-   the ADMISSIBLE READ RESULTS, and that set is computed from the hart's
-   actual weak state, which a lower bound may under-determine.  If so, keep
-   an exact fragment available for the racy sites — `mono` ghost state
-   supports both — but this must be CHECKED, not assumed, because it decides
-   whether the racy layer survives unchanged.
+2. ~~**Exactness vs lower bounds.**~~ — **CHECKED, AND IT IS FINE.**
+   `iris/WeakViewRacy.v`.  The worry was that `WeakRacy.wp_wracy_load`
+   quantifies over the ADMISSIBLE READ RESULTS, computed from the hart's
+   actual weak state, which a lower bound might under-determine.
+
+   It does not, because **admissibility is ANTITONE in the hart's state**.
+   `WeakInterp.wbyte_ok` depends on `wm_ws` only through
+
+   ```coq
+   readable img log ws vpre a t :=
+     is_Some (log_byte img log t a) ∧ ¬ writes_in log a t (Nat.max vpre (coh ws a))
+   ```
+
+   with `load_vpre ws aq := Nat.max (w_vrNew ws) (…)`.  A LARGER `ws` raises
+   the exclusion window and therefore excludes MORE timestamps.  Racy clients
+   only ever want to SHRINK the admissible set — to rule out stale reads —
+   and shrinking is driven by knowing the hart's view is at least something.
+   That is exactly a lower bound.
+
+   The landed exclusion lemmas already say so in their own statements:
+   `WeakKpt.wbyte_ok_ge` and `wbyte_ok_variant_from` each take
+   `(tc ≤ w_vrNew (wm_ws s))%nat` — a bare inequality, not an equation.
+   `WeakViewRacy.wbyte_ok_ge_from_lb` discharges it from `ws_lb` alone, and
+   `wracy_exclusion_after_step` shows the floor snapshotted at the OLD state
+   still lands the exclusion at the NEW one, across an arbitrary `ws_le`
+   step, with nothing rebased.
+
+   **So no exact fragment is needed anywhere.**  One persistent `ws_lb` is
+   the single client-facing fact for the owned layer and the racy layer
+   alike, and the racy layer survives the change unchanged.
 3. **The boundary seam.**  Ownership must enter and leave the covered
    registry at exactly the acquire/release points.  If a soundness bug
    exists, it is here.

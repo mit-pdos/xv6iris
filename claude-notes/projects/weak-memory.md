@@ -1922,7 +1922,7 @@ at every step. One leaf did not finish in 10 minutes; at a
 39 closed literals, and the decode layer sits in its own file so the
 theorem's edit-compile loop is ~50 s rather than minutes.
 
-## SC PARITY FOR LOCK-DISCIPLINED CODE (2026-08 — PROPOSAL, nothing built)
+## SC PARITY FOR LOCK-DISCIPLINED CODE (2026-08 — §5.1 built, §6.2 settled)
 
 Design: [`../design/weak-memory-sc-parity.md`](../design/weak-memory-sc-parity.md).
 
@@ -1941,7 +1941,34 @@ monotone ghost state (`ws_le` is pointwise <= on every field, with no
 non-monotone component) and splits the second into an objective `↦o` for
 lock-protected memory and the current subjective `↦w` for the racy sites
 only.  Target: a lock-disciplined function's proof above the leaves IS its
-SC proof.  Three named risks in §6 of the design; none checked.
+SC proof.  Three named risks in §6 of the design.
+
+**Built so far** (prototype; nothing in the tree consumes it yet):
+
+- `iris/WeakViewMono.v` — obligation §5.1, the algebra.  Five `mono_nat` for
+  the scalar floors plus `auth (discrete_funUR (λ _ : Z, max_natUR))` for the
+  per-byte coherence floor; `ws_auth` / persistent `ws_lb` / `ws_update` /
+  `ws_lb_valid`, and the opaque token `hart_view γ := ∃ w, ws_auth γ w` with
+  `hart_view_step`.  TRAP, recorded in the file's §2: the coherence camera
+  must NOT be `auth (gmap Z max_nat)` — `gmap` inclusion is pointwise
+  inclusion in `option` and `Some x ≼ None` is FALSE, so a state with an
+  explicit zero entry is not included in one omitting the key even though
+  `ws_le` holds.  The function camera has pointwise `≤` as inclusion on the
+  nose.  Iris's `Finite` side condition on `discrete_fun_included_spec` does
+  not bite: for a max-camera the witness for `f ≼ g` is `g` itself.
+- `iris/WeakViewRacy.v` — risk §6.2 CHECKED, and it comes out in the good
+  direction.  Admissibility is ANTITONE in the hart's state (`wbyte_ok`
+  touches `wm_ws` only through `readable`'s exclusion window
+  `Nat.max vpre (coh ws a)`, which a larger state only widens), so racy
+  clients need a LOWER bound, which is what they already ask for:
+  `WeakKpt.wbyte_ok_ge` takes `tc ≤ w_vrNew (wm_ws s)`, a bare inequality.
+  `wracy_exclusion_after_step` shows a floor snapshotted at the old state
+  still lands the exclusion at the new one across an arbitrary `ws_le` step.
+  **No exact fragment is needed at the racy sites**; one persistent `ws_lb`
+  serves the owned and racy layers alike.
+
+Risks §6.1 (read fragments) and §6.3 (the boundary seam) remain unchecked,
+and obligations §5.2–§5.6 remain unbuilt.
 
 ## M4 — the sweep
 
