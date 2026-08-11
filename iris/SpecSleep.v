@@ -30,11 +30,18 @@
        hart [h];
      - [panic_wp_any] replaces [panic_wp]: the re-acquire's holding-panic arm
        has to be discharged at the RESUMING hart;
-     - [eb = true] is now a premise.  At level 0 with an enabled base the
-       trap CSRs sit in the SIE arm and the pushing acquire hands them out,
-       so the parking thread genuinely holds the set the chain payload
-       demands.  [arm_pay 0 eb _] therefore still rides both sides --
-       sleep's interior pop reaches level 0 -- but is now [trap_csrs]. *)
+     - the trap CSRs and the running claim ride BOTH SIDES, index-free.
+       sched's crossing demands them (sepc/scause/stval are per-hart, so a
+       park cannot frame them), and sleep's interior pop reaches level 0, so
+       it must hold them across that stretch too.  This used to be
+       [arm_pay 0 eb pj] plus an [eb = true] premise -- true at the enabled
+       index, where the caller's push_off frees the pair out of
+       [sie_arm true], and VACUOUS at the disabled one, which is what made
+       every sleeper (hence kexit, hence usertrap) unprovable with
+       interrupts off.  Naming the pair directly says the same thing at
+       [eb = true] ([arm_pay_on] is a [reflexivity]) and the honest thing at
+       [eb = false], where the caller holds them because the TRAP handed
+       them over -- with no [if] anywhere in the statement. *)
 From Stdlib Require Import ZArith Lia List.
 From stdpp Require Import gmap bitvector.definitions.
 From iris.proofmode Require Import proofmode.
@@ -75,17 +82,22 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  eb = true ->
-  (* [kv_frame_slots + 22], NOT [22].  sleep is entered at level 1 with an
-     ENABLED base, so its release(&p->lock) pops to level 0 with [intena] and
-     RE-ENABLES interrupts -- at a point where nobody is holding the trap
-     reserve.  Like the scheduler's inlined intr_on(), it must therefore fund
-     [kv_frame_slots] out of its own budget.  Entry and exit indices do NOT
-     move (they are still [av] at arm [false]); only the stretch between that
-     release and the re-acquire of lk runs at the reduced count, so this is
-     the only premise that changes.  Free at every call site: they all pass
-     [av := trap_res true + (K - k)]. *)
-  (kv_frame_slots + 22 <= av)%nat ->
+  (* THE RESERVE IS OWED ONLY WHERE THE POP RE-ENABLES, which is why the
+     bound is [trap_res eb + 22] and not a constant.  At [eb = true] sleep's
+     release(&p->lock) pops to level 0 WITH [intena], i.e. it turns
+     interrupts back on at a point where nobody is holding the trap reserve,
+     so -- like the scheduler's inlined intr_on() -- sleep must fund
+     [kv_frame_slots] out of its own budget; that is the old
+     [kv_frame_slots + 22 <= av], unchanged, and free at every existing call
+     site (they all pass [av := trap_res true + (K - k)]).  At [eb = false]
+     the pop re-enables nothing, there is no reserve to fund, and the bound
+     is just sleep's own [22] -- which matters, because the disabled-index
+     callers are the trap cone, where inflating every budget by 78 slots
+     would be a real cost for a window that cannot take a trap.
+     Entry and exit indices do NOT move either way (still [av] at arm
+     [false]); only the stretch between that release and the re-acquire of
+     lk runs at the reduced count. *)
+  (trap_res eb + 22 <= av)%nat ->
   (* TWO INDICES, AND THEY ARE OPPOSITE CONSTANTS (porting guide, "A PARKING
      function's [wp_next] index is [true] UNCONDITIONALLY").  sleep runs at
      noff = 1, so [cpu_own 1 eb pj C b] forces the RESOURCE index to [false]:
@@ -97,11 +109,19 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
      that called it", which is false twice over.  Hence no [b] binder. *)
   sie_cap_gpr m av false pj -∗
   cpu_own 1 eb pj C false -∗
-  (* sleep is NOT push/pop-order-balanced: it pops p->lock to level 0
-     BEFORE re-acquiring the condition lock, so at eb = true the interior
-     pop deposits the trap CSRs into the re-enabled arm and the
-     re-acquire extracts them back -- the pay must ride the spec. *)
-  arm_pay 0 eb pj -∗
+  (* THE TRAP CSRS AND THE RUNNING CLAIM, INDEX-FREE.  sleep is not
+     push/pop-order-balanced: it pops p->lock to level 0 BEFORE
+     re-acquiring the condition lock, so it must hold both across that
+     stretch and hand both to sched's crossing.  Where they COME FROM is
+     what depends on [eb], and that is the caller's business, not this
+     contract's: at [eb = true] the caller's own push_off freed them out of
+     [sie_arm true] ([arm_pay 0 true pj] IS this pair, by [arm_pay_on]), and
+     at [eb = false] the caller holds them because the TRAP handed them
+     over.  Stating the pair rather than [arm_pay 0 eb pj] is what drops the
+     [eb = true] premise without adding an [if]: it is the same proposition
+     at the enabled index and the honest one at the disabled index. *)
+  trap_csrs -∗
+  cpu_claim pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   (* the caller's condition lock, HELD (acquired on this cpu) *)
@@ -115,7 +135,8 @@ Definition wp_sleep_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG Σ, 
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av false pj -∗
       cpu_own 1 eb pj C false -∗
-      arm_pay 0 eb pj -∗
+      trap_csrs -∗
+      cpu_claim pj -∗
       pc_is ret_tgt -∗
       (* lk reacquired on the resuming hart, with its resource *)
       locked γk cpu_id -∗
@@ -246,17 +267,22 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (j < NPROC)%nat ->
   γs !! j = Some γl ->
   add_vec lk0 (sign_extend' 64 (mword_of_int 0 : mword 12)) = lka ->
-  eb = true ->
-  (* [kv_frame_slots + 22], NOT [22].  sleep is entered at level 1 with an
-     ENABLED base, so its release(&p->lock) pops to level 0 with [intena] and
-     RE-ENABLES interrupts -- at a point where nobody is holding the trap
-     reserve.  Like the scheduler's inlined intr_on(), it must therefore fund
-     [kv_frame_slots] out of its own budget.  Entry and exit indices do NOT
-     move (they are still [av] at arm [false]); only the stretch between that
-     release and the re-acquire of lk runs at the reduced count, so this is
-     the only premise that changes.  Free at every call site: they all pass
-     [av := trap_res true + (K - k)]. *)
-  (kv_frame_slots + 22 <= av)%nat ->
+  (* THE RESERVE IS OWED ONLY WHERE THE POP RE-ENABLES, which is why the
+     bound is [trap_res eb + 22] and not a constant.  At [eb = true] sleep's
+     release(&p->lock) pops to level 0 WITH [intena], i.e. it turns
+     interrupts back on at a point where nobody is holding the trap reserve,
+     so -- like the scheduler's inlined intr_on() -- sleep must fund
+     [kv_frame_slots] out of its own budget; that is the old
+     [kv_frame_slots + 22 <= av], unchanged, and free at every existing call
+     site (they all pass [av := trap_res true + (K - k)]).  At [eb = false]
+     the pop re-enables nothing, there is no reserve to fund, and the bound
+     is just sleep's own [22] -- which matters, because the disabled-index
+     callers are the trap cone, where inflating every budget by 78 slots
+     would be a real cost for a window that cannot take a trap.
+     Entry and exit indices do NOT move either way (still [av] at arm
+     [false]); only the stretch between that release and the re-acquire of
+     lk runs at the reduced count. *)
+  (trap_res eb + 22 <= av)%nat ->
   (* the three refutations of the dead state.  The two token refutations are
      needed at EVERY hart: the interior release runs on the parking hart, the
      re-acquire on the dispatching one. *)
@@ -266,8 +292,10 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
   (* same two-index note as [wp_sleep_sconf_body] above *)
   sie_cap_gpr m av false pj -∗
   cpu_own 1 eb pj C false -∗
-  (* same pay note as [wp_sleep_sconf_body]: the interior pop reaches 0 *)
-  arm_pay 0 eb pj -∗
+  (* same note as [wp_sleep_sconf_body]: the interior pop reaches 0, and the
+     pair is stated index-free rather than as [arm_pay 0 eb pj] *)
+  trap_csrs -∗
+  cpu_claim pj -∗
   kernel_text -∗ pc_is pcE -∗
   procs_inv γs -∗
   (* the caller's condition lock, HELD, with the credential *)
@@ -282,7 +310,8 @@ Definition wp_sleep_gen_sconf_body `{!riscvGS Σ, !sieG Σ, !lockG Σ, !fdslotG 
       ⌜callee_saved m mf⌝ -∗
       sie_cap_gpr mf av false pj -∗
       cpu_own 1 eb pj C false -∗
-      arm_pay 0 eb pj -∗
+      trap_csrs -∗
+      cpu_claim pj -∗
       pc_is ret_tgt -∗
       (* lk reacquired on the resuming hart, with its resource and the
          credential *)

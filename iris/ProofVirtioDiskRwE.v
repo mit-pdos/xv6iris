@@ -451,15 +451,24 @@ Section ProofVirtioDiskRwE.
       assert (HL3ra : L3 !!! Regidx Rra
                       = add_vec_int (mword_of_int (KernelSyms.virtio_disk_rw + 0x1a4) : mword 64) 4)
         by (rewrite /L3; apply upd_eq).
+      (* sleep takes the trap CSRs and the running claim SEPARATELY now, and
+         index-free.  Here [eb = true], so the complement is [emp] and
+         [IntrDefs.arm_pay_ext_join] turns the pay into the pair. *)
+      iDestruct (arm_pay_ext_join eb _ with "Hpay []") as "[Htcx Hclmx]".
+      { rewrite Heb /trap_csrs_ext /cpu_claim_ext. iSplitR; done. }
       iApply (Sleep.wp_sleep_sconf γs j γl γk d_lock "virtio_disk"%string
                 (disk_res γd pd pav pu) L3 (trap_res true + (K - 12))%nat eb C
-                Hj Hjl HL3a1 Heb
+                Hj Hjl HL3a1
                 (* [change]: [lia] cannot relate the atoms [trap_res true] and
                    [kv_frame_slots] -- see ProofAcquiresleep's sleep call. *)
-                ltac:(pose proof (vdrw_K22 K HK);
+                ltac:(pose proof (vdrw_K22 K HK); rewrite Heb;
                       change (trap_res true) with kv_frame_slots; lia)
-                with "Hcg Hown Hpay Htext Hpc Hpinv Hlk Htok HR Hpanic [-]").
-      iIntros (CIDsl Hssl Mf) "%Hcsf Hcg Hown Hpay Hpc Htok HR". rgall.
+                with "Hcg Hown Htcx Hclmx Htext Hpc Hpinv Hlk Htok HR Hpanic [-]").
+      iIntros (CIDsl Hssl Mf) "%Hcsf Hcg Hown Htcx Hclmx Hpc Htok HR". rgall.
+      (* ... and back into the pay at the RESUMING hart.  A lemma application,
+         not an [iAssert]: a hart-indexed term written fresh would mean the
+         SECTION hart (durable-notes.md). *)
+      iDestruct (arm_pay_ext_split eb _ with "Htcx Hclmx") as "[Hpay _]".
       assert (Hret : ret_pc (L3 !!! Regidx Rra) = mword_of_int (KernelSyms.virtio_disk_rw + 0x1a8))
         by (rewrite HL3ra; pcstep).
       iEval (rewrite Hret) in "Hpc".

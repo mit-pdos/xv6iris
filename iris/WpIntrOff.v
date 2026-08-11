@@ -99,21 +99,6 @@ Section WpIntrOff.
 
 End WpIntrOff.
 
-(* THE TRANSPORT THE CALLERS NEED, the [trap_csrs_ext] twin of
-   [CpuOwn.cpu_own_transport].  A caller that holds the complement at [b =
-   false] holds REAL per-hart CSR cells, so it cannot simply frame them past
-   a step whose continuation rebinds the hart -- but at [b = false] no step
-   moves the hart, and at [b = true] the complement is [emp].  Both arms are
-   therefore free, which is the whole point of guarding on the same index.
-
-   Stated here rather than beside [trap_csrs_ext] in IntrDefs because this is
-   the file about that seam, and nothing below it needs the lemma. *)
-Lemma trap_csrs_ext_transport `{!riscvGS Σ} `{!sieG Σ} `{GEN : GenId}
-    (CID0 CID1 : CpuId) (p : mword 64) (b : bool) :
-  (b = false \/ p = zero_reg -> (CID1 : CPU) = (CID0 : CPU)) ->
-  trap_csrs_ext (CID := CID0) b -∗ trap_csrs_ext (CID := CID1) b.
-Proof.
-  intros Heq. destruct b.
-  - iIntros "$".
-  - rewrite (_ : CID1 = CID0); [ iIntros "$" | exact (Heq (or_introl eq_refl)) ].
-Qed.
+(* The transport a caller needs for its own [trap_csrs_ext] across the
+   rebinding steps before this leaf ([IntrDefs.trap_csrs_ext_transport], and
+   its [cpu_claim_ext] twin) lives beside the definitions, not here. *)

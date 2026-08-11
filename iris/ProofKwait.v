@@ -2561,17 +2561,25 @@ Section ProofKwait.
         assert (Hlka : add_vec (T4 !!! Regidx Ra1)
                          (sign_extend' 64 (mword_of_int 0 : mword 12)) = wait_lock_addr)
           by (rewrite HT4a1; apply addv_sext0).
+        (* sleep takes the trap CSRs and the running claim SEPARATELY now, and
+           index-free.  Here [eb = true], so the complement is [emp] and
+           [IntrDefs.arm_pay_ext_join] turns the pay into the pair. *)
+        iDestruct (arm_pay_ext_join eb _ with "Hpay []") as "[Htcx Hclmx]".
+        { rewrite Heb /trap_csrs_ext /cpu_claim_ext. iSplitR; done. }
         iApply (Sleep.wp_sleep_sconf γs jj γl γw wait_lock_addr "wait_lock"%string
-                  wait_res T4 (trap_res eb + (K - 10))%nat eb C Hjj Hgl Hlka Heb
-                  (* sleep demands [eb = true] ([Heb]), so rewrite the arm first
-                     and then [change] the reserve to its constant -- [lia] sees
+                  wait_res T4 (trap_res eb + (K - 10))%nat eb C Hjj Hgl Hlka
+                  (* [change] the reserve to its constant -- [lia] sees
                      [trap_res _] and [kv_frame_slots] as unrelated atoms. *)
                   ltac:(pose proof (kw_K22 K HK); rewrite Heb;
                         change (trap_res true) with kv_frame_slots; lia)
-                  with "Hcg Hown Hpay Htext Hpc Hpinv Hlk Htok [Hps] Hpanic [-]").
+                  with "Hcg Hown Htcx Hclmx Htext Hpc Hpinv Hlk Htok [Hps] Hpanic [-]").
         { rewrite /wait_res. iExists px. iExact "Hps". }
         (* SLEEP RETURNS ON HART [CIDs]: the outer loop's one crossing. *)
-        iIntros (CIDs Hss mfs) "%Hscs Hcg Hown Hpay Hpc Htok Hres".
+        iIntros (CIDs Hss mfs) "%Hscs Hcg Hown Htcx Hclmx Hpc Htok Hres".
+        (* ... and back into the pay at the RESUMING hart.  A lemma application,
+           not an [iAssert]: a hart-indexed term written fresh would mean the
+           SECTION hart (durable-notes.md). *)
+        iDestruct (arm_pay_ext_split eb _ with "Htcx Hclmx") as "[Hpay _]".
         assert (Hpdc : ret_pc (T4 !!! Regidx Rra) = mword_of_int (KW + 0xdc))
           by (rewrite HT4ra; pcstep).
         iEval (rewrite Hpdc) in "Hpc".

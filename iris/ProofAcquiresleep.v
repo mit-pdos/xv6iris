@@ -737,18 +737,26 @@ Section AslBodies.
     iDestruct (sl_res_close_held γsl slk R vh Hvh with "Hw") as "HRc".
     assert (Hsl_lka : add_vec (L2 !!! Regidx (mword_of_int 11 : mword 5)) (sign_extend' 64 (mword_of_int 0 : mword 12)) = sl_lk slk).
     { rewrite HL2a1. replace (sign_extend' 64 (mword_of_int 0 : mword 12) : mword 64) with (mword_of_int 0 : mword 64) by (apply bv_eq; vm_compute; reflexivity). apply kv_addv_zero. }
+    (* sleep takes the trap CSRs and the running claim SEPARATELY now, and
+       index-free.  Here [eb = true], so the complement is [emp] and
+       [IntrDefs.arm_pay_ext_join] turns the pay into the pair. *)
+    iDestruct (arm_pay_ext_join eb _ with "Hpay []") as "[Htcx Hclmx]".
+    { rewrite Heb /trap_csrs_ext /cpu_claim_ext. iSplitR; done. }
     iApply (Sleep.wp_sleep_sconf γs j γpl γl (sl_lk slk) "sleep lock"%string (sl_res γsl slk R) L2 (trap_res true + (av - 4))%nat eb C
-              Hj Hjpl Hsl_lka Heb
-              (* [kv_frame_slots + 22 <= trap_res true + (av - 4)]: [lia] sees
-                 [trap_res true] and [kv_frame_slots] as two unrelated atoms, so
-                 convert one to the other first (it is [if true then ...], an
-                 iota step).  Every sleep call site needs this one [change]. *)
-              ltac:(change (trap_res true) with kv_frame_slots; lia)
-              with "Hcg Hown Hpay Htext Hpc Hpinv [] Htok HRc Hpanic [-]").
+              Hj Hjpl Hsl_lka
+              (* [trap_res eb + 22 <= trap_res true + (av - 4)]: [lia] sees
+                 [trap_res _] and [kv_frame_slots] as two unrelated atoms, so
+                 pin the arm and convert one to the other first (it is
+                 [if true then ...], an iota step). *)
+              ltac:(rewrite Heb; change (trap_res true) with kv_frame_slots; lia)
+              with "Hcg Hown Htcx Hclmx Htext Hpc Hpinv [] Htok HRc Hpanic [-]").
     { iApply (is_sleeplock_lock with "Hslk"). }
     (* SLEEP RETURNS ON HART [CIDs].  Everything after the park runs there,
        inside [asl_post_sleep_body] at [(CID := CIDs)]. *)
-    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Hpay Hpc Htok HRc".
+    iIntros (CIDs Hss mfs) "%Hs_cs Hcg Hown Htcx Hclmx Hpc Htok HRc".
+    (* ... and back into the pay at the RESUMING hart (durable-notes.md: a
+       hart-indexed term written fresh would mean the SECTION hart). *)
+    iDestruct (arm_pay_ext_split eb _ with "Htcx Hclmx") as "[Hpay _]".
     assert (Hpc24 : ret_pc (L2 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.acquiresleep + 0x24)) by (rewrite HL2ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc24) in "Hpc".

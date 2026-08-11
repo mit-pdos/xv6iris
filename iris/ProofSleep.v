@@ -171,12 +171,16 @@ Proof. vm_compute. reflexivity. Qed.
 (* It is also why [SpecSleep]'s premise is [kv_frame_slots + 22 <= av] and *)
 (* not [22 <= av]: without the 78 there is nothing to carve out.           *)
 (* ===================================================================== *)
-Lemma sl_carve (av : nat) :
-  (kv_frame_slots + 22 <= av)%nat ->
-  (av - 6)%nat = (trap_res true + (av - 6 - kv_frame_slots))%nat.
+Lemma sl_carve (eb : bool) (av : nat) :
+  (trap_res eb + 22 <= av)%nat ->
+  (av - 6)%nat = (trap_res eb + (av - 6 - trap_res eb))%nat.
 Proof.
-  intros Hav. change (trap_res true) with kv_frame_slots. lia.
+  intros Hav. lia.
 Qed.
+
+(* The index split this proof runs on -- [IntrDefs.arm_pay_ext_split] and
+   its [_join] inverse -- lives beside the definitions; see the header
+   there for why splitting beats a [destruct eb] here. *)
 
 (* p->lock is a STATIC kernel lock, so its two call sites take the plain
    [Acquire] / [Release]; only the caller's CONDITION lock lk goes through
@@ -208,11 +212,12 @@ Section SleepPostSched.
        (γs : list gname)
       (j : nat) (γl : gname) (ch' : mword 64)
       (γk : gname) (lka lk0 : mword 64) (Rk Tk Dk : iProp Σ)
-      (m msch : regfile) (av : nat) (C : iProp Σ)
+      (m msch : regfile) (av : nat) (eb : bool) (C : iProp Σ)
       (sp0 spd vgap : mword 64) :
     let pj := proc_addr j in
-    (* [kv_frame_slots + 22], see [sl_carve]: the release below re-enables. *)
-    (kv_frame_slots + 22 <= av)%nat ->
+    (* [trap_res eb + 22], see [sl_carve]: only at [eb = true] does the
+       release below re-enable, and only then is a reserve owed. *)
+    (trap_res eb + 22 <= av)%nat ->
     (j < NPROC)%nat ->
     add_vec sp0 (sign_extend' 64 (caddi16sp_imm (mword_of_int 61 : mword 6))) = spd ->
     sp0 = m !!! Regidx csp_rs1 ->
@@ -239,7 +244,7 @@ Section SleepPostSched.
     pc_is (mword_of_int (KernelSyms.sleep + 0x2e)) -∗
     proc_held cpu_id j γl RUNNING ch' -∗
     trap_csrs -∗
-    cpu_own 1 true pj emp false -∗
+    cpu_own 1 eb pj emp false -∗
     C -∗
     Tk -∗
     (* the cells swtch handed back; they go into the RUNNING lock at the
@@ -259,8 +264,9 @@ Section SleepPostSched.
       ∀ (mf : regfile),
         ⌜callee_saved m mf⌝ -∗
         sie_cap_gpr mf av false pj -∗
-        cpu_own 1 true pj C false -∗
-        arm_pay 0 true pj -∗
+        cpu_own 1 eb pj C false -∗
+        trap_csrs -∗
+        cpu_claim pj -∗
         pc_is (ret_pc (m !!! Regidx (mword_of_int 1 : mword 5))) -∗
         Tk -∗
         locked γk cpu_id -∗
@@ -294,7 +300,7 @@ Section SleepPostSched.
     rewrite unclaimed_RUNNING.
     iDestruct (pstate_at_elim j (1/2) RUNNING Hjn with "Hclm") as "Hclm".
     rewrite hart_split. iDestruct "Htag" as "[Htaga Htagb]".
-    iAssert (cpu_own 1 true (proc_addr j) C false) with "[Hcpuemp HC]" as "Hcpu".
+    iAssert (cpu_own 1 eb (proc_addr j) C false) with "[Hcpuemp HC]" as "Hcpu".
     { iApply (cpu_own_ctx_swap with "Hcpuemp"). iIntros "_". iExact "HC". }
     (* ------------------------------------------------------------------ *)
     (* +0x2e: sd x0,32(s1) -- p->chan := 0.                                *)
@@ -344,9 +350,13 @@ Section SleepPostSched.
     iEval (rewrite Hpcrl2) in "Hpc".
     (* ------------------------------------------------------------------ *)
     (* +0x34: release(&p->lock) -- RUNNING (slot emp), n = 0.              *)
-    (* THE HART UNPINS HERE: this pop reaches level 0 with eb = true, so    *)
-    (* release re-enables SIE at its last instruction and its exit index is *)
-    (* [true].  Everything from here to the re-acquire's return is generic. *)
+    (* THE HART UNPINS ONLY AT [eb = true]: there the pop reaches level 0    *)
+    (* WITH intena, so release re-enables SIE at its last instruction and    *)
+    (* its exit index is [true] -- and a trap can move the thread until the  *)
+    (* re-acquire turns them off again.  At [eb = false] the pop re-enables  *)
+    (* nothing, the exit index is [false] and the hart stays pinned; the     *)
+    (* stretch is then just ordinary interrupts-off code.  Everything here   *)
+    (* is written at [outb = eb] and covers both.                            *)
     (* ------------------------------------------------------------------ *)
     assert (Ha0_E1 : E1 !!! Regidx (mword_of_int 10 : mword 5) = proc_addr j).
     { rewrite /E1 upd_ne; [| vm_compute; discriminate]. rewrite /E0 upd_eq Hs1_msch !add_vec_zero_l. reflexivity. }
@@ -363,22 +373,27 @@ Section SleepPostSched.
     iAssert (proc_lock_res γs γl (proc_addr j)) with "[Hstate Hpg Hchan Hpub Hown' Htaga Hvc']" as "HR2".
     { rewrite /proc_lock_res. iExists RUNNING, (zero_reg : mword 64). iFrame "Hstate Hpg Hchan Hpub".
       iApply (proc_slots_running_intro γs j cpu_id Hjn with "Htaga Hown' Hvc'"). }
-    (* THE RE-ENABLING RELEASE.  Popping to level 0 with [intena] turns
+    (* THE RELEASE TO LEVEL 0.  At [eb = true] popping with [intena] turns
        interrupts back on, so from here to the re-acquire the arm is [true]
        and [kv_frame_slots] of the budget is the trap reserve rather than
-       usable stack.  [sl_carve] re-spells [Hcg]'s [av - 6] as
-       [trap_res true + (av - 6 - kv_frame_slots)], which is the shape
-       release's entry index demands at [outb = true]; its exit -- the
-       level-0 usable count -- is that reduced index. *)
-    iEval (rewrite (sl_carve av Hav)) in "Hcg".
+       usable stack; at [eb = false] nothing is re-enabled and no reserve is
+       carved.  [sl_carve] re-spells [Hcg]'s [av - 6] as
+       [trap_res eb + (av - 6 - trap_res eb)] -- the shape release's entry
+       index demands at [outb = eb], and DEFINITIONALLY [av - 6] again at
+       [eb = false].  Its exit -- the level-0 usable count -- is the reduced
+       index. *)
+    iEval (rewrite (sl_carve eb av Hav)) in "Hcg".
+    (* SPLIT AT THE INDEX ([arm_pay_ext_split]): what the release consumes, and
+       what this thread carries past it.  See the lemma's header. *)
+    iAssert (cpu_claim (proc_addr j)) with "[Hclm Htagb]" as "Hclm".
+    { iApply (cpu_claim_proc j Hjn with "Hclm Htagb"). }
+    iDestruct (arm_pay_ext_split eb (proc_addr j) with "Htc Hclm") as "[Hpay Hext]".
     iApply (Release.wp_release_sconf γl (proc_addr j) "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) E1 0 true (proc_addr j) C
-              (av - 6 - kv_frame_slots)%nat
+              (proc_lock_res γs γl (proc_addr j)) E1 0 eb (proc_addr j) C
+              (av - 6 - trap_res eb)%nat
               Hlka_r2
               ltac:(lia)
-              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu [Htc Hclm Htagb] [-]").
-    { rewrite /arm_pay /trap_csrs_pay /cpu_claim_pay. iFrame "Htc".
-      iApply (cpu_claim_proc j Hjn with "Hclm Htagb"). }
+              with "Hcg Htext Hpc Hislock Hlocked HR2 Hcpu Hpay [-]").
     iIntros (CID1 Hs1 mrel2) "Hcg Hpc %Hcs_rel2 Hcpu".
     assert (Hpc38 : ret_pc (E1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x38)) by (rewrite HE1ra; apply bv_eq; vm_compute; reflexivity).
@@ -394,7 +409,7 @@ Section SleepPostSched.
     (* +0x38 c.mv a0,s2 *)
     iPoseProof (sli_38 with "Htext") as "Hi38".
     iApply (wp_cmv_s_sconf (mword_of_int (KernelSyms.sleep + 0x38)) (mword_of_int 10 : mword 5) (mword_of_int 18 : mword 5)
-              mrel2 (av - 6 - kv_frame_slots)%nat true ltac:(vm_compute; discriminate) ltac:(rdok)
+              mrel2 (av - 6 - trap_res eb)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok)
               with "Hcg Hpc Hi38 [-]").
     iIntros (CID2 Hs2) "Hcg Hpc".
     iEval (rgne) in "Hcg".
@@ -407,7 +422,7 @@ Section SleepPostSched.
     (* +0x3a jal acquire *)
     iPoseProof (sli_3a with "Htext") as "Hi3a".
     iApply (wp_jal_s_sconf (mword_of_int (KernelSyms.sleep + 0x3a)) (mword_of_int 1 : mword 5) (mword_of_int 2092222 : mword 21)
-              F0 (av - 6 - kv_frame_slots)%nat true ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
+              F0 (av - 6 - trap_res eb)%nat eb ltac:(vm_compute; discriminate) ltac:(rdok) ltac:(vm_compute; reflexivity)
               with "Hcg Hpc Hi3a [-]").
     iIntros (CID3 Hs3) "Hcg Hpc".
     set (F1 := <[Regidx (mword_of_int 1 : mword 5) := regval_into_reg (add_vec_int (mword_of_int (KernelSyms.sleep + 0x3a) : mword 64) 4)]> F0).
@@ -425,22 +440,35 @@ Section SleepPostSched.
       assert (H0 : sign_extend' 64 (mword_of_int 0 : mword 12) = (mword_of_int 0 : mword 64)) by (apply bv_eq; vm_compute; reflexivity).
       rewrite H0. apply kv_addv_zero. }
     (* the bundle was stranded at the release's exit hart; re-anchor it. *)
-    iDestruct (cpu_own_transport CID1 CID3 0 true pj C true ltac:(wp_next_chain)
+    iDestruct (cpu_own_transport CID1 CID3 0 eb pj C eb ltac:(wp_next_chain)
                  with "Hcpu") as "Hcpu".
     (* the parked credential "HTk" is presented here, and handed back. *)
-    iApply (AcquireGen.wp_acquire_gen_sconf γk Rk Tk Dk F1 0 true (proc_addr j) C
-              (av - 6 - kv_frame_slots)%nat true
+    iApply (AcquireGen.wp_acquire_gen_sconf γk Rk Tk Dk F1 0 eb (proc_addr j) C
+              (av - 6 - trap_res eb)%nat eb
               ltac:(lia)
               ltac:(lia)
               HrefT HrefLkp
               with "Hcg Hcpu Htext Hpc [Hkopen] HTk Hpanicany [-]").
     { iEval (rewrite Hislk_f). iExact "Hkopen". }
     iIntros (CID4 Hs4 ms3 macq2) "%Hmsf3 HTk Hcg Hpc %Hcs_acq2 Hklocked HRk Hcpu Hpay0'".
+    (* THE COMPLEMENT IS HART-INDEXED AND FOUR STEPS BEHIND.  At [eb = true]
+       it is [emp] and there is nothing to move; at [eb = false] no trap can
+       have been taken, so the chained guards pin every hart on the way.
+       [IntrDefs]' two transports are exactly that argument. *)
+    iDestruct "Hext" as "[Hextc Hextm]".
+    iDestruct (trap_csrs_ext_transport CID0 CID4 eb pj ltac:(wp_next_chain)
+                 with "Hextc") as "Hextc".
+    iDestruct (cpu_claim_ext_transport CID0 CID4 eb pj ltac:(wp_next_chain)
+                 with "Hextm") as "Hextm".
     (* the re-acquire's push_off disables again and folds the reserve back
-       into the usable count -- [trap_res true + (av - 6 - kv_frame_slots)],
-       which [sl_carve] says IS [av - 6].  The epilogue below is written at
-       that spelling, so undo the re-spelling here. *)
-    iEval (rewrite -(sl_carve av Hav)) in "Hcg".
+       into the usable count -- [trap_res eb + (av - 6 - trap_res eb)], which
+       [sl_carve] says IS [av - 6].  The epilogue below is written at that
+       spelling, so undo the re-spelling here.  (At [eb = false] both
+       spellings are the same term and the rewrite is a no-op.) *)
+    iEval (rewrite -(sl_carve eb av Hav)) in "Hcg".
+    (* REJOIN: the pair the contract promises back, whichever index we came
+       through ([arm_pay_ext_join]). *)
+    iDestruct (arm_pay_ext_join eb (proc_addr j) with "Hpay0' [$Hextc $Hextm]") as "[Htcf Hclmf]".
     assert (Hpc3e : ret_pc (F1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x3e)) by (rewrite HF1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc3e) in "Hpc".
@@ -637,7 +665,7 @@ Section SleepPostSched.
     assert (Cs11 : Gf !!! Regidx (mword_of_int 27 : mword 5) = m !!! Regidx (mword_of_int 27 : mword 5))
       by (rewrite (Hthr (mword_of_int 27) ltac:(vm_compute; reflexivity) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate) ltac:(vm_compute; discriminate)); exact Hmsch27).
     iSpecialize ("Hcont" $! CID4 with "[%]"); [wp_next_chain|].
-    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Hpay0' Hpc HTk Hklocked HRk").
+    iApply ("Hcont" $! Gf with "[%] Hcg Hcpu Htcf Hclmf Hpc HTk Hklocked HRk").
     { unfold callee_saved. repeat split; assumption. }
   Qed.
 
@@ -662,12 +690,12 @@ Section ProofSleep.
     : wp_sleep_gen_sconf_body γs j γl γk lka Rk Tk Dk m av eb C.
   Proof.
     cbv beta delta [wp_sleep_gen_sconf_body].
-    intros pcE pj chan lk0 ret_tgt Hj Hgl Hlka0 Heb Hav HrefT HrefLk HrefLkp. subst eb.
+    intros pcE pj chan lk0 ret_tgt Hj Hgl Hlka0 Hav HrefT HrefLk HrefLkp.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     (* "HTk" is PARKED across the whole middle of the proof: the credential
        rides the sleeping process's frame through sched() and is presented
        again at the re-acquire of lk. *)
-    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkopen HTk Hklocked HRk #Hpanicany Hcont".
+    iIntros "Hcg Hcpu Htc0 Hclm0 #Htext Hpc #Hprocs #Hkopen HTk Hklocked HRk #Hpanicany Hcont".
     (* ------------------------------------------------------------------ *)
     (* Prologue: 48-byte frame (push 6), save ra/s0/s1/s2/s3.             *)
     (* sleep runs at noff = 1, so the resource index is the literal        *)
@@ -819,7 +847,7 @@ Section ProofSleep.
     (* ------------------------------------------------------------------ *)
     assert (HA4ra : A4 !!! Regidx (mword_of_int 1 : mword 5) = add_vec_int (mword_of_int (KernelSyms.sleep + 0x12) : mword 64) 4)
       by (rewrite /A4 upd_eq; reflexivity).
-    iApply (Myproc.wp_myproc_sconf A4 (av - 6)%nat 1 true (proc_addr j) C false
+    iApply (Myproc.wp_myproc_sconf A4 (av - 6)%nat 1 eb (proc_addr j) C false
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc [-]").
@@ -864,7 +892,7 @@ Section ProofSleep.
       by (rewrite /B1 upd_eq; reflexivity).
     iPoseProof (procs_inv_lookup γs j γl Hgl with "Hprocs") as "#Hislock".
     iApply (Acquire.wp_acquire_sconf γl "proc"%string
-              (proc_lock_res γs γl (proc_addr j)) B1 1 true (proc_addr j) C (av - 6)%nat false
+              (proc_lock_res γs γl (proc_addr j)) B1 1 eb (proc_addr j) C (av - 6)%nat false
               ltac:(lia)
               ltac:(lia)
               with "Hcg Hcpu Htext Hpc [Hislock] Hpanicany [-]").
@@ -874,11 +902,11 @@ Section ProofSleep.
     assert (Hpc1c : ret_pc (B1 !!! Regidx (mword_of_int 1 : mword 5))
                     = mword_of_int (KernelSyms.sleep + 0x1c)) by (rewrite HB1ra; apply bv_eq; vm_compute; reflexivity).
     iEval (rewrite Hpc1c) in "Hpc".
-    (* this lemma runs at the literal [eb = true], so the arm owned the claim
-       and [arm_pay] carries it whole -- the caller's complement is [emp].
-       Taking it apart yields the state half AND the HART TAG half. *)
-    iDestruct "Hpay0" as "[Hpay0 Hclm]".
-    iDestruct (cpu_claim_elim j Hj with "Hclm") as "[Hclm Htag]".
+    (* THE CLAIM IS ITS OWN PREMISE NOW, index-free: at [eb = true] the
+       caller's push_off freed it out of [sie_arm true], at [eb = false] the
+       TRAP handed it over, and this proof does not care which.  Taking it
+       apart yields the state half AND the HART TAG half. *)
+    iDestruct (cpu_claim_elim j Hj with "Hclm0") as "[Hclm Htag]".
     (* unpack the proc lock resource.  Presenting the tag half refutes the
        slot's [not_running] arm, so the state under the lock is RUNNING --
        and the RUNNING arm is the raw context cells sched wants plus THIS
@@ -936,7 +964,7 @@ Section ProofSleep.
       by (rewrite Ha0_C1; exact Hlka0).
     (* the finisher CLOSES the invariant again (Out = emp): sleep gives the
        condition lock back, it does not dispose of it. *)
-    iApply (ReleaseGen.wp_release_gen_sconf γk lka Rk Dk emp%I C1 1 true (proc_addr j) C (av - 6)%nat
+    iApply (ReleaseGen.wp_release_gen_sconf γk lka Rk Dk emp%I C1 1 eb (proc_addr j) C (av - 6)%nat
               Hlka_r1
               ltac:(lia)
               (HrefLk cpu_id) (HrefLkp cpu_id)
@@ -1039,11 +1067,11 @@ Section ProofSleep.
     iApply fupd_wp.
     iMod (pstate_whole_update (proc_addr j) RUNNING SLEEPING with "Hpg") as "Hpg".
     iModIntro.
-    (* the trap-CSR set the spec's own pay carries crosses inside the chain
+    (* the trap-CSR set the contract carries crosses inside the chain
        payload and comes back at the dispatching hart, where the release of
-       p->lock spends it. *)
-    iAssert trap_csrs with "[Hpay0]" as "Htc". { iExact "Hpay0". }
-    iApply (Sched.wp_sched_sconf γs j γl SLEEPING chan D1 (av - 6)%nat true
+       p->lock either spends it ([eb = true]) or hands it on ([eb = false]). *)
+    iAssert trap_csrs with "[Htc0]" as "Htc". { iExact "Htc0". }
+    iApply (Sched.wp_sched_sconf γs j γl SLEEPING chan D1 (av - 6)%nat eb
               Hj Hgl (park_ok_SLEEPING) ltac:(lia)
               with "Hcg Htext Hpc Hprocs [Hlocked Hstate Hpg Hchan Hpub] [] Htc Hcpuemp Hown Htag Hvc [-]").
     { rewrite /proc_held. iFrame "Hlocked Hstate Hpg Hchan Hpub". }
@@ -1129,7 +1157,7 @@ Section ProofSleep.
     (* re-anchor the caller's continuation at the DISPATCHING hart, and run
        the post-resume half there. *)
     iDestruct (wp_next_shift Hss with "Hcont") as "Hcont".
-    iApply (sleep_post_sched (CID0 := CIDs)  γs j γl ch' γk lka lk0 Rk Tk Dk m msch av C
+    iApply (sleep_post_sched (CID0 := CIDs)  γs j γl ch' γk lka lk0 Rk Tk Dk m msch av eb C
               sp0 spd vgap
               ltac:(lia) Hj ltac:(reflexivity) ltac:(reflexivity) Hlka0 HrefT HrefLkp
               Hsp_msch Hs1_msch Hs2_msch
@@ -1550,17 +1578,17 @@ Section OfGen.
     : wp_sleep_sconf_body γs j γl γk lka sk Rk m av eb C.
   Proof.
     cbv beta delta [wp_sleep_sconf_body].
-    intros pcE pj chan lk0 ret_tgt Hj Hgl Hlka0 Heb Hav.
-    iIntros "Hcg Hcpu Hpay0 #Htext Hpc #Hprocs #Hkislock Hklocked HRk #Hpanic Hcont".
+    intros pcE pj chan lk0 ret_tgt Hj Hgl Hlka0 Hav.
+    iIntros "Hcg Hcpu Htc0 Hclm0 #Htext Hpc #Hprocs #Hkislock Hklocked HRk #Hpanic Hcont".
     iApply (G.wp_sleep_gen_sconf γs j γl γk lka Rk emp%I False%I m av eb C
-              Hj Hgl Hlka0 Heb Hav
+              Hj Hgl Hlka0 Hav
               (lock_refute_False _) (fun i => lock_refute_False _) (fun i => lock_refute_False _)
-              with "Hcg Hcpu Hpay0 Htext Hpc Hprocs [] [] Hklocked HRk Hpanic [-]").
+              with "Hcg Hcpu Htc0 Hclm0 Htext Hpc Hprocs [] [] Hklocked HRk Hpanic [-]").
     { iApply (is_lock_openable with "Hkislock"). }
     { done. }
     iIntros (CIDf) "%Hsf".
-    iIntros (mf) "%Hcs Hcg Hcpu Hpay Hpc _ Hklocked HRk".
-    iApply ("Hcont" $! CIDf with "[%] [//] Hcg Hcpu Hpay Hpc Hklocked HRk").
+    iIntros (mf) "%Hcs Hcg Hcpu Htcf Hclmf Hpc _ Hklocked HRk".
+    iApply ("Hcont" $! CIDf with "[%] [//] Hcg Hcpu Htcf Hclmf Hpc Hklocked HRk").
     { exact Hsf. }
   Qed.
 
