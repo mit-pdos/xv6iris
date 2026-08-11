@@ -2252,8 +2252,27 @@ bits — the kernel gets fixed, per the virtio precedent.)
    `update_PTE_Bits` always sets A). Seven of the eight bytes are
    "value-pinned" — every admissible read returns THE value, a pure lemma
    away from behaving SC — and one byte carries a small finite case.
-   **The latest variant is NOT monotone — write-backs can supersede each
-   other backwards** (found 2026-08, user question): the walker's
+   **SUPERSEDED (verified 2026-08-11) — the paragraph below described the
+   BASELINE model and no longer describes the tree.**  The regenerated
+   model has LANDED: `model-xv6iris/rv64d.v` defines
+   `write_pte_conditional` (:24781) and `read_pte_exclusive` (:24795), and
+   `update_and_write_pte` (:24965) reads the leaf EXCLUSIVELY, re-checks
+   the FRESH word (`check_leaf_pte`), and writes conditionally — the
+   architecture's atomic check-and-set.  Consequences, both of which
+   REVERSE what the struck text says:
+   (i) the leaf's message sequence IS bit-monotone, because the written
+   value is derived from the exclusive (`ak_latest`) read, never from the
+   stale walk read — the D-bit regression cannot occur;
+   (ii) RESURRECTION IS IMPOSSIBLE, so there is NO user-cone prerequisite
+   here: a PTE that `uvmunmap` zeroed fails the walker's re-check and
+   faults instead of being written back.
+   Still true from the struck text: no software reads A/D,
+   `check_PTE_permission` ignores them, and the invariants are stated at
+   "∃ variant" with no order on the lattice — keep them that way, since
+   monotonicity is now a THEOREM about the message sequence and not
+   something the invariant needs to assert.
+   ~~The latest variant is NOT monotone — write-backs can supersede each
+   other backwards~~ (found 2026-08, user question): the walker's
    write-back is a PLAIN read at the hart's own view followed by a PLAIN
    store, and stores append at `S (length log)` unconditionally. So hart
    A's store-walk can append (1,1), and hart B — whose view does not
@@ -2266,7 +2285,7 @@ bits — the kernel gets fixed, per the virtio precedent.)
    sound direction, and BENIGN for the kernel table: no software reads
    A/D, `check_PTE_permission` ignores them, a regressed variant at worst
    triggers another write-back, and every invariant here is stated at
-   "∃ variant" with no order on the lattice (do NOT state one). WHERE IT
+   "∃ variant" with no order on the lattice (do NOT state one). ~~WHERE IT
    STOPS BEING BENIGN — record for the USER cone: once SOFTWARE writes
    PTEs concurrently with walkers (uvmunmap zeroing an entry while
    another hart's stale walker holds an old variant), the model's plain
@@ -2276,7 +2295,7 @@ bits — the kernel gets fixed, per the virtio precedent.)
    must either model the walker update as the architecture's atomic
    check-and-set (an `ak_latest`-style RMW at the interpreter seam) or
    declare the gap; deciding that is a user-cone prerequisite, NOT a
-   batch-6 item.
+   batch-6 item.~~
 3. **The SC tier's interfaces are already A/D-CLOSED.** Translation
    results (pa, `check_PTE_permission`) are variant-independent
    (`pte_set_ad_ppn`, checks ignore A/D); the ONLY register the read
@@ -2568,11 +2587,15 @@ stale-TLB tests, patched-rv64d diff machine-verified CONFINED to the
 vmem cone (398+/318− after renumber normalization; rv64d_types
 unchanged). ONE deliberate sequentially-visible difference: the
 TLB-HIT A/D update re-checks the in-memory PTE and faults instead of
-writing the stale TLB copy back (per the spec's CAS). Landing the
+writing the stale TLB copy back (per the spec's CAS). ~~Landing the
 regenerated model into xv6iris is a SEPARATE, still-pending step —
 the tree is on the baseline model; when it lands, the SC update-cone
 rework (PtTreeAdue/`exec_update_and_write_pte_needs_update`/O3 arms +
-the new `check_leaf_pte` factoring) begins.
+the new `check_leaf_pte` factoring) begins.~~ **DONE — the regenerated
+model IS in the tree** (`model-xv6iris/rv64d.v:24781/24795/24965`), and
+the update-cone rework landed with it (`iris/WeakUpdEff.v`, whose header
+states the landed shape).  Everything below this line describing the
+change as prospective is history.
 
 *Semantic payoff*: every PT write becomes FRESH-derived ⟹ the leaf
 word's message sequence is BIT-MONOTONE ⟹ (with the fresh-has-bits
