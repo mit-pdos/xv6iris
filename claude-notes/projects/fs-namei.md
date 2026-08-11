@@ -215,12 +215,13 @@ usual near-full rebuild lands with it.
   5 platform axioms + funext and nothing else. See "N2's ledger" below for
   the exact names N3/N4 consume.
 - **N3**: PARTIAL — the pure layer (`DirView.v`), BOTH CONTRACTS
-  (`SpecDirlookup.v`, `SpecDirlink.v`) and now the proofs' shared pure layer
-  (`ProofDirlookupParts.v`, N3b) are landed and compiled; the four
-  Proof/Link files are NOT (see "N3's ledger" below for exactly what is
-  there, the five spec-fit lemmas that were proved to validate the
-  contracts, the four findings that changed the layer-3 design, and — under
-  "N3b" — how far the dirlookup walk got and where its text is parked).
+  (`SpecDirlookup.v`, `SpecDirlink.v`), the proofs' shared pure layer
+  (`ProofDirlookupParts.v`, N3b) and **dirlookup's own Proof/Link pair**
+  (N3c) are landed and compiled; `ProofDirlink.v` / `LinkDirlink.v` are NOT
+  (see "N3's ledger" below for exactly what is there, the five spec-fit
+  lemmas that were proved to validate the contracts, the four findings that
+  changed the layer-3 design, and — under "N3c" — the loop/tail shape and
+  the six traps dirlink will meet again).
 - **N4**: namex (318B, width 3 — the campaign's boss: the inlined
   skipelem loop over the path grammar, ilock/dirlookup/iunlockput
   per element, the parent-vs-target split) + namei/nameiparent
@@ -567,7 +568,7 @@ a scratch file, exit 0, since deleted (`.v` and `.vo`) from the mirror.
 two `NEWAXIOM` lines that are the `Module Type` seal `Parameter`s
 (`wp_dirlookup_sconf`, `wp_dirlink_sconf`).
 
-### N3b — the PURE half of the proofs has landed; the WP halves have not
+### N3b — the PURE half both directory proofs are built on
 
 **LANDED: `iris/ProofDirlookupParts.v`** (compiled standalone on the mirror,
 exit 0; `Print Assumptions` on `dlk_rd_clamp_full`, `dlk_sext_zext_16_32_64`,
@@ -596,53 +597,11 @@ context*; no `Axiom`, no `Admitted`).  One `_CoqProject` row, after
   `callee_saved` — this is the lemma that keeps the walk short across
   readi/namecmp/iget) and `dlk_regs_s1` (the loop's `c.addiw s1,s1,16`).
 
-**STILL OWED: `ProofDirlookup.v` / `LinkDirlookup.v` and `ProofDirlink.v` /
-`LinkDirlink.v`.**  Functors `DirlookupProof (RD : READI) (NC : NAMECMP)
-(IG : IGET)` and `DirlinkProof (DL : DIRLOOKUP) (RD : READI) (SC : STRNCPY)
-(WI : WRITEI) (IP : IPUT)`.
+**STILL OWED: `ProofDirlink.v` / `LinkDirlink.v`.**  Functor
+`DirlinkProof (DL : DIRLOOKUP) (RD : READI) (SC : STRNCPY) (WI : WRITEI)
+(IP : IPUT)`.  dirlookup's own pair LANDED — see N3c below.
 
-**The dirlookup walk is written and COMPILED as far as +0x36** — the whole
-prologue and setup — and the text is parked at
-[`fs-namei-dirlookup-wip.v`](fs-namei-dirlookup-wip.v) (a `.v` under
-`claude-notes/`, deliberately NOT in `iris/_CoqProject`: it still ends in a
-`cheat_` stub and must not be built).  Move it into `iris/ProofDirlookup.v`
-and continue from there.  What it already establishes, verified:
-
-- the functor's parameter list matches `Module Type DIRLOOKUP` exactly (the
-  `: DIRLOOKUP` ascription type-checks), and the `intros` line for the
-  contract's seven `let`s is
-  `intros pcE pj nb pf ret_tgt nrec s HK Htype Hgran Hlg Hbmwf Hbmcov Hszb
-  Hinums Hj Hgs Ha0 Hposs Heb.`
-- **every ambient resource dirlookup threads is PERSISTENT** and should be
-  introduced with `#`: `kernel_text`, `panic_wp_any`, `bio_ctx`,
-  `kalloc_env`, `procs_inv`, `dev_inv`, `disk_geom`, the disk `is_lock`,
-  `is_itable2`, `itable_inv`, `ic_escrows`.  That is forced by readi's own
-  contract, which does not hand any of them back — and it is what keeps the
-  scan loop's universal down to the eleven genuinely linear resources (the
-  16 `de` bytes, `i_dev`, `inode_meta`'s five cells, `inode_map`,
-  `inode_blocks`, the name buffer, the `poff` cell, `p_pid`, `bslot`,
-  `iref_slot`).
-- the 12-slot frame: ra@slot1, s0@2, s1@3, s2@4, s3@5, s4@6, s5@7, s6@8,
-  s7@9; **slot 10 is padding gcc never touches** and rides through as an
-  anonymous `∃w` cell; slots 12 and 11 ARE the `de` record (bytes 0..7 and
-  8..15), carved with `dlk_slots_bytes` and named with `dlk_bytes_name`.
-- `panic("dirlookup not DIR")` is refuted at +0x1c from the `di_type dn =
-  T_DIR` premise (`wp_bne_fall_s_sconf` + `dlk_neq_refl`).
-- the loop enters at +0x5c with `dlk_regs m sp0 ip nb pf 0 R13` in hand.
-
-What remains for dirlookup, in the order to write it: the shared TAIL at
-+0x96..+0xaa (nine `c.ldsp`, the pop, `c.ret`) proven ONCE as a `pose`d
-`wp_next`-wrapped assertion the way `ProofIget.v`'s `TAILC` is — it takes an
-`ARM found kk kslot q mt` block plus the frame cells, and transports the
-arm's `a0` claim because the tail writes no `a0`; then the `size = 0` arm
-(+0x38 `c.j`); then the scan as a **fuel induction wrapped in `wp_next`**
-(ProofKexit's loop shape, NOT ProofIget's — dirlookup's body SLEEPS inside
-readi, so the hart moves and the loop statement must be
-`∀ fuel, wp_next b pj (fun CIDl => ∀ i Ml dolds, …)`, applied at the
-current hart with `iSpecialize ("IHf" $! CIDcur with "[%]"); [wp_next_chain|]`
-exactly as ProofKexit does); then the found arm (+0x7e..+0x92) with iget.
-
-Three things the next agent should not have to rediscover:
+Three things the dirlink agent should not have to rediscover:
 
 1. **`upd_ne`'s side condition comes out in BOTH orientations** depending on
    the goal, so a discharge written as `apply is_cs_idx_true_neq; [...]`
@@ -659,3 +618,105 @@ Both loops are still iget's scan-loop recipe with the measure `off <
 dp->size, off += 16`; `DirView.dir_first_step_miss/_hit` and
 `dir_free_first_step_live/_free` are the invariant steps, `dir_first_mono`
 closes the found arm at `nrec`, and `dir_slot_char` closes dirlink's scan.
+
+### N3c — dirlookup is PROVEN and LINKED
+
+**LANDED: `iris/ProofDirlookup.v` (≈1930 lines) and `iris/LinkDirlookup.v`**,
+two `_CoqProject` rows after `ProofDirlookupParts.v`.  `SpecDirlookup.v` was
+provable exactly as frozen — no premise, no arm and no register fact had to
+move.  `Print Assumptions Dirlookup.wp_dirlookup_sconf` gives **the five
+platform axioms (`cancel_reservation`, `load_reservation`,
+`match_reservation`, `valid_reservation`, `plat_term_write`) plus
+`functional_extensionality_dep`, and nothing else** — in particular balloc's
+Axiom does not reach here, because readi comes in through `LinkBmapNoalloc`.
+`tools/proof_coverage.py` reads dirlookup as **proven**, 172 B.  The parked
+`claude-notes/projects/fs-namei-dirlookup-wip.v` has been absorbed and
+deleted.
+
+The file is built out of three pieces, and the shape is worth reusing for
+dirlink:
+
+- **`Htail`, the shared epilogue at +0x96, is a `□`-PERSISTENT
+  `wp_next`-wrapped assertion with an ABSTRACT CONTINUATION.**  Three arms
+  reach it (empty directory, found, loop-exhausted) holding three different
+  resource bundles, so it must not mention them: it takes the ten frame
+  slots, the `de` buffer as sixteen raw bytes, `dlk_tregs m sp0 Mt`, and a
+  continuation `wp_next (fun CIDf => ∀ mf, ⌜callee_saved m mf⌝ -∗
+  ⌜mf !!! a0 = Mt !!! a0⌝ -∗ …)`, and each arm supplies its own.  Making it
+  `□` (provable, since only `kernel_text` is used) is what lets the two
+  in-loop arms use it from inside the fuel induction's `iAssert … with "[]"`.
+- **`Hloop` is ProofKexit's `∀ fuel, wp_next` shape** with measure
+  `nrec - i`, and `Hlatch` (+0x52..+0x58, reached from BOTH misses) is the
+  same shape one level in, asserted inside the induction step so it can use
+  `IHf`.  Both are `iAssert … with "[]"`, i.e. proved from the intuitionistic
+  context only.
+- **THE CONTRACT'S OWN CONTINUATION HAS TO BE THREADED THROUGH THE LOOP AS A
+  RESOURCE.**  `Hcont` is spatial, so it cannot be in the context of an
+  `iAssert … with "[]"`, and the exhausted/found arms both need it.  The only
+  workable shape is to restate its type as the last `-∗` slot of the loop
+  invariant (and of the latch) and pass it round the loop.  It is ~25 lines
+  of copy from `SpecDirlookup.v` each time; budget for it.  Two details:
+  write the wrapper as `wp_next (CID0 := CID) …` explicitly (inside
+  `fun CIDl => …` the ambient instance is `CIDl`, which is wrong), and let
+  the INNER lambda binder supply the `cpu_own`/`sie_cap_gpr` hart, matching
+  the spec's own shadowing `fun (CID : CpuId) => …`.
+
+Six traps, none of which the N3b notes predicted:
+
+1. **`readi`'s contract has its own `let pj := proc_addr j`, so everything it
+   hands back is phrased at `proc_addr j` while dirlookup's is phrased at the
+   `let`-bound `pj`.**  The two are convertible and PRINT DIFFERENTLY, but
+   `iSpecialize` matches syntactically and fails on `p_pid`, `sie_cap_gpr`
+   and `cpu_own` alike.  Fix: `assert (Hpjd : proc_addr j = pj) by
+   reflexivity` once, and `iEval (rewrite Hpjd) in "Hcg"/"Hcnt"/"Hppid"` at
+   the readi seam.  namecmp and iget are unaffected because their `p` is an
+   explicit argument.  (dirlink calls writei and iput, which have the same
+   `let`; expect it there.)
+2. **`cpu_own_transport`'s FIRST argument is the hart the resource is
+   CURRENTLY at, and a callee that does not take `cpu_own` does not move
+   it.**  namecmp leaves `Hcnt` at readi's `CIDrd`, so the transport before
+   iget is `CIDrd → …`, not `CIDnc → …`.  Getting it wrong gives
+   *"iSpecialize: cannot instantiate (cpu_own … -∗ cpu_own …) with
+   (cpu_own …)"* where the two sides print CHARACTER-IDENTICALLY — the
+   `CpuId` is implicit and not printed.
+3. **`destruct <bool> eqn:H` rewrites the comparison hypothesis too**, so the
+   leaf's side condition written as `ltac:(…; rewrite Hcmp; exact Hge)` fails
+   with *"Hge has type … while it is expected to have type true = true"*.
+   Write `first [ exact Hge | reflexivity ]` (durable-notes already records
+   this shape; it bit the `bgeu` at +0x58).
+4. **A `zero_extend' 64 (dir_inum data i)` does not elaborate**: `dir_inum`
+   returns `bv 16` and the width is an evar, so it must be written
+   `zero_extend' 64 (dir_inum data i : mword 16)`.  Same family as the
+   durable note on `mword`-typed value binders.
+5. **Do not index `dlk_regs`' ten conjuncts with `proj1 (proj2 (proj2 …))`
+   chains** — an off-by-one is invisible until the `rewrite` fails on a
+   register you never mentioned.  `destruct H as (D1 & … & D10)` inside the
+   `assert`'s own block leaves the outer hypothesis intact and names the
+   slots: D1 sp, D2 s0, D3 s1, D4 s2, D5 s3, D6 s4, D7 s5, D8 s6, D9 s7,
+   D10 the thread fact.
+6. **The `de` record's three views want ONE equivalence, not three
+   rewrites.**  `dlk_de_view` (local to ProofDirlookup.v) states
+   `[∗ list] jj ∈ seq 0 16, … ↦ₘ file_byte data (16*i+jj) ⊣⊢ a ↦₂ dir_inum
+   data i ∗ [∗ list] jj ∈ seq 0 14, … ↦ₘ dir_name data i jj`, proved by
+   `rewrite -(dlk_half_acc …); rewrite -(dlk_name_acc …); exact
+   (dlk_de_split a (fun jj => file_byte data (16*i+jj)))` — the closing
+   `exact` is what absorbs the beta-redex a forward `rewrite` of
+   `dlk_de_split` at a lambda would leave unmatched.  Used forwards after
+   readi and backwards at each of the three exits.
+
+Everything else went as N3b predicted: `dlk_regs_caller` / `_cs` / `_s1`
+carried the register bundle across every instruction and all three calls,
+`dlk_rd_clamp_full` killed the read panic, `dlk_rd_delivered` + `bb_ext`
+turned readi's delivered bytes into `file_byte`, `dlk_sext_zext_16_32_64` fed
+iget, and `dir_first_step_miss` / `_step_hit` / `_mono` / `dir_first_None`
+closed the three arms.  One readi argument has no meaning on the kernel arm
+and needs a dummy: `dlk_dummyV : pprivate` (`MkPPriv 0 (UPTD 0 0 ∅ ∅) [] [] 0
+[]`).
+
+#### Build evidence (EC2 mirror, git-synced at 4fc0e7c3)
+
+`ProofDirlookup.v` and `LinkDirlookup.v` `coqc`-ed standalone against the
+mirror's full `.vo` tree, exit 0 each; `Print Assumptions` as above, run from
+a scratch file since deleted from the mirror.  `tools/lemma_diff.py --ref
+HEAD` reports CLEAN — no `GONE`, no `ADMITTED`, no `NEWAXIOM`.  No
+`Admitted`, `Axiom` or `cheat_` anywhere in either file.

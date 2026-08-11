@@ -971,3 +971,5 @@ LinkIunlockput.v
 SpecDirlookup.v
 SpecDirlink.v
 ProofDirlookupParts.v
+ProofDirlookup.v
+LinkDirlookup.v
