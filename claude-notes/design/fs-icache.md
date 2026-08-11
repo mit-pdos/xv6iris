@@ -2266,6 +2266,59 @@ cascade through SpecIunlock into every caller; the ambient class is
 already how inode_held names the same bound. Consumers with their own
 nib parameter take nib = icfg_nib (ProofKexit's existing premise).
 
+### 15.2 (i) IS DISCHARGED — the dist=0 retrofit (fs-sysfile S2, 2026-08-11)
+
+The three items §15.1(i) owed to sysfile are landed, and the verdict
+on the design ruling is: **CONFIRMED, with no mechanism disturbing
+kernel-arm bytes.** SpecEitherCopyin's post is
+`⌜r = 0 ∨ r = -1⌝ ∗ …` on the user arm but a bare `⌜r = 0⌝` on the
+kernel arm, so writei's `either_copyin == -1` break at +0xb0 is DEAD
+for `user = false`. It is the ONLY site in ProofWritei that
+instantiates `dist` nonzero (every other exit passes the literal
+`0%nat`), which is why the whole retrofit is one extra postcondition
+clause and one extra conjunct in the proof:
+
+1. **SpecWritei** gains `⌜user = false -> dist = 0%nat⌝` as its own
+   clause, next to the existing `tot = n -> dist = 0`. Stated
+   separately rather than by case-splitting the range clause: user-arm
+   consumers are untouched, and a kernel-arm consumer rewrites `dist`
+   to 0 and reads the two-way clause off the same line. ProofWritei's
+   internal chain (wi_cont / wi_ret / wi_join / wi_size) takes one more
+   hypothesis; the copy-failure normalisation `Hnorm` now carries
+   `user = true` on its −1 disjunct, and that conjunct IS the proof.
+2. **SpecDirlink** drops `dist` and `dstb` from its postcondition
+   binder entirely — dirlink writes from its own stack record, so
+   `dist = 0` is immediate and the range clause is TWO-way. The short
+   arm (`tot < 16`) now differs from the old file in exactly the `tot`
+   bytes it wrote.
+3. **The linked-inum premise** `bv_unsigned inum < 16 * nib` is in
+   SpecDirlink and is deliberately UNUSED by dirlink's own proof
+   (`clear Hcinb` right after the intros, with a comment). Nothing in
+   the tree calls dirlink, so it broke no caller.
+4. **`DirView.dir_ok_dirlink`** is the derivation §15.1(i) said was
+   unavailable, and it goes through — *Closed under the global
+   context*, zero assumptions. Its shape:
+
+   - every record but `k0` keeps both inum bytes (windows are
+     16-aligned and `tot ≤ 16`), so `dir_inums_ok` rides;
+   - the count grows by at most one, and only when `k0 = nrec` **and**
+     `tot = 16` — which is the full-write case;
+   - at `k0` itself: `tot = 0` is pointwise-equal data; `tot ≥ 2` makes
+     the inum halfword wholly new, bounded by the new premise; `tot = 1`
+     is §15(a)'s **mod-256 argument, and this is its home** — the slot
+     is free (`dir_slot_free`) so the old high byte is 0 and the stored
+     halfword is `inum mod 256 ≤ inum`. §15.1(i) was right that the
+     argument had no place in the APPEND analysis; it belongs here.
+
+   Supporting additions in DirView: `dir_nrec_range` (the two floor
+   bounds in one shape), `dir_inum_unsigned` (the halfword's value from
+   its two bytes) and `dir_inum_of_two` (`dir_record_inum` needing only
+   the first two bytes).
+
+Print Assumptions after the retrofit: `Writei.wp_writei_sconf` and
+`Dirlink.wp_dirlink_sconf` are each exactly the 5 platform axioms +
+funext, unchanged. Full gate EXIT=0, 1021 vo.
+
 ## 16. `ialloc` CANNOT BE STATED OVER §13.3'S POOL — the free arm's
 ## authority is filed under the wrong lock (OPEN, raised 2026-08-11 by
 ## fs-namei N5a)
