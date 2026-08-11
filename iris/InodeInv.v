@@ -77,6 +77,18 @@ Definition MAXFILE  : nat := 268%nat.         (* NDIRECT + NINDIRECT  *)
 Lemma maxfile_split : MAXFILE = (NDIRECT + NINDIRECT)%nat.
 Proof. reflexivity. Qed.
 
+(* THE ROOT DEVICE AND THE ROOT INUM (param.h / fs.h).  These were
+   [SpecNamex.ROOTDEV] / [SpecNamex.ROOTINO], read off namex's absolute arm
+   ([li a1,1] at +0x48 and the [mv a0,a1] at +0x4a that makes the device
+   argument the same word).  Hoisted here (N5d) because [SpecFsinit] states
+   the boot-geometry tie [icfg_dev = ROOTDEV] and a Spec file must not
+   require another function's Spec.  SpecNamex keeps unqualified
+   ABBREVIATIONS for both, so every existing qualified and unqualified use --
+   and ProofNamex's bare [unfold ROOTDEV] / [unfold ROOTINO] -- still
+   resolves to these definitions. *)
+Definition ROOTDEV : mword 32 := mword_of_int 1.
+Definition ROOTINO : mword 32 := mword_of_int 1.
+
 (* ===================================================================== *)
 (*  struct inode geometry                                                 *)
 (* ===================================================================== *)
