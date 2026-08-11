@@ -61,6 +61,14 @@ Require Import WpDecode WpDecodeBridge.
 Require Import WeakLeafUtypeShift.
 Require Import WeakLeafItype.
 Require Import WeakLeafRtypeW.
+Require Import WeakLeafCsrrM WeakLeafCsrrTime.
+(* the CSR numbers the §7 statements name.  [WpGprCsrrA]/[WpGprCsrrB] are the
+   SC-side homes of [csr_mcounteren] / [csr_menvcfg] / [csr_time]; note
+   [WpGprCsrwA] defines two of those names AGAIN (same values, [mword_of_int]
+   rather than [Ox]), so the import order here matters and this file must not
+   pull the write-side one in. *)
+Require Import WpGprCsrrA WpGprCsrrB.
+Require Import WeakLeafCsrw2 WeakLeafStimecmp.
 Require Import WkEntryEff.
 
 Import SailStdpp.Values.
@@ -564,6 +572,334 @@ Section WeakLeafM.
     iIntros (ws') "%Hle Hmm Hpcf Hpc Hfile Hhws".
     iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
     iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hfile Hhws HF"). exact Hle.
+  Qed.
+
+  (* ==================================================================== *)
+  (** ** 7. The CSR-read family.
+
+      Wider than §6 only in resource slots: a CSR read names the CSR's own
+      cell and the SINGLE destination GPR cell rather than the whole
+      [gpr_file] (its SC twin does the same), so the wrapper passes two
+      extra points-tos through.  The packaging itself is unchanged -- all
+      four are [F_Base], so all four use [winstr_m_base]. *)
+
+  (** [csrr rd, menvcfg] *)
+  Lemma wwp_csrr_menvcfg (pc : mword 64) (rd : mword 5)
+      (menvcfg_in rd0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    menvcfg ↦ᵣ menvcfg_in -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc false (CSRReg (csr_menvcfg, zreg, Regidx rd, CSRRS)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg menvcfg_in -∗
+      menvcfg ↦ᵣ menvcfg_in -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hcsr Hrd #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrr_menvcfg_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rd menvcfg_in rd0 pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hcsr Hrd Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrd Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** [csrr rd, mcounteren] -- the one 32-bit CSR of the four, so the
+      written-back value is [zero_extend' 64]. *)
+  Lemma wwp_csrr_mcounteren (pc : mword 64) (rd : mword 5)
+      (mcen_in : mword 32) (rd0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    mcounteren ↦ᵣ mcen_in -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc false (CSRReg (csr_mcounteren, zreg, Regidx rd, CSRRS)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ
+        regval_into_reg (zero_extend' 64 mcen_in) -∗
+      mcounteren ↦ᵣ mcen_in -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hcsr Hrd #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrr_mcounteren_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rd mcen_in rd0 pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hcsr Hrd Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrd Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** [csrr rd, mhartid] *)
+  Lemma wwp_csrr_mhartid (pc : mword 64) (rd : mword 5)
+      (mhartid_in rd0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    mhartid ↦ᵣ mhartid_in -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc false (CSRReg (csr_csrr, zreg, Regidx rd, CSRRS)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg mhartid_in -∗
+      mhartid ↦ᵣ mhartid_in -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hcsr Hrd #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrr_mhartid_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rd mhartid_in rd0 pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hcsr Hrd Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrd Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrd Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** [csrr rd, time] -- the odd one out: [time] is not a register the proof
+      owns, so the leaf hands back a value it does not fix, and the
+      wrapper's continuation quantifies over it exactly as the leaf's does. *)
+  Lemma wwp_csrr_time (pc : mword 64) (rd : mword 5) (rd0 : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rd <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ rd0 -∗
+    winstr_m pc false (CSRReg (csr_time, zreg, Regidx rd, CSRRS)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ (tv : mword 64) (ws' : wstate),
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rd)) ↦ᵣ regval_into_reg tv -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrd #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrr_time_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rd rd0 pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrd Hb Hhws").
+    iIntros (tv ws') "%Hle Hmm Hpcf Hpc Hrd Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! tv ws' with "[%] Hmm Hpcf Hpc Hrd Hhws HF"). exact Hle.
+  Qed.
+
+  (* ==================================================================== *)
+  (** ** 8. The CSR-write family.
+
+      A NAME COLLISION TO BE CAREFUL ABOUT, since it is silent.  Both
+      CSR-number tables define [csr_menvcfg] and [csr_mcounteren] --
+      [WpGprCsrrA]/[WpGprCsrrB] as [Ox"30A"] / [Ox"306"], [WpGprCsrwA] as
+      [mword_of_int 0x30a] / [mword_of_int 0x306].  Same values, different
+      terms.  §7 above needs the READ-side ones and this section needs the
+      WRITE-side ones, so importing both would silently give one of the two
+      sections the wrong constant and leave the [winstr_m] token failing to
+      unify with its leaf for no visible reason.  Only the read-side table is
+      imported; §8 spells the write-side numbers -- and [menvcfg_legalized] /
+      [stimecmp_legalized], which live in the same modules -- QUALIFIED. *)
+
+  (** [csrw menvcfg, rs1] *)
+  Lemma wwp_csrw_menvcfg (pc : mword 64) (rs1 : mword 5)
+      (menvcfg0 : type_of_register menvcfg) (rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    menvcfg ↦ᵣ menvcfg0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwA.csr_menvcfg, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      menvcfg ↦ᵣ WpGprCsrwA.menvcfg_legalized menvcfg0 rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hcsr #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_menvcfg_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 menvcfg0 rs1v pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hcsr Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** [csrw mcounteren, rs1] *)
+  Lemma wwp_csrw_mcounteren (pc : mword 64) (rs1 : mword 5)
+      (mcounteren0 : type_of_register mcounteren) (rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    mcounteren ↦ᵣ mcounteren0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwA.csr_mcounteren, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      mcounteren ↦ᵣ legalize_mcounteren mcounteren0 rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hcsr #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_mcounteren_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 mcounteren0 rs1v pc pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hcsr Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hcsr Hhws HF"). exact Hle.
+  Qed.
+
+  (** [csrw stimecmp, rs1] *)
+  Lemma wwp_csrw_stimecmp (pc : mword 64) (rs1 : mword 5)
+      (stimecmp0 : type_of_register stimecmp) (rs1v : mword 64)
+      (pmpcfg0 : type_of_register pmpcfg_n) (q : Qp) (ws : wstate)
+      (F : vProp Σ) :
+    gen_id = 0%nat ->
+    pmp_allows_all pmpcfg0 ->
+    uint rs1 <> 0 ->
+    mmode_config (DfracOwn q) -∗
+    pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+    pc_is pc -∗
+    R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+    stimecmp ↦ᵣ stimecmp0 -∗
+    winstr_m pc false
+      (CSRReg (WpGprCsrwB.csr_stimecmp, Regidx rs1, zreg, CSRRW)) -∗
+    hart_ws cpu_id ws -∗
+    vwp_hold F ws -∗
+    ( ∀ ws' : wstate,
+      ⌜ws_le ws ws'⌝ -∗
+      mmode_config (DfracOwn q) -∗
+      pmpcfg_n ↦ᵣ{DfracOwn q} pmpcfg0 -∗
+      pc_is (add_vec_int pc 4) -∗
+      R_bitvector_64 (gpr_of_Z (uint rs1)) ↦ᵣ rs1v -∗
+      stimecmp ↦ᵣ WpGprCsrwB.stimecmp_legalized stimecmp0 rs1v -∗
+      hart_ws cpu_id ws' -∗
+      vwp_hold F ws' -∗
+      WWP Loop) -∗
+    WWP Loop.
+  Proof.
+    intros Hgid Hpmp Hnz.
+    iIntros "Hmm Hpcf [Hpc Hnpc] Hrs Hcsr #Hi Hhws HF Hcont".
+    iDestruct (winstr_m_base with "Hi") as
+      (w) "(#Hb & %Hal2 & %Hall & %Hgood & %Hdec)".
+    iApply (wwp_csrw_stimecmp_leaf (is_aligned_vaddr (Virtaddr pc) 4)
+              pc w rs1 rs1v pc stimecmp0 pmpcfg0 q D_m dstateM ws
+              Hgid Hpmp Hal2 eq_refl Hnz
+              Hall (fun rs Hp Hmi Hsec => agree_m_regs rs Hp Hsec Hmi)
+              D_m_mi Hgood Hdec
+              with "Hmm Hpcf Hpc Hnpc Hrs Hcsr Hb Hhws").
+    iIntros (ws') "%Hle Hmm Hpcf Hpc Hrs Hcsr Hhws".
+    iDestruct (vwp_hold_mono _ ws ws' Hle with "HF") as "HF".
+    iApply ("Hcont" $! ws' with "[%] Hmm Hpcf Hpc Hrs Hcsr Hhws HF"). exact Hle.
   Qed.
 
 End WeakLeafM.
