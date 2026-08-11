@@ -554,6 +554,7 @@ SpecIinit.v
 ProofIinit.v
 LinkIinit.v
 InodeInv.v
+DirView.v
 SpecBalloc.v
 SpecBmap.v
 CodeBmap.v
@@ -967,3 +968,5 @@ LinkNamecmp.v
 SpecIunlockput.v
 ProofIunlockput.v
 LinkIunlockput.v
+SpecDirlookup.v
+SpecDirlink.v

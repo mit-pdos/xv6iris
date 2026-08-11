@@ -147,9 +147,11 @@ usual near-full rebuild lands with it.
   sealed; `Print Assumptions` on each of the three linked modules gives the
   5 platform axioms + funext and nothing else. See "N2's ledger" below for
   the exact names N3/N4 consume.
-- **N3**: dirlookup (172B: the readi-per-record scan; iget's scan-loop
-  recipe + readi's contract) + dirlink (170B: the free-slot scan +
-  writei append; the two-armed postcondition — found/appended).
+- **N3**: PARTIAL — the pure layer (`DirView.v`) and BOTH CONTRACTS
+  (`SpecDirlookup.v`, `SpecDirlink.v`) are landed and compiled; the
+  Proof/Link halves are NOT (see "N3's ledger" below for exactly what is
+  there, the five spec-fit lemmas that were proved to validate the
+  contracts, and the four findings that changed the layer-3 design).
 - **N4**: namex (318B, width 3 — the campaign's boss: the inlined
   skipelem loop over the path grammar, ilock/dirlookup/iunlockput
   per element, the parent-vs-target split) + namei/nameiparent
@@ -262,3 +264,247 @@ Each of the nine compiled standalone, exit 0, against the mirror's full
 `wp_iunlockput_sconf`), which every `Spec<F>.v` in the tree has and which
 the matching `Proof<F>.v` discharges — the tool flags a `Parameter`
 regardless of whether it sits in a `Module Type`.
+
+## N3's ledger — the record view and the two contracts
+
+Three new files, no existing file touched (`iris/_CoqProject` gains three
+rows: `DirView.v` right after `InodeInv.v`, and `SpecDirlookup.v` /
+`SpecDirlink.v` after `LinkIunlockput.v`).  **The Proof and Link halves are
+NOT done** — what is below is the interface N4/N5 and the eventual proof
+agent consume, plus the evidence that the two contracts actually compose
+with readi/writei/iget/iput/namecmp/strncpy.
+
+### `DirView.v` — the pure record view (compiles, no `Admitted`, no axioms)
+
+Imports `DirentEnc` (bname/`de_of_name`/`dirent_bytes`) and `InodeInv`
+(`file_byte`).  **It therefore pulls the iris proofmode transitively and is
+NOT ssreflect-free** — a local copy of `file_byte` was rejected because
+readi's and writei's postconditions are stated on InodeInv's one and a
+second definition would only be *convertible*, forcing a bridge at every
+use.  Consequence for anyone editing it: no `rewrite a b c`, no
+`rewrite !lem` (ssreflect is not in scope), and `rewrite lem. 2:{ tac }`
+for a conditional rewrite.
+
+- **the search**: `dfirst : (nat -> bool) -> nat -> option nat` (least
+  index below n), with `dfirst_None_1/_2`, `dfirst_Some_1/_2`,
+  `dfirst_lt/_true/_before`, `dfirst_mono`, `dfirst_ext`, and the two
+  loop-invariant steps `dfirst_step_false` / `dfirst_step_true`.
+  BOOLEAN predicate on purpose: `dfirst_ext` (dirlink's write-back
+  stability) is then an ordinary equation, no `Decision`-instance juggling.
+- **the record view**: `dir_inum data k : bv 16` (little-endian from
+  `file_byte data (16k)` / `(16k+1)`, spelled through
+  `RiscvModelBytes.assemble_bytes`), `dir_name data k : nat -> bv 8`
+  (`fun j => file_byte data (16k+2+j)`), `dir_freeb` / `dir_live` /
+  `dir_liveb`, `dir_matchb` / `dir_match`, and the boolean/Prop bridges
+  `dir_freeb_true/_false`, `dir_liveb_true/_false`,
+  `dir_matchb_true/_false`.
+- **the two searches**: `dir_first data nrec s` and `dir_free_first data
+  nrec` + `dir_slot data nrec` (= the free slot, or `nrec`).
+  Characterisations `dir_first_Some` / `dir_first_None` (first-match iff
+  match-here-and-none-below / no-match-anywhere), the readouts
+  `dir_first_live` / `dir_first_name` / `dir_first_lt`, the loop steps
+  `dir_first_step_miss` / `dir_first_step_hit`, `dir_first_mono`, and the
+  first-free twin `dir_free_first_None/_Some/_step_live/_step_free/_mono`
+  plus `dir_slot_le`, `dir_slot_free`, `dir_slot_live_below` and
+  **`dir_slot_char`** (the shape the WP loop leaves: stopped at `i`, all
+  below live, `i = nrec` or record `i` free ⇒ `dir_slot = i`).
+- **the encoded-record bridge**: `dir_inum_byte0/_byte1`,
+  `dir_inum_half_bytes`, then `dir_record_inum` / `dir_record_name`
+  (a window holding `dirent_bytes d` has `de_inum d` / `de_name_str d`)
+  and `dir_record_of_name` for `de_of_name i s`.
+- **stability**: `dir_win_agree data data' k` (the 16 bytes agree),
+  `dir_win_agree_below`, `dir_inum_agree`, `dir_bname_agree`,
+  `dir_freeb_agree`, `dir_liveb_agree`, `dir_matchb_agree`,
+  `dir_first_agree`, `dir_free_first_agree`, `dir_slot_agree`.
+- **strncpy's image**: `dl_nonul` / `dl_cstr` / `dl_snc` are
+  `SpecStrncpy.snc_post` TRANSCRIBED at n = 14 (a Spec file must not be a
+  dependency of this one; the bridge at the call site is
+  `exact (fun H => H)`), and `snc_bview` / `snc_bname` / `snc_record`
+  prove **`MkDirent i (bview 14 h) = de_of_name i (bname 14 f)`** on BOTH
+  of strncpy's arms.  That is what makes dirlink's appended arm statable
+  as `de_of_name`.
+- **the record count**: `dir_nrec sz := Z.to_nat (sz / 16)`, with
+  `dir_nrec_exact` (`16 | sz -> 16 * dir_nrec sz = sz`) and
+  `dir_nrec_bound` (`i * 16 < sz <-> i < dir_nrec sz`).
+- one law DirentEnc lacks and this file adds: **`bname_ext`**.
+
+### `SpecDirlookup.wp_dirlookup_sconf_body` — signature and arms
+
+```
+wp_dirlookup_sconf_body
+  gs j gl gu gd gk pd pav pu bn gfs gi cn gtl ga gf
+  cov logstart nib dev ip bm data dn
+  fn hasp pofv pidv dq dqd dqn m K eb C b
+```
+`K_dirlookup = 82` (12-slot frame + readi's 70).  `T_DIR : mword 16 :=
+mword_of_int 1` is defined here (read off the `li a5,1` at +0x1a).
+`nrec := dir_nrec (di_size dn)`, `s := bname 14 fn`, `nb := m !!! a1`,
+`pf := m !!! a2`.
+
+Premises: `di_type dn = T_DIR`; **`16 | bv_unsigned (di_size dn)`**;
+readi's `log_geom_ok` / `blkmap_wf` / `bm_covers` / `size <=
+MAXFILE*BSIZE`; **`dir_inums_ok data nrec nib`** (new — see finding 1);
+`j < NPROC`; `gs !! j = Some gl`; `a0 = ip`; `eq_vec (m !!! a2) zero_reg =
+negb hasp`; `eb = true`.
+
+Resources: readi's bundle verbatim (`i_dev`, `inode_meta`, `inode_map`,
+`inode_blocks`, `p_pid`, `procs_inv`, `dev_inv`, `disk_geom`, the disk
+lock, `bslot bn`, `bio_ctx`, `kalloc_env`, `panic_wp_any`,
+`cpu_own 0 eb pj C b`), the caller's 14-byte name buffer
+`[∗ list] i ∈ seq 0 14, pa_add nb i ↦ₘ{dqn} fn i` (namecmp's `f`), the
+two-armed `if hasp then pf ↦₄ pofv else emp`, and **iget's icache set**:
+`is_itable2 gtl cn gfs gi cov logstart nib dev`, `itable_inv`,
+`ic_escrows cn gfs gi cov logstart`, and ONE `iref_slot`.
+
+Post (`∀ mf found k kslot q`): everything above comes back untouched, plus
+- `found = true`: `dir_first data nrec s = Some k`, `kslot < NINODE`,
+  `a0 = ientry kslot`, `inode_ref kslot q dev (zero_extend' 32 (dir_inum
+  data k))`, and `pf ↦₄ mword_of_int (16*k)` on the `hasp` arm;
+- `found = false`: `dir_first data nrec s = None`, `a0 = 0`, the
+  `iref_slot` comes BACK (iget is only reached on the found arm), `pf`
+  untouched.
+
+### `SpecDirlink.wp_dirlink_sconf_body` — signature and arms
+
+```
+wp_dirlink_sconf_body
+  gs j gl gu gd gk pd pav pu bn g gfs gi cn gtl ga gf gpr
+  cov logstart inodestart nib bmapstart size dev used
+  ip dinum bm data dn dn0 fn inum ncount
+  pidv dq dqd dqn dqs dqb dqbs dqf m K eb C b
+```
+`K_dirlink = 92`; `dirlink_units = 7`.  `inum : mword 16` (the LINKED
+inum) with the register premise `m !!! a2 = zero_extend' 64 inum` — the
+`sh s6,-80(s0)` at +0x7c stores exactly the low sixteen bits, so a 32-bit
+parameter would only have re-introduced a truncation the caller has to
+undo.  Two new definitions live here: **`ic_sleeplocks cn`** (the
+per-entry `∃ γil γisl, is_sleeplock … (ic_tok cn kk)` family, in exactly
+the shape `IcacheBoot.icache_alloc` produces — iput names ONE slot and
+dirlink cannot know which, the same reason iget takes `ic_escrows`), and
+**`ireg_blocks_ok inodestart nib cov logstart`** (finding 2).
+
+Precondition = dirlookup's ∪ writei's ∪ iput's, plus `size + 16 <=
+MAXFILE*BSIZE`.  Post (`∀ mf found bm' data' dn' dn0' n' used' tot dist
+dstb`), with `k0 := dir_slot data nrec`:
+- `found`: `a0 = -1`, `dir_first ≠ None`, `bm'/data'/dn'/dn0'` unchanged,
+  `used' ⊆ used`, `tot = dist = 0`;
+- otherwise: `dir_first = None`, `used ⊆ used'`, writei's five
+  preservation facts, `dn' = wi_dinode dn bm' (16*k0) tot`, `dn0' = dn'`,
+  `tot ≤ 16`, `dist ≤ BSIZE`, `tot = 16 -> dist = 0`, the range clause
+  with `dirent_bytes (de_of_name inum s) !!! (x - 16*k0)` in the window,
+  and `(a0 = 0 ∧ tot = 16) ∨ (a0 = -1 ∧ tot < 16)`.
+Both arms return one `iref_slot` (net zero: dirlookup's iget spends one,
+iput returns one) and `log_op γ n'` with the spend-at-most interval.
+
+### THE FIVE SPEC-FIT LEMMAS — proved on the mirror, then deleted with the scratch file (**paste them into ProofDirlookup / ProofDirlink**)
+
+They are the evidence that the two contracts compose; the file compiled
+standalone against the mirror's `.vo` tree, exit 0.
+
+1. `fit_rd_clamp_full (sz : bv 32) (i : nat) : (16 | bv_unsigned sz) ->
+   Z.of_nat i * 16 < bv_unsigned sz -> rd_clamp sz (16*i) 16 = 16`
+   — the GRANULARITY premise doing its job: every loop readi is
+   full-length, so `panic("dirlookup read")` / `panic("dirlink read")` is
+   dead.  Proof: `unfold rd_clamp; rewrite decide_False; lia`.
+2. `fit_wi_cost (k : nat) : wi_cost (16*k) 16 = 7`
+   — sixteen bytes never straddle a block at a 16-aligned offset
+   (1024 = 64*16), which is why `dirlink_units` is a CONSTANT.  Proof:
+   `Nat.Div0.mul_mod_distr_l` at `1024 = 16*64`, then `symmetry;
+   apply Nat.div_unique with (r := 16*(k mod 64) + 15); lia`.
+3. `fit_slot_offset : 0 <= sz -> (16 | sz) ->
+   16 * dir_slot data (dir_nrec sz) <= sz`
+   — `dir_slot_le` + `dir_nrec_exact`.  This is what kills **writei's own
+   -1 arm**: `off <= size` always, and `off + 16 <= size + 16 <=
+   MAXFILE*BSIZE` is the premise.  So the only failure dirlink can report
+   is a SHORT WRITE.
+4. `fit_sext_zext_16_32_64 (x : mword 16) :
+   sign_extend' 64 (zero_extend' 32 x) = zero_extend' 64 x`
+   — the `lhu` value widened to 32 for `inode_ref` sign-extends to the
+   zero-extension iget's premise wants.  Proof is
+   `RiscvExtras.sext9_12_64`'s verbatim, with `2^16 = 65536` and
+   `2^32/2 = 2147483648`.
+5. `fit_rd_delivered : (j < 16) ->
+   rd_delivered data olds (16*i) 16 j = file_byte data (16*i+j)`
+   — readi's delivered de buffer IS what `dir_inum`/`dir_name` are
+   defined on.  `unfold rd_delivered; rewrite decide_True; lia`.
+
+### FINDINGS — four things the layer-3 design did not anticipate
+
+1. **iget's argument bound cannot be threaded "verbatim"; it has to be
+   quantified over the RECORDS.**  `SpecIget` requires `bv_unsigned inum <
+   16 * nib`, and dirlookup's inum comes off the DISK, so no proof step
+   can establish it and the loop does not know which record it will stop
+   at.  Hence the new premise `SpecDirlookup.dir_inums_ok data nrec nib :
+   ∀ k < nrec, dir_live data k -> bv_unsigned (dir_inum data k) < 16*nib`.
+   It is an IMAGE WELL-FORMEDNESS fact about a directory's contents and it
+   will have to be threaded all the way up through namex — flag it for
+   N4's stage-0, and note it is the same family as the recorded image-wf
+   effort in layer 4.
+2. **iput's two block-membership premises are better stated over the
+   REGION than over the child.**  iput wants `IBLOCK inum inodestart ∈
+   cov` and `∉ log_region_set logstart` for the inode dirlookup returned —
+   again unknown at spec time.  `SpecDirlink.ireg_blocks_ok inodestart nib
+   cov logstart : ∀ w, bv_unsigned w < 16*nib -> IBLOCK w inodestart ∈ cov
+   ∧ ¬(… ∈ log_region_set logstart)` is strictly the better shape: a fact
+   about the superblock LAYOUT, provable once, instead of a fact about a
+   directory's contents.  Recommend hoisting it into the fs geometry
+   vocabulary (beside `log_geom_ok` / `bitmap_geom_ok`) when N5 lands
+   ialloc, and deriving iput's/writei's own copies from it.
+3. **dirlink's postcondition needs a THIRD arm, not two.**  The design
+   said found / appended.  The decode's branchless tail at +0x90..+0x96
+   (`addi a0,a0,-16; sltu a0,zero,a0; subw a0,zero,a0`) is
+   `a0 = -(writei(...) != 16)`, and writei's contract genuinely admits a
+   SHORT WRITE (bmap returning 0 when balloc is out of blocks — balloc
+   prints and returns 0, it does not panic).  Fit lemma 3 above shows
+   writei's *up-front* -1 arm is dead here, so the honest shape is
+   "appended fully (a0 = 0, tot = 16, dist = 0)" vs "short write
+   (a0 = -1, tot < 16)", with writei's bounded DISTURBED REGION carried in
+   both.  That is what `SpecDirlink`'s `else` branch states.
+4. **Two of the design's caller obligations on the name are NOT
+   premises.**  The design asked dirlink's caller for `length s <= 14` and
+   `nonul s`.  Because `s` is DEFINED as `bname 14 fn` (the canonical view
+   of the caller's own 14-byte buffer), both are free —
+   `DirentEnc.bname_length_le` and `cut_nul_nonul`.  Dropping them makes
+   dirlink callable from `create` with no extra work.
+
+Two smaller decode notes for whoever writes the proofs:
+
+- dirlookup's `de` is at `sp+0 .. sp+15` of its 96-byte frame (`s0 = sp+96`,
+  `&de = s0-96`), i.e. `pa_stk sp0 12` and `pa_stk sp0 11` in `StackOwn`'s
+  numbering; `StackBytes.slot_bytes_own` + `bytes_own_app` is the carve.
+  dirlink's is at `sp+0 .. sp+15` of an 80-byte frame.
+- dirlink saves **s1 / s3 / s4 LAZILY** (+0x1c, +0x24, +0x26) and its two
+  early exits skip the matching restores (the found arm enters the
+  epilogue at +0x9c, past the `ld s1`; the `size = 0` arm never saves
+  s3/s4 and never clobbers them).  A whole-function `callee_saved`
+  transport has to follow that, not the textual epilogue.
+
+Everything else in the decode matched the layer-3 design exactly: the
+16-byte stride, DIRSIZ 14, `de.inum` at offset 0 read by `lhu` (so the free
+test is the halfword), `de.name` at offset 2, the size re-read every
+iteration, the three panics/jal targets resolved to `panic` (0x80000826),
+`readi` (0x8000356e), `namecmp` (0x80003766), `iget` (0x80002f6a),
+`dirlookup` (0x8000377c), `iput` (0x8000335e), `strncpy` (0x80000dd6, NOT
+safestrcpy) and `writei` (0x80003660), and the inode field offsets
+dev@0 / type@68 / size@76 confirmed against `IcacheRef.i_dev` and
+`InodeInv.i_type` / `i_size`.
+
+### Build evidence (EC2 mirror, git-synced at f7584169)
+
+`DirView.v`, `SpecDirlookup.v`, `SpecDirlink.v` each `coqc`-ed standalone,
+exit 0, against the mirror's full `.vo` tree; the five fit lemmas above in
+a scratch file, exit 0, since deleted (`.v` and `.vo`) from the mirror.
+`tools/lemma_diff.py --ref HEAD` reports no `GONE`, no `ADMITTED`, and the
+two `NEWAXIOM` lines that are the `Module Type` seal `Parameter`s
+(`wp_dirlookup_sconf`, `wp_dirlink_sconf`).
+
+### What N3 still owes
+
+`ProofDirlookup.v` / `LinkDirlookup.v` and `ProofDirlink.v` /
+`LinkDirlink.v`, functors `DirlookupProof (RD : READI) (NC : NAMECMP)
+(IG : IGET)` and `DirlinkProof (DL : DIRLOOKUP) (RD : READI)
+(SC : STRNCPY) (WI : WRITEI) (IP : IPUT)`.  Both loops are iget's
+scan-loop recipe (`ProofIget.v`) with the measure `off < dp->size,
+off += 16`; `DirView.dir_first_step_miss/_hit` and
+`dir_free_first_step_live/_free` are the invariant steps, `dir_first_mono`
+closes the found arm at `nrec`, and `dir_slot_char` closes dirlink's scan.
