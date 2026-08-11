@@ -484,6 +484,7 @@ ProofFiledup.v
 LinkFiledup.v
 CodeFileclose.v
 CodeFileread.v
+CodeFlags2perm.v
 SpecFileclose.v
 ProofFilecloseParts.v
 LinkFilealloc.v
@@ -502,6 +503,7 @@ FsBlocks.v
 BlockWords.v
 DinodeEnc.v
 DirentEnc.v
+ElfEnc.v
 PathElems.v
 WpSconfSrliw.v
 CodeWriteHead.v
@@ -1006,3 +1008,8 @@ SpecIreclaim.v
 SpecFsinit.v
 ProofIreclaim.v
 LinkIreclaim.v
+CodeKexec.v
+SpecKexec.v
+SpecFlags2perm.v
+ProofFlags2perm.v
+LinkFlags2perm.v

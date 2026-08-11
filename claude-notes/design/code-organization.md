@@ -160,8 +160,19 @@ Two invariants of `tools/gen_code.py` and its `tools/code_manifest.json`:
 - **The manifest's lemma-prefix column must be unique per function.** Prefixes
   are initials, so collisions are easy (`printk` and `printkinit` both had
   `pki_`, making `CodePrintk.pki_00` and `CodePrintkinit.pki_00` differ only by
-  which file a proof imported last). Nothing errors — a proof just silently
-  steps the wrong function's instruction. Check the column when adding a row.
+  which file a proof imported last; `kexit` and `kexec` both had `kxi_`).
+  Nothing errors — a proof just silently steps the wrong function's
+  instruction. **The generator now WARNS**, listing every collision before it
+  writes anything; read the list when you add a row, yours is the one that
+  moved. It warns rather than fails because the check found **~20 rows that
+  predate it** (`cii_` = clockintr/consoleinit/copyin, `fai_` =
+  fetchaddr/filealloc, `fdi_` = fdalloc/filedup/free_desc, `fri_` =
+  fileread/freeproc/freerange, `sli_` = sleep/strlen, …), none of them
+  currently reachable: a collision bites only a proof that imports BOTH
+  `Code<F>.v` files, and a caller uses its callees' *Specs*, never their Code.
+  So they are latent, and failing the generator on them would block every
+  regeneration behind a rename sweep nothing is asking for. Rename a colliding
+  pair when you touch one of them — do not start the sweep for its own sake.
 - **`--only` restricts the `Code<F>.v` files, never `KernelDecode*.v`.** The
   shards are keyed by WORD over the *whole* covered set, so they are always
   computed from every group; deriving them from a restricted set would rewrite

@@ -192,6 +192,23 @@ are working on that effort — the relevant `projects/` file.
   worklist spells out the exact chain that makes it work in `kfork`'s
   uncounted regime (uvmcreate -> proc_pagetable -> freeproc), plus
   `proc_priv_owe`, the payload-deficit predicate `sys_dup` needs.
+- **[`kexec.md`](projects/kexec.md)** — `kexec()`, the exec() system call and
+  **the largest function in the tree** (287 instructions / 860 bytes, 3× the
+  next one), where the FS, the page-table builder and `struct proc` meet. The
+  definitional layer has LANDED — `CodeKexec.v`, `ElfEnc.v` (the fifth byte
+  vocabulary, a pure READER since kexec never writes these bytes),
+  `ProcInv.proc_priv_newspace` (the address-space bridge that does NOT pin
+  `ud_root`, which every existing one does because every previous caller grew
+  the table it already had) and `SpecKexec.v` — and `flags2perm` is proven;
+  the whole-function proof has not started. Read it for the four-phase
+  decomposition, the four-point lazy callee-saved spill that makes
+  `callee_saved` an epilogue premise, and above all **the three upstream spec
+  changes kexec is blocked on**, each found by trying to compose the callees:
+  copyout's contract assumes the destination table IS the running process's
+  (vmfault maps into `p->pagetable`, not the table it is passed), safestrcpy
+  over-asks its source by 16 bytes where kexec can only own the string, and
+  the log budget does not close for a two-element path because namei charges
+  one iput too many on its SUCCESS arm.
 - **[`cwd-ref.md`](projects/cwd-ref.md)** — filling the `ProcInv.cwd_ref`
   hole (S5 of the above, promoted to its own file). `cwd_ref` is still `emp`
   while `SpecIdup.v` is now stated over the REAL inode cache, so the tree is

@@ -240,6 +240,12 @@
   2
  ],
  [
+  "CodeFlags2perm.v",
+  "flags2perm",
+  "fpi_",
+  2
+ ],
+ [
   "CodeFreeDesc.v",
   "free_desc",
   "fdi_",
@@ -394,6 +400,12 @@
   "kerneltrap",
   "kti_",
   2
+ ],
+ [
+  "CodeKexec.v",
+  "kexec",
+  "kxc_",
+  3
  ],
  [
   "CodeKexit.v",
