@@ -1231,12 +1231,16 @@ Section ProofFileclose.
              performs, and the whole point of the payload being a
              cancellable invariant rather than a fraction of the reference
              (which does not exist -- see [FileInv.inode_pay]). *)
-          iAssert (inode_pay (fp_icv pn) (fc_ip Cf) 1) with "[Hpl]" as "Hpl".
+          iAssert (inode_pay (fp_icv pn) (fp_iq pn) (fc_ip Cf) 1) with "[Hpl]" as "Hpl".
           { rewrite /file_payload bool_decide_eq_false_2; [|exact Hnpipe].
             rewrite Hib. iExact "Hpl". }
           iApply fupd_wp.
-          iMod (inode_pay_cancel ⊤ (fp_icv pn) (fc_ip Cf) ltac:(solve_ndisj)
-                  with "Hpl") as "Hheld".
+          (* THE GATHER IS INSIDE THE CANCEL (B3).  The cinv parks the
+             reference SHORT by [fp_iq pn] and the payload's own arm at
+             [1 * fp_iq pn] is the exact complement, so what comes out is
+             canonical and iput can spend it. *)
+          iMod (inode_pay_cancel ⊤ (fp_icv pn) (fp_iq pn) (fc_ip Cf)
+                  ltac:(solve_ndisj) with "Hpl") as "Hheld".
           iDestruct "Hheld" as (kk qq inum) "(%Hipe & %Hkk & %Hinumb & Href)".
           iModIntro.
           rewrite /fileclose_fs_env /fileclose_fs_env_nopid.

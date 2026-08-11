@@ -167,13 +167,13 @@ Section KforkB4Res.
     iExact "Hc".
   Qed.
 
-  (* THE CHILD'S OWN cwd REFERENCE, out of idup's SECOND half.
+  (* THE CHILD'S OWN cwd REFERENCE, out of the reference idup MINTS.
 
      This is what the hole that used to sit here has become.  While
      [ProcInv.cwd_ref] was [emp] the child's reference could be conjured at
-     any [v] and idup's second half was dropped on the floor; now the two
-     are the same predicate and the store at +0xac consumes the half, which
-     is the whole reason idup returns two.  No coherence premise is needed
+     any [v] and idup's result was dropped on the floor; now the two
+     are the same predicate and the store at +0xac consumes it, which
+     is the whole reason idup returns one.  No coherence premise is needed
      to tie the itable the caller holds the LOCK for to the authority
      [cwd_ref] is stated over: both are the same canonical
      [IcacheInv.iref_name] by construction ([InodeRef.v]'s header explains
@@ -295,6 +295,21 @@ Section KforkB4Proof.
     iDestruct (cwd_ref_held (pv_cwd Vp) with "Hpcref") as "Hpcref".
     iDestruct "Hpcref" as (ck cq cinum) "(%Hcwd & %Hcklt & %Hcinumb & Hiref)".
     set (cdev := icfg_dev).
+    (* THE PARENT SHEDS A SHARE (B3).  idup no longer takes a reference: it
+       takes a count-0 share, hands it straight back and mints the child's
+       reference from the table's retained slice (design §14.7(3)).  So the
+       parent's own reference is never handed in and never halves -- it goes
+       SHORT for the length of the call ([IcacheRef.inode_ref_shed], a pure
+       resource split: no fupd, no invariant, no mask) and is made whole again
+       by the gather below.
+       IT CANNOT CLOSE ITS BLOCK ANY EARLIER THAN THAT, and that is what our
+       algebra costs against the natR version this is ported from.  There
+       [cwd_ref] could be re-formed from the reference the parent kept; here
+       [cwd_ref] is [inode_held], which demands a CANONICAL pairing, and a
+       short parent has none by construction -- being unspendable while a
+       share is out is exactly what makes shares unable to outlive it. *)
+    iEval (rewrite inode_ref_shed) in "Hiref".
+    iDestruct "Hiref" as "[Hpkeep Hshr]".
     assert (Hpa0a4 : add_vec (rget m Rs5) (sign_extend' 64 (mword_of_int 336 : mword 12))
                      = p_cwd pme).
     { rewrite (rget_ne m Rs5 ltac:(vm_compute; discriminate)) Hms5. apply p_cwd_sext. }
@@ -346,13 +361,19 @@ Section KforkB4Proof.
     (* THE idup CALL.                                                 *)
     (* ------------------------------------------------------------- *)
     iApply (ID.wp_idup_sconf γil cn γfs γic cov logstart nib
-              ck cq cdev cinum M1 lvl eb pme C (K - 8)%nat false
-              (kfk_b4_stack_idup K HK) Hlvl HM1a0
-              with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hiref [-]").
+              ck (cq/2)%Qp cdev cinum M1 lvl eb pme C (K - 8)%nat false
+              (kfk_b4_stack_idup K HK) Hlvl Hcklt HM1a0
+              with "Hcg Hown Htext Hpc Hitb Hitinv Hpanic Hirs Hshr [-]").
     iApply wp_next_off_intro.
-    iIntros (mr) "Hcg Hown Hpc %Hidup_post Href1 Href2".
-    iDestruct (kfk_child_cwd ck (cq/2)%Qp cinum Hcklt Hcinumb
-                 with "Href1") as "Hpcref1".
+    iIntros (mr) "Hcg Hown Hpc %Hidup_post Hshr (%qn & Href2)".
+    (* THE GATHER: the share comes back at the fraction it left at (nothing
+       in idup touches it), so it re-pairs with the short parent and the
+       parent's block closes at the fraction it came in with -- no halving. *)
+    iDestruct (inode_ref_gather ck (cq/2)%Qp (cq/2)%Qp cdev cinum
+                 with "Hpkeep Hshr") as "Hiref".
+    iEval (rewrite Qp.div_2) in "Hiref".
+    iDestruct (kfk_child_cwd ck cq cinum Hcklt Hcinumb
+                 with "Hiref") as "Hpcref1".
     iEval (rewrite -Hcwd) in "Hpcref1".
     iDestruct ("Hpback" $! (pv_cwd Vp) with "Hpcwd Hpcref1") as "Hparent2".
     iEval (rewrite upd_cwd_id) in "Hparent2".
@@ -380,7 +401,7 @@ Section KforkB4Proof.
     assert (Hstoreval : rget mr Ra0 = ientry ck).
     { rewrite (rget_ne mr Ra0 ltac:(vm_compute; discriminate)). exact Hidup_a0. }
     iEval (rewrite Hstoreval) in "Hccwd".
-    iDestruct (kfk_child_cwd ck (cq/2)%Qp cinum Hcklt Hcinumb
+    iDestruct (kfk_child_cwd ck qn cinum Hcklt Hcinumb
                  with "Href2") as "Hccref2".
     iDestruct ("Hcback" $! (ientry ck) with "Hccwd") as "Hchild2".
     (* THE WINDOW CLOSES HERE: cell + reference = the real block. *)

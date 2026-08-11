@@ -26,8 +26,41 @@
    applies [wp_idup_sconf] (iput, by contrast, has two).  The old
    postcondition could not survive the change in any case -- it returned
    [cwd_ref ip ∗ cwd_ref ip], i.e. fraction 1 twice, which is satisfiable
-   only while the predicate is [emp].  A real duplicate splits the caller's
-   share, and that is what the two [q/2]s below are.
+   only while the predicate is [emp].
+
+   ---- IT TAKES A SHARE, AND HANDS THE SHARE BACK BESIDE A NEW REFERENCE ----
+
+   [ip->ref++] does not need a reference to start from.  It needs a claim
+   that the entry cannot be freed underneath it, and a count-0 SHARE
+   ([IcacheRef.inode_shr]) is already that: it carries a positive slice of
+   the slot's liveness unit, which blocks the last close
+   ([IcacheInv.live_whole_share_absurd]), so the entry stays.
+
+   WHAT THE INCREMENT DOES IS NOT AN UPGRADE, and this is where our algebra
+   parts company with the natR version this contract was ported from.  Under
+   [natR] a share IS authority mass, so "share (q,0) becomes reference (q,1)"
+   conjures nothing and idup can hand back one reference at the share's own
+   fraction.  Under [positiveR] the identity budget forbids it: the table's
+   retained share is [1/2 - qt] against the authority's [qt] (§13.1b), so a
+   new count fragment at [s] would have to be matched by [s] of identity out
+   of the TABLE -- and the share's own [s] is already spoken for, as the hole
+   in its parent's slice.  A share therefore cannot BECOME a reference
+   (design §14.7(3), and [IcacheInv.iref_upgrade_store_au]'s header).
+
+   So the share RIDES THROUGH UNTOUCHED and the new reference is minted from
+   the table's retained share, exactly as iget's cache-hit arm mints one --
+   which is why its fraction is EXISTENTIAL here (it is a slice of a [qt] no
+   caller can name) where the share's is the caller's own.  The old shape
+   returned two [q/2] references and cost every caller a factor of two on
+   every call; this one costs the caller nothing at all -- kfork's parent
+   sheds a share, gets it back, and its cwd fraction is the fraction it came
+   in with.
+
+   [(k < NINODE)] is a premise where it used to be derived.  [iref_lookup]
+   read the slot's liveness off a COUNT fragment, which names its own slot in
+   [dom M]; a share has no count fragment, so the share-side twin
+   ([IcacheInv.iref_share_lookup_au]) takes the range as a hypothesis.  Every
+   caller has it for free -- [ProcInv.cwd_ref] carries it.
 
    ---- THE TWO PREMISES A READER SHOULD LOOK AT TWICE -------------------
 
@@ -107,13 +140,15 @@ Definition wp_idup_sconf_body
     `{GEN : GenId} `{CID : CpuId}
     (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
     (cov : gset Z) (logstart : Z) (nib : nat)
-    (k : nat) (q : Qp) (dev inum : mword 32)
+    (k : nat) (s : Qp) (dev inum : mword 32)
     (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
     (K : nat) (b : bool) :=
   let pcE : mword 64 := mword_of_int KernelSyms.idup in
   let ret_tgt := ret_pc (m !!! Regidx (mword_of_int 1 : mword 5) : mword 64) in
   (K_idup <= K)%nat ->
   (Z.of_nat n + 1 < 2 ^ 31)%Z ->
+  (* the share does not name its own slot -- see the header. *)
+  (k < NINODE)%nat ->
   (* a0 = ip, and a [struct inode *] IS its slot: [ientry_inj]. *)
   m !!! Regidx (mword_of_int 10 : mword 5) = ientry k ->
   sie_cap_gpr m K b p -∗
@@ -124,7 +159,8 @@ Definition wp_idup_sconf_body
   panic_wp_any -∗
   (* THE precondition that makes [ip->ref++] safe -- see the header. *)
   iref_slot -∗
-  inode_ref k q dev inum -∗
+  (* A SHARE, not a reference -- see the header. *)
+  inode_shr k s dev inum -∗
   wp_next b p (fun (CID : CpuId) =>
     ∀ mr,
     sie_cap_gpr mr K b p -∗
@@ -132,8 +168,12 @@ Definition wp_idup_sconf_body
     pc_is ret_tgt -∗
     ⌜ callee_saved m mr
       /\ mr !!! Regidx (mword_of_int 10 : mword 5) = ientry k ⌝ -∗
-    inode_ref k (q/2)%Qp dev inum -∗
-    inode_ref k (q/2)%Qp dev inum -∗
+    (* THE SAME SHARE BACK -- the increment moved the count and nothing
+       else, so the caller's slice is neither split nor spent... *)
+    inode_shr k s dev inum -∗
+    (* ...beside a NEW reference, minted from the table's retained share at
+       a fraction only the table knows. *)
+    (∃ qn : Qp, inode_ref k qn dev inum) -∗
     WP (Loop : expr riscv_lang)) -∗
   WP (Loop : expr riscv_lang).
 
@@ -144,9 +184,9 @@ Module Type IDUP.
       `{GEN : GenId} `{CID : CpuId}
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
-      (k : nat) (q : Qp) (dev inum : mword 32)
+      (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool),
-      wp_idup_sconf_body γl cn γfs γi cov logstart nib k q dev inum
+      wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
                          m n eb p C K b.
 End IDUP.

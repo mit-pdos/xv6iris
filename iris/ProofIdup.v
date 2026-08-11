@@ -71,6 +71,33 @@ From Kernel Require KernelSyms.
 Local Open Scope Z_scope.
 
 
+(* ---- THE MINT'S TWO FRACTION FACTS ----------------------------------
+
+   idup's increment now mints the new reference out of the TABLE's retained
+   identity share, which is iget's cache-hit arithmetic verbatim: the table
+   holds [1/2 - qt], the mint takes half of it, and the remainder is what
+   [islot_rest_at] must be at the grown [qt].  [ProofIget] states the same two
+   facts as [ig_frac_lt1] / [ig_frac_rest]; they are restated here rather than
+   imported because [ProofIget] is a proof file and nothing may depend on one.
+   If a third caller appears they belong in [IcacheInv] beside
+   [iref_upgrade_store_au]. *)
+Lemma id_frac_lt1 (qt qr : Qp) :
+  (1/2)%Qp = (qt + qr)%Qp -> (qt + qr/2 < 1)%Qp.
+Proof.
+  intro Hs. apply Qp.lt_sum. exists (qr/2 + 1/2)%Qp.
+  rewrite Qp.add_assoc.
+  assert (Hstep : ((qt + qr/2) + qr/2)%Qp = (1/2)%Qp).
+  { rewrite -Qp.add_assoc (Qp.div_2 qr). by rewrite Hs. }
+  rewrite Hstep. by rewrite Qp.half_half.
+Qed.
+
+Lemma id_frac_rest (qt qr : Qp) :
+  (1/2)%Qp = (qt + qr)%Qp -> (1/2 - (qt + qr/2))%Qp = Some (qr/2)%Qp.
+Proof.
+  intro Hs. apply Qp.sub_Some.
+  rewrite -Qp.add_assoc (Qp.div_2 qr). exact Hs.
+Qed.
+
 Module IdupProof (Acquire : ACQUIRE) (Release : RELEASE) : IDUP.
 
 Section ProofIdup.
@@ -111,14 +138,14 @@ Section ProofIdup.
   Lemma wp_idup_sconf
       (γl : gname) (cn : ic_names) (γfs : fs_names) (γi : gname)
       (cov : gset Z) (logstart : Z) (nib : nat)
-      (k : nat) (q : Qp) (dev inum : mword 32)
+      (k : nat) (s : Qp) (dev inum : mword 32)
       (m : regfile) (n : nat) (eb : bool) (p : mword 64) (C : iProp Σ)
       (K : nat) (b : bool)
-    : wp_idup_sconf_body γl cn γfs γi cov logstart nib k q dev inum
+    : wp_idup_sconf_body γl cn γfs γi cov logstart nib k s dev inum
                          m n eb p C K b.
   Proof.
     cbv beta delta [wp_idup_sconf_body].
-    intros pcE ret_tgt HK HnZ Ha0.
+    intros pcE ret_tgt HK HnZ Hk Ha0.
     unfold K_idup in HK.
     pose (sp0 := (m !!! Regidx csp_rs1 : mword 64)).
     iIntros "Hcg Hcnt #Htext Hpc #Hlock #Hinv #Hpanic Hislot Href Hcont".
@@ -292,9 +319,19 @@ Section ProofIdup.
       by (rewrite (callee_saved_lookup Hacqpins_cs (mword_of_int 9) ltac:(vm_compute; reflexivity)); exact HmAs1).
     (* ===== the critical section (literal [false], no hart threading) ===== *)
     iDestruct "HRres" as (M ci) "(Hhalf & %Hwf & %Hciwf & Hiauth & Hslots & Hpool)".
-    iDestruct "Href" as "[Hrtok Hrident]".
-    iDestruct (iref_lookup with "Hhalf Hrtok") as %(qt & cnt & HMk & Hqt & _ & _).
-    assert (Hk : (k < NINODE)%nat) by (apply (proj1 Hwf); by eexists).
+    (* THE SHARE FINDS THE SLOT.  [iref_lookup] read the entry off a COUNT
+       fragment, which names its own slot in [dom M]; a share has none, and
+       what stands in for it is the LIVENESS slice: the invariant holds a free
+       slot's unit whole, so a positive slice outside it is only possible at a
+       live slot ([IcacheInv.iref_share_lookup_au], design §14.7(2)).  That
+       one opens [itable_inv] and closes it again with nothing moved, so it is
+       a fupd where [iref_lookup] was a pure wand -- hence the [fupd_wp]. *)
+    iDestruct "Href" as "[Hrident Hrlive]".
+    iApply fupd_wp.
+    iMod (iref_share_lookup_au ⊤ M k s ltac:(solve_ndisj) Hk
+            with "Hinv Hhalf Hrlive") as "(%HMk0 & Hhalf & Hrlive)".
+    iModIntro.
+    destruct HMk0 as [[qt cnt] HMk].
     (* [ci] records exactly the LIVE slots (§13.9's restored [dom ci = dom
        M]), so the slot's identity values are readable off [ci !! k] -- which
        is what makes [islot2]'s mismatched arms unreachable. *)
@@ -307,6 +344,20 @@ Section ProofIdup.
     iDestruct (islots2_acc_upd cn M ci k Hk with "Hslots") as "[Hslot Hback]".
     iEval (rewrite /islot2 HMk Hcik) in "Hslot".
     iDestruct "Hslot" as "(Hrest & Hiu & Hgid)".
+    (* THE NEW REFERENCE'S IDENTITY SLICE COMES OUT OF THE TABLE'S RETAINED
+       SHARE, exactly as iget's cache-hit arm mints one -- the caller brought
+       a share, and a share's own fraction is the hole in its PARENT's slice,
+       so it cannot pay for a count fragment of its own (design §14.7(3)).
+       The [None] arm is the "table kept nothing" state, which [islot_rest_at]
+       makes [False] precisely so this mint always has room. *)
+    destruct ((1/2 - qt)%Qp) as [qr|] eqn:Eqt.
+    2:{ iEval (rewrite /islot_rest_at Eqt) in "Hrest". iDestruct "Hrest" as "[]". }
+    iEval (rewrite /islot_rest_at Eqt) in "Hrest".
+    (* the table's values ARE the caller's: one entry, one identity *)
+    iDestruct (inode_ident_agree with "Hrest Hrident") as %[Hcd Hcn].
+    subst cdev cinum.
+    assert (Hhalfsum : (1/2)%Qp = (qt + qr)%Qp) by (by apply Qp.sub_Some).
+    assert (Hqv : (qt + qr/2 < 1)%Qp) by (by apply id_frac_lt1).
     (* the iref-slot conservation law: the caller's unit plus the ones the
        table already holds for this entry are within the fixed supply, so the
        count is safely below what an int holds -- before AND after. *)
@@ -381,28 +432,33 @@ Section ProofIdup.
     { rewrite (rget_ne D2 Rs1 ltac:(vm_compute; discriminate)) HD2s1. reflexivity. }
     iApply (wp_sw_au_s_sconf true (mword_of_int (KernelSyms.idup + 0x1c)) Ra5 Rs1
               (mword_of_int 8 : mword 12) D2 (K - 4)%nat
-              (itable_half (<[k := (qt, Pos.succ cnt)]> M) ∗
-               iref_tok k (q/2)%Qp ∗ iref_tok k (q/2)%Qp)%I
+              (itable_half (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ∗
+               iref_tok k (qr/2)%Qp ∗ live_frac k s)%I
               (⊤ ∖ ↑minstretN ∖ ↑icacheN) false
               ltac:(solve_ndisj)
-              with "Hcg Hpc Hi1c [Hhalf Hrtok] [-]").
+              with "Hcg Hpc Hi1c [Hhalf Hrlive] [-]").
     { rewrite Hpa2 Hstv.
-      iMod (iref_dup_store_au (⊤ ∖ ↑minstretN) M k q qt cnt
-              ltac:(solve_ndisj) HMk Hno with "Hinv Hhalf Hrtok") as "[Hcell Hback]".
+      iMod (iref_upgrade_store_au (⊤ ∖ ↑minstretN) M k qt (qr/2)%Qp s cnt
+              ltac:(solve_ndisj) HMk Hqv Hno with "Hinv Hhalf Hrlive")
+        as "[Hcell Hback]".
       iModIntro. iExists (iref_word M k). iFrame "Hcell". iIntros "Hcell".
-      iMod ("Hback" with "Hcell") as "(Hhalf & Ht1 & Ht2)". iModIntro. iFrame. }
-    iApply wp_next_off_intro. iIntros "Hcg Hpc (Hhalf & Ht1 & Ht2)".
-    (* rebuild the lock's resource at the new map *)
-    iDestruct (inode_ident_split k (q/2) (q/2) dev inum) as "[Hsplit _]".
+      iMod ("Hback" with "Hcell") as "(Hhalf & Ht1 & Hlv)". iModIntro. iFrame. }
+    iApply wp_next_off_intro. iIntros "Hcg Hpc (Hhalf & Ht1 & Hrlive)".
+    (* rebuild the lock's resource at the new map.  The caller's SHARE rides
+       straight through -- neither of its two slices moved -- and what does
+       get split is the TABLE's retained identity: half to the new reference,
+       half back into [islot_rest_at] at the grown [qt]. *)
+    iDestruct (inode_ident_split k (qr/2) (qr/2) dev inum) as "[Hsplit _]".
     iEval (rewrite Qp.div_2) in "Hsplit".
-    iDestruct ("Hsplit" with "Hrident") as "[Hid1 Hid2]".
-    iDestruct ("Hback" $! (<[k := (qt, Pos.succ cnt)]> M) ci
-                 with "[%] [%] [Hrest Hiu Hgid]") as "Hslots".
+    iDestruct ("Hsplit" with "Hrest") as "[Hid1 Hid2]".
+    iDestruct ("Hback" $! (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M) ci
+                 with "[%] [%] [Hid1 Hiu Hgid]") as "Hslots".
     { intros j Hj. rewrite lookup_insert_ne; [reflexivity | by apply not_eq_sym]. }
     { intros j Hj. reflexivity. }
-    { rewrite /islot2 lookup_insert Hcik. iFrame "Hrest Hiu Hgid". }
+    { rewrite /islot2 lookup_insert Hcik. iFrame "Hiu Hgid".
+      rewrite /islot_rest_at (id_frac_rest qt qr Hhalfsum). iFrame. }
     iAssert (itable_res2 cn γfs γi cov logstart nib dev) with "[Hhalf Hiauth Hslots Hpool]" as "HRres".
-    { iExists (<[k := (qt, Pos.succ cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
+    { iExists (<[k := ((qt + qr/2)%Qp, Pos.succ cnt)]> M), ci. iFrame "Hhalf Hiauth Hpool".
       iSplitR; [| iSplitR; [| iExact "Hslots"]].
       2:{ (* [ci] did not move, and [M]'s domain did not either: the slot was
              already live, so §13.2/§13.9/§13.11's four clauses are
@@ -604,9 +660,9 @@ Section ProofIdup.
     iDestruct (cpu_own_transport CIDr CIDe6 n eb p C b ltac:(wp_next_chain)
                  with "Hcnt") as "Hcnt".
     iSpecialize ("Hcont" $! CIDe6 with "[]"); [ iPureIntro; wp_next_chain | ].
-    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Ht1 Hid1] [Ht2 Hid2]").
-    3:{ rewrite /inode_ref. iFrame "Ht2 Hid2". }
-    2:{ rewrite /inode_ref. iFrame "Ht1 Hid1". }
+    iApply ("Hcont" $! P5 with "Hcg Hcnt Hpc [%] [Hrident Hrlive] [Ht1 Hid2]").
+    3:{ iExists (qr/2)%Qp. rewrite /inode_ref. iFrame "Ht1 Hid2". }
+    2:{ rewrite /IcacheRef.inode_shr. iFrame "Hrident Hrlive". }
     (* callee_saved m P5, and a0 = ip *)
     split; [| exact HP5a0].
     assert (Hthread : forall c : mword 5, is_cs_idx c = true ->

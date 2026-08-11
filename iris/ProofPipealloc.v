@@ -1474,14 +1474,14 @@ Section ProofPipealloc.
        here and the epilogue can touch it. *)
     iDestruct "Hpay0" as (pn0) "[Hpn0 _]".
     iDestruct "Hpay1" as (pn1) "[Hpn1 _]".
-    iMod (fpay_tok_update γf k0 pn0 (MkFPNames γpl γp 1%positive) with "Hpn0") as "Hpn0".
-    iMod (fpay_tok_update γf k1 pn1 (MkFPNames γpl γp 1%positive) with "Hpn1") as "Hpn1".
+    iMod (fpay_tok_update γf k0 pn0 (MkFPNames γpl γp 1%positive 1%Qp) with "Hpn0") as "Hpn0".
+    iMod (fpay_tok_update γf k1 pn1 (MkFPNames γpl γp 1%positive 1%Qp) with "Hpn1") as "Hpn1".
     iAssert (file_pay γf k0 1
                (MkFContent FD_PIPE (mword_of_int 1 : mword 8)
                   (mword_of_int 0 : mword 8) pi
                   (fc_ip Cf0) (fc_major Cf0)))
       with "[Hpn0 Hrd]" as "Hpay0".
-    { iExists (MkFPNames γpl γp 1%positive). iFrame "Hpn0".
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp). iFrame "Hpn0".
       rewrite /file_payload /fc_wbool; cbn [fc_type fc_pipe fc_writable].
       rewrite bool_decide_eq_true_2; [|reflexivity].
       rewrite (_ : negb (eq_vec (mword_of_int 0 : mword 8) (mword_of_int 0 : mword 8))
@@ -1492,7 +1492,7 @@ Section ProofPipealloc.
                   (mword_of_int 1 : mword 8) pi
                   (fc_ip Cf1) (fc_major Cf1)))
       with "[Hpn1 Hwr]" as "Hpay1".
-    { iExists (MkFPNames γpl γp 1%positive). iFrame "Hpn1".
+    { iExists (MkFPNames γpl γp 1%positive 1%Qp). iFrame "Hpn1".
       rewrite /file_payload /fc_wbool; cbn [fc_type fc_pipe fc_writable].
       rewrite bool_decide_eq_true_2; [|reflexivity].
       rewrite (_ : negb (eq_vec (mword_of_int 1 : mword 8) (mword_of_int 0 : mword 8))

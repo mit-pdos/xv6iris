@@ -2109,3 +2109,52 @@ proof and the spec applications there name their arguments.
 
 `IcacheInv.iref_load_au` is now consumer-less (both guard reads went to the
 liveness twin). Kept deliberately as the reference-side form.
+
+### 14.10 B3 LANDED (2026-08-11): PLAN B IS COMPLETE — the payload's share,
+### idup's mint, and the one thing a short parent cannot do
+
+Tree green (937 `.vo`), coverage unchanged, assumption sets unchanged.
+`projects/reconcile-fork-icache.md`'s "What B3 actually landed" is the WHAT;
+this is the design half.
+
+**§14.6's third shape, as built.** The FD_INODE payload is
+`cinv fileipN γx (inode_held_short v Q) ∗ cinv_own γx q ∗
+inode_shr_held v (q·Q)`, with `Q = fp_iq pn` a per-slot CONSTANT in
+`FileInv.fpnames`. The share cannot be carved from the parked reference on
+demand, because a `cinv`'s content is unreachable without cancelling it —
+so it is carved once, at publication, and **the invariant parks the parent
+SHORT**. That is sound for the reason `inode_ref_short` exists at all: a
+short parent is unspendable, the cinv is its only holder, and the gather
+that restores canonical pairing is the last closer's move, inside
+`inode_pay_cancel`, before iput ever sees the reference. Conservation is
+untouched — `1·Q` out, `Q` back.
+
+The arm being PROPORTIONAL rather than existential is what makes
+`file_payload_split` distributivity, and it is what makes B2b's retirement
+of `fileread_fs_out`'s `∃ q'` pay off: a gather needs the fraction that was
+carved, and now both ends name it.
+
+**§14.7(3) at the call site.** idup takes the share, hands it back
+UNTOUCHED, and mints the child's reference from the table's retained
+`1/2 − qt` — iget's cache-hit arm, not an upgrade. The postcondition's
+fraction is therefore existential (a slice of a `qt` no caller can name)
+while the share's is the caller's own. Consequence at kfork: the parent's
+cwd fraction stops halving on every `fork`, which the `natR` shape this was
+ported from could not achieve either (there the parent kept a reference but
+still split it).
+
+**THE ONE THING THAT DID NOT PORT, and the general law behind it.** The
+staged plan had kfork close the parent's `proc_priv` block BEFORE the idup
+call, on the strength of "the reference never leaves". Under canonical
+pairing it cannot: `ProcInv.cwd_ref` is `inode_held`, i.e. a CANONICAL
+`inode_ref`, and a parent with a share out has `iref_frag` at `q+s` against
+identity and liveness at `q`. Re-canonicalising it downwards would mean
+SHRINKING the count fragment — handing back authority mass that §14.6's
+conservation argument requires to come home — and no such lemma may exist.
+
+State it as the law it is: **a carve is a BRACKET, and the bracket cannot
+be escaped by re-forming a smaller reference; it can only be closed by the
+gather.** §14.1 observed that every share use is bracket-shaped; §14.6 made
+the bracket a resource; this is the price, and it is the same fact that
+makes shares unable to outlive their parent. Any future caller that wants
+to lend a share across a call must keep the parent's block OPEN across it.

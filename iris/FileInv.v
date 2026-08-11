@@ -184,14 +184,36 @@ Definition frefUR : ucmra := authUR (gmapUR nat (prodR fracR positiveR)).
 
    [fp_icv] is the FD_INODE arm's, and is a CANCELLABLE INVARIANT'S name
    rather than the inode's: see [inode_pay] for why a share of an inode
-   reference cannot be the reference itself. *)
+   reference cannot be the reference itself.
+
+   [fp_iq] IS NOT A GHOST NAME, and it is the one field here that is a plain
+   number: it is THE FRACTION OF THE INODE'S IDENTITY-AND-LIVENESS SLICE that
+   this slot's FD_INODE / FD_DEVICE payload lends its holders, fixed when the
+   file is published and unchanged for the file's life.  A holder of file
+   fraction [q] carries [q * fp_iq] of it; the parked reference inside the
+   cinv is SHORT by exactly [fp_iq], and the last closer's gather adds the two
+   back up (see [inode_pay]).
+
+   WHY IT HAS TO BE A CONSTANT RATHER THAN AN EXISTENTIAL.  An existential
+   "some share" splits and rejoins freely, which would make
+   [file_payload_split] fall out for nothing -- and would make the inode
+   UNFREEABLE.  [IcacheRef.inode_held_gather] re-forms the canonical reference
+   only from the EXACT fraction that was carved (canonical pairing, design
+   §14.6/§14.7), and [IcacheInv.iref_close_last_step] then requires the final
+   closer to hold the whole outstanding slice; so every sliver handed out has
+   to come back, and an existential fraction lets a holder split and drop
+   half.  With a constant, [file_payload_split] is distributivity,
+   [(q1 + q2) * Q = q1 * Q + q2 * Q].
+
+   It lives HERE, in the per-slot names, because that is what this record is
+   for: per-slot constants agreed across every holder by [fpay_tok]. *)
 Record fpnames := MkFPNames
-  { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname }.
+  { fp_lock : gname; fp_pipe : pipe_names; fp_icv : gname; fp_iq : Qp }.
 
 Global Instance fpnames_inhabited : Inhabited fpnames :=
   populate (MkFPNames 1%positive
               (MkPipeNames 1%positive 1%positive 1%positive 1%positive)
-              1%positive).
+              1%positive 1%Qp).
 
 Definition fpayUR : ucmra :=
   gmapUR nat (prodR fracR (agreeR (leibnizO fpnames))).
@@ -522,40 +544,75 @@ Section FileInv.
      closer -- and only it -- holds [cinv_own γx 1], cancels, and walks
      away with a WHOLE [inode_held] to give to iput.
 
+     THE THIRD CONJUNCT, AND WHY THE PARKED REFERENCE IS SHORT (design §14.6's
+     "share beside the cinv").  A cancel token alone says nothing ABOUT the
+     inode: it cannot be read through, and it cannot discharge a contract that
+     wants to know the entry is live -- which is exactly what a reader needs
+     ([SpecFileread]'s [frn_s], and [SpecIlock] v3 behind it, both take an
+     [IcacheRef.inode_shr]).  So a real slice travels beside the token.
+
+     IT CANNOT BE CARVED OUT OF THE PARKED REFERENCE ON DEMAND, because the
+     cinv's content is not accessible without cancelling it.  It is carved
+     ONCE, when the payload is published ([inode_pay_alloc]), and what goes
+     into the cinv is therefore the parent SHORT by the whole outstanding
+     slice: [IcacheRef.inode_held_short v (fp_iq pn)].  That is not a breach of
+     canonical pairing -- [inode_ref_short] IS the design's name for a parent
+     with a share out, and the pairing is restored by the gather, which is the
+     last closer's move ([inode_pay_cancel]) and happens before iput ever sees
+     the reference.  Nothing can spend the parked reference in the meantime:
+     the cinv is the only holder and cancelling it is what the closer does.
+
+     The travelling slice is PROPORTIONAL, [q * fp_iq pn], so that the split
+     law is distributivity and the closer at [q = 1] holds exactly the
+     [fp_iq pn] the cinv is short by.  See the header above [fpnames] for why
+     the constant cannot be an existential.
+
      [v] is the pointer, not the slot: [ientry_inj] makes them the same
-     thing, and the file table has no vocabulary for a slot. *)
+     thing, and the file table has no vocabulary for a slot -- which is why
+     both [inode_held_short] and [inode_shr_held] are stated at the pointer. *)
   Definition fileipN : namespace := nroot .@ "fileip".
 
-  Definition inode_pay (γx : gname) (v : mword 64) (q : Qp) : iProp Σ :=
-    (cinv fileipN γx (inode_held v) ∗ cinv_own γx q)%I.
+  Definition inode_pay (γx : gname) (Q : Qp) (v : mword 64) (q : Qp) : iProp Σ :=
+    (cinv fileipN γx (inode_held_short v Q) ∗ cinv_own γx q ∗
+     inode_shr_held v (q * Q)%Qp)%I.
 
-  Lemma inode_pay_split γx v q1 q2 :
-    inode_pay γx v (q1 + q2) ⊣⊢ inode_pay γx v q1 ∗ inode_pay γx v q2.
+  Lemma inode_pay_split γx Q v q1 q2 :
+    inode_pay γx Q v (q1 + q2) ⊣⊢ inode_pay γx Q v q1 ∗ inode_pay γx Q v q2.
   Proof.
-    rewrite /inode_pay cinv_own_fractional. iSplit.
-    - iIntros "[#Hi [H1 H2]]". iFrame "Hi H1 H2".
-    - iIntros "[[#Hi H1] [_ H2]]". iFrame "Hi H1 H2".
+    rewrite /inode_pay cinv_own_fractional Qp.mul_add_distr_r
+            inode_shr_held_split.
+    iSplit.
+    - iIntros "(#Hi & [H1 H2] & [S1 S2])". iFrame "Hi H1 H2 S1 S2".
+    - iIntros "[(#Hi & H1 & S1) (_ & H2 & S2)]". iFrame "Hi H1 H2 S1 S2".
   Qed.
 
   (* THE LAST CLOSER'S MOVE, packaged: fraction one is the whole reference.
-     A fupd, and the only one the file layer performs. *)
-  Lemma inode_pay_cancel (E : coPset) (γx : gname) (v : mword 64) :
-    ↑fileipN ⊆ E -> inode_pay γx v 1 ={E}=∗ inode_held v.
+     A fupd, and the only one the file layer performs.  The gather is what
+     makes it a WHOLE one -- the cinv gives back the parent short by [Q] and
+     the closer's own arm is [1 * Q], the exact complement. *)
+  Lemma inode_pay_cancel (E : coPset) (γx : gname) (Q : Qp) (v : mword 64) :
+    ↑fileipN ⊆ E -> inode_pay γx Q v 1 ={E}=∗ inode_held v.
   Proof.
-    iIntros (HE) "[#Hi Hown]".
+    iIntros (HE) "(#Hi & Hown & Hs)".
     iMod (cinv_cancel with "Hi Hown") as "H"; [exact HE|].
-    by iMod "H".
+    iMod "H". iModIntro. rewrite Qp.mul_1_l.
+    iApply (inode_held_gather with "H Hs").
   Qed.
 
   (* ...and its inverse, for whoever PUBLISHES an FD_INODE file (sys_open):
-     an inode reference becomes a payload at fraction one. *)
+     an inode reference becomes a payload at fraction one.  The constant is
+     the publisher's to choose -- it comes OUT of the carve here, and the
+     [fpnames] it installs in the same breath is where it is recorded. *)
   Lemma inode_pay_alloc (E : coPset) (v : mword 64) :
-    inode_held v ={E}=∗ ∃ γx, inode_pay γx v 1.
+    inode_held v ={E}=∗ ∃ (γx : gname) (Q : Qp), inode_pay γx Q v 1.
   Proof.
     iIntros "H".
-    iMod (cinv_alloc E fileipN (inode_held v) with "[H]") as (γx) "[#Hi Hown]".
+    iDestruct (inode_held_shed with "H") as (Q) "[Hsh Hs]".
+    iMod (cinv_alloc E fileipN (inode_held_short v Q) with "[Hsh]")
+      as (γx) "[#Hi Hown]".
     { by iNext. }
-    iModIntro. iExists γx. by iFrame "Hi Hown".
+    iModIntro. iExists γx, Q. rewrite /inode_pay Qp.mul_1_l.
+    by iFrame "Hi Hown Hs".
   Qed.
 
   (* the per-slot payload-names ghost: fractional, agreeing, and updatable
@@ -618,7 +675,7 @@ Section FileInv.
      then is_pipe (fp_lock pn) (fp_pipe pn) (fc_pipe C) ∗
           pipe_ref (fp_pipe pn) (fc_wbool C) q
      else if bool_decide (fc_type C = FD_INODE) || bool_decide (fc_type C = FD_DEVICE)
-     then inode_pay (fp_icv pn) (fc_ip C) q
+     then inode_pay (fp_icv pn) (fp_iq pn) (fc_ip C) q
      else emp)%I.
 
   Lemma file_payload_split q1 q2 pn C :

@@ -560,6 +560,42 @@ Section IcacheRef.
     iIntros "[_ H1] [H2 _]". iApply (inode_ident_agree with "H1 H2").
   Qed.
 
+  (* ...and the same for a SHORT parent, which is what the gather at a
+     [FileInv.inode_pay] cancel has in hand: the cinv gives back the parked
+     parent and the closer brings the travelling share, and the two have to
+     be shown to name one entry before [inode_ref_gather] applies. *)
+  Lemma inode_ref_short_shr_agree k qt qi s d1 n1 d2 n2 :
+    inode_ref_short k qt qi d1 n1 -∗ inode_shr k s d2 n2 -∗ ⌜d1 = d2 /\ n1 = n2⌝.
+  Proof.
+    iIntros "(_ & _ & H1) [H2 _]". iApply (inode_ident_agree with "H1 H2").
+  Qed.
+
+  (* A SHARE SPLITS, which is what makes the file payload's arm proportional:
+     [FileInv.file_payload_split] is this plus [Qp.mul_add_distr_r]. *)
+  Lemma inode_shr_split k s1 s2 dev inum :
+    inode_shr k (s1 + s2)%Qp dev inum ⊣⊢
+    inode_shr k s1 dev inum ∗ inode_shr k s2 dev inum.
+  Proof.
+    rewrite /inode_shr inode_ident_split live_frac_split.
+    iSplit; [iIntros "[[$ $] [$ $]]" | iIntros "[[$ $] [$ $]]"].
+  Qed.
+
+  (* SHEDDING A HALF-SHARE -- the form every caller that has no fraction in
+     mind actually wants, and A LEMMA RATHER THAN A [rewrite -(Qp.div_2 q)]
+     at the call site: inside the proofmode that rewrite puts the split's evar
+     out of [q]'s scope and fails with "cannot instantiate ?b" (durable-notes).
+     Stated with the sum UNREDUCED on the left so that a consumer whose target
+     is [inode_ref_short k (qi + s) qi] -- the shape [inode_ref_gather] and the
+     pointer-keyed [inode_held_short] below both want -- needs no arithmetic. *)
+  Lemma inode_ref_shed k q dev inum :
+    inode_ref k q dev inum ⊣⊢
+    inode_ref_short k (q/2 + q/2)%Qp (q/2)%Qp dev inum ∗
+    inode_shr k (q/2)%Qp dev inum.
+  Proof.
+    pose proof (inode_ref_carve k (q/2)%Qp (q/2)%Qp dev inum) as Hc.
+    by rewrite {1}(Qp.div_2 q) in Hc.
+  Qed.
+
   Global Instance inode_ident_timeless k dq dev inum :
     Timeless (inode_ident k dq dev inum).
   Proof. apply _. Qed.
@@ -609,6 +645,91 @@ Section IcacheHeld.
   Proof.
     iIntros "(%k & %q & %inum & -> & %Hk & _ & _)". iPureIntro.
     apply ientry_ne_zero. lia.
+  Qed.
+
+  (* ---- THE SAME TWO SHAPES FOR A SHARE, AND FOR A PARKED SHORT PARENT ----
+
+     [FileInv]'s FD_INODE payload is "a reference parked in a cancellable
+     invariant, SHORT by a per-slot constant, with the complement travelling
+     as a share beside every holder's cancel token" (design §14.6's third
+     shape).  Both halves of that live at the FILE TABLE's altitude, which
+     names an inode by its POINTER and has no vocabulary for a slot -- so both
+     need the same pointer->slot bridge [inode_held] already carries, and for
+     the same reason: [ientry_inj] makes the slot a function of the pointer,
+     so hiding it existentially is lossless.  The three pure conjuncts (the
+     pointer IS an entry, the entry is in range, the inum is one the inode
+     region covers) are [inode_held]'s verbatim.
+
+     [inode_held_short] states the shortfall with a pure equation rather than
+     as [inode_ref_short k (qi + s) qi] so that instantiating it never has to
+     rewrite under a binder: the carve produces [q/2 + q/2] and the closer
+     wants [q], and [Qp.div_2] is then a side condition rather than a rewrite
+     in the goal. *)
+  Definition inode_shr_held (v : mword 64) (s : Qp) : iProp Σ :=
+    (∃ (k : nat) (inum : mword 32),
+       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
+       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       inode_shr k s icfg_dev inum)%I.
+
+  Definition inode_held_short (v : mword 64) (s : Qp) : iProp Σ :=
+    (∃ (k : nat) (qt qi : Qp) (inum : mword 32),
+       ⌜v = ientry k⌝ ∗ ⌜(k < NINODE)%nat⌝ ∗
+       ⌜bv_unsigned inum < 16 * Z.of_nat icfg_nib⌝ ∗
+       ⌜qt = (qi + s)%Qp⌝ ∗
+       inode_ref_short k qt qi icfg_dev inum)%I.
+
+  Global Instance inode_shr_held_timeless v s : Timeless (inode_shr_held v s).
+  Proof. apply _. Qed.
+  Global Instance inode_held_short_timeless v s : Timeless (inode_held_short v s).
+  Proof. apply _. Qed.
+
+  (* the share splits and rejoins at the POINTER too.  Rightwards is
+     [inode_shr_split]; leftwards also needs the two existentials to agree,
+     and they do: the slot by [ientry_inj] off the common pointer, the inum by
+     [inode_shr_agree].  This is the [⊣⊢] [FileInv.file_payload_split] runs in
+     both directions (filedup leftwards, fileclose rightwards). *)
+  Lemma inode_shr_held_split v s1 s2 :
+    inode_shr_held v (s1 + s2)%Qp ⊣⊢ inode_shr_held v s1 ∗ inode_shr_held v s2.
+  Proof.
+    rewrite /inode_shr_held. iSplit.
+    - iIntros "(%k & %inum & %Hv & %Hk & %Hb & Hs)".
+      rewrite inode_shr_split. iDestruct "Hs" as "[Hs1 Hs2]".
+      iSplitL "Hs1"; iExists k, inum; by iFrame.
+    - iIntros "[(%k1 & %n1 & %Hv1 & %Hk1 & %Hb1 & Hs1)
+                (%k2 & %n2 & %Hv2 & %Hk2 & %Hb2 & Hs2)]".
+      assert (Hkk : k1 = k2).
+      { apply ientry_inj; [lia | lia |]. rewrite -Hv1 -Hv2. reflexivity. }
+      subst k2.
+      iDestruct (inode_shr_agree with "Hs1 Hs2") as %[_ ->].
+      iExists k1, n2. rewrite inode_shr_split. by iFrame.
+  Qed.
+
+  (* THE CARVE AND THE GATHER, at the pointer.  The carve is what publishes an
+     FD_INODE payload ([FileInv.inode_pay_alloc]): the whole reference goes
+     into the cinv short by the share it sheds, and the share becomes the
+     payload's travelling arm.  The gather is the LAST CLOSER's move, the one
+     that re-forms a canonical reference for iput. *)
+  Lemma inode_held_shed (v : mword 64) :
+    inode_held v -∗ ∃ s : Qp, inode_held_short v s ∗ inode_shr_held v s.
+  Proof.
+    iIntros "(%k & %q & %inum & -> & %Hk & %Hb & Href)".
+    rewrite inode_ref_shed. iDestruct "Href" as "[Hsh Hs]".
+    iExists (q/2)%Qp. iSplitL "Hsh".
+    - iExists k, (q/2 + q/2)%Qp, (q/2)%Qp, inum. by iFrame.
+    - iExists k, inum. by iFrame.
+  Qed.
+
+  Lemma inode_held_gather (v : mword 64) (s : Qp) :
+    inode_held_short v s -∗ inode_shr_held v s -∗ inode_held v.
+  Proof.
+    iIntros "(%k1 & %qt & %qi & %n1 & %Hv1 & %Hk1 & %Hb1 & -> & Hsh)".
+    iIntros "(%k2 & %n2 & %Hv2 & %Hk2 & %Hb2 & Hs)".
+    assert (Hkk : k1 = k2).
+    { apply ientry_inj; [lia | lia |]. rewrite -Hv1 -Hv2. reflexivity. }
+    subst k2.
+    iDestruct (inode_ref_short_shr_agree with "Hsh Hs") as %[_ ->].
+    iDestruct (inode_ref_gather with "Hsh Hs") as "Href".
+    iExists k1, (qi + s)%Qp, n2. by iFrame.
   Qed.
 
 End IcacheHeld.

@@ -172,14 +172,18 @@ sizing). Staging, one branch + gate per stage:
 - **B2b — LANDED** (2026-08-11): SpecIlock v3 / SpecIunlock v3 /
   SpecFileread v3 over `inode_shr`, with both postcondition existentials
   retired by the descriptor.
-- **B3** — origin's share commits ported: SpecIdup's share form
-  (carve+upgrade), ProofKforkB4's shorter block, fp_iq's payload arm.
-  Partly deferrable. NOTE for B3: `SpecFileread`'s `frn_s` is stated as a
-  premise with no producer yet — sys_read's cone is where the carve from
-  the file payload's cinv-parked reference has to happen
-  (`inode_ref_carve` at entry, `inode_ref_gather` at exit, `fp_iq`'s
-  proportional allotment). Both ends now pin the SAME fraction, which is
-  what a gather needs.
+- **B3 — LANDED** (2026-08-11): origin's two share commits rebuilt on the
+  positiveR vocabulary — `fp_iq`'s payload arm (which is `frn_s`'s
+  producer), SpecIdup's share form, ProofKforkB4's carve/gather. See
+  "What B3 actually landed" below.
+
+**THE PLAN-B TRIAL IS COMPLETE.** T5's gate — a share that a reader can
+hold, that keeps its entry alive, and that iput can still close over —
+is built and green, with no witness ledger and no `natR` retype. What
+`positiveR` costs, in full: a share cannot become a reference
+(§14.7(3)), so idup MINTS the duplicate from the table instead of
+upgrading the caller's slice, and a short parent cannot re-form a
+`cwd_ref` until the gather (B3's one correction, below).
 
 The canonical-pairing convention (tok fraction = ident fraction in
 `inode_ref`) is LOAD-BEARING and must be stated in IcacheRef's header:
@@ -325,6 +329,103 @@ comes to know its own `q` is the whole outstanding mass.
 to `iref_live_load_au`). It is kept as the reference-side twin of the guard
 read; a future reference-holding caller of a lock-free `ip->ref` read is
 exactly what it is for.
+
+## What B3 actually landed (2026-08-11) — and the trial's last correction
+
+Full remote build green (937 `.vo`, 0 errors, 278 files recompiled);
+`lemma_diff --ref 5079a83d` CLEAN; `proof_coverage` unchanged (151 proven,
+the same seven `!`); filealloc / filedup / fileclose / idup / kfork /
+sys_fork all still PROVEN. `Print Assumptions` on `Idup.wp_idup_sconf`,
+`Fileclose.wp_fileclose_sconf` and `Iput.wp_iput_sconf` is the five
+`rv64d.*` platform axioms + `functional_extensionality_dep`;
+`Kfork.wp_kfork_sconf` adds its pre-existing `ForkretPark.forkret_park`.
+Nothing new.
+
+**(1) The payload arm: A SHARE BESIDE THE CINV, and the cinv parks the
+parent SHORT.** `fpnames` gains `fp_iq : Qp` and
+
+    inode_pay γx Q v q := cinv fileipN γx (inode_held_short v Q)
+                        ∗ cinv_own γx q
+                        ∗ inode_shr_held v (q * Q)
+
+The share cannot be carved on demand — the cinv's content is unreachable
+without cancelling it — so it is carved ONCE, at publication
+(`inode_pay_alloc`), and what goes into the invariant is the parent minus
+the whole outstanding slice. That is not a breach of canonical pairing:
+`inode_ref_short` IS the design's name for a parent with a share out, the
+cinv is its only holder, and cancelling is what the last closer does. The
+proportional `q * Q` makes `inode_pay_split` distributivity
+(`Qp.mul_add_distr_r`) and makes the closer's arm at `q = 1` the cinv's
+exact complement, so **the gather lives inside `inode_pay_cancel`** and
+`ProofFileclose`'s site changed by one argument, not by a step.
+
+`fp_iq` is a CONSTANT for origin's reason, restated for ours: an
+existential fraction splits and rejoins freely, and
+`IcacheRef.inode_held_gather` re-forms a canonical reference only from the
+exact fraction that was carved. `ProofPipealloc` passes `1%Qp` (unused —
+its arm is FD_PIPE). `ProofFilealloc` never builds an `fpnames` at all, so
+the "real constant" it was expected to supply does not exist: the only
+publisher of an FD_INODE payload is sys_open, which is unproven, and the
+constant comes OUT of `inode_pay_alloc`'s carve rather than being chosen.
+
+**The pointer↔slot tie**, which `inode_shr` (slot-keyed) needed and
+`inode_held` already had: two new address-keyed forms in `IcacheRef`,
+`inode_shr_held` and `inode_held_short`, carrying `inode_held`'s three
+pure conjuncts verbatim. Joining two shares at one pointer recovers the
+slot by `ientry_inj` and the inum by `inode_shr_agree`, which is what makes
+`inode_shr_held_split` a genuine `⊣⊢`. `inode_held_short` states the
+shortfall as a pure equation (`qt = qi + s`) rather than as
+`inode_ref_short k (qi + s) qi`, so instantiating it is never a rewrite
+under a binder.
+
+**This is `frn_s`'s producer.** A holder of `file_payload q pn C` at
+FD_INODE now literally holds `inode_shr k (q * fp_iq pn) icfg_dev inum` —
+the premise `SpecFileread` v3 asks for. No carve at fileread's entry and no
+gather at its exit: the share is already out, for the file's whole life,
+and B2b's retirement of both postcondition existentials is what makes it
+come back at the fraction it left at.
+
+**(2) SpecIdup v-share.** Premise `inode_shr k s dev inum` (plus
+`iref_slot` and a NEW pure `(k < NINODE)%nat` — `iref_lookup` read the slot
+off a count fragment, and a share has none, so `iref_share_lookup_au` takes
+the range as a hypothesis; every caller has it from `cwd_ref`).
+Postcondition: the SAME share back, beside `∃ qn, inode_ref k qn dev inum`.
+The fraction is existential because the new reference is minted from the
+table's retained `1/2 - qt` — iget's cache-hit arithmetic verbatim
+(`iref_upgrade_store_au` + splitting `islot_rest_at`, with `id_frac_lt1` /
+`id_frac_rest` restated locally in `ProofIdup` because nothing may depend
+on `ProofIget`). The caller's slice is not split, not spent and not
+upgraded; `ProofIdup`'s identity re-split moved from the CALLER's cells to
+the TABLE's.
+
+**(3) ProofKforkB4 — and B3's one design correction.** The parent sheds a
+half-share (`IcacheRef.inode_ref_shed`, a pure split, stated as its own
+lemma to dodge the `rewrite -(Qp.div_2 q)` evar trap), passes it to idup,
+gets it back, gathers, closes its block, and hands the freshly minted
+reference to the child.
+
+**THE PARENT'S BLOCK CANNOT CLOSE BEFORE THE GATHER.** The staged plan said
+"close the parent's `proc_priv` block immediately, then call idup" —
+origin's shape, and it does not port. There the parent KEPT a reference
+across the call; here what it keeps is `inode_ref_short`, and `cwd_ref` is
+`inode_held`, which demands canonical pairing. Re-forming a smaller
+canonical reference would mean shrinking `iref_frag`, i.e. giving away
+authority mass that conservation requires to come home — no such lemma, and
+there must not be one. So `ProofKforkB4` does NOT lose a step. What it
+gains instead is better: **the parent's cwd fraction no longer halves.** It
+goes short by `cq/2` for the length of the call and comes back at `cq`,
+where the old shape charged every `fork` a factor of two, and the child's
+reference is new mass from the table rather than a slice of the parent's.
+
+`SpecKfork` did NOT move — verified, not assumed: the carve and the gather
+are both proof-internal, both fractions are hidden inside `cwd_ref`, and
+the kfork/sys_fork cone rebuilt untouched.
+
+**No surprises otherwise.** Everything above compiled on the first full
+build; no lemma in the B1/B2 layer needed a statement change, and
+`IcacheRef` grew only additions (`inode_shr_split`,
+`inode_ref_short_shr_agree`, `inode_ref_shed`, and the two address-keyed
+forms with `inode_held_shed` / `inode_held_gather`).
 
 ## Why the escrow carries a deposit DESCRIPTOR (the durable half of B2a)
 
