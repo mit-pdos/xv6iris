@@ -147,7 +147,7 @@ Section IupdateDefs.
         inode_meta ip dn -∗
         inode_map γfs ip bm -∗
         sb_inodestart ↦₄{dqs} (mword_of_int inodestart : mword 32) -∗
-        dinode_at γi inum dn -∗
+        ireg_out γi inum dn -∗
         bslots bn 2 -∗
         log_op γ u -∗
         WP (Loop : expr riscv_lang))%I.
@@ -319,15 +319,22 @@ Section IupdateTail.
     rewrite /log_op. iDestruct "Hop" as (Sb) "HopS".
     iApply (LW.wp_log_write_au bn γ γfs γd cov logstart dev kk pidv bno
               (diblk_bytes (<[islot inum := dn]> ds)) (diblk_bytes ds) bsd d0 u
-              false Sb (⊤ ∖ ↑iregN) (dinode_at γi inum dn)
+              false Sb (⊤ ∖ ↑iregN) (ireg_out γi inum dn)
               T1 0%nat true (proc_addr j) C (K - 4)%nat b
               HKlw ltac:(change (2 ^ 31)%Z with 2147483648%Z; lia) Hkk HT1a0
               ltac:(rewrite Hbno; exact Hcov)
               ltac:(rewrite Hbno; exact Hlog) ltac:(discriminate)
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hsl HopS [Hdn] Hheld").
     { iEval (rewrite Hbno).
-      iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn ds
-                ltac:(solve_ndisj) Hnib Hdswf Hdnwf with "Hireg Hdn"). }
+      (* WHICH ARM MOVE (§16.4): a type-0 flush is iput's free path and it
+         ABSORBS the fragment, paying out the marker; every other flush keeps
+         the fragment out and the marker in.  [ireg_out] is exactly that
+         two-case payout, so iupdate still has ONE contract. *)
+      rewrite /ireg_out. case_decide as Hty.
+      - iApply (ireg_free_au ⊤ γi γfs inodestart nib inum dn0 dn ds
+                  ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty with "Hireg Hdn").
+      - iApply (ireg_write_au ⊤ γi γfs inodestart nib inum dn0 dn ds
+                  ltac:(solve_ndisj) Hnib Hdswf Hdnwf Hty with "Hireg Hdn"). }
     iIntros (CID3 Hq3 mL) "Hcg Hcnt Hpc %Hcs1 HopS Hdn Hlk Hsl".
     iDestruct (log_opS_op with "HopS") as "Hop".
     assert (Hpc6c : ret_pc (T1 !!! Regidx Rra : mword 64)

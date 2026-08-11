@@ -186,6 +186,7 @@ Section ItruncTail.
     IBLOCK inum inodestart ∈ cov ->
     ~ (IBLOCK inum inodestart ∈ log_region_set logstart) ->
     bv_unsigned inum < 16 * Z.of_nat nib ->
+    bv_unsigned (di_type dn) <> 0 ->
     (j < NPROC)%nat ->
     γs !! j = Some γl ->
     it_sp m M ->
@@ -220,7 +221,7 @@ Section ItruncTail.
             used dev ip inum dn bm u pidv dq dqd dqn dqb dqs j m K C b -∗
     WP (Loop : expr riscv_lang).
   Proof.
-    intros HK Hgeom Hist Hicov Hilog Hnib Hj Hgl Hsp Hthr Hs3.
+    intros HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl Hsp Hthr Hs3.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     iIntros "Hcg Hcnt #Htext Hpc #Hpanic #Hbio #Hlctx #Hprocs Hframe Hppid Hidev Hinum Hsbb Hsbi Hmeta Hmap Hblks Hbmr
               #Hireg Hdn #Hdevi #Hdgeom #Hdlock Hsl Hop Hcont".
@@ -322,6 +323,10 @@ Section ItruncTail.
                     Hdlock Hsl Hop").
     iIntros (CID4 Hq4 mI) "%Hcs1 Hcg Hcnt Hpc Hppid Hidev Hinum
                            Hmeta Hmap Hsbi Hdn Hsl Hop".
+    (* §16.4: iupdate's payout is conditional on the flushed record's type,
+       and [di_trunc] keeps the type -- so this is the allocated branch *)
+    iDestruct (ireg_out_alloc_inv γi inum (di_trunc dn) Hdtnz with "Hdn")
+      as "Hdn".
     assert (Hpc42 : ret_pc (T1 !!! Regidx Rra : mword 64)
                     = mword_of_int (IT + 0x42)) by (rewrite HT1ra; pcw).
     iEval (rewrite Hpc42) in "Hpc".
@@ -2361,7 +2366,7 @@ Section ItruncMain.
   Proof.
     cbv beta delta [wp_itrunc_sconf_body].
     intros pcE pj ret_tgt HK Hgeom Hsize Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
-           Hnib Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Heb.
+           Hnib Hdtnz Hwf Hbelow Hblen Hadr Hj Hgl Ha0 Heb.
     subst eb.
     pose proof HK as HK'. unfold K_itrunc in HK'.
     (* THE PER-SLOT RANGE FACT, no longer a premise: [blkmap_wf] already
@@ -2727,7 +2732,7 @@ Section ItruncMain.
                 cov logstart bmapstart inodestart size nib dev used ip inum
                 dn dn0 bm
                 n1 pidv dq dqd dqn dqb dqs m R0 K C b
-                HK Hgeom Hist Hicov Hilog Hnib Hj Hgl HR0sp HR0thr HR0s3
+                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl HR0sp HR0thr HR0s3
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
                       Hframe Hppid Hidev Hinum Hsbb Hsbi
                       Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock
@@ -2788,7 +2793,7 @@ Section ItruncMain.
                 cov logstart bmapstart inodestart size nib dev used ip inum
                 dn dn0 bm
                 n3 pidv dq dqd dqn dqb dqs m Mz K C b
-                HK Hgeom Hist Hicov Hilog Hnib Hj Hgl HMzsp HMzthr HMzs3
+                HK Hgeom Hist Hicov Hilog Hnib Hdtnz Hj Hgl HMzsp HMzthr HMzs3
                 with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlctx Hprocs
                       [Hf1 Hf2 Hf3 Hf4 Hf5 Hslot6] Hppid Hidev Hinum Hsbb
                       Hsbi Hmeta Hmap Hblks Hbmr Hireg Hdn Hdevi Hdgeom Hdlock

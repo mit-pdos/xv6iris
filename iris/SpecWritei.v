@@ -288,6 +288,13 @@ Definition wp_writei_sconf_body
      replaced the block-half premise and its [diblk_wf ds] (design §11.3) *)
   bv_unsigned inum < 16 * Z.of_nat nib ->
   di_addrs dn = bm_cells bm ->
+  (* THE INODE IS ALLOCATED (fs-icache §16.4).  iupdate's flush keeps this
+     inum's fragment OUT of the region invariant, which the region's arm
+     only permits for a nonzero type -- a type-0 flush is iput's free path
+     and absorbs the fragment instead.  Every caller has it: a locked
+     inode's [InodeLock.inode_ok] carries it, and dirlink's own
+     [di_type dn = T_DIR] is stronger. *)
+  bv_unsigned (di_type dn) <> 0 ->
   (* the file's block map, and the normalisation of its holes *)
   blkmap_wf cov logstart bm ->
   blk_holes_zero bm data ->

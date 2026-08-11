@@ -2292,3 +2292,297 @@ md5s of the landed files: `KernelRvcDecode.v 54240c83d61d4e9daf096e278dd5b9d9`,
    `Definition` deleted (`lemma_diff` will then report one intended
    `GONE`).  This is also where the `icfg_dev = ROOTDEV` premise the
    N4b/N4d ledgers owe finally gets stated.
+
+### N5b — the §16 retrofit lands: the claim box IS the region's arm, and the marker is a token
+
+**Twelve files, all landed green.**  `InodeRegion.v`, `IcacheEscrow.v`,
+`IcacheBoot.v`, `SpecIupdate.v` + `ProofIupdate.v`, `SpecItrunc.v` +
+`ProofItrunc.v`, `SpecWritei.v` + `ProofWritei.v`, `ProofDirlink.v`,
+`ProofIlock.v`, `ProofIput.v`.  **No new file, no `_CoqProject` row**, and
+**`SpecIlock.v` did not change at all** — the zero-contract-change goal for
+ilock was met.
+
+#### (a) THE ONE DESIGN DEVIATION, and why it is not optional
+
+§16.4 is landed in content but not in packaging: there is **no
+`IcacheClaim.v`**, because the ruled shape is not provable and the repair
+dissolves the second invariant.  Full argument in
+`claude-notes/design/fs-icache.md` §16.5; the short version:
+
+1. `icb_withdraw` as ruled is **undischargeable**.  Its "the box must be
+   full" step is §16.4's exhaustiveness argument, which is a uniqueness
+   claim about the whole itable (`ic_ci_wf` injectivity + `dom(pool) =
+   in-range ∖ cached`).  Both live under the **itable spinlock**, and
+   ilock's fill holds only its entry's sleeplock.  With a content-free
+   marker the two box states are indistinguishable from inside the fill.
+2. The repair is to make the marker an **exclusive per-inum ghost token**,
+   `InodeRegion.imark γi z`.  Then the fill refutes "fragment is out" in
+   one line (`imark_excl`) and the box is just the region's own arm at a
+   `fresh_shape` record.  **The two-invariant mask problem the stage brief
+   flagged never arises.**
+3. The token is filed in the region's OWN `ghost_map`, at
+   `imark_key z := -(z+1)` — inums are `bv_unsigned`s and hence ≥ 0, so the
+   negative half of the key space is free.  A second gname would have had
+   to appear in `ireg_inv` **and** in `ipool_shape`, i.e. in `ic_escrow`'s
+   arity, i.e. in every fs contract in the tree.
+
+#### (b) `InodeRegion.v` — the arm and the four moves
+
+```coq
+Definition imark_key (z : Z) : Z := -(z + 1).
+Definition fresh_shape (d : dinode) : Prop :=
+  bv_unsigned (di_type d) <> 0 /\ bv_unsigned (di_size d) = 0
+  /\ di_addrs d = replicate 13 (bv_0 32).   (* memset 0 + type; nlink STAYS 0 *)
+
+Definition imark (γi : gname) (z : Z) : iProp Σ := (∃ d, imark_key z ↪[γi] d)%I.
+Definition ireg_in (d : dinode) : Prop :=
+  bv_unsigned (di_type d) = 0 \/ fresh_shape d.
+Definition ireg_slot (γi : gname) (z : Z) (d : dinode) : iProp Σ :=
+  ((⌜ireg_in d⌝ ∗ z ↪[γi] d)
+   ∨ (⌜bv_unsigned (di_type d) <> 0⌝ ∗ imark γi z))%I.
+```
+
+`ireg_blk` gains `γi` and the sixteen-slot conjunct; `ireg_body`,
+`ireg_blk_mono`, `ireg_blks_acc_upd` follow.  New `ireg_slots_acc_upd` is
+the per-slot accessor every arm move goes through.  `ireg_read` and
+`ireg_read_blk` are unchanged in STATEMENT (they only thread the new
+conjunct).
+
+**THE TWO SIGNATURES N5c's ialloc PROOF DRIVES.**  `ireg_claim_au` is
+ialloc's whole ghost step and takes **no caller resource at all**:
+
+```coq
+  Lemma ireg_claim_au (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (dn' : dinode)
+      (ds : list dinode) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    diblk_wf ds ->
+    bv_unsigned (di_type (ds !!! islot inum)) = 0 ->
+    fresh_shape dn' ->
+    ireg_inv γi γfs inodestart nib -∗
+    |={E, E ∖ ↑iregN}=> ∃ bsl' : list (bv 8),
+      fsblock γfs (IBLOCK inum inodestart) bsl' ∗
+      (⌜bsl' = diblk_bytes ds⌝ -∗
+       fsblock γfs (IBLOCK inum inodestart)
+               (diblk_bytes (<[islot inum := dn']> ds))
+       ={E ∖ ↑iregN, E}=∗ True).
+```
+
+It is exactly `SpecLogWrite.wp_log_write_au_body`'s fupd premise at
+`Efs := ⊤ ∖ ↑iregN`, `Φfsb := True` — plug it in at ialloc's `jal log_write`
+(+0x9a) the way `ProofIupdate.v` plugs in its own.  `ds` is the list
+ialloc's `bread` decoded (via `ireg_read_blk`), and `dn'` is the record its
+`memset` + `sh s6,0(s3)` leaves.  **The claim pays out NOTHING** — the
+retagged fragment stays in the region, which is what makes §16.4's killing
+interleaving impossible.  A second concurrent claim of the same inum is
+refuted PURELY (a claimed slot has `fresh_shape`, hence a nonzero type,
+against the claimer's buffer showing 0).
+
+`icb_withdraw` is `InodeRegion.ireg_withdraw`, mask-preserving in
+`ireg_read`'s shape:
+
+```coq
+  Lemma ireg_withdraw (E : coPset) (γi : gname) (γfs : fs_names)
+      (inodestart : Z) (nib : nat) (inum : bv 32) (ds : list dinode)
+      (b : Z) (bsl : list (bv 8)) :
+    ↑iregN ⊆ E ->
+    bv_unsigned inum < 16 * Z.of_nat nib ->
+    b = IBLOCK inum inodestart ->
+    diblk_wf ds ->
+    bsl = diblk_bytes ds ->
+    bv_unsigned (di_type (ds !!! islot inum)) <> 0 ->
+    ireg_inv γi γfs inodestart nib -∗
+    imark γi (bv_unsigned inum) -∗
+    (b ↪[fs_L γfs]{#(1/2)} bsl) ={E}=∗
+    ⌜fresh_shape (ds !!! islot inum)⌝ ∗
+    dinode_at γi inum (ds !!! islot inum) ∗
+    (b ↪[fs_L γfs]{#(1/2)} bsl).
+```
+
+`ireg_free_au` is `ireg_write_au`'s dual (premise `di_type dn' = 0`, payout
+`imark γi (bv_unsigned inum)`); `ireg_write_au` gains
+`bv_unsigned (di_type dn') <> 0`.
+
+#### (c) THE CONTRACT CHANGE THE RULING DID NOT COST: iupdate
+
+§16.4 says "ProofIput's free path switches its region step to
+`ireg_free_au`" — but **iput touches the region only through iupdate**, so
+that is not reachable without changing iupdate's contract.  One conditional
+payout keeps it at ONE contract:
+
+```coq
+  Definition ireg_out (γi : gname) (inum : bv 32) (dn : dinode) : iProp Σ :=
+    (if decide (bv_unsigned (di_type dn) = 0)
+     then imark γi (bv_unsigned inum)
+     else dinode_at γi inum dn)%I.
+```
+
+`SpecIupdate`'s post is now `ireg_out γi inum dn` (was `dinode_at`);
+`ProofIupdate` `case_decide`s and calls `ireg_free_au` or `ireg_write_au`.
+Consequences up the chain, all landed:
+
+- **`SpecWritei` and `SpecItrunc` gain `bv_unsigned (di_type dn) <> 0`** —
+  they flush type-preserving records (`wi_dinode` / `di_trunc`), so their
+  own `dinode_at` postconditions survive.  Threaded through
+  `wi_join` / `wi_size` / `wi_loop` and `it_tail` as `Hdtnz`.
+- **dirlink** supplies it from `di_type dn = T_DIR`
+  (`ltac:(rewrite Htype; vm_compute; discriminate)`); **iput** from
+  `inode_ok`'s `Htyne2`.
+- `InodeRegion.ireg_out_alloc_inv` / `ireg_out_free_inv` are the two
+  one-line converters the call sites use.
+
+#### (d) `IcacheEscrow.v`: the free arm, and the refutation that had to move
+
+`ipool_shape`'s free arm is now literally `imark γi (bv_unsigned inum)`.
+
+**`ic_payload_dinode` RETIRES (the one `lemma_diff` GONE).**  It pulled a
+`dinode_at` out of any payload so that `ic_open_held` could refute the
+PARKED and MID arms by `dinode_at_excl`; the slimmed free arm has no
+`dinode_at` to pull.  Its replacement is
+
+```coq
+  Lemma ic_payload_excl γfs γi cov logstart k inum1 inum2 (v1 v2 : bool) :
+    ic_payload γfs γi cov logstart k inum1 v1 -∗
+    ic_payload γfs γi cov logstart k inum2 v2 -∗ False.
+```
+
+which refutes on the entry's `i_size` CELL (every payload owns
+`inode_meta` on both polarities — loaded outright, unloaded inside
+`InodeLock.inode_raw`).  **Strictly better**: slot-keyed rather than
+inum-keyed, so the two `ic_id_agree`s that used to be needed to pin the
+arms' inums first are gone.  Local `iesc_word4_excl` is
+`FileOff.word4_pointsto_excl` restated (this file must not depend on the
+file layer).
+
+#### (e) `ProofIlock.v`: the fill's third case, and why the record moved
+
+The pool entry can no longer be reshuffled into `∃ dn, dinode_at ∗ …`
+BEFORE the bread — a marker names no record.  So the reshuffle moved down,
+past the bread, and the record is now `ds !!! islot inum` off a
+**fragment-free** `ireg_read_blk` (`pose dn := …; assert Hagr; clearbody
+dn` keeps the 700 lines below it textually unchanged).  Three cases:
+
+| parked payload | buffer type | what happens |
+|---|---|---|
+| allocated bundle | (any) | `ireg_read` as before; `diblk_bytes_inj` pins its `dn0` to `dn` |
+| MARKER | `= 0` | the free inode: `panic("ilock: no type")`, already live |
+| MARKER | `≠ 0` | **NEW** `ireg_withdraw`, then `ic_loaded` built out of nothing |
+
+The new arm's `ic_loaded` comes entirely from `fresh_shape`: `bm_empty`
+collapses `ind_res` and every `blk_res` (`il_ind_res_empty`,
+`il_blocks_empty`, both local), `bm_empty_wf` / `bm_covers_nonpos` /
+`inode_sized_zero` / `bm_empty_holes` give `inode_ok`, and
+`DirView.dir_ok_size_zero` gives `dir_ok`.  `il_bmcells_empty`
+(`bm_cells bm_empty = replicate 13 (bv_0 32)`) is the one bridge between
+`fresh_shape`'s spelling and `inode_ok`'s.
+
+#### (f) `IcacheBoot.v`: one alloc, two maps
+
+`ghost_map_alloc (ireg_M0 dss nib ∪ ireg_MK nib)` mints the records and the
+markers together (`ireg_MK := gset_to_gmap dinode_mark (mark_inums nib)`,
+disjoint because the marker keys are negative).  `ireg_alloc` pays out
+`ireg_out γi (mword_of_int z) (image_dinode dss z)` per inum — the marker
+for a free one, the fragment for an allocated one — and keeps the
+complement in `ireg_slot`.  `ipool_shape_free` and `ipool_alloc_all_free`
+KEEP their names with slimmer statements (so no `lemma_diff` GONE);
+`ipool_alloc`'s second premise is now a big-op of markers.
+
+`seq16_flatten` is new and was not anticipated: the region's
+`[∗ set] z ∈ region_inums nib` has to become the nested `seq 0 nib` /
+`seq 0 16` the block conjunct wants, and before §16.4 the block conjunct
+held no ghost elements so the bridge never existed.
+
+#### (g) `ProofIget.v` rides, as predicted — it only ever touches
+`ipool_acc` / `ipool_insert`, both opaque in `ipool_shape`.
+
+#### Build evidence (EC2 mirror, git-synced at `5598d477`, a merge containing `18f60ab8`)
+
+`bash ~/full.sh` (`make -f CoqMakefile -j24 -k` over the whole tree):
+**`EXIT=0`, 0 `Error` lines, 985 `.vo` / 985 `.v`** — the same count as
+before the stage (no file added, none lost; `_CoqProject` untouched).
+
+`Print Assumptions` on the six linked modules whose cones this stage
+touches — `Ilock.wp_ilock_sconf`, `Iput.wp_iput_sconf`,
+`Iget.wp_iget_sconf`, `Iupdate.wp_iupdate_sconf`, `Writei.wp_writei_sconf`,
+`Fileread.wp_fileread_sconf`: **each is EXACTLY the 5 platform axioms
+(`rv64d.valid_reservation` / `plat_term_write` / `match_reservation` /
+`load_reservation` / `cancel_reservation`) plus
+`functional_extensionality_dep`**, and Fileread additionally carries its
+known `Consoleread.wp_consoleread_sconf` assumption.  Nothing else.
+
+`python3 tools/lemma_diff.py --ref HEAD`: **one GONE**,
+`IcacheEscrow.ic_payload_dinode`, justified in (d) above — its credential
+(a `dinode_at` pulled out of any payload) does not survive the free arm's
+slim, and `ic_payload_excl` replaces it strictly more cheaply.
+`ipool_shape_free`, `ipool_alloc_all_free`, `ireg_alloc` and
+`ireg_write_au` all KEEP their names with changed statements, so nothing
+else is reported.  No `Admitted`, no `Axiom`, no `cheat_` in any touched
+file.  Mirror scratch (`N5bCheck.*`) deleted.
+
+#### SURPRISES (numbered)
+
+1. **§16.4's exhaustiveness argument needs the itable lock** — see (a).
+   This is the one that changed the design.
+2. **iupdate's contract had to change** — §16.4's iput instruction is not
+   reachable otherwise; see (c).  It cascaded into `SpecWritei` and
+   `SpecItrunc` premises and four levels of `ProofWritei`'s internal
+   lemmas.
+3. **`ic_payload_dinode` was load-bearing** for `ic_open_held`'s PARKED/MID
+   refutations and is not restatable after the slim; the blast-radius list
+   named it as a "construct/destruct site", which understates it.
+4. **`(*dip)` inside a Coq comment opens a NESTED comment.**  Writing
+   `memset(dip, 0, sizeof(*dip))` in a header comment cost a compile with
+   *"Lexer: Unterminated comment"* pointing at the END of the file.
+5. **`NoDup` is ambiguous in files that import both `Stdlib.List` and
+   `stdpp.list`.**  A lemma stated with a bare `NoDup` elaborates to
+   `List.NoDup` and will not unify with `big_sepS_list_to_set`'s
+   `base.NoDup` — the error is *"Unable to unify `base.NoDup (?f <$> ?l)`
+   with `NoDup (…)`"*, which reads like a shape mismatch and is not one.
+   Say `base.NoDup` in the statement.
+6. **`InodeRegion.v` IS single-file checkable** (contrary to N5a's note,
+   which was really about a session that also edited `KernelRvcDecode.v`).
+   So are `IcacheEscrow.v` / `IcacheBoot.v` once their dependency is fresh.
+   That made the whole definitional half of this stage a one-file loop and
+   is worth remembering for N5c.
+7. **`BSIZE` is not in `ProofIlock`'s scope** even though `InodeInv`
+   requires `FsCrash` (a `Require Import` does not re-export).  Added the
+   explicit require.
+8. **Never start a second `~/full.sh` while one is running.**  `full.sh`
+   truncates `/tmp/full.log`, so two runs interleave and the second one's
+   `EXIT=` line lands in the middle of the first one's output — which
+   reads exactly like a failed gate with zero `Error` lines.  Kill the
+   `rocqworker`s by PID and re-run one clean gate (durable-notes' fork
+   discipline, hit here through the log rather than through `.vo`s).
+
+#### md5s of the landed files
+
+`InodeRegion.v f38af37dcbdaa446d9e4e7bd85ca1165`,
+`IcacheEscrow.v 5ecb1629c26d978b9c14e69d0de72891`,
+`IcacheBoot.v 64c385d457ec187fab04ae510e4ea481`,
+`SpecIupdate.v f6706e31ba16b356588e21441f4a5c35`,
+`ProofIupdate.v 4de417839c1d07a8b8ba1dfd96119d12`,
+`SpecItrunc.v 89d5bec3648bd3ae37f5d723fce33bc6`,
+`ProofItrunc.v 71376fc28a05c098de199928a8dd00e9`,
+`SpecWritei.v 8af012cc229f98b5210eaf09f682373c`,
+`ProofWritei.v de173e5880bf5f6eccf4bd941fa34d9a`,
+`ProofDirlink.v 1903c2095219fc9bd1e3e38d882e9498`,
+`ProofIlock.v 45675fa1329082d924bd1c3ac432166f`,
+`ProofIput.v 7099c47f42fdfffbd63b75e362e1d0c0`.
+
+#### What N5c should do
+
+1. **ialloc is UNBLOCKED.**  Its whole ghost step is `ireg_claim_au`
+   (signature in (b) above), plugged into `SpecLogWrite.wp_log_write_au`
+   at +0x9a with `Efs := ⊤ ∖ ↑iregN` and `Φfsb := True`; the scan's per-block
+   decode is `ireg_read_blk` + `ireg_blk_slot` (landed by N5a).  ialloc's
+   contract needs NO region resource from its caller and pays none back,
+   which is what makes `create` statable without the itable lock.
+2. The `fresh_shape` ialloc must establish is `di_type ≠ 0 ∧ di_size = 0 ∧
+   di_addrs = replicate 13 (bv_0 32)` — exactly memset+`sh` — and
+   deliberately says **nothing about nlink**, which stays 0 until the
+   caller's own iupdate.
+3. The loop's `bgeu a5,a4` exit at +0x62 and the **`printk`-not-`panic`**
+   no-inodes exit at +0x7a are in the N5a decode above; do not redo it.
+4. N5d (ireclaim + fsinit) is still gated on nothing but its own work;
+   `ROOTDEV`'s hoist (N5a item 4) is still owed.

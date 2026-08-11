@@ -1838,7 +1838,7 @@ Section ProofIput.
               pidv dq (DfracOwn (1/2)) (DfracOwn (1/2)) dqb dqs J2 (K - 4)%nat
               true C true
               ltac:(unfold K_itrunc; lia) Hgeom Hsz Hbm0 Hbmcov Hbmlog Hist Hicov Hilog
-              Hnib Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0 eq_refl
+              Hnib Htyne2 Hbmwf2 Hcovb Hsized2 Hdiaddrs2 Hj Hgsj HJ2a0 eq_refl
               with "Hcg Hcnt Htext Hpc Hpanic Hbio Hlogc Hidv Hinh Hmeta
                     [Haddrs Hind] Hblks Hbms Hins Hbm Hireg Hdat Hppid Hprocs
                     Hdevi Hdgeom Hdlock [Hbs2 Hbs1] [Hop] [-]").
@@ -1932,6 +1932,12 @@ Section ProofIput.
     { rewrite Hu'1. iExact "Hop". }
     iIntros (CIDiu Hsiu mfu)
       "%Hcsu Hcg Hcnt Hpc Hppid Hidv Hinh Hmeta Hmap Hins Hdat Hbs2 Hop".
+    (* THE FREE PATH'S PAYOUT (§16.4): the flushed record has type 0, so
+       iupdate ran [InodeRegion.ireg_free_au] -- the fragment went back INTO
+       the region invariant and what comes out is the MARKER, which is
+       exactly what the park below deposits. *)
+    iDestruct (ireg_out_free_inv gi inum (di_free dn2) (di_free_type dn2)
+                 with "Hdat") as "Hdat".
     assert (Hpc70 : ret_pc (J4 !!! Regidx Rra) = mword_of_int (KernelSyms.iput + 0x70))
       by (rewrite HJ4ra; pcw).
     iEval (rewrite Hpc70) in "Hpc".
@@ -1980,8 +1986,7 @@ Section ProofIput.
       - rewrite /inode_raw. iSplitL "Hmeta"; [by iExists (di_free dn2) |].
         iExists (bm_cells bm_empty). iSplitR; [iPureIntro; reflexivity |].
         iExact "Haddrs".
-      - rewrite /ipool_shape. iRight. iExists (di_free dn2).
-        iSplitR; [iPureIntro; exact (di_free_type dn2) |]. iExact "Hdat". }
+      - rewrite /ipool_shape. iRight. iExact "Hdat". }
     iMod (ic_swap_park cn gfs gi cov logstart k (DepRef q dev inum) false dev inum
                  with "Hbody Hdepk Hidv Hinh Hvld Hpayf")
       as "(Hbody & Hictok & Hrefo)".

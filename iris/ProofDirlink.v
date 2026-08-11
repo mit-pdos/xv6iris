@@ -2025,7 +2025,9 @@ Section ProofDirlinkMain.
                   ltac:(exact HKwi)
                   ltac:(rewrite (dl_wi_cost k0); unfold dirlink_units in Hnc;
                         exact Hnc)
-                  Hlg Hist0 Hiblk Hiblog Hdinb Haddrs Hbmwf Hholes Hbmcov
+                  Hlg Hist0 Hiblk Hiblog Hdinb Haddrs
+                  ltac:(rewrite Htype; vm_compute; discriminate)
+                  Hbmwf Hholes Hbmcov
                   ltac:(change (Z.of_nat 16%nat) with 16;
                         exact (dl_lt31 _ Hk0fit))
                   Hsz31 Hbmgeo Hpkc Hj Hgs HV6a0
