@@ -3656,26 +3656,75 @@ the family says does.
 
 ### THE TWO BLOCKERS FOR SLICE 3 (2026-08-11)
 
-**(A) The real walk trace RE-TOUCHES the window after the racy read, and
-`wstep_ok_racy` forbids that.**  `wtlb_res_pt_translateAddr_at` enumerates
-five trace shapes; slice 2 covers two — `[]` (TLB hit) and the plain walk
-`[read a2; read a1; read la]` (racy leaf last, tail empty).  The other three
-carry the A/D writeback CAS AT THE SAME LEAF ADDRESS.  In phase `false` the
-read arm can only take the disjoint disjunct and the write arm demands
-`racc_disj`, so any post-racy access to the window is inexpressible BY
-CONSTRUCTION ("after it, the window may not be touched again" — `WeakRacy`'s
-header).  This is inherited from the definition, not a limitation of the new
-lemma.  **The fix looks tractable and is scoped:** the CAS read half is
-`ak_latest`, hence `ak_pins = true`, hence self-pinning — it needs no
-pinnedness, and only the DISJOINTNESS demand blocks it.  So permit, in phase
-`false`, a self-pinning read at the window and one write at the window, and
-thread the PATCH VALUE through the bridge: `exec_of_wrun_win` currently
-concludes at a fixed `w`, and a window writeback has to move the successor's
-patch from `w` to `lw'`.  That changes `wstep_ok_racy` and three proved
-lemmas in `WeakRacy.v`.  **Do this before (B): it blocks even the
-SINGLE-window walk with a writeback, i.e. the common case.**
+**(A) — RE-ANALYSED 2026-08-11, AND THE SCOPED FIX IS NOT SOUND.  Read this
+before touching `wstep_ok_racy`.**
 
-**(B) Multi-window is real, and there may be a cheap way out.**  An S-mode
+First, the accounting is sharper than "two of five shapes".  Of
+`wtlb_res_pt_translateAddr_at`'s five:
+
+| # | shape | racy window? | producer |
+|---|---|---|---|
+| 1 | `[]` (TLB hit) | none | `wstep_ok` (WeakCert) |
+| 2 | `[read a2; read a1; read la]` (walk, no writeback) | ONE, tail empty | **slice 2** ✓ |
+| 3 | `[read(excl) la]` (refresh) | none — `ak_latest` ⇒ `ak_pins` ⇒ self-pinning | `wstep_ok` |
+| 4 | `[read a2; read a1; read la; read(excl) la; write(excl) la lw']` | **BLOCKED** | — |
+| 5 | `[read(excl) la; write(excl) la lw']` (hit + writeback) | none — same reason as 3 | `wstep_ok` |
+
+So exactly ONE shape is blocked, and it is the one where the leaf slot is
+read TWICE: once PLAIN (racy, possibly stale) and once EXCLUSIVE
+(`ak_latest`, necessarily the newest), with NO INTERVENING WRITE.
+
+**Why threading the patch value cannot fix it.**  `WeakRacy.wpatch_st`
+(:274) puts ONE value `w` at the window for the whole SC run, and
+`RiscvExec.exec` is KIND-BLIND — the notes' own blast-radius entry says so
+("SC behavior at one memory is unchanged (fresh = stale there)").  So in the
+SC run BOTH reads of `la` return `w`, while the weak run has the plain read
+return a stale variant and the exclusive read return the latest `lw`.  When
+`w ≠ lw` the two runs diverge at the second read, and no choice of a single
+patch value repairs it: patch with the stale value and the exclusive read is
+wrong; patch with the latest and the PLAIN read is wrong.  **A single-memory
+SC run cannot model a location read twice with two different values and no
+write between them — that is exactly what "racy" means, and it is not a
+gap in the lemma but a property of the bridge's shape.**
+
+Note this bites even in the arm where NO write occurs: if the stale word
+lacks A, `update_PTE_Bits stale` fires, the CAS re-reads `lw` which already
+has the bits, and the run lands in O-FRESH — read only.  Still two reads,
+still two values.
+
+**What slice 3 therefore has to be.**  The peel and the BRIDGE have to come
+apart.  `wstep_ok_racy` is a structural predicate and can be extended to
+permit a self-pinning read and a write at the window; it is
+`exec_of_wrun_win`'s single-patched-`exec` CONCLUSION that cannot follow.
+The observation that makes this tractable is that the leaf never needed an
+`exec` fact spanning the translation: on the SC side `tlb_inv_pt_fetch`
+ABSORBS the translation in a `==∗` and hands the caller an `exec` fact for
+what follows, and `wtlb_res_pt_translateAddr_at` is already the weak twin of
+that absorption — it delivers `exec_eff (translateAddr …) (wflat_st σ)` at
+the UNPATCHED state together with the ∀-variant collapse conjunct.  So the
+route is:
+
+  - give `translateAddr` a BESPOKE peel lemma proved from the absorption
+    theorem (structure only — no patched-`exec` conclusion), and
+  - compose it with the ordinary machinery for the rest of the step via
+    `WeakEff`'s composition kit, so the leaf's `exec` fact concerns only the
+    EXECUTE, where no racy window appears.
+
+That is very likely what 6c's "the absorption theorem hides the racy
+continuation from specs" was always going to mean.  **Decision to take
+before writing any code: whether `wp_wracy_load`'s peel-and-bridge coupling
+gets split, or the walk gets its own rule that never produces a patched
+`exec` at all.**  The second is smaller and does not disturb the `started`
+cone, which is the only consumer of the coupled form.
+
+Slices 1 and 2 are NOT wasted by this: they are what the `started` load
+needs (a genuine single-occurrence racy window whose consumer DOES want the
+patched `exec`), and shape 2 above rides them unchanged.
+
+**(B) Multi-window is real, and there may be a cheap way out.**  (Re-read
+(A) first: if the walk gets a bespoke absorbed peel, (B) may dissolve with
+it, since a translation that never contributes a racy window to the peel
+cannot collide with a second one.)  An S-mode
 load with paging on has TWO translations in one step — fetch and data — at
 two DIFFERENT leaf slots; after the first racy read the phase is `false` and
 every later read must be disjoint from the first window, so the second leaf
