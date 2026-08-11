@@ -163,22 +163,10 @@ Lemma exec_check_CSR_priv_satp_S s :
   exec (check_CSR_priv csr_satp Supervisor) s = Some (true, s).
 Proof. vm_compute. reflexivity. Qed.
 
-Lemma exec_is_CSR_accessible_satp_S s :
-  eq_vec (_get_Mstatus_TVM (register_lookup mstatus s.(sregs))) ('b"1") = false ->
-  exec (is_CSR_accessible csr_satp Supervisor CSRWrite) s = Some (true, s).
-Proof.
-  intro HTVM.
-  unfold is_CSR_accessible.
-  skip_csr_false_clauses.
-  match goal with |- context[if ?g then _ else _] =>
-    replace g with true by (vm_compute; reflexivity) end. cbn match.
-  unfold satp_accessible. cbn match.
-  rewrite (exec_bind_Some _ _ _ _ _ (exec_read_reg mstatus s)).
-  pose proof (mword1_zero_of_ne_one _ HTVM) as H0.
-  rewrite H0.
-  replace (eq_vec ('b"0" : mword 1) ('b"0")) with true by (vm_compute; reflexivity).
-  apply exec_returnM.
-Qed.
+(* The accessibility check itself -- [satp_accessible Supervisor], i.e.
+   mstatus.TVM = 0 -- is WpGprCsrwB's [exec_is_CSR_accessible_satp_S], shared
+   with the csrr leaf in WpSconfCsr.v because the 0x180 dispatch arm ignores
+   the access type.  See the note there. *)
 
 Lemma exec_check_CSR_result_csrw_satp_S s :
   eq_vec (_get_Mstatus_TVM (register_lookup mstatus s.(sregs))) ('b"1") = false ->
@@ -194,7 +182,7 @@ Proof.
       assert (HB : exec A s = Some (true, s)) end.
     { vm_compute (check_CSR_access _ _). apply exec_returnM. }
     rewrite (exec_and_boolM_Some _ _ _ _ _ HB). cbn match.
-    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_is_CSR_accessible_satp_S s HTVM)). cbn match.
+    rewrite (exec_and_boolM_Some _ _ _ _ _ (exec_is_CSR_accessible_satp_S CSRWrite s HTVM)). cbn match.
     vm_compute (stateen_allows_CSR_access csr_satp Supervisor CSRWrite).
     apply exec_returnM. }
   rewrite (exec_bind_Some _ _ _ _ _ Hcc). cbn match. apply exec_returnm.
