@@ -1424,8 +1424,12 @@ Section KernelvecHandler.
     iModIntro.
     iIntros (m av p pc0 sc tv) "%Hpc0 %Hsc Hentry Hnext".
     iEval (rewrite /ihs_entry_of) in "Hentry".
+    (* [Hrcpt] is the KPT receipt (IntrDefs §6b), the tenth conjunct: the trap
+       hands it over because the handler owes the ENABLED arm back, and the
+       sret is what rebuilds that arm.  It goes into kerneltrap (which parks
+       with it, inside [trap_csrs]) and comes back at the RESUMING hart. *)
     iDestruct "Hentry" as
-      "(Hcg & Hsret & Hsepc & Hscause & Hstval & Hcpu & Hclm & Hires & Hpc)".
+      "(Hcg & Hsret & Hsepc & Hscause & Hstval & Hrcpt & Hcpu & Hclm & Hires & Hpc)".
     iEval (rewrite -sie_cap_gpr_of_eq) in "Hcg".
     iEval (rewrite -intr_res_of_eq) in "Hires".
     (* ---- the bundle -> the raw cells the VC tier runs on ---- *)
@@ -1671,10 +1675,10 @@ Section KernelvecHandler.
     iApply (Kerneltrap.wp_kerneltrap_sconf γu γv γtx γdk γtl γs pd pav pu
               (kv_m2 Me) (46 + av) p emp%I pc0 sc tv
               Hgs ltac:(unfold kerneltrap_stack; lia) Hdi Hpc0
-              with "Hcgk Hsret Hires [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
+              with "Hcgk Hsret Hires Hrcpt [Hcpu] Htext Hpc Hsepc Hscause Hstval Hcaps Hclm").
     { rewrite /cpu_own. iFrame "Hcpu". }
     (* ---- THE CROSSING: everything below is at the RESUMING hart ---- *)
-    iIntros (CIDn Hsn mf ms_f sc' tv') "%Hcs %Hsppf %Hspief %Hsief Hcgf Hsretf Hiresf Hownf Hsepcf Hscausef Hstvalf Hpcf Hclmf".
+    iIntros (CIDn Hsn mf ms_f sc' tv') "%Hcs %Hsppf %Hspief %Hsief Hcgf Hsretf Hiresf Hrcptf Hownf Hsepcf Hscausef Hstvalf Hpcf Hclmf".
     assert (Hret : ret_pc (kv_m2 (tp_pin m) !!! Regidx (mword_of_int 1 : mword 5))
                    = (mword_of_int (KernelSyms.kernelvec + 0x28) : mword 64)).
     { unfold kv_m2. rewrite upd_eq. unfold ret_pc, regval_into_reg.
@@ -1835,7 +1839,7 @@ Section KernelvecHandler.
     iDestruct (sie_cap_gpr_join (CID := CIDn) with "Hhsf Hscf Hcapf Hfilef") as "Hcgs".
     iApply (wp_sret_s_sconf (CID := CIDn)
               (mword_of_int (KernelSyms.kernelvec + 0x4c) : mword 64) m av pc0
-              with "Hcgs Hsretf Hcntf Hsepcf [Hscausef] [Hstvalf] Hiresf Hcellsf Hclmf Hpcf Hi38").
+              with "Hcgs Hsretf Hcntf Hsepcf [Hscausef] [Hstvalf] Hiresf Hrcptf Hcellsf Hclmf Hpcf Hi38").
     { iExists sc'. iExact "Hscausef". }
     { iExists tv'. iExact "Hstvalf". }
     iIntros "Hcg Hpc".
